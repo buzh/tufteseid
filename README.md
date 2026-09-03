@@ -104,12 +104,29 @@ you're ready to give it a hostname.
 
 ### 4. Create the PocketBase superuser
 
-Open **<http://localhost:3030/pb/_/>**. On first visit PocketBase asks
-you to create its superuser account — this is the database
-administrator, separate from the app's own admin role in step 6.
+This is the database administrator, separate from the app's own admin
+role in step 6. Create it from the host:
 
-Under **Settings → Application**, set the Application URL to the URL
-users will actually visit.
+```sh
+docker compose exec pocketbase /pb/pocketbase superuser create \
+  you@example.com 'a-password-of-8-or-more-chars' --dir=/pb_data
+```
+
+`--dir=/pb_data` is required — without it the CLI writes to its default
+data directory instead of the volume the running server uses, and the
+account won't be there when you try to log in.
+
+Then open **<http://localhost:3030/pb/_/>** and sign in with it. Under
+**Settings → Application**, set the Application URL to the URL users
+will actually visit.
+
+> The admin UI shows a plain login form on first visit — there is no
+> create-account screen. Since PocketBase 0.23 the first superuser is
+> made either with the command above or through a one-time tokenised
+> link the server prints at startup while no superuser exists
+> (`docker compose logs pocketbase | grep pbinstal`; swap the printed
+> origin for your own, keep the `#/pbinstal/…` fragment). That token
+> expires, so the CLI is the reliable route.
 
 > If the admin UI doesn't load through the `/pb/` path, publish
 > PocketBase directly for the duration of the setup: add
