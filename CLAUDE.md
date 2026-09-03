@@ -219,6 +219,37 @@ all three are load-bearing:
   zoomed-out view is a ~5 ms hit rather than a multi-second origin
   round trip (see `$skip_cache`).
 
+### Every WMS background layer needs a `coverageExtent`
+
+A `TileWMS` with no tile grid of its own takes one spanning the whole
+**projection** extent — and EPSG:25833 is a UTM zone reaching far past
+Norway. Zoomed out, OL therefore asks the LiDAR renderer for tiles over
+the Atlantic, Denmark and western Russia. Observed in the wmscache log
+at zoom 3: BBOXes like `-1113504,6966240,-420256,7659488` and
+`1312864,5579744,1659488,5926368`, none of which can ever draw a pixel,
+each a full on-the-fly render at the origin, one of them 504-ing after
+the 30 s upstream timeout.
+
+`coverageExtent` on `WMSBackgroundLayer` (`{ extent, crs }`, transformed
+to the view projection in `getWMSLayer`) becomes the layer's `extent`,
+and OL culls those tiles before a request goes out. Values come from
+each service's GetCapabilities `<BoundingBox>`:
+
+- national mosaic + the DOM one: `LIDAR_COVERAGE_EXTENT_25833`
+  (`-100275, 6399725, 1150255, 8000275`).
+- `wms.topo` overlay: `-127998, 6377920, 1145510, 7976800`.
+- per-project: **the project's own `bboxLonLat`**, not the service's.
+  `wms.hoyde-dtm-prosjekt` advertises the union of all 1936
+  acquisitions (Jan Mayen to Svalbard), which culls almost nothing; a
+  single project covers a county at most.
+
+The transform uses 8 sampling stops per edge. Corners-only would clip
+the bulge a Norway-sized box grows when reprojected out of UTM33, and
+that clips *real coverage* off the map — a much worse failure than
+requesting a few extra tiles.
+
+Add one whenever you add a WMS background layer.
+
 ### The background stack
 
 `backgroundLayerAtomEffect` builds a stack, bottom-first, not a single
@@ -515,7 +546,10 @@ AuthDialog lists whatever is enabled via
 1. Add id to the appropriate name union in
    `src/map/layers/backgroundLayers.ts`.
 2. Create/extend a config in `src/map/layers/config/backgroundLayers/` and
-   spread it into `allConfiguredBackgroundLayers` in `atoms.ts`.
+   spread it into `allConfiguredBackgroundLayers` in `atoms.ts`. For a
+   WMS layer, set `coverageExtent` from the service's GetCapabilities
+   `<BoundingBox>` — without it OL requests tiles across the whole UTM33
+   zone (see "Every WMS background layer needs a `coverageExtent`").
 3. Add priority in `backgroundLayerOrder` in
    `src/map/backgroundLayer/utils.ts` (controls display order in the
    "Kart" panel).

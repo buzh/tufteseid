@@ -32,4 +32,12 @@ export const TOPO_OVERLAY_CONFIG: WMSBackgroundLayer = {
     TRANSPARENT: true,
     VERSION: '1.3.0',
   },
+  // wms.topo's own declared EPSG:25833 bounds. Same reason as the LiDAR
+  // layers: without it OL takes the tile grid from the UTM33 projection
+  // extent and asks this on-the-fly renderer for tiles over the North
+  // Atlantic.
+  coverageExtent: {
+    extent: [-127998, 6377920, 1145510, 7976800],
+    crs: 'EPSG:25833',
+  },
 };

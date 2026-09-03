@@ -30,6 +30,10 @@ export type WMSBackgroundLayer = BackgroundLayerBase & {
   layerName: WMSLayerName;
   url: string;
   props?: Record<string, string | number | boolean>;
+  // Where this layer actually has data. Transformed to the view
+  // projection and set as the layer's `extent`, so OL culls tiles
+  // outside coverage instead of asking the origin to render them.
+  coverageExtent?: { extent: [number, number, number, number]; crs: string };
 };
 
 export type EmptyBackgroundLayer = BackgroundLayerBase & {

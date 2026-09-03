@@ -1,4 +1,8 @@
-import { LidarModel, NATIONAL_WMS } from './lidarProjects';
+import {
+  LidarModel,
+  LIDAR_COVERAGE_EXTENT_25833,
+  NATIONAL_WMS,
+} from './lidarProjects';
 import { WMSBackgroundLayer } from './types';
 
 // The national mosaic can show any style the WMS publishes (see
@@ -20,4 +24,5 @@ export const buildNationalLidarConfig = (
     LAYERS: `${NATIONAL_WMS[model].prefix}:${style}`,
     VERSION: '1.3.0',
   },
+  coverageExtent: { extent: LIDAR_COVERAGE_EXTENT_25833, crs: 'EPSG:25833' },
 });

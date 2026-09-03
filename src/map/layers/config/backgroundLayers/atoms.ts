@@ -17,6 +17,7 @@ import {
   DEFAULT_LIDAR_PROJECT_STYLE,
   effectiveLidarStyle,
   LidarModel,
+  LidarProject,
   LIDAR_PROJECT_WMS_URL,
 } from './lidarProjects';
 import {
@@ -103,7 +104,7 @@ export const hybridOverlayAtom = atom<boolean>(
 );
 
 const buildLidarProjectConfig = (
-  projectId: string,
+  project: LidarProject,
   style: string,
   model: LidarModel,
 ): WMSBackgroundLayer => ({
@@ -111,9 +112,14 @@ const buildLidarProjectConfig = (
   layerName: 'lidarProject',
   url: LIDAR_PROJECT_WMS_URL[model],
   props: {
-    LAYERS: `${projectId}:${style}`,
+    LAYERS: `${project.id}:${style}`,
     VERSION: '1.3.0',
   },
+  // The acquisition's own footprint, not the service's. A single
+  // project covers a county at most, while wms.hoyde-dtm-prosjekt
+  // advertises the union of all 1936 of them (Jan Mayen to Svalbard) —
+  // so the per-project bbox culls far more of the pointless renders.
+  coverageExtent: { extent: project.bboxLonLat, crs: 'EPSG:4326' },
 });
 
 export const backgroundLayerAtomEffect = atomEffect((get) => {
@@ -138,7 +144,7 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
     layerName === 'lidarProject'
       ? activeLidarProject
         ? buildLidarProjectConfig(
-            activeLidarProject.id,
+            activeLidarProject,
             lidarStyle,
             activeLidarModel,
           )

@@ -2,6 +2,7 @@ import { getDefaultStore } from 'jotai';
 import { WMTSCapabilities } from 'ol/format';
 import type BaseLayer from 'ol/layer/Base';
 import TileLayer from 'ol/layer/Tile';
+import { transformExtent } from 'ol/proj';
 import TileWMS from 'ol/source/TileWMS';
 import WMTS, { optionsFromCapabilities } from 'ol/source/WMTS';
 import { mapAtom } from '../../../atoms';
@@ -83,13 +84,28 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
     url: layerConfig.url,
     params: { ...layerConfig.props, SRS: projection },
   });
+  // 8 sampling stops per edge rather than the default corners-only:
+  // reprojecting a Norway-sized box out of UTM33 bows its edges, and
+  // four corners would clip the bulge — cutting real coverage off the
+  // map. Sampling along the edges errs outward instead.
+  const coverage = layerConfig.coverageExtent;
+  const extent = coverage
+    ? coverage.crs === projection
+      ? coverage.extent
+      : transformExtent(coverage.extent, coverage.crs, projection, 8)
+    : undefined;
   // preload 0, unlike the WMTS base. These are on-the-fly renders —
   // measured 3-12 s for a cold LiDAR tile at the origin — and every
   // preloaded coarse tile occupies one of the map's globally limited
   // concurrent tile slots (see maxTilesLoading in src/map/atoms.ts) for
   // that long. Spending them on levels the user may never look at is
   // what starves the base map of slots.
-  return new TileLayer({ source, properties, preload: 0 });
+  return new TileLayer({
+    source,
+    properties,
+    preload: 0,
+    ...(extent ? { extent } : {}),
+  });
 };
 
 export const getLayerFromConfig = async (

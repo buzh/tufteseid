@@ -56,6 +56,23 @@ export const LIDAR_PROJECT_WMS_URL: Record<LidarModel, string> = {
   dtm: '/wms/geonorge/wms.hoyde-dtm-prosjekt',
   dom: '/wms/geonorge/wms.hoyde-dom-prosjekt',
 };
+
+// The extent the LiDAR services actually cover, straight out of their
+// GetCapabilities `<BoundingBox CRS="EPSG:25833">`. Norway plus a
+// margin; nothing outside it will ever be anything but a no-data tile.
+//
+// This has to be handed to the layer explicitly. A TileWMS with no
+// tileGrid of its own falls back to a grid spanning the whole *
+// projection* extent, and EPSG:25833 is a UTM zone stretching far
+// beyond Norway — so at low zoom OpenLayers cheerfully asks for tiles
+// over the Atlantic, Denmark and western Russia. Every one of those is
+// a full on-the-fly render at the origin that comes back 479 bytes
+// (worse: some of them time out and 504), and none of them can ever
+// draw a pixel. Setting `extent` on the layer makes OL cull them before
+// a request is made.
+export const LIDAR_COVERAGE_EXTENT_25833: [number, number, number, number] = [
+  -100275, 6399725, 1150255, 8000275,
+];
 export const DEFAULT_LIDAR_PROJECT_STYLE = 'skyggerelieff';
 
 // Every DOM layer, national and per-project alike, publishes
