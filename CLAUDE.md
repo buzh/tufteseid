@@ -323,22 +323,32 @@ Notes on shared behavior:
 - `proxy_ignore_headers Set-Cookie Cache-Control Expires` — upstreams
   frequently set session cookies which would otherwise disable caching
   entirely.
-- **`max_fails=0` on every `server` line, and `proxy_next_upstream`.**
+- **Retry: repeated `server` lines, `max_fails=0`, `proxy_next_upstream`.**
   Kartverket's edge sheds load instead of queueing — under a burst of
   uncached tiles some fraction comes back 502/504, and the
   Prosjektavgrensning WFS hangs on roughly one request in five (both
   verified against the origins directly, with this proxy out of the
-  picture). Two consequences were being amplified locally rather than
-  merely passed on. First, each upstream group holds one server, so the
-  default `max_fails=1 fail_timeout=10s` let a single shed tile mark
-  that server down and turn the next 10 seconds of requests into
-  instant 502s — a whole viewport of holes from one bad response.
-  Signature in the error log is `no live upstreams`. Second, nothing
-  retried, so every shed response reached the browser. The WFS also
-  gets a deliberately short `proxy_read_timeout 8s` (against the WMS's
-  30s) because a healthy answer takes ~0.25s and a hung one never
-  recovers — better to cut it early and retry than to spend 30s
-  arriving at a 504.
+  picture). Nothing retried, so every shed response reached the browser
+  as a hole in the map.
+
+  The part that bites when editing this: **each host is listed three
+  times in its `upstream` block on purpose.** nginx sets a request's
+  retry budget from the peer count and `proxy_next_upstream_tries` can
+  only lower it, so a one-server group gets exactly one attempt and
+  `proxy_next_upstream` does nothing at all — no warning, no log, it
+  just never fires. Collapsing those duplicates back into a single line
+  silently disables every retry here. `max_fails=0` then keeps a burst
+  of upstream errors from marking all three peers down at once and
+  turning a hiccup into 10s of blanket 502s (`no live upstreams` in the
+  error log).
+
+  The WFS also gets a deliberately short `proxy_read_timeout 8s`
+  (against the WMS's 30s) because a healthy answer takes ~0.25s and a
+  hung one never recovers — better to cut it early and retry than to
+  spend 30s arriving at a 504.
+
+  Verify what nginx actually loaded, not what the file says:
+  `docker compose exec wmscache nginx -T | grep 'read_timeout\|max_fails\|next_upstream'`.
 - Adds `X-Cache-Status: HIT|MISS|BYPASS` to responses for debugging.
 - `proxy_cache_lock on` — one upstream request in flight per cold key.
 
