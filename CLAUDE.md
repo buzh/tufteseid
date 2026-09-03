@@ -14,15 +14,21 @@ titles, export filenames or assets. Attribution belongs in prose (the
 Feature scope is deliberately narrow: keep what an amateur reading
 relief-shaded terrain against the heritage record needs (Kulturminner
 theme layers, LiDAR hillshade + per-project LiDAR backgrounds, LiDAR
-tile extract, drawing, place/property search), drop the rest. If
-you're tempted to re-add an upstream Norgeskart feature, ask whether
-this specific use case needs it before wiring it back in.
+tile extract, lokaliteter with their drawing and imagery,
+place/property search), drop the rest. If you're tempted to re-add an
+upstream Norgeskart feature, ask whether this specific use case needs
+it before wiring it back in.
 
 ## Deploy
 
 Runs as a Docker Compose stack. The user builds and runs on their host —
 **do not run `npm run build` / `tsc` locally**; TypeScript errors surface in
 the docker build output instead.
+
+`README.md` is the third-party-facing install and admin guide (first-run
+PocketBase setup, OAuth, TLS, backup, troubleshooting). Keep it accurate
+when any of that changes; what follows here is the working detail, not a
+substitute for it.
 
 Standard rebuild on the server:
 
@@ -68,17 +74,17 @@ Ports: Caddy inside the container listens on `:3000`; docker-compose maps host
 - **tufteseid** — multi-stage Dockerfile: `node:24-alpine` builds the SPA,
   then `caddy:2.10.0-alpine` serves `/var/www` with the baked-in `Caddyfile`.
   `config.js` is bind-mounted at runtime.
-- **pocketbase** — annotations backend for the "Mine funn" feature. Small
+- **pocketbase** — backend for lokaliteter (auth + user content). Small
   in-repo Dockerfile that pins a PocketBase release from GitHub. Serves the
-  SPA's `/pb/*` API (auth, `finds` collection, realtime). SQLite state on
-  the `pbdata` volume; schema versioned in `pocketbase/pb_migrations/`.
-  First-run setup: hit `http://<host>:3030/pb/_/` to create the admin, then
-  enable OAuth providers under Settings → Auth providers (Google, GitHub,
-  Microsoft, generic OIDC…). To grant admin app-role (distinct from PB
-  admin), edit the users record and set `role = "admin"`.
+  SPA's `/pb/*` API (auth, the `localities` / `finds` / `attachments`
+  collections, file storage, realtime). SQLite state on the `pbdata`
+  volume; schema versioned in `pocketbase/pb_migrations/`. First-run setup
+  is in README.md.
 - **wmscache** — `nginx:1.27-alpine` sidecar. Reverse-proxies + caches
-  every external WMS the SPA uses. Currently fronts three upstreams:
+  every external WMS the SPA uses. Currently fronts four upstreams:
   - `wms.geonorge.no/skwms1/*` — Kartverket theme + LiDAR WMS.
+  - `wfs.geonorge.no/skwms1/*` — Kartverket WFS (kulturminner readout,
+    LiDAR project footprints). Proxied but **not** cached.
   - `kart.ra.no/wms/*` — Riksantikvaren Kulturminner WMS.
   - `testapi.norgeskart.no/v1/*` — matrikkel (cadastral) WMS.
 
@@ -87,9 +93,14 @@ Ports: Caddy inside the container listens on `:3000`; docker-compose maps host
 
   ```
   /wms/geonorge/wms.foo    →  wms.geonorge.no/skwms1/wms.foo
+  /wfs/geonorge/wfs.foo    →  wfs.geonorge.no/skwms1/wfs.foo
   /wms/ra/kulturminner2    →  kart.ra.no/wms/kulturminner2
   /wms/testapi/matrikkel   →  testapi.norgeskart.no/v1/matrikkel
   ```
+
+  The WFS prefix goes through a distinct internal alias
+  (`/wfs-skwms1/`) so it can't collide with the WMS host's `/skwms1/`
+  in nginx.
 
   Cache config at `nginx/wms-cache.conf` (per-upstream `location` blocks)
   + `nginx/wms-proxy-common.conf` (shared cache/timeout/header defaults).
@@ -339,38 +350,73 @@ First call: `MISS`. Repeat: `HIT`. Inspect on-disk size:
    (`application/vnd.ogc.gml` works for MapServer via
    `parseXmlFeatureInfo`).
 
-## Annotations (Mine funn)
+## Lokaliteter (user content)
 
-Users can sign in via OIDC and save "finds" — geometry + title + description
-with a visibility flag (private / limited / public). The feature is split
-across two MapTool panels (`myFinds` and `newFind`) plus a dedicated
-`findsLayer` VectorLayer added to the map.
+The top-level user object is **an area to explore**, not a claim that
+something is there — mirroring Riksantikvaren's lokalitet →
+enkeltminne hierarchy. A lokalitet is an authored rectangle (created
+with one box-drag, resizable afterwards) holding *funn* (individually
+named and addressable drawn features) and *bilder* (kept LiDAR
+extracts, map screenshots, uploads).
+
+Consequences worth remembering before changing anything here:
+
+- Drawing and LiDAR extract exist **only** inside a lokalitet
+  workspace. The route to those tools is creating a lokalitet; there
+  are no standalone `draw` / `lidarExtract` / `newFind` map tools any
+  more. Measure stays global because it's ephemeral.
+- The bbox is authored, never derived from content. If a drawn funn
+  escapes the rectangle the workspace offers to grow it.
+- All lokalitet content is behind sign-in, including `public` ones —
+  the read rules require `@request.auth.id != ""`. The map itself
+  stays publicly browsable.
+- `limited` visibility is a placeholder that behaves as `private`
+  until groups exist.
 
 Key files:
 
 - `src/api/pocketbase.ts` — singleton PB client (`pocketbaseUrl` from env,
   defaults `/pb`).
-- `src/api/finds.ts` — CRUD + realtime for the `finds` collection.
+- `src/api/localities.ts`, `localityFinds.ts`, `attachments.ts` — CRUD
+  + realtime per collection. Attachment files are `protected`, so the
+  client fetches short-lived file tokens for thumbnails.
+- `src/api/kulturminnerWfs.ts` — the "kjente kulturminner her" readout.
+  kart.ra.no has WFS disabled, so this goes to GeoNorge's
+  redistribution (`wfs.kulturminner`, feature type `app:Lokalitet`,
+  GML 3.2 only, DOM-parsed).
 - `src/auth/` — atoms (currentUserAtom, roleAtom, isAdminAtom), hooks
   (useOAuthProviders, useSignIn, useSignOut), AuthButton + AuthDialog.
-- `src/finds/` — MyFindsPanel, NewFindPanel, findsLayer (adds a
-  VectorLayer with id `findsLayer` to the map, hydrates from PB, keeps
-  it in sync via PB realtime).
-- `pocketbase/pb_migrations/1700000000_finds_and_roles.js` — schema.
+- `src/localities/` — `LocalityWorkspace` (the docked panel: header,
+  Funn, Bilder, Verktøy), `LocalitiesPanel` (the `localities` map
+  tool), `localityLayer` / `funnLayer`, `useLocalityCreate`,
+  `useLocalityAdjust`, `screenshot.ts`, `serializeDrawLayer.ts`.
+- `pocketbase/pb_migrations/1700000200_localities.js` — current schema.
+  The two earlier migrations create the superseded flat `finds`
+  collection and the `users.role` field; leave them alone so fresh
+  installs replay in order.
 
-Data model (finds collection):
+The workspace is driven by `activeLocalityAtom`, deliberately *not* by
+the `MapTool` union (`'layers' | 'measure' | 'localities' | null`), so
+a map tool and an open workspace can't fight over the same slot.
 
-- `owner` (relation → users, cascade delete)
-- `title` (text, required)
-- `description` (text, optional)
-- `visibility` ('private' | 'limited' | 'public')
-- `geometry` (json — always a GeoJSON FeatureCollection in EPSG:4326)
-- `bbox` (json — [minLon, minLat, maxLon, maxLat] in EPSG:4326)
+Data model:
 
-Rules (server-enforced by PB):
+- **`localities`** — `owner` (relation → users, cascade), `name`,
+  `description`, `visibility` (private | limited | public), `bbox`
+  (json, `[minLon, minLat, maxLon, maxLat]` EPSG:4326).
+- **`finds`** — `locality` (relation, cascade), `owner`
+  (denormalized so rules stay cheap), `title`, `note`, `status`
+  (mulig | sannsynlig | avkreftet | rapportert), `geometry` (json
+  GeoJSON FeatureCollection, EPSG:4326 — Circles round-trip as 64-gons).
+- **`attachments`** — `locality`, `owner`, `kind` (extract | screenshot
+  | upload), `file` (protected, ≤20 MB, png/jpeg/webp, thumbs),
+  `caption`, `meta` (json: source key/label, style, metresPerPx, bbox).
 
-- read: `visibility = "public" || owner = @request.auth.id || @request.auth.role = "admin"`
-- create: signed in, must own the record
+Rules (server-enforced by PB), same shape on all three:
+
+- read: signed in **and** (own it, or its lokalitet is public, or
+  `@request.auth.role = "admin"`)
+- create: signed in, owns the record, and owns the parent lokalitet
 - update/delete: owner or admin
 
 Adding an OAuth provider: PB admin UI → Settings → Auth providers. No

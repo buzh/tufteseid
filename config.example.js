@@ -1,19 +1,21 @@
 // Runtime configuration for a self-hosted deployment.
-// Copy this file to /config.js at the site root (docker-compose mounts
-// ./config.js from the repo root into /var/www/config.js).
+// Copy this file to config.js in the repo root; docker-compose mounts it
+// into the container as /var/www/config.js and it is served as /config.js.
 //
 // Anything you set here overrides the compiled-in defaults from src/env.ts.
-// Omit a field to keep the default.
+// Omit a field to keep the default. Changes take effect on the next page
+// load — no rebuild, no restart. See README.md for the full reference.
 window.__NK_CONFIG__ = {
+  // Picks which operational-message channel to look for upstream. Any value
+  // outside local/dev/test/prod means none is found, which is what we want.
   envName: 'selfhost',
 
-  // Drawing save/load and cadastral property lookup. These endpoints are
-  // Kartverket-hosted and CORS-locked to their own domains — expect them
-  // to fail from a private server until you stand up your own backend or
-  // a permitted proxy.
+  // Kartverket's cadastral (matrikkel) API — property search and property
+  // outlines, called from the browser. It reflects the caller's Origin, so
+  // it works from a self-hosted site.
   apiUrl: 'https://api.norgeskart.no',
 
-  // Public service that works directly from the browser.
+  // Place-name and address search. Public, browser-callable.
   geoNorgeApiBaseUrl: 'https://ws.geonorge.no',
 
   // Annotations backend (PocketBase). Same-origin path proxied by Caddy
@@ -22,6 +24,7 @@ window.__NK_CONFIG__ = {
   pocketbaseUrl: '/pb',
 
   layerProviderParameters: {
+    // Topographic base map tiles, fetched by the browser directly.
     kartverketCache: { baseUrl: 'https://cache.kartverket.no' },
     // Fronted by the wmscache sidecar via Caddy. Change only if you want to
     // bypass the cache and go straight to origin.
