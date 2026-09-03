@@ -5,7 +5,6 @@ import './i18n';
 import { Layout } from './Layout.tsx';
 import { LidarExtractViewer } from './lidarExtract/LidarExtractViewer.tsx';
 import { useMapSettings } from './map/mapHooks.ts';
-import { MessageBox } from './messages/MessageBox.tsx';
 
 export const App = () => {
   const { setMapFullScreen } = useMapSettings();
@@ -27,7 +26,6 @@ export const App = () => {
 
   return (
     <>
-      <MessageBox />
       <LidarExtractViewer />
       <Routes>
         <Route path="/" element={<Layout />} />

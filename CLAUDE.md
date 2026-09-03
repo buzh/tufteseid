@@ -461,6 +461,42 @@ AuthDialog lists whatever is enabled via
   the reasoning isn't obvious from the diff. The `Co-Authored-By` trailer
   is added by the commit workflow.
 
+## Removed upstream machinery — don't re-add
+
+Deleted deliberately; if one of these reappears, something regressed.
+
+- **The service-message banner** (`src/messages/`, `src/api/messageApi.ts`).
+  It fetched Markdown from
+  `raw.githubusercontent.com/kartverket/nk3config/…/messages/{env}.{lang}.md`
+  and rendered it, i.e. it put *Norgeskart's* operational announcements in
+  Tufteseid's chrome and pinged GitHub on every page load. It was the only
+  consumer of `react-markdown` and of `getEnvName()`, both now gone.
+- **Hostname-based environment detection** in `src/env.ts`. It matched
+  Kartverket's own domains (`*.kartverket-intern.cloud`, `norgeskart.no`,
+  …), so *every* Tufteseid deployment fell through to
+  `console.error('Unknown domain')` and silently ran the DEV table. There
+  is now one `DEFAULT_ENV` plus the `window.__NK_CONFIG__` override from
+  the bind-mounted `config.js`, which was always the real mechanism. The
+  `envName` and `layerProviderParameters.geoNorgeWMS` keys went with it —
+  `geoNorgeWMS` had no consumers at all despite being documented.
+- **Google Fonts** (Raleway + Work Sans) in `index.html`. Nothing set
+  `font-family`, so they were downloaded on every load and never applied;
+  kvib's theme supplies Mulish, self-hosted. `font-src 'self'` is now
+  enough.
+- **Dead dependencies**: `maplibre-gl` and `@geoblocks/ol-maplibre-layer`
+  (zero references — OpenLayers is the map engine, and it's the right one
+  for WMS + EPSG:25833; MapLibre is vector-tile-first and weak on
+  non-Mercator projections), and `fast-xml-parser` (all XML goes through
+  native `DOMParser`).
+
+The Caddyfile CSP was narrowed to what the browser actually contacts:
+`cache.kartverket.no` (WMTS tiles *and* its GetCapabilities fetch),
+`*.geonorge.no`, `*.norgeskart.no` and `hoydedata.no` (the ArcGIS
+identify call in `searchApi.ts`). Nine dead hosts came out. Note
+`hoydedata.no` is both an `<a href>` in the help page *and* a real fetch —
+only the latter needs the directive. `style-src 'unsafe-inline'` has to
+stay while the UI is on kvib/Chakra: emotion injects styles at runtime.
+
 ## Lint and dev tooling
 
 **oxlint, not ESLint.** Config is `.oxlintrc.json`; `eslint.config.js` is

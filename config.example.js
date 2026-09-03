@@ -6,10 +6,6 @@
 // Omit a field to keep the default. Changes take effect on the next page
 // load — no rebuild, no restart. See README.md for the full reference.
 window.__NK_CONFIG__ = {
-  // Picks which operational-message channel to look for upstream. Any value
-  // outside local/dev/test/prod means none is found, which is what we want.
-  envName: 'selfhost',
-
   // Kartverket's cadastral (matrikkel) API — property search and property
   // outlines, called from the browser. It reflects the caller's Origin, so
   // it works from a self-hosted site.
@@ -26,8 +22,5 @@ window.__NK_CONFIG__ = {
   layerProviderParameters: {
     // Topographic base map tiles, fetched by the browser directly.
     kartverketCache: { baseUrl: 'https://cache.kartverket.no' },
-    // Fronted by the wmscache sidecar via Caddy. Change only if you want to
-    // bypass the cache and go straight to origin.
-    geoNorgeWMS: { baseUrl: '/wms/geonorge/wms' },
   },
 };

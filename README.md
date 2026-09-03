@@ -56,8 +56,9 @@ Network access the **server** needs (outbound HTTPS): `wms.geonorge.no`,
 
 Network access the **browser** needs: your Tufteseid host, and directly
 `cache.kartverket.no` (base map tiles), `ws.geonorge.no` and
-`api.norgeskart.no` (search), `fonts.googleapis.com` /
-`fonts.gstatic.com`. Everything else is proxied same-origin.
+`api.norgeskart.no` (search) and `hoydedata.no` (terrain elevation
+readout). Everything else is proxied same-origin. Fonts are bundled and
+served from your own host — no third-party font CDN.
 
 ## Install
 
@@ -194,16 +195,10 @@ Edits take effect on the next page load — no rebuild, no restart.
 
 | Key | Default | What it's for |
 | --- | --- | --- |
-| `envName` | `'selfhost'` | Only used to pick an operational-message channel from Kartverket's config repo. Any value other than `local`/`dev`/`test`/`prod` means no banner is fetched, which is what you want. |
 | `apiUrl` | `https://api.norgeskart.no` | Kartverket's cadastral (matrikkel) API, called from the browser for property search and property outlines. It reflects the caller's `Origin`, so it works from a self-hosted site. |
 | `geoNorgeApiBaseUrl` | `https://ws.geonorge.no` | Place-name and address search. Public, browser-callable. |
 | `pocketbaseUrl` | `/pb` | Where the SPA looks for PocketBase. Same-origin by default so auth cookies and the OAuth redirect just work; only change it for a `vite dev` setup. |
 | `layerProviderParameters.kartverketCache.baseUrl` | `https://cache.kartverket.no` | The topographic base map tiles, fetched by the browser directly. |
-| `layerProviderParameters.geoNorgeWMS.baseUrl` | `/wms/geonorge/wms` | Kartverket WMS prefix. Same-origin, so it goes through the caching sidecar. Point it at `https://wms.geonorge.no/skwms1/wms` only if you deliberately want to bypass the cache. |
-
-The browser console logging `Unknown domain: <your host>` on load is
-expected: the upstream code picks defaults by hostname, doesn't
-recognise yours, and `config.js` then overrides them anyway.
 
 ### The stack
 
