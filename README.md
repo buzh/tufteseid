@@ -69,24 +69,7 @@ git clone https://github.com/buzh/tufteseid.git
 cd tufteseid
 ```
 
-### 2. Create `config.js`
-
-```sh
-cp config.example.js config.js
-```
-
-`config.js` is git-ignored and bind-mounted into the container. The
-defaults work as-is for a first run; see
-[Configuration](#configuration) for what you may want to change.
-
-> **Create the file before the first `docker compose up`.** If it
-> doesn't exist, Docker helpfully creates a *directory* named
-> `config.js`; `index.html` then loads nothing from `/config.js` and the
-> app silently runs on its compiled-in defaults. If that happens:
-> `docker compose down && rm -rf config.js` and start over from this
-> step.
-
-### 3. Build and start
+### 2. Build and start
 
 ```sh
 docker compose build --pull
@@ -98,7 +81,7 @@ In the `pocketbase` logs you should see the three migrations applied
 (`localities`, `finds`, `attachments`). Ctrl-C stops following the logs;
 the stack keeps running.
 
-### 4. Reach it
+### 3. Reach it
 
 The stack publishes **`127.0.0.1:3030`** only — nothing is exposed to
 the network by design. From the host:
@@ -119,11 +102,11 @@ at this point; only the lokalitet features need the next steps.
 See [Putting it on the internet](#putting-it-on-the-internet) when
 you're ready to give it a hostname.
 
-### 5. Create the PocketBase superuser
+### 4. Create the PocketBase superuser
 
 Open **<http://localhost:3030/pb/_/>**. On first visit PocketBase asks
 you to create its superuser account — this is the database
-administrator, separate from the app's own admin role in step 7.
+administrator, separate from the app's own admin role in step 6.
 
 Under **Settings → Application**, set the Application URL to the URL
 users will actually visit.
@@ -135,7 +118,7 @@ users will actually visit.
 > the same way, and use <http://localhost:8090/_/>. Remove it again
 > afterwards.
 
-### 6. Enable a sign-in provider
+### 5. Enable a sign-in provider
 
 Lokaliteter, funn and bilder all require sign-in, and sign-in is OAuth
 only — there is no username/password path in the UI. In the PocketBase
@@ -158,7 +141,7 @@ accept; a public deployment needs https.
 No code change is needed to add a provider later — the sign-in dialog
 lists whatever is enabled here.
 
-### 7. Give yourself the app admin role
+### 6. Give yourself the app admin role
 
 Sign in through the app once so PocketBase creates your user record.
 Then in the admin UI: **Collections → users → your record → `role` =
@@ -173,7 +156,7 @@ anyone's. A missing role is treated as an ordinary `user`.
 > own lokaliteter. If you want a closed instance, put authentication in
 > front of it at your reverse proxy, or don't publish it.
 
-### 8. Check the cache is working
+### 7. Check the cache is working
 
 ```sh
 curl -sI "http://localhost:3030/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=NHM_DTM_TOPOBATHY_25833:skyggerelieff&CRS=EPSG:25833&BBOX=200000,6500000,300000,6600000&WIDTH=256&HEIGHT=256&FORMAT=image/png" | grep -i x-cache
@@ -192,6 +175,11 @@ Everything runtime-configurable lives in `config.js` at the repo root,
 served to the browser as `/config.js`. Values there override the
 compiled-in defaults from `src/env.ts`; omit a key to keep the default.
 Edits take effect on the next page load — no rebuild, no restart.
+
+It ships with the defaults already filled in, so a first run needs no
+edit at all. It is a tracked file, which means a `git pull` can conflict
+with your changes; if that gets tiresome, `git update-index
+--skip-worktree config.js` keeps git's hands off your copy.
 
 | Key | Default | What it's for |
 | --- | --- | --- |
@@ -299,8 +287,8 @@ on disk is current but the process hasn't re-read it:
 
 The `tufteseid_pbdata` volume is the only irreplaceable state — user
 accounts, lokaliteter, funn and uploaded images. (`tufteseid_wmscache`
-is disposable; it re-warms. `config.js` is not in git, so keep a copy
-of it too.)
+is disposable; it re-warms. `config.js` is in git, but keep a copy of it
+if you've edited it.)
 
 Easiest route: PocketBase admin UI → **Settings → Backups**, which can
 also run on a schedule and lets you download a zip.
@@ -353,9 +341,11 @@ console.
 the cache doing its job. Riksantikvaren's origin in particular is slow
 when cold.
 
-**The SPA loads but with default endpoints** — check that `config.js` is
-a file, not a directory, and that `curl http://localhost:3030/config.js`
-returns JavaScript.
+**The SPA loads but with default endpoints** — check that
+`curl http://localhost:3030/config.js` returns JavaScript. If `config.js`
+was deleted from the checkout, Docker recreates it as a *directory* on
+the next `up`; `docker compose down && rm -rf config.js && git checkout
+config.js` puts it back.
 
 ## Data sources
 

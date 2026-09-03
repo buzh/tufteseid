@@ -14,7 +14,7 @@ type Env = {
 };
 
 // Compiled-in defaults. Every field is overridable at runtime from
-// config.js (see config.example.js), which is why there's one table here
+// config.js at the repo root, which is why there's one table here
 // rather than a per-environment set keyed off the hostname.
 const DEFAULT_ENV: Env = {
   apiUrl: 'https://api.norgeskart.no',

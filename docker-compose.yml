@@ -9,8 +9,8 @@ services:
     ports:
       - "127.0.0.1:3030:3000"
     volumes:
-      # Runtime config injected into the SPA. Copy config.example.js to
-      # config.js and edit for your deployment.
+      # Runtime config injected into the SPA. Edit in place; it is read
+      # on page load, so no rebuild or restart is needed.
       - ./config.js:/var/www/config.js:ro
       # Optional: override the baked-in Caddyfile without rebuilding.
       # - ./Caddyfile:/etc/caddy/Caddyfile:ro
