@@ -103,9 +103,9 @@ export const mapAtom = atom<Map>(() => {
     controls: defaultControls({ zoom: false, rotate: false }).extend([
       new ScaleLine({ minWidth: 100 }),
     ]),
-    // Rotation UI (compass rose / reset button) was removed in the top-bar
-    // consolidation, so lock the map to north-up to prevent users from
-    // getting stuck with a rotation they can't clear.
+    // There is no rotation UI (compass rose / reset button), so lock the
+    // map north-up — otherwise a stray gesture leaves the user with a
+    // rotation they have no way to clear.
     interactions: defaultInteractions({
       altShiftDragRotate: false,
       pinchRotate: false,

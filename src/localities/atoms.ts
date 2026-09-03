@@ -12,8 +12,7 @@ export const activeLocalityAtom = atom<LocalityRecord | null>(null);
 export const creatingLocalityAtom = atom<boolean>(false);
 
 // A funn is being drawn/edited in the workspace right now. Layout uses
-// this to mount the mobile bottom draw toolbar (the standalone 'draw'
-// MapTool no longer exists).
+// this to mount the mobile bottom draw toolbar.
 export const funnDraftActiveAtom = atom<boolean>(false);
 
 // "Juster området": the open lokalitet's rectangle is move/resizable on

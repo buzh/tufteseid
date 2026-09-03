@@ -2,8 +2,8 @@
 //
 // Lokaliteter schema — replaces the flat annotations MVP.
 // The old `finds` collection (one geometry blob per record) is dropped
-// WITH its data (agreed — MVP test data only) and rebuilt as a child of
-// the new `localities` collection.
+// WITH its data and rebuilt as a child of the new `localities`
+// collection.
 //
 // 1. `localities` — the top-level "area to explore": an authored
 //    rectangle (bbox), name, description, visibility. Same visibility

@@ -62,7 +62,7 @@ route {
                 reverse_proxy http://wmscache
         }
 
-        # PocketBase — annotations backend (auth + finds collection).
+        # PocketBase — backend for lokaliteter (auth + user content).
         # Kept same-origin so browser auth cookies "just work" and there's
         # no CORS to configure. The full OAuth2 redirect flow bounces
         # through /pb/api/oauth2-redirect on the SPA origin. Realtime

@@ -170,12 +170,11 @@ let cancelPendingRetire: (() => void) | null = null;
 // above them (the dataset being featured, and the hybrid overlay on top
 // of that, which must not be buried by a layer on its way out).
 //
-// Removing the old layers first — which is what this used to do — means
-// the map has nothing but the topo base to draw while the new LiDAR
-// tiles load, so cycling styles or datasets flashes topo between every
-// step. Instead the outgoing layers stay put (faded, see above) and are
-// removed only once the map reports a complete render with the incoming
-// ones in.
+// Removing the old layers first would leave the map nothing but the
+// topo base to draw while the new LiDAR tiles load, so cycling styles or
+// datasets would flash topo between every step. Instead the outgoing
+// layers stay put (faded, see above) and are removed only once the map
+// reports a complete render with the incoming ones in.
 export const swapBackgroundLayers = (under: TileLayer[], over: TileLayer[]) => {
   const store = getDefaultStore();
   const map = store.get(mapAtom);

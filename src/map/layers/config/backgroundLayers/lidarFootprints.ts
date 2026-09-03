@@ -1,11 +1,10 @@
 // Real per-project LiDAR coverage footprints — Kartverket's
 // "Prosjektavgrensning" (project boundary) WFS, the same service that
 // backs høydedata.no's project map. A full-catalogue join against
-// wms.hoyde-dtm-prosjekt confirmed ~100% of
-// projects match by normalized name + year tolerance, so this is now the
-// sole source of truth for "does this project actually cover the
-// viewport" — real polygon-vs-viewport intersection replaces the old
-// center-point pixel probe (coverageProbe.ts, removed).
+// wms.hoyde-dtm-prosjekt confirmed ~100% of projects match by
+// normalized name + year tolerance, so this is the sole source of truth
+// for "does this project actually cover the viewport": real
+// polygon-vs-viewport intersection.
 //
 // Routed same-origin through wmscache (/wfs/geonorge/ →
 // wfs.geonorge.no/skwms1/, uncached — same path shape as

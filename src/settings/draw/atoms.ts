@@ -116,7 +116,7 @@ export const textStyleReadAtom = atom((get) => {
 });
 
 // Drawing exists only inside a lokalitet workspace: enabled exactly
-// while a funn draft is open (the standalone 'draw' MapTool is gone).
+// while a funn draft is open.
 export const drawEnabledAtom = atom<boolean>((get) => {
   return get(funnDraftActiveAtom);
 });
