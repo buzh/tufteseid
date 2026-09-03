@@ -66,6 +66,14 @@ Symptom of forgetting this: API calls against the new/changed collection
 404, which the SPA may surface only in the browser console (e.g. "Ny
 lokalitet" appearing to do nothing).
 
+Note on migration ordering: PocketBase applies **all** of its built-in Go
+migrations during bootstrap and only then registers the JS ones from
+`pb_migrations/`, whatever the timestamps say. A JS migration therefore
+can never run before a core migration — which is why the 0.22 → 0.23
+collection-id fixup is an out-of-band script run against a stopped
+database (`pocketbase/repair-pre-0.23-ids.sh` + `.sql`, documented in
+README) instead of a migration.
+
 Ports: Caddy inside the container listens on `:3000`; docker-compose maps host
 `3030 → container 3000`.
 
@@ -79,7 +87,9 @@ Ports: Caddy inside the container listens on `:3000`; docker-compose maps host
   SPA's `/pb/*` API (auth, the `localities` / `finds` / `attachments`
   collections, file storage, realtime). SQLite state on the `pbdata`
   volume; schema versioned in `pocketbase/pb_migrations/`. First-run setup
-  is in README.md.
+  is in README.md. Pinned to 0.40.2 — migrations use the ≥0.23 App-based
+  JSVM API (`$app.findCollectionByNameOrId` / `app.save`, flattened field
+  classes), *not* the 0.22 `Dao` API.
 - **wmscache** — `nginx:1.27-alpine` sidecar. Reverse-proxies + caches
   every external WMS the SPA uses. Currently fronts four upstreams:
   - `wms.geonorge.no/skwms1/*` — Kartverket theme + LiDAR WMS.
@@ -391,9 +401,10 @@ Key files:
   tool), `localityLayer` / `funnLayer`, `useLocalityCreate`,
   `useLocalityAdjust`, `screenshot.ts`, `serializeDrawLayer.ts`.
 - `pocketbase/pb_migrations/1700000200_localities.js` — current schema.
-  The two earlier migrations create the superseded flat `finds`
-  collection and the `users.role` field; leave them alone so fresh
-  installs replay in order.
+  `1700000000` adds `users.role`, `1700000100` relaxes it, `1700000300`
+  restores the JSON size limits PocketBase 0.22 had clamped. Leave the
+  filenames alone — they're recorded in `_migrations` on every existing
+  install, so renaming one makes PB re-run it.
 
 The workspace is driven by `activeLocalityAtom`, deliberately *not* by
 the `MapTool` union (`'layers' | 'measure' | 'localities' | null`), so
@@ -419,9 +430,11 @@ Rules (server-enforced by PB), same shape on all three:
 - create: signed in, owns the record, and owns the parent lokalitet
 - update/delete: owner or admin
 
-Adding an OAuth provider: PB admin UI → Settings → Auth providers. No
-code change needed — the SPA's AuthDialog lists whatever the admin has
-enabled via `pb.collection('users').listAuthMethods()`.
+Adding an OAuth provider: PB admin UI → Collections → `users` → Edit
+collection → Options → OAuth2 (since 0.23 the providers live on the auth
+collection, not in global settings). No code change needed — the SPA's
+AuthDialog lists whatever is enabled via
+`pb.collection('users').listAuthMethods()`, reading `oauth2.providers`.
 
 ## Adding another background layer
 

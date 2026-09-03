@@ -118,11 +118,11 @@ at this point; only the lokalitet features need the next steps.
 See [Putting it on the internet](#putting-it-on-the-internet) when
 you're ready to give it a hostname.
 
-### 5. Create the PocketBase admin account
+### 5. Create the PocketBase superuser
 
 Open **<http://localhost:3030/pb/_/>**. On first visit PocketBase asks
-you to create its admin account — this is the database administrator,
-separate from the app's own admin role in step 7.
+you to create its superuser account — this is the database
+administrator, separate from the app's own admin role in step 7.
 
 Under **Settings → Application**, set the Application URL to the URL
 users will actually visit.
@@ -138,9 +138,10 @@ users will actually visit.
 
 Lokaliteter, funn and bilder all require sign-in, and sign-in is OAuth
 only — there is no username/password path in the UI. In the PocketBase
-admin: **Settings → Auth providers**, enable at least one (Google,
-GitHub, Microsoft, or a generic OIDC endpoint) and paste in the client
-id and secret from that provider.
+admin, providers are configured per auth collection: **Collections →
+`users` → ⚙ Edit collection → Options → OAuth2**. Enable it, add at
+least one provider (Google, GitHub, Microsoft, or a generic OIDC
+endpoint) and paste in the client id and secret from that provider.
 
 In the provider's own console, register the redirect / callback URL:
 
@@ -162,7 +163,7 @@ Sign in through the app once so PocketBase creates your user record.
 Then in the admin UI: **Collections → users → your record → `role` =
 `admin`**.
 
-The app role is separate from the PocketBase admin account. `admin`
+The app role is separate from the PocketBase superuser account. `admin`
 means: see every lokalitet regardless of visibility, and edit or delete
 anyone's. A missing role is treated as an ordinary `user`.
 
@@ -271,6 +272,51 @@ docker compose up -d
 docker compose logs -f tufteseid
 ```
 
+If `pocketbase/Dockerfile` changed, add `pocketbase` to the build and
+watch its log too — PocketBase applies both its own and this repo's
+migrations at startup:
+
+```sh
+docker compose build --pull tufteseid pocketbase
+docker compose up -d
+docker compose logs -f pocketbase
+```
+
+**Back up the `tufteseid_pbdata` volume first** (see
+[Backup](#backup)) whenever the PocketBase version moves. Migrations
+rewrite the database in place and there is no downgrade path.
+
+#### One-time repair: instances that ran PocketBase 0.22
+
+Only relevant if you deployed Tufteseid before it moved to PocketBase
+0.40. Those databases gave two collections an id identical to their
+name, which PocketBase ≥ 0.23 rejects, so the upgrade stops at boot
+with:
+
+```
+failed to apply migration 1717233556_v0.23_migrate.go: migrated
+collection "localities" validation failure: name: The name must not
+match an existing collection id.
+```
+
+Fix it against the stopped database, then bring the stack up again:
+
+```sh
+docker compose stop pocketbase
+./pocketbase/repair-pre-0.23-ids.sh
+docker compose up -d
+docker compose logs -f pocketbase
+```
+
+The script rewrites the two collection ids and the references to them,
+and moves `storage/attachments/` to match — PocketBase keys uploads by
+collection id, so the images would otherwise be orphaned. No record of
+user data is touched, and it is safe to run twice (a second run prints
+two `no such column: schema` errors and changes nothing).
+
+It assumes the default volume name `tufteseid_pbdata`; pass another as
+the first argument.
+
 ### What needs restarting after what
 
 `docker compose up -d` only recreates containers whose image or
@@ -283,6 +329,7 @@ on disk is current but the process hasn't re-read it:
 | `src/**`, `Caddyfile`, `Dockerfile` | `docker compose build tufteseid && docker compose up -d` |
 | `nginx/wms-cache.conf`, `nginx/wms-proxy-common.conf` | `docker compose restart wmscache` |
 | `pocketbase/pb_migrations/*` | `docker compose restart pocketbase` then check `docker compose logs pocketbase` |
+| `pocketbase/Dockerfile` | `docker compose build --pull pocketbase && docker compose up -d` — back up `tufteseid_pbdata` first |
 
 ### Backup
 

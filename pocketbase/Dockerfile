@@ -1,9 +1,12 @@
-# PocketBase — auth + collections backend for user annotations ("Mine funn").
+# PocketBase — auth + collections backend for lokaliteter.
 # Downloads a pinned release straight from the upstream GitHub. No official
 # image exists; building it in-repo keeps the supply chain visible.
+#
+# Upgrading across 0.23 needs a one-time fixup of databases written by the
+# old 0.22 image — see pocketbase/repair-pre-0.23-ids.sh.
 FROM alpine:3.20
 
-ARG PB_VERSION=0.22.20
+ARG PB_VERSION=0.40.2
 
 RUN apk add --no-cache ca-certificates unzip wget \
   && wget -O /tmp/pb.zip \

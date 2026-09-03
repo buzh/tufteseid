@@ -23,7 +23,9 @@ services:
   # localities / finds / attachments collections. SQLite-backed; state
   # lives on the pbdata volume, schema is versioned in
   # ./pocketbase/pb_migrations. Only reachable from tufteseid over the
-  # compose network — Caddy is the only public entrypoint. To reach the
+  # compose network — Caddy is the only public entrypoint. Upgrading a
+  # database written by the old PocketBase 0.22 image needs a one-time
+  # fixup first — see pocketbase/repair-pre-0.23-ids.sh. To reach the
   # PB admin UI directly during setup, temporarily add
   #   ports: ["127.0.0.1:8090:8090"]
   # here; normally it's at <site>/pb/_/.

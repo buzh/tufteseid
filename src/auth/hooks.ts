@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { pb } from '../api/pocketbase';
 
-// Provider list is fetched from PB — whatever the admin enabled in the
-// pb admin UI appears here (google, github, gitlab, oidc, …). We cache
-// it per session so the sign-in dialog opens instantly on re-open.
+// Provider list is fetched from PB — whatever the superuser enabled in
+// the pb admin UI appears here (google, github, gitlab, oidc, …). We
+// cache it per session so the sign-in dialog opens instantly on re-open.
+// Structural subset of the SDK's AuthProviderInfo; only these two are
+// used, the rest belong to the manual OAuth2 flow we don't drive.
 export type OAuthProvider = {
   name: string;
   displayName: string;
-  state: string;
-  authUrl: string;
-  codeVerifier: string;
-  codeChallenge: string;
-  codeChallengeMethod: string;
 };
 
 let cachedProviders: OAuthProvider[] | null = null;
@@ -29,8 +26,7 @@ export const useOAuthProviders = () => {
       .listAuthMethods()
       .then((methods) => {
         if (cancelled) return;
-        cachedProviders = (methods.authProviders ??
-          []) as unknown as OAuthProvider[];
+        cachedProviders = methods.oauth2.providers;
         setProviders(cachedProviders);
       })
       .catch((e: unknown) => {

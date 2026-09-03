@@ -6,7 +6,7 @@ import { NkUser, pb, Role } from '../api/pocketbase';
 // components can subscribe via jotai instead of onChange handlers.
 // Initial value comes from LocalAuthStore (rehydrated at pb import).
 export const currentUserAtom = atom<NkUser | null>(
-  (pb.authStore.model as NkUser | null) ?? null,
+  (pb.authStore.record as NkUser | null) ?? null,
 );
 
 // Kept in sync by pbAuthSyncEffect below. Consumers should NOT set the
@@ -14,7 +14,7 @@ export const currentUserAtom = atom<NkUser | null>(
 // (or signOut) which fires authStore events that this effect catches.
 export const pbAuthSyncEffect = atomEffect((_get, set) => {
   const unsubscribe = pb.authStore.onChange(() => {
-    set(currentUserAtom, (pb.authStore.model as NkUser | null) ?? null);
+    set(currentUserAtom, (pb.authStore.record as NkUser | null) ?? null);
   });
   return unsubscribe;
 });

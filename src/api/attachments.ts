@@ -21,7 +21,7 @@ export type AttachmentRecord = {
   meta: AttachmentMeta | null;
   created: string;
   updated: string;
-  // Set by PB on fetched records; pb.files.getUrl needs one of them.
+  // Set by PB on fetched records; pb.files.getURL needs one of them.
   collectionId?: string;
   collectionName?: string;
 };
@@ -92,7 +92,7 @@ export const getAttachmentUrl = async (
   thumb?: '200x200' | '800x0',
 ): Promise<string> => {
   const token = await getFileToken();
-  return pb.files.getUrl(rec, rec.file, { token, thumb });
+  return pb.files.getURL(rec, rec.file, { token, thumb });
 };
 
 export const subscribeAttachments = (

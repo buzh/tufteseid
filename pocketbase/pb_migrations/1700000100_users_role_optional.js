@@ -8,24 +8,35 @@
 //
 // The frontend (`roleAtom`) already treats a missing role as 'user',
 // so nullable + no default is the intended behaviour.
+//
+// `fields.add()` replaces an existing field with the same id, so this
+// is a full redefinition rather than an in-place mutation.
 
 migrate(
-  (db) => {
-    const dao = new Dao(db);
-    const users = dao.findCollectionByNameOrId('users');
-    const field = users.schema.getFieldById('users_role');
-    if (field) {
-      field.required = false;
-      dao.saveCollection(users);
-    }
+  (app) => {
+    const users = app.findCollectionByNameOrId('users');
+    users.fields.add(
+      new SelectField({
+        id: 'users_role',
+        name: 'role',
+        required: false,
+        maxSelect: 1,
+        values: ['guest', 'user', 'admin'],
+      }),
+    );
+    app.save(users);
   },
-  (db) => {
-    const dao = new Dao(db);
-    const users = dao.findCollectionByNameOrId('users');
-    const field = users.schema.getFieldById('users_role');
-    if (field) {
-      field.required = true;
-      dao.saveCollection(users);
-    }
+  (app) => {
+    const users = app.findCollectionByNameOrId('users');
+    users.fields.add(
+      new SelectField({
+        id: 'users_role',
+        name: 'role',
+        required: true,
+        maxSelect: 1,
+        values: ['guest', 'user', 'admin'],
+      }),
+    );
+    app.save(users);
   },
 );
