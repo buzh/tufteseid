@@ -79,7 +79,7 @@ const OSLO_PRIME_MERIDIAN = 10.722916667;
 
 /**
  * Returns the central meridian (degrees East of Greenwich) for Transverse Mercator
- * / UTM projections used in Norgeskart.
+ * / UTM projections used in this app.
  * Returns null for geographic or Web Mercator projections where grid north = true north.
  */
 export const getCentralMeridianDeg = (

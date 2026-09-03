@@ -201,7 +201,7 @@
     "addresses": "Addresses",
     "coordinates": "Coordinates",
     "houseNumber": "House nr.",
-    "placeholder": "Search Norgeskart",
+    "placeholder": "Search Tufteseid",
     "placeName": "Placenames",
     "properties": "Properties",
     "roads": "Roads",
@@ -257,9 +257,9 @@
   },
   "about": {
     "heading": "About us",
-    "textone": "Norgeskart is the Norwegian Mapping Authority’s most widely used map service. Whether you are planning a trip to the mountains or at sea, or need information about a property, Norgeskart provides reliable and detailed geographic information – presented in a simple and accessible way.",
-    "texttwo": "Since 1773, the Norwegian Mapping Authority has been mapping Norway. Much has changed since then. Needs evolve over time, and new technology continuously gives us new opportunities. That is why we work continuously to offer a wide range of map products that meet users’ needs – both today and in the future.",
-    "textthree": "Together with our users, we aim to be open, innovative, and reliable.",
+    "textone": "Tufteseid is a map tool for armchair archaeology: read LiDAR hillshade against Riksantikvaren’s heritage register and spot house sites, burial mounds and other traces in the terrain without leaving your chair.",
+    "texttwo": "Tufteseid is not Norgeskart, and is not operated by the Norwegian Mapping Authority. It is an independent, non-commercial hobby project built on the source code of Kartverket’s Norgeskart.",
+    "textthree": "Map and elevation data come from Kartverket and Geonorge, heritage data from Riksantikvaren. The data is theirs and subject to their own terms of use. Nothing you find here has been vetted by either of them.",
     "version": "Version",
     "buildDate": "Built"
   },

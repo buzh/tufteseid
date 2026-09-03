@@ -64,7 +64,7 @@ export const handleGeoJsonExport = (layer: VectorLayer) => {
   });
   downloadStringAsFile(
     geojsonStr,
-    'Norgeskart_eksport.geojson',
+    'Tufteseid_eksport.geojson',
     'application/json',
   );
 };
@@ -82,7 +82,7 @@ export const handleGMLExport = (layer: VectorLayer) => {
     .getCode();
   // Use a default feature type and geometry name
   const formater = new GML({
-    featureNS: 'http://www.norgeskart.no/drawings',
+    featureNS: 'urn:tufteseid:drawings',
     featureType: 'drawings',
     srsName: 'urn:ogc:def:crs:EPSG::4326',
     surface: false,
@@ -113,14 +113,14 @@ export const handleGMLExport = (layer: VectorLayer) => {
   <?xml version="1.0" encoding="UTF-8"?>
     <gml:FeatureCollection  xmlns:gml="http://www.opengis.net/gml"
                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                            xsi:schemaLocation="http://www.norgeskart.no/drawings"
+                            xsi:schemaLocation="urn:tufteseid:drawings"
                             gml:srsName="urn:ogc:def:crs:EPSG::4326">
       ${gmlStr}
     </gml:FeatureCollection>`.trim();
 
   downloadStringAsFile(
     wrappedGmlStr,
-    'Norgeskart_eksport.gml',
+    'Tufteseid_eksport.gml',
     'application/gml+xml',
   );
 };
@@ -184,7 +184,7 @@ export const handleGPXExport = (layer: VectorLayer) => {
 
   downloadStringAsFile(
     gpxString,
-    'Norgeskart_eksport.gpx',
+    'Tufteseid_eksport.gpx',
     'application/gpx+xml',
   );
 };

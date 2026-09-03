@@ -206,7 +206,7 @@
     "addresses": "Adresser",
     "coordinates": "Koordinater",
     "houseNumber": "Husnr",
-    "placeholder": "Søk i Norgeskart",
+    "placeholder": "Søk i Tufteseid",
     "placeName": "Stedsnavn",
     "properties": "Eiendommer",
     "roads": "Veger",
@@ -262,9 +262,9 @@
   },
   "about": {
     "heading": "Om oss",
-    "textone": "Norgeskart er Kartverkets mest brukte karttjeneste. Enten du planlegger en tur til fjells eller til sjøs, eller trenger informasjon om en eiendom, gir Norgeskart deg pålitelig og detaljert geografisk informasjon – presentert på en enkel og tilgjengelig måte.",
-    "texttwo": "Siden 1773 har Kartverket kartlagt Norge. Mye har endret seg siden den gang. Behov utvikler seg over tid, og ny teknologi gir oss stadig nye muligheter. Derfor jobber vi kontinuerlig med å tilby et bredt spekter av kartprodukter som møter brukernes behov – både i dag og i fremtiden.",
-    "textthree": "Sammen med brukerne skal vi være åpne, innovative og stabile.",
+    "textone": "Tufteseid er et kartverktøy for lenestolsarkeologi: les skyggerelieff fra LiDAR mot Riksantikvarens kulturminneregister, og finn tufter, gravhauger og andre spor i terrenget hjemmefra.",
+    "texttwo": "Tufteseid er ikke Norgeskart og drives ikke av Kartverket. Det er et uavhengig, ikke-kommersielt hobbyprosjekt, bygget videre på kildekoden til Kartverkets Norgeskart.",
+    "textthree": "Kartdata og høydedata kommer fra Kartverket og Geonorge, kulturminnedata fra Riksantikvaren. Dataene er deres, og er underlagt deres egne bruksvilkår. Det du finner her er ikke kvalitetssikret av noen av dem.",
     "version": "Versjon",
     "buildDate": "Bygget"
   },

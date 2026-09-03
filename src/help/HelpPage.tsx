@@ -153,9 +153,8 @@ export const HelpPage = () => {
   return (
     <>
       <Header
-        title="Norgeskart"
+        title="Tufteseid"
         titleLink="/"
-        logoLink="https://kartverket.no"
         gap={4}
         showMenuButton={false}
         content={

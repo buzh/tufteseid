@@ -1,5 +1,9 @@
+# Pinned so the volume names below don't change if the checkout
+# directory is renamed. Volumes are prefixed with the project name.
+name: tufteseid
+
 services:
-  norgeskart:
+  tufteseid:
     build: .
     restart: unless-stopped
     ports:
@@ -18,7 +22,7 @@ services:
   # for user auth (OIDC via Google/GitHub/etc.) and the `finds`
   # collection ("Mine funn"). SQLite-backed; state lives on the
   # pbdata volume, schema is versioned in ./pocketbase/pb_migrations.
-  # Only reachable from norgeskart over the compose network — Caddy
+  # Only reachable from tufteseid over the compose network — Caddy
   # is the only public entrypoint.
   pocketbase:
     build: ./pocketbase
@@ -30,7 +34,7 @@ services:
   # Caching reverse proxy for the Kartverket LiDAR hillshade WMS. Caddy
   # forwards /wms/hoyde-dtm to this service, which caches successful
   # tile responses on disk (25 GB LRU). Not exposed on the host — only
-  # reachable from the norgeskart container on the compose network.
+  # reachable from the tufteseid container on the compose network.
   wmscache:
     image: nginx:1.27-alpine
     restart: unless-stopped

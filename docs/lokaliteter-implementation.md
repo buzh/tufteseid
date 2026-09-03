@@ -3,7 +3,7 @@
 Companion to `lokaliteter-design.md` (the what/why). This is the how:
 stages, files, and the seams in the current code each stage replaces.
 Each stage is independently buildable and deployable
-(`docker compose build --pull norgeskart && docker compose up -d`);
+(`docker compose build --pull tufteseid && docker compose up -d`);
 TypeScript errors surface in the docker build, never locally.
 
 ## Schema decision (locked for stage 1)

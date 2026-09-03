@@ -1,9 +1,15 @@
-# Norgeskart — armchair-archaeology build
+# Tufteseid — armchair archaeology on Norwegian public data
 
 Map viewer tailored for reading Norwegian LiDAR terrain against the
 Riksantikvaren heritage register (Kulturminner). Hard fork of
 Kartverket's Norgeskart — not tracking upstream. Working branch:
-`self-host` (deploy shape, not the project's purpose).
+`main`.
+
+Not affiliated with Kartverket or Riksantikvaren; the app is
+de-branded from upstream on purpose, so don't reintroduce Norgeskart
+naming or Kartverket's visual identity in user-visible strings, page
+titles, export filenames or assets. Attribution belongs in prose (the
+"Om oss" text, README, LICENCE), not in the chrome.
 
 Feature scope is deliberately narrow: keep what an amateur reading
 relief-shaded terrain against the heritage record needs (Kulturminner
@@ -22,9 +28,9 @@ Standard rebuild on the server:
 
 ```
 git pull
-docker compose build --pull norgeskart
+docker compose build --pull tufteseid
 docker compose up -d
-docker compose logs -f norgeskart wmscache
+docker compose logs -f tufteseid wmscache
 ```
 
 If `nginx/wms-cache.conf` or `nginx/wms-proxy-common.conf` changed, also
@@ -59,7 +65,7 @@ Ports: Caddy inside the container listens on `:3000`; docker-compose maps host
 
 ## Services (docker-compose.yml)
 
-- **norgeskart** — multi-stage Dockerfile: `node:24-alpine` builds the SPA,
+- **tufteseid** — multi-stage Dockerfile: `node:24-alpine` builds the SPA,
   then `caddy:2.10.0-alpine` serves `/var/www` with the baked-in `Caddyfile`.
   `config.js` is bind-mounted at runtime.
 - **pocketbase** — annotations backend for the "Mine funn" feature. Small
@@ -88,7 +94,7 @@ Ports: Caddy inside the container listens on `:3000`; docker-compose maps host
   Cache config at `nginx/wms-cache.conf` (per-upstream `location` blocks)
   + `nginx/wms-proxy-common.conf` (shared cache/timeout/header defaults).
   Cache lives on the `wmscache` docker volume with a 25 GB LRU cap. Not
-  exposed on the host — only reachable from `norgeskart` over the compose
+  exposed on the host — only reachable from `tufteseid` over the compose
   network.
 
   Because everything is same-origin from the browser's POV, none of these
@@ -308,7 +314,7 @@ curl -sI "http://localhost:3030/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833?S
 ```
 
 First call: `MISS`. Repeat: `HIT`. Inspect on-disk size:
-`docker run --rm -v norgeskart_wmscache:/c alpine du -sh /c`.
+`docker run --rm -v tufteseid_wmscache:/c alpine du -sh /c`.
 
 ## Adding another theme layer
 
