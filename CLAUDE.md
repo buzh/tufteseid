@@ -460,3 +460,49 @@ AuthDialog lists whatever is enabled via
 - Commits use short imperative subject lines. Body explains the *why* when
   the reasoning isn't obvious from the diff. The `Co-Authored-By` trailer
   is added by the commit workflow.
+
+## Lint and dev tooling
+
+**oxlint, not ESLint.** Config is `.oxlintrc.json`; `eslint.config.js` is
+gone along with `eslint`, `typescript-eslint` and the four eslint plugins.
+
+The trigger was TypeScript 7. It's the native Go port, and
+typescript-eslint 8.x (through 8.69.0, canary included) still declares
+peer `typescript ">=4.8.4 <6.1.0"` — so TS 7 made `npm ci` fail with
+ERESOLVE and the docker build never reached `npm run build`. That's
+fixable with an `overrides` entry, but oxlint parses TypeScript natively
+and has no `typescript` peer at all, so the coupling is gone rather than
+suppressed. Every remaining `typescript` peer in the tree
+(`prettier-plugin-organize-imports` `>=2.9`, i18next / react-i18next
+`^5 || ^6 || ^7`) accepts 7 on its own. **Don't reintroduce an
+`overrides` block for this** — if it seems necessary again, something
+pulled a typescript-eslint dependency back in.
+
+Two things to know before editing `.oxlintrc.json`:
+
+- **No plugins are enabled by default** — they must be listed in
+  `plugins`. And rules only fire if their *category* is enabled.
+  `react/hooks` (rules-of-hooks) is `suspicious` and
+  `react/only-export-components` is `restriction`, neither of which is
+  on, so both are listed explicitly under `rules`. Enabling only
+  `correctness` would silently drop rules-of-hooks across ~400 hook call
+  sites.
+- `react/exhaustive-deps` is deliberately `warn`, matching what
+  eslint-plugin-react-hooks' recommended preset did.
+
+Two capabilities were dropped in the move, on purpose:
+
+- `eslint-plugin-compat` (browserslist API checking) has no oxlint
+  equivalent. `browserslist` in `package.json` still drives the build.
+- `eslint-plugin-prettier` — formatting is `npm run format` /
+  `format-check`, not a lint rule.
+
+`npm run lint` is not enforced anywhere: it's absent from the Dockerfile,
+there are no git hooks, and there is no CI. The build is
+`npm ci && tsc -b && vite build`, so type errors block a deploy and lint
+findings don't.
+
+Also note `prettier-plugin-organize-imports` drives the TypeScript
+*language service*, which is the part of the API the native port trims
+hardest. If `npm run format` starts failing under TS 7, that plugin is
+the first suspect.

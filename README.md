@@ -397,8 +397,8 @@ TypeScript errors surface in the build output. For editing:
 
 ```sh
 npm ci
-npm run lint
-npx vitest run
+npm run lint       # oxlint
+npm test           # vitest
 npm run dev        # vite on :3000
 ```
 

@@ -1,7 +1,7 @@
 import babel from '@rolldown/plugin-babel';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import { execSync } from 'child_process';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 // Falls back to 'unknown' when building outside a git checkout (e.g. a Docker
 // build stage that doesn't COPY .git) so the build doesn't crash over a label.
@@ -31,5 +31,10 @@ export default defineConfig({
   },
   preview: {
     port: 4173,
+  },
+  // urlUtils reads and rewrites window.location, so the suite needs a DOM.
+  test: {
+    environment: 'jsdom',
+    include: ['test/**/*.test.ts'],
   },
 });
