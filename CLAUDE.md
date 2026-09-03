@@ -342,10 +342,22 @@ Notes on shared behavior:
   turning a hiccup into 10s of blanket 502s (`no live upstreams` in the
   error log).
 
-  The WFS also gets a deliberately short `proxy_read_timeout 8s`
-  (against the WMS's 30s) because a healthy answer takes ~0.25s and a
-  hung one never recovers — better to cut it early and retry than to
-  spend 30s arriving at a 504.
+  `timeout` is in the WFS location's `proxy_next_upstream` list but
+  deliberately not in the shared one. The WFS either answers in ~0.25s
+  or hangs forever, so cutting it at `proxy_read_timeout 8s` and
+  retrying is free — measured 20/20 successes where the unretried config
+  gave 8 failures in 25. The WMS renders on the fly and is bimodal:
+  ~80ms from Kartverket's own cache, or 5-14s cold with a long tail. A
+  read timeout there means a render still in progress, so retrying would
+  abandon it and queue a second one for the same tile, multiplying load
+  on an origin already slow enough to have hit the timeout.
+
+  Worth knowing before chasing a "performance regression": cold LiDAR
+  tiles are slow at the origin, not here. Measured direct against
+  wms.geonorge.no with this proxy out of the path — median 0.08s but
+  11 of 30 tiles over 5s. A cache HIT through wmscache serves the same
+  tile in ~80ms, so the second visit to an area is fast and the first
+  is at Kartverket's mercy.
 
   Verify what nginx actually loaded, not what the file says:
   `docker compose exec wmscache nginx -T | grep 'read_timeout\|max_fails\|next_upstream'`.
