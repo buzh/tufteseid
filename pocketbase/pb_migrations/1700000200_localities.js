@@ -25,9 +25,7 @@
 //
 // Collection ids are deliberately *not* equal to the collection names:
 // PocketBase ≥0.23 rejects a collection whose name matches any existing
-// collection id. Databases created by the old PocketBase 0.22 image used
-// name-equals-id and need a one-time repair before they can be opened —
-// see pocketbase/repair-pre-0.23-ids.sh.
+// collection id, its own included.
 //
 // Written against the PocketBase v0.23+ JSVM API (App-based). No ES2021
 // numeric separators — Goja / PB jsvm rejects them.

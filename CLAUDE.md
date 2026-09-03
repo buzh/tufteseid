@@ -68,11 +68,9 @@ lokalitet" appearing to do nothing).
 
 Note on migration ordering: PocketBase applies **all** of its built-in Go
 migrations during bootstrap and only then registers the JS ones from
-`pb_migrations/`, whatever the timestamps say. A JS migration therefore
-can never run before a core migration — which is why the 0.22 → 0.23
-collection-id fixup is an out-of-band script run against a stopped
-database (`pocketbase/repair-pre-0.23-ids.sh` + `.sql`, documented in
-README) instead of a migration.
+`pb_migrations/`, whatever the timestamps say. A JS migration can
+therefore never run before a core one, so anything that has to precede a
+core migration has to happen out of band, against a stopped database.
 
 Ports: Caddy inside the container listens on `:3000`; docker-compose maps host
 `3030 → container 3000`.
@@ -401,10 +399,11 @@ Key files:
   tool), `localityLayer` / `funnLayer`, `useLocalityCreate`,
   `useLocalityAdjust`, `screenshot.ts`, `serializeDrawLayer.ts`.
 - `pocketbase/pb_migrations/1700000200_localities.js` — current schema.
-  `1700000000` adds `users.role`, `1700000100` relaxes it, `1700000300`
-  restores the JSON size limits PocketBase 0.22 had clamped. Leave the
-  filenames alone — they're recorded in `_migrations` on every existing
-  install, so renaming one makes PB re-run it.
+  `1700000000` adds `users.role`, `1700000100` relaxes it. Leave the
+  filenames alone — they're recorded in `_migrations`, so renaming one
+  makes PB re-run it. Collection ids must not equal any collection name
+  (0.23+ rejects that), hence `pbc_localities` / `finds2` /
+  `pbc_attachments`.
 
 The workspace is driven by `activeLocalityAtom`, deliberately *not* by
 the `MapTool` union (`'layers' | 'measure' | 'localities' | null`), so

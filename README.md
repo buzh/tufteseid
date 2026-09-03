@@ -286,37 +286,6 @@ docker compose logs -f pocketbase
 [Backup](#backup)) whenever the PocketBase version moves. Migrations
 rewrite the database in place and there is no downgrade path.
 
-#### One-time repair: instances that ran PocketBase 0.22
-
-Only relevant if you deployed Tufteseid before it moved to PocketBase
-0.40. Those databases gave two collections an id identical to their
-name, which PocketBase ≥ 0.23 rejects, so the upgrade stops at boot
-with:
-
-```
-failed to apply migration 1717233556_v0.23_migrate.go: migrated
-collection "localities" validation failure: name: The name must not
-match an existing collection id.
-```
-
-Fix it against the stopped database, then bring the stack up again:
-
-```sh
-docker compose stop pocketbase
-./pocketbase/repair-pre-0.23-ids.sh
-docker compose up -d
-docker compose logs -f pocketbase
-```
-
-The script rewrites the two collection ids and the references to them,
-and moves `storage/attachments/` to match — PocketBase keys uploads by
-collection id, so the images would otherwise be orphaned. No record of
-user data is touched, and it is safe to run twice (a second run prints
-two `no such column: schema` errors and changes nothing).
-
-It assumes the default volume name `tufteseid_pbdata`; pass another as
-the first argument.
-
 ### What needs restarting after what
 
 `docker compose up -d` only recreates containers whose image or
