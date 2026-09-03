@@ -166,22 +166,58 @@ caches. This same-origin path avoids CORS issues seen when calling
 for the per-project LiDAR at `/wms/geonorge/wms.hoyde-dtm-prosjekt` (see
 `lidarProjects.ts`).
 
-### Why the LiDAR tile loader is custom
+### Tile loading is OpenLayers' default — don't make it custom again
 
-`retryBlankTileLoadFunction` in `src/map/layers/config/backgroundLayers/loadFunctions.ts`
-handles a subtle failure mode of the Kartverket DTM WMS: the on-the-fly
-renderer occasionally returns a valid HTTP 200 response with a tiny (~479
-byte) transparent PNG instead of the real 5–50 KB hillshade. The default
-OL error retry doesn't help because there's no error to retry on.
+There used to be a `retryBlankTileLoadFunction` here, on the theory that
+the DTM WMS occasionally returns HTTP 200 with a tiny (~479 byte)
+transparent PNG instead of the real 5–50 KB hillshade, and that retrying
+would repair it. It `fetch()`ed every tile with `cache: 'no-store'` and
+retried anything under 800 bytes three times with backoff.
 
-The loader `fetch()`es each tile with `cache: 'no-store'`, checks blob
-size, and if under 800 bytes retries up to 3 times with exponential
-backoff. After the retry budget is spent, whatever came back is accepted
-(legit no-coverage tiles — ocean, Sweden — return the same tiny response
-and would loop forever otherwise).
+It was removed because measurement against the origin says it cannot
+work and costs a great deal:
 
-Key CSP dependencies for this path: `img-src` must include `blob:`
-(because the loader hands blob URLs to `<img>`).
+- The 479-byte no-data PNG is **deterministic** — byte-identical (same
+  md5) across repeated requests for a fixed BBOX. There is a second
+  variant at 495 bytes, also stable. Retrying returns the same bytes.
+- 40 cache-busted renders of *covered* mainland BBOXes produced **zero**
+  blanks, so the failure mode the retry existed for never reproduced.
+- So the only tiles it ever retried were legitimate no-coverage ones —
+  ocean, Sweden — turning each into 4 origin requests and holding it in
+  OL's `LOADING` state for ~12 s. See the tile-queue note below for why
+  that is the expensive part.
+- `cache: 'no-store'` also defeated the browser HTTP cache for every
+  LiDAR tile, so revisiting an area always went back over the network.
+
+If a blank-where-there-is-data tile ever *is* observed, fix it at
+wmscache (which can see and retry the upstream) rather than reinstating
+a client loader that bypasses the browser cache.
+
+### The map-wide tile queue is the scarce resource
+
+OpenLayers runs **one** tile queue per `Map`, shared by every layer, and
+will not start a tile while `maxTilesLoading` are already in flight. The
+default is 16 — and during a zoom/pan animation OL hard-caps it to 8
+regardless, or 0 when the frame budget is blown.
+
+That default assumes tile servers answer in milliseconds. Measured
+against Kartverket's origin, a cold LiDAR WMS tile takes **3–12 s**
+(median fast, long tail), while the topo WMTS base answers in ~130 ms.
+So a screenful of cold hillshade pins every slot and the base map never
+gets scheduled — the map sits empty for tens of seconds on a zoom out,
+which defeats the entire point of keeping topo at the bottom of the
+stack.
+
+Three things keep the fast base layer from queueing behind the slow one;
+all three are load-bearing:
+
+- `maxTilesLoading: 48` on the `Map` (`src/map/atoms.ts`).
+- `preload: 0` on the WMS background layers, vs `preload: 2` on the WMTS
+  base (`backgroundLayers/utils.ts`). Preloading coarser levels is free
+  on a pre-rendered base and ruinous on an on-the-fly renderer.
+- wmscache caching the no-data tiles, so the no-coverage majority of a
+  zoomed-out view is a ~5 ms hit rather than a multi-second origin
+  round trip (see `$skip_cache`).
 
 ### The background stack
 
@@ -230,10 +266,6 @@ subset of its groups yields a real overlay: no terrain, no landcover,
 no background fill. Both families are needed — the generalized `kd_*`
 groups stop rendering around 1:25 000 and the `fkb_*` ones take over.
 
-Deliberately **no** `retryBlankTileLoadFunction` on this layer: a blank
-overlay tile is the normal case out in the woods, unlike a blank DTM
-tile, and retrying each one three times buys nothing.
-
 Notes for anyone changing this: `cache.kartverket.no`'s WMTS has no
 transparent overlay layer (only the full basemaps), `wms.topo4` is dead,
 and NiB needs an API token — `wms.topo` is the one that works.
@@ -264,10 +296,10 @@ Two things make this smaller than it looks:
   clamp to it.
 
 The style clamp isn't cosmetic: asking a DOM layer for a DTM-only style
-(`helning_prosent`, say) hits the same silent failure as a blank tile —
-HTTP 200, `Content-Type: image/png`, a ~100-byte JSON error body that
-`retryBlankTileLoadFunction` eventually accepts — i.e. a blank map with
-nothing in the console. `activeLidarStyleAtom` keeps holding the user's
+(`helning_prosent`, say) fails silently: HTTP 200, `Content-Type:
+image/png`, a ~100-byte JSON error body that the browser gives up on as
+a broken image — i.e. a blank map with nothing in the console.
+`activeLidarStyleAtom` keeps holding the user's
 DTM pick while in DOM mode so it comes back on the way out, which is
 also why A/D is a deliberate no-op there instead of walking a one-entry
 ring over the top of it.
@@ -316,10 +348,15 @@ Notes on shared behavior:
 - Per-host `Host` + `proxy_ssl_name` set inline in each `location`, plus
   explicit TLS 1.2/1.3 in the common include, so the handshake with each
   upstream (Kartverket istio-envoy, RA MapServer, etc.) is unambiguous.
-- Skips caching for responses under 1000 bytes (`map` on
-  `$upstream_http_content_length`) so blank responses never poison the
-  cache. Legit no-coverage tiles are also small and bypass the cache too —
-  cheap because they're 479 bytes.
+- Skips caching for responses under **300** bytes (`map` on
+  `$upstream_http_content_length`), which keeps the ~100-byte JSON error
+  body out of a 180-day cache entry. The threshold used to be 1000
+  bytes on the theory that no-coverage tiles were "cheap because they're
+  479 bytes" — they are not: measured 0.3–6 s each at the origin, on
+  every single request, because nothing ever cached them. Zoomed out
+  that is most of the screen. They are cached now; the no-data render is
+  deterministic (verified byte-identical across requests for a fixed
+  BBOX), so it is the correct answer and safe to keep.
 - `proxy_ignore_headers Set-Cookie Cache-Control Expires` — upstreams
   frequently set session cookies which would otherwise disable caching
   entirely.

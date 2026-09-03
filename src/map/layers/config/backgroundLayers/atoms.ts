@@ -19,7 +19,6 @@ import {
   LidarModel,
   LIDAR_PROJECT_WMS_URL,
 } from './lidarProjects';
-import { retryBlankTileLoadFunction } from './loadFunctions';
 import {
   BackgroundLayer,
   EmptyBackgroundLayer,
@@ -115,7 +114,6 @@ const buildLidarProjectConfig = (
     LAYERS: `${projectId}:${style}`,
     VERSION: '1.3.0',
   },
-  tileLoadFunction: retryBlankTileLoadFunction,
 });
 
 export const backgroundLayerAtomEffect = atomEffect((get) => {

@@ -98,9 +98,10 @@ export const TIER_A_STYLES = [
 // this. The national mosaic publishes *only* `skyggerelieff`, while
 // every per-project dataset publishes four — and asking the national
 // WMS for a per-project style doesn't fail loudly: it answers HTTP 200,
-// Content-Type image/png, with a ~100 byte JSON error body. That is
-// small enough for retryBlankTileLoadFunction to treat as a blank tile
-// and accept, so the background just silently goes empty.
+// Content-Type image/png, with a ~100 byte JSON error body. The browser
+// decodes that as a broken image and the background just silently goes
+// empty — nothing in the console, nothing in the network tab that looks
+// wrong. (wmscache refuses to cache it; see $skip_cache.)
 export const resolveLidarStyle = (
   published: string[],
   preferred: string,

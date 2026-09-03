@@ -1,5 +1,4 @@
 import { LidarModel, NATIONAL_WMS } from './lidarProjects';
-import { retryBlankTileLoadFunction } from './loadFunctions';
 import { WMSBackgroundLayer } from './types';
 
 // The national mosaic can show any style the WMS publishes (see
@@ -21,5 +20,4 @@ export const buildNationalLidarConfig = (
     LAYERS: `${NATIONAL_WMS[model].prefix}:${style}`,
     VERSION: '1.3.0',
   },
-  tileLoadFunction: retryBlankTileLoadFunction,
 });

@@ -57,6 +57,9 @@ export const getWMTSLayer = async (
       // Every other raster source is same-origin via the /wms/* proxies.
       source: new WMTS({ ...layerOptions, crossOrigin: 'anonymous' }),
       properties: { id: `bg.${layerConfig.layerName}` },
+      // The WMTS base is pre-rendered and answers in ~130 ms, so
+      // preloading coarser levels is nearly free and it is the layer we
+      // most want ready when a zoom lands. Contrast the WMS layers below.
       preload: 2,
     });
 
@@ -80,10 +83,13 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
     url: layerConfig.url,
     params: { ...layerConfig.props, SRS: projection },
   });
-  if (layerConfig.tileLoadFunction) {
-    source.setTileLoadFunction(layerConfig.tileLoadFunction);
-  }
-  return new TileLayer({ source, properties, preload: 2 });
+  // preload 0, unlike the WMTS base. These are on-the-fly renders —
+  // measured 3-12 s for a cold LiDAR tile at the origin — and every
+  // preloaded coarse tile occupies one of the map's globally limited
+  // concurrent tile slots (see maxTilesLoading in src/map/atoms.ts) for
+  // that long. Spending them on levels the user may never look at is
+  // what starves the base map of slots.
+  return new TileLayer({ source, properties, preload: 0 });
 };
 
 export const getLayerFromConfig = async (
@@ -147,10 +153,10 @@ export const buildOrReuseBackgroundLayer = async (
 
 // How long the outgoing stack may hang around waiting for a render that
 // never comes — a tile stuck loading, a backgrounded tab. Generous,
-// because the LiDAR tile loader retries blank responses with backoff
-// (see loadFunctions.ts) and a slow-but-real swap should still be
-// gapless; the only cost of waiting is two background stacks in memory.
-const SWAP_TIMEOUT_MS = 8000;
+// because a cold LiDAR tile takes 3-12 s at the origin and a
+// slow-but-real swap should still be gapless; the only cost of waiting
+// is two background stacks in memory.
+const SWAP_TIMEOUT_MS = 15000;
 
 // What a layer on its way out is dimmed to, immediately, for as long as
 // it hangs around. A per-project dataset usually covers only part of the

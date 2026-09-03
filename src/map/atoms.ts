@@ -111,6 +111,16 @@ export const mapAtom = atom<Map>(() => {
       pinchRotate: false,
     }),
     keyboardEventTarget: document,
+    // OpenLayers runs ONE tile queue for the whole map and will not
+    // start a new tile while `maxTilesLoading` are already in flight —
+    // the default 16 assumes tile servers answer in milliseconds. Ours
+    // do not: a cold LiDAR WMS tile is 3-12 s at Kartverket's origin, so
+    // a screenful of them pins every slot and the topo base — which
+    // answers in ~130 ms and is the whole reason there is always
+    // supposed to be *something* on screen — never gets scheduled at
+    // all. A wider window lets the fast base layer slip past the slow
+    // hillshade instead of queueing behind it.
+    maxTilesLoading: 48,
   });
 
   map.addLayer(mapLayers.markerLayer.getLayer());

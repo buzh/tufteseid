@@ -32,9 +32,4 @@ export const TOPO_OVERLAY_CONFIG: WMSBackgroundLayer = {
     TRANSPARENT: true,
     VERSION: '1.3.0',
   },
-  // Deliberately no retryBlankTileLoadFunction. That loader exists
-  // because the DTM renderer sometimes returns a blank tile where there
-  // is data; here a blank tile is the normal case (no road, no name out
-  // in the woods) and every one of them would burn the full retry
-  // budget before being accepted anyway.
 };

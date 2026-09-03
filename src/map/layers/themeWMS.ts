@@ -93,7 +93,12 @@ export const createThemeLayerFromConfig = (
       cacheSize: 512,
     }),
     properties: layerProperties,
-    preload: 2,
+    // preload 0 for the same reason as the WMS background layers: these
+    // are on-the-fly renders (RA's MapServer especially) sharing the
+    // map's one tile queue with the base map, and coarse levels nobody
+    // asked for are not worth a slot. See "The map-wide tile queue is
+    // the scarce resource" in CLAUDE.md.
+    preload: 0,
     ...(minZoom !== undefined ? { minZoom } : {}),
   });
 };
