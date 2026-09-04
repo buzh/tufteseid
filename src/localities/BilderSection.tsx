@@ -34,8 +34,11 @@ import { LocalityRecord } from '../api/localities';
 import { lightboxOpenAtom } from './atoms';
 import { ConfirmPopover } from './ui';
 
+// `landscape` is what the TopBar already uses for LiDAR mode, so an
+// extract carries the same mark here. (Material Symbols' `terrain` isn't
+// in the set material-symbols ships types for.)
 const KIND_ICON: Record<AttachmentKind, MaterialSymbol> = {
-  extract: 'terrain',
+  extract: 'landscape',
   screenshot: 'photo_camera',
   upload: 'image',
 };

@@ -84,7 +84,7 @@ const StatusPicker = ({
           onClick={(e: MouseEvent) => e.stopPropagation()}
         >
           {badge}
-          <Icon icon="expand_more" size={14} />
+          <Icon icon="keyboard_arrow_down" size={14} />
         </Box>
       </PopoverTrigger>
       <PopoverContent width="190px">
