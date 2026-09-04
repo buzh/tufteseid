@@ -12,6 +12,7 @@ import {
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getUserAvatarUrl } from '../api/pocketbase';
 import { currentUserAtom, isAdminAtom } from './atoms';
 import { isAuthDialogOpenAtom } from './atoms-dialog';
 import { useSignOut } from './hooks';
@@ -53,6 +54,7 @@ export const AuthButton = () => {
   }
 
   const label = user.name || user.email;
+  const avatarUrl = getUserAvatarUrl(user);
 
   return (
     <Popover
@@ -70,15 +72,15 @@ export const AuthButton = () => {
             w="28px"
             h="28px"
             borderRadius="full"
-            bg={user.avatar ? 'transparent' : 'green.100'}
+            bg={avatarUrl ? 'transparent' : 'green.100'}
             color="green.900"
             fontSize="xs"
             fontWeight="bold"
             overflow="hidden"
           >
-            {user.avatar ? (
+            {avatarUrl ? (
               <img
-                src={user.avatar}
+                src={avatarUrl}
                 alt={label}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
