@@ -18,6 +18,7 @@ import {
   updateLocality,
 } from '../api/localities';
 import { mapAtom } from '../map/atoms';
+import { addOwnedInteraction } from '../map/interactions';
 import { activeLocalityAtom, adjustingLocalityAtom } from './atoms';
 import {
   hideLocalityOnLayer,
@@ -141,8 +142,8 @@ export const useLocalityAdjust = (locality: LocalityRecord) => {
     });
     translate.on('translateend', persist);
 
-    map.addInteraction(translate);
-    map.addInteraction(modify);
+    addOwnedInteraction(map, 'localityAdjust', translate);
+    addOwnedInteraction(map, 'localityAdjust', modify);
 
     return () => {
       map.removeInteraction(modify);

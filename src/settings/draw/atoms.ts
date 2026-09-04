@@ -34,11 +34,7 @@ import {
   INTERACTIVE_OVERLAY_PREFIX,
   MEASUREMNT_OVERLAY_PREFIX,
 } from '../../draw/drawControls/hooks/drawSettings';
-import {
-  getDrawInteraction,
-  getSelectInteraction,
-  getTranslateInteraction,
-} from '../../draw/drawControls/hooks/mapInterations';
+import { getDrawInteraction } from '../../draw/drawControls/hooks/mapInterations';
 import {
   getDrawLayer,
   getDrawOverlayLayer,
@@ -46,6 +42,12 @@ import {
 import { getHighestZIndex } from '../../draw/drawControls/hooks/verticalMove';
 import { funnDraftActiveAtom } from '../../localities/atoms';
 import { mapAtom } from '../../map/atoms';
+import {
+  addOwnedInteraction,
+  getOwnedInteractions,
+  removeOwnedInteractions,
+} from '../../map/interactions';
+import { mapToolAtom } from '../../map/overlay/atoms';
 import { addDrawAction } from './drawActions/drawActionsHooks';
 
 export const DEFAULT_PRIMARY_COLOR = '#0e5aa0ff';
@@ -116,38 +118,48 @@ export const textStyleReadAtom = atom((get) => {
 });
 
 // Drawing exists only inside a lokalitet workspace: enabled exactly
-// while a funn draft is open.
+// while a funn draft is open — and suspended while the measure tool is,
+// since both want the same clicks and OL will happily hand them to both.
+// (The workspace already makes the draft exclusive with "juster området"
+// and the LiDAR extract; measure is the one tool outside it.) Suspending
+// rather than cancelling: the draft form and anything already drawn
+// survive, and closing measure puts the interactions back.
 export const drawEnabledAtom = atom<boolean>((get) => {
-  return get(funnDraftActiveAtom);
+  return get(funnDraftActiveAtom) && get(mapToolAtom) !== 'measure';
 });
 
 export const selectedFeatureAtom = atom<Feature<Geometry> | null>(null);
 
 export const drawEnabledEffect = atomEffect((get, set) => {
   const drawEnabled = get(drawEnabledAtom);
-  const store = getDefaultStore();
-  const map = store.get(mapAtom);
-
-  const drawInteraction = getDrawInteraction();
-  const selectInteraction = getSelectInteraction();
-  const translateInteraction = getTranslateInteraction();
 
   if (drawEnabled) {
     set(drawTypeAtom, 'LineString');
   } else {
-    if (drawInteraction) {
-      map.removeInteraction(drawInteraction);
-    }
-    if (selectInteraction) {
-      const features = selectInteraction.getFeatures();
-      map.removeInteraction(selectInteraction);
-      features.forEach(handleFeatureSelectDone);
-    }
-    if (translateInteraction) {
-      map.removeInteraction(translateInteraction);
-    }
+    // null rather than a bare clearInteractions(): DrawControls stays
+    // mounted while measure suspends drawing, so re-enabling has to move
+    // drawTypeAtom for drawTypeEffect to rebuild. Leaving it on
+    // 'LineString' would make the write back to 'LineString' a no-op and
+    // the interactions would never return. drawTypeEffect clears on its
+    // way through null.
+    set(drawTypeAtom, null);
   }
 });
+
+// Snap rewrites the event coordinate before Draw/Modify read it, and
+// interactions are dispatched last-added-first, so it only works if it
+// goes on after them. That's why it is re-added on every rebuild rather
+// than being set up once and left alone.
+const addSnapInteractionToMap = (drawLayer: VectorLayer, map: Map) => {
+  if (!getDefaultStore().get(snapEnabledAtom)) {
+    return;
+  }
+  addOwnedInteraction(
+    map,
+    'draw',
+    new Snap({ source: drawLayer.getSource() as VectorSource }),
+  );
+};
 
 const addSelectMoveInteractionToMap = (drawLayer: VectorLayer, map: Map) => {
   const selectInteraction = new Select({
@@ -156,7 +168,7 @@ const addSelectMoveInteractionToMap = (drawLayer: VectorLayer, map: Map) => {
     hitTolerance: 12,
   });
   selectInteraction.addEventListener('select', handleSelect);
-  map.addInteraction(selectInteraction);
+  addOwnedInteraction(map, 'draw', selectInteraction);
 
   const translateInteraction = new Translate({
     features: selectInteraction.getFeatures(),
@@ -172,8 +184,10 @@ const addSelectMoveInteractionToMap = (drawLayer: VectorLayer, map: Map) => {
 
   modifyInteraction.addEventListener('modifystart', handleModifyStart);
   modifyInteraction.addEventListener('modifyend', handleModifyEnd);
-  map.addInteraction(translateInteraction);
-  map.addInteraction(modifyInteraction);
+  addOwnedInteraction(map, 'draw', translateInteraction);
+  addOwnedInteraction(map, 'draw', modifyInteraction);
+
+  addSnapInteractionToMap(drawLayer, map);
 };
 
 const addDrawInteractionToMap = (
@@ -196,17 +210,9 @@ const addDrawInteractionToMap = (
   newDraw.addEventListener('drawend', (event: BaseEvent | Event) => {
     drawEnd(event);
   });
-  map.addInteraction(newDraw);
+  addOwnedInteraction(map, 'draw', newDraw);
 
-  const store = getDefaultStore();
-  const snapEnabled = store.get(snapEnabledAtom);
-
-  if (snapEnabled) {
-    const snapInteraction = new Snap({
-      source: drawLayer.getSource() as VectorSource,
-    });
-    map.addInteraction(snapInteraction);
-  }
+  addSnapInteractionToMap(drawLayer, map);
 };
 
 const setDisplayStaticMeasurement = (enable: boolean, map: Map) => {
@@ -272,21 +278,20 @@ const setDisplayInteractiveMeasurementForDrawInteraction = (
   }
 };
 
+// Every interaction the draw tool put on the map, including the Modify
+// and Snap ones — the previous version only knew about Select, Draw and
+// Translate, so each draw-type change left another Modify behind, still
+// bound to the discarded Select's feature collection and still firing
+// modifystart/modifyend.
 export const clearInteractions = () => {
   const store = getDefaultStore();
   const map = store.get(mapAtom);
-  const interactions = map.getInteractions().getArray();
 
-  for (const interaction of interactions) {
+  for (const interaction of getOwnedInteractions(map, 'draw')) {
+    map.removeInteraction(interaction);
     if (interaction instanceof Select) {
-      const features = interaction.getFeatures();
-      map.removeInteraction(interaction);
-      features.forEach(handleFeatureSelectDone);
-
-      map.removeInteraction(interaction);
-    }
-    if (interaction instanceof Draw || interaction instanceof Translate) {
-      map.removeInteraction(interaction);
+      // After detaching, so nothing re-selects on the way out.
+      interaction.getFeatures().forEach(handleFeatureSelectDone);
     }
   }
 };
@@ -317,21 +322,14 @@ export const drawTypeEffect = atomEffect((get) => {
 });
 
 export const snapEffect = atomEffect((get) => {
-  const snapEnabled = get(snapEnabledAtom);
+  // Read for the dependency; addSnapInteractionToMap re-reads it.
+  get(snapEnabledAtom);
   const store = getDefaultStore();
   const map = store.get(mapAtom);
   const drawLayer = getDrawLayer();
 
-  map.getInteractions().forEach((interaction) => {
-    if (interaction instanceof Snap) {
-      map.removeInteraction(interaction);
-    }
-  });
-
-  if (snapEnabled) {
-    const snap = new Snap({ source: drawLayer.getSource() as VectorSource });
-    map.addInteraction(snap);
-  }
+  removeOwnedInteractions(map, 'draw', (i) => i instanceof Snap);
+  addSnapInteractionToMap(drawLayer, map);
 });
 
 const drawEnd = (event: BaseEvent | Event) => {

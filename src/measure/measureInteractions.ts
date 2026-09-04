@@ -9,6 +9,10 @@ import VectorSource from 'ol/source/Vector';
 import { getArea, getLength } from 'ol/sphere';
 import { Fill, Stroke, Style } from 'ol/style';
 import Text from 'ol/style/Text';
+import {
+  addOwnedInteraction,
+  removeOwnedInteractions,
+} from '../map/interactions';
 import { DistanceUnit, distanceUnitAtom } from '../settings/draw/atoms';
 import { formatArea, formatDistance } from '../shared/utils/stringUtils';
 
@@ -62,11 +66,7 @@ export const addMeasureInteractionToMap = (
   const unit = store.get(distanceUnitAtom);
   const projection = map.getView().getProjection().getCode();
 
-  map.getInteractions().forEach((interaction) => {
-    if (interaction instanceof Draw) {
-      map.removeInteraction(interaction);
-    }
-  });
+  removeOwnedInteractions(map, 'measure');
 
   const draw = new Draw({
     source: measureLayer.getSource() as VectorSource,
@@ -100,7 +100,7 @@ export const addMeasureInteractionToMap = (
     });
   });
 
-  map.addInteraction(draw);
+  addOwnedInteraction(map, 'measure', draw);
 
   return draw;
 };

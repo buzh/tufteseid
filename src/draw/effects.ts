@@ -1,12 +1,10 @@
 import { atomEffect } from 'jotai-effect';
 import Draw from 'ol/interaction/Draw';
-import Map from 'ol/Map';
 import { Fill, RegularShape, Style } from 'ol/style';
 import CircleStyle from 'ol/style/Circle';
 import { mapAtom } from '../map/atoms';
 
 import { getDefaultStore } from 'jotai';
-import Select from 'ol/interaction/Select';
 import VectorLayer from 'ol/layer/Vector';
 import {
   distanceUnitAtom,
@@ -26,25 +24,11 @@ import {
   INTERACTIVE_OVERLAY_PREFIX,
   MEASUREMNT_OVERLAY_PREFIX,
 } from './drawControls/hooks/drawSettings';
+import {
+  getDrawInteraction,
+  getSelectInteraction,
+} from './drawControls/hooks/mapInterations';
 import { getFeatureIcon } from './utils/featureUtils';
-
-const getDrawInteraction = (map: Map) => {
-  const drawInteraction = map
-    .getInteractions()
-    .getArray()
-    .filter((interaction) => interaction instanceof Draw)[0] as
-    Draw | undefined;
-  return drawInteraction;
-};
-
-const getSelectInteraction = (map: Map) => {
-  const selectInteraction = map
-    .getInteractions()
-    .getArray()
-    .filter((interaction) => interaction instanceof Select)[0] as
-    Select | undefined;
-  return selectInteraction;
-};
 
 const getDrawOverlayStyle = (draw: Draw) => {
   const style = draw.getOverlay()?.getStyle() as Style | null;
@@ -54,7 +38,7 @@ const getDrawOverlayStyle = (draw: Draw) => {
 export const editPrimaryColorEffect = atomEffect((get) => {
   const primaryColor = get(primaryColorAtom);
   const map = get(mapAtom);
-  const selectInteraction = getSelectInteraction(map);
+  const selectInteraction = getSelectInteraction();
   if (selectInteraction) {
     selectInteraction.getFeatures().forEach((feature) => {
       const featureStyle = feature.getStyle() as Style | undefined;
@@ -109,8 +93,7 @@ export const editPrimaryColorEffect = atomEffect((get) => {
 
 export const editSecondaryColorEffect = atomEffect((get) => {
   const secondaryColor = get(secondaryColorAtom);
-  const map = get(mapAtom);
-  const selectInteraction = getSelectInteraction(map);
+  const selectInteraction = getSelectInteraction();
   if (selectInteraction) {
     selectInteraction.getFeatures().forEach((feature) => {
       const featureStyle = feature.getStyle() as Style | undefined;
@@ -139,8 +122,7 @@ export const editTextEffect = atomEffect((get) => {
   const text = get(textInputAtom);
   const fontSize = get(textFontSizeAtom);
 
-  const map = get(mapAtom);
-  const selectInteraction = getSelectInteraction(map);
+  const selectInteraction = getSelectInteraction();
 
   if (!selectInteraction) {
     return;
@@ -168,7 +150,7 @@ export const editTextEffect = atomEffect((get) => {
 export const lineWidthEffect = atomEffect((get) => {
   const lineWidth = get(lineWidthAtom);
   const map = get(mapAtom);
-  const selectInteraction = getSelectInteraction(map);
+  const selectInteraction = getSelectInteraction();
   if (selectInteraction) {
     selectInteraction.getFeatures().forEach((feature) => {
       const featuretype = feature.getGeometry()?.getType();
@@ -205,9 +187,8 @@ export const lineWidthEffect = atomEffect((get) => {
 export const editPointIconEffect = atomEffect((get) => {
   const pointIcon = get(pointIconAtom);
   const lineWidth = get(lineWidthAtom);
-  const map = get(mapAtom);
 
-  const selectInteraction = getSelectInteraction(map);
+  const selectInteraction = getSelectInteraction();
 
   if (!selectInteraction) {
     return;
@@ -242,9 +223,8 @@ export const drawStyleEffect = atomEffect((get) => {
   const primaryColor = get(primaryColorAtom);
   const secondaryColor = get(secondaryColorAtom);
   const lineWidth = get(lineWidthAtom);
-  const map = get(mapAtom);
   const drawType = get(drawTypeAtom);
-  const drawInteraction = getDrawInteraction(map);
+  const drawInteraction = getDrawInteraction();
   if (!drawInteraction) {
     return;
   }

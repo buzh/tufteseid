@@ -14,6 +14,7 @@ import { transformExtent } from 'ol/proj';
 import VectorSource from 'ol/source/Vector';
 import { Fill, Stroke, Style } from 'ol/style';
 import { mapAtom } from '../map/atoms';
+import { addOwnedInteraction } from '../map/interactions';
 import { lidarExtractSelectionAtom } from './atoms';
 
 const SELECTION_LAYER_ID = 'lidarExtractSelectionLayer';
@@ -95,7 +96,7 @@ export const useDrawSelection = () => {
       setSelection({ bboxMap, mapProjection, bbox25833, bboxLonLat });
     });
 
-    map.addInteraction(draw);
+    addOwnedInteraction(map, 'lidarExtract', draw);
 
     return () => {
       map.removeInteraction(draw);

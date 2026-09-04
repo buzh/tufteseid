@@ -3,7 +3,7 @@ import { atomEffect } from 'jotai-effect';
 import { getMeasureLayer } from '../draw/drawControls/hooks/mapLayers';
 import { mapAtom } from '../map/atoms';
 
-import Draw from 'ol/interaction/Draw';
+import { removeOwnedInteractions } from '../map/interactions';
 import { mapToolAtom } from '../map/overlay/atoms';
 import { addMeasureInteractionToMap } from './measureInteractions';
 
@@ -19,11 +19,7 @@ export const measureEnabledEffect = atomEffect((get) => {
 
   if (tool !== 'measure') {
     layer.getSource()?.clear();
-    map.getInteractions().forEach((interaction) => {
-      if (interaction instanceof Draw) {
-        map.removeInteraction(interaction);
-      }
-    });
+    removeOwnedInteractions(map, 'measure');
     return;
   }
   setTimeout(() => {

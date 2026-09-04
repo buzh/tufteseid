@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { createLocality, LocalityBbox } from '../api/localities';
 import { currentUserAtom } from '../auth/atoms';
 import { mapAtom } from '../map/atoms';
+import { addOwnedInteraction } from '../map/interactions';
 import { activeLocalityAtom, creatingLocalityAtom } from './atoms';
 import { upsertLocalityOnLayer } from './localityLayer';
 
@@ -90,7 +91,7 @@ export const useLocalityCreate = () => {
         });
     });
 
-    map.addInteraction(draw);
+    addOwnedInteraction(map, 'localityCreate', draw);
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setCreating(false);
