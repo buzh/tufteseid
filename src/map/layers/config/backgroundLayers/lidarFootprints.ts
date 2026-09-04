@@ -315,4 +315,3 @@ export const touchesExtent = (
   geometries: Geometry[],
   extent: [number, number, number, number],
 ): boolean => geometries.some((g) => g.intersectsExtent(extent));
-</content>
