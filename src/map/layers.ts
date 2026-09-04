@@ -4,10 +4,6 @@ import VectorSource from 'ol/source/Vector';
 
 type LayerFunction = () => BaseLayer;
 
-export const isMapLayerBackground = (layer: BaseLayer): boolean => {
-  return layer.get('id')?.startsWith('bg.') === true;
-};
-
 export type MapLayer = {
   getLayer: LayerFunction;
   maxZoom?: number;
@@ -18,7 +14,6 @@ export type MapLayers = {
   drawOverlayLayer: MapLayer;
   markerLayer: MapLayer;
   posterMarkerLayer: MapLayer;
-  clusterLayer: MapLayer;
   propertyGeometryLayer: MapLayer;
   measureLayer: MapLayer;
 };
@@ -61,15 +56,6 @@ const mapLayers: MapLayers = {
     },
   },
 
-  clusterLayer: {
-    getLayer: () => {
-      return new VectorLayer({
-        zIndex: 4,
-        source: new VectorSource({ wrapX: false }),
-        properties: { id: 'clusterLayer' },
-      });
-    },
-  },
   propertyGeometryLayer: {
     getLayer: () => {
       return new VectorLayer({

@@ -1,5 +1,4 @@
-import { atom, getDefaultStore } from 'jotai';
-import { atomEffect } from 'jotai-effect';
+import { atom } from 'jotai';
 import { View } from 'ol';
 import { defaults as defaultControls, ScaleLine } from 'ol/control';
 import { defaults as defaultInteractions } from 'ol/interaction';
@@ -9,23 +8,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { parseCoordinateInput } from '../shared/utils/coordinateParser';
 import { validateProjectionIdString } from '../shared/utils/enumUtils';
 import { getUrlParameter, setUrlParameter } from '../shared/utils/urlUtils';
-import { isMapLayerBackground, mapLayers } from './layers';
-import { activeThemeLayersAtom } from './layers/atoms';
-import {
-  allConfiguredBackgroundLayers,
-  backgroundLayerAtom,
-} from './layers/config/backgroundLayers/atoms';
-import { getLayerFromConfig } from './layers/config/backgroundLayers/utils';
+import { mapLayers } from './layers';
 import { ProjectionIdentifier } from './projections/types';
 
 export const DEFAULT_PROJECTION: ProjectionIdentifier = 'EPSG:25833';
 export const DEFAULT_ZOOM_LEVEL = 3;
 export const DEFAULT_CENTER = [396722, 7197860]; // Center in EPSG:25833
-
-export const currentProjectionAtom = atom<ProjectionIdentifier>(
-  validateProjectionIdString(getUrlParameter('projection')) ||
-    DEFAULT_PROJECTION,
-);
 
 const getInitialMapView = () => {
   const projectionIdFromUrl = validateProjectionIdString(
@@ -148,90 +136,4 @@ export const mapAtom = atom<Map>(() => {
   map.setProperties({ id: mapId });
 
   return map;
-});
-
-export const projectionEffect = atomEffect((get, set) => {
-  const projectionId = get(currentProjectionAtom);
-  const store = getDefaultStore();
-  const map = store.get(mapAtom);
-
-  const oldView = map.getView();
-  const oldProjection = oldView.getProjection();
-  const oldProjectionCode = oldProjection.getCode();
-
-  if (oldProjectionCode === projectionId) return;
-
-  const backgroundLayerName = store.get(backgroundLayerAtom);
-  const activeThemeLayers = store.get(activeThemeLayersAtom);
-
-  const projection = getProjection(projectionId)!;
-  const oldCenter = oldView.getCenter();
-
-  const newCenter = oldCenter
-    ? transform(oldCenter, oldProjection, projection)
-    : undefined;
-
-  let newZoom = oldView.getZoom() ?? DEFAULT_ZOOM_LEVEL;
-  if (oldProjectionCode !== 'EPSG:3857' && projectionId === 'EPSG:3857') {
-    newZoom += 1;
-  } else if (
-    oldProjectionCode === 'EPSG:3857' &&
-    projectionId !== 'EPSG:3857'
-  ) {
-    newZoom -= 1;
-  }
-  newZoom = Math.round(newZoom);
-
-  map.setView(
-    new View({
-      center: newCenter,
-      zoom: newZoom,
-      minZoom: oldView.getMinZoom(),
-      maxZoom: oldView.getMaxZoom(),
-      projection,
-      constrainResolution: true,
-      extent: projection.getExtent(),
-
-      smoothResolutionConstraint: false,
-    }),
-  );
-
-  if (activeThemeLayers.size > 0) {
-    map
-      .getLayers()
-      .getArray()
-      .filter((l) => l.get('id')?.startsWith('theme.'))
-      .forEach((l) => map.removeLayer(l));
-    set(activeThemeLayersAtom, new Set(activeThemeLayers));
-  }
-
-  setUrlParameter('projection', projectionId);
-
-  const currentBackgroundLayer = map.getAllLayers().find(isMapLayerBackground);
-
-  if (currentBackgroundLayer) {
-    const bgLayerProjection = currentBackgroundLayer
-      .getSource()
-      ?.getProjection()
-      ?.getCode();
-
-    if (bgLayerProjection && bgLayerProjection !== projectionId) {
-      const layerConfig = allConfiguredBackgroundLayers.find(
-        (config) => config.layerName === backgroundLayerName,
-      );
-
-      if (layerConfig) {
-        getLayerFromConfig(layerConfig, projectionId).then((layer) => {
-          if (layer) {
-            map.removeLayer(currentBackgroundLayer);
-            map.addLayer(layer);
-          } else {
-            console.warn(
-              `Could not create layer for ${backgroundLayerName} with projection ${projectionId}`,
-            );
-          }
-        });
-      }
-    }
-  }
 });

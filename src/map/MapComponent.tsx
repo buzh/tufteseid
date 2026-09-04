@@ -4,7 +4,6 @@ import 'ol/ol.css';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ErrorBoundary } from '../shared/ErrorBoundary.tsx';
-import { projectionEffect } from './atoms.ts';
 import { trackPostitionAtomEffect } from './geolocation/atoms.ts';
 import { themeLayerEffect } from './layers/atoms.ts';
 import { backgroundLayerAtomEffect } from './layers/config/backgroundLayers/atoms.ts';
@@ -17,7 +16,6 @@ export const MapComponent = () => {
   const { setTargetElement } = useMap();
   useAtom(themeLayerEffect);
   useAtom(trackPostitionAtomEffect);
-  useAtom(projectionEffect);
   useAtom(backgroundLayerAtomEffect);
 
   useEffect(() => {

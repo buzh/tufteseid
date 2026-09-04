@@ -80,9 +80,13 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
   const projection = map.getView().getProjection().getCode();
   const properties = { id: `bg.${layerConfig.layerName}` };
 
+  // No SRS/CRS here: OL derives it from the source projection and writes
+  // it itself on every request (`params[v13 ? 'CRS' : 'SRS']` in
+  // ol/source/wms.js). A hand-set SRS is not overwritten, it is just
+  // carried along as a spare parameter the server ignores.
   const source = new TileWMS({
     url: layerConfig.url,
-    params: { ...layerConfig.props, SRS: projection },
+    params: { ...layerConfig.props },
   });
   // 8 sampling stops per edge rather than the default corners-only:
   // reprojecting a Norway-sized box out of UTM33 bows its edges, and
@@ -122,10 +126,13 @@ export const getLayerFromConfig = async (
   return null;
 };
 
-const isBackgroundLayer = (layer: BaseLayer): boolean => {
-  const layerId = layer.get('id');
-  return !layerId || String(layerId).startsWith('bg.');
-};
+// Strictly the `bg.` prefix. This used to also count any layer without
+// an id, which no layer in the app has — every one is constructed with
+// `properties: { id }` — so the clause could only ever fire for a future
+// id-less layer, and its effect there would be to have the next
+// background swap quietly delete it.
+const isBackgroundLayer = (layer: BaseLayer): boolean =>
+  String(layer.get('id') ?? '').startsWith('bg.');
 
 // Identity of what a background layer is showing: equal signatures mean
 // equal pixels. Cycling styles or datasets rebuilds the whole stack on

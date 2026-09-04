@@ -64,10 +64,12 @@ export const createThemeLayerFromConfig = (
   const minZoom =
     layerDef.minZoom ?? category?.minZoom ?? parentCategory?.minZoom;
 
+  // No SRS/CRS: OL writes it from the source projection on every request
+  // (ol/source/wms.js). Setting it here just adds a parameter the server
+  // ignores.
   const wmsParams = {
     LAYERS: layerDef.layers,
     TRANSPARENT: true,
-    SRS: projection,
     STYLES: layerDef.styles ?? '',
     FILTER: layerDef.filter ? layerDef.filter : undefined,
     ...extraWmsParams,
@@ -90,7 +92,6 @@ export const createThemeLayerFromConfig = (
       url: wmsUrl,
       params: { ...wmsParams, TILED: true },
       projection: projection,
-      cacheSize: 512,
     }),
     properties: layerProperties,
     // preload 0 for the same reason as the WMS background layers: these
