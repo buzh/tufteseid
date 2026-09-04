@@ -417,12 +417,20 @@ export const TopBar = () => {
     };
   }, []);
 
-  // Badge on the dataset pulldown: how many catalogued projects
-  // intersect the current viewport, i.e. how much that pulldown has to
-  // offer here. Cheap (pure array filter over the already-loaded
-  // catalogue, no network), so it keeps running even outside LiDAR mode
-  // — the count is then ready the instant the pulldown appears.
-  const [relevantCount, setRelevantCount] = useState(0);
+  // Upper bound on how many datasets cover the viewport: catalogued
+  // projects whose *envelope* intersects it. Cheap (pure array filter
+  // over the already-loaded catalogue, no network), so it keeps running
+  // even outside LiDAR mode — a number is then ready the instant the
+  // pulldown appears. It overshoots, often by 3× in a town where a
+  // county-sized acquisition's envelope reaches across the screen but
+  // its polygon doesn't; the badge below prefers the real, polygon-
+  // confirmed count as soon as the viewport list has been fetched.
+  const [envelopeCount, setEnvelopeCount] = useState(0);
+  // The coverage-confirmed count, kept after the pulldown closes so the
+  // badge doesn't jump back to the estimate the moment the user picks
+  // something. Only the viewport list can produce it, and that's only
+  // fetched while the pulldown is open or W/S cycling is armed.
+  const [confirmedCount, setConfirmedCount] = useState<number | null>(null);
   useEffect(() => {
     if (!allProjects) return;
     const recompute = () => {
@@ -435,10 +443,12 @@ export const TopBar = () => {
         | [number, number, number, number]
         | undefined;
       if (!extentLonLat) return;
-      setRelevantCount(
+      setEnvelopeCount(
         allProjects.filter((p) => bboxIntersects(p.bboxLonLat, extentLonLat))
           .length,
       );
+      // A confirmed count belongs to the view it was counted in.
+      setConfirmedCount(null);
     };
     recompute();
     map.on('moveend', recompute);
@@ -446,6 +456,15 @@ export const TopBar = () => {
       map.un('moveend', recompute);
     };
   }, [allProjects, map]);
+
+  useEffect(() => {
+    if (viewport.status !== 'ready') return;
+    setConfirmedCount(viewport.primary.length + viewport.secondary.length);
+  }, [viewport]);
+  // Prefer the confirmed count; fall back to the envelope estimate,
+  // where overshooting is the right way to be wrong for a "there is
+  // something here" hint.
+  const datasetCount = confirmedCount ?? envelopeCount;
 
   const toggleTool = (name: Exclude<MapTool, null>) => {
     setCurrentMapTool(currentMapTool === name ? null : name);
@@ -777,9 +796,9 @@ export const TopBar = () => {
                     footprint fetch; without this the key looks dead. */}
                 {cyclingPending && <Spinner size="xs" />}
               </Button>
-              {/* How many catalogued projects intersect the viewport —
-                  i.e. how much this pulldown has to offer here. */}
-              <CountBadge value={relevantCount} />
+              {/* How many datasets cover the viewport — i.e. how much
+                  this pulldown has to offer here. */}
+              <CountBadge value={datasetCount} />
             </Box>
           </PopoverTrigger>
           <PopoverContent width="320px" p={0} borderRadius="lg">

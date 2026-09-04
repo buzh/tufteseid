@@ -312,6 +312,25 @@ export const bboxIntersects = (
   b: [number, number, number, number],
 ): boolean => a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
 
+// Fraction of `viewport` covered by `bbox`, both lon/lat. An *upper
+// bound* on the project's real on-screen coverage — the catalogue only
+// knows envelopes, and a project's polygon is always a subset of its
+// envelope. That makes it the right key for deciding which candidates
+// are worth fetching a real footprint for: the ones dropped are the ones
+// that could not have scored well even if their polygon filled their
+// bbox. Degrees, not metres, but every candidate shares the viewport's
+// latitude band so the distortion cancels out of the ordering.
+export const bboxOverlapRatio = (
+  bbox: [number, number, number, number],
+  viewport: [number, number, number, number],
+): number => {
+  const w = Math.min(bbox[2], viewport[2]) - Math.max(bbox[0], viewport[0]);
+  const h = Math.min(bbox[3], viewport[3]) - Math.max(bbox[1], viewport[1]);
+  if (w <= 0 || h <= 0) return 0;
+  const area = (viewport[2] - viewport[0]) * (viewport[3] - viewport[1]);
+  return area > 0 ? (w * h) / area : 0;
+};
+
 // --- National mosaic styles ---
 //
 // wms.hoyde-dtm-nhm-topobathy-25833 publishes the same kind of styled

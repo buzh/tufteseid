@@ -28,7 +28,9 @@ import {
 import {
   activeLidarProjectAtom,
   bboxIntersects,
+  bboxOverlapRatio,
   fetchLidarProjects,
+  sortProjectsByRelevance,
 } from './layers/config/backgroundLayers/lidarProjects';
 import {
   classifyRelevance,
@@ -44,20 +46,25 @@ import {
 
 export const LIDAR_FOOTPRINTS_LAYER_ID = 'lidarFootprintsLayer';
 
-// Furthest out we'll ask the Prosjektavgrensning WFS about the viewport.
+// Furthest out the pulldown will try to answer "what covers this view".
 // Expressed as a zoom level rather than a viewport width because that's
 // what the cutoff feels like in use, and it doesn't move with the
 // browser window.
 //
-// It buys reach at a real cost: the responses are uncompressed GeoJSON
-// and grow with area — ~1 MB across a 20 km viewport, 7.7 MB across a
-// county, ~18 MB at zoom 7 on a wide screen (measured, ~3 s). Zoomed out
-// past this the request stops being answerable at all: the upstream
-// gives up with a 504 after 30 s on a whole-Norway box, which is also
-// where the /wfs-skwms1/ proxy would cut it. So the honest answer below
-// the threshold is "zoom in", not a half-minute spinner ending in an
-// empty list.
+// Not a cost bound any more — FOOTPRINT_FETCH_CAP below bounds the work
+// at every zoom. It's that the answer stops being a picker: a
+// whole-country view intersects some 450 acquisitions, of which the list
+// can show 25, and "these 25 counties have LiDAR" is not a choice anyone
+// is trying to make. The honest response out here is "zoom in".
 const MIN_FOOTPRINT_ZOOM = 7;
+
+// How many candidates get a real footprint fetched. Candidates are
+// ordered by bboxOverlapRatio first — an upper bound on real coverage —
+// so the ones this drops are the ones that could not have made the top
+// of the list anyway. Sized above RENDER_CAP (25) with room for the
+// envelope-vs-polygon slack, and it's also the request budget: 60 name
+// queries at 6 concurrent is ~2 s cold and free once cached.
+const FOOTPRINT_FETCH_CAP = 60;
 
 type Tier = 'hover' | 'active';
 
@@ -189,22 +196,35 @@ export const useLidarFootprintsLayer = () => {
 
       fetchLidarProjects()
         .then((allProjects) => {
-          // Catalogue bboxes are a coarse prefilter — they cut ~1900
-          // projects down to something the name join can chew through.
-          // What actually qualifies a project for the list is its WFS
-          // footprint touching the viewport, decided below.
-          const candidates = allProjects.filter((p) =>
-            bboxIntersects(p.bboxLonLat, extentLonLat),
-          );
+          // The catalogue's GetCapabilities bounding boxes are true
+          // envelopes, so this prefilter is *complete* — it can only
+          // over-include. That completeness is what lets the footprint
+          // fetch be a per-name lookup instead of a spatial query the
+          // WFS answers wrong at small extents (see lidarFootprints.ts).
+          // What actually qualifies a project for the list is its real
+          // polygon touching the viewport, decided below.
+          const candidates = allProjects
+            .filter((p) => bboxIntersects(p.bboxLonLat, extentLonLat))
+            .map((project) => ({
+              project,
+              maxRatio: bboxOverlapRatio(project.bboxLonLat, extentLonLat),
+            }))
+            .sort(
+              (a, b) =>
+                b.maxRatio - a.maxRatio ||
+                sortProjectsByRelevance(a.project, b.project),
+            )
+            .slice(0, FOOTPRINT_FETCH_CAP)
+            .map(({ project }) => project);
 
-          return fetchLidarFootprints(extent, projection, candidates).then(
+          return fetchLidarFootprints(candidates, projection).then(
             (matches) => {
               if (isStale()) return;
               const entries: LidarViewportEntry[] = [];
               for (const project of candidates) {
                 const geometries = matches.get(project.id)?.geometries;
-                // No footprint back from the WFS, or one that only came
-                // back because its envelope overlaps: the project has
+                // No boundary in the WFS, or one whose only overlap with
+                // the viewport was its envelope's: the project has
                 // nothing on this screen, so it isn't in this list.
                 if (!geometries || !touchesExtent(geometries, extent)) continue;
                 entries.push({
