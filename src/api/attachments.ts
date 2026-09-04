@@ -44,6 +44,21 @@ export const listLocalityAttachments = async (
   });
 };
 
+// Bilder per lokalitet for the "Mine lokaliteter" list — see
+// countFindsByLocality; same `fields` trick, same reason.
+export const countAttachmentsByLocality = async (): Promise<
+  Map<string, number>
+> => {
+  const rows = await pb
+    .collection(COLLECTION)
+    .getFullList<{ locality: string }>({ fields: 'locality' });
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    counts.set(row.locality, (counts.get(row.locality) ?? 0) + 1);
+  }
+  return counts;
+};
+
 export const createAttachment = async (
   input: NewAttachmentInput,
   ownerId: string,

@@ -2,69 +2,87 @@ import {
   Badge,
   Box,
   Button,
+  Dialog,
+  DialogBody,
+  DialogCloseTrigger,
+  DialogContent,
   Flex,
   Heading,
   HStack,
   IconButton,
   Input,
-  Spinner,
+  MaterialSymbol,
   Stack,
   Text,
+  toaster,
   Tooltip,
 } from '@kvib/react';
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { transformExtent } from 'ol/proj';
-import type { ChangeEvent, CSSProperties, FocusEvent, MouseEvent } from 'react';
+import type {
+  FocusEvent as ReactFocusEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createAttachment } from '../api/attachments';
 import {
   deleteLocality,
   LocalityBbox,
+  LocalityPatch,
   LocalityRecord,
-  LocalityVisibility,
   updateLocality,
 } from '../api/localities';
 import {
   createLocalityFind,
   deleteLocalityFind,
-  listLocalityFinds,
   LocalityFindRecord,
   LocalityFindStatus,
-  subscribeLocalityFinds,
   updateLocalityFind,
 } from '../api/localityFinds';
 import { currentUserAtom } from '../auth/atoms';
-import { DrawControls } from '../draw/drawControls/DrawControls';
 import { useDrawSettings } from '../draw/drawControls/hooks/drawSettings';
 import { getDrawLayer } from '../draw/drawControls/hooks/mapLayers';
 import { lidarExtractSelectionAtom } from '../lidarExtract/atoms';
 import { LidarExtractPanel } from '../lidarExtract/LidarExtractPanel';
 import { mapAtom } from '../map/atoms';
-import { BilderSection } from './BilderSection';
-import { KulturminnerSection } from './KulturminnerSection';
-import { captureLocalityScreenshot } from './screenshot';
 import {
   activeLocalityAtom,
   adjustingLocalityAtom,
   funnDraftActiveAtom,
+  lightboxOpenAtom,
+  selectedFunnIdAtom,
 } from './atoms';
+import { BilderSection } from './BilderSection';
+import { formatBboxArea } from './format';
+import { FunnDraft } from './FunnDraft';
+import { FunnList } from './FunnList';
 import {
   getFunnExtentOnLayer,
   hideFunnOnLayer,
   removeFunnFromLayer,
   upsertFunnOnLayer,
 } from './funnLayer';
+import { KulturminnerSection } from './KulturminnerSection';
+import { LocalityDetails } from './LocalityDetails';
 import {
   removeLocalityFromLayer,
   setLocalityHighlight,
   upsertLocalityOnLayer,
 } from './localityLayer';
+import { captureLocalityScreenshot } from './screenshot';
 import {
   getDrawLayerExtent4326,
   serializeDrawLayer,
 } from './serializeDrawLayer';
+import { BadgePalette, ConfirmPopover, WorkspaceSection } from './ui';
+import { useKulturminner } from './useKulturminner';
 import { useLocalityAdjust } from './useLocalityAdjust';
+import {
+  useLocalityAttachments,
+  useLocalityFinds,
+} from './useLocalityContent';
+import { useWorkspaceKeys } from './useWorkspaceKeys';
 
 const bboxContains = (outer: LocalityBbox, inner: LocalityBbox): boolean =>
   inner[0] >= outer[0] &&
@@ -79,205 +97,67 @@ const bboxUnion = (a: LocalityBbox, b: LocalityBbox): LocalityBbox => [
   Math.max(a[3], b[3]),
 ];
 
-const NATIVE_INPUT_STYLE: CSSProperties = {
-  width: '100%',
-  padding: '4px 8px',
-  fontSize: '14px',
-  border: '1px solid #CBD5E0',
-  borderRadius: '6px',
-  resize: 'vertical',
-  fontFamily: 'inherit',
+const VISIBILITY_PALETTE: Record<
+  LocalityRecord['visibility'],
+  BadgePalette
+> = {
+  private: 'gray',
+  limited: 'yellow',
+  public: 'green',
 };
 
-const STATUS_ORDER: LocalityFindStatus[] = [
-  'mulig',
-  'sannsynlig',
-  'avkreftet',
-  'rapportert',
-];
-
-const STATUS_PALETTE: Record<LocalityFindStatus, string> = {
-  mulig: 'yellow',
-  sannsynlig: 'green',
-  avkreftet: 'red',
-  rapportert: 'blue',
-};
-
-const StatusBadge = ({
-  value,
-  editable,
-  onChange,
+// One verb per button, always in the same place regardless of how far
+// down the panel is scrolled. Before this the tools lived in a section at
+// the very bottom, below Funn, Bilder and the register readout.
+const ActionButton = ({
+  icon,
+  label,
+  tooltip,
+  active,
+  disabled,
+  onClick,
 }: {
-  value: LocalityFindStatus;
-  editable: boolean;
-  onChange: (v: LocalityFindStatus) => void;
-}) => {
-  const { t } = useTranslation();
-  const next = (e: MouseEvent) => {
-    e.stopPropagation();
-    if (!editable) return;
-    const idx = STATUS_ORDER.indexOf(value);
-    onChange(STATUS_ORDER[(idx + 1) % STATUS_ORDER.length]);
-  };
-  return (
-    <Badge
-      as={editable ? 'button' : undefined}
-      onClick={next}
-      colorPalette={STATUS_PALETTE[value]}
-      cursor={editable ? 'pointer' : undefined}
-      title={editable ? t('localities.funn.status.cycleHint') : undefined}
+  icon: MaterialSymbol;
+  label: string;
+  tooltip: string;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) => (
+  <Tooltip content={tooltip} positioning={{ placement: 'bottom' }}>
+    <Button
+      size="xs"
+      flex="1"
+      minW={0}
+      px={1.5}
+      leftIcon={icon}
+      variant={active ? 'primary' : 'secondary'}
+      colorPalette="green"
+      disabled={disabled}
+      aria-pressed={active}
+      onClick={onClick}
     >
-      {t(`localities.funn.status.${value}`)}
-    </Badge>
-  );
-};
-
-const FunnRow = ({
-  funn,
-  editable,
-  onZoom,
-  onStatus,
-  onSaveMeta,
-  onEditGeometry,
-  onDelete,
-}: {
-  funn: LocalityFindRecord;
-  editable: boolean;
-  onZoom: (f: LocalityFindRecord) => void;
-  onStatus: (f: LocalityFindRecord, s: LocalityFindStatus) => void;
-  onSaveMeta: (f: LocalityFindRecord, title: string, note: string) => void;
-  onEditGeometry: (f: LocalityFindRecord) => void;
-  onDelete: (f: LocalityFindRecord) => void;
-}) => {
-  const { t } = useTranslation();
-  const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(funn.title);
-  const [note, setNote] = useState(funn.note ?? '');
-
-  const stop = (fn: () => void) => (e: MouseEvent) => {
-    e.stopPropagation();
-    fn();
-  };
-
-  if (editing) {
-    return (
-      <Box borderWidth="1px" borderColor="gray.300" borderRadius="md" p={2}>
-        <Stack gap={1}>
-          <Input
-            size="sm"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={200}
-          />
-          <textarea
-            value={note}
-            onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
-              setNote(e.target.value)
-            }
-            rows={2}
-            maxLength={20000}
-            style={NATIVE_INPUT_STYLE}
-          />
-          <HStack justify="flex-end">
-            <Button size="xs" variant="tertiary" onClick={() => setEditing(false)}>
-              {t('localities.funn.draft.cancel')}
-            </Button>
-            <Button
-              size="xs"
-              variant="primary"
-              colorPalette="green"
-              disabled={title.trim().length === 0}
-              onClick={() => {
-                onSaveMeta(funn, title.trim(), note.trim());
-                setEditing(false);
-              }}
-            >
-              {t('localities.workspace.save')}
-            </Button>
-          </HStack>
-        </Stack>
-      </Box>
-    );
-  }
-
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="gray.200"
-      borderRadius="md"
-      p={2}
-      cursor="pointer"
-      _hover={{ bg: 'gray.50', borderColor: 'gray.300' }}
-      onClick={() => onZoom(funn)}
-      title={t('localities.funn.actions.zoom')}
-    >
-      <Flex justify="space-between" align="flex-start" gap={2}>
-        <Box flex="1" minW={0}>
-          <Text fontWeight="semibold" fontSize="sm" lineClamp={1}>
-            {funn.title}
-          </Text>
-          {funn.note && (
-            <Text fontSize="xs" color="gray.600" lineClamp={2}>
-              {funn.note}
-            </Text>
-          )}
-        </Box>
-        <HStack gap={1} flexShrink={0}>
-          <StatusBadge
-            value={funn.status}
-            editable={editable}
-            onChange={(s) => onStatus(funn, s)}
-          />
-          {editable && (
-            <IconButton
-              icon="edit"
-              size="xs"
-              variant="ghost"
-              aria-label={t('localities.funn.actions.edit')}
-              onClick={stop(() => {
-                setTitle(funn.title);
-                setNote(funn.note ?? '');
-                setEditing(true);
-              })}
-            />
-          )}
-          {editable && (
-            <IconButton
-              icon="draw"
-              size="xs"
-              variant="ghost"
-              aria-label={t('localities.funn.actions.editGeometry')}
-              onClick={stop(() => onEditGeometry(funn))}
-            />
-          )}
-          {editable && (
-            <IconButton
-              icon="delete"
-              size="xs"
-              variant="ghost"
-              colorPalette="red"
-              aria-label={t('localities.funn.actions.delete')}
-              onClick={stop(() => onDelete(funn))}
-            />
-          )}
-        </HStack>
-      </Flex>
-    </Box>
-  );
-};
+      <Text fontSize="11px" lineClamp={1}>
+        {label}
+      </Text>
+    </Button>
+  </Tooltip>
+);
 
 export const LocalityWorkspace = ({
   locality,
 }: {
   locality: LocalityRecord;
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const map = useAtomValue(mapAtom);
   const user = useAtomValue(currentUserAtom);
-  const [, setActiveLocality] = useAtom(activeLocalityAtom);
+  const setActiveLocality = useSetAtom(activeLocalityAtom);
   const [draftActive, setDraftActive] = useAtom(funnDraftActiveAtom);
   const [adjusting, setAdjusting] = useAtom(adjustingLocalityAtom);
-  const [, setLidarSelection] = useAtom(lidarExtractSelectionAtom);
+  const [selectedFunnId, setSelectedFunnId] = useAtom(selectedFunnIdAtom);
+  const lightboxOpen = useAtomValue(lightboxOpenAtom);
+  const setLidarSelection = useSetAtom(lidarExtractSelectionAtom);
   const [lidarOpen, setLidarOpen] = useState(false);
   const [shooting, setShooting] = useState(false);
   const { setDrawLayerFeatures } = useDrawSettings();
@@ -288,86 +168,75 @@ export const LocalityWorkspace = ({
   // set; persists the bbox after every finished gesture.
   useLocalityAdjust(locality);
 
-  // Lokalitet metadata form.
-  const [name, setName] = useState(locality.name);
-  const [description, setDescription] = useState(locality.description ?? '');
-  const [visibility, setVisibility] = useState<LocalityVisibility>(
-    locality.visibility,
+  const { items: findItems, setItems: setFindItems } = useLocalityFinds(
+    locality.id,
   );
-  const [savingMeta, setSavingMeta] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { items: attachmentItems, setItems: setAttachmentItems } =
+    useLocalityAttachments(locality.id);
+  const kulturminner = useKulturminner(locality.bbox);
 
-  // Funn list + draft form. editingFunnId non-null means the draft is
-  // re-editing an existing funn's drawing rather than creating one.
-  const [items, setItems] = useState<LocalityFindRecord[] | null>(null);
+  // Fresh records open straight into the rename field (creation flow:
+  // drag first, name after).
+  const isFreshRecord = locality.name === t('localities.defaultName');
+  const [renaming, setRenaming] = useState(isFreshRecord);
+  const [name, setName] = useState(locality.name);
+
+  // Funn draft. editingFunnId non-null means the draft is re-editing an
+  // existing funn's drawing rather than creating one.
   const [editingFunnId, setEditingFunnId] = useState<string | null>(null);
   const [funnTitle, setFunnTitle] = useState('');
   const [funnNote, setFunnNote] = useState('');
   const [savingFunn, setSavingFunn] = useState(false);
   const [funnError, setFunnError] = useState<string | null>(null);
+  const [growPrompt, setGrowPrompt] = useState<LocalityBbox | null>(null);
 
-  // The component is keyed by locality.id in Layout, so state initializers
-  // above seed fresh on every open. Heavier frame on the open rectangle:
   useEffect(() => {
     setLocalityHighlight(locality.id);
     return () => setLocalityHighlight(null);
   }, [locality.id]);
 
-  // Fresh records get the name field focused with the placeholder name
-  // selected (creation flow: drag first, name after).
-  const isFreshRecord = locality.name === t('localities.defaultName');
-
-  // Draft/adjust/lidar cleanup when the workspace closes or swaps
-  // lokalitet.
+  // Draft/adjust/lidar/selection cleanup when the workspace closes or
+  // swaps lokalitet.
   useEffect(() => {
     return () => {
       setDraftActive(false);
       setAdjusting(false);
       setLidarSelection(null);
+      setSelectedFunnId(null);
       getDrawLayer()?.getSource()?.clear();
     };
-  }, [locality.id, setDraftActive, setAdjusting, setLidarSelection]);
+  }, [
+    locality.id,
+    setDraftActive,
+    setAdjusting,
+    setLidarSelection,
+    setSelectedFunnId,
+  ]);
 
-  const loadFunn = useCallback(async () => {
-    try {
-      setItems(await listLocalityFinds(locality.id));
-    } catch (e) {
-      console.warn('[LocalityWorkspace] funn load failed', e);
-      setItems([]);
+  const patchLocality = useCallback(
+    async (patch: LocalityPatch) => {
+      try {
+        const updated = await updateLocality(locality.id, patch);
+        upsertLocalityOnLayer(updated);
+        setActiveLocality(updated);
+        return updated;
+      } catch (e) {
+        console.warn('[LocalityWorkspace] save failed', e);
+        toaster.error({ title: t('localities.workspace.saveFailed') });
+        return null;
+      }
+    },
+    [locality.id, setActiveLocality, t],
+  );
+
+  const commitName = async () => {
+    setRenaming(false);
+    const next = name.trim();
+    if (next.length === 0 || next === locality.name) {
+      setName(locality.name);
+      return;
     }
-  }, [locality.id]);
-
-  useEffect(() => {
-    setItems(null);
-    loadFunn();
-    const unsub = subscribeLocalityFinds((_action, rec) => {
-      if (rec.locality === locality.id) loadFunn();
-    });
-    return unsub;
-  }, [loadFunn, locality.id]);
-
-  const metaDirty =
-    name.trim() !== locality.name ||
-    description.trim() !== (locality.description ?? '') ||
-    visibility !== locality.visibility;
-
-  const saveMeta = async () => {
-    setError(null);
-    setSavingMeta(true);
-    try {
-      const updated = await updateLocality(locality.id, {
-        name: name.trim(),
-        description: description.trim(),
-        visibility,
-      });
-      upsertLocalityOnLayer(updated);
-      setActiveLocality(updated);
-    } catch (e) {
-      console.warn('[LocalityWorkspace] save failed', e);
-      setError(t('localities.workspace.saveFailed'));
-    } finally {
-      setSavingMeta(false);
-    }
+    await patchLocality({ name: next });
   };
 
   const zoomToLocality = () => {
@@ -379,35 +248,46 @@ export const LocalityWorkspace = ({
   };
 
   const removeLocality = async () => {
-    const ok = window.confirm(
-      t('localities.workspace.confirmDelete', { name: locality.name }),
-    );
-    if (!ok) return;
     try {
       await deleteLocality(locality.id);
       removeLocalityFromLayer(locality.id);
       setActiveLocality(null);
     } catch (e) {
       console.warn('[LocalityWorkspace] delete failed', e);
-      setError(t('localities.workspace.saveFailed'));
+      toaster.error({ title: t('localities.workspace.saveFailed') });
     }
   };
 
-  const startDraft = () => {
+  const cancelDraft = useCallback(() => {
+    getDrawLayer()?.getSource()?.clear();
+    if (editingFunnId) {
+      // Restore the hidden persisted copy.
+      const rec = findItems?.find((it) => it.id === editingFunnId);
+      if (rec) upsertFunnOnLayer(rec);
+      setEditingFunnId(null);
+    }
+    setDraftActive(false);
+  }, [editingFunnId, findItems, setDraftActive]);
+
+  const startDraft = useCallback(() => {
+    if (!isMine || draftActive) return;
     // Leftovers on the shared draw layer can only be an abandoned draft;
     // drop them so the new funn starts clean.
     getDrawLayer()?.getSource()?.clear();
     setAdjusting(false);
+    setLidarOpen(false);
+    setLidarSelection(null);
     setEditingFunnId(null);
     setFunnTitle('');
     setFunnNote('');
     setFunnError(null);
     setDraftActive(true);
-  };
+  }, [isMine, draftActive, setAdjusting, setLidarSelection, setDraftActive]);
 
   const startGeometryEdit = (f: LocalityFindRecord) => {
     getDrawLayer()?.getSource()?.clear();
     setAdjusting(false);
+    setLidarOpen(false);
     setDrawLayerFeatures(f.geometry, 'EPSG:4326', true);
     hideFunnOnLayer(f.id);
     setEditingFunnId(f.id);
@@ -417,18 +297,7 @@ export const LocalityWorkspace = ({
     setDraftActive(true);
   };
 
-  const cancelDraft = () => {
-    getDrawLayer()?.getSource()?.clear();
-    if (editingFunnId) {
-      // Restore the hidden persisted copy.
-      const rec = items?.find((it) => it.id === editingFunnId);
-      if (rec) upsertFunnOnLayer(rec);
-      setEditingFunnId(null);
-    }
-    setDraftActive(false);
-  };
-
-  const saveDraft = async () => {
+  const performSave = async (grownBbox: LocalityBbox | null) => {
     setFunnError(null);
     const projection = map.getView().getProjection().getCode();
     const geometry = serializeDrawLayer(projection);
@@ -438,52 +307,34 @@ export const LocalityWorkspace = ({
     }
     if (!user) return;
 
-    // A lokalitet holds the entire extent of its funn — offer to grow
-    // the rectangle when the drawing sticks out.
-    const drawnBbox = getDrawLayerExtent4326(projection);
-    let currentLocality = locality;
-    if (drawnBbox && !bboxContains(currentLocality.bbox, drawnBbox)) {
-      const grow = window.confirm(t('localities.funn.growConfirm'));
-      if (!grow) return;
-      try {
-        currentLocality = await updateLocality(locality.id, {
-          bbox: bboxUnion(currentLocality.bbox, drawnBbox),
-        });
-        upsertLocalityOnLayer(currentLocality);
-        setActiveLocality(currentLocality);
-      } catch (e) {
-        console.warn('[LocalityWorkspace] grow-to-fit failed', e);
-        setFunnError(t('localities.workspace.saveFailed'));
-        return;
-      }
-    }
+    if (grownBbox && !(await patchLocality({ bbox: grownBbox }))) return;
 
     setSavingFunn(true);
     try {
-      let saved: LocalityFindRecord;
-      if (editingFunnId) {
-        saved = await updateLocalityFind(editingFunnId, {
-          title: funnTitle.trim(),
-          note: funnNote.trim(),
-          geometry,
-        });
-        setItems((prev) =>
-          prev ? prev.map((it) => (it.id === saved.id ? saved : it)) : prev,
-        );
-      } else {
-        saved = await createLocalityFind(
-          {
-            locality: locality.id,
+      const saved: LocalityFindRecord = editingFunnId
+        ? await updateLocalityFind(editingFunnId, {
             title: funnTitle.trim(),
-            note: funnNote.trim() || undefined,
+            note: funnNote.trim(),
             geometry,
-          },
-          user.id,
-        );
-        setItems((prev) => (prev ? [...prev, saved] : [saved]));
-      }
+          })
+        : await createLocalityFind(
+            {
+              locality: locality.id,
+              title: funnTitle.trim(),
+              note: funnNote.trim() || undefined,
+              geometry,
+            },
+            user.id,
+          );
+      setFindItems((prev) => {
+        if (!prev) return [saved];
+        return prev.some((it) => it.id === saved.id)
+          ? prev.map((it) => (it.id === saved.id ? saved : it))
+          : [...prev, saved];
+      });
       upsertFunnOnLayer(saved);
       getDrawLayer()?.getSource()?.clear();
+      setSelectedFunnId(saved.id);
       setEditingFunnId(null);
       setDraftActive(false);
     } catch (e) {
@@ -494,19 +345,32 @@ export const LocalityWorkspace = ({
     }
   };
 
+  // A lokalitet holds the entire extent of its funn — offer to grow the
+  // rectangle when the drawing sticks out.
+  const saveDraft = () => {
+    const projection = map.getView().getProjection().getCode();
+    const drawn = getDrawLayerExtent4326(projection);
+    if (drawn && !bboxContains(locality.bbox, drawn)) {
+      setGrowPrompt(bboxUnion(locality.bbox, drawn));
+      return;
+    }
+    performSave(null);
+  };
+
   // LiDAR extract seeded with the lokalitet's rectangle — no manual box
   // drag needed inside the workspace (the panel's "tegn på nytt" still
   // allows a custom sub-box).
-  const openLidar = () => {
+  const openLidar = useCallback(() => {
     if (draftActive) cancelDraft();
     setAdjusting(false);
     const mapProjection = map.getView().getProjection().getCode();
     setLidarSelection({
-      bboxMap: transformExtent(
-        locality.bbox,
-        'EPSG:4326',
-        mapProjection,
-      ) as [number, number, number, number],
+      bboxMap: transformExtent(locality.bbox, 'EPSG:4326', mapProjection) as [
+        number,
+        number,
+        number,
+        number,
+      ],
       mapProjection,
       bbox25833: transformExtent(
         locality.bbox,
@@ -516,48 +380,75 @@ export const LocalityWorkspace = ({
       bboxLonLat: locality.bbox,
     });
     setLidarOpen(true);
-  };
+  }, [
+    draftActive,
+    cancelDraft,
+    setAdjusting,
+    map,
+    locality.bbox,
+    setLidarSelection,
+  ]);
 
-  const closeLidar = () => {
+  const closeLidar = useCallback(() => {
     setLidarOpen(false);
     setLidarSelection(null);
-  };
+  }, [setLidarSelection]);
 
-  // Capture the current view cropped to the rectangle → Bilder. The
-  // BilderSection realtime subscription picks the new attachment up.
-  const takeScreenshot = async () => {
-    if (!user || shooting) return;
+  // Capture the current view cropped to the rectangle → Bilder.
+  const takeScreenshot = useCallback(async () => {
+    if (!user || !isMine || shooting) return;
     setShooting(true);
     try {
       const blob = await captureLocalityScreenshot(map, locality.bbox);
       if (!blob) {
-        window.alert(t('localities.tools.screenshotFailed'));
+        toaster.error({ title: t('localities.tools.screenshotFailed') });
         return;
       }
-      await createAttachment(
+      const rec = await createAttachment(
         {
           locality: locality.id,
           kind: 'screenshot',
-          caption: `${t('localities.tools.screenshotCaption')} ${new Date().toLocaleDateString('nb-NO')}`,
+          caption: `${t('localities.tools.screenshotCaption')} ${new Date().toLocaleDateString(i18n.language)}`,
         },
         user.id,
         blob,
         'skjermbilde.png',
       );
+      setAttachmentItems((prev) => (prev ? [rec, ...prev] : [rec]));
+      toaster.success({ title: t('localities.tools.screenshotSaved') });
     } catch (e) {
       console.warn('[LocalityWorkspace] screenshot failed', e);
-      window.alert(t('localities.tools.screenshotFailed'));
+      toaster.error({ title: t('localities.tools.screenshotFailed') });
     } finally {
       setShooting(false);
     }
-  };
+  }, [
+    user,
+    isMine,
+    shooting,
+    map,
+    locality.id,
+    locality.bbox,
+    setAttachmentItems,
+    t,
+    i18n.language,
+  ]);
 
-  const zoomToFunn = (f: LocalityFindRecord) => {
-    const extent = getFunnExtentOnLayer(f.id);
+  const zoomToFunn = useCallback((id: string) => {
+    const extent = getFunnExtentOnLayer(id);
     if (!extent) return;
-    map
-      .getView()
-      .fit(extent, { padding: [120, 120, 120, 120], maxZoom: 19, duration: 400 });
+    map.getView().fit(extent, {
+      padding: [120, 120, 120, 120],
+      maxZoom: 19,
+      duration: 400,
+    });
+    // `map` is a stable singleton atom value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const selectFunn = (f: LocalityFindRecord) => {
+    setSelectedFunnId(f.id);
+    zoomToFunn(f.id);
   };
 
   const changeStatus = async (
@@ -566,11 +457,12 @@ export const LocalityWorkspace = ({
   ) => {
     try {
       const updated = await updateLocalityFind(f.id, { status });
-      setItems((prev) =>
+      setFindItems((prev) =>
         prev ? prev.map((it) => (it.id === f.id ? updated : it)) : prev,
       );
     } catch (e) {
       console.warn('[LocalityWorkspace] status update failed', e);
+      toaster.error({ title: t('localities.funn.saveFailed') });
     }
   };
 
@@ -581,27 +473,77 @@ export const LocalityWorkspace = ({
   ) => {
     try {
       const updated = await updateLocalityFind(f.id, { title, note });
-      setItems((prev) =>
+      setFindItems((prev) =>
         prev ? prev.map((it) => (it.id === f.id ? updated : it)) : prev,
       );
     } catch (e) {
       console.warn('[LocalityWorkspace] funn update failed', e);
+      toaster.error({ title: t('localities.funn.saveFailed') });
     }
   };
 
   const removeFunn = async (f: LocalityFindRecord) => {
-    const ok = window.confirm(
-      t('localities.funn.confirmDelete', { title: f.title }),
-    );
-    if (!ok) return;
     try {
       await deleteLocalityFind(f.id);
       removeFunnFromLayer(f.id);
-      setItems((prev) => (prev ? prev.filter((it) => it.id !== f.id) : prev));
+      setFindItems((prev) =>
+        prev ? prev.filter((it) => it.id !== f.id) : prev,
+      );
+      if (selectedFunnId === f.id) setSelectedFunnId(null);
     } catch (e) {
       console.warn('[LocalityWorkspace] funn delete failed', e);
+      toaster.error({ title: t('localities.funn.saveFailed') });
     }
   };
+
+  const mode = draftActive ? 'draft' : lidarOpen ? 'lidar' : 'browse';
+
+  useWorkspaceKeys({
+    enabled: !lightboxOpen && growPrompt == null,
+    navigable: mode === 'browse',
+    draftActive,
+    onNewFunn: startDraft,
+    onToggleLidar: () => (lidarOpen ? closeLidar() : openLidar()),
+    onScreenshot: takeScreenshot,
+    onMoveSelection: (delta) => {
+      const items = findItems;
+      if (!items || items.length === 0) return;
+      const at = items.findIndex((f) => f.id === selectedFunnId);
+      const next =
+        at < 0
+          ? delta > 0
+            ? 0
+            : items.length - 1
+          : (at + delta + items.length) % items.length;
+      setSelectedFunnId(items[next].id);
+    },
+    onZoomSelected: () => selectedFunnId && zoomToFunn(selectedFunnId),
+    onEscape: () => {
+      if (lidarOpen) closeLidar();
+      else if (adjusting) setAdjusting(false);
+      else if (selectedFunnId) setSelectedFunnId(null);
+      else setActiveLocality(null);
+    },
+  });
+
+  const funnCount = findItems?.length ?? 0;
+  const bilderCount = attachmentItems?.length ?? 0;
+  const kmCount = kulturminner.result
+    ? kulturminner.result.truncated
+      ? `${kulturminner.result.items.length}+`
+      : kulturminner.result.items.length
+    : null;
+
+  const summary = [
+    funnCount > 0 ? t('localities.summary.funn', { count: funnCount }) : null,
+    bilderCount > 0
+      ? t('localities.summary.bilder', { count: bilderCount })
+      : null,
+    formatBboxArea(locality.bbox, i18n.language),
+    !isMine && locality.expand?.owner
+      ? t('localities.byOwner', { name: locality.expand.owner.name })
+      : null,
+  ].filter((s): s is string => !!s);
 
   return (
     <Stack
@@ -610,288 +552,177 @@ export const LocalityWorkspace = ({
       pointerEvents="auto"
       bg="white"
       shadow="lg"
-      p={4}
       m={{ base: 0, md: 1 }}
       mr={{ base: 0, md: 3 }}
       borderRadius="16px"
       overflowY="auto"
-      gap={3}
+      gap={0}
     >
-      {/* Header row */}
-      <Flex align="center" gap={1}>
-        <IconButton
-          icon="arrow_back"
-          variant="ghost"
-          size="sm"
-          aria-label={t('localities.workspace.back')}
-          onClick={() => setActiveLocality(null)}
-        />
-        <Heading size="sm" flex="1" lineClamp={1}>
-          {locality.name}
-        </Heading>
-        <IconButton
-          icon="zoom_in_map"
-          variant="ghost"
-          size="sm"
-          aria-label={t('localities.workspace.zoom')}
-          onClick={zoomToLocality}
-        />
-        {isMine && (
-          <Tooltip content={t('localities.workspace.adjust')}>
-            <IconButton
-              icon="transform"
-              variant={adjusting ? 'primary' : 'ghost'}
-              colorPalette="green"
+      {/* Header */}
+      <Stack gap={1} px={4} pt={3} pb={2}>
+        <Flex align="center" gap={1}>
+          <IconButton
+            icon="arrow_back"
+            variant="ghost"
+            size="sm"
+            aria-label={t('localities.workspace.back')}
+            onClick={() => setActiveLocality(null)}
+          />
+          {renaming && isMine ? (
+            <Input
               size="sm"
-              aria-label={t('localities.workspace.adjust')}
+              flex="1"
+              value={name}
+              autoFocus
+              maxLength={200}
+              placeholder={t('localities.workspace.namePlaceholder')}
+              onFocus={(e: ReactFocusEvent<HTMLInputElement>) =>
+                e.target.select()
+              }
+              onChange={(e) => setName(e.target.value)}
+              onBlur={commitName}
+              onKeyDown={(e: ReactKeyboardEvent<HTMLInputElement>) => {
+                if (e.key === 'Enter') commitName();
+                if (e.key === 'Escape') {
+                  setName(locality.name);
+                  setRenaming(false);
+                }
+              }}
+            />
+          ) : (
+            <Heading
+              size="sm"
+              flex="1"
+              lineClamp={1}
+              cursor={isMine ? 'text' : undefined}
+              title={isMine ? t('localities.workspace.renameHint') : undefined}
+              onClick={() => isMine && setRenaming(true)}
+            >
+              {locality.name}
+            </Heading>
+          )}
+          <Tooltip content={t('localities.workspace.zoom')}>
+            <IconButton
+              icon="zoom_in_map"
+              variant="ghost"
+              size="sm"
+              aria-label={t('localities.workspace.zoom')}
+              onClick={zoomToLocality}
+            />
+          </Tooltip>
+          {isMine && (
+            <ConfirmPopover
+              title={t('localities.workspace.confirmDelete', {
+                name: locality.name,
+              })}
+              confirmLabel={t('localities.workspace.deleteLocality')}
+              onConfirm={removeLocality}
+              trigger={
+                <IconButton
+                  icon="delete"
+                  variant="ghost"
+                  colorPalette="red"
+                  size="sm"
+                  aria-label={t('localities.workspace.deleteLocality')}
+                />
+              }
+            />
+          )}
+        </Flex>
+
+        {/* At-a-glance: what's in here and how big it is, without
+            unfolding a section or scrolling. */}
+        <Flex align="center" gap={1.5} wrap="wrap" pl={1}>
+          <Badge
+            colorPalette={VISIBILITY_PALETTE[locality.visibility]}
+            size="sm"
+          >
+            {t(`localities.visibility.${locality.visibility}`)}
+          </Badge>
+          {summary.length > 0 && (
+            <Text fontSize="xs" color="gray.600">
+              {summary.join(' · ')}
+            </Text>
+          )}
+        </Flex>
+      </Stack>
+
+      {/* Action bar — sticky so the verbs stay reachable at any scroll
+          depth. */}
+      <Box
+        position="sticky"
+        top={0}
+        zIndex={1}
+        bg="white"
+        px={4}
+        py={2}
+        borderTopWidth="1px"
+        borderBottomWidth="1px"
+        borderColor="gray.100"
+      >
+        <HStack gap={1}>
+          {isMine && (
+            <ActionButton
+              icon="add"
+              label={t('localities.funn.new')}
+              tooltip={`${t('localities.funn.new')} (N)`}
+              active={mode === 'draft'}
+              onClick={() => (draftActive ? cancelDraft() : startDraft())}
+            />
+          )}
+          <ActionButton
+            icon="crop_free"
+            label={t('localities.tools.lidarExtractShort')}
+            tooltip={`${t('localities.tools.lidarExtract')} (U)`}
+            active={mode === 'lidar'}
+            onClick={() => (lidarOpen ? closeLidar() : openLidar())}
+          />
+          {isMine && (
+            <ActionButton
+              icon="photo_camera"
+              label={t('localities.tools.screenshotShort')}
+              tooltip={`${t('localities.tools.screenshot')} (B)`}
+              disabled={shooting}
+              onClick={takeScreenshot}
+            />
+          )}
+          {isMine && (
+            <ActionButton
+              icon="transform"
+              label={t('localities.workspace.adjustShort')}
+              tooltip={t('localities.workspace.adjust')}
+              active={adjusting}
               onClick={() => {
                 if (!adjusting && draftActive) cancelDraft();
                 setAdjusting(!adjusting);
               }}
             />
-          </Tooltip>
-        )}
-        {isMine && (
-          <IconButton
-            icon="delete"
-            variant="ghost"
-            colorPalette="red"
-            size="sm"
-            aria-label={t('localities.workspace.deleteLocality')}
-            onClick={removeLocality}
-          />
-        )}
-      </Flex>
-
-      {/* Metadata */}
-      <Stack gap={2}>
-        <Stack gap={1}>
-          <Text fontSize="xs" fontWeight="semibold">
-            {t('localities.workspace.name')}
-          </Text>
-          <Input
-            size="sm"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onFocus={(e: FocusEvent<HTMLInputElement>) =>
-              isFreshRecord && e.target.select()
-            }
-            autoFocus={isFreshRecord}
-            placeholder={t('localities.workspace.namePlaceholder')}
-            maxLength={200}
-            disabled={!isMine}
-          />
-        </Stack>
-        <Stack gap={1}>
-          <Text fontSize="xs" fontWeight="semibold">
-            {t('localities.workspace.description')}
-          </Text>
-          <textarea
-            value={description}
-            onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
-              setDescription(e.target.value)
-            }
-            placeholder={t('localities.workspace.descriptionPlaceholder')}
-            rows={2}
-            maxLength={20000}
-            disabled={!isMine}
-            style={NATIVE_INPUT_STYLE}
-          />
-        </Stack>
-        <Stack gap={1}>
-          <Text fontSize="xs" fontWeight="semibold">
-            {t('localities.workspace.visibility')}
-          </Text>
-          <select
-            value={visibility}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-              setVisibility(e.target.value as LocalityVisibility)
-            }
-            disabled={!isMine}
-            style={{ ...NATIVE_INPUT_STYLE, background: 'white' }}
-          >
-            <option value="private">{t('localities.visibility.private')}</option>
-            <option value="limited">{t('localities.visibility.limited')}</option>
-            <option value="public">{t('localities.visibility.public')}</option>
-          </select>
-          {visibility === 'limited' && (
-            <Text fontSize="xs" color="gray.500">
-              {t('localities.visibility.limitedHint')}
-            </Text>
           )}
-        </Stack>
-        {error && (
-          <Text fontSize="xs" color="red.600">
-            {error}
-          </Text>
-        )}
-        {isMine && metaDirty && (
-          <Flex justify="flex-end">
-            <Button
-              size="sm"
-              variant="primary"
-              colorPalette="green"
-              onClick={saveMeta}
-              disabled={savingMeta || name.trim().length === 0}
-            >
-              {savingMeta
-                ? t('localities.workspace.saving')
-                : t('localities.workspace.save')}
-            </Button>
-          </Flex>
-        )}
-      </Stack>
+        </HStack>
+      </Box>
 
-      {/* Kjente kulturminner — "is this already registered?" up front. */}
-      <KulturminnerSection locality={locality} />
-
-      {/* Funn */}
-      <Stack gap={2}>
-        <Flex justify="space-between" align="center">
-          <Heading size="xs">{t('localities.funn.heading')}</Heading>
-          {isMine && !draftActive && (
-            <Button
-              size="xs"
-              variant="secondary"
-              colorPalette="green"
-              leftIcon="add"
-              onClick={startDraft}
-            >
-              {t('localities.funn.new')}
-            </Button>
-          )}
-        </Flex>
-
-        {draftActive && (
-          <Stack
-            gap={2}
-            borderWidth="1px"
-            borderColor="gray.200"
-            borderRadius="md"
-            p={2}
-          >
-            <Text fontSize="xs" color="gray.600">
-              {t(
-                editingFunnId
-                  ? 'localities.funn.draft.instructionsEdit'
-                  : 'localities.funn.draft.instructions',
-              )}
-            </Text>
-            <DrawControls />
-            <Input
-              size="sm"
-              value={funnTitle}
-              onChange={(e) => setFunnTitle(e.target.value)}
-              placeholder={t('localities.funn.draft.titlePlaceholder')}
-              maxLength={200}
-            />
-            <textarea
-              value={funnNote}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
-                setFunnNote(e.target.value)
-              }
-              placeholder={t('localities.funn.draft.notePlaceholder')}
-              rows={2}
-              maxLength={20000}
-              style={NATIVE_INPUT_STYLE}
-            />
-            {funnError && (
-              <Text fontSize="xs" color="red.600">
-                {funnError}
-              </Text>
-            )}
-            <Flex justify="flex-end">
-              <HStack>
-                <Button size="sm" variant="tertiary" onClick={cancelDraft}>
-                  {t('localities.funn.draft.cancel')}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  colorPalette="green"
-                  onClick={saveDraft}
-                  disabled={savingFunn || funnTitle.trim().length === 0}
-                >
-                  {savingFunn
-                    ? t('localities.workspace.saving')
-                    : t('localities.funn.draft.save')}
-                </Button>
-              </HStack>
-            </Flex>
-          </Stack>
-        )}
-
-        {items == null && (
-          <Flex align="center" gap={2}>
-            <Spinner size="xs" />
-            <Text fontSize="xs" color="gray.500">
-              {t('localities.funn.loading')}
-            </Text>
-          </Flex>
-        )}
-        {items && items.length === 0 && !draftActive && (
-          <Text fontSize="sm" color="gray.600">
-            {t('localities.funn.empty')}
-          </Text>
-        )}
-        {items?.map((f) => (
-          <FunnRow
-            key={f.id}
-            funn={f}
-            editable={isMine}
-            onZoom={zoomToFunn}
-            onStatus={changeStatus}
-            onSaveMeta={saveFunnMeta}
-            onEditGeometry={startGeometryEdit}
-            onDelete={removeFunn}
+      {/* Body. Drawing a funn and running an extract each take over the
+          panel: both are multi-step and neither wants the section list
+          shifting underneath it. */}
+      <Box px={4} pt={3} pb={4}>
+        {mode === 'draft' && (
+          <FunnDraft
+            editing={editingFunnId != null}
+            title={funnTitle}
+            note={funnNote}
+            saving={savingFunn}
+            error={funnError}
+            onTitle={setFunnTitle}
+            onNote={setFunnNote}
+            onSave={saveDraft}
+            onCancel={cancelDraft}
           />
-        ))}
-      </Stack>
+        )}
 
-      {/* Bilder */}
-      {user && (
-        <BilderSection locality={locality} userId={user.id} isMine={isMine} />
-      )}
-
-      {/* Verktøy */}
-      <Stack gap={2}>
-        <Heading size="xs">{t('localities.tools.heading')}</Heading>
-        {!lidarOpen ? (
-          <HStack>
-            <Button
-              size="xs"
-              variant="secondary"
-              colorPalette="green"
-              leftIcon="crop_free"
-              onClick={openLidar}
-            >
-              {t('localities.tools.lidarExtract')}
-            </Button>
-            {isMine && (
-              <Button
-                size="xs"
-                variant="secondary"
-                colorPalette="green"
-                leftIcon="photo_camera"
-                disabled={shooting}
-                onClick={takeScreenshot}
-              >
-                {shooting
-                  ? t('localities.tools.screenshotTaking')
-                  : t('localities.tools.screenshot')}
-              </Button>
-            )}
-          </HStack>
-        ) : (
-          <Stack
-            gap={2}
-            borderWidth="1px"
-            borderColor="gray.200"
-            borderRadius="md"
-            p={2}
-          >
+        {mode === 'lidar' && (
+          <Stack gap={2}>
             <Flex justify="space-between" align="center">
-              <Text fontSize="sm" fontWeight="semibold">
+              <Text fontSize="sm" fontWeight="bold">
                 {t('localities.tools.lidarExtract')}
               </Text>
               <IconButton
@@ -905,7 +736,106 @@ export const LocalityWorkspace = ({
             <LidarExtractPanel />
           </Stack>
         )}
-      </Stack>
+
+        {mode === 'browse' && (
+          <Stack gap={3}>
+            <WorkspaceSection
+              id="funn"
+              title={t('localities.funn.heading')}
+              count={funnCount}
+              countPalette="green"
+            >
+              <FunnList
+                items={findItems}
+                editable={isMine}
+                selectedId={selectedFunnId}
+                onSelect={selectFunn}
+                onStatus={changeStatus}
+                onSaveMeta={saveFunnMeta}
+                onEditGeometry={startGeometryEdit}
+                onDelete={removeFunn}
+              />
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              id="bilder"
+              title={t('localities.bilder.heading')}
+              count={bilderCount}
+            >
+              {user && (
+                <BilderSection
+                  locality={locality}
+                  userId={user.id}
+                  isMine={isMine}
+                  items={attachmentItems}
+                  setItems={setAttachmentItems}
+                />
+              )}
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              id="kulturminner"
+              title={t('localities.kulturminner.heading')}
+              count={kmCount}
+              countPalette="yellow"
+            >
+              <KulturminnerSection
+                result={kulturminner.result}
+                error={kulturminner.error}
+              />
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              id="detaljer"
+              title={t('localities.workspace.details')}
+            >
+              <LocalityDetails
+                locality={locality}
+                isMine={isMine}
+                onPatch={patchLocality}
+              />
+            </WorkspaceSection>
+          </Stack>
+        )}
+      </Box>
+
+      {/* Grow-to-fit. Used to be a window.confirm in the middle of the
+          save. */}
+      <Dialog
+        open={growPrompt != null}
+        placement="center"
+        onOpenChange={(e) => !e.open && setGrowPrompt(null)}
+      >
+        <DialogContent>
+          <DialogBody p={5}>
+            <Stack gap={4}>
+              <Text fontSize="sm">{t('localities.funn.growConfirm')}</Text>
+              <HStack justify="flex-end">
+                <Button
+                  size="sm"
+                  variant="tertiary"
+                  onClick={() => setGrowPrompt(null)}
+                >
+                  {t('localities.funn.draft.cancel')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  colorPalette="green"
+                  onClick={() => {
+                    const bbox = growPrompt;
+                    setGrowPrompt(null);
+                    if (bbox) performSave(bbox);
+                  }}
+                >
+                  {t('localities.funn.growConfirmAction')}
+                </Button>
+              </HStack>
+            </Stack>
+          </DialogBody>
+          <DialogCloseTrigger />
+        </DialogContent>
+      </Dialog>
     </Stack>
   );
 };

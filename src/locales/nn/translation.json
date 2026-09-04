@@ -313,6 +313,12 @@
     "defaultName": "Utan namn",
     "createFailed": "Kunne ikkje opprette lokaliteten. Sjekk at du er innlogga og at serveren køyrer oppdatert skjema (detaljar i nettlesarkonsollen).",
     "byOwner": "av {{name}}",
+    "summary": {
+      "funn_one": "1 funn",
+      "funn_other": "{{count}} funn",
+      "bilder_one": "1 bilete",
+      "bilder_other": "{{count}} bilete"
+    },
     "visibility": {
       "private": "Privat",
       "limited": "Avgrensa",
@@ -332,7 +338,10 @@
       "filter": {
         "mine": "Mine",
         "all": "Alle (admin)"
-      }
+      },
+      "searchPlaceholder": "Søk i lokalitetar…",
+      "clearSearch": "Tøm søket",
+      "noMatch": "Ingen lokalitetar samsvarar med «{{query}}»."
     },
     "workspace": {
       "back": "Tilbake",
@@ -340,21 +349,24 @@
       "adjust": "Juster området (flytt eller dra i hjørna)",
       "deleteLocality": "Slett lokaliteten",
       "confirmDelete": "Slette «{{name}}» med alle funn og bilete? Handlinga kan ikkje angrast.",
-      "name": "Namn",
       "namePlaceholder": "Namn på lokaliteten",
       "description": "Skildring",
       "descriptionPlaceholder": "Kva vil du undersøkje her? Notat, referansar…",
       "visibility": "Synlegheit",
-      "save": "Lagre",
       "saving": "Lagrar…",
-      "saveFailed": "Kunne ikkje lagre. Prøv igjen."
+      "saveFailed": "Kunne ikkje lagre. Prøv igjen.",
+      "adjustShort": "Juster",
+      "renameHint": "Klikk for å endre namnet",
+      "details": "Detaljar",
+      "owner": "Eigar",
+      "created": "Oppretta",
+      "updated": "Sist endra"
     },
     "funn": {
       "heading": "Funn",
       "new": "Nytt funn",
       "loading": "Hentar funn…",
       "empty": "Ingen funn enno. Teikn det du ser i terrenget.",
-      "confirmDelete": "Slette funnet «{{title}}»?",
       "saveFailed": "Kunne ikkje lagre funnet. Prøv igjen.",
       "draft": {
         "instructions": "Teikn funnet på kartet med verktøya under, og gjev det ein tittel.",
@@ -370,15 +382,20 @@
         "sannsynlig": "Sannsynleg",
         "avkreftet": "Avkrefta",
         "rapportert": "Rapportert",
-        "cycleHint": "Klikk for å endre status"
+        "heading": "Status",
+        "pickHint": "Endre status"
       },
       "actions": {
         "zoom": "Zoom til funnet",
         "edit": "Rediger",
         "editGeometry": "Rediger teikninga",
-        "delete": "Slett"
+        "delete": "Slett",
+        "menu": "Fleire val",
+        "done": "Ferdig"
       },
-      "growConfirm": "Funnet ligg utanfor lokaliteten sitt område. Utvide området slik at det dekkjer funnet?"
+      "growConfirm": "Funnet ligg utanfor lokaliteten sitt område. Utvide området slik at det dekkjer funnet?",
+      "confirmDeleteShort": "Slette funnet?",
+      "growConfirmAction": "Utvid området"
     },
     "bilder": {
       "heading": "Bilete",
@@ -388,16 +405,26 @@
       "empty": "Ingen bilete enno. Køyr eit LiDAR-uttrekk og trykk «Behald», eller last opp eit bilete.",
       "confirmDelete": "Slette biletet? Handlinga kan ikkje angrast.",
       "uploadFailed": "Kunne ikkje laste opp biletet. Prøv igjen.",
-      "delete": "Slett biletet"
+      "delete": "Slett biletet",
+      "captionPlaceholder": "Bilettekst…",
+      "previous": "Førre bilete",
+      "next": "Neste bilete",
+      "openOriginal": "Opne originalen",
+      "kind": {
+        "extract": "LiDAR-uttrekk",
+        "screenshot": "Skjermbilete",
+        "upload": "Lasta opp"
+      }
     },
     "tools": {
-      "heading": "Verktøy",
       "lidarExtract": "LiDAR-uttrekk",
       "closeLidar": "Lukk LiDAR-uttrekk",
       "screenshot": "Skjermbilete",
-      "screenshotTaking": "Tek skjermbilete…",
       "screenshotCaption": "Skjermbilete",
-      "screenshotFailed": "Kunne ikkje ta skjermbilete. Sørg for at lokaliteten er synleg i kartet."
+      "screenshotFailed": "Kunne ikkje ta skjermbilete. Sørg for at lokaliteten er synleg i kartet.",
+      "lidarExtractShort": "LiDAR",
+      "screenshotShort": "Bilete",
+      "screenshotSaved": "Skjermbiletet er lagra under Bilete."
     },
     "kulturminner": {
       "heading": "Kjende kulturminne",

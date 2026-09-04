@@ -4,6 +4,7 @@ import { AuthDialog } from './auth/AuthDialog';
 import { pbAuthSyncEffect } from './auth/atoms';
 import { BottomDrawToolSelector } from './draw/BottomDrawToolSelector';
 import { activeLocalityAtom, funnDraftActiveAtom } from './localities/atoms';
+import { useFunnHighlightLayer } from './localities/funnHighlightLayer';
 import { useFunnLayer } from './localities/funnLayer';
 import {
   useLocalitiesLayer,
@@ -44,6 +45,7 @@ export const Layout = () => {
   // lokalitet only), click-to-open, and the "Ny lokalitet" box drag.
   useLocalitiesLayer();
   useFunnLayer();
+  useFunnHighlightLayer();
   useLocalityClick();
   useLocalityCreate();
   useLidarFootprintsLayer();

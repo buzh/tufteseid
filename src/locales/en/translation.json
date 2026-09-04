@@ -308,6 +308,12 @@
     "defaultName": "Untitled",
     "createFailed": "Could not create the locality. Check that you are signed in and the server runs the current schema (details in the browser console).",
     "byOwner": "by {{name}}",
+    "summary": {
+      "funn_one": "1 find",
+      "funn_other": "{{count}} finds",
+      "bilder_one": "1 image",
+      "bilder_other": "{{count}} images"
+    },
     "visibility": {
       "private": "Private",
       "limited": "Limited",
@@ -327,7 +333,10 @@
       "filter": {
         "mine": "Mine",
         "all": "All (admin)"
-      }
+      },
+      "searchPlaceholder": "Search localities…",
+      "clearSearch": "Clear the search",
+      "noMatch": "No localities match \"{{query}}\"."
     },
     "workspace": {
       "back": "Back",
@@ -335,21 +344,24 @@
       "adjust": "Adjust the area (move it or drag the corners)",
       "deleteLocality": "Delete the locality",
       "confirmDelete": "Delete \"{{name}}\" with all its finds and images? This cannot be undone.",
-      "name": "Name",
       "namePlaceholder": "Name of the locality",
       "description": "Description",
       "descriptionPlaceholder": "What do you want to investigate here? Notes, references…",
       "visibility": "Visibility",
-      "save": "Save",
       "saving": "Saving…",
-      "saveFailed": "Could not save. Try again."
+      "saveFailed": "Could not save. Try again.",
+      "adjustShort": "Adjust",
+      "renameHint": "Click to rename",
+      "details": "Details",
+      "owner": "Owner",
+      "created": "Created",
+      "updated": "Last changed"
     },
     "funn": {
       "heading": "Finds",
       "new": "New find",
       "loading": "Loading finds…",
       "empty": "No finds yet. Draw what you see in the terrain.",
-      "confirmDelete": "Delete the find \"{{title}}\"?",
       "saveFailed": "Could not save the find. Try again.",
       "draft": {
         "instructions": "Draw the find on the map with the tools below, and give it a title.",
@@ -365,15 +377,20 @@
         "sannsynlig": "Probable",
         "avkreftet": "Dismissed",
         "rapportert": "Reported",
-        "cycleHint": "Click to change status"
+        "heading": "Status",
+        "pickHint": "Change status"
       },
       "actions": {
         "zoom": "Zoom to the find",
         "edit": "Edit",
         "editGeometry": "Edit the drawing",
-        "delete": "Delete"
+        "delete": "Delete",
+        "menu": "More actions",
+        "done": "Done"
       },
-      "growConfirm": "The find extends beyond the locality's area. Grow the area so it covers the find?"
+      "growConfirm": "The find extends beyond the locality's area. Grow the area so it covers the find?",
+      "confirmDeleteShort": "Delete the find?",
+      "growConfirmAction": "Grow the area"
     },
     "bilder": {
       "heading": "Images",
@@ -383,16 +400,26 @@
       "empty": "No images yet. Run a LiDAR extract and press \"Keep\", or upload an image.",
       "confirmDelete": "Delete the image? This cannot be undone.",
       "uploadFailed": "Could not upload the image. Try again.",
-      "delete": "Delete the image"
+      "delete": "Delete the image",
+      "captionPlaceholder": "Caption…",
+      "previous": "Previous image",
+      "next": "Next image",
+      "openOriginal": "Open the original",
+      "kind": {
+        "extract": "LiDAR extract",
+        "screenshot": "Screenshot",
+        "upload": "Uploaded"
+      }
     },
     "tools": {
-      "heading": "Tools",
       "lidarExtract": "LiDAR extract",
       "closeLidar": "Close LiDAR extract",
       "screenshot": "Screenshot",
-      "screenshotTaking": "Taking screenshot…",
       "screenshotCaption": "Screenshot",
-      "screenshotFailed": "Could not take a screenshot. Make sure the locality is visible on the map."
+      "screenshotFailed": "Could not take a screenshot. Make sure the locality is visible on the map.",
+      "lidarExtractShort": "LiDAR",
+      "screenshotShort": "Image",
+      "screenshotSaved": "Screenshot saved under Images."
     },
     "kulturminner": {
       "heading": "Known cultural heritage",

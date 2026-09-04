@@ -313,6 +313,12 @@
     "defaultName": "Uten navn",
     "createFailed": "Kunne ikke opprette lokaliteten. Sjekk at du er innlogget og at serveren kjører oppdatert skjema (detaljer i nettleserkonsollen).",
     "byOwner": "av {{name}}",
+    "summary": {
+      "funn_one": "1 funn",
+      "funn_other": "{{count}} funn",
+      "bilder_one": "1 bilde",
+      "bilder_other": "{{count}} bilder"
+    },
     "visibility": {
       "private": "Privat",
       "limited": "Begrenset",
@@ -332,7 +338,10 @@
       "filter": {
         "mine": "Mine",
         "all": "Alle (admin)"
-      }
+      },
+      "searchPlaceholder": "Søk i lokaliteter…",
+      "clearSearch": "Tøm søket",
+      "noMatch": "Ingen lokaliteter matcher «{{query}}»."
     },
     "workspace": {
       "back": "Tilbake",
@@ -340,21 +349,24 @@
       "adjust": "Juster området (flytt eller dra i hjørnene)",
       "deleteLocality": "Slett lokaliteten",
       "confirmDelete": "Slette «{{name}}» med alle funn og bilder? Handlingen kan ikke angres.",
-      "name": "Navn",
       "namePlaceholder": "Navn på lokaliteten",
       "description": "Beskrivelse",
       "descriptionPlaceholder": "Hva vil du undersøke her? Notater, referanser…",
       "visibility": "Synlighet",
-      "save": "Lagre",
       "saving": "Lagrer…",
-      "saveFailed": "Kunne ikke lagre. Prøv igjen."
+      "saveFailed": "Kunne ikke lagre. Prøv igjen.",
+      "adjustShort": "Juster",
+      "renameHint": "Klikk for å endre navnet",
+      "details": "Detaljer",
+      "owner": "Eier",
+      "created": "Opprettet",
+      "updated": "Sist endret"
     },
     "funn": {
       "heading": "Funn",
       "new": "Nytt funn",
       "loading": "Henter funn…",
       "empty": "Ingen funn enda. Tegn det du ser i terrenget.",
-      "confirmDelete": "Slette funnet «{{title}}»?",
       "saveFailed": "Kunne ikke lagre funnet. Prøv igjen.",
       "draft": {
         "instructions": "Tegn funnet på kartet med verktøyene under, og gi det en tittel.",
@@ -370,15 +382,20 @@
         "sannsynlig": "Sannsynlig",
         "avkreftet": "Avkreftet",
         "rapportert": "Rapportert",
-        "cycleHint": "Klikk for å endre status"
+        "heading": "Status",
+        "pickHint": "Endre status"
       },
       "actions": {
         "zoom": "Zoom til funnet",
         "edit": "Rediger",
         "editGeometry": "Rediger tegningen",
-        "delete": "Slett"
+        "delete": "Slett",
+        "menu": "Flere valg",
+        "done": "Ferdig"
       },
-      "growConfirm": "Funnet ligger utenfor lokalitetens område. Utvide området slik at det dekker funnet?"
+      "growConfirm": "Funnet ligger utenfor lokalitetens område. Utvide området slik at det dekker funnet?",
+      "confirmDeleteShort": "Slette funnet?",
+      "growConfirmAction": "Utvid området"
     },
     "bilder": {
       "heading": "Bilder",
@@ -388,16 +405,26 @@
       "empty": "Ingen bilder enda. Kjør et LiDAR-uttrekk og trykk «Behold», eller last opp et bilde.",
       "confirmDelete": "Slette bildet? Handlingen kan ikke angres.",
       "uploadFailed": "Kunne ikke laste opp bildet. Prøv igjen.",
-      "delete": "Slett bildet"
+      "delete": "Slett bildet",
+      "captionPlaceholder": "Bildetekst…",
+      "previous": "Forrige bilde",
+      "next": "Neste bilde",
+      "openOriginal": "Åpne originalen",
+      "kind": {
+        "extract": "LiDAR-uttrekk",
+        "screenshot": "Skjermbilde",
+        "upload": "Opplastet"
+      }
     },
     "tools": {
-      "heading": "Verktøy",
       "lidarExtract": "LiDAR-uttrekk",
       "closeLidar": "Lukk LiDAR-uttrekk",
       "screenshot": "Skjermbilde",
-      "screenshotTaking": "Tar skjermbilde…",
       "screenshotCaption": "Skjermbilde",
-      "screenshotFailed": "Kunne ikke ta skjermbilde. Sørg for at lokaliteten er synlig i kartet."
+      "screenshotFailed": "Kunne ikke ta skjermbilde. Sørg for at lokaliteten er synlig i kartet.",
+      "lidarExtractShort": "LiDAR",
+      "screenshotShort": "Bilde",
+      "screenshotSaved": "Skjermbildet er lagret under Bilder."
     },
     "kulturminner": {
       "heading": "Kjente kulturminner",

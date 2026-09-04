@@ -1,3 +1,4 @@
+import { toaster } from '@kvib/react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { Polygon } from 'ol/geom';
 import Draw, { createBox } from 'ol/interaction/Draw';
@@ -84,7 +85,7 @@ export const useLocalityCreate = () => {
           // Surface it — a silent failure here looks like "the button
           // does nothing" (classic cause: pocketbase not restarted after
           // a migration change, so the collection doesn't exist).
-          window.alert(t('localities.createFailed'));
+          toaster.error({ title: t('localities.createFailed') });
         })
         .finally(() => {
           setCreating(false);

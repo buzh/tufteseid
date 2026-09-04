@@ -47,6 +47,21 @@ export const listLocalityFinds = async (
   });
 };
 
+// Funn per lokalitet for the "Mine lokaliteter" list. `fields` keeps the
+// GeoJSON blob — by far the biggest column here — out of the response;
+// without it this would pull every drawing in the account to render a
+// number.
+export const countFindsByLocality = async (): Promise<Map<string, number>> => {
+  const rows = await pb
+    .collection(COLLECTION)
+    .getFullList<{ locality: string }>({ fields: 'locality' });
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    counts.set(row.locality, (counts.get(row.locality) ?? 0) + 1);
+  }
+  return counts;
+};
+
 export const createLocalityFind = async (
   input: NewLocalityFindInput,
   ownerId: string,
