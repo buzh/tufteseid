@@ -3,6 +3,7 @@ import { Coordinate } from 'ol/coordinate';
 import { Geometry } from 'ol/geom';
 import BaseLayer from 'ol/layer/Base';
 import ImageLayer from 'ol/layer/Image';
+import Layer from 'ol/layer/Layer';
 import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector';
 import Map from 'ol/Map';
@@ -20,6 +21,17 @@ import { DEFAULT_INFO_FORMAT } from './types';
 
 export type QueryableWMSLayer = TileLayer | ImageLayer<ImageWMS>;
 
+// `getVisible()` is only the checkbox — it says nothing about whether the
+// layer is actually drawing at the current zoom. The whole Kulturminner
+// category carries `minZoom: 8`, so below that these layers render
+// nothing while still reporting visible: clicking empty topo at zoom 3
+// fired five GetFeatureInfo requests at kart.ra.no and could open an
+// info panel about heritage the map wasn't showing. `Layer#isVisible`
+// folds in min/max zoom, min/max resolution and the layer extent
+// (ol/layer/Layer.js `inView`), which is what "on screen" means here.
+const isRendering = (layer: BaseLayer, map: Map): boolean =>
+  layer instanceof Layer && layer.isVisible(map.getView());
+
 export const getQueryableWMSLayers = (map: Map): QueryableWMSLayer[] => {
   return map
     .getLayers()
@@ -34,9 +46,8 @@ export const getQueryableWMSLayers = (map: Map): QueryableWMSLayer[] => {
       const id = layer.get('id');
       const isThemeLayer = typeof id === 'string' && id.startsWith('theme.');
       const isQueryable = layer.get('queryable') === true;
-      const isVisible = layer.getVisible();
 
-      return isThemeLayer && isQueryable && isVisible;
+      return isThemeLayer && isQueryable && isRendering(layer, map);
     });
 };
 
@@ -53,9 +64,8 @@ export const getVisibleVectorLayers = (
 
       const id = layer.get('id');
       const isThemeLayer = typeof id === 'string' && id.startsWith('theme.');
-      const isVisible = layer.getVisible();
 
-      return isThemeLayer && isVisible;
+      return isThemeLayer && isRendering(layer, map);
     });
 };
 
@@ -578,7 +588,7 @@ export const hasVisibleLayerWithIdIn = (
     .getLayers()
     .getArray()
     .some((layer) => {
-      if (!layer.getVisible()) return false;
+      if (!isRendering(layer, map)) return false;
       const id = layer.get('id');
       return typeof id === 'string' && layerIds.has(id);
     });

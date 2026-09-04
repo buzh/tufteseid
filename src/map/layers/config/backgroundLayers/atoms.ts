@@ -122,7 +122,17 @@ const buildLidarProjectConfig = (
   coverageExtent: { extent: project.bboxLonLat, crs: 'EPSG:4326' },
 });
 
+// Which run of the effect below is the current one. The effect builds
+// its stack asynchronously — a WMTS base still needs its capabilities
+// fetched the first time — while W/S and A/D fire the effect faster than
+// that round trip. Without this an earlier run could resolve last and
+// install a stack the user has already cycled past, along with its URL
+// parameters. Bumped before any of the early returns so switching to the
+// empty background invalidates an in-flight build too.
+let swapGeneration = 0;
+
 export const backgroundLayerAtomEffect = atomEffect((get) => {
+  const generation = ++swapGeneration;
   const layerName = get(backgroundLayerAtom);
   // Depend on the active lidar project + style so switching either while
   // a LiDAR layer is the background rebuilds the WMS layer.
@@ -211,6 +221,11 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
             ? buildOrReuseBackgroundLayer(overlayConfig, projection)
             : Promise.resolve(null),
         ]);
+
+      // A newer run started while this one was building. Everything from
+      // here on mutates shared state — the layer collection, the URL —
+      // so it has to be the last word or not happen at all.
+      if (generation !== swapGeneration) return;
 
       if (!topLayer) return;
 
