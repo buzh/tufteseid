@@ -2,8 +2,10 @@ import { MaterialSymbol } from '@kvib/react';
 import { FeatureCollection, GeoJsonProperties } from 'geojson';
 import { getDefaultStore, useAtom, useAtomValue } from 'jotai';
 import { Feature, Overlay } from 'ol';
+import type { EventsKey } from 'ol/events';
 import GeoJSON from 'ol/format/GeoJSON.js';
 import { Circle, Geometry, Point } from 'ol/geom';
+import { unByKey } from 'ol/Observable';
 import VectorSource from 'ol/source/Vector';
 import { Fill, Stroke, Style } from 'ol/style';
 import CircleStyle from 'ol/style/Circle';
@@ -347,6 +349,15 @@ const useDrawSettings = () => {
 
 export { useDrawSettings };
 
+// One 'change' listener per feature, not one per call. This function is
+// re-run for the same feature every time its icon, colour or size
+// changes, and while the old Overlay is taken off the map below, the old
+// listener was left registered — still holding that detached Overlay and
+// still repositioning it on every geometry change. Ten icon edits meant
+// ten listeners and nine dead overlays kept alive by their closures.
+// Weakly keyed so the entry goes when the feature does.
+const iconOverlayListeners = new WeakMap<Feature, EventsKey>();
+
 export const addIconOverlayToPointFeature = (
   feature: Feature,
   icon: PointIcon,
@@ -390,13 +401,20 @@ export const addIconOverlayToPointFeature = (
   point.setProperties({
     overlayIcon: icon,
   });
-  feature.on('change', () => {
-    const geom = feature.getGeometry();
-    if (geom && geom instanceof Point) {
-      const coords = geom.getCoordinates();
-      overlay.setPosition(coords);
-    }
-  });
+  const previousListener = iconOverlayListeners.get(feature);
+  if (previousListener) {
+    unByKey(previousListener);
+  }
+  iconOverlayListeners.set(
+    feature,
+    feature.on('change', () => {
+      const geom = feature.getGeometry();
+      if (geom && geom instanceof Point) {
+        const coords = geom.getCoordinates();
+        overlay.setPosition(coords);
+      }
+    }),
+  );
   feature.setStyle(
     new Style({
       image: new CircleStyle({

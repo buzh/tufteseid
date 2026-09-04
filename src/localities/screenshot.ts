@@ -1,6 +1,15 @@
 import Map from 'ol/Map';
+import { unByKey } from 'ol/Observable';
 import { transformExtent } from 'ol/proj';
 import { LocalityBbox } from '../api/localities';
+
+// 'rendercomplete' only fires once every source has finished loading, so
+// a single tile that never settles means it never fires and the promise
+// never resolves — the "ta skjermbilde" button stays spinning for good.
+// Waiting is normal (a cold LiDAR tile is 3-12 s at Kartverket's
+// origin), so the budget is the same generous one the background swap
+// uses as its retirement backstop.
+const RENDER_TIMEOUT_MS = 15000;
 
 // Capture the current map view cropped to a lokalitet's rectangle.
 // Standard OL canvas-export recipe: wait for rendercomplete, composite
@@ -15,15 +24,29 @@ export const captureLocalityScreenshot = (
   bbox4326: LocalityBbox,
 ): Promise<Blob | null> =>
   new Promise((resolve) => {
-    map.once('rendercomplete', () => {
+    let settled = false;
+    const finish = (blob: Blob | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      unByKey(key);
+      resolve(blob);
+    };
+
+    const timer = setTimeout(() => {
+      console.warn('[screenshot] no rendercomplete, giving up');
+      finish(null);
+    }, RENDER_TIMEOUT_MS);
+
+    const key = map.once('rendercomplete', () => {
       try {
         const size = map.getSize();
-        if (!size) return resolve(null);
+        if (!size) return finish(null);
         const projection = map.getView().getProjection().getCode();
         const extent = transformExtent(bbox4326, 'EPSG:4326', projection);
         const topLeft = map.getPixelFromCoordinate([extent[0], extent[3]]);
         const bottomRight = map.getPixelFromCoordinate([extent[2], extent[1]]);
-        if (!topLeft || !bottomRight) return resolve(null);
+        if (!topLeft || !bottomRight) return finish(null);
 
         // Rectangle ∩ viewport, in CSS pixels.
         const sx = Math.max(0, Math.floor(topLeft[0]));
@@ -32,13 +55,13 @@ export const captureLocalityScreenshot = (
         const ey = Math.min(size[1], Math.ceil(bottomRight[1]));
         const sw = ex - sx;
         const sh = ey - sy;
-        if (sw < 20 || sh < 20) return resolve(null);
+        if (sw < 20 || sh < 20) return finish(null);
 
         const composite = document.createElement('canvas');
         composite.width = size[0];
         composite.height = size[1];
         const ctx = composite.getContext('2d');
-        if (!ctx) return resolve(null);
+        if (!ctx) return finish(null);
 
         const canvases = map
           .getViewport()
@@ -88,12 +111,12 @@ export const captureLocalityScreenshot = (
         out.width = sw;
         out.height = sh;
         const outCtx = out.getContext('2d');
-        if (!outCtx) return resolve(null);
+        if (!outCtx) return finish(null);
         outCtx.drawImage(composite, sx, sy, sw, sh, 0, 0, sw, sh);
-        out.toBlob((blob) => resolve(blob), 'image/png');
+        out.toBlob((blob) => finish(blob), 'image/png');
       } catch (e) {
         console.warn('[screenshot] capture failed', e);
-        resolve(null);
+        finish(null);
       }
     });
     map.renderSync();
