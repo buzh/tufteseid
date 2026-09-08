@@ -219,6 +219,85 @@ all three are load-bearing:
   zoomed-out view is a ~5 ms hit rather than a multi-second origin
   round trip (see `$skip_cache`).
 
+### Kartverket rate-limits, and says so with an HTTP 200
+
+`wms.geonorge.no` meters GetMap by source IP — which is the server, so
+the budget is shared by every visitor at once. Over it, the reply is
+**HTTP 200**, `Content-Type: application/vnd.ogc.se_xml`, 238 bytes:
+
+```
+[99][Interceptor]
+Overforbruk på kort tid.
+Vent litt, prøv igjen.
+(4)
+```
+
+The browser cannot decode that as a PNG, so OpenLayers marks the tile
+`ERROR` — and an errored tile is **never retried**. It stays a hole
+until something rebuilds the layer. This is the cause of the classic
+"some tiles didn't load and the map is a patchwork of sources": the
+patchwork is `findAltTiles_` filling the holes from other zoom levels.
+
+Measured budget: 120 strictly sequential requests never trip it, nor do
+36-tile bursts at up to 32-way concurrency, but 210 requests at 16-way
+concurrency get through the first 120 and then lose 75 of the next 90.
+So it is a **short-window volume** budget of roughly 120 GetMaps, not a
+concurrency limit — which is why `maxTilesLoading: 48` is not the
+problem and lowering it would not help.
+
+Nothing in nginx can retry it: `proxy_next_upstream` only sees status
+codes, and this one is a 200. The only defence is to spend fewer
+requests, which is what the next two sections are about.
+
+### 512 px WMS tiles
+
+`src/map/layers/wmsTileGrid.ts` gives every `TileWMS` in the app —
+background *and* theme — an explicit 512 px `TileGrid` whose resolutions
+are the View's own ladder (`max(width, height) / 256 / 2**z` over the
+projection extent, mirroring `View`'s `createResolutionConstraint`).
+Alignment is exact, so tiles never resample.
+
+At OpenLayers' default 256 px a 1600×1000 viewport is ~35 tiles per
+layer per level, and LiDAR project mode stacks two WMS layers (faded
+national mosaic under the project) — 70 requests for one zoom step,
+before theme layers. That trips the interceptor above in two steps.
+512 px quarters it.
+
+It is not a bandwidth trade: one 512 px hillshade tile measured 146 060
+bytes against 4 × ~36 800 for the same ground at 256 px. Wall clock was
+equal or better in all six cold trials, and only the 256 px runs threw
+long-tail outliers (one at 30.2 s) — a screenful's worst case is its
+slowest tile, so fewer tiles means fewer chances to draw one.
+
+Two things to know before changing the size. The request stays 512×512
+on every display because `TileWMS` pins its pixel ratio to 1 unless
+`serverType` is set and none of these sources sets one — if you ever add
+one, it will start asking for 1024×1024 (checked: both origins serve
+that fine). And projections without an extent get `undefined` back and
+stay on OL's default grid rather than a guessed one.
+
+The same module sets `cacheSize: 128` on those layers (~10 screenfuls at
+512 px; the 512 default was budgeted for quarter-size tiles) and
+`zDirection: 1`.
+
+`zDirection: 1` asks for the **coarser** of the two bracketing levels
+when the view resolution falls between them. At rest it does nothing —
+`constrainResolution` means the view always settles on a level this grid
+matches exactly, and an exact match ignores the direction
+(`linearFindNearest`, `ol/array.js`). It only applies during the 250 ms
+zoom animation, which is where the waste was: a single notch from z13 to
+z12 used to fetch the 35 tiles z12 needs *plus* a 19-tile ring at z13,
+because the extent grows throughout the animation while nearest-rounding
+still says z13. Now a zoom-out heads straight for its destination level
+and a zoom-in keeps drawing the level it already has until it arrives.
+
+Not done, and why: coalescing rapid wheel notches by raising
+`MouseWheelZoom`'s `timeout` looks like the obvious companion fix and is
+not one. With `constrainResolution` on the View, `handleWheelZoom_`
+already collapses a whole burst inside the timeout window to exactly
+**one** level (it clamps delta to ±1). A longer timeout therefore skips
+no intermediate levels; it only caps how fast the user can zoom.
+
 ### Every WMS background layer needs a `coverageExtent`
 
 A `TileWMS` with no tile grid of its own takes one spanning the whole
@@ -431,14 +510,43 @@ Notes on shared behavior:
   `docker compose exec wmscache nginx -T | grep 'read_timeout\|max_fails\|next_upstream'`.
 - Adds `X-Cache-Status: HIT|MISS|BYPASS` to responses for debugging.
 - `proxy_cache_lock on` — one upstream request in flight per cold key.
+- **Rewrites `Cache-Control` for the browser** (`$tile_cache_control`,
+  `public, max-age=604800`, or `no-store` when `$skip_cache` says the
+  body is too small to be a map). None of the upstreams sends a usable
+  one — Kartverket sends none at all — and with no validator either,
+  Chrome's heuristic freshness is zero. Measured over one session:
+  `cache.kartverket.no` (which does send `max-age`) served 173 of 254
+  requests from disk cache while everything through this proxy served
+  **0 of 454**. Every revisit to an area therefore re-spent the origin's
+  rate budget on tiles the browser already had.
+
+  A week is deliberately generous: these come out of a 180-day LRU here,
+  so a browser copy up to 7 days old can never be staler than what this
+  proxy would have served anyway. That also settles RA's `max-age=3600`,
+  which was already meaningless downstream of that LRU.
+
+  Two details that are easy to get wrong. The upstream's own
+  `Cache-Control`/`Expires`/`Pragma` must be **hidden**, not merely
+  ignored — `proxy_ignore_headers` only governs nginx's own storage
+  decision, and leaving them on the wire means two `Cache-Control`
+  headers where the browser takes the stricter. And the `add_header`
+  deliberately has **no `always`**, which scopes it to successful
+  statuses: a 502/504 from a shed upstream must not go out with a week
+  of freshness on it. The rate-limit exception is still covered because
+  it arrives as a 200 and `$skip_cache` catches it on length.
+
+  Unlike `proxy_cache_bypass`, `add_header` is evaluated after the
+  upstream response headers arrive, so `$upstream_http_content_length`
+  is populated and the `$skip_cache` chain resolves correctly.
 
 Sanity check after a rebuild (LiDAR hillshade):
 
 ```
-curl -sI "http://localhost:3030/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=NHM_DTM_TOPOBATHY_25833:skyggerelieff&CRS=EPSG:25833&BBOX=200000,6500000,300000,6600000&WIDTH=256&HEIGHT=256&FORMAT=image/png" | grep -i x-cache
+curl -sI "http://localhost:3030/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=NHM_DTM_TOPOBATHY_25833:skyggerelieff&CRS=EPSG:25833&BBOX=200000,6500000,300000,6600000&WIDTH=512&HEIGHT=512&FORMAT=image/png" | grep -i 'x-cache\|cache-control'
 ```
 
-First call: `MISS`. Repeat: `HIT`. Inspect on-disk size:
+First call: `MISS`. Repeat: `HIT`. Both should carry
+`Cache-Control: public, max-age=604800`. Inspect on-disk size:
 `docker run --rm -v tufteseid_wmscache:/c alpine du -sh /c`.
 
 ## Adding another theme layer

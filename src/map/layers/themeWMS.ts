@@ -10,6 +10,11 @@ import {
   getEffectiveWmsUrl,
   getParentCategory,
 } from './themeLayerConfigApi';
+import {
+  getWMSTileGrid,
+  WMS_TILE_CACHE_SIZE,
+  WMS_Z_DIRECTION,
+} from './wmsTileGrid';
 
 // Fork keeps only Kulturminner theme layers.
 export type ThemeLayerName =
@@ -92,8 +97,16 @@ export const createThemeLayerFromConfig = (
       url: wmsUrl,
       params: { ...wmsParams, TILED: true },
       projection: projection,
+      // 512 px, same grid the WMS background layers use — see
+      // src/map/layers/wmsTileGrid.ts. RA's MapServer is the slowest
+      // origin in the stack, so quartering the request count per
+      // screenful helps most here; it also halves the number of tile
+      // seams a point symbol or label can be clipped by.
+      tileGrid: getWMSTileGrid(projection),
+      zDirection: WMS_Z_DIRECTION,
     }),
     properties: layerProperties,
+    cacheSize: WMS_TILE_CACHE_SIZE,
     // preload 0 for the same reason as the WMS background layers: these
     // are on-the-fly renders (RA's MapServer especially) sharing the
     // map's one tile queue with the base map, and coarse levels nobody

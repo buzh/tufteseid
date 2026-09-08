@@ -6,6 +6,11 @@ import { transformExtent } from 'ol/proj';
 import TileWMS from 'ol/source/TileWMS';
 import WMTS, { optionsFromCapabilities } from 'ol/source/WMTS';
 import { mapAtom } from '../../../atoms';
+import {
+  getWMSTileGrid,
+  WMS_TILE_CACHE_SIZE,
+  WMS_Z_DIRECTION,
+} from '../../wmsTileGrid';
 import { backgroundLayerCapabilitiesCacheAtom } from './atoms';
 import {
   BackgroundLayer,
@@ -87,6 +92,11 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
   const source = new TileWMS({
     url: layerConfig.url,
     params: { ...layerConfig.props },
+    // 512 px tiles, aligned to the view's resolution ladder. See
+    // src/map/layers/wmsTileGrid.ts — this is a request-count decision,
+    // not a bandwidth one.
+    tileGrid: getWMSTileGrid(projection),
+    zDirection: WMS_Z_DIRECTION,
   });
   // 8 sampling stops per edge rather than the default corners-only:
   // reprojecting a Norway-sized box out of UTM33 bows its edges, and
@@ -108,6 +118,7 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
     source,
     properties,
     preload: 0,
+    cacheSize: WMS_TILE_CACHE_SIZE,
     ...(extent ? { extent } : {}),
   });
 };
