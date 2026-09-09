@@ -475,12 +475,15 @@ token is bound to the requesting IP + referer, so only the server can
 mint one that works for the server's tile fetches. See the **nib-proxy**
 service note above and `nib-proxy/server.mjs`.
 
-Deploy-time unknowns to verify (can't be checked from the client before
-the sidecar is up): the exact published WMS **layer name** (`FLYFOTO_LAYER`
-in `flyfoto.ts`, assumed `ortofoto`) via GetCapabilities through the
-running sidecar, and that header-token tile fetches succeed. If the
-header form is ever rejected, the fallback is `&token=` in the query
-(still cache-safe because injection is server-side).
+Verified against the running service: the WMS namespace is
+`services.norgeibilder.no/wms/*` (the sidecar's `UPSTREAM` ends in `/wms`
+because the Caddy+nginx prefix rewrites strip the request down to the
+bare service name, e.g. `/ortofoto`, before it reaches the sidecar — a
+bare-host base 404s), the layer name is `ortofoto` (`FLYFOTO_LAYER`), and
+NiB accepts the token as **either** the `X-Esri-Authorization: Bearer`
+header (what the sidecar sends, to keep it out of the URL) **or** a
+`&token=` query param (the fallback if the header form is ever rejected;
+still cache-safe because injection is server-side).
 
 Licensing: NiB imagery is free for private, non-commercial use;
 publishing/commercial use is the user's responsibility. A notice dialog

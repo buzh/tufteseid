@@ -27,8 +27,13 @@ const TOKEN_URL =
   process.env.NIB_TOKEN_URL ||
   'https://backend-api.klienter-prod-k8s2.norgeibilder.no/token/nib';
 const REFERER = process.env.NIB_REFERER || 'https://norgeibilder.no/';
+// Base is the NiB WMS namespace, not the bare host: by the time a request
+// reaches this sidecar the chain of prefix rewrites (Caddy /wms/nib/* →
+// nginx /nib-wms/) has stripped everything down to the service name, e.g.
+// /ortofoto. Prepending /wms here rebuilds services.norgeibilder.no/wms/
+// ortofoto — and generalizes to /prosjekter, /mosaikk the same way.
 const UPSTREAM = (
-  process.env.NIB_UPSTREAM || 'https://services.norgeibilder.no'
+  process.env.NIB_UPSTREAM || 'https://services.norgeibilder.no/wms'
 ).replace(/\/$/, '');
 
 // The mint endpoint returns {"token":"..."} with no expiry field, so the
