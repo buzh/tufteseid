@@ -41,6 +41,7 @@ const KIND_ICON: Record<AttachmentKind, MaterialSymbol> = {
   extract: 'landscape',
   screenshot: 'photo_camera',
   upload: 'image',
+  flyfoto: 'satellite_alt',
 };
 
 // Tokened URLs are async (the file field is protected), so every image

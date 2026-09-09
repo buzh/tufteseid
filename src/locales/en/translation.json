@@ -419,7 +419,16 @@
       "screenshotFailed": "Could not take a screenshot. Make sure the locality is visible on the map.",
       "lidarExtractShort": "LiDAR",
       "screenshotShort": "Image",
-      "screenshotSaved": "Screenshot saved under Images."
+      "screenshotSaved": "Screenshot saved under Images.",
+      "flyfoto": "Fetch aerial photo",
+      "flyfotoShort": "Aerial",
+      "flyfotoCaption": "Aerial photo",
+      "flyfotoSaved": "Aerial photo saved under Images.",
+      "flyfotoFailed": "Could not fetch aerial imagery for this area.",
+      "flyfotoEmpty": "No aerial imagery coverage found for this area.",
+      "flyfotoNoticeTitle": "About using aerial imagery",
+      "flyfotoNotice": "Aerial imagery is fetched from Norge i bilder (© Kartverket, Geovekst, municipalities and others) and stored in the locality for your own use. The images are free for private, non-commercial use. If you intend to publish them or use them commercially, obtaining the rights and following the source's terms is your own responsibility.",
+      "flyfotoConfirm": "Fetch aerial photo"
     },
     "kulturminner": {
       "heading": "Known cultural heritage",

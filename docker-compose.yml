@@ -47,6 +47,21 @@ services:
       - ./nginx/wms-cache.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/wms-proxy-common.conf:/etc/nginx/wms-proxy-common.conf:ro
       - wmscache:/var/cache/nginx/wms
+    depends_on:
+      - nib-proxy
+
+  # Token-injecting sidecar for Norge i bilder (NiB) ortofoto. NiB's WMS
+  # needs an access token even for the imagery norgeibilder.no shows
+  # anonymously; that token is minted anonymously (Referer only) and bound
+  # to the requesting IP + referer, so it has to be minted and used
+  # server-side. wmscache proxies /nib-wms/* here; this mints/refreshes
+  # the token, injects it toward services.norgeibilder.no, and re-mints on
+  # auth failure. Zero deps (Node 24 global fetch); see nib-proxy/server.mjs.
+  # Not exposed on the host — only reachable from wmscache on the compose
+  # network.
+  nib-proxy:
+    build: ./nib-proxy
+    restart: unless-stopped
 
   # If you want Caddy to terminate TLS itself instead of sitting behind
   # another reverse proxy, change the ":3000" line in Caddyfile to your

@@ -424,7 +424,16 @@
       "screenshotFailed": "Kunne ikke ta skjermbilde. Sørg for at lokaliteten er synlig i kartet.",
       "lidarExtractShort": "LiDAR",
       "screenshotShort": "Bilde",
-      "screenshotSaved": "Skjermbildet er lagret under Bilder."
+      "screenshotSaved": "Skjermbildet er lagret under Bilder.",
+      "flyfoto": "Hent flyfoto",
+      "flyfotoShort": "Flyfoto",
+      "flyfotoCaption": "Flyfoto",
+      "flyfotoSaved": "Flyfotoet er lagret under Bilder.",
+      "flyfotoFailed": "Kunne ikke hente flyfoto for dette området.",
+      "flyfotoEmpty": "Fant ingen flyfoto-dekning for dette området.",
+      "flyfotoNoticeTitle": "Om bruk av flyfoto",
+      "flyfotoNotice": "Flyfoto hentes fra Norge i bilder (© Kartverket, Geovekst, kommuner m.fl.) og lagres i lokaliteten til eget bruk. Bildene er frie til privat, ikke-kommersiell bruk. Vil du publisere dem eller bruke dem kommersielt, må du selv innhente rettigheter og følge vilkårene til kilden.",
+      "flyfotoConfirm": "Hent flyfoto"
     },
     "kulturminner": {
       "heading": "Kjente kulturminner",

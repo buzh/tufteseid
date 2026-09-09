@@ -424,7 +424,16 @@
       "screenshotFailed": "Kunne ikkje ta skjermbilete. Sørg for at lokaliteten er synleg i kartet.",
       "lidarExtractShort": "LiDAR",
       "screenshotShort": "Bilete",
-      "screenshotSaved": "Skjermbiletet er lagra under Bilete."
+      "screenshotSaved": "Skjermbiletet er lagra under Bilete.",
+      "flyfoto": "Hent flyfoto",
+      "flyfotoShort": "Flyfoto",
+      "flyfotoCaption": "Flyfoto",
+      "flyfotoSaved": "Flyfotoet er lagra under Bilete.",
+      "flyfotoFailed": "Kunne ikkje hente flyfoto for dette området.",
+      "flyfotoEmpty": "Fann ingen flyfoto-dekning for dette området.",
+      "flyfotoNoticeTitle": "Om bruk av flyfoto",
+      "flyfotoNotice": "Flyfoto blir henta frå Norge i bilder (© Kartverket, Geovekst, kommunar m.fl.) og lagra i lokaliteten til eige bruk. Bileta er frie til privat, ikkje-kommersiell bruk. Vil du publisere dei eller bruke dei kommersielt, må du sjølv innhente rettar og følgje vilkåra til kjelda.",
+      "flyfotoConfirm": "Hent flyfoto"
     },
     "kulturminner": {
       "heading": "Kjende kulturminne",

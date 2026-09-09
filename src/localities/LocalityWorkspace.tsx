@@ -70,6 +70,7 @@ import {
   setLocalityHighlight,
   upsertLocalityOnLayer,
 } from './localityLayer';
+import { fetchFlyfoto } from './flyfoto';
 import { captureLocalityScreenshot } from './screenshot';
 import {
   getDrawLayerExtent4326,
@@ -160,6 +161,8 @@ export const LocalityWorkspace = ({
   const setLidarSelection = useSetAtom(lidarExtractSelectionAtom);
   const [lidarOpen, setLidarOpen] = useState(false);
   const [shooting, setShooting] = useState(false);
+  const [fetchingFlyfoto, setFetchingFlyfoto] = useState(false);
+  const [flyfotoNotice, setFlyfotoNotice] = useState(false);
   const { setDrawLayerFeatures } = useDrawSettings();
 
   const isMine = user != null && user.id === locality.owner;
@@ -434,6 +437,53 @@ export const LocalityWorkspace = ({
     i18n.language,
   ]);
 
+  // Stitch NiB ortofoto over the rectangle → Bilder. Gated behind the
+  // licensing notice dialog (the imagery is free for private use only),
+  // so this runs on the notice's confirm, not the button click.
+  const runFlyfoto = useCallback(async () => {
+    if (!user || !isMine || fetchingFlyfoto) return;
+    setFlyfotoNotice(false);
+    setFetchingFlyfoto(true);
+    try {
+      const result = await fetchFlyfoto(locality.bbox);
+      if (!result) {
+        toaster.error({ title: t('localities.tools.flyfotoEmpty') });
+        return;
+      }
+      const rec = await createAttachment(
+        {
+          locality: locality.id,
+          kind: 'flyfoto',
+          caption: `${t('localities.tools.flyfotoCaption')} ${new Date().toLocaleDateString(i18n.language)}`,
+          meta: {
+            sourceLabel: 'Norge i bilder',
+            metresPerPx: result.metresPerPx,
+            bbox25833: result.bbox25833,
+          },
+        },
+        user.id,
+        result.blob,
+        'flyfoto.jpg',
+      );
+      setAttachmentItems((prev) => (prev ? [rec, ...prev] : [rec]));
+      toaster.success({ title: t('localities.tools.flyfotoSaved') });
+    } catch (e) {
+      console.warn('[LocalityWorkspace] flyfoto failed', e);
+      toaster.error({ title: t('localities.tools.flyfotoFailed') });
+    } finally {
+      setFetchingFlyfoto(false);
+    }
+  }, [
+    user,
+    isMine,
+    fetchingFlyfoto,
+    locality.id,
+    locality.bbox,
+    setAttachmentItems,
+    t,
+    i18n.language,
+  ]);
+
   const zoomToFunn = useCallback((id: string) => {
     const extent = getFunnExtentOnLayer(id);
     if (!extent) return;
@@ -688,6 +738,15 @@ export const LocalityWorkspace = ({
           )}
           {isMine && (
             <ActionButton
+              icon="satellite_alt"
+              label={t('localities.tools.flyfotoShort')}
+              tooltip={t('localities.tools.flyfoto')}
+              disabled={fetchingFlyfoto}
+              onClick={() => setFlyfotoNotice(true)}
+            />
+          )}
+          {isMine && (
+            <ActionButton
               icon="transform"
               label={t('localities.workspace.adjustShort')}
               tooltip={t('localities.workspace.adjust')}
@@ -829,6 +888,44 @@ export const LocalityWorkspace = ({
                   }}
                 >
                   {t('localities.funn.growConfirmAction')}
+                </Button>
+              </HStack>
+            </Stack>
+          </DialogBody>
+          <DialogCloseTrigger />
+        </DialogContent>
+      </Dialog>
+
+      {/* Licensing notice shown before every flyfoto grab: NiB imagery is
+          free for private use, but publishing or commercial use is the
+          user's own responsibility. Confirm runs the fetch. */}
+      <Dialog
+        open={flyfotoNotice}
+        placement="center"
+        onOpenChange={(e) => !e.open && setFlyfotoNotice(false)}
+      >
+        <DialogContent>
+          <DialogBody p={5}>
+            <Stack gap={4}>
+              <Heading size="sm">
+                {t('localities.tools.flyfotoNoticeTitle')}
+              </Heading>
+              <Text fontSize="sm">{t('localities.tools.flyfotoNotice')}</Text>
+              <HStack justify="flex-end">
+                <Button
+                  size="sm"
+                  variant="tertiary"
+                  onClick={() => setFlyfotoNotice(false)}
+                >
+                  {t('localities.funn.draft.cancel')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  colorPalette="green"
+                  onClick={runFlyfoto}
+                >
+                  {t('localities.tools.flyfotoConfirm')}
                 </Button>
               </HStack>
             </Stack>

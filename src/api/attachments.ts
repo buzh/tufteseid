@@ -4,10 +4,13 @@ import { pb } from './pocketbase';
 // and plain uploads. Visibility follows the parent lokalitet via the
 // collection rules, and the file field is *protected* — image bytes are
 // only served with a short-lived file token (see getAttachmentUrl).
-export type AttachmentKind = 'extract' | 'screenshot' | 'upload';
+// Keep in sync with the attachments.kind select values in the PocketBase
+// migrations (1700000300 adds 'flyfoto').
+export type AttachmentKind = 'extract' | 'screenshot' | 'upload' | 'flyfoto';
 
 // Free-form; extracts store sourceKey/sourceLabel/style/metresPerPx/
-// bbox25833 so the gallery can say what an image shows.
+// bbox25833 so the gallery can say what an image shows. Flyfoto stores
+// source label + metresPerPx + bbox25833.
 export type AttachmentMeta = Record<string, unknown>;
 
 export type AttachmentRecord = {

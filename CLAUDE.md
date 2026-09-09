@@ -88,13 +88,25 @@ Ports: Caddy inside the container listens on `:3000`; docker-compose maps host
   is in README.md. Pinned to 0.40.2 — migrations use the ≥0.23 App-based
   JSVM API (`$app.findCollectionByNameOrId` / `app.save`, flattened field
   classes), *not* the 0.22 `Dao` API.
+- **nib-proxy** — `node:24-alpine` token-injecting sidecar for Norge i
+  bilder (NiB) ortofoto (zero deps; see the "Flyfoto" section below).
+  NiB's WMS needs an access token even for the imagery norgeibilder.no
+  serves anonymously; the token is minted anonymously (Referer only) and
+  bound to the requesting IP + referer, so it must be minted *and* used
+  server-side. This mints/refreshes it, injects it toward
+  `services.norgeibilder.no`, and re-mints on auth failure (including the
+  HTTP-200-with-JSON-error case). Only reachable from wmscache on the
+  compose network.
 - **wmscache** — `nginx:1.27-alpine` sidecar. Reverse-proxies + caches
-  every external WMS the SPA uses. Currently fronts four upstreams:
+  every external WMS the SPA uses. Currently fronts five upstreams:
   - `wms.geonorge.no/skwms1/*` — Kartverket theme + LiDAR WMS.
   - `wfs.geonorge.no/skwms1/*` — Kartverket WFS (kulturminner readout,
     LiDAR project footprints). Proxied but **not** cached.
   - `kart.ra.no/wms/*` — Riksantikvaren Kulturminner WMS.
   - `testapi.norgeskart.no/v1/*` — matrikkel (cadastral) WMS.
+  - the **nib-proxy** sidecar — NiB ortofoto. The only internal upstream,
+    and the only one resolved at request time (Docker DNS `127.0.0.11`),
+    because a compose service's IP can change on restart.
 
   Caddy exposes each host under a same-origin prefix and rewrites into
   the upstream namespace before forwarding:
@@ -104,11 +116,12 @@ Ports: Caddy inside the container listens on `:3000`; docker-compose maps host
   /wfs/geonorge/wfs.foo    →  wfs.geonorge.no/skwms1/wfs.foo
   /wms/ra/kulturminner2    →  kart.ra.no/wms/kulturminner2
   /wms/testapi/matrikkel   →  testapi.norgeskart.no/v1/matrikkel
+  /wms/nib/ortofoto        →  nib-proxy → services.norgeibilder.no/wms/ortofoto
   ```
 
   The WFS prefix goes through a distinct internal alias
   (`/wfs-skwms1/`) so it can't collide with the WMS host's `/skwms1/`
-  in nginx.
+  in nginx. The NiB prefix goes through `/nib-wms/`.
 
   Cache config at `nginx/wms-cache.conf` (per-upstream `location` blocks)
   + `nginx/wms-proxy-common.conf` (shared cache/timeout/header defaults).
@@ -433,6 +446,51 @@ on leaving LiDAR mode) keeps the viewport list *fetched*. The project
 ring is that list, so the first W/S press after a pause only starts the
 WFS fetch — the dataset chip shows a spinner meanwhile — and the next
 press walks it.
+
+### Flyfoto (Norge i bilder ortofoto)
+
+A lokalitet's "Flyfoto" action (`LocalityWorkspace.tsx`) stitches NiB
+ortofoto over the authored bbox and saves it as an attachment of kind
+`flyfoto` — the automatic version of what used to be a manual screenshot
+after opening norgeibilder.no in a new tab. (The TopBar "Flyfoto ↗"
+external-link button is unrelated and still there.)
+
+The stitch (`src/localities/flyfoto.ts`) reuses the LiDAR extract
+machinery (`planTiles` / `fetchAndPaint` / `runWithConcurrency` from
+`src/lidarExtract/stitch.ts`) — WMS 1.3.0 GetMap, EPSG:25833, JPEG,
+target 0.2 m/px, per-tile retry. `fetchAndPaint`'s uniform-image check
+drops no-coverage tiles, so a bbox entirely outside coverage returns
+null and the UI says so.
+
+Request path is same-origin like every other raster source:
+`/wms/nib/ortofoto` → Caddy → wmscache → **nib-proxy** →
+`services.norgeibilder.no/wms/ortofoto`. The token is injected by the
+sidecar in a request *header* (`X-Esri-Authorization: Bearer`), never in
+the URL, so wmscache keys stay stable as the token rotates and the token
+never reaches the browser. Old NiB WMS endpoints die Sep 2026; this uses
+the new `services.norgeibilder.no/wms/*`.
+
+Why a whole sidecar instead of minting in the browser: the anonymous
+token is bound to the requesting IP + referer, so only the server can
+mint one that works for the server's tile fetches. See the **nib-proxy**
+service note above and `nib-proxy/server.mjs`.
+
+Deploy-time unknowns to verify (can't be checked from the client before
+the sidecar is up): the exact published WMS **layer name** (`FLYFOTO_LAYER`
+in `flyfoto.ts`, assumed `ortofoto`) via GetCapabilities through the
+running sidecar, and that header-token tile fetches succeed. If the
+header form is ever rejected, the fallback is `&token=` in the query
+(still cache-safe because injection is server-side).
+
+Licensing: NiB imagery is free for private, non-commercial use;
+publishing/commercial use is the user's responsibility. A notice dialog
+gates every grab (`localities.tools.flyfotoNotice*`), by deliberate
+product decision — this facilitates personal use, akin to hitting print.
+Attribution lives in that prose, not the chrome.
+
+`attachments.kind` gained `flyfoto` (migration
+`1700000300_attachments_flyfoto.js`; `AttachmentKind` in
+`src/api/attachments.ts`; `KIND_ICON` in `BilderSection.tsx`).
 
 ## nginx cache behavior (wmscache)
 

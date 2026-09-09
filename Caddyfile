@@ -62,6 +62,15 @@ route {
                 reverse_proxy http://wmscache
         }
 
+        # Norge i bilder ortofoto — same-origin via wmscache, which proxies
+        # to the nib-proxy sidecar that injects NiB's anonymous access
+        # token (see nginx/wms-cache.conf location /nib-wms/). No CSP entry
+        # needed: the browser only ever talks to this origin.
+        handle_path /wms/nib/* {
+                rewrite * /nib-wms{http.request.uri.path}
+                reverse_proxy http://wmscache
+        }
+
         # PocketBase — backend for lokaliteter (auth + user content).
         # Kept same-origin so browser auth cookies "just work" and there's
         # no CORS to configure. The full OAuth2 redirect flow bounces
