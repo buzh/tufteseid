@@ -36,6 +36,28 @@ const UPSTREAM = (
   process.env.NIB_UPSTREAM || 'https://services.norgeibilder.no/wms'
 ).replace(/\/$/, '');
 
+// Second namespace: NiB's ArcGIS REST services, behind the same token.
+// Needed because per-project ortofoto is not reachable over WMS at all —
+// /wms/ortofoto publishes only the single seamless `ortofoto` mosaic, and
+// /wms/ortofoto_prosjekter 403s (that service has no WMS endpoint). One
+// acquisition is selected instead through the ImageServer's mosaic rule:
+//   ortofoto_prosjekter/ImageServer/exportImage
+//     ?mosaicRule={"mosaicMethod":"esriMosaicNone","where":"prosjektnavn='…'"}
+// and the list of acquisitions covering an area comes from
+//   prosjekter/MapServer/4/query  (layer 4 = "Prosjektomriss prosessert").
+// Both live under /arcgis/rest/services, both need the token, neither is
+// a WMS — hence a base of its own rather than widening UPSTREAM.
+const REST_UPSTREAM = (
+  process.env.NIB_REST_UPSTREAM ||
+  'https://services.norgeibilder.no/arcgis/rest/services'
+).replace(/\/$/, '');
+// wmscache hands REST requests over under this marker (see the
+// /nib-arcgis/ location in nginx/wms-cache.conf). It is what disambiguates
+// the two namespaces: after the prefix rewrites a WMS request is a bare
+// service name like /ortofoto, which is otherwise indistinguishable from
+// the head of a REST path.
+const REST_PREFIX = '/arcgis/';
+
 // The mint endpoint returns {"token":"..."} with no expiry field, so the
 // common path is this fallback TTL. If the token is a JWT we honour its
 // own exp instead (see decodeJwtExp).
@@ -101,15 +123,25 @@ async function getToken(forceRefresh) {
   return minting;
 }
 
+// Pick the namespace from the path. Keeping the leading slash of the
+// remainder (slice to the prefix's trailing slash) means REST_UPSTREAM
+// stays a clean base with no trailing slash, like UPSTREAM.
+function upstreamUrl(pathWithQuery) {
+  if (pathWithQuery.startsWith(REST_PREFIX)) {
+    return REST_UPSTREAM + pathWithQuery.slice(REST_PREFIX.length - 1);
+  }
+  return UPSTREAM + pathWithQuery;
+}
+
 function proxyOnce(pathWithQuery, token) {
-  return fetch(UPSTREAM + pathWithQuery, {
+  return fetch(upstreamUrl(pathWithQuery), {
     method: 'GET',
     headers: {
       Referer: REFERER,
       // NiB accepts the token either as ?token= or as this header; the
       // header keeps it out of the (nginx-cached, browser-visible) URL.
       'X-Esri-Authorization': `Bearer ${token}`,
-      Accept: 'image/png,image/jpeg,*/*',
+      Accept: 'image/png,image/jpeg,application/json,*/*',
       // Ask NiB for uncompressed bytes so Content-Length is accurate for
       // nginx's cache (it keys caching off body length).
       'Accept-Encoding': 'identity',

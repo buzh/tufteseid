@@ -71,6 +71,10 @@ import {
   upsertLocalityOnLayer,
 } from './localityLayer';
 import { fetchFlyfoto } from './flyfoto';
+import {
+  fetchFlyfotoProjectsForBbox,
+  type FlyfotoProject,
+} from './flyfotoProjects';
 import { captureLocalityScreenshot } from './screenshot';
 import {
   getDrawLayerExtent4326,
@@ -84,6 +88,16 @@ import {
   useLocalityFinds,
 } from './useLocalityContent';
 import { useWorkspaceKeys } from './useWorkspaceKeys';
+
+// Sentinel for the seamless best-available mosaic in flyfotoBusy, which
+// otherwise holds a project id.
+const FLYFOTO_MOSAIC = '__mosaic__';
+
+// How many acquisitions "Hent alle" will take in one go. A busy area has
+// well over a hundred — Oslo lists 121 — so the batch is the newest slice,
+// not the whole list: each project is a full tile burst against NiB and a
+// separate Bilde, and nobody wants a gallery of 121 near-identical images.
+const FLYFOTO_BATCH_MAX = 8;
 
 const bboxContains = (outer: LocalityBbox, inner: LocalityBbox): boolean =>
   inner[0] >= outer[0] &&
@@ -163,6 +177,15 @@ export const LocalityWorkspace = ({
   const [shooting, setShooting] = useState(false);
   const [fetchingFlyfoto, setFetchingFlyfoto] = useState(false);
   const [flyfotoNotice, setFlyfotoNotice] = useState(false);
+  // The acquisition picker, opened once the licensing notice is accepted.
+  const [flyfotoPicker, setFlyfotoPicker] = useState(false);
+  const [flyfotoProjects, setFlyfotoProjects] = useState<
+    FlyfotoProject[] | null
+  >(null);
+  const [flyfotoProjectsError, setFlyfotoProjectsError] = useState(false);
+  // Which grab is running: a project id, or MOSAIC for the seamless one.
+  // Doubles as the per-row spinner flag, hence a value rather than a bool.
+  const [flyfotoBusy, setFlyfotoBusy] = useState<string | null>(null);
   const { setDrawLayerFeatures } = useDrawSettings();
 
   const isMine = user != null && user.id === locality.owner;
@@ -437,52 +460,153 @@ export const LocalityWorkspace = ({
     i18n.language,
   ]);
 
-  // Stitch NiB ortofoto over the rectangle → Bilder. Gated behind the
-  // licensing notice dialog (the imagery is free for private use only),
-  // so this runs on the notice's confirm, not the button click.
-  const runFlyfoto = useCallback(async () => {
-    if (!user || !isMine || fetchingFlyfoto) return;
-    setFlyfotoNotice(false);
-    setFetchingFlyfoto(true);
-    try {
-      const result = await fetchFlyfoto(locality.bbox);
-      if (!result) {
-        toaster.error({ title: t('localities.tools.flyfotoEmpty') });
-        return;
-      }
-      const rec = await createAttachment(
-        {
-          locality: locality.id,
-          kind: 'flyfoto',
-          caption: `${t('localities.tools.flyfotoCaption')} ${new Date().toLocaleDateString(i18n.language)}`,
-          meta: {
-            sourceLabel: 'Norge i bilder',
-            metresPerPx: result.metresPerPx,
-            bbox25833: result.bbox25833,
+  // The acquisition list is per-rectangle, so drop it when the rectangle
+  // moves or is resized. Keyed on the values rather than the array, which
+  // is a fresh identity on every record update.
+  const bboxKey = locality.bbox.join(',');
+  useEffect(() => {
+    setFlyfotoProjects(null);
+    setFlyfotoProjectsError(false);
+  }, [bboxKey]);
+
+  // One grab: stitch the requested source over the rectangle and keep it
+  // as a Bilde. Returns whether an image was saved, so the batch loop can
+  // report how many of the projects it tried actually had coverage.
+  const grabFlyfoto = useCallback(
+    async (project?: FlyfotoProject): Promise<boolean> => {
+      if (!user || !isMine) return false;
+      const label = project
+        ? (project.year?.toString() ?? project.projectName)
+        : t('localities.tools.flyfotoMosaic');
+      try {
+        const result = await fetchFlyfoto(locality.bbox, { project });
+        if (!result) {
+          toaster.error({
+            title: t('localities.tools.flyfotoEmptyFor', { label }),
+          });
+          return false;
+        }
+        const rec = await createAttachment(
+          {
+            locality: locality.id,
+            kind: 'flyfoto',
+            // A project's own year is what makes the gallery readable as a
+            // time series; the mosaic has no year, so it gets the date it
+            // was grabbed instead.
+            caption: `${t('localities.tools.flyfotoCaption')} ${
+              project
+                ? label
+                : new Date().toLocaleDateString(i18n.language)
+            }`,
+            meta: {
+              sourceLabel: 'Norge i bilder',
+              metresPerPx: result.metresPerPx,
+              bbox25833: result.bbox25833,
+              ...(project
+                ? {
+                    projectName: project.projectName,
+                    year: project.year,
+                    photoDate: project.photoDate,
+                  }
+                : {}),
+            },
           },
-        },
-        user.id,
-        result.blob,
-        'flyfoto.jpg',
-      );
-      setAttachmentItems((prev) => (prev ? [rec, ...prev] : [rec]));
-      toaster.success({ title: t('localities.tools.flyfotoSaved') });
-    } catch (e) {
-      console.warn('[LocalityWorkspace] flyfoto failed', e);
-      toaster.error({ title: t('localities.tools.flyfotoFailed') });
+          user.id,
+          result.blob,
+          'flyfoto.jpg',
+        );
+        setAttachmentItems((prev) => (prev ? [rec, ...prev] : [rec]));
+        return true;
+      } catch (e) {
+        console.warn('[LocalityWorkspace] flyfoto failed', e);
+        toaster.error({
+          title: t('localities.tools.flyfotoFailedFor', { label }),
+        });
+        return false;
+      }
+    },
+    [
+      user,
+      isMine,
+      locality.id,
+      locality.bbox,
+      setAttachmentItems,
+      t,
+      i18n.language,
+    ],
+  );
+
+  const runFlyfoto = useCallback(
+    async (project?: FlyfotoProject) => {
+      if (fetchingFlyfoto) return;
+      setFlyfotoBusy(project?.id ?? FLYFOTO_MOSAIC);
+      setFetchingFlyfoto(true);
+      try {
+        if (await grabFlyfoto(project)) {
+          toaster.success({ title: t('localities.tools.flyfotoSaved') });
+        }
+      } finally {
+        setFlyfotoBusy(null);
+        setFetchingFlyfoto(false);
+      }
+    },
+    [fetchingFlyfoto, grabFlyfoto, t],
+  );
+
+  const runFlyfotoAll = useCallback(async () => {
+    if (fetchingFlyfoto || !flyfotoProjects) return;
+    const batch = flyfotoProjects.slice(0, FLYFOTO_BATCH_MAX);
+    if (batch.length === 0) return;
+    setFetchingFlyfoto(true);
+    let saved = 0;
+    try {
+      // Sequential on purpose. A single project's tile burst already
+      // saturates the stitcher's concurrency budget against NiB's shared
+      // edge, so overlapping two would not finish sooner — it would just
+      // make both slower and invite shed responses.
+      for (const project of batch) {
+        setFlyfotoBusy(project.id);
+        if (await grabFlyfoto(project)) saved++;
+      }
     } finally {
+      setFlyfotoBusy(null);
       setFetchingFlyfoto(false);
     }
-  }, [
-    user,
-    isMine,
-    fetchingFlyfoto,
-    locality.id,
-    locality.bbox,
-    setAttachmentItems,
-    t,
-    i18n.language,
-  ]);
+    toaster.success({
+      title: t('localities.tools.flyfotoBatchDone', {
+        saved,
+        total: batch.length,
+      }),
+    });
+  }, [fetchingFlyfoto, flyfotoProjects, grabFlyfoto, t]);
+
+  // Notice → picker.
+  const openFlyfotoPicker = useCallback(() => {
+    setFlyfotoNotice(false);
+    setFlyfotoPicker(true);
+  }, []);
+
+  // Fetch the acquisition list lazily, the first time the picker is opened
+  // for a given rectangle — and again if the rectangle is resized while it
+  // is open, since the effect above has just cleared it. Driving it from an
+  // effect rather than the open handler is what covers that second case;
+  // it also aborts a list still in flight when the picker is closed.
+  // Reopening is close to free either way: wmscache fronts the query.
+  useEffect(() => {
+    if (!flyfotoPicker || flyfotoProjects !== null) return;
+    const ac = new AbortController();
+    fetchFlyfotoProjectsForBbox(locality.bbox, ac.signal)
+      .then((projects) => {
+        if (!ac.signal.aborted) setFlyfotoProjects(projects);
+      })
+      .catch((e) => {
+        if (ac.signal.aborted) return;
+        console.warn('[LocalityWorkspace] flyfoto project list failed', e);
+        setFlyfotoProjectsError(true);
+        setFlyfotoProjects([]);
+      });
+    return () => ac.abort();
+  }, [flyfotoPicker, flyfotoProjects, locality.bbox]);
 
   const zoomToFunn = useCallback((id: string) => {
     const extent = getFunnExtentOnLayer(id);
@@ -923,9 +1047,156 @@ export const LocalityWorkspace = ({
                   size="sm"
                   variant="primary"
                   colorPalette="green"
-                  onClick={runFlyfoto}
+                  onClick={openFlyfotoPicker}
                 >
                   {t('localities.tools.flyfotoConfirm')}
+                </Button>
+              </HStack>
+            </Stack>
+          </DialogBody>
+          <DialogCloseTrigger />
+        </DialogContent>
+      </Dialog>
+
+      {/* Acquisition picker. NiB keeps every ortofoto project flown over
+          an area back to the 1930s, so the same ground can be kept as a
+          temporal stack rather than only as today's best mosaic. */}
+      <Dialog
+        open={flyfotoPicker}
+        placement="center"
+        onOpenChange={(e) =>
+          !e.open && !fetchingFlyfoto && setFlyfotoPicker(false)
+        }
+      >
+        <DialogContent>
+          <DialogBody p={5}>
+            <Stack gap={4}>
+              <Heading size="sm">
+                {t('localities.tools.flyfotoPickerTitle')}
+              </Heading>
+
+              <HStack justify="space-between" gap={3}>
+                <Stack gap={0}>
+                  <Text fontSize="sm" fontWeight="medium">
+                    {t('localities.tools.flyfotoMosaic')}
+                  </Text>
+                  <Text fontSize="xs" color="fg.muted">
+                    {t('localities.tools.flyfotoMosaicHint')}
+                  </Text>
+                </Stack>
+                <Button
+                  size="xs"
+                  variant="primary"
+                  colorPalette="green"
+                  disabled={fetchingFlyfoto}
+                  onClick={() => runFlyfoto()}
+                >
+                  {flyfotoBusy === FLYFOTO_MOSAIC
+                    ? t('localities.tools.flyfotoFetching')
+                    : t('localities.tools.flyfotoGrab')}
+                </Button>
+              </HStack>
+
+              {flyfotoProjects === null && (
+                <Text fontSize="sm" color="fg.muted">
+                  {t('localities.tools.flyfotoProjectsLoading')}
+                </Text>
+              )}
+
+              {flyfotoProjectsError && (
+                <Text fontSize="sm" color="red.600">
+                  {t('localities.tools.flyfotoProjectsFailed')}
+                </Text>
+              )}
+
+              {flyfotoProjects !== null &&
+                !flyfotoProjectsError &&
+                flyfotoProjects.length === 0 && (
+                  <Text fontSize="sm" color="fg.muted">
+                    {t('localities.tools.flyfotoProjectsNone')}
+                  </Text>
+                )}
+
+              {flyfotoProjects !== null && flyfotoProjects.length > 0 && (
+                <Stack gap={2}>
+                  <HStack justify="space-between">
+                    <Text fontSize="sm" fontWeight="medium">
+                      {t('localities.tools.flyfotoProjectsHeading', {
+                        count: flyfotoProjects.length,
+                      })}
+                    </Text>
+                    <Button
+                      size="xs"
+                      variant="secondary"
+                      disabled={fetchingFlyfoto}
+                      onClick={runFlyfotoAll}
+                    >
+                      {t('localities.tools.flyfotoGrabAll', {
+                        count: Math.min(
+                          flyfotoProjects.length,
+                          FLYFOTO_BATCH_MAX,
+                        ),
+                      })}
+                    </Button>
+                  </HStack>
+
+                  {flyfotoProjects.length > FLYFOTO_BATCH_MAX && (
+                    <Text fontSize="xs" color="fg.muted">
+                      {t('localities.tools.flyfotoGrabAllHint', {
+                        count: FLYFOTO_BATCH_MAX,
+                      })}
+                    </Text>
+                  )}
+
+                  <Stack gap={1} maxH="40vh" overflowY="auto">
+                    {flyfotoProjects.map((project) => (
+                      <HStack
+                        key={project.id}
+                        justify="space-between"
+                        gap={3}
+                        py={1}
+                      >
+                        <Stack gap={0} minW={0}>
+                          <Text fontSize="sm">
+                            {project.year ?? project.projectName}
+                          </Text>
+                          <Text
+                            fontSize="xs"
+                            color="fg.muted"
+                            whiteSpace="nowrap"
+                            textOverflow="ellipsis"
+                            overflow="hidden"
+                          >
+                            {project.photoDate
+                              ? `${project.photoDate} · ${project.projectName}`
+                              : project.projectName}
+                          </Text>
+                        </Stack>
+                        <Button
+                          size="xs"
+                          variant="tertiary"
+                          flexShrink={0}
+                          disabled={fetchingFlyfoto}
+                          onClick={() => runFlyfoto(project)}
+                        >
+                          {flyfotoBusy === project.id
+                            ? t('localities.tools.flyfotoFetching')
+                            : t('localities.tools.flyfotoGrab')}
+                        </Button>
+                      </HStack>
+                    ))}
+                  </Stack>
+                </Stack>
+              )}
+
+              <HStack justify="flex-end">
+                <Button
+                  size="sm"
+                  variant="tertiary"
+                  disabled={fetchingFlyfoto}
+                  onClick={() => setFlyfotoPicker(false)}
+                >
+                  {t('localities.tools.flyfotoClose')}
                 </Button>
               </HStack>
             </Stack>

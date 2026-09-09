@@ -71,6 +71,18 @@ route {
                 reverse_proxy http://wmscache
         }
 
+        # Norge i bilder ArcGIS REST — the same sidecar and the same token,
+        # but a different upstream namespace (/arcgis/rest/services). This
+        # is how per-project ortofoto works: NiB exposes no WMS for single
+        # acquisitions, so the lokalitet "Flyfoto" action enumerates them
+        # via prosjekter/MapServer/4/query and renders one at a time via
+        # ortofoto_prosjekter/ImageServer/exportImage. Same-origin as
+        # everything else, so still no CSP entry.
+        handle_path /arcgis/nib/* {
+                rewrite * /nib-arcgis{http.request.uri.path}
+                reverse_proxy http://wmscache
+        }
+
         # PocketBase — backend for lokaliteter (auth + user content).
         # Kept same-origin so browser auth cookies "just work" and there's
         # no CORS to configure. The full OAuth2 redirect flow bounces
