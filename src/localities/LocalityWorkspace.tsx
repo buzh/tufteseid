@@ -122,9 +122,8 @@ const VISIBILITY_PALETTE: Record<
   public: 'green',
 };
 
-// One verb per button, always in the same place regardless of how far
-// down the panel is scrolled. Before this the tools lived in a section at
-// the very bottom, below Funn, Bilder and the register readout.
+// One verb per button, in the sticky bar so it stays reachable however
+// far the panel body is scrolled (docs/ui-architecture.md §8.1).
 const ActionButton = ({
   icon,
   label,
@@ -1029,8 +1028,8 @@ export const LocalityWorkspace = ({
         )}
       </Box>
 
-      {/* Grow-to-fit. Used to be a window.confirm in the middle of the
-          save. */}
+      {/* Grow-to-fit: the bbox is authored, so a funn that escapes it
+          prompts rather than silently resizing. */}
       <Dialog
         open={growPrompt != null}
         placement="center"

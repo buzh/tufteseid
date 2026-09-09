@@ -23,10 +23,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { openSectionsAtom, WorkspaceSectionId } from './atoms';
 
-// Shared chrome for the lokalitet workspace. Everything here exists so
-// the panel reads as one surface instead of a stack of ad-hoc forms —
-// notably: no native <textarea>/<select> with hardcoded hex borders, and
-// no window.confirm for destructive actions.
+// Shared chrome for the lokalitet workspace — the components kvib does
+// not supply at the density this panel needs. Inventory and rationale:
+// docs/ui-architecture.md §8.2.
 
 // kvib narrows `colorPalette` per component: Badge passes chakra's token
 // set straight through, while Button and IconButton accept exactly these
@@ -184,9 +183,7 @@ export const Segmented = <T extends string>({
 );
 
 // Destructive confirm anchored to the button that triggers it, matching
-// the "tøm tegning" popover in DrawControlsFooter. Replaces
-// window.confirm, which yanks the user out of the app and reads as
-// unfinished.
+// the "tøm tegning" popover in DrawControlsFooter.
 export const ConfirmPopover = ({
   trigger,
   title,

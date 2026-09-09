@@ -21,6 +21,13 @@ it before wiring it back in.
 
 ## Companion docs
 
+- `docs/ui-architecture.md` — **the whole user interface**: the kvib/Chakra
+  situation, the Layout shell and its slot geometry, the TopBar, the lokalitet
+  workspace, drawing, the analysis panels, search, state and URL persistence,
+  the keyboard map, and an exhaustive inventory of every user-facing action as
+  the contract a redesign has to honour. The UI is a placeholder awaiting a
+  full refresh, so that doc is written for whoever plans the replacement.
+  **Read it before touching anything under `src/` that renders.**
 - `docs/wms-proxy-and-tiles.md` — how map requests are proxied (Caddy →
   wmscache → upstream, nib-proxy), the nginx cache rules, and the
   tile-loading constraints that keep request counts under Kartverket's rate
@@ -200,12 +207,12 @@ outgoing layers (context the fading dataset should keep covering), 3–4 go
 
 ### Hybrid mode
 
-Third mode button next to Standard and LiDAR: the same LiDAR stack with
-Kartverket's roads/railways/place-names drawn transparently on top, for
-working out *where* a feature is without leaving the terrain. State is
-`hybridOverlayAtom` (a modifier on the background, not a background of its
-own — dataset, style and W/S + A/D cycling all keep working), persisted as
-`?hybrid=true`.
+The same LiDAR stack with Kartverket's roads/railways/place-names drawn
+transparently on top, for working out *where* a feature is without leaving the
+terrain. State is `hybridOverlayAtom`, persisted as `?hybrid=true`. It is a
+*modifier* on the background, not a background of its own, so dataset, style
+and cycling all keep working underneath it — see `docs/ui-architecture.md`
+for the control and why that distinction matters.
 
 Config: `backgroundLayers/topoOverlay.ts` — `/wms/geonorge/wms.topo` with
 `LAYERS=kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,`
@@ -223,9 +230,8 @@ needs an API token.
 Both the national mosaic and the per-project service exist in a terrain
 (DTM) and a surface (DOM) flavour. `activeLidarModelAtom`
 (`lidarProjects.ts`) picks between them; persisted as `?lidarModel=dom`,
-absent means DTM. A `DTM | DOM` segment next to the style chip, bound to `E`,
-switches it — like hybrid it's a modifier, not a fourth mode, so the dataset
-picker and W/S cycling are unaffected.
+absent means DTM. Like hybrid it's a modifier rather than a fourth mode; the
+control is in `docs/ui-architecture.md`.
 
 URL pairs live in `LIDAR_PROJECT_WMS_URL` and `NATIONAL_WMS`
 (`wms.hoyde-dom-prosjekt` / `wms.hoyde-dom-nhm-25833`, layer prefix
@@ -242,26 +248,10 @@ URL pairs live in `LIDAR_PROJECT_WMS_URL` and `NATIONAL_WMS`
   `Content-Type: image/png`, a ~100-byte JSON body the browser gives up on as
   a broken image, i.e. a blank map with nothing in the console.
   `activeLidarStyleAtom` keeps holding the user's DTM pick while in DOM mode
-  so it comes back on the way out, which is why A/D is a deliberate no-op
-  there rather than walking a one-entry ring over the top of it.
+  so it comes back on the way out.
 
 The LiDAR *extract* tool stays DTM-only (`lidarExtract/sources.ts` pins
 `LIDAR_PROJECT_WMS_URL.dtm`): an extract is meant to be read as terrain.
-
-### Keyboard cycling of the LiDAR pulldowns
-
-`TopBar.tsx` binds A/D to the style pulldown and W/S to the dataset pulldown,
-top-tier entries only (not what's behind "flere stiler" / "mindre
-relevante"), wrapping at both ends, plus E for the DTM/DOM segment. None of
-them open a pulldown — cycling should leave the terrain unobstructed, which
-also means no footprint polygons.
-
-Hence two flags rather than one: `lidarPickerOpenAtom` decides whether
-footprints are *drawn*, while `lidarCyclingAtom` (armed by W/S, expires 90 s
-after the last press or on leaving LiDAR mode) keeps the viewport list
-*fetched*. The project ring is that list, so the first W/S press after a
-pause only starts the WFS fetch — the dataset chip shows a spinner meanwhile
-— and the next press walks it.
 
 ### Flyfoto (Norge i bilder ortofoto)
 
@@ -354,16 +344,11 @@ retry / blank-drop) is unchanged. It also clamps resolution to the project's own
 `pixelstorrelse` when that is coarser than the 0.2 m target — upsampling a 1937
 flight to 0.2 m is four times the tiles for the same detail.
 
-**UX:** "Flyfoto" → licensing notice → picker listing the mosaic plus every
-covering acquisition (label = year, subtitle = photo date + project name), each
-with "Hent", plus "Hent alle" over the newest `FLYFOTO_BATCH_MAX` (8). The batch
-runs **sequentially** — one project's tile burst already saturates
-`MAX_CONCURRENT` against the shared NiB edge — and reports how many of the
-attempted projects actually had coverage, since `fetchAndPaint`'s uniform-image
-check drops all-blank ones. `meta` records `projectName` / `year` / `photoDate`
-so the gallery captions "Flyfoto 1937". No new map layer or footprints — it
-stays a workspace action, out of the `MapTool` union like `takeScreenshot`.
-
+The batch grab runs **sequentially** — one project's tile burst already
+saturates `MAX_CONCURRENT` against the shared NiB edge. `meta` records
+`projectName` / `year` / `photoDate` so the gallery can caption "Flyfoto 1937".
+The picker, the licensing gate and the batch cap are UI:
+`docs/ui-architecture.md`.
 
 ### Terrenganalyse (client-side relief from float DEMs)
 
@@ -388,12 +373,12 @@ hillshade. Rationale and endpoint details: `docs/terrain-analysis.md`.
   local relief model, sky-view factor. Pure functions over a `Dem`, split
   from rendering so the UI can cache the expensive pass while scrubbing the
   cheap one.
-- `src/terrain/TerrainPanel.tsx` — DTM/DOM toggle, visualization picker, and
-  live azimuth/altitude/exaggeration sliders. Output saves as an attachment
-  of the existing `extract` kind (with `style` = the visualization), so no
-  PocketBase migration was needed.
+- `src/terrain/TerrainPanel.tsx` — the control surface
+  (`docs/ui-architecture.md`). Output saves as an attachment of the existing
+  `extract` kind (with `style` = the visualization), so no PocketBase
+  migration was needed.
 
-Two things that are load-bearing:
+Load-bearing:
 
 - **The multidirectional blend's azimuths are unevenly spaced and weighted.**
   Averaging evenly spaced azimuths at equal weight cancels the directional
@@ -412,21 +397,20 @@ hierarchy. A lokalitet is an authored rectangle (created with one box-drag,
 resizable afterwards) holding *funn* (individually named and addressable
 drawn features) and *bilder* (kept LiDAR extracts, map screenshots, uploads).
 
-Consequences worth remembering before changing anything here:
+Two rules that hold regardless of what the interface looks like:
 
-- Drawing and LiDAR extract exist **only** inside a lokalitet workspace. The
-  route to those tools is creating a lokalitet; there are no standalone
-  `draw` / `lidarExtract` / `newFind` map tools. Measure stays global because
-  it's ephemeral.
-- The bbox is authored, never derived from content. If a drawn funn escapes
-  the rectangle the workspace offers to grow it.
 - All lokalitet content is behind sign-in, including `public` ones — the read
   rules require `@request.auth.id != ""`. The map itself stays publicly
   browsable.
 - `limited` visibility is a placeholder that behaves as `private` until
   groups exist.
 
-Key files:
+The workspace panel, the funn/bilder sections, the drawing tools and the
+policy decisions around them (bbox is authored not derived; drawing and
+extract exist only inside a workspace; measure stays global) are in
+`docs/ui-architecture.md`.
+
+Key files (data side):
 
 - `src/api/pocketbase.ts` — singleton PB client (`pocketbaseUrl` from env,
   defaults `/pb`).
@@ -438,21 +422,13 @@ Key files:
   (`wfs.kulturminner`, feature type `app:Lokalitet`, GML 3.2 only,
   DOM-parsed).
 - `src/auth/` — atoms (currentUserAtom, roleAtom, isAdminAtom), hooks
-  (useOAuthProviders, useSignIn, useSignOut), AuthButton + AuthDialog.
-- `src/localities/` — `LocalityWorkspace` (the docked panel: header, Funn,
-  Bilder, Verktøy), `LocalitiesPanel` (the `localities` map tool),
-  `localityLayer` / `funnLayer`, `useLocalityCreate`, `useLocalityAdjust`,
-  `screenshot.ts`, `serializeDrawLayer.ts`.
+  (useOAuthProviders, useSignIn, useSignOut).
 - `pocketbase/pb_migrations/1700000200_localities.js` — current schema.
   `1700000000` adds `users.role`, `1700000100` relaxes it. **Leave the
   filenames alone** — they're recorded in `_migrations`, so renaming one
   makes PB re-run it. Collection ids must not equal any collection name
   (0.23+ rejects that), hence `pbc_localities` / `finds2` /
   `pbc_attachments`.
-
-The workspace is driven by `activeLocalityAtom`, deliberately *not* by the
-`MapTool` union (`'layers' | 'measure' | 'localities' | null`), so a map tool
-and an open workspace can't fight over the same slot.
 
 Data model:
 
@@ -522,13 +498,9 @@ AuthDialog lists whatever is enabled via
   `docker compose ...` commands they should run.
 - Keep unused code out. If a helper (retry function, config field) has no
   live caller after a change, delete it — don't leave it in "for later".
-- `icon="…"` props are typed against `MaterialSymbol` from
-  `material-symbols`, which kvib pins — a plausible-looking name that isn't
-  in that union fails the docker build, and plenty aren't (`terrain`,
-  `filter_hdr`, `topography` are all missing; `elevation`, `landscape`,
-  `altitude` exist). Since there are no local `node_modules` to check
-  against, validate a new name by pulling the tarball into `/tmp`:
-  `curl -sL https://registry.npmjs.org/material-symbols/-/material-symbols-0.40.2.tgz | tar xz -O package/index.d.ts | grep '"terrain"'`
+- `icon="…"` props are typed against a `MaterialSymbol` union that kvib pins,
+  and a plausible-looking name that isn't in it fails the docker build. How
+  to check a name without local `node_modules`: `docs/ui-architecture.md`.
 - Commits use short imperative subject lines. Body explains the *why* when
   the reasoning isn't obvious from the diff. The `Co-Authored-By` trailer is
   added by the commit workflow.

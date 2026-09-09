@@ -25,12 +25,8 @@ import { ErrorBoundary } from './shared/ErrorBoundary';
 import { useIsMobileScreen } from './shared/hooks';
 import { TopBar } from './TopBar';
 
-// Values referenced by the mapToolAtom in map/overlay/atoms.ts and by the
-// tool-card renderer in map/overlay/MapToolCards.tsx. Kept in this file
-// so any TopBar / other module that toggles the atom uses the same type.
-// Drawing, LiDAR extract and the lokalitet workspace are NOT MapTools —
-// they live inside the workspace, which is driven by activeLocalityAtom
-// so it never fights the card slot.
+// Drawing, LiDAR extract and the lokalitet workspace are deliberately NOT
+// MapTools. See docs/ui-architecture.md §1.
 export type MapTool = 'layers' | 'measure' | 'localities' | null;
 
 export const Layout = () => {
@@ -70,10 +66,9 @@ export const Layout = () => {
             <MapComponent />
           </ErrorBoundary>
 
-          {/* Left column: the lokalitet workspace when one is open,
-              otherwise search results + any tool card (Kartlag /
-              LiDAR-uttrekk / Mine lokaliteter). Absolute-positioned so
-              it floats over the map. */}
+          {/* Left column. pointerEvents=none here, auto on the cards
+              inside — the column spans the map height and must stay
+              transparent to panning. docs/ui-architecture.md §3.1. */}
           <Box
             position="absolute"
             top={0}

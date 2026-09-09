@@ -141,11 +141,8 @@ const LabelledToggleButton = ({
   </Tooltip>
 );
 
-// Terrain model vs surface model, as a two-state segment rather than a
-// fourth mode button: like hybrid it modifies the LiDAR background
-// rather than replacing it, and the dataset and style pulldowns keep
-// working across it. DOM is mostly a cross-check — is that mound in the
-// DTM really ground, or a hedge the filtering didn't catch.
+// Terrain model vs surface model. A modifier, not a fourth mode —
+// docs/ui-architecture.md §5.2.
 const MODEL_LABELS: Record<LidarModel, string> = {
   dtm: 'DTM',
   dom: 'DOM',
@@ -220,11 +217,8 @@ const CURRENT_YEAR = new Date().getFullYear();
 // How long after the last W/S press the dataset list stays warm.
 const CYCLING_IDLE_MS = 90_000;
 
-// One dataset per line, name truncated, year/density right-aligned.
-// Deliberately single-line and borderless: a viewport can turn up
-// RENDER_CAP entries, and the earlier two-line bordered card ran the
-// list off the bottom of the screen. Selection is a left rule rather
-// than a full border so rows still scan as a column.
+// Single-line and borderless because a viewport can turn up RENDER_CAP
+// entries and the list has to fit on screen.
 //
 // `onHover` fires for pointer *and* focus, so tabbing the list lights up
 // the same footprint on the map that mousing it would.
@@ -593,11 +587,9 @@ export const TopBar = () => {
     );
   };
 
-  // Keyboard cycling: A/D steps the style pulldown, W/S the dataset
-  // pulldown. Both walk the top tier only — the entries the pulldowns
-  // show without expanding "flere lag" — and wrap at both ends. Reading
-  // terrain means flipping the same handful of styles back and forth
-  // over one spot; going via the mouse every time breaks that rhythm.
+  // Keyboard cycling (A/D styles, W/S datasets, E model) —
+  // docs/ui-architecture.md §5.3, which also records that this listener
+  // is bubble-phase and should not be.
   //
   // Held through a ref rather than an effect dependency: the lists it
   // closes over are rebuilt on every render, so the alternative is
@@ -747,11 +739,8 @@ export const TopBar = () => {
         }}
       />
 
-      {/* Same LiDAR stack with roads, railways and place names drawn on
-          top — a third mode rather than a checkbox because that's how it
-          is used: you flip to it to work out where you are, then flip
-          back to read the terrain clean. Dataset, style and the W/S + A/D
-          cycling all keep working, since it's still LiDAR mode. */}
+      {/* LiDAR stack + roads/rail/place names. Still LiDAR mode, so
+          dataset, style and cycling keep working. */}
       <LabelledToggleButton
         icon="signpost"
         label="Hybrid"
@@ -763,10 +752,8 @@ export const TopBar = () => {
         }}
       />
 
-      {/* LiDAR pulldown — only surfaces when LiDAR mode is active. Shows
-          current selection and lets the user swap between the national
-          mosaic and per-project datasets confirmed (by real WFS footprint
-          polygon, see lidarFootprintsLayer.ts) to cover the viewport. */}
+      {/* Dataset pulldown. Coverage is confirmed against real WFS
+          footprint polygons — see lidarFootprintsLayer.ts. */}
       {isLidarMode && (
         <Popover
           open={lidarOpen}
@@ -976,11 +963,8 @@ export const TopBar = () => {
         </Popover>
       )}
 
-      {/* Style pulldown — sits next to the dataset chip whenever the
-          active dataset publishes more than one styled variant. Cycling
-          skyggerelieff / multiskyggerelieff / helning_prosent is the
-          fast path; anything else (helning_grader, ...) sits behind
-          "flere lag" here too. */}
+      {/* Style pulldown — only when the active dataset publishes more
+          than one styled variant. Rarer styles sit behind "flere lag". */}
       {isLidarMode && showStylePicker && (
         <Popover
           open={styleOpen}
@@ -1064,10 +1048,8 @@ export const TopBar = () => {
 
       <Box borderLeft="1px solid" borderColor="gray.200" h="36px" mx={1} />
 
-      {/* Featured overlay: kulturminner (Lokaliteter og enkeltminner).
-          Fast one-click toggle for the layer the user opens most often;
-          the full kulturminner list lives behind the adjacent Temakart
-          card — same layout pattern as the LiDAR icon + pulldown. */}
+      {/* One-click toggle for the most-used heritage layer; the full
+          list is behind the adjacent Kartlag card. */}
       <LabelledToggleButton
         icon="castle"
         label="Kulturminner"
@@ -1100,10 +1082,8 @@ export const TopBar = () => {
 
       <MeasurePopover />
 
-      {/* Signed-in-only lokalitet controls. Hidden entirely for guests
-          rather than shown-disabled — the AuthButton at the right is
-          the discoverable path in. Drawing and LiDAR keeps happen inside
-          a lokalitet's workspace, not from here. */}
+      {/* Signed-in-only lokalitet controls. Hidden for guests rather
+          than shown-disabled; AuthButton is the way in. */}
       {isSignedIn && (
         <>
           <Box borderLeft="1px solid" borderColor="gray.200" h="36px" mx={1} />

@@ -42,9 +42,6 @@ const STATUS_PALETTE: Record<LocalityFindStatus, BadgePalette> = {
   rapportert: 'blue',
 };
 
-// Status used to cycle on click through four values with no way back and
-// no way to see what the next one was. It's a pick-from-a-list, so it's a
-// list.
 const StatusPicker = ({
   value,
   editable,
@@ -121,8 +118,7 @@ const StatusPicker = ({
   );
 };
 
-// Row actions behind one affordance instead of three always-on icon
-// buttons. Delete confirms in place rather than nesting a second popover.
+// Delete confirms in place rather than nesting a second popover.
 const RowMenu = ({
   onEditText,
   onEditGeometry,

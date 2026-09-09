@@ -26,11 +26,8 @@ const initials = (nameOrEmail: string): string => {
   return (first + second).toUpperCase();
 };
 
-// Sits at the far right of TopBar. Signed out → "Logg inn" opens
-// AuthDialog. Signed in → avatar chip; popover has an admin marker
-// and sign-out. Using Popover to stay consistent with the LiDAR
-// pulldown pattern in TopBar rather than pulling in Chakra's Menu
-// primitives, whose surface in @kvib we can't verify offline.
+// Popover rather than Chakra's Menu primitives, whose surface in @kvib
+// we can't verify offline (no local node_modules).
 export const AuthButton = () => {
   const { t } = useTranslation();
   const user = useAtomValue(currentUserAtom);

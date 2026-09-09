@@ -22,9 +22,8 @@ export const adjustingLocalityAtom = atom<boolean>(false);
 
 // Which funn the list is pointing at. `hovered` is transient (pointer or
 // keyboard cursor), `selected` sticks until another row is picked or the
-// list is dismissed. Both drive the halo drawn by funnHighlightLayer —
-// the funn features themselves keep the style they were drawn with, so
-// the emphasis has to live on a layer of its own.
+// list is dismissed. Both drive the halo in funnHighlightLayer, which
+// explains why that's a separate layer.
 export const hoveredFunnIdAtom = atom<string | null>(null);
 export const selectedFunnIdAtom = atom<string | null>(null);
 

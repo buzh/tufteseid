@@ -1,11 +1,10 @@
-// The card body rendered when mapTool === 'lidarExtract'. Steps the user
-// through: draw a box → pick styles + sources → fetch + stitch → preview
-// and download the composed canvases. Each source renders at its native
-// ground resolution — no per-run resolution picker.
+// The workspace body in `lidar` mode (docs/ui-architecture.md §10):
+// pick styles + sources → fetch + stitch → preview and download.
 //
-// Styles are chosen once for the whole run and applied to every enabled
-// source that advertises them; sources are enabled/disabled individually.
-// This avoids the "uncheck 'skyggerelieff' on every dataset" busywork.
+// Each source renders at its native ground resolution — no per-run
+// resolution picker. Styles are chosen once for the whole run and applied
+// to every enabled source that advertises them, which avoids unchecking
+// 'skyggerelieff' on every dataset in turn.
 
 import { Box, Button, HStack, Text, VStack } from '@kvib/react';
 import { useAtom, useSetAtom } from 'jotai';

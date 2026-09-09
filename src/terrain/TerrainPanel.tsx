@@ -1,15 +1,9 @@
 // The lokalitet workspace's "Terreng" tool: pull the float DEM for the
-// rectangle once, then let the user re-light and re-process it locally.
+// rectangle once, then re-light and re-process it locally, so azimuth is
+// a slider over data already in memory rather than a new WMS request.
 //
-// The point is the interaction, not the still image. Kartverket's WMS can
-// only hand us a hillshade baked at one sun angle, and a feature running
-// parallel to that light is invisible. Here the azimuth is a slider over
-// data already in memory, so dragging it sweeps the light across the
-// terrain — which is the single most effective way to notice an earthwork.
-// The illumination-independent views (sky-view factor, local relief) catch
-// what no sun angle shows.
-//
-// See docs/terrain-analysis.md.
+// Why that matters: docs/terrain-analysis.md. The control surface and the
+// two deliberately-split useMemos: docs/ui-architecture.md §10.
 
 import { Box, Button, HStack, Spinner, Text, VStack } from '@kvib/react';
 import { useAtomValue } from 'jotai';

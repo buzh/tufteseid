@@ -20,11 +20,9 @@ const Fact = ({ label, value }: { label: string; value: string }) => (
   </Flex>
 );
 
-// Everything you set once and then stop looking at. Folded away by
-// default so the funn/bilder you came back for are the first thing in
-// the panel. Saves on blur (description) or on click (synlighet) — the
-// dirty-state Lagre button it replaces was the only thing in the
-// workspace that made you confirm a single-field edit.
+// Everything you set once and then stop looking at, folded away by
+// default. Saves on blur (description) or on click (synlighet); there is
+// no dirty-state Lagre button anywhere in the workspace.
 export const LocalityDetails = ({
   locality,
   isMine,

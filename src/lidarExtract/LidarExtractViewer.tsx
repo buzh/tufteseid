@@ -1,17 +1,13 @@
-// Full-screen results viewer for the LiDAR extract. Opens when the user
-// presses "Hent" in the panel. Displays a horizontal strip of thumbnails
-// along the top and the currently-selected canvas below at full size.
+// Full-screen results viewer for the LiDAR extract
+// (docs/ui-architecture.md §10). Mounted at App.tsx, outside the router.
 //
-// Interactions:
-//   - Left/Right arrow keys cycle the selection.
-//   - Escape closes the viewer.
-//   - Thumbnails can be drag-reordered so two images can be placed
-//     adjacent for quick A/B toggling with the arrow keys.
+// The source LidarCanvas.canvas element is the actual DOM node handed to
+// the big-view slot, moved there with replaceChildren — React does not
+// own that subtree, so the viewer can't be casually re-parented.
+// Thumbnails have their own small canvases that mirror the source at
+// reduced size, updated whenever a new tile lands.
 //
-// The source LidarCanvas.canvas element is the actual DOM node we hand
-// to the big-view slot (moving it with replaceChildren). Thumbnails have
-// their own small canvases that mirror the source at reduced size,
-// updated whenever a new tile lands.
+// Keys are capture-phase; see docs/ui-architecture.md §1 for why.
 
 import { Box, Button, HStack, IconButton, Text, VStack } from '@kvib/react';
 import { useAtom, useAtomValue } from 'jotai';
