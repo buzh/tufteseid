@@ -75,6 +75,7 @@ import {
   fetchFlyfotoProjectsForBbox,
   type FlyfotoProject,
 } from './flyfotoProjects';
+import { TerrainPanel } from '../terrain/TerrainPanel';
 import { captureLocalityScreenshot } from './screenshot';
 import {
   getDrawLayerExtent4326,
@@ -174,6 +175,7 @@ export const LocalityWorkspace = ({
   const lightboxOpen = useAtomValue(lightboxOpenAtom);
   const setLidarSelection = useSetAtom(lidarExtractSelectionAtom);
   const [lidarOpen, setLidarOpen] = useState(false);
+  const [terrainOpen, setTerrainOpen] = useState(false);
   const [shooting, setShooting] = useState(false);
   const [fetchingFlyfoto, setFetchingFlyfoto] = useState(false);
   const [flyfotoNotice, setFlyfotoNotice] = useState(false);
@@ -389,6 +391,7 @@ export const LocalityWorkspace = ({
   const openLidar = useCallback(() => {
     if (draftActive) cancelDraft();
     setAdjusting(false);
+    setTerrainOpen(false);
     const mapProjection = map.getView().getProjection().getCode();
     setLidarSelection({
       bboxMap: transformExtent(locality.bbox, 'EPSG:4326', mapProjection) as [
@@ -419,6 +422,19 @@ export const LocalityWorkspace = ({
     setLidarOpen(false);
     setLidarSelection(null);
   }, [setLidarSelection]);
+
+  // Terreng takes over the panel body like the extract does, so the two are
+  // mutually exclusive.
+  const toggleTerrain = useCallback(() => {
+    setTerrainOpen((open) => {
+      if (open) return false;
+      if (draftActive) cancelDraft();
+      setAdjusting(false);
+      setLidarOpen(false);
+      setLidarSelection(null);
+      return true;
+    });
+  }, [draftActive, cancelDraft, setAdjusting, setLidarSelection]);
 
   // Capture the current view cropped to the rectangle → Bilder.
   const takeScreenshot = useCallback(async () => {
@@ -670,7 +686,13 @@ export const LocalityWorkspace = ({
     }
   };
 
-  const mode = draftActive ? 'draft' : lidarOpen ? 'lidar' : 'browse';
+  const mode = draftActive
+    ? 'draft'
+    : lidarOpen
+      ? 'lidar'
+      : terrainOpen
+        ? 'terrain'
+        : 'browse';
 
   useWorkspaceKeys({
     enabled: !lightboxOpen && growPrompt == null,
@@ -851,6 +873,13 @@ export const LocalityWorkspace = ({
             active={mode === 'lidar'}
             onClick={() => (lidarOpen ? closeLidar() : openLidar())}
           />
+          <ActionButton
+            icon="elevation"
+            label={t('localities.terrain.short')}
+            tooltip={t('localities.terrain.tooltip')}
+            active={mode === 'terrain'}
+            onClick={toggleTerrain}
+          />
           {isMine && (
             <ActionButton
               icon="photo_camera"
@@ -917,6 +946,24 @@ export const LocalityWorkspace = ({
               />
             </Flex>
             <LidarExtractPanel />
+          </Stack>
+        )}
+
+        {mode === 'terrain' && (
+          <Stack gap={2}>
+            <Flex justify="space-between" align="center">
+              <Text fontSize="sm" fontWeight="bold">
+                {t('localities.terrain.heading')}
+              </Text>
+              <IconButton
+                icon="close"
+                size="xs"
+                variant="ghost"
+                aria-label={t('localities.terrain.close')}
+                onClick={toggleTerrain}
+              />
+            </Flex>
+            <TerrainPanel />
           </Stack>
         )}
 

@@ -19,6 +19,28 @@ place/property search), drop the rest. If you're tempted to re-add an
 upstream Norgeskart feature, ask whether this specific use case needs
 it before wiring it back in.
 
+## Companion docs
+
+- `docs/wms-proxy-and-tiles.md` — how map requests are proxied (Caddy →
+  wmscache → upstream, nib-proxy), the nginx cache rules, and the
+  tile-loading constraints that keep request counts under Kartverket's rate
+  limit. **Read it before touching `Caddyfile`, `nginx/`, `nib-proxy/`, tile
+  grids, or adding a new external map source.** That machinery is working;
+  its details are deliberately out of this file.
+- `docs/terrain-analysis.md` — how we get **float elevation** (not shaded
+  PNGs) out of hoydedata.no, the endpoint's quirks, and the designs for the
+  two bigger analysis builds (a server-side RVT sidecar, a QGIS export) plus
+  the Norwegian data sources still unused. **Read it before touching
+  `src/terrain/`** or before adding another elevation-derived visualization.
+- `docs/analysis-roadmap.md` — status of the "what more can we do with a
+  lokalitet" thread: the tier model (0 built, 1–2 designed), the open-source
+  GIS tool survey with verdicts and licences, and what's worth building next.
+  **Read it before proposing a new analysis feature** — it records what was
+  already rejected and why, so those don't get re-litigated.
+- `README.md` — third-party-facing install and admin guide (first-run
+  PocketBase setup, OAuth, TLS, backup, troubleshooting). Keep it accurate
+  when any of that changes.
+
 ## Deploy
 
 Runs as a Docker Compose stack **on a separate server**. The working copy you
@@ -36,10 +58,6 @@ can't do is mint a token the server would accept, or the reverse — so a token
 is never worth carrying between the two, just mint a fresh one wherever the
 call is being made.
 
-`README.md` is the third-party-facing install and admin guide (first-run
-PocketBase setup, OAuth, TLS, backup, troubleshooting). Keep it accurate
-when any of that changes.
-
 Standard rebuild on the server:
 
 ```
@@ -49,12 +67,9 @@ docker compose up -d
 docker compose logs -f tufteseid wmscache
 ```
 
-If `nginx/wms-cache.conf` or `nginx/wms-proxy-common.conf` changed, also
-`docker compose restart wmscache` — the configs are bind-mounted, but nginx
-only reads config at startup and `docker compose up -d` doesn't recreate the
-container (image tag unchanged). Symptom of forgetting: same-origin proxy
-paths (e.g. `/wms/ra/...`) return nginx's default 404 page even though the
-Caddyfile and layer configs look correct.
+If anything under `nginx/` changed, also `docker compose restart wmscache` —
+the configs are bind-mounted but nginx only reads them at startup, and
+`docker compose up -d` doesn't recreate the container.
 
 Same gotcha for **pocketbase** after adding/changing a migration in the
 bind-mounted `pocketbase/pb_migrations/`:
@@ -90,215 +105,26 @@ Ports: Caddy inside the container listens on `:3000`; docker-compose maps host
   is in README.md. Pinned to 0.40.2 — migrations use the ≥0.23 App-based
   JSVM API (`$app.findCollectionByNameOrId` / `app.save`, flattened field
   classes), *not* the 0.22 `Dao` API.
-- **nib-proxy** — `node:24-alpine` token-injecting sidecar for Norge i
-  bilder (NiB) ortofoto (zero deps; see the "Flyfoto" section below).
-  NiB's WMS needs an access token even for imagery norgeibilder.no serves
-  anonymously; the token is minted anonymously (Referer only) and bound to
-  the requesting IP + referer, so it must be minted *and* used server-side.
-  This mints/refreshes it, injects it toward `services.norgeibilder.no`, and
-  re-mints on auth failure (including the HTTP-200-with-JSON-error case).
+- **nib-proxy** — token-injecting sidecar for Norge i bilder (NiB) ortofoto.
   Only reachable from wmscache on the compose network.
-- **wmscache** — `nginx:1.27-alpine` sidecar. Reverse-proxies + caches
-  every external WMS the SPA uses. Currently fronts five upstreams:
-  - `wms.geonorge.no/skwms1/*` — Kartverket theme + LiDAR WMS.
-  - `wfs.geonorge.no/skwms1/*` — Kartverket WFS (kulturminner readout,
-    LiDAR project footprints). Proxied but **not** cached.
-  - `kart.ra.no/wms/*` — Riksantikvaren Kulturminner WMS.
-  - `testapi.norgeskart.no/v1/*` — matrikkel (cadastral) WMS.
-  - the **nib-proxy** sidecar — NiB ortofoto. The only internal upstream,
-    and the only one resolved at request time (Docker DNS `127.0.0.11`),
-    because a compose service's IP can change on restart.
+- **wmscache** — `nginx:1.27-alpine` reverse proxy + 25 GB disk cache in
+  front of every external WMS/WFS/ArcGIS service the SPA uses (Kartverket,
+  Riksantikvaren, matrikkel, NiB). Caddy exposes each upstream under a
+  same-origin prefix (`/wms/geonorge/…`, `/wms/ra/…`, `/wms/nib/…`,
+  `/arcgis/nib/…`), so no external map host appears in the Caddyfile CSP.
 
-  Caddy exposes each host under a same-origin prefix and rewrites into
-  the upstream namespace before forwarding:
+  Details, rules and verification commands: `docs/wms-proxy-and-tiles.md`.
 
-  ```
-  /wms/geonorge/wms.foo    →  wms.geonorge.no/skwms1/wms.foo
-  /wfs/geonorge/wfs.foo    →  wfs.geonorge.no/skwms1/wfs.foo
-  /wms/ra/kulturminner2    →  kart.ra.no/wms/kulturminner2
-  /wms/testapi/matrikkel   →  testapi.norgeskart.no/v1/matrikkel
-  /wms/nib/ortofoto        →  nib-proxy → services.norgeibilder.no/wms/ortofoto
-  ```
+## Tile loading
 
-  The WFS prefix goes through a distinct internal alias (`/wfs-skwms1/`) so
-  it can't collide with the WMS host's `/skwms1/` in nginx. The NiB prefix
-  goes through `/nib-wms/`.
-
-  Cache config at `nginx/wms-cache.conf` (per-upstream `location` blocks)
-  + `nginx/wms-proxy-common.conf` (shared cache/timeout/header defaults).
-  Cache lives on the `wmscache` docker volume with a 25 GB LRU cap. Not
-  exposed on the host — only reachable from `tufteseid` over the compose
-  network.
-
-  Because everything is same-origin from the browser's POV, none of these
-  hosts need to appear in the Caddyfile CSP `img-src` / `connect-src`.
-
-## nginx cache behavior (wmscache)
-
-Split across two files:
-
-- `nginx/wms-cache.conf` — shared cache zone, `$skip_cache` map, one
-  `upstream` block per host, and one `location` per host with the
-  per-host bits (`proxy_pass`, `Host`, `proxy_ssl_name`).
-- `nginx/wms-proxy-common.conf` — everything host-independent: cache
-  directives, timeouts, TLS 1.2/1.3, header scrubbing. Included from
-  each `location`.
-
-Rules that are load-bearing:
-
-- Single 25 GB LRU on `/var/cache/nginx/wms`, `inactive=180d`, shared
-  across upstreams. The cache key is the full request URI, which starts
-  with a unique per-upstream prefix (`/skwms1/`, `/wms/`, `/v1/`), so
-  there's no risk of collision.
-- **Static upstream blocks** (`server host:443; keepalive 8;`) — resolved
-  once at startup, so no `resolver` directive. Variable-based `proxy_pass`
-  leaks HTTP 426 responses back to the browser.
-- Per-host `Host` + `proxy_ssl_name` inline in each `location`, plus
-  explicit TLS 1.2/1.3 in the common include, so the handshake with each
-  upstream (Kartverket istio-envoy, RA MapServer, …) is unambiguous.
-- **Skip caching under 300 bytes** (`map` on `$upstream_http_content_length`)
-  — keeps the ~100-byte JSON error body and the rate-limit notice out of a
-  180-day entry. Don't raise it to exclude no-coverage tiles: those are
-  deterministic, cost 0.3–6 s each at the origin, and dominate a zoomed-out
-  screen. They must stay cached.
-- `proxy_ignore_headers Set-Cookie Cache-Control Expires` — upstreams set
-  session cookies that would otherwise disable caching entirely.
-- **Retry: each host is listed three times in its `upstream` block on
-  purpose.** nginx sets a request's retry budget from the peer count and
-  `proxy_next_upstream_tries` can only lower it, so a one-server group gets
-  exactly one attempt and `proxy_next_upstream` never fires — no warning, no
-  log. Collapsing the duplicates silently disables every retry here.
-  `max_fails=0` keeps a burst of upstream errors from marking all three
-  peers down at once (`no live upstreams` in the error log).
-- `timeout` belongs in the **WFS** location's `proxy_next_upstream` list and
-  deliberately **not** in the shared one. The WFS either answers in ~0.25 s
-  or hangs forever, so cutting it at `proxy_read_timeout 8s` and retrying is
-  free. The WMS renders on the fly and can legitimately take 5–14 s cold; a
-  read timeout there means a render still in progress, so retrying would
-  abandon it and queue a second one for the same tile.
-- `proxy_cache_lock on` — one upstream request in flight per cold key.
-- Adds `X-Cache-Status: HIT|MISS|BYPASS` for debugging.
-- **Rewrites `Cache-Control` for the browser** (`$tile_cache_control`,
-  `public, max-age=604800`, or `no-store` when `$skip_cache` says the body is
-  too small to be a map). No upstream sends a usable one, and with no
-  validator either the browser's heuristic freshness is zero — without this
-  every revisit re-spends the origin's rate budget. A week is safe because
-  these come out of a 180-day LRU here anyway.
-  - The upstream's own `Cache-Control`/`Expires`/`Pragma` must be **hidden**,
-    not merely ignored — `proxy_ignore_headers` only governs nginx's own
-    storage decision, and leaving them on the wire gives the browser two
-    `Cache-Control` headers, of which it takes the stricter.
-  - The `add_header` deliberately has **no `always`**, scoping it to
-    successful statuses: a 502/504 from a shed upstream must not go out with
-    a week of freshness. The rate-limit case is still covered because it
-    arrives as a 200 and `$skip_cache` catches it on length.
-
-Verify what nginx actually loaded, not what the file says:
-
-```
-docker compose exec wmscache nginx -T | grep 'read_timeout\|max_fails\|next_upstream'
-```
-
-Sanity check after a rebuild (LiDAR hillshade):
-
-```
-curl -sI "http://localhost:3030/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=NHM_DTM_TOPOBATHY_25833:skyggerelieff&CRS=EPSG:25833&BBOX=200000,6500000,300000,6600000&WIDTH=512&HEIGHT=512&FORMAT=image/png" | grep -i 'x-cache\|cache-control'
-```
-
-First call: `MISS`. Repeat: `HIT`. Both should carry
-`Cache-Control: public, max-age=604800`. Inspect on-disk size:
-`docker run --rm -v tufteseid_wmscache:/c alpine du -sh /c`.
-
-## Tile-loading constraints
-
-The whole app's map performance rests on spending *few* WMS requests. Four
-things enforce that; none of them is cosmetic.
-
-**Kartverket rate-limits with an HTTP 200.** `wms.geonorge.no` meters GetMap
-by source IP — the server, so the budget is shared by every visitor at once.
-Over it the reply is HTTP 200, `Content-Type: application/vnd.ogc.se_xml`,
-238 bytes ("Overforbruk på kort tid"). The browser can't decode it as a PNG,
-so OpenLayers marks the tile `ERROR` — and **an errored tile is never
-retried**; it stays a hole until something rebuilds the layer. (That's the
-cause of the classic "patchwork of zoom levels": `findAltTiles_` filling
-holes.) It's a short-window *volume* budget of roughly 120 GetMaps, not a
-concurrency limit, and nothing in nginx can retry it — `proxy_next_upstream`
-only sees status codes. The only defence is fewer requests.
-
-**One tile queue per `Map`, shared by every layer.** OL won't start a tile
-while `maxTilesLoading` are in flight (default 16, hard-capped to 8 during
-animation). A cold LiDAR WMS tile takes 3–12 s against Kartverket while the
-topo WMTS base answers in ~130 ms, so a screenful of hillshade otherwise
-pins every slot and the base map never gets scheduled. Three settings keep
-the fast layer from queueing behind the slow one:
-
-- `maxTilesLoading: 48` on the `Map` (`src/map/atoms.ts`).
-- `preload: 0` on WMS background layers vs `preload: 2` on the WMTS base
-  (`backgroundLayers/utils.ts`). Preloading coarser levels is free on a
-  pre-rendered base and ruinous on an on-the-fly renderer.
-- wmscache caching no-data tiles, so the no-coverage majority of a
-  zoomed-out view is a ~5 ms hit.
-
-**512 px WMS tiles.** `src/map/layers/wmsTileGrid.ts` gives every `TileWMS`
-in the app — background *and* theme — an explicit 512 px `TileGrid` whose
-resolutions are the View's own ladder (`max(width, height) / 256 / 2**z` over
-the projection extent, mirroring `View`'s `createResolutionConstraint`), so
-alignment is exact and tiles never resample. At OL's default 256 px a
-1600×1000 viewport is ~35 tiles per layer per level and LiDAR project mode
-stacks two WMS layers — 70 requests per zoom step, which trips the
-interceptor in two steps. It is not a bandwidth trade: one 512 px tile is
-about the same total bytes as the four it replaces, and fewer tiles means
-fewer chances to draw a long-tail slow one.
-
-Two things to know before changing the size: the request stays 512×512 on
-every display because `TileWMS` pins its pixel ratio to 1 unless `serverType`
-is set and none of these sources sets one (set one and it will start asking
-for 1024×1024 — both origins serve that fine). And projections without an
-extent get `undefined` back and stay on OL's default grid.
-
-The same module sets `cacheSize: 128` (~10 screenfuls at 512 px; OL's 512
-default was budgeted for quarter-size tiles) and `zDirection: 1`.
-`zDirection: 1` asks for the coarser of two bracketing levels; at rest it
-does nothing (`constrainResolution` means the view settles on an exact
-match), but during the 250 ms zoom animation it stops a one-notch zoom-out
-from also fetching a ring at the level it's leaving.
-
-Not done, and not worth trying: raising `MouseWheelZoom`'s `timeout` to
-coalesce wheel notches. With `constrainResolution` on, `handleWheelZoom_`
-already collapses a burst inside the window to exactly one level (delta
-clamped to ±1), so a longer timeout skips no intermediate levels — it only
-caps how fast the user can zoom.
-
-**Every WMS background layer needs a `coverageExtent`.** A `TileWMS` with no
-tile grid of its own takes one spanning the whole *projection* extent, and
-EPSG:25833 reaches far past Norway — zoomed out, OL asks the LiDAR renderer
-for full on-the-fly renders over the Atlantic, Denmark and western Russia.
-`coverageExtent` on `WMSBackgroundLayer` (`{ extent, crs }`, transformed to
-the view projection in `getWMSLayer`) becomes the layer's `extent` and OL
-culls those tiles before a request goes out. Values come from each service's
-GetCapabilities `<BoundingBox>`:
-
-- national mosaic + the DOM one: `LIDAR_COVERAGE_EXTENT_25833`
-  (`-100275, 6399725, 1150255, 8000275`).
-- `wms.topo` overlay: `-127998, 6377920, 1145510, 7976800`.
-- per-project: **the project's own `bboxLonLat`**, not the service's.
-  `wms.hoyde-dtm-prosjekt` advertises the union of all 1936 acquisitions
-  (Jan Mayen to Svalbard), which culls almost nothing.
-
-The transform uses 8 sampling stops per edge. Corners-only would clip the
-bulge a Norway-sized box grows when reprojected out of UTM33, cutting *real
-coverage* off the map — worse than requesting a few extra tiles.
-
-**Tile loading is OpenLayers' default — don't make it custom again.** There
-was a `retryBlankTileLoadFunction` that `fetch()`ed every tile with
-`cache: 'no-store'` and retried anything under 800 bytes, on the theory that
-the DTM WMS sometimes returns a tiny transparent PNG instead of hillshade.
-The no-data PNG is deterministic (byte-identical across requests for a fixed
-BBOX), so retrying returns the same bytes; the only tiles it ever retried
-were legitimate no-coverage ones, turning each into 4 origin requests and
-~12 s in `LOADING`, and `no-store` defeated the browser HTTP cache for every
-LiDAR tile. If a blank-where-there-is-data tile ever *is* observed, fix it at
-wmscache (which can see and retry the upstream), not in a client loader.
+Map performance rests on spending *few* WMS requests — Kartverket rate-limits
+GetMap per source IP (i.e. per server, shared across all visitors) and signals
+it with an HTTP 200 that OpenLayers turns into a permanently errored tile. The
+countermeasures (512 px tile grids, `maxTilesLoading`, `preload`,
+`coverageExtent` culling, cached no-data tiles, stock OL tile loading) are all
+load-bearing and documented in `docs/wms-proxy-and-tiles.md`. Read that before
+changing tile grids, layer preloading, or anything that multiplies request
+counts.
 
 ## Added map content
 
@@ -453,20 +279,10 @@ UI says so.
 
 Request path is same-origin like every other raster source:
 `/wms/nib/ortofoto` → Caddy → wmscache → **nib-proxy** →
-`services.norgeibilder.no/wms/ortofoto`. The token is injected by the sidecar
-in a request *header* (`X-Esri-Authorization: Bearer`), never in the URL, so
-wmscache keys stay stable as the token rotates and the token never reaches
-the browser. Old NiB WMS endpoints die **Sep 2026**; this uses the new
-`services.norgeibilder.no/wms/*`.
-
-Verified against the running service: the WMS namespace is
-`services.norgeibilder.no/wms/*` (the sidecar's `UPSTREAM` ends in `/wms`
-because the Caddy+nginx prefix rewrites strip the request down to the bare
-service name, e.g. `/ortofoto`, before it reaches the sidecar — a bare-host
-base 404s), the layer name is `ortofoto` (`FLYFOTO_LAYER`), and NiB accepts
-the token as **either** the `X-Esri-Authorization: Bearer` header (what the
-sidecar sends) **or** a `&token=` query param (fallback if the header form is
-ever rejected; still cache-safe because injection is server-side).
+`services.norgeibilder.no/wms/ortofoto` (layer name `ortofoto`,
+`FLYFOTO_LAYER`). Old NiB WMS endpoints die **Sep 2026**; this uses the new
+`services.norgeibilder.no/wms/*`. Token handling is the sidecar's job — see
+`docs/wms-proxy-and-tiles.md`.
 
 Licensing: NiB imagery is free for private, non-commercial use;
 publishing/commercial use is the user's responsibility. A notice dialog gates
@@ -519,19 +335,10 @@ returns one row *per raster tile* (1000 rows / 24 MB for an Oslo-sized bbox),
 which is why enumeration uses the `prosjekter` MapServer instead — 121
 projects in ~25 KB for the same bbox.
 
-**Infra.** The sidecar grew a second base: a request path starting `/arcgis/`
-goes to `NIB_REST_UPSTREAM` (`…/arcgis/rest/services`), everything else stays
-on `UPSTREAM` (`…/wms`). That marker is what disambiguates them — after the
-prefix rewrites a WMS request is a bare service name like `/ortofoto`, which is
-otherwise indistinguishable from the head of a REST path. Chain:
-`/arcgis/nib/*` (Caddy) → `/nib-arcgis/*` (nginx) → `/arcgis/*` (sidecar).
-
-Two nginx locations, because the two endpoints want different lifetimes:
-`/nib-arcgis/prosjekter/` is spelled out with `proxy_cache_valid 200 7d` (the
-catalogue *grows* — a new acquisition a few times a year would otherwise be
-hidden for 180 days), while `/nib-arcgis/` takes the shared include's 180d
-(a completed acquisition's pixels never change). Longest-prefix wins, so the
-order in the file is not what selects them.
+**Infra.** The sidecar routes `/arcgis/*` to NiB's REST base and everything
+else to its WMS base; chain is `/arcgis/nib/*` (Caddy) → `/nib-arcgis/*`
+(nginx) → `/arcgis/*` (sidecar). Routing and per-endpoint cache lifetimes:
+`docs/wms-proxy-and-tiles.md`.
 
 **Client.** `src/localities/flyfotoProjects.ts` — `FlyfotoProject { id
 (= prosjektnavn, the imagery selector), projectName, year, photoDate,
@@ -557,6 +364,45 @@ check drops all-blank ones. `meta` records `projectName` / `year` / `photoDate`
 so the gallery captions "Flyfoto 1937". No new map layer or footprints — it
 stays a workspace action, out of the `MapTool` union like `takeScreenshot`.
 
+
+### Terrenganalyse (client-side relief from float DEMs)
+
+A lokalitet workspace action ("Terreng") that fetches the **raw float
+elevation grid** for the rectangle and computes its own relief
+visualizations in the browser, instead of restyling Kartverket's pre-baked
+hillshade. Rationale and endpoint details: `docs/terrain-analysis.md`.
+
+- Source is hoydedata.no's ArcGIS ImageServers via `exportImage` with
+  `renderingRule={"rasterFunction":"None"}` — the service's *other* raster
+  function is `skyggerelieff`, i.e. the shaded product the WMS already
+  serves. Same-origin at `/arcgis/hoydedata/*` → Caddy → wmscache →
+  `hoydedata.no/arcgis/rest/services/*`. Anonymous, no token sidecar.
+- `src/terrain/dem.ts` — fetch + a ~120-line float-TIFF reader. Deliberately
+  **not** geotiff.js: the endpoint emits exactly one shape (uncompressed,
+  single-band, 32-bit float, tiled 128×128) and adding a dependency would
+  mean regenerating `package-lock.json`, which the workstation can't do.
+  No-coverage arrives as **sparse tiles** (`TileOffsets: 0`), not as a nodata
+  value or an error — those pixels become NaN and every operator is
+  NaN-aware.
+- `src/terrain/shade.ts` — hillshade, multidirectional hillshade, slope,
+  local relief model, sky-view factor. Pure functions over a `Dem`, split
+  from rendering so the UI can cache the expensive pass while scrubbing the
+  cheap one.
+- `src/terrain/TerrainPanel.tsx` — DTM/DOM toggle, visualization picker, and
+  live azimuth/altitude/exaggeration sliders. Output saves as an attachment
+  of the existing `extract` kind (with `style` = the visualization), so no
+  PocketBase migration was needed.
+
+Two things that are load-bearing:
+
+- **The multidirectional blend's azimuths are unevenly spaced and weighted.**
+  Averaging evenly spaced azimuths at equal weight cancels the directional
+  term by symmetry and silently collapses the result to `cos(zenith)·cos(slope)`
+  — a slope map with a hillshade's name. The tell is a maximum of exactly
+  0.7071 at altitude 45°, i.e. nothing brighter than flat ground.
+- **The two `useMemo`s in TerrainPanel are split on purpose.** Sky-view factor
+  is ~800 ms on a 600² grid and must never be keyed on azimuth, or dragging
+  the slider queues a multi-second recompute per frame.
 
 ## Lokaliteter (user content)
 
@@ -645,12 +491,9 @@ AuthDialog lists whatever is enabled via
    `src/map/layers/themeLayerConfigApi.ts` inside `getThemeLayerConfig()`.
 3. Add the layer id(s) to a union in `src/map/layers/themeWMS.ts` and into
    `ThemeLayerName`.
-4. Route requests through `wmscache` instead of hitting the origin from the
-   browser. Add a `handle_path /wms/<host-slug>/*` block in `Caddyfile` that
-   rewrites to the upstream's WMS path prefix, plus an `upstream` +
-   `location` pair in `nginx/wms-cache.conf`, and use `/wms/<host-slug>/...`
-   as `wmsUrl` in the config. This gives you the 25 GB LRU disk cache and
-   same-origin browser requests for free (no CSP entry needed).
+4. Route requests through `wmscache` rather than hitting the origin from the
+   browser, and use the same-origin `/wms/<host-slug>/...` prefix as `wmsUrl`
+   (recipe in `docs/wms-proxy-and-tiles.md`).
 5. If the WMS's GetFeatureInfo doesn't offer JSON, set `infoFormat` on the
    category or layer to a format the parser can handle
    (`application/vnd.ogc.gml` works for MapServer via `parseXmlFeatureInfo`).
@@ -661,8 +504,8 @@ AuthDialog lists whatever is enabled via
    `src/map/layers/backgroundLayers.ts`.
 2. Create/extend a config in `src/map/layers/config/backgroundLayers/` and
    spread it into `allConfiguredBackgroundLayers` in `atoms.ts`. For a WMS
-   layer, set `coverageExtent` from the service's GetCapabilities
-   `<BoundingBox>` (see "Tile-loading constraints").
+   layer, `coverageExtent` is mandatory — see
+   `docs/wms-proxy-and-tiles.md`.
 3. Add priority in `backgroundLayerOrder` in
    `src/map/backgroundLayer/utils.ts` (controls display order in the "Kart"
    panel).
@@ -679,6 +522,13 @@ AuthDialog lists whatever is enabled via
   `docker compose ...` commands they should run.
 - Keep unused code out. If a helper (retry function, config field) has no
   live caller after a change, delete it — don't leave it in "for later".
+- `icon="…"` props are typed against `MaterialSymbol` from
+  `material-symbols`, which kvib pins — a plausible-looking name that isn't
+  in that union fails the docker build, and plenty aren't (`terrain`,
+  `filter_hdr`, `topography` are all missing; `elevation`, `landscape`,
+  `altitude` exist). Since there are no local `node_modules` to check
+  against, validate a new name by pulling the tarball into `/tmp`:
+  `curl -sL https://registry.npmjs.org/material-symbols/-/material-symbols-0.40.2.tgz | tar xz -O package/index.d.ts | grep '"terrain"'`
 - Commits use short imperative subject lines. Body explains the *why* when
   the reasoning isn't obvious from the diff. The `Co-Authored-By` trailer is
   added by the commit workflow.
@@ -711,41 +561,3 @@ The Caddyfile CSP is narrowed to what the browser actually contacts:
 `*.geonorge.no`, `*.norgeskart.no` and `hoydedata.no` (the ArcGIS identify
 call in `searchApi.ts`). `style-src 'unsafe-inline'` has to stay while the UI
 is on kvib/Chakra: emotion injects styles at runtime.
-
-## Lint and dev tooling
-
-**oxlint, not ESLint.** Config is `.oxlintrc.json`; there is no
-`eslint.config.js`.
-
-The project is on TypeScript 7 (the native Go port), which
-typescript-eslint's peer range still excludes — that made `npm ci` fail with
-ERESOLVE. oxlint parses TypeScript natively and has no `typescript` peer at
-all. Every remaining `typescript` peer in the tree
-(`prettier-plugin-organize-imports` `>=2.9`, i18next / react-i18next
-`^5 || ^6 || ^7`) accepts 7 on its own. **Don't add an `overrides` block for
-this** — if it seems necessary, something pulled a typescript-eslint
-dependency back in.
-
-Two things to know before editing `.oxlintrc.json`:
-
-- **No plugins are enabled by default** — they must be listed in `plugins`.
-  And rules only fire if their *category* is enabled. `react/hooks`
-  (rules-of-hooks) is `suspicious` and `react/only-export-components` is
-  `restriction`, neither of which is on, so both are listed explicitly under
-  `rules`. Enabling only `correctness` would silently drop rules-of-hooks
-  across ~400 hook call sites.
-- `react/exhaustive-deps` is deliberately `warn`, matching what
-  eslint-plugin-react-hooks' recommended preset did.
-
-Dropped in the move to oxlint, on purpose: `eslint-plugin-compat`
-(browserslist API checking — no oxlint equivalent; `browserslist` in
-`package.json` still drives the build) and `eslint-plugin-prettier`
-(formatting is `npm run format` / `format-check`, not a lint rule).
-
-`npm run lint` is not enforced anywhere: absent from the Dockerfile, no git
-hooks, no CI. The build is `npm ci && tsc -b && vite build`, so type errors
-block a deploy and lint findings don't.
-
-Note `prettier-plugin-organize-imports` drives the TypeScript *language
-service*, the part of the API the native port trims hardest. If
-`npm run format` starts failing under TS 7, that plugin is the first suspect.

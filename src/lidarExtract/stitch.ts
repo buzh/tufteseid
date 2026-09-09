@@ -27,9 +27,15 @@ export type TilePlan = {
 
 // Build the tile grid for a given source bbox + resolution. The bbox is in
 // EPSG:25833. widthPx / heightPx are the final canvas dimensions.
+//
+// `maxSidePx` overrides the canvas cap for callers whose destination isn't a
+// canvas: the terrain tool assembles a Float32Array, where 4 bytes per pixel
+// (rather than a canvas's own bookkeeping) makes 12000² a 576 MB allocation.
+// See MAX_DEM_PX_PER_SIDE in src/terrain/dem.ts.
 export function planTiles(
   bbox: [number, number, number, number],
   metresPerPx: number,
+  maxSidePx: number = MAX_CANVAS_PX_PER_SIDE,
 ): TilePlan {
   const [minX, minY, maxX, maxY] = bbox;
   const worldWidthM = maxX - minX;
@@ -41,10 +47,7 @@ export function planTiles(
   // Enforce the per-canvas cap by scaling both axes together so we keep
   // aspect ratio. The effective resolution the caller ends up with is
   // metresPerPx / scale.
-  const scale = Math.min(
-    1,
-    MAX_CANVAS_PX_PER_SIDE / Math.max(widthPx, heightPx),
-  );
+  const scale = Math.min(1, maxSidePx / Math.max(widthPx, heightPx));
   widthPx = Math.max(1, Math.round(widthPx * scale));
   heightPx = Math.max(1, Math.round(heightPx * scale));
 

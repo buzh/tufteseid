@@ -443,6 +443,36 @@
       "flyfotoFailedFor": "Could not fetch aerial imagery for {{label}}.",
       "flyfotoClose": "Close"
     },
+    "terrain": {
+      "short": "Terrain",
+      "tooltip": "Terrain analysis — relight and process elevation data for the rectangle",
+      "heading": "Terrain analysis",
+      "close": "Close terrain analysis",
+      "visualization": "Visualization",
+      "vis": {
+        "hillshade": "Hillshade",
+        "multiHillshade": "Multidirectional",
+        "svf": "Sky-view factor",
+        "lrm": "Local relief",
+        "slope": "Slope"
+      },
+      "visHint": {
+        "hillshade": "One light source. Drag the azimuth to sweep it — features running parallel to the light are invisible.",
+        "multiHillshade": "Six light directions weighted toward the north-west. No orientation is left unlit.",
+        "svf": "How much of the sky is visible. Independent of light direction: hollows and ditches go dark, mounds and banks go bright.",
+        "lrm": "The elevation model minus a smoothed copy. Removes the landform trend and leaves the small scale standing.",
+        "slope": "Steepness of the terrain. Steep is dark."
+      },
+      "azimuth": "Light direction",
+      "altitude": "Sun altitude",
+      "zFactor": "Exaggeration",
+      "resolution": "{{m}} m/px · {{w}}×{{h}}",
+      "save": "Save as image",
+      "saving": "Saving …",
+      "sourceLabel": "Elevation data (Kartverket)",
+      "failed": "Could not fetch elevation data.",
+      "empty": "No LiDAR data covers this rectangle."
+    },
     "kulturminner": {
       "heading": "Known cultural heritage",
       "loading": "Checking the register…",

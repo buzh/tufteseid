@@ -83,6 +83,19 @@ route {
                 reverse_proxy http://wmscache
         }
 
+        # hoydedata.no ArcGIS REST — Kartverket's elevation ImageServers.
+        # Unlike /wms/geonorge/* (which serves Kartverket's *pre-shaded*
+        # hillshade PNGs) this is where the raw float elevation grid comes
+        # from: exportImage with renderingRule {"rasterFunction":"None"}
+        # returns a 32-bit float GeoTIFF, which is what the lokalitet
+        # terrain tool needs to compute its own relief visualizations.
+        # See docs/terrain-analysis.md. Anonymous — no token sidecar, so
+        # this goes straight to the host via wmscache.
+        handle_path /arcgis/hoydedata/* {
+                rewrite * /hoydedata-arcgis{http.request.uri.path}
+                reverse_proxy http://wmscache
+        }
+
         # PocketBase — backend for lokaliteter (auth + user content).
         # Kept same-origin so browser auth cookies "just work" and there's
         # no CORS to configure. The full OAuth2 redirect flow bounces

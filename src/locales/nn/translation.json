@@ -448,6 +448,36 @@
       "flyfotoFailedFor": "Kunne ikkje hente flyfoto for {{label}}.",
       "flyfotoClose": "Lukk"
     },
+    "terrain": {
+      "short": "Terreng",
+      "tooltip": "Terrenganalyse — lys opp og bearbeid høgdedata for rektangelet",
+      "heading": "Terrenganalyse",
+      "close": "Lukk terrenganalyse",
+      "visualization": "Visualisering",
+      "vis": {
+        "hillshade": "Skyggerelieff",
+        "multiHillshade": "Fleirretning",
+        "svf": "Himmelsyn",
+        "lrm": "Lokalrelieff",
+        "slope": "Helling"
+      },
+      "visHint": {
+        "hillshade": "Éi lyskjelde. Dra på asimut for å sveipe lyset — strukturar som ligg parallelt med lyset er usynlege.",
+        "multiHillshade": "Seks lysretningar vekta mot nordvest. Ingen retning blir liggjande i mørke.",
+        "svf": "Kor mykje av himmelen som er synleg. Uavhengig av lysretning: søkk og grøfter blir mørke, haugar og vollar lyse.",
+        "lrm": "Høgdemodellen minus ei glatta utgåve. Fjernar landskapsforma og lèt det småskala stå att.",
+        "slope": "Bratthet i terrenget. Bratt er mørkt."
+      },
+      "azimuth": "Lysretning",
+      "altitude": "Solhøgd",
+      "zFactor": "Overdriving",
+      "resolution": "{{m}} m/px · {{w}}×{{h}}",
+      "save": "Lagre som bilete",
+      "saving": "Lagrar …",
+      "sourceLabel": "Høgdedata (Kartverket)",
+      "failed": "Klarte ikkje å hente høgdedata.",
+      "empty": "Ingen laserdata dekkjer dette rektangelet."
+    },
     "kulturminner": {
       "heading": "Kjende kulturminne",
       "loading": "Sjekkar registeret…",
