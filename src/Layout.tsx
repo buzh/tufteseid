@@ -17,6 +17,7 @@ import { useFeatureInfoClick } from './map/featureInfo/useFeatureInfo';
 import { useLidarFootprintsLayer } from './map/lidarFootprintsLayer';
 import { MapComponent } from './map/MapComponent';
 import { MapToolCards } from './map/overlay/MapToolCards';
+import { useLidarCyclingKeys } from './map/useLidarCyclingKeys';
 import { useSearchEffects } from './search/atoms';
 import { useMapClickSearch } from './search/hooks';
 import { InfoBox } from './search/infobox/InfoBox';
@@ -45,6 +46,9 @@ export const Layout = () => {
   useLocalityClick();
   useLocalityCreate();
   useLidarFootprintsLayer();
+  // A/D/W/S/E background cycling. Mounted here rather than in the TopBar
+  // so the document listener outlives whatever renders the controls.
+  useLidarCyclingKeys();
   // Subscribe to PB authStore changes → currentUserAtom.
   useAtom(pbAuthSyncEffect);
 

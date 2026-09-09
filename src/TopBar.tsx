@@ -58,6 +58,7 @@ import {
 } from './map/layers/config/backgroundLayers/lidarRelevance';
 import { ThemeLayerName } from './map/layers/themeWMS';
 import { mapToolAtom } from './map/overlay/atoms';
+import { type CycleKey, useRegisterLidarCycle } from './map/useLidarCyclingKeys';
 import { MeasurePopover } from './measure/MeasurePopover';
 import {
   displaySearchResultsAtom,
@@ -588,14 +589,10 @@ export const TopBar = () => {
   };
 
   // Keyboard cycling (A/D styles, W/S datasets, E model) —
-  // docs/ui-architecture.md §5.3, which also records that this listener
-  // is bubble-phase and should not be.
-  //
-  // Held through a ref rather than an effect dependency: the lists it
-  // closes over are rebuilt on every render, so the alternative is
-  // re-attaching the document listener continuously.
-  const cycleRef = useRef<(key: string) => boolean>(() => false);
-  cycleRef.current = (key: string): boolean => {
+  // docs/ui-architecture.md §5.3. The document listener itself lives in
+  // useLidarCyclingKeys, mounted at the shell root; this is only the
+  // behaviour, published to it.
+  const cycle = (key: CycleKey): boolean => {
     // The extract viewer covers the map: swapping the background behind
     // it would be invisible and still cost a full round of WMS loads.
     if (!isLidarMode || extractViewerOpen) return false;
@@ -647,30 +644,7 @@ export const TopBar = () => {
     return true;
   };
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      // e.repeat: a leaned-on key would otherwise queue a full WMS
-      // reload per frame.
-      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) {
-        return;
-      }
-      const target = event.target;
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable ||
-          ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-      ) {
-        return;
-      }
-      const key = event.key.toLowerCase();
-      if (!['a', 'd', 'w', 's', 'e'].includes(key)) return;
-      if (cycleRef.current(key)) event.preventDefault();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-    };
-  }, []);
+  useRegisterLidarCycle(cycle);
 
   return (
     <Flex

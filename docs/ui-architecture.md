@@ -50,8 +50,13 @@ document and does not check `defaultPrevented`. Any app-level key binding that
 must beat the map has to listen in the **capture** phase and call
 `preventDefault` + `stopPropagation` + `stopImmediatePropagation` — a
 bubble-phase listener will fire *and* pan the map out from under itself.
-`useWorkspaceKeys` and `LidarExtractViewer` both do this; TopBar's cycling
-listener does not (see §5.3, it's a latent bug, not a design).
+`useWorkspaceKeys`, `useLidarCyclingKeys` and `LidarExtractViewer` all do this.
+
+The layers also have to stand down for each other. Each checks `event.target`
+for an input, a `contentEditable`, or an enclosing
+`[data-scope="popover"|"dialog"|"select"]`, and then checks
+`anyOverlayOpenAtom` — the attribute walk only works if the overlay took
+focus, so anything that renders without doing so needs the counter.
 
 ---
 
@@ -337,10 +342,19 @@ publishes exactly one style, and `activeLidarStyleAtom` keeps holding the user's
 DTM pick so it returns when they switch back. Walking a single-entry ring would
 overwrite it.
 
-**Known defect:** unlike `useWorkspaceKeys`, this listener is registered in the
-**bubble** phase, so it does not reliably beat OL's `KeyboardPan`. It also does
-not guard against typing into an input the way the workspace listener does. A
-rewrite should route it through the same discipline as §1.
+The listener itself is **not** in the TopBar. It lives in
+`src/map/useLidarCyclingKeys.ts` and is mounted at the shell root, because it
+registers with `[]` deps: a host that unmounts (a collapsing ribbon row) would
+re-register and flip its position in the capture chain relative to the other
+keyboard layers. The TopBar publishes only the behaviour, via
+`useRegisterLidarCycle`.
+
+It follows the §1 discipline: capture phase, handled keys stopped with
+`preventDefault` + `stopPropagation` + `stopImmediatePropagation`, and the same
+input / `[data-scope]` guard as `useWorkspaceKeys`. Both listeners additionally
+consult `anyOverlayOpenAtom` (`src/ui/overlayAtoms.ts`) — a focus-independent
+second check, because the `[data-scope]` walk starts at `event.target` and only
+reaches the attribute if the overlay actually took focus.
 
 ### 5.4 Internationalisation, or the lack of it
 
@@ -746,6 +760,5 @@ Fix-list for the rewrite; none of these are load-bearing.
 - `trackPositionAtom` and its effect have no UI entry point (§6.3).
 - The theme-picker's category/subtheme machinery is unexercised (§6.2).
 - Search has no keyboard support and no i18n (§7).
-- TopBar keyboard cycling is bubble-phase and has no input guard (§5.3).
 - The layer z-index ladder contains a `4.5`.
 - Fourteen TopBar controls "fit" on mobile only via horizontal scroll (§5).
