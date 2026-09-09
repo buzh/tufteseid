@@ -1,7 +1,7 @@
-import { Button, Flex, HStack, Input, Stack, Text } from '@kvib/react';
 import { useTranslation } from 'react-i18next';
 import { DrawControls } from '../draw/drawControls/DrawControls';
-import { NoteInput } from './ui';
+import { Button, Input, NoteInput } from '../ui';
+import styles from './FunnDraft.module.css';
 
 // The new-funn / edit-the-drawing form. Unlike an existing row (which
 // saves on blur) a draft is a commit-or-discard form: there is no record
@@ -30,19 +30,18 @@ export const FunnDraft = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <Stack gap={2.5}>
-      <Text fontSize="xs" color="gray.600">
+    <div className={styles.root}>
+      <p className={styles.instructions}>
         {t(
           editing
             ? 'localities.funn.draft.instructionsEdit'
             : 'localities.funn.draft.instructions',
         )}
-      </Text>
+      </p>
 
       <DrawControls />
 
       <Input
-        size="sm"
         value={title}
         onChange={(e) => onTitle(e.target.value)}
         placeholder={t('localities.funn.draft.titlePlaceholder')}
@@ -54,30 +53,23 @@ export const FunnDraft = ({
         placeholder={t('localities.funn.draft.notePlaceholder')}
       />
 
-      {error && (
-        <Text fontSize="xs" color="red.600">
-          {error}
-        </Text>
-      )}
+      {error && <p className={styles.error}>{error}</p>}
 
-      <Flex justify="flex-end">
-        <HStack>
-          <Button size="sm" variant="tertiary" onClick={onCancel}>
-            {t('localities.funn.draft.cancel')}
-          </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            colorPalette="green"
-            onClick={onSave}
-            disabled={saving || title.trim().length === 0}
-          >
-            {saving
-              ? t('localities.workspace.saving')
-              : t('localities.funn.draft.save')}
-          </Button>
-        </HStack>
-      </Flex>
-    </Stack>
+      <div className={styles.actions}>
+        <Button size="sm" palette="gray" onClick={onCancel}>
+          {t('localities.funn.draft.cancel')}
+        </Button>
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={onSave}
+          disabled={saving || title.trim().length === 0}
+        >
+          {saving
+            ? t('localities.workspace.saving')
+            : t('localities.funn.draft.save')}
+        </Button>
+      </div>
+    </div>
   );
 };

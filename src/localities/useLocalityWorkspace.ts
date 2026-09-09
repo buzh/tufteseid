@@ -113,6 +113,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const mode = useAtomValue(workspaceModeAtom);
   const [growPrompt, setGrowPrompt] = useAtom(growPromptAtom);
   const [shooting, setShooting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [fetchingFlyfoto, setFetchingFlyfoto] = useState(false);
   const [flyfotoNotice, setFlyfotoNotice] = useState(false);
   // The acquisition picker, opened once the licensing notice is accepted.
@@ -475,6 +476,31 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     i18n.language,
   ]);
 
+  // Upload lives here rather than in the Bilder column because the same
+  // verb is on the lokalitet ribbon row: two copies of the create call
+  // would be two places to keep the optimistic list update right.
+  const uploadFile = useCallback(
+    async (file: File) => {
+      if (!user || !isMine || uploading) return;
+      setUploading(true);
+      try {
+        const rec = await createAttachment(
+          { locality: locality.id, kind: 'upload' },
+          user.id,
+          file,
+          file.name,
+        );
+        setAttachmentItems((prev) => (prev ? [rec, ...prev] : [rec]));
+      } catch (e) {
+        console.warn('[localityWorkspace] upload failed', e);
+        toaster.error({ title: t('localities.bilder.uploadFailed') });
+      } finally {
+        setUploading(false);
+      }
+    },
+    [user, isMine, uploading, locality.id, setAttachmentItems, t],
+  );
+
   // The acquisition list is per-rectangle, so drop it when the rectangle
   // moves or is resized. Keyed on the values rather than the array, which
   // is a fresh identity on every record update.
@@ -796,6 +822,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     toggleTerrain,
     shooting,
     takeScreenshot,
+    uploading,
+    uploadFile,
 
     // flyfoto
     fetchingFlyfoto,
@@ -812,3 +840,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     runFlyfotoAll,
   };
 };
+
+// What the ribbon rows, the tray columns and the dialogs are handed. Derived
+// from the hook rather than declared, so adding a member to the return above
+// is all it takes to make it available to every consumer.
+export type LocalityWorkspaceApi = ReturnType<typeof useLocalityWorkspace>;

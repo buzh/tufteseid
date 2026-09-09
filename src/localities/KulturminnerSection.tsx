@@ -1,6 +1,7 @@
-import { Box, Flex, Icon, Link, Spinner, Stack, Text } from '@kvib/react';
 import { useTranslation } from 'react-i18next';
 import { KnownKulturminne, KulturminnerResult } from '../api/kulturminnerWfs';
+import { Icon, Spinner } from '../ui';
+import styles from './KulturminnerSection.module.css';
 
 // Register codes → readable labels. Domain vocabulary from Askeladden,
 // left in Norwegian on purpose; unknown codes fall back to the raw code.
@@ -28,40 +29,38 @@ const KulturminneRow = ({ km }: { km: KnownKulturminne }) => {
   const kategori = KATEGORI_LABELS[km.kategori] ?? km.kategori;
   const vern = VERNETYPE_LABELS[km.vernetype] ?? km.vernetype;
   const body = (
-    <Flex justify="space-between" align="center" gap={2} py={1.5} px={1}>
-      <Box flex="1" minW={0}>
-        <Text fontSize="xs" fontWeight="medium" lineClamp={1}>
+    <>
+      <span className={styles.main}>
+        <span className={styles.name}>
           {name}
           {km.antallEnkeltminner != null && km.antallEnkeltminner > 1
             ? ` (${km.antallEnkeltminner})`
             : ''}
-        </Text>
-        <Text fontSize="10px" color="gray.600" lineClamp={1}>
+        </span>
+        <span className={styles.meta}>
           {[kategori, vern].filter(Boolean).join(' · ')}
-        </Text>
-      </Box>
+        </span>
+      </span>
       {km.linkKulturminnesok && (
-        <Box color="green.700" flexShrink={0} display="flex">
+        <span className={styles.link}>
           <Icon icon="open_in_new" size={14} />
-        </Box>
+        </span>
       )}
-    </Flex>
+    </>
   );
+
   return km.linkKulturminnesok ? (
-    <Link
+    <a
+      className={styles.row}
       href={km.linkKulturminnesok}
       target="_blank"
       rel="noopener noreferrer"
-      display="block"
-      color="inherit"
-      borderRadius="sm"
-      _hover={{ bg: 'gray.50', textDecoration: 'none' }}
       title={t('localities.kulturminner.openLink')}
     >
       {body}
-    </Link>
+    </a>
   ) : (
-    body
+    <div className={styles.row}>{body}</div>
   );
 };
 
@@ -76,38 +75,30 @@ export const KulturminnerSection = ({
 
   if (error) {
     return (
-      <Text fontSize="xs" color="gray.500">
-        {t('localities.kulturminner.error')}
-      </Text>
+      <p className={styles.message}>{t('localities.kulturminner.error')}</p>
     );
   }
 
   if (!result) {
     return (
-      <Flex align="center" gap={2}>
-        <Spinner size="xs" />
-        <Text fontSize="xs" color="gray.500">
-          {t('localities.kulturminner.loading')}
-        </Text>
-      </Flex>
+      <div className={styles.busy}>
+        <Spinner size={14} />
+        {t('localities.kulturminner.loading')}
+      </div>
     );
   }
 
   if (result.items.length === 0) {
     return (
-      <Text fontSize="xs" color="gray.600">
-        {t('localities.kulturminner.empty')}
-      </Text>
+      <p className={styles.message}>{t('localities.kulturminner.empty')}</p>
     );
   }
 
   return (
-    <Stack gap={0} maxH="200px" overflowY="auto">
+    <div className={styles.list}>
       {result.items.map((km, i) => (
-        <Box key={i} borderBottomWidth="1px" borderColor="gray.100">
-          <KulturminneRow km={km} />
-        </Box>
+        <KulturminneRow key={i} km={km} />
       ))}
-    </Stack>
+    </div>
   );
 };

@@ -1,0 +1,21 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.instructions {
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+.error {
+  font-size: var(--font-xs);
+  color: var(--c-danger);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+}

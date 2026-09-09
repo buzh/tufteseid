@@ -64,10 +64,10 @@
 }
 
 /*
- * Left slot: one occupant at a time, either a MapTool card or the lokalitet
- * workspace (docs/ui-architecture.md §1). top/bottom give it a definite
- * height, which is what replaced the old `calc(100vh - 65px)` guesses at
- * the header height inside the cards — they can now just say 100%.
+ * Left slot: the search box and the MapTool cards. top/bottom give it a
+ * definite height, which is what replaced the old `calc(100vh - 65px)`
+ * guesses at the header height inside the cards — they can now just say
+ * 100%.
  */
 .left {
   position: absolute;
@@ -81,24 +81,15 @@
   pointer-events: none;
 }
 
-/* The workspace needs more room than a tool card. */
 @media (min-width: 48rem) {
   .left {
     max-width: 360px;
-  }
-
-  .leftWide {
-    max-width: 400px;
   }
 }
 
 @media (min-width: 62rem) {
   .left {
     max-width: 400px;
-  }
-
-  .leftWide {
-    max-width: 440px;
   }
 }
 

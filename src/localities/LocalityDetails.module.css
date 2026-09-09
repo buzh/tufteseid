@@ -1,0 +1,45 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.label {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--c-fg-muted);
+}
+
+.hint {
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+/* Fact rows: label left, value right, value truncating rather than
+   wrapping — these are dates and names, and none of them repay a
+   second line. */
+.fact {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  font-size: var(--font-xs);
+}
+
+.factLabel {
+  flex: none;
+  color: var(--c-fg-subtle);
+}
+
+.factValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-fg-muted);
+  text-align: right;
+}

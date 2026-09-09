@@ -22,9 +22,9 @@ export const adjustingLocalityAtom = atom<boolean>(false);
 export const hoveredFunnIdAtom = atom<string | null>(null);
 export const selectedFunnIdAtom = atom<string | null>(null);
 
-// Which workspace sections are expanded. Outside the component because
-// LocalityWorkspace is keyed by locality.id and remounts on every swap —
-// folding "Detaljer" away should stay folded for the next lokalitet too.
+// Which tray sections are expanded. Outside the component because the tray
+// is keyed by locality.id and remounts on every swap — folding "Detaljer"
+// away should stay folded for the next lokalitet too.
 export type WorkspaceSectionId =
   | 'funn'
   | 'bilder'

@@ -1,8 +1,7 @@
 import { useAtomValue } from 'jotai';
 import { AuthDialog } from '../auth/AuthDialog';
 import { BottomDrawToolSelector } from '../draw/BottomDrawToolSelector';
-import { activeLocalityAtom, funnDraftActiveAtom } from '../localities/atoms';
-import { LocalityWorkspace } from '../localities/LocalityWorkspace';
+import { funnDraftActiveAtom } from '../localities/atoms';
 import { KulturminnerPopup } from '../map/featureInfo/KulturminnerPopup';
 import { MapComponent } from '../map/MapComponent';
 import { MapToolCards } from '../map/overlay/MapToolCards';
@@ -10,19 +9,15 @@ import { SearchComponent } from '../search/SearchComponent';
 import { InfoBox } from '../search/infobox/InfoBox';
 import { ErrorBoundary } from '../shared/ErrorBoundary';
 import { useIsMobileScreen } from '../shared/hooks';
-import { cx } from '../ui/cx';
 import styles from './AppShell.module.css';
 import { Ribbon } from './Ribbon';
 import { useMapSideEffects } from './useMapSideEffects';
 
 export const AppShell = () => {
   const isMobile = useIsMobileScreen();
-  const activeLocality = useAtomValue(activeLocalityAtom);
   const funnDraftActive = useAtomValue(funnDraftActiveAtom);
 
   useMapSideEffects();
-
-  const leftClass = cx(styles.left, activeLocality && styles.leftWide);
 
   return (
     <ErrorBoundary>
@@ -45,26 +40,16 @@ export const AppShell = () => {
           </div>
 
           <div className={styles.row}>
-            <div className={leftClass}>
-              {activeLocality ? (
-                <ErrorBoundary name="LocalityWorkspace">
-                  {/* Keyed so swapping lokalitet remounts with fresh form
-                      state (and autoFocus re-applies for new records). */}
-                  <LocalityWorkspace
-                    key={activeLocality.id}
-                    locality={activeLocality}
-                  />
-                </ErrorBoundary>
-              ) : (
-                <>
-                  <ErrorBoundary name="SearchComponent">
-                    <SearchComponent />
-                  </ErrorBoundary>
-                  <ErrorBoundary name="MapToolCards">
-                    <MapToolCards />
-                  </ErrorBoundary>
-                </>
-              )}
+            {/* The left slot used to arbitrate between a MapTool card and
+                the lokalitet workspace. The workspace is in the ribbon now,
+                so there is nothing left to arbitrate and both render. */}
+            <div className={styles.left}>
+              <ErrorBoundary name="SearchComponent">
+                <SearchComponent />
+              </ErrorBoundary>
+              <ErrorBoundary name="MapToolCards">
+                <MapToolCards />
+              </ErrorBoundary>
             </div>
 
             {/* Right slot: coordinate readout / search-result infobox. */}

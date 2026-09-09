@@ -413,7 +413,8 @@
       "kind": {
         "extract": "LiDAR extract",
         "screenshot": "Screenshot",
-        "upload": "Uploaded"
+        "upload": "Uploaded",
+        "flyfoto": "Aerial photo"
       }
     },
     "tools": {
@@ -549,6 +550,10 @@
       "moreStyles": "{{count}} more styles",
       "modelLabel": "Elevation model",
       "modelTip": "DTM = terrain (vegetation removed), DOM = surface (buildings and trees). Switch with E"
+    },
+    "tray": {
+      "show": "Show contents",
+      "hide": "Hide contents"
     }
   }
 }

@@ -24,10 +24,10 @@ import { countFindsByLocality } from '../api/localityFinds';
 import { currentUserAtom, isAdminAtom } from '../auth/atoms';
 import { mapAtom } from '../map/atoms';
 import { mapToolAtom } from '../map/overlay/atoms';
+import { BadgePalette, Segmented } from '../ui';
 import { activeLocalityAtom } from './atoms';
 import { formatBboxArea, formatDate } from './format';
 import { setLocalityHighlight } from './localityLayer';
-import { BadgePalette, Segmented } from './ui';
 
 const VISIBILITY_PALETTE: Record<
   LocalityRecord['visibility'],

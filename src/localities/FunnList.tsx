@@ -1,32 +1,22 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Flex,
-  HStack,
-  Icon,
-  IconButton,
-  Input,
-  PopoverArrow,
-  PopoverBody,
-  PopoverContent,
-  PopoverRoot,
-  PopoverTitle,
-  PopoverTrigger,
-  Spinner,
-  Stack,
-  Text,
-} from '@kvib/react';
 import { useSetAtom } from 'jotai';
 import type { MouseEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { LocalityFindRecord, LocalityFindStatus } from '../api/localityFinds';
 import {
-  LocalityFindRecord,
-  LocalityFindStatus,
-} from '../api/localityFinds';
+  Badge,
+  type BadgePalette,
+  Button,
+  cx,
+  Icon,
+  IconButton,
+  Input,
+  NoteInput,
+  Popover,
+  Spinner,
+} from '../ui';
 import { hoveredFunnIdAtom } from './atoms';
-import { BadgePalette, NoteInput } from './ui';
+import styles from './FunnList.module.css';
 
 const STATUS_ORDER: LocalityFindStatus[] = [
   'mulig',
@@ -42,6 +32,13 @@ const STATUS_PALETTE: Record<LocalityFindStatus, BadgePalette> = {
   rapportert: 'blue',
 };
 
+/*
+ * Every control in here calls stopPropagation on its click. The row itself
+ * is clickable (it zooms the map to the funn), and React events bubble
+ * through the component tree — so even the portalled popover bodies would
+ * otherwise fire the row's handler.
+ */
+
 const StatusPicker = ({
   value,
   editable,
@@ -55,12 +52,7 @@ const StatusPicker = ({
   const [open, setOpen] = useState(false);
 
   const badge = (
-    <Badge
-      colorPalette={STATUS_PALETTE[value]}
-      size="sm"
-      flexShrink={0}
-      whiteSpace="nowrap"
-    >
+    <Badge palette={STATUS_PALETTE[value]}>
       {t(`localities.funn.status.${value}`)}
     </Badge>
   );
@@ -68,53 +60,53 @@ const StatusPicker = ({
   if (!editable) return badge;
 
   return (
-    <PopoverRoot open={open} onOpenChange={(e) => setOpen(e.open)}>
-      <PopoverTrigger asChild>
-        <Box
-          as="button"
-          display="flex"
-          alignItems="center"
-          gap={0.5}
-          flexShrink={0}
-          borderRadius="sm"
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      align="end"
+      width={190}
+      label={t('localities.funn.status.heading')}
+      trigger={
+        <button
+          type="button"
+          className={styles.statusTrigger}
           title={t('localities.funn.status.pickHint')}
-          onClick={(e: MouseEvent) => e.stopPropagation()}
+          aria-expanded={open}
+          onClick={(e: MouseEvent) => {
+            e.stopPropagation();
+            setOpen(!open);
+          }}
         >
           {badge}
           <Icon icon="keyboard_arrow_down" size={14} />
-        </Box>
-      </PopoverTrigger>
-      <PopoverContent width="190px">
-        <PopoverArrow />
-        <PopoverBody>
-          <PopoverTitle fontSize="xs" mb={2}>
-            {t('localities.funn.status.heading')}
-          </PopoverTitle>
-          <Stack gap={1}>
-            {STATUS_ORDER.map((s) => (
-              <Button
-                key={s}
-                size="xs"
-                justifyContent="flex-start"
-                variant={s === value ? 'secondary' : 'ghost'}
-                colorPalette="gray"
-                onClick={(e: MouseEvent) => {
-                  e.stopPropagation();
-                  setOpen(false);
-                  if (s !== value) onChange(s);
-                }}
-              >
-                {/* The same badge the row shows, so picking is
-                    recognition rather than reading a word list. */}
-                <Badge colorPalette={STATUS_PALETTE[s]} size="sm">
-                  {t(`localities.funn.status.${s}`)}
-                </Badge>
-              </Button>
-            ))}
-          </Stack>
-        </PopoverBody>
-      </PopoverContent>
-    </PopoverRoot>
+        </button>
+      }
+    >
+      <p className={styles.menuTitle}>{t('localities.funn.status.heading')}</p>
+      <div className={styles.menu}>
+        {STATUS_ORDER.map((s) => (
+          <button
+            key={s}
+            type="button"
+            className={cx(
+              styles.menuItem,
+              s === value && styles.menuItemActive,
+            )}
+            onClick={(e: MouseEvent) => {
+              e.stopPropagation();
+              setOpen(false);
+              if (s !== value) onChange(s);
+            }}
+          >
+            {/* The same badge the row shows, so picking is recognition
+                rather than reading a word list. */}
+            <Badge palette={STATUS_PALETTE[s]}>
+              {t(`localities.funn.status.${s}`)}
+            </Badge>
+          </button>
+        ))}
+      </div>
+    </Popover>
   );
 };
 
@@ -138,92 +130,92 @@ const RowMenu = ({
   };
 
   return (
-    <PopoverRoot
+    <Popover
       open={open}
-      onOpenChange={(e) => {
-        setOpen(e.open);
-        if (!e.open) setConfirming(false);
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setConfirming(false);
       }}
-    >
-      <PopoverTrigger asChild>
+      align="end"
+      width={230}
+      label={t('localities.funn.actions.menu')}
+      trigger={
         <IconButton
           icon="more_vert"
           size="xs"
-          variant="ghost"
+          palette="gray"
           aria-label={t('localities.funn.actions.menu')}
-          onClick={(e: MouseEvent) => e.stopPropagation()}
+          aria-expanded={open}
+          onClick={(e: MouseEvent) => {
+            e.stopPropagation();
+            setOpen(!open);
+          }}
         />
-      </PopoverTrigger>
-      <PopoverContent width="230px">
-        <PopoverArrow />
-        <PopoverBody onClick={(e: MouseEvent) => e.stopPropagation()}>
-          {confirming ? (
-            <>
-              <PopoverTitle fontSize="sm">
-                {t('localities.funn.confirmDeleteShort')}
-              </PopoverTitle>
-              <HStack mt={3} justifyContent="flex-end">
-                <Button
-                  size="xs"
-                  variant="tertiary"
-                  onClick={() => setConfirming(false)}
-                >
-                  {t('localities.funn.draft.cancel')}
-                </Button>
-                <Button
-                  size="xs"
-                  variant="primary"
-                  colorPalette="red"
-                  onClick={() => {
-                    close();
-                    onDelete();
-                  }}
-                >
-                  {t('localities.funn.actions.delete')}
-                </Button>
-              </HStack>
-            </>
-          ) : (
-            <Stack gap={1}>
+      }
+    >
+      <div onClick={(e: MouseEvent) => e.stopPropagation()}>
+        {confirming ? (
+          <>
+            <p className={styles.menuTitle}>
+              {t('localities.funn.confirmDeleteShort')}
+            </p>
+            <div className={styles.confirmActions}>
               <Button
                 size="xs"
-                variant="ghost"
-                justifyContent="flex-start"
-                leftIcon="edit"
-                onClick={() => {
-                  close();
-                  onEditText();
-                }}
+                palette="gray"
+                onClick={() => setConfirming(false)}
               >
-                {t('localities.funn.actions.edit')}
+                {t('localities.funn.draft.cancel')}
               </Button>
               <Button
                 size="xs"
-                variant="ghost"
-                justifyContent="flex-start"
-                leftIcon="draw"
+                variant="primary"
+                palette="red"
                 onClick={() => {
                   close();
-                  onEditGeometry();
+                  onDelete();
                 }}
-              >
-                {t('localities.funn.actions.editGeometry')}
-              </Button>
-              <Button
-                size="xs"
-                variant="ghost"
-                colorPalette="red"
-                justifyContent="flex-start"
-                leftIcon="delete"
-                onClick={() => setConfirming(true)}
               >
                 {t('localities.funn.actions.delete')}
               </Button>
-            </Stack>
-          )}
-        </PopoverBody>
-      </PopoverContent>
-    </PopoverRoot>
+            </div>
+          </>
+        ) : (
+          <div className={styles.menu}>
+            <button
+              type="button"
+              className={styles.menuItem}
+              onClick={() => {
+                close();
+                onEditText();
+              }}
+            >
+              <Icon icon="edit" size={16} />
+              {t('localities.funn.actions.edit')}
+            </button>
+            <button
+              type="button"
+              className={styles.menuItem}
+              onClick={() => {
+                close();
+                onEditGeometry();
+              }}
+            >
+              <Icon icon="draw" size={16} />
+              {t('localities.funn.actions.editGeometry')}
+            </button>
+            <button
+              type="button"
+              className={cx(styles.menuItem, styles.menuItemDanger)}
+              onClick={() => setConfirming(true)}
+            >
+              <Icon icon="delete" size={16} />
+              {t('localities.funn.actions.delete')}
+            </button>
+          </div>
+        )}
+      </div>
+    </Popover>
   );
 };
 
@@ -285,28 +277,23 @@ const FunnRow = ({
   };
 
   return (
-    <Box
+    <div
       ref={rowRef}
-      borderWidth="1px"
-      borderLeftWidth="3px"
-      borderColor={selected ? 'green.500' : 'gray.200'}
-      borderLeftColor={selected ? 'green.500' : 'gray.200'}
-      borderRadius="md"
-      bg={selected ? 'green.50' : undefined}
-      p={2}
-      cursor={editing ? undefined : 'pointer'}
-      _hover={editing ? undefined : { bg: selected ? 'green.50' : 'gray.50' }}
+      className={cx(
+        styles.row,
+        selected && styles.rowSelected,
+        editing && styles.rowEditing,
+      )}
       onMouseEnter={() => setHovered(funn.id)}
       onMouseLeave={() => setHovered(null)}
       onClick={() => !editing && onSelect(funn)}
       title={editing ? undefined : t('localities.funn.actions.zoom')}
     >
-      <Flex justify="space-between" align="flex-start" gap={2}>
-        <Box flex="1" minW={0}>
+      <div className={styles.head}>
+        <div className={styles.main}>
           {editing ? (
-            <Stack gap={1.5}>
+            <div className={styles.editor}>
               <Input
-                size="sm"
                 value={title}
                 autoFocus
                 onChange={(e) => setTitle(e.target.value)}
@@ -319,11 +306,10 @@ const FunnRow = ({
                 onBlur={commit}
                 placeholder={t('localities.funn.draft.notePlaceholder')}
               />
-              <Flex justify="flex-end">
+              <div className={styles.editorActions}>
                 <Button
                   size="xs"
                   variant="secondary"
-                  colorPalette="green"
                   onClick={() => {
                     commit();
                     setEditing(false);
@@ -331,23 +317,17 @@ const FunnRow = ({
                 >
                   {t('localities.funn.actions.done')}
                 </Button>
-              </Flex>
-            </Stack>
+              </div>
+            </div>
           ) : (
             <>
-              <Text fontWeight="semibold" fontSize="sm" lineClamp={1}>
-                {funn.title}
-              </Text>
-              {funn.note && (
-                <Text fontSize="xs" color="gray.600" lineClamp={2}>
-                  {funn.note}
-                </Text>
-              )}
+              <div className={styles.title}>{funn.title}</div>
+              {funn.note && <div className={styles.note}>{funn.note}</div>}
             </>
           )}
-        </Box>
+        </div>
         {!editing && (
-          <HStack gap={0.5} flexShrink={0}>
+          <div className={styles.actions}>
             <StatusPicker
               value={funn.status}
               editable={editable}
@@ -360,10 +340,10 @@ const FunnRow = ({
                 onDelete={() => onDelete(funn)}
               />
             )}
-          </HStack>
+          </div>
         )}
-      </Flex>
-    </Box>
+      </div>
+    </div>
   );
 };
 
@@ -394,25 +374,19 @@ export const FunnList = ({
 
   if (items == null) {
     return (
-      <Flex align="center" gap={2}>
-        <Spinner size="xs" />
-        <Text fontSize="xs" color="gray.500">
-          {t('localities.funn.loading')}
-        </Text>
-      </Flex>
+      <div className={styles.busy}>
+        <Spinner size={14} />
+        {t('localities.funn.loading')}
+      </div>
     );
   }
 
   if (items.length === 0) {
-    return (
-      <Text fontSize="xs" color="gray.600">
-        {t('localities.funn.empty')}
-      </Text>
-    );
+    return <p className={styles.empty}>{t('localities.funn.empty')}</p>;
   }
 
   return (
-    <Stack gap={1.5}>
+    <div className={styles.list}>
       {items.map((f) => (
         <FunnRow
           key={f.id}
@@ -426,6 +400,6 @@ export const FunnList = ({
           onDelete={onDelete}
         />
       ))}
-    </Stack>
+    </div>
   );
 };

@@ -7,11 +7,11 @@ import styles from './Section.module.css';
 
 /*
  * Collapsible block with a heading, a count and an optional action on the
- * header row. Successor to WorkspaceSection in src/localities/ui.tsx.
+ * header row.
  *
- * Controlled, unlike its predecessor, which reached into openSectionsAtom
- * itself. The tray needs the same block for sections whose open state is not
- * in that atom, so the binding moves out to the call site.
+ * Controlled, unlike the workspace's own version, which reached into
+ * openSectionsAtom itself. The tray needs the same block for sections whose
+ * open state is not in that atom, so the binding moves out to the call site.
  *
  * Content is unmounted while collapsed. That is a change from the kvib
  * Collapsible, and the point of it: the Bilder gallery fetches short-lived

@@ -1,23 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Dialog,
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  Flex,
-  HStack,
-  Icon,
-  IconButton,
-  Input,
-  MaterialSymbol,
-  SimpleGrid,
-  Spinner,
-  Stack,
-  Text,
-  toaster,
-} from '@kvib/react';
+import { toaster } from '@kvib/react';
 import { useSetAtom } from 'jotai';
 import type { ChangeEvent, Dispatch, SetStateAction } from 'react';
 import { useEffect, useRef, useState } from 'react';
@@ -25,14 +6,22 @@ import { useTranslation } from 'react-i18next';
 import {
   AttachmentKind,
   AttachmentRecord,
-  createAttachment,
   deleteAttachment,
   getAttachmentUrl,
   updateAttachmentCaption,
 } from '../api/attachments';
-import { LocalityRecord } from '../api/localities';
+import {
+  Badge,
+  Button,
+  Dialog,
+  Icon,
+  IconButton,
+  Input,
+  type MaterialSymbol,
+  Spinner,
+} from '../ui';
 import { lightboxOpenAtom } from './atoms';
-import { ConfirmPopover } from './ui';
+import styles from './BilderSection.module.css';
 
 // `landscape` is what the ribbon already uses for LiDAR mode, so an
 // extract carries the same mark here. (Material Symbols' `terrain` isn't
@@ -84,16 +73,10 @@ const MetaLine = ({ rec }: { rec: AttachmentRecord }) => {
   const parts = [
     typeof meta.sourceLabel === 'string' ? meta.sourceLabel : null,
     typeof meta.style === 'string' ? meta.style : null,
-    typeof meta.metresPerPx === 'number'
-      ? `${meta.metresPerPx} m/px`
-      : null,
+    typeof meta.metresPerPx === 'number' ? `${meta.metresPerPx} m/px` : null,
   ].filter((s): s is string => !!s);
   if (parts.length === 0) return null;
-  return (
-    <Text fontSize="xs" color="gray.500" lineClamp={2}>
-      {parts.join(' · ')}
-    </Text>
-  );
+  return <p className={styles.metaLine}>{parts.join(' · ')}</p>;
 };
 
 const Thumb = ({
@@ -105,59 +88,31 @@ const Thumb = ({
 }) => {
   const { url, onError } = useAttachmentUrl(rec, '200x200');
   return (
-    <Stack gap={0.5}>
-      <Box
-        as="button"
-        onClick={onOpen}
-        position="relative"
-        w="100%"
-        aspectRatio={1}
-        borderRadius="md"
-        overflow="hidden"
-        borderWidth="1px"
-        borderColor="gray.200"
-        bg="gray.100"
-        cursor="pointer"
+    <div className={styles.cell}>
+      <button
+        type="button"
+        className={styles.tile}
         title={rec.caption || rec.kind}
-        _hover={{ borderColor: 'green.500' }}
+        onClick={onOpen}
       >
         {url ? (
           <img
             src={url}
             alt={rec.caption || rec.kind}
             onError={onError}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              display: 'block',
-            }}
+            className={styles.tileImage}
           />
         ) : (
-          <Flex align="center" justify="center" h="100%">
-            <Spinner size="xs" />
-          </Flex>
+          <span className={styles.tileBusy}>
+            <Spinner size={14} />
+          </span>
         )}
-        <Box
-          position="absolute"
-          bottom="4px"
-          left="4px"
-          bg="rgba(0, 0, 0, 0.55)"
-          color="white"
-          borderRadius="sm"
-          px={1}
-          display="flex"
-          alignItems="center"
-        >
+        <span className={styles.kindMark}>
           <Icon icon={KIND_ICON[rec.kind]} size={14} />
-        </Box>
-      </Box>
-      {rec.caption && (
-        <Text fontSize="10px" color="gray.600" lineClamp={1}>
-          {rec.caption}
-        </Text>
-      )}
-    </Stack>
+        </span>
+      </button>
+      {rec.caption && <div className={styles.caption}>{rec.caption}</div>}
+    </div>
   );
 };
 
@@ -184,6 +139,11 @@ const Lightbox = ({
   const rec = items[index] ?? null;
   const { url, onError } = useAttachmentUrl(rec, '800x0');
   const [caption, setCaption] = useState(rec?.caption ?? '');
+  // Confirm inline rather than with ConfirmPopover: a modal <dialog> paints
+  // in the browser's top layer, and Popover portals to <body> — which is
+  // underneath it and inert. Any anchored overlay inside a dialog has to be
+  // rendered as part of the dialog's own subtree.
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     setCaption(rec?.caption ?? '');
@@ -223,136 +183,127 @@ const Lightbox = ({
   return (
     <Dialog
       open
-      placement="center"
-      size="xl"
-      onOpenChange={(e) => !e.open && onClose()}
-    >
-      <DialogContent>
-        <DialogBody p={4}>
-          <Stack gap={3}>
-            <Flex
-              align="center"
-              justify="center"
-              bg="gray.900"
-              borderRadius="md"
-              minH="200px"
-              maxH="60vh"
-              overflow="hidden"
-              position="relative"
-            >
-              {url ? (
-                <img
-                  src={url}
-                  alt={rec.caption || rec.kind}
-                  onError={onError}
-                  style={{
-                    maxWidth: '100%',
-                    maxHeight: '60vh',
-                    objectFit: 'contain',
-                    display: 'block',
-                  }}
-                />
-              ) : (
-                <Spinner size="md" />
-              )}
-              {items.length > 1 && (
-                <>
-                  <IconButton
-                    icon="chevron_left"
-                    aria-label={t('localities.bilder.previous')}
-                    position="absolute"
-                    left="8px"
-                    variant="solid"
-                    size="sm"
-                    borderRadius="full"
-                    disabled={index === 0}
-                    onClick={() => onIndex(index - 1)}
-                  />
-                  <IconButton
-                    icon="chevron_right"
-                    aria-label={t('localities.bilder.next')}
-                    position="absolute"
-                    right="8px"
-                    variant="solid"
-                    size="sm"
-                    borderRadius="full"
-                    disabled={index === items.length - 1}
-                    onClick={() => onIndex(index + 1)}
-                  />
-                </>
-              )}
-            </Flex>
-
-            <Flex align="center" gap={2}>
-              <Badge colorPalette="gray" size="sm">
-                {t(`localities.bilder.kind.${rec.kind}`)}
-              </Badge>
-              <Text fontSize="xs" color="gray.500">
-                {index + 1} / {items.length}
-              </Text>
-            </Flex>
-
-            <Input
+      onOpenChange={(next) => !next && onClose()}
+      title={t('localities.bilder.heading')}
+      closeLabel={t('shared.close')}
+      className={styles.lightbox}
+      footer={
+        confirming ? (
+          <>
+            <span className={styles.confirmText}>
+              {t('localities.bilder.confirmDelete')}
+            </span>
+            <Button
               size="sm"
-              value={caption}
-              disabled={!isMine}
-              placeholder={t('localities.bilder.captionPlaceholder')}
-              maxLength={200}
-              onChange={(e) => setCaption(e.target.value)}
-              onBlur={commitCaption}
-            />
-            <MetaLine rec={rec} />
-
-            <HStack justify="flex-end">
+              palette="gray"
+              onClick={() => setConfirming(false)}
+            >
+              {t('shared.cancel')}
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              palette="red"
+              onClick={() => onDeleted(rec)}
+            >
+              {t('localities.bilder.delete')}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button size="sm" leftIcon="open_in_new" onClick={openOriginal}>
+              {t('localities.bilder.openOriginal')}
+            </Button>
+            {isMine && (
               <Button
                 size="sm"
-                variant="tertiary"
-                leftIcon="open_in_new"
-                onClick={openOriginal}
+                palette="red"
+                leftIcon="delete"
+                onClick={() => setConfirming(true)}
               >
-                {t('localities.bilder.openOriginal')}
+                {t('localities.bilder.delete')}
               </Button>
-              {isMine && (
-                <ConfirmPopover
-                  title={t('localities.bilder.confirmDelete')}
-                  confirmLabel={t('localities.bilder.delete')}
-                  onConfirm={() => onDeleted(rec)}
-                  trigger={
-                    <Button
-                      size="sm"
-                      variant="tertiary"
-                      colorPalette="red"
-                      leftIcon="delete"
-                    >
-                      {t('localities.bilder.delete')}
-                    </Button>
-                  }
-                />
-              )}
-            </HStack>
-          </Stack>
-        </DialogBody>
-        <DialogCloseTrigger />
-      </DialogContent>
+            )}
+          </>
+        )
+      }
+    >
+      <div className={styles.viewer}>
+        <div className={styles.stage}>
+          {url ? (
+            <img
+              src={url}
+              alt={rec.caption || rec.kind}
+              onError={onError}
+              className={styles.stageImage}
+            />
+          ) : (
+            <Spinner size={28} />
+          )}
+          {items.length > 1 && (
+            <>
+              <IconButton
+                icon="chevron_left"
+                aria-label={t('localities.bilder.previous')}
+                palette="gray"
+                className={styles.navPrev}
+                disabled={index === 0}
+                onClick={() => onIndex(index - 1)}
+              />
+              <IconButton
+                icon="chevron_right"
+                aria-label={t('localities.bilder.next')}
+                palette="gray"
+                className={styles.navNext}
+                disabled={index === items.length - 1}
+                onClick={() => onIndex(index + 1)}
+              />
+            </>
+          )}
+        </div>
+
+        <div className={styles.viewerMeta}>
+          <Badge>{t(`localities.bilder.kind.${rec.kind}`)}</Badge>
+          <span className={styles.counter}>
+            {index + 1} / {items.length}
+          </span>
+        </div>
+
+        <Input
+          value={caption}
+          disabled={!isMine}
+          placeholder={t('localities.bilder.captionPlaceholder')}
+          maxLength={200}
+          onChange={(e) => setCaption(e.target.value)}
+          onBlur={commitCaption}
+        />
+        <MetaLine rec={rec} />
+      </div>
     </Dialog>
   );
 };
 
+/**
+ * The Bilder column of the tray.
+ *
+ * Upload lives in the workspace controller rather than here: the same verb
+ * is on the lokalitet ribbon row, and two copies of the create-attachment
+ * call would be two places to keep the optimistic list update right.
+ */
 export const BilderSection = ({
-  locality,
-  userId,
   isMine,
   items,
   setItems,
+  uploading,
+  onUpload,
 }: {
-  locality: LocalityRecord;
-  userId: string;
   isMine: boolean;
   items: AttachmentRecord[] | null;
   setItems: Dispatch<SetStateAction<AttachmentRecord[] | null>>;
+  uploading: boolean;
+  onUpload: (file: File) => void;
 }) => {
   const { t } = useTranslation();
-  const [uploading, setUploading] = useState(false);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const setLightboxOpen = useSetAtom(lightboxOpenAtom);
@@ -363,25 +314,10 @@ export const BilderSection = ({
     return () => setLightboxOpen(false);
   }, [openIndex, setLightboxOpen]);
 
-  const onUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+  const pickFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file) return;
-    setUploading(true);
-    try {
-      const rec = await createAttachment(
-        { locality: locality.id, kind: 'upload', caption: file.name },
-        userId,
-        file,
-        file.name,
-      );
-      setItems((prev) => (prev ? [rec, ...prev] : [rec]));
-    } catch (err) {
-      console.warn('[BilderSection] upload failed', err);
-      toaster.error({ title: t('localities.bilder.uploadFailed') });
-    } finally {
-      setUploading(false);
-    }
+    if (file) onUpload(file);
   };
 
   const remove = async (rec: AttachmentRecord) => {
@@ -409,72 +345,50 @@ export const BilderSection = ({
 
   if (items == null) {
     return (
-      <Flex align="center" gap={2}>
-        <Spinner size="xs" />
-        <Text fontSize="xs" color="gray.500">
-          {t('localities.bilder.loading')}
-        </Text>
-      </Flex>
+      <div className={styles.busy}>
+        <Spinner size={14} />
+        {t('localities.bilder.loading')}
+      </div>
     );
   }
 
   return (
     <>
       {items.length === 0 && (
-        <Text fontSize="xs" color="gray.600" mb={2}>
-          {t('localities.bilder.empty')}
-        </Text>
+        <p className={styles.empty}>{t('localities.bilder.empty')}</p>
       )}
-      <SimpleGrid columns={3} gap={2}>
+      <div className={styles.grid}>
         {isMine && (
           <>
             <input
               ref={fileInputRef}
               type="file"
               accept="image/png,image/jpeg,image/webp"
-              style={{ display: 'none' }}
-              onChange={onUpload}
+              hidden
+              onChange={pickFile}
             />
-            <Box
-              as="button"
-              w="100%"
-              aspectRatio={1}
-              borderRadius="md"
-              borderWidth="1px"
-              borderStyle="dashed"
-              borderColor="gray.300"
-              color="gray.500"
-              display="flex"
-              flexDirection="column"
-              alignItems="center"
-              justifyContent="center"
-              gap={0.5}
-              cursor="pointer"
-              _hover={{ borderColor: 'green.500', color: 'green.600' }}
-              // Inert rather than `disabled` while an upload runs: this is
-              // a Box, so it takes style props, not button attributes.
-              pointerEvents={uploading ? 'none' : undefined}
-              opacity={uploading ? 0.6 : 1}
-              onClick={() => fileInputRef.current?.click()}
+            <button
+              type="button"
+              className={styles.addTile}
+              disabled={uploading}
               title={t('localities.bilder.upload')}
+              onClick={() => fileInputRef.current?.click()}
             >
               {uploading ? (
-                <Spinner size="sm" />
+                <Spinner size={18} />
               ) : (
                 <Icon icon="add_photo_alternate" size={22} />
               )}
-              <Text fontSize="10px">
-                {uploading
-                  ? t('localities.bilder.uploading')
-                  : t('localities.bilder.upload')}
-              </Text>
-            </Box>
+              {uploading
+                ? t('localities.bilder.uploading')
+                : t('localities.bilder.upload')}
+            </button>
           </>
         )}
         {items.map((rec, i) => (
           <Thumb key={rec.id} rec={rec} onOpen={() => setOpenIndex(i)} />
         ))}
-      </SimpleGrid>
+      </div>
 
       {openIndex != null && (
         <Lightbox

@@ -1,4 +1,3 @@
-import { Flex, Stack, Text } from '@kvib/react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -6,18 +5,17 @@ import {
   LocalityRecord,
   LocalityVisibility,
 } from '../api/localities';
+import { NoteInput, Segmented } from '../ui';
 import { formatDate } from './format';
-import { NoteInput, Segmented } from './ui';
+import styles from './LocalityDetails.module.css';
 
 const VISIBILITY_ORDER: LocalityVisibility[] = ['private', 'limited', 'public'];
 
 const Fact = ({ label, value }: { label: string; value: string }) => (
-  <Flex justify="space-between" gap={3} fontSize="xs">
-    <Text color="gray.500">{label}</Text>
-    <Text color="gray.700" textAlign="right" lineClamp={1}>
-      {value}
-    </Text>
-  </Flex>
+  <div className={styles.fact}>
+    <span className={styles.factLabel}>{label}</span>
+    <span className={styles.factValue}>{value}</span>
+  </div>
 );
 
 // Everything you set once and then stop looking at, folded away by
@@ -46,28 +44,29 @@ export const LocalityDetails = ({
   };
 
   return (
-    <Stack gap={3}>
-      <Stack gap={1}>
-        <Text fontSize="xs" fontWeight="semibold" color="gray.600">
+    <div className={styles.root}>
+      <div className={styles.group}>
+        <span className={styles.label}>
           {t('localities.workspace.description')}
-        </Text>
+        </span>
         <NoteInput
           value={description}
           onChange={setDescription}
           onBlur={commitDescription}
           placeholder={t('localities.workspace.descriptionPlaceholder')}
-          rows={3}
+          minRows={3}
           disabled={!isMine}
         />
-      </Stack>
+      </div>
 
-      <Stack gap={1}>
-        <Text fontSize="xs" fontWeight="semibold" color="gray.600">
+      <div className={styles.group}>
+        <span className={styles.label}>
           {t('localities.workspace.visibility')}
-        </Text>
+        </span>
         <Segmented<LocalityVisibility>
           value={locality.visibility}
           disabled={!isMine}
+          label={t('localities.workspace.visibility')}
           onChange={(v) => onPatch({ visibility: v })}
           options={VISIBILITY_ORDER.map((v) => ({
             value: v,
@@ -75,13 +74,13 @@ export const LocalityDetails = ({
           }))}
         />
         {locality.visibility === 'limited' && (
-          <Text fontSize="xs" color="gray.500">
+          <span className={styles.hint}>
             {t('localities.visibility.limitedHint')}
-          </Text>
+          </span>
         )}
-      </Stack>
+      </div>
 
-      <Stack gap={1}>
+      <div className={styles.group}>
         {locality.expand?.owner && (
           <Fact
             label={t('localities.workspace.owner')}
@@ -96,7 +95,7 @@ export const LocalityDetails = ({
           label={t('localities.workspace.updated')}
           value={formatDate(locality.updated, i18n.language)}
         />
-      </Stack>
-    </Stack>
+      </div>
+    </div>
   );
 };

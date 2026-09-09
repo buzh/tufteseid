@@ -418,7 +418,8 @@
       "kind": {
         "extract": "LiDAR-uttrekk",
         "screenshot": "Skjermbilde",
-        "upload": "Opplastet"
+        "upload": "Opplastet",
+        "flyfoto": "Flyfoto"
       }
     },
     "tools": {
@@ -554,6 +555,10 @@
       "moreStyles": "{{count}} flere stiler",
       "modelLabel": "Høydemodell",
       "modelTip": "DTM = terreng (vegetasjon fjernet), DOM = overflate (bygg og trær). Bytt med E"
+    },
+    "tray": {
+      "show": "Vis innhold",
+      "hide": "Skjul innhold"
     }
   }
 }

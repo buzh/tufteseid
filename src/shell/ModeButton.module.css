@@ -38,6 +38,16 @@
   outline-offset: 1px;
 }
 
+.button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.button:disabled:hover {
+  background: transparent;
+  color: var(--c-fg-muted);
+}
+
 .active,
 .active:hover {
   background: var(--c-accent);

@@ -7,6 +7,7 @@ export const ModeButton = ({
   tooltip,
   active,
   badge,
+  disabled,
   onClick,
 }: {
   icon: MaterialSymbol;
@@ -14,6 +15,7 @@ export const ModeButton = ({
   tooltip?: string;
   active?: boolean;
   badge?: number;
+  disabled?: boolean;
   onClick: () => void;
 }) => (
   <Tooltip label={tooltip ?? label}>
@@ -23,6 +25,7 @@ export const ModeButton = ({
         className={cx(styles.button, active && styles.active)}
         aria-pressed={active}
         aria-label={tooltip ?? label}
+        disabled={disabled}
         onClick={onClick}
       >
         <Icon icon={icon} size={21} filled={active} />

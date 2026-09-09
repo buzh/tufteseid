@@ -20,6 +20,12 @@ export const workspaceModeAtom = atom<WorkspaceMode>((get) =>
   get(funnDraftActiveAtom) ? 'draft' : (get(ribbonToolAtom) ?? 'browse'),
 );
 
+// Whether the tray (funn / bilder / kulturminner / detaljer) is unfolded.
+// Module-level rather than component state because the tray unmounts
+// whenever a tool takes the surface over, and folding it away should not be
+// undone by a trip through the terrain panel.
+export const trayOpenAtom = atom(true);
+
 // Pending bbox for the grow-to-fit prompt; non-null means the modal is up.
 // An atom rather than component state because the keyboard layer has to
 // stand down while it shows, and once the panel is split into ribbon rows
