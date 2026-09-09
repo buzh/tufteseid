@@ -26,10 +26,6 @@ import { ErrorBoundary } from './shared/ErrorBoundary';
 import { useIsMobileScreen } from './shared/hooks';
 import { TopBar } from './TopBar';
 
-// Drawing, LiDAR extract and the lokalitet workspace are deliberately NOT
-// MapTools. See docs/ui-architecture.md §1.
-export type MapTool = 'layers' | 'measure' | 'localities' | null;
-
 export const Layout = () => {
   const isMobile = useIsMobileScreen();
   const activeLocality = useAtomValue(activeLocalityAtom);

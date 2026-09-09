@@ -57,7 +57,7 @@ import {
   LidarViewportEntry,
 } from './map/layers/config/backgroundLayers/lidarRelevance';
 import { ThemeLayerName } from './map/layers/themeWMS';
-import { mapToolAtom } from './map/overlay/atoms';
+import { type MapTool, mapToolAtom } from './map/overlay/atoms';
 import { type CycleKey, useRegisterLidarCycle } from './map/useLidarCyclingKeys';
 import { MeasurePopover } from './measure/MeasurePopover';
 import {
@@ -65,7 +65,6 @@ import {
   searchQueryAtom,
   useResetSearchResults,
 } from './search/atoms';
-import type { MapTool } from './Layout';
 
 // Small count pill, absolutely positioned over whatever it's nested in.
 // Shared by the LiDAR/Kartlag toggle buttons and the style-pulldown chip.
