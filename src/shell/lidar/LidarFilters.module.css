@@ -1,0 +1,29 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin: 0 var(--sp-3) var(--sp-3);
+  padding: var(--sp-4);
+  border-radius: var(--radius-md);
+  background: var(--c-bg-subtle);
+}
+
+.label {
+  display: block;
+  margin-bottom: var(--sp-1);
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+/* Raw range input, as everywhere else in this app: the styled sliders in
+   the component libraries we have tried drop frames while dragging, and
+   these are all live-preview controls. */
+.range {
+  display: block;
+  width: 100%;
+  accent-color: var(--c-accent);
+}
+
+.reset {
+  align-self: flex-start;
+}

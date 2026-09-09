@@ -1,0 +1,159 @@
+/*
+ * Rows inside the dataset and style pulldowns. Single-line and borderless
+ * because a viewport can turn up RENDER_CAP entries and the list still has
+ * to fit on screen.
+ */
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  width: 100%;
+  padding: var(--sp-3) var(--sp-4);
+  border: 0;
+  border-left: 3px solid transparent;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item:hover {
+  background: var(--c-bg-hover);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+
+.itemActive {
+  border-left-color: var(--c-accent);
+  background: var(--c-accent-subtle);
+}
+
+.itemActive:hover {
+  background: var(--c-green-100);
+}
+
+.itemLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-sm);
+  color: var(--c-fg);
+}
+
+.itemActive .itemLabel {
+  font-weight: 600;
+}
+
+.itemMeta {
+  flex: none;
+  white-space: nowrap;
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+/* Overflow group trigger — chevron first, same shape as the theme layer
+   picker's subtheme rows. */
+.disclosure {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-3) var(--sp-4);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.disclosure:hover {
+  background: var(--c-bg-hover);
+}
+
+.chevron {
+  transition: transform 120ms ease;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+/*
+ * Pulldown trigger. `position: relative` so the count badge can overhang the
+ * top-right corner, and a max-width so a sixty-character project name
+ * truncates instead of shoving the rest of the row onto a second line.
+ */
+.trigger {
+  position: relative;
+  display: inline-flex;
+}
+
+.triggerButton {
+  max-width: 240px;
+}
+
+/* A project name can run to sixty characters. Truncate inside the chip
+   rather than letting it set the width of the whole row. */
+.triggerLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.triggerBadge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  pointer-events: none;
+  border: 2px solid var(--c-bg);
+}
+
+/* Panel scaffolding shared by both pulldowns. */
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+.hint {
+  padding: var(--sp-2) var(--sp-4) var(--sp-3);
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+.rule {
+  height: 1px;
+  margin: var(--sp-2) var(--sp-4);
+  background: var(--c-border);
+}
+
+.busy {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  font-size: var(--font-sm);
+  color: var(--c-fg-subtle);
+}
+
+/*
+ * Only the list scrolls. The header, the filter panel and the national
+ * mosaic row stay put — they are the parts you reach for after scrolling
+ * to the bottom of a long list and deciding against all of it.
+ */
+.list {
+  max-height: min(45vh, 300px);
+  overflow-y: auto;
+}

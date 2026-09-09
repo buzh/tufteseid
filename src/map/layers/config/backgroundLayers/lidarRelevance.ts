@@ -90,7 +90,7 @@ export const lidarFilterSettingsAtom = atom<LidarFilterSettings>(
   DEFAULT_LIDAR_FILTERS,
 );
 
-// One entry per viewport candidate, shared by the TopBar picker (list
+// One entry per viewport candidate, shared by the ribbon picker (list
 // rows) and the map footprint layer (drawn shapes) so both read off a
 // single fetch/classify pass instead of duplicating the WFS call.
 export type LidarViewportEntry = {
@@ -144,7 +144,7 @@ export const lidarViewportAtom = atom<LidarViewportState>(
   emptyLidarViewport('idle'),
 );
 
-// Whether the TopBar's LiDAR dataset pulldown is open. The footprint
+// Whether the ribbon's LiDAR dataset pulldown is open. The footprint
 // polygons are a picking aid, not a persistent overlay — they'd only
 // clutter the terrain the user came to read — so the drawn shapes hang
 // off this, and go away the moment the pulldown closes (selecting a
@@ -156,8 +156,8 @@ export const lidarPickerOpenAtom = atom(false);
 // WFS fetch — but with no pulldown and no polygons on the map, which is
 // the whole point of cycling from the keyboard. Hence two atoms: this
 // one keeps the *data* current, lidarPickerOpenAtom decides whether
-// anything is *drawn*. TopBar clears it after an idle period so panning
-// around long after the last keypress doesn't keep refetching.
+// anything is *drawn*. useLidarControls clears it after an idle period, so
+// panning around long after the last keypress doesn't keep refetching.
 export const lidarCyclingAtom = atom(false);
 
 // The pulldown row the pointer (or keyboard focus) is currently on. Only

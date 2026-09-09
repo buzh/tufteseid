@@ -10,9 +10,9 @@ import { SearchComponent } from '../search/SearchComponent';
 import { InfoBox } from '../search/infobox/InfoBox';
 import { ErrorBoundary } from '../shared/ErrorBoundary';
 import { useIsMobileScreen } from '../shared/hooks';
-import { TopBar } from '../TopBar';
 import { cx } from '../ui/cx';
 import styles from './AppShell.module.css';
+import { Ribbon } from './Ribbon';
 import { useMapSideEffects } from './useMapSideEffects';
 
 export const AppShell = () => {
@@ -41,9 +41,7 @@ export const AppShell = () => {
 
         <div className={styles.overlay}>
           <div className={styles.ribbon}>
-            <ErrorBoundary name="TopBar">
-              <TopBar />
-            </ErrorBoundary>
+            <Ribbon />
           </div>
 
           <div className={styles.row}>

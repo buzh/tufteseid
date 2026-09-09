@@ -508,5 +508,52 @@
       "hoydedataDescription": "Her får du oversikt over og tilgang til høydedata som Kartverket tilbyr på internett.",
       "hoydedataButton": "Gå til høydedata.no"
     }
+  },
+  "ribbon": {
+    "mode": {
+      "standard": "Standard",
+      "standardTip": "Standardkart",
+      "lidar": "LiDAR",
+      "lidarTip": "LiDAR-relieff (nasjonal mosaikk eller per prosjekt)",
+      "hybrid": "Hybrid",
+      "hybridTip": "LiDAR med vegar og stadnamn"
+    },
+    "heritage": {
+      "label": "Kulturminne",
+      "tip": "Lokalitetar og enkeltminne"
+    },
+    "layers": {
+      "tip": "Alle kulturminne-lag"
+    },
+    "flyfoto": {
+      "label": "Flyfoto ↗",
+      "tip": "Opne Norge i bilder for dette utsnittet (ny fane)"
+    },
+    "search": {
+      "clear": "Tøm søk"
+    },
+    "lidar": {
+      "datasetLabel": "LiDAR-datasett",
+      "datasetHead": "LiDAR-datasett · W/S",
+      "nationalMosaic": "Nasjonal mosaikk",
+      "nationalMeta": "heile Noreg",
+      "projectsHint": "Prosjekt, mest dekning først. Hald over for omriss.",
+      "loadingCatalogue": "Hentar katalog…",
+      "loadingFootprints": "Hentar omriss…",
+      "zoomedOut": "Zoom inn for å sjå kva for LiDAR-prosjekt som dekkjer området.",
+      "error": "Fekk ikkje henta prosjektomriss akkurat no. Prøv igjen, eller zoom litt inn.",
+      "empty": "Ingen LiDAR-prosjekt dekkjer dette utsnittet. Bruk nasjonal mosaikk, eller prøv ein annan stad.",
+      "lessRelevant": "{{count}} mindre relevante",
+      "filter": "Filter",
+      "filterMinYear": "Vis som hovudliste frå år: {{year}}",
+      "filterDense": "Rekn ≥5 pkt/m² som nytt nok",
+      "filterMinArea": "Minste del av synsfeltet: {{percent}}%",
+      "filterReset": "Tilbakestill filter",
+      "styleLabel": "Visingsstil",
+      "styleHead": "Visingsstil · A/D",
+      "moreStyles": "{{count}} fleire stilar",
+      "modelLabel": "Høgdemodell",
+      "modelTip": "DTM = terreng (vegetasjon fjerna), DOM = overflate (bygg og tre). Byt med E"
+    }
   }
 }

@@ -503,5 +503,52 @@
       "hoydedataDescription": "Here you can find an overview of and access to elevation data provided by Kartverket online",
       "hoydedataButton": "Go to hoydedata.no"
     }
+  },
+  "ribbon": {
+    "mode": {
+      "standard": "Standard",
+      "standardTip": "Standard map",
+      "lidar": "LiDAR",
+      "lidarTip": "LiDAR relief (national mosaic or per project)",
+      "hybrid": "Hybrid",
+      "hybridTip": "LiDAR with roads and place names"
+    },
+    "heritage": {
+      "label": "Heritage",
+      "tip": "Heritage sites and monuments"
+    },
+    "layers": {
+      "tip": "All heritage layers"
+    },
+    "flyfoto": {
+      "label": "Aerial ↗",
+      "tip": "Open Norge i bilder for this view (new tab)"
+    },
+    "search": {
+      "clear": "Clear search"
+    },
+    "lidar": {
+      "datasetLabel": "LiDAR dataset",
+      "datasetHead": "LiDAR dataset · W/S",
+      "nationalMosaic": "National mosaic",
+      "nationalMeta": "all of Norway",
+      "projectsHint": "Projects, most coverage first. Hover for outline.",
+      "loadingCatalogue": "Loading catalogue…",
+      "loadingFootprints": "Loading outlines…",
+      "zoomedOut": "Zoom in to see which LiDAR projects cover this area.",
+      "error": "Could not load project outlines right now. Try again, or zoom in a little.",
+      "empty": "No LiDAR project covers this view. Use the national mosaic, or try somewhere else.",
+      "lessRelevant": "{{count}} less relevant",
+      "filter": "Filter",
+      "filterMinYear": "Show in main list from year: {{year}}",
+      "filterDense": "Treat ≥5 pts/m² as recent enough",
+      "filterMinArea": "Minimum share of the view: {{percent}}%",
+      "filterReset": "Reset filter",
+      "styleLabel": "Visualization",
+      "styleHead": "Visualization · A/D",
+      "moreStyles": "{{count}} more styles",
+      "modelLabel": "Elevation model",
+      "modelTip": "DTM = terrain (vegetation removed), DOM = surface (buildings and trees). Switch with E"
+    }
   }
 }
