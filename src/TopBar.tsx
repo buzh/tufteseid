@@ -25,7 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { AuthButton } from './auth/AuthButton';
 import { isSignedInAtom } from './auth/atoms';
 import { lidarExtractViewerOpenAtom } from './lidarExtract/atoms';
-import { creatingLocalityAtom } from './localities/atoms';
+import { useCreateLocalityFromViewport } from './localities/createFromBbox';
 import { mapAtom } from './map/atoms';
 import { activeThemeLayersAtom } from './map/layers/atoms';
 import {
@@ -347,9 +347,11 @@ export const TopBar = () => {
     activeLidarProjectAtom,
   );
 
-  const [creatingLocality, setCreatingLocality] = useAtom(
-    creatingLocalityAtom,
-  );
+  // "Ny lokalitet" frames the visible map rather than arming a box drag.
+  // topInset is 0 while the bar is still a flow element above the map; the
+  // ribbon shell floats over it and will pass its own height.
+  const { create: createFromViewport, creating: creatingLocality } =
+    useCreateLocalityFromViewport();
 
   // Shared, not local state: the map-side footprint overlay is drawn
   // only while this pulldown is open, and only for the row under the
@@ -1071,8 +1073,8 @@ export const TopBar = () => {
             label={t('localities.topbar.newLocality')}
             active={creatingLocality}
             onClick={() => {
-              setCreatingLocality(!creatingLocality);
               setCurrentMapTool(null);
+              createFromViewport();
             }}
           />
         </>

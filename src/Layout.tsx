@@ -11,7 +11,6 @@ import {
   useLocalityClick,
 } from './localities/localityLayer';
 import { LocalityWorkspace } from './localities/LocalityWorkspace';
-import { useLocalityCreate } from './localities/useLocalityCreate';
 import { KulturminnerPopup } from './map/featureInfo/KulturminnerPopup';
 import { useFeatureInfoClick } from './map/featureInfo/useFeatureInfo';
 import { useLidarFootprintsLayer } from './map/lidarFootprintsLayer';
@@ -35,12 +34,11 @@ export const Layout = () => {
   useSearchEffects();
   useMapClickSearch();
   // Lokaliteter: rectangle layer (all visible records), funn layer (open
-  // lokalitet only), click-to-open, and the "Ny lokalitet" box drag.
+  // lokalitet only) and click-to-open.
   useLocalitiesLayer();
   useFunnLayer();
   useFunnHighlightLayer();
   useLocalityClick();
-  useLocalityCreate();
   useLidarFootprintsLayer();
   // A/D/W/S/E background cycling. Mounted here rather than in the TopBar
   // so the document listener outlives whatever renders the controls.

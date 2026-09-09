@@ -312,6 +312,7 @@
   "localities": {
     "defaultName": "Uten navn",
     "createFailed": "Kunne ikke opprette lokaliteten. Sjekk at du er innlogget og at serveren kjører oppdatert skjema (detaljer i nettleserkonsollen).",
+    "createTooLarge": "Skjermbildet dekker for stort område til å bli én lokalitet. Zoom inn og prøv igjen.",
     "byOwner": "av {{name}}",
     "summary": {
       "funn_one": "1 funn",

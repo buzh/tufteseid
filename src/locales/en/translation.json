@@ -307,6 +307,7 @@
   "localities": {
     "defaultName": "Untitled",
     "createFailed": "Could not create the locality. Check that you are signed in and the server runs the current schema (details in the browser console).",
+    "createTooLarge": "The view covers too large an area for one locality. Zoom in and try again.",
     "byOwner": "by {{name}}",
     "summary": {
       "funn_one": "1 find",
