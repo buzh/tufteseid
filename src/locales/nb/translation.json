@@ -241,7 +241,11 @@
         "polygon": "Flater"
       }
     },
-    "moreInfo": "Mer info"
+    "moreInfo": "Mer info",
+    "errorBoundary": {
+      "title": "Noe gikk galt her",
+      "retry": "Prøv igjen"
+    }
   },
   "tipsandtricks": {
     "heading": "Tips og triks",

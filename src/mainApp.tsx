@@ -10,11 +10,15 @@ import './index.css';
 import { projInit } from './map/projections/proj/projInit.ts';
 projInit();
 
+// Module scope, not inline in the element tree: constructing it there
+// makes any root re-render throw the whole query cache away.
+const queryClient = new QueryClient();
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AtomWrapper>
-        <QueryClientProvider client={new QueryClient()}>
+        <QueryClientProvider client={queryClient}>
           <KvibProvider>
             <App />
             <Toaster />

@@ -157,8 +157,8 @@ export const getFunnExtentOnLayer = (
   return extent as [number, number, number, number] | null;
 };
 
-// Mount from Layout. Follows the open lokalitet: hydrates its funn,
-// keeps them synced via realtime, empties when the workspace closes.
+// Mount from useMapSideEffects. Follows the open lokalitet: hydrates its
+// funn, keeps them synced via realtime, empties when the workspace closes.
 export const useFunnLayer = () => {
   const map = useAtomValue(mapAtom);
   const activeLocality = useAtomValue(activeLocalityAtom);

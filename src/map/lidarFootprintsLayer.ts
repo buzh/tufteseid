@@ -116,7 +116,8 @@ const getOrCreateLayer = (map: OlMap): VectorLayer => {
   return layer;
 };
 
-// Mount once (Layout.tsx) alongside the other map-effect hooks.
+// Mount once (src/shell/useMapSideEffects.ts) alongside the other
+// map-effect hooks.
 export const useLidarFootprintsLayer = () => {
   const map = useAtomValue(mapAtom);
   const backgroundLayer = useAtomValue(backgroundLayerAtom);

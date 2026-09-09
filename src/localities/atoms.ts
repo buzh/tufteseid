@@ -6,8 +6,8 @@ import { LocalityRecord } from '../api/localities';
 // workspace refreshes it after its own updates.
 export const activeLocalityAtom = atom<LocalityRecord | null>(null);
 
-// A funn is being drawn/edited in the workspace right now. Layout uses
-// this to mount the mobile bottom draw toolbar.
+// A funn is being drawn/edited in the workspace right now. The shell
+// uses this to mount the mobile bottom draw toolbar.
 export const funnDraftActiveAtom = atom<boolean>(false);
 
 // "Juster området": the open lokalitet's rectangle is move/resizable on

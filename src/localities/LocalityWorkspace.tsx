@@ -109,7 +109,7 @@ export const LocalityWorkspace = ({
   return (
     <Stack
       width="100%"
-      maxHeight="calc(100vh - 80px)"
+      maxHeight="100%"
       pointerEvents="auto"
       bg="white"
       shadow="lg"

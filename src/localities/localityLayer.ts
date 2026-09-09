@@ -138,8 +138,8 @@ export const hideLocalityOnLayer = (id: string) => {
   }
 };
 
-// Mount from Layout. Everything is behind sign-in: signed out, the layer
-// stays empty and we never hit PB.
+// Mount from useMapSideEffects. Everything is behind sign-in: signed out,
+// the layer stays empty and we never hit PB.
 export const useLocalitiesLayer = () => {
   const map = useAtomValue(mapAtom);
   const user = useAtomValue(currentUserAtom);

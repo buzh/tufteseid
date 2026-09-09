@@ -1,0 +1,35 @@
+.fallback {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin: var(--sp-2);
+  padding: var(--sp-3) var(--sp-5);
+  border: 1px solid var(--c-red-100);
+  border-radius: var(--radius-md);
+  background: var(--c-red-50);
+  color: var(--c-fg);
+  font-size: var(--font-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.retry {
+  flex: none;
+  border: 1px solid var(--c-red-100);
+  border-radius: var(--radius-sm);
+  background: var(--c-gray-0);
+  padding: var(--sp-1) var(--sp-4);
+  font: inherit;
+  font-size: var(--font-xs);
+  color: var(--c-danger);
+  cursor: pointer;
+}
+
+.retry:hover {
+  background: var(--c-red-50);
+}
+
+.retry:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 1px;
+}

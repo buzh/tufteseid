@@ -1,0 +1,114 @@
+/*
+ * The map is the window; the chrome floats over it.
+ *
+ * No ResizeObserver and no measured CSS variable for the ribbon's height:
+ * .overlay is an ordinary flow column that *contains* the ribbon, so the
+ * ribbon's natural height pushes the slots below it down with zero JS.
+ * Growing a ribbon row therefore costs nothing and — because the OL canvas
+ * never resizes — provokes no new GetMap requests, which matters against
+ * Kartverket's per-IP rate limit (docs/wms-proxy-and-tiles.md).
+ */
+
+.shell {
+  position: relative;
+  height: 100dvh;
+  width: 100dvw;
+  overflow: hidden;
+  background: var(--c-gray-200);
+}
+
+/*
+ * The OL target element's wrapper. Must stay a sibling of .overlay, never
+ * its parent: F11 calls requestFullscreen() on the map target, and
+ * parenting the chrome inside it would drag the chrome into fullscreen.
+ */
+.map {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-map);
+}
+
+/*
+ * pointer-events is load-bearing all the way down this tree. Every element
+ * here spans the whole viewport, so a single stray `auto` on a container
+ * stops the map being panned anywhere at all. Only leaf surfaces — the
+ * ribbon itself and the individual cards — turn it back on.
+ */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+
+.ribbon {
+  position: relative;
+  z-index: var(--z-ribbon);
+  flex: 0 0 auto;
+  pointer-events: auto;
+}
+
+/*
+ * Everything under the ribbon. The slots inside are absolutely positioned
+ * rather than laid out as flex children so that they may overlap — on a
+ * phone the left slot is full width and the infobox sits on top of it,
+ * which two flex items competing for the same row cannot do.
+ */
+.row {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  pointer-events: none;
+}
+
+/*
+ * Left slot: one occupant at a time, either a MapTool card or the lokalitet
+ * workspace (docs/ui-architecture.md §1). top/bottom give it a definite
+ * height, which is what replaced the old `calc(100vh - 65px)` guesses at
+ * the header height inside the cards — they can now just say 100%.
+ */
+.left {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 100%;
+  padding: var(--sp-5) 0 var(--sp-5) var(--sp-5);
+  overflow-y: auto;
+  pointer-events: none;
+}
+
+/* The workspace needs more room than a tool card. */
+@media (min-width: 48rem) {
+  .left {
+    max-width: 360px;
+  }
+
+  .leftWide {
+    max-width: 400px;
+  }
+}
+
+@media (min-width: 62rem) {
+  .left {
+    max-width: 400px;
+  }
+
+  .leftWide {
+    max-width: 440px;
+  }
+}
+
+/* Right slot: coordinate readout / search-result infobox. */
+.right {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--sp-5) var(--sp-5) 0 0;
+  pointer-events: none;
+}

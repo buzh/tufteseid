@@ -370,7 +370,7 @@ export const TopBar = () => {
   );
   const [lidarModel, setLidarModel] = useAtom(activeLidarModelAtom);
   // Coverage-confirmed, tiered, capped viewport data — fetched once (in
-  // lidarFootprintsLayer.ts, mounted from Layout) and shared with the map
+  // lidarFootprintsLayer.ts, mounted by the shell) and shared with the map
   // footprint overlay so both read off a single WFS call.
   const viewport = useAtomValue(lidarViewportAtom);
   const [cycling, setCycling] = useAtom(lidarCyclingAtom);

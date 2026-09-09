@@ -236,7 +236,11 @@
         "polygon": "Surfaces"
       }
     },
-    "moreInfo": "More info"
+    "moreInfo": "More info",
+    "errorBoundary": {
+      "title": "Something went wrong here",
+      "retry": "Try again"
+    }
   },
   "tipsandtricks": {
     "heading": "Tips and tricks",

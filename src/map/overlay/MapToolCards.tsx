@@ -125,7 +125,7 @@ const MapToolCard = ({
     <VStack
       width="100%"
       maxWidth={{ base: '100%', md: '345px' }}
-      maxHeight={isMobile ? '80dvh' : 'calc(100vh - 65px)'}
+      maxHeight={isMobile ? '80dvh' : '100%'}
       pointerEvents="auto"
       bg="#FFFF"
       shadow="lg"
