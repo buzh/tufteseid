@@ -1,0 +1,29 @@
+.spinner {
+  display: inline-block;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border-style: solid;
+  border-color: var(--c-gray-200);
+  border-top-color: var(--c-accent);
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Respect the OS setting: pulse instead of rotate, so the control still
+   reads as busy without motion. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    50% {
+      opacity: 0.35;
+    }
+  }
+}

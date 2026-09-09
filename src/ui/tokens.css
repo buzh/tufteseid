@@ -1,0 +1,121 @@
+/*
+ * Design tokens for the in-repo UI kit (src/ui/). Plain custom properties on
+ * :root — no theme provider, no runtime style injection, so nothing here
+ * needs `style-src 'unsafe-inline'` the way emotion does.
+ *
+ * The palette is deliberately our own rather than Kartverket's: CLAUDE.md
+ * rules out reintroducing their visual identity. It stays close to the greys
+ * the kvib components render while both systems coexist, so a half-migrated
+ * screen doesn't look broken.
+ */
+
+:root {
+  /* Neutrals. Text lives at 600–900, borders at 200–400, surfaces at 0–100. */
+  --c-gray-0: #ffffff;
+  --c-gray-50: #f7fafc;
+  --c-gray-100: #edf2f7;
+  --c-gray-200: #e2e8f0;
+  --c-gray-300: #cbd5e0;
+  --c-gray-400: #a0aec0;
+  --c-gray-500: #718096;
+  --c-gray-600: #4a5568;
+  --c-gray-700: #2d3748;
+  --c-gray-800: #1a202c;
+  --c-gray-900: #171923;
+
+  /* Accent. Reads as "map" without being anyone's brand green. */
+  --c-green-50: #edf7ef;
+  --c-green-100: #d0ecd6;
+  --c-green-200: #a9d9b4;
+  --c-green-400: #4fa45f;
+  --c-green-500: #3b8a4c;
+  --c-green-600: #2f7040;
+  --c-green-700: #245832;
+  --c-green-900: #14301c;
+
+  /* Status. Used by funn status, visibility and destructive actions. */
+  --c-red-50: #fff5f5;
+  --c-red-100: #fed7d7;
+  --c-red-500: #e53e3e;
+  --c-red-600: #c53030;
+  --c-blue-50: #ebf8ff;
+  --c-blue-100: #bee3f8;
+  --c-blue-300: #90cdf4;
+  --c-blue-600: #2b6cb0;
+  --c-yellow-50: #fffff0;
+  --c-yellow-100: #fefcbf;
+  --c-yellow-400: #ecc94b;
+  --c-yellow-600: #b7791f;
+
+  /* Draft orange — the authored-rectangle colour, shared with the OL styles
+     in src/localities/. Keep in sync if either side changes. */
+  --c-draft: #ff6a00;
+
+  /* Semantic aliases. Components reference these, not the ramp above, so a
+     palette change is one edit here. */
+  --c-fg: var(--c-gray-800);
+  --c-fg-muted: var(--c-gray-600);
+  --c-fg-subtle: var(--c-gray-500);
+  --c-fg-inverted: var(--c-gray-0);
+  --c-bg: var(--c-gray-0);
+  --c-bg-subtle: var(--c-gray-50);
+  --c-bg-muted: var(--c-gray-100);
+  --c-bg-hover: var(--c-gray-100);
+  --c-bg-active: var(--c-gray-200);
+  --c-border: var(--c-gray-200);
+  --c-border-strong: var(--c-gray-300);
+  --c-accent: var(--c-green-500);
+  --c-accent-hover: var(--c-green-600);
+  --c-accent-fg: var(--c-gray-0);
+  --c-accent-subtle: var(--c-green-50);
+  --c-danger: var(--c-red-600);
+  --c-danger-hover: #9b2626;
+  --c-focus: var(--c-green-500);
+
+  /* Space. 4px base; the ribbon is dense, so the small end gets more steps. */
+  --sp-0: 0;
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 12px;
+  --sp-6: 16px;
+  --sp-7: 20px;
+  --sp-8: 24px;
+  --sp-9: 32px;
+
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-full: 999px;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 8%);
+  --shadow-md: 0 2px 8px rgb(0 0 0 / 12%);
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 18%);
+
+  --font-xs: 11px;
+  --font-sm: 13px;
+  --font-md: 14px;
+  --font-lg: 16px;
+  --font-xl: 20px;
+
+  --ctl-h-sm: 24px;
+  --ctl-h-md: 30px;
+  --ctl-h-lg: 36px;
+
+  /*
+   * z ladder. Previously scattered across five files at 1 / 2 / 20 / 1000 /
+   * 9999; named here so the floating ribbon and the map overlay columns —
+   * now siblings in one stacking context — can be reasoned about.
+   *
+   * Native <dialog> + showModal() paints in the browser top layer, above
+   * every z-index in this list, which is why there is no --z-dialog.
+   */
+  --z-map: 0;
+  --z-map-controls: 1;
+  --z-overlay: 2;
+  --z-ribbon: 20;
+  --z-fixed: 1000; /* BottomDrawToolSelector, LidarExtractViewer */
+  --z-popover: 1200;
+  --z-tooltip: 1300;
+}

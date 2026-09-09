@@ -1,0 +1,27 @@
+/*
+ * Selectors are doubled to outrank `.material-symbols-rounded` from
+ * material-symbols/rounded.css, which sets font-variation-settings on the
+ * same element at equal specificity — whichever stylesheet Vite happens to
+ * emit last would otherwise win.
+ */
+.icon.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  user-select: none;
+  line-height: 1;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+}
+
+.filled.filled {
+  font-variation-settings:
+    'FILL' 1,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+}

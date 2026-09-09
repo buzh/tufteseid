@@ -1,0 +1,24 @@
+.anchor {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.tip {
+  position: fixed;
+  z-index: var(--z-tooltip);
+  max-width: 260px;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-md);
+  background: var(--c-gray-800);
+  color: var(--c-gray-0);
+  font-size: var(--font-xs);
+  line-height: 1.4;
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+}
+
+.measuring {
+  top: 0;
+  left: -9999px;
+  visibility: hidden;
+}
