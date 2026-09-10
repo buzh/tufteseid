@@ -337,6 +337,7 @@
       "upload": "Last opp",
       "uploading": "Laster opp…",
       "loading": "Henter bilder…",
+      "loadFailed": "Kunne ikke laste bildet.",
       "empty": "Ingen bilder enda. Kjør et LiDAR-uttrekk og trykk «Behold», eller last opp et bilde.",
       "confirmDelete": "Slette bildet? Handlingen kan ikke angres.",
       "uploadFailed": "Kunne ikke laste opp bildet. Prøv igjen.",

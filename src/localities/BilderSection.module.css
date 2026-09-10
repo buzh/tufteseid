@@ -52,6 +52,17 @@
   align-items: center;
   justify-content: center;
   height: 100%;
+  color: var(--c-fg-muted);
+}
+
+/* Over the dark lightbox stage, so not --c-fg-muted. */
+.stageError {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--c-gray-400);
+  font-size: var(--font-sm);
 }
 
 /* Which kind of image this is, legible over whatever it is sitting on. */

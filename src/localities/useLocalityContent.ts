@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AttachmentRecord,
   listLocalityAttachments,
@@ -32,32 +32,37 @@ const useCollection = <T extends { id: string; locality: string }>(
   label: string,
 ): LocalityContent<T> => {
   const [items, setItems] = useState<T[] | null>(null);
+  // Realtime events reload too, so "is this response still the newest one"
+  // can't be answered by the effect's cleanup alone — a burst of events
+  // starts several loads the effect never sees. A sequence number does
+  // answer it, and makes a late or failed response harmless instead of
+  // something that blanks a list that has since loaded.
+  const seq = useRef(0);
 
   const reload = useCallback(() => {
-    let cancelled = false;
+    const mine = ++seq.current;
     list(localityId)
       .then((data) => {
-        if (!cancelled) setItems(data);
+        if (seq.current === mine) setItems(data);
       })
       .catch((e) => {
+        if (seq.current !== mine) return;
         console.warn(`[${label}] load failed`, e);
-        if (!cancelled) setItems([]);
+        setItems([]);
       });
-    return () => {
-      cancelled = true;
-    };
     // `list` and `label` are module-level constants at every call site.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localityId]);
 
   useEffect(() => {
     setItems(null);
-    const cancel = reload();
+    reload();
     const unsub = subscribe((_action, rec) => {
       if (rec.locality === localityId) reload();
     });
     return () => {
-      cancel();
+      // Retire whatever is in flight; the next mount starts a newer one.
+      seq.current += 1;
       unsub();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

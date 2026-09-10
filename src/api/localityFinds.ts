@@ -44,6 +44,10 @@ export const listLocalityFinds = async (
   return pb.collection(COLLECTION).getFullList<LocalityFindRecord>({
     filter: pb.filter('locality = {:lid}', { lid: localityId }),
     sort: 'created',
+    // See listLocalityAttachments: reload-on-realtime-event means two of
+    // these overlap routinely, and auto-cancellation would turn the older
+    // one into a rejected promise the caller then logs as a load failure.
+    requestKey: null,
   });
 };
 

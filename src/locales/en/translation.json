@@ -337,6 +337,7 @@
       "upload": "Upload",
       "uploading": "Uploading…",
       "loading": "Loading images…",
+      "loadFailed": "Could not load the image.",
       "empty": "No images yet. Run a LiDAR extract and press \"Keep\", or upload an image.",
       "confirmDelete": "Delete the image? This cannot be undone.",
       "uploadFailed": "Could not upload the image. Try again.",

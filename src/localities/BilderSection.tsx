@@ -43,10 +43,12 @@ const useAttachmentUrl = (
 ) => {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     setUrl(null);
     setFailed(false);
+    setError(false);
   }, [rec?.id]);
 
   useEffect(() => {
@@ -56,7 +58,13 @@ const useAttachmentUrl = (
       .then((u) => {
         if (!cancelled) setUrl(u);
       })
-      .catch((e) => console.warn('[BilderSection] url failed', e));
+      .catch((e) => {
+        console.warn('[BilderSection] url failed', e);
+        // Say so. Left to itself the tile keeps its spinner up forever,
+        // which reads as "still loading" for something that will never
+        // arrive.
+        if (!cancelled) setError(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -65,7 +73,7 @@ const useAttachmentUrl = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rec?.id, rec?.file, thumb, failed]);
 
-  return { url, onError: () => setFailed(true) };
+  return { url, error, onError: () => setFailed(true) };
 };
 
 const MetaLine = ({ rec }: { rec: AttachmentRecord }) => {
@@ -86,13 +94,16 @@ const Thumb = ({
   rec: AttachmentRecord;
   onOpen: () => void;
 }) => {
-  const { url, onError } = useAttachmentUrl(rec, '200x200');
+  const { url, error, onError } = useAttachmentUrl(rec, '200x200');
+  const { t } = useTranslation();
   return (
     <div className={styles.cell}>
       <button
         type="button"
         className={styles.tile}
-        title={rec.caption || rec.kind}
+        title={
+          error ? t('localities.bilder.loadFailed') : rec.caption || rec.kind
+        }
         onClick={onOpen}
       >
         {url ? (
@@ -104,7 +115,11 @@ const Thumb = ({
           />
         ) : (
           <span className={styles.tileBusy}>
-            <Spinner size={14} />
+            {error ? (
+              <Icon icon="broken_image" size={18} />
+            ) : (
+              <Spinner size={14} />
+            )}
           </span>
         )}
         <span className={styles.kindMark}>
@@ -137,7 +152,7 @@ const Lightbox = ({
 }) => {
   const { t } = useTranslation();
   const rec = items[index] ?? null;
-  const { url, onError } = useAttachmentUrl(rec, '800x0');
+  const { url, error, onError } = useAttachmentUrl(rec, '800x0');
   const [caption, setCaption] = useState(rec?.caption ?? '');
   // Confirm inline rather than with ConfirmPopover: a modal <dialog> paints
   // in the browser's top layer, and Popover portals to <body> — which is
@@ -237,6 +252,11 @@ const Lightbox = ({
               onError={onError}
               className={styles.stageImage}
             />
+          ) : error ? (
+            <span className={styles.stageError}>
+              <Icon icon="broken_image" size={28} />
+              {t('localities.bilder.loadFailed')}
+            </span>
           ) : (
             <Spinner size={28} />
           )}

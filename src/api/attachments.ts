@@ -44,6 +44,11 @@ export const listLocalityAttachments = async (
   return pb.collection(COLLECTION).getFullList<AttachmentRecord>({
     filter: pb.filter('locality = {:lid}', { lid: localityId }),
     sort: '-created',
+    // The list reloads on every realtime event, so two of these are
+    // regularly in flight at once. The SDK's auto-cancellation would abort
+    // the older one and reject its promise; the caller sequences results
+    // itself (useLocalityContent), so let both finish.
+    requestKey: null,
   });
 };
 
@@ -91,15 +96,33 @@ export const deleteAttachment = async (id: string): Promise<void> => {
 
 // PB file tokens are valid ~2 minutes; cache one and refresh early so a
 // gallery of thumbnails costs a single token request, not one each.
-let fileToken: { token: string; fetchedAt: number } | null = null;
+//
+// The cache holds the *promise*, not the resolved token, and that is
+// load-bearing: a grid mounts all its thumbnails in the same tick, so
+// caching only the result still lets N requests leave before the first one
+// answers — and the SDK auto-cancels same-key requests, so N-1 of them
+// reject and those thumbnails spin forever. `requestKey: null` covers the
+// remaining window, where an entry expires while its request is still out.
+let fileToken: { token: Promise<string>; fetchedAt: number } | null = null;
 const FILE_TOKEN_MAX_AGE_MS = 100000;
 
-const getFileToken = async (): Promise<string> => {
+const getFileToken = (): Promise<string> => {
   const now = Date.now();
-  if (!fileToken || now - fileToken.fetchedAt > FILE_TOKEN_MAX_AGE_MS) {
-    fileToken = { token: await pb.files.getToken(), fetchedAt: now };
+  if (fileToken && now - fileToken.fetchedAt <= FILE_TOKEN_MAX_AGE_MS) {
+    return fileToken.token;
   }
-  return fileToken.token;
+  // Annotated because the catch handler refers back to `pending`, which
+  // would otherwise be a circular type inference.
+  const pending: Promise<string> = pb.files
+    .getToken({ requestKey: null })
+    .catch((e) => {
+      // A failure must not sit in the cache for the next 100 seconds of
+      // thumbnails — drop it so the next caller retries.
+      if (fileToken?.token === pending) fileToken = null;
+      throw e;
+    });
+  fileToken = { token: pending, fetchedAt: now };
+  return pending;
 };
 
 // Tokened URL for a protected attachment file. `thumb` takes the sizes
