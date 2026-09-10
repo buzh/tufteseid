@@ -31,6 +31,7 @@ import {
   adjustingLocalityAtom,
   funnDraftActiveAtom,
   lightboxOpenAtom,
+  marksHiddenAtom,
   selectedFunnIdAtom,
 } from './atoms';
 import { fetchFlyfoto } from './flyfoto';
@@ -131,6 +132,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [draftActive, setDraftActive] = useAtom(funnDraftActiveAtom);
   const [adjusting, setAdjusting] = useAtom(adjustingLocalityAtom);
   const [selectedFunnId, setSelectedFunnId] = useAtom(selectedFunnIdAtom);
+  const setMarksHidden = useSetAtom(marksHiddenAtom);
   const lightboxOpen = useAtomValue(lightboxOpenAtom);
   const setLidarSelection = useSetAtom(lidarExtractSelectionAtom);
   const [tool, setTool] = useAtom(ribbonToolAtom);
@@ -467,6 +469,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // already saved and put down; drop them so the new funn starts clean.
     getDrawLayer()?.getSource()?.clear();
     hideFunnOnLayer(null);
+    // "Skjul markeringer" is a way of looking at the ground, not a way of
+    // working on it: drawing with the existing funn invisible is how you end
+    // up drawing the one you already have.
+    setMarksHidden(false);
     setAdjusting(false);
     // Only the extract is dismissed — terrain is a read-only view of the
     // same rectangle and there is no reason drawing on top should close it.
@@ -481,6 +487,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   }, [
     isMine,
     draftActive,
+    setMarksHidden,
     setAdjusting,
     setTool,
     setLidarSelection,

@@ -496,6 +496,10 @@
       "sameAsLeft": "already on the map",
       "divider": "Move the divider"
     },
+    "marks": {
+      "label": "Hide marks",
+      "tip": "Hide finds and locality frames so they do not cover what you are comparing"
+    },
     "heritage": {
       "label": "Heritage",
       "tip": "Heritage sites and monuments"

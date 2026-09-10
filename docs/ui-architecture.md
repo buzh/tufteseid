@@ -372,6 +372,8 @@ subsume.
   The split is read by the OL render handlers through
   `setCurtainSplit`, so `compareLayerAtomEffect` deliberately does *not* depend
   on it — dragging the divider must not rebuild a tile stack.
+- **Skjul merker** — `marksHiddenAtom` (`src/localities/atoms.ts`), read by
+  `useMarksVisibility` (§8.6). Not persisted to the URL.
 - **Theme layers** — `activeThemeLayersAtom` (a `Set<ThemeLayerName>`).
 - **Chrome** — `mapToolAtom`, `overlayOpenCountAtom` / `anyOverlayOpenAtom`
   (`src/ui/overlayAtoms.ts`, incremented by every `Popover` and `Dialog` so the
@@ -461,6 +463,7 @@ looking at.
 | **Flyfoto** (4) | Background mode: NiB ortofoto (§5.5) |
 | **Terreng** (5) | Terrain analysis: relief computed here from float elevation, over the open lokalitet's rectangle if there is one and the visible map otherwise (§10) |
 | **Sammenlign** | Puts a second ground on the right of a draggable curtain, with a pulldown for which one (§5.8) |
+| **Skjul merker** (H) | Takes our own marks — funn, their halo, the lokalitet rectangles — off the map for as long as it is pressed in (§8.6) |
 | Dataset pulldown | LiDAR: **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport. Flyfoto: the seamless mosaic or any acquisition covering the viewport, newest first |
 | Style pulldown | The active LiDAR dataset's WMS styles, with a "flere stiler" second tier |
 | DTM / DOM segment | Terrain model vs surface model |
@@ -531,6 +534,11 @@ re-attaching the listener continuously.
 - **Hold X** — peek at the ground you were on before, snapping back on release.
   Reading relief against a photograph means flipping dozens of times, and a
   hold-to-compare is the cheapest form of that.
+- **H** — hide/show our own marks (§8.6). The one key here written straight
+  against an atom rather than through a registered handler: there is a single
+  boolean and no mode owns it, so there is nothing for a component to
+  contribute. It is a press rather than a hold because judging a bump against a
+  1937 photograph takes longer than a key can comfortably be held down.
 
 `PEEK_KEY` is **not** the backtick, which was the obvious pick: on the
 Norwegian layout it is a dead key and arrives as `key: "Dead"`, unusable for
@@ -1174,6 +1182,26 @@ and losing the highlight on every pan-nudge would make it useless. The hover
 handler keeps the last id in a local and writes only transitions; it fires on
 every mouse move over the map.
 
+**Skjul merker.** Restraint in the styling only goes so far: a cased outline
+sitting exactly on the bump you are judging is still on it, and the point of
+the curtain and the digit keys is to look at the *ground* in two acquisitions.
+`marksHiddenAtom` (row 1, key **H**) takes all three mark layers off —
+localities, funn, the selection halo — through `useMarksVisibility`
+(`src/localities/marksVisibility.ts`).
+
+- **`setVisible(false)`, never removal.** Everything the glance must leave
+  alone hangs off those layers: the hydrated features, two realtime
+  subscriptions, the selection, and the draw layer's idea of which funn it is
+  holding.
+- It re-applies on the layer collection's `add` as well as on the flag, because
+  each of the three layers is created by its own hook and one arriving while
+  marks are hidden would default to visible.
+- **The draw layer is not in the set**, and `startDraft` lifts the flag. You
+  cannot draw a shape you cannot see, and drawing with the existing funn
+  invisible is how you end up drawing the one you already have.
+- Not persisted to the URL, on the same grounds as the compare curtain: a link
+  shared to show someone a funn must not arrive with the funn hidden.
+
 ### 8.7 The attachment pipeline
 
 Four producers converge on one sink, and that convergence is the part worth
@@ -1653,7 +1681,9 @@ historical acquisition covering the viewport; cycle styles with A/D, the active
 mode's datasets with W/S, model with E, without opening any pulldown or
 occluding the map; put a second ground on the right of a draggable curtain
 (Sammenlign), pick which one, drag the seam with the pointer or nudge it with
-the arrow keys once it has focus, and leave to take the second stack back down.
+the arrow keys once it has focus, and leave to take the second stack back down;
+hide your own marks with H or the ribbon button so they do not cover the ground
+you are judging, and bring them back the same way.
 
 **Overlay the heritage record**
 toggle the five Kulturminner layers as a group; open the Kartlag card and toggle

@@ -1,6 +1,7 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { isSignedInAtom } from '../auth/atoms';
+import { marksHiddenAtom } from '../localities/atoms';
 import { useCreateLocalityFromViewport } from '../localities/createFromBbox';
 import { activeThemeLayersAtom } from '../map/layers/atoms';
 import type { ThemeLayerName } from '../map/layers/themeWMS';
@@ -56,6 +57,7 @@ export const RibbonGlobalRow = () => {
   const { t } = useTranslation();
   const isSignedIn = useAtomValue(isSignedInAtom);
   const [tool, setTool] = useAtom(mapToolAtom);
+  const [marksHidden, setMarksHidden] = useAtom(marksHiddenAtom);
   const [themeLayers, setThemeLayers] = useAtom(activeThemeLayersAtom);
   const lidar = useLidarControls();
   const flyfoto = useFlyfotoControls();
@@ -154,6 +156,19 @@ export const RibbonGlobalRow = () => {
 
       <div className={styles.group}>
         <CompareControl mode={ground.mode} previous={ground.previous} />
+        {/* Beside Sammenlign because it answers the question that comes up
+            the moment you have two acquisitions of the same ground side by
+            side: is that bump real, or is it my own outline? Global rather
+            than a row-2 verb — the rectangles are on the map whether or not
+            a lokalitet is open, and hiding them is a way of looking, not
+            something you do to a lokalitet. */}
+        <ModeButton
+          icon="visibility_off"
+          label={t('ribbon.marks.label')}
+          tooltip={`${t('ribbon.marks.tip')} (H)`}
+          active={marksHidden}
+          onClick={() => setMarksHidden(!marksHidden)}
+        />
       </div>
 
       {flyfoto.isFlyfotoMode && (

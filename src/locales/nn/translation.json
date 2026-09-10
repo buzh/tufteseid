@@ -496,6 +496,10 @@
       "sameAsLeft": "alt på kartet",
       "divider": "Flytt skiljet"
     },
+    "marks": {
+      "label": "Skjul merke",
+      "tip": "Skjul funn og lokalitetsrammer, så dei ikkje dekkjer det du samanliknar"
+    },
     "heritage": {
       "label": "Kulturminne",
       "tip": "Lokalitetar og enkeltminne"

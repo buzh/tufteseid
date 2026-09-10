@@ -22,6 +22,16 @@ export const adjustingLocalityAtom = atom<boolean>(false);
 export const hoveredFunnIdAtom = atom<string | null>(null);
 export const selectedFunnIdAtom = atom<string | null>(null);
 
+// Take everything *we* drew off the map for a moment — the funn, their
+// selection halo and the lokalitet rectangles. Comparing two acquisitions of
+// the same ground means looking at the ground, and a cased outline sitting
+// exactly on the bump you are trying to judge is the one thing guaranteed to
+// be in the way of judging it.
+//
+// Not persisted to the URL: it is a glance, like the ground peek, and a link
+// shared to show someone a funn must not arrive with the funn hidden.
+export const marksHiddenAtom = atom(false);
+
 // Which dock sections are expanded. Outside the component because the dock
 // is keyed by locality.id and remounts on every swap — folding "Detaljer"
 // away should stay folded for the next lokalitet too.

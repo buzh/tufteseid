@@ -16,7 +16,7 @@ import { FUNN_ID_PROPERTY, getFunnLayer } from './funnLayer';
 // drawing and restoring it afterwards means reconstructing that style.
 // Cloning the geometry one layer down costs nothing and is reversible.
 
-const HIGHLIGHT_LAYER_ID = 'funnHighlightLayer';
+export const HIGHLIGHT_LAYER_ID = 'funnHighlightLayer';
 
 const halo = (color: string, width: number) =>
   new Style({

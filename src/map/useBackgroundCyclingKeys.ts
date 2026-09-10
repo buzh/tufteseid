@@ -1,5 +1,6 @@
 import { atom, useAtomValue, useStore } from 'jotai';
 import { useEffect } from 'react';
+import { marksHiddenAtom } from '../localities/atoms';
 import { anyOverlayOpenAtom } from '../ui/overlayAtoms';
 
 /*
@@ -14,6 +15,10 @@ import { anyOverlayOpenAtom } from '../ui/overlayAtoms';
  * walks whichever ring the active mode has: LiDAR acquisitions in LiDAR mode,
  * ortofoto acquisitions in flyfoto mode. A/D and E are LiDAR-only.
  * docs/ui-architecture.md §5.3.
+ *
+ * H takes our own marks off the map and puts them back. It needs no
+ * registered handler — there is one boolean and no mode owns it — so it is
+ * the one key here written straight against an atom.
  *
  * Split into a listener and a registration so the two halves can live in
  * different components. The listener has to be mounted somewhere that never
@@ -54,6 +59,8 @@ const GROUND_KEYS: readonly string[] = ['1', '2', '3', '4', '5'];
 // Not the backtick: on the Norwegian layout it is a dead key and arrives as
 // `key: "Dead"`, which is unusable for hold-and-release.
 const PEEK_KEY = 'x';
+// Hide/show funn, their halo and the lokalitet rectangles.
+const MARKS_KEY = 'h';
 
 // A mutable box rather than the handler itself: the handler closes over
 // lists that are rebuilt on every render, and putting that in atom state
@@ -113,7 +120,8 @@ export const useBackgroundCyclingKeys = () => {
       const isCycle = CYCLE_KEYS.includes(key);
       const isGround = GROUND_KEYS.includes(key);
       const isPeek = key === PEEK_KEY;
-      if (!isCycle && !isGround && !isPeek) return;
+      const isMarks = key === MARKS_KEY;
+      if (!isCycle && !isGround && !isPeek && !isMarks) return;
 
       const target = event.target;
       if (
@@ -134,7 +142,9 @@ export const useBackgroundCyclingKeys = () => {
       // event.target === document.body and slip past the walk above.
       if (store.get(anyOverlayOpenAtom)) return;
 
-      if (isCycle) {
+      if (isMarks) {
+        store.set(marksHiddenAtom, (prev) => !prev);
+      } else if (isCycle) {
         if (!box.current?.(key as CycleKey)) return;
       } else {
         const ground = groundBox.current;
