@@ -34,6 +34,7 @@ export const Segmented = <T extends string>({
   disabled,
   size = 'xs',
   label,
+  wrap,
   className,
 }: {
   value: T;
@@ -42,6 +43,8 @@ export const Segmented = <T extends string>({
   disabled?: boolean;
   size?: 'xs' | 'sm';
   label?: string;
+  /** Flow onto more lines instead of being clipped. For narrow columns. */
+  wrap?: boolean;
   className?: string;
 }) => {
   const move = (delta: number) => {
@@ -56,7 +59,7 @@ export const Segmented = <T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className={cx(styles.root, className)}
+      className={cx(styles.root, wrap && styles.wrap, className)}
       onKeyDown={(e) => {
         if (disabled) return;
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {

@@ -269,10 +269,14 @@ export const TerrainPanel = ({
   return (
     <div className={styles.root}>
       <div className={styles.top}>
+        {/* Five long Norwegian words in a 360 px column: this one has to be
+            allowed onto a second line, or the dock's overflow eats the last
+            two options. */}
         <Segmented
           value={vis}
           options={visOptions}
           onChange={setVis}
+          wrap
           label={t('localities.terrain.visualization')}
         />
         <Segmented
@@ -313,31 +317,45 @@ export const TerrainPanel = ({
           )}
         </div>
 
-        {/* Re-frames the analysed rectangle onto the map as it is now. Only
-            meaningful without a lokalitet: once the render is on the map,
-            panning off it is the natural next move, and the bbox is
-            deliberately held rather than tracking the view. */}
-        {!locality && (
-          <Button size="sm" variant="ghost" onClick={frame}>
-            {t('localities.terrain.reframe')}
+        {/* On their own line in the dock's column: two full-length Norwegian
+            verbs will not share one with the pickers, and left to wrap
+            individually they arrive at different times as the panel reflows. */}
+        <div className={styles.actions}>
+          {/* Moves the analysed rectangle onto the map as it now stands. The
+              bbox is deliberately held rather than tracking the view — the DEM
+              behind it is a real download, not a tile request — so panning off
+              it is a normal move, and this is how you bring the analysis back
+              to what you are looking at. Only offered without a lokalitet:
+              with one the rectangle is the lokalitet's, and "Juster området"
+              owns it. */}
+          {!locality && (
+            <Button
+              size="sm"
+              variant="ghost"
+              leftIcon="filter_center_focus"
+              title={t('localities.terrain.reframeHint')}
+              onClick={frame}
+            >
+              {t('localities.terrain.reframe')}
+            </Button>
+          )}
+          {/* The verbs stay put through a reload rather than appearing with
+              the render, so the row does not reflow under the pointer — but
+              there is nothing to keep until a DEM is painted, and the canvas
+              may still be holding the previous rectangle. */}
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={saving || loading || !dem}
+            onClick={save}
+          >
+            {saving
+              ? t('localities.terrain.saving')
+              : locality
+                ? t('localities.terrain.save')
+                : t('localities.terrain.saveNew')}
           </Button>
-        )}
-        {/* The verbs stay put through a reload rather than appearing with the
-            render, so the row does not reflow under the pointer — but there
-            is nothing to keep until a DEM is painted, and the canvas may
-            still be holding the previous rectangle. */}
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={saving || loading || !dem}
-          onClick={save}
-        >
-          {saving
-            ? t('localities.terrain.saving')
-            : locality
-              ? t('localities.terrain.save')
-              : t('localities.terrain.saveNew')}
-        </Button>
+        </div>
       </div>
 
       {dem && !loading && (

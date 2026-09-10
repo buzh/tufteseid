@@ -1386,6 +1386,25 @@ layer. Scrubbing the light therefore re-lights the terrain in place, at full
 size, against everything else on screen. What is left in the panel is knobs, a
 resolution readout and the two verbs.
 
+It lives in a ~360 px dock column now, not the wide ribbon row it was written
+for, and everything in it has to *wrap* rather than run off the edge. Five long
+Norwegian visualization names do not fit on one line, and `Segmented`'s root is
+`overflow: hidden` — so the group is clipped mid-word unless it is given the
+`wrap` prop, which flows it onto more lines and turns the segment separators
+into gaps over a border-coloured background. The two verbs sit in an `.actions`
+row with `flex-basis: 100%` so they land on their own line together, in the same
+place whether or not the reframe one is showing.
+
+**"Flytt analysen hit"** (`localities.terrain.reframe`) moves the analysed
+rectangle onto the map as it now stands. It exists because the standalone bbox
+is deliberately *held* rather than tracking the view — the DEM behind it is a
+real download, not a tile request — so panning off the render is a normal move
+and there has to be a way back without closing and reopening the tool. It is
+offered only without a lokalitet: with one, the rectangle is the lokalitet's and
+"Juster området" owns it. The label used to read "Analyser utsnittet", which
+named the mechanism rather than the effect and left it unclear what it did to
+the analysis already on screen.
+
 Consequences worth knowing:
 
 - The layer is **imperative and module-level**, like `swapBackgroundLayers`, not

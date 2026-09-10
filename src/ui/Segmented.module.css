@@ -31,6 +31,37 @@
   border-left: 1px solid var(--c-border);
 }
 
+/*
+ * For a group too wide for its column — five terrain visualizations in a
+ * 360 px dock, say. Without this the root's `overflow: hidden` simply cuts
+ * the last options off mid-word.
+ *
+ * The separators become 1 px gaps over a border-coloured background rather
+ * than left borders: a wrapped line would otherwise start with a stray
+ * border on its first segment, and there is nothing between the rows.
+ */
+.wrap {
+  flex-wrap: wrap;
+  width: 100%;
+  gap: 1px;
+  background: var(--c-border);
+}
+
+/* Two classes deep, so it beats `.selected` — hence the pair below. Hover
+   and focus already carry a pseudo-class each and outrank both. */
+.wrap .option {
+  flex: 1 1 auto;
+  background: var(--c-bg);
+}
+
+.wrap .option + .option {
+  border-left: none;
+}
+
+.wrap .selected {
+  background: var(--seg-accent, var(--c-accent));
+}
+
 .option:not(:disabled):hover {
   background: var(--c-bg-hover);
 }

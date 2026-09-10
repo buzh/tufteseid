@@ -1,7 +1,10 @@
 /*
  * Terrenganalyse is knobs only. The render itself is on the map — see
- * terrainOverlayLayer.ts — so this row exists to stay *short*: every line it
- * adds is a line of terrain the ribbon is covering while you read it.
+ * terrainOverlayLayer.ts — so this panel exists to stay *short*: every line it
+ * adds is a line of the dock covering terrain you could be reading.
+ *
+ * It lives in a ~360 px column, not the wide ribbon row it was first written
+ * for, so everything here wraps rather than being cut off by the column edge.
  */
 
 .root {
@@ -36,6 +39,17 @@
 
 .error {
   color: var(--c-danger);
+}
+
+/* Always a line of its own — `flex-basis: 100%` rather than relying on the
+   wrap landing there — so the two verbs stay together and in the same place
+   whether or not the reframe one is showing. */
+.actions {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2);
 }
 
 /* Fixed basis and no stretch: a light-sweep slider needs travel, and letting
