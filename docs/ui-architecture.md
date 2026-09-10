@@ -127,7 +127,7 @@ worked example: re-pointing two variables is the app's entire dark theme, and
 `Button.module.css` needed no dark variant.
 
 `<KvibProvider>` is still mounted, and kvib still carries what has not been
-ported: drawing (`src/draw/**`) and the search results + infobox. There is no
+ported: drawing (`src/draw/**`) and the search infobox. There is no
 dark mode in either system — the extract viewer's dark chrome is local, not a
 mode.
 
@@ -467,13 +467,17 @@ ribbon puts **all** of them through it, under a `ribbon.*` namespace
 (`mode`, `lidar`, `flyfoto`, `heritage`, `layers`, `search`, `terrain`,
 `tray`) in all three locales.
 
-The remaining hole is `SearchComponent`, which still uses `t()` **zero** times
-— the whole results surface is hardcoded Norwegian bokmål. The three locale
-files also still largely describe upstream Norgeskart features.
+The remaining hole is `src/search/**`. It calls `t()` — the section headings,
+the pagination row, the coordinate-swap warning all go through it — but it
+leaks Norwegian bokmål around the edges regardless: the `"${placeType} i
+${municipality}"` joiner in `PlacesResults`, `'Ja'`/`'Nei'` in
+`FeatureInfoSection`, the thrown `'Ingen matrikkelreferanse funnet'` in
+`PropertyInfo`. The three locale files also still largely describe upstream
+Norgeskart features.
 
 The decision is still open and should be taken deliberately: either commit to
 three locales and finish `src/search/**`, or drop to Norwegian-only and delete
-i18next. A full i18n stack that one surface bypasses is the worst of both.
+i18next. A full i18n stack that one surface half-bypasses is the worst of both.
 
 ### 5.5 Flyfoto as a background mode
 
@@ -597,14 +601,27 @@ map. Splitting them that way keeps the bar a bar — a results list is a list
 over the map, not chrome. Selecting a result drops a marker, opens the InfoBox
 with the result's details, and flies the map there.
 
+`src/search/results/**` is on `src/ui`: one `SearchResults.module.css` shared by
+all seven files rather than one each — they are a single visual surface, and
+splitting the row away from the list it sits in would mean reading two files to
+change one row. Each result group is a controlled `Section`, with
+`SearchResults.tsx` holding the open set (all four open on arrival); a row is a
+`<button>` inside its `<li>`, so it is keyboard-reachable even though the list
+as a whole still is not. A road's house numbers expand into a sibling `<li>` of
+chips, which is why the row separator is `:not(:first-child)` rather than
+`.line + .line`. Place names are the only paged result set, so their prev/next
+row is inline rather than a kit primitive (§12).
+
 Three things to fix rather than port:
 
 - **Every selection lands at a hardcoded zoom 15** (`src/search/atoms.ts:162`),
   regardless of whether the result is a farm building or a municipality.
-- **There is no keyboard support at all.** No arrow-key navigation of the result
-  list, no Enter to select, no Escape to dismiss, no focus management, no
-  `role="listbox"`/`role="option"`. Mouse only.
-- **Zero `t()` calls** — the entire surface is hardcoded Norwegian.
+- **The result list is tab-reachable but not navigable.** Every row is a real
+  `<button>` since the port, so Tab and Enter work; there is still no arrow-key
+  navigation, no Escape to dismiss, no focus management and no
+  `role="listbox"`/`role="option"`.
+- **Partial `t()` coverage** — Norwegian leaks around the edges of the
+  translated strings (§5.4).
 
 `searchApi.ts` also carries the one direct-to-origin call in the app: an ArcGIS
 identify against `hoydedata.no` for the elevation readout, which is why that
@@ -960,21 +977,22 @@ ribbon, the lokalitet surfaces (`FunnList`, `BilderSection`,
 `LocalitiesPanel`), both analysis panels, `AuthButton`, `AuthDialog`,
 `ErrorBoundary`, the measure trigger, the toast region, `MapComponent`,
 `SearchComponent`, `KulturminnerPopup`, `LidarExtractViewer`, `MapToolCards`,
-`MapThemes`/`SubTheme`, `HelpPage` and `LanguageSwitcher`. So `src/terrain/`,
-`src/settings/`, `src/auth/`, `src/lidarExtract/`, `src/localities/`,
-`src/help/`, `src/languageswitcher/` and `src/map/` are all clear.
+`MapThemes`/`SubTheme`, `HelpPage`, `LanguageSwitcher` and the search results
+panel (`src/search/results/**`). So `src/terrain/`, `src/settings/`,
+`src/auth/`, `src/lidarExtract/`, `src/localities/`, `src/help/`,
+`src/languageswitcher/` and `src/map/` are all clear.
 
-Still on kvib — 24 surfaces in two subsystems (plus `src/ui/Icon.tsx`, which
+Still on kvib — 17 surfaces in two subsystems (plus `src/ui/Icon.tsx`, which
 re-exports the `MaterialSymbol` union, and `src/mainApp.tsx`, which mounts the
 provider; those two are the strip itself):
 
 | Surface | Size | Note |
 |---|---|---|
-| `src/search/**` | 15 files, ~3200 lines | results list + infobox; also the one with no `t()` at all (§5.4) |
+| `src/search/infobox/**` | 8 files, ~1100 lines | `FeatureInfoSection` is the one that reads container state (`useAccordionContext`) |
 | `src/draw/**` | 9 files | the largest subsystem; inherited upstream, least-touched |
 
-What the kit still has to grow to absorb them: a small `Pagination`. That is
-all — the list used to also say `Accordion`, `Select` and `Alert`:
+The kit needs nothing more to absorb them. The list used to say `Accordion`,
+`Select`, `Pagination` and `Alert`:
 
 - **`Accordion` is not coming.** Every kvib accordion in this app is
   `collapsible multiple`, i.e. a stack of independent disclosures, which is
@@ -987,6 +1005,9 @@ all — the list used to also say `Accordion`, `Select` and `Alert`:
 - **`Select` is not coming either.** The only two are the language picker and
   the draw point-style picker, and a native `<select>` covers both — see
   `src/languageswitcher/`. Anything that wants a richer list is a `Popover`.
+- **`Pagination` is not coming.** One consumer — place names are the only
+  result set the API pages — so the prev/status/next row lives inline in
+  `PlacesResults.tsx`.
 - **`Alert` was built** (`src/ui/Alert.tsx`, `info` / `warning`): a standing
   remark in the flow, as opposed to `toast`, which is a reply to an action.
 

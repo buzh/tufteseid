@@ -164,6 +164,11 @@
     "coordinates": "Coordinates",
     "houseNumber": "House nr.",
     "placeholder": "Search Tufteseid",
+    "pagination": {
+      "previous": "Previous page",
+      "next": "Next page",
+      "status": "Page {{page}} of {{pages}}"
+    },
     "placeName": "Placenames",
     "properties": "Properties",
     "roads": "Roads",

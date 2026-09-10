@@ -1,10 +1,10 @@
-import { AccordionRoot, Box, Stack } from '@kvib/react';
 import { useAtom, useAtomValue } from 'jotai';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMapSettings } from '../../map/mapHooks.ts';
 import { getInputCRS } from '../../shared/utils/crsUtils.ts';
 import { SearchResult } from '../../types/searchTypes.ts';
+import { cx } from '../../ui';
 import {
   allSearchResultsAtom,
   coordinateResultsAtom,
@@ -18,8 +18,9 @@ import { CoordinateResults } from './CoorResult.tsx';
 import { PlacesResult } from './PlacesResults.tsx';
 import { PropertiesResults } from './PropertiesResults.tsx';
 import { RoadsResults } from './RoadsResults.tsx';
+import styles from './SearchResults.module.css';
 
-type AccordionTab = 'places' | 'roads' | 'properties' | 'addresses';
+type ResultTab = 'places' | 'roads' | 'properties' | 'addresses';
 
 interface SearchResultsProps {
   hoveredResult: SearchResult | null;
@@ -34,12 +35,23 @@ export const SearchResults = ({
   const searchQuery = useAtomValue(searchQueryAtom);
   const { t } = useTranslation();
   const displaySearchResults = useAtomValue(displaySearchResultsAtom);
-  const [accordionTabsOpen, setAccordionTabsOpen] = useState<AccordionTab[]>([
+
+  // The sections are independent disclosures, all open to begin with, so the
+  // container holds the set and each section is a controlled `Section`.
+  const [openTabs, setOpenTabs] = useState<ResultTab[]>([
     'places',
     'roads',
     'properties',
     'addresses',
   ]);
+  const tabProps = (tab: ResultTab) => ({
+    open: openTabs.includes(tab),
+    onOpenChange: (open: boolean) =>
+      setOpenTabs((prev) =>
+        open ? [...prev, tab] : prev.filter((it) => it !== tab),
+      ),
+  });
+
   const coord = useAtomValue(coordinateResultsAtom);
   const coordResult: SearchResult | null = useMemo(() => {
     return coord
@@ -59,14 +71,6 @@ export const SearchResults = ({
 
   const handleHover = (res: SearchResult) => {
     setHoveredResult(res);
-  };
-
-  const handleAccordionTabClick = (value: AccordionTab) => {
-    setAccordionTabsOpen((prev) =>
-      prev.includes(value)
-        ? prev.filter((tab) => tab !== value)
-        : [...prev, value],
-    );
   };
 
   const handleSearchClick = useCallback(
@@ -95,74 +99,48 @@ export const SearchResults = ({
 
   if (allResults.length === 0 && coordResult == null) {
     if (searchQuery !== '') {
-      return (
-        <Box p={4} bg="white" borderRadius={'16px'} w="100%">
-          {t('search.noResults')}
-        </Box>
-      );
-    } else {
-      return null;
+      return <div className={styles.panel}>{t('search.noResults')}</div>;
     }
+    return null;
   }
 
   return (
-    <Stack
-      gap={0}
-      p={4}
-      bg="white"
-      borderRadius={'16px'}
-      maxH={'100%'}
-      overflowY={'auto'}
-      display={displaySearchResults ? 'flex' : 'none'}
-      maxWidth={'450px'}
-    >
-      <Box overflowY="auto" overflowX="hidden" minHeight="0px">
-        <AccordionRoot
-          collapsible
-          multiple
-          value={accordionTabsOpen}
-          backgroundColor="white"
-          mt="5px"
-          borderRadius={10}
-          variant={'plain'}
-        >
-          {coordResult != null ? (
-            <CoordinateResults
-              coordinateResult={coordResult}
-              setSelectedResult={handleSearchClick}
-              handleHover={handleHover}
-              setHoveredResult={setHoveredResult}
-            />
-          ) : (
-            <>
-              <AddressesResults
-                handleSearchClick={handleSearchClick}
-                handleHover={handleHover}
-                setHoveredResult={setHoveredResult}
-                onTabClick={() => handleAccordionTabClick('addresses')}
-              />
-              <PlacesResult
-                handleSearchClick={handleSearchClick}
-                handleHover={handleHover}
-                setHoveredResult={setHoveredResult}
-                onTabClick={() => handleAccordionTabClick('places')}
-              />
-              <RoadsResults
-                handleSearchClick={handleSearchClick}
-                handleHover={handleHover}
-                setHoveredResult={setHoveredResult}
-                onTabClick={() => handleAccordionTabClick('roads')}
-              />
-              <PropertiesResults
-                handleSearchClick={handleSearchClick}
-                handleHover={handleHover}
-                setHoveredResult={setHoveredResult}
-                onTabClick={() => handleAccordionTabClick('properties')}
-              />
-            </>
-          )}
-        </AccordionRoot>
-      </Box>
-    </Stack>
+    <div className={cx(styles.panel, !displaySearchResults && styles.hidden)}>
+      {coordResult != null ? (
+        <CoordinateResults
+          coordinateResult={coordResult}
+          setSelectedResult={handleSearchClick}
+          handleHover={handleHover}
+          setHoveredResult={setHoveredResult}
+        />
+      ) : (
+        <>
+          <AddressesResults
+            handleSearchClick={handleSearchClick}
+            handleHover={handleHover}
+            setHoveredResult={setHoveredResult}
+            {...tabProps('addresses')}
+          />
+          <PlacesResult
+            handleSearchClick={handleSearchClick}
+            handleHover={handleHover}
+            setHoveredResult={setHoveredResult}
+            {...tabProps('places')}
+          />
+          <RoadsResults
+            handleSearchClick={handleSearchClick}
+            handleHover={handleHover}
+            setHoveredResult={setHoveredResult}
+            {...tabProps('roads')}
+          />
+          <PropertiesResults
+            handleSearchClick={handleSearchClick}
+            handleHover={handleHover}
+            setHoveredResult={setHoveredResult}
+            {...tabProps('properties')}
+          />
+        </>
+      )}
+    </div>
   );
 };

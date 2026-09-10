@@ -1,0 +1,146 @@
+/*
+ * The results panel and everything in it. One module for the six components
+ * under results/ rather than six files: they are a single visual surface,
+ * and splitting the list row away from the list it lives in would only mean
+ * reading two files to change one row.
+ */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  min-height: 0;
+  max-width: 450px;
+  margin-right: var(--sp-5);
+  padding: var(--sp-6);
+  border-radius: var(--radius-lg);
+  background: var(--c-bg);
+  box-shadow: var(--shadow-lg);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-size: var(--font-md);
+}
+
+.hidden {
+  display: none;
+}
+
+.section {
+  flex: 0 0 auto;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-3) 0;
+}
+
+/* :not(:first-child) rather than `.line + .line` — an expanded road puts its
+   house-number row between two lines and would break the adjacency. */
+.line:not(:first-child) {
+  border-top: 1px solid var(--c-border);
+}
+
+/*
+ * The row's own hit target is a button rather than a click handler on the
+ * <li>, so it is reachable by keyboard. The house-number control in the road
+ * results is a sibling, not a child, which is also why it no longer needs to
+ * stop propagation.
+ */
+.lineMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: var(--sp-2) 0;
+  font: inherit;
+  text-align: left;
+  color: var(--c-fg);
+  cursor: pointer;
+}
+
+.lineMain:hover .lineHeading {
+  font-weight: 600;
+}
+
+.lineMain:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.lineHeading {
+  overflow-wrap: anywhere;
+}
+
+.lineType {
+  font-size: var(--font-sm);
+  font-style: italic;
+  color: var(--c-fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.houseNumbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-4) var(--sp-7);
+  padding: 0;
+}
+
+.houseNumber {
+  min-width: var(--ctl-h-sm);
+  height: var(--ctl-h-sm);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-bg);
+  font: inherit;
+  font-size: var(--font-sm);
+  color: var(--c-fg);
+  cursor: pointer;
+}
+
+.houseNumber:hover {
+  background: var(--c-bg-hover);
+}
+
+.houseNumber:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 1px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  margin-top: var(--sp-4);
+}
+
+.pageStatus {
+  font-size: var(--font-sm);
+  color: var(--c-fg-muted);
+  white-space: nowrap;
+}
+
+.coordSwap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-4);
+}

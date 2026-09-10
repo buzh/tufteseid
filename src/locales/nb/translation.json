@@ -164,6 +164,11 @@
     "coordinates": "Koordinater",
     "houseNumber": "Husnr",
     "placeholder": "Søk i Tufteseid",
+    "pagination": {
+      "previous": "Forrige side",
+      "next": "Neste side",
+      "status": "Side {{page}} av {{pages}}"
+    },
     "placeName": "Stedsnavn",
     "properties": "Eiendommer",
     "roads": "Veger",
