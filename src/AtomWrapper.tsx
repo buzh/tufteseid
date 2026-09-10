@@ -1,7 +1,5 @@
 import { useHydrateAtoms } from 'jotai/utils';
-import 'material-symbols/rounded.css';
 import { ReactNode } from 'react';
-import './index.css';
 import { activeThemeLayersAtom } from './map/layers/atoms.ts';
 import { ThemeLayerName } from './map/layers/themeWMS.ts';
 import { getListUrlParameter } from './shared/utils/urlUtils.ts';
