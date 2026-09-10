@@ -183,6 +183,37 @@ deliberately does not rely on that: same-origin gets us the 25 GB disk cache,
 and a 4 MB float TIFF is exactly the kind of response that should only be
 fetched from the origin once.
 
+### Every saved render carries its own parameters
+
+A render is only as useful as the settings behind it: a hillshade at 315°/35°
+and one at 135°/20° disagree about whether there is a mound in the same field,
+and a slope map stretched 2–98 % is a different picture from one stretched to
+its true range. So nothing leaves the app bare — `src/figure/` draws a caption
+panel under every kept or downloaded raster, and `terrainFigure`
+(`src/figure/specs.ts`) is the builder that turns the current knob positions
+into that caption:
+
+| Visualization | Recorded |
+|---|---|
+| hillshade | azimuth, altitude, z-factor |
+| multidirectional | all six azimuths *and* their weights, altitude, z-factor |
+| slope | z-factor, 2–98 % stretch |
+| local relief model | radius (`DEFAULT_LRM_RADIUS`), diverging ramp symmetric about zero, stretch |
+| sky-view factor | radius (`DEFAULT_SVF_RADIUS`), `SVF_DIRECTIONS`, stretch |
+
+Plus, always: the model (DTM/DOM), the source mosaic, the EPSG:25833 extent,
+the geodetic centre, the grid resolution — and, when the rectangle was too
+large for `MAX_DEM_PX_PER_SIDE`, the `nativeMetresPerPx` it was resampled
+*from*. That last one is the difference between "this is all the detail there
+is" and "there is more, ask for a smaller area", and two renders of
+different-sized areas are not comparable without it.
+
+Practical consequence for this module: **`MULTI_AZIMUTHS`, `SVF_DIRECTIONS`,
+`DEFAULT_LRM_RADIUS` and `DEFAULT_SVF_RADIUS` are exported and printed on
+figures.** Changing one silently changes what old and new renders mean relative
+to each other; the caption is what keeps that honest, so keep them exported.
+The figure machinery itself is `docs/ui-architecture.md` §8.10.
+
 ## Tier 1 — server-side visualization sidecar (design, not built)
 
 The client can do hillshade, slope, local relief and a serviceable sky-view

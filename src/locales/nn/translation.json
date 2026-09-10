@@ -554,5 +554,57 @@
       "tooLarge": "Utsnittet dekkjer for stort område for terrenganalyse. Zoom inn og prøv igjen.",
       "unavailable": "Fann ikkje noko kartutsnitt å analysere."
     }
+  },
+  "figure": {
+    "app": "Tufteseid",
+    "label": {
+      "source": "Kjelde",
+      "method": "Metode",
+      "area": "Område",
+      "image": "Bilete",
+      "rights": "Rettar",
+      "produced": "Laga"
+    },
+    "terms": {
+      "ccby": "CC BY 4.0",
+      "nib": "fri bruk privat, ikkje-kommersielt"
+    },
+    "title": {
+      "extract": "LiDAR-uttrekk",
+      "terrain": "Terrenganalyse",
+      "flyfoto": "Flyfoto",
+      "screenshot": "Kartutsnitt"
+    },
+    "source": {
+      "lidarWms": "Kartverket høgdedata (WMS, ferdigskugga)",
+      "dem": "hoydedata.no · {{model}} prosjektmosaikk (høgdeverdiar)",
+      "nibProject": "Norge i bilder, enkeltprosjekt",
+      "nibMosaic": "Norge i bilder, saumlaus mosaikk",
+      "map": "Kartvising"
+    },
+    "acq": {
+      "year": "opptaksår {{year}}",
+      "density": "{{density}}/m²",
+      "project": "prosjekt {{name}}",
+      "date": "opptak {{date}}",
+      "native": "opphavleg {{m}} m/px",
+      "overlays": "temalag: {{layers}}"
+    },
+    "set": {
+      "wmsStyle": "WMS-stil {{style}}",
+      "model": "modell {{model}}",
+      "azimuth": "asimut {{deg}}°",
+      "altitude": "solhøgd {{deg}}°",
+      "zFactor": "z-faktor {{z}}",
+      "multiAzimuths": "fleirretnings skuggerelieff, asimut {{azimuths}}°, vekt {{weights}}",
+      "lrmRadius": "LRM-radius {{m}} m",
+      "svfRadius": "SVF-radius {{m}} m",
+      "svfDirections": "{{n}} retningar",
+      "diverging": "divergerande fargeskala, symmetrisk om null",
+      "stretch": "kontraststrekk 2–98 %",
+      "resampled": "resampla frå {{m}} m/px",
+      "ortofoto": "ortofoto, ubehandla",
+      "composite": "sett saman av kartlaga"
+    }
   }
 }

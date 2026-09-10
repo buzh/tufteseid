@@ -25,6 +25,8 @@ import { createAttachment } from '../api/attachments';
 import type { LocalityBbox, LocalityRecord } from '../api/localities';
 import { currentUserAtom } from '../auth/atoms';
 import { isAuthDialogOpenAtom } from '../auth/atoms-dialog';
+import { renderFigureBlob } from '../figure/figure';
+import { terrainFigure } from '../figure/specs';
 import { activeLocalityAtom } from '../localities/atoms';
 import { createLocalityFromBbox } from '../localities/createFromBbox';
 import {
@@ -174,7 +176,7 @@ export const TerrainPanel = ({
 
   const save = useCallback(async () => {
     const canvas = canvasRef.current;
-    if (!canvas || saving) return;
+    if (!canvas || !dem || saving) return;
     // Signed out is a normal state here — the whole point of Terreng in row 1
     // is that reading the ground needs no account. Only keeping the render
     // does.
@@ -184,14 +186,12 @@ export const TerrainPanel = ({
     }
     setSaving(true);
     try {
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, 'image/png'),
-      );
-      if (!blob) return;
-
       // No lokalitet yet: the analysed rectangle becomes one. Deliberately
       // `bbox` and not the current view — the map is live underneath this
       // panel, so the user has probably panned since pressing Terreng.
+      //
+      // Before the render rather than after, so the figure's title can carry
+      // the name the registers just gave the rectangle.
       let target = locality;
       if (!target) {
         target = await createLocalityFromBbox(
@@ -204,6 +204,21 @@ export const TerrainPanel = ({
           return;
         }
       }
+
+      // What leaves the app is a figure, not a screengrab of the overlay:
+      // a hillshade at 315°/35° and one at 135°/20° disagree about whether
+      // there is a mound in that field, so the angles travel with the pixels.
+      const figure = await renderFigureBlob(
+        canvas,
+        terrainFigure({
+          subject: target.name || undefined,
+          vis,
+          model,
+          light: { azimuth, altitude, zFactor },
+          dem,
+        }),
+      );
+      if (!figure) return;
 
       const label = t(`localities.terrain.vis.${vis}`);
       await createAttachment(
@@ -219,8 +234,11 @@ export const TerrainPanel = ({
             sourceLabel: t('localities.terrain.sourceLabel'),
             style: vis,
             model,
-            metresPerPx: dem?.metresPerPx,
-            bbox25833: dem?.bbox25833,
+            metresPerPx: dem.metresPerPx,
+            bbox25833: dem.bbox25833,
+            // Where the render sits inside the file: the caption panel is
+            // drawn below it, so the image is no longer the whole PNG.
+            imageRect: figure.imageRect,
             // Only meaningful for the sun-dependent views, but recording it
             // unconditionally keeps the shape predictable.
             ...(vis === 'hillshade' ? { azimuth } : {}),
@@ -229,7 +247,7 @@ export const TerrainPanel = ({
           },
         },
         user.id,
-        blob,
+        figure.blob,
         `terreng_${vis}_${model}.png`,
       );
 

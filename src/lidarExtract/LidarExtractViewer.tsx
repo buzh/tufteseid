@@ -14,11 +14,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createAttachment } from '../api/attachments';
 import { currentUserAtom } from '../auth/atoms';
+import { renderFigureBlob } from '../figure/figure';
+import { lidarExtractFigure, lidarSourceFacts } from '../figure/specs';
 import { activeLocalityAtom } from '../localities/atoms';
 import { Button, cx, IconButton } from '../ui';
 import {
   LidarCanvas,
   lidarExtractRunAtom,
+  lidarExtractSourcesAtom,
   lidarExtractViewerOpenAtom,
 } from './atoms';
 import styles from './LidarExtractViewer.module.css';
@@ -29,6 +32,9 @@ export const LidarExtractViewer = () => {
   const { t } = useTranslation();
   const [open, setOpen] = useAtom(lidarExtractViewerOpenAtom);
   const run = useAtomValue(lidarExtractRunAtom);
+  // Read only for the figure caption: the enumerated source carries the
+  // acquisition year and point density the run itself doesn't keep.
+  const sources = useAtomValue(lidarExtractSourcesAtom);
   const activeLocality = useAtomValue(activeLocalityAtom);
   const user = useAtomValue(currentUserAtom);
   // Canvas ids already kept as attachments this run, plus in-flight ones.
@@ -280,20 +286,39 @@ export const LidarExtractViewer = () => {
     setDraggingId(null);
   };
 
+  // Nothing leaves this viewer bare. Kept or downloaded, the image goes out
+  // as a provenance figure (src/figure) — which service, which acquisition,
+  // which style, at what scale — because a hillshade with none of that on it
+  // is a picture rather than evidence, and the downloaded copy is precisely
+  // the one that ends up in somebody else's report.
+  const figureFor = useCallback(
+    (c: LidarCanvas, bbox25833: [number, number, number, number]) =>
+      renderFigureBlob(
+        c.canvas,
+        lidarExtractFigure({
+          subject: activeLocality?.name || undefined,
+          sourceLabel: c.sourceLabel,
+          style: c.style,
+          ...lidarSourceFacts(sources?.find((s) => s.key === c.sourceKey)),
+          metresPerPx: c.metresPerPx,
+          bbox25833,
+        }),
+      ),
+    [activeLocality?.name, sources],
+  );
+
   // "Behold": store the selected canvas as a Bilde on the open lokalitet
   // instead of (only) downloading it. The workspace's Bilder section
   // picks it up via the attachments realtime subscription.
-  const keep = () => {
+  const keep = async () => {
     if (!selected || !run || !activeLocality || !user) return;
     if (keptIds.has(selected.id) || keepingId) return;
     const cur = selected;
     setKeepingId(cur.id);
-    cur.canvas.toBlob((blob) => {
-      if (!blob) {
-        setKeepingId(null);
-        return;
-      }
-      createAttachment(
+    try {
+      const figure = await figureFor(cur, run.bbox25833);
+      if (!figure) return;
+      await createAttachment(
         {
           locality: activeLocality.id,
           kind: 'extract',
@@ -304,36 +329,37 @@ export const LidarExtractViewer = () => {
             style: cur.style,
             metresPerPx: cur.metresPerPx,
             bbox25833: run.bbox25833,
+            // The caption panel is drawn under the image, so the file is
+            // taller than the ground it covers — this is where the pixels
+            // that *are* the ground sit.
+            imageRect: figure.imageRect,
           },
         },
         user.id,
-        blob,
+        figure.blob,
         `${sanitizeFilename(cur.sourceLabel)}_${cur.style}.png`,
-      )
-        .then(() => {
-          setKeptIds((prev) => new Set(prev).add(cur.id));
-        })
-        .catch((e) => {
-          console.warn('[LidarExtractViewer] keep failed', e);
-          window.alert(t('lidarExtract.viewer.keepFailed'));
-        })
-        .finally(() => setKeepingId(null));
-    }, 'image/png');
+      );
+      setKeptIds((prev) => new Set(prev).add(cur.id));
+    } catch (e) {
+      console.warn('[LidarExtractViewer] keep failed', e);
+      window.alert(t('lidarExtract.viewer.keepFailed'));
+    } finally {
+      setKeepingId(null);
+    }
   };
 
-  const download = () => {
-    if (!selected) return;
-    selected.canvas.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${sanitizeFilename(selected.sourceLabel)}_${
-        selected.style
-      }_${selected.widthPx}x${selected.heightPx}.png`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    }, 'image/png');
+  const download = async () => {
+    if (!selected || !run) return;
+    const figure = await figureFor(selected, run.bbox25833);
+    if (!figure) return;
+    const url = URL.createObjectURL(figure.blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${sanitizeFilename(selected.sourceLabel)}_${
+      selected.style
+    }_${selected.widthPx}x${selected.heightPx}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
   if (!open || !run) return null;

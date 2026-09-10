@@ -1210,18 +1210,22 @@ preserving:
 ```
 screenshot.ts         ─┐
 flyfoto.ts            ─┤
-lidarExtract "Behold" ─┼→ createAttachment() → PocketBase → realtime → BilderSection
-terrain "Lagre"       ─┤
+lidarExtract "Behold" ─┼→ renderFigureBlob() → createAttachment() → PocketBase
+terrain "Lagre"       ─┤   (§8.10)                → realtime → BilderSection
 starterPack.ts        ─┘
 ```
+
+Every producer hands a **canvas**, not bytes, so the figure stage has somewhere
+to draw a caption; only "Last opp" bypasses it (§8.10).
 
 `kind` is one of `extract | screenshot | upload | flyfoto`; terrain renders
 reuse `extract` with the visualization recorded in `meta.style`, which is why
 adding terrain analysis needed no migration. `meta` also carries source
-key/label, `metresPerPx`, bbox, and for flyfoto the `projectName` / `year` /
-`photoDate` that the gallery captions from ("Flyfoto 1937"). Files are
-`protected` in PocketBase, so the gallery fetches short-lived file tokens for
-thumbnails — a new UI must keep doing that or every thumbnail 403s.
+key/label, `metresPerPx`, bbox, `imageRect` (§8.10), and for flyfoto the
+`projectName` / `year` / `photoDate` that the gallery captions from
+("Flyfoto 1937"). Files are `protected` in PocketBase, so the gallery fetches
+short-lived file tokens for thumbnails — a new UI must keep doing that or every
+thumbnail 403s.
 
 ### 8.8 The flyfoto picker
 
@@ -1286,6 +1290,78 @@ Load-bearing choices:
 - **Multidirectional, not plain hillshade, for the terrain step.** It needs no
   azimuth chosen for it, and a single sun angle hides whatever runs along it —
   the failure that costs most in an image nobody will go back and re-light.
+
+### 8.10 Provenance figures — what a saved image carries
+
+`src/figure/` — three files, no UI. Every raster the app keeps or hands out
+goes through `renderFigureBlob(canvas, spec)` first, and comes back as a
+**figure**: the image untouched, a scale bar and north arrow on it, and a
+caption panel under it naming the dataset, the acquisition, the processing
+settings, the extent, the rights holder and the licence.
+
+This is not decoration. A relief render is an *interpretation* of the ground —
+a hillshade at 315°/35° and one at 135°/20° disagree about whether there is a
+mound in a field. A figure that does not carry its own azimuth cannot be
+checked by anyone, which is the difference between a picture and evidence, and
+reporting a find to Riksantikvaren or a county archaeologist means handing over
+the second kind.
+
+| File | What |
+|---|---|
+| `figure/draw.ts` | canvas primitives: `layoutCaption`, `drawScaleBar`, `drawNorthArrow`, number formatting |
+| `figure/figure.ts` | `FigureSpec`, `CREDITS`, `renderFigure` / `renderFigureBlob`, the seven caption rows |
+| `figure/specs.ts` | one spec builder per producer: `lidarExtractFigure`, `terrainFigure`, `flyfotoFigure`, `screenshotFigure` |
+
+**Scope: everything but "Last opp".** Both LiDAR extract exits ("Behold" *and*
+the PNG download — the download is precisely the copy that ends up in someone
+else's report), terrain "Lagre", the flyfoto grab, "Ta skjermbilde" and all
+three steps of Hent grunnpakke. An upload's provenance is unknown to the app,
+so inventing a caption for it would be worse than none.
+
+Load-bearing:
+
+- **The caption is a panel *below* the image, never an overlay.** No pixel of
+  ground is covered. The cost is that the file is no longer pixel-registered to
+  its bbox, so every attachment records `meta.imageRect` (`{x, y, width,
+  height}`) — where the image sits inside the file. Anything that later wants
+  to georeference a saved raster reads that, not the canvas size.
+- **An image narrower than `MIN_FIGURE_WIDTH` (560 px) is matted, not
+  squeezed.** Below that the caption wraps until it is taller than the picture.
+  `imageRect.x` is the matte offset.
+- **The caption is paper; the furnishings are not.** Dark ink on near-white for
+  the caption, because these land in reports next to excavation photographs.
+  White cased on a translucent dark plate for the scale bar and north arrow,
+  because they sit on ground that is black in one visualization and white in
+  the next.
+- **Every dimension derives from one `figureFontSize(width)`**, so a 600 px
+  screenshot and a 4000 px extract come out as the same figure rather than one
+  with unreadable text and one you could read across a room.
+- **Text wrapping splits on `/ +/`, not `/\s+/`.** `Intl.NumberFormat` groups
+  thousands with U+00A0, and `\s` would happily break a coordinate across two
+  lines.
+- **The north arrow is skipped when the image is under ~6 radii wide or tall.**
+  An arrow overlapping the scale bar reads as a mistake, and "which way is up"
+  is the one thing a north-up raster can leave implicit. It turns by
+  `-rotation`, which is non-zero only for a screenshot of a rotated map.
+- **`renderFigure` never throws and never returns a smaller image than it was
+  given.** If a 2D context cannot be obtained the source canvas comes straight
+  back: losing the picture to save the caption is the wrong trade every time.
+- **`figure/` reads `t` / `i18n` from `'i18next'` directly**, not through
+  `useTranslation` — it is called from five places, three of them outside
+  React. Precedent: `search/infobox/InfoBoxSections.tsx`,
+  `shared/utils/coordinateParser.ts`. Strings live under `figure.*` in all
+  three locales; rights holders are proper names and are *not* translated.
+- **The screenshot is the one figure whose contents the app does not choose**,
+  so its provenance is assembled from live layer state instead —
+  `backgroundLayerAtom` + `hybridOverlayAtom` for the ground label and whether
+  NiB pixels are in it, `activeThemeLayersAtom` for the overlays and hence
+  whether Riksantikvaren is credited. `captureLocalityScreenshot` returns
+  `bbox25833` (the *envelope* of four screen corners, so rotation is honest),
+  `metresPerPx` straight off the view resolution, and the rotation itself.
+
+- **The PocketBase `caption` field is untouched** — still the short human line
+  the gallery shows ("Flyfoto 1937"). The long-form provenance lives in the
+  pixels, where it survives being downloaded, emailed and pasted into a report.
 
 ---
 
@@ -1516,9 +1592,15 @@ Two things in that file must not be undone:
   slider to drag (§8.9).
 
 The canvas itself is **off-DOM**. React does not own it and neither does the
-row: it is the OL source's image and the blob "Lagre" keeps, and the panel
-paints into that one element. Same trap as `LidarExtractViewer`'s moved canvas
-node, from the other direction.
+row: it is the OL source's image and what "Lagre" hands to the figure stage,
+and the panel paints into that one element. Same trap as
+`LidarExtractViewer`'s moved canvas node, from the other direction.
+
+Neither panel's output leaves bare. "Behold", the viewer's PNG download and
+"Lagre" all run their canvas through `renderFigureBlob` first, so the azimuth,
+altitude, z-factor, radii and stretch that produced the render travel with the
+pixels — §8.10. On the no-lokalitet path the lokalitet is created *before* the
+figure, so the name the registers just derived can be its title.
 
 The algorithmic side of all this is `docs/terrain-analysis.md`; the panel is
 only the control surface.
@@ -1732,7 +1814,10 @@ progress in that section.
 
 **Keep it**
 browse the Bilder gallery; open the lightbox; caption an attachment; delete one;
-see flyfoto captioned with its acquisition year.
+see flyfoto captioned with its acquisition year; get every kept or downloaded
+image back as a report-ready figure — scale bar, north arrow, dataset,
+acquisition, processing settings, extent, rights holder and licence burned into
+the file (§8.10), with only "Last opp" left as it arrived.
 
 **Housekeeping**
 switch language (nb / nn / en); open the help page at `/hjelp`; sign out.

@@ -554,5 +554,57 @@
       "tooLarge": "The view covers too large an area for terrain analysis. Zoom in and try again.",
       "unavailable": "Found no map view to analyse."
     }
+  },
+  "figure": {
+    "app": "Tufteseid",
+    "label": {
+      "source": "Source",
+      "method": "Method",
+      "area": "Area",
+      "image": "Image",
+      "rights": "Rights",
+      "produced": "Produced"
+    },
+    "terms": {
+      "ccby": "CC BY 4.0",
+      "nib": "free for private, non-commercial use"
+    },
+    "title": {
+      "extract": "LiDAR extract",
+      "terrain": "Terrain analysis",
+      "flyfoto": "Aerial photo",
+      "screenshot": "Map view"
+    },
+    "source": {
+      "lidarWms": "Kartverket elevation data (WMS, pre-shaded)",
+      "dem": "hoydedata.no · {{model}} per-project mosaic (elevation values)",
+      "nibProject": "Norge i bilder, single acquisition",
+      "nibMosaic": "Norge i bilder, seamless mosaic",
+      "map": "Map view"
+    },
+    "acq": {
+      "year": "flown {{year}}",
+      "density": "{{density}}/m²",
+      "project": "project {{name}}",
+      "date": "acquired {{date}}",
+      "native": "native {{m}} m/px",
+      "overlays": "theme layers: {{layers}}"
+    },
+    "set": {
+      "wmsStyle": "WMS style {{style}}",
+      "model": "model {{model}}",
+      "azimuth": "azimuth {{deg}}°",
+      "altitude": "sun altitude {{deg}}°",
+      "zFactor": "z-factor {{z}}",
+      "multiAzimuths": "multidirectional hillshade, azimuths {{azimuths}}°, weights {{weights}}",
+      "lrmRadius": "LRM radius {{m}} m",
+      "svfRadius": "SVF radius {{m}} m",
+      "svfDirections": "{{n}} directions",
+      "diverging": "diverging ramp, symmetric about zero",
+      "stretch": "contrast stretch 2–98 %",
+      "resampled": "resampled from {{m}} m/px",
+      "ortofoto": "orthophoto, unprocessed",
+      "composite": "composite of the map layers"
+    }
   }
 }

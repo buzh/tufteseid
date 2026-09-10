@@ -522,7 +522,8 @@ Data model:
   EPSG:4326 — Circles round-trip as 64-gons).
 - **`attachments`** — `locality`, `owner`, `kind` (extract | screenshot |
   upload | flyfoto), `file` (protected, ≤20 MB, png/jpeg/webp, thumbs),
-  `caption`, `meta` (json: source key/label, style, metresPerPx, bbox).
+  `caption`, `meta` (json: source key/label, style, metresPerPx, bbox,
+  `imageRect`).
 
 Rules (server-enforced by PB), same shape on all three:
 
@@ -536,6 +537,35 @@ collection → Options → OAuth2 (since 0.23 the providers live on the auth
 collection, not in global settings). No code change needed — the SPA's
 AuthDialog lists whatever is enabled via
 `pb.collection('users').listAuthMethods()`, reading `oauth2.providers`.
+
+### Provenance figures (what a saved image says about itself)
+
+`src/figure/` — every raster the app keeps *or hands out* goes through
+`renderFigureBlob(canvas, spec)` first and comes back as a figure: the image
+untouched, a scale bar and north arrow on it, and a caption panel **below** it
+naming the dataset, the acquisition, the processing settings (azimuth,
+altitude, z-factor, radii, stretch), the EPSG:25833 extent, the geodetic
+centre, the rights holder and the licence.
+
+The reason is the point of the app: a hillshade at 315°/35° and one at 135°/20°
+disagree about whether there is a mound in that field, so a render without its
+own azimuth on it cannot be checked by anyone — which is the difference between
+a picture and evidence, and reporting a find to Riksantikvaren means handing
+over the second kind.
+
+- Scope is **everything but "Last opp"**: both extract exits (Behold *and* the
+  PNG download), terrain Lagre, the flyfoto grab, Ta skjermbilde, all three
+  steps of Hent grunnpakke. An upload's provenance is unknown to the app.
+- Because the caption is a panel below rather than an overlay, the file is no
+  longer pixel-registered to `bbox25833` — every attachment records
+  `meta.imageRect` for where the image sits inside it.
+- Producers therefore hand back a **canvas**, not a blob (`fetchFlyfoto`,
+  `captureLocalityScreenshot`, `renderTerrain`, `extractCanvas`).
+- Strings live under `figure.*`; `src/figure/` reads `t` / `i18n` from
+  `'i18next'` directly, since three of its five call sites are outside React.
+
+Full rationale and the load-bearing details: `docs/ui-architecture.md` §8.10,
+and `docs/terrain-analysis.md` for which parameters each visualization records.
 
 ### Sted / kommune / matrikkel (what the registers already know)
 

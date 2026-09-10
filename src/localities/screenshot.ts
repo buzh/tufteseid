@@ -11,26 +11,43 @@ import { LocalityBbox } from '../api/localities';
 // uses as its retirement backstop.
 const RENDER_TIMEOUT_MS = 15000;
 
+export type LocalityScreenshot = {
+  canvas: HTMLCanvasElement;
+  // Ground covered, EPSG:25833. Exact for an unrotated view, which is every
+  // view unless somebody alt-shift-dragged: under rotation the crop is the
+  // screen-aligned bounding box of a turned rectangle, so this is its
+  // envelope rather than its outline.
+  bbox25833: [number, number, number, number];
+  // From the view resolution, so it stays exact under rotation — which is
+  // what the figure's scale bar is measured off.
+  metresPerPx: number;
+  // Radians, positive clockwise, for the figure's north arrow.
+  rotation: number;
+};
+
 // Capture the current map view cropped to a lokalitet's rectangle.
 // Standard OL canvas-export recipe: wait for rendercomplete, composite
 // every layer canvas (applying each one's CSS transform + opacity), then
 // crop to the rectangle∩viewport in CSS pixels. Safe from canvas taint
 // because all tile sources are same-origin via the /wms/* proxies.
 //
+// Hands back the canvas rather than bytes: the caller runs it through the
+// provenance figure (src/figure), which needs somewhere to draw a caption.
+//
 // Resolves null when the rectangle isn't (meaningfully) in view or
 // anything else goes wrong — callers alert, nothing throws.
 export const captureLocalityScreenshot = (
   map: Map,
   bbox4326: LocalityBbox,
-): Promise<Blob | null> =>
+): Promise<LocalityScreenshot | null> =>
   new Promise((resolve) => {
     let settled = false;
-    const finish = (blob: Blob | null) => {
+    const finish = (shot: LocalityScreenshot | null) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       unByKey(key);
-      resolve(blob);
+      resolve(shot);
     };
 
     const timer = setTimeout(() => {
@@ -42,7 +59,8 @@ export const captureLocalityScreenshot = (
       try {
         const size = map.getSize();
         if (!size) return finish(null);
-        const projection = map.getView().getProjection().getCode();
+        const view = map.getView();
+        const projection = view.getProjection().getCode();
         const extent = transformExtent(bbox4326, 'EPSG:4326', projection);
         const topLeft = map.getPixelFromCoordinate([extent[0], extent[3]]);
         const bottomRight = map.getPixelFromCoordinate([extent[2], extent[1]]);
@@ -113,7 +131,45 @@ export const captureLocalityScreenshot = (
         const outCtx = out.getContext('2d');
         if (!outCtx) return finish(null);
         outCtx.drawImage(composite, sx, sy, sw, sh, 0, 0, sw, sh);
-        out.toBlob((blob) => finish(blob), 'image/png');
+
+        // What the crop actually covers, back out of screen space. Four
+        // corners rather than two, so a rotated view still yields the right
+        // envelope.
+        const xs: number[] = [];
+        const ys: number[] = [];
+        for (const pixel of [
+          [sx, sy],
+          [ex, sy],
+          [sx, ey],
+          [ex, ey],
+        ]) {
+          const coord = map.getCoordinateFromPixel(pixel);
+          if (!coord) return finish(null);
+          xs.push(coord[0]);
+          ys.push(coord[1]);
+        }
+        const captured: [number, number, number, number] = [
+          Math.min(...xs),
+          Math.min(...ys),
+          Math.max(...xs),
+          Math.max(...ys),
+        ];
+        const bbox25833 =
+          projection === 'EPSG:25833'
+            ? captured
+            : (transformExtent(captured, projection, 'EPSG:25833') as [
+                number,
+                number,
+                number,
+                number,
+              ]);
+
+        finish({
+          canvas: out,
+          bbox25833,
+          metresPerPx: view.getResolution() ?? (captured[2] - captured[0]) / sw,
+          rotation: view.getRotation(),
+        });
       } catch (e) {
         console.warn('[screenshot] capture failed', e);
         finish(null);

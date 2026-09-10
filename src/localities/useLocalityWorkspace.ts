@@ -21,8 +21,16 @@ import {
 import { currentUserAtom } from '../auth/atoms';
 import { useDrawSettings } from '../draw/drawControls/hooks/drawSettings';
 import { getDrawLayer } from '../draw/drawControls/hooks/mapLayers';
+import { renderFigureBlob } from '../figure/figure';
+import { flyfotoFigure, screenshotFigure } from '../figure/specs';
 import { lidarExtractSelectionAtom } from '../lidarExtract/atoms';
 import { mapAtom } from '../map/atoms';
+import { activeThemeLayersAtom } from '../map/layers/atoms';
+import type { BackgroundLayerName } from '../map/layers/backgroundLayers';
+import {
+  backgroundLayerAtom,
+  hybridOverlayAtom,
+} from '../map/layers/config/backgroundLayers/atoms';
 import { fitPadding } from '../shell/chromeInsets';
 import { terrainStandaloneBboxAtom } from '../terrain/atoms';
 import { toast } from '../ui';
@@ -90,6 +98,25 @@ export type FlyfotoNoticeFor = 'picker' | 'starter';
 // How many images a full grunnpakke is, for the "n of m" it reports.
 const STARTER_TOTAL = STARTER_STEPS.length;
 
+// What the ground was, for the screenshot figure's source line. Keyed on the
+// background layer rather than asked of useGroundMode, which needs the whole
+// LiDAR + flyfoto control surface mounted to answer the same question.
+const GROUND_LABEL_KEY: Record<BackgroundLayerName, string> = {
+  topo: 'ribbon.mode.standard',
+  empty: 'ribbon.mode.standard',
+  lidarHillshade: 'ribbon.mode.lidar',
+  lidarProject: 'ribbon.mode.lidar',
+  flyfoto: 'ribbon.mode.flyfoto',
+  flyfotoProject: 'ribbon.mode.flyfoto',
+  // Never the value of backgroundLayerAtom — hybrid is a modifier — but the
+  // union has to be covered.
+  topoOverlay: 'ribbon.mode.hybrid',
+};
+
+// Which grounds put Norge i bilder pixels in the frame, i.e. whose credit
+// line has to name NiB as well as Kartverket.
+const NIB_GROUNDS = new Set<BackgroundLayerName>(['flyfoto', 'flyfotoProject']);
+
 // Attachment filenames go into a download dialog eventually, so keep them to
 // something a filesystem and a URL both accept.
 const sanitizeFilename = (s: string) =>
@@ -139,6 +166,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const mode = useAtomValue(workspaceModeAtom);
   const [funnOutside, setFunnOutside] = useAtom(funnOutsideAtom);
   const setTerrainStandaloneBbox = useSetAtom(terrainStandaloneBboxAtom);
+  // Read only so a screenshot can say whose pixels are in it.
+  const background = useAtomValue(backgroundLayerAtom);
+  const hybrid = useAtomValue(hybridOverlayAtom);
+  const themeLayers = useAtomValue(activeThemeLayersAtom);
   const [shooting, setShooting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fetchingFlyfoto, setFetchingFlyfoto] = useState(false);
@@ -594,8 +625,29 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     if (!user || !isMine || shooting) return;
     setShooting(true);
     try {
-      const blob = await captureLocalityScreenshot(map, locality.bbox);
-      if (!blob) {
+      const shot = await captureLocalityScreenshot(map, locality.bbox);
+      if (!shot) {
+        toast.error({ title: t('localities.tools.screenshotFailed') });
+        return;
+      }
+      // Hybrid is a LiDAR stack with names on it, so it credits the same
+      // way; the label is the only thing that differs.
+      const figure = await renderFigureBlob(
+        shot.canvas,
+        screenshotFigure({
+          subject: locality.name || undefined,
+          groundLabel: t(
+            hybrid ? 'ribbon.mode.hybrid' : GROUND_LABEL_KEY[background],
+          ),
+          groundIsFlyfoto: NIB_GROUNDS.has(background),
+          themeLayers: [...themeLayers],
+          metresPerPx: shot.metresPerPx,
+          bbox25833: shot.bbox25833,
+          rotation: shot.rotation,
+          language: i18n.language,
+        }),
+      );
+      if (!figure) {
         toast.error({ title: t('localities.tools.screenshotFailed') });
         return;
       }
@@ -604,9 +656,14 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           locality: locality.id,
           kind: 'screenshot',
           caption: `${t('localities.tools.screenshotCaption')} ${new Date().toLocaleDateString(i18n.language)}`,
+          meta: {
+            bbox25833: shot.bbox25833,
+            metresPerPx: shot.metresPerPx,
+            imageRect: figure.imageRect,
+          },
         },
         user.id,
-        blob,
+        figure.blob,
         'skjermbilde.png',
       );
       setAttachmentItems((prev) => (prev ? [rec, ...prev] : [rec]));
@@ -623,7 +680,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     shooting,
     map,
     locality.id,
+    locality.name,
     locality.bbox,
+    background,
+    hybrid,
+    themeLayers,
     setAttachmentItems,
     t,
     i18n.language,
@@ -686,6 +747,26 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           });
           return false;
         }
+        // JPEG all the way through, like the stitch itself: the caption is
+        // large flat type and survives it, and a lossless copy of a
+        // lossy-sourced photograph is several times the bytes for nothing.
+        const figure = await renderFigureBlob(
+          result.canvas,
+          flyfotoFigure({
+            subject: locality.name || undefined,
+            project,
+            metresPerPx: result.metresPerPx,
+            bbox25833: result.bbox25833,
+          }),
+          'image/jpeg',
+          0.9,
+        );
+        if (!figure) {
+          toast.error({
+            title: t('localities.tools.flyfotoFailedFor', { label }),
+          });
+          return false;
+        }
         const rec = await createAttachment(
           {
             locality: locality.id,
@@ -700,6 +781,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
               sourceLabel: 'Norge i bilder',
               metresPerPx: result.metresPerPx,
               bbox25833: result.bbox25833,
+              imageRect: figure.imageRect,
               ...(project
                 ? {
                     projectName: project.projectName,
@@ -710,7 +792,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
             },
           },
           user.id,
-          result.blob,
+          figure.blob,
           'flyfoto.jpg',
         );
         setAttachmentItems((prev) => (prev ? [rec, ...prev] : [rec]));
@@ -728,6 +810,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       user,
       isMine,
       locality.id,
+      locality.name,
       locality.bbox,
       setAttachmentItems,
       t,
@@ -814,6 +897,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
             style: raster.style,
             metresPerPx: raster.metresPerPx,
             bbox25833: raster.bbox25833,
+            imageRect: raster.imageRect,
           },
         },
         user.id,
@@ -870,11 +954,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       if (ac.signal.aborted) return;
       setStarterStep('extract');
       try {
-        const extract = await starterExtract(
-          locality.bbox,
-          bbox25833,
-          ac.signal,
-        );
+        const extract = await starterExtract(locality.bbox, bbox25833, {
+          subject: locality.name || undefined,
+          signal: ac.signal,
+        });
         if (extract && !ac.signal.aborted) {
           await saveStarterRaster(
             extract,
@@ -895,7 +978,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         const terrain = await starterTerrain(
           locality.bbox,
           t('localities.terrain.sourceLabel'),
-          ac.signal,
+          { subject: locality.name || undefined, signal: ac.signal },
         );
         if (terrain && !ac.signal.aborted) {
           await saveStarterRaster(
@@ -932,6 +1015,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     starterStep,
     fetchingFlyfoto,
     locality.bbox,
+    locality.name,
     ensureFlyfotoProjects,
     grabFlyfoto,
     saveStarterRaster,

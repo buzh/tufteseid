@@ -12,14 +12,20 @@
 // This module only *makes* the images. Captions, `createAttachment` and the
 // gallery's optimistic update stay in useLocalityWorkspace, where the
 // translations and the record ids are — see `runStarterPack` there.
+//
+// Both images go out as provenance figures (src/figure), same as when they
+// are produced by hand: an image nobody chose the settings for is exactly the
+// one whose settings have to be written on it.
 
 import type { LocalityBbox } from '../api/localities';
+import { type ImageRect, renderFigureBlob } from '../figure/figure';
+import { lidarExtractFigure, terrainFigure } from '../figure/specs';
 import { extractCanvas } from '../lidarExtract/run';
 import {
   enumerateLidarSources,
   type LidarSource,
 } from '../lidarExtract/sources';
-import { renderTerrain } from '../terrain/render';
+import { DEFAULT_LIGHT, renderTerrain } from '../terrain/render';
 import type { Visualization } from '../terrain/shade';
 
 /** The order they are fetched in, and the order they appear in Bilder. */
@@ -35,7 +41,12 @@ export type StarterRaster = {
   style: string;
   metresPerPx: number;
   bbox25833: [number, number, number, number];
+  /** Where the image sits inside the figure — the caption is below it. */
+  imageRect: ImageRect;
 };
+
+/** The lokalitet's name for the figure's title line, and the abort signal. */
+export type StarterOptions = { subject?: string; signal?: AbortSignal };
 
 // The hillshade every LiDAR source advertises. A starter pack is not the
 // place to offer helning_prosent — one legible image beats five to pick from,
@@ -47,9 +58,6 @@ const STARTER_STYLE = 'skyggerelieff';
 // it — which for a starter image is the failure that costs the most, because
 // nobody goes back to re-light a render they were handed.
 const STARTER_VIS: Visualization = 'multiHillshade';
-
-const toPng = (canvas: HTMLCanvasElement): Promise<Blob | null> =>
-  new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 
 /**
  * The best LiDAR source over this rectangle: the densest, newest per-project
@@ -68,7 +76,7 @@ const bestLidarSource = (sources: LidarSource[]): LidarSource | null => {
 export const starterExtract = async (
   bbox4326: LocalityBbox,
   bbox25833: [number, number, number, number],
-  signal?: AbortSignal,
+  { subject, signal }: StarterOptions = {},
 ): Promise<StarterRaster | null> => {
   const sources = await enumerateLidarSources(bbox4326);
   const source = bestLidarSource(sources);
@@ -80,11 +88,24 @@ export const starterExtract = async (
 
   const result = await extractCanvas(bbox25833, source, style, signal);
   if (!result) return null;
-  const blob = await toPng(result.canvas);
-  if (!blob) return null;
+
+  const figure = await renderFigureBlob(
+    result.canvas,
+    lidarExtractFigure({
+      subject,
+      sourceLabel: source.label,
+      style,
+      year: source.year,
+      pointDensity: source.pointDensity,
+      metresPerPx: result.metresPerPx,
+      bbox25833: result.bbox25833,
+    }),
+  );
+  if (!figure) return null;
 
   return {
-    blob,
+    blob: figure.blob,
+    imageRect: figure.imageRect,
     sourceLabel: source.label,
     style,
     metresPerPx: result.metresPerPx,
@@ -101,18 +122,29 @@ export const starterExtract = async (
 export const starterTerrain = async (
   bbox4326: LocalityBbox,
   sourceLabel: string,
-  signal?: AbortSignal,
+  { subject, signal }: StarterOptions = {},
 ): Promise<StarterRaster | null> => {
   const render = await renderTerrain(bbox4326, {
     vis: STARTER_VIS,
     signal,
   });
   if (!render) return null;
-  const blob = await toPng(render.canvas);
-  if (!blob) return null;
+
+  const figure = await renderFigureBlob(
+    render.canvas,
+    terrainFigure({
+      subject,
+      vis: STARTER_VIS,
+      model: 'dtm',
+      light: DEFAULT_LIGHT,
+      dem: render.dem,
+    }),
+  );
+  if (!figure) return null;
 
   return {
-    blob,
+    blob: figure.blob,
+    imageRect: figure.imageRect,
     sourceLabel,
     style: STARTER_VIS,
     metresPerPx: render.dem.metresPerPx,

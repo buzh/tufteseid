@@ -34,7 +34,7 @@ export type Visualization =
 // by symmetry and the blend collapses to cos(zenith)·cos(slope) — a slope
 // map. Measured on a 1 m Oslo DEM the giveaway was a maximum of exactly
 // 0.7071 = cos(45°), i.e. no cell anywhere brighter than flat ground.
-const MULTI_AZIMUTHS = [
+export const MULTI_AZIMUTHS = [
   { azimuth: 225, weight: 3 },
   { azimuth: 270, weight: 4 },
   { azimuth: 315, weight: 5 },
@@ -46,7 +46,7 @@ const MULTI_AZIMUTHS = [
 // Sky-view factor cost is width × height × directions × radius. 16 is the
 // usual compromise in the literature — 8 leaves visible directional
 // banding, 32 doubles the cost for little gain.
-const SVF_DIRECTIONS = 16;
+export const SVF_DIRECTIONS = 16;
 
 // Hard ceiling on the SVF search radius in *pixels*, whatever the metre
 // value works out to. Keeps a fine-resolution DEM from turning a 3-second

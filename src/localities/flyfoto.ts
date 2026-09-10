@@ -69,7 +69,10 @@ const MAX_CONCURRENT = 4;
 const TILE_RETRIES = 3;
 
 export type FlyfotoResult = {
-  blob: Blob;
+  // The stitched pixels, not bytes: everything that keeps one of these runs
+  // it through the provenance figure first (src/figure), which needs a
+  // canvas to draw a caption under.
+  canvas: HTMLCanvasElement;
   widthPx: number;
   heightPx: number;
   metresPerPx: number;
@@ -183,13 +186,8 @@ export async function fetchFlyfoto(
 
   if (painted === 0) return null;
 
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, 'image/jpeg', 0.9),
-  );
-  if (!blob) return null;
-
   return {
-    blob,
+    canvas,
     widthPx: plan.widthPx,
     heightPx: plan.heightPx,
     metresPerPx: (bbox25833[2] - bbox25833[0]) / plan.widthPx,
