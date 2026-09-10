@@ -1,5 +1,4 @@
 import { atom } from 'jotai';
-import type { LocalityBbox } from '../api/localities';
 import { funnDraftActiveAtom } from './atoms';
 
 // Which tool surface the workspace is showing. Drawing is deliberately not
@@ -20,14 +19,17 @@ export const workspaceModeAtom = atom<WorkspaceMode>((get) =>
   get(funnDraftActiveAtom) ? 'draft' : (get(ribbonToolAtom) ?? 'browse'),
 );
 
-// Whether the tray (funn / bilder / kulturminner / detaljer) is unfolded.
-// Module-level rather than component state because the tray unmounts
-// whenever a tool takes the surface over, and folding it away should not be
-// undone by a trip through the terrain panel.
-export const trayOpenAtom = atom(true);
+// Whether the lokalitet dock is unfolded. Module-level rather than component
+// state so folding it away to look at the map survives closing and reopening
+// a lokalitet — the one gesture you make precisely because you want the map,
+// undone by the next thing you open, would be worse than no fold at all.
+export const dockOpenAtom = atom(true);
 
-// Pending bbox for the grow-to-fit prompt; non-null means the modal is up.
-// An atom rather than component state because the keyboard layer has to
-// stand down while it shows, and once the panel is split into ribbon rows
-// the modal and that layer no longer share a component.
-export const growPromptAtom = atom<LocalityBbox | null>(null);
+// The drawing in progress sticks out of the lokalitet's rectangle.
+//
+// A flag, not the union bbox it used to hold: this is read while the pen is
+// moving, and re-publishing a rectangle that grows with every frame of a drag
+// would re-render the dock on every frame to say the same thing. The union is
+// cheap to recompute from the draw layer at the moment "Utvid området" is
+// pressed, and computing it there means it can't go stale.
+export const funnOutsideAtom = atom(false);

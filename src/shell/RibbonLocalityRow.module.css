@@ -37,7 +37,7 @@
 }
 
 /* Visibility chip plus the "1,4 km² · 3 funn" line. Hidden below md: the
-   same facts are in the tray's Detaljer section, and the verbs matter more
+   same facts are in the dock's Detaljer section, and the verbs matter more
    on a small screen. */
 .summary {
   display: none;
@@ -65,4 +65,58 @@
   align-items: center;
   flex-wrap: wrap;
   gap: var(--sp-2);
+}
+
+/* The overflow menu. Same shape as the funn row's, on purpose: one idiom for
+   "the rest of what you can do to this thing". */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.menuTitle {
+  margin-bottom: var(--sp-3);
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-sm);
+  color: var(--c-fg);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover:not(:disabled) {
+  background: var(--c-bg-hover);
+}
+
+.menuItem:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.menuItemActive {
+  background: var(--c-bg-active);
+}
+
+.menuItemDanger {
+  color: var(--c-danger);
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
 }

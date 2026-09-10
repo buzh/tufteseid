@@ -4,28 +4,30 @@ import { ErrorBoundary } from '../shared/ErrorBoundary';
 import { LocalityRibbon } from './LocalityRibbon';
 import styles from './Ribbon.module.css';
 import { RibbonGlobalRow } from './RibbonGlobalRow';
-import { RibbonTerrainRow } from './RibbonTerrainRow';
 
 /**
- * The bar across the top of the map. One row per level of context: row 1 is
- * the map itself and is always there; the rest appear with an open lokalitet
- * — except terrain, which is a reading of the ground and needs neither a
- * lokalitet nor an account, so it hangs off the bar directly.
+ * The bar across the top of the map. Two thin rows at most: row 1 is the map
+ * itself and is always there; row 2 is the open lokalitet, and is a context
+ * strip rather than a surface.
  *
- * `data-ribbon` is how `viewportBbox` finds out how much of the map the bar
- * is covering. Measured rather than a constant because the bar's height is
- * whatever its rows currently add up to.
+ * Nothing with a body goes here any more. The tray and the tool rows used to
+ * grow the bar to five hundred pixels — over the terrain the panels were
+ * describing — and have moved to the dock in the right slot.
+ *
+ * `data-chrome="top"` is how `chromeInsets` finds out how much of the map the
+ * bar is covering. Measured rather than a constant because the rows wrap on
+ * narrow screens and row 2 comes and goes.
  *
  * Each row gets its own error boundary rather than one around the bar. A
- * crash in a lokalitet row should not take the search field and the
- * background controls with it — the map underneath stays usable, and that
- * is the whole reason the chrome floats over it.
+ * crash in the lokalitet row should not take the search field and the
+ * background controls with it — the map underneath stays usable, and that is
+ * the whole reason the chrome floats over it.
  */
 export const Ribbon = () => {
   const activeLocality = useAtomValue(activeLocalityAtom);
 
   return (
-    <div className={styles.bar} data-ribbon>
+    <div className={styles.bar} data-chrome="top">
       <ErrorBoundary name="RibbonGlobalRow">
         <RibbonGlobalRow />
       </ErrorBoundary>
@@ -34,9 +36,6 @@ export const Ribbon = () => {
         // form state rather than carrying the previous one's draft across.
         <LocalityRibbon key={activeLocality.id} locality={activeLocality} />
       )}
-      <ErrorBoundary name="RibbonTerrainRow">
-        <RibbonTerrainRow />
-      </ErrorBoundary>
     </div>
   );
 };

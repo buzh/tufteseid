@@ -1,0 +1,76 @@
+/*
+ * The seam is drawn here rather than on the canvas so it stays crisp at any
+ * device pixel ratio and can carry a grip that is a real focus target.
+ * Everything is cased white-under-dark for the same reason the lokalitet
+ * frame is: it has to read over both a grey hillshade and a bright ortofoto.
+ */
+
+.root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Wider than the line: a 2 px grab target is a 2 px grab target. */
+  width: 24px;
+  margin-left: -12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ew-resize;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.handle:focus-visible {
+  outline: none;
+}
+
+.handle:focus-visible .line,
+.handle:focus-visible .grip {
+  box-shadow: 0 0 0 2px var(--c-focus);
+}
+
+.line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--c-gray-900);
+  box-shadow:
+    -1px 0 0 rgb(255 255 255 / 85%),
+    1px 0 0 rgb(255 255 255 / 85%);
+}
+
+.grip {
+  position: relative;
+  width: 18px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  background: var(--c-bg);
+  border: 1px solid var(--c-border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+/* Two ticks, so the pill reads as something to drag sideways. */
+.grip::before,
+.grip::after {
+  content: '';
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  width: 1px;
+  background: var(--c-fg-subtle);
+}
+
+.grip::before {
+  left: 6px;
+}
+
+.grip::after {
+  right: 6px;
+}

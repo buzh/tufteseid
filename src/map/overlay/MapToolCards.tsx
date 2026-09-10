@@ -74,7 +74,7 @@ const MapToolCard = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <div className={styles.card}>
+    <div className={styles.card} data-chrome="left">
       <div className={styles.head}>
         {header}
         <IconButton

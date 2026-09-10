@@ -8,6 +8,7 @@ import Cluster from 'ol/source/Cluster';
 import VectorSource from 'ol/source/Vector';
 import { getMarkerLayer } from '../../draw/drawControls/hooks/mapLayers';
 import { mapAtom } from '../../map/atoms';
+import { fitPadding } from '../../shell/chromeInsets';
 import { SearchResult } from '../../types/searchTypes';
 import { clusterStyle } from './cluster';
 import { createMarker } from './marker';
@@ -52,7 +53,7 @@ const handleClusterClick = (
     });
     view.fit(extent, {
       duration: 500,
-      padding: [50, 50, 50, 50],
+      padding: fitPadding(map),
       maxZoom: minZoom,
     });
   }

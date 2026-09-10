@@ -60,8 +60,8 @@
   padding-left: var(--sp-1);
 }
 
-/* Tray columns want the body to scroll on its own rather than growing the
-   ribbon; row layouts leave this off and let the whole section grow. */
+/* Dock sections want the body to scroll on its own rather than growing the
+   column; inline layouts leave this off and let the whole section grow. */
 .scroll {
   overflow: auto;
   overscroll-behavior: contain;

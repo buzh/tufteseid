@@ -181,6 +181,18 @@ export const getLayerFromConfig = async (
   return null;
 };
 
+/**
+ * Which stack a raster layer belongs to.
+ *
+ * `bg.` is *the* background — the one stack `swapBackgroundLayers` owns and
+ * sweeps. `cmp.` is the compare curtain's B side (src/map/compare/), which
+ * has to be invisible to that sweep. It also namespaces the reuse signature:
+ * A and B routinely resolve to the same config (both stacks carry a topo
+ * base), and handing them one layer instance would put it in the map twice
+ * and clip the wrong half.
+ */
+export type LayerNamespace = 'bg' | 'cmp';
+
 // Strictly the `bg.` prefix. This used to also count any layer without
 // an id, which no layer in the app has — every one is constructed with
 // `properties: { id }` — so the clause could only ever fire for a future
@@ -217,10 +229,12 @@ const layerSignature = (
 export const buildOrReuseBackgroundLayer = async (
   config: BackgroundLayer,
   projection: string,
+  ns: LayerNamespace = 'bg',
 ): Promise<TileLayer | null> => {
   const store = getDefaultStore();
   const map = store.get(mapAtom);
-  const signature = layerSignature(config, projection);
+  const base = layerSignature(config, projection);
+  const signature = base && `${ns}|${base}`;
   if (signature) {
     const existing = map
       .getLayers()
@@ -229,7 +243,12 @@ export const buildOrReuseBackgroundLayer = async (
     if (existing) return existing as TileLayer;
   }
   const layer = await getLayerFromConfig(config, projection);
-  if (layer && signature) layer.set('sig', signature);
+  if (layer) {
+    // The builders all stamp `bg.<name>`; anything else renames on the way
+    // out rather than threading the namespace through three constructors.
+    if (ns !== 'bg') layer.set('id', `${ns}.${config.layerName}`);
+    if (signature) layer.set('sig', signature);
+  }
   return layer;
 };
 

@@ -200,6 +200,16 @@ holes.) It's a short-window *volume* budget of roughly 120 GetMaps, not a
 concurrency limit, and nothing in nginx can retry it — `proxy_next_upstream`
 only sees status codes. The only defence is fewer requests.
 
+*The one deliberate exception* is the compare curtain
+(`src/map/compare/`, `docs/ui-architecture.md` §5.8): it puts a second full
+background stack on the map, so a screenful costs roughly twice what it
+normally does, and the two stacks share the one tile queue below. That is why
+Sammenlign is a mode you enter and leave rather than a persistent split, why
+the B stack is torn down on exit, and why it is not persisted to the URL — a
+shared link must not put every recipient into double spend on a budget the
+whole deployment shares. Its layers are otherwise ordinary background layers
+and get every mitigation below, `coverageExtent` culling included.
+
 **One tile queue per `Map`, shared by every layer.** OL won't start a tile
 while `maxTilesLoading` are in flight (default 16, hard-capped to 8 during
 animation). A cold LiDAR WMS tile takes 3–12 s against Kartverket while the

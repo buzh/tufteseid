@@ -34,6 +34,130 @@ export type StylesBySource = Record<string, string[]>;
 
 let currentAbort: AbortController | null = null;
 
+type TileJob = {
+  url: string;
+  dx: number;
+  dy: number;
+  dw: number;
+  dh: number;
+  ctx: CanvasRenderingContext2D;
+};
+
+// 'aborted' is not an outcome the caller records — the run it belonged to is
+// gone, and counting it would finish a canvas nobody is watching.
+type TileOutcomeKind = 'painted' | 'blank' | 'failed' | 'aborted';
+
+// The retry loop both entrances share. Progress reporting is deliberately not
+// in here: the interactive run pushes per-tile counters into an atom, the
+// headless one only cares how many tiles painted.
+async function paintTile(
+  item: TileJob,
+  signal: AbortSignal,
+): Promise<{ kind: TileOutcomeKind; errorMessage?: string }> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= TILE_MAX_RETRIES; attempt++) {
+    if (signal.aborted) return { kind: 'aborted' };
+    try {
+      const result = await fetchAndPaint(
+        item.url,
+        item.ctx,
+        item.dx,
+        item.dy,
+        item.dw,
+        item.dh,
+        signal,
+      );
+      return { kind: result === 'blank' ? 'blank' : 'painted' };
+    } catch (err) {
+      lastErr = err;
+      if (signal.aborted) return { kind: 'aborted' };
+      if (attempt < TILE_MAX_RETRIES) {
+        await sleep(TILE_RETRY_BASE_MS * 2 ** attempt, signal);
+      }
+    }
+  }
+  return {
+    kind: 'failed',
+    errorMessage: lastErr instanceof Error ? lastErr.message : String(lastErr),
+  };
+}
+
+export type ExtractedCanvas = {
+  canvas: HTMLCanvasElement;
+  metresPerPx: number;
+  widthPx: number;
+  heightPx: number;
+  bbox25833: [number, number, number, number];
+};
+
+/**
+ * One source × one style, stitched, with no atom in sight — what "Hent
+ * grunnpakke" runs.
+ *
+ * Separate from `startExtraction` rather than a special case of it: that one
+ * exists to *report*, spending a shared tile budget across every canvas of a
+ * multi-source run and pushing per-tile counters into `lidarExtractRunAtom`
+ * as they land. This one has a single canvas and one thing to say about it at
+ * the end. It also does not touch `currentAbort`, so a background grab can
+ * never cancel the extract the user is watching.
+ *
+ * `null` when nothing painted, i.e. the rectangle is outside this source's
+ * coverage or every tile failed — the same meaning `noCoverage` has in the
+ * interactive run.
+ */
+export async function extractCanvas(
+  bbox25833: [number, number, number, number],
+  source: LidarSource,
+  style: string,
+  signal?: AbortSignal,
+): Promise<ExtractedCanvas | null> {
+  const metresPerPx = nativeResolutionMetersPerPx(source);
+  const plan = planTiles(bbox25833, metresPerPx);
+  if (plan.tiles.length === 0) return null;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = plan.widthPx;
+  canvas.height = plan.heightPx;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const ac = new AbortController();
+  const abort = () => ac.abort();
+  signal?.addEventListener('abort', abort);
+
+  let painted = 0;
+  try {
+    await runWithConcurrency(plan.tiles, MAX_CONCURRENT_TILES, async (tile) => {
+      const outcome = await paintTile(
+        {
+          url: buildGetMapUrl(source, style, tile.bbox25833, tile.w, tile.h),
+          dx: tile.dx,
+          dy: tile.dy,
+          dw: tile.w,
+          dh: tile.h,
+          ctx,
+        },
+        ac.signal,
+      );
+      if (outcome.kind === 'painted') painted++;
+    });
+  } finally {
+    signal?.removeEventListener('abort', abort);
+  }
+
+  if (painted === 0 || signal?.aborted) return null;
+  return {
+    canvas,
+    // What the stitch actually produced: planTiles scales both axes down
+    // together past its canvas cap, so on a large rectangle this is coarser
+    // than the source's native resolution.
+    metresPerPx: (bbox25833[2] - bbox25833[0]) / plan.widthPx,
+    widthPx: plan.widthPx,
+    heightPx: plan.heightPx,
+    bbox25833,
+  };
+}
+
 export function startExtraction(
   bbox25833: [number, number, number, number],
   sources: LidarSource[],
@@ -47,15 +171,7 @@ export function startExtraction(
   const runId = Date.now();
 
   const canvases: LidarCanvas[] = [];
-  const workItems: Array<{
-    canvasId: string;
-    url: string;
-    dx: number;
-    dy: number;
-    dw: number;
-    dh: number;
-    ctx: CanvasRenderingContext2D;
-  }> = [];
+  const workItems: Array<TileJob & { canvasId: string }> = [];
 
   for (const source of sources) {
     const styles = stylesBySource[source.key] ?? [];
@@ -110,37 +226,12 @@ export function startExtraction(
   void runWithConcurrency(workItems, MAX_CONCURRENT_TILES, async (item) => {
     if (abort.signal.aborted) return;
     markStatus(runId, item.canvasId, 'fetching');
-    let lastErr: unknown;
-    for (let attempt = 0; attempt <= TILE_MAX_RETRIES; attempt++) {
-      if (abort.signal.aborted) return;
-      try {
-        const result = await fetchAndPaint(
-          item.url,
-          item.ctx,
-          item.dx,
-          item.dy,
-          item.dw,
-          item.dh,
-          abort.signal,
-        );
-        recordTileDone(runId, item.canvasId, {
-          blank: result === 'blank',
-          failed: false,
-        });
-        return;
-      } catch (err) {
-        lastErr = err;
-        if (abort.signal.aborted) return;
-        if (attempt < TILE_MAX_RETRIES) {
-          await sleep(TILE_RETRY_BASE_MS * 2 ** attempt, abort.signal);
-        }
-      }
-    }
-    const message = lastErr instanceof Error ? lastErr.message : String(lastErr);
+    const outcome = await paintTile(item, abort.signal);
+    if (outcome.kind === 'aborted') return;
     recordTileDone(runId, item.canvasId, {
-      blank: false,
-      failed: true,
-      errorMessage: message,
+      blank: outcome.kind === 'blank',
+      failed: outcome.kind === 'failed',
+      errorMessage: outcome.errorMessage,
     });
   });
 

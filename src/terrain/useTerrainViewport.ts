@@ -6,10 +6,13 @@ import { toast } from '../ui';
 import { terrainStandaloneBboxAtom } from './atoms';
 
 /**
- * Row 1's "Terreng": read the ground you are looking at, with no lokalitet
- * and no sign-in. Terrain analysis is the one thing here that no WMS can
- * offer, and until now it sat four steps deep behind sign-in, creating a
- * lokalitet and opening its workspace.
+ * Row 1's "Terreng", standalone half: read the ground you are looking at,
+ * with no lokalitet and no sign-in. Terrain analysis is the one thing here
+ * that no WMS can offer, and until now it sat four steps deep behind sign-in,
+ * creating a lokalitet and opening its workspace.
+ *
+ * Entering and leaving the mode is useGroundMode's job — this only knows how
+ * to frame a rectangle and whether one is up.
  *
  * Frames the same inset viewport rectangle "Ny lokalitet" does, so the two
  * agree about what "the visible map" means — including the span guard, which
@@ -39,13 +42,5 @@ export const useTerrainViewport = () => {
     setBbox(result.bbox);
   };
 
-  const toggle = () => {
-    if (bbox) {
-      setBbox(null);
-      return;
-    }
-    frame();
-  };
-
-  return { active: bbox != null, toggle, frame };
+  return { active: bbox != null, frame };
 };

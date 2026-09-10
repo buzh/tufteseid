@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, MouseEvent } from 'react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LocalityRecord } from '../api/localities';
@@ -6,10 +6,12 @@ import type { LocalityWorkspaceApi } from '../localities/useLocalityWorkspace';
 import {
   Badge,
   type BadgePalette,
-  ConfirmPopover,
+  Button,
   cx,
+  Icon,
   IconButton,
   Input,
+  Popover,
   Tooltip,
 } from '../ui';
 import { ModeButton } from './ModeButton';
@@ -87,25 +89,163 @@ const LocalityName = ({
   );
 };
 
-/**
- * Row 2 — the open lokalitet: what it is on the left, what you can do to it
- * on the right.
- *
- * Every verb here either flips the surface below (Nytt funn, LiDAR, Terreng)
- * or acts on the rectangle in place (Bilde, Flyfoto, Last opp, Juster). They
- * share a row because they share a subject; which of them takes the tool row
- * over is the controller's business, not this component's.
+/*
+ * The verbs that are not part of the loop: uploading a file you already have,
+ * reshaping the rectangle, throwing the whole thing away. Behind a menu
+ * because the strip beside it has to stay short enough to read at a glance —
+ * this row is a context strip now, not a toolbar.
  */
-export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
+const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
-  const { locality, isMine, mode } = ws;
+  const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const close = () => {
+    setOpen(false);
+    setConfirming(false);
+  };
 
   const pickFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (file) ws.uploadFile(file);
   };
+
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        hidden
+        onChange={pickFile}
+      />
+      <Popover
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) setConfirming(false);
+        }}
+        align="end"
+        width={240}
+        label={t('localities.workspace.more')}
+        trigger={
+          <IconButton
+            icon="more_vert"
+            size="md"
+            palette="gray"
+            aria-label={t('localities.workspace.more')}
+            aria-expanded={open}
+            onClick={(e: MouseEvent) => {
+              e.stopPropagation();
+              setOpen(!open);
+            }}
+          />
+        }
+      >
+        {confirming ? (
+          <>
+            <p className={rowStyles.menuTitle}>
+              {t('localities.workspace.confirmDelete', {
+                name: ws.locality.name,
+              })}
+            </p>
+            <div className={rowStyles.confirmActions}>
+              <Button
+                size="xs"
+                palette="gray"
+                onClick={() => setConfirming(false)}
+              >
+                {t('shared.cancel')}
+              </Button>
+              <Button
+                size="xs"
+                variant="primary"
+                palette="red"
+                onClick={() => {
+                  close();
+                  ws.removeLocality();
+                }}
+              >
+                {t('localities.workspace.deleteLocality')}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className={rowStyles.menu}>
+            {/* First in the list because it is the one thing here you do on
+                a lokalitet you have just made, and never again. */}
+            <button
+              type="button"
+              className={rowStyles.menuItem}
+              disabled={ws.starterStep != null || ws.fetchingFlyfoto}
+              title={t('localities.tools.starterHint')}
+              onClick={() => {
+                close();
+                ws.openStarterNotice();
+              }}
+            >
+              <Icon icon="library_add" size={16} />
+              {t('localities.tools.starter')}
+            </button>
+            <button
+              type="button"
+              className={rowStyles.menuItem}
+              disabled={ws.uploading}
+              onClick={() => {
+                close();
+                fileInputRef.current?.click();
+              }}
+            >
+              <Icon icon="add_photo_alternate" size={16} />
+              {t('localities.bilder.upload')}
+            </button>
+            <button
+              type="button"
+              className={cx(
+                rowStyles.menuItem,
+                ws.adjusting && rowStyles.menuItemActive,
+              )}
+              onClick={() => {
+                close();
+                ws.toggleAdjusting();
+              }}
+            >
+              <Icon icon="transform" size={16} />
+              {t('localities.workspace.adjust')}
+            </button>
+            <button
+              type="button"
+              className={cx(rowStyles.menuItem, rowStyles.menuItemDanger)}
+              onClick={() => setConfirming(true)}
+            >
+              <Icon icon="delete" size={16} />
+              {t('localities.workspace.deleteLocality')}
+            </button>
+          </div>
+        )}
+      </Popover>
+    </>
+  );
+};
+
+/**
+ * Row 2 — the open lokalitet, as one line: what it is on the left, the verbs
+ * that are part of the loop on the right, the rest behind a menu.
+ *
+ * A context strip, not a surface. Everything with a body — the funn list, the
+ * gallery, the draft form, the extract and terrain panels — is in the dock;
+ * what is left here is identity and the verbs you reach for while reading the
+ * ground. Nothing in this row opens downwards.
+ *
+ * Terreng is *not* one of them: it is a ground mode, lives in row 1 with the
+ * other four, and works the same whether a lokalitet is open or not. It only
+ * ever appeared here because row 1 hid its copy while a lokalitet was open.
+ */
+export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
+  const { t } = useTranslation();
+  const { locality, isMine, mode } = ws;
 
   return (
     <div className={cx(styles.row, styles.rowSub)}>
@@ -140,25 +280,6 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             onClick={ws.zoomToLocality}
           />
         </Tooltip>
-        {isMine && (
-          <ConfirmPopover
-            title={t('localities.workspace.confirmDelete', {
-              name: locality.name,
-            })}
-            confirmLabel={t('localities.workspace.deleteLocality')}
-            cancelLabel={t('shared.cancel')}
-            onConfirm={ws.removeLocality}
-            trigger={(props) => (
-              <IconButton
-                icon="delete"
-                size="md"
-                palette="red"
-                aria-label={t('localities.workspace.deleteLocality')}
-                {...props}
-              />
-            )}
-          />
-        )}
       </div>
 
       <div className={rowStyles.verbs}>
@@ -168,9 +289,7 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             label={t('localities.funn.new')}
             tooltip={`${t('localities.funn.new')} (N)`}
             active={mode === 'draft'}
-            onClick={() =>
-              ws.draftActive ? ws.cancelDraft() : ws.startDraft()
-            }
+            onClick={() => (ws.draftActive ? ws.stopDraft() : ws.startDraft())}
           />
         )}
         <ModeButton
@@ -179,13 +298,6 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           tooltip={`${t('localities.tools.lidarExtract')} (U)`}
           active={mode === 'lidar'}
           onClick={ws.toggleLidar}
-        />
-        <ModeButton
-          icon="elevation"
-          label={t('localities.terrain.short')}
-          tooltip={t('localities.terrain.tooltip')}
-          active={mode === 'terrain'}
-          onClick={ws.toggleTerrain}
         />
         {isMine && (
           <ModeButton
@@ -201,37 +313,11 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             icon="satellite_alt"
             label={t('localities.tools.flyfotoShort')}
             tooltip={t('localities.tools.flyfoto')}
-            disabled={ws.fetchingFlyfoto}
+            disabled={ws.fetchingFlyfoto || ws.starterStep != null}
             onClick={ws.openFlyfotoNotice}
           />
         )}
-        {isMine && (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              hidden
-              onChange={pickFile}
-            />
-            <ModeButton
-              icon="add_photo_alternate"
-              label={t('localities.bilder.upload')}
-              tooltip={t('localities.bilder.upload')}
-              disabled={ws.uploading}
-              onClick={() => fileInputRef.current?.click()}
-            />
-          </>
-        )}
-        {isMine && (
-          <ModeButton
-            icon="transform"
-            label={t('localities.workspace.adjustShort')}
-            tooltip={t('localities.workspace.adjust')}
-            active={ws.adjusting}
-            onClick={ws.toggleAdjusting}
-          />
-        )}
+        {isMine && <OverflowMenu ws={ws} />}
       </div>
     </div>
   );

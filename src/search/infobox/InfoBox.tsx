@@ -28,7 +28,10 @@ export const InfoBox = () => {
     selectedResult.type !== 'Coordinate' && selectedResult.name;
 
   return (
-    <div className={cx(styles.panel, isMinimized && styles.minimized)}>
+    <div
+      className={cx(styles.panel, isMinimized && styles.minimized)}
+      data-chrome="right"
+    >
       <div className={styles.head}>
         <Button
           size="sm"

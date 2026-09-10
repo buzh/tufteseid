@@ -11,6 +11,7 @@ import {
 } from '../api/localities';
 import { currentUserAtom } from '../auth/atoms';
 import { mapAtom } from '../map/atoms';
+import { CHROME_MARGIN_PX, chromeInsets } from '../shell/chromeInsets';
 import { toast } from '../ui';
 import { activeLocalityAtom } from './atoms';
 import { fetchLocalityContext } from './localityContext';
@@ -24,18 +25,7 @@ import { upsertLocalityOnLayer } from './localityLayer';
 // The bbox stays *authored*, not derived — the viewport only seeds it, and
 // "Juster området" reshapes it afterwards.
 
-// Clear of the chrome by this much beyond the ribbon's own height, so the
-// top edge is visibly inside the map rather than tucked under the bar.
-const RIBBON_GAP_PX = 24;
-
-// How much of the map the ribbon is covering right now. Measured rather than
-// a constant: the bar grows a row per level of context and wraps on narrow
-// screens, so there is no number to hard-code — hard-coded header heights are
-// exactly what the floating shell replaced.
-const ribbonHeight = (): number =>
-  document.querySelector('[data-ribbon]')?.getBoundingClientRect().height ?? 0;
-
-// Side/bottom inset: enough to prove the rectangle is fully on screen, and
+// Inset: enough to prove the rectangle is fully on screen, and
 // at ≥8% also enough that transformExtent's corner-only reprojection has
 // no chance of clipping something the user could see inside the box.
 const INSET_FRACTION = 0.08;
@@ -59,11 +49,15 @@ export type ViewportBboxResult =
  * The visible map inset away from the chrome, as EPSG:4326.
  *
  * Pixel corners rather than `View#calculateExtent` and a ratio:
- * `calculateExtent` is symmetric about the view centre and the ribbon only
- * covers the top, so no symmetric ratio can clear it without over-insetting
- * the other three edges. Pixels are relative to the map viewport element,
- * which the ribbon floats over, so the measured ribbon height maps 1:1 onto
- * the top inset.
+ * `calculateExtent` is symmetric about the view centre while the chrome is
+ * not — a ribbon on top and a dock on the right — so no symmetric ratio can
+ * clear it without over-insetting the other edges. Pixels are relative to the
+ * map viewport element, which every surface floats over, so the measured
+ * chrome insets map 1:1 onto the pixel insets.
+ *
+ * Each edge takes whichever is larger, the chrome in front of it or the
+ * proportional inset: with nothing docked this is exactly the old symmetric
+ * rectangle, and with the dock open the right edge moves in to clear it.
  *
  * Rotation is locked off, so the pixel rectangle stays axis-aligned and two
  * corners describe it.
@@ -75,10 +69,13 @@ export const viewportBbox = (map: Map): ViewportBboxResult => {
 
   const insetX = Math.max(INSET_MIN_PX, Math.round(width * INSET_FRACTION));
   const insetY = Math.max(INSET_MIN_PX, Math.round(height * INSET_FRACTION));
-  const left = insetX;
-  const right = width - insetX;
-  const top = ribbonHeight() + RIBBON_GAP_PX;
-  const bottom = height - insetY;
+  const [chromeTop, chromeRight, chromeBottom, chromeLeft] = chromeInsets(map);
+  const clear = (chrome: number) => chrome + CHROME_MARGIN_PX;
+
+  const left = Math.max(insetX, clear(chromeLeft));
+  const right = width - Math.max(insetX, clear(chromeRight));
+  const top = Math.max(insetY, clear(chromeTop));
+  const bottom = height - Math.max(insetY, clear(chromeBottom));
   if (right - left < MIN_SIDE_PX || bottom - top < MIN_SIDE_PX) {
     return { ok: false, reason: 'unavailable' };
   }

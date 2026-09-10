@@ -2,6 +2,8 @@ import { getDefaultStore, useAtomValue, useSetAtom } from 'jotai';
 import { Feature, MapBrowserEvent } from 'ol';
 import BaseEvent from 'ol/events/Event';
 import type { FeatureLike } from 'ol/Feature';
+import MultiLineString from 'ol/geom/MultiLineString';
+import Point from 'ol/geom/Point';
 import { fromExtent as polygonFromExtent } from 'ol/geom/Polygon';
 import VectorLayer from 'ol/layer/Vector';
 import { transformExtent } from 'ol/proj';
@@ -26,30 +28,124 @@ export const LOCALITIES_LAYER_ID = 'localitiesLayer';
 // style function can't reach jotai hooks; the workspace keeps it synced.
 let highlightedLocalityId: string | null = null;
 
-const baseStyle = (name: string, highlighted: boolean) =>
+/*
+ * How a lokalitet rectangle draws.
+ *
+ * The rectangle is a frame around the ground, never a tint over it: relief
+ * shading is the thing being read, and an interior fill — even at 4 % — is
+ * the loudest object on a grey hillshade. So: no fill at all, a thin line
+ * cased in white so it survives both dark relief and bright ortofoto, corner
+ * brackets to say "this one is open", and the name in a chip pinned to the
+ * top-left corner instead of a haloed word across the middle of the view.
+ */
+const FRAME = '#FF6A00';
+const CASING = 'rgba(255, 255, 255, 0.9)';
+// Bracket arms are a constant length on screen, not on the ground.
+const BRACKET_PX = 18;
+
+const cornerBrackets = (
+  extent: number[],
+  resolution: number,
+): MultiLineString => {
+  const [minX, minY, maxX, maxY] = extent;
+  // Never longer than a third of a side, or a small rectangle turns into a
+  // solid frame with a gap in the middle of each edge.
+  const a = Math.min(
+    BRACKET_PX * resolution,
+    (maxX - minX) / 3,
+    (maxY - minY) / 3,
+  );
+  return new MultiLineString([
+    [
+      [minX, minY + a],
+      [minX, minY],
+      [minX + a, minY],
+    ],
+    [
+      [maxX - a, minY],
+      [maxX, minY],
+      [maxX, minY + a],
+    ],
+    [
+      [maxX, maxY - a],
+      [maxX, maxY],
+      [maxX - a, maxY],
+    ],
+    [
+      [minX + a, maxY],
+      [minX, maxY],
+      [minX, maxY - a],
+    ],
+  ]);
+};
+
+const nameChip = (name: string, corner: number[], highlighted: boolean) =>
   new Style({
-    stroke: new Stroke({
-      color: '#FF6A00',
-      width: highlighted ? 4 : 2,
-      lineDash: highlighted ? undefined : [8, 6],
-    }),
-    fill: new Fill({
-      color: highlighted ? 'rgba(255, 106, 0, 0.04)' : 'rgba(255, 106, 0, 0.08)',
-    }),
+    geometry: new Point(corner),
     text: new Text({
       text: name,
-      font: '600 13px sans-serif',
-      fill: new Fill({ color: '#7a3300' }),
-      stroke: new Stroke({ color: '#ffffff', width: 3 }),
+      font: `${highlighted ? 600 : 500} 12px sans-serif`,
+      fill: new Fill({ color: highlighted ? '#ffffff' : '#3a1800' }),
+      backgroundFill: new Fill({
+        color: highlighted ? FRAME : 'rgba(255, 255, 255, 0.82)',
+      }),
+      padding: [2, 5, 2, 5],
+      textAlign: 'left',
+      textBaseline: 'bottom',
+      offsetX: 2,
+      offsetY: -4,
       overflow: true,
     }),
   });
 
-const styleFor = (feature: FeatureLike): Style =>
-  baseStyle(
-    (feature.get('name') as string) ?? '',
-    feature.get(LOCALITY_ID_PROPERTY) === highlightedLocalityId,
-  );
+const styleFor = (feature: FeatureLike, resolution: number): Style[] => {
+  const extent = feature.getGeometry()?.getExtent();
+  if (!extent) return [];
+  const name = (feature.get('name') as string) ?? '';
+  const highlighted =
+    feature.get(LOCALITY_ID_PROPERTY) === highlightedLocalityId;
+
+  const styles = [
+    new Style({
+      // Not decoration: OL hit-detects a polygon's interior by re-executing
+      // its fill and testing the alpha byte, so dropping the fill entirely
+      // would make a rectangle clickable only within a few pixels of its
+      // edge — and clicking one is how you open it. 1 % white is invisible
+      // over both hillshade and ortofoto and still rounds to alpha > 0.
+      fill: new Fill({ color: 'rgba(255, 255, 255, 0.01)' }),
+    }),
+    new Style({
+      stroke: new Stroke({
+        color: CASING,
+        width: highlighted ? 4 : 3,
+        lineDash: highlighted ? undefined : [7, 7],
+      }),
+    }),
+    new Style({
+      stroke: new Stroke({
+        color: FRAME,
+        width: highlighted ? 2 : 1,
+        lineDash: highlighted ? undefined : [7, 7],
+      }),
+    }),
+  ];
+
+  if (highlighted) {
+    styles.push(
+      new Style({
+        geometry: cornerBrackets(extent, resolution),
+        stroke: new Stroke({ color: CASING, width: 6 }),
+      }),
+      new Style({
+        geometry: cornerBrackets(extent, resolution),
+        stroke: new Stroke({ color: FRAME, width: 3 }),
+      }),
+    );
+  }
+
+  if (name) styles.push(nameChip(name, [extent[0], extent[3]], highlighted));
+  return styles;
+};
 
 // PB json fields arrive parsed in REST responses but have shipped as
 // strings over realtime SSE — cope with both.

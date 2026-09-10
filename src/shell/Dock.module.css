@@ -1,0 +1,82 @@
+/*
+ * The dock. A card, not a sidebar: it floats over the map like every other
+ * surface in the shell, so the terrain keeps running underneath its edges.
+ */
+
+.dock {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+  width: 100%;
+  border-radius: var(--radius-lg);
+  background: var(--c-bg);
+  box-shadow: var(--shadow-lg);
+  /* The slot around it is pointer-events: none so the map stays draggable. */
+  pointer-events: auto;
+}
+
+/* Folded away. Hidden, not unmounted — see Dock.tsx. */
+.folded {
+  display: none;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 0 0 auto;
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--c-border);
+}
+
+/* The column scrolls as a whole; each section may also scroll inside its own
+   body, so twenty funn do not push Bilder out of reach. */
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+/* The pinned tool band. Tinted and ruled off so it reads as a thing that has
+   taken over rather than as another section of the list. */
+.tool {
+  flex: 0 0 auto;
+  padding: var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-bg-subtle);
+}
+
+.toolHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.toolTitle {
+  margin: 0;
+  font-size: var(--font-sm);
+  font-weight: 700;
+}
+
+@media (max-width: 47.999rem) {
+  /* Bottom sheet. Capped short of the viewport so there is always map left
+     to drag, and short of BottomDrawToolSelector, which is position:fixed at
+     z 1000 down there while a funn is being drawn. */
+  .dock {
+    flex: 0 1 auto;
+    max-height: 45vh;
+  }
+
+  .body {
+    padding: var(--sp-3);
+    gap: var(--sp-3);
+  }
+}

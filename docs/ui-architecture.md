@@ -1,11 +1,23 @@
 # UI architecture — the status quo, and the contract a replacement inherits
 
 The interface was inherited Norgeskart chrome, de-branded and extended sideways
-until it carried features it was never shaped for. It is being replaced. The
-first slice of that landed: the map is now the full window, the chrome is a
-**ribbon** floating over it, the lokalitet workspace lives in the ribbon rather
-than in a panel covering the terrain, and new code is on an in-repo plain-CSS
-kit (`src/ui`) instead of kvib — which is now gone entirely (§12).
+until it carried features it was never shaped for. It is being replaced. Two
+slices of that have landed. First: the map became the full window, the chrome a
+**ribbon** floating over it, and new code moved onto an in-repo plain-CSS kit
+(`src/ui`) instead of kvib — which is now gone entirely (§12). Then the ribbon
+turned out to be the wrong container for anything with a body, and the second
+slice reshaped the app around the work loop it exists for:
+
+- everything about the thing you are working on is in a **right-hand dock**
+  column (§8), and the ribbon is back to two thin rows;
+- **all framing is chrome-aware** — `chromeInsets` measures what the floating
+  surfaces are covering, so the map fits its subject into the free area (§3.1);
+- lokalitet rectangles and funn are **cased frames over the relief, not tints
+  across it** (§8.6), and clicking one on the map selects it in the dock;
+- the five grounds — Standard, LiDAR, Hybrid, Flyfoto, **Terreng** — are one
+  ring of buttons with digits 1–5 and a hold-to-peek key (§5.1, §5.3);
+- a funn is **saved from the moment its first shape closes** (§8.5); there is no
+  Lagre and nothing to discard.
 
 This document exists so the rest can be planned without archaeology: what is on
 screen today, what holds it up, which parts are load-bearing engineering and
@@ -29,16 +41,28 @@ it is), `docs/analysis-roadmap.md` (what the workspace is expected to grow).
 Everything else in this document is description. These three are constraints,
 and each has already cost a debugging session.
 
-**One surface, one occupant, never both.** Drawing a funn, running a LiDAR
-extract and reading terrain each take a surface over completely; they are not
-panels that stack. `workspaceModeAtom` (`src/localities/toolAtoms.ts`) derives
-the single answer — `'draft' | 'lidar' | 'terrain' | 'browse'` — from
-`funnDraftActiveAtom` and `ribbonToolAtom`, and the ribbon renders the tray
-only in `browse`. `MapTool` (`'layers' | 'measure' | 'localities' | null`,
-`src/map/overlay/atoms.ts`) is separate state again, so a map tool card and an
-open lokalitet cannot fight over the same real estate. Whatever comes next
-needs an equivalent story for "these surfaces are mutually exclusive", or the
-fight comes back.
+**One slot, one occupant — but only where the slot is really one.** Running a
+LiDAR extract and reading terrain are the same slot: `ribbonToolAtom`
+(`src/localities/toolAtoms.ts`) holds at most one of `'lidar' | 'terrain'`, and
+picking one drops the other. Drawing is deliberately *not* in that slot. It has
+its own flag, `funnDraftActiveAtom`, and the draft band and the terrain band can
+be on screen together — terrain is a read-only view of the same rectangle and
+tracing what it shows is the reason to have it up. A column can stack two bands;
+the ribbon row this used to be could not, which is the whole reason the rule was
+stricter before.
+
+`workspaceModeAtom` still derives the single answer
+(`'draft' | 'lidar' | 'terrain' | 'browse'`) and is what the ribbon's button
+highlighting and `useWorkspaceKeys`' `navigable` flag read. The dock reads the
+two underlying flags instead, precisely because collapsing them to one answer is
+what would force the bands apart again. `MapTool`
+(`'layers' | 'measure' | 'localities' | null`, `src/map/overlay/atoms.ts`) is
+separate state again, so a map tool card and an open lokalitet cannot fight over
+the same real estate.
+
+What must not come back is the version where a tool surface *replaced* the
+content it was about: starting to draw hid the list of what you had already
+drawn, and running an extract hid the gallery it was about to add to.
 
 **OL interactions are owned, not scanned for.** `src/map/interactions.ts` tags
 every interaction with an owner (`draw`, `measure`, `localityAdjust`,
@@ -184,29 +208,30 @@ decision everything else follows from.
 └── .overlay  position:absolute inset:0  z --z-overlay
               display:flex  flex-direction:column  pointer-events:none
     ├── .ribbon   flex:0 0 auto   pointer-events:auto   z --z-ribbon
-    │     └── Ribbon           ← row 1, then rows 2–4 as context appears
+    │     └── Ribbon                  ← row 1, plus row 2 when a lokalitet is open
     └── .row      flex:1  min-height:0  position:relative  pointer-events:none
-          ├── .left    absolute top/left/bottom   SearchComponent + MapToolCards
-          └── .right   absolute top/right         InfoBox
+          ├── .left    absolute top/left/bottom          SearchComponent + MapToolCards
+          └── .right   absolute top/right/bottom  360→400px
+                       InfoBox, TerrainDock, and the portalled LocalityDock
 ```
 
 Siblings of the whole thing: `BottomDrawToolSelector` (mobile only, only while
 a funn draft is active), `KulturminnerPopup`, `AuthDialog`.
 
-Four details that are easy to lose:
+Details that are easy to lose:
 
-- **No height measurement anywhere.** `.overlay` is an ordinary flow column
-  that *contains* the ribbon, so the ribbon's natural height pushes the slots
-  below it down with zero JS — no ResizeObserver, no CSS variable. Growing a
-  ribbon row therefore costs nothing, and because the OL canvas never resizes
-  it provokes no new GetMap requests. The old `calc(100vh - 65px)` /
+- **No height measurement in the *layout*.** `.overlay` is an ordinary flow
+  column that *contains* the ribbon, so the ribbon's natural height pushes the
+  slots below it down with zero JS — no ResizeObserver, no CSS variable.
+  Growing a ribbon row therefore costs nothing, and because the OL canvas never
+  resizes it provokes no new GetMap requests. The old `calc(100vh - 65px)` /
   `calc(100vh - 80px)` guesses at the header height are gone; the slots have a
   definite height and their cards say `100%`.
-- **The one place the ribbon's height *is* read** is
-  `viewportBbox` in `src/localities/createFromBbox.ts`, which measures
-  `[data-ribbon]` with `getBoundingClientRect()` to inset the top of a
-  new rectangle. Measured, not a constant: the bar grows a row per level of
-  context and wraps on narrow screens.
+- **`.right` needs `bottom: 0`.** It only had `top`/`right`, so a child asking
+  for `max-height: 100%` had no containing height to resolve against and the
+  dock could grow past the bottom of the window. It is a flex column now: 360 px
+  from `48rem`, 400 px from `62rem`, full width below that (where the dock is a
+  bottom sheet), with the infobox keeping its own width against the right edge.
 - **`.map` must stay a *sibling* of `.overlay`, never its parent.** F11 calls
   `requestFullscreen()` on the map target element, and parenting the chrome
   inside it drags the chrome into fullscreen.
@@ -219,10 +244,41 @@ The lokalitet rows are keyed on `locality.id` in `Ribbon.tsx`, which remounts
 the workspace controller with fresh form state. Without the key, opening a
 second lokalitet shows the first one's half-typed name.
 
-Error boundaries are per row and per tray column, not one around the bar: a
-crash in the terrain row should not take the search field and the background
-controls with it, and the map underneath stays usable either way — which is the
-whole reason the chrome floats over it.
+Error boundaries are per ribbon row and per dock section, not one around the
+bar: a crash in the terrain panel should not take the search field and the
+background controls with it, and the map underneath stays usable either way —
+which is the whole reason the chrome floats over it. `RibbonLocalityRow` is
+outside the boundary that wraps the dock for the same reason: if the panel
+inside throws, you still need the back arrow to get out of it.
+
+#### `data-chrome`, and why nothing hard-codes a padding
+
+The chrome floats *over* the map, so the map's own size says nothing about how
+much of it you can see. Anything that frames something — fitting a lokalitet's
+rectangle, seeding a new one from the viewport, zooming to a funn, marking a
+search result — has to work in the free area, or it centres its subject
+underneath the ribbon or behind the dock.
+
+`src/shell/chromeInsets.ts` answers that. Surfaces opt in by carrying
+`data-chrome="top|right|bottom|left"`; `chromeInsets(map)` walks them, measures
+each one's depth into the map viewport, and takes the max per edge.
+`fitPadding(map, margin)` adds breathing room and is what every `view.fit` call
+passes — replacing the hard-coded `[80, 80, 80, 80]` and `[120, 120, 120, 120]`
+that the floating shell had made unknowable in the first place.
+
+Three properties of it are deliberate:
+
+- **Generic, not a registry.** The lone predecessor was a `ribbonHeight()` that
+  measured `[data-ribbon]` and knew about no other edge. A new panel joins the
+  calculation by declaring which edge it hugs, with nothing to register
+  anywhere — which is exactly what the `Dock` does when it switches to
+  `data-chrome="bottom"` below the md breakpoint.
+- **Measured on demand, never observed.** No ResizeObserver, no layout state,
+  no re-render; the values are read at the instant a fit is computed. A folded
+  dock is `display: none`, reports no rect, and drops out on its own.
+- **Opposing paddings are clamped together** to 70 % of the viewport. Two that
+  together exceed it cannot both be honoured, and `View#fit` answers an
+  over-constrained rectangle by zooming out to nothing useful.
 
 ### 3.2 Where map side-effects mount
 
@@ -232,7 +288,7 @@ but it is the **only** mount point for three atom effects (`themeLayerEffect`,
 
 Everything else is `src/shell/useMapSideEffects.ts`, called once by `AppShell`:
 `useFeatureInfoClick`, `useSearchEffects`, `useMapClickSearch`,
-`useLocalitiesLayer`, `useFunnLayer`, `useFunnHighlightLayer`,
+`useLocalitiesLayer`, `useFunnLayer`, `useFunnHighlightLayer`, `useFunnPointer`,
 `useLocalityClick`, `useLidarFootprintsLayer`, `useBackgroundCyclingKeys`.
 
 This is the sharpest coupling between "the UI" and "the map": these are not
@@ -253,10 +309,19 @@ unmounts.
 ### 3.3 Stacking order
 
 Two independent ladders. **OL layer `zIndex`** (map-internal): background stack
-and theme layers at 2–3, active theme layer promoted to 10, terrain render 1,
-lidar footprints 3, localities 4, funn highlight 4.5, funn 5, locality draft 7,
-lidar extract selection 7, locality adjust 8. The fractional 4.5 is the tell
-that this ladder grew by insertion rather than design.
+at 0 (it sets none), terrain render 1, the compare curtain's B stack 1.5, draw
+layer 2, draw overlay / measure / theme layers 3, active theme layer promoted
+to 10, lidar footprints 3, localities 4, funn highlight 4.5, funn 5, locality
+draft 7, lidar extract selection 7, locality adjust 8. The fractional 4.5 and
+1.5 are the tell that this ladder grew by insertion rather than design.
+
+`COMPARE_Z = 1.5` (`src/map/compare/curtainLayers.ts`) is a real constraint,
+not a free choice: the B half has to cover the A background *and* the terrain
+render — Terreng on the left against a photograph on the right is one of the
+comparisons worth making — while staying under everything drawn on top of the
+ground. A funn, a measurement or a pen stroke in progress that vanished when
+the curtain was dragged over it would be exactly the thing compare was opened
+to look at.
 
 **DOM `zIndex`** (chrome) is entirely named in `src/ui/tokens.css` and listed
 in §2 — no raw numbers left anywhere in `src/`.
@@ -301,20 +366,30 @@ subsume.
   the viewport project list. The flyfoto acquisition list is *not* an atom —
   nothing draws its footprints, so it is component state in
   `useFlyfotoControls`.
+- **Sammenlign** — `compareGroundAtom` (`null` = off, otherwise the ground on
+  the right of the curtain) and `compareSplitAtom` (0–1, where the divider is),
+  both in `src/map/compare/atoms.ts` (§5.8). Neither is persisted to the URL.
+  The split is read by the OL render handlers through
+  `setCurtainSplit`, so `compareLayerAtomEffect` deliberately does *not* depend
+  on it — dragging the divider must not rebuild a tile stack.
 - **Theme layers** — `activeThemeLayersAtom` (a `Set<ThemeLayerName>`).
 - **Chrome** — `mapToolAtom`, `overlayOpenCountAtom` / `anyOverlayOpenAtom`
   (`src/ui/overlayAtoms.ts`, incremented by every `Popover` and `Dialog` so the
   keyboard layers can stand down).
 - **Ribbon / workspace** — `ribbonToolAtom`, the derived `workspaceModeAtom`,
-  `trayOpenAtom`, `growPromptAtom` (`src/localities/toolAtoms.ts`), and
-  `terrainStandaloneBboxAtom` (`src/terrain/atoms.ts`).
+  `dockOpenAtom`, `funnOutsideAtom` (`src/localities/toolAtoms.ts`),
+  `openSectionsAtom` (`src/localities/atoms.ts`), `dockSlotAtom`
+  (`src/shell/dockSlot.ts` — the portal target, a DOM node rather than a value)
+  and `terrainStandaloneBboxAtom` (`src/terrain/atoms.ts`).
 - **Search** — query, results, selected result, marker, infobox visibility.
 - **Feature info** — the clicked-position readout and the Kulturminner popup.
 - **Draw** — the largest single cluster (`src/settings/draw/atoms.ts`, 375
   lines): active tool, colour, line width, line style, point style, text style,
   measurement toggles, undo/redo stacks.
-- **Lokaliteter** — `activeLocalityAtom`, `funnDraftActiveAtom`, selection,
-  content caches.
+- **Lokaliteter** — `activeLocalityAtom`, `funnDraftActiveAtom`,
+  `adjustingLocalityAtom`, `selectedFunnIdAtom` / `hoveredFunnIdAtom` (written
+  from both the dock list and the map, §8.6), `lightboxOpenAtom`, content
+  caches.
 - **LiDAR extract** — selection rectangle, run status, result canvas.
 - **Auth** — `currentUserAtom`, `roleAtom`, `isAdminAtom`, dialog open state.
 
@@ -342,26 +417,34 @@ closing in the rewrite.
 
 ## 5. The ribbon
 
-`src/shell/Ribbon.tsx` and the components around it. One row per level of
-context, and rows appear and disappear rather than the bar having a fixed
-height:
+`src/shell/Ribbon.tsx` and the components around it. **Two thin rows at most**,
+and nothing with a body goes in either:
 
 | Row | Component | When |
 |---|---|---|
 | 1 — the map | `RibbonGlobalRow` | always |
 | 2 — the lokalitet | `RibbonLocalityRow` | a lokalitet is open |
-| 3 — the tool | `RibbonToolRow` (draft, lidar) / `RibbonTerrainRow` | a tool has the surface |
-| 4 — the tray | `Tray` | a lokalitet is open and no tool has the surface |
 
-Rows 2–4 are grouped under `LocalityRibbon`, which is the **one** mount point
-for `useLocalityWorkspace` — that hook opens two PocketBase realtime
-subscriptions that reload the whole list on every event, so a second call site
-doubles both. Terrain is the exception and hangs off `Ribbon` directly, because
-it works with no lokalitet and no account (§10).
+There used to be four. A tool row and the tray stacked under these two could
+reach five hundred pixels of chrome across the top of the map — over the very
+ground the panels were describing — so both moved into the dock (§8). Row 2 is
+a **context strip** now, not a surface: identity on the left, the verbs that are
+part of the work loop on the right, the rest behind an overflow menu. Nothing in
+it opens downwards.
 
-On narrow screens the rows wrap onto more lines. The old TopBar's answer to
-"fourteen controls do not fit on a phone" was `overflowX: auto` on the whole
-bar, which made the pulldowns inside it clip; that is gone.
+`LocalityRibbon` renders row 2 and is the **one** mount point for
+`useLocalityWorkspace` — that hook opens two PocketBase realtime subscriptions
+that reload the whole list on every event, so a second call site doubles both.
+It also portals `LocalityDock` into the shell's right slot through
+`dockSlotAtom`, rather than hoisting an 850-line hook to a common ancestor and
+making every one of its callbacks nullable: one React tree, two places in the
+DOM.
+
+`data-chrome="top"` on the bar is how framing code learns how much of the map it
+covers (§3.1). Measured rather than a constant, because row 2 comes and goes and
+the rows wrap on narrow screens. The old TopBar's answer to "fourteen controls
+do not fit on a phone" was `overflowX: auto` on the whole bar, which made the
+pulldowns inside it clip; that is gone.
 
 ### 5.1 Row 1, left to right
 
@@ -372,20 +455,36 @@ looking at.
 | Control | What it does |
 |---|---|
 | `RibbonSearch` | Place/address/property search field; results render in the left slot (§7) |
-| **Standard** | Background mode: topo basemap |
-| **LiDAR** | Background mode: hillshade stack |
-| **Hybrid** | LiDAR stack + transparent roads/rail/place-names on top |
-| **Flyfoto** | Background mode: NiB ortofoto (§5.5) |
+| **Standard** (1) | Background mode: topo basemap |
+| **LiDAR** (2) | Background mode: hillshade stack |
+| **Hybrid** (3) | LiDAR stack + transparent roads/rail/place-names on top |
+| **Flyfoto** (4) | Background mode: NiB ortofoto (§5.5) |
+| **Terreng** (5) | Terrain analysis: relief computed here from float elevation, over the open lokalitet's rectangle if there is one and the visible map otherwise (§10) |
+| **Sammenlign** | Puts a second ground on the right of a draggable curtain, with a pulldown for which one (§5.8) |
 | Dataset pulldown | LiDAR: **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport. Flyfoto: the seamless mosaic or any acquisition covering the viewport, newest first |
 | Style pulldown | The active LiDAR dataset's WMS styles, with a "flere stiler" second tier |
 | DTM / DOM segment | Terrain model vs surface model |
 | **Kulturminner** | Toggles the five Riksantikvaren theme layers as a group |
 | **Kartlag** | Opens the theme-layer card (`MapTool = 'layers'`) |
 | Mål | Popover with the measure tools |
-| **Terreng** | Terrain analysis of the visible map — no lokalitet, no account (§10). Hidden while a lokalitet is open, because row 2 carries the same verb scoped to its rectangle |
 | Mine lokaliteter | Opens the localities card (signed in only) |
 | Ny lokalitet | Creates a lokalitet from the visible map (signed in only, §5.6) |
 | `RibbonAccount` | Sign in / account menu |
+
+The five grounds are **one ring**, in digit order, driven by
+`useGroundMode` (`src/shell/useGroundMode.ts`). Underneath they are three
+different mechanisms — a background-layer atom, a modifier flag, and a rectangle
+to analyse — and the buttons used to speak all three separately, with Terreng in
+a different group that *disappeared whenever a lokalitet was open* because row 2
+carried a second copy of the verb. Two controls for one surface disagreeing
+about which rectangle "Lagre" keeps is why there is one now. One list, one
+index, one setter; `GROUND_MODES` is the render order and the digit order at
+once, and `GROUND_KEYS` in `useBackgroundCyclingKeys` is positional against it.
+
+Terreng belongs in that ring even though it is not a background: it does not
+replace the background, it covers it. Leaving therefore costs nothing and
+returns you to exactly the dataset and style you left — 1→5→1 is free where
+1→2→1 is a screenful of tile requests.
 
 The dataset and style pulldowns are still the most complicated things here:
 each row needs a two-line label, a relevance badge, an on-hover map preview of
@@ -409,15 +508,43 @@ it, and activating it from Standard turns the national mosaic on rather than
 becoming a fourth mode. Same for DTM/DOM. Modelling either as a mode would
 multiply the mode buttons and break cycling.
 
+**Hybrid is nonetheless a button in the ground ring, and that is the one
+deliberate exception.** It is a modifier by mechanism and one of the five things
+you flip between by intent, and splitting the ring to say so would cost more
+than it explains. The distinction is unharmed where it does work: DTM/DOM and
+the style pick stay in the pulldown group, and picking Hybrid still activates
+the LiDAR stack underneath rather than replacing it.
+
 Switching to Flyfoto deliberately leaves `hybridOverlayAtom` alone rather than
 clearing it: it is a LiDAR modifier, inert in flyfoto mode, and switching back
 should return you to the stack you left.
 
-### 5.3 Keyboard cycling
+### 5.3 The map keyboard: grounds, and cycling within one
 
-One `document` keydown listener, with `[]` deps and a mutable ref for the
-current handler — the lists it closes over are rebuilt on every render, so the
-alternative is re-attaching the listener continuously:
+One `document` keydown listener, with `[]` deps and a mutable ref per handler —
+the lists they close over are rebuilt on every render, so the alternative is
+re-attaching the listener continuously.
+
+**Across grounds:**
+
+- **1–5** — select the ground outright, in the order row 1 renders the buttons.
+- **Hold X** — peek at the ground you were on before, snapping back on release.
+  Reading relief against a photograph means flipping dozens of times, and a
+  hold-to-compare is the cheapest form of that.
+
+`PEEK_KEY` is **not** the backtick, which was the obvious pick: on the
+Norwegian layout it is a dead key and arrives as `key: "Dead"`, unusable for
+hold-and-release. Three more things the peek needs and would be broken without:
+`event.repeat` is already discarded (the autorepeat of a held key must not
+re-enter `peekStart`), the keyup listener is *not* guarded the way the keydown
+is (whatever took focus in between, the peek has to end or the map is stranded
+on a mode nobody chose — `peekEnd` is a no-op when no peek is running, which is
+what makes that safe), and `window.blur` ends it too, since alt-tabbing with the
+key down lands the keyup somewhere else. `useGroundMode` keeps "the previous
+mode" in refs rather than state, and a peek deliberately does not become the
+thing to peek back to.
+
+**Within one ground:**
 
 - **A / D** — previous / next LiDAR style, top tier only, wrapping at both ends.
 - **W / S** — previous / next dataset in **the active mode's ring**: LiDAR
@@ -455,10 +582,11 @@ The listener itself is **not** in the ribbon. It lives in
 `useMapSideEffects`, because it registers with `[]` deps: a host that unmounts
 (a collapsing ribbon row) would re-register and flip its position in the
 capture chain relative to the other keyboard layers. Row 1 publishes only the
-behaviour, via `useRegisterBackgroundCycle`, and chains the two halves —
-`flyfoto.cycle(key) || lidar.cycle(key)`. Each half declines every key outside
-its own mode, so the order decides who is asked first, not who gets it. There
-is exactly one registered handler.
+behaviour, via `useRegisterBackgroundCycle` and `useRegisterGroundKeys`, and
+chains the two cycling halves — `flyfoto.cycle(key) || lidar.cycle(key)`. Each
+half declines every key outside its own mode, so the order decides who is asked
+first, not who gets it. There is exactly one registered handler of each kind;
+two registrations would silently mean the last one mounted wins.
 
 It follows the §1 discipline: capture phase, handled keys stopped with
 `preventDefault` + `stopPropagation` + `stopImmediatePropagation`, and the same
@@ -471,8 +599,8 @@ reaches the attribute if the overlay actually took focus.
 
 The TopBar put exactly four strings through `t()` and hardcoded the rest. The
 ribbon puts **all** of them through it, under a `ribbon.*` namespace
-(`mode`, `lidar`, `flyfoto`, `heritage`, `layers`, `search`, `terrain`,
-`tray`) in all three locales.
+(`mode`, `lidar`, `flyfoto`, `heritage`, `layers`, `search`, `terrain`) in all
+three locales, with the dock and the workspace under `localities.*`.
 
 The remaining hole is `src/search/**`. It calls `t()` — the section headings,
 the pagination row, the coordinate-swap warning all go through it — but it
@@ -514,16 +642,29 @@ did; the notice gates *grab-and-keep* (§8.6), which is a different act.
 
 Pressing it creates a lokalitet immediately from the rectangle you can see. No
 box-drag to arm, no dialog to fill in: `viewportBbox` in
-`src/localities/createFromBbox.ts` insets the visible map — the ribbon's
-measured height plus a gap at the top, a percentage of the dimension on the
-other three sides — and `createLocalityFromBbox` turns it into a record.
+`src/localities/createFromBbox.ts` insets the visible map and
+`createLocalityFromBbox` turns the result into a record.
+
+Each of the four edges takes **whichever is larger, the chrome in front of it
+(`chromeInsets(map)` plus `CHROME_MARGIN_PX`, §3.1) or a proportional inset**
+(8 % of the dimension, at least 48 px). With nothing docked that is exactly the
+old symmetric rectangle; with the ribbon up and the dock open the top and right
+edges move in to clear them. The proportional floor is not just cosmetic — at
+≥8 % it also guarantees `transformExtent`'s corner-only reprojection cannot clip
+something the user could see inside the box.
 
 Details worth not re-deriving:
 
 - **Inset pixel corners through `map.getCoordinateFromPixel`**, not
   `calculateExtent` with a ratio. `calculateExtent` is symmetric about the view
-  centre and the ribbon is asymmetric (top only), so no ratio clears the bar
-  without over-insetting the other three edges.
+  centre and the chrome is not — a ribbon on top, a dock on the right — so no
+  symmetric ratio clears it without over-insetting the opposite edges. Pixels
+  are relative to the map viewport element, which every surface floats over, so
+  the measured chrome insets map 1:1 onto the pixel insets. Rotation is locked
+  off, so two corners describe the rectangle.
+- **A floor on the result.** Chrome plus insets can leave nothing worth framing
+  (a narrow window with the dock open); under `MIN_SIDE_PX` the press is
+  refused as `unavailable` rather than creating a sliver.
 - **A zoom guard.** `minZoom: 3` means the viewport can be most of Norway, and
   opening the workspace fires a WFS BBOX query over whatever you framed. Too
   large a span is refused with a toast rather than created.
@@ -596,6 +737,62 @@ above `AUTO_ENGAGE_M_PER_PX` (out there the answer is the mosaic and no round
 trip is needed to know it), and moveend is debounced 250 ms. The per-project
 footprint responses are immutable and memoised for the tab, so panning around
 one region settles to no network at all.
+
+### 5.8 Sammenlign — the curtain
+
+Flipping grounds with 1–5 answers "what does this look like in LiDAR". It
+cannot answer "is that bump in the ortofoto the same bump as in the relief" —
+that needs both on screen at once and in register. **Sammenlign** keeps the
+ordinary background stack across the whole map (the *A* half) and clips a
+second stack to the right of a draggable edge (the *B* half).
+
+It is **not** one of the five ground buttons and has no digit key: it does not
+answer "what does the ground look like" but "against what". It sits in its own
+group beside the ring, and reads the ring's current and previous mode to choose
+a sensible other half — entering lands on the ground you were last on, which is
+almost always the one you just flipped away from, i.e. the comparison you were
+already making by hand.
+
+**One resolver, two stacks.** `resolveStack(layerName, opts)` in
+`backgroundLayers/stack.ts` is the whole "what does this mode put on the map"
+rule — topo base where a service is transparent outside coverage, the faded
+national mosaic under a per-project dataset, the hybrid overlay on top —
+returning *configs*, synchronously. `buildStack` is the half that awaits. The
+background effect and the compare effect are both callers, so the B half gets
+the topo base and the faded fallback it needs without a second copy of the
+rule. Splitting resolve from build is also what lets each caller decide what a
+stale run may do before anything on the map is touched.
+
+**`bg.` and `cmp.`.** `LayerNamespace` prefixes both the layer id and the reuse
+signature. The id keeps `swapBackgroundLayers`' outgoing sweep off the B half
+(`isBackgroundLayer` is a strict `startsWith('bg.')`), and the signature stops
+`buildOrReuseBackgroundLayer` handing A and B the same layer instance — the two
+stacks routinely resolve to the same topo base, and one instance cannot be in
+the map twice with two different clips.
+
+**The clip is on the canvas, the seam is in the DOM.** Each B layer gets
+`prerender`/`postrender` handlers that `save()` / `clip()` / `restore()` around
+a rectangle from the split fraction to the right edge, translated through
+`getRenderPixel` — the context is in device pixels and carries whatever
+transform OL is mid-frame with, so raw canvas coordinates drift during an
+animated zoom. `CompareCurtain` draws only the visible line and the grip, which
+line up because the shell and the map viewport are the same rectangle. The
+fraction lives in an atom for React and in a module-level variable for the
+render handlers, because OL calls those, not us — the same split as the terrain
+overlay's.
+
+**Entered and left, not persistent.** Two live stacks are roughly twice the
+GetMap requests and Kartverket rate-limits per source IP across every visitor
+of a deployment, so leaving tears the B stack down and nothing writes the mode
+to the URL: a shared link should not silently double someone's request budget.
+
+Two deliberate limits: **Terreng is not offered as a B half** (it is a render
+over the background rather than a background, and Terreng on the A side against
+any raster on the B side already gives that comparison), and **the B half has
+no dataset picker of its own** — the row-1 pulldowns are the one place a
+dataset is chosen, and B shows whichever acquisition they last named. That is
+what makes a temporal compare work without new controls: pick 1937 in the
+flyfoto pulldown, switch A to LiDAR, turn on Sammenlign.
 
 ---
 
@@ -745,49 +942,70 @@ too (§10) because reading the ground is not an act of ownership.
 
 ### 8.1 Anatomy
 
-There is no workspace *panel* any more. The state is one controller hook,
-`src/localities/useLocalityWorkspace.ts` (854 lines), and the presentation is
-ribbon rows that consume it:
+There is no workspace *panel*, and no workspace *rows* either. The state is one
+controller hook, `src/localities/useLocalityWorkspace.ts`, and the presentation
+is a context strip plus a dock column:
 
 | Region | Component | Contents |
 |---|---|---|
-| Identity + verbs | `RibbonLocalityRow` | back, inline-editable name, visibility badge, summary line, zoom-to, delete; then Nytt funn · LiDAR-uttrekk · Terreng · Bilde · Flyfoto · Last opp · Juster området |
-| Tool surface | `RibbonToolRow` / `RibbonTerrainRow` | whichever of draft / lidar / terrain has the surface |
-| Tray | `Tray` | Funn · Bilder · Kulturminner + Detaljer, as columns |
-| Dialogs | `LocalityDialogs` | grow-to-fit confirmation, flyfoto licensing notice, flyfoto picker |
+| Identity + verbs | `RibbonLocalityRow` (row 2) | back, inline-editable name, visibility badge, summary line, zoom-to; then Nytt funn · LiDAR-uttrekk · Bilde · Flyfoto, with Hent grunnpakke / Last opp / Juster området / Slett behind a `more_vert` menu |
+| Everything with a body | `LocalityDock` (right slot) | the live tool band, then Funn · Bilder · Kulturminner · Detaljer as sections |
+| Dialogs | `LocalityDialogs` | flyfoto licensing notice, flyfoto picker |
 
-The mode switch survived the move and is still the core idea:
-`workspaceModeAtom` derives `'draft' | 'lidar' | 'terrain' | 'browse'`, the
-tray renders only in `browse`, and a tool row renders otherwise. One surface
-becomes the tool you asked for rather than tool panels stacking. It is also
-why `useWorkspaceKeys` takes a `navigable` flag — arrow keys walk the funn list
-in `browse` and mean nothing in `lidar`.
+Terreng is deliberately *not* in row 2 — it is a ground mode in row 1 and works
+the same with or without a lokalitet (§5.1, §10).
 
-Splitting the old panel into rows removed the `key={locality.id}` remount that
-used to reset its `useState`, which is why the state had to move into the
-controller first. What stays component-local is the half-typed name in
-`LocalityName`, still keyed on `locality.id` for exactly that reason.
+Splitting the old panel up removed the `key={locality.id}` remount that used to
+reset its `useState`, which is why the state had to move into the controller
+first. What stays component-local is the half-typed name in `LocalityName`,
+still keyed on `locality.id` for exactly that reason.
 
-`LocalityRibbon` is the single mount point for the controller (§5): the hook
-holds two PocketBase realtime subscriptions that reload the whole list on every
-event.
+`LocalityRibbon` is the single mount point for the controller (§5) and portals
+the dock into the shell's right slot: the hook holds two PocketBase realtime
+subscriptions that reload the whole list on every event.
 
-### 8.2 The tray
+### 8.2 The dock
 
-Three columns side by side above `md`, stacked below, each with its own scroll
-and its own error boundary — the Bilder column fetches short-lived file tokens
-and the Kulturminner column hits an external WFS, and either failing should
-cost you that column rather than the funn list next to it. The whole tray folds
-away; `trayOpenAtom` is module-level so a trip through the terrain panel does
-not silently unfold it again.
+`src/shell/Dock.tsx` is the frame — a header, then a body — and
+`LocalityDock.tsx` fills it. Two occupants of the same frame exist:
+`LocalityDock` for an open lokalitet, and `TerrainDock` for a standalone terrain
+analysis with no lokalitet at all (§10).
+
+The column costs a fixed slice of the *width* (360 px, 400 px above `62rem`) and
+the map fits its subject into what is left, where the ribbon it replaced cost
+height across the top of the very ground the panels described. Below the md
+breakpoint the column has nowhere to go and becomes a bottom sheet;
+`data-chrome` follows it, which is the whole reason framing code asks for the
+edge rather than assuming one (§3.1).
+
+**The tool band and the section list coexist.** A live tool — `FunnDraft` +
+`DrawControls`, `LidarExtractPanel`, `TerrainPanel` — renders in a `DockTool`
+pinned above the sections, not instead of them. Under the old tray they were
+mutually exclusive, which meant starting to draw hid the list of what you had
+already drawn. Starting a tool also unfolds the dock, since its controls *are*
+the tool.
+
+**Folding hides, it does not unmount.** Folding is what you do *to see the map*
+— most often the terrain render the panel inside just produced — and unmounting
+would take that render off the map with it, along with the DEM behind it and
+every panel's scroll position. A `display: none` subtree costs nothing to keep
+and reports no rect, so `chromeInsets` stops counting it on its own. What is
+left in its place is a tab on the edge carrying the funn count: still reachable,
+still countable, which is the reason to unfold. `dockOpenAtom` is module-level,
+so folding away survives closing and reopening a lokalitet — the one gesture you
+make precisely because you want the map, undone by the next thing you open,
+would be worse than no fold at all.
+
+Each section keeps its own error boundary: `BilderSection` fetches short-lived
+file tokens and `KulturminnerSection` hits an external WFS, and either failing
+should cost you that section rather than the funn list above it.
 
 `FunnList` (per-row status, rename, zoom-to, delete), `BilderSection`
 (attachment gallery with lightbox), `KulturminnerSection` (the "kjente
 kulturminner her" readout from GeoNorge's WFS redistribution of the
 Riksantikvaren register — `kart.ra.no` has WFS disabled, hence the detour), and
-`LocalityDetails` (where it is, description, synlighet, metadata) tucked under
-Kulturminner rather than given a fourth column, because it is the one section
-you set once and stop looking at.
+`LocalityDetails` (where it is, description, synlighet, metadata) last, because
+it is the one section you set once and stop looking at.
 
 `LocalityDetails` opens with the location group: **Sted**, **Kommune** and
 **Matrikkel** as ordinary text fields, then **Koordinater** and **Areal** as
@@ -852,25 +1070,121 @@ the overlay actually took focus.
 |---|---|
 | ↑ / ↓ | Move funn selection (only when `navigable`) |
 | Enter | Zoom to selected funn (only when `navigable`) |
-| N | New funn |
+| N | Arm drawing / put the pen down — the same toggle as the row-2 button the key is advertised on |
 | U | Toggle LiDAR extract |
 | B | Screenshot |
 | Escape | Close / back out — **except while a funn draft is open** |
 
+`navigable` is off only while drawing: the funn list is always on screen in the
+dock, so arrows keep working with the extract and terrain panels open, and
+picking a different funn out from under the pen is never what the arrow meant.
+
 That Escape carve-out is deliberate: `DrawControls` binds Escape to abort the
 shape currently being sketched, and stealing it would throw away a drawing
-instead of a keystroke.
+instead of a keystroke. Under autosave (§8.5) it is also no longer the
+data-loss risk it was — everything already drawn is a record by then.
 
-### 8.5 The attachment pipeline
+Row 1's map keys (1–5, hold X, A/D/W/S/E) are a separate listener and keep
+working throughout; see §5.3.
+
+### 8.5 Funn autosave
+
+**A funn is a record from the moment its first shape closes.** There is no
+Lagre button, no disabled-until-titled state, and nothing to discard.
+
+That replaced a commit-or-discard form whose Cancel was called *silently* from
+five places — Escape, "Nytt funn" used as a toggle, opening the extract,
+starting an adjust, closing the workspace — each of which cleared the draw layer
+and threw the drawing away. The trade-off, taken deliberately: a stray click can
+leave a junk funn to delete, which is a recoverable annoyance where the old
+failure was not.
+
+`src/localities/useFunnAutosave.ts` is the mechanism. It watches the shared draw
+layer's source (`addfeature` / `changefeature` / `removefeature`), debounces
+`SETTLE_MS = 700` — long enough that dragging a vertex is one save and not
+forty — and then either creates the record or patches its geometry.
+`useLocalityWorkspace` supplies both callbacks and holds the two the hook
+returns (`flush`, `rebind`) in refs, because the halves point at each other.
+
+Six rules in there are load-bearing:
+
+- **An empty layer is never a delete.** Clearing the draw layer is how *every*
+  exit path takes the drawing back off the map; if that serialized to "no
+  features" and got written, putting the pen down would erase the funn.
+- **One write at a time.** Two creates in flight is two funn, so a second change
+  during a request sets a dirty flag and re-arms the timer instead.
+- **The baseline is seeded, not observed.** `rebind()` re-points the pen and
+  records what is already on the layer as "written", which is what stops
+  "Rediger tegningen" from immediately re-saving the geometry it just loaded.
+  It is called explicitly at the two call sites that know a swap happened,
+  rather than keyed on the funn id changing — keying it would race the create's
+  own completion and could swallow the edit that followed it.
+- **Every exit flushes first.** `stopDraft`, `openLidar`, `toggleAdjusting`,
+  deleting the drafted funn, and the workspace's unmount cleanup all call the
+  flush *before* clearing the layer.
+- **The drafted funn stays hidden across re-hydration.** `hideFunnOnLayer(id)`
+  sets a module-level id in `funnLayer.ts`, not a one-time style pass: every
+  autosaved patch comes back as a realtime event that rebuilds that record's
+  features from scratch, and without the id the persisted copy would reappear
+  underneath the one on the draw layer. `hideFunnOnLayer(null)` lifts it.
+- **Titles are never empty.** The create names the funn `Funn n`
+  (`localities.funn.autoName`) rather than blocking on one being typed — a funn
+  you can rename is worth more than a funn you have to name — and the draft
+  band's title field reverts rather than clearing it.
+
+The receipt is a **toast carrying an "Angre"**, which is what lets the first
+shape commit without asking: undo deletes the record, clears the layer and
+leaves the pen armed, so the next shape starts a new funn. `src/ui/Toast.tsx`
+grew one optional `action` for this rather than the app growing a second
+transient surface.
+
+`FunnDraft` is accordingly not a form. Its title and note edit the live record
+on blur, like a row in the list; the only button puts the pen down; and what is
+left to say is *state* — "Lagret" / "Lagrer…" as a receipt, not a control.
+
+**Grow-to-fit is an `Alert` in that band, not a modal.** Drawing past the edge
+of the rectangle is worth remarking on and not worth stopping the pen for.
+`funnOutsideAtom` is a **flag**, not the union bbox it used to hold: it is
+written while the pen is moving, and re-publishing a rectangle that grows with
+every frame of a drag would re-render the dock per frame to say the same thing.
+"Utvid området" recomputes the union from the live drawing at press time, which
+also means it cannot grow the rectangle to fit a shape since moved back inside.
+
+### 8.6 How a lokalitet and its funn draw on the map
+
+**A frame around the ground, never a tint over it.** Relief shading is the thing
+being read, and an interior fill — even at 4 % — is the loudest object on a grey
+hillshade. So `localityLayer.ts` draws no fill, a thin line cased in white so it
+survives both dark relief and bright ortofoto, corner brackets to say "this one
+is open", and the name in a chip pinned to the top-left corner instead of a
+haloed word across the middle of the view. `funnLayer.ts`'s default is the same
+treatment: white casing under an orange stroke, fill at 0.12.
+
+One catch worth not rediscovering: the rectangle keeps a **1 % white fill**.
+OpenLayers hit-detects a polygon's interior by re-executing its fill and testing
+the alpha byte, so dropping the fill entirely would make a rectangle clickable
+only within a few pixels of its edge — and clicking one is how you open it.
+
+`useFunnPointer` (mounted in `useMapSideEffects`) completes the link the list
+already had in one direction: hovering or clicking a funn *on the map* writes
+`hoveredFunnIdAtom` / `selectedFunnIdAtom`, so the two views of the same set stay
+pointed at the same thing whichever one you touch. Clicking past a funn is
+deliberately **not** a deselect — the click may well be aimed at the background,
+and losing the highlight on every pan-nudge would make it useless. The hover
+handler keeps the last id in a local and writes only transitions; it fires on
+every mouse move over the map.
+
+### 8.7 The attachment pipeline
 
 Four producers converge on one sink, and that convergence is the part worth
 preserving:
 
 ```
-screenshot.ts        ─┐
-flyfoto.ts           ─┤
-lidarExtract "Behold" ├→ createAttachment()  →  PocketBase  →  realtime  →  BilderSection
-terrain "Lagre"      ─┘
+screenshot.ts         ─┐
+flyfoto.ts            ─┤
+lidarExtract "Behold" ─┼→ createAttachment() → PocketBase → realtime → BilderSection
+terrain "Lagre"       ─┤
+starterPack.ts        ─┘
 ```
 
 `kind` is one of `extract | screenshot | upload | flyfoto`; terrain renders
@@ -881,7 +1195,7 @@ key/label, `metresPerPx`, bbox, and for flyfoto the `projectName` / `year` /
 `protected` in PocketBase, so the gallery fetches short-lived file tokens for
 thumbnails — a new UI must keep doing that or every thumbnail 403s.
 
-### 8.6 The flyfoto picker
+### 8.8 The flyfoto picker
 
 "Flyfoto" → licensing notice dialog → picker listing the seamless best mosaic
 plus every ortofoto acquisition intersecting the bbox (label = year, subtitle =
@@ -899,6 +1213,52 @@ NiB imagery is free for private non-commercial use and publishing is the user's
 responsibility, so the notice is the point at which that is communicated. Do not
 add a "don't show this again" checkbox without thinking about it.
 
+### 8.9 Hent grunnpakke
+
+The first item in the row-2 overflow menu, and the only one there you press on a
+lokalitet you have just made and never again — hence its position. One press
+produces the three images you would otherwise fetch by hand before starting to
+read a rectangle, into Bilder:
+
+| Step | What | Producer |
+|---|---|---|
+| `flyfoto` | the newest ortofoto acquisition covering the bbox, or the seamless mosaic when the list is empty | the same `grabFlyfoto` the picker uses |
+| `extract` | a `skyggerelieff` LiDAR hillshade from the densest per-project dataset here | `starterExtract` → `extractCanvas` |
+| `terrain` | a **multidirectional** relief render computed from the float DEM | `starterTerrain` → `renderTerrain` |
+
+`src/localities/starterPack.ts` only *makes* the rasters; captions,
+`createAttachment` and the gallery's optimistic update stay in
+`runStarterPack` (`useLocalityWorkspace`), where the translations and record ids
+are. Both derived rasters save as the existing `extract` kind with the
+visualization in `meta.style` (§8.7), so there is no migration.
+
+Load-bearing choices:
+
+- **It goes through the flyfoto licensing notice**, like every other NiB grab.
+  `flyfotoNotice` is therefore a `'picker' | 'starter' | null` target rather than
+  a boolean, and "Fortsett" dispatches on it. One notice covers the pack; the
+  two Kartverket steps need none.
+- **Sequential, and mutually exclusive with a hand-picked grab.** One stitch
+  already saturates its concurrency budget against a shared public edge, and
+  these hit two of them. The pack sets the same `fetchingFlyfoto` flag the picker
+  does while its first step runs, and both the Flyfoto verb and the menu item are
+  disabled whenever either is busy.
+- **Each step is independently fallible.** A rectangle at the coast can have
+  ortofoto and no laser data; that is not a failed pack. Failures are counted,
+  not thrown, and the toast says how many of the three arrived.
+- **Cancellable.** An `AbortController` in a ref, aborted by the same cleanup
+  that closes the workspace, with an abort check between every step — closing a
+  lokalitet stops spending tile requests on it. An aborted stitch paints nothing,
+  which is indistinguishable from no coverage, so the "ingen dekning" toast is
+  suppressed when the signal is aborted.
+- **Progress renders in the Bilder section**, as one line with a spinner naming
+  the current step, and the dock unfolds and opens that section when a pack
+  starts. Deliberately not a placeholder tile among the saved ones — a tile that
+  disappears would be read as a fourth image that failed.
+- **Multidirectional, not plain hillshade, for the terrain step.** It needs no
+  azimuth chosen for it, and a single sun angle hides whatever runs along it —
+  the failure that costs most in an image nobody will go back and re-light.
+
 ---
 
 ## 9. Drawing
@@ -915,8 +1275,8 @@ style. Plus undo/redo and measurement readouts.
 **What the trim removed, and why it isn't coming back.** The file
 import/export dialogs (`dialogs/import/`, `dialogs/ExportDialog.tsx`,
 `export/`) let a drawing be written out as GeoJSON/GPX and read back in. A funn
-already persists to PocketBase on save; the dialogs were an upstream answer to
-a question this fork doesn't ask, and the export half additionally wrote
+already persists to PocketBase as it is drawn (§8.5); the dialogs were an
+upstream answer to a question this fork doesn't ask, and the export half wrote
 Norgeskart-branded filenames. `DrawControlsFooter.tsx` existed only to hold
 their buttons plus the clear-drawing confirm — that confirm now lives inline in
 `DrawControls.tsx` as a `ConfirmPopover`. The nautical-mile unit went with them
@@ -931,14 +1291,19 @@ the read-only funn layer. They now live in `src/draw/featureStyle.ts`, together
 with the `StyleForStorage` shape that had been sitting in `src/api/nkApiClient.ts`.
 
 Two surfaces render the same tools: `DrawToolSelector` (desktop, inside
-`DrawControls`, which the draft row of the ribbon renders) and
+`DrawControls`, which the dock's draft band renders) and
 `BottomDrawToolSelector` (mobile, `zIndex 1000`, mounted at the shell root and
 only while a funn draft is active). `DrawControls.tsx` renders the desktop
 selector behind `{!isMobile && …}`, which is what keeps the two from both
 appearing. The tools are icon-over-label buttons rather than a `Segmented`
-row: six named tools do not fit across the 320px the draft row gives the
-drawing column, and the name is what tells a first-time user what the glyph
-means.
+row: six named tools do not fit across the width of the dock column, and the
+name is what tells a first-time user what the glyph means.
+
+In the draft band the pen comes **first** and the fields after it. That was the
+other way round when the band was a ribbon row, where a single column would have
+put "Lagre" off the bottom of a bar already sitting on top of the map; a column
+scrolls and there is no Lagre any more, so the tools you keep reaching for come
+before the fields you fill in once.
 
 **The port off kvib.** One `src/draw/Draw.module.css` for the subsystem, on
 the same reasoning as the two search modules. Line style, line width and text
@@ -984,10 +1349,12 @@ feature properties.
 
 ## 10. Analysis panels
 
-Both are row-3 surfaces, both write to the attachment pipeline, and both are
-laid out for a wide row rather than a 400 px column — which is an upgrade for
-them, not a compromise. They differ in where the result lands: the extract
-opens a fullscreen viewer, the terrain render goes onto the map itself.
+Both are `DockTool` occupants of the dock's tool band (§8.2), both write to the
+attachment pipeline, and both are laid out for a 360–400 px column. They differ
+in where the result lands: the extract opens a fullscreen viewer, the terrain
+render goes onto the map itself. They are also the one pair that really is a
+single slot — `ribbonToolAtom` holds at most one — where drawing, which can be
+up alongside either, is not.
 
 **LiDAR extract** — `src/lidarExtract/LidarExtractPanel.tsx` drives style and
 source selection and shows progress. The selection size and the run controls
@@ -1016,8 +1383,8 @@ rectangles (4), the funn (5) and the theme layers (10). That ordering is the
 point: relief is the ground and the heritage record goes on top of it, which is
 the same argument that makes LiDAR hillshade a *background* rather than a theme
 layer. Scrubbing the light therefore re-lights the terrain in place, at full
-size, against everything else on screen. What is left in the row is knobs, a
-resolution readout and the two verbs, so it stays a couple of lines tall.
+size, against everything else on screen. What is left in the panel is knobs, a
+resolution readout and the two verbs.
 
 Consequences worth knowing:
 
@@ -1048,30 +1415,33 @@ Consequences worth knowing:
   the topo map without losing the light you just dialled in. It is panel state
   mirrored onto the layer, and the remembered value survives a DTM→DOM rebuild.
 
-It takes `bbox` and `locality` as **props**, and has *two entrances*:
+It takes `bbox` and `locality` as **props**, and has *two entrances* — the same
+button in row 1 either way, resolving to whichever rectangle is in play:
 
-- **Row 1's "Terreng"**, with no lokalitet and no account. `useTerrainViewport`
-  frames the visible map into `terrainStandaloneBboxAtom`, and `Ribbon` renders
-  the surface off that. The bbox is held rather than recomputed from the live
+- **No lokalitet open**: `useTerrainViewport` frames the visible map into
+  `terrainStandaloneBboxAtom`, and `TerrainDock` renders the panel as the sole
+  occupant of its own dock. The bbox is held rather than recomputed from the live
   view: the analysis is of one fixed rectangle and the user is expected to pan
   underneath it while reading the render. **"Analyser utsnittet"** in the panel
   re-frames it onto the view as it is now — the same `frame()` the ribbon
   button calls. It exists because putting the render on the map makes panning
   off the analysed rectangle a normal move, and there was otherwise no way back
-  short of closing and reopening the tool. Hidden with a lokalitet open, where
-  "Juster området" in row 2 owns the rectangle.
+  short of closing and reopening the tool.
   Note that the rectangle is `viewportBbox`'s **inset** viewport, the same one
   "Ny lokalitet" uses, so the render stops short of the screen edges. That is
   deliberate — the two have to agree about what "the visible map" means, the
-  span guard rides on it, and the rectangle may become a lokalitet — and the
-  visible margin doubles as the affordance for exactly which ground is being
-  analysed.
-- **Row 2's "Terreng"**, over the open lokalitet's own bbox, via
-  `ribbonToolAtom`.
+  span guard rides on it, the free area is what `chromeInsets` reports, and the
+  rectangle may become a lokalitet — and the visible margin doubles as the
+  affordance for exactly which ground is being analysed.
+- **A lokalitet open**: `ribbonToolAtom` goes to `'terrain'` and the panel
+  renders in that lokalitet's dock, over its own bbox. "Juster området" owns the
+  rectangle here.
 
-They can never both be live — row 1's button is hidden while a lokalitet is
-open, and opening a lokalitet clears the standalone bbox — because two controls
-for one surface would disagree about which rectangle "Lagre" keeps. Passing the
+They can never both be live: `useGroundMode` routes the button to one or the
+other depending on whether a lokalitet is open, and opening a lokalitet clears
+the standalone bbox. That matters because two live controls for one surface
+would disagree about which rectangle "Lagre" keeps — which is exactly what row
+2's duplicate Terreng verb used to cause, and why it is gone. Passing the
 lokalitet's bbox as a prop rather than copying it into an atom is also what
 makes "Juster området" refetch the DEM for free.
 
@@ -1091,7 +1461,12 @@ Two things in that file must not be undone:
   `useBackgroundCyclingKeys` bails on `INPUT` targets.
 - The two `useMemo`s are **split on purpose**: sky-view factor takes ~800 ms on
   a 600² grid and must never be keyed on azimuth, or dragging the azimuth
-  slider queues a multi-second recompute per frame.
+  slider queues a multi-second recompute per frame. The split survives the move
+  of the arithmetic into `src/terrain/render.ts` — that module exports
+  `terrainStaticField` (expensive, sun-independent) and `terrainField` (cheap,
+  sun-dependent) as *two* functions for exactly this reason, and the panel
+  memoizes each. Its one-call `renderTerrain` is for headless callers with no
+  slider to drag (§8.9).
 
 The canvas itself is **off-DOM**. React does not own it and neither does the
 row: it is the OL source's image and the blob "Lagre" keeps, and the panel
@@ -1249,13 +1624,17 @@ search by source; clear the search; select a result (marker + fly-to + InfoBox);
 click the map for a coordinate + elevation readout.
 
 **Choose what the terrain looks like** — the core of the tool
-switch Standard / LiDAR / Hybrid / Flyfoto; pick the national mosaic or any
-per-project LiDAR dataset; see datasets ranked by relevance to the current
-viewport and expand to the less relevant ones; preview a project's footprint on
-hover; pick a render style and expand to the full style list; switch DTM / DOM;
-pick the seamless ortofoto mosaic or any historical acquisition covering the
-viewport; cycle styles with A/D, the active mode's datasets with W/S, model
-with E, without opening any pulldown or occluding the map.
+switch Standard / LiDAR / Hybrid / Flyfoto / Terreng, by button or by digits
+1–5; hold X to peek at the ground you were on before and release to snap back;
+pick the national mosaic or any per-project LiDAR dataset; see datasets ranked
+by relevance to the current viewport and expand to the less relevant ones;
+preview a project's footprint on hover; pick a render style and expand to the
+full style list; switch DTM / DOM; pick the seamless ortofoto mosaic or any
+historical acquisition covering the viewport; cycle styles with A/D, the active
+mode's datasets with W/S, model with E, without opening any pulldown or
+occluding the map; put a second ground on the right of a draggable curtain
+(Sammenlign), pick which one, drag the seam with the pointer or nudge it with
+the arrow keys once it has focus, and leave to take the second stack back down.
 
 **Overlay the heritage record**
 toggle the five Kulturminner layers as a group; open the Kartlag card and toggle
@@ -1274,14 +1653,18 @@ for them after moving the rectangle; read its centre coordinate and area; search
 your lokaliteter by any of those; set visibility (private / limited / public);
 adjust the rectangle afterwards (translate + modify); delete it; browse "Mine
 lokaliteter"; click a rectangle on the map to open it; see which known
-kulturminner already fall inside it.
+kulturminner already fall inside it; fold the dock away to see the map and
+unfold it from the tab that stays behind.
 
 **Record what you find**
-create a funn; draw it as point, line, polygon, circle or text; style it
-(colour, width, line style, point style, text style); select, move, reshape,
-vertex-edit and delete geometry; undo/redo; show or hide measurements on the
-drawing; name a funn; note it; set its status (mulig / sannsynlig / avkreftet /
-rapportert); zoom to it; walk the funn list with ↑/↓/Enter; grow the lokalitet
+arm the pen and have the first finished shape become a saved funn, auto-named
+and undoable from its toast; draw as point, line, polygon, circle or text; style
+it (colour, width, line style, point style, text style); select, move, reshape,
+vertex-edit and delete geometry, with every change written back on its own;
+undo/redo; show or hide measurements on the drawing; rename a funn; note it; set
+its status (mulig / sannsynlig / avkreftet / rapportert); re-edit an existing
+funn's drawing; zoom to it; walk the funn list with ↑/↓/Enter; click or hover a
+funn on the map to select it in the list, and the reverse; grow the lokalitet
 when a funn escapes it.
 
 **Analyse it**
@@ -1293,7 +1676,10 @@ current view; save the render (creating the lokalitet if there is none); run a
 LiDAR extract over the rectangle at a chosen
 source and resolution, view it fullscreen, keep it as a Bilde; fetch flyfoto —
 the seamless mosaic or any historical acquisition covering the area,
-individually or as a batch; take a map screenshot; upload an image.
+individually or as a batch; take a map screenshot; upload an image; or press
+**Hent grunnpakke** once and get the newest flyfoto, the best LiDAR hillshade
+and a multidirectional relief render fetched in sequence into Bilder, with
+progress in that section.
 
 **Keep it**
 browse the Bilder gallery; open the lightbox; caption an attachment; delete one;
@@ -1319,7 +1705,10 @@ Fix-list; none of these are load-bearing.
 - `trackPositionAtom` and its effect have no UI entry point (§6.3).
 - The theme-picker's category/subtheme machinery is unexercised (§6.2).
 - Search has no keyboard support and no i18n (§7, §5.4).
-- The layer z-index ladder contains a `4.5`.
+- The layer z-index ladder contains a `4.5` and a `1.5`.
+- Dragging the compare seam under the dock is possible and pointless — the
+  clamp is a flat 5–95 % rather than measured against `chromeInsets`, on the
+  grounds that it is a gesture nobody makes twice.
 - `test/map/overlay/atoms.test.ts` imports an atom that does not exist;
   `tsconfig.test.json` is not in `tsconfig.json`'s references, so `tsc -b`
   passes and only `npm test` notices.
@@ -1331,4 +1720,8 @@ Closed by the ribbon work, listed so they are not re-reported: the root
 the old TopBar. Closed by the kvib migration: `MapToolCardProps.hideHeader`,
 and the language switcher being reachable only on mobile — the old TopBar
 carried it, the ribbon does not, and the help page's copy was behind an
-`isMobile` gate.
+`isMobile` gate. Closed by the dock work: chrome that ate 500 px of the map,
+hard-coded `view.fit` paddings that could not know about it, the orange wash
+over the relief, funn that were only linked to the list in one direction,
+Terreng existing twice with two different rectangles, and the silent
+`cancelDraft` that discarded a drawing from five call sites.

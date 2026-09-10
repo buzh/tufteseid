@@ -306,7 +306,8 @@
       "details": "Detaljar",
       "owner": "Eigar",
       "created": "Oppretta",
-      "updated": "Sist endra"
+      "updated": "Sist endra",
+      "more": "Fleire val"
     },
     "funn": {
       "heading": "Funn",
@@ -315,13 +316,16 @@
       "empty": "Ingen funn enno. Teikn det du ser i terrenget.",
       "saveFailed": "Kunne ikkje lagre funnet. Prøv igjen.",
       "draft": {
-        "instructions": "Teikn funnet på kartet med verktøya under, og gjev det ein tittel.",
-        "instructionsEdit": "Endre teikninga på kartet, tittelen eller notatet – lagre for å oppdatere funnet.",
+        "instructions": "Teikn funnet på kartet. Det blir lagra av seg sjølv så snart den første forma er ferdig.",
+        "instructionsEdit": "Endre teikninga på kartet. Endringane blir lagra av seg sjølve.",
         "titlePlaceholder": "T.d. gravhaug?",
         "notePlaceholder": "Kvifor trur du det er noko her?",
-        "save": "Lagre funn",
         "cancel": "Avbryt",
-        "noGeometry": "Teikn noko på kartet før du lagrar."
+        "heading": "Teiknar funn",
+        "headingEdit": "Rediger funn",
+        "saved": "Lagra",
+        "pending": "Blir lagra når du har teikna noko",
+        "done": "Ferdig"
       },
       "status": {
         "mulig": "Mogleg",
@@ -339,9 +343,12 @@
         "menu": "Fleire val",
         "done": "Ferdig"
       },
-      "growConfirm": "Funnet ligg utanfor lokaliteten sitt område. Utvide området slik at det dekkjer funnet?",
       "confirmDeleteShort": "Slette funnet?",
-      "growConfirmAction": "Utvid området"
+      "growConfirmAction": "Utvid området",
+      "autoName": "Funn {{n}}",
+      "autoSaved": "«{{title}}» er lagra",
+      "undo": "Angre",
+      "growHint": "Teikninga går utanfor området til lokaliteten."
     },
     "bilder": {
       "heading": "Bilete",
@@ -394,11 +401,19 @@
       "flyfotoBatchDone": "Lagra {{saved}} av {{total}} opptak under Bilete.",
       "flyfotoEmptyFor": "Fann ingen flyfoto-dekning for {{label}}.",
       "flyfotoFailedFor": "Kunne ikkje hente flyfoto for {{label}}.",
-      "flyfotoClose": "Lukk"
+      "flyfotoClose": "Lukk",
+      "starter": "Hent grunnpakke",
+      "starterHint": "Hentar nyaste flyfoto, beste LiDAR-skuggerelieff og ei fleirretnings terrengrendring inn i Bilete.",
+      "starterNotice": "Grunnpakken startar med eit flyfoto, og hentar deretter LiDAR-skuggerelieff og ei terrengrendring. Det tek nokre minutt.",
+      "starterStep": {
+        "flyfoto": "Hentar flyfoto …",
+        "extract": "Hentar LiDAR-skuggerelieff …",
+        "terrain": "Reknar ut terrengrendring …"
+      },
+      "starterDone": "Lagra {{saved}} av {{total}} bilete under Bilete.",
+      "starterNone": "Fann ingen data for dette området. Grunnpakken gav ingen bilete."
     },
     "terrain": {
-      "short": "Terreng",
-      "tooltip": "Terrenganalyse — lys opp og bearbeid høgdedata for rektangelet",
       "heading": "Terrenganalyse",
       "close": "Lukk terrenganalyse",
       "visualization": "Visualisering",
@@ -438,6 +453,10 @@
       "error": "Klarte ikkje å sjekke kulturminneregisteret.",
       "unnamed": "(utan namn)",
       "openLink": "Opne i Kulturminnesøk"
+    },
+    "dock": {
+      "show": "Vis lokalitetspanelet",
+      "hide": "Skjul lokalitetspanelet"
     }
   },
   "helpPage": {
@@ -467,6 +486,14 @@
       "hybridTip": "LiDAR med vegar og stadnamn",
       "flyfoto": "Flyfoto",
       "flyfotoTip": "Ortofoto frå Norge i bilder — saumlaus mosaikk eller eitt enkelt flyfotoprosjekt"
+    },
+    "compare": {
+      "label": "Samanlikn",
+      "tip": "Legg eit anna kartgrunnlag til høgre for eit skyvbart skilje",
+      "groundLabel": "Grunnlag til høgre",
+      "head": "Vis til høgre",
+      "sameAsLeft": "alt på kartet",
+      "divider": "Flytt skiljet"
     },
     "heritage": {
       "label": "Kulturminne",
@@ -521,10 +548,6 @@
       "tip": "Terrenganalyse av kartutsnittet — hent høgdedata og lys dei opp sjølv. Krev inga lokalitet",
       "tooLarge": "Utsnittet dekkjer for stort område for terrenganalyse. Zoom inn og prøv igjen.",
       "unavailable": "Fann ikkje noko kartutsnitt å analysere."
-    },
-    "tray": {
-      "show": "Vis innhald",
-      "hide": "Skjul innhald"
     }
   }
 }

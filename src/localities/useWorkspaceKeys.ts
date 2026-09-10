@@ -26,9 +26,10 @@ export type WorkspaceKeyHandlers = {
   onZoomSelected: () => void;
   onEscape: () => void;
   draftActive: boolean;
-  // Arrows/Enter walk the funn list. Off when the panel is showing
-  // something else (the extract tool), where they mean nothing and the
-  // map may as well have them.
+  // Arrows/Enter walk the funn list. The list is always on screen in the
+  // dock, so this stays on while the extract and terrain panels are open —
+  // it is off only while drawing, where picking a different funn out from
+  // under the pen is never what the arrow meant.
   navigable: boolean;
   // Off while a modal owns the keyboard (the Bilder lightbox).
   enabled: boolean;

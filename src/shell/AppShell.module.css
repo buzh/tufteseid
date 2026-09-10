@@ -93,13 +93,49 @@
   }
 }
 
-/* Right slot: coordinate readout / search-result infobox. */
+/*
+ * Right slot: the dock column — the search-result infobox on top, then
+ * whichever dock is live under it.
+ *
+ * `bottom: 0` is what makes this a column rather than a floating card: the
+ * slot only had `top`/`right`, so a child asking for `max-height: 100%` had
+ * no containing height to resolve against and the dock could grow past the
+ * bottom of the window.
+ */
 .right {
   position: absolute;
   top: 0;
   right: 0;
+  bottom: 0;
   display: flex;
+  flex-direction: column;
+  /* Cross-axis: the infobox keeps its own width and sits against the right
+     edge; the dock asks for 100% and fills the column. */
+  align-items: flex-end;
   justify-content: flex-end;
-  padding: var(--sp-5) var(--sp-5) 0 0;
+  gap: var(--sp-4);
+  width: 100%;
+  padding: var(--sp-5) var(--sp-5) var(--sp-5) 0;
   pointer-events: none;
+}
+
+/* Phone: the dock is a bottom sheet, so the slot spans the width and its
+   contents pile up against the bottom edge. */
+@media (max-width: 47.999rem) {
+  .right {
+    padding: var(--sp-5) var(--sp-3) var(--sp-3);
+  }
+}
+
+@media (min-width: 48rem) {
+  .right {
+    width: 360px;
+    justify-content: flex-start;
+  }
+}
+
+@media (min-width: 62rem) {
+  .right {
+    width: 400px;
+  }
 }

@@ -36,16 +36,15 @@ import {
 } from '../ui';
 import { fetchDem, type Dem, type DemModel } from './dem';
 import {
-  computeHillshade,
-  computeLrm,
-  computeMultiHillshade,
-  computeSlope,
-  computeSvf,
-  percentileRange,
-  toImageData,
-  type Ramp,
-  type Visualization,
-} from './shade';
+  DEFAULT_ALTITUDE,
+  DEFAULT_AZIMUTH,
+  DEFAULT_Z_FACTOR,
+  demImageExtent,
+  paintTerrainField,
+  terrainField,
+  terrainStaticField,
+} from './render';
+import { type Visualization } from './shade';
 import styles from './TerrainPanel.module.css';
 import {
   hideTerrainOverlay,
@@ -66,18 +65,6 @@ const MODEL_OPTIONS: SegmentedOption<DemModel>[] = [
   { value: 'dtm', label: 'DTM' },
   { value: 'dom', label: 'DOM' },
 ];
-
-// Only the sun-dependent views react to these, which is why they're split
-// from the expensive memo below.
-const DEFAULT_AZIMUTH = 315;
-const DEFAULT_ALTITUDE = 35;
-const DEFAULT_Z_FACTOR = 2;
-
-// Metres. The LRM smoothing radius has to be comfortably larger than the
-// features being hunted or it removes them along with the landform trend;
-// 15 m suits mounds and ditches.
-const DEFAULT_LRM_RADIUS = 15;
-const DEFAULT_SVF_RADIUS = 20;
 
 export const TerrainPanel = ({
   bbox,
@@ -143,32 +130,22 @@ export const TerrainPanel = ({
 
   // Expensive, sun-independent passes. Keyed so that dragging the azimuth
   // slider — which happens dozens of times a second — can never retrigger a
-  // multi-second sky-view factor.
-  const staticField = useMemo(() => {
-    if (!dem) return null;
-    if (vis === 'svf') return computeSvf(dem, DEFAULT_SVF_RADIUS);
-    if (vis === 'lrm') return computeLrm(dem, DEFAULT_LRM_RADIUS);
-    return null;
-  }, [dem, vis]);
+  // multi-second sky-view factor. The two memos are split for that reason
+  // alone; see render.ts.
+  const staticField = useMemo(
+    () => (dem ? terrainStaticField(dem, vis) : null),
+    [dem, vis],
+  );
 
-  const field = useMemo(() => {
-    if (!dem) return null;
-    switch (vis) {
-      case 'hillshade':
-        return computeHillshade(dem, azimuth, altitude, zFactor);
-      case 'multiHillshade':
-        return computeMultiHillshade(dem, altitude, zFactor);
-      case 'slope':
-        return computeSlope(dem, zFactor);
-      default:
-        return staticField;
-    }
-  }, [dem, vis, azimuth, altitude, zFactor, staticField]);
+  const field = useMemo(
+    () =>
+      dem
+        ? terrainField(dem, vis, { azimuth, altitude, zFactor }, staticField)
+        : null,
+    [dem, vis, azimuth, altitude, zFactor, staticField],
+  );
 
-  // Paint, then hand the canvas to the map. Ranges differ per visualization:
-  // the shaded ones are already normalised to 0..1, the physical ones need a
-  // robust stretch because a single spike or the flat 0.0 plane over water
-  // would otherwise swallow the whole ramp.
+  // Paint, then hand the canvas to the map.
   useEffect(() => {
     if (!dem || !field) {
       // Covers loading, the no-coverage case and a failed fetch alike: an
@@ -177,52 +154,12 @@ export const TerrainPanel = ({
       hideTerrainOverlay();
       return;
     }
+    // Reused rather than recreated: this exact element is what the map's
+    // image source draws from, so replacing it every slider frame would mean
+    // rebuilding the layer's image too.
     const canvas = (canvasRef.current ??= document.createElement('canvas'));
-    // Assigning either dimension resets the canvas, so only do it when the
-    // grid actually changed — otherwise every slider frame reallocates a
-    // multi-megapixel buffer that putImageData is about to overwrite anyway.
-    if (canvas.width !== dem.width || canvas.height !== dem.height) {
-      canvas.width = dem.width;
-      canvas.height = dem.height;
-    }
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let ramp: Ramp = 'grey';
-    let range: [number, number] = [0, 1];
-    if (vis === 'slope') {
-      ramp = 'greyInverted';
-      range = [0, percentileRange(field, 0.02, 0.98)[1]];
-    } else if (vis === 'svf') {
-      range = percentileRange(field, 0.02, 0.98);
-    } else if (vis === 'lrm') {
-      ramp = 'diverging';
-      // Symmetric about zero, or the neutral tone drifts off the "no local
-      // relief" value and two renders stop being comparable.
-      const [lo, hi] = percentileRange(field, 0.02, 0.98);
-      const m = Math.max(Math.abs(lo), Math.abs(hi)) || 1;
-      range = [-m, m];
-    }
-    ctx.putImageData(
-      toImageData(field, dem.width, dem.height, ramp, range),
-      0,
-      0,
-    );
-
-    // The grid is sized from the bbox width, so the last row lands a fraction
-    // of a pixel short of the southern edge. Deriving the extent from the
-    // pixel count rather than reusing bbox25833 keeps the image registered to
-    // the ground it actually holds.
-    const [minX, , , maxY] = dem.bbox25833;
-    showTerrainOverlay({
-      canvas,
-      extent25833: [
-        minX,
-        maxY - dem.height * dem.metresPerPx,
-        minX + dem.width * dem.metresPerPx,
-        maxY,
-      ],
-    });
+    if (!paintTerrainField(field, dem, vis, canvas)) return;
+    showTerrainOverlay({ canvas, extent25833: demImageExtent(dem) });
   }, [dem, field, vis]);
 
   // After the paint effect on purpose: on the commit that first builds the

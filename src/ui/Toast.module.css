@@ -83,6 +83,14 @@
   overflow-wrap: anywhere;
 }
 
+/* Sits between the message and the close button, and must not be squeezed by
+   a long title — the whole point of the action is that it stays hittable for
+   the few seconds the toast is up. */
+.action {
+  flex: none;
+  align-self: center;
+}
+
 .info {
   border-left-color: var(--c-blue-600);
 }

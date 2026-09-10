@@ -1,6 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
-import { IconButton } from './Button';
+import { Button, IconButton } from './Button';
 import { cx } from './cx';
 import { Icon, type MaterialSymbol } from './Icon';
 import styles from './Toast.module.css';
@@ -27,11 +27,23 @@ import styles from './Toast.module.css';
 
 export type ToastTone = 'info' | 'success' | 'warning' | 'error';
 
+/**
+ * One verb offered alongside the message — in practice, undoing what the
+ * message just reported. A toast with an action is how a surface can commit
+ * something without asking first: the receipt carries the way back.
+ */
+export type ToastAction = {
+  label: string;
+  /** The toast dismisses itself first, then this runs. */
+  onClick: () => void;
+};
+
 export type ToastOptions = {
   title: string;
   description?: string;
   /** Milliseconds; 0 keeps it up until dismissed. Defaults per tone. */
   duration?: number;
+  action?: ToastAction;
 };
 
 type ToastItem = ToastOptions & { id: number; tone: ToastTone };
@@ -137,6 +149,19 @@ export const Toaster = ({ closeLabel = 'Lukk' }: { closeLabel?: string }) => {
               <div className={styles.description}>{item.description}</div>
             )}
           </div>
+          {item.action && (
+            <Button
+              size="xs"
+              variant="secondary"
+              className={styles.action}
+              onClick={() => {
+                dismiss(item.id);
+                item.action?.onClick();
+              }}
+            >
+              {item.action.label}
+            </Button>
+          )}
           <IconButton
             icon="close"
             aria-label={closeLabel}

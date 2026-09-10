@@ -11,7 +11,7 @@ export const SearchComponent = () => {
 
   return (
     <ErrorBoundary name="SearchResults">
-      <div className={styles.results}>
+      <div className={styles.results} data-chrome="left">
         <SearchResults
           hoveredResult={hoveredResult}
           setHoveredResult={setHoveredResult}

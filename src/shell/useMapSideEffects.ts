@@ -1,5 +1,5 @@
 import { useFunnHighlightLayer } from '../localities/funnHighlightLayer';
-import { useFunnLayer } from '../localities/funnLayer';
+import { useFunnLayer, useFunnPointer } from '../localities/funnLayer';
 import {
   useLocalitiesLayer,
   useLocalityClick,
@@ -35,10 +35,12 @@ export const useMapSideEffects = () => {
   useSearchEffects();
   useMapClickSearch();
   // Lokaliteter: rectangle layer (all visible records), funn layer (open
-  // lokalitet only) and click-to-open.
+  // lokalitet only), the selection halo, the map→dock pointer link and
+  // click-to-open.
   useLocalitiesLayer();
   useFunnLayer();
   useFunnHighlightLayer();
+  useFunnPointer();
   useLocalityClick();
   useLidarFootprintsLayer();
   // A/D/W/S/E background cycling. Mounted at the shell root rather than in

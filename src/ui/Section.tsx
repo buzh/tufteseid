@@ -10,12 +10,12 @@ import styles from './Section.module.css';
  * header row.
  *
  * Controlled, unlike the workspace's own version, which reached into
- * openSectionsAtom itself. The tray needs the same block for sections whose
+ * openSectionsAtom itself. The dock needs the same block for sections whose
  * open state is not in that atom, so the binding moves out to the call site.
  *
  * Content is unmounted while collapsed. That is a change from the kvib
  * Collapsible, and the point of it: the Bilder gallery fetches short-lived
- * file tokens for its thumbnails, and a collapsed column should not.
+ * file tokens for its thumbnails, and a collapsed section should not.
  */
 export const Section = ({
   title,

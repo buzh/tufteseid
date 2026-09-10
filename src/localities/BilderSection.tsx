@@ -22,6 +22,7 @@ import {
 } from '../ui';
 import { lightboxOpenAtom } from './atoms';
 import styles from './BilderSection.module.css';
+import type { StarterStep } from './starterPack';
 
 // `landscape` is what the ribbon already uses for LiDAR mode, so an
 // extract carries the same mark here. (Material Symbols' `terrain` isn't
@@ -304,7 +305,7 @@ const Lightbox = ({
 };
 
 /**
- * The Bilder column of the tray.
+ * The Bilder section of the dock.
  *
  * Upload lives in the workspace controller rather than here: the same verb
  * is on the lokalitet ribbon row, and two copies of the create-attachment
@@ -316,12 +317,15 @@ export const BilderSection = ({
   setItems,
   uploading,
   onUpload,
+  starterStep,
 }: {
   isMine: boolean;
   items: AttachmentRecord[] | null;
   setItems: Dispatch<SetStateAction<AttachmentRecord[] | null>>;
   uploading: boolean;
   onUpload: (file: File) => void;
+  /** Which grunnpakke image is being fetched, or null when none is. */
+  starterStep: StarterStep | null;
 }) => {
   const { t } = useTranslation();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -374,8 +378,17 @@ export const BilderSection = ({
 
   return (
     <>
-      {items.length === 0 && (
+      {items.length === 0 && starterStep == null && (
         <p className={styles.empty}>{t('localities.bilder.empty')}</p>
+      )}
+      {/* Above the grid, not a tile in it: the images the pack has already
+          saved are in that grid, and a placeholder sitting among them would
+          be read as a fourth one that failed. */}
+      {starterStep != null && (
+        <div className={styles.busy}>
+          <Spinner size={14} />
+          {t(`localities.tools.starterStep.${starterStep}`)}
+        </div>
       )}
       <div className={styles.grid}>
         {isMine && (

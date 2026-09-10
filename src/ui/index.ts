@@ -26,7 +26,13 @@ export { Section } from './Section';
 export { Segmented, type SegmentedOption } from './Segmented';
 export { Spinner } from './Spinner';
 export { Switch } from './Switch';
-export { toast, Toaster, type ToastOptions, type ToastTone } from './Toast';
+export {
+  toast,
+  Toaster,
+  type ToastAction,
+  type ToastOptions,
+  type ToastTone,
+} from './Toast';
 export { Tooltip } from './Tooltip';
 export {
   BREAKPOINTS,

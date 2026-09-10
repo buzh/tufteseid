@@ -1,7 +1,8 @@
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { AuthDialog } from '../auth/AuthDialog';
 import { BottomDrawToolSelector } from '../draw/BottomDrawToolSelector';
 import { funnDraftActiveAtom } from '../localities/atoms';
+import { CompareCurtain } from '../map/compare/CompareCurtain';
 import { KulturminnerPopup } from '../map/featureInfo/KulturminnerPopup';
 import { MapComponent } from '../map/MapComponent';
 import { MapToolCards } from '../map/overlay/MapToolCards';
@@ -10,12 +11,15 @@ import { InfoBox } from '../search/infobox/InfoBox';
 import { ErrorBoundary } from '../shared/ErrorBoundary';
 import { useIsMobileScreen } from '../shared/hooks';
 import styles from './AppShell.module.css';
+import { dockSlotAtom } from './dockSlot';
 import { Ribbon } from './Ribbon';
+import { TerrainDock } from './TerrainDock';
 import { useMapSideEffects } from './useMapSideEffects';
 
 export const AppShell = () => {
   const isMobile = useIsMobileScreen();
   const funnDraftActive = useAtomValue(funnDraftActiveAtom);
+  const setDockSlot = useSetAtom(dockSlotAtom);
 
   useMapSideEffects();
 
@@ -35,6 +39,12 @@ export const AppShell = () => {
         </div>
 
         <div className={styles.overlay}>
+          {/* First, so it paints under the ribbon and the slots: the curtain
+              edge belongs to the map, and the chrome floats over the map. */}
+          <ErrorBoundary name="CompareCurtain">
+            <CompareCurtain />
+          </ErrorBoundary>
+
           <div className={styles.ribbon}>
             <Ribbon />
           </div>
@@ -52,10 +62,15 @@ export const AppShell = () => {
               </ErrorBoundary>
             </div>
 
-            {/* Right slot: coordinate readout / search-result infobox. */}
-            <div className={styles.right}>
+            {/* Right slot: the dock column. The search-result infobox stacks
+                above whichever dock is live, and `LocalityRibbon` portals the
+                lokalitet dock in here (see dockSlot.ts) — hence the ref. */}
+            <div className={styles.right} ref={setDockSlot}>
               <ErrorBoundary name="InfoBox">
                 <InfoBox />
+              </ErrorBoundary>
+              <ErrorBoundary name="TerrainDock">
+                <TerrainDock />
               </ErrorBoundary>
             </div>
           </div>

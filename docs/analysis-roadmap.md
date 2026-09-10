@@ -54,9 +54,18 @@ in memory is the single most effective way to notice an earthwork, and it is
 exactly what a pre-rendered WMS cannot offer. The two illumination-independent
 views cover what no sun angle shows.
 
-Files: `src/terrain/{dem,shade}.ts`, `src/terrain/TerrainPanel.tsx`. Proxy
-route `/arcgis/hoydedata/*`. Reuses `attachments.kind = 'extract'`, so no
+Files: `src/terrain/{dem,shade,render}.ts`, `src/terrain/TerrainPanel.tsx`.
+Proxy route `/arcgis/hoydedata/*`. Reuses `attachments.kind = 'extract'`, so no
 PocketBase migration.
+
+Since 2026-09-10 it also runs **headless**: `render.ts` holds the arithmetic
+between a knob position and a canvas, and "Hent grunnpakke" uses it to drop a
+multidirectional render into a new lokalitet's Bilder alongside an ortofoto and
+a LiDAR hillshade, without anyone opening the panel (`docs/ui-architecture.md`
+§8.9). The relevant consequence for this thread: an analysis nobody was asked
+to configure is now the *first* thing a lokalitet has, so any Tier 1 product
+should be judged on whether it is worth a press at all — the bar is no longer
+"better than nothing".
 
 Measured on a live 600×600 fetch: hillshade 32 ms, slope 18 ms, LRM 23 ms,
 multidirectional 149 ms, SVF 775 ms. That spread is why the panel's two

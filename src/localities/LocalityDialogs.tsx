@@ -8,45 +8,29 @@ import {
 } from './useLocalityWorkspace';
 
 /**
- * The workspace's three modals, kept out of the ribbon rows.
+ * The workspace's two modals, kept out of the ribbon rows.
  *
- * None of them is anchored to a control, and all three are driven by
- * controller state rather than by whoever pressed the button — the flyfoto
- * notice hands off to the picker, and the grow prompt is raised from deep
- * inside the funn save path. Mounting them next to the trigger would tie
- * their lifetime to whichever row happens to be on screen.
+ * Neither is anchored to a control, and both are driven by controller state
+ * rather than by whoever pressed the button — the flyfoto notice hands off to
+ * the picker. Mounting them next to the trigger would tie their lifetime to
+ * whichever row happens to be on screen.
+ *
+ * Grow-to-fit used to be a third one, raised from inside the funn save path.
+ * It is an Alert in the draft band now: drawing past the edge of the
+ * rectangle is worth remarking on, but not worth stopping the pen for.
  */
 export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
 
   return (
     <>
-      {/* Grow-to-fit: the bbox is authored, so a funn that escapes it
-          prompts rather than silently resizing. */}
-      <Dialog
-        open={ws.growPrompt != null}
-        onOpenChange={(next) => !next && ws.cancelGrow()}
-        title={t('localities.funn.heading')}
-        closeLabel={t('shared.close')}
-        footer={
-          <>
-            <Button size="sm" palette="gray" onClick={ws.cancelGrow}>
-              {t('localities.funn.draft.cancel')}
-            </Button>
-            <Button size="sm" variant="primary" onClick={ws.confirmGrow}>
-              {t('localities.funn.growConfirmAction')}
-            </Button>
-          </>
-        }
-      >
-        <p className={styles.text}>{t('localities.funn.growConfirm')}</p>
-      </Dialog>
-
       {/* Licensing notice shown before every flyfoto grab: NiB imagery is
           free for private use, but publishing or commercial use is the
-          user's own responsibility. Confirm opens the picker. */}
+          user's own responsibility. Two things can be waiting behind it —
+          the acquisition picker, or the whole grunnpakke, whose first image
+          is a flyfoto and which therefore needs the same consent. */}
       <Dialog
-        open={ws.flyfotoNotice}
+        open={ws.flyfotoNotice != null}
         onOpenChange={(next) => !next && ws.closeFlyfotoNotice()}
         title={t('localities.tools.flyfotoNoticeTitle')}
         closeLabel={t('shared.close')}
@@ -55,13 +39,20 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             <Button size="sm" palette="gray" onClick={ws.closeFlyfotoNotice}>
               {t('localities.funn.draft.cancel')}
             </Button>
-            <Button size="sm" variant="primary" onClick={ws.openFlyfotoPicker}>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={ws.acceptFlyfotoNotice}
+            >
               {t('localities.tools.flyfotoConfirm')}
             </Button>
           </>
         }
       >
         <p className={styles.text}>{t('localities.tools.flyfotoNotice')}</p>
+        {ws.flyfotoNotice === 'starter' && (
+          <p className={styles.text}>{t('localities.tools.starterNotice')}</p>
+        )}
       </Dialog>
 
       {/* Acquisition picker. NiB keeps every ortofoto project flown over an

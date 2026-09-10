@@ -13,6 +13,7 @@ import { countFindsByLocality } from '../api/localityFinds';
 import { currentUserAtom, isAdminAtom } from '../auth/atoms';
 import { mapAtom } from '../map/atoms';
 import { mapToolAtom } from '../map/overlay/atoms';
+import { fitPadding } from '../shell/chromeInsets';
 import {
   Badge,
   BadgePalette,
@@ -149,9 +150,11 @@ export const LocalitiesPanel = () => {
       setLocalityHighlight(null);
       const projection = map.getView().getProjection().getCode();
       const extent = transformExtent(l.bbox, 'EPSG:4326', projection);
-      map
-        .getView()
-        .fit(extent, { padding: [80, 80, 80, 80], maxZoom: 18, duration: 400 });
+      map.getView().fit(extent, {
+        padding: fitPadding(map),
+        maxZoom: 18,
+        duration: 400,
+      });
       setActiveLocality(l);
       setMapTool(null);
     },

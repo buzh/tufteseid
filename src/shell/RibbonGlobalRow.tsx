@@ -1,14 +1,17 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { isSignedInAtom } from '../auth/atoms';
-import { activeLocalityAtom } from '../localities/atoms';
 import { useCreateLocalityFromViewport } from '../localities/createFromBbox';
 import { activeThemeLayersAtom } from '../map/layers/atoms';
 import type { ThemeLayerName } from '../map/layers/themeWMS';
 import { type MapTool, mapToolAtom } from '../map/overlay/atoms';
-import { useRegisterBackgroundCycle } from '../map/useBackgroundCyclingKeys';
+import {
+  useRegisterBackgroundCycle,
+  useRegisterGroundKeys,
+} from '../map/useBackgroundCyclingKeys';
 import { useTerrainViewport } from '../terrain/useTerrainViewport';
 import { IconButton, Tooltip } from '../ui';
+import { CompareControl } from './compare/CompareControl';
 import { FlyfotoDatasetPicker } from './flyfoto/FlyfotoDatasetPicker';
 import { useFlyfotoControls } from './flyfoto/useFlyfotoControls';
 import { LidarDatasetPicker } from './lidar/LidarDatasetPicker';
@@ -20,6 +23,7 @@ import { RibbonAccount } from './RibbonAccount';
 import { RibbonMeasure } from './RibbonMeasure';
 import { RibbonSearch } from './RibbonSearch';
 import styles from './Ribbon.module.css';
+import { GROUND_MODES, useGroundMode } from './useGroundMode';
 
 /**
  * Row 1 — always present, independent of any lokalitet: what the map shows
@@ -30,30 +34,44 @@ import styles from './Ribbon.module.css';
  * heritage record on top of it, then the tools that act on what you are
  * looking at.
  *
- * Modes versus modifiers is the distinction to preserve here
- * (docs/ui-architecture.md §5.2). Standard, LiDAR and Flyfoto are modes.
- * Hybrid, DTM/DOM and the style pick are modifiers on the LiDAR stack —
- * which is why Hybrid activates the national mosaic when nothing LiDAR is on
- * yet rather than becoming a background of its own.
+ * The five ground buttons are one ring, in digit order, driven by
+ * useGroundMode — including Terreng, which is a render over the background
+ * rather than a background of its own but is a *ground* as far as the person
+ * reading it is concerned. Hybrid is the odd one out and stays a mode here on
+ * purpose: it is a modifier on the LiDAR stack (which is why picking it
+ * activates the national mosaic when nothing LiDAR is on yet), but it is also
+ * one of the five things you flip between, and splitting the ring to say so
+ * would cost more than it explains. DTM/DOM and the style pick remain
+ * modifiers and stay in the pulldown group. docs/ui-architecture.md §5.2.
  *
  * LiDAR and Flyfoto each bring a dataset pulldown and a keyboard ring, and
  * only one of the two is ever on screen — this row is where they are
  * chained, because there is exactly one registered cycle handler.
+ *
+ * Sammenlign sits beside the ring rather than in it: it does not answer
+ * "what does the ground look like" but "against what", and it needs the
+ * ring's current and previous mode to pick a sensible other half.
  */
 export const RibbonGlobalRow = () => {
   const { t } = useTranslation();
   const isSignedIn = useAtomValue(isSignedInAtom);
-  const activeLocality = useAtomValue(activeLocalityAtom);
   const [tool, setTool] = useAtom(mapToolAtom);
   const [themeLayers, setThemeLayers] = useAtom(activeThemeLayersAtom);
   const lidar = useLidarControls();
   const flyfoto = useFlyfotoControls();
   const terrain = useTerrainViewport();
+  const ground = useGroundMode(lidar, flyfoto, terrain);
 
   // A/D/W/S/E. Each half declines every key outside its own mode, so the
   // order here only decides who is asked first, not who gets it. The
   // document listener lives at the shell root (useMapSideEffects).
   useRegisterBackgroundCycle((key) => flyfoto.cycle(key) || lidar.cycle(key));
+  // 1–5 and hold-X, against the same button order rendered below.
+  useRegisterGroundKeys({
+    select: (position) => ground.select(GROUND_MODES[position - 1]),
+    peekStart: ground.peekStart,
+    peekEnd: ground.peekEnd,
+  });
 
   // "Ny lokalitet" frames the visible map rather than arming a box drag.
   const { create: createFromViewport, creating } =
@@ -74,16 +92,14 @@ export const RibbonGlobalRow = () => {
     <div className={styles.row}>
       <RibbonSearch />
 
+      {/* The ring. Order is GROUND_MODES, which is also 1–5. */}
       <div className={styles.group}>
         <ModeButton
           icon="map"
           label={t('ribbon.mode.standard')}
-          tooltip={t('ribbon.mode.standardTip')}
-          active={lidar.backgroundLayer === 'topo'}
-          onClick={() => {
-            lidar.setHybridOverlay(false);
-            lidar.setBackgroundLayer('topo');
-          }}
+          tooltip={`${t('ribbon.mode.standardTip')} (1)`}
+          active={ground.mode === 'standard'}
+          onClick={() => ground.select('standard')}
         />
 
         {/* Activating LiDAR lands on whatever the dataset pulldown is set to
@@ -93,12 +109,9 @@ export const RibbonGlobalRow = () => {
         <ModeButton
           icon="landscape"
           label={t('ribbon.mode.lidar')}
-          tooltip={t('ribbon.mode.lidarTip')}
-          active={lidar.isLidarMode && !lidar.hybridOverlay}
-          onClick={() => {
-            lidar.setHybridOverlay(false);
-            if (!lidar.isLidarMode) lidar.enterLidar();
-          }}
+          tooltip={`${t('ribbon.mode.lidarTip')} (2)`}
+          active={ground.mode === 'lidar'}
+          onClick={() => ground.select('lidar')}
         />
 
         {/* The LiDAR stack plus roads, rail and place names. Still LiDAR
@@ -106,12 +119,9 @@ export const RibbonGlobalRow = () => {
         <ModeButton
           icon="signpost"
           label={t('ribbon.mode.hybrid')}
-          tooltip={t('ribbon.mode.hybridTip')}
-          active={lidar.isLidarMode && lidar.hybridOverlay}
-          onClick={() => {
-            lidar.setHybridOverlay(true);
-            if (!lidar.isLidarMode) lidar.enterLidar();
-          }}
+          tooltip={`${t('ribbon.mode.hybridTip')} (3)`}
+          active={ground.mode === 'hybrid'}
+          onClick={() => ground.select('hybrid')}
         />
 
         {/* Ortofoto: the seamless best-available mosaic by default, with
@@ -122,10 +132,28 @@ export const RibbonGlobalRow = () => {
         <ModeButton
           icon="satellite_alt"
           label={t('ribbon.mode.flyfoto')}
-          tooltip={t('ribbon.mode.flyfotoTip')}
-          active={flyfoto.isFlyfotoMode}
-          onClick={flyfoto.enterFlyfoto}
+          tooltip={`${t('ribbon.mode.flyfotoTip')} (4)`}
+          active={ground.mode === 'flyfoto'}
+          onClick={() => ground.select('flyfoto')}
         />
+
+        {/* Terrenganalyse: relief computed here from float elevation, over
+            the lokalitet's rectangle when one is open and over the visible
+            map otherwise. It stays on the bar with a lokalitet open — row 2
+            used to carry a second copy of this verb, and the two disagreeing
+            about which rectangle "Lagre" keeps is exactly why there is one
+            control now. */}
+        <ModeButton
+          icon="elevation"
+          label={t('ribbon.terrain.label')}
+          tooltip={`${t('ribbon.terrain.tip')} (5)`}
+          active={ground.mode === 'terreng'}
+          onClick={() => ground.select('terreng')}
+        />
+      </div>
+
+      <div className={styles.group}>
+        <CompareControl mode={ground.mode} previous={ground.previous} />
       </div>
 
       {flyfoto.isFlyfotoMode && (
@@ -175,20 +203,6 @@ export const RibbonGlobalRow = () => {
 
       <div className={styles.group}>
         <RibbonMeasure />
-
-        {/* Terrenganalyse of the ground you are looking at: no lokalitet, no
-            account. Hidden while a lokalitet is open, because row 2 carries
-            the same verb scoped to its rectangle and two live controls for
-            one surface would disagree about which rectangle "Lagre" keeps. */}
-        {!activeLocality && (
-          <ModeButton
-            icon="elevation"
-            label={t('ribbon.terrain.label')}
-            tooltip={t('ribbon.terrain.tip')}
-            active={terrain.active}
-            onClick={terrain.toggle}
-          />
-        )}
       </div>
 
       {/* Signed-in-only lokalitet controls. Hidden for guests rather than

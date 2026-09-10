@@ -1,21 +1,24 @@
 /*
- * The draft form in a ribbon row: drawing on the left, naming on the right.
- * Stacked in a single column the title field ended up below the drawing
- * controls' own two rows of buttons, which on a short window put "Lagre"
- * off the bottom of a bar that is already sitting on top of the map.
+ * The drawing band in the dock, in one column: the pen first, then what the
+ * funn is called.
+ *
+ * It used to be two columns side by side, because it lived in a ribbon row
+ * where a single column put "Lagre" off the bottom of a bar already sitting
+ * on top of the map. The dock is a column by construction and scrolls, so
+ * that pressure is gone — and with the save gone too, the tools you keep
+ * reaching for come before the fields you fill in once.
  */
 
 .root {
   display: flex;
-  align-items: flex-start;
-  gap: var(--sp-5);
+  flex-direction: column;
+  gap: var(--sp-3);
 }
 
 .draw {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
-  flex: 1 1 320px;
   min-width: 0;
 }
 
@@ -23,7 +26,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
-  flex: 1 1 280px;
   min-width: 0;
 }
 
@@ -39,20 +41,25 @@
   color: var(--c-danger);
 }
 
+.grow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
 .actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--sp-3);
 }
 
-@media (max-width: 47.999rem) {
-  .root {
-    flex-direction: column;
-    gap: var(--sp-4);
-  }
-
-  .draw,
-  .form {
-    width: 100%;
-  }
+/* "Lagret" / "Lagrer…" — a receipt, not a control. Quiet enough that it does
+   not read as something to press, present enough to answer the only question
+   an autosaving surface raises. */
+.state {
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
 }

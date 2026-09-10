@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ErrorBoundary } from '../shared/ErrorBoundary.tsx';
 import styles from './MapComponent.module.css';
+import { compareLayerAtomEffect } from './compare/atoms.ts';
 import { trackPostitionAtomEffect } from './geolocation/atoms.ts';
 import { themeLayerEffect } from './layers/atoms.ts';
 import { backgroundLayerAtomEffect } from './layers/config/backgroundLayers/atoms.ts';
@@ -17,6 +18,11 @@ export const MapComponent = () => {
   useAtom(themeLayerEffect);
   useAtom(trackPostitionAtomEffect);
   useAtom(backgroundLayerAtomEffect);
+  // The compare curtain's B stack. Separate from the background effect
+  // above and deliberately so: it resolves through the same rules
+  // (resolveStack) but installs into its own `cmp.` namespace, which the
+  // background swap must never sweep.
+  useAtom(compareLayerAtomEffect);
 
   useEffect(() => {
     if (mapRef.current) {

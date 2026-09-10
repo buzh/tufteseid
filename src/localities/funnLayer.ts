@@ -1,8 +1,10 @@
 import type { FeatureCollection } from 'geojson';
-import { getDefaultStore, useAtomValue } from 'jotai';
-import { Feature } from 'ol';
+import { getDefaultStore, useAtomValue, useSetAtom } from 'jotai';
+import { Feature, MapBrowserEvent } from 'ol';
+import BaseEvent from 'ol/events/Event';
 import { GeoJSON } from 'ol/format';
 import VectorLayer from 'ol/layer/Vector';
+import type Map from 'ol/Map';
 import VectorSource from 'ol/source/Vector';
 import { Fill, Stroke, Style } from 'ol/style';
 import CircleStyle from 'ol/style/Circle';
@@ -14,7 +16,11 @@ import {
 } from '../api/localityFinds';
 import { getStyleFromProperties } from '../draw/featureStyle';
 import { mapAtom } from '../map/atoms';
-import { activeLocalityAtom } from './atoms';
+import {
+  activeLocalityAtom,
+  hoveredFunnIdAtom,
+  selectedFunnIdAtom,
+} from './atoms';
 
 // Renders the funn of the OPEN lokalitet only. Features keep the style
 // they were drawn with (round-tripped through geometry properties by
@@ -23,15 +29,34 @@ import { activeLocalityAtom } from './atoms';
 export const FUNN_ID_PROPERTY = '__funnId';
 export const FUNN_LAYER_ID = 'funnLayer';
 
-const defaultFunnStyle = new Style({
-  stroke: new Stroke({ color: '#FF6A00', width: 3 }),
-  fill: new Fill({ color: 'rgba(255, 106, 0, 0.35)' }),
-  image: new CircleStyle({
-    radius: 8,
-    fill: new Fill({ color: '#FF6A00' }),
-    stroke: new Stroke({ color: '#ffffff', width: 2 }),
+// Cased, barely filled. The relief under a funn is the evidence for it, so
+// the shape marks the ground rather than covering it; the white underline is
+// what keeps an orange stroke readable on both dark hillshade and bright
+// ortofoto without having to shout.
+const defaultFunnStyle = [
+  new Style({
+    stroke: new Stroke({ color: 'rgba(255, 255, 255, 0.9)', width: 5 }),
   }),
-});
+  new Style({
+    stroke: new Stroke({ color: '#FF6A00', width: 2.5 }),
+    fill: new Fill({ color: 'rgba(255, 106, 0, 0.12)' }),
+    image: new CircleStyle({
+      radius: 7,
+      fill: new Fill({ color: '#FF6A00' }),
+      stroke: new Stroke({ color: '#ffffff', width: 2 }),
+    }),
+  }),
+];
+
+// A style with nothing in it draws nothing — how a funn is kept off the map
+// while the draw layer is holding its shapes.
+const INVISIBLE = new Style(undefined);
+
+// The funn currently being drawn, if any. It has to stay hidden across
+// re-hydration, not just once: every autosaved geometry patch comes back as a
+// realtime update, which rebuilds the record's features from scratch and would
+// otherwise put the persisted copy back underneath the one on the draw layer.
+let hiddenFunnId: string | null = null;
 
 const geoJson = new GeoJSON();
 
@@ -71,6 +96,10 @@ const hydrateFeatures = (
   }
   for (const f of features) {
     f.set(FUNN_ID_PROPERTY, rec.id);
+    if (rec.id === hiddenFunnId) {
+      f.setStyle(INVISIBLE);
+      continue;
+    }
     let styled = getStyleFromProperties(f.getProperties());
     // Icon points were drawn with a transparent hit-area style plus a DOM
     // overlay; the round-tripped Style has no image, which would render
@@ -118,14 +147,15 @@ export const removeFunnFromLayer = (id: string) => {
   if (source) removeById(source, id);
 };
 
-// Hide a funn while its geometry is being edited on the draw layer, so
-// the persisted copy doesn't double-render underneath. Restore by
-// re-upserting the record (save and cancel both do).
-export const hideFunnOnLayer = (id: string) => {
+// Hide a funn while its geometry is being drawn on the draw layer, so the
+// persisted copy doesn't double-render underneath. Pass null to lift it, then
+// re-upsert the record to draw the version that was just saved.
+export const hideFunnOnLayer = (id: string | null) => {
+  hiddenFunnId = id;
   const source = getFunnLayer()?.getSource();
-  if (!source) return;
+  if (!source || id == null) return;
   for (const f of source.getFeatures()) {
-    if (f.get(FUNN_ID_PROPERTY) === id) f.setStyle(new Style(undefined));
+    if (f.get(FUNN_ID_PROPERTY) === id) f.setStyle(INVISIBLE);
   }
 };
 
@@ -213,4 +243,71 @@ export const useFunnLayer = () => {
       source.clear();
     };
   }, [map, localityId]);
+};
+
+const funnIdAtPixel = (map: Map, pixel: [number, number]): string | null => {
+  let hitId: string | null = null;
+  map.forEachFeatureAtPixel(
+    pixel,
+    (feature, layer) => {
+      if (layer?.get('id') !== FUNN_LAYER_ID) return undefined;
+      const id = feature.get(FUNN_ID_PROPERTY) as string | undefined;
+      if (id) {
+        hitId = id;
+        return true;
+      }
+      return undefined;
+    },
+    // A drawn line is a couple of pixels wide; without slack the only way
+    // to hit one is to be exactly on it.
+    { hitTolerance: 6 },
+  );
+  return hitId;
+};
+
+// The other half of the pointer link the list already had: hovering or
+// clicking a funn *on the map* selects it in the dock, so the two views of
+// the same set stay pointed at the same thing whichever one you touch.
+//
+// Mount from useMapSideEffects, next to useFunnLayer. Only the open
+// lokalitet's funn are on the layer, so this is inert without one.
+export const useFunnPointer = () => {
+  const map = useAtomValue(mapAtom);
+  const activeLocality = useAtomValue(activeLocalityAtom);
+  const setSelected = useSetAtom(selectedFunnIdAtom);
+  const setHovered = useSetAtom(hoveredFunnIdAtom);
+  const localityId = activeLocality?.id ?? null;
+
+  useEffect(() => {
+    if (!localityId) return;
+
+    const onClick = (e: Event | BaseEvent) => {
+      if (!(e instanceof MapBrowserEvent)) return;
+      const id = funnIdAtPixel(map, e.pixel as [number, number]);
+      // Clicking past the funn is not "deselect": the click may well be
+      // aimed at the background, and losing the selection every time you
+      // pan-nudge the map would make the list's highlight useless.
+      if (id) setSelected(id);
+    };
+
+    // Written through a local rather than read back off the store: this
+    // fires on every mouse move over the map, and only the transitions
+    // are worth a jotai write.
+    let last: string | null = null;
+    const onMove = (e: Event | BaseEvent) => {
+      if (!(e instanceof MapBrowserEvent) || e.dragging) return;
+      const id = funnIdAtPixel(map, e.pixel as [number, number]);
+      if (id === last) return;
+      last = id;
+      setHovered(id);
+    };
+
+    map.on('singleclick', onClick);
+    map.on('pointermove', onMove);
+    return () => {
+      map.un('singleclick', onClick);
+      map.un('pointermove', onMove);
+      setHovered(null);
+    };
+  }, [map, localityId, setSelected, setHovered]);
 };
