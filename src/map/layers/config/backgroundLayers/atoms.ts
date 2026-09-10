@@ -9,6 +9,11 @@ import {
 import { mapAtom } from '../../../atoms';
 import { BackgroundLayerName, WMTSLayerName } from '../../backgroundLayers';
 import { buildNationalLidarConfig } from './elevation';
+import {
+  activeFlyfotoProjectAtom,
+  buildFlyfotoProjectConfig,
+  FLYFOTO_MOSAIC_CONFIG,
+} from './flyfotoBackground';
 import { KvCacheBackgroundLayers } from './kvCache';
 import {
   activeLidarModelAtom,
@@ -37,41 +42,60 @@ import {
 // wms.hoyde-dtm-prosjekt behave this way). Rendering them on top of the
 // topo WMTS layer means the topo shines through the transparent tiles,
 // so the user still has geographic context outside the LiDAR footprint
-// instead of an empty grey canvas.
+// instead of an empty grey canvas. A single ortofoto acquisition behaves
+// the same way (see the jpgpng note in flyfotoBackground.ts) and covers
+// even less of the screen, so it wants the same treatment.
+//
+// The seamless ortofoto mosaic is *not* in here: it is opaque JPEG across
+// its whole advertised extent, so a base under it would be invisible and
+// still cost a screenful of requests.
 const NEEDS_TOPO_BASE = new Set<BackgroundLayerName>([
+  'lidarProject',
+  'lidarHillshade',
+  'flyfotoProject',
+]);
+
+// Which layers the LiDAR modifiers mean anything for. Deliberately not
+// NEEDS_TOPO_BASE, which flyfotoProject now also belongs to: hybrid's
+// roads-and-names overlay and the DTM/DOM choice are decisions about the
+// LiDAR stack, and writing ?lidarModel=dom while looking at a 1937
+// photograph would be a lie about what's on screen.
+const LIDAR_LAYERS = new Set<BackgroundLayerName>([
   'lidarProject',
   'lidarHillshade',
 ]);
 
-// How far the national mosaic is dimmed when it's playing backdrop to a
-// per-project dataset: strong enough to read relief outside the
-// project's footprint, weak enough that the project is obviously the
-// layer in focus. The topo base still sits under it, so the uncovered
-// area also picks up a green cast — which turns out to be useful, the
-// coverage edge reads as a change in hue as well as in contrast. Turn
-// this up towards 1 if the blend is too soft to read terrain in.
-const LIDAR_FALLBACK_OPACITY = 0.6;
+// How far the layer underneath is dimmed when it's playing backdrop to a
+// per-project dataset: strong enough to read outside the project's
+// footprint, weak enough that the project is obviously the layer in focus.
+// For LiDAR the topo base still sits under the faded national mosaic, so
+// the uncovered area also picks up a green cast — which turns out to be
+// useful, the coverage edge reads as a change in hue as well as in
+// contrast. Turn this up towards 1 if the blend is too soft to read.
+const FALLBACK_OPACITY = 0.6;
 
 const emptyBackgroundLayer: EmptyBackgroundLayer = {
   type: 'Empty',
   layerName: 'empty',
 };
 
-// 'lidarHillshade' (national mosaic) and 'lidarProject' are both handled
-// as dynamic branches in backgroundLayerAtomEffect below — their style
-// comes from activeLidarStyleAtom, so neither has a static entry here.
+// 'lidarHillshade' (national mosaic), 'lidarProject', 'flyfoto' and
+// 'flyfotoProject' are all handled as dynamic branches in
+// backgroundLayerAtomEffect below — their style or their acquisition comes
+// out of an atom, so none of them has a static entry here.
 export const allConfiguredBackgroundLayers = [
   emptyBackgroundLayer,
   ...KvCacheBackgroundLayers,
 ];
 
-// Startup values the URL param may name directly. `lidarProject` is
-// excluded because its concrete acquisition lives in
-// `activeLidarProjectAtom`, which starts null on a fresh visit — leaving
-// the app on `lidarProject` with no active project renders nothing.
+// Startup values the URL param may name directly. `lidarProject` and
+// `flyfotoProject` are excluded because their concrete acquisition lives in
+// an atom that starts null on a fresh visit — leaving the app on either one
+// with nothing selected renders nothing.
 const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'topo',
   'lidarHillshade',
+  'flyfoto',
   'empty',
 ]);
 
@@ -139,6 +163,9 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
   const activeLidarProject = get(activeLidarProjectAtom);
   const activeLidarStyle = get(activeLidarStyleAtom);
   const activeLidarModel = get(activeLidarModelAtom);
+  // Same for the flyfoto acquisition: picking another year while
+  // 'flyfotoProject' is the background rebuilds its mosaicRule.
+  const activeFlyfotoProject = get(activeFlyfotoProjectAtom);
   const hybridOverlay = get(hybridOverlayAtom);
   // DOM publishes one style, so the model has the last word — and the
   // user's DTM pick stays in the atom, waiting for them to switch back.
@@ -150,22 +177,39 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
     return;
   }
 
-  const layerConfig: BackgroundLayer | undefined =
-    layerName === 'lidarProject'
-      ? activeLidarProject
-        ? buildLidarProjectConfig(
-            activeLidarProject,
-            lidarStyle,
-            activeLidarModel,
-          )
-        : undefined
-      : layerName === 'lidarHillshade'
-        ? buildNationalLidarConfig(lidarStyle, activeLidarModel)
-        : allConfiguredBackgroundLayers.find((l) => l.layerName === layerName);
+  // The four dynamic layers are built here from the atoms above; everything
+  // else is a static entry looked up by name.
+  const pickLayerConfig = (): BackgroundLayer | undefined => {
+    switch (layerName) {
+      case 'lidarProject':
+        return activeLidarProject
+          ? buildLidarProjectConfig(
+              activeLidarProject,
+              lidarStyle,
+              activeLidarModel,
+            )
+          : undefined;
+      case 'lidarHillshade':
+        return buildNationalLidarConfig(lidarStyle, activeLidarModel);
+      case 'flyfoto':
+        return FLYFOTO_MOSAIC_CONFIG;
+      case 'flyfotoProject':
+        return activeFlyfotoProject
+          ? buildFlyfotoProjectConfig(activeFlyfotoProject)
+          : undefined;
+      default:
+        return allConfiguredBackgroundLayers.find(
+          (l) => l.layerName === layerName,
+        );
+    }
+  };
+
+  const layerConfig = pickLayerConfig();
 
   if (!layerConfig) {
-    if (layerName === 'lidarProject') {
-      // No project selected yet — nothing to render, no warning needed.
+    if (layerName === 'lidarProject' || layerName === 'flyfotoProject') {
+      // Nothing picked out of the archive yet — nothing to render, and
+      // nothing wrong either, so no warning.
       return;
     }
     console.warn(`No layer config found for layer name: ${layerName}`);
@@ -188,33 +232,37 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
       // A per-project dataset typically covers a fraction of the screen.
       // Dropping to topo outside its footprint reads as "the terrain
       // stopped", and while cycling projects it's the loudest thing on
-      // screen. The national mosaic underneath instead keeps relief
-      // everywhere, and faded it stays clearly subordinate to the
+      // screen. The seamless national product underneath instead keeps
+      // coverage everywhere, and faded it stays clearly subordinate to the
       // project — the coverage edge is the contrast step, not a switch
-      // to a different kind of map. Fixed to the mosaic's own style:
-      // it publishes skyggerelieff and nothing else.
-      const lidarFallbackConfig =
+      // to a different kind of map. For LiDAR that's the national mosaic,
+      // fixed to its own style (it publishes skyggerelieff and nothing
+      // else); for one ortofoto acquisition it's the best-available
+      // ortofoto mosaic, i.e. the same ground photographed recently.
+      const fallbackConfig =
         layerName === 'lidarProject'
           ? buildNationalLidarConfig(
               DEFAULT_LIDAR_PROJECT_STYLE,
               activeLidarModel,
             )
-          : undefined;
+          : layerName === 'flyfotoProject'
+            ? FLYFOTO_MOSAIC_CONFIG
+            : undefined;
 
       // Only meaningful over terrain — on the plain topo map it would
       // just redraw roads and names the base already has.
       const overlayConfig =
-        hybridOverlay && NEEDS_TOPO_BASE.has(layerName)
+        hybridOverlay && LIDAR_LAYERS.has(layerName)
           ? TOPO_OVERLAY_CONFIG
           : undefined;
 
-      const [baseLayer, lidarFallback, topLayer, overlayLayer] =
+      const [baseLayer, fallbackLayer, topLayer, overlayLayer] =
         await Promise.all([
           baseTopoConfig
             ? buildOrReuseBackgroundLayer(baseTopoConfig, projection)
             : Promise.resolve(null),
-          lidarFallbackConfig
-            ? buildOrReuseBackgroundLayer(lidarFallbackConfig, projection)
+          fallbackConfig
+            ? buildOrReuseBackgroundLayer(fallbackConfig, projection)
             : Promise.resolve(null),
           buildOrReuseBackgroundLayer(layerConfig, projection),
           overlayConfig
@@ -232,13 +280,13 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
       // Always set opacity explicitly: any of these may be a reused
       // layer still carrying the fade from an earlier swap.
       baseLayer?.setOpacity(1);
-      lidarFallback?.setOpacity(LIDAR_FALLBACK_OPACITY);
+      fallbackLayer?.setOpacity(FALLBACK_OPACITY);
       topLayer.setOpacity(1);
       overlayLayer?.setOpacity(1);
 
       const notNull = (l: TileLayer | null): l is TileLayer => l != null;
       swapBackgroundLayers(
-        [baseLayer, lidarFallback].filter(notNull),
+        [baseLayer, fallbackLayer].filter(notNull),
         [topLayer, overlayLayer].filter(notNull),
       );
       setUrlParameter('backgroundLayer', layerName);
@@ -246,7 +294,7 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
       // shared URL should reproduce what's on screen.
       if (overlayConfig) setUrlParameter('hybrid', true);
       else removeUrlParameter('hybrid');
-      if (NEEDS_TOPO_BASE.has(layerName) && activeLidarModel === 'dom') {
+      if (LIDAR_LAYERS.has(layerName) && activeLidarModel === 'dom') {
         setUrlParameter('lidarModel', 'dom');
       } else {
         removeUrlParameter('lidarModel');

@@ -178,13 +178,36 @@ function relayStream(upstream, res) {
   Readable.fromWeb(upstream.body).pipe(res);
 }
 
-function relayBuffered(upstream, contentType, text, res) {
-  const buf = Buffer.from(text, 'utf8');
+function relayBuffer(upstream, contentType, buf, res) {
   res.writeHead(upstream.status, {
     'Content-Type': contentType || 'application/octet-stream',
     'Content-Length': String(buf.length),
   });
   res.end(buf);
+}
+
+// Content types NiB declines to name. The per-project ImageServer is asked
+// for `format=jpgpng` — JPEG where the tile is opaque, a small transparent
+// PNG where the acquisition has no coverage — and answers every one of them
+// as `application/octet-stream`, because it only knows which it produced
+// after producing it. Asking for a single format instead is not an option:
+// `jpg` paints black over the gaps and `png32` is eight times the bytes for
+// the same pixels.
+//
+// It has to be corrected here rather than at the browser: Caddy sets
+// X-Content-Type-Options: nosniff on every response, so an <img> would
+// refuse to paint an octet-stream. Here is also upstream of wmscache, so
+// the corrected type is what gets stored.
+const IMAGE_MAGIC = [
+  { type: 'image/jpeg', bytes: [0xff, 0xd8, 0xff] },
+  { type: 'image/png', bytes: [0x89, 0x50, 0x4e, 0x47] },
+];
+
+function sniffImageType(buf) {
+  for (const { type, bytes } of IMAGE_MAGIC) {
+    if (bytes.every((b, i) => buf[i] === b)) return type;
+  }
+  return null;
 }
 
 function authFailed(upstream, contentType, text) {
@@ -203,36 +226,45 @@ const server = http.createServer(async (req, res) => {
     }
 
     const pathWithQuery = req.url; // e.g. /wms/ortofoto?SERVICE=WMS&...
-    let upstream = await proxyOnce(pathWithQuery, await getToken(false));
-    let ct = upstream.headers.get('content-type') || '';
 
-    // A successful GetMap is an image — stream it straight through.
-    if (ct.startsWith('image/')) {
-      relayStream(upstream, res);
-      return;
-    }
+    // Two attempts: an auth failure re-mints the token and retries once.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const upstream = await proxyOnce(
+        pathWithQuery,
+        await getToken(attempt > 0),
+      );
+      const ct = upstream.headers.get('content-type') || '';
 
-    // Non-image: small enough to buffer and inspect. It's either an auth
-    // error (re-mint + retry once) or a legitimate non-image response
-    // (GetCapabilities XML, GetFeatureInfo JSON) — pass those through.
-    let text = await upstream.text();
-    if (authFailed(upstream, ct, text)) {
-      upstream = await proxyOnce(pathWithQuery, await getToken(true));
-      ct = upstream.headers.get('content-type') || '';
+      // A successful GetMap is an image — stream it straight through.
       if (ct.startsWith('image/')) {
         relayStream(upstream, res);
         return;
       }
-      text = await upstream.text();
-      if (authFailed(upstream, ct, text)) {
-        // Persistent failure: 502 so nginx won't cache it as a tile and
-        // won't stamp a week of browser freshness on it.
-        res.writeHead(502, { 'Content-Type': 'text/plain' });
-        res.end('nib upstream auth failed');
+
+      // Anything else is small enough to buffer, and has to be. Bytes
+      // rather than text(): an unnamed image would come back as mojibake
+      // from a UTF-8 decode, and the whole point of buffering is to find
+      // out which of the three this is.
+      const buf = Buffer.from(await upstream.arrayBuffer());
+      const sniffed = sniffImageType(buf);
+      if (sniffed) {
+        relayBuffer(upstream, sniffed, buf, res);
+        return;
+      }
+
+      // Left: an auth error (retry), or a legitimate non-image response —
+      // GetCapabilities XML, GetFeatureInfo JSON — which passes through.
+      const text = buf.toString('utf8');
+      if (!authFailed(upstream, ct, text)) {
+        relayBuffer(upstream, ct, buf, res);
         return;
       }
     }
-    relayBuffered(upstream, ct, text, res);
+
+    // Persistent failure: 502 so nginx won't cache it as a tile and won't
+    // stamp a week of browser freshness on it.
+    res.writeHead(502, { 'Content-Type': 'text/plain' });
+    res.end('nib upstream auth failed');
   } catch (err) {
     res.writeHead(502, { 'Content-Type': 'text/plain' });
     res.end(`nib proxy error: ${err?.message ?? err}`);

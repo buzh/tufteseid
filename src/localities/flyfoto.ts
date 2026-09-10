@@ -34,8 +34,29 @@ export const FLYFOTO_LAYER = 'ortofoto';
 // the per-project service has no WMS endpoint at all. It is an ArcGIS
 // ImageServer whose mosaic catalogue carries a prosjektnavn column, so a
 // single project is selected with a mosaicRule `where` clause.
-const FLYFOTO_PROJECT_URL =
-  '/arcgis/nib/ortofoto_prosjekter/ImageServer/exportImage';
+//
+// The service root, without the operation: the background layer built on
+// the same service in map/layers/config/backgroundLayers/flyfotoBackground.ts
+// hands this to OpenLayers, which appends /exportImage itself.
+export const FLYFOTO_PROJECT_IMAGESERVER =
+  '/arcgis/nib/ortofoto_prosjekter/ImageServer';
+const FLYFOTO_PROJECT_URL = `${FLYFOTO_PROJECT_IMAGESERVER}/exportImage`;
+
+// Selects exactly one acquisition out of the ImageServer's mosaic
+// catalogue. Doubling is SQL's apostrophe escape; a few project names have
+// one. Shared with the background layer so the two paths can never disagree
+// about how a name is quoted.
+export const flyfotoProjectWhere = (projectId: string): string =>
+  `prosjektnavn='${projectId.replace(/'/g, "''")}'`;
+
+// Draw exactly the rasters the where clause selects, in catalogue order,
+// with none of the service's default by-date/by-quality preference mixing
+// other projects back in.
+export const flyfotoMosaicRule = (projectId: string): string =>
+  JSON.stringify({
+    mosaicMethod: 'esriMosaicNone',
+    where: flyfotoProjectWhere(projectId),
+  });
 
 // Ortofoto nationally is ~0.10–0.25 m/px; 0.20 keeps a lokalitet-sized
 // grab sharp. planTiles scales both axes down together past its canvas
@@ -67,15 +88,11 @@ function buildProjectUrl(
     bboxSR: '25833',
     imageSR: '25833',
     size: `${widthPx},${heightPx}`,
+    // Plain jpg, not the jpgpng the background layer asks for: a stitch
+    // flattens onto an opaque white canvas anyway, and fetchAndPaint's
+    // uniform-image check is what drops the no-coverage tiles.
     format: 'jpg',
-    mosaicRule: JSON.stringify({
-      // esriMosaicNone: draw exactly the rasters the where clause selects,
-      // in catalogue order, with none of the service's default
-      // by-date/by-quality preference mixing other projects back in.
-      mosaicMethod: 'esriMosaicNone',
-      // Doubling is SQL's apostrophe escape; a few project names have one.
-      where: `prosjektnavn='${project.id.replace(/'/g, "''")}'`,
-    }),
+    mosaicRule: flyfotoMosaicRule(project.id),
   });
   return `${FLYFOTO_PROJECT_URL}?${params.toString()}`;
 }

@@ -3,6 +3,7 @@ import { WMTSCapabilities } from 'ol/format';
 import type BaseLayer from 'ol/layer/Base';
 import TileLayer from 'ol/layer/Tile';
 import { transformExtent } from 'ol/proj';
+import TileArcGISRest from 'ol/source/TileArcGISRest';
 import TileWMS from 'ol/source/TileWMS';
 import WMTS, { optionsFromCapabilities } from 'ol/source/WMTS';
 import { mapAtom } from '../../../atoms';
@@ -13,7 +14,9 @@ import {
 } from '../../wmsTileGrid';
 import { backgroundLayerCapabilitiesCacheAtom } from './atoms';
 import {
+  ArcGISImageBackgroundLayer,
   BackgroundLayer,
+  CoverageExtent,
   WMSBackgroundLayer,
   WMTSBackgroundLayer,
 } from './types';
@@ -79,6 +82,19 @@ export const getWMTSLayer = async (
   }
 };
 
+// 8 sampling stops per edge rather than the default corners-only:
+// reprojecting a Norway-sized box out of UTM33 bows its edges, and four
+// corners would clip the bulge — cutting real coverage off the map.
+// Sampling along the edges errs outward instead.
+const toViewExtent = (
+  coverage: CoverageExtent | undefined,
+  projection: string,
+): number[] | undefined => {
+  if (!coverage) return undefined;
+  if (coverage.crs === projection) return coverage.extent;
+  return transformExtent(coverage.extent, coverage.crs, projection, 8);
+};
+
 export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
   const store = getDefaultStore();
   const map = store.get(mapAtom);
@@ -98,16 +114,7 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
     tileGrid: getWMSTileGrid(projection),
     zDirection: WMS_Z_DIRECTION,
   });
-  // 8 sampling stops per edge rather than the default corners-only:
-  // reprojecting a Norway-sized box out of UTM33 bows its edges, and
-  // four corners would clip the bulge — cutting real coverage off the
-  // map. Sampling along the edges errs outward instead.
-  const coverage = layerConfig.coverageExtent;
-  const extent = coverage
-    ? coverage.crs === projection
-      ? coverage.extent
-      : transformExtent(coverage.extent, coverage.crs, projection, 8)
-    : undefined;
+  const extent = toViewExtent(layerConfig.coverageExtent, projection);
   // preload 0, unlike the WMTS base. These are on-the-fly renders —
   // measured 3-12 s for a cold LiDAR tile at the origin — and every
   // preloaded coarse tile occupies one of the map's globally limited
@@ -123,6 +130,40 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
   });
 };
 
+// ArcGIS ImageServer / MapServer as a tiled background. Same tile grid,
+// same culling and the same preload policy as the WMS layers above — the
+// service renders on the fly exactly like they do, so every request-count
+// argument in docs/wms-proxy-and-tiles.md carries over unchanged.
+export const getArcGISImageLayer = (
+  layerConfig: ArcGISImageBackgroundLayer,
+): TileLayer => {
+  const store = getDefaultStore();
+  const map = store.get(mapAtom);
+  const projection = map.getView().getProjection().getCode();
+
+  const source = new TileArcGISRest({
+    url: layerConfig.url,
+    params: { ...layerConfig.params },
+    tileGrid: getWMSTileGrid(projection),
+    zDirection: WMS_Z_DIRECTION,
+    // Off, so a tile is 512×512 at DPI 90 whatever the display. Left on
+    // (the default) TileArcGISRest scales SIZE and DPI by the map's pixel
+    // ratio, which on a HiDPI screen quadruples the pixels the service has
+    // to resample *and* gives wmscache a second set of cache keys for the
+    // same ground — the tile grid's whole argument, undone.
+    hidpi: false,
+  });
+
+  const extent = toViewExtent(layerConfig.coverageExtent, projection);
+  return new TileLayer({
+    source,
+    properties: { id: `bg.${layerConfig.layerName}` },
+    preload: 0,
+    cacheSize: WMS_TILE_CACHE_SIZE,
+    ...(extent ? { extent } : {}),
+  });
+};
+
 export const getLayerFromConfig = async (
   layerConfig: BackgroundLayer,
   projection?: string,
@@ -132,6 +173,9 @@ export const getLayerFromConfig = async (
   }
   if (layerConfig.type === 'WMS') {
     return getWMSLayer(layerConfig);
+  }
+  if (layerConfig.type === 'ArcGISImage') {
+    return getArcGISImageLayer(layerConfig);
   }
   console.warn(`Unsupported layer type for layerconfig: ${layerConfig}`);
   return null;
@@ -158,6 +202,10 @@ const layerSignature = (
   if (config.type === 'WMTS') return `wmts|${config.layerName}|${projection}`;
   if (config.type === 'WMS') {
     return `wms|${config.url}|${JSON.stringify(config.props)}|${projection}`;
+  }
+  if (config.type === 'ArcGISImage') {
+    const params = JSON.stringify(config.params);
+    return `arcgis|${config.url}|${params}|${projection}`;
   }
   return null;
 };
