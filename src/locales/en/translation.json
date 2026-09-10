@@ -125,7 +125,8 @@
     "sources": {
       "label": "Sources",
       "loading": "Loading LiDAR catalogue …",
-      "none": "No LiDAR sources cover this area."
+      "none": "No LiDAR sources cover this area.",
+      "capped": "capped"
     },
     "actions": {
       "redraw": "Draw again",

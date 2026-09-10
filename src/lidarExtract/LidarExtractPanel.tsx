@@ -1,21 +1,27 @@
-// The workspace body in `lidar` mode (docs/ui-architecture.md §10):
+// The ribbon's `lidar` tool surface (docs/ui-architecture.md §10):
 // pick styles + sources → fetch + stitch → preview and download.
 //
 // Each source renders at its native ground resolution — no per-run
 // resolution picker. Styles are chosen once for the whole run and applied
 // to every enabled source that advertises them, which avoids unchecking
 // 'skyggerelieff' on every dataset in turn.
+//
+// Laid out for a wide row: the run controls sit on one line with the
+// selection size, and the sources are a wrapping grid of cards. As a
+// full-width `space-between` list they degenerated into long thin lines with
+// the name at one end and the badges at the other.
 
-import { Box, Button, HStack, Text, VStack } from '@kvib/react';
 import { useAtom, useSetAtom } from 'jotai';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button, cx, Spinner } from '../ui';
 import {
   lidarExtractRunAtom,
   lidarExtractSelectionAtom,
   lidarExtractSourcesAtom,
   lidarExtractViewerOpenAtom,
 } from './atoms';
+import styles from './LidarExtractPanel.module.css';
 import { cancelExtraction, startExtraction, StylesBySource } from './run';
 import {
   enumerateLidarSources,
@@ -98,9 +104,9 @@ export const LidarExtractPanel = () => {
     const active: LidarSource[] = [];
     for (const s of sources) {
       if (disabledSources.has(s.key)) continue;
-      const styles = s.styles.filter((st) => enabledStyles.has(st));
-      if (styles.length === 0) continue;
-      stylesBySource[s.key] = styles;
+      const activeStyles = s.styles.filter((st) => enabledStyles.has(st));
+      if (activeStyles.length === 0) continue;
+      stylesBySource[s.key] = activeStyles;
       active.push(s);
     }
     startExtraction(selection.bbox25833, active, stylesBySource);
@@ -134,60 +140,66 @@ export const LidarExtractPanel = () => {
 
   if (!selection) {
     return (
-      <VStack align="stretch" gap={3}>
-        <Text fontSize="sm">
-          {t('lidarExtract.instructions.drawBox')}
-        </Text>
-        <Text fontSize="xs" color="gray.500">
-          {t('lidarExtract.instructions.drawHint')}
-        </Text>
-      </VStack>
+      <div className={styles.empty}>
+        <p className={styles.lead}>{t('lidarExtract.instructions.drawBox')}</p>
+        <p className={styles.hint}>{t('lidarExtract.instructions.drawHint')}</p>
+      </div>
     );
   }
 
   return (
-    <VStack align="stretch" gap={3}>
-      <Box>
-        <Text fontSize="xs" color="gray.600">
-          {t('lidarExtract.selection.label')}
-        </Text>
-        <Text fontSize="sm">
-          {spanM
-            ? `${formatMeters(spanM.w)} × ${formatMeters(spanM.h)}`
-            : ''}
-        </Text>
-      </Box>
+    <div className={styles.root}>
+      <div className={styles.bar}>
+        <span className={styles.selection}>
+          <span className={styles.label}>
+            {t('lidarExtract.selection.label')}
+          </span>
+          {spanM && `${formatMeters(spanM.w)} × ${formatMeters(spanM.h)}`}
+        </span>
+
+        {/* Kept together and to the right: "Tegn nytt" throws the selection
+            away, so it should never sit under the pointer on its way to
+            "Hent". */}
+        <div className={styles.actions}>
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon="crop_free"
+            onClick={drawAgain}
+          >
+            {t('lidarExtract.actions.redraw')}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={!canRun}
+            onClick={handleRun}
+          >
+            {t('lidarExtract.actions.run')}
+          </Button>
+        </div>
+      </div>
 
       {enumerating && (
-        <Text fontSize="xs" color="gray.500">
+        <div className={styles.busy}>
+          <Spinner size={14} />
           {t('lidarExtract.sources.loading')}
-        </Text>
+        </div>
       )}
 
       {!enumerating && sources && sources.length === 0 && (
-        <Text fontSize="xs" color="gray.500">
-          {t('lidarExtract.sources.none')}
-        </Text>
+        <p className={styles.hint}>{t('lidarExtract.sources.none')}</p>
       )}
 
       {!enumerating && sources && sources.length > 0 && spanM && (
         <>
-          <Box>
-            <Text fontSize="xs" color="gray.600" mb={1}>
+          <div className={styles.field}>
+            <span className={styles.label}>
               {t('lidarExtract.styles.label')}
-            </Text>
-            <VStack align="stretch" gap={0}>
+            </span>
+            <div className={styles.checks}>
               {allStyles.map((style) => (
-                <label
-                  key={style}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    fontSize: 12,
-                    padding: '2px 0',
-                  }}
-                >
+                <label key={style} className={styles.check}>
                   <input
                     type="checkbox"
                     checked={enabledStyles.has(style)}
@@ -196,16 +208,16 @@ export const LidarExtractPanel = () => {
                   <span>{style}</span>
                 </label>
               ))}
-            </VStack>
-          </Box>
+            </div>
+          </div>
 
-          <Box>
-            <Text fontSize="xs" color="gray.600" mb={1}>
+          <div className={styles.field}>
+            <span className={styles.label}>
               {t('lidarExtract.sources.label')}
-            </Text>
-            <VStack align="stretch" gap={2}>
+            </span>
+            <div className={styles.sources}>
               {sources.map((source) => (
-                <SourceRow
+                <SourceCard
                   key={source.key}
                   source={source}
                   spanM={spanM}
@@ -213,36 +225,15 @@ export const LidarExtractPanel = () => {
                   onToggle={() => toggleSource(source.key)}
                 />
               ))}
-            </VStack>
-          </Box>
+            </div>
+          </div>
         </>
       )}
-
-      <HStack justify="space-between">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={drawAgain}
-          leftIcon="crop_free"
-        >
-          {t('lidarExtract.actions.redraw')}
-        </Button>
-        <Button
-          variant="primary"
-          colorPalette="green"
-          size="sm"
-          onClick={handleRun}
-          disabled={!canRun}
-        >
-          {t('lidarExtract.actions.run')}
-        </Button>
-      </HStack>
-
-    </VStack>
+    </div>
   );
 };
 
-const SourceRow = ({
+const SourceCard = ({
   source,
   spanM,
   enabled,
@@ -253,6 +244,7 @@ const SourceRow = ({
   enabled: boolean;
   onToggle: () => void;
 }) => {
+  const { t } = useTranslation();
   const mpp = nativeResolutionMetersPerPx(source);
   const rawW = Math.max(1, Math.round(spanM.w / mpp));
   const rawH = Math.max(1, Math.round(spanM.h / mpp));
@@ -262,7 +254,7 @@ const SourceRow = ({
   const capped = scale < 1;
   const effectiveMpp = spanM.w / outW;
   const resLabel = capped
-    ? `~${effectiveMpp.toFixed(2)} m/px (kappet)`
+    ? `~${effectiveMpp.toFixed(2)} m/px (${t('lidarExtract.sources.capped')})`
     : `~${mpp} m/px`;
   const badges = [
     source.year != null ? String(source.year) : null,
@@ -272,34 +264,21 @@ const SourceRow = ({
   ].filter((x): x is string => x != null);
 
   return (
-    <Box borderWidth="1px" borderColor="gray.200" borderRadius="sm" p={2}>
-      <HStack justify="space-between" gap={2}>
-        <HStack gap={2} flex={1}>
-          <input
-            type="checkbox"
-            aria-label={source.label}
-            checked={enabled}
-            onChange={onToggle}
-          />
-          <Text fontSize="sm" fontWeight="medium">
-            {source.label}
-          </Text>
-        </HStack>
-        <HStack gap={1} flexWrap="wrap" justify="flex-end">
-          {badges.map((b) => (
-            <Text
-              key={b}
-              fontSize="10px"
-              bg="gray.100"
-              px={1.5}
-              borderRadius="sm"
-            >
-              {b}
-            </Text>
-          ))}
-        </HStack>
-      </HStack>
-    </Box>
+    // The whole card is the label, so the click target is the card rather
+    // than a 13 px box in its corner.
+    <label className={cx(styles.card, !enabled && styles.cardOff)}>
+      <span className={styles.cardHead}>
+        <input type="checkbox" checked={enabled} onChange={onToggle} />
+        <span className={styles.cardTitle}>{source.label}</span>
+      </span>
+      <span className={styles.badges}>
+        {badges.map((b) => (
+          <span key={b} className={styles.badge}>
+            {b}
+          </span>
+        ))}
+      </span>
+    </label>
   );
 };
 

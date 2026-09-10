@@ -130,7 +130,8 @@
     "sources": {
       "label": "Kilder",
       "loading": "Leser LiDAR-katalog …",
-      "none": "Ingen LiDAR-kilder dekker dette området."
+      "none": "Ingen LiDAR-kilder dekker dette området.",
+      "capped": "kappet"
     },
     "actions": {
       "redraw": "Tegn nytt",

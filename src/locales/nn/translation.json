@@ -130,7 +130,8 @@
     "sources": {
       "label": "Kjelder",
       "loading": "Les LiDAR-katalog …",
-      "none": "Ingen LiDAR-kjelder dekkjer dette området."
+      "none": "Ingen LiDAR-kjelder dekkjer dette området.",
+      "capped": "kappa"
     },
     "actions": {
       "redraw": "Teikn ny",

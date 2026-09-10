@@ -1,0 +1,139 @@
+/*
+ * LiDAR-uttrekk in a ribbon row. The vertical version stacked selection,
+ * styles, sources and actions down a 400 px column; here the run controls sit
+ * on the top line where they are always reachable, and the sources spread
+ * into a grid instead of stretching one card per line across the window.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.lead {
+  margin: 0;
+  font-size: var(--font-sm);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+.selection {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.label {
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+.busy {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-4);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+/* auto-fill rather than auto-fit: a single source keeps a card-sized card
+   instead of stretching to the full width of a 27-inch screen. */
+.sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--sp-2);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: var(--c-border-strong);
+}
+
+/* Dimmed rather than hidden: which sources cover the rectangle is itself
+   information, and one is often unchecked only to be checked again. */
+.cardOff {
+  opacity: 0.55;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.cardTitle {
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+.badge {
+  padding: 0 var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--c-bg-muted);
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--c-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
