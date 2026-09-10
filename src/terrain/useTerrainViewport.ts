@@ -1,8 +1,8 @@
-import { toaster } from '@kvib/react';
 import { useAtom, useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { viewportBbox } from '../localities/createFromBbox';
 import { mapAtom } from '../map/atoms';
+import { toast } from '../ui';
 import { terrainStandaloneBboxAtom } from './atoms';
 
 /**
@@ -28,7 +28,7 @@ export const useTerrainViewport = () => {
   const frame = () => {
     const result = viewportBbox(map);
     if (!result.ok) {
-      toaster.error({
+      toast.error({
         title:
           result.reason === 'tooLarge'
             ? t('ribbon.terrain.tooLarge')

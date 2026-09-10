@@ -1,4 +1,4 @@
-import { KvibProvider, Toaster } from '@kvib/react';
+import { KvibProvider } from '@kvib/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import 'material-symbols/rounded.css';
 import { StrictMode } from 'react';
@@ -8,6 +8,7 @@ import App from './App.tsx';
 import { AtomWrapper } from './AtomWrapper.tsx';
 import './index.css';
 import { projInit } from './map/projections/proj/projInit.ts';
+import { Toaster } from './ui';
 projInit();
 
 // Module scope, not inline in the element tree: constructing it there
@@ -21,8 +22,10 @@ createRoot(document.getElementById('root')!).render(
         <QueryClientProvider client={queryClient}>
           <KvibProvider>
             <App />
-            <Toaster />
           </KvibProvider>
+          {/* Outside KvibProvider: src/ui needs no theme context, and this
+              way the region survives kvib's removal untouched. */}
+          <Toaster />
         </QueryClientProvider>
       </AtomWrapper>
     </BrowserRouter>

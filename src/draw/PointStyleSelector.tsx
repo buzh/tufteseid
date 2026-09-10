@@ -3,7 +3,6 @@ import {
   Heading,
   HStack,
   Icon,
-  MaterialSymbol,
   SelectContent,
   SelectItem,
   SelectRoot,
@@ -16,6 +15,7 @@ import { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { pointIconAtom, primaryColorAtom } from '../settings/draw/atoms';
 import { useIsMobileScreen } from '../shared/hooks';
+import type { MaterialSymbol } from '../ui';
 import { isDrawIconFilled } from './drawControls/drawUtils';
 
 const icons: MaterialSymbol[] = [

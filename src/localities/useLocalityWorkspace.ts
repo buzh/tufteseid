@@ -1,4 +1,3 @@
-import { toaster } from '@kvib/react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { transformExtent } from 'ol/proj';
 import { useCallback, useEffect, useState } from 'react';
@@ -24,6 +23,7 @@ import { getDrawLayer } from '../draw/drawControls/hooks/mapLayers';
 import { lidarExtractSelectionAtom } from '../lidarExtract/atoms';
 import { mapAtom } from '../map/atoms';
 import { terrainStandaloneBboxAtom } from '../terrain/atoms';
+import { toast } from '../ui';
 import {
   activeLocalityAtom,
   adjustingLocalityAtom,
@@ -200,7 +200,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         return updated;
       } catch (e) {
         console.warn('[localityWorkspace] save failed', e);
-        toaster.error({ title: t('localities.workspace.saveFailed') });
+        toast.error({ title: t('localities.workspace.saveFailed') });
         return null;
       }
     },
@@ -237,7 +237,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setActiveLocality(null);
     } catch (e) {
       console.warn('[localityWorkspace] delete failed', e);
-      toaster.error({ title: t('localities.workspace.saveFailed') });
+      toast.error({ title: t('localities.workspace.saveFailed') });
     }
   }, [locality.id, setActiveLocality, t]);
 
@@ -450,7 +450,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     try {
       const blob = await captureLocalityScreenshot(map, locality.bbox);
       if (!blob) {
-        toaster.error({ title: t('localities.tools.screenshotFailed') });
+        toast.error({ title: t('localities.tools.screenshotFailed') });
         return;
       }
       const rec = await createAttachment(
@@ -464,10 +464,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         'skjermbilde.png',
       );
       setAttachmentItems((prev) => (prev ? [rec, ...prev] : [rec]));
-      toaster.success({ title: t('localities.tools.screenshotSaved') });
+      toast.success({ title: t('localities.tools.screenshotSaved') });
     } catch (e) {
       console.warn('[localityWorkspace] screenshot failed', e);
-      toaster.error({ title: t('localities.tools.screenshotFailed') });
+      toast.error({ title: t('localities.tools.screenshotFailed') });
     } finally {
       setShooting(false);
     }
@@ -500,7 +500,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         setAttachmentItems((prev) => (prev ? [rec, ...prev] : [rec]));
       } catch (e) {
         console.warn('[localityWorkspace] upload failed', e);
-        toaster.error({ title: t('localities.bilder.uploadFailed') });
+        toast.error({ title: t('localities.bilder.uploadFailed') });
       } finally {
         setUploading(false);
       }
@@ -529,7 +529,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       try {
         const result = await fetchFlyfoto(locality.bbox, { project });
         if (!result) {
-          toaster.error({
+          toast.error({
             title: t('localities.tools.flyfotoEmptyFor', { label }),
           });
           return false;
@@ -565,7 +565,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         return true;
       } catch (e) {
         console.warn('[localityWorkspace] flyfoto failed', e);
-        toaster.error({
+        toast.error({
           title: t('localities.tools.flyfotoFailedFor', { label }),
         });
         return false;
@@ -589,7 +589,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setFetchingFlyfoto(true);
       try {
         if (await grabFlyfoto(project)) {
-          toaster.success({ title: t('localities.tools.flyfotoSaved') });
+          toast.success({ title: t('localities.tools.flyfotoSaved') });
         }
       } finally {
         setFlyfotoBusy(null);
@@ -618,7 +618,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setFlyfotoBusy(null);
       setFetchingFlyfoto(false);
     }
-    toaster.success({
+    toast.success({
       title: t('localities.tools.flyfotoBatchDone', {
         saved,
         total: batch.length,
@@ -688,7 +688,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         );
       } catch (e) {
         console.warn('[localityWorkspace] status update failed', e);
-        toaster.error({ title: t('localities.funn.saveFailed') });
+        toast.error({ title: t('localities.funn.saveFailed') });
       }
     },
     [setFindItems, t],
@@ -703,7 +703,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         );
       } catch (e) {
         console.warn('[localityWorkspace] funn update failed', e);
-        toaster.error({ title: t('localities.funn.saveFailed') });
+        toast.error({ title: t('localities.funn.saveFailed') });
       }
     },
     [setFindItems, t],
@@ -720,7 +720,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         if (selectedFunnId === f.id) setSelectedFunnId(null);
       } catch (e) {
         console.warn('[localityWorkspace] funn delete failed', e);
-        toaster.error({ title: t('localities.funn.saveFailed') });
+        toast.error({ title: t('localities.funn.saveFailed') });
       }
     },
     [setFindItems, selectedFunnId, setSelectedFunnId, t],

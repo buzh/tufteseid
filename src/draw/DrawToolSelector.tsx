@@ -1,4 +1,4 @@
-import { Flex, IconButton, MaterialSymbol, Text } from '@kvib/react';
+import { Flex, IconButton, Text } from '@kvib/react';
 import { useAtom, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import {
@@ -6,6 +6,7 @@ import {
   primaryColorAtom,
   secondaryColorAtom,
 } from '../settings/draw/atoms';
+import type { MaterialSymbol } from '../ui';
 import { DrawType } from './drawControls/hooks/drawSettings';
 
 export const DrawToolSelector = () => {

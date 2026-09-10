@@ -118,4 +118,5 @@
   --z-fixed: 1000; /* BottomDrawToolSelector, LidarExtractViewer */
   --z-popover: 1200;
   --z-tooltip: 1300;
+  --z-toast: 1400; /* only reached where the popover API is missing */
 }

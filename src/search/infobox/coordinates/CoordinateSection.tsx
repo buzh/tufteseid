@@ -1,10 +1,11 @@
-import { Button, HStack, Stack, toaster, Tooltip } from '@kvib/react';
+import { Button, HStack, Stack, Tooltip } from '@kvib/react';
 import { useAtomValue } from 'jotai';
 import { transform } from 'ol/proj';
 import { useTranslation } from 'react-i18next';
 import { mapAtom } from '../../../map/atoms';
 import { ProjectionIdentifier } from '../../../map/projections/types';
 import { decimalToDMS } from '../../../shared/utils/coordinateCalculations';
+import { toast } from '../../../ui';
 import { CoordinateText } from './CoordinateText';
 
 interface CoordinateInfoProps {
@@ -35,7 +36,7 @@ export const CoordinateInfo = ({ lat, lon, inputCRS }: CoordinateInfoProps) => {
       : `${x.toFixed(decimals)},${y.toFixed(decimals)}@${projection}`;
 
     navigator.clipboard.writeText(coordString);
-    toaster.create({
+    toast.create({
       title: t('infoBox.coordinateSection.copy.toast.title'),
       duration: 2000,
     });
@@ -52,7 +53,7 @@ export const CoordinateInfo = ({ lat, lon, inputCRS }: CoordinateInfoProps) => {
       : `${formatDMS(x)}, ${formatDMS(y)}`;
 
     navigator.clipboard.writeText(coordString);
-    toaster.create({
+    toast.create({
       title: t('infoBox.coordinateSection.copyDMS.toast.title'),
       duration: 2000,
     });

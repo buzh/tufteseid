@@ -89,21 +89,32 @@ kit — plain CSS Modules over custom properties, no new npm dependency, because
 `package-lock.json` cannot be regenerated on the workstation this is developed
 on. It exports `Button` / `IconButton`, `Badge` / `CountBadge`, `Popover`,
 `Dialog`, `Tooltip`, `Switch`, `Segmented`, `Section`, `Field` (`Input` +
-`NoteInput`), `ConfirmPopover`, `Spinner`, `Icon`, `cx`, `useMediaQuery` and
-`overlayAtoms`. The shell, the lokalitet surfaces and the analysis panels are
-all on it.
+`NoteInput`), `ConfirmPopover`, `Spinner`, `Icon`, `toast` / `Toaster`, `cx`,
+`useMediaQuery` and `overlayAtoms`. The shell, the lokalitet surfaces and the
+analysis panels are all on it.
 
 `src/ui/tokens.css` is the single source for colour, spacing, radius, shadow,
 control heights and — the one that was genuinely scattered before — the
 **z-index ladder**: `--z-map: 0`, `--z-map-controls: 1`, `--z-overlay: 2`,
-`--z-ribbon: 20`, `--z-fixed: 1000`, `--z-popover: 1200`, `--z-tooltip: 1300`.
-There is no `--z-dialog` because `Dialog` is a native `<dialog>` opened with
-`showModal()`, which puts it in the browser's top layer above everything.
+`--z-ribbon: 20`, `--z-fixed: 1000`, `--z-popover: 1200`, `--z-tooltip: 1300`,
+`--z-toast: 1400`. There is no `--z-dialog` because `Dialog` is a native
+`<dialog>` opened with `showModal()`, which puts it in the browser's top layer
+above everything.
+
+`Toaster` reaches that same top layer by a different door: the region is a
+`popover="manual"` element, not a z-index. Toasts are fired from inside modal
+dialogs — a failed save from a lokalitet dialog — and an ordinary z-index loses
+to the top layer, i.e. the message would be invisible exactly when it matters.
+`--z-toast` is only the fallback for browsers without the popover API. Its
+store is a module-level list read through `useSyncExternalStore` rather than an
+atom: `toast.error(…)` is called from non-React modules, and one component
+reads it.
 
 `<KvibProvider>` is still mounted, and kvib still carries what has not been
-ported: drawing (`src/draw/**`, `src/settings/draw/**`), search results and the
-infobox, the help page, the language switcher, `KulturminnerPopup`,
-`MapToolCards`, and `toaster`. There is no dark mode in either system.
+ported: drawing (`src/draw/**`), search results and the infobox, the help page,
+the language switcher, `KulturminnerPopup`, `MapToolCards`, `LocalitiesPanel`,
+`LidarExtractViewer`, `AuthDialog` and `MapComponent`. There is no dark mode in
+either system.
 
 Hand-written CSS is now the `src/ui/*.module.css` files plus one module per
 shell and lokalitet component, on top of `src/index.css` and `src/map/map.css`
@@ -738,10 +749,11 @@ add a "don't show this again" checkbox without thinking about it.
 subsystem in the app. Inherited largely intact from upstream and the
 least-touched part of the fork.
 
-Tools: point, line, polygon, rectangle, circle, text, freehand. Editing:
-select, translate, modify, delete, plus a vertical-move hook. Styling: colour,
-line width, line style, point style, text style. Plus import/export dialogs
-(GeoJSON/GPX-ish), undo/redo, and measurement readouts.
+`DrawType` is exactly six: point, line, polygon, circle, text, and `Move` (the
+edit/select tool). Editing: select, translate, modify, delete, plus a
+vertical-move hook. Styling: colour, line width, line style, point style, text
+style. Plus import/export dialogs (GeoJSON/GPX-ish, slated for deletion — §12),
+undo/redo, and measurement readouts.
 
 Two surfaces render the same tools: `DrawToolSelector` (desktop, inside
 `DrawControls`, which the draft row of the ribbon renders) and
@@ -905,18 +917,50 @@ curl -sL https://registry.npmjs.org/material-symbols/-/material-symbols-0.40.2.t
 The migration is partial by design. Ported to `src/ui`: the whole shell and
 ribbon, the lokalitet surfaces (`FunnList`, `BilderSection`,
 `KulturminnerSection`, `LocalityDetails`, `LocalityDialogs`, `FunnDraft`), both
-analysis panels, `AuthButton`, `ErrorBoundary`, and the measure trigger.
+analysis panels, `AuthButton`, `ErrorBoundary`, the measure trigger, and the
+toast region. That last one carried five files across on its own — the workspace
+callbacks, `createFromBbox`, `BilderSection`, `TerrainPanel` and
+`useTerrainViewport` imported nothing else from kvib — so `src/terrain/`,
+`src/settings/draw/` and all of `src/localities/` bar `LocalitiesPanel` are now
+clear.
 
-Still on kvib, and each is a separate piece of work:
+Still on kvib — 43 files, and each row is a separate piece of work:
 
 | Surface | Size | Note |
 |---|---|---|
-| `src/draw/**`, `src/settings/draw/**` | ~4400 lines | the largest subsystem; inherited upstream, least-touched |
-| `src/search/**` | results list + infobox | also the one with no `t()` at all (§5.4) |
-| `MapToolCards` + `MapThemes` | the card slot | §6.1, §6.2 |
+| `src/draw/**` | ~3700 lines | the largest subsystem; inherited upstream, least-touched |
+| `src/search/**` | ~3200 lines | results list + infobox; also the one with no `t()` at all (§5.4) |
+| `LidarExtractViewer` | 602 lines | layout primitives and buttons only |
 | `KulturminnerPopup` | 557 lines | §7.1 |
-| `src/help/`, `src/languageswitcher/` | small | |
-| `toaster` | app-wide | every error path calls it |
+| `MapToolCards` + `MapThemes`/`SubTheme` | ~540 lines | the card slot; §6.1, §6.2 |
+| `src/help/`, `src/languageswitcher/` | ~410 lines | between them the only `Select` |
+| `LocalitiesPanel` | 260 lines | rendered inside the card slot |
+| `AuthDialog`, `MapComponent`, `SearchComponent` | ~160 lines | trivial |
+
+What the kit still has to grow to absorb them: an `Accordion` (nine files, most
+of search, plus `useAccordionContext` in `FeatureInfoSection`), a `Select`, a
+layout/typography convention to replace `Box`/`Flex`/`HStack`/`VStack`/`Stack`/
+`Text`/`Heading`/`Link`/`List`, and small `Pagination` and `Alert` pieces.
+`Section` already covers kvib's `Collapsible`.
+
+Two decisions taken to keep that list short rather than long:
+
+- **The drawing import/export dialogs go, they are not ported.** ~780 lines
+  (`ImportDialog`, `dialogs/import/utils`, `ImportContentDetails`,
+  `ExportDialog`, `ExportControls`, `exportUtils`) plus the `DrawControlsFooter`
+  accordion that fronts them. Funn geometry already persists to PocketBase, and
+  file-level GeoJSON/GPX round-tripping is upstream Norgeskart's "save your
+  drawing" feature, which this fork's per-lokalitet drawing does not need.
+  Deleting them also removes the only call for a `FileUpload` dropzone. First
+  move `getStyleFromProperties` out of `dialogs/import/utils.ts` — despite the
+  path it is live style code, imported by `localities/funnLayer.ts` and
+  `drawControls/hooks/drawSettings.ts`.
+- **The colour picker becomes `<input type="color">` plus the existing recent
+  swatches**, not a hand-built saturation/hue/alpha surface. That was the single
+  largest component the migration would otherwise have owed.
+
+Also going while draw is opened up: the nautical-mile unit in
+`MeasurementControls`, an upstream sea-chart concern.
 
 Until the last of those goes, kvib's cost stays: it drags in Chakra, emotion,
 the `@zag-js` machine set, `react-select`, `react-day-picker`, `react-aria`,
@@ -938,11 +982,20 @@ selectors in the keyboard layers (§1, §8.3). `src/ui`'s `Popover` and `Dialog`
 set the same attributes, so the contract holds across both systems rather than
 having to be replaced in one go.
 
-**`material-symbols` has to become a direct dependency when kvib finally
-goes** — `src/mainApp.tsx` imports it today while it is only transitive, and
-`MaterialSymbol` is re-exported from `src/ui/Icon.tsx` so the switch is one
-line. That is the one `package.json` + `package-lock.json` edit the whole
-migration requires.
+**Two of kvib's own dependencies have to be promoted to direct ones when it
+goes**: `material-symbols`, which `src/mainApp.tsx` already imports while it is
+only transitive, and `@fontsource/mulish` — nothing in `src/` imports the font,
+so it arrives purely through kvib's theme and would vanish silently with it.
+`<KvibProvider>` also supplies the CSS reset, which `src/index.css` has to take
+over along with a `font-family`.
+
+Every `MaterialSymbol` import already points at `src/ui/Icon.tsx`, which
+re-exports the union from kvib; re-homing it there is one line. The Dockerfile
+runs `npm ci`, which fails on a package.json/lock mismatch, and the workstation
+cannot run `npm install` — but both packages are already locked as
+`node_modules/*` entries, so promoting them is a hand-edit of `package.json`
+plus the root `dependencies` block of `package-lock.json`. That is the whole
+dependency edit the migration requires.
 
 ---
 

@@ -1,4 +1,3 @@
-import { MaterialSymbol } from '@kvib/react';
 import { atom, getDefaultStore } from 'jotai';
 import { atomEffect } from 'jotai-effect';
 import { atomWithStorage } from 'jotai/utils';
@@ -48,6 +47,7 @@ import {
   removeOwnedInteractions,
 } from '../../map/interactions';
 import { mapToolAtom } from '../../map/overlay/atoms';
+import type { MaterialSymbol } from '../../ui';
 import { addDrawAction } from './drawActions/drawActionsHooks';
 
 export const DEFAULT_PRIMARY_COLOR = '#0e5aa0ff';

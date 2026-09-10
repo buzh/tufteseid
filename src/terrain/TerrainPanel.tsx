@@ -18,7 +18,6 @@
 // Why any of this: docs/terrain-analysis.md. The control surface and the two
 // deliberately-split useMemos: docs/ui-architecture.md §10.
 
-import { toaster } from '@kvib/react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,7 +27,13 @@ import { currentUserAtom } from '../auth/atoms';
 import { isAuthDialogOpenAtom } from '../auth/atoms-dialog';
 import { activeLocalityAtom } from '../localities/atoms';
 import { createLocalityFromBbox } from '../localities/createFromBbox';
-import { Button, Segmented, Spinner, type SegmentedOption } from '../ui';
+import {
+  Button,
+  Segmented,
+  Spinner,
+  toast,
+  type SegmentedOption,
+} from '../ui';
 import { fetchDem, type Dem, type DemModel } from './dem';
 import {
   computeHillshade,
@@ -258,7 +263,7 @@ export const TerrainPanel = ({
           t('localities.defaultName'),
         );
         if (!target) {
-          toaster.error({ title: t('localities.createFailed') });
+          toast.error({ title: t('localities.createFailed') });
           return;
         }
       }
@@ -297,7 +302,7 @@ export const TerrainPanel = ({
       if (!locality) setActiveLocality(target);
     } catch (e) {
       console.warn('[TerrainPanel] save failed', e);
-      toaster.error({ title: t('localities.terrain.saveFailed') });
+      toast.error({ title: t('localities.terrain.saveFailed') });
     } finally {
       setSaving(false);
     }

@@ -1,4 +1,3 @@
-import { MaterialSymbol } from '@kvib/react';
 import { getDefaultStore } from 'jotai';
 import { Feature, Overlay } from 'ol';
 import { Circle, Geometry, LineString, Polygon } from 'ol/geom';
@@ -11,6 +10,7 @@ import {
   showMeasurementsAtom,
 } from '../../settings/draw/atoms';
 import { formatArea, formatDistance } from '../../shared/utils/stringUtils';
+import type { MaterialSymbol } from '../../ui';
 import {
   INTERACTIVE_MEASUREMNT_OVERLAY_ID,
   INTERACTIVE_OVERLAY_PREFIX,

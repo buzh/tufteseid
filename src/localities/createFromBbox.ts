@@ -1,4 +1,3 @@
-import { toaster } from '@kvib/react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { boundingExtent } from 'ol/extent';
 import type Map from 'ol/Map';
@@ -12,6 +11,7 @@ import {
 } from '../api/localities';
 import { currentUserAtom } from '../auth/atoms';
 import { mapAtom } from '../map/atoms';
+import { toast } from '../ui';
 import { activeLocalityAtom } from './atoms';
 import { upsertLocalityOnLayer } from './localityLayer';
 
@@ -141,7 +141,7 @@ export const useCreateLocalityFromViewport = () => {
     if (!user || creating) return;
     const result = viewportBbox(map);
     if (!result.ok) {
-      toaster.error({
+      toast.error({
         title:
           result.reason === 'tooLarge'
             ? t('localities.createTooLarge')
@@ -157,7 +157,7 @@ export const useCreateLocalityFromViewport = () => {
         t('localities.defaultName'),
       );
       if (!rec) {
-        toaster.error({ title: t('localities.createFailed') });
+        toast.error({ title: t('localities.createFailed') });
         return;
       }
       setActiveLocality(rec);

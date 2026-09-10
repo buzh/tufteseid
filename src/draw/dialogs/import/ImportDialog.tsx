@@ -16,7 +16,6 @@ import {
   SwitchLabel,
   SwitchRoot,
   Text,
-  toaster,
   Tooltip,
   VStack,
 } from '@kvib/react';
@@ -24,6 +23,7 @@ import { useAtom } from 'jotai';
 import { Feature } from 'ol';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from '../../../ui';
 import {
   addIconOverlayToPointFeature,
   PointIcon,
@@ -121,7 +121,7 @@ export const ImportDialog = () => {
                     break;
                   }
                   default:
-                    toaster.error({
+                    toast.error({
                       title: t(
                         'importDialog.toasts.fileTypeNotSupported.title',
                       ),
@@ -132,7 +132,7 @@ export const ImportDialog = () => {
                 }
 
                 if (readResult.status === 'error') {
-                  toaster.error({
+                  toast.error({
                     title: t('importDialog.toasts.fileReadError.title'),
                   });
                   setImportedFeatures(null);
@@ -142,7 +142,7 @@ export const ImportDialog = () => {
 
                 const features = readResult.features;
                 if (features.length === 0) {
-                  toaster.warning({
+                  toast.warning({
                     title: t('importDialog.toasts.noFeaturesFound.title'),
                   });
                   setImportedFeatures(null);

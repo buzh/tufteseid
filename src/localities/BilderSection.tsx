@@ -1,4 +1,3 @@
-import { toaster } from '@kvib/react';
 import { useSetAtom } from 'jotai';
 import type { ChangeEvent, Dispatch, SetStateAction } from 'react';
 import { useEffect, useRef, useState } from 'react';
@@ -19,6 +18,7 @@ import {
   Input,
   type MaterialSymbol,
   Spinner,
+  toast,
 } from '../ui';
 import { lightboxOpenAtom } from './atoms';
 import styles from './BilderSection.module.css';
@@ -327,7 +327,7 @@ export const BilderSection = ({
       setOpenIndex(null);
     } catch (e) {
       console.warn('[BilderSection] delete failed', e);
-      toaster.error({ title: t('localities.workspace.saveFailed') });
+      toast.error({ title: t('localities.workspace.saveFailed') });
     }
   };
 
@@ -339,7 +339,7 @@ export const BilderSection = ({
       );
     } catch (e) {
       console.warn('[BilderSection] caption save failed', e);
-      toaster.error({ title: t('localities.workspace.saveFailed') });
+      toast.error({ title: t('localities.workspace.saveFailed') });
     }
   };
 
