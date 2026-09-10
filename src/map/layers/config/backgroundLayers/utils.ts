@@ -28,14 +28,15 @@ export const getWMTSLayer = async (
   const store = getDefaultStore();
 
   try {
+    const url = layerConfig.provider.capabilitiesUrl;
     const cache = store.get(backgroundLayerCapabilitiesCacheAtom);
     let capabilitiesText: string;
-    if (cache[layerConfig.layerName]) {
-      capabilitiesText = cache[layerConfig.layerName]!;
+    // Keyed by URL: one document describes every layer a provider publishes,
+    // so switching between the Standard variants costs one fetch in total.
+    if (cache[url]) {
+      capabilitiesText = cache[url]!;
     } else {
-      const capabilitiesResponse = await fetch(
-        layerConfig.provider.capabilitiesUrl,
-      );
+      const capabilitiesResponse = await fetch(url);
       if (!capabilitiesResponse.ok) {
         throw new Error(
           `Failed to fetch capabilities for layer ${layerConfig.layerName}: ${capabilitiesResponse.statusText}`,
@@ -44,7 +45,7 @@ export const getWMTSLayer = async (
       capabilitiesText = await capabilitiesResponse.text();
       store.set(backgroundLayerCapabilitiesCacheAtom, {
         ...cache,
-        [layerConfig.layerName]: capabilitiesText,
+        [url]: capabilitiesText,
       });
     }
     const parser = new WMTSCapabilities();

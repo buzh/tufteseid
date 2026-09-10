@@ -360,8 +360,8 @@ subsume.
 
 - **Map core** — `mapAtom`, `currentZoomAtom`, `mapFullScreenAtom`,
   `trackPositionAtom`.
-- **Background** — `backgroundLayerAtom`, `hybridOverlayAtom`,
-  `hybridContoursAtom`,
+- **Background** — `backgroundLayerAtom`, `standardVariantAtom`,
+  `hybridOverlayAtom`, `hybridContoursAtom`,
   `activeLidarModelAtom`, `activeLidarStyleAtom`, `activeLidarProjectAtom`,
   `lidarPickerOpenAtom`, `lidarCyclingAtom`, `lidarAutoDatasetAtom`,
   `activeFlyfotoProjectAtom`, plus
@@ -369,8 +369,9 @@ subsume.
   nothing draws its footprints, so it is component state in
   `useFlyfotoControls`.
 
-  Seven of those are **halved** (§5.8): `backgroundLayerAtom`,
-  `hybridOverlayAtom`, `hybridContoursAtom` and the four LiDAR/flyfoto dataset
+  Eight of those are **halved** (§5.8): `backgroundLayerAtom`,
+  `standardVariantAtom`, `hybridOverlayAtom`, `hybridContoursAtom` and the four
+  LiDAR/flyfoto dataset
   atoms are each the `focused` facade over an `{ a, b }` pair from `halved()`,
   exported under the name they always had. Everything reading them keeps
   working unchanged; the
@@ -422,6 +423,11 @@ Live parameters: `lat`, `lon`, `zoom` (written on every map `moveend`),
 `backgroundLayer`, `hybrid`, `contours`, `lidarModel`, `themeLayers`,
 `heritageDetails`, `heritageRender`, `heritageOpacity`, `sok`, `markerLat`,
 `markerLon`, `showSelection`.
+
+`backgroundLayer` carries the Standard cartography as well, because a variant
+*is* a layer name (§5.10) — so there is no second parameter, and
+`standardVariantAtom` seeds itself from that one on a cold load rather than
+letting the two disagree about a shared link.
 
 The three `heritage*` ones are written from `themeLayerEffect`, not from their
 setters, so a link always describes what is on the map; each is *removed* at
@@ -492,7 +498,7 @@ looking at. Row 1 answers **what am I looking at**; the strip under it answers
 | Control | What it does |
 |---|---|
 | `RibbonSearch` | Place/address/property search field; results render in the left slot (§7) |
-| **Standard** (1) | Background mode: topo basemap |
+| **Standard** (1) | Background mode: an ordinary map, in one of five cartographies (§5.10) |
 | **LiDAR** (2) | Background mode: hillshade stack |
 | **Hybrid** (3) | LiDAR stack + transparent roads/rail/place-names on top |
 | **Flyfoto** (4) | Background mode: NiB ortofoto (§5.5) |
@@ -525,16 +531,17 @@ returns you to exactly the dataset and style you left — 1→5→1 is free wher
 
 | Ground | Strip |
 |---|---|
-| Standard (1) | *absent* — no variants to choose between |
+| Standard (1) | Karttype pulldown — the five cartographies (topografisk, gråtone, rasterkart, sjøkart, amtskart), also the W/S ring (§5.10) |
 | LiDAR (2), Hybrid (3) | Dataset pulldown — **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport · style pulldown (the active dataset's WMS styles, with a "flere stiler" second tier), only when the dataset publishes more than one · DTM/DOM segment · **Høydekurver** switch, Hybrid only |
 | Flyfoto (4) | Acquisition pulldown — the seamless mosaic or any acquisition covering the viewport, newest first · period chips (Alle / 2010– / 1990–2009 / 1960–1989 / –1959), which narrow both that list and the W/S ring (§5.5) |
 | Terreng (5) | Visualization segment (five, each with its own explanation as a tooltip) · DTM/DOM segment · the resolution readout · "Flytt analysen hit" (standalone only) · "Lagre" — **plus a second row under the strip** holding the sliders the current visualization uses, three to four of azimuth / altitude / exaggeration / radius / opacity (§10) |
 
-Absent, not empty: a labelled bar with no controls in it would spend map pixels
-to say nothing. The one exception is Sammenlign: with the curtain up the strip
-is always on the bar, carrying the A|B switch ahead of the subject label, since
-that switch is what a Standard focused half needs in order to stop being one
-(§5.8).
+**The strip is always on the bar.** It used to vanish under Standard, which had
+nothing to adjust; five cartographies filled that hole, and the fixture is the
+better shape anyway — a line of chrome appearing and disappearing as you walk
+the ring changes the whole bar's height under the pointer and moves every
+control below row 1. With the compare curtain up it also carries the A|B switch
+ahead of the subject label (§5.8).
 
 `RibbonSettingsRow` splits the two questions deliberately. `ground.modifiers`
 picks the **controls**, because they act on a stack and Hybrid is a modifier on
@@ -587,12 +594,22 @@ worse than what the Flyfoto mode now does in place.
 
 A distinction the UI encodes and a redesign should preserve, because it keeps
 the control count down: **Standard / LiDAR / Flyfoto are modes; Hybrid,
-DTM/DOM and the style pick are modifiers.** Hybrid is not a background of its
-own — it is `hybridOverlayAtom`, a flag on top of the LiDAR stack, so the
-dataset picker, style picker and keyboard cycling all keep working underneath
-it, and activating it from Standard turns the national mosaic on rather than
-becoming a fourth mode. Same for DTM/DOM. Modelling either as a mode would
-multiply the mode buttons and break cycling.
+DTM/DOM, the style pick and the Standard cartography are modifiers.** Hybrid
+is not a background of its own — it is `hybridOverlayAtom`, a flag on top of
+the LiDAR stack, so the dataset picker, style picker and keyboard cycling all
+keep working underneath it, and activating it from Standard turns the national
+mosaic on rather than becoming a fourth mode. Same for DTM/DOM. Modelling
+either as a mode would multiply the mode buttons and break cycling.
+
+The five Standard cartographies are the same call, made again in 2026-09: they
+answer one question (*an ordinary map, to know where I am*) drawn five ways, so
+they are a pulldown and a W/S ring, not five more buttons — exactly like LiDAR
+datasets and ortofoto acquisitions. Amtskart is the interesting one to have
+resisted promoting, since it is the only pick that changes *what century* the
+map is from; it stays a variant because you read it the same way you read the
+topographic map, and because the comparison it is for — the 1890s survey
+against a hillshade of the same hillside — is what the curtain is already for
+(§5.8).
 
 **Hybrid is nonetheless a button in the ground ring, and that is the one
 deliberate exception.** It is a modifier by mechanism and one of the five things
@@ -653,10 +670,10 @@ thing to peek back to.
 **Within one ground:**
 
 - **A / D** — previous / next LiDAR style, top tier only, wrapping at both ends.
-- **W / S** — previous / next dataset in **the active mode's ring**: LiDAR
-  projects in LiDAR mode, ortofoto acquisitions in flyfoto mode (as narrowed by
-  the period chips, §5.5), nothing in Standard or Terreng (the ground on screen
-  there has no ring). In LiDAR mode
+- **W / S** — previous / next dataset in **the active mode's ring**: the five
+  cartographies in Standard (§5.10), LiDAR projects in LiDAR mode, ortofoto
+  acquisitions in flyfoto mode (as narrowed by the period chips, §5.5), nothing
+  in Terreng (a client-side render has no dataset ring). In LiDAR mode
   a press also pins the dataset (§5.7) — walking the ring is the user choosing,
   and otherwise the auto resolver would take the background back on the next
   pan and W/S would feel broken.
@@ -945,9 +962,10 @@ Consequences worth stating:
   input to that effect changes value; this is an accepted artefact rather than
   something to engineer around, and pinning the resolver to `.a` would be worse
   (it would fight the pulldown the user is holding).
-- **The strip stays on the bar while the curtain is up**, even when the focused
-  half has no modifiers, because the A|B switch is itself a control. Focusing a
-  Standard B half and losing the way back to A would be a trap.
+- **The A|B switch rides on the strip**, ahead of the subject label, because
+  it governs what that label even names: "Høyre — Flyfoto" is one phrase read
+  left to right. The strip is a permanent fixture now (§5.1), so there is no
+  longer a focused half that can take the way back to A off the bar with it.
 - **`previous()` records focus flips too**, so hold-X while comparing peeks the
   focused half back to whatever the ring last showed — including the other
   half's ground. Harmless, and not worth a second history.
@@ -1064,6 +1082,54 @@ puts the render, the omitted sublayers and any reduced opacity on the
 screenshot's caption. "Outlines of the automatically protected sites only" and
 "every register, filled" are different claims about what the blank ground in
 the picture means, and only one of them says nothing was recorded there (§8.10).
+
+### 5.10 Standard — five cartographies of the same ground
+
+Standard's strip carries one control, the **Karttype** pulldown
+(`src/shell/standard/StandardVariantPicker.tsx`), over the ring in
+`STANDARD_VARIANTS`:
+
+| Variant | What it is |
+|---|---|
+| Topografisk | The ordinary vector-drawn topographic map. The default, and what Standard used to mean outright |
+| Gråtone | The same drawing in grey — the one to put coloured funn, heritage polygons and a terrain render on top of |
+| Rasterkart | The printed series' own cartography, scanned: heavier line work, the old typography |
+| Sjøkart | The nautical chart — depths, soundings and skerries, i.e. the only variant that says anything below the waterline |
+| Amtskart | The county map series, first sheet 1826 and publication stopped around 1917 |
+
+Four of the five are WMTS renderings out of the same tile cache, so switching
+between them is a tile fetch and nothing else; the capabilities document is
+cached **by URL** rather than by layer name, so the four share one 35 kB fetch
+instead of one each. Amtskart is a WMS (`wms.historiskekart`, layer `amt1`) —
+the historical maps are not in the tile cache.
+
+**Amtskart is the reason this section exists.** Farm names, mills, ferry
+crossings, the road that is now a track and the tract that has since been
+cleared, surveyed before the twentieth century rearranged them, in register
+with a hillshade of the same hillside. Two things follow for the UI:
+
+- **It is drawn transparent over a topo base.** The series has a hole the size
+  of Nordland — publication stopped before that county was ever mapped, which a
+  GetMap probe confirms (Bodø and Mosjøen come back empty, Narvik and Tromsø
+  are drawn). Bare, that reads as a broken app rather than as a map nobody
+  drew, so `amtskart` is in `NEEDS_TOPO_BASE` like the LiDAR layers.
+- **It names itself in a saved figure.** `GROUND_LABEL_KEY` maps all five
+  variants to their own label rather than to "Standard": a screenshot over an
+  1890s survey and one over the current topographic map are different
+  documents, and the caption is the only place the file says which (§8.10).
+
+The pulldown has no count badge, no spinner and no relevance tier, unlike the
+LiDAR and ortofoto ones. Nothing is queried — all five are national products,
+the same five everywhere, known at build time — and the only ordering decision
+is the rule and the hint above the amtskart row, derived from its position in
+`STANDARD_VARIANTS` so the list and the W/S ring cannot disagree.
+
+`useStandardControls` keeps two pieces of state where the other grounds keep
+one: `backgroundLayerAtom` is what is on the map, `standardVariantAtom` is what
+Standard *means*. They agree while Standard is the ground and diverge on
+purpose while you are elsewhere, which is what makes pressing 1 come back to
+the map you left instead of resetting to topo — the same promise the LiDAR
+dataset and the ortofoto acquisition already make.
 
 ---
 
@@ -2094,6 +2160,9 @@ click the map for a coordinate + elevation readout.
 **Choose what the terrain looks like** — the core of the tool
 switch Standard / LiDAR / Hybrid / Flyfoto / Terreng, by button or by digits
 1–5; hold X to peek at the ground you were on before and release to snap back;
+draw Standard as any of five cartographies — the topographic map, its greyscale
+twin, the scanned paper series, the nautical chart, or the nineteenth-century
+amtskart series over a modern base where that survey never reached;
 pick the national mosaic or any per-project LiDAR dataset; see datasets ranked
 by relevance to the current viewport and expand to the less relevant ones;
 preview a project's footprint on hover; pick a render style and expand to the
@@ -2106,7 +2175,8 @@ cycle styles with A/D, the active
 mode's datasets with W/S, model with E, without opening any pulldown or
 occluding the map; put a second ground on the right of a draggable curtain
 (Sammenlign) and then describe *either* half with the whole of row 1 and its
-strip — ground, dataset, style, DTM/DOM, hybrid, contours, A/D/W/S/E —
+strip — ground, cartography, dataset, style, DTM/DOM, hybrid, contours,
+A/D/W/S/E —
 switching between
 them with the A|B control or C, so one acquisition can be compared against
 another of the same ground; drag the seam with the pointer or nudge it with

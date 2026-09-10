@@ -7,7 +7,7 @@ import {
 } from '../../../../shared/utils/urlUtils';
 import { mapAtom } from '../../../atoms';
 import { halved } from '../../../compare/halves';
-import { BackgroundLayerName, WMTSLayerName } from '../../backgroundLayers';
+import { BackgroundLayerName } from '../../backgroundLayers';
 import { activeFlyfotoProjectHalves } from './flyfotoBackground';
 import {
   activeLidarModelHalves,
@@ -24,6 +24,12 @@ import { clearBackgroundLayer, swapBackgroundLayers } from './utils';
 // with nothing selected renders nothing.
 const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'topo',
+  // The other four Standard variants qualify for the same reason `topo`
+  // does: each is one fixed layer, so a cold load into one renders it.
+  'topograatone',
+  'toporaster',
+  'sjokartraster',
+  'amtskart',
   'lidarHillshade',
   'flyfoto',
   'empty',
@@ -39,8 +45,12 @@ const getDefaultBackgroundLayer = (): BackgroundLayerName => {
   return 'topo';
 };
 
+// Fetched WMTS capabilities documents, keyed by the URL they came from
+// rather than by layer name: Kartverket's cache publishes all four Standard
+// variants in one 35 kB document, and keying it per layer would refetch the
+// same bytes on the way to each of them.
 export const backgroundLayerCapabilitiesCacheAtom = atom<
-  Partial<Record<WMTSLayerName, string>>
+  Record<string, string>
 >({});
 
 // Two halves and a facade — see src/map/compare/halves.ts. `.a` is the

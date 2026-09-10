@@ -13,6 +13,7 @@ import {
   LidarProject,
   LIDAR_PROJECT_WMS_URL,
 } from './lidarProjects';
+import { AMTSKART_CONFIG } from './standardVariants';
 import { buildTopoOverlayConfig } from './topoOverlay';
 import {
   BackgroundLayer,
@@ -49,10 +50,17 @@ import { buildOrReuseBackgroundLayer, LayerNamespace } from './utils';
 // The seamless ortofoto mosaic is *not* in here: it is opaque JPEG across
 // its whole advertised extent, so a base under it would be invisible and
 // still cost a screenful of requests.
+//
+// Amtskart is, for the same reason as the LiDAR layers and with a much
+// larger hole: publication of the series stopped around 1917 before Nordland
+// was ever mapped, so a third of the coastline has no sheet at all. Left
+// bare, picking it there would look like a broken app rather than like a map
+// nobody drew.
 const NEEDS_TOPO_BASE = new Set<BackgroundLayerName>([
   'lidarProject',
   'lidarHillshade',
   'flyfotoProject',
+  'amtskart',
 ]);
 
 // Which layers the LiDAR modifiers mean anything for. Deliberately not
@@ -82,10 +90,12 @@ const emptyBackgroundLayer: EmptyBackgroundLayer = {
 // 'lidarHillshade' (national mosaic), 'lidarProject', 'flyfoto' and
 // 'flyfotoProject' are all built from atoms by `pickLayerConfig` below —
 // their style or their acquisition is a runtime choice, so none of them has
-// a static entry here.
+// a static entry here. The four cache renderings and amtskart do: a Standard
+// variant is one fixed layer, and which one is the name itself.
 export const allConfiguredBackgroundLayers = [
   emptyBackgroundLayer,
   ...KvCacheBackgroundLayers,
+  AMTSKART_CONFIG,
 ];
 
 const buildLidarProjectConfig = (

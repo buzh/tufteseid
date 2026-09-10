@@ -1,5 +1,9 @@
 export type WMSLayerName =
   | 'lidarHillshade'
+  // Kartverket's amtskart series, georeferenced and stitched. A Standard
+  // variant like the three WMTS renderings below, but a WMS because the
+  // historical maps are not in the tile cache.
+  | 'amtskart'
   // Dynamic per-acquisition LiDAR project. The concrete project + style
   // come from activeLidarProjectAtom, not from a static layer config.
   | 'lidarProject'
@@ -18,7 +22,16 @@ export type WMSLayerName =
 export type ArcGISImageLayerName = 'flyfotoProject';
 
 export type EmptyLayerName = 'empty';
-export type WMTSLayerName = 'topo';
+
+// The four finished cartographies Kartverket's tile cache publishes, which
+// are also four of the five Standard variants (see standardVariants.ts). Each
+// name is the WMTS layer identifier it asks the cache for, so they cannot be
+// renamed to something friendlier here.
+export type WMTSLayerName =
+  | 'topo'
+  | 'topograatone'
+  | 'toporaster'
+  | 'sjokartraster';
 
 export type BackgroundLayerName =
   | WMTSLayerName

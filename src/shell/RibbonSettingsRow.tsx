@@ -15,6 +15,8 @@ import { LidarModelToggle } from './lidar/LidarModelToggle';
 import { LidarStylePicker } from './lidar/LidarStylePicker';
 import type { LidarControls } from './lidar/useLidarControls';
 import styles from './Ribbon.module.css';
+import { StandardVariantPicker } from './standard/StandardVariantPicker';
+import type { StandardControls } from './standard/useStandardControls';
 import { TerrainStrip } from './terrain/TerrainStrip';
 import type { TerrainAnalysis } from './terrain/useTerrainAnalysis';
 import type { GroundControls, GroundMode } from './useGroundMode';
@@ -25,8 +27,8 @@ import type { GroundControls, GroundMode } from './useGroundMode';
  * the LiDAR stack's, but the person reading the map is reading Hybrid, and
  * labelling the strip "LiDAR" there would describe the plumbing instead.
  *
- * Exhaustive over GroundMode even though Standard never renders a strip, so
- * adding a sixth ground is a type error here rather than an unlabelled bar.
+ * Exhaustive over GroundMode, so adding a sixth ground is a type error here
+ * rather than an unlabelled bar.
  */
 const SUBJECT_KEY: Record<GroundMode, string> = {
   standard: 'ribbon.mode.standard',
@@ -57,9 +59,11 @@ const SUBJECT_KEY: Record<GroundMode, string> = {
  * - `ground.mode` picks the **label**, because that is the ground actually on
  *   screen.
  *
- * Absent rather than empty when there is nothing to adjust: Standard has no
- * variants, and a labelled bar with no controls in it would spend map pixels
- * to say nothing.
+ * Always present. It used to disappear under Standard, which had nothing to
+ * adjust; now that Standard is five cartographies the strip is a fixture, and
+ * that is the better shape anyway — a line of chrome that comes and goes as
+ * you walk the ring makes the whole bar change height under the pointer, and
+ * every control below row 1 move.
  *
  * Terreng is the one subject that also puts a second line under this one —
  * its four sliders, in `TerrainSliders`, rendered by row 1 as a sibling. That
@@ -79,11 +83,13 @@ const SUBJECT_KEY: Record<GroundMode, string> = {
  */
 export const RibbonSettingsRow = ({
   ground,
+  standard,
   lidar,
   flyfoto,
   terrain,
 }: {
   ground: GroundControls;
+  standard: StandardControls;
   lidar: LidarControls;
   flyfoto: FlyfotoControls;
   terrain: TerrainAnalysis;
@@ -92,11 +98,6 @@ export const RibbonSettingsRow = ({
   const compareOn = useAtomValue(compareOnAtom);
   const [focus, setFocus] = useAtom(compareFocusAtom);
 
-  // While the curtain is up the strip stays on the bar even when the focused
-  // half has nothing to adjust, because the A|B switch is itself a control —
-  // pointing at a Standard B half and losing the way back to A would be a
-  // trap with no keyboard escape.
-  if (ground.modifiers === null && !compareOn) return null;
   const subject = t(SUBJECT_KEY[ground.mode]);
 
   const halfOptions: SegmentedOption<CompareHalf>[] = [
@@ -123,6 +124,12 @@ export const RibbonSettingsRow = ({
       )}
 
       <span className={styles.settingsSubject}>{subject}</span>
+
+      {ground.modifiers === 'standard' && (
+        <div className={styles.group}>
+          <StandardVariantPicker standard={standard} />
+        </div>
+      )}
 
       {ground.modifiers === 'flyfoto' && (
         <div className={styles.group}>

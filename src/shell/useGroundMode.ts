@@ -9,6 +9,7 @@ import { terrainStandaloneBboxAtom } from '../terrain/atoms';
 import type { useTerrainViewport } from '../terrain/useTerrainViewport';
 import type { FlyfotoControls } from './flyfoto/useFlyfotoControls';
 import type { LidarControls } from './lidar/useLidarControls';
+import type { StandardControls } from './standard/useStandardControls';
 
 /**
  * The five grounds, as one control surface.
@@ -36,7 +37,7 @@ import type { LidarControls } from './lidar/useLidarControls';
  * still LiDAR or ortofoto underneath a terrain render, so anything that speaks
  * about the visible ground — which modifier pulldowns the ribbon shows
  * (`modifiers`), which ring the keyboard walks (`cycle`) — has to come from
- * here rather than from the two control hooks' own predicates.
+ * here rather than from the control hooks' own predicates.
  */
 export const GROUND_MODES = [
   'standard',
@@ -50,8 +51,13 @@ export type GroundMode = (typeof GROUND_MODES)[number];
 
 /**
  * Which family of modifier controls belongs to a ground: what the settings
- * strip puts under row 1, and — for the two raster families — the ring W/S
- * walks. `null` only for Standard, which has no variants to offer.
+ * strip puts under row 1, and — for the three raster families — the ring W/S
+ * walks.
+ *
+ * Total, with no `null` case. Standard used to be one: it meant the topo map
+ * and nothing else, so the strip was simply absent under it. It now offers
+ * the same ground drawn five ways, which is what makes the strip a permanent
+ * fixture rather than something that appears when you leave the default.
  *
  * Terreng is in the list like the rest of them. Its knobs used to live in a
  * dock column down the side of the map, so pressing 5 moved the controls to a
@@ -67,8 +73,10 @@ export type GroundMode = (typeof GROUND_MODES)[number];
  */
 const groundModifiers = (
   mode: GroundMode,
-): 'lidar' | 'flyfoto' | 'terrain' | null => {
+): 'standard' | 'lidar' | 'flyfoto' | 'terrain' => {
   switch (mode) {
+    case 'standard':
+      return 'standard';
     // Hybrid is a modifier on the LiDAR stack, so it keeps LiDAR's own
     // modifiers — dataset, style, DTM/DOM — working underneath it (§5.2).
     case 'lidar':
@@ -78,12 +86,11 @@ const groundModifiers = (
       return 'flyfoto';
     case 'terreng':
       return 'terrain';
-    default:
-      return null;
   }
 };
 
 export const useGroundMode = (
+  standard: StandardControls,
   lidar: LidarControls,
   flyfoto: FlyfotoControls,
   terrain: ReturnType<typeof useTerrainViewport>,
@@ -143,7 +150,9 @@ export const useGroundMode = (
     switch (next) {
       case 'standard':
         lidar.setHybridOverlay(false);
-        lidar.setBackgroundLayer('topo');
+        // Whichever of the five this half was last set to, not topo: entering
+        // a mode is never a dataset pick, here no more than in LiDAR.
+        standard.enterStandard();
         break;
       case 'lidar':
         lidar.setHybridOverlay(false);
@@ -174,15 +183,17 @@ export const useGroundMode = (
   // open-change callback — and LiDAR's open flag is what paints footprint
   // polygons on the map. Only the *controls* stand down; the background stays
   // exactly as it was, which is what makes coming back out of Terreng free.
+  const { standDown: standardStandDown } = standard;
   const { standDown: lidarStandDown } = lidar;
   const { standDown: flyfotoStandDown } = flyfoto;
   useEffect(() => {
+    if (modifiers !== 'standard') standardStandDown();
     if (modifiers !== 'lidar') lidarStandDown();
     if (modifiers !== 'flyfoto') flyfotoStandDown();
-  }, [modifiers, lidarStandDown, flyfotoStandDown]);
+  }, [modifiers, standardStandDown, lidarStandDown, flyfotoStandDown]);
 
   // A/D/W/S/E go to the ring of the ground on screen, and nowhere else. The
-  // two control hooks each know *how* to walk their own ring but cannot see
+  // three control hooks each know *how* to walk their own ring but cannot see
   // Terreng from where they sit, so whether they are asked at all is decided
   // here — otherwise W/S in Terreng would walk an invisible background,
   // spending a screenful of tile requests per keypress on imagery under a
@@ -193,6 +204,8 @@ export const useGroundMode = (
     // way of setting up what you will see on the way out.
     if (extractViewerOpen) return false;
     switch (modifiers) {
+      case 'standard':
+        return standard.cycle(key);
       case 'lidar':
         return lidar.cycle(key);
       case 'flyfoto':

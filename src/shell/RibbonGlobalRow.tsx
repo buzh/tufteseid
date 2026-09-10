@@ -22,6 +22,7 @@ import { RibbonMeasure } from './RibbonMeasure';
 import { RibbonSearch } from './RibbonSearch';
 import { RibbonSettingsRow } from './RibbonSettingsRow';
 import styles from './Ribbon.module.css';
+import { useStandardControls } from './standard/useStandardControls';
 import { TerrainSliders } from './terrain/TerrainSliders';
 import { useTerrainAnalysis } from './terrain/useTerrainAnalysis';
 import { GROUND_MODES, useGroundMode } from './useGroundMode';
@@ -40,7 +41,7 @@ import { GROUND_MODES, useGroundMode } from './useGroundMode';
  * this row is what stops it wrapping to two lines on a laptop as soon as
  * LiDAR is on. Terreng adds a third row under the strip for its sliders, and
  * is the only ground that does. All of them come from this component because
- * all of them run off the three control hooks below, which are mounted once
+ * all of them run off the four control hooks below, which are mounted once
  * and only here.
  *
  * The five ground buttons are one ring, in digit order, driven by
@@ -53,9 +54,9 @@ import { GROUND_MODES, useGroundMode } from './useGroundMode';
  * would cost more than it explains. DTM/DOM and the style pick remain
  * modifiers and stay on the settings strip. docs/ui-architecture.md §5.2.
  *
- * LiDAR and Flyfoto each bring a dataset pulldown and a keyboard ring, and
- * only one of the two is ever on screen — this component is where they are
- * chained, because there is exactly one registered cycle handler. The
+ * Standard, LiDAR and Flyfoto each bring a dataset pulldown and a keyboard
+ * ring, and only one of the three is ever on screen — this component is where
+ * they are chained, because there is exactly one registered cycle handler. The
  * pulldowns themselves render on the strip.
  *
  * Sammenlign sits beside the ring rather than in it: it does not answer
@@ -71,13 +72,14 @@ export const RibbonGlobalRow = () => {
   const [tool, setTool] = useAtom(mapToolAtom);
   const [marksHidden, setMarksHidden] = useAtom(marksHiddenAtom);
   const [themeLayers, setThemeLayers] = useAtom(activeThemeLayersAtom);
+  const standard = useStandardControls();
   const lidar = useLidarControls();
   const flyfoto = useFlyfotoControls();
   const viewport = useTerrainViewport();
-  const ground = useGroundMode(lidar, flyfoto, viewport);
+  const ground = useGroundMode(standard, lidar, flyfoto, viewport);
   // The DEM, the render and every knob that shapes it. Mounted here with the
-  // other two control hooks, and for the same reason: its controls are spread
-  // over the two rows below, and the analysis behind them must not exist
+  // other three control hooks, and for the same reason: its controls are
+  // spread over the two rows below, and the analysis behind them must not exist
   // twice. Unconditional — the hook itself decides whether a rectangle is
   // being analysed, and hiding it behind `ground.modifiers` would throw the
   // DEM away every time someone glanced at another ground.
@@ -270,6 +272,7 @@ export const RibbonGlobalRow = () => {
           hooks. */}
       <RibbonSettingsRow
         ground={ground}
+        standard={standard}
         lidar={lidar}
         flyfoto={flyfoto}
         terrain={terrain}

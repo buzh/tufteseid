@@ -21,6 +21,10 @@ import {
   buildStack,
   resolveStack,
 } from '../layers/config/backgroundLayers/stack';
+import {
+  standardVariantHalves,
+  type StandardVariant,
+} from '../layers/config/backgroundLayers/standardVariants';
 import { clearCompareLayers, installCompareLayers } from './curtainLayers';
 import { compareFocusAtom, compareOnAtom, seedHalfB } from './halves';
 
@@ -71,10 +75,13 @@ export const compareSplitAtom = atom(0.5);
  */
 const groundLayer = (
   ground: CompareGround,
+  standardVariant: StandardVariant,
   lidarProject: LidarProject | null,
   flyfotoProject: FlyfotoProject | null,
 ): BackgroundLayerName => {
-  if (ground === 'standard') return 'topo';
+  // Whichever cartography this half was last set to, not necessarily topo —
+  // amtskart against a hillshade is one of the comparisons worth making.
+  if (ground === 'standard') return standardVariant;
   if (ground === 'flyfoto') {
     return flyfotoProject ? 'flyfotoProject' : 'flyfoto';
   }
@@ -100,6 +107,7 @@ export const enterCompareAtom = atom(
       backgroundLayerHalves.b,
       groundLayer(
         ground,
+        get(standardVariantHalves.b),
         get(activeLidarProjectHalves.b),
         get(activeFlyfotoProjectHalves.b),
       ),

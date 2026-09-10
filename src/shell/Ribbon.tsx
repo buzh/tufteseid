@@ -30,7 +30,7 @@ import { RibbonGlobalRow } from './RibbonGlobalRow';
  * lokalitet row should not take the search field and the background controls
  * with it — the map underneath stays usable, and that is the whole reason the
  * chrome floats over it. Row 1, the settings strip and the terrain sliders
- * share a boundary because they share the three control hooks: a crash in any
+ * share a boundary because they share the four control hooks: a crash in any
  * of them comes from the same state, so isolating them would buy nothing.
  */
 export const Ribbon = () => {

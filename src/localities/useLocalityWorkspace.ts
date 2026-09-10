@@ -112,7 +112,15 @@ const STARTER_TOTAL = STARTER_STEPS.length;
 // background layer rather than asked of useGroundMode, which needs the whole
 // LiDAR + flyfoto control surface mounted to answer the same question.
 const GROUND_LABEL_KEY: Record<BackgroundLayerName, string> = {
-  topo: 'ribbon.mode.standard',
+  // The five Standard cartographies name themselves rather than all reporting
+  // "Standard": a screenshot over the 1890s amtskart and one over the current
+  // topographic map are different documents, and the caption is the only place
+  // the file says which it is.
+  topo: 'ribbon.standard.topo',
+  topograatone: 'ribbon.standard.topograatone',
+  toporaster: 'ribbon.standard.toporaster',
+  sjokartraster: 'ribbon.standard.sjokartraster',
+  amtskart: 'ribbon.standard.amtskart',
   empty: 'ribbon.mode.standard',
   lidarHillshade: 'ribbon.mode.lidar',
   lidarProject: 'ribbon.mode.lidar',

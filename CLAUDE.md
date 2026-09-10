@@ -177,6 +177,34 @@ kicks in and shows structured fields. Left unset, the WMS returns HTML,
 which the parser wraps as `{ _html: ... }` and the UI shows an unhelpful
 "HTML-respons mottatt" placeholder.
 
+### Standard, and the amtskart series
+
+Standard is five cartographies of the same ground, not one: `topo`,
+`topograatone`, `toporaster`, `sjokartraster` (all WMTS out of
+`cache.kartverket.no`, one capabilities document between them) and `amtskart`.
+`STANDARD_VARIANTS` in
+`src/map/layers/config/backgroundLayers/standardVariants.ts` is the ring, the
+pulldown order and the type; UI contract in `docs/ui-architecture.md` §5.10.
+They are *variants*, not modes — the picker is on the settings strip and the
+ring is W/S, like LiDAR datasets and ortofoto acquisitions.
+
+`standardVariantAtom` is what Standard means, `backgroundLayerAtom` is what is
+drawn; the two diverge while another ground is up so pressing 1 returns to the
+map you left. There is no second URL parameter — a variant *is* a layer name,
+so `?backgroundLayer=amtskart` covers it, and the atom seeds itself from that.
+
+Amtskartserien: `/wms/geonorge/wms.historiskekart`, layer `amt1` (the seamless
+mosaic of the series; the service's other layer, `georefererte`, wants the id
+of one specific scanned sheet). Needed no proxy work — the nginx `location
+/skwms1/` rule already covers all of `wms.geonorge.no`.
+
+- **It is `TRANSPARENT` and in `NEEDS_TOPO_BASE`.** The series ran 1826 to
+  around 1917 and stopped before Nordland was ever mapped: a GetMap probe has
+  Bodø and Mosjøen coming back empty while Narvik, Tromsø and Alta draw. Bare,
+  that looks like a broken app rather than like a map nobody surveyed.
+- GetMap probes against this service need the bbox in **E,N** order for
+  EPSG:25833, despite what the layer's own metadata sample URL does.
+
 ### LiDAR hillshade (background layer, Kartverket)
 
 A *background*, not a theme layer: the intent is to overlay Kulturminner

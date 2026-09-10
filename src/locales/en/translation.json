@@ -460,7 +460,7 @@
   "ribbon": {
     "mode": {
       "standard": "Standard",
-      "standardTip": "Standard map",
+      "standardTip": "Ordinary map — topographic, greyscale, raster, nautical chart or amtskart",
       "lidar": "LiDAR",
       "lidarTip": "LiDAR relief (national mosaic or per project)",
       "hybrid": "Hybrid",
@@ -523,6 +523,21 @@
     },
     "search": {
       "clear": "Clear search"
+    },
+    "standard": {
+      "datasetLabel": "Map type",
+      "datasetHead": "Map type · W/S",
+      "historicHint": "Older surveys, drawn before the twentieth century rearranged the landscape.",
+      "topo": "Topographic",
+      "topoMeta": "the ordinary map",
+      "topograatone": "Greyscale",
+      "topograatoneMeta": "muted, for coloured marks on top",
+      "toporaster": "Raster map",
+      "toporasterMeta": "the printed series' own drawing",
+      "sjokartraster": "Nautical chart",
+      "sjokartrasterMeta": "depths and skerries along the coast",
+      "amtskart": "Amtskart",
+      "amtskartMeta": "the county series, 1826–1917, no Nordland"
     },
     "lidar": {
       "datasetLabel": "LiDAR dataset",

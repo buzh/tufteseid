@@ -460,7 +460,7 @@
   "ribbon": {
     "mode": {
       "standard": "Standard",
-      "standardTip": "Standardkart",
+      "standardTip": "Vanleg kart — topografisk, gråtone, raster, sjøkart eller amtskart",
       "lidar": "LiDAR",
       "lidarTip": "LiDAR-relieff (nasjonal mosaikk eller per prosjekt)",
       "hybrid": "Hybrid",
@@ -523,6 +523,21 @@
     },
     "search": {
       "clear": "Tøm søk"
+    },
+    "standard": {
+      "datasetLabel": "Karttype",
+      "datasetHead": "Karttype · W/S",
+      "historicHint": "Eldre kartverk, teikna før 1900-talet endra landskapet.",
+      "topo": "Topografisk",
+      "topoMeta": "det vanlege kartet",
+      "topograatone": "Gråtone",
+      "topograatoneMeta": "dempa, for fargar oppå",
+      "toporaster": "Rasterkart",
+      "toporasterMeta": "papirkartet si eiga teikning",
+      "sjokartraster": "Sjøkart",
+      "sjokartrasterMeta": "djupner og skjer langs kysten",
+      "amtskart": "Amtskart",
+      "amtskartMeta": "amtskartserien 1826–1917, manglar Nordland"
     },
     "lidar": {
       "datasetLabel": "LiDAR-datasett",

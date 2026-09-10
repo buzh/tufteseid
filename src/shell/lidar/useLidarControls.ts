@@ -405,8 +405,6 @@ export const useLidarControls = () => {
     // Keyboard
     cycle,
     // Background, and being taken off the bar
-    backgroundLayer,
-    setBackgroundLayer,
     hybridOverlay,
     setHybridOverlay,
     hybridContours,

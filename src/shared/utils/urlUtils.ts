@@ -116,6 +116,7 @@ export type NKUrlParameter =
   | 'projection'
   | 'backgroundLayer'
   | 'hybrid'
+  | 'contours'
   | 'lidarModel'
   | 'themeLayers'
   | 'heritageDetails'
