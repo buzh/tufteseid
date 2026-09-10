@@ -27,8 +27,8 @@ import { themeLayerName } from '../map/layers/themeLayerConfigApi';
 import type { ThemeLayerName } from '../map/layers/themeWMS';
 import type { Dem, DemModel } from '../terrain/dem';
 import {
-  DEFAULT_LRM_RADIUS,
-  DEFAULT_SVF_RADIUS,
+  clampRadius,
+  defaultRadius,
   type TerrainLight,
 } from '../terrain/render';
 import {
@@ -115,14 +115,21 @@ export type TerrainFigureInput = {
   model: DemModel;
   light: TerrainLight;
   dem: Dem;
+  /** Metres; `lrm` and `svf` only. Omitted means the view's default. */
+  radius?: number;
 };
 
 const terrainSettings = ({
   vis,
   light,
   dem,
-}: Pick<TerrainFigureInput, 'vis' | 'light' | 'dem'>): string[] => {
+  radius,
+}: Pick<TerrainFigureInput, 'vis' | 'light' | 'dem' | 'radius'>): string[] => {
   const settings: string[] = [];
+  // Through the same clamp the render used rather than the number the caller
+  // held: on a 0.25 m grid computeSvf caps its search at 6 m, and a caption
+  // claiming 20 m would describe a render nobody made.
+  const r = clampRadius(vis, dem, radius ?? defaultRadius(vis));
   switch (vis) {
     case 'hillshade':
       settings.push(
@@ -149,14 +156,14 @@ const terrainSettings = ({
       break;
     case 'lrm':
       settings.push(
-        t('figure.set.lrmRadius', { m: DEFAULT_LRM_RADIUS }),
+        t('figure.set.lrmRadius', { m: r }),
         t('figure.set.diverging'),
         t('figure.set.stretch'),
       );
       break;
     case 'svf':
       settings.push(
-        t('figure.set.svfRadius', { m: DEFAULT_SVF_RADIUS }),
+        t('figure.set.svfRadius', { m: r }),
         t('figure.set.svfDirections', { n: SVF_DIRECTIONS }),
         t('figure.set.stretch'),
       );
@@ -179,13 +186,14 @@ export const terrainFigure = ({
   model,
   light,
   dem,
+  radius,
 }: TerrainFigureInput): FigureSpec => ({
   title: titleOf(
     subject,
     `${t('figure.title.terrain')} — ${t(`localities.terrain.vis.${vis}`)}`,
   ),
   source: t('figure.source.dem', { model: model.toUpperCase() }),
-  settings: terrainSettings({ vis, light, dem }),
+  settings: terrainSettings({ vis, light, dem, radius }),
   metresPerPx: dem.metresPerPx,
   bbox25833: dem.bbox25833,
   credits: [CREDITS.hoydedata],

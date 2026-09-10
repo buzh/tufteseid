@@ -411,6 +411,8 @@
       "azimuth": "Lysretning",
       "altitude": "Solhøyde",
       "zFactor": "Overdrivelse",
+      "lrmRadius": "Utjevningsradius",
+      "svfRadius": "Søkeradius",
       "opacity": "Dekkraft",
       "lightLabel": "Lys og dekkraft",
       "resolution": "{{m}} m/px · {{w}}×{{h}}",

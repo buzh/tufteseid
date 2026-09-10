@@ -8,9 +8,11 @@
 //
 // **The split between `terrainStaticField` and `terrainField` is
 // load-bearing** (docs/ui-architecture.md §10). Sky-view factor is ~800 ms on
-// a 600² grid; the panel memoizes the two separately so dragging the azimuth
-// slider cannot queue a multi-second recompute per frame. Joining them here
-// would put that back the first time someone reached for the "simpler" API.
+// a 600² grid; `useTerrainAnalysis` memoizes the two separately so dragging
+// the azimuth slider cannot queue a multi-second recompute per frame. Joining
+// them here would put that back the first time someone reached for the
+// "simpler" API. The same line decides how a control may behave: `radius` is
+// the only knob on the expensive side, so its slider commits on release.
 
 import type { LocalityBbox } from '../api/localities';
 import { fetchDem, type Dem, type DemModel } from './dem';
@@ -21,6 +23,7 @@ import {
   computeSlope,
   computeSvf,
   percentileRange,
+  SVF_MAX_RADIUS_PX,
   toImageData,
   type Ramp,
   type Visualization,
@@ -38,6 +41,51 @@ export const DEFAULT_Z_FACTOR = 2;
 export const DEFAULT_LRM_RADIUS = 15;
 export const DEFAULT_SVF_RADIUS = 20;
 
+/** Where the radius starts for the two views that have one. */
+export const defaultRadius = (vis: Visualization): number =>
+  vis === 'svf' ? DEFAULT_SVF_RADIUS : DEFAULT_LRM_RADIUS;
+
+/**
+ * What a radius control may offer for this visualization over this grid, in
+ * metres, or `null` for the three views that have no radius.
+ *
+ * SVF's ceiling is measured off the DEM rather than chosen: `computeSvf`
+ * clamps its search to `SVF_MAX_RADIUS_PX` pixels whatever metre value it is
+ * handed, so on a 0.25 m grid every position past 6 m would render
+ * identically. LRM has no such cap — its box blur is O(n) per pass whatever
+ * the radius — so 60 m is a judgement about scale: past that the smoothed
+ * copy stops being the landform trend and starts being a plane.
+ */
+export const radiusRange = (
+  vis: Visualization,
+  dem: Dem,
+): { min: number; max: number; step: number } | null => {
+  if (vis === 'svf') {
+    return {
+      min: 2,
+      max: Math.max(3, Math.round(SVF_MAX_RADIUS_PX * dem.metresPerPx)),
+      step: 1,
+    };
+  }
+  if (vis === 'lrm') return { min: 5, max: 60, step: 5 };
+  return null;
+};
+
+/**
+ * The radius that will actually be used. Both the render and the provenance
+ * caption go through this, so the number printed under a figure is the number
+ * the pixels were computed with even when the request was out of range.
+ */
+export const clampRadius = (
+  vis: Visualization,
+  dem: Dem,
+  radiusMetres: number,
+): number => {
+  const range = radiusRange(vis, dem);
+  if (!range) return radiusMetres;
+  return Math.min(range.max, Math.max(range.min, radiusMetres));
+};
+
 export type TerrainLight = {
   azimuth: number;
   altitude: number;
@@ -53,13 +101,19 @@ export const DEFAULT_LIGHT: TerrainLight = {
 /**
  * The expensive, sun-independent pass. `null` for the visualizations that
  * have none — they are computed by `terrainField` instead, cheaply.
+ *
+ * `radiusMetres` is the one knob on this side of the split, which is exactly
+ * why a control for it must not fire per drag frame: on a 600² grid this is
+ * ~800 ms for sky-view factor.
  */
 export const terrainStaticField = (
   dem: Dem,
   vis: Visualization,
+  radiusMetres: number = defaultRadius(vis),
 ): Float32Array | null => {
-  if (vis === 'svf') return computeSvf(dem, DEFAULT_SVF_RADIUS);
-  if (vis === 'lrm') return computeLrm(dem, DEFAULT_LRM_RADIUS);
+  const radius = clampRadius(vis, dem, radiusMetres);
+  if (vis === 'svf') return computeSvf(dem, radius);
+  if (vis === 'lrm') return computeLrm(dem, radius);
   return null;
 };
 
@@ -154,6 +208,8 @@ export type TerrainRenderOptions = {
   vis: Visualization;
   model?: DemModel;
   light?: TerrainLight;
+  /** Metres; only `lrm` and `svf` read it. Defaults per `defaultRadius`. */
+  radius?: number;
   signal?: AbortSignal;
 };
 
@@ -172,11 +228,18 @@ export type TerrainRender = {
  */
 export const renderTerrain = async (
   bbox: LocalityBbox,
-  { vis, model = 'dtm', light = DEFAULT_LIGHT, signal }: TerrainRenderOptions,
+  {
+    vis,
+    model = 'dtm',
+    light = DEFAULT_LIGHT,
+    radius,
+    signal,
+  }: TerrainRenderOptions,
 ): Promise<TerrainRender | null> => {
   const dem = await fetchDem(bbox, { model, signal });
   if (!dem) return null;
-  const field = terrainField(dem, vis, light, terrainStaticField(dem, vis));
+  const staticField = terrainStaticField(dem, vis, radius);
+  const field = terrainField(dem, vis, light, staticField);
   if (!field) return null;
   const canvas = paintTerrainField(field, dem, vis);
   return canvas ? { canvas, dem } : null;

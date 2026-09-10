@@ -526,7 +526,7 @@ returns you to exactly the dataset and style you left — 1→5→1 is free wher
 | Standard (1) | *absent* — no variants to choose between |
 | LiDAR (2), Hybrid (3) | Dataset pulldown — **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport · style pulldown (the active dataset's WMS styles, with a "flere stiler" second tier), only when the dataset publishes more than one · DTM/DOM segment |
 | Flyfoto (4) | Acquisition pulldown — the seamless mosaic or any acquisition covering the viewport, newest first · period chips (Alle / 2010– / 1990–2009 / 1960–1989 / –1959), which narrow both that list and the W/S ring (§5.5) |
-| Terreng (5) | Visualization segment (five, each with its own explanation as a tooltip) · DTM/DOM segment · the resolution readout · "Flytt analysen hit" (standalone only) · "Lagre" — **plus a second row under the strip** holding the four sliders (§10) |
+| Terreng (5) | Visualization segment (five, each with its own explanation as a tooltip) · DTM/DOM segment · the resolution readout · "Flytt analysen hit" (standalone only) · "Lagre" — **plus a second row under the strip** holding the sliders the current visualization uses, three to four of azimuth / altitude / exaggeration / radius / opacity (§10) |
 
 Absent, not empty: a labelled bar with no controls in it would spend map pixels
 to say nothing. The one exception is Sammenlign: with the curtain up the strip
@@ -1744,14 +1744,14 @@ DTM-only on purpose: an extract is meant to be read as terrain.
 
 **Terrain** — `src/shell/terrain/`: DTM/DOM toggle, five visualizations
 (hillshade, multidirectional hillshade, slope, local relief model, sky-view
-factor), and live azimuth / altitude / exaggeration / opacity sliders. Three
-files:
+factor), and azimuth / altitude / exaggeration / radius / opacity sliders.
+Three files:
 
 | File | What it is |
 |---|---|
-| `useTerrainAnalysis.ts` | All of the state — which rectangle, the DEM, the model, the visualization, the four knobs, the canvas, the save. Mounted **once**, from `RibbonGlobalRow`, beside `useLidarControls` and `useFlyfotoControls` |
+| `useTerrainAnalysis.ts` | All of the state — which rectangle, the DEM, the model, the visualization, the five knobs, the canvas, the save. Mounted **once**, from `RibbonGlobalRow`, beside `useLidarControls` and `useFlyfotoControls` |
 | `TerrainStrip.tsx` | The settings-strip half: visualization, DTM/DOM, the resolution readout, "Flytt analysen hit", "Lagre" |
-| `TerrainSliders.tsx` | The row beneath: azimuth, altitude, exaggeration, opacity |
+| `TerrainSliders.tsx` | The row beneath: azimuth, altitude, exaggeration, radius, opacity |
 
 The hook is mounted **unconditionally**, not behind `ground.modifiers ===
 'terrain'`: it decides for itself whether a rectangle is being analysed, and
@@ -1761,8 +1761,30 @@ light survives leaving and re-entering Terreng, which the old panel — mounted
 with the dock — did not.
 
 Only the sliders the current visualization uses are rendered: two for sky-view
-factor, four for a plain hillshade. Absent rather than disabled, because a
-slider that cannot move is indistinguishable from one that has no effect.
+factor, four for a plain hillshade. Absent rather than disabled,
+because a slider that cannot move is indistinguishable from one that has no
+effect.
+
+**The radius slider is the one that commits on release**, and the reason is the
+memo split below rather than taste. Local relief and sky-view factor are the
+two views with a radius, and it is the only knob that feeds
+`terrainStaticField`: streaming it for sky-view factor would queue an ~800 ms
+pass per drag frame and lock the tab for the length of the gesture. `SliderRow`
+takes a `deferred` flag — the thumb and the readout follow the drag, the caller
+hears about it on `pointerup` / `keyup` / `blur` — and local relief, at 23 ms,
+streams like the rest.
+
+Its two ends are also not the same kind of number. LRM's 60 m ceiling is a
+judgement about scale; **SVF's is measured off the grid**, because `computeSvf`
+clamps its search to `SVF_MAX_RADIUS_PX` (24) pixels whatever metre value it is
+handed — 6 m on a 0.25 m DEM. `radiusRange` and `clampRadius` in
+`src/terrain/render.ts` are what keep the slider's bounds, the pixels and the
+figure's caption agreeing on one value; before they existed the caption printed
+`DEFAULT_SVF_RADIUS` unconditionally, i.e. "20 m" under a render computed at
+6 m. The hook exposes the clamped number but stores the raw one, so a radius
+capped over a fine grid comes back at its full value over a coarse one. LRM and
+SVF hold **separate** values: same unit, different quantities — how far to
+smooth before subtracting, versus how far to look for a horizon.
 
 The five visualization names carry their explanation as a per-option `title`
 tooltip (`SegmentedOption.title`) rather than as a paragraph under the row. The
@@ -1886,7 +1908,9 @@ Two things in `useTerrainAnalysis` must not be undone:
   matters more now that they sit on the ribbon, inches from the ring.
 - The two `useMemo`s are **split on purpose**: sky-view factor takes ~800 ms on
   a 600² grid and must never be keyed on azimuth, or dragging the azimuth
-  slider queues a multi-second recompute per frame. The split survives the move
+  slider queues a multi-second recompute per frame. Radius is on the other side
+  of that line — it is a *key* of the expensive memo, which is exactly why its
+  slider is the deferred one. The split survives the move
   of the arithmetic into `src/terrain/render.ts` — that module exports
   `terrainStaticField` (expensive, sun-independent) and `terrainField` (cheap,
   sun-dependent) as *two* functions for exactly this reason, and the hook
@@ -2112,7 +2136,8 @@ when a funn escapes it.
 
 **Analyse it**
 run terrain analysis (DTM or DOM) with five visualizations and live azimuth /
-altitude / exaggeration / opacity over *either* the visible map — signed out,
+altitude / exaggeration / opacity, plus a smoothing or search radius for the
+two views that have one, over *either* the visible map — signed out,
 with no lokalitet — or an open lokalitet's rectangle, with the render drawn on
 the map under the heritage layers and every knob on the ribbon's settings strip
 and its slider row rather than in a column beside the map; re-frame the

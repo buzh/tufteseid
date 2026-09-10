@@ -198,8 +198,8 @@ into that caption:
 | hillshade | azimuth, altitude, z-factor |
 | multidirectional | all six azimuths *and* their weights, altitude, z-factor |
 | slope | z-factor, 2–98 % stretch |
-| local relief model | radius (`DEFAULT_LRM_RADIUS`), diverging ramp symmetric about zero, stretch |
-| sky-view factor | radius (`DEFAULT_SVF_RADIUS`), `SVF_DIRECTIONS`, stretch |
+| local relief model | smoothing radius, diverging ramp symmetric about zero, stretch |
+| sky-view factor | search radius, `SVF_DIRECTIONS`, stretch |
 
 Plus, always: the model (DTM/DOM), the source mosaic, the EPSG:25833 extent,
 the geodetic centre, the grid resolution — and, when the rectangle was too
@@ -208,11 +208,23 @@ large for `MAX_DEM_PX_PER_SIDE`, the `nativeMetresPerPx` it was resampled
 is" and "there is more, ask for a smaller area", and two renders of
 different-sized areas are not comparable without it.
 
-Practical consequence for this module: **`MULTI_AZIMUTHS`, `SVF_DIRECTIONS`,
-`DEFAULT_LRM_RADIUS` and `DEFAULT_SVF_RADIUS` are exported and printed on
-figures.** Changing one silently changes what old and new renders mean relative
-to each other; the caption is what keeps that honest, so keep them exported.
-The figure machinery itself is `docs/ui-architecture.md` §8.10.
+Practical consequence for this module: **`MULTI_AZIMUTHS` and `SVF_DIRECTIONS`
+are exported and printed on figures.** Changing one silently changes what old
+and new renders mean relative to each other; the caption is what keeps that
+honest, so keep them exported. The figure machinery itself is
+`docs/ui-architecture.md` §8.10.
+
+The two radii are the user's now — a slider on the terrain row, defaulting to
+`DEFAULT_LRM_RADIUS` / `DEFAULT_SVF_RADIUS` — so the caption prints the value
+that was used rather than the constant. Getting that right needed one more
+thing than passing the number through: `computeSvf` **silently clamps** its
+search to `SVF_MAX_RADIUS_PX` (24) pixels, i.e. 6 m on a 0.25 m DEM, so the
+requested radius and the effective one are routinely different numbers.
+`clampRadius(vis, dem, metres)` in `render.ts` is the single answer both the
+render and the caption go through, and `radiusRange` derives the slider's
+ceiling from the same cap so the control cannot offer a position that renders
+identically to the one before it. A caption reading "SVF-radius 20 m" over a
+6 m render is exactly the failure the figure machinery exists to prevent.
 
 ## Tier 1 — server-side visualization sidecar (design, not built)
 

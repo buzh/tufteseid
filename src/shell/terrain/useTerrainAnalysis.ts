@@ -36,11 +36,15 @@ import { ribbonToolAtom } from '../../localities/toolAtoms';
 import { terrainStandaloneBboxAtom } from '../../terrain/atoms';
 import { fetchDem, type Dem, type DemModel } from '../../terrain/dem';
 import {
+  clampRadius,
   DEFAULT_ALTITUDE,
   DEFAULT_AZIMUTH,
+  DEFAULT_LRM_RADIUS,
+  DEFAULT_SVF_RADIUS,
   DEFAULT_Z_FACTOR,
   demImageExtent,
   paintTerrainField,
+  radiusRange,
   terrainField,
   terrainStaticField,
 } from '../../terrain/render';
@@ -95,6 +99,23 @@ export const useTerrainAnalysis = () => {
   // Percent, mirrored onto the layer imperatively — see terrainOverlayLayer.
   const [opacity, setOpacity] = useState(100);
 
+  // One radius each rather than one shared: they are different quantities
+  // measured in the same unit — how far to smooth before subtracting, versus
+  // how far to look for a horizon — and a good value for one is a poor value
+  // for the other, so switching views must not carry the number across.
+  const [lrmRadius, setLrmRadius] = useState(DEFAULT_LRM_RADIUS);
+  const [svfRadius, setSvfRadius] = useState(DEFAULT_SVF_RADIUS);
+  // Exposed already clamped, so the slider's thumb, the number beside it, the
+  // render and the caption are the same value. The *stored* number is left
+  // alone: a 20 m sky-view radius that a 0.25 m grid caps at 6 m should come
+  // back at 20 m over a 1 m one, not be quietly rewritten on the way past.
+  const rawRadius = vis === 'svf' ? svfRadius : lrmRadius;
+  const radius = dem ? clampRadius(vis, dem, rawRadius) : rawRadius;
+  const setRadius = useCallback(
+    (value: number) => (vis === 'svf' ? setSvfRadius : setLrmRadius)(value),
+    [vis],
+  );
+
   const [saving, setSaving] = useState(false);
   // Off-DOM: this canvas is the layer's image and the blob "Lagre" keeps, and
   // it is never shown in a row. React does not own it either — the OL source
@@ -138,9 +159,18 @@ export const useTerrainAnalysis = () => {
   // Expensive, sun-independent passes. Keyed so that dragging the azimuth
   // slider — which happens dozens of times a second — can never retrigger a
   // multi-second sky-view factor. The two memos are split for that reason
-  // alone; see render.ts.
+  // alone; see render.ts. Radius is the one knob that lands on *this* side of
+  // the line, which is why its slider commits on release instead of streaming
+  // like the other four (TerrainSliders).
   const staticField = useMemo(
-    () => (dem ? terrainStaticField(dem, vis) : null),
+    () => (dem ? terrainStaticField(dem, vis, radius) : null),
+    [dem, vis, radius],
+  );
+
+  // What the radius slider may offer, or null for the three views that have
+  // no radius. Grid-dependent for sky-view factor — see radiusRange.
+  const radiusLimits = useMemo(
+    () => (dem ? radiusRange(vis, dem) : null),
     [dem, vis],
   );
 
@@ -221,6 +251,7 @@ export const useTerrainAnalysis = () => {
           model,
           light: { azimuth, altitude, zFactor },
           dem,
+          radius,
         }),
       );
       if (!figure) return;
@@ -249,6 +280,8 @@ export const useTerrainAnalysis = () => {
             ...(vis === 'hillshade' ? { azimuth } : {}),
             altitude,
             zFactor,
+            // Already clamped to the grid — see above.
+            ...(radiusLimits ? { radius } : {}),
           },
         },
         user.id,
@@ -278,6 +311,8 @@ export const useTerrainAnalysis = () => {
     azimuth,
     altitude,
     zFactor,
+    radius,
+    radiusLimits,
     t,
   ]);
 
@@ -299,6 +334,9 @@ export const useTerrainAnalysis = () => {
     setAltitude,
     zFactor,
     setZFactor,
+    radius,
+    setRadius,
+    radiusLimits,
     opacity,
     setOpacity,
   };

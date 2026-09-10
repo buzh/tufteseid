@@ -411,6 +411,8 @@
       "azimuth": "Light direction",
       "altitude": "Sun altitude",
       "zFactor": "Exaggeration",
+      "lrmRadius": "Smoothing radius",
+      "svfRadius": "Search radius",
       "opacity": "Opacity",
       "lightLabel": "Light and opacity",
       "resolution": "{{m}} m/px · {{w}}×{{h}}",

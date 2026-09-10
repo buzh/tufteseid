@@ -486,7 +486,16 @@ Load-bearing:
   0.7071 at altitude 45°, i.e. nothing brighter than flat ground.
 - **The two `useMemo`s in `useTerrainAnalysis` are split on purpose.** Sky-view
   factor is ~800 ms on a 600² grid and must never be keyed on azimuth, or
-  dragging the slider queues a multi-second recompute per frame.
+  dragging the slider queues a multi-second recompute per frame. The radius
+  knob is on the *expensive* side of that line, which is why its slider alone
+  commits on release instead of streaming.
+- **`computeSvf` clamps its search radius to 24 px** — 6 m on a 0.25 m DEM —
+  whatever metre value it is handed, so a requested radius and an effective
+  one are routinely different numbers. Everything that renders or *describes*
+  a render goes through `clampRadius` (`render.ts`), and `radiusRange` derives
+  the slider's ceiling from the same cap. Skipping it puts "SVF-radius 20 m"
+  on the caption of a 6 m render, which is the one thing `src/figure/` exists
+  to prevent.
 
 ## Lokaliteter (user content)
 

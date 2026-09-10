@@ -51,7 +51,12 @@ export const SVF_DIRECTIONS = 16;
 // Hard ceiling on the SVF search radius in *pixels*, whatever the metre
 // value works out to. Keeps a fine-resolution DEM from turning a 3-second
 // pass into a 30-second one.
-const SVF_MAX_RADIUS_PX = 24;
+//
+// Exported because it silently caps what the caller asked for: on a 0.25 m
+// grid this is 6 m, so a control offering 20 m would be a knob that moves
+// without changing anything, and a caption reading "20 m" would be false.
+// `radiusRange` in render.ts derives the slider's maximum from it.
+export const SVF_MAX_RADIUS_PX = 24;
 
 // ---------------------------------------------------------------------------
 // Gradients
