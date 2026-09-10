@@ -23,6 +23,7 @@ import { useDrawSettings } from '../draw/drawControls/hooks/drawSettings';
 import { getDrawLayer } from '../draw/drawControls/hooks/mapLayers';
 import { lidarExtractSelectionAtom } from '../lidarExtract/atoms';
 import { mapAtom } from '../map/atoms';
+import { terrainStandaloneBboxAtom } from '../terrain/atoms';
 import {
   activeLocalityAtom,
   adjustingLocalityAtom,
@@ -112,6 +113,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [tool, setTool] = useAtom(ribbonToolAtom);
   const mode = useAtomValue(workspaceModeAtom);
   const [growPrompt, setGrowPrompt] = useAtom(growPromptAtom);
+  const setTerrainStandaloneBbox = useSetAtom(terrainStandaloneBboxAtom);
   const [shooting, setShooting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fetchingFlyfoto, setFetchingFlyfoto] = useState(false);
@@ -156,6 +158,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // Draft/adjust/tool/selection cleanup when the workspace closes or
   // swaps lokalitet.
   useEffect(() => {
+    // A standalone terrain analysis may be up over the bare map. Opening a
+    // lokalitet rescopes the ribbon, and leaving a rectangle unrelated to it
+    // in row 3 would mean "Lagre" quietly created a *second* lokalitet.
+    setTerrainStandaloneBbox(null);
     return () => {
       setDraftActive(false);
       setAdjusting(false);
@@ -173,6 +179,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setLidarSelection,
     setSelectedFunnId,
     setGrowPrompt,
+    setTerrainStandaloneBbox,
   ]);
 
   // The funn draft used to be reset by the whole panel remounting on a

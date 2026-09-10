@@ -479,6 +479,8 @@
       "zFactor": "Overdrivelse",
       "resolution": "{{m}} m/px · {{w}}×{{h}}",
       "save": "Lagre som bilde",
+      "saveNew": "Lagre som ny lokalitet",
+      "saveFailed": "Klarte ikke å lagre bildet.",
       "saving": "Lagrer …",
       "sourceLabel": "Høydedata (Kartverket)",
       "failed": "Klarte ikke å hente høydedata.",
@@ -564,6 +566,12 @@
       "moreStyles": "{{count}} flere stiler",
       "modelLabel": "Høydemodell",
       "modelTip": "DTM = terreng (vegetasjon fjernet), DOM = overflate (bygg og trær). Bytt med E"
+    },
+    "terrain": {
+      "label": "Terreng",
+      "tip": "Terrenganalyse av kartutsnittet — hent høydedata og belys dem selv. Krever ingen lokalitet",
+      "tooLarge": "Utsnittet dekker for stort område for terrenganalyse. Zoom inn og prøv igjen.",
+      "unavailable": "Fant ikke noe kartutsnitt å analysere."
     },
     "tray": {
       "show": "Vis innhold",

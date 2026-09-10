@@ -1,17 +1,27 @@
-// The lokalitet workspace's "Terreng" tool: pull the float DEM for the
-// rectangle once, then re-light and re-process it locally, so azimuth is
-// a slider over data already in memory rather than a new WMS request.
+// Terrenganalyse: pull the float DEM for a rectangle once, then re-light and
+// re-process it locally, so azimuth is a slider over data already in memory
+// rather than a new WMS request.
 //
-// Why that matters: docs/terrain-analysis.md. The control surface and the
-// two deliberately-split useMemos: docs/ui-architecture.md §10.
+// Two entrances share this panel, which is why the lokalitet is a nullable
+// prop rather than an atom read. A lokalitet's "Terreng" verb analyses its
+// rectangle and saves into its Bilder; row 1's "Terreng" analyses the visible
+// map with nothing open at all, and turns that rectangle into a lokalitet on
+// the way out.
+//
+// Why any of this: docs/terrain-analysis.md. The control surface and the two
+// deliberately-split useMemos: docs/ui-architecture.md §10.
 
-import { Box, Button, HStack, Spinner, Text, VStack } from '@kvib/react';
-import { useAtomValue } from 'jotai';
+import { toaster } from '@kvib/react';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createAttachment } from '../api/attachments';
+import type { LocalityBbox, LocalityRecord } from '../api/localities';
 import { currentUserAtom } from '../auth/atoms';
+import { isAuthDialogOpenAtom } from '../auth/atoms-dialog';
 import { activeLocalityAtom } from '../localities/atoms';
+import { createLocalityFromBbox } from '../localities/createFromBbox';
+import { Button, Segmented, Spinner, type SegmentedOption } from '../ui';
 import { fetchDem, type Dem, type DemModel } from './dem';
 import {
   computeHillshade,
@@ -24,6 +34,7 @@ import {
   type Ramp,
   type Visualization,
 } from './shade';
+import styles from './TerrainPanel.module.css';
 
 const VISUALIZATIONS: Visualization[] = [
   'hillshade',
@@ -31,6 +42,11 @@ const VISUALIZATIONS: Visualization[] = [
   'svf',
   'lrm',
   'slope',
+];
+
+const MODEL_OPTIONS: SegmentedOption<DemModel>[] = [
+  { value: 'dtm', label: 'DTM' },
+  { value: 'dom', label: 'DOM' },
 ];
 
 // Only the sun-dependent views react to these, which is why they're split
@@ -45,10 +61,18 @@ const DEFAULT_Z_FACTOR = 2;
 const DEFAULT_LRM_RADIUS = 15;
 const DEFAULT_SVF_RADIUS = 20;
 
-export const TerrainPanel = () => {
+export const TerrainPanel = ({
+  bbox,
+  locality,
+}: {
+  bbox: LocalityBbox;
+  /** The lokalitet the rectangle belongs to, or null when analysing the map. */
+  locality: LocalityRecord | null;
+}) => {
   const { t } = useTranslation();
-  const locality = useAtomValue(activeLocalityAtom);
   const user = useAtomValue(currentUserAtom);
+  const openAuthDialog = useSetAtom(isAuthDialogOpenAtom);
+  const setActiveLocality = useSetAtom(activeLocalityAtom);
 
   const [model, setModel] = useState<DemModel>('dtm');
   const [dem, setDem] = useState<Dem | null>(null);
@@ -63,18 +87,17 @@ export const TerrainPanel = () => {
   const [saving, setSaving] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const bboxKey = locality && `${locality.id}:${locality.bbox.join(',')}`;
+  const bboxKey = bbox.join(',');
 
   // Fetch the DEM whenever the rectangle or the model changes. The abort
   // matters: resizing a lokalitet can retrigger this while several
   // megabytes are still in flight.
   useEffect(() => {
-    if (!locality) return;
     const controller = new AbortController();
     setLoading(true);
     setError(null);
     setDem(null);
-    fetchDem(locality.bbox, { model, signal: controller.signal })
+    fetchDem(bbox, { model, signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return;
         if (!result) setError('empty');
@@ -87,8 +110,8 @@ export const TerrainPanel = () => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-    // bboxKey rather than locality.bbox: the array is a fresh identity on
-    // every record update, which would refetch on an unrelated rename.
+    // bboxKey rather than bbox: the array is a fresh identity on every
+    // record update, which would refetch on an unrelated rename.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bboxKey, model]);
 
@@ -143,22 +166,50 @@ export const TerrainPanel = () => {
       const m = Math.max(Math.abs(lo), Math.abs(hi)) || 1;
       range = [-m, m];
     }
-    ctx.putImageData(toImageData(field, dem.width, dem.height, ramp, range), 0, 0);
+    ctx.putImageData(
+      toImageData(field, dem.width, dem.height, ramp, range),
+      0,
+      0,
+    );
   }, [dem, field, vis]);
 
   const save = useCallback(async () => {
     const canvas = canvasRef.current;
-    if (!canvas || !locality || !user || saving) return;
+    if (!canvas || saving) return;
+    // Signed out is a normal state here — the whole point of Terreng in row 1
+    // is that reading the ground needs no account. Only keeping the render
+    // does.
+    if (!user) {
+      openAuthDialog(true);
+      return;
+    }
     setSaving(true);
     try {
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob(resolve, 'image/png'),
       );
       if (!blob) return;
+
+      // No lokalitet yet: the analysed rectangle becomes one. Deliberately
+      // `bbox` and not the current view — the map is live underneath this
+      // panel, so the user has probably panned since pressing Terreng.
+      let target = locality;
+      if (!target) {
+        target = await createLocalityFromBbox(
+          bbox,
+          user.id,
+          t('localities.defaultName'),
+        );
+        if (!target) {
+          toaster.error({ title: t('localities.createFailed') });
+          return;
+        }
+      }
+
       const label = t(`localities.terrain.vis.${vis}`);
       await createAttachment(
         {
-          locality: locality.id,
+          locality: target.id,
           // Reuses the existing `extract` kind rather than adding one: this
           // is a LiDAR-derived raster of the rectangle, which is what that
           // kind already means, and a new enum value would need a
@@ -182,147 +233,138 @@ export const TerrainPanel = () => {
         blob,
         `terreng_${vis}_${model}.png`,
       );
+
+      // Opening the new lokalitet is the receipt: the ribbon rescopes to it
+      // and the render is sitting in its Bilder. (That also unmounts this
+      // panel, since the standalone rectangle is cleared with it.)
+      if (!locality) setActiveLocality(target);
     } catch (e) {
       console.warn('[TerrainPanel] save failed', e);
+      toaster.error({ title: t('localities.terrain.saveFailed') });
     } finally {
       setSaving(false);
     }
-  }, [locality, user, saving, vis, model, dem, azimuth, altitude, zFactor, t]);
-
-  if (!locality) return null;
+  }, [
+    locality,
+    bbox,
+    user,
+    openAuthDialog,
+    setActiveLocality,
+    saving,
+    vis,
+    model,
+    dem,
+    azimuth,
+    altitude,
+    zFactor,
+    t,
+  ]);
 
   const sunDependent = vis === 'hillshade';
   const usesZFactor = vis !== 'svf' && vis !== 'lrm';
 
+  const visOptions: SegmentedOption<Visualization>[] = VISUALIZATIONS.map(
+    (v) => ({ value: v, label: t(`localities.terrain.vis.${v}`) }),
+  );
+
   return (
-    <VStack align="stretch" gap={3}>
-      <HStack gap={1}>
-        {(['dtm', 'dom'] as DemModel[]).map((m) => (
-          <Button
-            key={m}
-            size="xs"
-            flex="1"
-            variant={model === m ? 'primary' : 'secondary'}
-            colorPalette="green"
-            onClick={() => setModel(m)}
-          >
-            {m.toUpperCase()}
-          </Button>
-        ))}
-      </HStack>
-
-      <Box>
-        <Text fontSize="xs" color="gray.600" mb={1}>
-          {t('localities.terrain.visualization')}
-        </Text>
-        <HStack gap={1} wrap="wrap">
-          {VISUALIZATIONS.map((v) => (
-            <Button
-              key={v}
-              size="xs"
-              variant={vis === v ? 'primary' : 'secondary'}
-              colorPalette="green"
-              onClick={() => setVis(v)}
-            >
-              <Text fontSize="11px">{t(`localities.terrain.vis.${v}`)}</Text>
-            </Button>
-          ))}
-        </HStack>
-        <Text fontSize="11px" color="gray.500" mt={1}>
-          {t(`localities.terrain.visHint.${vis}`)}
-        </Text>
-      </Box>
-
-      <Box
-        borderWidth="1px"
-        borderColor="gray.200"
-        borderRadius="md"
-        overflow="hidden"
-        bg="gray.50"
-        minH="120px"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-      >
-        {loading && <Spinner size="sm" />}
+    <div className={styles.root}>
+      {/* Capped by the wrapper and letterboxed, not scaled to fit the row: a
+          3000 px DEM at width:100% would make the ribbon several screens
+          tall. */}
+      <div className={styles.preview}>
+        {loading && <Spinner size={20} />}
         {!loading && error && (
-          <Text fontSize="sm" color="gray.600" p={4} textAlign="center">
-            {t(`localities.terrain.${error}`)}
-          </Text>
+          <p className={styles.message}>{t(`localities.terrain.${error}`)}</p>
         )}
         <canvas
           ref={canvasRef}
-          style={{
-            display: loading || error ? 'none' : 'block',
-            width: '100%',
-            height: 'auto',
-            // The DEM grid is already at or near native resolution; letting
-            // the browser smooth it on upscale hides exactly the
-            // single-pixel detail we're looking for.
-            imageRendering: 'pixelated',
-          }}
+          className={styles.canvas}
+          style={{ display: loading || error ? 'none' : 'block' }}
         />
-      </Box>
+      </div>
 
-      {dem && !loading && (
-        <VStack align="stretch" gap={2}>
-          {sunDependent && (
-            <SliderRow
-              label={t('localities.terrain.azimuth')}
-              value={azimuth}
-              min={0}
-              max={359}
-              step={1}
-              suffix="°"
-              onChange={setAzimuth}
-            />
-          )}
-          {(sunDependent || vis === 'multiHillshade') && (
-            <SliderRow
-              label={t('localities.terrain.altitude')}
-              value={altitude}
-              min={5}
-              max={85}
-              step={1}
-              suffix="°"
-              onChange={setAltitude}
-            />
-          )}
-          {usesZFactor && (
-            <SliderRow
-              label={t('localities.terrain.zFactor')}
-              value={zFactor}
-              min={1}
-              max={8}
-              step={0.5}
-              suffix="×"
-              onChange={setZFactor}
-            />
-          )}
+      <div className={styles.controls}>
+        <div className={styles.pickers}>
+          <Segmented
+            value={vis}
+            options={visOptions}
+            onChange={setVis}
+            label={t('localities.terrain.visualization')}
+          />
+          <Segmented
+            value={model}
+            options={MODEL_OPTIONS}
+            onChange={setModel}
+            label={t('ribbon.lidar.modelLabel')}
+          />
+        </div>
 
-          <HStack justify="space-between" gap={2}>
-            <Text fontSize="11px" color="gray.500">
-              {t('localities.terrain.resolution', {
-                m: dem.metresPerPx.toFixed(2),
-                w: dem.width,
-                h: dem.height,
-              })}
-            </Text>
-            <Button
-              size="xs"
-              variant="secondary"
-              colorPalette="green"
-              disabled={saving || !user}
-              onClick={save}
-            >
-              {saving
-                ? t('localities.terrain.saving')
-                : t('localities.terrain.save')}
-            </Button>
-          </HStack>
-        </VStack>
-      )}
-    </VStack>
+        <p className={styles.hint}>{t(`localities.terrain.visHint.${vis}`)}</p>
+
+        {dem && !loading && (
+          <>
+            <div className={styles.sliders}>
+              {sunDependent && (
+                <SliderRow
+                  label={t('localities.terrain.azimuth')}
+                  value={azimuth}
+                  min={0}
+                  max={359}
+                  step={1}
+                  suffix="°"
+                  onChange={setAzimuth}
+                />
+              )}
+              {(sunDependent || vis === 'multiHillshade') && (
+                <SliderRow
+                  label={t('localities.terrain.altitude')}
+                  value={altitude}
+                  min={5}
+                  max={85}
+                  step={1}
+                  suffix="°"
+                  onChange={setAltitude}
+                />
+              )}
+              {usesZFactor && (
+                <SliderRow
+                  label={t('localities.terrain.zFactor')}
+                  value={zFactor}
+                  min={1}
+                  max={8}
+                  step={0.5}
+                  suffix="×"
+                  onChange={setZFactor}
+                />
+              )}
+            </div>
+
+            <div className={styles.footer}>
+              <span className={styles.meta}>
+                {t('localities.terrain.resolution', {
+                  m: dem.metresPerPx.toFixed(2),
+                  w: dem.width,
+                  h: dem.height,
+                })}
+              </span>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={saving}
+                onClick={save}
+              >
+                {saving
+                  ? t('localities.terrain.saving')
+                  : locality
+                    ? t('localities.terrain.save')
+                    : t('localities.terrain.saveNew')}
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -346,16 +388,14 @@ const SliderRow = ({
   suffix: string;
   onChange: (v: number) => void;
 }) => (
-  <Box>
-    <HStack justify="space-between" mb={0.5}>
-      <Text fontSize="11px" color="gray.600">
-        {label}
-      </Text>
-      <Text fontSize="11px" color="gray.500">
+  <div className={styles.slider}>
+    <div className={styles.sliderHead}>
+      <span>{label}</span>
+      <span className={styles.sliderValue}>
         {value}
         {suffix}
-      </Text>
-    </HStack>
+      </span>
+    </div>
     <input
       type="range"
       min={min}
@@ -363,7 +403,6 @@ const SliderRow = ({
       step={step}
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
-      style={{ width: '100%' }}
     />
-  </Box>
+  </div>
 );

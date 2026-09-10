@@ -1,11 +1,13 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { isSignedInAtom } from '../auth/atoms';
+import { activeLocalityAtom } from '../localities/atoms';
 import { useCreateLocalityFromViewport } from '../localities/createFromBbox';
 import { activeThemeLayersAtom } from '../map/layers/atoms';
 import type { ThemeLayerName } from '../map/layers/themeWMS';
 import { type MapTool, mapToolAtom } from '../map/overlay/atoms';
 import { useRegisterBackgroundCycle } from '../map/useBackgroundCyclingKeys';
+import { useTerrainViewport } from '../terrain/useTerrainViewport';
 import { IconButton, Tooltip } from '../ui';
 import { FlyfotoDatasetPicker } from './flyfoto/FlyfotoDatasetPicker';
 import { useFlyfotoControls } from './flyfoto/useFlyfotoControls';
@@ -41,10 +43,12 @@ import styles from './Ribbon.module.css';
 export const RibbonGlobalRow = () => {
   const { t } = useTranslation();
   const isSignedIn = useAtomValue(isSignedInAtom);
+  const activeLocality = useAtomValue(activeLocalityAtom);
   const [tool, setTool] = useAtom(mapToolAtom);
   const [themeLayers, setThemeLayers] = useAtom(activeThemeLayersAtom);
   const lidar = useLidarControls();
   const flyfoto = useFlyfotoControls();
+  const terrain = useTerrainViewport();
 
   // A/D/W/S/E. Each half declines every key outside its own mode, so the
   // order here only decides who is asked first, not who gets it. The
@@ -169,6 +173,20 @@ export const RibbonGlobalRow = () => {
 
       <div className={styles.group}>
         <RibbonMeasure />
+
+        {/* Terrenganalyse of the ground you are looking at: no lokalitet, no
+            account. Hidden while a lokalitet is open, because row 2 carries
+            the same verb scoped to its rectangle and two live controls for
+            one surface would disagree about which rectangle "Lagre" keeps. */}
+        {!activeLocality && (
+          <ModeButton
+            icon="elevation"
+            label={t('ribbon.terrain.label')}
+            tooltip={t('ribbon.terrain.tip')}
+            active={terrain.active}
+            onClick={terrain.toggle}
+          />
+        )}
       </div>
 
       {/* Signed-in-only lokalitet controls. Hidden for guests rather than

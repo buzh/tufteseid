@@ -25,8 +25,15 @@ export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
       <ErrorBoundary name="RibbonLocalityRow">
         <RibbonLocalityRow ws={ws} />
       </ErrorBoundary>
+      {/* `terrain` is missing on purpose: that surface exists with no
+          lokalitet too, so the ribbon renders it a level up. Everything here
+          still stands down for it — the tray is not shown, because the mode
+          is not `browse`. */}
       <ErrorBoundary name="RibbonWorkspaceBody">
-        {ws.mode === 'browse' ? <Tray ws={ws} /> : <RibbonToolRow ws={ws} />}
+        {ws.mode === 'browse' && <Tray ws={ws} />}
+        {(ws.mode === 'draft' || ws.mode === 'lidar') && (
+          <RibbonToolRow ws={ws} />
+        )}
       </ErrorBoundary>
       <ErrorBoundary name="LocalityDialogs">
         <LocalityDialogs ws={ws} />

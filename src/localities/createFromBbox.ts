@@ -27,6 +27,13 @@ import { upsertLocalityOnLayer } from './localityLayer';
 // top edge is visibly inside the map rather than tucked under the bar.
 const RIBBON_GAP_PX = 24;
 
+// How much of the map the ribbon is covering right now. Measured rather than
+// a constant: the bar grows a row per level of context and wraps on narrow
+// screens, so there is no number to hard-code — hard-coded header heights are
+// exactly what the floating shell replaced.
+const ribbonHeight = (): number =>
+  document.querySelector('[data-ribbon]')?.getBoundingClientRect().height ?? 0;
+
 // Side/bottom inset: enough to prove the rectangle is fully on screen, and
 // at ≥8% also enough that transformExtent's corner-only reprojection has
 // no chance of clipping something the user could see inside the box.
@@ -54,13 +61,13 @@ export type ViewportBboxResult =
  * `calculateExtent` is symmetric about the view centre and the ribbon only
  * covers the top, so no symmetric ratio can clear it without over-insetting
  * the other three edges. Pixels are relative to the map viewport element,
- * which the ribbon floats over, so the ribbon's height maps 1:1 onto the
- * top inset.
+ * which the ribbon floats over, so the measured ribbon height maps 1:1 onto
+ * the top inset.
  *
  * Rotation is locked off, so the pixel rectangle stays axis-aligned and two
  * corners describe it.
  */
-export const viewportBbox = (map: Map, topInset = 0): ViewportBboxResult => {
+export const viewportBbox = (map: Map): ViewportBboxResult => {
   const size = map.getSize();
   if (!size) return { ok: false, reason: 'unavailable' };
   const [width, height] = size;
@@ -69,7 +76,7 @@ export const viewportBbox = (map: Map, topInset = 0): ViewportBboxResult => {
   const insetY = Math.max(INSET_MIN_PX, Math.round(height * INSET_FRACTION));
   const left = insetX;
   const right = width - insetX;
-  const top = topInset + RIBBON_GAP_PX;
+  const top = ribbonHeight() + RIBBON_GAP_PX;
   const bottom = height - insetY;
   if (right - left < MIN_SIDE_PX || bottom - top < MIN_SIDE_PX) {
     return { ok: false, reason: 'unavailable' };
@@ -130,37 +137,34 @@ export const useCreateLocalityFromViewport = () => {
   const setActiveLocality = useSetAtom(activeLocalityAtom);
   const [creating, setCreating] = useState(false);
 
-  const create = useCallback(
-    async (topInset = 0) => {
-      if (!user || creating) return;
-      const result = viewportBbox(map, topInset);
-      if (!result.ok) {
-        toaster.error({
-          title:
-            result.reason === 'tooLarge'
-              ? t('localities.createTooLarge')
-              : t('localities.createFailed'),
-        });
+  const create = useCallback(async () => {
+    if (!user || creating) return;
+    const result = viewportBbox(map);
+    if (!result.ok) {
+      toaster.error({
+        title:
+          result.reason === 'tooLarge'
+            ? t('localities.createTooLarge')
+            : t('localities.createFailed'),
+      });
+      return;
+    }
+    setCreating(true);
+    try {
+      const rec = await createLocalityFromBbox(
+        result.bbox,
+        user.id,
+        t('localities.defaultName'),
+      );
+      if (!rec) {
+        toaster.error({ title: t('localities.createFailed') });
         return;
       }
-      setCreating(true);
-      try {
-        const rec = await createLocalityFromBbox(
-          result.bbox,
-          user.id,
-          t('localities.defaultName'),
-        );
-        if (!rec) {
-          toaster.error({ title: t('localities.createFailed') });
-          return;
-        }
-        setActiveLocality(rec);
-      } finally {
-        setCreating(false);
-      }
-    },
-    [user, creating, map, t, setActiveLocality],
-  );
+      setActiveLocality(rec);
+    } finally {
+      setCreating(false);
+    }
+  }, [user, creating, map, t, setActiveLocality]);
 
   return { create, creating };
 };

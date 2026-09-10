@@ -1,0 +1,137 @@
+/*
+ * Terrenganalyse in a ribbon row: the render on the left, the knobs on the
+ * right, rather than the 400 px column it grew up in. Wide suits it — the
+ * sliders are what you sweep while watching the relief change, and putting
+ * them beside the image instead of under it keeps both in one glance.
+ */
+
+.root {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-5);
+}
+
+/* The DEM is up to 3000 px a side, so the image is capped and letterboxed
+   here rather than scaled to the row's width — otherwise the ribbon grows
+   to several screens tall for a big rectangle. */
+.preview {
+  flex: 1 1 360px;
+  min-width: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 140px;
+  max-height: 320px;
+  padding: var(--sp-1);
+  background: var(--c-bg-subtle);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.canvas {
+  max-width: 100%;
+  max-height: 312px;
+  width: auto;
+  height: auto;
+  /* The DEM grid is already at or near native resolution; letting the
+     browser smooth it on upscale hides exactly the single-pixel detail we
+     are looking for. */
+  image-rendering: pixelated;
+}
+
+.message {
+  margin: 0;
+  padding: var(--sp-4);
+  text-align: center;
+  font-size: var(--font-sm);
+  color: var(--c-fg-muted);
+}
+
+.controls {
+  flex: 1 1 320px;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.pickers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--font-xs);
+  line-height: 1.4;
+  color: var(--c-fg-muted);
+}
+
+/* Fixed basis and no shrink: a light-sweep slider needs travel, and letting
+   three of them share a row would give each about a centimetre. */
+.sliders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+}
+
+.slider {
+  flex: 0 1 200px;
+}
+
+.slider input[type='range'] {
+  width: 100%;
+  margin: 0;
+}
+
+.sliderHead {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: 2px;
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+.sliderValue {
+  font-variant-numeric: tabular-nums;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.meta {
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stacked below md: side by side would leave the render a thumbnail and the
+   sliders too short to sweep. */
+@media (max-width: 47.999rem) {
+  .root {
+    flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  .preview,
+  .controls {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .preview {
+    max-height: 220px;
+  }
+
+  .canvas {
+    max-height: 212px;
+  }
+}
