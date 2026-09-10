@@ -509,13 +509,16 @@
     "flyfoto": {
       "datasetLabel": "Flyfotoprosjekt",
       "datasetHead": "Flyfoto · W/S",
+      "eraLabel": "Periode",
+      "eraAll": "Alle",
       "mosaic": "Beste mosaikk",
       "mosaicMeta": "nyeste tilgjengelige",
       "projectsHint": "Enkeltprosjekter, nyeste først. Gå bakover i tid med S.",
       "loading": "Henter flyfotoprosjekter…",
       "zoomedOut": "Zoom inn for å se hvilke flyfotoprosjekter som dekker området.",
       "error": "Fikk ikke hentet flyfotoprosjekter akkurat nå. Prøv igjen, eller zoom litt inn.",
-      "empty": "Ingen enkeltprosjekter dekker dette utsnittet. Bruk beste mosaikk, eller prøv et annet sted."
+      "empty": "Ingen enkeltprosjekter dekker dette utsnittet. Bruk beste mosaikk, eller prøv et annet sted.",
+      "emptyEra": "Ingen flyfoto fra denne perioden dekker utsnittet. Velg en annen periode, eller Alle."
     },
     "search": {
       "clear": "Tøm søk"

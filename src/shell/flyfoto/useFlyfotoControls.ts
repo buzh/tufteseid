@@ -1,6 +1,6 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { transformExtent } from 'ol/proj';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   fetchFlyfotoProjectsForBbox,
   type FlyfotoProject,
@@ -9,6 +9,7 @@ import { mapAtom } from '../../map/atoms';
 import { backgroundLayerAtom } from '../../map/layers/config/backgroundLayers/atoms';
 import { activeFlyfotoProjectAtom } from '../../map/layers/config/backgroundLayers/flyfotoBackground';
 import type { CycleKey } from '../../map/useBackgroundCyclingKeys';
+import { countByEra, filterByEra, type FlyfotoEra } from './eras';
 
 // Furthest out the acquisition list is worth answering. Same reasoning as
 // MIN_FOOTPRINT_ZOOM in lidarFootprintsLayer, one level tighter: a flight
@@ -35,7 +36,8 @@ const EMPTY_VIEWPORT: FlyfotoViewport = { status: 'idle', projects: [] };
 /**
  * Everything the flyfoto controls in the ribbon share: whether ortofoto is
  * the background at all, which acquisition is painting it, what the viewport
- * has to offer, and the W/S behaviour.
+ * has to offer, which period of it the chips have narrowed that to, and the
+ * W/S behaviour.
  *
  * Shaped after useLidarControls, but simpler in two ways that are worth
  * stating rather than rediscovering. Nothing on the map draws acquisition
@@ -61,6 +63,7 @@ export const useFlyfotoControls = () => {
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [viewport, setViewport] = useState<FlyfotoViewport>(EMPTY_VIEWPORT);
+  const [era, setEra] = useState<FlyfotoEra>('all');
 
   const isMosaic = backgroundLayer === 'flyfoto';
   const isProject = backgroundLayer === 'flyfotoProject';
@@ -135,6 +138,20 @@ export const useFlyfotoControls = () => {
     };
   }, [map, isFlyfotoBackground]);
 
+  // The period chips narrow one list, and everything that walks acquisitions
+  // walks the narrowed one — the pulldown rows, the count on the chip, and
+  // W/S. A filter the keyboard ignores would be worse than no filter: the
+  // whole point of picking "–1959" is that S then steps between the two
+  // pre-war flights instead of through eighteen modern omløp to reach them.
+  const projects = useMemo(
+    () => filterByEra(viewport.projects, era),
+    [viewport.projects, era],
+  );
+  const eraCounts = useMemo(
+    () => countByEra(viewport.projects),
+    [viewport.projects],
+  );
+
   // Called by useGroundMode when ortofoto stops being the ground on screen,
   // for the same reason as LiDAR's: taking the pulldown off the bar unmounts
   // it without it ever firing its open-change callback. The active
@@ -168,14 +185,14 @@ export const useFlyfotoControls = () => {
     // Consumed even with nothing to walk to. In flyfoto mode W/S is this
     // ring, and the list being mid-refresh after a pan is a transient the
     // key should wait out rather than fall through on.
-    if (viewport.status !== 'ready' || viewport.projects.length === 0) {
+    if (viewport.status !== 'ready' || projects.length === 0) {
       return true;
     }
 
     const step = key === 's' ? 1 : -1;
     // Index 0 is the seamless mosaic, then the acquisitions newest first —
     // same order the pulldown lists them in, so S walks back in time.
-    const entries = viewport.projects;
+    const entries = projects;
     const ring = entries.length + 1;
     const at = entries.findIndex((p) => p.id === activeProject?.id);
     const from = isMosaic ? 0 : at >= 0 ? at + 1 : step > 0 ? -1 : 0;
@@ -194,8 +211,14 @@ export const useFlyfotoControls = () => {
     isProject,
     standDown,
     activeProject,
-    // Dataset
+    // Dataset. `viewport` is what the query returned, `projects` is what the
+    // period chips left of it — the second is what anything walking or
+    // listing acquisitions should use.
     viewport,
+    projects,
+    era,
+    setEra,
+    eraCounts,
     pickerOpen,
     setPickerOpen,
     activateMosaic,

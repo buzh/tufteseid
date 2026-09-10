@@ -22,8 +22,13 @@ const projectMeta = (p: FlyfotoProject): string =>
  * Listed newest first, so walking down the list walks back in time.
  *
  * No filter sub-panel and no hover-to-preview footprint, unlike the LiDAR
- * pulldown next to it: the index query returns no geometry, and the list is
- * already scoped to acquisitions whose real outline touches this screen.
+ * pulldown next to it: the index query returns no geometry, so there is
+ * nothing to draw and no coverage ratio to rank by, and the list is already
+ * scoped to acquisitions whose real outline touches this screen. The one
+ * filter it has — the period — is on the strip beside this chip rather than
+ * inside it (FlyfotoEraPicker), because with a hundred rows in a city the
+ * period is the first thing you set and the last thing you should have to
+ * open a pulldown to see.
  */
 export const FlyfotoDatasetPicker = ({
   flyfoto,
@@ -58,10 +63,11 @@ export const FlyfotoDatasetPicker = ({
           >
             <span className={styles.triggerLabel}>{chipLabel}</span>
           </Button>
-          {/* How many acquisitions cover the viewport — i.e. how much this
-              pulldown has to offer here. */}
+          {/* How many acquisitions this pulldown has to offer here: covering
+              the viewport *and* inside the chosen period, because that is
+              the list a click or a W/S press will actually walk. */}
           <CountBadge
-            count={viewport.projects.length}
+            count={flyfoto.projects.length}
             palette="yellow"
             className={styles.triggerBadge}
           />
@@ -97,11 +103,18 @@ export const FlyfotoDatasetPicker = ({
         {viewport.status === 'error' && (
           <p className={styles.hint}>{t('ribbon.flyfoto.error')}</p>
         )}
-        {viewport.status === 'ready' && viewport.projects.length === 0 && (
-          <p className={styles.hint}>{t('ribbon.flyfoto.empty')}</p>
+        {viewport.status === 'ready' && flyfoto.projects.length === 0 && (
+          <p className={styles.hint}>
+            {/* Two different nothings: the archive has never flown here, or
+                it has but not in the period the chips are set to. The second
+                is one click from being undone, so say which one it is. */}
+            {viewport.projects.length === 0
+              ? t('ribbon.flyfoto.empty')
+              : t('ribbon.flyfoto.emptyEra')}
+          </p>
         )}
 
-        {viewport.projects.map((p) => (
+        {flyfoto.projects.map((p) => (
           <PulldownItem
             key={p.id}
             label={p.projectName}

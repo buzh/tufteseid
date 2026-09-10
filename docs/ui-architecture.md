@@ -524,7 +524,7 @@ returns you to exactly the dataset and style you left — 1→5→1 is free wher
 |---|---|
 | Standard (1) | *absent* — no variants to choose between |
 | LiDAR (2), Hybrid (3) | Dataset pulldown — **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport · style pulldown (the active dataset's WMS styles, with a "flere stiler" second tier), only when the dataset publishes more than one · DTM/DOM segment |
-| Flyfoto (4) | Acquisition pulldown — the seamless mosaic or any acquisition covering the viewport, newest first |
+| Flyfoto (4) | Acquisition pulldown — the seamless mosaic or any acquisition covering the viewport, newest first · period chips (Alle / 2010– / 1990–2009 / 1960–1989 / –1959), which narrow both that list and the W/S ring (§5.5) |
 | Terreng (5) | *absent* — its knobs are in the dock panel (§10), on the rectangle they analyse |
 
 Absent, not empty: a labelled bar with no controls in it would spend map pixels
@@ -637,8 +637,9 @@ thing to peek back to.
 
 - **A / D** — previous / next LiDAR style, top tier only, wrapping at both ends.
 - **W / S** — previous / next dataset in **the active mode's ring**: LiDAR
-  projects in LiDAR mode, ortofoto acquisitions in flyfoto mode, nothing in
-  Standard or Terreng (the ground on screen there has no ring). In LiDAR mode
+  projects in LiDAR mode, ortofoto acquisitions in flyfoto mode (as narrowed by
+  the period chips, §5.5), nothing in Standard or Terreng (the ground on screen
+  there has no ring). In LiDAR mode
   a press also pins the dataset (§5.7) — walking the ring is the user choosing,
   and otherwise the auto resolver would take the background back on the next
   pan and W/S would feel broken.
@@ -739,6 +740,33 @@ The acquisition list comes from `fetchFlyfotoProjectsForBbox` refetched on
 moveend while the mode is active. **No licensing notice for viewing** —
 browsing NiB imagery as a background is what the old external link already
 did; the notice gates *grab-and-keep* (§8.6), which is a different act.
+
+**The period chips** (`src/shell/flyfoto/eras.ts`, `FlyfotoEraPicker`) are the
+mode's one filter, and they sit on the strip beside the acquisition chip rather
+than inside its pulldown. The complete list is the problem the filter exists
+for: an Oslo-sized bbox intersects on the order of a hundred acquisitions, and
+the two flights that answer "what was here before the road" are buried under
+twenty years of near-identical modern omløp. Ranking cannot help the way it
+does for LiDAR — the index returns no geometry, so there is no coverage ratio,
+and every row is equally relevant to the screen. What differs is *when*.
+
+- **Four periods, not ten decades**, and they are breaks in the archive rather
+  than round numbers: `2010–` the digital omløp at 0.1–0.25 m, `1990–2009`
+  colour, `1960–1989` the systematic national coverage, `–1959` the early
+  flights. Labels are the ranges themselves, so only "Alle" is translated.
+- **W/S walks the filtered list.** A filter the keyboard ignored would be worse
+  than none: the point of picking `–1959` is that S then steps between the two
+  pre-war flights instead of through eighteen modern ones to reach them. The
+  count badge on the acquisition chip counts the same filtered list, so the
+  chip and the key never disagree about how much there is.
+- **An empty period is disabled, never hidden** — the row must not reflow under
+  the pointer while panning, and "there are no pre-war flights here" should be
+  answerable without clicking. The *selected* period is exempt, or a pan could
+  strand the user on a filter with no neighbour to click back to; the pulldown
+  then says which of the two nothings it is, since one of them is one click
+  from being undone.
+- Undated rows appear only under "Alle". A period is a claim about when, and a
+  row that cannot support the claim should not answer it.
 
 ### 5.6 Ny lokalitet from the viewport
 
@@ -1979,7 +2007,9 @@ pick the national mosaic or any per-project LiDAR dataset; see datasets ranked
 by relevance to the current viewport and expand to the less relevant ones;
 preview a project's footprint on hover; pick a render style and expand to the
 full style list; switch DTM / DOM; pick the seamless ortofoto mosaic or any
-historical acquisition covering the viewport; cycle styles with A/D, the active
+historical acquisition covering the viewport; narrow those acquisitions to one
+period of the archive so both the list and the keyboard ring walk only it;
+cycle styles with A/D, the active
 mode's datasets with W/S, model with E, without opening any pulldown or
 occluding the map; put a second ground on the right of a draggable curtain
 (Sammenlign) and then describe *either* half with the whole of row 1 and its

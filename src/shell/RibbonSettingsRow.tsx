@@ -7,6 +7,7 @@ import {
 } from '../map/compare/halves';
 import { cx, Segmented, type SegmentedOption } from '../ui';
 import { FlyfotoDatasetPicker } from './flyfoto/FlyfotoDatasetPicker';
+import { FlyfotoEraPicker } from './flyfoto/FlyfotoEraPicker';
 import type { FlyfotoControls } from './flyfoto/useFlyfotoControls';
 import { LidarDatasetPicker } from './lidar/LidarDatasetPicker';
 import { LidarModelToggle } from './lidar/LidarModelToggle';
@@ -117,6 +118,9 @@ export const RibbonSettingsRow = ({
       {ground.modifiers === 'flyfoto' && (
         <div className={styles.group}>
           <FlyfotoDatasetPicker flyfoto={flyfoto} />
+          {/* Narrows the pulldown beside it and the W/S ring together, so
+              the chips are next to the chip whose count they change. */}
+          <FlyfotoEraPicker flyfoto={flyfoto} />
         </div>
       )}
 
