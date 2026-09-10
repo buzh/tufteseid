@@ -48,6 +48,42 @@ export const PulldownItem = ({
   </button>
 );
 
+/**
+ * A row that toggles rather than selects. Same geometry as PulldownItem, but
+ * a checkbox glyph instead of the active row's left bar: in a list where
+ * several rows can be on at once, that bar reads as "this is the one" and
+ * says the wrong thing about the other three.
+ *
+ * `indent` is for a source's own sublayers — one level only, since the
+ * register's hierarchy below that is not something this app asks about.
+ */
+export const PulldownCheck = ({
+  label,
+  checked,
+  indent,
+  onToggle,
+}: {
+  label: string;
+  checked: boolean;
+  indent?: boolean;
+  onToggle: () => void;
+}) => (
+  <button
+    type="button"
+    role="menuitemcheckbox"
+    aria-checked={checked}
+    className={cx(styles.item, indent && styles.itemIndent)}
+    onClick={onToggle}
+  >
+    <Icon
+      icon={checked ? 'check_box' : 'check_box_outline_blank'}
+      size={18}
+      className={checked ? styles.checkOn : styles.checkOff}
+    />
+    <span className={styles.itemLabel}>{label}</span>
+  </button>
+);
+
 /** Opens/closes an overflow group. */
 export const PulldownDisclosure = ({
   open,

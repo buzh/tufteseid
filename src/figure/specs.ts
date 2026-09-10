@@ -19,9 +19,11 @@ import { t } from 'i18next';
 import type { LidarSource } from '../lidarExtract/sources';
 import type { FlyfotoProject } from '../localities/flyfotoProjects';
 import {
-  getThemeLayerById,
-  themeLayerConfig,
-} from '../map/layers/themeLayerConfigApi';
+  HERITAGE_DETAILS,
+  type HeritageDetail,
+  type HeritageRender,
+} from '../map/layers/heritage';
+import { themeLayerName } from '../map/layers/themeLayerConfigApi';
 import type { ThemeLayerName } from '../map/layers/themeWMS';
 import type { Dem, DemModel } from '../terrain/dem';
 import {
@@ -250,6 +252,16 @@ export type ScreenshotFigureInput = {
   /** Whether the ground came from NiB rather than Kartverket. */
   groundIsFlyfoto: boolean;
   themeLayers: ThemeLayerName[];
+  /**
+   * How the heritage overlay was drawn — the render setting, and the
+   * sublayers left out of it. Omitted when no heritage layer was on.
+   *
+   * Not decoration: "outlines of the automatically protected sites only" and
+   * "every register, filled" are different claims about what the blank ground
+   * in the picture means, and only one of them says nothing was recorded
+   * there.
+   */
+  heritageRender?: string;
   metresPerPx: number;
   bbox25833: Bbox25833;
   /** OL view rotation, radians. See NorthArrowOptions. */
@@ -257,13 +269,35 @@ export type ScreenshotFigureInput = {
   language: string;
 };
 
-const themeLayerLabel = (id: ThemeLayerName, language: string): string => {
-  const def = getThemeLayerById(themeLayerConfig, id);
-  if (!def) return id;
-  const lang = (['nb', 'nn', 'en'] as const).find((l) =>
-    language.startsWith(l),
-  );
-  return def.name[lang ?? 'nb'];
+/**
+ * The `heritageRender` line, from the live overlay settings. Here rather than
+ * in `map/layers/heritage.ts` so that module stays what it is — the WMS
+ * tables — and every string the caption prints keeps coming from one file.
+ *
+ * Returns undefined when the overlay is at its defaults *and* fully opaque:
+ * a caption listing settings nobody changed is noise, and the defaults are
+ * recoverable from the layer names already on the line above.
+ */
+export const describeHeritageRender = (
+  details: ReadonlySet<HeritageDetail>,
+  render: HeritageRender,
+  opacity: number,
+): string | undefined => {
+  const parts = [t(`ribbon.heritage.render.${render}`)];
+  if (details.size < HERITAGE_DETAILS.length) {
+    parts.push(
+      HERITAGE_DETAILS.filter((d) => details.has(d))
+        .map((d) => t(`ribbon.heritage.detail.${d}`))
+        .join(', ') || t('figure.set.heritageNone'),
+    );
+  }
+  if (opacity < 1) {
+    parts.push(
+      t('figure.set.heritageOpacity', { percent: Math.round(opacity * 100) }),
+    );
+  }
+  if (parts.length === 1 && render === 'omriss') return undefined;
+  return joinDot(parts);
 };
 
 export const screenshotFigure = ({
@@ -271,6 +305,7 @@ export const screenshotFigure = ({
   groundLabel,
   groundIsFlyfoto,
   themeLayers,
+  heritageRender,
   metresPerPx,
   bbox25833,
   rotation,
@@ -281,11 +316,14 @@ export const screenshotFigure = ({
   acquisition: themeLayers.length
     ? t('figure.acq.overlays', {
         layers: themeLayers
-          .map((id) => themeLayerLabel(id, language))
+          .map((id) => themeLayerName(id, language))
           .join(', '),
       })
     : undefined,
-  settings: [t('figure.set.composite')],
+  settings: [
+    t('figure.set.composite'),
+    ...(heritageRender ? [heritageRender] : []),
+  ],
   metresPerPx,
   bbox25833,
   rotation,

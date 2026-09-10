@@ -22,10 +22,19 @@ import { currentUserAtom } from '../auth/atoms';
 import { useDrawSettings } from '../draw/drawControls/hooks/drawSettings';
 import { getDrawLayer } from '../draw/drawControls/hooks/mapLayers';
 import { renderFigureBlob } from '../figure/figure';
-import { flyfotoFigure, screenshotFigure } from '../figure/specs';
+import {
+  describeHeritageRender,
+  flyfotoFigure,
+  screenshotFigure,
+} from '../figure/specs';
 import { lidarExtractSelectionAtom } from '../lidarExtract/atoms';
 import { mapAtom } from '../map/atoms';
 import { activeThemeLayersAtom } from '../map/layers/atoms';
+import {
+  heritageDetailsAtom,
+  heritageOpacityAtom,
+  heritageRenderAtom,
+} from '../map/layers/heritage';
 import type { BackgroundLayerName } from '../map/layers/backgroundLayers';
 import {
   backgroundLayerAtom,
@@ -170,6 +179,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const background = useAtomValue(backgroundLayerAtom);
   const hybrid = useAtomValue(hybridOverlayAtom);
   const themeLayers = useAtomValue(activeThemeLayersAtom);
+  const heritageDetails = useAtomValue(heritageDetailsAtom);
+  const heritageRender = useAtomValue(heritageRenderAtom);
+  const heritageOpacity = useAtomValue(heritageOpacityAtom);
   const [shooting, setShooting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fetchingFlyfoto, setFetchingFlyfoto] = useState(false);
@@ -641,6 +653,13 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           ),
           groundIsFlyfoto: NIB_GROUNDS.has(background),
           themeLayers: [...themeLayers],
+          heritageRender: themeLayers.has('heritageSites')
+            ? describeHeritageRender(
+                heritageDetails,
+                heritageRender,
+                heritageOpacity,
+              )
+            : undefined,
           metresPerPx: shot.metresPerPx,
           bbox25833: shot.bbox25833,
           rotation: shot.rotation,
@@ -685,6 +704,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     background,
     hybrid,
     themeLayers,
+    heritageDetails,
+    heritageRender,
+    heritageOpacity,
     setAttachmentItems,
     t,
     i18n.language,

@@ -56,7 +56,7 @@ stricter before.
 highlighting and `useWorkspaceKeys`' `navigable` flag read. The dock reads the
 two underlying flags instead, precisely because collapsing them to one answer is
 what would force the bands apart again. `MapTool`
-(`'layers' | 'measure' | 'localities' | null`, `src/map/overlay/atoms.ts`) is
+(`'measure' | 'localities' | null`, `src/map/overlay/atoms.ts`) is
 separate state again, so a map tool card and an open lokalitet cannot fight over
 the same real estate.
 
@@ -374,7 +374,9 @@ subsume.
   on it — dragging the divider must not rebuild a tile stack.
 - **Skjul merker** — `marksHiddenAtom` (`src/localities/atoms.ts`), read by
   `useMarksVisibility` (§8.6). Not persisted to the URL.
-- **Theme layers** — `activeThemeLayersAtom` (a `Set<ThemeLayerName>`).
+- **Theme layers** — `activeThemeLayersAtom` (a `Set<ThemeLayerName>`), plus
+  `heritageDetailsAtom` / `heritageRenderAtom` / `heritageOpacityAtom` in
+  `src/map/layers/heritage.ts` for how the Kulturminner overlay is drawn.
 - **Chrome** — `mapToolAtom`, `overlayOpenCountAtom` / `anyOverlayOpenAtom`
   (`src/ui/overlayAtoms.ts`, incremented by every `Popover` and `Dialog` so the
   keyboard layers can stand down).
@@ -404,8 +406,17 @@ navigation**, by omission rather than decision). There is also a migration path
 for the legacy Norgeskart `#!?` hash format.
 
 Live parameters: `lat`, `lon`, `zoom` (written on every map `moveend`),
-`backgroundLayer`, `hybrid`, `lidarModel`, `themeLayers`, `sok`, `markerLat`,
-`markerLon`, `showSelection`.
+`backgroundLayer`, `hybrid`, `lidarModel`, `themeLayers`, `heritageDetails`,
+`heritageRender`, `heritageOpacity`, `sok`, `markerLat`, `markerLon`,
+`showSelection`.
+
+The three `heritage*` ones are written from `themeLayerEffect`, not from their
+setters, so a link always describes what is on the map; each is *removed* at
+its default rather than written, keeping a shared URL down to what the sender
+changed. `heritageDetails` is read with `getUrlParameter` and split by hand
+rather than with `getListUrlParameter`, because that helper cannot tell an
+absent parameter from an empty one and "no sublayers" is a state the picker can
+reach.
 
 Dead entries still in the union: `rotation`, `drawing`, `printTool` have no live
 writers, and `projection` is read but never written. Not persisted at all,
@@ -475,8 +486,8 @@ looking at. Row 1 answers **what am I looking at**; the strip under it answers
 | **Terreng** (5) | Terrain analysis: relief computed here from float elevation, over the open lokalitet's rectangle if there is one and the visible map otherwise (§10) |
 | **Sammenlign** | Puts a second ground on the right of a draggable curtain, with a pulldown for which one (§5.8) |
 | **Skjul merker** (H) | Takes our own marks — funn, their halo, the lokalitet rectangles — off the map for as long as it is pressed in (§8.6) |
-| **Kulturminner** | Toggles the five Riksantikvaren theme layers as a group |
-| **Kartlag** | Opens the theme-layer card (`MapTool = 'layers'`) |
+| **Kulturminner** | Toggles `heritageSites`, the one register most readings start from |
+| **Oppsett** (`tune`) | Popover: the five RA sources, kulturminner2's three sublayers, how they are drawn and how strongly (§5.9) |
 | Mål | Popover with the measure tools |
 | Mine lokaliteter | Opens the localities card (signed in only) |
 | Ny lokalitet | Creates a lokalitet from the visible map (signed in only, §5.6) |
@@ -872,6 +883,66 @@ second place a dataset is chosen — but it is the one combination where the
 answer is "you can't from here", so a B-half picker is the obvious thing to
 build if this turns out to bite.
 
+### 5.9 Kulturminner — the source and rendering popover
+
+Two controls in row 1, next to each other:
+
+- **Kulturminner** (`castle`) — a plain toggle for `heritageSites`, the one
+  register most readings start from. One press, no menu.
+- **Oppsett** (`tune`) — a `Popover` (`src/shell/heritage/HeritagePicker.tsx`)
+  with a `CountBadge` of how many sources are on, holding everything else.
+
+The panel has four parts, top to bottom: the five RA services as
+`PulldownCheck` rows; kulturminner2's three registers (lokaliteter,
+enkeltminner, sikringssoner) indented under it; how they are drawn; and an
+opacity slider for the whole overlay.
+
+**A popover, not a row on the settings strip.** The strip belongs to the ground
+on screen and follows the ground ring (§5.1). The heritage overlay is not a
+ground — it is the thing you read the ground *against*, and it stays on while
+you cycle LiDAR datasets underneath it. Giving it the strip would mean the
+strip's subject changed on its own, so the controls under your cursor would be
+for something else by the time you reached them. It would also need a
+`rowSubjectAtom` and a three-state button to say which subject the strip is
+showing, for a surface that is opened rarely and read once.
+
+**The three sublayers are indented, and only appear while their source is on.**
+They belong to kulturminner2; offering them next to a switched-off source
+invites the reasonable guess that ticking one turns the source on.
+
+**Rendering is one axis, not two.** Outlines / filled and the five vern subsets
+sit in one list under two headings. That is not a UI simplification — it is the
+WMS: `STYLES` takes a single value per `LAYERS` entry and RA publishes no
+filled variant of any subset, so "filled *and* only the automatically protected
+ones" is not a request that exists. Two controls would promise it. The tables
+behind this, and the sublayer/style pairs each render expands to, are in
+`src/map/layers/heritage.ts`, read off live GetCapabilities and confirmed with
+GetMap probes rather than inferred.
+
+**Outlines is the default**, where the service's own default fills enkeltminner
+in cyan. The register is here to be read against the relief, and a filled
+polygon is an opaque lid over the one thing the app exists to show. For the
+same reason the opacity slider bottoms out at 20 % rather than 0: a fully
+invisible overlay that still counts as "on" is a state nobody can debug from
+looking at the screen.
+
+**Reshaping happens in `themeLayerEffect`, not at construction.** The effect
+reads the three atoms, so any change re-runs it; the add/remove diff is a no-op
+on those runs and a reshape pass afterwards calls `source.updateParams` — but
+only when `LAYERS`/`STYLES` actually moved, since `updateParams` invalidates
+the tile cache and re-requests the whole screen. Selecting nothing hides the
+layer rather than sending a request whose only possible answer is a transparent
+tile. `createThemeLayerFromConfig` also takes the pair as an override, so a
+layer switched on while the settings are already off default is built correct
+instead of built wrong and corrected a frame later — at RA's MapServer that
+difference is a screenful of GetMaps.
+
+**Saved images carry it.** `describeHeritageRender` (`src/figure/specs.ts`)
+puts the render, the omitted sublayers and any reduced opacity on the
+screenshot's caption. "Outlines of the automatically protected sites only" and
+"every register, filled" are different claims about what the blank ground in
+the picture means, and only one of them says nothing was recorded there (§8.10).
+
 ---
 
 ## 6. Map panels and controls
@@ -879,9 +950,10 @@ build if this turns out to bite.
 ### 6.1 The card slot
 
 `src/map/overlay/MapToolCards.tsx` renders **one** card at a time from
-`mapToolAtom`: `'layers'` → `MapThemes`, `'localities'` → `LocalitiesPanel`,
-`'measure'` → nothing (measure lives in a ribbon popover; the enum member is
-vestigial and the switch falls through to `undefined`).
+`mapToolAtom`: `'localities'` → `LocalitiesPanel`, `'measure'` → nothing
+(measure lives in a ribbon popover; the enum member is vestigial and the switch
+falls through to `undefined`). There is one real card left, so the slot is a
+`MapToolCard` shell around a single branch.
 
 `MapToolCard` is the shared shell: white card, `max-height: 100%` against the
 slot's definite height (§3.1), `pointer-events: auto` against the slot's
@@ -894,29 +966,24 @@ The card slot no longer arbitrates with the lokalitet workspace: the workspace
 is in the ribbon, so search and the cards simply render, and `mapToolAtom` only
 has to keep the cards exclusive with each other.
 
-The layers card has a bespoke header (`MapLayersCardHeader`): the active
-theme-layer count as a `CountBadge`, plus a "clear all" button that appears
-only when there is something to clear.
+### 6.2 The theme picker, and where it went
 
-### 6.2 The theme picker
+There used to be a second card here: `src/settings/map/themes/MapThemes.tsx` +
+`SubTheme.tsx`, upstream's generic machinery for browsing categories of theme
+layers with expandable subthemes, a per-subtheme "add all", an active-layer
+`CountBadge` in a bespoke card header and a performance warning at fifteen
+active layers. This fork has **one category with five layers**, all from
+Riksantikvaren, so every one of those capabilities was scaffolding around a
+list of five checkboxes — and it spent the left card slot, on top of the map,
+to hold it.
 
-`src/settings/map/themes/MapThemes.tsx` + `SubTheme.tsx`. Generic upstream
-machinery for browsing categories of theme layers with expandable subthemes —
-and this fork has **one category with five layers** (Kulturminner). The
-multi-subtheme, multi-category, search-within-themes capability is entirely
-unexercised. A replacement can almost certainly collapse this to a flat list
-without losing anything a user sees today, but check `themeLayerConfigApi.ts`
-first in case new categories are planned.
+It is gone (`MapThemes`, `SubTheme`, their CSS and `types.ts`, plus
+`useThemeLayers`, `MapLayersCardHeader` and `MapTool = 'layers'`). What
+replaced it is §5.9: a popover on row 1 that offers the five sources *and* the
+three things the register can actually be asked beyond on/off.
 
-Selecting a theme layer promotes it to `setZIndex(10)`, above everything else.
-
-Three heading levels stack in one 400 px column — theme, subtheme, layer — and
-each of the first two is a controlled `Section`. The size step that separates
-them rides on `--section-title-size`, set on the theme's `Section` and put back
-on its body, because custom properties inherit and would otherwise carry into
-the subtheme headings nested inside. A layer row is the kit `Switch` with its
-label reversed to the left by CSS, so the switch's own `<label>` spans the row
-and there is no second click handler on a wrapper.
+Selecting a theme layer still promotes it to `setZIndex(10)`, above everything
+else.
 
 ### 6.3 What does not exist
 
@@ -924,10 +991,11 @@ Worth stating, because their absence reads as an oversight and is at least
 partly a choice: **no zoom in/out buttons** (mouse wheel, pinch and keyboard
 only), **no north arrow / rotation reset** (the map cannot rotate), **no
 coordinate readout** on the map itself (the InfoBox shows one for a clicked
-point), **no map legend**, **no layer opacity control** exposed to the user
-(opacity is used internally by the background stack), and **no geolocation
-button** — `trackPositionAtom` and `trackPostitionAtomEffect` are fully wired
-but nothing ever sets the atom `true`, so the "where am I" feature is dead code
+point), **no map legend**, **no opacity control for the *background*** (opacity
+there is used internally by the stack; the heritage overlay does have one,
+§5.9), and **no geolocation button** — `trackPositionAtom` and
+`trackPostitionAtomEffect` are fully wired but nothing ever sets the atom
+`true`, so the "where am I" feature is dead code
 with no entry point. For a field-adjacent tool that is a genuine gap; a rewrite
 should either add the control or delete the effect.
 
@@ -1703,7 +1771,7 @@ whole shell and ribbon, the lokalitet surfaces (`FunnList`, `BilderSection`,
 `LocalitiesPanel`), both analysis panels, `AuthButton`, `AuthDialog`,
 `ErrorBoundary`, the measure trigger, the toast region, `MapComponent`,
 `SearchComponent`, `KulturminnerPopup`, `LidarExtractViewer`, `MapToolCards`,
-`MapThemes`/`SubTheme`, `HelpPage`, `LanguageSwitcher`, the whole of
+`HelpPage`, `LanguageSwitcher`, the whole of
 `src/search/**` — results panel and infobox — and the whole of `src/draw/**`.
 So `src/terrain/`, `src/settings/`, `src/auth/`, `src/lidarExtract/`,
 `src/localities/`, `src/help/`, `src/languageswitcher/`, `src/search/`,
@@ -1715,8 +1783,8 @@ list used to say `Accordion`, `Select`, `Pagination` and `Alert`:
 - **`Accordion` is not coming.** Every kvib accordion in this app is
   `collapsible multiple`, i.e. a stack of independent disclosures, which is
   exactly the controlled `Section` the workspace already uses. The call site
-  owns the open set (a `string[]` in `MapThemes` and `InfoBoxSections`, a
-  single `string | null` per card in `HelpPage`) and gets
+  owns the open set (a `string[]` in `InfoBoxSections`, a single
+  `string | null` per card in `HelpPage`) and gets
   `lazyMount`/`unmountOnExit` for free, because `Section` never renders a
   closed body. `FeatureInfoSection` was the one place that read the
   container's state rather than owning it — `useAccordionContext`, to open
@@ -1838,10 +1906,15 @@ hide your own marks with H or the ribbon button so they do not cover the ground
 you are judging, and bring them back the same way.
 
 **Overlay the heritage record**
-toggle the five Kulturminner layers as a group; open the Kartlag card and toggle
-layers individually; see the active-layer count; clear all theme layers; click a
-heritage feature for its attributes; deep-link the active layers via
-`?themeLayers`.
+toggle the register most readings start from in one press; open the Oppsett
+popover and switch any of the five Riksantikvaren services on or off
+individually; see the active-source count on the trigger; clear them all; pick
+which of kulturminner2's three registers (lokaliteter / enkeltminner /
+sikringssoner) are drawn; draw them as outlines or filled; narrow the map to one
+vern class (fredede, verneverdige, listeførte, uten vern, uavklart); dim the
+whole overlay with a slider so the relief under it stays readable; click a
+heritage feature for its attributes; deep-link all of it via `?themeLayers`,
+`?heritageDetails`, `?heritageRender` and `?heritageOpacity`.
 
 **Measure**
 distance and area, with live on-map tooltips; clear the measurement.

@@ -129,28 +129,7 @@
     "road": "Road"
   },
   "map": {
-    "errorMessage": "Something went very wrong with the map",
-    "settings": {
-      "layers": {
-        "theme": {
-          "label": "Chose theme layers",
-          "activeLayersCount": "Active layers",
-          "warningPerformance": "Activating many layers may affect performance. Consider deactivating unused layers.",
-          "resetbutton": {
-            "text": "Reset"
-          },
-          "subtheme": {
-            "toggleall": {
-              "addall": "Add all layers",
-              "removeall": "Remove all"
-            }
-          }
-        }
-      }
-    }
-  },
-  "mapLayers": {
-    "label": "Maplayers"
+    "errorMessage": "Something went very wrong with the map"
   },
   "placeInfo": {
     "errorPlaceNameInfo": "Error fetching place name information",
@@ -502,10 +481,29 @@
     },
     "heritage": {
       "label": "Heritage",
-      "tip": "Heritage sites and monuments"
-    },
-    "layers": {
-      "tip": "All heritage layers"
+      "tip": "Heritage sites and monuments",
+      "settings": "Heritage: sources, rendering and opacity",
+      "settingsShort": "Options",
+      "sourcesHead": "Sources",
+      "renderHead": "Rendering",
+      "subsetHead": "Only these",
+      "clear": "Turn all off",
+      "opacity": "Opacity {{percent}} %",
+      "omrissHint": "outlines only, no fill",
+      "detail": {
+        "lokaliteter": "Sites",
+        "enkeltminner": "Monuments",
+        "sikringssoner": "Protection zones"
+      },
+      "render": {
+        "omriss": "Outlines",
+        "flate": "Filled",
+        "fredede": "Protected by law",
+        "verneverdige": "Worth preserving",
+        "listefoerte": "Listed",
+        "utenVern": "Not protected",
+        "uavklart": "Undetermined status"
+      }
     },
     "flyfoto": {
       "datasetLabel": "Aerial acquisition",
@@ -604,7 +602,9 @@
       "stretch": "contrast stretch 2–98 %",
       "resampled": "resampled from {{m}} m/px",
       "ortofoto": "orthophoto, unprocessed",
-      "composite": "composite of the map layers"
+      "composite": "composite of the map layers",
+      "heritageOpacity": "heritage at {{percent}} % opacity",
+      "heritageNone": "no sublayers"
     }
   }
 }

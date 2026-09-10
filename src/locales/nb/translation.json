@@ -129,28 +129,7 @@
     "road": "Veg"
   },
   "map": {
-    "errorMessage": "Noe gikk veldig galt med kartet",
-    "settings": {
-      "layers": {
-        "theme": {
-          "label": "Velg temakart",
-          "activeLayersCount": "Aktive lag",
-          "warningPerformance": "Aktivering av mange lag kan påvirke ytelsen. Vurder å deaktivere ubrukte lag.",
-          "resetbutton": {
-            "text": "Nullstill"
-          },
-          "subtheme": {
-            "toggleall": {
-              "addall": "Legg til alle",
-              "removeall": "Fjern alle"
-            }
-          }
-        }
-      }
-    }
-  },
-  "mapLayers": {
-    "label": "Temakart"
+    "errorMessage": "Noe gikk veldig galt med kartet"
   },
   "placeInfo": {
     "errorPlaceNameInfo": "Feil ved henting av stedsnavninformasjon",
@@ -502,10 +481,29 @@
     },
     "heritage": {
       "label": "Kulturminner",
-      "tip": "Lokaliteter og enkeltminner"
-    },
-    "layers": {
-      "tip": "Alle kulturminne-lag"
+      "tip": "Lokaliteter og enkeltminner",
+      "settings": "Kulturminner: kilder, visning og dekkevne",
+      "settingsShort": "Oppsett",
+      "sourcesHead": "Kilder",
+      "renderHead": "Visning",
+      "subsetHead": "Bare disse",
+      "clear": "Slå av alle",
+      "opacity": "Dekkevne {{percent}} %",
+      "omrissHint": "grenselinjer, ingen fyll",
+      "detail": {
+        "lokaliteter": "Lokaliteter",
+        "enkeltminner": "Enkeltminner",
+        "sikringssoner": "Sikringssoner"
+      },
+      "render": {
+        "omriss": "Omriss",
+        "flate": "Heldekkende",
+        "fredede": "Fredede",
+        "verneverdige": "Verneverdige",
+        "listefoerte": "Listeførte",
+        "utenVern": "Uten vern",
+        "uavklart": "Uavklart vernestatus"
+      }
     },
     "flyfoto": {
       "datasetLabel": "Flyfotoprosjekt",
@@ -604,7 +602,9 @@
       "stretch": "kontraststrekk 2–98 %",
       "resampled": "resamplet fra {{m}} m/px",
       "ortofoto": "ortofoto, ubehandlet",
-      "composite": "sammensatt av kartlagene"
+      "composite": "sammensatt av kartlagene",
+      "heritageOpacity": "kulturminner {{percent}} % dekkevne",
+      "heritageNone": "ingen dellag"
     }
   }
 }

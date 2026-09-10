@@ -14,6 +14,7 @@ import { useTerrainViewport } from '../terrain/useTerrainViewport';
 import { IconButton, Tooltip } from '../ui';
 import { CompareControl } from './compare/CompareControl';
 import { useFlyfotoControls } from './flyfoto/useFlyfotoControls';
+import { HeritagePicker } from './heritage/HeritagePicker';
 import { useLidarControls } from './lidar/useLidarControls';
 import { ModeButton } from './ModeButton';
 import { RibbonAccount } from './RibbonAccount';
@@ -180,8 +181,9 @@ export const RibbonGlobalRow = () => {
         <div className={styles.divider} />
 
         <div className={styles.group}>
-          {/* One-click toggle for the most-used heritage layer; the full list
-              is behind the Kartlag card next to it. */}
+          {/* One-click toggle for the most-used heritage layer; the other four
+              services, the sublayers, the rendering and the opacity are in the
+              submenu next to it. */}
           <ModeButton
             icon="castle"
             label={t('ribbon.heritage.label')}
@@ -189,14 +191,7 @@ export const RibbonGlobalRow = () => {
             active={themeLayers.has('heritageSites')}
             onClick={() => toggleThemeLayer('heritageSites')}
           />
-          <ModeButton
-            icon="layers"
-            label={t('mapLayers.label')}
-            tooltip={t('ribbon.layers.tip')}
-            active={tool === 'layers'}
-            badge={themeLayers.size}
-            onClick={() => toggleTool('layers')}
-          />
+          <HeritagePicker />
         </div>
 
         <div className={styles.divider} />

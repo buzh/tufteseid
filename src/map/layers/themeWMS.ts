@@ -1,6 +1,5 @@
-import ImageLayer from 'ol/layer/Image.js';
 import TileLayer from 'ol/layer/Tile';
-import { ImageWMS, TileWMS } from 'ol/source';
+import { TileWMS } from 'ol/source';
 import type {
   ThemeLayerConfig,
   ThemeLayerDefinition,
@@ -24,11 +23,19 @@ export type ThemeLayerName =
   | 'protectedBuildings'
   | 'userReportedHeritage';
 
+/**
+ * `overrides` lets a caller pin LAYERS/STYLES at construction time. Only
+ * Kulturminner uses it, and only because the sublayer and render settings can
+ * already differ from the config's defaults on the first frame: building the
+ * layer from the config and correcting it afterwards would spend a screenful
+ * of GetMap requests, at RA's MapServer, on a picture nobody asked for.
+ */
 export const createThemeLayerFromConfig = (
   config: ThemeLayerConfig,
   layerDef: ThemeLayerDefinition,
   projection: string,
-): TileLayer | ImageLayer<ImageWMS> | null => {
+  overrides?: { LAYERS: string; STYLES: string },
+): TileLayer | null => {
   if (!layerDef.layers) {
     console.warn(`Layer ${layerDef.id} has no WMS layers defined`);
     return null;
@@ -76,21 +83,9 @@ export const createThemeLayerFromConfig = (
     LAYERS: layerDef.layers,
     TRANSPARENT: true,
     STYLES: layerDef.styles ?? '',
-    FILTER: layerDef.filter ? layerDef.filter : undefined,
     ...extraWmsParams,
+    ...overrides,
   };
-
-  if (layerDef.singleImage) {
-    return new ImageLayer({
-      source: new ImageWMS({
-        url: wmsUrl,
-        params: wmsParams,
-        projection: projection,
-      }),
-      properties: layerProperties,
-      ...(minZoom !== undefined ? { minZoom } : {}),
-    });
-  }
 
   return new TileLayer({
     source: new TileWMS({

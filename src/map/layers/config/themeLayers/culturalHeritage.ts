@@ -12,7 +12,6 @@ export const culturalHeritageConfig: ThemeLayerConfig = {
   categories: [
     {
       id: 'culturalHeritage',
-      groupid: 19,
       name: {
         nb: 'Kulturminner',
         nn: 'Kulturminne',
@@ -40,9 +39,7 @@ export const culturalHeritageConfig: ThemeLayerConfig = {
       wmsUrl: '/wms/ra/kulturminner2',
       layers: 'Kulturminner',
       categoryId: 'culturalHeritage',
-      groupid: 19,
       queryable: true,
-      useLegendGraphic: true,
     },
     {
       id: 'culturalEnvironments',
@@ -54,9 +51,7 @@ export const culturalHeritageConfig: ThemeLayerConfig = {
       wmsUrl: '/wms/ra/kulturmiljoer',
       layers: 'Kulturmiljoer',
       categoryId: 'culturalHeritage',
-      groupid: 19,
       queryable: true,
-      useLegendGraphic: true,
     },
     {
       id: 'sefrakBuildings',
@@ -68,9 +63,7 @@ export const culturalHeritageConfig: ThemeLayerConfig = {
       wmsUrl: '/wms/ra/sefrak',
       layers: 'SEFRAK',
       categoryId: 'culturalHeritage',
-      groupid: 19,
       queryable: true,
-      useLegendGraphic: true,
     },
     {
       id: 'protectedBuildings',
@@ -82,9 +75,7 @@ export const culturalHeritageConfig: ThemeLayerConfig = {
       wmsUrl: '/wms/ra/freda_bygninger',
       layers: 'Freda_bygninger_WMS',
       categoryId: 'culturalHeritage',
-      groupid: 19,
       queryable: true,
-      useLegendGraphic: true,
     },
     {
       id: 'userReportedHeritage',
@@ -96,9 +87,7 @@ export const culturalHeritageConfig: ThemeLayerConfig = {
       wmsUrl: '/wms/ra/brukerminner',
       layers: 'Brukerminner_WMS',
       categoryId: 'culturalHeritage',
-      groupid: 19,
       queryable: true,
-      useLegendGraphic: true,
     },
   ],
 };

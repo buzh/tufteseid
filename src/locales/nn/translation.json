@@ -129,28 +129,7 @@
     "road": "Veg"
   },
   "map": {
-    "errorMessage": "Noko gjekk gale med kartet",
-    "settings": {
-      "layers": {
-        "theme": {
-          "label": "Vel temakart",
-          "activeLayersCount": "Aktive lag",
-          "warningPerformance": "Aktivering av mange lag kan påverke ytinga. Vurder å deaktivere ubrukte lag.",
-          "resetbutton": {
-            "text": "Nullstill"
-          },
-          "subtheme": {
-            "toggleall": {
-              "addall": "Legg til alle",
-              "removeall": "Fjern alle"
-            }
-          }
-        }
-      }
-    }
-  },
-  "mapLayers": {
-    "label": "Temakart"
+    "errorMessage": "Noko gjekk gale med kartet"
   },
   "placeInfo": {
     "errorPlaceNameInfo": "Feil ved henting av stadnamninformasjon",
@@ -502,10 +481,29 @@
     },
     "heritage": {
       "label": "Kulturminne",
-      "tip": "Lokalitetar og enkeltminne"
-    },
-    "layers": {
-      "tip": "Alle kulturminne-lag"
+      "tip": "Lokalitetar og enkeltminne",
+      "settings": "Kulturminne: kjelder, vising og dekkevne",
+      "settingsShort": "Oppsett",
+      "sourcesHead": "Kjelder",
+      "renderHead": "Vising",
+      "subsetHead": "Berre desse",
+      "clear": "Slå av alle",
+      "opacity": "Dekkevne {{percent}} %",
+      "omrissHint": "grenselinjer, ingen fyll",
+      "detail": {
+        "lokaliteter": "Lokalitetar",
+        "enkeltminner": "Enkeltminne",
+        "sikringssoner": "Sikringssoner"
+      },
+      "render": {
+        "omriss": "Omriss",
+        "flate": "Heildekkjande",
+        "fredede": "Freda",
+        "verneverdige": "Verneverdige",
+        "listefoerte": "Listeførte",
+        "utenVern": "Utan vern",
+        "uavklart": "Uavklart vernestatus"
+      }
     },
     "flyfoto": {
       "datasetLabel": "Flyfotoprosjekt",
@@ -604,7 +602,9 @@
       "stretch": "kontraststrekk 2–98 %",
       "resampled": "resampla frå {{m}} m/px",
       "ortofoto": "ortofoto, ubehandla",
-      "composite": "sett saman av kartlaga"
+      "composite": "sett saman av kartlaga",
+      "heritageOpacity": "kulturminne {{percent}} % dekkevne",
+      "heritageNone": "ingen dellag"
     }
   }
 }

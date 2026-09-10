@@ -9,13 +9,40 @@ import {
   featureInfoPanelOpenAtom,
   featureInfoResultAtom,
 } from '../featureInfo/atoms';
+import {
+  type HeritageDetail,
+  heritageDetailsAtom,
+  heritageOpacityAtom,
+  type HeritageRender,
+  heritageRenderAtom,
+  heritageSitesParams,
+  writeHeritageUrlParameters,
+} from './heritage';
 import { getThemeLayerById, themeLayerConfig } from './themeLayerConfigApi';
 import { createThemeLayerFromConfig, ThemeLayerName } from './themeWMS';
 
 export const activeThemeLayersAtom = atom<Set<ThemeLayerName>>(new Set([]));
 
+/**
+ * The one theme layer whose WMS request the user can reshape. The other four
+ * RA services publish a single style each, so there is nothing to say about
+ * them beyond on/off and how strongly to draw them.
+ */
+const RESHAPEABLE: ThemeLayerName = 'heritageSites';
+
+const paramsFor = (
+  layerName: ThemeLayerName,
+  details: ReadonlySet<HeritageDetail>,
+  render: HeritageRender,
+) => (layerName === RESHAPEABLE ? heritageSitesParams(details, render) : null);
+
 export const themeLayerEffect = atomEffect((get) => {
   const themeLayers = get(activeThemeLayersAtom);
+  // Read, so changing any of them re-runs the effect and reshapes the layers
+  // already on the map. The add/remove diff below is a no-op on those runs.
+  const heritageDetails = get(heritageDetailsAtom);
+  const heritageRender = get(heritageRenderAtom);
+  const heritageOpacity = get(heritageOpacityAtom);
   const store = getDefaultStore();
   const map = store.get(mapAtom);
   const mapProjection = map.getView().getProjection().getCode();
@@ -54,10 +81,12 @@ export const themeLayerEffect = atomEffect((get) => {
       return;
     }
 
+    const params = paramsFor(layerName, heritageDetails, heritageRender);
     const layerToAdd = createThemeLayerFromConfig(
       themeLayerConfig,
       layerDef,
       mapProjection,
+      params ?? undefined,
     );
 
     if (!layerToAdd) {
@@ -99,5 +128,45 @@ export const themeLayerEffect = atomEffect((get) => {
     removeFromUrlListParameter('themeLayers', layerName);
   });
 
-  return;
+  // Reshape whatever is on the map now — including the layers just added, so
+  // one pass covers both "the settings changed" and "a source was switched
+  // on while they were already off default".
+  map
+    .getLayers()
+    .getArray()
+    .forEach((layer) => {
+      const id = layer.get('id');
+      if (typeof id !== 'string' || !id.startsWith('theme.')) return;
+      layer.setOpacity(heritageOpacity);
+
+      const layerName = id.substring(6) as ThemeLayerName;
+      if (layerName !== RESHAPEABLE) return;
+      const params = paramsFor(layerName, heritageDetails, heritageRender);
+      // Nothing selected renders nothing, so say so by hiding the layer
+      // rather than by sending a request whose only possible answer is a
+      // transparent tile.
+      layer.setVisible(params !== null);
+      if (!params) return;
+
+      const source = (layer as { getSource?: () => unknown }).getSource?.();
+      if (!isWmsSource(source)) return;
+      const current = source.getParams();
+      // updateParams invalidates the tile cache and re-requests the whole
+      // screen, so only when something actually moved: this effect also runs
+      // for unrelated theme-layer adds and removes.
+      if (current.LAYERS === params.LAYERS && current.STYLES === params.STYLES)
+        return;
+      source.updateParams(params);
+    });
+
+  writeHeritageUrlParameters(heritageDetails, heritageRender, heritageOpacity);
 });
+
+type WmsSource = {
+  getParams: () => Record<string, unknown>;
+  updateParams: (params: Record<string, unknown>) => void;
+};
+
+const isWmsSource = (source: unknown): source is WmsSource =>
+  typeof (source as WmsSource | null)?.updateParams === 'function' &&
+  typeof (source as WmsSource | null)?.getParams === 'function';

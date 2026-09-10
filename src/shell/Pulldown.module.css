@@ -70,8 +70,24 @@
   color: var(--c-accent);
 }
 
-/* Overflow group trigger — chevron first, same shape as the theme layer
-   picker's subtheme rows. */
+/* Checkbox rows. The glyph carries the state, so the row keeps the plain
+   background an active PulldownItem gives up — several of these are on at
+   once and highlighting them all would highlight nothing. */
+.checkOn {
+  color: var(--c-accent);
+}
+
+.checkOff {
+  color: var(--c-fg-subtle);
+}
+
+/* A source's own sublayers, one level in. The indent lands under the parent
+   row's label rather than its checkbox, so the two columns read as a tree. */
+.itemIndent {
+  padding-left: var(--sp-8);
+}
+
+/* Overflow group trigger — chevron first, otherwise an item's geometry. */
 .disclosure {
   display: flex;
   align-items: center;

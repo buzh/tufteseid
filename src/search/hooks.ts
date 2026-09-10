@@ -74,13 +74,12 @@ export const useMapClickSearch = () => {
   const mapClickHandler = useCallback(
     (e: MapBrowserEvent) => {
       const store = getDefaultStore();
-      const currentTool = store.get(mapToolAtom);
-      if (currentTool && currentTool !== 'layers') {
+      // A tool owns the map click while it is open. 'layers' used to be the
+      // exception — clicking the map dismissed the theme-layer card first and
+      // then acted normally — but that card is gone; the heritage settings
+      // are a popover now, which closes itself on any outside pointerdown.
+      if (store.get(mapToolAtom)) {
         return;
-      }
-
-      if (currentTool === 'layers') {
-        store.set(mapToolAtom, null);
       }
 
       if (isClusterClick(e)) {

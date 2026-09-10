@@ -1,4 +1,3 @@
-import i18n from 'i18next';
 import { ProjectionIdentifier } from '../../map/projections/types';
 
 export interface ParsedCoordinate {
@@ -246,13 +245,9 @@ const parseWithEPSG = (input: string): ParsedCoordinate | null => {
   const projection = toProjectionIdentifier(epsgCode);
   if (!projection) return null;
 
-  const translationKey = `map.settings.layers.projection.projections.${projection.replace(':', '').toLowerCase()}.displayName`;
-  const translated = i18n.t(translationKey);
-  const formatName = translated.startsWith(
-    'map.settings.layers.projection.projections',
-  )
-    ? projection
-    : translated;
+  // Upstream looked up a per-projection display name here; no locale in this
+  // fork ever carried those keys, so it always fell through to the EPSG code.
+  const formatName = projection;
 
   // Strip common label prefixes, then split into two numbers
   const coordsCleaned = coordsPart

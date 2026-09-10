@@ -12,7 +12,6 @@ export interface FieldConfig {
 
 export interface ThemeLayerCategory {
   id: string;
-  groupid: number;
   name: {
     nb: string;
     nn: string;
@@ -38,20 +37,13 @@ export interface ThemeLayerDefinition {
     en: string;
   };
   wmsUrl?: string;
-  legendUrl?: string;
   layers?: string;
   categoryId: string;
-  groupid: number;
   queryable?: boolean;
   styles?: string;
   infoFormat?: string;
   featureInfoImageBaseUrl?: string;
   featureInfoFields?: FieldConfig[];
-  useLegendGraphic?: boolean;
-  legendLayerNames?: string[];
-  filter?: string;
-  noLegend?: boolean;
-  singleImage?: boolean;
   extraWmsParams?: Record<string, string | number | boolean>;
   minZoom?: number;
 }
@@ -93,28 +85,6 @@ export const getEffectiveWmsUrl = (
   );
 };
 
-export const getMainCategories = (
-  config: ThemeLayerConfig,
-): ThemeLayerCategory[] => {
-  return config.categories.filter(isMainCategory);
-};
-
-export const getSubcategories = (
-  config: ThemeLayerConfig,
-  parentId: string,
-): ThemeLayerCategory[] => {
-  return config.categories.filter(
-    (cat) => cat.parentId === parentId && !isMainCategory(cat),
-  );
-};
-
-export const getDirectLayersForCategory = (
-  config: ThemeLayerConfig,
-  categoryId: string,
-): ThemeLayerDefinition[] => {
-  return config.layers.filter((layer) => layer.categoryId === categoryId);
-};
-
 export const getParentCategory = (
   config: ThemeLayerConfig,
   category: ThemeLayerCategory,
@@ -125,6 +95,17 @@ export const getParentCategory = (
   return getCategoryById(config, category.parentId);
 };
 
-export const isMainCategory = (category: ThemeLayerCategory): boolean => {
-  return !category.parentId;
+/**
+ * A layer's name in the user's language. Shared by the picker and the figure
+ * captions: a saved image lists the overlays that were on it, and the two
+ * naming the same layer differently would make a figure hard to reproduce
+ * from its own caption.
+ */
+export const themeLayerName = (id: string, language: string): string => {
+  const def = getThemeLayerById(themeLayerConfig, id);
+  if (!def) return id;
+  const lang = (['nb', 'nn', 'en'] as const).find((l) =>
+    language.startsWith(l),
+  );
+  return def.name[lang ?? 'nb'];
 };

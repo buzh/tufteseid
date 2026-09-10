@@ -1,0 +1,22 @@
+/*
+ * The opacity row at the foot of the Kulturminner submenu. Its own file
+ * rather than more of Pulldown.module.css: that one is rows in a list, and
+ * this is a control with a label above it.
+ */
+
+.opacity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4) var(--sp-4);
+}
+
+.opacityLabel {
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+.range {
+  width: 100%;
+  accent-color: var(--c-accent);
+}

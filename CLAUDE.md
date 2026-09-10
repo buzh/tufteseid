@@ -144,11 +144,32 @@ Config: `src/map/layers/config/themeLayers/culturalHeritage.ts`. Registered
 in `themeLayerConfigApi.ts` (added to `configs` array) and the layer id
 union in `themeWMS.ts` (`CulturalHeritageLayerName`).
 
-Five layers under the "Kulturminner" theme category (groupid 19), one per
-Riksantikvaren WMS service. URLs are same-origin (`/wms/ra/<name>`) and
-routed through `wmscache` to `kart.ra.no/wms/<name>`: `kulturminner2`
-(sites + monuments), `kulturmiljoer`, `sefrak`, `freda_bygninger`,
-`brukerminner`.
+Five layers under the "Kulturminner" theme category, one per Riksantikvaren
+WMS service. URLs are same-origin (`/wms/ra/<name>`) and routed through
+`wmscache` to `kart.ra.no/wms/<name>`: `kulturminner2` (sites + monuments),
+`kulturmiljoer`, `sefrak`, `freda_bygninger`, `brukerminner`.
+
+`kulturminner2` is the one the user can reshape rather than just switch on.
+`src/map/layers/heritage.ts` holds the WMS tables — which of its six sublayers
+each of the three registers (lokaliteter / enkeltminner / sikringssoner)
+expands to, and the STYLES value each render maps to per sublayer — plus the
+three atoms and their URL persistence. Everything in it was read off live
+GetCapabilities and confirmed with GetMap probes, because both failure modes
+are hard to read from the document: an **unpublished** style is a
+ServiceException (loud, but a wall of broken tiles), and a **published but
+empty** style is a valid transparent PNG (indistinguishable from "no data",
+which for a vern subset is the correct answer). Do not derive a style name
+from a render name — `Enkeltminner`'s default is the *fill* and `grenser` is
+its outline, the inverse of `Lokaliteter`, and `Lokalitetsikoner` spells its
+vern style `Uavklart` where every other sublayer spells it `uavklart`.
+
+Rendering is deliberately **one axis** (outlines / filled / five vern subsets),
+not two: STYLES takes a single value per LAYERS entry and RA publishes no
+filled variant of any subset, so "filled *and* fredede only" is not a request
+that exists. FILTER (the MapServer OGC vendor parameter) does work on kart.ra.no
+and would compose, but it needs the `vernetype` *text* vocabulary enumerated
+client-side — and a value missed there under-reports silently, where a wrong
+style is a ServiceException. UI contract: `docs/ui-architecture.md` §5.9.
 
 Feature-info: the category sets `infoFormat: 'application/vnd.ogc.gml'` so
 the existing `parseXmlFeatureInfo` (which handles MapServer `msGMLOutput`)
@@ -609,7 +630,8 @@ filled; UI consequences are `docs/ui-architecture.md` §8.3.
 2. Import + append to the `configs` array in
    `src/map/layers/themeLayerConfigApi.ts` inside `getThemeLayerConfig()`.
 3. Add the layer id(s) to a union in `src/map/layers/themeWMS.ts` and into
-   `ThemeLayerName`.
+   `ThemeLayerName`. It will appear in the Kulturminner "Oppsett" popover
+   automatically — that list is `themeLayerConfig.layers`.
 4. Route requests through `wmscache` rather than hitting the origin from the
    browser, and use the same-origin `/wms/<host-slug>/...` prefix as `wmsUrl`
    (recipe in `docs/wms-proxy-and-tiles.md`).
@@ -676,6 +698,14 @@ Deleted deliberately; if one of these reappears, something regressed.
   `font-family`. Mulish is self-hosted instead: `src/mainApp.tsx` imports the
   four `@fontsource/mulish` weights the kit asks for, and `src/index.css` sets
   the family on `body`. `font-src 'self'` is enough.
+- **The generic theme-layer tree** (`src/settings/map/themes/`,
+  `src/map/layers/themeLayers.ts`, `MapTool = 'layers'`) — categories,
+  expandable subthemes, per-subtheme "add all", a fifteen-layer performance
+  warning, and a whole card slot on top of the map to hold them, for one
+  category of five layers from one rights holder. Replaced by the Kulturminner
+  "Oppsett" popover in ribbon row 1, which offers the same five sources plus
+  the things the register can actually be asked (`docs/ui-architecture.md`
+  §5.9, §6.2).
 - **Dead dependencies**: `maplibre-gl` and `@geoblocks/ol-maplibre-layer`
   (OpenLayers is the map engine and is the right one for WMS + EPSG:25833;
   MapLibre is vector-tile-first and weak on non-Mercator projections), and
