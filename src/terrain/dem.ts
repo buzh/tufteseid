@@ -21,26 +21,59 @@ const IMAGE_SERVER_BASE = '/arcgis/hoydedata';
 // Mirrors activeLidarModelAtom on the map background.
 export type DemModel = 'dtm' | 'dom';
 
-// TOPOBATHY for DTM matches what the app's national LiDAR background and
-// searchApi.ts already use. DOM has no topobathy variant.
+// The *per-acquisition* mosaics, not the national ones. The national
+// NHM_DTM_TOPOBATHY_25833 / NHM_DOM_25833 are 1 m, and — measured, see
+// docs/terrain-analysis.md — they are also mixed: where NHM never flew,
+// their catalogue falls through to DTM10 rows carrying MINPS 0, so the
+// service happily serves 10 m data interpolated up to whatever cell size
+// you ask for. Nothing in the response says so.
+//
+// Prosjekt_DTM / Prosjekt_DOM are 0.25 m and honest about the same gaps:
+// their DTM10 rows carry MINPS 27, so below 27 m/px those rows drop out of
+// the mosaic and an uncovered pixel comes back as no-data. Coverage was
+// probed against the national mosaic at 120 random land points: 99 had real
+// LiDAR in both, 21 had it in neither (the national mosaic returning
+// DTM10, pixel-identical to its own LOWPS>=10 sub-mosaic), and **none** had
+// LiDAR nationally but not per-project. So this loses no laser data
+// anywhere — it only stops dressing 10 m contours up as terrain.
 const SERVICE: Record<DemModel, string> = {
-  dtm: 'NHM_DTM_TOPOBATHY_25833',
-  dom: 'NHM_DOM_25833',
+  dtm: 'Prosjekt_DTM',
+  dom: 'Prosjekt_DOM',
 };
 
-// The national mosaics are 1 m native; asking for finer just interpolates.
-const NATIVE_M_PER_PX = 1;
+// Where acquisitions overlap, take the finest. That is already Prosjekt_DTM's
+// service default (defaultMosaicMethod ByAttribute, sortField lowps), but
+// Prosjekt_DOM defaults to Northwest — which picks by where a raster sits
+// rather than by what it is worth — so the rule has to be stated to make the
+// two models behave the same.
+const MOSAIC_RULE = JSON.stringify({
+  mosaicMethod: 'esriMosaicAttribute',
+  sortField: 'lowps',
+  sortValue: 0,
+});
+
+// The finest the per-project services publish, and the target when the
+// coverage probe below can't say better. Acquisitions come in 0.25, 0.5 and
+// 1 m; asking for 0.25 m over a 0.5 m project is four times the pixels — and
+// four times the sky-view factor — for interpolation, which is the same
+// mistake as the national mosaic one notch down.
+const FINEST_M_PER_PX = 0.25;
 
 // Cap the assembled grid. Unlike a canvas extract this is a Float32Array we
 // then run neighbourhood operators over several times, so the ceiling is
 // about working memory and CPU, not just allocation: 3000² is 36 MB and a
 // sky-view factor pass over it is already a few seconds. planTiles scales
 // resolution down to fit, so a huge lokalitet still works — just coarser.
+//
+// Unchanged by the move to 0.25 m sources, so nothing comes back coarser
+// than it used to. Small rectangles do get up to four times finer, which is
+// sixteen times the pixels — the panel prints the resolution it settled on
+// precisely because that trade is now visible in how long a render takes.
 const MAX_DEM_PX_PER_SIDE = 3000;
 
-// Well under the service's declared maxImageWidth/Height of 4096 for the
-// national mosaics; planTiles' own MAX_TILE_PX (2048) is what actually
-// bounds a single request.
+// Well under the per-project services' declared maxImageWidth/Height of
+// 15000; planTiles' own MAX_TILE_PX (2048) is what actually bounds a single
+// request.
 const MAX_CONCURRENT = 3;
 const TILE_RETRIES = 3;
 
@@ -52,6 +85,12 @@ export type Dem = {
   data: Float32Array;
   bbox25833: [number, number, number, number];
   metresPerPx: number;
+  // What the finest acquisition covering the rectangle actually publishes.
+  // Equal to metresPerPx when the grid fits under MAX_DEM_PX_PER_SIDE, and
+  // finer than it when the rectangle was too large and had to be sampled
+  // down — the difference is the only way to tell "this is all the detail
+  // there is" from "there is more, ask for a smaller area".
+  nativeMetresPerPx: number;
   model: DemModel;
 };
 
@@ -74,8 +113,95 @@ function buildUrl(
     // what a hillshade amplifies.
     interpolation: 'RSP_BilinearInterpolation',
     renderingRule: JSON.stringify({ rasterFunction: 'None' }),
+    mosaicRule: MOSAIC_RULE,
   });
   return `${IMAGE_SERVER_BASE}/${SERVICE[model]}/ImageServer/exportImage?${params.toString()}`;
+}
+
+// ---------------------------------------------------------------------------
+// Coverage probe
+// ---------------------------------------------------------------------------
+//
+// One ~200-byte catalogue query, before any pixels, asking the mosaic
+// catalogue for the finest OPPLOSNING among the acquisitions intersecting
+// the rectangle. Two answers come out of it: what resolution is worth
+// requesting, and whether there is any laser data here at all.
+//
+// It reads the *envelope*, so an acquisition clipping one corner sets the
+// target for the whole grid. That errs towards detail rather than away from
+// it, which is the right way to be wrong here.
+
+// 'none' is the catalogue answering that nothing covers this. 'unknown' is
+// the probe itself failing, which must not be reported as an absence — fall
+// back to the finest and let the tiles decide.
+type Coverage = { metresPerPx: number } | 'none' | 'unknown';
+
+// wmscache declines to store responses under 1000 bytes (see
+// nginx/wms-proxy-common.conf — the rule that keeps WMS error bodies out of
+// a 180-day cache), and this response is nowhere near that. Memoise in-tab
+// instead: "Juster området" refetches the DEM on every resize and the
+// catalogue does not change between two of them.
+const coverageCache = new Map<string, Promise<Coverage>>();
+
+function probeCoverage(
+  model: DemModel,
+  bbox25833: [number, number, number, number],
+  signal?: AbortSignal,
+): Promise<Coverage> {
+  const key = `${model}|${bbox25833.map((v) => Math.round(v)).join(',')}`;
+  const hit = coverageCache.get(key);
+  if (hit) return hit;
+
+  const params = new URLSearchParams({
+    f: 'json',
+    geometry: JSON.stringify({
+      xmin: bbox25833[0],
+      ymin: bbox25833[1],
+      xmax: bbox25833[2],
+      ymax: bbox25833[3],
+      spatialReference: { wkid: 25833 },
+    }),
+    geometryType: 'esriGeometryEnvelope',
+    inSR: '25833',
+    spatialRel: 'esriSpatialRelIntersects',
+    // The catalogue also holds the 10 m fallback rows, which have no
+    // OPPLOSNING. Excluding them is what makes a null answer mean "no laser
+    // data" rather than "no laser data but plenty of contour model".
+    where: 'OPPLOSNING IS NOT NULL',
+    outStatistics: JSON.stringify([
+      {
+        statisticType: 'min',
+        onStatisticField: 'OPPLOSNING',
+        outStatisticFieldName: 'best',
+      },
+    ]),
+    returnGeometry: 'false',
+  });
+  const url = `${IMAGE_SERVER_BASE}/${SERVICE[model]}/ImageServer/query?${params.toString()}`;
+
+  const pending = (async (): Promise<Coverage> => {
+    const res = await fetch(url, { signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.json();
+    if (body?.error) throw new Error('catalogue query rejected');
+    // Two quirks of the reply, both load-bearing: the service upper-cases
+    // outStatisticFieldName, and "nothing covers this" arrives as one
+    // feature holding a *null* statistic, not as an empty features array.
+    const attrs = body?.features?.[0]?.attributes;
+    const best = attrs ? (attrs.BEST ?? attrs.best) : null;
+    if (typeof best !== 'number' || !(best > 0)) return 'none';
+    return { metresPerPx: best };
+  })();
+
+  // A failed probe must not be remembered — the next attempt should get to
+  // ask again — but the result of a successful one is a fact about the
+  // catalogue and keeps.
+  const guarded = pending.catch((): Coverage => {
+    coverageCache.delete(key);
+    return 'unknown';
+  });
+  coverageCache.set(key, guarded);
+  return guarded;
 }
 
 export type FetchDemOptions = {
@@ -96,7 +222,15 @@ export async function fetchDem(
     number,
   ];
 
-  const plan = planTiles(bbox25833, NATIVE_M_PER_PX, MAX_DEM_PX_PER_SIDE);
+  const coverage = await probeCoverage(model, bbox25833, signal);
+  // The catalogue said nothing covers this. Same answer as an all-sparse
+  // stitch, arrived at for one small request instead of a screenful of
+  // multi-megabyte ones.
+  if (coverage === 'none') return null;
+  const nativeMetresPerPx =
+    coverage === 'unknown' ? FINEST_M_PER_PX : coverage.metresPerPx;
+
+  const plan = planTiles(bbox25833, nativeMetresPerPx, MAX_DEM_PX_PER_SIDE);
   const data = new Float32Array(plan.widthPx * plan.heightPx);
   // Absent tiles must read as no-data, not as sea level: a failed or
   // uncovered tile left at 0 would be a cliff edge in every derivative.
@@ -140,6 +274,7 @@ export async function fetchDem(
     data,
     bbox25833,
     metresPerPx: (bbox25833[2] - bbox25833[0]) / plan.widthPx,
+    nativeMetresPerPx,
     model,
   };
 }

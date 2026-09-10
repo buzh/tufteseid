@@ -34,14 +34,15 @@ So the unlock is getting float elevation into our hands.
 elevation grid, anonymously, no token:
 
 ```
-GET https://hoydedata.no/arcgis/rest/services/NHM_DTM_TOPOBATHY_25833/ImageServer/exportImage
-    ?bbox=262000,6649000,263000,6650000
+GET https://hoydedata.no/arcgis/rest/services/Prosjekt_DTM/ImageServer/exportImage
+    ?bbox=262000,6649000,262300,6649300
     &bboxSR=25833&imageSR=25833
-    &size=1000,1000
+    &size=1200,1200
     &format=tiff&pixelType=F32
     &renderingRule={"rasterFunction":"None"}
+    &mosaicRule={"mosaicMethod":"esriMosaicAttribute","sortField":"lowps","sortValue":0}
     &f=image
-→ 200 image/tiff, 4.2 MB, 1000×1000, 32-bit float, 1 m/px
+→ 200 image/tiff, 6.4 MB, 1200×1200, 32-bit float, 0.25 m/px
 ```
 
 `renderingRule` matters: the service's other raster function is `skyggerelieff`,
@@ -49,15 +50,17 @@ i.e. the same shaded product the WMS serves. `None` is what gets you values.
 
 Facts worth not re-deriving:
 
-- **The services we care about** are `NHM_DTM_TOPOBATHY_25833` (matches the
-  app's existing national background and `searchApi.ts`), `NHM_DOM_25833`
-  (surface model — the counterpart to `activeLidarModelAtom`'s DOM), and
-  `Prosjekt_DTM` / `Prosjekt_DOM` (per-acquisition). `25832` and `25835`
-  variants exist for the other UTM zones; we're 25833 throughout.
+- **The services we care about** are `Prosjekt_DTM` / `Prosjekt_DOM`
+  (per-acquisition, 0.25 m — what `src/terrain/dem.ts` fetches) and the
+  national `NHM_DTM_TOPOBATHY_25833` / `NHM_DOM_25833` (1 m — what the app's
+  LiDAR background and `searchApi.ts` use). `25832` and `25835` variants exist
+  for the other UTM zones; we're 25833 throughout. Why the per-project pair
+  won: the coverage probe below.
 - **Request-size caps differ.** The national mosaics declare
   `maxImageWidth/Height: 4096`; `Prosjekt_DTM` declares **15000**. A
-  lokalitet-sized bbox is one request either way, but tile against 4096 so the
-  national path stays correct.
+  lokalitet-sized bbox is one request either way, and `planTiles`' own
+  `MAX_TILE_PX` (2048) is what actually bounds a single request — but tile
+  against 4096 if the national path is ever used again.
 - **The output TIFF is a very narrow subset of the format.** Always
   little-endian, `Compression: 1` (none), `BitsPerSample: 32`,
   `SampleFormat: 3` (IEEE float), `SamplesPerPixel: 1`, `PlanarConfig: 1`,
@@ -73,11 +76,14 @@ Facts worth not re-deriving:
   `TileByteCounts: [0]`. Absent tile, not an error. The `noData` query
   parameter has no observable effect on this endpoint; don't bother passing
   it.
-- **Water inside a covered tile reads as exactly `0.0`**, in bulk. Despite
-  the TOPOBATHY name, sea areas near shore come back as a flat zero plane
-  rather than bathymetry. Harmless for a land lokalitet, but it will flatten
-  the histogram of any bbox with a fjord in it, so relief stretches should be
-  computed on percentiles rather than min/max.
+- **Water inside a covered tile reads as exactly `0.0`**, in bulk — a flat
+  zero plane rather than bathymetry, even on the mosaic named TOPOBATHY.
+  (Open water past the laser's reach is not covered at all: at 1 m/px a bbox
+  out in Skagerrak comes back fully sparse from national and per-project
+  alike, so the bathymetry rows must sit behind a `MINPS` of their own.)
+  Harmless for a land lokalitet, but it will flatten the histogram of any
+  bbox with a fjord in it, so relief stretches should be computed on
+  percentiles rather than min/max.
 - **Georeferencing is exactly what you asked for.** `ModelPixelScale` is the
   requested resolution and `ModelTiepoint` maps raster (0,0) to the bbox's
   north-west corner. There's no need to parse the GeoTIFF geo-tags at all —
@@ -86,11 +92,83 @@ Facts worth not re-deriving:
   is available the same way per-project ortofoto works. One difference from
   the NiB recipe: its `allowedMosaicMethods` are `ByAttribute,NorthWest,
   LockRaster` — **`esriMosaicNone` is not in the list**, so the `mosaicRule`
-  used for flyfoto won't transfer verbatim. Needs a probe before building on
-  it.
+  used for flyfoto won't transfer verbatim.
 - **A standards-based alternative exists** if the ArcGIS dependency ever
   bothers us: `wcs.geonorge.no/skwms1/wcs.hoyde-dtm-nhm-25833` answers
   GetCapabilities. Untested beyond that.
+
+### Which mosaic: the coverage-edge probe (measured 2026-09-10)
+
+The analysis originally pinned the **national** 1 m mosaic. It now uses the
+**per-project** 0.25 m one, and the switch turned out to cost nothing. What
+the measurements said:
+
+- **The national mosaic is not a 1 m LiDAR product — it is a blend.** Its
+  catalogue holds NHM laser tiles (`33-158-182`, LOWPS 1, ZORDER −300), DTM10
+  tiles (`7607_1_10m_z33`, LOWPS 10, ZORDER −200) and DTM50, and the DTM10
+  rows carry **`MINPS: 0`**. There is no lower cell size at which they stop
+  participating, so wherever NHM never flew, `exportImage` serves 10 m
+  contour-derived elevation resampled up to whatever you asked for. HTTP 200,
+  correct georeferencing, no flag anywhere in the response. This is the real
+  cause of "the analysis looks softer than the pre-rendered hillshade".
+- **The per-project mosaic is honest about the same gaps.** Its DTM10 rows
+  carry **`MINPS: 27`**, so below 27 m/px they drop out and an uncovered pixel
+  comes back as an absent tile → NaN, which `fetchDem` already handles.
+- **Coverage is identical where it matters.** 120 random land points, 128 m
+  window at 1 m/px, comparing three fetches per point — national default,
+  national restricted to `LOWPS>=10`, and per-project:
+
+  | | per-project has data | per-project empty |
+  |---|---|---|
+  | **national serves real 1 m** | 99 | **0** |
+  | **national serves DTM10** (pixel-identical to its own `LOWPS>=10` mosaic) | 0 | 21 |
+
+  Not one point had laser data nationally and not per-project. So the switch
+  loses no LiDAR anywhere; in the ~18 % of land where the national mosaic was
+  answering with DTM10, the tool now says "ingen laserdata" instead of drawing
+  a smooth lie. **Don't add a fallback to the national mosaic** — the only
+  thing it could contribute is exactly that 10 m data.
+- **Do not trust the catalogue for coverage; trust the pixels.** A point can
+  intersect a LOWPS 1 tile's footprint and still be served DTM10 — those tiles
+  are large and internally sparse. The `LOWPS>=10` comparison fetch is the
+  reliable detector.
+- **`Prosjekt_DOM` defaults to `Northwest`** (`sortField` empty), unlike
+  `Prosjekt_DTM`'s `ByAttribute` / `lowps`. `dem.ts` therefore sends an
+  explicit `mosaicRule` — `{"mosaicMethod":"esriMosaicAttribute",
+  "sortField":"lowps","sortValue":0}` — so both models resolve overlaps to the
+  finest raster.
+- **Resolution is probed, not assumed.** Acquisitions are 0.25, 0.5 or 1 m;
+  requesting 0.25 m over a 0.5 m project is 4× the pixels and 4× the sky-view
+  factor for pure interpolation. One catalogue query answers it:
+
+  ```
+  GET .../Prosjekt_DTM/ImageServer/query
+      ?geometry={envelope}&geometryType=esriGeometryEnvelope&inSR=25833
+      &spatialRel=esriSpatialRelIntersects
+      &where=OPPLOSNING IS NOT NULL
+      &outStatistics=[{"statisticType":"min","onStatisticField":"OPPLOSNING",
+                       "outStatisticFieldName":"best"}]
+      &returnGeometry=false&f=json
+  → {"features":[{"attributes":{"BEST":0.25}}]}
+  ```
+
+  Sampled over 45 land points: 0.25 m at 19, 0.5 m at 18, no coverage at 8.
+  Two quirks: the reply **upper-cases** `outStatisticFieldName`, and
+  no-coverage arrives as one feature with `"BEST": null`, *not* as an empty
+  `features` array. The same query doubles as the cheap "is there anything
+  here" check, before any megabytes move. It is ~200 bytes, which is under
+  wmscache's 1000-byte store threshold, so `dem.ts` memoises it in-tab
+  instead.
+- **The cost of the switch is pixels.** `MAX_DEM_PX_PER_SIDE` is unchanged at
+  3000, so nothing comes back coarser than before — but a small rectangle that
+  used to be 300² at 1 m is now 1200² at 0.25 m, i.e. 16× the download and 16×
+  the neighbourhood work. That is the trade being bought, and it is why the
+  panel prints both the effective and the source resolution.
+- **`returnDistinctValues=true` does work here** — unlike on NiB's ImageServer,
+  where it silently returns zero features — but it **ignores
+  `returnGeometry=false`** and ships full footprint rings with every distinct
+  value, which is kilobytes to megabytes for the same one number.
+  `outStatistics` is the one to use.
 
 ### Proxying
 

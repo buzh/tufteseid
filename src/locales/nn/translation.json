@@ -409,6 +409,7 @@
       "zFactor": "Overdriving",
       "opacity": "Dekkraft",
       "resolution": "{{m}} m/px · {{w}}×{{h}}",
+      "resolutionCapped": "{{m}} m/px · {{w}}×{{h}} · kjelde {{src}} m",
       "reframe": "Analyser utsnittet",
       "save": "Lagre som bilete",
       "saveNew": "Lagre som ny lokalitet",

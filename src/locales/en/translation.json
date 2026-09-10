@@ -409,6 +409,7 @@
       "zFactor": "Exaggeration",
       "opacity": "Opacity",
       "resolution": "{{m}} m/px · {{w}}×{{h}}",
+      "resolutionCapped": "{{m}} m/px · {{w}}×{{h}} · source {{src}} m",
       "reframe": "Analyse this view",
       "save": "Save as image",
       "saveNew": "Save as new lokalitet",
