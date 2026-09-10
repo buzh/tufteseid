@@ -1,21 +1,12 @@
-import {
-  Box,
-  Flex,
-  Heading,
-  HStack,
-  IconButton,
-  Text,
-  Tooltip,
-  VStack,
-} from '@kvib/react';
-
 import { useAtom } from 'jotai';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LocalitiesPanel } from '../../localities/LocalitiesPanel';
 import { MapThemes } from '../../settings/map/themes/MapThemes';
-import { useIsMobileScreen } from '../../shared/hooks';
+import { CountBadge, IconButton, Tooltip } from '../../ui';
 import { activeThemeLayersAtom } from '../layers/atoms';
 import { mapToolAtom } from './atoms';
+import styles from './MapToolCards.module.css';
 
 const MapLayersCardHeader = () => {
   const { t } = useTranslation();
@@ -23,76 +14,34 @@ const MapLayersCardHeader = () => {
     activeThemeLayersAtom,
   );
   return (
-    <HStack mb={{ base: '0', md: '2' }} h={6}>
-      <Heading fontWeight="bold" size="md">
-        {t('mapLayers.label')}
-      </Heading>
+    <div className={styles.layersHeader}>
+      <h2 className={styles.title}>{t('mapLayers.label')}</h2>
       {activeThemeLayers.size > 0 && (
-        <HStack gap={0.5}>
-          <Text
-            backgroundColor={'#FFDD9D'}
-            borderRadius="full"
-            borderWidth={'2px'}
-            borderColor={'white'}
-            px={2}
-            py={0.5}
-            pointerEvents={'none'}
-            fontSize={'sm'}
-          >
-            {activeThemeLayers.size}
-          </Text>
-          <Tooltip content={t('map.settings.layers.theme.resetbutton.text')}>
+        <>
+          <CountBadge count={activeThemeLayers.size} palette="yellow" />
+          <Tooltip label={t('map.settings.layers.theme.resetbutton.text')}>
             <IconButton
-              variant="tertiary"
-              colorPalette={'red'}
-              size={'md'}
-              visibility={activeThemeLayers.size > 0 ? 'visible' : 'hidden'}
-              onClick={() => {
-                setActiveThemeLayers(new Set());
-              }}
-              icon={'playlist_remove'}
+              icon="playlist_remove"
+              palette="red"
+              aria-label={t('map.settings.layers.theme.resetbutton.text')}
+              onClick={() => setActiveThemeLayers(new Set())}
             />
           </Tooltip>
-        </HStack>
+        </>
       )}
-    </HStack>
-  );
-};
-
-const MapToolCardHeader = ({ label }: { label: string | React.ReactNode }) => {
-  const isLabelString = typeof label === 'string';
-  return isLabelString ? (
-    <Heading
-      fontWeight="bold"
-      mb={{ base: '0', md: '2' }}
-      size={{ base: 'sm', md: 'md' }}
-    >
-      {label}
-    </Heading>
-  ) : (
-    <>{label}</>
+    </div>
   );
 };
 
 export const MapToolCards = () => {
-  return (
-    <Box pointerEvents={'none'} w="100%">
-      <MapToolCardsBody />
-    </Box>
-  );
-};
-
-const MapToolCardsBody = () => {
   const { t } = useTranslation();
   const [currentMapTool, setCurrentMapTool] = useAtom(mapToolAtom);
 
-  const onClose = () => {
-    setCurrentMapTool(null);
-  };
+  const onClose = () => setCurrentMapTool(null);
 
   if (currentMapTool === 'layers') {
     return (
-      <MapToolCard label={<MapLayersCardHeader />} onClose={onClose}>
+      <MapToolCard header={<MapLayersCardHeader />} onClose={onClose}>
         <MapThemes />
       </MapToolCard>
     );
@@ -100,59 +49,42 @@ const MapToolCardsBody = () => {
 
   if (currentMapTool === 'localities') {
     return (
-      <MapToolCard label={t('localities.panel.tabHeading')} onClose={onClose}>
+      <MapToolCard
+        header={
+          <h2 className={styles.title}>{t('localities.panel.tabHeading')}</h2>
+        }
+        onClose={onClose}
+      >
         <LocalitiesPanel />
       </MapToolCard>
     );
   }
+
+  return null;
 };
 
-interface MapToolCardProps {
-  label: string | React.ReactNode;
-  children: React.ReactNode | React.ReactNode[] | undefined;
-  onClose: () => void;
-  hideHeader?: boolean;
-}
 const MapToolCard = ({
-  label,
+  header,
   children,
   onClose,
-  hideHeader,
-}: MapToolCardProps) => {
-  const isMobile = useIsMobileScreen();
-
+}: {
+  header: ReactNode;
+  children: ReactNode;
+  onClose: () => void;
+}) => {
+  const { t } = useTranslation();
   return (
-    <VStack
-      width="100%"
-      maxWidth={{ base: '100%', md: '345px' }}
-      maxHeight={isMobile ? '80dvh' : '100%'}
-      pointerEvents="auto"
-      bg="#FFFF"
-      shadow="lg"
-      p={4}
-      m={{ base: 0, md: 1 }}
-      mr={{ base: 0, md: 3 }}
-      borderRadius="16px"
-      borderBottomLeftRadius={{ base: '0px', md: '16px' }}
-      borderBottomRightRadius={{ base: '0px', md: '16px' }}
-      overflowY="auto"
-    >
-      <Flex justify="space-between" gap="2" w="100%" align="center">
-        {!hideHeader ? <MapToolCardHeader label={label} /> : <Box />}
-
+    <div className={styles.card}>
+      <div className={styles.head}>
+        {header}
         <IconButton
-          variant="ghost"
           icon="close"
-          aria-label="Lukk"
-          colorPalette="red"
+          palette="red"
+          aria-label={t('shared.close')}
           onClick={onClose}
-          size={{ base: 'xs', md: 'sm' }}
         />
-      </Flex>
-
-      <Box w="100%" overflowY="auto" maxHeight="90%">
-        {children}
-      </Box>
-    </VStack>
+      </div>
+      <div className={styles.body}>{children}</div>
+    </div>
   );
 };

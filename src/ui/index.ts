@@ -6,6 +6,7 @@
  * Import from 'src/ui' rather than the individual files so the eventual
  * additions and removals are invisible to call sites.
  */
+export { Alert, type AlertTone } from './Alert';
 export { Badge, CountBadge, type BadgePalette } from './Badge';
 export {
   Button,

@@ -1,14 +1,3 @@
-import {
-  Accordion,
-  AccordionItem,
-  AccordionItemContent,
-  AccordionItemTrigger,
-  Alert,
-  Flex,
-  Heading,
-  Text,
-  VStack,
-} from '@kvib/react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -22,6 +11,8 @@ import {
   useThemeLayers,
 } from '../../../map/layers/themeLayers';
 import { ThemeLayerName } from '../../../map/layers/themeWMS';
+import { Alert, Section } from '../../../ui';
+import styles from './MapThemes.module.css';
 import { LayerLine, SubThemeSection } from './SubTheme';
 import { SubTheme, Theme } from './types';
 
@@ -120,76 +111,64 @@ export const MapThemes = () => {
     [addThemeLayerToMap, removeThemeLayerFromMap, isLayerChecked],
   );
 
+  const toggleExpanded = useCallback((name: string) => {
+    setExpandedItems((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
+    );
+  }, []);
+
   return (
-    <VStack gap={0} align="stretch">
+    <div className={styles.root}>
       {showLimitWarning && (
-        <Alert status="info" marginTop={2}>
-          <Text fontSize="sm">
-            {t('map.settings.layers.theme.warningPerformance')}
-          </Text>
+        <Alert tone="info">
+          {t('map.settings.layers.theme.warningPerformance')}
         </Alert>
       )}
 
-      <Accordion
-        collapsible
-        multiple
-        size="sm"
-        variant="outline"
-        value={expandedItems}
-        onValueChange={(details) => setExpandedItems(details.value)}
-        lazyMount
-        unmountOnExit
-      >
-        {configThemeLayers.map((theme) => {
-          const activeInCategory = getActiveCategoryCount(theme);
-          const totalInCategory = getTotalCategoryLayers(theme);
-          const defaultOpen =
-            theme.subThemes.length === 1 && theme.directLayers.length === 0;
+      {configThemeLayers.map((theme) => {
+        const activeInCategory = getActiveCategoryCount(theme);
+        const totalInCategory = getTotalCategoryLayers(theme);
+        const defaultOpen =
+          theme.subThemes.length === 1 && theme.directLayers.length === 0;
 
-          return (
-            <AccordionItem key={theme.name} value={theme.name}>
-              <AccordionItemTrigger>
-                <Flex
-                  justifyContent="space-between"
-                  width="100%"
-                  alignItems="center"
-                >
-                  <Heading size={{ base: 'sm', md: 'md' }}>
-                    {theme.heading}
-                  </Heading>
-                  {activeInCategory > 0 && (
-                    <Text fontSize="sm" colorPalette="green" marginLeft={2}>
-                      ({activeInCategory}/{totalInCategory})
-                    </Text>
-                  )}
-                </Flex>
-              </AccordionItemTrigger>
-              <AccordionItemContent>
-                {theme.subThemes.map((subTheme) => (
-                  <SubThemeSection
-                    key={subTheme.name}
-                    subTheme={subTheme}
-                    toggleLayer={toggleLayer}
-                    defaultOpen={defaultOpen}
-                  />
-                ))}
-                {theme.directLayers.map((layer) => (
-                  <LayerLine
-                    key={layer.name}
-                    toggleLayer={toggleLayer}
-                    layer={layer}
-                    checked={isLayerChecked(layer.name)}
-                    disabled={
-                      !isLayerChecked(layer.name) &&
-                      activeCount >= WARNING_THRESHOLD
-                    }
-                  />
-                ))}
-              </AccordionItemContent>
-            </AccordionItem>
-          );
-        })}
-      </Accordion>
-    </VStack>
+        return (
+          <Section
+            key={theme.name}
+            title={theme.heading}
+            open={expandedItems.includes(theme.name)}
+            onOpenChange={() => toggleExpanded(theme.name)}
+            count={
+              activeInCategory > 0
+                ? `${activeInCategory}/${totalInCategory}`
+                : null
+            }
+            countPalette="green"
+            className={styles.theme}
+            bodyClassName={styles.themeBody}
+          >
+            {theme.subThemes.map((subTheme) => (
+              <SubThemeSection
+                key={subTheme.name}
+                subTheme={subTheme}
+                toggleLayer={toggleLayer}
+                defaultOpen={defaultOpen}
+              />
+            ))}
+            {theme.directLayers.map((layer) => (
+              <LayerLine
+                key={layer.name}
+                toggleLayer={toggleLayer}
+                layer={layer}
+                checked={isLayerChecked(layer.name)}
+                disabled={
+                  !isLayerChecked(layer.name) &&
+                  activeCount >= WARNING_THRESHOLD
+                }
+              />
+            ))}
+          </Section>
+        );
+      })}
+    </div>
   );
 };

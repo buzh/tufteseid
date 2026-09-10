@@ -89,9 +89,10 @@ kit — plain CSS Modules over custom properties, no new npm dependency, because
 `package-lock.json` cannot be regenerated on the workstation this is developed
 on. It exports `Button` / `IconButton`, `Badge` / `CountBadge`, `Popover`,
 `Dialog`, `Tooltip`, `Switch`, `Segmented`, `Section`, `Field` (`Input` +
-`NoteInput`), `ConfirmPopover`, `Spinner`, `Icon`, `toast` / `Toaster`, `cx`,
-`useMediaQuery` and `overlayAtoms`. The shell, the lokalitet surfaces and the
-analysis panels are all on it.
+`NoteInput`), `ConfirmPopover`, `Alert`, `Spinner`, `Icon`, `toast` /
+`Toaster`, `cx`, `useMediaQuery` and `overlayAtoms`. The shell, the lokalitet
+surfaces, the analysis panels, the map tool cards and the help page are all on
+it.
 
 `src/ui/tokens.css` is the single source for colour, spacing, radius, shadow,
 control heights and — the one that was genuinely scattered before — the
@@ -126,9 +127,9 @@ worked example: re-pointing two variables is the app's entire dark theme, and
 `Button.module.css` needed no dark variant.
 
 `<KvibProvider>` is still mounted, and kvib still carries what has not been
-ported: drawing (`src/draw/**`), search results and the infobox, the help page,
-the language switcher and `MapToolCards`. There is no dark mode in either
-system — the extract viewer's dark chrome is local, not a mode.
+ported: drawing (`src/draw/**`) and the search results + infobox. There is no
+dark mode in either system — the extract viewer's dark chrome is local, not a
+mode.
 
 Hand-written CSS is now the `src/ui/*.module.css` files plus one module per
 ported component, on top of `src/index.css` and `src/map/map.css`
@@ -255,9 +256,8 @@ lidar extract selection 7, locality adjust 8. The fractional 4.5 is the tell
 that this ladder grew by insertion rather than design.
 
 **DOM `zIndex`** (chrome) is now named in `src/ui/tokens.css` and listed in §2.
-The two remaining raw numbers are kvib's: `BottomDrawToolSelector` at `1000`
-(which `--z-fixed` matches deliberately) and the language switcher's
-`SelectContent` at `9999`.
+One raw number is left, kvib's: `BottomDrawToolSelector` at `1000`, which
+`--z-fixed` matches deliberately.
 
 ---
 
@@ -535,19 +535,20 @@ The bbox stays **authored, not derived**: the viewport only seeds it, and
 `'measure'` → nothing (measure lives in a ribbon popover; the enum member is
 vestigial and the switch falls through to `undefined`).
 
-`MapToolCard` is the shared shell: white card, `maxWidth` 345px on desktop /
-full width on mobile, `maxHeight` `80dvh` mobile / `100%` desktop (the slot has
-a definite height now, §3.1), 16px radius squared off at the bottom on mobile,
-`pointerEvents="auto"`, a close IconButton. `MapToolCardProps.hideHeader` is
-declared and handled but **never passed** — dead prop.
+`MapToolCard` is the shared shell: white card, `max-height: 100%` against the
+slot's definite height (§3.1), `pointer-events: auto` against the slot's
+`none`, a heading and a close IconButton. Width is the slot's — the old
+`maxWidth: 345px` was a second guess at the same number `.left` already
+enforces. The `hideHeader` prop went with the port: declared and handled, never
+passed.
 
 The card slot no longer arbitrates with the lokalitet workspace: the workspace
 is in the ribbon, so search and the cards simply render, and `mapToolAtom` only
-has to keep the cards exclusive with each other. This card and everything under
-it is one of the surfaces still on kvib.
+has to keep the cards exclusive with each other.
 
-The layers card has a bespoke header (`MapLayersCardHeader`) showing the active
-theme-layer count in a hardcoded-amber pill with a "clear all" button.
+The layers card has a bespoke header (`MapLayersCardHeader`): the active
+theme-layer count as a `CountBadge`, plus a "clear all" button that appears
+only when there is something to clear.
 
 ### 6.2 The theme picker
 
@@ -560,6 +561,14 @@ without losing anything a user sees today, but check `themeLayerConfigApi.ts`
 first in case new categories are planned.
 
 Selecting a theme layer promotes it to `setZIndex(10)`, above everything else.
+
+Three heading levels stack in one 400 px column — theme, subtheme, layer — and
+each of the first two is a controlled `Section`. The size step that separates
+them rides on `--section-title-size`, set on the theme's `Section` and put back
+on its body, because custom properties inherit and would otherwise carry into
+the subtheme headings nested inside. A layer row is the kit `Switch` with its
+label reversed to the left by CSS, so the switch's own `<label>` spans the row
+and there is no second click handler on a wrapper.
 
 ### 6.3 What does not exist
 
@@ -950,25 +959,38 @@ ribbon, the lokalitet surfaces (`FunnList`, `BilderSection`,
 `KulturminnerSection`, `LocalityDetails`, `LocalityDialogs`, `FunnDraft`,
 `LocalitiesPanel`), both analysis panels, `AuthButton`, `AuthDialog`,
 `ErrorBoundary`, the measure trigger, the toast region, `MapComponent`,
-`SearchComponent`, `KulturminnerPopup` and `LidarExtractViewer`. So
-`src/terrain/`, `src/settings/draw/`, `src/auth/`, `src/lidarExtract/`,
-`src/localities/` and `src/map/` bar `MapToolCards` are all clear.
+`SearchComponent`, `KulturminnerPopup`, `LidarExtractViewer`, `MapToolCards`,
+`MapThemes`/`SubTheme`, `HelpPage` and `LanguageSwitcher`. So `src/terrain/`,
+`src/settings/`, `src/auth/`, `src/lidarExtract/`, `src/localities/`,
+`src/help/`, `src/languageswitcher/` and `src/map/` are all clear.
 
-Still on kvib — 29 surfaces, and each row is a separate piece of work (plus
-`src/ui/Icon.tsx`, which re-exports the `MaterialSymbol` union, and
-`src/mainApp.tsx`, which mounts the provider; those two are the strip itself):
+Still on kvib — 24 surfaces in two subsystems (plus `src/ui/Icon.tsx`, which
+re-exports the `MaterialSymbol` union, and `src/mainApp.tsx`, which mounts the
+provider; those two are the strip itself):
 
 | Surface | Size | Note |
 |---|---|---|
 | `src/search/**` | 15 files, ~3200 lines | results list + infobox; also the one with no `t()` at all (§5.4) |
 | `src/draw/**` | 9 files | the largest subsystem; inherited upstream, least-touched |
-| `src/help/`, `src/languageswitcher/` | ~410 lines | between them the only `Select` |
-| `MapToolCards` + `MapThemes`/`SubTheme` | ~540 lines | the card slot; §6.1, §6.2 |
 
-What the kit still has to grow to absorb them: an `Accordion` (nine files, most
-of search, plus `useAccordionContext` in `FeatureInfoSection`), a `Select`, and
-small `Pagination` and `Alert` pieces. `Section` already covers kvib's
-`Collapsible`. Layout and typography need nothing — see §2 on why there are no
+What the kit still has to grow to absorb them: a small `Pagination`. That is
+all — the list used to also say `Accordion`, `Select` and `Alert`:
+
+- **`Accordion` is not coming.** Every kvib accordion in this app is
+  `collapsible multiple`, i.e. a stack of independent disclosures, which is
+  exactly the controlled `Section` the workspace already uses. The call site
+  owns the open set (a `string[]` in `MapThemes`, a single `string | null` per
+  card in `HelpPage`) and gets `lazyMount`/`unmountOnExit` for free, because
+  `Section` never renders a closed body. `FeatureInfoSection`'s
+  `useAccordionContext` is the one place that reads the container's state
+  instead of owning it, and lifting that state is the port.
+- **`Select` is not coming either.** The only two are the language picker and
+  the draw point-style picker, and a native `<select>` covers both — see
+  `src/languageswitcher/`. Anything that wants a richer list is a `Popover`.
+- **`Alert` was built** (`src/ui/Alert.tsx`, `info` / `warning`): a standing
+  remark in the flow, as opposed to `toast`, which is a reply to an action.
+
+Layout and typography need nothing — see §2 on why there are no
 `Box`/`Stack`/`Text` primitives.
 
 Two decisions taken to keep that list short rather than long:
@@ -1090,7 +1112,6 @@ switch language (nb / nn / en); open the help page at `/hjelp`; sign out.
 
 Fix-list; none of these are load-bearing.
 
-- `MapToolCardProps.hideHeader` — declared, handled, never passed.
 - `mapToolAtom`'s `'measure'` member renders nothing (measure is a ribbon
   popover).
 - `NKUrlParameter` carries `rotation`, `drawing`, `printTool` with no writers;
@@ -1111,4 +1132,7 @@ Closed by the ribbon work, listed so they are not re-reported: the root
 `new QueryClient()` in JSX, the duplicate `index.css` /
 `material-symbols/rounded.css` imports, the scattered raw z-indexes, the
 `calc(100vh - 65px)` header-height guesses, and the mobile horizontal scroll of
-the old TopBar.
+the old TopBar. Closed by the kvib migration: `MapToolCardProps.hideHeader`,
+and the language switcher being reachable only on mobile — the old TopBar
+carried it, the ribbon does not, and the help page's copy was behind an
+`isMobile` gate.
