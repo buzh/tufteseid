@@ -257,14 +257,17 @@ export const buildOrReuseBackgroundLayer = async (
 // because a cold LiDAR tile takes 3-12 s at the origin and a
 // slow-but-real swap should still be gapless; the only cost of waiting
 // is two background stacks in memory.
-const SWAP_TIMEOUT_MS = 15000;
+//
+// Exported for the compare curtain, which retires its own B stack by the
+// same rules against the same map (src/map/compare/curtainLayers.ts).
+export const SWAP_TIMEOUT_MS = 15000;
 
 // What a layer on its way out is dimmed to, immediately, for as long as
 // it hangs around. A per-project dataset usually covers only part of the
 // screen, and an outgoing full-screen layer at full opacity behind it is
 // indistinguishable from real coverage — the edge of what you just
 // selected has to be readable before its tiles are even in.
-const OUTGOING_OPACITY = 0.35;
+export const OUTGOING_OPACITY = 0.35;
 
 // Cancels the pending retirement of the previous swap, if any.
 let cancelPendingRetire: (() => void) | null = null;

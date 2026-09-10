@@ -13,7 +13,6 @@
 // Walking that ring with W/S is the point of the mode: the same ground in
 // 2024, 1963 and 1937 without leaving the map.
 
-import { atom } from 'jotai';
 import {
   FLYFOTO_LAYER,
   FLYFOTO_PROJECT_IMAGESERVER,
@@ -21,6 +20,7 @@ import {
   flyfotoMosaicRule,
 } from '../../../../localities/flyfoto';
 import type { FlyfotoProject } from '../../../../localities/flyfotoProjects';
+import { halved } from '../../../compare/halves';
 import type { ArcGISImageBackgroundLayer, WMSBackgroundLayer } from './types';
 
 // The <BoundingBox CRS="EPSG:25833"> the ortofoto WMS advertises in its own
@@ -77,5 +77,7 @@ export const buildFlyfotoProjectConfig = (
 
 // Which acquisition 'flyfotoProject' means. Null until the user picks one,
 // which is why 'flyfotoProject' is not a valid startup layer — exactly the
-// situation activeLidarProjectAtom is in.
-export const activeFlyfotoProjectAtom = atom<FlyfotoProject | null>(null);
+// situation activeLidarProjectAtom is in. Halved so the curtain can hold
+// 1937 on one side and 2024 on the other (src/map/compare/halves.ts).
+export const activeFlyfotoProjectHalves = halved<FlyfotoProject | null>(null);
+export const activeFlyfotoProjectAtom = activeFlyfotoProjectHalves.focused;

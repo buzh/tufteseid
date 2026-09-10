@@ -1,12 +1,13 @@
-import { useAtom } from 'jotai';
-import { useState } from 'react';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
-import { COMPARE_GROUNDS, compareGroundAtom } from '../../map/compare/atoms';
-import { Button, Popover } from '../../ui';
+import {
+  type CompareGround,
+  enterCompareAtom,
+  leaveCompareAtom,
+} from '../../map/compare/atoms';
+import { compareOnAtom } from '../../map/compare/halves';
 import { ModeButton } from '../ModeButton';
-import { PulldownItem } from '../Pulldown';
-import styles from '../Pulldown.module.css';
-import type { GroundMode } from '../useGroundMode';
+import type { GroundControls } from '../useGroundMode';
 
 /**
  * Sammenlign — put a second ground on the right of a draggable curtain.
@@ -19,17 +20,18 @@ import type { GroundMode } from '../useGroundMode';
  * Not one of the five ground buttons, because it does not answer "what does
  * the ground look like" — it answers "against what". Hence its own group,
  * and no digit key.
+ *
+ * One button and nothing else. The B half used to need a pulldown of its own
+ * here to name its ground, because it had no other way to say anything; now
+ * the whole ribbon retargets to whichever half is focused, so choosing B's
+ * ground is the same five buttons that choose A's, and the only new control
+ * is the A|B switch on the settings strip.
  */
-export const CompareControl = ({
-  mode,
-  previous,
-}: {
-  mode: GroundMode;
-  previous: () => GroundMode | null;
-}) => {
+export const CompareControl = ({ ground }: { ground: GroundControls }) => {
   const { t } = useTranslation();
-  const [ground, setGround] = useAtom(compareGroundAtom);
-  const [open, setOpen] = useState(false);
+  const on = useAtomValue(compareOnAtom);
+  const enterCompare = useSetAtom(enterCompareAtom);
+  const leaveCompare = useSetAtom(leaveCompareAtom);
 
   // Entering lands on the ground you were last on, which is almost always
   // the one you just flipped away from to see this one — i.e. the comparison
@@ -37,72 +39,23 @@ export const CompareControl = ({
   // can the ground already filling the map, so both fall through to the
   // other of the two that matter.
   const enter = () => {
-    const prev = previous();
-    setGround(
-      prev && prev !== 'terreng' && prev !== mode
+    const prev = ground.previous();
+    const target: CompareGround =
+      prev && prev !== 'terreng' && prev !== ground.mode
         ? prev
-        : mode === 'flyfoto'
+        : ground.mode === 'flyfoto'
           ? 'lidar'
-          : 'flyfoto',
-    );
+          : 'flyfoto';
+    enterCompare(target);
   };
 
   return (
-    <>
-      <ModeButton
-        icon="compare"
-        label={t('ribbon.compare.label')}
-        tooltip={t('ribbon.compare.tip')}
-        active={ground != null}
-        onClick={() => {
-          if (ground) setGround(null);
-          else enter();
-        }}
-      />
-
-      {ground && (
-        <Popover
-          open={open}
-          onOpenChange={setOpen}
-          width={220}
-          padded={false}
-          label={t('ribbon.compare.groundLabel')}
-          className={styles.trigger}
-          trigger={
-            <Button
-              variant="secondary"
-              size="md"
-              className={styles.triggerButton}
-              rightIcon="arrow_drop_down"
-              title={t('ribbon.compare.groundLabel')}
-              aria-expanded={open}
-              onClick={() => setOpen(!open)}
-            >
-              <span className={styles.triggerLabel}>
-                {t(`ribbon.mode.${ground}`)}
-              </span>
-            </Button>
-          }
-        >
-          <div className={styles.head}>
-            <span>{t('ribbon.compare.head')}</span>
-          </div>
-          {COMPARE_GROUNDS.map((g) => (
-            <PulldownItem
-              key={g}
-              label={t(`ribbon.mode.${g}`)}
-              // Naming the half that is already on the map keeps the list
-              // from looking like it offers a comparison it can't make.
-              meta={g === mode ? t('ribbon.compare.sameAsLeft') : undefined}
-              active={g === ground}
-              onActivate={() => {
-                setGround(g);
-                setOpen(false);
-              }}
-            />
-          ))}
-        </Popover>
-      )}
-    </>
+    <ModeButton
+      icon="compare"
+      label={t('ribbon.compare.label')}
+      tooltip={t('ribbon.compare.tip')}
+      active={on}
+      onClick={() => (on ? leaveCompare() : enter())}
+    />
   );
 };

@@ -4,6 +4,10 @@ import type TileLayer from 'ol/layer/Tile';
 import { getRenderPixel } from 'ol/render';
 import type RenderEvent from 'ol/render/Event';
 import { mapAtom } from '../atoms';
+import {
+  OUTGOING_OPACITY,
+  SWAP_TIMEOUT_MS,
+} from '../layers/config/backgroundLayers/utils';
 
 /*
  * The B half of the compare curtain, on the map.
@@ -92,32 +96,80 @@ const attachClip = (layer: TileLayer) => {
   layer.on('postrender', unclip);
 };
 
+// Cancels the pending retirement of the previous B swap, if any. Its own
+// variable rather than the background stack's: the two swap independently
+// and either may be mid-retirement while the other starts.
+let cancelPendingRetire: (() => void) | null = null;
+
 /**
- * Put this stack on the map as the B half, bottom-first, and take down
- * whatever the previous B half was.
+ * Put this stack on the map as the B half and take down whatever the
+ * previous B half was.
  *
- * Every layer gets the same zIndex; OL breaks ties by collection order, and
- * because the whole set is removed and re-added together that order is
- * exactly the one passed in.
+ * Both lists are bottom-first and mean what they mean in
+ * `swapBackgroundLayers`: `under` goes below the outgoing layers (the topo
+ * base, the faded national mosaic — context the layer on its way out should
+ * keep covering), `over` above them. The split is what makes the swap
+ * gapless. Pushing the whole incoming stack on top would put its *topo base*
+ * over the outgoing dataset, so changing B's acquisition would flash plain
+ * topo through the curtain while the new tiles loaded — which is exactly the
+ * comparison the user was in the middle of making.
+ *
+ * All of them share one zIndex; OL breaks ties by collection order, so the
+ * positions below are the order they draw in. Where they sit relative to the
+ * A half is settled by zIndex alone (COMPARE_Z against its default 0), which
+ * is why `under` may go to the bottom of the collection without ending up
+ * beneath the background stack.
  */
-export const installCompareLayers = (layers: TileLayer[]) => {
+export const installCompareLayers = (under: TileLayer[], over: TileLayer[]) => {
   const map = getMap();
   const collection = map.getLayers();
-  for (const layer of collection.getArray().slice()) {
-    if (isCompareLayer(layer) && !layers.includes(layer as TileLayer)) {
-      map.removeLayer(layer);
-    }
-  }
-  for (const layer of layers) {
+  const layers = [...under, ...over];
+  if (layers.length === 0) return;
+
+  // An install arriving while an earlier one is still retiring: cancel that
+  // retirement rather than run it, for the same reason as the background
+  // swap — those layers are this install's outgoing set anyway.
+  cancelPendingRetire?.();
+
+  const outgoing = collection
+    .getArray()
+    .filter(
+      (l) => isCompareLayer(l) && !layers.includes(l as TileLayer),
+    ) as TileLayer[];
+
+  under.forEach((layer, i) => {
+    attachClip(layer);
+    layer.setZIndex(COMPARE_Z);
+    collection.remove(layer);
+    collection.insertAt(i, layer);
+  });
+  for (const layer of over) {
     attachClip(layer);
     layer.setZIndex(COMPARE_Z);
     collection.remove(layer);
     collection.push(layer);
   }
+
+  for (const layer of outgoing) layer.setOpacity(OUTGOING_OPACITY);
+
+  const retire = () => {
+    cancelPendingRetire?.();
+    for (const layer of outgoing) map.removeLayer(layer);
+  };
+  const timer = setTimeout(retire, SWAP_TIMEOUT_MS);
+  cancelPendingRetire = () => {
+    cancelPendingRetire = null;
+    clearTimeout(timer);
+    map.un('rendercomplete', retire);
+  };
+  map.on('rendercomplete', retire);
 };
 
 export const clearCompareLayers = () => {
   const map = getMap();
+  // Nothing is coming in to hide behind, so a deferred removal should just
+  // happen now.
+  cancelPendingRetire?.();
   for (const layer of map.getLayers().getArray().slice()) {
     if (isCompareLayer(layer)) map.removeLayer(layer);
   }

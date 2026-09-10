@@ -470,9 +470,10 @@
     "compare": {
       "label": "Sammenlign",
       "tip": "Legg et annet kartgrunnlag til høyre for et skyvbart skille",
-      "groundLabel": "Grunnlag til høyre",
-      "head": "Vis til høyre",
-      "sameAsLeft": "allerede på kartet",
+      "halfLabel": "Hvilken halvdel du justerer (C)",
+      "halfA": "Venstre",
+      "halfB": "Høyre",
+      "noTerrainRight": "Terreng kan ikke være høyre halvdel — det er en analyse over hele kartet",
       "divider": "Flytt skillet"
     },
     "marks": {
@@ -578,7 +579,8 @@
       "dem": "hoydedata.no · {{model}} prosjektmosaikk (høydeverdier)",
       "nibProject": "Norge i bilder, enkeltprosjekt",
       "nibMosaic": "Norge i bilder, sømløs mosaikk",
-      "map": "Kartvisning"
+      "map": "Kartvisning",
+      "compareGrounds": "{{left}} til venstre, {{right}} til høyre"
     },
     "acq": {
       "year": "opptaksår {{year}}",

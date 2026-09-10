@@ -6,12 +6,13 @@ import {
   setUrlParameter,
 } from '../../../../shared/utils/urlUtils';
 import { mapAtom } from '../../../atoms';
+import { halved } from '../../../compare/halves';
 import { BackgroundLayerName, WMTSLayerName } from '../../backgroundLayers';
-import { activeFlyfotoProjectAtom } from './flyfotoBackground';
+import { activeFlyfotoProjectHalves } from './flyfotoBackground';
 import {
-  activeLidarModelAtom,
-  activeLidarProjectAtom,
-  activeLidarStyleAtom,
+  activeLidarModelHalves,
+  activeLidarProjectHalves,
+  activeLidarStyleHalves,
   effectiveLidarStyle,
 } from './lidarProjects';
 import { buildStack, LIDAR_LAYERS, resolveStack } from './stack';
@@ -42,9 +43,15 @@ export const backgroundLayerCapabilitiesCacheAtom = atom<
   Partial<Record<WMTSLayerName, string>>
 >({});
 
-export const backgroundLayerAtom = atom<BackgroundLayerName>(
+// Two halves and a facade — see src/map/compare/halves.ts. `.a` is the
+// ordinary background, i.e. the whole map whenever the compare curtain is
+// down; `.b` is the curtain's right side. Everything that adjusts the
+// background goes on writing `backgroundLayerAtom` and lands in whichever
+// half has focus.
+export const backgroundLayerHalves = halved<BackgroundLayerName>(
   getDefaultBackgroundLayer(),
 );
+export const backgroundLayerAtom = backgroundLayerHalves.focused;
 
 // Hybrid mode: the LiDAR relief with Kartverket's transparent
 // roads/railways/place-names overlay on top, so you can tell what
@@ -52,9 +59,10 @@ export const backgroundLayerAtom = atom<BackgroundLayerName>(
 // background rather than a background of its own — it only has meaning
 // over a LiDAR layer, and toggling it doesn't disturb which dataset or
 // style is selected underneath.
-export const hybridOverlayAtom = atom<boolean>(
+export const hybridOverlayHalves = halved<boolean>(
   getUrlParameter('hybrid') === 'true',
 );
+export const hybridOverlayAtom = hybridOverlayHalves.focused;
 
 // Which run of the effect below is the current one. The effect builds
 // its stack asynchronously — a WMTS base still needs its capabilities
@@ -67,16 +75,19 @@ let swapGeneration = 0;
 
 export const backgroundLayerAtomEffect = atomEffect((get) => {
   const generation = ++swapGeneration;
-  const layerName = get(backgroundLayerAtom);
+  // The A half throughout, never the focused facade: this effect owns the
+  // whole map when the curtain is down and the left side when it is up, and
+  // pointing the ribbon at B must not rebuild it.
+  const layerName = get(backgroundLayerHalves.a);
   // Depend on the active lidar project + style so switching either while
   // a LiDAR layer is the background rebuilds the WMS layer.
-  const activeLidarProject = get(activeLidarProjectAtom);
-  const activeLidarStyle = get(activeLidarStyleAtom);
-  const activeLidarModel = get(activeLidarModelAtom);
+  const activeLidarProject = get(activeLidarProjectHalves.a);
+  const activeLidarStyle = get(activeLidarStyleHalves.a);
+  const activeLidarModel = get(activeLidarModelHalves.a);
   // Same for the flyfoto acquisition: picking another year while
   // 'flyfotoProject' is the background rebuilds its mosaicRule.
-  const activeFlyfotoProject = get(activeFlyfotoProjectAtom);
-  const hybridOverlay = get(hybridOverlayAtom);
+  const activeFlyfotoProject = get(activeFlyfotoProjectHalves.a);
+  const hybridOverlay = get(hybridOverlayHalves.a);
 
   if (layerName === 'empty') {
     clearBackgroundLayer();

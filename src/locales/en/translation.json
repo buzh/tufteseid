@@ -470,9 +470,10 @@
     "compare": {
       "label": "Compare",
       "tip": "Put another ground on the right of a draggable divider",
-      "groundLabel": "Ground on the right",
-      "head": "Show on the right",
-      "sameAsLeft": "already on the map",
+      "halfLabel": "Which half you are adjusting (C)",
+      "halfA": "Left",
+      "halfB": "Right",
+      "noTerrainRight": "Terrain cannot be the right half — it is an analysis of the whole map",
       "divider": "Move the divider"
     },
     "marks": {
@@ -578,7 +579,8 @@
       "dem": "hoydedata.no · {{model}} per-project mosaic (elevation values)",
       "nibProject": "Norge i bilder, single acquisition",
       "nibMosaic": "Norge i bilder, seamless mosaic",
-      "map": "Map view"
+      "map": "Map view",
+      "compareGrounds": "{{left}} on the left, {{right}} on the right"
     },
     "acq": {
       "year": "flown {{year}}",

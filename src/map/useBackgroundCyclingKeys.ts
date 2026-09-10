@@ -2,6 +2,7 @@ import { atom, useAtomValue, useStore } from 'jotai';
 import { useEffect } from 'react';
 import { marksHiddenAtom } from '../localities/atoms';
 import { anyOverlayOpenAtom } from '../ui/overlayAtoms';
+import { compareFocusAtom, compareOnAtom } from './compare/halves';
 
 /*
  * The map's keyboard layer: which ground you are on, and which variant of it.
@@ -16,9 +17,14 @@ import { anyOverlayOpenAtom } from '../ui/overlayAtoms';
  * ortofoto acquisitions in flyfoto mode. A/D and E are LiDAR-only.
  * docs/ui-architecture.md §5.3.
  *
- * H takes our own marks off the map and puts them back. It needs no
- * registered handler — there is one boolean and no mode owns it — so it is
- * the one key here written straight against an atom.
+ * H takes our own marks off the map and puts them back, and C flips which
+ * half of the compare curtain everything above is aimed at. Neither needs a
+ * registered handler — one atom each and no mode owns them — so they are the
+ * two keys here written straight against atoms.
+ *
+ * C is what keeps the curtain usable from the keyboard at all: with it, "the
+ * 1937 flight on the right against 2024 on the left" is C W W C, and without
+ * it every change of side is a trip to the mouse.
  *
  * Split into a listener and a registration so the two halves can live in
  * different components. The listener has to be mounted somewhere that never
@@ -61,6 +67,10 @@ const GROUND_KEYS: readonly string[] = ['1', '2', '3', '4', '5'];
 const PEEK_KEY = 'x';
 // Hide/show funn, their halo and the lokalitet rectangles.
 const MARKS_KEY = 'h';
+// Point the ribbon at the other half of the compare curtain. Inert while the
+// curtain is down, and deliberately not a way of raising it: entering compare
+// is a decision about how many tile stacks this deployment is paying for.
+const HALF_KEY = 'c';
 
 // A mutable box rather than the handler itself: the handler closes over
 // lists that are rebuilt on every render, and putting that in atom state
@@ -121,7 +131,8 @@ export const useBackgroundCyclingKeys = () => {
       const isGround = GROUND_KEYS.includes(key);
       const isPeek = key === PEEK_KEY;
       const isMarks = key === MARKS_KEY;
-      if (!isCycle && !isGround && !isPeek && !isMarks) return;
+      const isHalf = key === HALF_KEY;
+      if (!isCycle && !isGround && !isPeek && !isMarks && !isHalf) return;
 
       const target = event.target;
       if (
@@ -144,6 +155,9 @@ export const useBackgroundCyclingKeys = () => {
 
       if (isMarks) {
         store.set(marksHiddenAtom, (prev) => !prev);
+      } else if (isHalf) {
+        if (!store.get(compareOnAtom)) return;
+        store.set(compareFocusAtom, (prev) => (prev === 'a' ? 'b' : 'a'));
       } else if (isCycle) {
         if (!box.current?.(key as CycleKey)) return;
       } else {

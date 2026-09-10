@@ -1,8 +1,9 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { compareGroundAtom, compareSplitAtom } from './atoms';
+import { compareSplitAtom } from './atoms';
 import { setCurtainSplit } from './curtainLayers';
+import { compareOnAtom } from './halves';
 import styles from './CompareCurtain.module.css';
 
 // Far enough from either edge that the half being dragged away is still a
@@ -30,7 +31,7 @@ const clamp = (f: number) => Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, f));
  */
 export const CompareCurtain = () => {
   const { t } = useTranslation();
-  const ground = useAtomValue(compareGroundAtom);
+  const on = useAtomValue(compareOnAtom);
   const [split, setSplit] = useAtom(compareSplitAtom);
   const rootRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -41,7 +42,7 @@ export const CompareCurtain = () => {
     setCurtainSplit(split);
   }, [split]);
 
-  if (!ground) return null;
+  if (!on) return null;
 
   const moveTo = (clientX: number) => {
     const rect = rootRef.current?.getBoundingClientRect();

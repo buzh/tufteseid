@@ -366,10 +366,20 @@ subsume.
   the viewport project list. The flyfoto acquisition list is *not* an atom —
   nothing draws its footprints, so it is component state in
   `useFlyfotoControls`.
-- **Sammenlign** — `compareGroundAtom` (`null` = off, otherwise the ground on
-  the right of the curtain) and `compareSplitAtom` (0–1, where the divider is),
-  both in `src/map/compare/atoms.ts` (§5.8). Neither is persisted to the URL.
-  The split is read by the OL render handlers through
+
+  Six of those are **halved** (§5.8): `backgroundLayerAtom`,
+  `hybridOverlayAtom` and the four LiDAR/flyfoto dataset atoms are each the
+  `focused` facade over an `{ a, b }` pair from `halved()`, exported under the
+  name they always had. Everything reading them keeps working unchanged; the
+  two stack effects reach past the facade to `.a` and `.b`. `halved()` also
+  registers a seeder, so a pair added later is copied A→B on entry for free.
+- **Sammenlign** — `compareOnAtom`, `compareFocusAtom` and the derived
+  `focusedHalfAtom` (which of the two the ribbon writes; always `'a'` with the
+  curtain down) in `src/map/compare/halves.ts`, and `compareSplitAtom` (0–1,
+  where the divider is) in `src/map/compare/atoms.ts` (§5.8). None are
+  persisted to the URL. `halves.ts` imports nothing but jotai on purpose — the
+  background config imports it, so anything else would be a cycle. The split is
+  read by the OL render handlers through
   `setCurtainSplit`, so `compareLayerAtomEffect` deliberately does *not* depend
   on it — dragging the divider must not rebuild a tile stack.
 - **Skjul merker** — `marksHiddenAtom` (`src/localities/atoms.ts`), read by
@@ -484,7 +494,7 @@ looking at. Row 1 answers **what am I looking at**; the strip under it answers
 | **Hybrid** (3) | LiDAR stack + transparent roads/rail/place-names on top |
 | **Flyfoto** (4) | Background mode: NiB ortofoto (§5.5) |
 | **Terreng** (5) | Terrain analysis: relief computed here from float elevation, over the open lokalitet's rectangle if there is one and the visible map otherwise (§10) |
-| **Sammenlign** | Puts a second ground on the right of a draggable curtain, with a pulldown for which one (§5.8) |
+| **Sammenlign** | Puts a second ground on the right of a draggable curtain; while it is on, everything in this table's ground rows describes the focused half (§5.8) |
 | **Skjul merker** (H) | Takes our own marks — funn, their halo, the lokalitet rectangles — off the map for as long as it is pressed in (§8.6) |
 | **Kulturminner** | Toggles `heritageSites`, the one register most readings start from |
 | **Oppsett** (`tune`) | Popover: the five RA sources, kulturminner2's three sublayers, how they are drawn and how strongly (§5.9) |
@@ -518,7 +528,10 @@ returns you to exactly the dataset and style you left — 1→5→1 is free wher
 | Terreng (5) | *absent* — its knobs are in the dock panel (§10), on the rectangle they analyse |
 
 Absent, not empty: a labelled bar with no controls in it would spend map pixels
-to say nothing.
+to say nothing. The one exception is Sammenlign: with the curtain up the strip
+is always on the bar, carrying the A|B switch ahead of the subject label, since
+that switch is what a Standard focused half needs in order to stop being one
+(§5.8).
 
 `RibbonSettingsRow` splits the two questions deliberately. `ground.modifiers`
 picks the **controls**, because they act on a stack and Hybrid is a modifier on
@@ -602,6 +615,11 @@ re-attaching the listener continuously.
   boolean and no mode owns it, so there is nothing for a component to
   contribute. It is a press rather than a hold because judging a bump against a
   1937 photograph takes longer than a key can comfortably be held down.
+- **C** — flip which half of the compare curtain everything else describes
+  (§5.8); a no-op when the curtain is down. Written against `compareFocusAtom`
+  directly, for the same reason H is. It is what keeps the curtain usable from
+  the keyboard at all: with it, "the 1937 flight on the right against 2024 on
+  the left" is `C W W C`.
 
 `PEEK_KEY` is **not** the backtick, which was the obvious pick: on the
 Norwegian layout it is a dead key and arrives as `key: "Dead"`, unusable for
@@ -628,7 +646,10 @@ thing to peek back to.
 
 W/S generalising across modes is the point of the flyfoto work: walking
 2024 → 1963 → 1937 over the same ground with one key is what makes a temporal
-stack readable at all.
+stack readable at all. With the curtain up they walk the *focused* half's ring,
+which is what makes the same trick work across the seam — and they needed no
+change to do it, because the atoms behind the rings are the ones that route
+(§5.8).
 
 None of them open the corresponding pulldown. That is deliberate: cycling exists
 so you can walk through relief styles while *watching the terrain*, and an open
@@ -819,6 +840,11 @@ trip is needed to know it), and moveend is debounced 250 ms. The per-project
 footprint responses are immutable and memoised for the tab, so panning around
 one region settles to no network at all.
 
+Auto is off on the compare curtain's B half and stays off: a term of a
+comparison that follows the viewport is not a term. Which also means the A
+half's resolver pauses while the ribbon is pointed at B — §5.8 has why that is
+accepted rather than fixed.
+
 ### 5.8 Sammenlign — the curtain
 
 Flipping grounds with 1–5 answers "what does this look like in LiDAR". It
@@ -833,6 +859,52 @@ group beside the ring, and reads the ring's current and previous mode to choose
 a sensible other half — entering lands on the ground you were last on, which is
 almost always the one you just flipped away from, i.e. the comparison you were
 already making by hand.
+
+**One control surface, pointed at one half at a time.** The button is the whole
+of Sammenlign's own UI. Everything that describes a ground — the five mode
+buttons, the dataset and style pulldowns on the settings strip, DTM/DOM, hybrid,
+and the W/S/A/D/E rings — acts on whichever half the **A|B switch** names, and
+that switch is the first control on the settings strip whenever the curtain is
+up. `C` flips it from the keyboard.
+
+That is a deliberate replacement for the first version, where B had a ground and
+nothing else: one pulldown here naming standard/LiDAR/hybrid/flyfoto, and both
+halves reading the same dataset atoms. It could not express "the 1937 flight
+against the 2024 flight", which is the comparison the mode exists for. The
+alternative fix — a second set of pickers for the B half — is two of every
+control on a bar whose governing rule is *bodies, not rows*, plus two pickers
+free to disagree about what they are naming.
+
+Underneath, every piece of ground state is **two primitives and a facade**
+(`src/map/compare/halves.ts`). `halved(initial)` returns `{ a, b, focused }`;
+the modules that own the state keep exporting the facade under the name the app
+already imports, so `useLidarControls`, `useFlyfotoControls`, the pickers, the
+style clamping and the cycling rings did not change at all — point the focus at
+B and the same controls describe B. What has to know about halves is exactly
+four things: `backgroundLayerAtomEffect` (pinned to `.a`),
+`compareLayerAtomEffect` (pinned to `.b`), the screenshot caption (which reports
+the whole map, so both), and the switch itself.
+
+Consequences worth stating:
+
+- **B is seeded from A on the way in**, through a registry every `halved()` call
+  writes itself into — so a pair added later cannot be forgotten and open the
+  curtain on a `null` acquisition. The only difference between the halves is
+  then whatever the user changes, and focus lands on B because that is the half
+  they have just brought into existence.
+- **Automatisk is cleared on B.** A half that follows the viewport is not a
+  fixed term of comparison. Its A-side counterpart keeps working, but *pauses*
+  while focus is on B — the resolver in `useLidarControls` reads the facade, so
+  it sees B's `false`. It self-corrects the moment focus returns, because every
+  input to that effect changes value; this is an accepted artefact rather than
+  something to engineer around, and pinning the resolver to `.a` would be worse
+  (it would fight the pulldown the user is holding).
+- **The strip stays on the bar while the curtain is up**, even when the focused
+  half has no modifiers, because the A|B switch is itself a control. Focusing a
+  Standard B half and losing the way back to A would be a trap.
+- **`previous()` records focus flips too**, so hold-X while comparing peeks the
+  focused half back to whatever the ring last showed — including the other
+  half's ground. Harmless, and not worth a second history.
 
 **One resolver, two stacks.** `resolveStack(layerName, opts)` in
 `backgroundLayers/stack.ts` is the whole "what does this mode put on the map"
@@ -867,21 +939,25 @@ GetMap requests and Kartverket rate-limits per source IP across every visitor
 of a deployment, so leaving tears the B stack down and nothing writes the mode
 to the URL: a shared link should not silently double someone's request budget.
 
-Two deliberate limits: **Terreng is not offered as a B half** (it is a render
-over the background rather than a background, and Terreng on the A side against
-any raster on the B side already gives that comparison), and **the B half has
-no dataset picker of its own** — the row-1 pulldowns are the one place a
-dataset is chosen, and B shows whichever acquisition they last named. That is
-what makes a temporal compare work without new controls: pick 1937 in the
-flyfoto pulldown, switch A to LiDAR, turn on Sammenlign.
+**The B half swaps gaplessly too.** `installCompareLayers` uses the same
+pattern as `swapBackgroundLayers` — outgoing `cmp.` layers are dimmed to
+`OUTGOING_OPACITY` immediately and removed on the next `rendercomplete`, with a
+timeout backstop, and an in-flight retirement is cancelled if another change
+arrives first. Both constants are exported from `backgroundLayers/utils.ts` so
+there is one answer for both stacks. The under/over split matters here for a
+reason particular to the curtain: pushing the whole incoming stack on top would
+put B's *topo base* over the outgoing dataset, and the right half would flash
+plain topo mid-swap. Under-layers go beneath the outgoing ones, over-layers on
+top, exactly as in the background effect.
 
-The corner where those two limits meet: with Terreng on the A side there are no
-row-1 pulldowns at all (§5.1), so B keeps whichever dataset was last named and
-changing it means leaving Terreng. Living with that is the same trade the
-pulldown rule makes everywhere else — a picker for a half of the map is a
-second place a dataset is chosen — but it is the one combination where the
-answer is "you can't from here", so a B-half picker is the obvious thing to
-build if this turns out to bite.
+**One deliberate limit: Terreng is not offered as a B half.** It is a
+client-side render over the whole map rather than a background, so it has no
+clippable stack. The button stays in the ring while focus is on B — disabled,
+not hidden, so the five positions and the digits keep meaning what they mean —
+and a render already up on the A side stays up: relief on the left against a
+photograph on the right is one of the better things this mode does, and the
+`cmp.` layers sit above the terrain overlay's `zIndex` so the curtain reads
+correctly over it.
 
 ### 5.9 Kulturminner — the source and rendering popover
 
@@ -1497,6 +1573,12 @@ Load-bearing:
   `bbox25833` (the *envelope* of four screen corners, so rotation is honest),
   `metresPerPx` straight off the view resolution, and the rotation itself.
 
+  It is also the one place that reads **both** compare halves (§5.8), because a
+  screenshot of a split map contains two grounds and naming one of them would
+  be a false caption: with the curtain up the ground line reads "LiDAR til
+  venstre, Flyfoto til høyre", and NiB is credited if *either* half is its
+  imagery.
+
 - **The PocketBase `caption` field is untouched** — still the short human line
   the gallery shows ("Flyfoto 1937"). The long-form provenance lives in the
   pixels, where it survives being downloaded, emailed and pasted into a report.
@@ -1900,7 +1982,10 @@ full style list; switch DTM / DOM; pick the seamless ortofoto mosaic or any
 historical acquisition covering the viewport; cycle styles with A/D, the active
 mode's datasets with W/S, model with E, without opening any pulldown or
 occluding the map; put a second ground on the right of a draggable curtain
-(Sammenlign), pick which one, drag the seam with the pointer or nudge it with
+(Sammenlign) and then describe *either* half with the whole of row 1 and its
+strip — ground, dataset, style, DTM/DOM, hybrid, A/D/W/S/E — switching between
+them with the A|B control or C, so one acquisition can be compared against
+another of the same ground; drag the seam with the pointer or nudge it with
 the arrow keys once it has focus, and leave to take the second stack back down;
 hide your own marks with H or the ribbon button so they do not cover the ground
 you are judging, and bring them back the same way.

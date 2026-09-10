@@ -35,10 +35,11 @@ import {
   heritageOpacityAtom,
   heritageRenderAtom,
 } from '../map/layers/heritage';
+import { compareOnAtom } from '../map/compare/halves';
 import type { BackgroundLayerName } from '../map/layers/backgroundLayers';
 import {
-  backgroundLayerAtom,
-  hybridOverlayAtom,
+  backgroundLayerHalves,
+  hybridOverlayHalves,
 } from '../map/layers/config/backgroundLayers/atoms';
 import { fitPadding } from '../shell/chromeInsets';
 import { terrainStandaloneBboxAtom } from '../terrain/atoms';
@@ -117,10 +118,15 @@ const GROUND_LABEL_KEY: Record<BackgroundLayerName, string> = {
   lidarProject: 'ribbon.mode.lidar',
   flyfoto: 'ribbon.mode.flyfoto',
   flyfotoProject: 'ribbon.mode.flyfoto',
-  // Never the value of backgroundLayerAtom — hybrid is a modifier — but the
+  // Never the value of the background atom — hybrid is a modifier — but the
   // union has to be covered.
   topoOverlay: 'ribbon.mode.hybrid',
 };
+
+// Hybrid is a LiDAR stack with names on it, so it credits the same way and
+// only the label differs.
+const groundLabelKey = (layer: BackgroundLayerName, hybrid: boolean): string =>
+  hybrid ? 'ribbon.mode.hybrid' : GROUND_LABEL_KEY[layer];
 
 // Which grounds put Norge i bilder pixels in the frame, i.e. whose credit
 // line has to name NiB as well as Kartverket.
@@ -175,9 +181,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const mode = useAtomValue(workspaceModeAtom);
   const [funnOutside, setFunnOutside] = useAtom(funnOutsideAtom);
   const setTerrainStandaloneBbox = useSetAtom(terrainStandaloneBboxAtom);
-  // Read only so a screenshot can say whose pixels are in it.
-  const background = useAtomValue(backgroundLayerAtom);
-  const hybrid = useAtomValue(hybridOverlayAtom);
+  // Read only so a screenshot can say whose pixels are in it. Both halves of
+  // the compare curtain, not the focused facade: a screenshot is of the whole
+  // map, so a split one has two grounds in it and — where one of them is
+  // ortofoto — two rights holders.
+  const background = useAtomValue(backgroundLayerHalves.a);
+  const hybrid = useAtomValue(hybridOverlayHalves.a);
+  const compareOn = useAtomValue(compareOnAtom);
+  const backgroundB = useAtomValue(backgroundLayerHalves.b);
+  const hybridB = useAtomValue(hybridOverlayHalves.b);
   const themeLayers = useAtomValue(activeThemeLayersAtom);
   const heritageDetails = useAtomValue(heritageDetailsAtom);
   const heritageRender = useAtomValue(heritageRenderAtom);
@@ -642,16 +654,19 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         toast.error({ title: t('localities.tools.screenshotFailed') });
         return;
       }
-      // Hybrid is a LiDAR stack with names on it, so it credits the same
-      // way; the label is the only thing that differs.
       const figure = await renderFigureBlob(
         shot.canvas,
         screenshotFigure({
           subject: locality.name || undefined,
-          groundLabel: t(
-            hybrid ? 'ribbon.mode.hybrid' : GROUND_LABEL_KEY[background],
-          ),
-          groundIsFlyfoto: NIB_GROUNDS.has(background),
+          groundLabel: compareOn
+            ? t('figure.source.compareGrounds', {
+                left: t(groundLabelKey(background, hybrid)),
+                right: t(groundLabelKey(backgroundB, hybridB)),
+              })
+            : t(groundLabelKey(background, hybrid)),
+          groundIsFlyfoto:
+            NIB_GROUNDS.has(background) ||
+            (compareOn && NIB_GROUNDS.has(backgroundB)),
           themeLayers: [...themeLayers],
           heritageRender: themeLayers.has('heritageSites')
             ? describeHeritageRender(
@@ -703,6 +718,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     locality.bbox,
     background,
     hybrid,
+    compareOn,
+    backgroundB,
+    hybridB,
     themeLayers,
     heritageDetails,
     heritageRender,

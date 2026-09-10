@@ -13,7 +13,7 @@
 // everything downstream behave identically whether a dataset was picked by
 // hand or resolved from the view.
 
-import { atom } from 'jotai';
+import { halved } from '../../../compare/halves';
 import type { LidarProject } from './lidarProjects';
 import type { LidarViewportState } from './lidarRelevance';
 
@@ -24,7 +24,13 @@ import type { LidarViewportState } from './lidarRelevance';
 // national mosaic, so a cold load looks exactly as it did before this
 // existed; the behaviour only diverges once the user is close enough in for
 // the divergence to be an improvement.
-export const lidarAutoDatasetAtom = atom(true);
+//
+// Halved like the rest of the ground state, but the two halves start out
+// disagreeing on purpose: entering compare clears it on the B side. A half
+// that follows the viewport is not a fixed term of comparison, and the whole
+// reason to open the curtain is to hold one side still.
+export const lidarAutoDatasetHalves = halved(true);
+export const lidarAutoDatasetAtom = lidarAutoDatasetHalves.focused;
 
 // Thresholds are map view resolution in metres per pixel. The view is
 // EPSG:25833, so that is metres on the ground — and unlike a viewport width

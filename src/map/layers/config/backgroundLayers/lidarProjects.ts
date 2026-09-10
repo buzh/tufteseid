@@ -5,8 +5,8 @@
 // The XML is proxied + long-cached through wmscache; we additionally
 // keep a week-long localStorage cache to avoid re-parsing on every load.
 
-import { atom } from 'jotai';
 import { getUrlParameter } from '../../../../shared/utils/urlUtils';
+import { halved } from '../../../compare/halves';
 
 // Terrengmodell vs overflatemodell: the same acquisitions with
 // vegetation and buildings stripped away (DTM) or left standing (DOM).
@@ -37,7 +37,12 @@ const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 // The project the picker most recently activated as the background source.
 // Read by the background-layer effect when backgroundLayerAtom is
 // 'lidarProject' to build the actual WMS request.
-export const activeLidarProjectAtom = atom<LidarProject | null>(null);
+//
+// Halved like every other piece of ground state (src/map/compare/halves.ts):
+// "this acquisition against that one" is the comparison the curtain exists
+// for, and it needs two of these.
+export const activeLidarProjectHalves = halved<LidarProject | null>(null);
+export const activeLidarProjectAtom = activeLidarProjectHalves.focused;
 
 // The styled variant (skyggerelieff, multiskyggerelieff, ...) currently
 // shown for whichever dataset is active (national mosaic or a project).
@@ -46,11 +51,13 @@ export const activeLidarProjectAtom = atom<LidarProject | null>(null);
 // This holds what the user *picked*, which is a DTM style: DOM has only
 // the one style, so it overrides rather than overwrites (see
 // effectiveLidarStyle) and a DTM choice survives a trip through DOM.
-export const activeLidarStyleAtom = atom<string>('skyggerelieff');
+export const activeLidarStyleHalves = halved<string>('skyggerelieff');
+export const activeLidarStyleAtom = activeLidarStyleHalves.focused;
 
-export const activeLidarModelAtom = atom<LidarModel>(
+export const activeLidarModelHalves = halved<LidarModel>(
   getUrlParameter('lidarModel') === 'dom' ? 'dom' : 'dtm',
 );
+export const activeLidarModelAtom = activeLidarModelHalves.focused;
 
 export const LIDAR_PROJECT_WMS_URL: Record<LidarModel, string> = {
   dtm: '/wms/geonorge/wms.hoyde-dtm-prosjekt',

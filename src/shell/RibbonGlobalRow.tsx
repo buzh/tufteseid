@@ -56,7 +56,10 @@ import { GROUND_MODES, useGroundMode } from './useGroundMode';
  *
  * Sammenlign sits beside the ring rather than in it: it does not answer
  * "what does the ground look like" but "against what", and it needs the
- * ring's current and previous mode to pick a sensible other half.
+ * ring's current and previous mode to pick a sensible other half. Once it is
+ * on, this whole row — buttons, digits, W/S — describes whichever half of the
+ * curtain the strip's A|B switch names. Nothing here has to know that; the
+ * ground atoms route themselves (src/map/compare/halves.ts).
  */
 export const RibbonGlobalRow = () => {
   const { t } = useTranslation();
@@ -151,18 +154,29 @@ export const RibbonGlobalRow = () => {
               map otherwise. It stays on the bar with a lokalitet open — the
               lokalitet row used to carry a second copy of this verb, and the
               two disagreeing about which rectangle "Lagre" keeps is exactly
-              why there is one control now. */}
+              why there is one control now.
+
+              The one ground that cannot be half of a comparison: it is a
+              render over the whole map, not a background. Disabled rather
+              than hidden while the curtain's right half has focus, so the
+              ring keeps its five positions and 1-5 keep meaning what they
+              mean. A render already up on the left half stays up. */}
           <ModeButton
             icon="elevation"
             label={t('ribbon.terrain.label')}
-            tooltip={`${t('ribbon.terrain.tip')} (5)`}
+            tooltip={
+              ground.half === 'b'
+                ? t('ribbon.compare.noTerrainRight')
+                : `${t('ribbon.terrain.tip')} (5)`
+            }
             active={ground.mode === 'terreng'}
+            disabled={ground.half === 'b'}
             onClick={() => ground.select('terreng')}
           />
         </div>
 
         <div className={styles.group}>
-          <CompareControl mode={ground.mode} previous={ground.previous} />
+          <CompareControl ground={ground} />
           {/* Beside Sammenlign because it answers the question that comes up
               the moment you have two acquisitions of the same ground side by
               side: is that bump real, or is it my own outline? Global rather

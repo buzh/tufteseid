@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { lidarExtractViewerOpenAtom } from '../lidarExtract/atoms';
 import { activeLocalityAtom } from '../localities/atoms';
 import { ribbonToolAtom } from '../localities/toolAtoms';
+import { focusedHalfAtom } from '../map/compare/halves';
 import type { CycleKey } from '../map/useBackgroundCyclingKeys';
 import { terrainStandaloneBboxAtom } from '../terrain/atoms';
 import type { useTerrainViewport } from '../terrain/useTerrainViewport';
@@ -84,10 +85,21 @@ export const useGroundMode = (
   const [tool, setTool] = useAtom(ribbonToolAtom);
   const setStandaloneBbox = useSetAtom(terrainStandaloneBboxAtom);
   const extractViewerOpen = useAtomValue(lidarExtractViewerOpenAtom);
+  // Which half of the compare curtain the ribbon is pointed at, and therefore
+  // which half everything below sets and reports. Always 'a' with the curtain
+  // down, so nothing here changes for the ordinary single-ground case.
+  const half = useAtomValue(focusedHalfAtom);
 
   // Two entrances, never both live: with a lokalitet open the standalone
   // rectangle is cleared and the panel runs off the lokalitet's own bbox.
-  const terrainActive = locality ? tool === 'terrain' : terrain.active;
+  //
+  // Never on the B half. Terreng is a client-side render over the whole map
+  // rather than a background, so it cannot be one side of a split — and while
+  // focus is on B, `mode` has to name B's raster ground even though a terrain
+  // render may well be up on the A side. That combination is supported, and
+  // it is one of the better ones: relief left, photograph right.
+  const terrainActive =
+    half === 'a' && (locality ? tool === 'terrain' : terrain.active);
 
   // Terreng first, because it is the only ground that leaves another one's
   // background switched on beneath it. Reading the background atom below this
@@ -113,7 +125,14 @@ export const useGroundMode = (
   // are rebuilt each render anyway, and the only consumers are event handlers
   // and a registration that re-publishes on every render by design.
   const select = (next: GroundMode) => {
-    if (next !== 'terreng') leaveTerrain();
+    // On the B half the ring is four buttons, not five, and it must not
+    // disturb the A half's terrain render either way: that render is very
+    // often the left-hand term of the comparison being set up.
+    if (half === 'b') {
+      if (next === 'terreng') return;
+    } else if (next !== 'terreng') {
+      leaveTerrain();
+    }
     switch (next) {
       case 'standard':
         lidar.setHybridOverlay(false);
@@ -215,7 +234,7 @@ export const useGroundMode = (
   // render's closure and make it stale by the time a handler read it.
   const previous = () => previousRef.current;
 
-  return { mode, modifiers, select, cycle, peekStart, peekEnd, previous };
+  return { mode, modifiers, half, select, cycle, peekStart, peekEnd, previous };
 };
 
 export type GroundControls = ReturnType<typeof useGroundMode>;

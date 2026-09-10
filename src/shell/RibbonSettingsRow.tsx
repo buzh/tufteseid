@@ -1,5 +1,11 @@
+import { useAtom, useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
-import { cx } from '../ui';
+import {
+  type CompareHalf,
+  compareFocusAtom,
+  compareOnAtom,
+} from '../map/compare/halves';
+import { cx, Segmented, type SegmentedOption } from '../ui';
 import { FlyfotoDatasetPicker } from './flyfoto/FlyfotoDatasetPicker';
 import type { FlyfotoControls } from './flyfoto/useFlyfotoControls';
 import { LidarDatasetPicker } from './lidar/LidarDatasetPicker';
@@ -53,6 +59,11 @@ const SUBJECT_KEY: Record<GroundMode, string> = {
  * they describe. A labelled bar with no controls in it would spend map pixels
  * to say nothing.
  *
+ * With the compare curtain up the strip also carries the A|B switch, and both
+ * questions above are then asked of the *focused* half — the controls on this
+ * line and the five buttons on the row above act on whichever side of the
+ * curtain the switch names (docs/ui-architecture.md §5.8).
+ *
  * Deliberately *not* registered with `anyOverlayOpenAtom`. The strip is
  * ordinary chrome, not an overlay, and counting it as one would disable 1–5
  * and W/S/A/D exactly while someone is using the controls that those keys are
@@ -68,16 +79,39 @@ export const RibbonSettingsRow = ({
   flyfoto: FlyfotoControls;
 }) => {
   const { t } = useTranslation();
+  const compareOn = useAtomValue(compareOnAtom);
+  const [focus, setFocus] = useAtom(compareFocusAtom);
 
-  if (ground.modifiers === null) return null;
+  // While the curtain is up the strip stays on the bar even when the focused
+  // half has nothing to adjust, because the A|B switch is itself a control —
+  // pointing at a Standard B half and losing the way back to A would be a
+  // trap with no keyboard escape.
+  if (ground.modifiers === null && !compareOn) return null;
   const subject = t(SUBJECT_KEY[ground.mode]);
+
+  const halfOptions: SegmentedOption<CompareHalf>[] = [
+    { value: 'a', label: t('ribbon.compare.halfA') },
+    { value: 'b', label: t('ribbon.compare.halfB') },
+  ];
+  const halfLabel = halfOptions.find((o) => o.value === focus)?.label ?? '';
 
   return (
     <div
       className={cx(styles.row, styles.rowSub, styles.rowSettings)}
       role="group"
-      aria-label={subject}
+      aria-label={compareOn ? `${halfLabel} — ${subject}` : subject}
     >
+      {/* First, ahead of the subject, because it governs what the subject
+          even names: "Høyre — Flyfoto" is one phrase read left to right. */}
+      {compareOn && (
+        <Segmented
+          value={focus}
+          options={halfOptions}
+          onChange={setFocus}
+          label={t('ribbon.compare.halfLabel')}
+        />
+      )}
+
       <span className={styles.settingsSubject}>{subject}</span>
 
       {ground.modifiers === 'flyfoto' && (

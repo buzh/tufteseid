@@ -3,11 +3,16 @@ import { atomEffect } from 'jotai-effect';
 import type { FlyfotoProject } from '../../localities/flyfotoProjects';
 import { mapAtom } from '../atoms';
 import { BackgroundLayerName } from '../layers/backgroundLayers';
-import { activeFlyfotoProjectAtom } from '../layers/config/backgroundLayers/flyfotoBackground';
 import {
-  activeLidarModelAtom,
-  activeLidarProjectAtom,
-  activeLidarStyleAtom,
+  backgroundLayerHalves,
+  hybridOverlayHalves,
+} from '../layers/config/backgroundLayers/atoms';
+import { activeFlyfotoProjectHalves } from '../layers/config/backgroundLayers/flyfotoBackground';
+import { lidarAutoDatasetHalves } from '../layers/config/backgroundLayers/lidarAuto';
+import {
+  activeLidarModelHalves,
+  activeLidarProjectHalves,
+  activeLidarStyleHalves,
   effectiveLidarStyle,
   LidarProject,
 } from '../layers/config/backgroundLayers/lidarProjects';
@@ -16,6 +21,7 @@ import {
   resolveStack,
 } from '../layers/config/backgroundLayers/stack';
 import { clearCompareLayers, installCompareLayers } from './curtainLayers';
+import { compareFocusAtom, compareOnAtom, seedHalfB } from './halves';
 
 /*
  * Sammenlign — the same ground twice, split by a curtain.
@@ -27,35 +33,42 @@ import { clearCompareLayers, installCompareLayers } from './curtainLayers';
  * second stack is built by the same rules and clipped to the right of a
  * draggable edge (the B half).
  *
+ * The two halves are two sets of the same atoms, and the ribbon points at one
+ * of them at a time — src/map/compare/halves.ts has the argument for that
+ * shape. What it buys is that the B half is not a lesser thing with a ground
+ * and no settings: dataset, style, DTM/DOM, hybrid and the W/S ring all work
+ * on it, so "this acquisition against that one" is expressible.
+ *
  * Terreng is not offered as a B half. It is a client-side render over the
  * background rather than a background, and it is already the case that
  * putting it on the A side and any raster ground on the B side gives exactly
  * the comparison — relief left, photograph right.
+ *
+ * Nothing here is persisted to the URL. Two live tile stacks are roughly
+ * twice the GetMap requests against a rate limit shared by every visitor of
+ * the deployment (docs/wms-proxy-and-tiles.md), so compare is a thing you
+ * turn on, not a thing a shared link turns on for someone else.
  */
-export const COMPARE_GROUNDS = [
-  'standard',
-  'lidar',
-  'hybrid',
-  'flyfoto',
-] as const;
-
-export type CompareGround = (typeof COMPARE_GROUNDS)[number];
-
-/** The B half's ground, or `null` for "compare is off". */
-export const compareGroundAtom = atom<CompareGround | null>(null);
+/**
+ * Every GroundMode except Terreng, spelled out rather than imported: this is
+ * a map module and useGroundMode is a shell one. The tripwire against drift
+ * is CompareControl, which narrows a GroundMode into this type and stops
+ * compiling if a sixth ground appears.
+ */
+export type CompareGround = 'standard' | 'lidar' | 'hybrid' | 'flyfoto';
 
 /** Where the curtain edge sits, as a fraction of the map width. */
 export const compareSplitAtom = atom(0.5);
 
-/*
- * The B half has no dataset picker of its own: the pulldowns in ribbon row 1
- * are the one place a dataset is chosen, and B follows whatever they last
- * named. Where B is in the same family as A that means the two halves show
- * the same dataset (LiDAR against hybrid compares just the overlay, which is
- * the point of asking for it); where it isn't, it means the acquisition you
- * picked while you were in that mode is what comes back.
+/**
+ * Which background layer a ground mode means, given what is already picked.
+ *
+ * The same mapping useGroundMode's `select` makes imperatively, needed once
+ * more here because entering compare has to write B's ground *before* React
+ * has re-rendered with the focus switch — so it cannot go through `select`,
+ * whose closure would still send the write to A.
  */
-const compareBackground = (
+const groundLayer = (
   ground: CompareGround,
   lidarProject: LidarProject | null,
   flyfotoProject: FlyfotoProject | null,
@@ -67,32 +80,70 @@ const compareBackground = (
   return lidarProject ? 'lidarProject' : 'lidarHillshade';
 };
 
+/**
+ * Raise the curtain on `ground`, and point the ribbon at the new half.
+ *
+ * B starts as a copy of A and is then moved to the requested ground, so the
+ * only difference between the halves is the one thing the user asked for.
+ * Focus lands on B because that is the half they have just brought into
+ * existence and are about to describe; leaving puts it back on A.
+ */
+export const enterCompareAtom = atom(
+  null,
+  (get, set, ground: CompareGround) => {
+    seedHalfB(get, set);
+    // A comparison term that follows the viewport is not a comparison term.
+    set(lidarAutoDatasetHalves.b, false);
+    set(hybridOverlayHalves.b, ground === 'hybrid');
+    set(
+      backgroundLayerHalves.b,
+      groundLayer(
+        ground,
+        get(activeLidarProjectHalves.b),
+        get(activeFlyfotoProjectHalves.b),
+      ),
+    );
+    set(compareOnAtom, true);
+    set(compareFocusAtom, 'b');
+  },
+);
+
+export const leaveCompareAtom = atom(null, (_get, set) => {
+  set(compareOnAtom, false);
+  set(compareFocusAtom, 'a');
+});
+
 // Same reason as the background effect's own generation counter: the build
 // awaits, the atoms move faster than the round trip, and an earlier run
 // resolving last would install a stack the user has already changed.
 let compareGeneration = 0;
 
 export const compareLayerAtomEffect = atomEffect((get) => {
-  const ground = get(compareGroundAtom);
-  const lidarProject = get(activeLidarProjectAtom);
-  const lidarStyle = get(activeLidarStyleAtom);
-  const lidarModel = get(activeLidarModelAtom);
-  const flyfotoProject = get(activeFlyfotoProjectAtom);
+  const on = get(compareOnAtom);
+  // The B half throughout, mirroring backgroundLayerAtomEffect's A half.
+  const layerName = get(backgroundLayerHalves.b);
+  const hybridOverlay = get(hybridOverlayHalves.b);
+  const lidarProject = get(activeLidarProjectHalves.b);
+  const lidarStyle = get(activeLidarStyleHalves.b);
+  const lidarModel = get(activeLidarModelHalves.b);
+  const flyfotoProject = get(activeFlyfotoProjectHalves.b);
 
   const generation = ++compareGeneration;
 
-  if (!ground) {
+  // 'empty' is unreachable from the ribbon but reachable from ?backgroundLayer
+  // on the A half, and B is seeded from A. A curtain over nothing is just the
+  // A half with a line down it, so take the whole thing down instead.
+  if (!on || layerName === 'empty') {
     clearCompareLayers();
     return;
   }
 
-  const layerName = compareBackground(ground, lidarProject, flyfotoProject);
   const stack = resolveStack(layerName, {
     lidarProject,
     lidarStyle: effectiveLidarStyle(lidarStyle, lidarModel),
     lidarModel,
     flyfotoProject,
-    hybridOverlay: ground === 'hybrid',
+    hybridOverlay,
   });
   if (!stack) return;
 
@@ -104,9 +155,13 @@ export const compareLayerAtomEffect = atomEffect((get) => {
       if (generation !== compareGeneration) return;
       if (!built) return;
 
-      const all = [...built.under, ...built.over];
-      for (const { layer, opacity } of all) layer.setOpacity(opacity);
-      installCompareLayers(all.map((e) => e.layer));
+      for (const { layer, opacity } of [...built.under, ...built.over]) {
+        layer.setOpacity(opacity);
+      }
+      installCompareLayers(
+        built.under.map((e) => e.layer),
+        built.over.map((e) => e.layer),
+      );
     } catch (error) {
       console.error('[compare] failed to build the B stack', error);
     }
