@@ -64,10 +64,11 @@ export const RibbonGlobalRow = () => {
   const terrain = useTerrainViewport();
   const ground = useGroundMode(lidar, flyfoto, terrain);
 
-  // A/D/W/S/E. Each half declines every key outside its own mode, so the
-  // order here only decides who is asked first, not who gets it. The
-  // document listener lives at the shell root (useMapSideEffects).
-  useRegisterBackgroundCycle((key) => flyfoto.cycle(key) || lidar.cycle(key));
+  // A/D/W/S/E. useGroundMode routes them to the ring of the ground on screen;
+  // there is exactly one registered handler, so the two halves compose there
+  // rather than each registering. The document listener lives at the shell
+  // root (useMapSideEffects).
+  useRegisterBackgroundCycle(ground.cycle);
   // 1–5 and hold-X, against the same button order rendered below.
   useRegisterGroundKeys({
     select: (position) => ground.select(GROUND_MODES[position - 1]),
@@ -171,13 +172,19 @@ export const RibbonGlobalRow = () => {
         />
       </div>
 
-      {flyfoto.isFlyfotoMode && (
+      {/* The modifier group belongs to the ground *on screen*, which is
+          ground.modifiers and not "which background layer is loaded" — under
+          a terrain render the ortofoto or hillshade the user has left behind
+          is still the background, and offering its acquisitions there would
+          describe imagery the terrain render is covering. Terreng's own knobs
+          are in its dock panel, on the rectangle it analyses. */}
+      {ground.modifiers === 'flyfoto' && (
         <div className={styles.group}>
           <FlyfotoDatasetPicker flyfoto={flyfoto} />
         </div>
       )}
 
-      {lidar.isLidarMode && (
+      {ground.modifiers === 'lidar' && (
         <div className={styles.group}>
           <LidarDatasetPicker lidar={lidar} />
           {/* Only when the dataset publishes more than one styled variant. */}

@@ -1,7 +1,9 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useRef } from 'react';
+import { lidarExtractViewerOpenAtom } from '../lidarExtract/atoms';
 import { activeLocalityAtom } from '../localities/atoms';
 import { ribbonToolAtom } from '../localities/toolAtoms';
+import type { CycleKey } from '../map/useBackgroundCyclingKeys';
 import { terrainStandaloneBboxAtom } from '../terrain/atoms';
 import type { useTerrainViewport } from '../terrain/useTerrainViewport';
 import type { FlyfotoControls } from './flyfoto/useFlyfotoControls';
@@ -27,6 +29,13 @@ import type { LidarControls } from './lidar/useLidarControls';
  * 1→5→1 is free where 1→2→1 is a screenful of tile requests. Its rectangle
  * comes from the open lokalitet when there is one and from the viewport
  * otherwise, which is why entering it writes two different atoms.
+ *
+ * That cheapness has a price this hook pays for everyone: `mode` is the *only*
+ * honest answer to "what ground is the user reading". The background layer is
+ * still LiDAR or ortofoto underneath a terrain render, so anything that speaks
+ * about the visible ground — which modifier pulldowns the ribbon shows
+ * (`modifiers`), which ring the keyboard walks (`cycle`) — has to come from
+ * here rather than from the two control hooks' own predicates.
  */
 export const GROUND_MODES = [
   'standard',
@@ -38,6 +47,34 @@ export const GROUND_MODES = [
 
 export type GroundMode = (typeof GROUND_MODES)[number];
 
+/**
+ * Which family of modifier controls belongs to a ground: the pulldowns row 1
+ * puts on the bar beside the ring, and the ring W/S walks. `null` where there
+ * is nothing to modify from row 1 — Standard has no variants, and Terreng's
+ * knobs (visualization, DTM/DOM, light, opacity) are in its dock panel, on the
+ * rectangle it is analysing.
+ *
+ * Keyed on the ground *on screen*, deliberately not on which background layer
+ * is set. Those two answers differ for exactly one mode, and it is the one
+ * this function exists for: Terreng covers the background rather than
+ * replacing it, so `isLidarBackground` / `isFlyfotoBackground` stay true
+ * underneath a terrain render — and a bar driven off them offers ortofoto
+ * acquisitions for imagery nobody can see, while the user reads relief.
+ */
+const groundModifiers = (mode: GroundMode): 'lidar' | 'flyfoto' | null => {
+  switch (mode) {
+    // Hybrid is a modifier on the LiDAR stack, so it keeps LiDAR's own
+    // modifiers — dataset, style, DTM/DOM — working underneath it (§5.2).
+    case 'lidar':
+    case 'hybrid':
+      return 'lidar';
+    case 'flyfoto':
+      return 'flyfoto';
+    default:
+      return null;
+  }
+};
+
 export const useGroundMode = (
   lidar: LidarControls,
   flyfoto: FlyfotoControls,
@@ -46,20 +83,26 @@ export const useGroundMode = (
   const locality = useAtomValue(activeLocalityAtom);
   const [tool, setTool] = useAtom(ribbonToolAtom);
   const setStandaloneBbox = useSetAtom(terrainStandaloneBboxAtom);
+  const extractViewerOpen = useAtomValue(lidarExtractViewerOpenAtom);
 
   // Two entrances, never both live: with a lokalitet open the standalone
   // rectangle is cleared and the panel runs off the lokalitet's own bbox.
   const terrainActive = locality ? tool === 'terrain' : terrain.active;
 
+  // Terreng first, because it is the only ground that leaves another one's
+  // background switched on beneath it. Reading the background atom below this
+  // line answers "what is loaded", not "what is the user looking at".
   const mode: GroundMode = terrainActive
     ? 'terreng'
-    : flyfoto.isFlyfotoMode
+    : flyfoto.isFlyfotoBackground
       ? 'flyfoto'
-      : lidar.isLidarMode
+      : lidar.isLidarBackground
         ? lidar.hybridOverlay
           ? 'hybrid'
           : 'lidar'
         : 'standard';
+
+  const modifiers = groundModifiers(mode);
 
   const leaveTerrain = () => {
     if (locality) setTool((cur) => (cur === 'terrain' ? null : cur));
@@ -79,12 +122,13 @@ export const useGroundMode = (
       case 'lidar':
         lidar.setHybridOverlay(false);
         // Entering the mode is not a dataset pick, so it leaves the pulldown
-        // alone; enterLidar only has to put something on screen.
-        if (!lidar.isLidarMode) lidar.enterLidar();
+        // alone; enterLidar only has to put something on screen. Nothing to
+        // put there if the stack is already loaded under a terrain render.
+        if (!lidar.isLidarBackground) lidar.enterLidar();
         break;
       case 'hybrid':
         lidar.setHybridOverlay(true);
-        if (!lidar.isLidarMode) lidar.enterLidar();
+        if (!lidar.isLidarBackground) lidar.enterLidar();
         break;
       case 'flyfoto':
         flyfoto.enterFlyfoto();
@@ -96,6 +140,39 @@ export const useGroundMode = (
         // already on when it snaps back.
         else if (!terrain.active) terrain.frame();
         break;
+    }
+  };
+
+  // The other half of `modifiers`: controls that leave the bar have to be
+  // told, because a pulldown that is unmounted never fires its own
+  // open-change callback — and LiDAR's open flag is what paints footprint
+  // polygons on the map. Only the *controls* stand down; the background stays
+  // exactly as it was, which is what makes coming back out of Terreng free.
+  const { standDown: lidarStandDown } = lidar;
+  const { standDown: flyfotoStandDown } = flyfoto;
+  useEffect(() => {
+    if (modifiers !== 'lidar') lidarStandDown();
+    if (modifiers !== 'flyfoto') flyfotoStandDown();
+  }, [modifiers, lidarStandDown, flyfotoStandDown]);
+
+  // A/D/W/S/E go to the ring of the ground on screen, and nowhere else. The
+  // two control hooks each know *how* to walk their own ring but cannot see
+  // Terreng from where they sit, so whether they are asked at all is decided
+  // here — otherwise W/S in Terreng would walk an invisible background,
+  // spending a screenful of tile requests per keypress on imagery under a
+  // terrain render.
+  const cycle = (key: CycleKey): boolean => {
+    // The extract viewer covers the whole map, so no ground has anything to
+    // show: same reasoning, one level up. Not applied to 1–5, which stay a
+    // way of setting up what you will see on the way out.
+    if (extractViewerOpen) return false;
+    switch (modifiers) {
+      case 'lidar':
+        return lidar.cycle(key);
+      case 'flyfoto':
+        return flyfoto.cycle(key);
+      default:
+        return false;
     }
   };
 
@@ -138,5 +215,5 @@ export const useGroundMode = (
   // render's closure and make it stale by the time a handler read it.
   const previous = () => previousRef.current;
 
-  return { mode, select, peekStart, peekEnd, previous };
+  return { mode, modifiers, select, cycle, peekStart, peekEnd, previous };
 };

@@ -1,7 +1,6 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { transformExtent } from 'ol/proj';
-import { useEffect, useState } from 'react';
-import { lidarExtractViewerOpenAtom } from '../../lidarExtract/atoms';
+import { useCallback, useEffect, useState } from 'react';
 import {
   fetchFlyfotoProjectsForBbox,
   type FlyfotoProject,
@@ -47,26 +46,31 @@ const EMPTY_VIEWPORT: FlyfotoViewport = { status: 'idle', projects: [] };
  * flyfoto is the background: no cycling flag, and no first W/S press that
  * only starts a fetch.
  *
+ * Like useLidarControls, everything here is scoped to **the ortofoto
+ * background being on**, not to ortofoto being the ground the user is
+ * reading: Terreng covers the background without replacing it, so
+ * `isFlyfotoBackground` stays true underneath it. Whether the picker is on the
+ * bar and whether W/S reach `cycle` are useGroundMode's calls.
+ *
  * Mount once, from RibbonGlobalRow.
  */
 export const useFlyfotoControls = () => {
   const map = useAtomValue(mapAtom);
   const [backgroundLayer, setBackgroundLayer] = useAtom(backgroundLayerAtom);
   const [activeProject, setActiveProject] = useAtom(activeFlyfotoProjectAtom);
-  const extractViewerOpen = useAtomValue(lidarExtractViewerOpenAtom);
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [viewport, setViewport] = useState<FlyfotoViewport>(EMPTY_VIEWPORT);
 
   const isMosaic = backgroundLayer === 'flyfoto';
   const isProject = backgroundLayer === 'flyfotoProject';
-  const isFlyfotoMode = isMosaic || isProject;
+  const isFlyfotoBackground = isMosaic || isProject;
 
   // Which acquisitions cover the current view. Refetched on every moveend
   // while flyfoto is the background — one query, answered from wmscache for
   // any view anyone has already looked at.
   useEffect(() => {
-    if (!isFlyfotoMode) {
+    if (!isFlyfotoBackground) {
       setViewport(EMPTY_VIEWPORT);
       return;
     }
@@ -129,14 +133,14 @@ export const useFlyfotoControls = () => {
       inFlight?.abort();
       map.un('moveend', refresh);
     };
-  }, [map, isFlyfotoMode]);
+  }, [map, isFlyfotoBackground]);
 
-  // Leaving flyfoto mode unmounts the pulldown without it ever firing its
-  // open-change callback. The active acquisition is kept, the way the LiDAR
-  // one is: coming back should return to the year you left on.
-  useEffect(() => {
-    if (!isFlyfotoMode) setPickerOpen(false);
-  }, [isFlyfotoMode]);
+  // Called by useGroundMode when ortofoto stops being the ground on screen,
+  // for the same reason as LiDAR's: taking the pulldown off the bar unmounts
+  // it without it ever firing its open-change callback. The active
+  // acquisition is deliberately kept, the way the LiDAR dataset is — coming
+  // back should return to the year you left on.
+  const standDown = useCallback(() => setPickerOpen(false), []);
 
   const selectMosaic = () => setBackgroundLayer('flyfoto');
   const selectProject = (p: FlyfotoProject) => {
@@ -155,12 +159,11 @@ export const useFlyfotoControls = () => {
   };
 
   // W/S walks the acquisition ring — the same ground in 2024, 1963 and 1937
-  // without leaving the map, which is the point of the mode. A/D and E are
-  // LiDAR's and are declined here so its handler gets them.
+  // without leaving the map, which is the point of the mode. Reached only
+  // while Flyfoto is the ground on screen (useGroundMode dispatches), so
+  // there is no mode check here. A/D and E belong to LiDAR and are declined,
+  // as they would be in any mode that has no use for them.
   const cycle = (key: CycleKey): boolean => {
-    // The extract viewer covers the map: swapping the background behind it
-    // would be invisible and still cost a full round of tile loads.
-    if (!isFlyfotoMode || extractViewerOpen) return false;
     if (key !== 'w' && key !== 's') return false;
     // Consumed even with nothing to walk to. In flyfoto mode W/S is this
     // ring, and the list being mid-refresh after a pan is a transient the
@@ -185,10 +188,11 @@ export const useFlyfotoControls = () => {
   return {
     // Keyboard
     cycle,
-    // Mode
-    isFlyfotoMode,
+    // Background, and being taken off the bar
+    isFlyfotoBackground,
     isMosaic,
     isProject,
+    standDown,
     activeProject,
     // Dataset
     viewport,
@@ -200,7 +204,7 @@ export const useFlyfotoControls = () => {
     // only thing that renders everywhere, so it's what "Flyfoto" means
     // until an acquisition is picked.
     enterFlyfoto: () => {
-      if (!isFlyfotoMode) setBackgroundLayer('flyfoto');
+      if (!isFlyfotoBackground) setBackgroundLayer('flyfoto');
     },
   };
 };

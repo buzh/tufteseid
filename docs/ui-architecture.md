@@ -489,6 +489,24 @@ replace the background, it covers it. Leaving therefore costs nothing and
 returns you to exactly the dataset and style you left — 1→5→1 is free where
 1→2→1 is a screenful of tile requests.
 
+**The pulldown group belongs to the ground on screen**, and follows the ring:
+LiDAR's dataset / style / DTM-DOM in modes 2 and 3, the acquisition list in
+mode 4, nothing in Standard, and nothing in Terreng — whose own knobs are in
+its dock panel (§10), on the rectangle it is analysing. `groundModifiers()` in
+`useGroundMode` is the single mapping, and both the pulldowns and the W/S ring
+(§5.3) read it. It is keyed on the *mode*, never on which background layer is
+loaded, because those two answers differ for exactly one ground and it is the
+one the mapping exists for: Terreng covers the background rather than replacing
+it, so `isLidarBackground` / `isFlyfotoBackground` stay true underneath a
+terrain render. A bar driven off those predicates — as it was — offers ortofoto
+acquisitions from 1937 while the user is reading a hillshade. The two control
+hooks own *how* their ring works and cannot see Terreng from where they sit;
+whether they are on screen or asked for a key is decided in `useGroundMode`.
+
+Changing the ground *beneath* a terrain render therefore means leaving Terreng
+first. That is the accepted cost: the opacity slider fades the render towards
+whichever ground you entered from, which is the comparison it is for.
+
 The dataset and style pulldowns are still the most complicated things here:
 each row needs a two-line label, a relevance badge, an on-hover map preview of
 the project footprint, and a tiering split ("mindre relevante" / "flere stiler"
@@ -556,7 +574,8 @@ thing to peek back to.
 
 - **A / D** — previous / next LiDAR style, top tier only, wrapping at both ends.
 - **W / S** — previous / next dataset in **the active mode's ring**: LiDAR
-  projects in LiDAR mode, ortofoto acquisitions in flyfoto mode. In LiDAR mode
+  projects in LiDAR mode, ortofoto acquisitions in flyfoto mode, nothing in
+  Standard or Terreng (the ground on screen there has no ring). In LiDAR mode
   a press also pins the dataset (§5.7) — walking the ring is the user choosing,
   and otherwise the auto resolver would take the background back on the next
   pan and W/S would feel broken.
@@ -591,10 +610,19 @@ The listener itself is **not** in the ribbon. It lives in
 (a collapsing ribbon row) would re-register and flip its position in the
 capture chain relative to the other keyboard layers. Row 1 publishes only the
 behaviour, via `useRegisterBackgroundCycle` and `useRegisterGroundKeys`, and
-chains the two cycling halves — `flyfoto.cycle(key) || lidar.cycle(key)`. Each
-half declines every key outside its own mode, so the order decides who is asked
-first, not who gets it. There is exactly one registered handler of each kind;
-two registrations would silently mean the last one mounted wins.
+what it publishes for cycling is `ground.cycle` — `useGroundMode` dispatches to
+the ring named by `groundModifiers(mode)` (§5.1) and returns false where there
+is none. The halves are *routed*, not chained past each other: neither hook
+tests the mode any more, because neither can see Terreng, and W/S falling
+through to a LiDAR background under a terrain render spends a screenful of tile
+requests per keypress on ground nobody is looking at. There is exactly one
+registered handler of each kind; two registrations would silently mean the last
+one mounted wins.
+
+The extract viewer's guard sits at that same dispatch rather than in each hook,
+for the same reason one level up: it covers the whole map, so no ground has
+anything to show. It does not stop 1–5, which stay a way of setting up what you
+will see on the way out.
 
 It follows the §1 discipline: capture phase, handled keys stopped with
 `preventDefault` + `stopPropagation` + `stopImmediatePropagation`, and the same
@@ -801,6 +829,14 @@ no dataset picker of its own** — the row-1 pulldowns are the one place a
 dataset is chosen, and B shows whichever acquisition they last named. That is
 what makes a temporal compare work without new controls: pick 1937 in the
 flyfoto pulldown, switch A to LiDAR, turn on Sammenlign.
+
+The corner where those two limits meet: with Terreng on the A side there are no
+row-1 pulldowns at all (§5.1), so B keeps whichever dataset was last named and
+changing it means leaving Terreng. Living with that is the same trade the
+pulldown rule makes everywhere else — a picker for a half of the map is a
+second place a dataset is chosen — but it is the one combination where the
+answer is "you can't from here", so a B-half picker is the obvious thing to
+build if this turns out to bite.
 
 ---
 

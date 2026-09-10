@@ -142,11 +142,12 @@ export const useLidarFootprintsLayer = () => {
   const hoveredProjectId = useAtomValue(hoveredLidarProjectIdAtom);
   const setHoveredProjectId = useSetAtom(hoveredLidarProjectIdAtom);
 
-  const isLidarMode =
+  const isLidarBackground =
     backgroundLayer === 'lidarProject' || backgroundLayer === 'lidarHillshade';
-  // The pulldown only exists in LiDAR mode, but check both — the atom
-  // can be left true if the popover unmounts without closing itself.
-  const picking = isLidarMode && pickerOpen;
+  // The pulldown is only on the bar while LiDAR is the ground on screen, but
+  // check both — the atom can be left true if the popover unmounts without
+  // closing itself (which is why useGroundMode calls standDown).
+  const picking = isLidarBackground && pickerOpen;
   // Keyboard cycling walks the same list without opening anything, so it
   // needs the fetch but not the drawing.
   //
@@ -156,7 +157,8 @@ export const useLidarFootprintsLayer = () => {
   // expensive at every zoom, which is why `refresh` below additionally
   // declines to fetch on auto's behalf out where auto already knows the
   // answer without asking.
-  const wantsViewport = picking || (isLidarMode && (cycling || autoDataset));
+  const wantsViewport =
+    picking || (isLidarBackground && (cycling || autoDataset));
 
   // Layer lifecycle: created lazily, visibility follows the pulldown.
   // Hover is cleared on the way out so a row the pointer happened to be

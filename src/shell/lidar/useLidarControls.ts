@@ -1,7 +1,6 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { transformExtent } from 'ol/proj';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { lidarExtractViewerOpenAtom } from '../../lidarExtract/atoms';
 import { mapAtom } from '../../map/atoms';
 import {
   backgroundLayerAtom,
@@ -50,9 +49,12 @@ const CYCLING_IDLE_MS = 90_000;
  * Mount once, from RibbonGlobalRow. Two mounts means two catalogue fetches
  * and two competing cycle registrations.
  *
- * `cycle` is returned rather than registered here: flyfoto mode has a ring
- * of its own and there is only ever one registered handler, so the ribbon
- * chains the two.
+ * Everything here is scoped to **the LiDAR background being on**, which is not
+ * the same question as "LiDAR is the ground the user is reading": Terreng
+ * covers the background without replacing it, so `isLidarBackground` stays
+ * true underneath it. Deciding whether these controls are on screen, or
+ * whether the keys reach `cycle`, is therefore useGroundMode's job and not
+ * this hook's — it cannot see Terreng from here.
  */
 export const useLidarControls = () => {
   const map = useAtomValue(mapAtom);
@@ -80,7 +82,6 @@ export const useLidarControls = () => {
   const viewport = useAtomValue(lidarViewportAtom);
   const [cycling, setCycling] = useAtom(lidarCyclingAtom);
   const cyclingTimerRef = useRef<number | undefined>(undefined);
-  const extractViewerOpen = useAtomValue(lidarExtractViewerOpenAtom);
 
   const [allProjects, setAllProjects] = useState<LidarProject[] | null>(null);
   const [nationalStyles, setNationalStyles] = useState<string[]>([]);
@@ -173,7 +174,7 @@ export const useLidarControls = () => {
 
   const isLidarProject = backgroundLayer === 'lidarProject';
   const isNationalMosaic = backgroundLayer === 'lidarHillshade';
-  const isLidarMode = isLidarProject || isNationalMosaic;
+  const isLidarBackground = isLidarProject || isNationalMosaic;
 
   // Map view resolution in metres per pixel — what the auto rules are
   // expressed in, since the view is EPSG:25833 and the thresholds are about
@@ -264,7 +265,7 @@ export const useLidarControls = () => {
   // effect does re-run on its own writes — activeLidarProject is an input —
   // but the second pass finds the dataset it just asked for and stops.
   useEffect(() => {
-    if (!isLidarMode || !autoDataset) return;
+    if (!isLidarBackground || !autoDataset) return;
     const choice = chooseAutoDataset({
       resolution,
       viewport,
@@ -278,7 +279,7 @@ export const useLidarControls = () => {
       }
     }
   }, [
-    isLidarMode,
+    isLidarBackground,
     autoDataset,
     resolution,
     viewport,
@@ -289,17 +290,21 @@ export const useLidarControls = () => {
     selectProject,
   ]);
 
-  // Leaving LiDAR mode unmounts the pulldown without it ever firing its
-  // open-change callback, so clear the shared flag by hand — otherwise the
-  // map would draw footprints again the next time LiDAR is switched on. Same
-  // for the cycling flag: no LiDAR background, nothing to cycle, so stop
-  // paying for the footprint fetch.
-  useEffect(() => {
-    if (isLidarMode) return;
+  // Called by useGroundMode the moment LiDAR stops being the ground on
+  // screen. It has to be pushed in from there rather than run off
+  // isLidarBackground here, because the LiDAR stack stays loaded under a
+  // terrain render and this is about the controls, not the layers.
+  //
+  // Taking the pulldown off the bar unmounts it without it ever firing its
+  // open-change callback, so the shared flag is cleared by hand — otherwise
+  // the map keeps drawing footprint polygons over ground the user is now
+  // reading some other way. Same for the cycling flag: no ring to walk,
+  // nothing worth keeping the footprint WFS warm for.
+  const standDown = useCallback(() => {
     setPickerOpen(false);
     window.clearTimeout(cyclingTimerRef.current);
     setCycling(false);
-  }, [isLidarMode, setPickerOpen, setCycling]);
+  }, [setPickerOpen, setCycling]);
 
   // In DOM mode this collapses to a single style, which takes the style
   // pulldown off the bar entirely — same as the national DTM mosaic, which
@@ -338,13 +343,11 @@ export const useLidarControls = () => {
   // Keyboard cycling (A/D styles, W/S datasets, E model) —
   // docs/ui-architecture.md §5.3. The document listener itself lives in
   // useBackgroundCyclingKeys, mounted at the shell root; this is only the
-  // behaviour, handed to the ribbon to register. Every key is declined
-  // outside LiDAR mode so another mode's handler can have it.
+  // behaviour, and it is reached only while LiDAR (or Hybrid) is the ground
+  // on screen — useGroundMode dispatches, so there is no mode check here.
+  // Keys this ring has no use for are still declined, so nothing else on the
+  // page is robbed of them.
   const cycle = (key: CycleKey): boolean => {
-    // The extract viewer covers the map: swapping the background behind it
-    // would be invisible and still cost a full round of WMS loads.
-    if (!isLidarMode || extractViewerOpen) return false;
-
     if (key === 'e') {
       setLidarModel((prev) => (prev === 'dtm' ? 'dom' : 'dtm'));
       return true;
@@ -397,15 +400,16 @@ export const useLidarControls = () => {
   return {
     // Keyboard
     cycle,
-    // Mode
+    // Background, and being taken off the bar
     backgroundLayer,
     setBackgroundLayer,
     hybridOverlay,
     setHybridOverlay,
-    isLidarMode,
+    isLidarBackground,
     isLidarProject,
     isNationalMosaic,
     enterLidar,
+    standDown,
     // Dataset
     activeLidarProject,
     allProjects,
