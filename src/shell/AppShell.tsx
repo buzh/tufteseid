@@ -13,7 +13,6 @@ import { useIsMobileScreen } from '../shared/hooks';
 import styles from './AppShell.module.css';
 import { dockSlotAtom } from './dockSlot';
 import { Ribbon } from './Ribbon';
-import { TerrainDock } from './TerrainDock';
 import { useMapSideEffects } from './useMapSideEffects';
 
 export const AppShell = () => {
@@ -63,14 +62,13 @@ export const AppShell = () => {
             </div>
 
             {/* Right slot: the dock column. The search-result infobox stacks
-                above whichever dock is live, and `LocalityRibbon` portals the
-                lokalitet dock in here (see dockSlot.ts) — hence the ref. */}
+                above the lokalitet dock, which `LocalityRibbon` portals in
+                here (see dockSlot.ts) — hence the ref. Terrenganalyse used to
+                have a dock of its own here; its knobs are on the ribbon
+                now. */}
             <div className={styles.right} ref={setDockSlot}>
               <ErrorBoundary name="InfoBox">
                 <InfoBox />
-              </ErrorBoundary>
-              <ErrorBoundary name="TerrainDock">
-                <TerrainDock />
               </ErrorBoundary>
             </div>
           </div>

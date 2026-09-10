@@ -393,8 +393,6 @@
       "starterNone": "Fant ingen data for dette området. Grunnpakken ga ingen bilder."
     },
     "terrain": {
-      "heading": "Terrenganalyse",
-      "close": "Lukk terrenganalyse",
       "visualization": "Visualisering",
       "vis": {
         "hillshade": "Skyggerelieff",
@@ -414,6 +412,7 @@
       "altitude": "Solhøyde",
       "zFactor": "Overdrivelse",
       "opacity": "Dekkraft",
+      "lightLabel": "Lys og dekkraft",
       "resolution": "{{m}} m/px · {{w}}×{{h}}",
       "resolutionCapped": "{{m}} m/px · {{w}}×{{h}} · kilde {{src}} m",
       "reframe": "Flytt analysen hit",

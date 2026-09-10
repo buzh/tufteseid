@@ -626,13 +626,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // read-only view of the same rectangle and tracing what it shows is the
   // whole reason to have it up.
   //
-  // Entering is normally row 1's job now (it owns all five ground modes) and
-  // arrives as a plain write to ribbonToolAtom — hence the effect below
-  // rather than cleanup inlined here. This is the way *out*, from the dock.
-  const toggleTerrain = useCallback(() => {
-    setTool((cur) => (cur === 'terrain' ? null : 'terrain'));
-  }, [setTool]);
-
+  // Both entering and leaving Terreng are row 1's job — it owns all five
+  // ground modes — and arrive as a plain write to ribbonToolAtom, so the
+  // slot's cleanup has to be an effect rather than something a handler here
+  // does on the way in.
   useEffect(() => {
     if (tool !== 'terrain') return;
     setAdjusting(false);
@@ -1298,7 +1295,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     toggleAdjusting,
     toggleLidar,
     closeLidar,
-    toggleTerrain,
     shooting,
     takeScreenshot,
     uploading,

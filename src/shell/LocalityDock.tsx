@@ -11,7 +11,6 @@ import { LocalityDetails } from '../localities/LocalityDetails';
 import { dockOpenAtom } from '../localities/toolAtoms';
 import type { LocalityWorkspaceApi } from '../localities/useLocalityWorkspace';
 import { ErrorBoundary } from '../shared/ErrorBoundary';
-import { TerrainPanel } from '../terrain/TerrainPanel';
 import { CountBadge, IconButton, Section, Tooltip } from '../ui';
 import { Dock, DockTool } from './Dock';
 import styles from './LocalityDock.module.css';
@@ -27,12 +26,12 @@ import styles from './LocalityDock.module.css';
  * content was never the invariant worth keeping.
  *
  * The bands read the two underlying flags rather than `workspaceModeAtom`,
- * which collapses them to one answer. Extract and terrain really are one
- * slot (`ribbonToolAtom` holds at most one). Drawing is not in that slot:
- * terrain is a read-only view of the same rectangle, and tracing what it
- * shows is the reason to have it up — so the draft band and the terrain band
- * can be on screen together, one above the other, which a column can do and
- * a ribbon row could not.
+ * which collapses them to one answer. Only the extract has a band here now:
+ * terrain shares its slot (`ribbonToolAtom` holds at most one) but is steered
+ * from the ribbon, since it is one of the five grounds. Drawing is not in
+ * that slot at all — terrain is a read-only view of the same rectangle, and
+ * tracing what it shows is the reason to have it up, so a draft and a terrain
+ * render are deliberately live at the same time.
  *
  * Each section keeps its own error boundary. Bilder fetches short-lived file
  * tokens and Kulturminner hits an external WFS; either failing should cost
@@ -54,14 +53,15 @@ export const LocalityDock = ({ ws }: { ws: LocalityWorkspaceApi }) => {
       }),
   });
 
-  // Starting a tool unfolds the dock: its controls are the tool. Row 1 owns
-  // Terreng now, so pressing 5 with the dock folded away would otherwise
-  // arm an analysis with nowhere to steer it from.
-  const tool = ws.tool;
+  // Starting the extract, or a funn draft, unfolds the dock: its controls are
+  // the tool. Terreng is deliberately not in that list — it is steered from
+  // the ribbon, so throwing the dock open for it would cover the map with a
+  // column the user has no business in.
+  const extractOpen = ws.tool === 'lidar';
   const draftActive = ws.draftActive;
   useEffect(() => {
-    if (tool || draftActive) setOpen(true);
-  }, [tool, draftActive, setOpen]);
+    if (extractOpen || draftActive) setOpen(true);
+  }, [extractOpen, draftActive, setOpen]);
 
   // A grunnpakke is minutes long and started from a menu in the ribbon. Show
   // it landing, or the only feedback for the first stitch is a menu closing.
@@ -152,17 +152,10 @@ export const LocalityDock = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           </ErrorBoundary>
         )}
 
-        {ws.tool === 'terrain' && (
-          <ErrorBoundary name="DockTerrain">
-            <DockTool
-              title={t('localities.terrain.heading')}
-              onClose={ws.toggleTerrain}
-              closeLabel={t('localities.terrain.close')}
-            >
-              <TerrainPanel bbox={ws.locality.bbox} locality={ws.locality} />
-            </DockTool>
-          </ErrorBoundary>
-        )}
+        {/* No terrain band. Terrenganalyse is a ground like the other four
+            now: its knobs are on the ribbon's settings strip and its slider
+            row, over the terrain they describe, and the way out is picking
+            another ground from the ring. */}
 
         <ErrorBoundary name="DockFunn">
           <Section

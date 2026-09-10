@@ -16,6 +16,13 @@ export type SegmentedOption<T extends string> = {
   icon?: MaterialSymbol;
   palette?: ButtonPalette;
   disabled?: boolean;
+  /**
+   * Native tooltip on this option alone. For sets where the label names a
+   * thing the reader may not know yet — the five terrain visualizations — and
+   * the hint therefore belongs to the option being *considered*, not to the
+   * group or to the one already selected.
+   */
+  title?: string;
 };
 
 /*
@@ -34,7 +41,6 @@ export const Segmented = <T extends string>({
   disabled,
   size = 'xs',
   label,
-  wrap,
   className,
 }: {
   value: T;
@@ -43,8 +49,6 @@ export const Segmented = <T extends string>({
   disabled?: boolean;
   size?: 'xs' | 'sm';
   label?: string;
-  /** Flow onto more lines instead of being clipped. For narrow columns. */
-  wrap?: boolean;
   className?: string;
 }) => {
   const move = (delta: number) => {
@@ -59,7 +63,7 @@ export const Segmented = <T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className={cx(styles.root, wrap && styles.wrap, className)}
+      className={cx(styles.root, className)}
       onKeyDown={(e) => {
         if (disabled) return;
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
@@ -82,6 +86,7 @@ export const Segmented = <T extends string>({
             // Roving tabindex: one stop for the whole group.
             tabIndex={selected ? 0 : -1}
             disabled={disabled || o.disabled}
+            title={o.title}
             className={cx(
               styles.option,
               styles[size],

@@ -22,6 +22,8 @@ import { RibbonMeasure } from './RibbonMeasure';
 import { RibbonSearch } from './RibbonSearch';
 import { RibbonSettingsRow } from './RibbonSettingsRow';
 import styles from './Ribbon.module.css';
+import { TerrainSliders } from './terrain/TerrainSliders';
+import { useTerrainAnalysis } from './terrain/useTerrainAnalysis';
 import { GROUND_MODES, useGroundMode } from './useGroundMode';
 
 /**
@@ -36,8 +38,10 @@ import { GROUND_MODES, useGroundMode } from './useGroundMode';
  * is where the *modifiers* on the chosen ground now live. Row 1 answers "what
  * am I looking at", the strip answers "how"; keeping the second question off
  * this row is what stops it wrapping to two lines on a laptop as soon as
- * LiDAR is on. Both come from this component because both run off the two
- * control hooks below, which are mounted once and only here.
+ * LiDAR is on. Terreng adds a third row under the strip for its sliders, and
+ * is the only ground that does. All of them come from this component because
+ * all of them run off the three control hooks below, which are mounted once
+ * and only here.
  *
  * The five ground buttons are one ring, in digit order, driven by
  * useGroundMode — including Terreng, which is a render over the background
@@ -69,8 +73,15 @@ export const RibbonGlobalRow = () => {
   const [themeLayers, setThemeLayers] = useAtom(activeThemeLayersAtom);
   const lidar = useLidarControls();
   const flyfoto = useFlyfotoControls();
-  const terrain = useTerrainViewport();
-  const ground = useGroundMode(lidar, flyfoto, terrain);
+  const viewport = useTerrainViewport();
+  const ground = useGroundMode(lidar, flyfoto, viewport);
+  // The DEM, the render and every knob that shapes it. Mounted here with the
+  // other two control hooks, and for the same reason: its controls are spread
+  // over the two rows below, and the analysis behind them must not exist
+  // twice. Unconditional — the hook itself decides whether a rectangle is
+  // being analysed, and hiding it behind `ground.modifiers` would throw the
+  // DEM away every time someone glanced at another ground.
+  const terrain = useTerrainAnalysis();
 
   // A/D/W/S/E. useGroundMode routes them to the ring of the ground on screen;
   // there is exactly one registered handler, so the two halves compose there
@@ -253,11 +264,23 @@ export const RibbonGlobalRow = () => {
 
       {/* The settings strip for whatever the ring above has selected. Rendered
           from here rather than as a sibling in Ribbon.tsx because it runs off
-          the same two control hooks, which are mounted once and only here —
+          the same control hooks, which are mounted once and only here —
           hoisting them into a context to gain a second error boundary would
           buy nothing, since a crash in either row comes from the same
           hooks. */}
-      <RibbonSettingsRow ground={ground} lidar={lidar} flyfoto={flyfoto} />
+      <RibbonSettingsRow
+        ground={ground}
+        lidar={lidar}
+        flyfoto={flyfoto}
+        terrain={terrain}
+      />
+
+      {/* Terreng's light, on a line of its own under the strip. The only
+          ground that needs a second row: four sliders will not share a line
+          with the visualization picker, and they have to stay on screen while
+          they are being dragged — sweeping the azimuth is how you tell a
+          mound from a shadow. */}
+      {ground.modifiers === 'terrain' && <TerrainSliders terrain={terrain} />}
     </>
   );
 };

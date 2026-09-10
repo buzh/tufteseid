@@ -12,8 +12,8 @@
 // times a second and no React component needs to see either. Routing them
 // through jotai would re-render the whole shell at that rate for nothing.
 //
-// The canvas is *the same element* TerrainPanel paints into and saves from;
-// nothing is copied. Repaints land in place, so the element identity never
+// The canvas is *the same element* useTerrainAnalysis paints into and saves
+// from; nothing is copied. Repaints land in place, so the identity never
 // changes and the source has no way of noticing its cached image went stale —
 // which is why `showTerrainOverlay` is also the repaint call.
 
@@ -33,7 +33,7 @@ const LAYER_ID = 'terrain.overlay';
 const Z_INDEX = 1;
 
 export type TerrainPlacement = {
-  /** Painted in place by TerrainPanel. Never copied. */
+  /** Painted in place by useTerrainAnalysis. Never copied. */
   canvas: HTMLCanvasElement;
   /** EPSG:25833. The ground the canvas covers, edge to edge. */
   extent25833: [number, number, number, number];
@@ -123,8 +123,8 @@ export const setTerrainOverlayOpacity = (value: number) => {
 
 // The remembered opacity deliberately survives this: switching DTM→DOM tears
 // the layer down and rebuilds it, and losing the fade you had just dialled in
-// on the way through would be a bug. TerrainPanel pushes its own value on
-// mount, so a fresh session of the tool still starts where its slider says.
+// on the way through would be a bug. useTerrainAnalysis pushes its own value
+// on mount, so a fresh session of the tool still starts where its slider says.
 export const hideTerrainOverlay = () => {
   if (layer) getDefaultStore().get(mapAtom).removeLayer(layer);
   layer = null;

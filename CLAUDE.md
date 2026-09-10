@@ -457,14 +457,18 @@ turns the analysed rectangle into a lokalitet.
   local relief model, sky-view factor. Pure functions over a `Dem`, split
   from rendering so the UI can cache the expensive pass while scrubbing the
   cheap one.
-- `src/terrain/TerrainPanel.tsx` — the control surface
-  (`docs/ui-architecture.md` §10). Takes `bbox` and `locality` as **props**,
-  not from an atom: passing the lokalitet's own bbox through is what makes
-  "Juster området" refetch the DEM for free. `terrainStandaloneBboxAtom`
-  (`src/terrain/atoms.ts`) holds the row-1 rectangle, and the two entrances can
-  never be live at once. Output saves as an attachment of the existing
-  `extract` kind (with `style` = the visualization), so no PocketBase
-  migration was needed.
+- `src/shell/terrain/` — the control surface (`docs/ui-architecture.md` §10),
+  and it is **on the ribbon**, not in a dock panel: `useTerrainAnalysis.ts`
+  holds all the state and is mounted once from `RibbonGlobalRow`,
+  `TerrainStrip.tsx` is its settings-strip half and `TerrainSliders.tsx` the
+  slider row under it. Terreng is one of the five grounds, so its modifiers
+  belong where every other ground's are — a column down the side of the map
+  covered the terrain the knobs were describing. The hook resolves the two
+  entrances to one rectangle: an open lokalitet's own bbox (which is what makes
+  "Juster området" refetch the DEM for free) or `terrainStandaloneBboxAtom`
+  (`src/terrain/atoms.ts`) for the row-1 rectangle, never both. Output saves as
+  an attachment of the existing `extract` kind (with `style` = the
+  visualization), so no PocketBase migration was needed.
 - `src/terrain/terrainOverlayLayer.ts` — the render goes **on the map**, as a
   georeferenced `ol/layer/Image` (`ImageCanvasSource`, `zIndex: 1`) over the
   background and under the Kulturminner layers, not as a thumbnail in the
@@ -480,9 +484,9 @@ Load-bearing:
   term by symmetry and silently collapses the result to `cos(zenith)·cos(slope)`
   — a slope map with a hillshade's name. The tell is a maximum of exactly
   0.7071 at altitude 45°, i.e. nothing brighter than flat ground.
-- **The two `useMemo`s in TerrainPanel are split on purpose.** Sky-view factor
-  is ~800 ms on a 600² grid and must never be keyed on azimuth, or dragging
-  the slider queues a multi-second recompute per frame.
+- **The two `useMemo`s in `useTerrainAnalysis` are split on purpose.** Sky-view
+  factor is ~800 ms on a 600² grid and must never be keyed on azimuth, or
+  dragging the slider queues a multi-second recompute per frame.
 
 ## Lokaliteter (user content)
 

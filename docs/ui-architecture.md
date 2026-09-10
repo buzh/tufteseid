@@ -208,11 +208,12 @@ decision everything else follows from.
 └── .overlay  position:absolute inset:0  z --z-overlay
               display:flex  flex-direction:column  pointer-events:none
     ├── .ribbon   flex:0 0 auto   pointer-events:auto   z --z-ribbon
-    │     └── Ribbon                  ← row 1, the settings strip, the lokalitet row
+    │     └── Ribbon                  ← row 1, the settings strip, the terrain
+    │                                   sliders, the lokalitet row
     └── .row      flex:1  min-height:0  position:relative  pointer-events:none
           ├── .left    absolute top/left/bottom          SearchComponent + MapToolCards
           └── .right   absolute top/right/bottom  360→400px
-                       InfoBox, TerrainDock, and the portalled LocalityDock
+                       InfoBox and the portalled LocalityDock
 ```
 
 Siblings of the whole thing: `BottomDrawToolSelector` (mobile only, only while
@@ -525,7 +526,7 @@ returns you to exactly the dataset and style you left — 1→5→1 is free wher
 | Standard (1) | *absent* — no variants to choose between |
 | LiDAR (2), Hybrid (3) | Dataset pulldown — **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport · style pulldown (the active dataset's WMS styles, with a "flere stiler" second tier), only when the dataset publishes more than one · DTM/DOM segment |
 | Flyfoto (4) | Acquisition pulldown — the seamless mosaic or any acquisition covering the viewport, newest first · period chips (Alle / 2010– / 1990–2009 / 1960–1989 / –1959), which narrow both that list and the W/S ring (§5.5) |
-| Terreng (5) | *absent* — its knobs are in the dock panel (§10), on the rectangle they analyse |
+| Terreng (5) | Visualization segment (five, each with its own explanation as a tooltip) · DTM/DOM segment · the resolution readout · "Flytt analysen hit" (standalone only) · "Lagre" — **plus a second row under the strip** holding the four sliders (§10) |
 
 Absent, not empty: a labelled bar with no controls in it would spend map pixels
 to say nothing. The one exception is Sammenlign: with the curtain up the strip
@@ -556,7 +557,11 @@ Two constraints on the strip that are load-bearing rather than stylistic:
   popover anchored to a control already on the strip, the way the dataset
   pickers do. A subject whose controls stop fitting is the signal to move
   something into a popover, never to let the strip grow — that is how the
-  five-hundred-pixel bar happened the first time.
+  five-hundred-pixel bar happened the first time. Terreng's slider row is the
+  one thing that answers that signal with a *second line* instead, and it is
+  allowed for the reason the rule exists: what the rule forbids is a body, and
+  the sliders have to stay visible while they are being dragged, because what
+  you are watching is the terrain under them (§10).
 - **Not registered with `anyOverlayOpenAtom`.** The strip is chrome, not an
   overlay. Counting it as one would disable 1–5 and W/S/A/D (§5.3) exactly
   while someone is using the controls those keys are the shortcut for.
@@ -1217,9 +1222,10 @@ subscriptions that reload the whole list on every event.
 ### 8.2 The dock
 
 `src/shell/Dock.tsx` is the frame — a header, then a body — and
-`LocalityDock.tsx` fills it. Two occupants of the same frame exist:
-`LocalityDock` for an open lokalitet, and `TerrainDock` for a standalone terrain
-analysis with no lokalitet at all (§10).
+`LocalityDock.tsx` is its one occupant. There was a second, `TerrainDock`, for a
+standalone terrain analysis with no lokalitet at all; it went when
+Terrenganalyse's knobs moved onto the ribbon (§10), so the dock now means
+exactly one thing: an open lokalitet.
 
 The column costs a fixed slice of the *width* (360 px, 400 px above `62rem`) and
 the map fits its subject into what is left, where the ribbon it replaced cost
@@ -1229,11 +1235,13 @@ breakpoint the column has nowhere to go and becomes a bottom sheet;
 edge rather than assuming one (§3.1).
 
 **The tool band and the section list coexist.** A live tool — `FunnDraft` +
-`DrawControls`, `LidarExtractPanel`, `TerrainPanel` — renders in a `DockTool`
-pinned above the sections, not instead of them. Under the old tray they were
-mutually exclusive, which meant starting to draw hid the list of what you had
-already drawn. Starting a tool also unfolds the dock, since its controls *are*
-the tool.
+`DrawControls`, or `LidarExtractPanel` — renders in a `DockTool` pinned above
+the sections, not instead of them. Under the old tray they were mutually
+exclusive, which meant starting to draw hid the list of what you had already
+drawn. Starting one of those two also unfolds the dock, since its controls
+*are* the tool. Terreng is deliberately not in that list even though it shares
+the extract's slot: it is steered from the ribbon, so throwing the dock open
+for it would cover the map with a column the user has no business in.
 
 **Folding hides, it does not unmount.** Folding is what you do *to see the map*
 — most often the terrain render the panel inside just produced — and unmounting
@@ -1291,7 +1299,7 @@ named; an auto-name good enough to keep does not shove a cursor at you. Click
 it to change it, like any other.
 
 `fetchLocalityContext` never rejects and never takes longer than 6 s; both call
-sites (the ribbon button and TerrainPanel's save-with-no-lokalitet path)
+sites (the ribbon button and Terreng's save-with-no-lokalitet path)
 already disable themselves while it runs. Which registers it asks, and how the
 placename is ranked, is out of scope here — see the header comment in
 `src/localities/localityContext.ts`.
@@ -1701,12 +1709,22 @@ feature properties.
 
 ## 10. Analysis panels
 
-Both are `DockTool` occupants of the dock's tool band (§8.2), both write to the
-attachment pipeline, and both are laid out for a 360–400 px column. They differ
-in where the result lands: the extract opens a fullscreen viewer, the terrain
-render goes onto the map itself. They are also the one pair that really is a
+Two of them, both writing to the attachment pipeline, and they really are a
 single slot — `ribbonToolAtom` holds at most one — where drawing, which can be
 up alongside either, is not.
+
+They no longer live in the same place, and the split is the point. The extract
+is still a `DockTool` occupant of the dock's tool band (§8.2), laid out for a
+360–400 px column, because it is a lokalitet errand: pick sources, run it,
+keep the result. Terrenganalyse is one of the five **grounds**, so its controls
+are on the ribbon with every other ground's — the settings strip plus one
+slider row under it — and the dock it used to occupy is gone.
+
+That move is what §5.1's strip table means by Terreng being the one subject
+with a second row. The knobs were in a column down the side of the map, which
+meant pressing `5` relocated the controls to a different part of the screen and
+then covered the terrain they were describing. Two thin rows over the map cost
+less of it than one panel beside it, and they are where the eye already is.
 
 **LiDAR extract** — `src/lidarExtract/LidarExtractPanel.tsx` drives style and
 source selection and shows progress. The selection size and the run controls
@@ -1724,9 +1742,32 @@ reason the viewer cannot be casually re-parented, or the same canvas rendered
 anywhere else. Its keys are capture-phase for the reason in §1. The extract is
 DTM-only on purpose: an extract is meant to be read as terrain.
 
-**Terrain** — `src/terrain/TerrainPanel.tsx`: DTM/DOM toggle, five
-visualizations (hillshade, multidirectional hillshade, slope, local relief
-model, sky-view factor), and live azimuth / altitude / exaggeration sliders.
+**Terrain** — `src/shell/terrain/`: DTM/DOM toggle, five visualizations
+(hillshade, multidirectional hillshade, slope, local relief model, sky-view
+factor), and live azimuth / altitude / exaggeration / opacity sliders. Three
+files:
+
+| File | What it is |
+|---|---|
+| `useTerrainAnalysis.ts` | All of the state — which rectangle, the DEM, the model, the visualization, the four knobs, the canvas, the save. Mounted **once**, from `RibbonGlobalRow`, beside `useLidarControls` and `useFlyfotoControls` |
+| `TerrainStrip.tsx` | The settings-strip half: visualization, DTM/DOM, the resolution readout, "Flytt analysen hit", "Lagre" |
+| `TerrainSliders.tsx` | The row beneath: azimuth, altitude, exaggeration, opacity |
+
+The hook is mounted **unconditionally**, not behind `ground.modifiers ===
+'terrain'`: it decides for itself whether a rectangle is being analysed, and
+unmounting it whenever the strip is not showing would throw a multi-megabyte
+DEM away every time someone glanced at another ground. It is also why the
+light survives leaving and re-entering Terreng, which the old panel — mounted
+with the dock — did not.
+
+Only the sliders the current visualization uses are rendered: two for sky-view
+factor, four for a plain hillshade. Absent rather than disabled, because a
+slider that cannot move is indistinguishable from one that has no effect.
+
+The five visualization names carry their explanation as a per-option `title`
+tooltip (`SegmentedOption.title`) rather than as a paragraph under the row. The
+hint is about the option you are *considering*, not the one already selected,
+and a strip has no room for a sentence.
 
 **The render is on the map, not in the row.** `src/terrain/terrainOverlayLayer.ts`
 puts the canvas down as a georeferenced `ol/layer/Image` at `zIndex: 1` — over
@@ -1735,17 +1776,24 @@ rectangles (4), the funn (5) and the theme layers (10). That ordering is the
 point: relief is the ground and the heritage record goes on top of it, which is
 the same argument that makes LiDAR hillshade a *background* rather than a theme
 layer. Scrubbing the light therefore re-lights the terrain in place, at full
-size, against everything else on screen. What is left in the panel is knobs, a
+size, against everything else on screen. What is left on the ribbon is knobs, a
 resolution readout and the two verbs.
 
-It lives in a ~360 px dock column now, not the wide ribbon row it was written
-for, and everything in it has to *wrap* rather than run off the edge. Five long
-Norwegian visualization names do not fit on one line, and `Segmented`'s root is
-`overflow: hidden` — so the group is clipped mid-word unless it is given the
-`wrap` prop, which flows it onto more lines and turns the segment separators
-into gaps over a border-coloured background. The two verbs sit in an `.actions`
-row with `flex-basis: 100%` so they land on their own line together, in the same
-place whether or not the reframe one is showing.
+That is also the argument for the sliders being a **row** rather than a popover
+anchored to the strip, which is what §5.1's one-line contract would otherwise
+ask for. They have to stay on screen while they are being dragged — sweeping
+the azimuth to see which bumps stay lit is the single most useful thing the
+tool does — and a popover over the map covers the wrong half of the screen to
+do it in.
+
+`TerrainStrip` is rendered into the strip **without** a `group` wrapper, unlike
+the LiDAR and Flyfoto pickers. Terreng brings the most controls of any subject
+and holding them on one unbreakable line is what would push the strip off a
+laptop; it supplies its own `.actions` grouping for the two verbs, which must
+not split, and lets the rest wrap. `Segmented`'s `wrap` prop went with the
+column — it existed only to keep five long Norwegian names from being clipped
+mid-word by the root's `overflow: hidden` in 360 px, and the ribbon rows wrap
+between controls instead of inside one.
 
 **"Flytt analysen hit"** (`localities.terrain.reframe`) moves the analysed
 rectangle onto the map as it now stands. It exists because the standalone bbox
@@ -1767,7 +1815,7 @@ Consequences worth knowing:
   the whole surface.
 - `showTerrainOverlay` is show, move *and* repaint in one call, because
   `ImageCanvasSource` caches one image and `changed()` is the only way to
-  invalidate it — the canvas element identity never changes, since the panel
+  invalidate it — the canvas element identity never changes, since the hook
   repaints in place.
 - The source's output canvas is **reused** across frames rather than allocated
   per call (which is what OL's own docs bless `changed()` for): a viewport-sized
@@ -1783,75 +1831,81 @@ Consequences worth knowing:
   lands a fraction of a pixel short of the southern edge.
 - An **opacity slider** joins the light controls. Fading the render towards what
   it covers is the only way to check a suspected feature against the ortofoto or
-  the topo map without losing the light you just dialled in. It is panel state
+  the topo map without losing the light you just dialled in. It is hook state
   mirrored onto the layer, and the remembered value survives a DTM→DOM rebuild.
 
-It takes `bbox` and `locality` as **props**, and has *two entrances* — the same
-button in row 1 either way, resolving to whichever rectangle is in play:
+There are *two entrances* — the same button in row 1 either way — and
+`useTerrainAnalysis` resolves them to one rectangle rather than making two
+callers do it:
 
 - **No lokalitet open**: `useTerrainViewport` frames the visible map into
-  `terrainStandaloneBboxAtom`, and `TerrainDock` renders the panel as the sole
-  occupant of its own dock. The bbox is held rather than recomputed from the live
-  view: the analysis is of one fixed rectangle and the user is expected to pan
-  underneath it while reading the render. **"Analyser utsnittet"** in the panel
-  re-frames it onto the view as it is now — the same `frame()` the ribbon
+  `terrainStandaloneBboxAtom`. The bbox is held rather than recomputed from the
+  live view: the analysis is of one fixed rectangle and the user is expected to
+  pan underneath it while reading the render. **"Flytt analysen hit"** on the
+  strip re-frames it onto the view as it is now — the same `frame()` the ribbon
   button calls. It exists because putting the render on the map makes panning
   off the analysed rectangle a normal move, and there was otherwise no way back
-  short of closing and reopening the tool.
+  short of leaving and re-entering the tool.
   Note that the rectangle is `viewportBbox`'s **inset** viewport, the same one
   "Ny lokalitet" uses, so the render stops short of the screen edges. That is
   deliberate — the two have to agree about what "the visible map" means, the
   span guard rides on it, the free area is what `chromeInsets` reports, and the
   rectangle may become a lokalitet — and the visible margin doubles as the
   affordance for exactly which ground is being analysed.
-- **A lokalitet open**: `ribbonToolAtom` goes to `'terrain'` and the panel
-  renders in that lokalitet's dock, over its own bbox. "Juster området" owns the
-  rectangle here.
+- **A lokalitet open**: `ribbonToolAtom` goes to `'terrain'` and the rectangle
+  is that lokalitet's own bbox. "Juster området" owns it here.
 
 They can never both be live: `useGroundMode` routes the button to one or the
 other depending on whether a lokalitet is open, and opening a lokalitet clears
 the standalone bbox. That matters because two live controls for one surface
 would disagree about which rectangle "Lagre" keeps — which is exactly what row
-2's duplicate Terreng verb used to cause, and why it is gone. Passing the
-lokalitet's bbox as a prop rather than copying it into an atom is also what
+2's duplicate Terreng verb used to cause, and why it is gone. Reading the
+lokalitet's bbox directly rather than copying it into an atom is also what
 makes "Juster området" refetch the DEM for free.
 
-"Lagre" accordingly has two paths: with a lokalitet, save the attachment; with
-none, `createLocalityFromBbox` over **the analysed rectangle** (not the current
-view — the map is live underneath the panel) and then save into it, opening the
-new lokalitet as the receipt. Signed out it opens `AuthDialog` instead; that is
-a normal state here, since the whole point of Terreng in row 1 is that reading
+**There is no close button, and that is not an omission.** Terreng is a ground:
+you leave it by picking another one from the ring, or by pressing its digit's
+neighbour, and leaving costs nothing because the background underneath was
+never switched off (§5.1). The dock the tool used to live in had to have a
+close control, since a panel that will not go away is a panel covering the map.
+
+"Lagre" has two paths: with a lokalitet, save the attachment; with none,
+`createLocalityFromBbox` over **the analysed rectangle** (not the current view
+— the map is live under the ribbon) and then save into it, opening the new
+lokalitet as the receipt. Signed out it opens `AuthDialog` instead; that is a
+normal state here, since the whole point of Terreng in row 1 is that reading
 the ground needs no account.
 
-Two things in that file must not be undone:
+Two things in `useTerrainAnalysis` must not be undone:
 
-- The sliders are **raw `<input type="range">`** (`SliderRow`) rather than a
-  component-library slider: sweeping the light smoothly needs a continuous
-  input stream during the drag, and the numeric value is rendered next to the
-  label anyway. They are safe from W/S cycling because
-  `useBackgroundCyclingKeys` bails on `INPUT` targets.
+- The sliders are **raw `<input type="range">`** (`SliderRow` in
+  `TerrainSliders.tsx`) rather than a component-library slider: sweeping the
+  light smoothly needs a continuous input stream during the drag, and the
+  numeric value is rendered next to the label anyway. They are safe from W/S
+  cycling because `useBackgroundCyclingKeys` bails on `INPUT` targets — which
+  matters more now that they sit on the ribbon, inches from the ring.
 - The two `useMemo`s are **split on purpose**: sky-view factor takes ~800 ms on
   a 600² grid and must never be keyed on azimuth, or dragging the azimuth
   slider queues a multi-second recompute per frame. The split survives the move
   of the arithmetic into `src/terrain/render.ts` — that module exports
   `terrainStaticField` (expensive, sun-independent) and `terrainField` (cheap,
-  sun-dependent) as *two* functions for exactly this reason, and the panel
+  sun-dependent) as *two* functions for exactly this reason, and the hook
   memoizes each. Its one-call `renderTerrain` is for headless callers with no
   slider to drag (§8.9).
 
-The canvas itself is **off-DOM**. React does not own it and neither does the
+The canvas itself is **off-DOM**. React does not own it and neither does any
 row: it is the OL source's image and what "Lagre" hands to the figure stage,
-and the panel paints into that one element. Same trap as
+and the hook paints into that one element. Same trap as
 `LidarExtractViewer`'s moved canvas node, from the other direction.
 
-Neither panel's output leaves bare. "Behold", the viewer's PNG download and
+Neither tool's output leaves bare. "Behold", the viewer's PNG download and
 "Lagre" all run their canvas through `renderFigureBlob` first, so the azimuth,
 altitude, z-factor, radii and stretch that produced the render travel with the
 pixels — §8.10. On the no-lokalitet path the lokalitet is created *before* the
 figure, so the name the registers just derived can be its title.
 
-The algorithmic side of all this is `docs/terrain-analysis.md`; the panel is
-only the control surface.
+The algorithmic side of all this is `docs/terrain-analysis.md`; the ribbon rows
+are only the control surface.
 
 ---
 
@@ -2060,8 +2114,10 @@ when a funn escapes it.
 run terrain analysis (DTM or DOM) with five visualizations and live azimuth /
 altitude / exaggeration / opacity over *either* the visible map — signed out,
 with no lokalitet — or an open lokalitet's rectangle, with the render drawn on
-the map under the heritage layers; re-frame the analysed rectangle onto the
-current view; save the render (creating the lokalitet if there is none); run a
+the map under the heritage layers and every knob on the ribbon's settings strip
+and its slider row rather than in a column beside the map; re-frame the
+analysed rectangle onto the current view; save the render (creating the
+lokalitet if there is none); run a
 LiDAR extract over the rectangle at a chosen
 source and resolution, view it fullscreen, keep it as a Bilde; fetch flyfoto —
 the seamless mosaic or any historical acquisition covering the area,

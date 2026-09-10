@@ -49,11 +49,14 @@ export const GROUND_MODES = [
 export type GroundMode = (typeof GROUND_MODES)[number];
 
 /**
- * Which family of modifier controls belongs to a ground: the pulldowns row 1
- * puts on the bar beside the ring, and the ring W/S walks. `null` where there
- * is nothing to modify from row 1 — Standard has no variants, and Terreng's
- * knobs (visualization, DTM/DOM, light, opacity) are in its dock panel, on the
- * rectangle it is analysing.
+ * Which family of modifier controls belongs to a ground: what the settings
+ * strip puts under row 1, and — for the two raster families — the ring W/S
+ * walks. `null` only for Standard, which has no variants to offer.
+ *
+ * Terreng is in the list like the rest of them. Its knobs used to live in a
+ * dock column down the side of the map, so pressing 5 moved the controls to a
+ * different part of the screen and then covered the terrain they described;
+ * the strip is where every other ground's modifiers already were.
  *
  * Keyed on the ground *on screen*, deliberately not on which background layer
  * is set. Those two answers differ for exactly one mode, and it is the one
@@ -62,7 +65,9 @@ export type GroundMode = (typeof GROUND_MODES)[number];
  * underneath a terrain render — and a bar driven off them offers ortofoto
  * acquisitions for imagery nobody can see, while the user reads relief.
  */
-const groundModifiers = (mode: GroundMode): 'lidar' | 'flyfoto' | null => {
+const groundModifiers = (
+  mode: GroundMode,
+): 'lidar' | 'flyfoto' | 'terrain' | null => {
   switch (mode) {
     // Hybrid is a modifier on the LiDAR stack, so it keeps LiDAR's own
     // modifiers — dataset, style, DTM/DOM — working underneath it (§5.2).
@@ -71,6 +76,8 @@ const groundModifiers = (mode: GroundMode): 'lidar' | 'flyfoto' | null => {
       return 'lidar';
     case 'flyfoto':
       return 'flyfoto';
+    case 'terreng':
+      return 'terrain';
     default:
       return null;
   }

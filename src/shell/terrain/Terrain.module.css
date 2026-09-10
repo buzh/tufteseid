@@ -1,0 +1,62 @@
+/*
+ * Terrenganalyse on the ribbon. The render is on the map — see
+ * terrainOverlayLayer.ts — so what is here is knobs, a resolution readout and
+ * two verbs, spread over the settings strip and one slider row under it.
+ *
+ * Nothing here is a panel. Both rows are thin and both let the terrain
+ * through, which is the whole reason the knobs left the dock column.
+ */
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.error {
+  color: var(--c-danger);
+}
+
+/* The two verbs stay glued when the strip wraps: "Flytt analysen hit" and
+   "Lagre som ny lokalitet" are a pair of decisions about the same rectangle,
+   and one of them arriving alone on a line reads as a different control. */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* Fixed basis and no stretch: a light-sweep slider needs travel, and letting
+   four of them share the row's free space would give each about a
+   centimetre on a laptop. */
+.sliders {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+}
+
+.slider {
+  flex: 0 1 200px;
+}
+
+.slider input[type='range'] {
+  width: 100%;
+  margin: 0;
+  display: block;
+}
+
+.sliderHead {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+.sliderValue {
+  font-variant-numeric: tabular-nums;
+}

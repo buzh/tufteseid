@@ -54,7 +54,7 @@ in memory is the single most effective way to notice an earthwork, and it is
 exactly what a pre-rendered WMS cannot offer. The two illumination-independent
 views cover what no sun angle shows.
 
-Files: `src/terrain/{dem,shade,render}.ts`, `src/terrain/TerrainPanel.tsx`.
+Files: `src/terrain/{dem,shade,render}.ts`, `src/shell/terrain/*`.
 Proxy route `/arcgis/hoydedata/*`. Reuses `attachments.kind = 'extract'`, so no
 PocketBase migration.
 

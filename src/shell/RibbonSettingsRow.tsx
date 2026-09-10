@@ -14,6 +14,8 @@ import { LidarModelToggle } from './lidar/LidarModelToggle';
 import { LidarStylePicker } from './lidar/LidarStylePicker';
 import type { LidarControls } from './lidar/useLidarControls';
 import styles from './Ribbon.module.css';
+import { TerrainStrip } from './terrain/TerrainStrip';
+import type { TerrainAnalysis } from './terrain/useTerrainAnalysis';
 import type { GroundControls, GroundMode } from './useGroundMode';
 
 /**
@@ -22,9 +24,8 @@ import type { GroundControls, GroundMode } from './useGroundMode';
  * the LiDAR stack's, but the person reading the map is reading Hybrid, and
  * labelling the strip "LiDAR" there would describe the plumbing instead.
  *
- * Exhaustive over GroundMode even though Standard and Terreng never render a
- * strip, so adding a sixth ground is a type error here rather than an
- * unlabelled bar.
+ * Exhaustive over GroundMode even though Standard never renders a strip, so
+ * adding a sixth ground is a type error here rather than an unlabelled bar.
  */
 const SUBJECT_KEY: Record<GroundMode, string> = {
   standard: 'ribbon.mode.standard',
@@ -56,9 +57,14 @@ const SUBJECT_KEY: Record<GroundMode, string> = {
  *   screen.
  *
  * Absent rather than empty when there is nothing to adjust: Standard has no
- * variants, and Terreng's knobs stay in its dock panel, next to the rectangle
- * they describe. A labelled bar with no controls in it would spend map pixels
+ * variants, and a labelled bar with no controls in it would spend map pixels
  * to say nothing.
+ *
+ * Terreng is the one subject that also puts a second line under this one —
+ * its four sliders, in `TerrainSliders`, rendered by row 1 as a sibling. That
+ * is still "one line each": what the rule forbids is a *body*, and two thin
+ * rows over the map cost less of it than the 360 px dock column those knobs
+ * used to live in, which covered the terrain it was describing.
  *
  * With the compare curtain up the strip also carries the A|B switch, and both
  * questions above are then asked of the *focused* half — the controls on this
@@ -74,10 +80,12 @@ export const RibbonSettingsRow = ({
   ground,
   lidar,
   flyfoto,
+  terrain,
 }: {
   ground: GroundControls;
   lidar: LidarControls;
   flyfoto: FlyfotoControls;
+  terrain: TerrainAnalysis;
 }) => {
   const { t } = useTranslation();
   const compareOn = useAtomValue(compareOnAtom);
@@ -138,6 +146,13 @@ export const RibbonSettingsRow = ({
           />
         </div>
       )}
+
+      {/* Not wrapped in a `group` like the two above: Terreng brings the most
+          controls of any subject — five long Norwegian visualization names,
+          a model toggle, a readout and two verbs — and holding them together
+          on one unbreakable line is what would push the strip off a laptop.
+          It supplies its own grouping for the pairs that must not split. */}
+      {ground.modifiers === 'terrain' && <TerrainStrip terrain={terrain} />}
     </div>
   );
 };

@@ -393,8 +393,6 @@
       "starterNone": "No data found for this area. The starter set produced no images."
     },
     "terrain": {
-      "heading": "Terrain analysis",
-      "close": "Close terrain analysis",
       "visualization": "Visualization",
       "vis": {
         "hillshade": "Hillshade",
@@ -414,6 +412,7 @@
       "altitude": "Sun altitude",
       "zFactor": "Exaggeration",
       "opacity": "Opacity",
+      "lightLabel": "Light and opacity",
       "resolution": "{{m}} m/px · {{w}}×{{h}}",
       "resolutionCapped": "{{m}} m/px · {{w}}×{{h}} · source {{src}} m",
       "reframe": "Move analysis here",

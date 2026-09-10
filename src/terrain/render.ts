@@ -1,9 +1,10 @@
 // Terrenganalyse without a control surface: DEM → field → pixels.
 //
-// Extracted from TerrainPanel so "Hent grunnpakke" can produce the same
-// render with nobody watching. The panel keeps every knob; what moved here is
-// only the arithmetic between a knob position and a canvas, which is why the
-// three functions below are the panel's three steps and not one `render()`.
+// Extracted from the terrain control surface so "Hent grunnpakke" can produce
+// the same render with nobody watching. `useTerrainAnalysis` keeps every knob;
+// what moved here is only the arithmetic between a knob position and a canvas,
+// which is why the three functions below are its three steps and not one
+// `render()`.
 //
 // **The split between `terrainStaticField` and `terrainField` is
 // load-bearing** (docs/ui-architecture.md §10). Sky-view factor is ~800 ms on
