@@ -1,15 +1,40 @@
+/*
+ * The draft form in a ribbon row: drawing on the left, naming on the right.
+ * Stacked in a single column the title field ended up below the drawing
+ * controls' own two rows of buttons, which on a short window put "Lagre"
+ * off the bottom of a bar that is already sitting on top of the map.
+ */
+
 .root {
   display: flex;
+  align-items: flex-start;
+  gap: var(--sp-5);
+}
+
+.draw {
+  display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
+  gap: var(--sp-2);
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  flex: 1 1 280px;
+  min-width: 0;
 }
 
 .instructions {
+  margin: 0;
   font-size: var(--font-xs);
   color: var(--c-fg-muted);
 }
 
 .error {
+  margin: 0;
   font-size: var(--font-xs);
   color: var(--c-danger);
 }
@@ -18,4 +43,16 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--sp-3);
+}
+
+@media (max-width: 47.999rem) {
+  .root {
+    flex-direction: column;
+    gap: var(--sp-4);
+  }
+
+  .draw,
+  .form {
+    width: 100%;
+  }
 }
