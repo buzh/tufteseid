@@ -10,11 +10,10 @@ import {
   snapEffect,
 } from '../../settings/draw/atoms.ts';
 import { useIsMobileScreen } from '../../shared/hooks.ts';
+import { Button, ConfirmPopover } from '../../ui';
 import { ColorControls } from '../ColorControls.tsx';
-import { DrawControlFooter } from '../DrawControlsFooter.tsx';
 import { DrawToolSelector } from '../DrawToolSelector.tsx';
 import {
-  distanceUnitAtomEffect,
   drawStyleEffect,
   editPointIconEffect,
   editPrimaryColorEffect,
@@ -42,13 +41,12 @@ const MEASUREMENT_TYPES: DrawType[] = [
 ];
 
 export const DrawControls = () => {
-  const { drawType } = useDrawSettings();
+  const { drawType, clearDrawing } = useDrawSettings();
   const [selectedFeature] = useAtom(selectedFeatureAtom);
   const isMobile = useIsMobileScreen();
   const { t } = useTranslation();
   useAtom(drawEnabledEffect);
   useAtom(drawTypeEffect);
-  useAtom(distanceUnitAtomEffect);
   useAtom(snapEffect);
   useAtom(drawStyleEffect);
   useAtom(editPrimaryColorEffect);
@@ -110,7 +108,17 @@ export const DrawControls = () => {
         {showMeasurementControls && <MeasurementControls />}
       </Flex>
       <EditControls drawType={drawType} />
-      <DrawControlFooter />
+      <ConfirmPopover
+        title={t('draw.confrimClear')}
+        confirmLabel={t('shared.yes')}
+        cancelLabel={t('shared.cancel')}
+        onConfirm={clearDrawing}
+        trigger={(props) => (
+          <Button {...props} size="xs" palette="red" leftIcon="delete">
+            {t('draw.clear')}
+          </Button>
+        )}
+      />
     </VStack>
   );
 };

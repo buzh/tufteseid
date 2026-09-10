@@ -1,27 +1,8 @@
 {
-  "controller": {
-    "draw": {
-      "text": "Tools",
-      "mobiletext": "Tools"
-    },
-    "lidarExtract": {
-      "text": "LiDAR extract",
-      "mobiletext": "LiDAR"
-    },
-    "export": "Export and download",
-    "hide": "Minimize"
-  },
   "draw": {
-    "begin": "Draw on map",
     "clear": "Clear drawing",
-    "close": "Close",
     "confrimClear": "Now everything that has been drawn will be removed. Are you sure?",
     "controls": {
-      "colorBackground": "Background ",
-      "colorFill": "Fill",
-      "colorPoint": "Point",
-      "colorStroke": "Stroke",
-      "colorText": "Text",
       "recentColors": "Recent colors",
       "pointType": "Select icon",
       "showMeasurements": "Show measurements on map",
@@ -35,42 +16,22 @@
           "text": "Text"
         },
         "tooltip": {
-          "movedown": "Move down",
-          "moveup": "Move up",
           "undo": "Undo",
           "redo": "Redo",
           "deleteselected": "Delete selected"
         }
       },
-      "toolSelect": {
-        "placeholder": "Select draw tool"
-      },
       "color": "Colors",
       "edit": "Edit",
-      "defaults": {
-        "primary": "Primary",
-        "secondary": "Secondary"
-      },
       "lineType": "Line type",
       "editInstruction": "Select an element to edit or move"
     },
-    "deleteSelection": "Remove selected",
-    "end": "Done",
-    "save": "Save drawing",
     "size": {
       "label": "Stroke width",
       "pointLabel": "Point size",
       "textLabel": "Text size"
     },
-    "tabHeading": "Draw and measure",
-    "textInputLabel": "Enter text",
-    "tools": "Tools",
-    "yesClear": "Yes clear",
-    "redoundo": "Undo / Redo ",
-    "download": "Download",
-    "uploadButton": {
-      "label": "Upload"
-    }
+    "textInputLabel": "Enter text"
   },
   "infoBox": {
     "address": "Address",
@@ -213,31 +174,9 @@
     "maxLength": "Max 100 characters"
   },
   "shared": {
-    "actions": {
-      "download": "Download",
-      "select": "Select"
-    },
     "close": "Close",
-    "open": "Open",
-    "units": {
-      "meter": "Metre",
-      "nauticalMile": "Nautical mile"
-    },
     "yes": "Yes",
-    "no": "No",
-    "in": "in",
-    "locations": {
-      "municipality": "municipality"
-    },
     "cancel": "Cancel",
-    "geometry": {
-      "types": {
-        "point": "Points",
-        "linestring": "Lines",
-        "polygon": "Surfaces"
-      }
-    },
-    "moreInfo": "More info",
     "errorBoundary": {
       "title": "Something went wrong here",
       "retry": "Try again"
@@ -267,29 +206,6 @@
     "textthree": "Map and elevation data come from Kartverket and Geonorge, heritage data from Riksantikvaren. The data is theirs and subject to their own terms of use. Nothing you find here has been vetted by either of them.",
     "version": "Version",
     "buildDate": "Built"
-  },
-  "importDialog": {
-    "header": "Import file for drawlayer",
-    "body": {
-      "text": "Select a file, either GPX, GML or GEOJSON to upload to the map. If you want, you can overwrite the existing drawing with the contents of the file. ",
-      "details": {
-        "heading": "Features in file"
-      }
-    },
-    "overwriteSwitch": {
-      "label": "Overwrite drawing",
-      "tooltip": "Will remove all drawings currently on the map"
-    },
-    "buttons": {
-      "confirm": {
-        "label": "Upload"
-      }
-    },
-    "fileupload": {
-      "dragdrop": {
-        "label": "Drag and drop or select a file"
-      }
-    }
   },
   "measure": {
     "label": "Measuring tool",

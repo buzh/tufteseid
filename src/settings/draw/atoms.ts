@@ -55,8 +55,6 @@ export const DEFAULT_SECONDARY_COLOR = '#1d823b80';
 
 export type LineWidth = 2 | 4 | 8;
 
-export type DistanceUnit = 'm' | 'NM';
-
 export type TextFontSize = 12 | 16 | 24;
 
 export type LineStyle = 'solid' | 'dashed';
@@ -96,7 +94,6 @@ export const drawStyleReadAtom = atom((get) => {
 
 export const drawTypeAtom = atom<DrawType | null>(null);
 export const showMeasurementsAtom = atom<boolean>(false);
-export const distanceUnitAtom = atom<DistanceUnit>('m');
 export const pointIconAtom = atom<MaterialSymbol>('circle');
 
 export const textInputAtom = atom('');

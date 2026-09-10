@@ -1,27 +1,8 @@
 {
-  "controller": {
-    "draw": {
-      "text": "Teikne og måle",
-      "mobiletext": "Verktøy"
-    },
-    "lidarExtract": {
-      "text": "LiDAR-uttrekk",
-      "mobiletext": "LiDAR"
-    },
-    "export": "Eksport og lagring",
-    "hide": "Minimer"
-  },
   "draw": {
-    "begin": "Teikn på kartet",
     "clear": "Fjern teikninga",
-    "close": "Lukk",
     "confrimClear": "No blir alt som er teikna, fjerna. Er du sikker?",
     "controls": {
-      "colorBackground": "Bakgrunn",
-      "colorFill": "Fyll",
-      "colorPoint": "Punkt",
-      "colorStroke": "Omriss",
-      "colorText": "Tekst",
       "recentColors": "Nylege fargar",
       "pointType": "Punkttype",
       "showMeasurements": "Vis målingar",
@@ -35,47 +16,22 @@
           "text": "Tekst"
         },
         "tooltip": {
-          "movedown": "Flytt ned",
-          "moveup": "Flytt opp",
           "undo": "Angre",
           "redo": "Gjer om",
           "deleteselected": "Slett valde element"
         }
       },
-      "toolSelect": {
-        "placeholder": "Vel teiknemåte"
-      },
       "color": "Fargar",
       "edit": "Rediger",
-      "defaults": {
-        "primary": "Hovudfarge",
-        "secondary": "Sekundær"
-      },
       "lineType": "Linjetype",
       "editInstruction": "Vel eit element du vil redigere eller flytte"
     },
-    "deleteSelection": "Fjern valde",
-    "end": "Ferdig",
-    "save": "Lagre teikning",
     "size": {
       "label": "Linjetjukkleik",
       "pointLabel": "Punktstorleik",
       "textLabel": "Tekststorleik"
     },
-    "tabHeading": "Teikne og måle",
-    "textInputLabel": "Skriv inn tekst",
-    "tool": {
-      "tooltip": {
-        "text": "Tekst"
-      }
-    },
-    "tools": "Verktøy",
-    "yesClear": "Ja, fjern",
-    "redoundo": "Angre / Gjør om",
-    "download": "Last ned",
-    "uploadButton": {
-      "label": "Last opp"
-    }
+    "textInputLabel": "Skriv inn tekst"
   },
   "infoBox": {
     "address": "Adresse",
@@ -218,31 +174,9 @@
     "maxLength": "Maks 100 teikn"
   },
   "shared": {
-    "actions": {
-      "download": "Last ned",
-      "select": "Vel"
-    },
     "close": "Lukk",
-    "open": "Opne",
-    "units": {
-      "meter": "Meter",
-      "nauticalMile": "Nautisk mil"
-    },
     "yes": "Ja",
-    "no": "Nei",
-    "in": "i",
-    "locations": {
-      "municipality": "kommune"
-    },
     "cancel": "Avbryt",
-    "geometry": {
-      "types": {
-        "point": "Punkter",
-        "linestring": "Linjer",
-        "polygon": "Flateer"
-      }
-    },
-    "moreInfo": "Meir info",
     "errorBoundary": {
       "title": "Noko gjekk gale her",
       "retry": "Prøv igjen"
@@ -272,29 +206,6 @@
     "textthree": "Kartdata og høgdedata kjem frå Kartverket og Geonorge, kulturminnedata frå Riksantikvaren. Dataa er deira, og er underlagde deira eigne bruksvilkår. Det du finn her er ikkje kvalitetssikra av nokon av dei.",
     "version": "Versjon",
     "buildDate": "Bygd"
-  },
-  "importDialog": {
-    "header": "Importer fil til teknelag",
-    "body": {
-      "text": "Vel ei fil, enten GPX, GML eller GEOJSON. Om du vil erstatte det som er tekna på kartet med innholdet i fila.",
-      "details": {
-        "heading": "Objekt i fila"
-      }
-    },
-    "overwriteSwitch": {
-      "label": "Overskriv tekning",
-      "tooltip": "Vil fjerne all tekning på kartet"
-    },
-    "buttons": {
-      "confirm": {
-        "label": "Last opp"
-      }
-    },
-    "fileupload": {
-      "dragdrop": {
-        "label": "Dra og slipp, eller vel ei fil"
-      }
-    }
   },
   "measure": {
     "label": "Måleverktøy",

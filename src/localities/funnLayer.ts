@@ -12,7 +12,7 @@ import {
   LocalityFindRecord,
   subscribeLocalityFinds,
 } from '../api/localityFinds';
-import { getStyleFromProperties } from '../draw/dialogs/import/utils';
+import { getStyleFromProperties } from '../draw/featureStyle';
 import { mapAtom } from '../map/atoms';
 import { activeLocalityAtom } from './atoms';
 

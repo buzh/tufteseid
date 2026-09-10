@@ -745,15 +745,32 @@ add a "don't show this again" checkbox without thinking about it.
 
 ## 9. Drawing
 
-`src/draw/` plus `src/settings/draw/` — 31 files, ~4400 lines, the largest
-subsystem in the app. Inherited largely intact from upstream and the
-least-touched part of the fork.
+`src/draw/` plus `src/settings/draw/` — 23 files, ~3500 lines, the largest
+subsystem in the app. Inherited from upstream and the least-touched part of the
+fork; trimmed once, ahead of the port off kvib.
 
 `DrawType` is exactly six: point, line, polygon, circle, text, and `Move` (the
 edit/select tool). Editing: select, translate, modify, delete, plus a
 vertical-move hook. Styling: colour, line width, line style, point style, text
-style. Plus import/export dialogs (GeoJSON/GPX-ish, slated for deletion — §12),
-undo/redo, and measurement readouts.
+style. Plus undo/redo and measurement readouts.
+
+**What the trim removed, and why it isn't coming back.** The file
+import/export dialogs (`dialogs/import/`, `dialogs/ExportDialog.tsx`,
+`export/`) let a drawing be written out as GeoJSON/GPX and read back in. A funn
+already persists to PocketBase on save; the dialogs were an upstream answer to
+a question this fork doesn't ask, and the export half additionally wrote
+Norgeskart-branded filenames. `DrawControlsFooter.tsx` existed only to hold
+their buttons plus the clear-drawing confirm — that confirm now lives inline in
+`DrawControls.tsx` as a `ConfirmPopover`. The nautical-mile unit went with them
+(upstream is a sea-chart viewer; this one reads inland relief), so
+`MeasurementControls` is a single show/hide `Switch` on `showMeasurementsAtom`
+and `formatDistance` / `formatArea` are metric-only.
+
+One live thing was buried in the import dialog's utils: `getStyleFromProperties`
+and its two siblings, which are the *load* half of the round-trip
+`serializeDrawLayer.ts` writes and are read by both the editable draw layer and
+the read-only funn layer. They now live in `src/draw/featureStyle.ts`, together
+with the `StyleForStorage` shape that had been sitting in `src/api/nkApiClient.ts`.
 
 Two surfaces render the same tools: `DrawToolSelector` (desktop, inside
 `DrawControls`, which the draft row of the ribbon renders) and
@@ -924,11 +941,13 @@ callbacks, `createFromBbox`, `BilderSection`, `TerrainPanel` and
 `src/settings/draw/` and all of `src/localities/` bar `LocalitiesPanel` are now
 clear.
 
-Still on kvib — 43 files, and each row is a separate piece of work:
+Still on kvib — 35 files, and each row is a separate piece of work (plus
+`src/ui/Icon.tsx`, which re-exports the `MaterialSymbol` union, and
+`src/mainApp.tsx`, which mounts the provider; those two are the strip itself):
 
 | Surface | Size | Note |
 |---|---|---|
-| `src/draw/**` | ~3700 lines | the largest subsystem; inherited upstream, least-touched |
+| `src/draw/**` | 9 files | the largest subsystem; inherited upstream, least-touched |
 | `src/search/**` | ~3200 lines | results list + infobox; also the one with no `t()` at all (§5.4) |
 | `LidarExtractViewer` | 602 lines | layout primitives and buttons only |
 | `KulturminnerPopup` | 557 lines | §7.1 |
@@ -945,22 +964,13 @@ layout/typography convention to replace `Box`/`Flex`/`HStack`/`VStack`/`Stack`/
 
 Two decisions taken to keep that list short rather than long:
 
-- **The drawing import/export dialogs go, they are not ported.** ~780 lines
-  (`ImportDialog`, `dialogs/import/utils`, `ImportContentDetails`,
-  `ExportDialog`, `ExportControls`, `exportUtils`) plus the `DrawControlsFooter`
-  accordion that fronts them. Funn geometry already persists to PocketBase, and
-  file-level GeoJSON/GPX round-tripping is upstream Norgeskart's "save your
-  drawing" feature, which this fork's per-lokalitet drawing does not need.
-  Deleting them also removes the only call for a `FileUpload` dropzone. First
-  move `getStyleFromProperties` out of `dialogs/import/utils.ts` — despite the
-  path it is live style code, imported by `localities/funnLayer.ts` and
-  `drawControls/hooks/drawSettings.ts`.
+- **The drawing import/export dialogs went rather than being ported** — done;
+  ~900 lines, the nautical-mile unit and the only call for a `FileUpload`
+  dropzone with them. Rationale and the one live thing that had to be rescued
+  first: §9.
 - **The colour picker becomes `<input type="color">` plus the existing recent
   swatches**, not a hand-built saturation/hue/alpha surface. That was the single
   largest component the migration would otherwise have owed.
-
-Also going while draw is opened up: the nautical-mile unit in
-`MeasurementControls`, an upstream sea-chart concern.
 
 Until the last of those goes, kvib's cost stays: it drags in Chakra, emotion,
 the `@zag-js` machine set, `react-select`, `react-day-picker`, `react-aria`,
@@ -1040,10 +1050,10 @@ rectangle on the map to open it; see which known kulturminner already fall
 inside it.
 
 **Record what you find**
-create a funn; draw it as point, line, polygon, rectangle, circle, text or
-freehand; style it (colour, width, line style, point style, text style); select,
-move, reshape, vertex-edit and delete geometry; undo/redo; import and export
-drawings; name a funn; note it; set its status (mulig / sannsynlig / avkreftet /
+create a funn; draw it as point, line, polygon, circle or text; style it
+(colour, width, line style, point style, text style); select, move, reshape,
+vertex-edit and delete geometry; undo/redo; show or hide measurements on the
+drawing; name a funn; note it; set its status (mulig / sannsynlig / avkreftet /
 rapportert); zoom to it; walk the funn list with ↑/↓/Enter; grow the lokalitet
 when a funn escapes it.
 

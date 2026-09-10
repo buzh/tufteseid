@@ -4,11 +4,7 @@ import { Circle, Geometry, LineString, Polygon } from 'ol/geom';
 import { getArea, getLength } from 'ol/sphere';
 import { Stroke, Style } from 'ol/style';
 import { mapAtom } from '../../map/atoms';
-import {
-  DistanceUnit,
-  distanceUnitAtom,
-  showMeasurementsAtom,
-} from '../../settings/draw/atoms';
+import { showMeasurementsAtom } from '../../settings/draw/atoms';
 import { formatArea, formatDistance } from '../../shared/utils/stringUtils';
 import type { MaterialSymbol } from '../../ui';
 import {
@@ -19,33 +15,29 @@ import {
 } from './hooks/drawSettings';
 import { getDrawOverlayLayer } from './hooks/mapLayers';
 
-const getMeasurementText = (
-  geometry: Geometry,
-  projection: string,
-  unit: DistanceUnit,
-) => {
+const getMeasurementText = (geometry: Geometry, projection: string) => {
   if (geometry instanceof Polygon) {
     const area = getArea(geometry, { projection: projection });
-    return formatArea(area, unit);
+    return formatArea(area);
   }
   if (geometry instanceof LineString) {
     const length = getLength(geometry, { projection: projection });
-    return formatDistance(length, unit);
+    return formatDistance(length);
   }
   if (geometry instanceof Circle) {
-    return `${getCircleRadiusMeasurementText(geometry, unit)}, ${getCircleAreaMeasurementText(geometry, unit)}`;
+    return `${getCircleRadiusMeasurementText(geometry)}, ${getCircleAreaMeasurementText(geometry)}`;
   }
   return '';
 };
 
-const getCircleRadiusMeasurementText = (circle: Circle, unit: DistanceUnit) => {
+const getCircleRadiusMeasurementText = (circle: Circle) => {
   const radius = circle.getRadius();
-  return 'r: ' + formatDistance(radius, unit);
+  return 'r: ' + formatDistance(radius);
 };
 
-const getCircleAreaMeasurementText = (circle: Circle, unit: DistanceUnit) => {
+const getCircleAreaMeasurementText = (circle: Circle) => {
   const area = circle.getRadius() * circle.getRadius() * Math.PI;
-  return 'A: ' + formatArea(area, unit);
+  return 'A: ' + formatArea(area);
 };
 
 const getGeometryPositionForOverlay = (geometry: Geometry) => {
@@ -105,7 +97,6 @@ const clearStaticOverlaysForFeature = (feature: Feature<Geometry>) => {
 const enableFeatureMeasurementOverlay = (feature: Feature<Geometry>) => {
   const store = getDefaultStore();
   const map = store.get(mapAtom);
-  const unit = store.get(distanceUnitAtom);
   const shouldShow = store.get(showMeasurementsAtom);
   if (!shouldShow) {
     return;
@@ -122,8 +113,8 @@ const enableFeatureMeasurementOverlay = (feature: Feature<Geometry>) => {
   const projection = map.getView().getProjection().getCode();
 
   if (geometry instanceof Circle) {
-    const radiusText = getCircleRadiusMeasurementText(geometry, unit);
-    const areaText = getCircleAreaMeasurementText(geometry, unit);
+    const radiusText = getCircleRadiusMeasurementText(geometry);
+    const areaText = getCircleAreaMeasurementText(geometry);
 
     feature.set('measurementText', `${areaText}\n${radiusText}`);
 
@@ -196,7 +187,7 @@ const enableFeatureMeasurementOverlay = (feature: Feature<Geometry>) => {
 
     map.addOverlay(radiusOverlay);
   } else {
-    const measurementText = getMeasurementText(geometry, projection, unit);
+    const measurementText = getMeasurementText(geometry, projection);
 
     feature.set('measurementText', measurementText);
 
@@ -233,7 +224,6 @@ const addInteractiveMeasurementOverlayToFeature = (
 ) => {
   const store = getDefaultStore();
   const map = store.get(mapAtom);
-  const distanceUnit = store.get(distanceUnitAtom);
   const mapProjection = map.getView().getProjection().getCode();
   const featureId = feature.getId();
 
@@ -258,11 +248,7 @@ const addInteractiveMeasurementOverlayToFeature = (
     if (geometryPosition == null) {
       return;
     }
-    const tooltipText = getMeasurementText(
-      geometry,
-      mapProjection,
-      distanceUnit,
-    );
+    const tooltipText = getMeasurementText(geometry, mapProjection);
 
     elm.classList.remove('hidden');
     toolTip.setPosition(geometryPosition);

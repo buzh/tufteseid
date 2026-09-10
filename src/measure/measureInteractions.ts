@@ -1,4 +1,3 @@
-import { getDefaultStore } from 'jotai';
 import { Map } from 'ol';
 import { noModifierKeys, primaryAction } from 'ol/events/condition';
 import { Geometry, LineString, Polygon } from 'ol/geom';
@@ -13,22 +12,17 @@ import {
   addOwnedInteraction,
   removeOwnedInteractions,
 } from '../map/interactions';
-import { DistanceUnit, distanceUnitAtom } from '../settings/draw/atoms';
 import { formatArea, formatDistance } from '../shared/utils/stringUtils';
 
-export const getMeasurementText = (
-  geometry: Geometry,
-  projection: string,
-  unit: DistanceUnit,
-) => {
+export const getMeasurementText = (geometry: Geometry, projection: string) => {
   if (geometry instanceof Polygon) {
     const area = getArea(geometry, { projection });
-    return formatArea(area, unit);
+    return formatArea(area);
   }
 
   if (geometry instanceof LineString) {
     const length = getLength(geometry, { projection });
-    return formatDistance(length, unit);
+    return formatDistance(length);
   }
 
   return '';
@@ -62,8 +56,6 @@ export const addMeasureInteractionToMap = (
   measureLayer: VectorLayer,
   map: Map,
 ) => {
-  const store = getDefaultStore();
-  const unit = store.get(distanceUnitAtom);
   const projection = map.getView().getProjection().getCode();
 
   removeOwnedInteractions(map, 'measure');
@@ -90,7 +82,7 @@ export const addMeasureInteractionToMap = (
     if (!geometry) return;
 
     const listener = geometry.on('change', () => {
-      const text = getMeasurementText(geometry, projection, unit);
+      const text = getMeasurementText(geometry, projection);
 
       feature.setStyle(createMeasureStyle(text));
     });
