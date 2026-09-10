@@ -1110,10 +1110,20 @@ tested locally:
 - The Dockerfile runs `npm ci`, which fails on a package.json/lock mismatch,
   and the workstation cannot run `npm install`. Both packages were already
   locked as `node_modules/*` entries, so the edit was `package.json` plus the
-  root `dependencies` block of `package-lock.json`, by hand and in step. The
-  kvib subtree is still *in* the lock (nothing depends on it, and pruning it
-  by hand would be a hundred entries deep); the next person with a toolchain
-  should run `npm install` once to drop it.
+  root `dependencies` block of `package-lock.json`, by hand and in step.
+- `package-lock.json` was then pruned the same way, in a second pass once the
+  build was known good: 262 of its 507 `packages` entries — kvib, Chakra,
+  emotion, Ark, the whole `@zag-js` and react-aria/react-stately sets,
+  `react-select`, `react-day-picker`, `date-fns`, `react-icons` — were
+  unreachable from the root's dependencies. `npm ci` was installing every one
+  of them into the build stage, and a vulnerability scanner would still have
+  read them as ours. Pruning by hand means reimplementing npm's
+  `node_modules` lookup (walk up from the importer's path) to compute
+  reachability, deleting what it does not reach, and then re-running the same
+  resolution over the *result* to prove every surviving package's declared
+  deps still resolve. Every kept entry stayed byte-identical and in order, so
+  the diff is deletions only. Whoever next has a toolchain should still run
+  `npm install` once and check it produces no diff.
 
 ---
 
