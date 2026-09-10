@@ -217,3 +217,5 @@ export const useGroundMode = (
 
   return { mode, modifiers, select, cycle, peekStart, peekEnd, previous };
 };
+
+export type GroundControls = ReturnType<typeof useGroundMode>;

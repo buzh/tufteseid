@@ -6,22 +6,30 @@ import styles from './Ribbon.module.css';
 import { RibbonGlobalRow } from './RibbonGlobalRow';
 
 /**
- * The bar across the top of the map. Two thin rows at most: row 1 is the map
- * itself and is always there; row 2 is the open lokalitet, and is a context
- * strip rather than a surface.
+ * The bar across the top of the map. Three thin rows at most, in the order a
+ * question leads to the next: row 1 is the map itself and is always there;
+ * the settings strip under it holds the controls for whatever row 1 has
+ * selected, and is absent when that ground has nothing to adjust; the
+ * lokalitet row is last, and is a context strip rather than a surface.
  *
- * Nothing with a body goes here any more. The tray and the tool rows used to
- * grow the bar to five hundred pixels — over the terrain the panels were
- * describing — and have moved to the dock in the right slot.
+ * Nothing with a body goes here. The rule is about **bodies, not rows** — the
+ * tray and the tool rows that were deleted grew the bar to five hundred
+ * pixels, over the terrain the panels were describing, and have moved to the
+ * dock in the right slot. A row that stays one line tall costs ~40 px and
+ * keeps the controls next to the thing they name; a row that can grow does
+ * not, which is why RibbonSettingsRow's one-line cap is a contract rather
+ * than a suggestion.
  *
  * `data-chrome="top"` is how `chromeInsets` finds out how much of the map the
  * bar is covering. Measured rather than a constant because the rows wrap on
- * narrow screens and row 2 comes and goes.
+ * narrow screens and the lower two come and go.
  *
- * Each row gets its own error boundary rather than one around the bar. A
- * crash in the lokalitet row should not take the search field and the
- * background controls with it — the map underneath stays usable, and that is
- * the whole reason the chrome floats over it.
+ * Two error boundaries rather than one around the bar. A crash in the
+ * lokalitet row should not take the search field and the background controls
+ * with it — the map underneath stays usable, and that is the whole reason the
+ * chrome floats over it. Row 1 and its settings strip share a boundary
+ * because they share the two control hooks: a crash in either comes from the
+ * same state, so isolating them from each other would buy nothing.
  */
 export const Ribbon = () => {
   const activeLocality = useAtomValue(activeLocalityAtom);

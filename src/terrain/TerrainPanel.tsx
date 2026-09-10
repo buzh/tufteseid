@@ -81,7 +81,8 @@ export const TerrainPanel = ({
   const openAuthDialog = useSetAtom(isAuthDialogOpenAtom);
   const setActiveLocality = useSetAtom(activeLocalityAtom);
   // Only the standalone entrance can re-frame; with a lokalitet open the
-  // rectangle is the lokalitet's, and "Juster området" in row 2 owns it.
+  // rectangle is the lokalitet's, and "Juster området" in the lokalitet row
+  // owns it.
   const { frame } = useTerrainViewport();
 
   const [model, setModel] = useState<DemModel>('dtm');

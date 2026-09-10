@@ -1,6 +1,7 @@
 /*
  * The ribbon: one white bar across the top of the map, one row per level of
- * context. Row 1 is always there, row 2 appears with an open lokalitet.
+ * context. Row 1 is always there; the settings strip appears when the ground
+ * on screen has something to adjust, the lokalitet row with an open lokalitet.
  *
  * Rows wrap rather than scroll horizontally. The old top bar set
  * `overflowX: auto` below md, which put the account button and the lokalitet
@@ -26,6 +27,27 @@
 .rowSub {
   background: var(--c-bg-subtle);
   border-top: 1px solid var(--c-border);
+}
+
+/* The settings strip. Shorter than a full row: it carries chips and toggles
+   rather than the mode buttons row 1 is sized for, and every pixel here is
+   map the user is not reading. Capped at one line by contract, not by CSS —
+   see RibbonSettingsRow. */
+.rowSettings {
+  min-height: 40px;
+  padding-top: var(--sp-2);
+  padding-bottom: var(--sp-2);
+}
+
+/* Names what the controls belong to. Without it the strip is a row of
+   unlabelled chips whose meaning changes under you when you press 2 or 4. */
+.settingsSubject {
+  flex: none;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-fg-subtle);
 }
 
 /* Keeps a set of controls together when the row wraps. */

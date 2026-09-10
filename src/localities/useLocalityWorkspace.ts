@@ -1159,8 +1159,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     enabled: !lightboxOpen,
     navigable: mode !== 'draft',
     draftActive,
-    // Same toggle as the row-2 button the key is advertised on: N puts the
-    // pen down again rather than doing nothing the second time.
+    // Same toggle as the lokalitet-row button the key is advertised on: N
+    // puts the pen down again rather than doing nothing the second time.
     onNewFunn: () => (draftActive ? stopDraft() : startDraft()),
     onToggleLidar: toggleLidar,
     onScreenshot: takeScreenshot,

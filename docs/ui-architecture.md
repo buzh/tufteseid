@@ -9,7 +9,7 @@ turned out to be the wrong container for anything with a body, and the second
 slice reshaped the app around the work loop it exists for:
 
 - everything about the thing you are working on is in a **right-hand dock**
-  column (§8), and the ribbon is back to two thin rows;
+  column (§8), and the ribbon is back to thin rows with no bodies in them;
 - **all framing is chrome-aware** — `chromeInsets` measures what the floating
   surfaces are covering, so the map fits its subject into the free area (§3.1);
 - lokalitet rectangles and funn are **cased frames over the relief, not tints
@@ -208,7 +208,7 @@ decision everything else follows from.
 └── .overlay  position:absolute inset:0  z --z-overlay
               display:flex  flex-direction:column  pointer-events:none
     ├── .ribbon   flex:0 0 auto   pointer-events:auto   z --z-ribbon
-    │     └── Ribbon                  ← row 1, plus row 2 when a lokalitet is open
+    │     └── Ribbon                  ← row 1, the settings strip, the lokalitet row
     └── .row      flex:1  min-height:0  position:relative  pointer-events:none
           ├── .left    absolute top/left/bottom          SearchComponent + MapToolCards
           └── .right   absolute top/right/bottom  360→400px
@@ -419,22 +419,32 @@ closing in the rewrite.
 
 ## 5. The ribbon
 
-`src/shell/Ribbon.tsx` and the components around it. **Two thin rows at most**,
-and nothing with a body goes in either:
+`src/shell/Ribbon.tsx` and the components around it. **Three thin rows at
+most**, and nothing with a body goes in any of them:
 
 | Row | Component | When |
 |---|---|---|
 | 1 — the map | `RibbonGlobalRow` | always |
-| 2 — the lokalitet | `RibbonLocalityRow` | a lokalitet is open |
+| 2 — settings for the ground on screen | `RibbonSettingsRow` | that ground has something to adjust |
+| 3 — the lokalitet | `RibbonLocalityRow` | a lokalitet is open |
 
-There used to be four. A tool row and the tray stacked under these two could
-reach five hundred pixels of chrome across the top of the map — over the very
-ground the panels were describing — so both moved into the dock (§8). Row 2 is
-a **context strip** now, not a surface: identity on the left, the verbs that are
-part of the work loop on the right, the rest behind an overflow menu. Nothing in
-it opens downwards.
+Rows 1 and 2 render from the same component: both run off `useLidarControls` /
+`useFlyfotoControls`, which are mounted once and only there.
 
-`LocalityRibbon` renders row 2 and is the **one** mount point for
+There used to be four, and the rule that came out of deleting two of them is
+about **bodies, not rows**. What made the old bar unusable was a tray at
+`max-height: min(42vh, 380px)` and tool rows at `min(52vh, 460px)` — five
+hundred pixels of chrome over the very ground the panels were describing — so
+both moved into the dock (§8). A row that cannot grow past one line costs
+~40 px and keeps a control next to the thing it names, which is why the
+settings strip is capped by contract (§5.1) rather than by a `max-height` that
+would merely make it scroll.
+
+Rows 2 and 3 are **context strips**, not surfaces. Nothing in either opens
+downwards; row 3 is identity on the left, the verbs that are part of the work
+loop on the right, the rest behind an overflow menu.
+
+`LocalityRibbon` renders the lokalitet row and is the **one** mount point for
 `useLocalityWorkspace` — that hook opens two PocketBase realtime subscriptions
 that reload the whole list on every event, so a second call site doubles both.
 It also portals `LocalityDock` into the shell's right slot through
@@ -443,16 +453,17 @@ making every one of its callbacks nullable: one React tree, two places in the
 DOM.
 
 `data-chrome="top"` on the bar is how framing code learns how much of the map it
-covers (§3.1). Measured rather than a constant, because row 2 comes and goes and
+covers (§3.1). Measured rather than a constant, because rows 2 and 3 come and go and
 the rows wrap on narrow screens. The old TopBar's answer to "fourteen controls
 do not fit on a phone" was `overflowX: auto` on the whole bar, which made the
 pulldowns inside it clip; that is gone.
 
-### 5.1 Row 1, left to right
+### 5.1 Row 1 and its settings strip
 
 Left to right, and the order is the argument: find a place, choose what the
 ground looks like, overlay the heritage record on it, then act on what you are
-looking at.
+looking at. Row 1 answers **what am I looking at**; the strip under it answers
+**how**, for whichever ground row 1 has selected.
 
 | Control | What it does |
 |---|---|
@@ -464,9 +475,6 @@ looking at.
 | **Terreng** (5) | Terrain analysis: relief computed here from float elevation, over the open lokalitet's rectangle if there is one and the visible map otherwise (§10) |
 | **Sammenlign** | Puts a second ground on the right of a draggable curtain, with a pulldown for which one (§5.8) |
 | **Skjul merker** (H) | Takes our own marks — funn, their halo, the lokalitet rectangles — off the map for as long as it is pressed in (§8.6) |
-| Dataset pulldown | LiDAR: **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport. Flyfoto: the seamless mosaic or any acquisition covering the viewport, newest first |
-| Style pulldown | The active LiDAR dataset's WMS styles, with a "flere stiler" second tier |
-| DTM / DOM segment | Terrain model vs surface model |
 | **Kulturminner** | Toggles the five Riksantikvaren theme layers as a group |
 | **Kartlag** | Opens the theme-layer card (`MapTool = 'layers'`) |
 | Mål | Popover with the measure tools |
@@ -478,8 +486,8 @@ The five grounds are **one ring**, in digit order, driven by
 `useGroundMode` (`src/shell/useGroundMode.ts`). Underneath they are three
 different mechanisms — a background-layer atom, a modifier flag, and a rectangle
 to analyse — and the buttons used to speak all three separately, with Terreng in
-a different group that *disappeared whenever a lokalitet was open* because row 2
-carried a second copy of the verb. Two controls for one surface disagreeing
+a different group that *disappeared whenever a lokalitet was open* because the
+lokalitet row carried a second copy of the verb. Two controls for one surface disagreeing
 about which rectangle "Lagre" keeps is why there is one now. One list, one
 index, one setter; `GROUND_MODES` is the render order and the digit order at
 once, and `GROUND_KEYS` in `useBackgroundCyclingKeys` is positional against it.
@@ -489,19 +497,45 @@ replace the background, it covers it. Leaving therefore costs nothing and
 returns you to exactly the dataset and style you left — 1→5→1 is free where
 1→2→1 is a screenful of tile requests.
 
-**The pulldown group belongs to the ground on screen**, and follows the ring:
-LiDAR's dataset / style / DTM-DOM in modes 2 and 3, the acquisition list in
-mode 4, nothing in Standard, and nothing in Terreng — whose own knobs are in
-its dock panel (§10), on the rectangle it is analysing. `groundModifiers()` in
-`useGroundMode` is the single mapping, and both the pulldowns and the W/S ring
-(§5.3) read it. It is keyed on the *mode*, never on which background layer is
-loaded, because those two answers differ for exactly one ground and it is the
-one the mapping exists for: Terreng covers the background rather than replacing
-it, so `isLidarBackground` / `isFlyfotoBackground` stay true underneath a
-terrain render. A bar driven off those predicates — as it was — offers ortofoto
-acquisitions from 1937 while the user is reading a hillshade. The two control
-hooks own *how* their ring works and cannot see Terreng from where they sit;
-whether they are on screen or asked for a key is decided in `useGroundMode`.
+**The settings strip belongs to the ground on screen**, and follows the ring:
+
+| Ground | Strip |
+|---|---|
+| Standard (1) | *absent* — no variants to choose between |
+| LiDAR (2), Hybrid (3) | Dataset pulldown — **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport · style pulldown (the active dataset's WMS styles, with a "flere stiler" second tier), only when the dataset publishes more than one · DTM/DOM segment |
+| Flyfoto (4) | Acquisition pulldown — the seamless mosaic or any acquisition covering the viewport, newest first |
+| Terreng (5) | *absent* — its knobs are in the dock panel (§10), on the rectangle they analyse |
+
+Absent, not empty: a labelled bar with no controls in it would spend map pixels
+to say nothing.
+
+`RibbonSettingsRow` splits the two questions deliberately. `ground.modifiers`
+picks the **controls**, because they act on a stack and Hybrid is a modifier on
+the LiDAR stack rather than a stack of its own; `ground.mode` picks the
+**label**, because telling someone in Hybrid that they are adjusting "LiDAR"
+describes the plumbing rather than the map.
+
+`groundModifiers()` in `useGroundMode` is the single mapping, and both the
+strip and the W/S ring (§5.3) read it. It is keyed on the *mode*, never on
+which background layer is loaded, because those two answers differ for exactly
+one ground and it is the one the mapping exists for: Terreng covers the
+background rather than replacing it, so `isLidarBackground` /
+`isFlyfotoBackground` stay true underneath a terrain render. A bar driven off
+those predicates — as it was — offers ortofoto acquisitions from 1937 while the
+user is reading a hillshade. The two control hooks own *how* their ring works
+and cannot see Terreng from where they sit; whether they are on screen or asked
+for a key is decided in `useGroundMode`.
+
+Two constraints on the strip that are load-bearing rather than stylistic:
+
+- **One line, by contract.** Anything a ground needs beyond that goes in a
+  popover anchored to a control already on the strip, the way the dataset
+  pickers do. A subject whose controls stop fitting is the signal to move
+  something into a popover, never to let the strip grow — that is how the
+  five-hundred-pixel bar happened the first time.
+- **Not registered with `anyOverlayOpenAtom`.** The strip is chrome, not an
+  overlay. Counting it as one would disable 1–5 and W/S/A/D (§5.3) exactly
+  while someone is using the controls those keys are the shortcut for.
 
 Changing the ground *beneath* a terrain render therefore means leaving Terreng
 first. That is the accepted cost: the opacity slider fades the render towards
@@ -533,7 +567,7 @@ multiply the mode buttons and break cycling.
 deliberate exception.** It is a modifier by mechanism and one of the five things
 you flip between by intent, and splitting the ring to say so would cost more
 than it explains. The distinction is unharmed where it does work: DTM/DOM and
-the style pick stay in the pulldown group, and picking Hybrid still activates
+the style pick stay on the settings strip, and picking Hybrid still activates
 the LiDAR stack underneath rather than replacing it.
 
 Switching to Flyfoto deliberately leaves `hybridOverlayAtom` alone rather than
@@ -992,12 +1026,12 @@ is a context strip plus a dock column:
 
 | Region | Component | Contents |
 |---|---|---|
-| Identity + verbs | `RibbonLocalityRow` (row 2) | back, inline-editable name, visibility badge, summary line, zoom-to; then Nytt funn · LiDAR-uttrekk · Bilde · Flyfoto, with Hent grunnpakke / Last opp / Juster området / Slett behind a `more_vert` menu |
+| Identity + verbs | `RibbonLocalityRow` (the lokalitet row) | back, inline-editable name, visibility badge, summary line, zoom-to; then Nytt funn · LiDAR-uttrekk · Bilde · Flyfoto, with Hent grunnpakke / Last opp / Juster området / Slett behind a `more_vert` menu |
 | Everything with a body | `LocalityDock` (right slot) | the live tool band, then Funn · Bilder · Kulturminner · Detaljer as sections |
 | Dialogs | `LocalityDialogs` | flyfoto licensing notice, flyfoto picker |
 
-Terreng is deliberately *not* in row 2 — it is a ground mode in row 1 and works
-the same with or without a lokalitet (§5.1, §10).
+Terreng is deliberately *not* in the lokalitet row — it is a ground mode in
+row 1 and works the same with or without a lokalitet (§5.1, §10).
 
 Splitting the old panel up removed the `key={locality.id}` remount that used to
 reset its `useState`, which is why the state had to move into the controller
@@ -1114,7 +1148,7 @@ the overlay actually took focus.
 |---|---|
 | ↑ / ↓ | Move funn selection (only when `navigable`) |
 | Enter | Zoom to selected funn (only when `navigable`) |
-| N | Arm drawing / put the pen down — the same toggle as the row-2 button the key is advertised on |
+| N | Arm drawing / put the pen down — the same toggle as the lokalitet-row button the key is advertised on |
 | U | Toggle LiDAR extract |
 | B | Screenshot |
 | Escape | Close / back out — **except while a funn draft is open** |
@@ -1283,10 +1317,10 @@ add a "don't show this again" checkbox without thinking about it.
 
 ### 8.9 Hent grunnpakke
 
-The first item in the row-2 overflow menu, and the only one there you press on a
-lokalitet you have just made and never again — hence its position. One press
-produces the three images you would otherwise fetch by hand before starting to
-read a rectangle, into Bilder:
+The first item in the lokalitet row's overflow menu, and the only one there you
+press on a lokalitet you have just made and never again — hence its position.
+One press produces the three images you would otherwise fetch by hand before
+starting to read a rectangle, into Bilder:
 
 | Step | What | Producer |
 |---|---|---|

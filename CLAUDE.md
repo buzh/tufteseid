@@ -166,9 +166,9 @@ objects on top of the terrain relief, so the relief has to be the ground.
 - Config: `src/map/layers/config/backgroundLayers/elevation.ts`. Built by a
   dynamic branch in `backgroundLayerAtomEffect` (`atoms.ts`) rather than a
   static entry, because the style comes out of an atom.
-- Control: the "LiDAR" `ModeButton` in ribbon row 1, with the dataset, style
-  and DTM/DOM pulldowns beside it. Strings live under `ribbon.*` in
-  `src/locales/{nb,nn,en}/translation.json`.
+- Control: the "LiDAR" `ModeButton` in ribbon row 1; the dataset, style and
+  DTM/DOM pulldowns are on the settings strip below it (`RibbonSettingsRow`).
+  Strings live under `ribbon.*` in `src/locales/{nb,nn,en}/translation.json`.
 
 The dataset pulldown's default is **Automatisk**: the national 1 m mosaic when
 zoomed out, the best-covering per-project dataset (0.25 m) once the view is fine
@@ -271,12 +271,12 @@ The LiDAR *extract* tool stays DTM-only (`lidarExtract/sources.ts` pins
 Two distinct things, on the same imagery:
 
 1. **A background mode** — "Flyfoto" in ribbon row 1, beside Standard / LiDAR
-   / Hybrid, with the same shape of dataset pulldown and W/S cycling. Just
-   *looking*, so no licensing notice. Layer plumbing below; the control is in
-   `docs/ui-architecture.md` §5.5.
-2. **A lokalitet action** — "Flyfoto" in row 2 stitches NiB ortofoto over the
-   authored bbox and *keeps* it as an attachment of kind `flyfoto`. Gated by
-   the licensing notice, every time.
+   / Hybrid, with the same shape of dataset pulldown (on the settings strip)
+   and W/S cycling. Just *looking*, so no licensing notice. Layer plumbing
+   below; the control is in `docs/ui-architecture.md` §5.5.
+2. **A lokalitet action** — "Flyfoto" in the lokalitet row stitches NiB
+   ortofoto over the authored bbox and *keeps* it as an attachment of kind
+   `flyfoto`. Gated by the licensing notice, every time.
 
 The old TopBar "Flyfoto ↗" external link is gone — it navigated out of the app
 to do worse than what the background mode now does in place.
@@ -401,10 +401,10 @@ its own relief visualizations in the browser, instead of restyling Kartverket's
 pre-baked hillshade. Rationale and endpoint details: `docs/terrain-analysis.md`.
 
 It has two entrances, and the surface is the same either way: **ribbon row 1**,
-over the visible map, with no lokalitet and no account; or **row 2**, over an
-open lokalitet's bbox. Reading the ground is not an act of ownership — only
-keeping the render is, and saving from row 1 signs you in and turns the
-analysed rectangle into a lokalitet.
+over the visible map, with no lokalitet and no account; or **the lokalitet
+row**, over an open lokalitet's bbox. Reading the ground is not an act of
+ownership — only keeping the render is, and saving from row 1 signs you in and
+turns the analysed rectangle into a lokalitet.
 
 - Source is hoydedata.no's ArcGIS ImageServers via `exportImage` with
   `renderingRule={"rasterFunction":"None"}` — the service's *other* raster
@@ -633,8 +633,9 @@ filled; UI consequences are `docs/ui-architecture.md` §8.3.
    `backgroundLayerAtomEffect`, no static entry, and stays out of
    `VALID_STARTUP_LAYERS` — a cold load onto it would render nothing.
 3. Give it a control in ribbon row 1 (`src/shell/RibbonGlobalRow.tsx`). There
-   is no thumbnail gallery any more: a *mode* is a `ModeButton`, and a choice
-   *within* a mode is a `Pulldown` (see `src/shell/lidar/` and
+   is no thumbnail gallery any more: a *mode* is a `ModeButton` in row 1, and
+   a choice *within* a mode is a `Pulldown` on the settings strip
+   (`src/shell/RibbonSettingsRow.tsx`) — see `src/shell/lidar/` and
    `src/shell/flyfoto/` for the two worked examples, incl. how a dataset ring
    registers itself for W/S cycling). Decide which of the two it is before
    writing anything — `docs/ui-architecture.md` §5.2 on modes vs modifiers.
