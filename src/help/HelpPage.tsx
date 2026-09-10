@@ -1,120 +1,101 @@
-import {
-  Accordion,
-  AccordionItem,
-  AccordionItemContent,
-  AccordionItemTrigger,
-  Box,
-  Card,
-  CardBody,
-  CardTitle,
-  Flex,
-  Header,
-  Heading,
-  Icon,
-  Link,
-  List,
-  ListItem,
-  SimpleGrid,
-  Stack,
-  Text,
-} from '@kvib/react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import LanguageSwitcher from '../languageswitcher/LanguageSwitcher';
-import { useIsMobileScreen } from '../shared/hooks';
 import { ContentBlock, Tip, unwrapJsonModule } from '../types/tips';
-
-type TipsContentProps = {
-  content: ContentBlock[];
-};
-
-type IconName = 'edit' | 'map' | 'search' | 'share' | 'house';
+import { Icon, type MaterialSymbol, Section } from '../ui';
+import styles from './HelpPage.module.css';
 
 const categories: {
   id: string;
-  title: string;
-  icon: IconName;
+  icon: MaterialSymbol;
 }[] = [
-  {
-    id: 'propertyInfo',
-    title: 'tipsandtricks.categories.propertyInfo',
-    icon: 'house',
-  },
-
-  {
-    id: 'map',
-    title: 'tipsandtricks.categories.map',
-    icon: 'map',
-  },
-  {
-    id: 'drawing',
-    title: 'tipsandtricks.categories.drawing',
-    icon: 'edit',
-  },
-  {
-    id: 'search',
-    title: 'tipsandtricks.categories.search',
-    icon: 'search',
-  },
-  {
-    id: 'sharing',
-    title: 'tipsandtricks.categories.sharing',
-    icon: 'share',
-  },
+  { id: 'propertyInfo', icon: 'house' },
+  { id: 'map', icon: 'map' },
+  { id: 'drawing', icon: 'edit' },
+  { id: 'search', icon: 'search' },
+  { id: 'sharing', icon: 'share' },
 ];
 
-const TipsAndTricksContent = ({ content }: TipsContentProps) => {
+const ExternalLink = ({
+  href,
+  children,
+}: {
+  href: string;
+  children: string;
+}) => (
+  <a className={styles.link} href={href} target="_blank" rel="noreferrer">
+    {children}
+    <Icon icon="open_in_new" size={14} />
+  </a>
+);
+
+const TipsAndTricksContent = ({ content }: { content: ContentBlock[] }) => (
+  <>
+    {content.map((block, i) => {
+      if (block.type === 'text') {
+        return (
+          <p key={i} className={styles.tipText}>
+            {block.text}
+          </p>
+        );
+      }
+      if (block.type === 'list') {
+        return (
+          <ul key={i} className={styles.tipList}>
+            {block.items.map((item, j) => (
+              <li key={j}>{item}</li>
+            ))}
+          </ul>
+        );
+      }
+      if (block.type === 'link') {
+        return (
+          <p key={i} className={styles.tipText}>
+            <ExternalLink href={block.href}>{block.text}</ExternalLink>
+          </p>
+        );
+      }
+      return null;
+    })}
+  </>
+);
+
+// One tip open at a time within a card — the tips are alternatives to each
+// other, and a card that expands to its full height pushes the grid around.
+const TipsCard = ({
+  categoryId,
+  icon,
+  tips,
+}: {
+  categoryId: string;
+  icon: MaterialSymbol;
+  tips: Tip[];
+}) => {
+  const { t } = useTranslation();
+  const [openTip, setOpenTip] = useState<string | null>(null);
+
   return (
-    <>
-      {content.map((block, i) => {
-        if (block.type === 'text') {
-          return (
-            <Text fontSize={{ base: 'sm', md: 'md' }} key={i} mb="2">
-              {block.text}
-            </Text>
-          );
-        }
-
-        if (block.type === 'list') {
-          return (
-            <List key={i} listStyleType="disc" mb="2" ml="4">
-              {block.items.map((item, j) => (
-                <ListItem key={j} fontSize={{ base: 'sm', md: 'md' }}>
-                  {item}
-                </ListItem>
-              ))}
-            </List>
-          );
-        }
-
-        if (block.type === 'link') {
-          return (
-            <Text fontSize={{ base: 'sm', md: 'md' }} key={i} mb="2">
-              <Link
-                colorPalette="green"
-                href={block.href}
-                size="md"
-                variant="underline"
-                external
-              >
-                {block.text}
-              </Link>
-            </Text>
-          );
-        }
-        return null;
-      })}
-    </>
+    <div className={styles.card}>
+      <div className={styles.cardHead}>
+        <Icon icon={icon} size={20} />
+        <h3 className={styles.cardTitle}>
+          {t(`tipsandtricks.categories.${categoryId}`)}
+        </h3>
+      </div>
+      {tips.map((tip) => (
+        <Section
+          key={tip.title}
+          title={tip.title}
+          open={openTip === tip.title}
+          onOpenChange={(open) => setOpenTip(open ? tip.title : null)}
+          className={styles.tip}
+        >
+          <TipsAndTricksContent content={tip.content} />
+        </Section>
+      ))}
+    </div>
   );
-};
-
-const boxStyles = {
-  bg: 'white',
-  boxShadow: 'md',
-  borderRadius: 'lg',
-  mt: 4,
-  p: 5,
 };
 
 const loaders: Record<string, () => Promise<{ default: unknown }>> = {
@@ -127,7 +108,6 @@ export const HelpPage = () => {
   const { i18n, t } = useTranslation();
   const [tipsData, setTipsData] = useState<Tip[]>([]);
   const navigate = useNavigate();
-  const isMobile = useIsMobileScreen();
 
   useEffect(() => {
     let cancelled = false;
@@ -137,8 +117,7 @@ export const HelpPage = () => {
     load()
       .then((m) => {
         if (cancelled) return;
-        const data = unwrapJsonModule<Tip[]>(m);
-        setTipsData(data);
+        setTipsData(unwrapJsonModule<Tip[]>(m));
       })
       .catch((err) => {
         console.error('Feil ved lasting av tips:', err);
@@ -152,161 +131,106 @@ export const HelpPage = () => {
 
   return (
     <>
-      <Header
-        title="Tufteseid"
-        titleLink="/"
-        gap={4}
-        showMenuButton={false}
-        content={
-          <Link
-            fontSize={{ base: 'sm', md: 'md' }}
-            onClick={() => navigate(-1)}
-          >
-            {t('helpPage.header.link')}
-          </Link>
-        }
-      />
-      <Box
-        minH="100vh"
-        bg="green.50"
-        px={{ base: 4, md: 8 }}
-        py={{ base: 2, md: 8 }}
-      >
-        <Box maxW="1120px" mx="auto">
-          <Heading size={{ base: '3xl', md: '5xl' }}>
-            {t('helpPage.title')}
-          </Heading>
-          <Box {...boxStyles}>
-            <Heading size={{ base: '2xl', md: '3xl' }} fontWeight="bold">
-              {t('tipsandtricks.heading')}
-            </Heading>
-            <Text mt={1} fontSize={{ base: 'sm', md: 'md' }}>
-              {t('tipsandtricks.description')}
-            </Text>
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 2 }} gap={4} mt={4}>
+      <header className={styles.header}>
+        <Link className={styles.brand} to="/">
+          Tufteseid
+        </Link>
+        <button
+          type="button"
+          className={styles.back}
+          onClick={() => navigate(-1)}
+        >
+          {t('helpPage.header.link')}
+        </button>
+      </header>
+
+      <div className={styles.page}>
+        <div className={styles.column}>
+          <h1 className={styles.pageTitle}>{t('helpPage.title')}</h1>
+
+          <section className={styles.block}>
+            <h2 className={styles.blockTitle}>{t('tipsandtricks.heading')}</h2>
+            <p className={styles.blockText}>{t('tipsandtricks.description')}</p>
+            <div className={styles.grid}>
               {categories.map((category) => {
-                const items = tipsData.filter(
+                const tips = tipsData.filter(
                   (tip) => tip.category === category.id,
                 );
-
-                if (!items.length) return null;
-
+                if (!tips.length) return null;
                 return (
-                  <Card key={category.id} borderRadius={10} boxShadow="lg">
-                    <CardBody>
-                      <Flex align="center" gap={2}>
-                        <Icon icon={category.icon} />
-                        <CardTitle>
-                          {t(`tipsandtricks.categories.${category.id}`)}
-                        </CardTitle>
-                      </Flex>
-
-                      <Accordion mt={2} collapsible>
-                        {items.map((tip) => (
-                          <AccordionItem key={tip.title} value={tip.title}>
-                            <AccordionItemTrigger
-                              fontSize={{ base: 'sm', md: 'md' }}
-                            >
-                              {tip.title}
-                            </AccordionItemTrigger>
-
-                            <AccordionItemContent>
-                              <TipsAndTricksContent content={tip.content} />
-                            </AccordionItemContent>
-                          </AccordionItem>
-                        ))}
-                      </Accordion>
-                    </CardBody>
-                  </Card>
+                  <TipsCard
+                    key={category.id}
+                    categoryId={category.id}
+                    icon={category.icon}
+                    tips={tips}
+                  />
                 );
               })}
-            </SimpleGrid>
-          </Box>
-          <Box {...boxStyles}>
-            <Heading size={{ base: '2xl', md: '3xl' }} fontWeight="bold">
-              {t('about.heading')}
-            </Heading>
-            <Text fontSize={{ base: 'sm', md: 'md' }}>
-              {' '}
-              {t('about.textone')}
-            </Text>
-            <Text fontSize={{ base: 'sm', md: 'md' }}>
-              {t('about.texttwo')}{' '}
-            </Text>
-            <Text fontSize={{ base: 'sm', md: 'md' }}>
-              {t('about.textthree')}
-            </Text>
-            <Text marginTop="4" textStyle="xs" color="fg.muted">
+            </div>
+          </section>
+
+          <section className={styles.block}>
+            <h2 className={styles.blockTitle}>{t('about.heading')}</h2>
+            <p className={styles.blockText}>{t('about.textone')}</p>
+            <p className={styles.blockText}>{t('about.texttwo')}</p>
+            <p className={styles.blockText}>{t('about.textthree')}</p>
+            <p className={styles.build}>
               {t('about.version')}: {__COMMIT_HASH__} | {t('about.buildDate')}:{' '}
               {new Date(__BUILD_DATE__).toLocaleDateString()}
-            </Text>
-          </Box>
+            </p>
+          </section>
 
-          {isMobile && (
-            <Box {...boxStyles}>
-              <Heading mb={2} size="2xl" fontWeight="bold">
-                {t('languageSelector.chooseLanguage')}
-              </Heading>
-              <LanguageSwitcher />
-            </Box>
-          )}
+          {/* Unconditional. The old TopBar carried a language button; the
+              ribbon does not, so gating this on `isMobile` left desktop with
+              no way to change language at all. */}
+          <section className={styles.block}>
+            <h2 className={styles.blockTitle}>
+              {t('languageSelector.chooseLanguage')}
+            </h2>
+            <LanguageSwitcher />
+          </section>
 
-          <Box {...boxStyles}>
-            <Heading size={{ base: '2xl', md: '3xl' }} fontWeight="bold">
+          <section className={styles.block}>
+            <h2 className={styles.blockTitle}>
               {t('helpPage.notFound.heading')}
-            </Heading>
-            <Text mt={2} fontSize={{ base: 'sm', md: 'md' }}>
+            </h2>
+            <p className={styles.blockText}>
               {t('helpPage.notFound.description')}
-            </Text>
-            <Stack gap={5} mt={4}>
-              <Box>
-                <Heading>
+            </p>
+            <div className={styles.sources}>
+              <div>
+                <h3 className={styles.sourceTitle}>
                   {t('helpPage.notFound.propertyRegisterHeading')}
-                </Heading>
-                <Text fontSize={{ base: 'sm', md: 'md' }}>
+                </h3>
+                <p className={styles.blockText}>
                   {t('helpPage.notFound.propertyRegisterDescription')}
-                </Text>
-                <Link
-                  mt={4}
-                  target="_blank"
-                  external
-                  href="https://eiendomsregisteret.kartverket.no/"
-                >
+                </p>
+                <ExternalLink href="https://eiendomsregisteret.kartverket.no/">
                   {t('helpPage.notFound.propertyRegisterButton')}
-                </Link>
-              </Box>
-              <Box>
-                <Heading>Norge i bilder</Heading>
-                <Text fontSize={{ base: 'sm', md: 'md' }}>
+                </ExternalLink>
+              </div>
+              <div>
+                <h3 className={styles.sourceTitle}>Norge i bilder</h3>
+                <p className={styles.blockText}>
                   {t('helpPage.notFound.norgeibilderDescription')}
-                </Text>
-                <Link
-                  mt={4}
-                  target="_blank"
-                  external
-                  href="http://www.norgeibilder.no/"
-                >
+                </p>
+                <ExternalLink href="https://www.norgeibilder.no/">
                   {t('helpPage.notFound.norgeibilderButton')}
-                </Link>
-              </Box>
-              <Box>
-                <Heading>Høydedata.no</Heading>
-                <Text fontSize={{ base: 'sm', md: 'md' }}>
+                </ExternalLink>
+              </div>
+              <div>
+                <h3 className={styles.sourceTitle}>Høydedata.no</h3>
+                <p className={styles.blockText}>
                   {t('helpPage.notFound.hoydedataDescription')}
-                </Text>
-                <Link
-                  mt={4}
-                  target="_blank"
-                  external
-                  href="https://hoydedata.no/"
-                >
+                </p>
+                <ExternalLink href="https://hoydedata.no/">
                   {t('helpPage.notFound.hoydedataButton')}
-                </Link>
-              </Box>
-            </Stack>
-          </Box>
-        </Box>
-      </Box>
+                </ExternalLink>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
     </>
   );
 };

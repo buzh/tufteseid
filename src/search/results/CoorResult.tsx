@@ -1,4 +1,3 @@
-import { Alert, Button, List, Stack, Text } from '@kvib/react';
 import { useSetAtom } from 'jotai';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,8 +5,10 @@ import { useMapSettings } from '../../map/mapHooks';
 import { isLikelyLonLatSwap } from '../../shared/utils/coordinateParser';
 import { getInputCRS } from '../../shared/utils/crsUtils';
 import { SearchResult } from '../../types/searchTypes';
+import { Alert, Button } from '../../ui';
 import { searchQueryAtom } from '../atoms';
 import { SearchResultLine } from './SearchResultLine';
+import styles from './SearchResults.module.css';
 
 interface CoordinateResultsProps {
   coordinateResult: SearchResult | null;
@@ -70,10 +71,9 @@ export const CoordinateResults = ({
     isLikelyLonLatSwap(coordinateResult.coordinate);
 
   return (
-    <Stack gap={1}>
-      <List>
+    <>
+      <ul className={styles.list}>
         <SearchResultLine
-          key="coordinate-result"
           heading={coordinateResult.coordinate.formattedString}
           locationType={
             t('infoBox.coordinateSystem') +
@@ -84,11 +84,11 @@ export const CoordinateResults = ({
           onMouseEnter={() => handleHover(coordinateResult)}
           onMouseLeave={() => setHoveredResult(null)}
         />
-      </List>
+      </ul>
       {showSwapWarning && (
-        <Alert status="warning">
-          <Stack gap={2} alignItems="flex-start">
-            <Text fontSize="sm">{t('search.coordinateSwapWarning')}</Text>
+        <Alert tone="warning">
+          <div className={styles.coordSwap}>
+            {t('search.coordinateSwapWarning')}
             <Button
               size="sm"
               variant="secondary"
@@ -96,9 +96,9 @@ export const CoordinateResults = ({
             >
               {t('search.coordinateSwapButton')}
             </Button>
-          </Stack>
+          </div>
         </Alert>
       )}
-    </Stack>
+    </>
   );
 };

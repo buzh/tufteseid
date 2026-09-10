@@ -1,0 +1,84 @@
+.control {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--c-bg);
+  color: var(--c-fg);
+  font: inherit;
+  font-size: var(--font-sm);
+}
+
+.control::placeholder {
+  color: var(--c-fg-subtle);
+}
+
+.control:hover:not(:disabled) {
+  border-color: var(--c-gray-400);
+}
+
+.control:focus {
+  outline: 1px solid var(--c-focus);
+  outline-offset: -1px;
+  border-color: var(--c-focus);
+}
+
+.control:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: var(--c-bg-subtle);
+}
+
+.invalid,
+.invalid:focus {
+  border-color: var(--c-danger);
+  outline-color: var(--c-danger);
+}
+
+.input {
+  height: var(--ctl-h-md);
+  padding: 0 var(--sp-4);
+}
+
+.inputXs {
+  height: var(--ctl-h-sm);
+  font-size: var(--font-xs);
+}
+
+.inputMd {
+  height: var(--ctl-h-lg);
+  font-size: var(--font-md);
+}
+
+.note {
+  display: block;
+  padding: var(--sp-3) var(--sp-4);
+  line-height: 1.4;
+  /* Height is driven from JS; a manual drag would immediately be undone. */
+  resize: none;
+  overflow-y: auto;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--c-fg-muted);
+}
+
+.hint {
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+.error {
+  font-size: var(--font-xs);
+  color: var(--c-danger);
+}

@@ -1,6 +1,6 @@
-import { Link, Separator, SimpleGrid, Text, VStack } from '@kvib/react';
 import { useTranslation } from 'react-i18next';
 import { Place } from '../../types/searchTypes';
+import styles from './InfoBox.module.css';
 
 interface PlaceInfoProps {
   place: Place;
@@ -10,33 +10,24 @@ export const PlaceInfo = ({ place }: PlaceInfoProps) => {
   const { t } = useTranslation();
 
   return (
-    <SimpleGrid
-      columns={2}
-      templateColumns="1fr auto"
-      gap={2}
-      w="100%"
-      alignItems={'start'}
-    >
-      <VStack align={'start'} userSelect={'text'}>
-        <Text>{place.name}</Text>
-        <Text fontSize="sm">
+    <div className={styles.place}>
+      <div className={styles.placeFacts}>
+        <span className={styles.placeName}>{place.name}</span>
+        <span className={styles.small}>
           {t('placeInfo.locationNumber')}: {place.placeNumber}
-        </Text>
-        <Text fontSize="sm">
+        </span>
+        <span className={styles.small}>
           {t('placeInfo.nameObjectType')}: {place.placeType}
-        </Text>
-        <Separator mt={2} />
-      </VStack>
-      <Link
-        target="_blank"
-        key={place.name}
+        </span>
+      </div>
+      <a
+        className={styles.link}
         href={`https://stadnamn.kartverket.no/fakta/${place.placeNumber}`}
-        w={'100%'}
-        textDecorationLine={'none'}
-        external
+        target="_blank"
+        rel="noreferrer"
       >
         {t('placeInfo.moreInfo')}
-      </Link>
-    </SimpleGrid>
+      </a>
+    </div>
   );
 };

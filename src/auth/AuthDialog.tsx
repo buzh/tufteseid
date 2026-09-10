@@ -1,16 +1,8 @@
-import {
-  Button,
-  Dialog,
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  Heading,
-  Stack,
-  Text,
-} from '@kvib/react';
 import { useAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
+import { Button, Dialog } from '../ui';
 import { isAuthDialogOpenAtom } from './atoms-dialog';
+import styles from './AuthDialog.module.css';
 import { useOAuthProviders, useSignIn } from './hooks';
 
 // PB provider name → localised display label. Falls back to the raw
@@ -48,50 +40,33 @@ export const AuthDialog = () => {
 
   return (
     <Dialog
-      placement="center"
-      motionPreset="slide-in-left"
-      onOpenChange={(e) => setIsOpen(e.open)}
       open={isOpen}
+      onOpenChange={setIsOpen}
+      title={t('auth.dialog.title')}
+      closeLabel={t('shared.close')}
     >
-      <DialogContent>
-        <DialogBody>
-          <Stack gap={3}>
-            <Heading size="md">{t('auth.dialog.title')}</Heading>
-            <Text fontSize="sm" color="gray.600">
-              {t('auth.dialog.subtitle')}
-            </Text>
-            {error && (
-              <Text fontSize="sm" color="red.600">
-                {t('auth.dialog.providersError')}
-              </Text>
-            )}
-            {providers == null && !error && (
-              <Text fontSize="sm" color="gray.500">
-                {t('auth.dialog.loading')}
-              </Text>
-            )}
-            {providers && providers.length === 0 && (
-              <Text fontSize="sm" color="gray.600">
-                {t('auth.dialog.noProviders')}
-              </Text>
-            )}
-            {providers &&
-              providers.map((p) => (
-                <Button
-                  key={p.name}
-                  variant="secondary"
-                  colorPalette="green"
-                  onClick={() => handle(p.name)}
-                >
-                  {t('auth.dialog.signInWith', {
-                    provider: providerLabel(p.name),
-                  })}
-                </Button>
-              ))}
-          </Stack>
-        </DialogBody>
-        <DialogCloseTrigger />
-      </DialogContent>
+      <div className={styles.body}>
+        <p className={styles.subtitle}>{t('auth.dialog.subtitle')}</p>
+        {error && (
+          <p className={styles.error}>{t('auth.dialog.providersError')}</p>
+        )}
+        {providers == null && !error && (
+          <p className={styles.status}>{t('auth.dialog.loading')}</p>
+        )}
+        {providers && providers.length === 0 && (
+          <p className={styles.subtitle}>{t('auth.dialog.noProviders')}</p>
+        )}
+        {providers?.map((p) => (
+          <Button
+            key={p.name}
+            variant="secondary"
+            size="md"
+            onClick={() => handle(p.name)}
+          >
+            {t('auth.dialog.signInWith', { provider: providerLabel(p.name) })}
+          </Button>
+        ))}
+      </div>
     </Dialog>
   );
 };

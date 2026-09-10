@@ -1,0 +1,175 @@
+/*
+ * The popup rides in an OpenLayers Overlay whose element is
+ * `pointer-events: none` (set imperatively in the component) so the map keeps
+ * its drag behaviour around the balloon; this box opts back in.
+ */
+.popup {
+  box-sizing: border-box;
+  width: 90vw;
+  max-width: 420px;
+  max-height: 60vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--sp-5);
+  border-radius: var(--radius-lg);
+  background: var(--c-bg);
+  box-shadow: var(--shadow-md);
+  color: var(--c-fg);
+  pointer-events: auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+.headerTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-sm);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.showMore {
+  margin-top: var(--sp-5);
+}
+
+.card {
+  min-width: 0;
+  padding: var(--sp-5);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+}
+
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-4);
+}
+
+.cardTitle {
+  font-size: var(--font-md);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.cardTags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.cardId {
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.fieldRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  font-size: var(--font-sm);
+}
+
+.fieldLabel {
+  flex: none;
+  min-width: 100px;
+  max-width: 120px;
+  font-weight: 500;
+  color: var(--c-fg-muted);
+}
+
+.fieldValue {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nested {
+  margin-top: var(--sp-5);
+}
+
+.nestedHeading {
+  margin-bottom: var(--sp-2);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  color: var(--c-fg-muted);
+}
+
+.nestedList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.nestedItem {
+  padding-left: var(--sp-4);
+  border-left: 2px solid var(--c-border);
+}
+
+.nestedName {
+  font-size: var(--font-sm);
+  overflow-wrap: anywhere;
+}
+
+.nestedSubtitle {
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+  overflow-wrap: anywhere;
+}
+
+.nestedTags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-top: var(--sp-1);
+}
+
+.nestedDatering {
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+.descriptionBlock {
+  margin-top: var(--sp-5);
+}
+
+.description {
+  margin-top: var(--sp-4);
+  font-size: var(--font-sm);
+  color: var(--c-gray-700);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-5);
+  margin-top: var(--sp-5);
+}
+
+.link {
+  font-size: var(--font-sm);
+  color: var(--c-blue-600);
+  text-decoration: underline;
+}

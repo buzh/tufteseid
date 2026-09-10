@@ -1,18 +1,11 @@
-import {
-  Box,
-  HStack,
-  Icon,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Text,
-} from '@kvib/react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { getInputCRS } from '../../shared/utils/crsUtils';
 import { isNumberOk } from '../../shared/utils/numberUtils';
 import { SearchResult } from '../../types/searchTypes';
+import { Icon, Tooltip } from '../../ui';
 import { getElevation } from '../searchApi';
+import styles from './InfoBox.module.css';
 
 interface InfoBoxContentProps {
   result: SearchResult;
@@ -23,33 +16,34 @@ const InfoBoxTextContent = ({ result }: { result: SearchResult }) => {
   switch (result.type) {
     case 'Place':
       return (
-        <Text>
+        <p>
           {`${t('search.placeName')} ${result.place.municipalities != null && `${t('infoBox.in')} ${result.place.municipalities.map((k) => k.kommunenavn).join(', ')} ${t('infoBox.municipality').toLowerCase()}`}`}
-        </Text>
+        </p>
       );
 
     case 'Road':
       return (
-        <Text>
+        <p>
           {`${t('infoBox.roadName')} ${t('infoBox.in')} ${result.road.KOMMUNENAVN} ${t('infoBox.municipality').toLowerCase()}`}
-        </Text>
+        </p>
       );
 
     case 'Property':
       return (
-        <Text>
+        <p>
           {`${t('infoBox.cadastralIdentifier')} ${t('infoBox.in')} ${result.property.KOMMUNENAVN} ${t('infoBox.municipality').toLowerCase()}`}
-        </Text>
+        </p>
       );
 
     case 'Address':
       return (
-        <Text>
+        <p>
           {`${t('infoBox.address')} ${t('infoBox.in')} ${result.address.kommunenavn} ${t('infoBox.municipality').toLowerCase()}`}
-        </Text>
+        </p>
       );
   }
 };
+
 const InfoBoxElevationContent = ({ result }: { result: SearchResult }) => {
   const { t } = useTranslation();
   const inputCRS = getInputCRS(result);
@@ -67,34 +61,28 @@ const InfoBoxElevationContent = ({ result }: { result: SearchResult }) => {
     return null;
   }
 
-  if (status === 'success' && elevationData) {
-    return (
-      <HStack>
-        <Text>
-          {t('infoBox.heightEstimatedByInterpolation')}{' '}
-          {numericValue.toFixed(1)} {t('infoBox.metersAboveSeaLevel')}
-        </Text>
-        <Popover>
-          <PopoverTrigger cursor="pointer">
-            <Icon icon={'info'} />
-          </PopoverTrigger>
-          <PopoverContent>
-            <Box p={2}>
-              <Text>{t('infoBox.metersAboveSeaLevelTooltip')}</Text>
-            </Box>
-          </PopoverContent>
-        </Popover>
-      </HStack>
-    );
-  }
-  return null;
-};
-
-export const InfoBoxPreamble = ({ result }: InfoBoxContentProps) => {
   return (
-    <Box userSelect={'text'}>
-      <InfoBoxTextContent result={result} />
-      <InfoBoxElevationContent result={result} />{' '}
-    </Box>
+    <div className={styles.elevation}>
+      <p>
+        {t('infoBox.heightEstimatedByInterpolation')}{' '}
+        {numericValue.toFixed(1)} {t('infoBox.metersAboveSeaLevel')}
+      </p>
+      {/* The caveat about how that number was arrived at is a hover label,
+          not the click-to-open popover it used to be — it is one sentence,
+          and nothing in it is worth a second click. */}
+      <Tooltip
+        label={t('infoBox.metersAboveSeaLevelTooltip')}
+        placement="top"
+      >
+        <Icon icon="info" size={16} />
+      </Tooltip>
+    </div>
   );
 };
+
+export const InfoBoxPreamble = ({ result }: InfoBoxContentProps) => (
+  <div className={styles.preamble}>
+    <InfoBoxTextContent result={result} />
+    <InfoBoxElevationContent result={result} />
+  </div>
+);

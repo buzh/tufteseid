@@ -42,8 +42,8 @@ const getHighlightLayer = (map: Map): VectorLayer | null =>
     | VectorLayer
     | undefined) ?? null;
 
-// Mount from Layout, next to useFunnLayer. Keeps the halo in sync with
-// the two pointer atoms; clears itself when neither is set.
+// Mount from useMapSideEffects, next to useFunnLayer. Keeps the halo in
+// sync with the two pointer atoms; clears itself when neither is set.
 export const useFunnHighlightLayer = () => {
   const map = useAtomValue(mapAtom);
   const hovered = useAtomValue(hoveredFunnIdAtom);

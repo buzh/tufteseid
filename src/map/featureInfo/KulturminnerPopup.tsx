@@ -1,12 +1,13 @@
-import { Badge, Box, Button, Flex, IconButton, Link, Stack, Text } from '@kvib/react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { Overlay } from 'ol';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { selectedResultAtom } from '../../search/atoms';
+import { Badge, Button, IconButton } from '../../ui';
 import { mapAtom } from '../atoms';
 import { ProjectionIdentifier } from '../projections/types';
 import { kulturminnerPopupAtom } from './atoms';
+import styles from './KulturminnerPopup.module.css';
 import type { LayerFeatureInfo } from './types';
 import { buildCoordinateResult } from './useFeatureInfo';
 
@@ -209,20 +210,10 @@ const formatDate = (v: unknown): string => {
 };
 
 const FieldRow = ({ label, value }: { label: string; value: string }) => (
-  <Flex gap={2} fontSize="sm" align="baseline">
-    <Text
-      color="gray.600"
-      fontWeight="medium"
-      flexShrink={0}
-      minW="100px"
-      maxW="120px"
-    >
-      {label}
-    </Text>
-    <Text flex="1" wordBreak="break-word">
-      {value}
-    </Text>
-  </Flex>
+  <div className={styles.fieldRow}>
+    <span className={styles.fieldLabel}>{label}</span>
+    <span className={styles.fieldValue}>{value}</span>
+  </div>
 );
 
 const NestedEnkeltminner = ({
@@ -230,11 +221,11 @@ const NestedEnkeltminner = ({
 }: {
   features: HeritageFeature[];
 }) => (
-  <Box mt={3}>
-    <Text fontSize="xs" fontWeight="bold" color="gray.600" mb={1}>
+  <div className={styles.nested}>
+    <div className={styles.nestedHeading}>
       Enkeltminner ved klikket ({features.length})
-    </Text>
-    <Stack gap={2}>
+    </div>
+    <div className={styles.nestedList}>
       {features.map((em, i) => {
         const p = em.properties;
         const emNavn = stringify(p['navn']);
@@ -245,34 +236,26 @@ const NestedEnkeltminner = ({
         const emDatering = stringify(p['datering']);
         const subtitle = [emArt, emKategori].filter(Boolean).join(' — ');
         return (
-          <Box key={i} pl={2} borderLeft="2px solid" borderColor="gray.200">
-            <Text fontSize="sm" wordBreak="break-word">
+          <div key={i} className={styles.nestedItem}>
+            <div className={styles.nestedName}>
               {emNavn || emArt || `Enkeltminne #${emId}`}
-            </Text>
+            </div>
             {subtitle && emNavn && (
-              <Text fontSize="xs" color="gray.500" wordBreak="break-word">
-                {subtitle}
-              </Text>
+              <div className={styles.nestedSubtitle}>{subtitle}</div>
             )}
             {(emVerne || emDatering) && (
-              <Flex gap={2} mt={0.5} wrap="wrap">
-                {emVerne && (
-                  <Badge colorPalette="green" size="sm">
-                    {emVerne}
-                  </Badge>
-                )}
+              <div className={styles.nestedTags}>
+                {emVerne && <Badge palette="green">{emVerne}</Badge>}
                 {emDatering && (
-                  <Text fontSize="xs" color="gray.600">
-                    {emDatering}
-                  </Text>
+                  <span className={styles.nestedDatering}>{emDatering}</span>
                 )}
-              </Flex>
+              </div>
             )}
-          </Box>
+          </div>
         );
       })}
-    </Stack>
-  </Box>
+    </div>
+  </div>
 );
 
 const HeritageCard = ({ group }: { group: HeritageGroup }) => {
@@ -335,36 +318,21 @@ const HeritageCard = ({ group }: { group: HeritageGroup }) => {
   const kulturminnesok = hasReal ? stringify(props['linkkulturminnesok']) : '';
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="gray.200"
-      borderRadius="8px"
-      p={3}
-      w="full"
-      minW={0}
-    >
-      <Stack gap={0.5} mb={2}>
-        <Text fontWeight="bold" fontSize="md" wordBreak="break-word">
-          {group.navn}
-        </Text>
-        <Flex gap={2} align="center" wrap="wrap">
-          <Text fontSize="xs" color="gray.500">
+    <div className={styles.card}>
+      <div className={styles.cardHead}>
+        <div className={styles.cardTitle}>{group.navn}</div>
+        <div className={styles.cardTags}>
+          <span className={styles.cardId}>
             #{group.parentId.replace(/^sz-/, '')}
-          </Text>
-          {group.lokalitet && (
-            <Badge colorPalette="blue" size="sm">
-              Lokalitet
-            </Badge>
-          )}
+          </span>
+          {group.lokalitet && <Badge palette="blue">Lokalitet</Badge>}
           {!group.lokalitet && group.sikringssoner.length > 0 && (
-            <Badge colorPalette="yellow" size="sm">
-              Sikringssone
-            </Badge>
+            <Badge palette="yellow">Sikringssone</Badge>
           )}
-        </Flex>
-      </Stack>
+        </div>
+      </div>
 
-      <Stack gap={1}>
+      <div className={styles.fields}>
         {artKategori && <FieldRow label="Kategori" value={artKategori} />}
         {beliggenhet && <FieldRow label="Beliggenhet" value={beliggenhet} />}
         {vernetype && (
@@ -375,7 +343,7 @@ const HeritageCard = ({ group }: { group: HeritageGroup }) => {
         )}
         {datering && <FieldRow label="Datering" value={datering} />}
         {antall && <FieldRow label="Enkeltminner totalt" value={antall} />}
-      </Stack>
+      </div>
 
       {(() => {
         // If we have a lokalitet, all enkeltminner nest below it. Otherwise
@@ -389,57 +357,39 @@ const HeritageCard = ({ group }: { group: HeritageGroup }) => {
       })()}
 
       {informasjon && (
-        <Box mt={3}>
-          <Button
-            onClick={() => setDescOpen((v) => !v)}
-            variant="tertiary"
-            size="xs"
-          >
+        <div className={styles.descriptionBlock}>
+          <Button size="xs" onClick={() => setDescOpen((v) => !v)}>
             {descOpen ? 'Skjul beskrivelse' : 'Vis beskrivelse'}
           </Button>
-          {descOpen && (
-            <Text
-              fontSize="sm"
-              mt={2}
-              whiteSpace="pre-wrap"
-              wordBreak="break-word"
-              color="gray.700"
-            >
-              {informasjon}
-            </Text>
-          )}
-        </Box>
+          {descOpen && <div className={styles.description}>{informasjon}</div>}
+        </div>
       )}
 
       {(askeladden || kulturminnesok) && (
-        <Flex gap={3} mt={3} wrap="wrap">
+        <div className={styles.links}>
           {askeladden && (
-            <Link
+            <a
+              className={styles.link}
               href={askeladden}
               target="_blank"
               rel="noopener noreferrer"
-              fontSize="sm"
-              color="blue.600"
-              textDecoration="underline"
             >
               Askeladden ↗
-            </Link>
+            </a>
           )}
           {kulturminnesok && (
-            <Link
+            <a
+              className={styles.link}
               href={kulturminnesok}
               target="_blank"
               rel="noopener noreferrer"
-              fontSize="sm"
-              color="blue.600"
-              textDecoration="underline"
             >
               Kulturminnesøk ↗
-            </Link>
+            </a>
           )}
-        </Flex>
+        </div>
       )}
-    </Box>
+    </div>
   );
 };
 
@@ -453,46 +403,34 @@ const PopupContent = ({
   onShowMore: () => void;
 }) => {
   return (
-    <Box
-      bg="white"
-      borderRadius="12px"
-      boxShadow="0 4px 12px rgba(0,0,0,0.2)"
-      p={3}
-      w="90vw"
-      maxW="420px"
-      maxH="60vh"
-      overflowY="auto"
-      overflowX="hidden"
-      pointerEvents="auto"
-    >
-      <Flex justify="space-between" align="center" mb={2} gap={2}>
-        <Text fontWeight="bold" fontSize="sm" flex="1" wordBreak="break-word">
+    <div className={styles.popup}>
+      <div className={styles.header}>
+        <span className={styles.headerTitle}>
           Kulturminne
           {groups.length > 1 ? ` (${groups.length})` : ''}
-        </Text>
+        </span>
         <IconButton
           onClick={onClose}
           icon="close"
-          variant="ghost"
           size="xs"
+          palette="gray"
           aria-label="Lukk"
         />
-      </Flex>
-      <Stack gap={3}>
+      </div>
+      <div className={styles.cards}>
         {groups.map((g) => (
           <HeritageCard key={g.key} group={g} />
         ))}
-      </Stack>
+      </div>
       <Button
+        className={styles.showMore}
         onClick={onShowMore}
-        variant="tertiary"
-        size="sm"
-        mt={3}
-        w="full"
+        variant="secondary"
+        fullWidth
       >
         Vis mer
       </Button>
-    </Box>
+    </div>
   );
 };
 

@@ -1,28 +1,20 @@
 {
-  "controller": {
-    "draw": {
-      "text": "Teikne og måle",
-      "mobiletext": "Verktøy"
-    },
-    "lidarExtract": {
-      "text": "LiDAR-uttrekk",
-      "mobiletext": "LiDAR"
-    },
-    "export": "Eksport og lagring",
-    "hide": "Minimer"
-  },
   "draw": {
-    "begin": "Teikn på kartet",
     "clear": "Fjern teikninga",
-    "close": "Lukk",
     "confrimClear": "No blir alt som er teikna, fjerna. Er du sikker?",
     "controls": {
-      "colorBackground": "Bakgrunn",
-      "colorFill": "Fyll",
-      "colorPoint": "Punkt",
-      "colorStroke": "Omriss",
-      "colorText": "Tekst",
       "recentColors": "Nylege fargar",
+      "opacity": "Dekkevne",
+      "colorText": "Tekstfarge",
+      "colorBackground": "Bakgrunn",
+      "colorPoint": "Punktfarge",
+      "colorStroke": "Strekfarge",
+      "colorFill": "Fyllfarge",
+      "defaults": {
+        "primary": "Farge",
+        "secondary": "Fyllfarge"
+      },
+      "snap": "Snapping",
       "pointType": "Punkttype",
       "showMeasurements": "Vis målingar",
       "tool": {
@@ -35,47 +27,24 @@
           "text": "Tekst"
         },
         "tooltip": {
-          "movedown": "Flytt ned",
-          "moveup": "Flytt opp",
           "undo": "Angre",
           "redo": "Gjer om",
           "deleteselected": "Slett valde element"
         }
       },
-      "toolSelect": {
-        "placeholder": "Vel teiknemåte"
-      },
       "color": "Fargar",
       "edit": "Rediger",
-      "defaults": {
-        "primary": "Hovudfarge",
-        "secondary": "Sekundær"
-      },
       "lineType": "Linjetype",
+      "lineTypeSolid": "Heiltrekt",
+      "lineTypeDashed": "Stipla",
       "editInstruction": "Vel eit element du vil redigere eller flytte"
     },
-    "deleteSelection": "Fjern valde",
-    "end": "Ferdig",
-    "save": "Lagre teikning",
     "size": {
       "label": "Linjetjukkleik",
       "pointLabel": "Punktstorleik",
       "textLabel": "Tekststorleik"
     },
-    "tabHeading": "Teikne og måle",
-    "textInputLabel": "Skriv inn tekst",
-    "tool": {
-      "tooltip": {
-        "text": "Tekst"
-      }
-    },
-    "tools": "Verktøy",
-    "yesClear": "Ja, fjern",
-    "redoundo": "Angre / Gjør om",
-    "download": "Last ned",
-    "uploadButton": {
-      "label": "Last opp"
-    }
+    "textInputLabel": "Skriv inn tekst"
   },
   "infoBox": {
     "address": "Adresse",
@@ -130,7 +99,8 @@
     "sources": {
       "label": "Kjelder",
       "loading": "Les LiDAR-katalog …",
-      "none": "Ingen LiDAR-kjelder dekkjer dette området."
+      "none": "Ingen LiDAR-kjelder dekkjer dette området.",
+      "capped": "kappa"
     },
     "actions": {
       "redraw": "Teikn ny",
@@ -207,6 +177,11 @@
     "coordinates": "Koordinatar",
     "houseNumber": "Husnummer",
     "placeholder": "Søk i Tufteseid",
+    "pagination": {
+      "previous": "Førre side",
+      "next": "Neste side",
+      "status": "Side {{page}} av {{pages}}"
+    },
     "placeName": "Stadnamn",
     "properties": "Eigedomar",
     "roads": "Vegar",
@@ -217,31 +192,13 @@
     "maxLength": "Maks 100 teikn"
   },
   "shared": {
-    "actions": {
-      "download": "Last ned",
-      "select": "Vel"
-    },
     "close": "Lukk",
-    "open": "Opne",
-    "units": {
-      "meter": "Meter",
-      "nauticalMile": "Nautisk mil"
-    },
     "yes": "Ja",
-    "no": "Nei",
-    "in": "i",
-    "locations": {
-      "municipality": "kommune"
-    },
     "cancel": "Avbryt",
-    "geometry": {
-      "types": {
-        "point": "Punkter",
-        "linestring": "Linjer",
-        "polygon": "Flateer"
-      }
-    },
-    "moreInfo": "Meir info"
+    "errorBoundary": {
+      "title": "Noko gjekk gale her",
+      "retry": "Prøv igjen"
+    }
   },
   "tipsandtricks": {
     "heading": "Tips og triks",
@@ -268,29 +225,6 @@
     "version": "Versjon",
     "buildDate": "Bygd"
   },
-  "importDialog": {
-    "header": "Importer fil til teknelag",
-    "body": {
-      "text": "Vel ei fil, enten GPX, GML eller GEOJSON. Om du vil erstatte det som er tekna på kartet med innholdet i fila.",
-      "details": {
-        "heading": "Objekt i fila"
-      }
-    },
-    "overwriteSwitch": {
-      "label": "Overskriv tekning",
-      "tooltip": "Vil fjerne all tekning på kartet"
-    },
-    "buttons": {
-      "confirm": {
-        "label": "Last opp"
-      }
-    },
-    "fileupload": {
-      "dragdrop": {
-        "label": "Dra og slipp, eller vel ei fil"
-      }
-    }
-  },
   "measure": {
     "label": "Måleverktøy",
     "length": "Lengd",
@@ -312,6 +246,7 @@
   "localities": {
     "defaultName": "Utan namn",
     "createFailed": "Kunne ikkje opprette lokaliteten. Sjekk at du er innlogga og at serveren køyrer oppdatert skjema (detaljar i nettlesarkonsollen).",
+    "createTooLarge": "Skjermbiletet dekkjer for stort område til å bli éin lokalitet. Zoom inn og prøv igjen.",
     "byOwner": "av {{name}}",
     "summary": {
       "funn_one": "1 funn",
@@ -413,7 +348,8 @@
       "kind": {
         "extract": "LiDAR-uttrekk",
         "screenshot": "Skjermbilete",
-        "upload": "Lasta opp"
+        "upload": "Lasta opp",
+        "flyfoto": "Flyfoto"
       }
     },
     "tools": {
@@ -424,7 +360,63 @@
       "screenshotFailed": "Kunne ikkje ta skjermbilete. Sørg for at lokaliteten er synleg i kartet.",
       "lidarExtractShort": "LiDAR",
       "screenshotShort": "Bilete",
-      "screenshotSaved": "Skjermbiletet er lagra under Bilete."
+      "screenshotSaved": "Skjermbiletet er lagra under Bilete.",
+      "flyfoto": "Hent flyfoto",
+      "flyfotoShort": "Flyfoto",
+      "flyfotoCaption": "Flyfoto",
+      "flyfotoSaved": "Flyfotoet er lagra under Bilete.",
+      "flyfotoNoticeTitle": "Om bruk av flyfoto",
+      "flyfotoNotice": "Flyfoto blir henta frå Norge i bilder (© Kartverket, Geovekst, kommunar m.fl.) og lagra i lokaliteten til eige bruk. Bileta er frie til privat, ikkje-kommersiell bruk. Vil du publisere dei eller bruke dei kommersielt, må du sjølv innhente rettar og følgje vilkåra til kjelda.",
+      "flyfotoConfirm": "Hent flyfoto",
+      "flyfotoPickerTitle": "Hent flyfoto",
+      "flyfotoMosaic": "Beste tilgjengelege mosaikk",
+      "flyfotoMosaicHint": "Nyaste bilete med best oppløysing, saumlaust sett saman.",
+      "flyfotoProjectsHeading": "Opptak over dette området ({{count}})",
+      "flyfotoProjectsLoading": "Hentar oversikt over opptak …",
+      "flyfotoProjectsFailed": "Kunne ikkje hente oversikta over opptak.",
+      "flyfotoProjectsNone": "Fann ingen enkeltopptak for dette området.",
+      "flyfotoGrab": "Hent",
+      "flyfotoGrabAll": "Hent alle ({{count}})",
+      "flyfotoGrabAllHint": "Hentar dei {{count}} nyaste opptaka, eitt om gongen.",
+      "flyfotoFetching": "Hentar …",
+      "flyfotoBatchDone": "Lagra {{saved}} av {{total}} opptak under Bilete.",
+      "flyfotoEmptyFor": "Fann ingen flyfoto-dekning for {{label}}.",
+      "flyfotoFailedFor": "Kunne ikkje hente flyfoto for {{label}}.",
+      "flyfotoClose": "Lukk"
+    },
+    "terrain": {
+      "short": "Terreng",
+      "tooltip": "Terrenganalyse — lys opp og bearbeid høgdedata for rektangelet",
+      "heading": "Terrenganalyse",
+      "close": "Lukk terrenganalyse",
+      "visualization": "Visualisering",
+      "vis": {
+        "hillshade": "Skyggerelieff",
+        "multiHillshade": "Fleirretning",
+        "svf": "Himmelsyn",
+        "lrm": "Lokalrelieff",
+        "slope": "Helling"
+      },
+      "visHint": {
+        "hillshade": "Éi lyskjelde. Dra på asimut for å sveipe lyset — strukturar som ligg parallelt med lyset er usynlege.",
+        "multiHillshade": "Seks lysretningar vekta mot nordvest. Ingen retning blir liggjande i mørke.",
+        "svf": "Kor mykje av himmelen som er synleg. Uavhengig av lysretning: søkk og grøfter blir mørke, haugar og vollar lyse.",
+        "lrm": "Høgdemodellen minus ei glatta utgåve. Fjernar landskapsforma og lèt det småskala stå att.",
+        "slope": "Bratthet i terrenget. Bratt er mørkt."
+      },
+      "azimuth": "Lysretning",
+      "altitude": "Solhøgd",
+      "zFactor": "Overdriving",
+      "opacity": "Dekkraft",
+      "resolution": "{{m}} m/px · {{w}}×{{h}}",
+      "reframe": "Analyser utsnittet",
+      "save": "Lagre som bilete",
+      "saveNew": "Lagre som ny lokalitet",
+      "saveFailed": "Klarte ikkje å lagre biletet.",
+      "saving": "Lagrar …",
+      "sourceLabel": "Høgdedata (Kartverket)",
+      "failed": "Klarte ikkje å hente høgdedata.",
+      "empty": "Ingen laserdata dekkjer dette rektangelet."
     },
     "kulturminner": {
       "heading": "Kjende kulturminne",
@@ -450,6 +442,72 @@
       "norgeibilderButton": "Gå til Norgeibilder.no",
       "hoydedataDescription": "Her får du oversikt over og tilgang til høydedata som Kartverket tilbyr på internett.",
       "hoydedataButton": "Gå til høydedata.no"
+    }
+  },
+  "ribbon": {
+    "mode": {
+      "standard": "Standard",
+      "standardTip": "Standardkart",
+      "lidar": "LiDAR",
+      "lidarTip": "LiDAR-relieff (nasjonal mosaikk eller per prosjekt)",
+      "hybrid": "Hybrid",
+      "hybridTip": "LiDAR med vegar og stadnamn",
+      "flyfoto": "Flyfoto",
+      "flyfotoTip": "Ortofoto frå Norge i bilder — saumlaus mosaikk eller eitt enkelt flyfotoprosjekt"
+    },
+    "heritage": {
+      "label": "Kulturminne",
+      "tip": "Lokalitetar og enkeltminne"
+    },
+    "layers": {
+      "tip": "Alle kulturminne-lag"
+    },
+    "flyfoto": {
+      "datasetLabel": "Flyfotoprosjekt",
+      "datasetHead": "Flyfoto · W/S",
+      "mosaic": "Beste mosaikk",
+      "mosaicMeta": "nyaste tilgjengelege",
+      "projectsHint": "Enkeltprosjekt, nyaste først. Gå bakover i tid med S.",
+      "loading": "Hentar flyfotoprosjekt…",
+      "zoomedOut": "Zoom inn for å sjå kva for flyfotoprosjekt som dekkjer området.",
+      "error": "Fekk ikkje henta flyfotoprosjekt akkurat no. Prøv igjen, eller zoom litt inn.",
+      "empty": "Ingen enkeltprosjekt dekkjer dette utsnittet. Bruk beste mosaikk, eller prøv ein annan stad."
+    },
+    "search": {
+      "clear": "Tøm søk"
+    },
+    "lidar": {
+      "datasetLabel": "LiDAR-datasett",
+      "datasetHead": "LiDAR-datasett · W/S",
+      "nationalMosaic": "Nasjonal mosaikk",
+      "nationalMeta": "heile Noreg",
+      "projectsHint": "Prosjekt, mest dekning først. Hald over for omriss.",
+      "loadingCatalogue": "Hentar katalog…",
+      "loadingFootprints": "Hentar omriss…",
+      "zoomedOut": "Zoom inn for å sjå kva for LiDAR-prosjekt som dekkjer området.",
+      "error": "Fekk ikkje henta prosjektomriss akkurat no. Prøv igjen, eller zoom litt inn.",
+      "empty": "Ingen LiDAR-prosjekt dekkjer dette utsnittet. Bruk nasjonal mosaikk, eller prøv ein annan stad.",
+      "lessRelevant": "{{count}} mindre relevante",
+      "filter": "Filter",
+      "filterMinYear": "Vis som hovudliste frå år: {{year}}",
+      "filterDense": "Rekn ≥5 pkt/m² som nytt nok",
+      "filterMinArea": "Minste del av synsfeltet: {{percent}}%",
+      "filterReset": "Tilbakestill filter",
+      "styleLabel": "Visingsstil",
+      "styleHead": "Visingsstil · A/D",
+      "moreStyles": "{{count}} fleire stilar",
+      "modelLabel": "Høgdemodell",
+      "modelTip": "DTM = terreng (vegetasjon fjerna), DOM = overflate (bygg og tre). Byt med E"
+    },
+    "terrain": {
+      "label": "Terreng",
+      "tip": "Terrenganalyse av kartutsnittet — hent høgdedata og lys dei opp sjølv. Krev inga lokalitet",
+      "tooLarge": "Utsnittet dekkjer for stort område for terrenganalyse. Zoom inn og prøv igjen.",
+      "unavailable": "Fann ikkje noko kartutsnitt å analysere."
+    },
+    "tray": {
+      "show": "Vis innhald",
+      "hide": "Skjul innhald"
     }
   }
 }

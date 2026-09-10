@@ -1,4 +1,3 @@
-import { ButtonGroup, HStack, IconButton, Switch, Tooltip } from '@kvib/react';
 import { useAtom, useAtomValue } from 'jotai';
 import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +12,8 @@ import {
   useDrawActions,
   useDrawActionsState,
 } from '../../settings/draw/drawActions/drawActionsHooks';
+import { IconButton, Switch, Tooltip } from '../../ui';
+import styles from '../Draw.module.css';
 import { StyleChangeDetail } from './hooks/drawEventHandlers';
 import { DrawType, useDrawSettings } from './hooks/drawSettings';
 
@@ -79,50 +80,43 @@ export const EditControls = ({ drawType }: EditControlsProps) => {
   const showDeleteControl = drawType === 'Move';
 
   return (
-    <>
-      <HStack marginTop={2} wrap="wrap">
-        <ButtonGroup>
-          <Tooltip content={t('draw.controls.tool.tooltip.undo')}>
-            <IconButton
-              variant="ghost"
-              disabled={!canUndoDrawAction}
-              onClick={undoLast}
-              icon="undo"
-              size={{ base: 'xs', md: 'sm' }}
-            />
-          </Tooltip>
+    <div className={styles.editRow}>
+      <div className={styles.editButtons}>
+        <Tooltip label={t('draw.controls.tool.tooltip.undo')}>
+          <IconButton
+            icon="undo"
+            aria-label={t('draw.controls.tool.tooltip.undo')}
+            disabled={!canUndoDrawAction}
+            onClick={undoLast}
+          />
+        </Tooltip>
 
-          <Tooltip content={t('draw.controls.tool.tooltip.redo')}>
-            <IconButton
-              variant="ghost"
-              disabled={!canRedoDrawAction}
-              onClick={redoLastUndone}
-              icon="redo"
-              size={{ base: 'xs', md: 'sm' }}
-            />
-          </Tooltip>
-        </ButtonGroup>
-        {showDeleteControl && (
-          <Tooltip content={t('draw.controls.tool.tooltip.deleteselected')}>
-            <IconButton
-              onClick={deleteSelected}
-              colorPalette="red"
-              icon="delete"
-              size="sm"
-              variant="ghost"
-            />
-          </Tooltip>
-        )}
-        {showSnapControl && (
-          <Switch
-            size="sm"
-            checked={snapEnabled}
-            onCheckedChange={(e) => setSnapEnabled(e.checked)}
-          >
-            Snap
-          </Switch>
-        )}
-      </HStack>
-    </>
+        <Tooltip label={t('draw.controls.tool.tooltip.redo')}>
+          <IconButton
+            icon="redo"
+            aria-label={t('draw.controls.tool.tooltip.redo')}
+            disabled={!canRedoDrawAction}
+            onClick={redoLastUndone}
+          />
+        </Tooltip>
+      </div>
+      {showDeleteControl && (
+        <Tooltip label={t('draw.controls.tool.tooltip.deleteselected')}>
+          <IconButton
+            icon="delete"
+            aria-label={t('draw.controls.tool.tooltip.deleteselected')}
+            palette="red"
+            onClick={deleteSelected}
+          />
+        </Tooltip>
+      )}
+      {showSnapControl && (
+        <Switch
+          checked={snapEnabled}
+          onChange={setSnapEnabled}
+          label={t('draw.controls.snap')}
+        />
+      )}
+    </div>
   );
 };

@@ -1,0 +1,33 @@
+/*
+ * Chrome around the terrain surface. Deliberately not RibbonToolRow's: that
+ * one caps its content at 720 px because the panels inside it are still the
+ * vertical ones from the left-hand workspace, and terrain is the one that has
+ * been made horizontal — it wants the width.
+ */
+
+.root {
+  display: block;
+  padding: var(--sp-4) var(--sp-5);
+  max-height: min(52vh, 460px);
+  overflow-y: auto;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-3);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-sm);
+  font-weight: 700;
+}
+
+@media (max-width: 47.999rem) {
+  .root {
+    padding: var(--sp-3);
+  }
+}

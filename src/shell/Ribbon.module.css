@@ -1,0 +1,73 @@
+/*
+ * The ribbon: one white bar across the top of the map, one row per level of
+ * context. Row 1 is always there, row 2 appears with an open lokalitet.
+ *
+ * Rows wrap rather than scroll horizontally. The old top bar set
+ * `overflowX: auto` below md, which put the account button and the lokalitet
+ * actions off-screen on a phone with nothing to say they were there.
+ */
+
+.bar {
+  background: var(--c-bg);
+  box-shadow: var(--shadow-md);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-5);
+  min-height: 48px;
+}
+
+/* Rows below the first read as subordinate: tinted, and separated by a rule
+   rather than by whitespace the bar does not have to spare. */
+.rowSub {
+  background: var(--c-bg-subtle);
+  border-top: 1px solid var(--c-border);
+}
+
+/* Keeps a set of controls together when the row wraps. */
+.group {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.divider {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  margin: var(--sp-1) var(--sp-2);
+  background: var(--c-border);
+}
+
+/* Pushes what follows to the right edge — but only while the row is on one
+   line. Once it wraps, `flex-basis: 0` lets it collapse instead of forcing
+   a line of its own. */
+.spacer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* The divider is the wrong idiom once the row has wrapped: it ends up
+   floating at the start of a line separating nothing. */
+@media (max-width: 47.999rem) {
+  .divider {
+    display: none;
+  }
+
+  .row {
+    padding: var(--sp-2) var(--sp-3);
+    gap: var(--sp-2);
+  }
+}
+
+/* Text chip for a pulldown trigger: truncates rather than stretching the
+   row, since a LiDAR project name can run to sixty characters. */
+.chipLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,0 +1,85 @@
+.text {
+  font-size: var(--font-sm);
+  line-height: 1.5;
+}
+
+.error {
+  font-size: var(--font-sm);
+  color: var(--c-danger);
+}
+
+.muted {
+  font-size: var(--font-sm);
+  color: var(--c-fg-muted);
+}
+
+.hint {
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+/* The seamless mosaic sits apart from the acquisition list: it is the
+   "just give me the best picture" answer, and it is not one of the years. */
+.mosaic {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  padding: var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+}
+
+.projects {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.projectsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.projectList {
+  display: flex;
+  flex-direction: column;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.project {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.projectMain {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+
+.sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}

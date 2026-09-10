@@ -1,7 +1,8 @@
-import { Box, Button, Flex, ListItem, Separator, Text } from '@kvib/react';
 import { useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
+import { Button } from '../../ui';
 import { displaySearchResultsAtom } from '../atoms';
+import styles from './SearchResults.module.css';
 
 export const SearchResultLine = ({
   heading,
@@ -24,54 +25,36 @@ export const SearchResultLine = ({
   const setDisplaySearchResults = useSetAtom(displaySearchResultsAtom);
 
   return (
-    <ListItem
-      cursor="pointer"
-      _hover={{ fontWeight: '600' }}
-      onClick={() => {
-        setDisplaySearchResults(false);
-        onClick();
-      }}
+    <li
+      className={styles.line}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      as={'ul'}
-      pr={2}
-      pl={1}
-      mb={1}
     >
-      <Flex
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        gap={2}
-        pb={2}
+      <button
+        type="button"
+        className={styles.lineMain}
+        onClick={() => {
+          setDisplaySearchResults(false);
+          onClick();
+        }}
       >
-        <Box>
-          <Text>{heading}</Text>
-          {locationType && (
-            <Text
-              fontSize="sm"
-              color="gray.600"
-              fontStyle="italic"
-              title={locationType}
-            >
-              {locationType}
-            </Text>
-          )}
-        </Box>
-        {showButton && (
-          <Button
-            size="sm"
-            colorPalette="gray"
-            onClick={(e) => {
-              e.stopPropagation();
-              onButtonClick?.();
-            }}
-          >
-            {t('search.houseNumber')}
-          </Button>
+        <span className={styles.lineHeading}>{heading}</span>
+        {locationType && (
+          <span className={styles.lineType} title={locationType}>
+            {locationType}
+          </span>
         )}
-      </Flex>
-      <Separator />
-    </ListItem>
+      </button>
+      {showButton && (
+        <Button
+          size="sm"
+          variant="secondary"
+          palette="gray"
+          onClick={() => onButtonClick?.()}
+        >
+          {t('search.houseNumber')}
+        </Button>
+      )}
+    </li>
   );
 };

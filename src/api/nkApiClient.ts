@@ -1,7 +1,5 @@
 import { getDefaultStore } from 'jotai';
 import { Feature } from 'ol';
-import { Color } from 'ol/color';
-import { ColorLike, PatternDescriptor } from 'ol/colorlike';
 import { GML } from 'ol/format';
 import { Polygon } from 'ol/geom';
 import { Fill, Stroke, Style } from 'ol/style';
@@ -9,26 +7,6 @@ import { getEnv } from '../env';
 import { mapAtom } from '../map/atoms';
 
 const BASE_API_URL = getEnv().apiUrl;
-
-export type StyleForStorage = {
-  fill: { color: Color | ColorLike | PatternDescriptor | null };
-  stroke: {
-    color: Color | ColorLike | undefined;
-    width: number | undefined;
-    lineDash?: number[];
-  };
-  text?: {
-    text?: string | undefined; // Preferred/current format; 'value' is supported for backward compatibility
-    value?: string | undefined;
-    font: string | undefined;
-    fillColor: Color | ColorLike | PatternDescriptor | null;
-    backgroundFillColor: Color | ColorLike | PatternDescriptor | null;
-    stroke?: {
-      color: Color | ColorLike | undefined;
-      width: number | undefined;
-    };
-  };
-};
 
 export const getPropertyGeometry = async (
   municipalityNumber: string, //kommunenummer

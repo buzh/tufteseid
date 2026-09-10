@@ -1,0 +1,112 @@
+/*
+ * The region is a `popover`, so most of what is here fights the UA stylesheet
+ * for `[popover]` (fixed, inset 0, auto margins, a border, `overflow: auto`)
+ * rather than styling from nothing.
+ */
+.region {
+  position: fixed;
+  inset: auto var(--sp-5) var(--sp-5) auto;
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-3);
+  width: auto;
+  max-width: min(360px, calc(100vw - 2 * var(--sp-5)));
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  /* The region spans nothing the map needs, but the toasts themselves do. */
+  pointer-events: none;
+}
+
+/* Narrow screens: full width, so a long message wraps to two lines instead
+   of a column of six words. */
+@media (max-width: 30rem) {
+  .region {
+    inset: auto var(--sp-4) calc(env(safe-area-inset-bottom, 0px) + var(--sp-4))
+      var(--sp-4);
+    max-width: none;
+    align-items: stretch;
+  }
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-3) var(--sp-4) var(--sp-5);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--c-border-strong);
+  background: var(--c-bg);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  animation: toast-in 140ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.glyph {
+  flex: none;
+  margin-top: 1px;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--c-fg);
+  overflow-wrap: anywhere;
+}
+
+.description {
+  margin-top: var(--sp-1);
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+  overflow-wrap: anywhere;
+}
+
+.info {
+  border-left-color: var(--c-blue-600);
+}
+.info .glyph {
+  color: var(--c-blue-600);
+}
+
+.success {
+  border-left-color: var(--c-green-500);
+}
+.success .glyph {
+  color: var(--c-green-500);
+}
+
+.warning {
+  border-left-color: var(--c-yellow-600);
+}
+.warning .glyph {
+  color: var(--c-yellow-600);
+}
+
+.error {
+  border-left-color: var(--c-danger);
+}
+.error .glyph {
+  color: var(--c-danger);
+}

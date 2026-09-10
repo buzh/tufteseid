@@ -1,6 +1,6 @@
-import { HStack, Stack, Text, VStack } from '@kvib/react';
 import { useTranslation } from 'react-i18next';
 import { decimalToDMS } from '../../../shared/utils/coordinateCalculations';
+import styles from '../InfoBox.module.css';
 
 const formatCoordinateDigit = (value: number, useDMS: boolean) => {
   if (useDMS) {
@@ -22,18 +22,16 @@ const CoordindateDigit = ({
   label: string;
   value: number;
   useDMS: boolean;
-}) => {
-  return (
-    <HStack justifyContent={'space-between'} alignItems={'flex-start'}>
-      <Text justifySelf={'end'}>{label}:</Text>
-      <VStack alignItems={'flex-end'} justifyItems={'flex-end'}>
-        {formatCoordinateDigit(value, useDMS).map((text, index) => (
-          <Text key={index}>{text}</Text>
-        ))}
-      </VStack>
-    </HStack>
-  );
-};
+}) => (
+  <div className={styles.coordRow}>
+    <span>{label}:</span>
+    <span className={styles.coordValues}>
+      {formatCoordinateDigit(value, useDMS).map((text, index) => (
+        <span key={index}>{text}</span>
+      ))}
+    </span>
+  </div>
+);
 
 export const CoordinateText = ({
   x,
@@ -48,35 +46,36 @@ export const CoordinateText = ({
 }) => {
   const { t } = useTranslation();
 
+  // Northing first in a geographic CRS, easting first in a projected one —
+  // the axis order each convention is read in.
+  const north = (
+    <CoordindateDigit
+      label={t('infoBox.coordinateSection.north')}
+      value={y}
+      useDMS={useDMS}
+    />
+  );
+  const east = (
+    <CoordindateDigit
+      label={t('infoBox.coordinateSection.east')}
+      value={x}
+      useDMS={useDMS}
+    />
+  );
+
   return (
-    <Stack>
+    <div className={styles.coordinates}>
       {isGeographicProjection ? (
         <>
-          <CoordindateDigit
-            label={t('infoBox.coordinateSection.north')}
-            value={y}
-            useDMS={useDMS}
-          />
-          <CoordindateDigit
-            label={t('infoBox.coordinateSection.east')}
-            value={x}
-            useDMS={useDMS}
-          />
+          {north}
+          {east}
         </>
       ) : (
         <>
-          <CoordindateDigit
-            label={t('infoBox.coordinateSection.east')}
-            value={x}
-            useDMS={useDMS}
-          />
-          <CoordindateDigit
-            label={t('infoBox.coordinateSection.north')}
-            value={y}
-            useDMS={useDMS}
-          />
+          {east}
+          {north}
         </>
       )}
-    </Stack>
+    </div>
   );
 };

@@ -6,13 +6,8 @@ import { LocalityRecord } from '../api/localities';
 // workspace refreshes it after its own updates.
 export const activeLocalityAtom = atom<LocalityRecord | null>(null);
 
-// "Ny lokalitet" armed: the box-drag interaction is live and the next
-// drag creates a record (see useLocalityCreate). Cancelled by Escape or
-// clicking the TopBar button again.
-export const creatingLocalityAtom = atom<boolean>(false);
-
-// A funn is being drawn/edited in the workspace right now. Layout uses
-// this to mount the mobile bottom draw toolbar.
+// A funn is being drawn/edited in the workspace right now. The shell
+// uses this to mount the mobile bottom draw toolbar.
 export const funnDraftActiveAtom = atom<boolean>(false);
 
 // "Juster området": the open lokalitet's rectangle is move/resizable on
@@ -22,15 +17,14 @@ export const adjustingLocalityAtom = atom<boolean>(false);
 
 // Which funn the list is pointing at. `hovered` is transient (pointer or
 // keyboard cursor), `selected` sticks until another row is picked or the
-// list is dismissed. Both drive the halo drawn by funnHighlightLayer —
-// the funn features themselves keep the style they were drawn with, so
-// the emphasis has to live on a layer of its own.
+// list is dismissed. Both drive the halo in funnHighlightLayer, which
+// explains why that's a separate layer.
 export const hoveredFunnIdAtom = atom<string | null>(null);
 export const selectedFunnIdAtom = atom<string | null>(null);
 
-// Which workspace sections are expanded. Outside the component because
-// LocalityWorkspace is keyed by locality.id and remounts on every swap —
-// folding "Detaljer" away should stay folded for the next lokalitet too.
+// Which tray sections are expanded. Outside the component because the tray
+// is keyed by locality.id and remounts on every swap — folding "Detaljer"
+// away should stay folded for the next lokalitet too.
 export type WorkspaceSectionId =
   | 'funn'
   | 'bilder'

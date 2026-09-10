@@ -13,13 +13,18 @@ route {
         header Referrer-Policy strict-origin
         @allowedOrigins header_regexp Origin ^https://(kartkatalog\.)?geonorge\.no$
         header @allowedOrigins Access-Control-Allow-Origin {http.request.header.Origin}
+        # style-src is 'self' now that emotion is gone with kvib: nothing
+        # injects a stylesheet at runtime any more, and the built CSS is a
+        # <link>. Inline style *attributes* are a separate directive, and they
+        # stay — React sets positions, sizes and picked colours that way.
         header Content-Security-Policy "
                 default-src 'self';
                 script-src 'self';
                 worker-src 'self' blob:;
                 img-src 'self' data: blob: cache.kartverket.no;
                 connect-src 'self' data: blob: *.geonorge.no *.norgeskart.no cache.kartverket.no hoydedata.no;
-                style-src 'self' 'unsafe-inline';
+                style-src 'self';
+                style-src-attr 'unsafe-inline';
                 font-src 'self';
                 frame-ancestors *;
         "
@@ -59,6 +64,40 @@ route {
         # testapi.norgeskart.no/v1/* — matrikkel (cadastral) WMS.
         handle_path /wms/testapi/* {
                 rewrite * /v1{http.request.uri.path}
+                reverse_proxy http://wmscache
+        }
+
+        # Norge i bilder ortofoto — same-origin via wmscache, which proxies
+        # to the nib-proxy sidecar that injects NiB's anonymous access
+        # token (see nginx/wms-cache.conf location /nib-wms/). No CSP entry
+        # needed: the browser only ever talks to this origin.
+        handle_path /wms/nib/* {
+                rewrite * /nib-wms{http.request.uri.path}
+                reverse_proxy http://wmscache
+        }
+
+        # Norge i bilder ArcGIS REST — the same sidecar and the same token,
+        # but a different upstream namespace (/arcgis/rest/services). This
+        # is how per-project ortofoto works: NiB exposes no WMS for single
+        # acquisitions, so the lokalitet "Flyfoto" action enumerates them
+        # via prosjekter/MapServer/4/query and renders one at a time via
+        # ortofoto_prosjekter/ImageServer/exportImage. Same-origin as
+        # everything else, so still no CSP entry.
+        handle_path /arcgis/nib/* {
+                rewrite * /nib-arcgis{http.request.uri.path}
+                reverse_proxy http://wmscache
+        }
+
+        # hoydedata.no ArcGIS REST — Kartverket's elevation ImageServers.
+        # Unlike /wms/geonorge/* (which serves Kartverket's *pre-shaded*
+        # hillshade PNGs) this is where the raw float elevation grid comes
+        # from: exportImage with renderingRule {"rasterFunction":"None"}
+        # returns a 32-bit float GeoTIFF, which is what the lokalitet
+        # terrain tool needs to compute its own relief visualizations.
+        # See docs/terrain-analysis.md. Anonymous — no token sidecar, so
+        # this goes straight to the host via wmscache.
+        handle_path /arcgis/hoydedata/* {
+                rewrite * /hoydedata-arcgis{http.request.uri.path}
                 reverse_proxy http://wmscache
         }
 

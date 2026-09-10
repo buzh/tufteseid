@@ -1,4 +1,3 @@
-import { MaterialSymbol } from '@kvib/react';
 import { getDefaultStore } from 'jotai';
 import { Feature } from 'ol';
 import BaseEvent from 'ol/events/Event';
@@ -8,6 +7,7 @@ import { SelectEvent } from 'ol/interaction/Select';
 import { TranslateEvent } from 'ol/interaction/Translate';
 import { Circle, RegularShape, Stroke, Style } from 'ol/style';
 import { mapAtom } from '../../../map/atoms';
+import type { MaterialSymbol } from '../../../ui';
 import {
   primaryColorAtom,
   secondaryColorAtom,

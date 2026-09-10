@@ -1,0 +1,17 @@
+.select {
+  height: var(--ctl-h-lg);
+  max-width: 100%;
+  padding: 0 var(--sp-5);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--c-bg);
+  font: inherit;
+  font-size: var(--font-md);
+  color: var(--c-fg);
+  cursor: pointer;
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}

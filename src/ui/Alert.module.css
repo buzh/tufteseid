@@ -1,0 +1,33 @@
+.root {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--alert-border);
+  border-radius: var(--radius-md);
+  background: var(--alert-bg);
+  font-size: var(--font-sm);
+  color: var(--c-fg);
+}
+
+.icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--alert-fg);
+}
+
+.body {
+  min-width: 0;
+}
+
+.info {
+  --alert-bg: var(--c-blue-50);
+  --alert-border: var(--c-blue-100);
+  --alert-fg: var(--c-blue-600);
+}
+
+.warning {
+  --alert-bg: var(--c-yellow-50);
+  --alert-border: var(--c-yellow-100);
+  --alert-fg: var(--c-yellow-600);
+}

@@ -1,0 +1,47 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 0 0 auto;
+  border-radius: var(--radius-sm);
+  padding: 0 var(--sp-3);
+  font-size: var(--font-xs);
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.gray {
+  background: var(--c-gray-100);
+  color: var(--c-gray-700);
+}
+
+.green {
+  background: var(--c-green-100);
+  color: var(--c-green-900);
+}
+
+.yellow {
+  background: var(--c-yellow-100);
+  color: var(--c-yellow-600);
+}
+
+.red {
+  background: var(--c-red-100);
+  color: var(--c-red-600);
+}
+
+.blue {
+  background: var(--c-blue-100);
+  color: var(--c-blue-600);
+}
+
+/* Count pill riding on a button or a heading: circular, tabular digits so
+   9 → 10 does not shift the layout next to it. */
+.count {
+  min-width: 18px;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  padding: 0 var(--sp-2);
+  font-variant-numeric: tabular-nums;
+}

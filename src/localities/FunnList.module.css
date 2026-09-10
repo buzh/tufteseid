@@ -1,0 +1,168 @@
+/*
+ * Funn rows. The whole card is the zoom target; the status badge and the
+ * overflow menu are separate targets sitting inside it, which is why both
+ * stop propagation rather than relying on layout to keep them apart.
+ */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.row {
+  border: 1px solid var(--c-border);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  padding: var(--sp-4);
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--c-bg-subtle);
+}
+
+.rowSelected {
+  border-color: var(--c-accent);
+  background: var(--c-accent-subtle);
+}
+
+.rowSelected:hover {
+  background: var(--c-accent-subtle);
+}
+
+/* An open editor is a form, not a link to the map. */
+.rowEditing,
+.rowEditing:hover {
+  cursor: default;
+  background: transparent;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-4);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--c-fg);
+}
+
+.note {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 2px;
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.editorActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Badge plus a chevron, with no button chrome of its own — the badge is
+   the affordance and a bordered box around it reads as a second control. */
+.statusTrigger {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--c-fg-muted);
+  cursor: pointer;
+}
+
+.statusTrigger:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+/* Popover bodies: the status list and the row menu. */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.menuTitle {
+  margin-bottom: var(--sp-3);
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-sm);
+  color: var(--c-fg);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: var(--c-bg-hover);
+}
+
+.menuItemActive {
+  background: var(--c-bg-active);
+}
+
+.menuItemDanger {
+  color: var(--c-danger);
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+}
+
+.busy {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+.empty {
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}

@@ -1,8 +1,11 @@
+import { useStore } from 'jotai';
 import { useEffect, useRef } from 'react';
+import { anyOverlayOpenAtom } from '../ui/overlayAtoms';
 
-// Keyboard for the open lokalitet, same shape as the LiDAR cycling keys
-// in TopBar: one document listener, bail out on modifiers, repeats and
-// anything typed into a field.
+// Keyboard for the open lokalitet, same shape as the background cycling keys
+// in src/map/useBackgroundCyclingKeys.ts: one document listener, bail out on
+// modifiers, repeats, anything typed into a field, and anything with an
+// overlay open over it.
 //
 // Capture phase, and handled keys are stopped dead. OpenLayers'
 // KeyboardPan is attached to `document` too (see the map atom's
@@ -34,6 +37,9 @@ export type WorkspaceKeyHandlers = {
 export const useWorkspaceKeys = (handlers: WorkspaceKeyHandlers) => {
   const ref = useRef(handlers);
   ref.current = handlers;
+  // Read through the store inside the listener: the value must be current
+  // at keypress time, and subscribing would re-register on every open.
+  const store = useStore();
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -56,6 +62,9 @@ export const useWorkspaceKeys = (handlers: WorkspaceKeyHandlers) => {
       ) {
         return;
       }
+      // Second, focus-independent check on the same question — see
+      // src/ui/overlayAtoms.ts.
+      if (store.get(anyOverlayOpenAtom)) return;
 
       let handled = true;
       switch (event.key) {
@@ -101,5 +110,5 @@ export const useWorkspaceKeys = (handlers: WorkspaceKeyHandlers) => {
     return () => {
       document.removeEventListener('keydown', onKey, true);
     };
-  }, []);
+  }, [store]);
 };

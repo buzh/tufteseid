@@ -284,7 +284,7 @@ function writeCache(projects: LidarProject[]) {
 }
 
 // pointDensity is a string like "10pkt" — parse the leading digits so we
-// can sort/compare densest first. Shared by the TopBar picker and the
+// can sort/compare densest first. Shared by the ribbon picker and the
 // footprint-layer relevance classification.
 export const densityOrder = (d: string | null): number => {
   if (!d) return 0;
@@ -336,7 +336,7 @@ export const bboxOverlapRatio = (
 // wms.hoyde-dtm-nhm-topobathy-25833 publishes the same kind of styled
 // variants as the per-project WMS, under one fixed layer prefix instead
 // of one per acquisition. Moved here (from lidarExtract/sources.ts, which
-// re-exports it) so the TopBar style pulldown and the LiDAR-uttrekk tool
+// re-exports it) so the ribbon style pulldown and the LiDAR-uttrekk tool
 // share one fetch/cache instead of hitting GetCapabilities twice.
 
 // One service per model, each with its own layer prefix. The DOM mosaic

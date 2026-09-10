@@ -1,0 +1,256 @@
+/*
+ * The infobox and everything in it — one module for the eight files under
+ * infobox/, on the same reasoning as the results panel: it is a single
+ * surface, and the property table has no life outside the panel it sits in.
+ */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: 355px;
+  max-width: 100%;
+  max-height: 52vh;
+  padding: var(--sp-5);
+  border-radius: var(--radius-lg);
+  background: var(--c-bg);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--font-md);
+  /* The shell's right slot is pointer-events: none so the map stays
+     draggable around it. */
+  pointer-events: auto;
+}
+
+/* Minimized, the panel is just its own title bar. */
+.minimized {
+  width: auto;
+}
+
+/* Everything below the title bar, as one thing the title bar can fold. */
+.folds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-height: 0;
+}
+
+.hidden {
+  display: none;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--font-lg);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.preamble {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  user-select: text;
+}
+
+.elevation {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* The one scroll container in the panel: heading and preamble stay put. */
+.body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.section {
+  flex: 0 0 auto;
+}
+
+/* --- place info ------------------------------------------------------- */
+
+.place {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  user-select: text;
+}
+
+.placeFacts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.placeName {
+  overflow-wrap: anywhere;
+}
+
+.nearby {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.nearby > * + * {
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--c-border);
+}
+
+/* --- property info ---------------------------------------------------- */
+
+.addresses {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--sp-4);
+}
+
+.addressLabel {
+  font-weight: 600;
+}
+
+.propertyControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-3);
+}
+
+.note {
+  margin: 0 0 var(--sp-4);
+}
+
+/* Zebra striping rather than rules: the values are short and the labels
+   are not, so a reader tracks the pair by band, not by line. Striped by
+   index rather than :nth-child, because the rows share a parent with the
+   address block and the switch above them. */
+.tableRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-2);
+}
+
+.tableRowAlt {
+  background: var(--c-bg-subtle);
+}
+
+/* --- feature info ----------------------------------------------------- */
+
+.loadingRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.featureGroup + .featureGroup {
+  margin-top: var(--sp-4);
+}
+
+.featureGroupTitle {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--c-fg-muted);
+}
+
+.featureId {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.fieldLabel {
+  font-weight: 600;
+  color: var(--c-fg-muted);
+}
+
+.symbols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
+.symbols img {
+  height: 32px;
+}
+
+.images {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
+.images img {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+}
+
+.empty {
+  color: var(--c-fg-muted);
+}
+
+.error {
+  color: var(--c-danger);
+}
+
+/* --- coordinates ------------------------------------------------------ */
+
+.coordinates {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.coordRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.coordValues {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.coordActions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+/* --- shared ----------------------------------------------------------- */
+
+.small {
+  font-size: var(--font-sm);
+}
+
+.link {
+  color: var(--c-accent);
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,68 @@
+/*
+ * Row 2 — who this lokalitet is, then what you can do to it.
+ *
+ * Identity on the left, verbs on the right, and the two are allowed to end
+ * up on separate lines: on a phone the verb strip is seven buttons and there
+ * is no arrangement in which it shares a line with a name field.
+ */
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  /* Takes the slack while the row is on one line; collapses instead of
+     forcing a line of its own once it wraps. */
+  flex: 1 1 240px;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+  padding: 0 var(--sp-2);
+  font-size: var(--font-md);
+  font-weight: 600;
+}
+
+.nameEditable {
+  cursor: text;
+}
+
+.nameInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 320px;
+}
+
+/* Visibility chip plus the "1,4 km² · 3 funn" line. Hidden below md: the
+   same facts are in the tray's Detaljer section, and the verbs matter more
+   on a small screen. */
+.summary {
+  display: none;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.summaryText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+@media (min-width: 48rem) {
+  .summary {
+    display: flex;
+  }
+}
+
+.verbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}

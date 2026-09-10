@@ -1,4 +1,3 @@
-import { Flex, HStack, Text, VStack } from '@kvib/react';
 import { useAtom } from 'jotai';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,11 +9,11 @@ import {
   snapEffect,
 } from '../../settings/draw/atoms.ts';
 import { useIsMobileScreen } from '../../shared/hooks.ts';
+import { Button, ConfirmPopover, cx } from '../../ui';
 import { ColorControls } from '../ColorControls.tsx';
-import { DrawControlFooter } from '../DrawControlsFooter.tsx';
+import styles from '../Draw.module.css';
 import { DrawToolSelector } from '../DrawToolSelector.tsx';
 import {
-  distanceUnitAtomEffect,
   drawStyleEffect,
   editPointIconEffect,
   editPrimaryColorEffect,
@@ -32,8 +31,6 @@ import { getFeatureType } from './drawUtils.ts';
 import { EditControls } from './EditControls.tsx';
 import { DrawType, useDrawSettings } from './hooks/drawSettings.ts';
 
-const MOBILE_TOOLBAR_RESERVE = '15px';
-
 const MEASUREMENT_TYPES: DrawType[] = [
   'LineString',
   'Polygon',
@@ -42,13 +39,12 @@ const MEASUREMENT_TYPES: DrawType[] = [
 ];
 
 export const DrawControls = () => {
-  const { drawType } = useDrawSettings();
+  const { drawType, clearDrawing } = useDrawSettings();
   const [selectedFeature] = useAtom(selectedFeatureAtom);
   const isMobile = useIsMobileScreen();
   const { t } = useTranslation();
   useAtom(drawEnabledEffect);
   useAtom(drawTypeEffect);
-  useAtom(distanceUnitAtomEffect);
   useAtom(snapEffect);
   useAtom(drawStyleEffect);
   useAtom(editPrimaryColorEffect);
@@ -76,41 +72,52 @@ export const DrawControls = () => {
     MEASUREMENT_TYPES.includes(currentType);
 
   return (
-    <VStack
-      alignItems="flex-start"
-      width="100%"
-      padding={0.5}
-      style={isMobile ? { paddingBottom: MOBILE_TOOLBAR_RESERVE } : undefined}
-    >
+    <div className={cx(styles.controls, isMobile && styles.mobileReserve)}>
+      {/* On a phone the same strip is pinned to the bottom edge, within
+          thumb reach — see BottomDrawToolSelector. */}
       {!isMobile && <DrawToolSelector />}
 
       {drawType === 'Move' && !selectedFeature && (
-        <Text fontSize="md" mt={4}>
+        <p className={styles.instruction}>
           {t('draw.controls.editInstruction')}
-        </Text>
+        </p>
       )}
 
       {currentType === 'Text' && <TextStyleControl />}
 
-      <HStack width="100%" align={'space-between'}>
+      <div className={styles.row}>
         {currentType && <ColorControls />}
-
         {currentType === 'Point' && <PointStyleSelector />}
-        {isMobile && drawType === 'LineString' && <LineStyleControl />}
-      </HStack>
-      <Flex
-        w="100%"
-        alignItems="flex-start"
-        flexDirection={{ base: 'row', md: 'column' }}
-        justifyContent="space-between"
-        py={1}
-      >
-        {!isMobile && drawType === 'LineString' && <LineStyleControl />}
+      </div>
+
+      {/* Line style, width and the measurement toggle wrap against each
+          other rather than switching layout at a breakpoint: which of them
+          are on screen depends on the active tool. */}
+      <div className={styles.row}>
+        {drawType === 'LineString' && <LineStyleControl />}
         <LineWidthControl />
         {showMeasurementControls && <MeasurementControls />}
-      </Flex>
+      </div>
+
       <EditControls drawType={drawType} />
-      <DrawControlFooter />
-    </VStack>
+
+      <ConfirmPopover
+        title={t('draw.confrimClear')}
+        confirmLabel={t('shared.yes')}
+        cancelLabel={t('shared.cancel')}
+        onConfirm={clearDrawing}
+        trigger={(props) => (
+          <Button
+            {...props}
+            size="xs"
+            palette="red"
+            leftIcon="delete"
+            className={styles.clear}
+          >
+            {t('draw.clear')}
+          </Button>
+        )}
+      />
+    </div>
   );
 };

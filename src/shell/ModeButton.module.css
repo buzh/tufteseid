@@ -1,0 +1,84 @@
+/*
+ * Icon over label, for the controls that decide what the map *is* —
+ * background modes and the one-click Kulturminner toggle. The label is
+ * always visible rather than tooltip-only: these are the controls a first
+ * visitor has to understand without hovering anything.
+ */
+
+.wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.button {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 54px;
+  min-height: 46px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--c-fg-muted);
+  font: inherit;
+  line-height: 1.1;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--c-bg-hover);
+  color: var(--c-fg);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 1px;
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.button:disabled:hover {
+  background: transparent;
+  color: var(--c-fg-muted);
+}
+
+.active,
+.active:hover {
+  background: var(--c-accent);
+  border-color: var(--c-accent);
+  color: var(--c-accent-fg);
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* The badge overhangs the corner, so the wrapper must not clip it. */
+.badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  pointer-events: none;
+}
+
+/* On a phone the labels are what makes the row wrap to three lines; the
+   glyphs alone are enough once the modes are familiar, and the accessible
+   name stays on the button either way. */
+@media (max-width: 29.999rem) {
+  .button {
+    min-width: 40px;
+    min-height: 36px;
+  }
+
+  .label {
+    display: none;
+  }
+}

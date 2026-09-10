@@ -1,0 +1,262 @@
+/*
+ * The drawing controls — one module for the whole subsystem, on the same
+ * reasoning as the search panels: it is a single surface (the left column of
+ * the funn draft row, plus the same tool strip pinned to the bottom edge on
+ * a phone), and none of these controls has a life outside it.
+ *
+ * Width budget: `.draw` in FunnDraft.module.css is `flex: 1 1 320px`, so
+ * every group in here has to fold at ~300px rather than push the naming
+ * column off the row.
+ */
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sp-4);
+  width: 100%;
+}
+
+/* The bottom tool strip is fixed over the map, so the last control in the
+   panel would otherwise sit underneath it. */
+.mobileReserve {
+  padding-bottom: 15px;
+}
+
+.instruction {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--c-fg-muted);
+}
+
+/* A labelled control: caption over the thing it names. */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.groupLabel {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--c-fg-muted);
+}
+
+/* Rows of groups. They wrap rather than switching layout at a breakpoint:
+   what fits beside what depends on which tool is active, not on the window. */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--sp-5);
+}
+
+/* A bare switch in a row of labelled groups: drop it to the control line
+   rather than leaving it floating up beside the captions. */
+.rowSwitch {
+  align-self: flex-end;
+}
+
+.clear {
+  align-self: flex-start;
+}
+
+/* --- tool selector ---------------------------------------------------- */
+
+.tools {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-1);
+}
+
+.tool {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-1);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--c-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tool:hover {
+  background: var(--c-bg-hover);
+}
+
+.tool:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 1px;
+}
+
+.toolActive,
+.toolActive:hover {
+  background: var(--c-green-100);
+}
+
+.toolLabel {
+  font-size: var(--font-xs);
+  line-height: 1.2;
+}
+
+/* The same strip pinned to the bottom edge on a phone, where the funn row
+   is too short to hold it and the thumb is down there anyway. */
+.bottomBar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--z-fixed);
+  padding: var(--sp-4);
+  /* iPhone home indicator. */
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--sp-4));
+  background: var(--c-bg);
+  box-shadow: var(--shadow-md);
+}
+
+/* --- colours ---------------------------------------------------------- */
+
+.colorGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-5);
+}
+
+.colorColumn {
+  display: flex;
+  flex: 1 1 130px;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.colorHead {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  cursor: pointer;
+}
+
+/* Native colour well. Chrome and Firefox each wrap the swatch in their own
+   pseudo-element with padding and a border of its own; both have to go or
+   the well renders as a small square inside a large grey one. */
+.swatch {
+  width: 30px;
+  height: 24px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: none;
+  cursor: pointer;
+}
+
+.swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: var(--radius-sm);
+}
+
+.swatch::-moz-color-swatch {
+  border: none;
+  border-radius: var(--radius-sm);
+}
+
+.colorLabel {
+  font-size: var(--font-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Alpha, which the native colour well cannot express: fills default to
+   half-transparent and the whole point of a fill here is seeing through it. */
+.opacity {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--c-accent);
+}
+
+.recents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+/* Checkerboard behind the swatch so a transparent recent reads as one. */
+.recentSwatch {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background-color: var(--c-gray-0);
+  background-image:
+    linear-gradient(45deg, var(--c-gray-300) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--c-gray-300) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--c-gray-300) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--c-gray-300) 75%);
+  background-position:
+    0 0,
+    0 4px,
+    4px -4px,
+    -4px 0;
+  background-size: 8px 8px;
+  cursor: pointer;
+}
+
+.recentFill {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- point icons ------------------------------------------------------ */
+
+.iconGrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--sp-1);
+}
+
+.iconChoice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-2);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+}
+
+.iconChoice:hover {
+  background: var(--c-bg-hover);
+}
+
+.iconChoiceActive,
+.iconChoiceActive:hover {
+  background: var(--c-green-100);
+}
+
+/* --- edit controls ---------------------------------------------------- */
+
+.editRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.editButtons {
+  display: flex;
+  gap: var(--sp-1);
+}

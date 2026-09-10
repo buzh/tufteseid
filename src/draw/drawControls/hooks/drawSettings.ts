@@ -1,4 +1,3 @@
-import { MaterialSymbol } from '@kvib/react';
 import { FeatureCollection, GeoJsonProperties } from 'geojson';
 import { getDefaultStore, useAtom, useAtomValue } from 'jotai';
 import { Feature, Overlay } from 'ol';
@@ -11,6 +10,7 @@ import { Fill, Stroke, Style } from 'ol/style';
 import CircleStyle from 'ol/style/Circle';
 import { v4 as uuidv4 } from 'uuid';
 import { mapAtom } from '../../../map/atoms';
+import type { MaterialSymbol } from '../../../ui';
 import {
   drawEnabledAtom,
   drawTypeAtom,
@@ -28,7 +28,7 @@ import {
   getCircleRadiusFromProperties,
   getOverlayIconFromProperties,
   getStyleFromProperties,
-} from '../../dialogs/import/utils';
+} from '../../featureStyle';
 import { getFeatureIcon } from '../../utils/featureUtils';
 import { isDrawIconFilled } from '../drawUtils';
 import { getDrawInteraction, getSelectInteraction } from './mapInterations';

@@ -1,0 +1,46 @@
+/* The shell's left slot is pointer-events: none so the map stays draggable
+   around the floating panels; the card has to opt back in. */
+.card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+  margin-right: var(--sp-5);
+  padding: var(--sp-6);
+  border-radius: var(--radius-lg);
+  background: var(--c-bg);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex: 0 0 auto;
+  margin-bottom: var(--sp-5);
+}
+
+.layersHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-lg);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

@@ -1,0 +1,138 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--c-fg);
+  transition:
+    background-color 100ms,
+    border-color 100ms,
+    color 100ms;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 1px;
+}
+
+.button:disabled,
+.button[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Sizes ------------------------------------------------------------------ */
+
+.xs {
+  height: var(--ctl-h-sm);
+  padding: 0 var(--sp-4);
+  font-size: var(--font-xs);
+}
+
+.sm {
+  height: var(--ctl-h-md);
+  padding: 0 var(--sp-5);
+  font-size: var(--font-sm);
+}
+
+.md {
+  height: var(--ctl-h-lg);
+  padding: 0 var(--sp-6);
+  font-size: var(--font-md);
+}
+
+/* Variants. `accent` is set per palette below and is what each variant
+   colours itself from, so adding a palette does not touch the variants. */
+
+.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+.primary:not(:disabled):hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.secondary {
+  border-color: var(--c-border-strong);
+  background: var(--c-bg);
+  color: var(--accent-text);
+}
+
+.secondary:not(:disabled):hover {
+  background: var(--c-bg-hover);
+  border-color: var(--c-gray-400);
+}
+
+.ghost {
+  color: var(--accent-text);
+}
+
+.ghost:not(:disabled):hover {
+  background: var(--c-bg-hover);
+}
+
+/* Palettes --------------------------------------------------------------- */
+
+.paletteGreen {
+  --accent: var(--c-green-500);
+  --accent-hover: var(--c-green-600);
+  --accent-fg: var(--c-gray-0);
+  --accent-text: var(--c-green-700);
+}
+
+.paletteGray {
+  --accent: var(--c-gray-600);
+  --accent-hover: var(--c-gray-700);
+  --accent-fg: var(--c-gray-0);
+  --accent-text: var(--c-fg);
+}
+
+.paletteRed {
+  --accent: var(--c-red-600);
+  --accent-hover: var(--c-danger-hover);
+  --accent-fg: var(--c-gray-0);
+  --accent-text: var(--c-red-600);
+}
+
+.paletteBlue {
+  --accent: var(--c-blue-600);
+  --accent-hover: #24578e;
+  --accent-fg: var(--c-gray-0);
+  --accent-text: var(--c-blue-600);
+}
+
+/* Modifiers -------------------------------------------------------------- */
+
+.full {
+  width: 100%;
+}
+
+/* Square, no label. Width tracks the size class's height. */
+.iconOnly {
+  padding: 0;
+  gap: 0;
+}
+
+.iconOnly.xs {
+  width: var(--ctl-h-sm);
+}
+
+.iconOnly.sm {
+  width: var(--ctl-h-md);
+}
+
+.iconOnly.md {
+  width: var(--ctl-h-lg);
+}

@@ -1,30 +1,27 @@
-// Full-screen results viewer for the LiDAR extract. Opens when the user
-// presses "Hent" in the panel. Displays a horizontal strip of thumbnails
-// along the top and the currently-selected canvas below at full size.
+// Full-screen results viewer for the LiDAR extract
+// (docs/ui-architecture.md §10). Mounted at App.tsx, outside the router.
 //
-// Interactions:
-//   - Left/Right arrow keys cycle the selection.
-//   - Escape closes the viewer.
-//   - Thumbnails can be drag-reordered so two images can be placed
-//     adjacent for quick A/B toggling with the arrow keys.
+// The source LidarCanvas.canvas element is the actual DOM node handed to
+// the big-view slot, moved there with replaceChildren — React does not
+// own that subtree, so the viewer can't be casually re-parented.
+// Thumbnails have their own small canvases that mirror the source at
+// reduced size, updated whenever a new tile lands.
 //
-// The source LidarCanvas.canvas element is the actual DOM node we hand
-// to the big-view slot (moving it with replaceChildren). Thumbnails have
-// their own small canvases that mirror the source at reduced size,
-// updated whenever a new tile lands.
+// Keys are capture-phase; see docs/ui-architecture.md §1 for why.
 
-import { Box, Button, HStack, IconButton, Text, VStack } from '@kvib/react';
 import { useAtom, useAtomValue } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createAttachment } from '../api/attachments';
 import { currentUserAtom } from '../auth/atoms';
 import { activeLocalityAtom } from '../localities/atoms';
+import { Button, cx, IconButton } from '../ui';
 import {
   LidarCanvas,
   lidarExtractRunAtom,
   lidarExtractViewerOpenAtom,
 } from './atoms';
+import styles from './LidarExtractViewer.module.css';
 
 const THUMB_SIZE = 96;
 
@@ -342,32 +339,16 @@ export const LidarExtractViewer = () => {
   if (!open || !run) return null;
 
   return (
-    <Box
-      position="fixed"
-      inset={0}
-      bg="rgba(15, 20, 25, 0.94)"
-      color="white"
-      zIndex={1000}
-      display="flex"
-      flexDirection="column"
+    <div
+      className={styles.root}
       onClick={(e) => {
         // Only close on plain background clicks.
         if (e.target === e.currentTarget) close();
       }}
     >
-      <HStack
-        p={2}
-        gap={2}
-        overflowX="auto"
-        overflowY="hidden"
-        borderBottom="1px solid rgba(255,255,255,0.1)"
-        bg="rgba(0,0,0,0.35)"
-        css={{ scrollbarColor: 'rgba(255,255,255,0.3) transparent' }}
-      >
+      <div className={styles.filmstrip}>
         {orderedCanvases.length === 0 && (
-          <Text fontSize="sm" color="whiteAlpha.700" px={2}>
-            {t('lidarExtract.viewer.empty')}
-          </Text>
+          <span className={styles.empty}>{t('lidarExtract.viewer.empty')}</span>
         )}
         {orderedCanvases.map((c, i) => (
           <Thumbnail
@@ -382,40 +363,29 @@ export const LidarExtractViewer = () => {
             onDrop={() => onThumbDrop(c.id)}
           />
         ))}
-      </HStack>
+      </div>
 
-      <HStack
-        justify="space-between"
-        px={3}
-        py={1.5}
-        bg="rgba(0,0,0,0.25)"
-        borderBottom="1px solid rgba(255,255,255,0.08)"
-      >
-        <VStack align="start" gap={0}>
-          <Text fontSize="sm" fontWeight="medium">
-            {selected?.sourceLabel ?? '—'}
-          </Text>
-          <Text fontSize="10px" color="whiteAlpha.700">
+      <div className={styles.toolbar}>
+        <div className={styles.meta}>
+          <div className={styles.metaTitle}>{selected?.sourceLabel ?? '—'}</div>
+          <div className={styles.metaDetail}>
             {selected
               ? `${selected.style} · ${selected.widthPx}×${selected.heightPx} px · ${selected.metresPerPx} m/px`
               : ''}
-          </Text>
-        </VStack>
-        <HStack gap={1}>
-          <Text fontSize="xs" color="whiteAlpha.700">
+          </div>
+        </div>
+        <div className={styles.actions}>
+          <span className={styles.counter}>
             {orderedCanvases.length > 0
               ? `${clampedSelected + 1} / ${orderedCanvases.length}`
               : ''}
-          </Text>
+          </span>
           {zoom !== 1 && (
             <>
-              <Text fontSize="xs" color="whiteAlpha.700">
-                {zoom.toFixed(1)}×
-              </Text>
+              <span className={styles.counter}>{zoom.toFixed(1)}×</span>
               <IconButton
                 size="xs"
-                variant="ghost"
-                colorPalette="gray"
+                palette="gray"
                 icon="restart_alt"
                 aria-label={t('lidarExtract.viewer.resetZoom')}
                 onClick={resetZoom}
@@ -425,8 +395,7 @@ export const LidarExtractViewer = () => {
           {activeLocality && (
             <Button
               size="xs"
-              variant="ghost"
-              colorPalette="gray"
+              palette="gray"
               leftIcon={
                 selected && keptIds.has(selected.id) ? 'check' : 'bookmark_add'
               }
@@ -445,8 +414,7 @@ export const LidarExtractViewer = () => {
           )}
           <Button
             size="xs"
-            variant="ghost"
-            colorPalette="gray"
+            palette="gray"
             leftIcon="download"
             onClick={download}
             disabled={!selected || selected.status !== 'done'}
@@ -455,8 +423,7 @@ export const LidarExtractViewer = () => {
           </Button>
           <IconButton
             size="xs"
-            variant="ghost"
-            colorPalette="gray"
+            palette="gray"
             icon="delete"
             aria-label={t('lidarExtract.viewer.delete')}
             onClick={deleteCurrent}
@@ -464,30 +431,23 @@ export const LidarExtractViewer = () => {
           />
           <IconButton
             size="xs"
-            variant="ghost"
-            colorPalette="gray"
+            palette="gray"
             icon="close"
             aria-label={t('lidarExtract.viewer.close')}
             onClick={close}
           />
-        </HStack>
-      </HStack>
+        </div>
+      </div>
 
-      <Box
-        flex={1}
+      <div
         ref={bigViewRef}
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        overflow="hidden"
-        p={4}
+        className={styles.bigView}
         onPointerDown={onBigViewPointerDown}
         onPointerMove={onBigViewPointerMove}
         onPointerUp={onBigViewPointerUp}
         onDoubleClick={resetZoom}
-        style={{ touchAction: 'none' }}
       />
-    </Box>
+    </div>
   );
 };
 
@@ -538,66 +498,40 @@ const Thumbnail = ({
       : 100;
 
   return (
-    <Box
-      as="button"
+    <button
+      type="button"
+      className={cx(
+        styles.thumb,
+        selected && styles.thumbSelected,
+        dragging && styles.thumbDragging,
+      )}
       onClick={onClick}
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      flexShrink={0}
-      w={`${THUMB_SIZE + 8}px`}
-      p={1}
-      borderRadius="md"
-      border="2px solid"
-      borderColor={
-        selected ? 'green.400' : dragging ? 'blue.300' : 'transparent'
-      }
-      bg={selected ? 'rgba(255,255,255,0.08)' : 'transparent'}
-      cursor={dragging ? 'grabbing' : 'grab'}
-      opacity={dragging ? 0.5 : 1}
+      // 96 px frame + 4 px padding + 2 px border, each side.
+      style={{ width: THUMB_SIZE + 12 }}
       title={`${canvasData.sourceLabel} · ${canvasData.style}`}
     >
-      <Box position="relative" w={`${THUMB_SIZE}px`} h={`${THUMB_SIZE}px`}>
+      <div
+        className={styles.thumbFrame}
+        style={{ width: THUMB_SIZE, height: THUMB_SIZE }}
+      >
         <canvas
           ref={thumbRef}
+          className={styles.thumbCanvas}
           width={THUMB_SIZE}
           height={THUMB_SIZE}
-          style={{
-            width: `${THUMB_SIZE}px`,
-            height: `${THUMB_SIZE}px`,
-            background: '#111',
-            display: 'block',
-          }}
+          style={{ width: THUMB_SIZE, height: THUMB_SIZE }}
         />
         {canvasData.status !== 'done' && (
-          <Box
-            position="absolute"
-            bottom={0}
-            left={0}
-            right={0}
-            bg="rgba(0,0,0,0.55)"
-            fontSize="10px"
-            textAlign="center"
-            color="white"
-          >
-            {progressPct}%
-          </Box>
+          <div className={styles.thumbProgress}>{progressPct}%</div>
         )}
-      </Box>
-      <Text
-        mt={1}
-        fontSize="9px"
-        color="whiteAlpha.800"
-        textAlign="center"
-        overflow="hidden"
-        whiteSpace="nowrap"
-        textOverflow="ellipsis"
-      >
-        {canvasData.style}
-      </Text>
-    </Box>
+      </div>
+      <div className={styles.thumbLabel}>{canvasData.style}</div>
+    </button>
   );
 };
 

@@ -6,7 +6,7 @@ import {
 import { WMSBackgroundLayer } from './types';
 
 // The national mosaic can show any style the WMS publishes (see
-// lidarProjects.ts's fetchNationalLidarStyles) — the TopBar style
+// lidarProjects.ts's fetchNationalLidarStyles) — the ribbon style
 // pulldown picks it via activeLidarStyleAtom. On the DOM side that's
 // skyggerelieff and nothing else.
 export const buildNationalLidarConfig = (

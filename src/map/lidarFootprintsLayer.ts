@@ -1,4 +1,4 @@
-// Shows where a LiDAR project actually lies while the TopBar's dataset
+// Shows where a LiDAR project actually lies while the ribbon's dataset
 // pulldown is open: the footprint of the row the pointer is on, plus the
 // dataset currently in use. Picking happens in the list, not here — this
 // is the "you are pointing at *that* valley" half of it, which is why it
@@ -6,7 +6,7 @@
 // LiDAR session.
 //
 // Fetching + relevance classification happens here and is written to
-// lidarViewportAtom, which the TopBar popover also reads — one WFS call
+// lidarViewportAtom, which the ribbon pulldown also reads — one WFS call
 // and one classification pass serve both the drawn shapes and the list.
 
 import { useAtomValue, useSetAtom } from 'jotai';
@@ -116,7 +116,8 @@ const getOrCreateLayer = (map: OlMap): VectorLayer => {
   return layer;
 };
 
-// Mount once (Layout.tsx) alongside the other map-effect hooks.
+// Mount once (src/shell/useMapSideEffects.ts) alongside the other
+// map-effect hooks.
 export const useLidarFootprintsLayer = () => {
   const map = useAtomValue(mapAtom);
   const backgroundLayer = useAtomValue(backgroundLayerAtom);

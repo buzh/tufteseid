@@ -1,0 +1,35 @@
+/*
+ * Place/property search. Grows to fill whatever the rest of row 1 leaves,
+ * within reason — wide enough for an address, never so wide it pushes the
+ * map controls onto a second line before it has to.
+ */
+.root {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 220px;
+  min-width: 150px;
+  max-width: 380px;
+}
+
+.icon {
+  position: absolute;
+  left: var(--sp-4);
+  color: var(--c-fg-subtle);
+  pointer-events: none;
+}
+
+/*
+ * Doubled up on .root for specificity. src/ui/Field.module.css sets the
+ * input's padding with a shorthand, and which of two single-class rules
+ * wins depends on the order Vite happens to concatenate the CSS modules in
+ * — not something to leave to chance for a control this visible.
+ */
+.root .input {
+  padding: 0 32px 0 34px;
+}
+
+.clear {
+  position: absolute;
+  right: var(--sp-2);
+}

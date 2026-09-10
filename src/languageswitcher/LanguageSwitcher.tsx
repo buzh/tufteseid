@@ -1,94 +1,37 @@
-import {
-  Box,
-  IconButton,
-  SelectContent,
-  SelectItem,
-  SelectRoot,
-  SelectTrigger,
-  SelectValueText,
-  createListCollection,
-  useSelectContext,
-} from '@kvib/react';
 import { useTranslation } from 'react-i18next';
+import styles from './LanguageSwitcher.module.css';
 
-type LanguageSwitcherVariant = 'text' | 'icon';
+const LANGUAGES = [
+  { value: 'nb', label: 'Norsk (bokmål)' },
+  { value: 'nn', label: 'Norsk (nynorsk)' },
+  { value: 'en', label: 'English' },
+];
 
-const TextTrigger = () => {
-  const { t } = useTranslation();
-  return (
-    <SelectTrigger>
-      <SelectValueText placeholder={t('languageSelector.chooseLanguage')} />
-    </SelectTrigger>
-  );
-};
+/*
+ * A native <select>. Three options, chosen once and then forgotten about —
+ * nothing here is worth a custom listbox, and the native one already knows
+ * about touch, keyboard and the platform's own idea of a picker.
+ */
+export const LanguageSwitcher = () => {
+  const { i18n, t } = useTranslation();
 
-const IconTrigger = () => {
-  const select = useSelectContext();
-  return (
-    <IconButton
-      icon={'language'}
-      px="2"
-      size="sm"
-      w={'40px'}
-      {...select.getTriggerProps()}
-    />
-  );
-};
-
-export const LanguageSwitcher = ({
-  variant = 'text',
-}: {
-  variant?: LanguageSwitcherVariant;
-}) => {
-  const { i18n } = useTranslation();
-
-  const languageOptions = [
-    { value: 'nb', label: 'Norsk (bokmål)' },
-    { value: 'nn', label: 'Norsk (nynorsk)' },
-    { value: 'en', label: 'English' },
-  ];
-
-  const currentLanguage = i18n.language;
-  const languageOptionCollection = createListCollection({
-    items: languageOptions.map((opt) => ({
-      key: opt.value,
-      ...opt,
-    })),
-  });
+  // i18next hands back region-tagged codes ('nb-NO') when the browser
+  // supplies one; the options are language-only.
+  const current = (i18n.language || 'nb').split('-')[0];
 
   return (
-    <>
-      <Box position="relative">
-        <SelectRoot
-          collection={languageOptionCollection}
-          value={[currentLanguage]}
-          positioning={
-            variant === 'text'
-              ? undefined
-              : {
-                  sameWidth: false,
-                }
-          }
-          width={variant === 'text' ? 'auto' : 'fit-content'}
-        >
-          {variant === 'text' ? <TextTrigger /> : <IconTrigger />}
-          <SelectContent
-            style={{ zIndex: 9999 }}
-            width={variant === 'text' ? 'auto' : 'fit-content'}
-          >
-            {languageOptions.map((lang) => (
-              <SelectItem
-                key={lang.value}
-                item={lang.value}
-                onClick={() => i18n.changeLanguage(lang.value)}
-              >
-                {lang.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </SelectRoot>
-      </Box>
-    </>
+    <select
+      className={styles.select}
+      aria-label={t('languageSelector.chooseLanguage')}
+      value={LANGUAGES.some((l) => l.value === current) ? current : 'nb'}
+      onChange={(e) => i18n.changeLanguage(e.target.value)}
+    >
+      {LANGUAGES.map((lang) => (
+        <option key={lang.value} value={lang.value}>
+          {lang.label}
+        </option>
+      ))}
+    </select>
   );
 };
 

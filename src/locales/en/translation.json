@@ -1,28 +1,20 @@
 {
-  "controller": {
-    "draw": {
-      "text": "Tools",
-      "mobiletext": "Tools"
-    },
-    "lidarExtract": {
-      "text": "LiDAR extract",
-      "mobiletext": "LiDAR"
-    },
-    "export": "Export and download",
-    "hide": "Minimize"
-  },
   "draw": {
-    "begin": "Draw on map",
     "clear": "Clear drawing",
-    "close": "Close",
     "confrimClear": "Now everything that has been drawn will be removed. Are you sure?",
     "controls": {
-      "colorBackground": "Background ",
-      "colorFill": "Fill",
-      "colorPoint": "Point",
-      "colorStroke": "Stroke",
-      "colorText": "Text",
       "recentColors": "Recent colors",
+      "opacity": "Opacity",
+      "colorText": "Text color",
+      "colorBackground": "Background",
+      "colorPoint": "Point color",
+      "colorStroke": "Stroke color",
+      "colorFill": "Fill color",
+      "defaults": {
+        "primary": "Color",
+        "secondary": "Fill color"
+      },
+      "snap": "Snapping",
       "pointType": "Select icon",
       "showMeasurements": "Show measurements on map",
       "tool": {
@@ -35,42 +27,24 @@
           "text": "Text"
         },
         "tooltip": {
-          "movedown": "Move down",
-          "moveup": "Move up",
           "undo": "Undo",
           "redo": "Redo",
           "deleteselected": "Delete selected"
         }
       },
-      "toolSelect": {
-        "placeholder": "Select draw tool"
-      },
       "color": "Colors",
       "edit": "Edit",
-      "defaults": {
-        "primary": "Primary",
-        "secondary": "Secondary"
-      },
       "lineType": "Line type",
+      "lineTypeSolid": "Solid",
+      "lineTypeDashed": "Dashed",
       "editInstruction": "Select an element to edit or move"
     },
-    "deleteSelection": "Remove selected",
-    "end": "Done",
-    "save": "Save drawing",
     "size": {
       "label": "Stroke width",
       "pointLabel": "Point size",
       "textLabel": "Text size"
     },
-    "tabHeading": "Draw and measure",
-    "textInputLabel": "Enter text",
-    "tools": "Tools",
-    "yesClear": "Yes clear",
-    "redoundo": "Undo / Redo ",
-    "download": "Download",
-    "uploadButton": {
-      "label": "Upload"
-    }
+    "textInputLabel": "Enter text"
   },
   "infoBox": {
     "address": "Address",
@@ -125,7 +99,8 @@
     "sources": {
       "label": "Sources",
       "loading": "Loading LiDAR catalogue …",
-      "none": "No LiDAR sources cover this area."
+      "none": "No LiDAR sources cover this area.",
+      "capped": "capped"
     },
     "actions": {
       "redraw": "Draw again",
@@ -202,6 +177,11 @@
     "coordinates": "Coordinates",
     "houseNumber": "House nr.",
     "placeholder": "Search Tufteseid",
+    "pagination": {
+      "previous": "Previous page",
+      "next": "Next page",
+      "status": "Page {{page}} of {{pages}}"
+    },
     "placeName": "Placenames",
     "properties": "Properties",
     "roads": "Roads",
@@ -212,31 +192,13 @@
     "maxLength": "Max 100 characters"
   },
   "shared": {
-    "actions": {
-      "download": "Download",
-      "select": "Select"
-    },
     "close": "Close",
-    "open": "Open",
-    "units": {
-      "meter": "Metre",
-      "nauticalMile": "Nautical mile"
-    },
     "yes": "Yes",
-    "no": "No",
-    "in": "in",
-    "locations": {
-      "municipality": "municipality"
-    },
     "cancel": "Cancel",
-    "geometry": {
-      "types": {
-        "point": "Points",
-        "linestring": "Lines",
-        "polygon": "Surfaces"
-      }
-    },
-    "moreInfo": "More info"
+    "errorBoundary": {
+      "title": "Something went wrong here",
+      "retry": "Try again"
+    }
   },
   "tipsandtricks": {
     "heading": "Tips and tricks",
@@ -263,29 +225,6 @@
     "version": "Version",
     "buildDate": "Built"
   },
-  "importDialog": {
-    "header": "Import file for drawlayer",
-    "body": {
-      "text": "Select a file, either GPX, GML or GEOJSON to upload to the map. If you want, you can overwrite the existing drawing with the contents of the file. ",
-      "details": {
-        "heading": "Features in file"
-      }
-    },
-    "overwriteSwitch": {
-      "label": "Overwrite drawing",
-      "tooltip": "Will remove all drawings currently on the map"
-    },
-    "buttons": {
-      "confirm": {
-        "label": "Upload"
-      }
-    },
-    "fileupload": {
-      "dragdrop": {
-        "label": "Drag and drop or select a file"
-      }
-    }
-  },
   "measure": {
     "label": "Measuring tool",
     "length": "Length",
@@ -307,6 +246,7 @@
   "localities": {
     "defaultName": "Untitled",
     "createFailed": "Could not create the locality. Check that you are signed in and the server runs the current schema (details in the browser console).",
+    "createTooLarge": "The view covers too large an area for one locality. Zoom in and try again.",
     "byOwner": "by {{name}}",
     "summary": {
       "funn_one": "1 find",
@@ -408,7 +348,8 @@
       "kind": {
         "extract": "LiDAR extract",
         "screenshot": "Screenshot",
-        "upload": "Uploaded"
+        "upload": "Uploaded",
+        "flyfoto": "Aerial photo"
       }
     },
     "tools": {
@@ -419,7 +360,63 @@
       "screenshotFailed": "Could not take a screenshot. Make sure the locality is visible on the map.",
       "lidarExtractShort": "LiDAR",
       "screenshotShort": "Image",
-      "screenshotSaved": "Screenshot saved under Images."
+      "screenshotSaved": "Screenshot saved under Images.",
+      "flyfoto": "Fetch aerial photo",
+      "flyfotoShort": "Aerial",
+      "flyfotoCaption": "Aerial photo",
+      "flyfotoSaved": "Aerial photo saved under Images.",
+      "flyfotoNoticeTitle": "About using aerial imagery",
+      "flyfotoNotice": "Aerial imagery is fetched from Norge i bilder (© Kartverket, Geovekst, municipalities and others) and stored in the locality for your own use. The images are free for private, non-commercial use. If you intend to publish them or use them commercially, obtaining the rights and following the source's terms is your own responsibility.",
+      "flyfotoConfirm": "Fetch aerial photo",
+      "flyfotoPickerTitle": "Fetch aerial photo",
+      "flyfotoMosaic": "Best available mosaic",
+      "flyfotoMosaicHint": "Newest imagery at the best resolution, seamlessly merged.",
+      "flyfotoProjectsHeading": "Acquisitions covering this area ({{count}})",
+      "flyfotoProjectsLoading": "Loading the list of acquisitions …",
+      "flyfotoProjectsFailed": "Could not load the list of acquisitions.",
+      "flyfotoProjectsNone": "No individual acquisitions found for this area.",
+      "flyfotoGrab": "Fetch",
+      "flyfotoGrabAll": "Fetch all ({{count}})",
+      "flyfotoGrabAllHint": "Fetches the {{count}} most recent acquisitions, one at a time.",
+      "flyfotoFetching": "Fetching …",
+      "flyfotoBatchDone": "Saved {{saved}} of {{total}} acquisitions under Images.",
+      "flyfotoEmptyFor": "No aerial imagery coverage found for {{label}}.",
+      "flyfotoFailedFor": "Could not fetch aerial imagery for {{label}}.",
+      "flyfotoClose": "Close"
+    },
+    "terrain": {
+      "short": "Terrain",
+      "tooltip": "Terrain analysis — relight and process elevation data for the rectangle",
+      "heading": "Terrain analysis",
+      "close": "Close terrain analysis",
+      "visualization": "Visualization",
+      "vis": {
+        "hillshade": "Hillshade",
+        "multiHillshade": "Multidirectional",
+        "svf": "Sky-view factor",
+        "lrm": "Local relief",
+        "slope": "Slope"
+      },
+      "visHint": {
+        "hillshade": "One light source. Drag the azimuth to sweep it — features running parallel to the light are invisible.",
+        "multiHillshade": "Six light directions weighted toward the north-west. No orientation is left unlit.",
+        "svf": "How much of the sky is visible. Independent of light direction: hollows and ditches go dark, mounds and banks go bright.",
+        "lrm": "The elevation model minus a smoothed copy. Removes the landform trend and leaves the small scale standing.",
+        "slope": "Steepness of the terrain. Steep is dark."
+      },
+      "azimuth": "Light direction",
+      "altitude": "Sun altitude",
+      "zFactor": "Exaggeration",
+      "opacity": "Opacity",
+      "resolution": "{{m}} m/px · {{w}}×{{h}}",
+      "reframe": "Analyse this view",
+      "save": "Save as image",
+      "saveNew": "Save as new lokalitet",
+      "saveFailed": "Could not save the image.",
+      "saving": "Saving …",
+      "sourceLabel": "Elevation data (Kartverket)",
+      "failed": "Could not fetch elevation data.",
+      "empty": "No LiDAR data covers this rectangle."
     },
     "kulturminner": {
       "heading": "Known cultural heritage",
@@ -445,6 +442,72 @@
       "norgeibilderButton": "Go to Norgeibilder.no",
       "hoydedataDescription": "Here you can find an overview of and access to elevation data provided by Kartverket online",
       "hoydedataButton": "Go to hoydedata.no"
+    }
+  },
+  "ribbon": {
+    "mode": {
+      "standard": "Standard",
+      "standardTip": "Standard map",
+      "lidar": "LiDAR",
+      "lidarTip": "LiDAR relief (national mosaic or per project)",
+      "hybrid": "Hybrid",
+      "hybridTip": "LiDAR with roads and place names",
+      "flyfoto": "Aerial",
+      "flyfotoTip": "Norge i bilder ortophoto — seamless mosaic or a single acquisition"
+    },
+    "heritage": {
+      "label": "Heritage",
+      "tip": "Heritage sites and monuments"
+    },
+    "layers": {
+      "tip": "All heritage layers"
+    },
+    "flyfoto": {
+      "datasetLabel": "Aerial acquisition",
+      "datasetHead": "Aerial photo · W/S",
+      "mosaic": "Best mosaic",
+      "mosaicMeta": "most recent available",
+      "projectsHint": "Single acquisitions, newest first. Walk back in time with S.",
+      "loading": "Loading acquisitions…",
+      "zoomedOut": "Zoom in to see which acquisitions cover this area.",
+      "error": "Could not load acquisitions right now. Try again, or zoom in a little.",
+      "empty": "No single acquisition covers this view. Use the best mosaic, or try somewhere else."
+    },
+    "search": {
+      "clear": "Clear search"
+    },
+    "lidar": {
+      "datasetLabel": "LiDAR dataset",
+      "datasetHead": "LiDAR dataset · W/S",
+      "nationalMosaic": "National mosaic",
+      "nationalMeta": "all of Norway",
+      "projectsHint": "Projects, most coverage first. Hover for outline.",
+      "loadingCatalogue": "Loading catalogue…",
+      "loadingFootprints": "Loading outlines…",
+      "zoomedOut": "Zoom in to see which LiDAR projects cover this area.",
+      "error": "Could not load project outlines right now. Try again, or zoom in a little.",
+      "empty": "No LiDAR project covers this view. Use the national mosaic, or try somewhere else.",
+      "lessRelevant": "{{count}} less relevant",
+      "filter": "Filter",
+      "filterMinYear": "Show in main list from year: {{year}}",
+      "filterDense": "Treat ≥5 pts/m² as recent enough",
+      "filterMinArea": "Minimum share of the view: {{percent}}%",
+      "filterReset": "Reset filter",
+      "styleLabel": "Visualization",
+      "styleHead": "Visualization · A/D",
+      "moreStyles": "{{count}} more styles",
+      "modelLabel": "Elevation model",
+      "modelTip": "DTM = terrain (vegetation removed), DOM = surface (buildings and trees). Switch with E"
+    },
+    "terrain": {
+      "label": "Terrain",
+      "tip": "Terrain analysis of the visible map — fetch the elevation data and light it yourself. No lokalitet required",
+      "tooLarge": "The view covers too large an area for terrain analysis. Zoom in and try again.",
+      "unavailable": "Found no map view to analyse."
+    },
+    "tray": {
+      "show": "Show contents",
+      "hide": "Hide contents"
     }
   }
 }

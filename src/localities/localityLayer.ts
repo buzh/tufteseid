@@ -17,7 +17,7 @@ import {
 } from '../api/localities';
 import { currentUserAtom } from '../auth/atoms';
 import { mapAtom } from '../map/atoms';
-import { activeLocalityAtom, creatingLocalityAtom } from './atoms';
+import { activeLocalityAtom } from './atoms';
 
 export const LOCALITY_ID_PROPERTY = '__localityId';
 export const LOCALITIES_LAYER_ID = 'localitiesLayer';
@@ -138,8 +138,8 @@ export const hideLocalityOnLayer = (id: string) => {
   }
 };
 
-// Mount from Layout. Everything is behind sign-in: signed out, the layer
-// stays empty and we never hit PB.
+// Mount from useMapSideEffects. Everything is behind sign-in: signed out,
+// the layer stays empty and we never hit PB.
 export const useLocalitiesLayer = () => {
   const map = useAtomValue(mapAtom);
   const user = useAtomValue(currentUserAtom);
@@ -204,11 +204,10 @@ export const useLocalityClick = () => {
   const map = useAtomValue(mapAtom);
   const user = useAtomValue(currentUserAtom);
   const active = useAtomValue(activeLocalityAtom);
-  const creating = useAtomValue(creatingLocalityAtom);
   const setActive = useSetAtom(activeLocalityAtom);
 
   useEffect(() => {
-    if (!user || creating) return;
+    if (!user) return;
 
     const onClick = (e: Event | BaseEvent) => {
       if (!(e instanceof MapBrowserEvent)) return;
@@ -239,5 +238,5 @@ export const useLocalityClick = () => {
     return () => {
       map.un('singleclick', onClick);
     };
-  }, [map, user, creating, active?.id, setActive]);
+  }, [map, user, active?.id, setActive]);
 };

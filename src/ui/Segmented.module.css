@@ -1,0 +1,88 @@
+.root {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--c-bg);
+}
+
+.option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--c-fg-muted);
+  transition:
+    background-color 100ms,
+    color 100ms;
+}
+
+.option + .option {
+  border-left: 1px solid var(--c-border);
+}
+
+.option:not(:disabled):hover {
+  background: var(--c-bg-hover);
+}
+
+.option:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+
+.option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.selected {
+  background: var(--seg-accent, var(--c-accent));
+  color: var(--c-gray-0);
+}
+
+.selected:not(:disabled):hover {
+  background: var(--seg-accent-hover, var(--c-accent-hover));
+}
+
+.xs {
+  height: var(--ctl-h-sm);
+  padding: 0 var(--sp-5);
+  font-size: var(--font-xs);
+}
+
+.sm {
+  height: var(--ctl-h-md);
+  padding: 0 var(--sp-5);
+  font-size: var(--font-sm);
+}
+
+/* Per-option palettes, so a status picker can colour its own segments. */
+.paletteGreen {
+  --seg-accent: var(--c-green-500);
+  --seg-accent-hover: var(--c-green-600);
+}
+
+.paletteGray {
+  --seg-accent: var(--c-gray-600);
+  --seg-accent-hover: var(--c-gray-700);
+}
+
+.paletteRed {
+  --seg-accent: var(--c-red-600);
+  --seg-accent-hover: var(--c-danger-hover);
+}
+
+.paletteBlue {
+  --seg-accent: var(--c-blue-600);
+  --seg-accent-hover: #24578e;
+}
