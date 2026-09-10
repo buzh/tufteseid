@@ -1,77 +1,45 @@
 /*
- * Terrenganalyse in a ribbon row: the render on the left, the knobs on the
- * right, rather than the 400 px column it grew up in. Wide suits it — the
- * sliders are what you sweep while watching the relief change, and putting
- * them beside the image instead of under it keeps both in one glance.
+ * Terrenganalyse is knobs only. The render itself is on the map — see
+ * terrainOverlayLayer.ts — so this row exists to stay *short*: every line it
+ * adds is a line of terrain the ribbon is covering while you read it.
  */
 
 .root {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-5);
-}
-
-/* The DEM is up to 3000 px a side, so the image is capped and letterboxed
-   here rather than scaled to the row's width — otherwise the ribbon grows
-   to several screens tall for a big rectangle. */
-.preview {
-  flex: 1 1 360px;
-  min-width: 220px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 140px;
-  max-height: 320px;
-  padding: var(--sp-1);
-  background: var(--c-bg-subtle);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-
-.canvas {
-  max-width: 100%;
-  max-height: 312px;
-  width: auto;
-  height: auto;
-  /* The DEM grid is already at or near native resolution; letting the
-     browser smooth it on upscale hides exactly the single-pixel detail we
-     are looking for. */
-  image-rendering: pixelated;
-}
-
-.message {
-  margin: 0;
-  padding: var(--sp-4);
-  text-align: center;
-  font-size: var(--font-sm);
-  color: var(--c-fg-muted);
-}
-
-.controls {
-  flex: 1 1 320px;
-  min-width: 240px;
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
 }
 
-.pickers {
+/* Pickers left, readout and verbs right, wrapping rather than scrolling. */
+.top {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+}
+
+/* Right-aligns what follows while the line holds, and collapses once it
+   wraps instead of forcing a line of its own. */
+.spacer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.status {
+  display: flex;
   align-items: center;
   gap: var(--sp-2);
-}
-
-.hint {
-  margin: 0;
   font-size: var(--font-xs);
-  line-height: 1.4;
   color: var(--c-fg-muted);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Fixed basis and no shrink: a light-sweep slider needs travel, and letting
-   three of them share a row would give each about a centimetre. */
+.error {
+  color: var(--c-danger);
+}
+
+/* Fixed basis and no stretch: a light-sweep slider needs travel, and letting
+   four of them share a row would give each about a centimetre. */
 .sliders {
   display: flex;
   flex-wrap: wrap;
@@ -100,38 +68,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
-}
-
-.meta {
+.hint {
+  margin: 0;
   font-size: var(--font-xs);
+  line-height: 1.4;
   color: var(--c-fg-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-/* Stacked below md: side by side would leave the render a thumbnail and the
-   sliders too short to sweep. */
-@media (max-width: 47.999rem) {
-  .root {
-    flex-direction: column;
-    gap: var(--sp-3);
-  }
-
-  .preview,
-  .controls {
-    flex: 0 0 auto;
-    width: 100%;
-  }
-
-  .preview {
-    max-height: 220px;
-  }
-
-  .canvas {
-    max-height: 212px;
-  }
 }

@@ -21,11 +21,11 @@ export const useTerrainViewport = () => {
   const map = useAtomValue(mapAtom);
   const [bbox, setBbox] = useAtom(terrainStandaloneBboxAtom);
 
-  const toggle = () => {
-    if (bbox) {
-      setBbox(null);
-      return;
-    }
+  // Also the panel's "Analyser utsnittet": with the render now sitting on the
+  // map rather than in the row, panning off the analysed rectangle is a
+  // normal move, and this is how you bring the analysis back to what you are
+  // looking at without closing and reopening the tool.
+  const frame = () => {
     const result = viewportBbox(map);
     if (!result.ok) {
       toaster.error({
@@ -39,5 +39,13 @@ export const useTerrainViewport = () => {
     setBbox(result.bbox);
   };
 
-  return { active: bbox != null, toggle };
+  const toggle = () => {
+    if (bbox) {
+      setBbox(null);
+      return;
+    }
+    frame();
+  };
+
+  return { active: bbox != null, toggle, frame };
 };

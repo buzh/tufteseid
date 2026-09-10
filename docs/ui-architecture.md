@@ -224,10 +224,10 @@ unmounts.
 ### 3.3 Stacking order
 
 Two independent ladders. **OL layer `zIndex`** (map-internal): background stack
-and theme layers at 2–3, active theme layer promoted to 10, lidar footprints 3,
-localities 4, funn highlight 4.5, funn 5, locality draft 7, lidar extract
-selection 7, locality adjust 8. The fractional 4.5 is the tell that this ladder
-grew by insertion rather than design.
+and theme layers at 2–3, active theme layer promoted to 10, terrain render 1,
+lidar footprints 3, localities 4, funn highlight 4.5, funn 5, locality draft 7,
+lidar extract selection 7, locality adjust 8. The fractional 4.5 is the tell
+that this ladder grew by insertion rather than design.
 
 **DOM `zIndex`** (chrome) is now named in `src/ui/tokens.css` and listed in §2.
 The two remaining raw numbers are kvib's: `BottomDrawToolSelector` and
@@ -766,7 +766,8 @@ feature properties.
 
 Both are row-3 surfaces, both write to the attachment pipeline, and both are
 laid out for a wide row rather than a 400 px column — which is an upgrade for
-them, not a compromise.
+them, not a compromise. They differ in where the result lands: the extract
+opens a fullscreen viewer, the terrain render goes onto the map itself.
 
 **LiDAR extract** — `src/lidarExtract/LidarExtractPanel.tsx` drives style and
 source selection and shows progress. The selection size and the run controls
@@ -786,8 +787,46 @@ DTM-only on purpose: an extract is meant to be read as terrain.
 
 **Terrain** — `src/terrain/TerrainPanel.tsx`: DTM/DOM toggle, five
 visualizations (hillshade, multidirectional hillshade, slope, local relief
-model, sky-view factor), and live azimuth / altitude / exaggeration sliders,
-with the render on the left and the controls on the right.
+model, sky-view factor), and live azimuth / altitude / exaggeration sliders.
+
+**The render is on the map, not in the row.** `src/terrain/terrainOverlayLayer.ts`
+puts the canvas down as a georeferenced `ol/layer/Image` at `zIndex: 1` — over
+the background stack (which sets no zIndex at all), under the lokalitet
+rectangles (4), the funn (5) and the theme layers (10). That ordering is the
+point: relief is the ground and the heritage record goes on top of it, which is
+the same argument that makes LiDAR hillshade a *background* rather than a theme
+layer. Scrubbing the light therefore re-lights the terrain in place, at full
+size, against everything else on screen. What is left in the row is knobs, a
+resolution readout and the two verbs, so it stays a couple of lines tall.
+
+Consequences worth knowing:
+
+- The layer is **imperative and module-level**, like `swapBackgroundLayers`, not
+  an atom plus a hook. The pixels change on every slider frame and the opacity
+  on every drag of its own; pushing either through jotai would re-render the
+  whole shell dozens of times a second for a change no component needs to see.
+  `showTerrainOverlay` / `setTerrainOverlayOpacity` / `hideTerrainOverlay` is
+  the whole surface.
+- `showTerrainOverlay` is show, move *and* repaint in one call, because
+  `ImageCanvasSource` caches one image and `changed()` is the only way to
+  invalidate it — the canvas element identity never changes, since the panel
+  repaints in place.
+- The source's output canvas is **reused** across frames rather than allocated
+  per call (which is what OL's own docs bless `changed()` for): a viewport-sized
+  canvas is ~30 MB at devicePixelRatio 2 on a 4K display, and a slider drag
+  would allocate one per frame.
+- `imageSmoothingEnabled` is off while zoomed in past native DEM resolution and
+  on while zoomed out. Smoothing on upscale blurs away exactly the single-pixel
+  step — a ditch edge, the lip of a mound — the visualization exists to show.
+- The source pins `projection: 'EPSG:25833'`, so the render is reprojected
+  rather than misplaced when the view is in one of the app's other projections.
+- The image extent is derived from `dem.width/height × metresPerPx`, not from
+  `dem.bbox25833`: the grid is sized from the bbox *width*, so the last row
+  lands a fraction of a pixel short of the southern edge.
+- An **opacity slider** joins the light controls. Fading the render towards what
+  it covers is the only way to check a suspected feature against the ortofoto or
+  the topo map without losing the light you just dialled in. It is panel state
+  mirrored onto the layer, and the remembered value survives a DTM→DOM rebuild.
 
 It takes `bbox` and `locality` as **props**, and has *two entrances*:
 
@@ -795,7 +834,18 @@ It takes `bbox` and `locality` as **props**, and has *two entrances*:
   frames the visible map into `terrainStandaloneBboxAtom`, and `Ribbon` renders
   the surface off that. The bbox is held rather than recomputed from the live
   view: the analysis is of one fixed rectangle and the user is expected to pan
-  underneath it while reading the render.
+  underneath it while reading the render. **"Analyser utsnittet"** in the panel
+  re-frames it onto the view as it is now — the same `frame()` the ribbon
+  button calls. It exists because putting the render on the map makes panning
+  off the analysed rectangle a normal move, and there was otherwise no way back
+  short of closing and reopening the tool. Hidden with a lokalitet open, where
+  "Juster området" in row 2 owns the rectangle.
+  Note that the rectangle is `viewportBbox`'s **inset** viewport, the same one
+  "Ny lokalitet" uses, so the render stops short of the screen edges. That is
+  deliberate — the two have to agree about what "the visible map" means, the
+  span guard rides on it, and the rectangle may become a lokalitet — and the
+  visible margin doubles as the affordance for exactly which ground is being
+  analysed.
 - **Row 2's "Terreng"**, over the open lokalitet's own bbox, via
   `ribbonToolAtom`.
 
@@ -823,8 +873,11 @@ Two things in that file must not be undone:
   a 600² grid and must never be keyed on azimuth, or dragging the azimuth
   slider queues a multi-second recompute per frame.
 
-The canvas is capped and letterboxed rather than `width: 100%`: at
-`MAX_DEM_PX_PER_SIDE` a free-scaling canvas made the row several screens tall.
+The canvas itself is **off-DOM**. React does not own it and neither does the
+row: it is the OL source's image and the blob "Lagre" keeps, and the panel
+paints into that one element. Same trap as `LidarExtractViewer`'s moved canvas
+node, from the other direction.
+
 The algorithmic side of all this is `docs/terrain-analysis.md`; the panel is
 only the control surface.
 
@@ -943,9 +996,11 @@ when a funn escapes it.
 
 **Analyse it**
 run terrain analysis (DTM or DOM) with five visualizations and live azimuth /
-altitude / exaggeration over *either* the visible map — signed out, with no
-lokalitet — or an open lokalitet's rectangle, and save the render (creating the
-lokalitet if there is none); run a LiDAR extract over the rectangle at a chosen
+altitude / exaggeration / opacity over *either* the visible map — signed out,
+with no lokalitet — or an open lokalitet's rectangle, with the render drawn on
+the map under the heritage layers; re-frame the analysed rectangle onto the
+current view; save the render (creating the lokalitet if there is none); run a
+LiDAR extract over the rectangle at a chosen
 source and resolution, view it fullscreen, keep it as a Bilde; fetch flyfoto —
 the seamless mosaic or any historical acquisition covering the area,
 individually or as a batch; take a map screenshot; upload an image.

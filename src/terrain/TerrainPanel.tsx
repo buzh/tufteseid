@@ -2,6 +2,13 @@
 // re-process it locally, so azimuth is a slider over data already in memory
 // rather than a new WMS request.
 //
+// The render goes on the **map**, not in this row — `terrainOverlayLayer.ts`
+// puts the canvas down as a georeferenced image layer over the background, so
+// scrubbing the light re-lights the ground in place, under the Kulturminner
+// layers and the lokalitet's own drawing. What is left here is only the
+// knobs, which is why the row is a couple of lines tall and lets the map
+// through.
+//
 // Two entrances share this panel, which is why the lokalitet is a nullable
 // prop rather than an atom read. A lokalitet's "Terreng" verb analyses its
 // rectangle and saves into its Bilder; row 1's "Terreng" analyses the visible
@@ -35,6 +42,12 @@ import {
   type Visualization,
 } from './shade';
 import styles from './TerrainPanel.module.css';
+import {
+  hideTerrainOverlay,
+  setTerrainOverlayOpacity,
+  showTerrainOverlay,
+} from './terrainOverlayLayer';
+import { useTerrainViewport } from './useTerrainViewport';
 
 const VISUALIZATIONS: Visualization[] = [
   'hillshade',
@@ -73,6 +86,9 @@ export const TerrainPanel = ({
   const user = useAtomValue(currentUserAtom);
   const openAuthDialog = useSetAtom(isAuthDialogOpenAtom);
   const setActiveLocality = useSetAtom(activeLocalityAtom);
+  // Only the standalone entrance can re-frame; with a lokalitet open the
+  // rectangle is the lokalitet's, and "Juster området" in row 2 owns it.
+  const { frame } = useTerrainViewport();
 
   const [model, setModel] = useState<DemModel>('dtm');
   const [dem, setDem] = useState<Dem | null>(null);
@@ -83,8 +99,13 @@ export const TerrainPanel = ({
   const [azimuth, setAzimuth] = useState(DEFAULT_AZIMUTH);
   const [altitude, setAltitude] = useState(DEFAULT_ALTITUDE);
   const [zFactor, setZFactor] = useState(DEFAULT_Z_FACTOR);
+  // Percent, mirrored onto the layer imperatively — see terrainOverlayLayer.
+  const [opacity, setOpacity] = useState(100);
 
   const [saving, setSaving] = useState(false);
+  // Off-DOM: this canvas is the layer's image and the blob "Lagre" keeps, and
+  // it is never shown in the row. React does not own it either — the OL
+  // source draws from this exact element.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const bboxKey = bbox.join(',');
@@ -139,15 +160,26 @@ export const TerrainPanel = ({
     }
   }, [dem, vis, azimuth, altitude, zFactor, staticField]);
 
-  // Paint. Ranges differ per visualization: the shaded ones are already
-  // normalised to 0..1, the physical ones need a robust stretch because a
-  // single spike or the flat 0.0 plane over water would otherwise swallow
-  // the whole ramp.
+  // Paint, then hand the canvas to the map. Ranges differ per visualization:
+  // the shaded ones are already normalised to 0..1, the physical ones need a
+  // robust stretch because a single spike or the flat 0.0 plane over water
+  // would otherwise swallow the whole ramp.
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !dem || !field) return;
-    canvas.width = dem.width;
-    canvas.height = dem.height;
+    if (!dem || !field) {
+      // Covers loading, the no-coverage case and a failed fetch alike: an
+      // earlier render must not stay on the map describing ground the panel
+      // is no longer analysing.
+      hideTerrainOverlay();
+      return;
+    }
+    const canvas = (canvasRef.current ??= document.createElement('canvas'));
+    // Assigning either dimension resets the canvas, so only do it when the
+    // grid actually changed — otherwise every slider frame reallocates a
+    // multi-megapixel buffer that putImageData is about to overwrite anyway.
+    if (canvas.width !== dem.width || canvas.height !== dem.height) {
+      canvas.width = dem.width;
+      canvas.height = dem.height;
+    }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -171,7 +203,32 @@ export const TerrainPanel = ({
       0,
       0,
     );
+
+    // The grid is sized from the bbox width, so the last row lands a fraction
+    // of a pixel short of the southern edge. Deriving the extent from the
+    // pixel count rather than reusing bbox25833 keeps the image registered to
+    // the ground it actually holds.
+    const [minX, , , maxY] = dem.bbox25833;
+    showTerrainOverlay({
+      canvas,
+      extent25833: [
+        minX,
+        maxY - dem.height * dem.metresPerPx,
+        minX + dem.width * dem.metresPerPx,
+        maxY,
+      ],
+    });
   }, [dem, field, vis]);
+
+  // After the paint effect on purpose: on the commit that first builds the
+  // layer, this is what gives it the panel's own slider position rather than
+  // whatever a previous session of the tool left behind.
+  useEffect(() => {
+    setTerrainOverlayOpacity(opacity / 100);
+  }, [opacity]);
+
+  // Closing the row, or swapping entrances, takes the layer with it.
+  useEffect(() => hideTerrainOverlay, []);
 
   const save = useCallback(async () => {
     const canvas = canvasRef.current;
@@ -269,101 +326,118 @@ export const TerrainPanel = ({
 
   return (
     <div className={styles.root}>
-      {/* Capped by the wrapper and letterboxed, not scaled to fit the row: a
-          3000 px DEM at width:100% would make the ribbon several screens
-          tall. */}
-      <div className={styles.preview}>
-        {loading && <Spinner size={20} />}
-        {!loading && error && (
-          <p className={styles.message}>{t(`localities.terrain.${error}`)}</p>
-        )}
-        <canvas
-          ref={canvasRef}
-          className={styles.canvas}
-          style={{ display: loading || error ? 'none' : 'block' }}
+      <div className={styles.top}>
+        <Segmented
+          value={vis}
+          options={visOptions}
+          onChange={setVis}
+          label={t('localities.terrain.visualization')}
         />
-      </div>
+        <Segmented
+          value={model}
+          options={MODEL_OPTIONS}
+          onChange={setModel}
+          label={t('ribbon.lidar.modelLabel')}
+        />
 
-      <div className={styles.controls}>
-        <div className={styles.pickers}>
-          <Segmented
-            value={vis}
-            options={visOptions}
-            onChange={setVis}
-            label={t('localities.terrain.visualization')}
-          />
-          <Segmented
-            value={model}
-            options={MODEL_OPTIONS}
-            onChange={setModel}
-            label={t('ribbon.lidar.modelLabel')}
-          />
+        <div className={styles.spacer} />
+
+        <div className={styles.status}>
+          {loading && <Spinner size={16} />}
+          {!loading && error && (
+            <span className={styles.error}>
+              {t(`localities.terrain.${error}`)}
+            </span>
+          )}
+          {!loading && !error && dem && (
+            <span>
+              {t('localities.terrain.resolution', {
+                m: dem.metresPerPx.toFixed(2),
+                w: dem.width,
+                h: dem.height,
+              })}
+            </span>
+          )}
         </div>
 
-        <p className={styles.hint}>{t(`localities.terrain.visHint.${vis}`)}</p>
-
-        {dem && !loading && (
-          <>
-            <div className={styles.sliders}>
-              {sunDependent && (
-                <SliderRow
-                  label={t('localities.terrain.azimuth')}
-                  value={azimuth}
-                  min={0}
-                  max={359}
-                  step={1}
-                  suffix="°"
-                  onChange={setAzimuth}
-                />
-              )}
-              {(sunDependent || vis === 'multiHillshade') && (
-                <SliderRow
-                  label={t('localities.terrain.altitude')}
-                  value={altitude}
-                  min={5}
-                  max={85}
-                  step={1}
-                  suffix="°"
-                  onChange={setAltitude}
-                />
-              )}
-              {usesZFactor && (
-                <SliderRow
-                  label={t('localities.terrain.zFactor')}
-                  value={zFactor}
-                  min={1}
-                  max={8}
-                  step={0.5}
-                  suffix="×"
-                  onChange={setZFactor}
-                />
-              )}
-            </div>
-
-            <div className={styles.footer}>
-              <span className={styles.meta}>
-                {t('localities.terrain.resolution', {
-                  m: dem.metresPerPx.toFixed(2),
-                  w: dem.width,
-                  h: dem.height,
-                })}
-              </span>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={saving}
-                onClick={save}
-              >
-                {saving
-                  ? t('localities.terrain.saving')
-                  : locality
-                    ? t('localities.terrain.save')
-                    : t('localities.terrain.saveNew')}
-              </Button>
-            </div>
-          </>
+        {/* Re-frames the analysed rectangle onto the map as it is now. Only
+            meaningful without a lokalitet: once the render is on the map,
+            panning off it is the natural next move, and the bbox is
+            deliberately held rather than tracking the view. */}
+        {!locality && (
+          <Button size="sm" variant="ghost" onClick={frame}>
+            {t('localities.terrain.reframe')}
+          </Button>
         )}
+        {/* The verbs stay put through a reload rather than appearing with the
+            render, so the row does not reflow under the pointer — but there
+            is nothing to keep until a DEM is painted, and the canvas may
+            still be holding the previous rectangle. */}
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={saving || loading || !dem}
+          onClick={save}
+        >
+          {saving
+            ? t('localities.terrain.saving')
+            : locality
+              ? t('localities.terrain.save')
+              : t('localities.terrain.saveNew')}
+        </Button>
       </div>
+
+      {dem && !loading && (
+        <div className={styles.sliders}>
+          {sunDependent && (
+            <SliderRow
+              label={t('localities.terrain.azimuth')}
+              value={azimuth}
+              min={0}
+              max={359}
+              step={1}
+              suffix="°"
+              onChange={setAzimuth}
+            />
+          )}
+          {(sunDependent || vis === 'multiHillshade') && (
+            <SliderRow
+              label={t('localities.terrain.altitude')}
+              value={altitude}
+              min={5}
+              max={85}
+              step={1}
+              suffix="°"
+              onChange={setAltitude}
+            />
+          )}
+          {usesZFactor && (
+            <SliderRow
+              label={t('localities.terrain.zFactor')}
+              value={zFactor}
+              min={1}
+              max={8}
+              step={0.5}
+              suffix="×"
+              onChange={setZFactor}
+            />
+          )}
+          {/* Fades the render towards whatever it is covering, which is the
+              only way to check a suspected feature against the ortofoto or
+              the topo map without losing the light you just dialled in. */}
+          <SliderRow
+            label={t('localities.terrain.opacity')}
+            value={opacity}
+            min={0}
+            max={100}
+            step={5}
+            suffix="%"
+            onChange={setOpacity}
+          />
+        </div>
+      )}
+
+      <p className={styles.hint}>{t(`localities.terrain.visHint.${vis}`)}</p>
     </div>
   );
 };

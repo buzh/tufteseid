@@ -420,6 +420,13 @@ analysed rectangle into a lokalitet.
   never be live at once. Output saves as an attachment of the existing
   `extract` kind (with `style` = the visualization), so no PocketBase
   migration was needed.
+- `src/terrain/terrainOverlayLayer.ts` — the render goes **on the map**, as a
+  georeferenced `ol/layer/Image` (`ImageCanvasSource`, `zIndex: 1`) over the
+  background and under the Kulturminner layers, not as a thumbnail in the
+  ribbon. Reading relief *against* the heritage record is the whole point, so
+  the relief has to be the ground. Imperative and module-level like
+  `swapBackgroundLayers` — the pixels change every slider frame and no React
+  component needs to see that.
 
 Load-bearing:
 
