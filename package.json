@@ -24,7 +24,7 @@
     "i18next-browser-languagedetector": "^8.2.1",
     "jotai": "^2.20.3",
     "jotai-effect": "^2.4.1",
-    "material-symbols": "^0.40.2",
+    "material-symbols": "^0.47.1",
     "ol": "^10.10.0",
     "pocketbase": "^0.28.0",
     "proj4": "^2.22.0",
