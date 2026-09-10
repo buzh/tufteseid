@@ -1,8 +1,8 @@
-import { Flex } from '@kvib/react';
 import { useState } from 'react';
 import { ErrorBoundary } from '../shared/ErrorBoundary.tsx';
 import { SearchResult } from '../types/searchTypes.ts';
 import { SearchResults } from './results/SearchResults.tsx';
+import styles from './SearchComponent.module.css';
 
 // Search *input* now lives in the ribbon. This component renders only
 // the results panel that floats under the bar, in the shell's left slot.
@@ -11,12 +11,12 @@ export const SearchComponent = () => {
 
   return (
     <ErrorBoundary name="SearchResults">
-      <Flex flexDir="column" pointerEvents="auto" maxH="100%" overflowY="auto">
+      <div className={styles.results}>
         <SearchResults
           hoveredResult={hoveredResult}
           setHoveredResult={setHoveredResult}
         />
-      </Flex>
+      </div>
     </ErrorBoundary>
   );
 };

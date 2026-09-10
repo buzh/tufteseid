@@ -1,14 +1,3 @@
-import {
-  Badge,
-  Box,
-  Flex,
-  Icon,
-  IconButton,
-  Input,
-  Spinner,
-  Stack,
-  Text,
-} from '@kvib/react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { transformExtent } from 'ol/proj';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -24,9 +13,18 @@ import { countFindsByLocality } from '../api/localityFinds';
 import { currentUserAtom, isAdminAtom } from '../auth/atoms';
 import { mapAtom } from '../map/atoms';
 import { mapToolAtom } from '../map/overlay/atoms';
-import { BadgePalette, Segmented } from '../ui';
+import {
+  Badge,
+  BadgePalette,
+  Icon,
+  IconButton,
+  Input,
+  Segmented,
+  Spinner,
+} from '../ui';
 import { activeLocalityAtom } from './atoms';
 import { formatBboxArea, formatDate } from './format';
+import styles from './LocalitiesPanel.module.css';
 import { setLocalityHighlight } from './localityLayer';
 
 const VISIBILITY_PALETTE: Record<
@@ -66,14 +64,8 @@ const LocalityRow = ({
   ].filter((s): s is string => !!s);
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="gray.200"
-      borderRadius="md"
-      px={2}
-      py={1.5}
-      cursor="pointer"
-      _hover={{ bg: 'gray.50', borderColor: 'green.400' }}
+    <div
+      className={styles.row}
       onClick={() => onOpen(locality)}
       // Pointing at a row lights up its rectangle in the map, so you can
       // tell two similarly named areas apart without opening either.
@@ -81,26 +73,22 @@ const LocalityRow = ({
       onMouseLeave={() => setLocalityHighlight(null)}
       title={t('localities.panel.openHint')}
     >
-      <Flex align="center" gap={2}>
-        <Text fontWeight="semibold" fontSize="sm" lineClamp={1} flex="1">
-          {locality.name}
-        </Text>
-        <Badge colorPalette={VISIBILITY_PALETTE[locality.visibility]} size="sm">
+      <div className={styles.rowHead}>
+        <span className={styles.name}>{locality.name}</span>
+        <Badge palette={VISIBILITY_PALETTE[locality.visibility]}>
           {t(`localities.visibility.${locality.visibility}`)}
         </Badge>
-      </Flex>
+      </div>
       {locality.description && (
-        <Text fontSize="xs" color="gray.600" lineClamp={1}>
-          {locality.description}
-        </Text>
+        <div className={styles.description}>{locality.description}</div>
       )}
-      <Text fontSize="10px" color="gray.500" lineClamp={1}>
+      <div className={styles.meta}>
         {meta.join(' · ')}
         {!isMine && locality.expand?.owner
           ? ` · ${t('localities.byOwner', { name: locality.expand.owner.name })}`
           : ''}
-      </Text>
-    </Box>
+      </div>
+    </div>
   );
 };
 
@@ -183,39 +171,32 @@ export const LocalitiesPanel = () => {
 
   if (!user) {
     return (
-      <Text fontSize="sm" color="gray.600">
-        {t('localities.panel.signInPrompt')}
-      </Text>
+      <p className={styles.signInPrompt}>{t('localities.panel.signInPrompt')}</p>
     );
   }
 
   return (
-    <Stack gap={2}>
-      <Flex gap={2} align="center">
-        <Flex flex="1" align="center" position="relative">
-          <Box position="absolute" left={2} color="gray.400" display="flex">
-            <Icon icon="search" size={16} />
-          </Box>
+    <div className={styles.root}>
+      <div className={styles.toolbar}>
+        <div className={styles.search}>
+          <Icon icon="search" size={16} className={styles.searchIcon} />
           <Input
-            size="sm"
-            pl={8}
-            pr={query ? 8 : 2}
+            className={styles.searchInput}
             value={query}
             placeholder={t('localities.panel.searchPlaceholder')}
             onChange={(e) => setQuery(e.target.value)}
           />
           {query && (
-            <Box position="absolute" right={1}>
-              <IconButton
-                icon="close"
-                size="xs"
-                variant="ghost"
-                aria-label={t('localities.panel.clearSearch')}
-                onClick={() => setQuery('')}
-              />
-            </Box>
+            <IconButton
+              className={styles.clear}
+              icon="close"
+              size="xs"
+              palette="gray"
+              aria-label={t('localities.panel.clearSearch')}
+              onClick={() => setQuery('')}
+            />
           )}
-        </Flex>
+        </div>
         {isAdmin && (
           <Segmented<Scope>
             value={scope}
@@ -226,24 +207,22 @@ export const LocalitiesPanel = () => {
             ]}
           />
         )}
-      </Flex>
+      </div>
 
       {filtered == null && (
-        <Flex align="center" gap={2}>
-          <Spinner size="xs" />
-          <Text fontSize="xs" color="gray.500">
-            {t('localities.panel.loading')}
-          </Text>
-        </Flex>
+        <div className={styles.status}>
+          <Spinner size={14} />
+          {t('localities.panel.loading')}
+        </div>
       )}
       {filtered && filtered.length === 0 && (
-        <Text fontSize="sm" color="gray.600">
+        <p className={styles.empty}>
           {query.trim()
             ? t('localities.panel.noMatch', { query: query.trim() })
             : t('localities.panel.empty')}
-        </Text>
+        </p>
       )}
-      <Stack gap={1.5} maxH="50vh" overflowY="auto">
+      <div className={styles.list}>
         {filtered?.map((l) => (
           <LocalityRow
             key={l.id}
@@ -254,7 +233,7 @@ export const LocalitiesPanel = () => {
             onOpen={open}
           />
         ))}
-      </Stack>
-    </Stack>
+      </div>
+    </div>
   );
 };

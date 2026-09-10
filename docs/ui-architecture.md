@@ -110,14 +110,28 @@ store is a module-level list read through `useSyncExternalStore` rather than an
 atom: `toast.error(…)` is called from non-React modules, and one component
 reads it.
 
+**Layout and typography have no primitives, and that is the convention.**
+There is no `Box`, `Stack`, `Text` or `Heading` in `src/ui` and none is coming.
+A ported component gets a co-located `Foo.module.css` and writes plain
+`div` / `span` / `p` / `h2` with `font-size: var(--font-sm)` and
+`gap: var(--sp-4)`; the kit is only for things with behaviour or a shape worth
+sharing. Flexbox in a stylesheet is shorter than `<VStack align="flex-start"
+gap={2}>`, survives kvib's removal untouched, and keeps the styling of a
+surface in one readable place instead of spread across a hundred props.
+
+Buttons colour themselves from `--c-fg` / `--c-bg-hover` / `--accent-*` rather
+than from literals, so a surface that needs a different ground overrides those
+custom properties on its own container. `LidarExtractViewer.module.css` is the
+worked example: re-pointing two variables is the app's entire dark theme, and
+`Button.module.css` needed no dark variant.
+
 `<KvibProvider>` is still mounted, and kvib still carries what has not been
 ported: drawing (`src/draw/**`), search results and the infobox, the help page,
-the language switcher, `KulturminnerPopup`, `MapToolCards`, `LocalitiesPanel`,
-`LidarExtractViewer`, `AuthDialog` and `MapComponent`. There is no dark mode in
-either system.
+the language switcher and `MapToolCards`. There is no dark mode in either
+system — the extract viewer's dark chrome is local, not a mode.
 
 Hand-written CSS is now the `src/ui/*.module.css` files plus one module per
-shell and lokalitet component, on top of `src/index.css` and `src/map/map.css`
+ported component, on top of `src/index.css` and `src/map/map.css`
 (79 lines). The latter is entirely OL control skinning: the `.ol-scale-line`
 position (with a mobile breakpoint that recentres it), the `.ol-tooltip` family
 used by the measure and draw tools, a `.hidden` utility that
@@ -208,7 +222,7 @@ whole reason the chrome floats over it.
 
 ### 3.2 Where map side-effects mount
 
-`src/map/MapComponent.tsx` is 41 lines and renders essentially a target div —
+`src/map/MapComponent.tsx` is 39 lines and renders essentially a target div —
 but it is the **only** mount point for three atom effects (`themeLayerEffect`,
 `trackPostitionAtomEffect`, `backgroundLayerAtomEffect`).
 
@@ -241,9 +255,9 @@ lidar extract selection 7, locality adjust 8. The fractional 4.5 is the tell
 that this ladder grew by insertion rather than design.
 
 **DOM `zIndex`** (chrome) is now named in `src/ui/tokens.css` and listed in §2.
-The two remaining raw numbers are kvib's: `BottomDrawToolSelector` and
-`LidarExtractViewer` at `1000` (which `--z-fixed` matches deliberately), and
-the language switcher's `SelectContent` at `9999`.
+The two remaining raw numbers are kvib's: `BottomDrawToolSelector` at `1000`
+(which `--z-fixed` matches deliberately) and the language switcher's
+`SelectContent` at `9999`.
 
 ---
 
@@ -596,7 +610,7 @@ Two surfaces, which is one more than a user needs:
 - `src/search/infobox/InfoBox.tsx` + `FeatureInfoSection.tsx` — the right-column
   panel, showing coordinates, elevation, and WMS GetFeatureInfo results for the
   clicked point.
-- `src/map/featureInfo/KulturminnerPopup.tsx` (557 lines) — a separate popup
+- `src/map/featureInfo/KulturminnerPopup.tsx` — a separate popup
   specifically for Riksantikvaren features, rendered as a sibling of the whole
   shell.
 
@@ -806,8 +820,8 @@ single source stays card-sized instead of spanning a 27-inch screen). The
 whole card is the `<label>`, and an unchecked source is dimmed rather than
 hidden — which sources cover the rectangle is itself information.
 
-`LidarExtractViewer.tsx` (606 lines) is a separate fullscreen result viewer at
-`z-index: 1000`, mounted way up at `App.tsx`. The viewer **moves the source
+`LidarExtractViewer.tsx` is a separate fullscreen result viewer at `--z-fixed`,
+mounted way up at `App.tsx`. The viewer **moves the source
 canvas DOM node** into itself with `replaceChildren` rather than re-rendering
 it — a deliberate trap for anyone who assumes React owns that subtree, and the
 reason the viewer cannot be casually re-parented, or the same canvas rendered
@@ -933,34 +947,29 @@ curl -sL https://registry.npmjs.org/material-symbols/-/material-symbols-0.40.2.t
 
 The migration is partial by design. Ported to `src/ui`: the whole shell and
 ribbon, the lokalitet surfaces (`FunnList`, `BilderSection`,
-`KulturminnerSection`, `LocalityDetails`, `LocalityDialogs`, `FunnDraft`), both
-analysis panels, `AuthButton`, `ErrorBoundary`, the measure trigger, and the
-toast region. That last one carried five files across on its own — the workspace
-callbacks, `createFromBbox`, `BilderSection`, `TerrainPanel` and
-`useTerrainViewport` imported nothing else from kvib — so `src/terrain/`,
-`src/settings/draw/` and all of `src/localities/` bar `LocalitiesPanel` are now
-clear.
+`KulturminnerSection`, `LocalityDetails`, `LocalityDialogs`, `FunnDraft`,
+`LocalitiesPanel`), both analysis panels, `AuthButton`, `AuthDialog`,
+`ErrorBoundary`, the measure trigger, the toast region, `MapComponent`,
+`SearchComponent`, `KulturminnerPopup` and `LidarExtractViewer`. So
+`src/terrain/`, `src/settings/draw/`, `src/auth/`, `src/lidarExtract/`,
+`src/localities/` and `src/map/` bar `MapToolCards` are all clear.
 
-Still on kvib — 35 files, and each row is a separate piece of work (plus
+Still on kvib — 29 surfaces, and each row is a separate piece of work (plus
 `src/ui/Icon.tsx`, which re-exports the `MaterialSymbol` union, and
 `src/mainApp.tsx`, which mounts the provider; those two are the strip itself):
 
 | Surface | Size | Note |
 |---|---|---|
+| `src/search/**` | 15 files, ~3200 lines | results list + infobox; also the one with no `t()` at all (§5.4) |
 | `src/draw/**` | 9 files | the largest subsystem; inherited upstream, least-touched |
-| `src/search/**` | ~3200 lines | results list + infobox; also the one with no `t()` at all (§5.4) |
-| `LidarExtractViewer` | 602 lines | layout primitives and buttons only |
-| `KulturminnerPopup` | 557 lines | §7.1 |
-| `MapToolCards` + `MapThemes`/`SubTheme` | ~540 lines | the card slot; §6.1, §6.2 |
 | `src/help/`, `src/languageswitcher/` | ~410 lines | between them the only `Select` |
-| `LocalitiesPanel` | 260 lines | rendered inside the card slot |
-| `AuthDialog`, `MapComponent`, `SearchComponent` | ~160 lines | trivial |
+| `MapToolCards` + `MapThemes`/`SubTheme` | ~540 lines | the card slot; §6.1, §6.2 |
 
 What the kit still has to grow to absorb them: an `Accordion` (nine files, most
-of search, plus `useAccordionContext` in `FeatureInfoSection`), a `Select`, a
-layout/typography convention to replace `Box`/`Flex`/`HStack`/`VStack`/`Stack`/
-`Text`/`Heading`/`Link`/`List`, and small `Pagination` and `Alert` pieces.
-`Section` already covers kvib's `Collapsible`.
+of search, plus `useAccordionContext` in `FeatureInfoSection`), a `Select`, and
+small `Pagination` and `Alert` pieces. `Section` already covers kvib's
+`Collapsible`. Layout and typography need nothing — see §2 on why there are no
+`Box`/`Stack`/`Text` primitives.
 
 Two decisions taken to keep that list short rather than long:
 

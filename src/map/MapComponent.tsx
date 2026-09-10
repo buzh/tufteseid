@@ -1,9 +1,9 @@
-import { Box, Text } from '@kvib/react';
 import { useAtom } from 'jotai';
 import 'ol/ol.css';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ErrorBoundary } from '../shared/ErrorBoundary.tsx';
+import styles from './MapComponent.module.css';
 import { trackPostitionAtomEffect } from './geolocation/atoms.ts';
 import { themeLayerEffect } from './layers/atoms.ts';
 import { backgroundLayerAtomEffect } from './layers/config/backgroundLayers/atoms.ts';
@@ -28,14 +28,12 @@ export const MapComponent = () => {
   }, [setTargetElement, mapRef]);
 
   return (
-    <Box position={'relative'} width="100%" height="100%">
-      <ErrorBoundary fallback={<Text>{t('map.errorMessage')}</Text>}>
-        <Box
-          ref={mapRef}
-          id="map"
-          style={{ width: '100%', height: '100%' }}
-        />
+    <div className={styles.root}>
+      <ErrorBoundary
+        fallback={<p className={styles.error}>{t('map.errorMessage')}</p>}
+      >
+        <div ref={mapRef} id="map" className={styles.map} />
       </ErrorBoundary>
-    </Box>
+    </div>
   );
 };
