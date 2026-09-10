@@ -296,7 +296,8 @@ subsume.
   `trackPositionAtom`.
 - **Background** — `backgroundLayerAtom`, `hybridOverlayAtom`,
   `activeLidarModelAtom`, `activeLidarStyleAtom`, `activeLidarProjectAtom`,
-  `lidarPickerOpenAtom`, `lidarCyclingAtom`, `activeFlyfotoProjectAtom`, plus
+  `lidarPickerOpenAtom`, `lidarCyclingAtom`, `lidarAutoDatasetAtom`,
+  `activeFlyfotoProjectAtom`, plus
   the viewport project list. The flyfoto acquisition list is *not* an atom —
   nothing draws its footprints, so it is component state in
   `useFlyfotoControls`.
@@ -375,7 +376,7 @@ looking at.
 | **LiDAR** | Background mode: hillshade stack |
 | **Hybrid** | LiDAR stack + transparent roads/rail/place-names on top |
 | **Flyfoto** | Background mode: NiB ortofoto (§5.5) |
-| Dataset pulldown | LiDAR: national mosaic or one of ~1936 per-project datasets, ranked by relevance to the viewport. Flyfoto: the seamless mosaic or any acquisition covering the viewport, newest first |
+| Dataset pulldown | LiDAR: **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport. Flyfoto: the seamless mosaic or any acquisition covering the viewport, newest first |
 | Style pulldown | The active LiDAR dataset's WMS styles, with a "flere stiler" second tier |
 | DTM / DOM segment | Terrain model vs surface model |
 | **Kulturminner** | Toggles the five Riksantikvaren theme layers as a group |
@@ -420,7 +421,10 @@ alternative is re-attaching the listener continuously:
 
 - **A / D** — previous / next LiDAR style, top tier only, wrapping at both ends.
 - **W / S** — previous / next dataset in **the active mode's ring**: LiDAR
-  projects in LiDAR mode, ortofoto acquisitions in flyfoto mode.
+  projects in LiDAR mode, ortofoto acquisitions in flyfoto mode. In LiDAR mode
+  a press also pins the dataset (§5.7) — walking the ring is the user choosing,
+  and otherwise the auto resolver would take the background back on the next
+  pan and W/S would feel broken.
 - **E** — toggle DTM / DOM.
 
 W/S generalising across modes is the point of the flyfoto work: walking
@@ -434,7 +438,8 @@ pulldown (or a drawn footprint polygon) covers the thing you are looking at.
 Hence two separate flags rather than one. `lidarPickerOpenAtom` decides whether
 project **footprints are drawn**; `lidarCyclingAtom` decides whether the
 viewport project list is **kept fetched**. Cycling arms the second without the
-first. `lidarCyclingAtom` expires `CYCLING_IDLE_MS = 90_000` after the last
+first. (`lidarAutoDatasetAtom` is now a third thing wanting the list fetched —
+§5.7 — which is why the first W/S press usually finds it already warm.) `lidarCyclingAtom` expires `CYCLING_IDLE_MS = 90_000` after the last
 keypress, or immediately on leaving LiDAR mode. The project ring *is* that
 fetched list, so the first W/S press after an idle period only kicks off the WFS
 query — the dataset chip shows a spinner — and the next press actually walks the
@@ -529,6 +534,68 @@ Details worth not re-deriving:
 
 The bbox stays **authored, not derived**: the viewport only seeds it, and
 "Juster området" still translates and reshapes it afterwards.
+
+### 5.7 Automatisk — the LiDAR dataset following the viewport
+
+The national mosaic and a per-project dataset are good at different scales: the
+mosaic is a seamless **1 m** grid over the whole country, a project is **0.25 m**
+over one municipality. Zoomed out, a project buys nothing but a coverage hole;
+zoomed in, it is four times the ground resolution, which for reading earthworks
+is the difference between seeing a ditch and not. Neither is "the right
+dataset" — the right one depends on how close you are standing, which is a
+question the app can answer for itself.
+
+So the dataset pulldown's first row is **Automatisk**, and it is the default.
+`lidarAutoDatasetAtom` is a *pin* flag, not a fourth dataset: while it is set,
+the resolver in `useLidarControls` writes through the same
+`selectNational` / `selectProject` the pulldown uses, so style clamping, the
+background stack and the keyboard ring behave identically whether a dataset was
+chosen or resolved. **Any explicit pick clears it** — a pulldown row or a W/S
+press — and the *Automatisk* row sets it again.
+
+Pressing the **LiDAR** or **Hybrid** mode button is not a pick: entering the
+mode has to put *something* on screen, but it says nothing about which dataset,
+so `enterLidar` leaves the flag alone and resolves once up front. Resolving up
+front rather than landing on the mosaic and letting the resolver correct it a
+beat later is worth the extra branch — two swaps in a row is two screenfuls of
+WMS requests for one keypress. When the answer isn't known yet (the coverage
+list is only fetched inside LiDAR mode, so on entry it never is) it starts on
+the mosaic, which always covers, and the resolver refines when the list lands.
+
+The rules are `src/map/layers/config/backgroundLayers/lidarAuto.ts`, as one
+pure `chooseAutoDataset`. Two hystereses, because a background swap here is a
+cross-fade plus a fresh screenful of WMS requests, not a cheap redraw:
+
+- **Scale.** Engage per-project at ≤ 1 m/px, release above 2 m/px, hold in
+  between. Metres per pixel rather than a zoom level because the view is
+  EPSG:25833 — and because the threshold is a fact about the *source grids*:
+  at 1 m/px the national mosaic is at its Nyquist limit and a 0.25 m project
+  has nothing more to show. Zoom steps are factor-2, so the release band is
+  the smallest hysteresis that exists.
+- **Coverage.** Engage when the top candidate paints over half the screen,
+  release the incumbent below 35%. Far above the picker's own `minAreaRatio`
+  (0.1): worth *listing* is a much lower bar than worth switching to unasked.
+
+The candidate is always `viewport.primary[0]` — the top row the pulldown would
+have shown. Nothing cleverer, deliberately: a picker whose first row is not
+what "automatisk" chose is a picker nobody can predict. That also means the
+LiDAR filter panel (`minYear`, density grandfathering) tunes auto too.
+
+**Showing it.** The chip keeps naming the dataset actually on screen — that is
+the fact you need while reading terrain — and carries a `bolt` glyph when the
+name got there by itself. Inside the pulldown, *Automatisk* is the **active**
+row and its meta line names what it has settled on; the row it settled on gets
+the same `bolt` as a `PulldownItem` `mark` rather than a second accent bar. Two
+accented rows would leave it ambiguous which one a click undoes.
+
+**Cost.** Auto needs the coverage list for as long as LiDAR mode lasts, where
+the pulldown and the W/S ring only needed it during an interaction — so
+`wantsViewport` in `lidarFootprintsLayer` grew a third term, and two things
+keep that affordable: `refresh` declines to fetch *on auto's behalf alone*
+above `AUTO_ENGAGE_M_PER_PX` (out there the answer is the mosaic and no round
+trip is needed to know it), and moveend is debounced 250 ms. The per-project
+footprint responses are immutable and memoised for the tab, so panning around
+one region settles to no network at all.
 
 ---
 

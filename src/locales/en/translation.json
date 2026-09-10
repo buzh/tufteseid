@@ -479,6 +479,10 @@
     "lidar": {
       "datasetLabel": "LiDAR dataset",
       "datasetHead": "LiDAR dataset · W/S",
+      "auto": "Automatic",
+      "autoMeta": "follows the view",
+      "autoMark": "chosen automatically",
+      "autoChipTip": "{{dataset}} — chosen automatically for this view. Pick a dataset from the list to pin it.",
       "nationalMosaic": "National mosaic",
       "nationalMeta": "all of Norway",
       "projectsHint": "Projects, most coverage first. Hover for outline.",

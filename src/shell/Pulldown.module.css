@@ -57,6 +57,19 @@
   color: var(--c-fg-subtle);
 }
 
+/*
+ * "Automatisk landed here." Accent-coloured so it reads as a system
+ * statement rather than more of the row's grey metadata, but a glyph rather
+ * than the active row's left bar — it is pointing at a consequence of the
+ * selection, not at the selection.
+ *
+ * Colour only — Icon's own rule sets `flex: 0 0 auto` at doubled
+ * specificity, so repeating the layout here would lose anyway.
+ */
+.itemMark {
+  color: var(--c-accent);
+}
+
 /* Overflow group trigger — chevron first, same shape as the theme layer
    picker's subtheme rows. */
 .disclosure {

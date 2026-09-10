@@ -479,6 +479,10 @@
     "lidar": {
       "datasetLabel": "LiDAR-datasett",
       "datasetHead": "LiDAR-datasett · W/S",
+      "auto": "Automatisk",
+      "autoMeta": "følger utsnittet",
+      "autoMark": "valgt automatisk",
+      "autoChipTip": "{{dataset}} — valgt automatisk for dette utsnittet. Velg et datasett i lista for å låse det.",
       "nationalMosaic": "Nasjonal mosaikk",
       "nationalMeta": "hele Norge",
       "projectsHint": "Prosjekter, mest dekning først. Hold over for omriss.",

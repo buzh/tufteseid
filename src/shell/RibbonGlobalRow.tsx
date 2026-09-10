@@ -86,8 +86,10 @@ export const RibbonGlobalRow = () => {
           }}
         />
 
-        {/* Activating LiDAR defaults to the national mosaic; the pulldown
-            below swaps to a specific per-project dataset. */}
+        {/* Activating LiDAR lands on whatever the dataset pulldown is set to
+            — the best acquisition for this view while it says Automatisk,
+            the national mosaic otherwise. Entering the mode is not itself a
+            dataset pick, so it leaves that setting alone. */}
         <ModeButton
           icon="landscape"
           label={t('ribbon.mode.lidar')}
@@ -95,7 +97,7 @@ export const RibbonGlobalRow = () => {
           active={lidar.isLidarMode && !lidar.hybridOverlay}
           onClick={() => {
             lidar.setHybridOverlay(false);
-            if (!lidar.isLidarMode) lidar.activateNational();
+            if (!lidar.isLidarMode) lidar.enterLidar();
           }}
         />
 
@@ -108,7 +110,7 @@ export const RibbonGlobalRow = () => {
           active={lidar.isLidarMode && lidar.hybridOverlay}
           onClick={() => {
             lidar.setHybridOverlay(true);
-            if (!lidar.isLidarMode) lidar.activateNational();
+            if (!lidar.isLidarMode) lidar.enterLidar();
           }}
         />
 
