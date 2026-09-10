@@ -517,7 +517,9 @@
       "lidar": "LiDAR",
       "lidarTip": "LiDAR-relieff (nasjonal mosaikk eller per prosjekt)",
       "hybrid": "Hybrid",
-      "hybridTip": "LiDAR med vegar og stadnamn"
+      "hybridTip": "LiDAR med vegar og stadnamn",
+      "flyfoto": "Flyfoto",
+      "flyfotoTip": "Ortofoto frå Norge i bilder — saumlaus mosaikk eller eitt enkelt flyfotoprosjekt"
     },
     "heritage": {
       "label": "Kulturminne",
@@ -527,8 +529,15 @@
       "tip": "Alle kulturminne-lag"
     },
     "flyfoto": {
-      "label": "Flyfoto ↗",
-      "tip": "Opne Norge i bilder for dette utsnittet (ny fane)"
+      "datasetLabel": "Flyfotoprosjekt",
+      "datasetHead": "Flyfoto · W/S",
+      "mosaic": "Beste mosaikk",
+      "mosaicMeta": "nyaste tilgjengelege",
+      "projectsHint": "Enkeltprosjekt, nyaste først. Gå bakover i tid med S.",
+      "loading": "Hentar flyfotoprosjekt…",
+      "zoomedOut": "Zoom inn for å sjå kva for flyfotoprosjekt som dekkjer området.",
+      "error": "Fekk ikkje henta flyfotoprosjekt akkurat no. Prøv igjen, eller zoom litt inn.",
+      "empty": "Ingen enkeltprosjekt dekkjer dette utsnittet. Bruk beste mosaikk, eller prøv ein annan stad."
     },
     "search": {
       "clear": "Tøm søk"

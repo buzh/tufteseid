@@ -5,7 +5,7 @@ import { atom } from 'jotai';
  *
  * The keyboard layers in this app decide "does something else own the
  * keyboard?" by walking up from event.target for a [data-scope] attribute
- * (src/localities/useWorkspaceKeys.ts, src/map/useLidarCyclingKeys.ts).
+ * (src/localities/useWorkspaceKeys.ts, src/map/useBackgroundCyclingKeys.ts).
  * That works for kvib/Ark, which portals to <body> and traps focus, so
  * event.target is always inside the overlay.
  *

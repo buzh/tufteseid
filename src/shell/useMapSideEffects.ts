@@ -6,7 +6,7 @@ import {
 } from '../localities/localityLayer';
 import { useFeatureInfoClick } from '../map/featureInfo/useFeatureInfo';
 import { useLidarFootprintsLayer } from '../map/lidarFootprintsLayer';
-import { useLidarCyclingKeys } from '../map/useLidarCyclingKeys';
+import { useBackgroundCyclingKeys } from '../map/useBackgroundCyclingKeys';
 import { useSearchEffects } from '../search/atoms';
 import { useMapClickSearch } from '../search/hooks';
 
@@ -44,5 +44,5 @@ export const useMapSideEffects = () => {
   // A/D/W/S/E background cycling. Mounted at the shell root rather than in
   // the ribbon so the document listener's position in the capture chain
   // does not depend on whether the control that drives it is rendered.
-  useLidarCyclingKeys();
+  useBackgroundCyclingKeys();
 };

@@ -4,15 +4,22 @@ import { anyOverlayOpenAtom } from '../ui/overlayAtoms';
 
 /*
  * A/D (style), W/S (dataset), E (DTM/DOM) — background cycling from the
- * keyboard. docs/ui-architecture.md §5.3.
+ * keyboard. W/S walks whichever ring the active mode has: LiDAR
+ * acquisitions in LiDAR mode, ortofoto acquisitions in flyfoto mode. A/D
+ * and E are LiDAR-only. docs/ui-architecture.md §5.3.
  *
  * Split into a listener and a registration so the two halves can live in
  * different components. The listener has to be mounted somewhere that never
  * unmounts: it registers with `[]` deps, so a host that comes and goes (a
  * ribbon row that collapses, say) would re-register and flip its position in
  * the capture chain relative to the other keyboard layers. The handler, on
- * the other hand, closes over the LiDAR pulldown's state and belongs with
- * whatever renders that.
+ * the other hand, closes over the state of whichever pulldown the keys are
+ * walking, and belongs with whatever renders that.
+ *
+ * Exactly one handler at a time, so a mode with its own ring composes rather
+ * than registers: each half declines every key outside its own mode, and the
+ * ribbon chains them. Two registrations would silently mean the last one
+ * mounted wins.
  *
  * Capture phase, and handled keys are stopped dead — the same treatment
  * useWorkspaceKeys and LidarExtractViewer already give theirs. OpenLayers'
@@ -38,7 +45,7 @@ const cycleHandlerRefAtom = atom<{ current: CycleHandler | null }>({
  * Publish the cycling behaviour. Safe to call from a component that
  * unmounts — the handler is withdrawn on the way out.
  */
-export const useRegisterLidarCycle = (handler: CycleHandler) => {
+export const useRegisterBackgroundCycle = (handler: CycleHandler) => {
   const box = useAtomValue(cycleHandlerRefAtom);
   // No dependency array on purpose: `handler` is a fresh closure every
   // render and an assignment is cheap, unlike re-attaching a listener.
@@ -51,7 +58,7 @@ export const useRegisterLidarCycle = (handler: CycleHandler) => {
 };
 
 /** Mount once, at the shell root. */
-export const useLidarCyclingKeys = () => {
+export const useBackgroundCyclingKeys = () => {
   const box = useAtomValue(cycleHandlerRefAtom);
   // Read through the store inside the listener rather than subscribing:
   // the value has to be current at keypress time, and subscribing would

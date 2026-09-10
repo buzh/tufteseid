@@ -1,4 +1,4 @@
-import { cx, Icon } from '../../ui';
+import { cx, Icon } from '../ui';
 import styles from './Pulldown.module.css';
 
 /**

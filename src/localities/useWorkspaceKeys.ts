@@ -2,8 +2,8 @@ import { useStore } from 'jotai';
 import { useEffect, useRef } from 'react';
 import { anyOverlayOpenAtom } from '../ui/overlayAtoms';
 
-// Keyboard for the open lokalitet, same shape as the LiDAR cycling keys
-// in src/map/useLidarCyclingKeys.ts: one document listener, bail out on
+// Keyboard for the open lokalitet, same shape as the background cycling keys
+// in src/map/useBackgroundCyclingKeys.ts: one document listener, bail out on
 // modifiers, repeats, anything typed into a field, and anything with an
 // overlay open over it.
 //

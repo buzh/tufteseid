@@ -142,6 +142,23 @@ as the token rotates and the token never reaches the browser. NiB accepts the
 token as either that header or a `&token=` query param (fallback if the header
 form is ever rejected; still cache-safe because injection is server-side).
 
+**The sidecar also fixes NiB's Content-Type.** `ortofoto_prosjekter/ImageServer`
+is asked for `format=jpgpng` — JPEG where the acquisition has coverage, a
+~1 kB transparent PNG where it doesn't — and labels every one of them
+`application/octet-stream`, because it only knows which it produced after
+producing it. Caddy sets `X-Content-Type-Options: nosniff` globally, so an
+`<img>` refuses to paint that. The handler buffers anything whose type isn't
+already `image/*`, checks the magic bytes for JPEG/PNG and re-labels; a real
+non-image (GetCapabilities XML, a GetFeatureInfo body, an auth error) falls
+through unchanged. It has to happen here rather than in the browser, and here
+is also upstream of wmscache, so the corrected type is what gets stored.
+
+Asking for a single format instead is not an option: `jpg` paints the
+no-coverage gaps opaque black, and `png32` is eight times the bytes for the
+same pixels (measured on one 512 px tile over Oslo: 68 kB vs 555 kB). The
+transparent no-coverage PNG is 1097 bytes, comfortably over `$skip_cache`'s
+300-byte floor, so those tiles do get cached.
+
 ### Verifying
 
 Verify what nginx actually loaded, not what the file says:
@@ -242,10 +259,32 @@ GetCapabilities `<BoundingBox>`:
 - per-project: **the project's own `bboxLonLat`**, not the service's.
   `wms.hoyde-dtm-prosjekt` advertises the union of all 1936 acquisitions
   (Jan Mayen to Svalbard), which culls almost nothing.
+- NiB ortofoto mosaic (`/wms/nib/ortofoto`): `-250025, 6299985, 1211155,
+  8985010`.
+- one ortofoto acquisition: again **the acquisition's own `bboxLonLat`**,
+  off `FlyfotoProject`. One flight covers a town while the ImageServer
+  advertises every flight ever flown.
+
+The same applies to the one non-WMS background source. `ArcGISImage` layers
+(`getArcGISImageLayer`) are on `ol/source/TileArcGISRest` but get the identical
+treatment — same 512 px grid, same `zDirection`, same `preload: 0`, same
+`coverageExtent` culling — because an ImageServer renders on the fly exactly
+like a WMS does. One extra setting there: `hidpi: false`. Left at its default
+`true`, `TileArcGISRest` scales `SIZE` and `DPI` by the map's pixel ratio,
+which on a HiDPI screen quadruples the pixels the service resamples *and*
+gives wmscache a second set of cache keys for the same ground.
 
 The transform uses 8 sampling stops per edge. Corners-only would clip the
 bulge a Norway-sized box grows when reprojected out of UTM33, cutting *real
 coverage* off the map — worse than requesting a few extra tiles.
+
+**Ortofoto backgrounds ask for JPEG, not PNG.** Measured on one 512 px tile
+over Oslo the same pixels are 68 kB as JPEG and 528 kB as PNG, and a live
+background spends that per tile per pan. The seamless mosaic has no
+transparency to lose (it is opaque across its whole advertised extent, and
+nothing is stacked under it), so `FORMAT=image/jpeg` is free. A single
+acquisition can't use plain JPEG — it needs transparent gaps — and uses
+`jpgpng` instead; see the sidecar's Content-Type note above.
 
 **Tile loading is OpenLayers' default — don't make it custom again.** There
 was a `retryBlankTileLoadFunction` that `fetch()`ed every tile with

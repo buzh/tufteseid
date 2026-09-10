@@ -27,10 +27,7 @@ import {
   lidarPickerOpenAtom,
   lidarViewportAtom,
 } from '../../map/layers/config/backgroundLayers/lidarRelevance';
-import {
-  type CycleKey,
-  useRegisterLidarCycle,
-} from '../../map/useLidarCyclingKeys';
+import type { CycleKey } from '../../map/useBackgroundCyclingKeys';
 
 // How long after the last W/S press the dataset list stays warm.
 const CYCLING_IDLE_MS = 90_000;
@@ -48,6 +45,10 @@ const CYCLING_IDLE_MS = 90_000;
  *
  * Mount once, from RibbonGlobalRow. Two mounts means two catalogue fetches
  * and two competing cycle registrations.
+ *
+ * `cycle` is returned rather than registered here: flyfoto mode has a ring
+ * of its own and there is only ever one registered handler, so the ribbon
+ * chains the two.
  */
 export const useLidarControls = () => {
   const map = useAtomValue(mapAtom);
@@ -238,8 +239,9 @@ export const useLidarControls = () => {
 
   // Keyboard cycling (A/D styles, W/S datasets, E model) —
   // docs/ui-architecture.md §5.3. The document listener itself lives in
-  // useLidarCyclingKeys, mounted at the shell root; this is only the
-  // behaviour, published to it.
+  // useBackgroundCyclingKeys, mounted at the shell root; this is only the
+  // behaviour, handed to the ribbon to register. Every key is declined
+  // outside LiDAR mode so another mode's handler can have it.
   const cycle = (key: CycleKey): boolean => {
     // The extract viewer covers the map: swapping the background behind it
     // would be invisible and still cost a full round of WMS loads.
@@ -290,9 +292,9 @@ export const useLidarControls = () => {
     return true;
   };
 
-  useRegisterLidarCycle(cycle);
-
   return {
+    // Keyboard
+    cycle,
     // Mode
     backgroundLayer,
     setBackgroundLayer,

@@ -1,16 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LidarViewportEntry } from '../../map/layers/config/backgroundLayers/lidarRelevance';
-import {
-  Button,
-  CountBadge,
-  IconButton,
-  Popover,
-  Spinner,
-} from '../../ui';
+import { Button, CountBadge, IconButton, Popover, Spinner } from '../../ui';
+import { PulldownDisclosure, PulldownItem } from '../Pulldown';
+import styles from '../Pulldown.module.css';
 import { LidarFilters } from './LidarFilters';
-import { PulldownDisclosure, PulldownItem } from './Pulldown';
-import styles from './Pulldown.module.css';
 import type { LidarControls } from './useLidarControls';
 
 // Worth a column of its own because it's what the list is ordered by: how

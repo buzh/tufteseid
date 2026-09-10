@@ -512,7 +512,9 @@
       "lidar": "LiDAR",
       "lidarTip": "LiDAR relief (national mosaic or per project)",
       "hybrid": "Hybrid",
-      "hybridTip": "LiDAR with roads and place names"
+      "hybridTip": "LiDAR with roads and place names",
+      "flyfoto": "Aerial",
+      "flyfotoTip": "Norge i bilder ortophoto — seamless mosaic or a single acquisition"
     },
     "heritage": {
       "label": "Heritage",
@@ -522,8 +524,15 @@
       "tip": "All heritage layers"
     },
     "flyfoto": {
-      "label": "Aerial ↗",
-      "tip": "Open Norge i bilder for this view (new tab)"
+      "datasetLabel": "Aerial acquisition",
+      "datasetHead": "Aerial photo · W/S",
+      "mosaic": "Best mosaic",
+      "mosaicMeta": "most recent available",
+      "projectsHint": "Single acquisitions, newest first. Walk back in time with S.",
+      "loading": "Loading acquisitions…",
+      "zoomedOut": "Zoom in to see which acquisitions cover this area.",
+      "error": "Could not load acquisitions right now. Try again, or zoom in a little.",
+      "empty": "No single acquisition covers this view. Use the best mosaic, or try somewhere else."
     },
     "search": {
       "clear": "Clear search"

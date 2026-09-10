@@ -2,11 +2,13 @@ import { useAtom, useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { isSignedInAtom } from '../auth/atoms';
 import { useCreateLocalityFromViewport } from '../localities/createFromBbox';
-import { mapAtom } from '../map/atoms';
 import { activeThemeLayersAtom } from '../map/layers/atoms';
 import type { ThemeLayerName } from '../map/layers/themeWMS';
 import { type MapTool, mapToolAtom } from '../map/overlay/atoms';
+import { useRegisterBackgroundCycle } from '../map/useBackgroundCyclingKeys';
 import { IconButton, Tooltip } from '../ui';
+import { FlyfotoDatasetPicker } from './flyfoto/FlyfotoDatasetPicker';
+import { useFlyfotoControls } from './flyfoto/useFlyfotoControls';
 import { LidarDatasetPicker } from './lidar/LidarDatasetPicker';
 import { LidarModelToggle } from './lidar/LidarModelToggle';
 import { LidarStylePicker } from './lidar/LidarStylePicker';
@@ -27,18 +29,27 @@ import styles from './Ribbon.module.css';
  * looking at.
  *
  * Modes versus modifiers is the distinction to preserve here
- * (docs/ui-architecture.md §5.2). Standard and LiDAR are modes. Hybrid,
- * DTM/DOM and the style pick are modifiers on the LiDAR stack — which is why
- * Hybrid activates the national mosaic when nothing LiDAR is on yet rather
- * than becoming a background of its own.
+ * (docs/ui-architecture.md §5.2). Standard, LiDAR and Flyfoto are modes.
+ * Hybrid, DTM/DOM and the style pick are modifiers on the LiDAR stack —
+ * which is why Hybrid activates the national mosaic when nothing LiDAR is on
+ * yet rather than becoming a background of its own.
+ *
+ * LiDAR and Flyfoto each bring a dataset pulldown and a keyboard ring, and
+ * only one of the two is ever on screen — this row is where they are
+ * chained, because there is exactly one registered cycle handler.
  */
 export const RibbonGlobalRow = () => {
   const { t } = useTranslation();
   const isSignedIn = useAtomValue(isSignedInAtom);
   const [tool, setTool] = useAtom(mapToolAtom);
   const [themeLayers, setThemeLayers] = useAtom(activeThemeLayersAtom);
-  const map = useAtomValue(mapAtom);
   const lidar = useLidarControls();
+  const flyfoto = useFlyfotoControls();
+
+  // A/D/W/S/E. Each half declines every key outside its own mode, so the
+  // order here only decides who is asked first, not who gets it. The
+  // document listener lives at the shell root (useMapSideEffects).
+  useRegisterBackgroundCycle((key) => flyfoto.cycle(key) || lidar.cycle(key));
 
   // "Ny lokalitet" frames the visible map rather than arming a box drag.
   const { create: createFromViewport, creating } =
@@ -54,30 +65,6 @@ export const RibbonGlobalRow = () => {
       else next.add(name);
       return next;
     });
-
-  // External hop to Norge i bilder at the same extent. Their SPA reads
-  // xmin/ymin/xmax/ymax + wkid from the query string (verified against
-  // their bundle) and defaults wkid to 25833, matching our projection.
-  //
-  // Temporary. This goes away when flyfoto becomes a background mode of its
-  // own; navigating out of the app to look at imagery we can render in
-  // place is not something to keep.
-  const openInNorgeIBilder = () => {
-    const size = map.getSize();
-    if (!size) return;
-    const extent = map.getView().calculateExtent(size);
-    if (!extent) return;
-    const wkid = map
-      .getView()
-      .getProjection()
-      .getCode()
-      .replace(/^EPSG:/, '');
-    const url =
-      `https://norgeibilder.no/?wkid=${wkid}` +
-      `&xmin=${extent[0]}&ymin=${extent[1]}` +
-      `&xmax=${extent[2]}&ymax=${extent[3]}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
 
   return (
     <div className={styles.row}>
@@ -120,7 +107,26 @@ export const RibbonGlobalRow = () => {
             if (!lidar.isLidarMode) lidar.activateNational();
           }}
         />
+
+        {/* Ortofoto: the seamless best-available mosaic by default, with
+            every acquisition back to the 1930s in the pulldown. Hybrid is
+            deliberately left alone rather than cleared — it's a LiDAR
+            modifier, inert here, and switching back should return to the
+            stack you left. */}
+        <ModeButton
+          icon="satellite_alt"
+          label={t('ribbon.mode.flyfoto')}
+          tooltip={t('ribbon.mode.flyfotoTip')}
+          active={flyfoto.isFlyfotoMode}
+          onClick={flyfoto.enterFlyfoto}
+        />
       </div>
+
+      {flyfoto.isFlyfotoMode && (
+        <div className={styles.group}>
+          <FlyfotoDatasetPicker flyfoto={flyfoto} />
+        </div>
+      )}
 
       {lidar.isLidarMode && (
         <div className={styles.group}>
@@ -162,12 +168,6 @@ export const RibbonGlobalRow = () => {
       <div className={styles.divider} />
 
       <div className={styles.group}>
-        <ModeButton
-          icon="photo_camera"
-          label={t('ribbon.flyfoto.label')}
-          tooltip={t('ribbon.flyfoto.tip')}
-          onClick={openInNorgeIBilder}
-        />
         <RibbonMeasure />
       </div>
 

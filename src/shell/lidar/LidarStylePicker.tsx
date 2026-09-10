@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, CountBadge, Popover } from '../../ui';
-import { PulldownDisclosure, PulldownItem } from './Pulldown';
-import styles from './Pulldown.module.css';
+import { PulldownDisclosure, PulldownItem } from '../Pulldown';
+import styles from '../Pulldown.module.css';
 import type { LidarControls } from './useLidarControls';
 
 /**
