@@ -354,13 +354,24 @@ export const TerrainPanel = ({
               {t(`localities.terrain.${error}`)}
             </span>
           )}
+          {/* Two readings, because "0,50 m/px" alone doesn't say whether
+              that is all the laser data there is or the grid cap biting.
+              Only the second is actionable — shrink the rectangle and you
+              get more detail — so it's the one that names the source. */}
           {!loading && !error && dem && (
             <span>
-              {t('localities.terrain.resolution', {
-                m: dem.metresPerPx.toFixed(2),
-                w: dem.width,
-                h: dem.height,
-              })}
+              {dem.metresPerPx > dem.nativeMetresPerPx * 1.05
+                ? t('localities.terrain.resolutionCapped', {
+                    m: dem.metresPerPx.toFixed(2),
+                    w: dem.width,
+                    h: dem.height,
+                    src: dem.nativeMetresPerPx.toFixed(2),
+                  })
+                : t('localities.terrain.resolution', {
+                    m: dem.metresPerPx.toFixed(2),
+                    w: dem.width,
+                    h: dem.height,
+                  })}
             </span>
           )}
         </div>

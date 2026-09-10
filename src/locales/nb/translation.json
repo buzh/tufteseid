@@ -409,6 +409,7 @@
       "zFactor": "Overdrivelse",
       "opacity": "Dekkraft",
       "resolution": "{{m}} m/px · {{w}}×{{h}}",
+      "resolutionCapped": "{{m}} m/px · {{w}}×{{h}} · kilde {{src}} m",
       "reframe": "Analyser utsnittet",
       "save": "Lagre som bilde",
       "saveNew": "Lagre som ny lokalitet",

@@ -411,6 +411,20 @@ analysed rectangle into a lokalitet.
   function is `skyggerelieff`, i.e. the shaded product the WMS already
   serves. Same-origin at `/arcgis/hoydedata/*` → Caddy → wmscache →
   `hoydedata.no/arcgis/rest/services/*`. Anonymous, no token sidecar.
+- The mosaics are the **per-project** `Prosjekt_DTM` / `Prosjekt_DOM` (0.25 m),
+  not the national `NHM_*` ones (1 m). Measured, not assumed: the national
+  mosaic silently serves DTM10 upsampled wherever NHM never flew (its DTM10
+  catalogue rows carry `MINPS: 0`), and across 120 random land points there
+  was **no** place with laser data nationally but not per-project. So there is
+  no fallback to the national mosaic and there should not be — the only thing
+  it could add back is the 10 m data. Full probe and the 2×2:
+  `docs/terrain-analysis.md`.
+- Target resolution is **probed**, not fixed: one `outStatistics` catalogue
+  query per bbox returns `min(OPPLOSNING)` over the acquisitions there (0.25,
+  0.5 or 1 m), which also answers "is there any laser data here" before a
+  single megabyte moves. `Prosjekt_DOM` defaults to a `Northwest` mosaic
+  method, so `dem.ts` states `esriMosaicAttribute` / `lowps` explicitly to
+  keep the two models alike.
 - `src/terrain/dem.ts` — fetch + a ~120-line float-TIFF reader. Deliberately
   **not** geotiff.js: the endpoint emits exactly one shape (uncompressed,
   single-band, 32-bit float, tiled 128×128) and adding a dependency would
