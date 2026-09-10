@@ -1,15 +1,3 @@
-import {
-  AccordionItem,
-  AccordionItemContent,
-  AccordionItemTrigger,
-  Box,
-  Flex,
-  Link,
-  Stack,
-  Switch,
-  SwitchLabel,
-  Text,
-} from '@kvib/react';
 import { useQuery } from '@tanstack/react-query';
 import { getDefaultStore } from 'jotai';
 import VectorLayer from 'ol/layer/Vector';
@@ -27,16 +15,21 @@ import {
   setUrlParameter,
 } from '../../shared/utils/urlUtils';
 import { Property } from '../../types/searchTypes';
+import { cx, Section, Switch } from '../../ui';
 import {
   getPropertyDetailsByMatrikkelId,
   getPropetyInfoByCoordinates,
 } from '../searchApi';
+import styles from './InfoBox.module.css';
 import { getContainingExtent } from './utils';
 
 export interface PropertyInfoProps {
   lon: number;
   lat: number;
   inputCRS: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  className?: string;
 }
 
 const fetchPropertyDetailsByCoordinates = async (
@@ -60,7 +53,14 @@ const fetchPropertyDetailsByCoordinates = async (
   );
 };
 
-export const PropertyInfo = ({ lon, lat, inputCRS }: PropertyInfoProps) => {
+export const PropertyInfo = ({
+  lon,
+  lat,
+  inputCRS,
+  open,
+  onOpenChange,
+  className,
+}: PropertyInfoProps) => {
   const { t } = useTranslation();
   const [lon4326, lat4326] = transform([lon, lat], inputCRS, 'EPSG:4326');
 
@@ -141,10 +141,6 @@ export const PropertyInfo = ({ lon, lat, inputCRS }: PropertyInfoProps) => {
     };
   }, [showGeometry, property]);
 
-  const handleSwitchChange = async (checked: boolean) => {
-    setShowGeometry(checked);
-  };
-
   if (isLoading || error || propertyDetails == null) return null;
 
   if (!property) {
@@ -168,64 +164,53 @@ export const PropertyInfo = ({ lon, lat, inputCRS }: PropertyInfoProps) => {
   const propertyRegisterUrl = `https://eiendomsregisteret.kartverket.no/eiendom/${property.KOMMUNENR}/${property.GARDSNR}/${property.BRUKSNR}/${property.FESTENR}/${property.SEKSJONSNR}`;
 
   return (
-    <AccordionItem value="propertyInfo">
-      <AccordionItemTrigger pl={0}>
-        {t('infoBox.propertyInfo')}
-      </AccordionItemTrigger>
-      <AccordionItemContent>
-        <Box>
-          {addresses.length > 0 && (
-            <Box mb={3}>
-              <Text fontSize="sm" fontWeight="semibold">
-                {t('propertyInfo.address')}
-              </Text>
-              {addresses.map((addr, i) => (
-                <Text key={i} fontSize="sm">
-                  {addr}
-                </Text>
-              ))}
-            </Box>
-          )}
-          <Stack gap={0}>
-            {hasMultipleAddresses && (
-              <Text mb={4} fontSize="sm">
-                {t('propertyInfo.multipleAddressesText')}
-              </Text>
-            )}
-            <Flex justify="space-between" align="center" mb={2}>
-              <Switch
-                checked={showGeometry}
-                onCheckedChange={(e) => {
-                  handleSwitchChange(e.checked);
-                }}
-              >
-                <SwitchLabel>
-                  {t('propertyInfo.markProperty.label')}
-                </SwitchLabel>
-              </Switch>
-              <Link
-                href={propertyRegisterUrl}
-                target="_blank"
-                fontSize="sm"
-                external
-              >
-                {t('propertyInfo.moreInformation')}
-              </Link>
-            </Flex>
-            {rows.map(([label, value], index) => (
-              <Flex
-                key={label}
-                justify="space-between"
-                bg={index % 2 === 0 ? 'gray.50' : 'white'}
-                p={2}
-              >
-                <Text fontSize="sm">{label}</Text>
-                <Text fontSize="sm">{value}</Text>
-              </Flex>
-            ))}
-          </Stack>
-        </Box>
-      </AccordionItemContent>
-    </AccordionItem>
+    <Section
+      title={t('infoBox.propertyInfo')}
+      open={open}
+      onOpenChange={onOpenChange}
+      className={className}
+    >
+      {addresses.length > 0 && (
+        <div className={styles.addresses}>
+          <span className={styles.addressLabel}>
+            {t('propertyInfo.address')}
+          </span>
+          {addresses.map((addr, i) => (
+            <span key={i} className={styles.small}>
+              {addr}
+            </span>
+          ))}
+        </div>
+      )}
+      {hasMultipleAddresses && (
+        <p className={cx(styles.small, styles.note)}>
+          {t('propertyInfo.multipleAddressesText')}
+        </p>
+      )}
+      <div className={styles.propertyControls}>
+        <Switch
+          checked={showGeometry}
+          onChange={setShowGeometry}
+          label={t('propertyInfo.markProperty.label')}
+        />
+        <a
+          className={styles.link}
+          href={propertyRegisterUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {t('propertyInfo.moreInformation')}
+        </a>
+      </div>
+      {rows.map(([label, value], index) => (
+        <div
+          key={label}
+          className={cx(styles.tableRow, index % 2 === 0 && styles.tableRowAlt)}
+        >
+          <span className={styles.small}>{label}</span>
+          <span className={styles.small}>{value}</span>
+        </div>
+      ))}
+    </Section>
   );
 };

@@ -91,8 +91,8 @@ on. It exports `Button` / `IconButton`, `Badge` / `CountBadge`, `Popover`,
 `Dialog`, `Tooltip`, `Switch`, `Segmented`, `Section`, `Field` (`Input` +
 `NoteInput`), `ConfirmPopover`, `Alert`, `Spinner`, `Icon`, `toast` /
 `Toaster`, `cx`, `useMediaQuery` and `overlayAtoms`. The shell, the lokalitet
-surfaces, the analysis panels, the map tool cards and the help page are all on
-it.
+surfaces, the analysis panels, the map tool cards, the help page and both
+search surfaces are all on it.
 
 `src/ui/tokens.css` is the single source for colour, spacing, radius, shadow,
 control heights and — the one that was genuinely scattered before — the
@@ -127,7 +127,7 @@ worked example: re-pointing two variables is the app's entire dark theme, and
 `Button.module.css` needed no dark variant.
 
 `<KvibProvider>` is still mounted, and kvib still carries what has not been
-ported: drawing (`src/draw/**`) and the search infobox. There is no
+ported: drawing (`src/draw/**`), and nothing else. There is no
 dark mode in either system — the extract viewer's dark chrome is local, not a
 mode.
 
@@ -640,6 +640,16 @@ Two surfaces, which is one more than a user needs:
   specifically for Riksantikvaren features, rendered as a sibling of the whole
   shell.
 
+The panel is a title bar over a stack of controlled `Section`s, with the open
+set in `InfoBoxSections.tsx` (all closed on arrival, except that feature info
+opens itself on a single hit). Two details are deliberate: the fold button
+**hides** rather than unmounts, because `PropertyInfo` draws the property
+outline on the map and clears it on unmount — folding the panel away to look at
+that outline is the point of folding it away; and the layer list inside feature
+info is single-open and resets to the first layer on every new click, since
+with several layers under the cursor it reads as a menu rather than a report.
+The eight files share one `InfoBox.module.css`, as the results panel does.
+
 `featureInfoService.ts` (595 lines) does the actual GetFeatureInfo dispatch and
 parsing, including the `msGMLOutput` XML path that the Kulturminner layers need
 (they are configured with `infoFormat: 'application/vnd.ogc.gml'`; left unset
@@ -977,19 +987,19 @@ ribbon, the lokalitet surfaces (`FunnList`, `BilderSection`,
 `LocalitiesPanel`), both analysis panels, `AuthButton`, `AuthDialog`,
 `ErrorBoundary`, the measure trigger, the toast region, `MapComponent`,
 `SearchComponent`, `KulturminnerPopup`, `LidarExtractViewer`, `MapToolCards`,
-`MapThemes`/`SubTheme`, `HelpPage`, `LanguageSwitcher` and the search results
-panel (`src/search/results/**`). So `src/terrain/`, `src/settings/`,
-`src/auth/`, `src/lidarExtract/`, `src/localities/`, `src/help/`,
-`src/languageswitcher/` and `src/map/` are all clear.
+`MapThemes`/`SubTheme`, `HelpPage`, `LanguageSwitcher` and the whole of
+`src/search/**` — results panel and infobox. So `src/terrain/`,
+`src/settings/`, `src/auth/`, `src/lidarExtract/`, `src/localities/`,
+`src/help/`, `src/languageswitcher/`, `src/search/` and `src/map/` are all
+clear.
 
-Still on kvib — 17 surfaces in two subsystems (plus `src/ui/Icon.tsx`, which
+Still on kvib — one subsystem, 9 files (plus `src/ui/Icon.tsx`, which
 re-exports the `MaterialSymbol` union, and `src/mainApp.tsx`, which mounts the
 provider; those two are the strip itself):
 
 | Surface | Size | Note |
 |---|---|---|
-| `src/search/infobox/**` | 8 files, ~1100 lines | `FeatureInfoSection` is the one that reads container state (`useAccordionContext`) |
-| `src/draw/**` | 9 files | the largest subsystem; inherited upstream, least-touched |
+| `src/draw/**` | 9 files | the last one; inherited upstream, least-touched |
 
 The kit needs nothing more to absorb them. The list used to say `Accordion`,
 `Select`, `Pagination` and `Alert`:
@@ -997,11 +1007,13 @@ The kit needs nothing more to absorb them. The list used to say `Accordion`,
 - **`Accordion` is not coming.** Every kvib accordion in this app is
   `collapsible multiple`, i.e. a stack of independent disclosures, which is
   exactly the controlled `Section` the workspace already uses. The call site
-  owns the open set (a `string[]` in `MapThemes`, a single `string | null` per
-  card in `HelpPage`) and gets `lazyMount`/`unmountOnExit` for free, because
-  `Section` never renders a closed body. `FeatureInfoSection`'s
-  `useAccordionContext` is the one place that reads the container's state
-  instead of owning it, and lifting that state is the port.
+  owns the open set (a `string[]` in `MapThemes` and `InfoBoxSections`, a
+  single `string | null` per card in `HelpPage`) and gets
+  `lazyMount`/`unmountOnExit` for free, because `Section` never renders a
+  closed body. `FeatureInfoSection` was the one place that read the
+  container's state rather than owning it — `useAccordionContext`, to open
+  itself on a single hit; with a controlled section that is just
+  `onOpenChange(true)`.
 - **`Select` is not coming either.** The only two are the language picker and
   the draw point-style picker, and a native `<select>` covers both — see
   `src/languageswitcher/`. Anything that wants a richer list is a `Popover`.
