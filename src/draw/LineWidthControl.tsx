@@ -1,4 +1,3 @@
-import { Box, Heading, HStack, VStack } from '@kvib/react';
 import { useAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import {
@@ -6,13 +5,16 @@ import {
   lineWidthAtom,
   selectedFeatureAtom,
 } from '../settings/draw/atoms';
+import { Segmented, type SegmentedOption } from '../ui';
+import styles from './Draw.module.css';
 import { getFeatureType } from './drawControls/drawUtils';
 import { useDrawSettings } from './drawControls/hooks/drawSettings';
 
-const lineWidthCollection: { value: LineWidth; label: string }[] = [
-  { value: 2, label: 'S' },
-  { value: 4, label: 'M' },
-  { value: 8, label: 'L' },
+// The three widths, as the strings `Segmented` indexes on.
+const widthOptions: SegmentedOption<string>[] = [
+  { value: '2', label: 'S' },
+  { value: '4', label: 'M' },
+  { value: '8', label: 'L' },
 ];
 
 export const LineWidthControl = () => {
@@ -34,62 +36,19 @@ export const LineWidthControl = () => {
   ) {
     return null;
   }
-  const isPoint = currentType === 'Point';
 
-  const getButtonSize = (value: number) => {
-    return value === 2 ? 24 : value === 4 ? 30 : 36;
-  };
-
-  const getPointSize = (value: number) => value * 2.2;
+  const label =
+    currentType === 'Point' ? t('draw.size.pointLabel') : t('draw.size.label');
 
   return (
-    <VStack align="stretch" paddingY={2}>
-      <Heading size={{ base: 'xs', md: 'sm' }}>
-        {isPoint ? t('draw.size.pointLabel') : t('draw.size.label')}
-      </Heading>
-      <HStack>
-        {lineWidthCollection.map((item) => {
-          const isSelected = lineWidth === item.value;
-          const buttonSize = getButtonSize(item.value);
-          const pointSize = getPointSize(item.value);
-
-          return (
-            <Box
-              key={item.value}
-              as="button"
-              onClick={() => setLineWidth(item.value)}
-              aria-pressed={isSelected}
-              aria-label={`${t('draw.size.label')} ${item.label}`}
-              w={`${buttonSize}px`}
-              h={`${buttonSize}px`}
-              borderRadius="full"
-              borderWidth="1px"
-              display="inline-flex"
-              alignItems="center"
-              justifyContent="center"
-              cursor="pointer"
-              borderColor="green.500"
-              bg={isSelected ? 'green.100' : 'transparent'}
-            >
-              {isPoint ? (
-                <Box
-                  w={`${pointSize}px`}
-                  h={`${pointSize}px`}
-                  borderRadius="full"
-                  bg="green.500"
-                />
-              ) : (
-                <Box
-                  w="80%"
-                  h={`${item.value}px`}
-                  borderRadius="full"
-                  bg="green.500"
-                />
-              )}
-            </Box>
-          );
-        })}
-      </HStack>
-    </VStack>
+    <div className={styles.group}>
+      <span className={styles.groupLabel}>{label}</span>
+      <Segmented
+        value={String(lineWidth)}
+        options={widthOptions}
+        onChange={(value) => setLineWidth(Number(value) as LineWidth)}
+        label={label}
+      />
+    </div>
   );
 };

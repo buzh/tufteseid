@@ -1,21 +1,9 @@
-import {
-  createListCollection,
-  Heading,
-  HStack,
-  Icon,
-  SelectContent,
-  SelectItem,
-  SelectRoot,
-  SelectTrigger,
-  SelectValueText,
-  VStack,
-} from '@kvib/react';
 import { useAtom, useAtomValue } from 'jotai';
-import { ReactNode } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { pointIconAtom, primaryColorAtom } from '../settings/draw/atoms';
-import { useIsMobileScreen } from '../shared/hooks';
-import type { MaterialSymbol } from '../ui';
+import { Button, cx, Icon, type MaterialSymbol, Popover } from '../ui';
+import styles from './Draw.module.css';
 import { isDrawIconFilled } from './drawControls/drawUtils';
 
 const icons: MaterialSymbol[] = [
@@ -39,67 +27,69 @@ const icons: MaterialSymbol[] = [
   'ac_unit',
 ];
 
-const iconsCollection = createListCollection({
-  items: icons.map((icon) => ({
-    value: icon,
-    label: icon,
-  })),
-});
-
+/*
+ * A grid of glyphs in a pulldown, not a `<select>`: the options *are* the
+ * pictures, and a native option list can only carry their English slugs.
+ * Each is drawn in the point colour, so the panel previews the marker rather
+ * than naming it.
+ */
 export const PointStyleSelector = () => {
   const [pointIcon, setPointIcon] = useAtom(pointIconAtom);
   const color = useAtomValue(primaryColorAtom);
+  const [open, setOpen] = useState(false);
   const { t } = useTranslation();
 
-  const isMobile = useIsMobileScreen();
-
   return (
-    <VStack align="stretch" mt={isMobile ? 1 : 1} gap={isMobile ? 1 : 1}>
-      <Heading fontWeight="semibold" size={{ base: 'xs', md: 'sm' }}>
-        {t('draw.controls.pointType')}
-      </Heading>
-
-      <SelectRoot
-        w={'80px'}
-        collection={iconsCollection}
-        value={pointIcon ? [pointIcon] : []}
+    <div className={styles.group}>
+      <span className={styles.groupLabel}>{t('draw.controls.pointType')}</span>
+      <Popover
+        open={open}
+        onOpenChange={setOpen}
+        width={240}
+        label={t('draw.controls.pointType')}
+        trigger={
+          <Button
+            variant="secondary"
+            rightIcon="arrow_drop_down"
+            aria-label={t('draw.controls.pointType')}
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+          >
+            <Icon
+              icon={pointIcon}
+              filled={isDrawIconFilled(pointIcon)}
+              color={color}
+              size={18}
+            />
+          </Button>
+        }
       >
-        <SelectTrigger>
-          <SelectValueText
-            placeholder={t('draw.controls.pointType')}
-            children={ValueText}
-          />
-        </SelectTrigger>
-        <SelectContent>
+        <div className={styles.iconGrid}>
           {icons.map((icon) => (
-            <SelectItem
+            <button
               key={icon}
-              item={icon}
-              onClick={() => setPointIcon(icon)}
+              type="button"
+              aria-label={icon}
+              aria-pressed={icon === pointIcon}
+              className={cx(
+                styles.iconChoice,
+                icon === pointIcon && styles.iconChoiceActive,
+              )}
+              onClick={() => {
+                setPointIcon(icon);
+                setOpen(false);
+              }}
             >
-              <Icon icon={icon} filled={isDrawIconFilled(icon)} color={color} />
-            </SelectItem>
+              <Icon
+                icon={icon}
+                filled={isDrawIconFilled(icon)}
+                color={color}
+                size={20}
+              />
+            </button>
           ))}
-        </SelectContent>
-      </SelectRoot>
-    </VStack>
-  );
-};
-
-const ValueText = (
-  items: { label: string; value: MaterialSymbol }[],
-): ReactNode => {
-  const color = useAtomValue(primaryColorAtom);
-  return (
-    <HStack>
-      {items.map((item) => (
-        <Icon
-          color={color}
-          key={item.value}
-          icon={item.value}
-          filled={isDrawIconFilled(item.value)}
-        />
-      ))}
-    </HStack>
+        </div>
+      </Popover>
+    </div>
   );
 };

@@ -4,6 +4,17 @@
     "confrimClear": "Nå fjernes alt som er tegnet. Er du sikker?",
     "controls": {
       "recentColors": "Nylige farger",
+      "opacity": "Dekkevne",
+      "colorText": "Tekstfarge",
+      "colorBackground": "Bakgrunn",
+      "colorPoint": "Punktfarge",
+      "colorStroke": "Strekfarge",
+      "colorFill": "Fyllfarge",
+      "defaults": {
+        "primary": "Farge",
+        "secondary": "Fyllfarge"
+      },
+      "snap": "Snapping",
       "pointType": "Punkttype",
       "showMeasurements": "Vis mål i kartet",
       "tool": {
@@ -24,6 +35,8 @@
       "color": "Farger",
       "edit": "Rediger",
       "lineType": "Linjetype",
+      "lineTypeSolid": "Heltrukken",
+      "lineTypeDashed": "Stiplet",
       "editInstruction": "Velg et element du vil redigere eller flytte"
     },
     "size": {

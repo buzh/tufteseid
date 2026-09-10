@@ -1,22 +1,3 @@
-import {
-  Box,
-  ColorPicker,
-  ColorPickerArea,
-  ColorPickerContent,
-  ColorPickerControl,
-  ColorPickerSliders,
-  ColorPickerSwatch,
-  ColorPickerTrigger,
-  Heading,
-  HStack,
-  Icon,
-  parseColor,
-  SimpleGrid,
-  Spacer,
-  Text,
-  VStack,
-} from '@kvib/react';
-import { t } from 'i18next';
 import { useAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import {
@@ -25,17 +6,26 @@ import {
   secondaryColorAtom,
   selectedFeatureAtom,
 } from '../settings/draw/atoms';
-import { useIsMobileScreen } from '../shared/hooks';
+import styles from './Draw.module.css';
 import { getFeatureType } from './drawControls/drawUtils';
 import { useDrawSettings } from './drawControls/hooks/drawSettings';
 
+/*
+ * Colour pair for the active tool: the native colour well plus a separate
+ * opacity slider, over the swatches of what has been picked before.
+ *
+ * The well cannot express alpha — `<input type="color">` is six digits by
+ * definition — and alpha is not decoration here: fills default to
+ * half-transparent so the terrain stays readable under a drawn polygon. So
+ * the two halves are edited separately and composed back into the
+ * `#rrggbbaa` the OpenLayers styles already take.
+ */
 export const ColorControls = () => {
   const [primaryColor, setPrimaryColor] = useAtom(primaryColorAtom);
   const [secondaryColor, setSecondaryColor] = useAtom(secondaryColorAtom);
   const [selectedFeature] = useAtom(selectedFeatureAtom);
   const { drawType } = useDrawSettings();
   const { t } = useTranslation();
-  const isMobile = useIsMobileScreen();
 
   const selectedFeatureType = selectedFeature
     ? getFeatureType(selectedFeature)
@@ -46,63 +36,23 @@ export const ColorControls = () => {
   const { primaryLabel, secondaryLabel } = useColorLabels(currentType);
 
   return (
-    <VStack
-      align="stretch"
-      w="100%"
-      mt={isMobile ? 1 : 1}
-      gap={isMobile ? 1 : 1}
-    >
-      <Heading fontWeight="semibold" size={{ base: 'xs', md: 'sm' }}>
-        {t('draw.controls.color')}
-      </Heading>
-
-      {isMobile ? (
-        <HStack w="100%" flexWrap="wrap" gap={2} align="stretch">
-          <Box>
-            <ColorRow
-              isMobile={true}
-              label={primaryLabel}
-              color={primaryColor}
-              onSetColor={setPrimaryColor}
-            />
-          </Box>
-
-          {secondaryLabel && (
-            <Box>
-              <ColorRow
-                isMobile={true}
-                label={secondaryLabel}
-                color={secondaryColor}
-                onSetColor={setSecondaryColor}
-              />
-            </Box>
-          )}
-        </HStack>
-      ) : (
-        // Desktop: to like kolonner (som før)
-        <HStack w="100%" align="stretch" gap={2}>
-          <Box flex="1">
-            <ColorRow
-              isMobile={false}
-              label={primaryLabel}
-              color={primaryColor}
-              onSetColor={setPrimaryColor}
-            />
-          </Box>
-
-          {secondaryLabel && (
-            <Box flex="1">
-              <ColorRow
-                isMobile={false}
-                label={secondaryLabel}
-                color={secondaryColor}
-                onSetColor={setSecondaryColor}
-              />
-            </Box>
-          )}
-        </HStack>
-      )}
-    </VStack>
+    <div className={styles.group}>
+      <span className={styles.groupLabel}>{t('draw.controls.color')}</span>
+      <div className={styles.colorGrid}>
+        <ColorRow
+          label={primaryLabel}
+          color={primaryColor}
+          onSetColor={setPrimaryColor}
+        />
+        {secondaryLabel && (
+          <ColorRow
+            label={secondaryLabel}
+            color={secondaryColor}
+            onSetColor={setSecondaryColor}
+          />
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -110,78 +60,99 @@ const ColorRow = ({
   label,
   color,
   onSetColor,
-  isMobile,
 }: {
   label: string;
   color: string;
   onSetColor: (v: string) => void;
-  isMobile: boolean;
 }) => {
+  const { t } = useTranslation();
   const [recentColors, setRecentColors] = useAtom(recentColorsAtom);
+  const { hex, alpha } = splitColor(color);
+
+  // Recorded when the user lets go, not on every frame of a drag — otherwise
+  // the strip fills with the colours passed through on the way to the one
+  // they wanted.
+  const remember = () => setRecentColors((prev) => addRecentColor(prev, color));
 
   return (
-    <ColorPicker
-      value={parseColor(color)}
-      onValueChange={(value) => onSetColor(value.valueAsString)}
-      onValueChangeEnd={(value) => {
-        const finalColor = value.valueAsString;
-        setRecentColors((prev) => addRecentColor(prev, finalColor));
-      }}
-    >
-      <ColorPickerControl>
-        <ColorPickerTrigger asChild>
-          <HStack
-            w={isMobile ? 'auto' : '100%'}
-            minW={isMobile ? '50px' : undefined}
-            maxW={isMobile ? '155px' : undefined}
-            role="button"
-            tabIndex={0}
-            align="center"
-            py={isMobile ? 0.5 : 1}
-            px={isMobile ? 2 : undefined}
-            borderWidth="1px"
-            borderRadius={isMobile ? 'md' : 'lg'}
-            bg="white"
-            cursor="pointer"
-            _hover={{ bg: 'gray.50' }}
-          >
-            <ColorPickerSwatch value={color} />
-            <Text fontSize={{ base: 'xs', md: 'sm' }}>{label}</Text>
-            <Spacer />
-            <Icon
-              color="colorPalette.500"
-              grade={0}
-              icon="chevron_right"
-              size={isMobile ? 16 : 18}
-              weight={300}
-            />
-          </HStack>
-        </ColorPickerTrigger>
-      </ColorPickerControl>
+    <div className={styles.colorColumn}>
+      <label className={styles.colorHead}>
+        <input
+          type="color"
+          className={styles.swatch}
+          value={hex}
+          onChange={(e) => onSetColor(joinColor(e.target.value, alpha))}
+          onBlur={remember}
+        />
+        <span className={styles.colorLabel}>{label}</span>
+      </label>
 
-      <ColorPickerContent>
-        <ColorPickerArea />
-        <ColorPickerSliders />
-        {recentColors.length > 0 && (
-          <VStack align="start" mt={2} gap={1}>
-            <Text fontSize="xs">{t('draw.controls.recentColors')}</Text>
+      <input
+        type="range"
+        className={styles.opacity}
+        min={0}
+        max={100}
+        value={Math.round(alpha * 100)}
+        aria-label={`${label} – ${t('draw.controls.opacity')}`}
+        title={`${t('draw.controls.opacity')}: ${Math.round(alpha * 100)} %`}
+        onChange={(e) =>
+          onSetColor(joinColor(hex, Number(e.target.value) / 100))
+        }
+        onPointerUp={remember}
+        onBlur={remember}
+      />
 
-            <SimpleGrid mt={1} columns={8} gap={1}>
-              {recentColors.map((c) => (
-                <ColorPickerSwatch
-                  key={c}
-                  value={c}
-                  onClick={() => onSetColor(c)}
-                  style={{ cursor: 'pointer' }}
-                  boxSize="5"
-                />
-              ))}
-            </SimpleGrid>
-          </VStack>
-        )}
-      </ColorPickerContent>
-    </ColorPicker>
+      {recentColors.length > 0 && (
+        <div className={styles.recents}>
+          {recentColors.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={styles.recentSwatch}
+              title={c}
+              aria-label={`${t('draw.controls.recentColors')}: ${c}`}
+              onClick={() => onSetColor(c)}
+            >
+              <span className={styles.recentFill} style={{ background: c }} />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
+};
+
+/*
+ * `#rgb`, `#rrggbb` and `#rrggbbaa` all turn up: the defaults carry alpha,
+ * the Text tool writes flat black and white, and the recent-colours list is
+ * whatever localStorage held from an earlier version.
+ */
+const splitColor = (value: string): { hex: string; alpha: number } => {
+  const raw = value.trim().replace(/^#/, '');
+  const digits =
+    raw.length === 3 || raw.length === 4
+      ? raw
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : raw;
+  // A colour well rejects anything that isn't `#rrggbb`, so an unparseable
+  // string — an `rgba()` left in localStorage by an older build — has to land
+  // somewhere rather than make the control render empty.
+  if (!/^([0-9a-f]{6}|[0-9a-f]{8})$/i.test(digits)) {
+    return { hex: '#000000', alpha: 1 };
+  }
+  const hex = `#${digits.slice(0, 6)}`;
+  const alpha = digits.length === 8 ? parseInt(digits.slice(6), 16) / 255 : 1;
+  return { hex, alpha };
+};
+
+const joinColor = (hex: string, alpha: number) => {
+  const clamped = Math.min(1, Math.max(0, alpha));
+  const suffix = Math.round(clamped * 255)
+    .toString(16)
+    .padStart(2, '0');
+  return `${hex}${suffix}`;
 };
 
 const addRecentColor = (list: string[], color: string) => {

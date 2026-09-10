@@ -126,10 +126,10 @@ custom properties on its own container. `LidarExtractViewer.module.css` is the
 worked example: re-pointing two variables is the app's entire dark theme, and
 `Button.module.css` needed no dark variant.
 
-`<KvibProvider>` is still mounted, and kvib still carries what has not been
-ported: drawing (`src/draw/**`), and nothing else. There is no
-dark mode in either system — the extract viewer's dark chrome is local, not a
-mode.
+`<KvibProvider>` is still mounted, but nothing renders through it any more:
+every surface is on the kit, and kvib is down to the CSS reset, the font and
+the `MaterialSymbol` union (§12). There is no dark mode in either system — the
+extract viewer's dark chrome is local, not a mode.
 
 Hand-written CSS is now the `src/ui/*.module.css` files plus one module per
 ported component, on top of `src/index.css` and `src/map/map.css`
@@ -827,7 +827,40 @@ Two surfaces render the same tools: `DrawToolSelector` (desktop, inside
 `BottomDrawToolSelector` (mobile, `zIndex 1000`, mounted at the shell root and
 only while a funn draft is active). `DrawControls.tsx` renders the desktop
 selector behind `{!isMobile && …}`, which is what keeps the two from both
-appearing.
+appearing. The tools are icon-over-label buttons rather than a `Segmented`
+row: six named tools do not fit across the 320px the draft row gives the
+drawing column, and the name is what tells a first-time user what the glyph
+means.
+
+**The port off kvib.** One `src/draw/Draw.module.css` for the subsystem, on
+the same reasoning as the two search modules. Line style, line width and text
+size are `Segmented` — three closed sets of two or three values, which is what
+that primitive is for; the graduated circles the widths used to render as were
+decoration over the same S/M/L labels. Point style is a `Popover` holding a
+grid of the 18 glyphs, each drawn in the current point colour (§12 on why not
+a `<select>`). Undo/redo/delete are `IconButton`s under `Tooltip`, snap is the
+kit `Switch` — and it finally has a translated label instead of a hardcoded
+"Snap".
+
+**Colour is the one place the port changed the control rather than its
+clothes.** kvib's `ColorPicker` gave a saturation/hue/alpha surface; the
+replacement is the native colour well plus a separate opacity slider, over the
+same recent-colour swatches. The split is forced: `<input type="color">` is
+six hex digits by definition, and alpha is load-bearing here —
+`DEFAULT_SECONDARY_COLOR` is `#1d823b80`, i.e. fills are half-transparent so
+the terrain stays readable under a drawn polygon. The two halves compose back
+into the `#rrggbbaa` the OpenLayers styles already accept, and `splitColor`
+tolerates `#rgb` / `#rrggbb` / `#rrggbbaa` because all three turn up (the
+defaults carry alpha, the Text tool writes flat black and white, and the
+recent list is whatever an earlier version left in localStorage). Recents are
+recorded on release — blur of the well, pointer-up on the slider — not on
+every frame, or the strip fills with the colours passed through on the way.
+
+The colour labels were also an i18n hole: `draw.controls.colorStroke`,
+`colorFill`, `colorText`, `colorBackground`, `colorPoint` and
+`defaults.primary` / `defaults.secondary` were read by `useColorLabels` but
+missing from all three locale files, so every label rendered as its own key.
+They exist now, along with `opacity`, `snap` and the two line-style names.
 
 Drawn geometry serializes through `src/localities/serializeDrawLayer.ts` into a
 GeoJSON `FeatureCollection` in EPSG:4326 on the funn record. **Circles
@@ -987,22 +1020,18 @@ ribbon, the lokalitet surfaces (`FunnList`, `BilderSection`,
 `LocalitiesPanel`), both analysis panels, `AuthButton`, `AuthDialog`,
 `ErrorBoundary`, the measure trigger, the toast region, `MapComponent`,
 `SearchComponent`, `KulturminnerPopup`, `LidarExtractViewer`, `MapToolCards`,
-`MapThemes`/`SubTheme`, `HelpPage`, `LanguageSwitcher` and the whole of
-`src/search/**` — results panel and infobox. So `src/terrain/`,
-`src/settings/`, `src/auth/`, `src/lidarExtract/`, `src/localities/`,
-`src/help/`, `src/languageswitcher/`, `src/search/` and `src/map/` are all
-clear.
+`MapThemes`/`SubTheme`, `HelpPage`, `LanguageSwitcher`, the whole of
+`src/search/**` — results panel and infobox — and the whole of `src/draw/**`.
+So `src/terrain/`, `src/settings/`, `src/auth/`, `src/lidarExtract/`,
+`src/localities/`, `src/help/`, `src/languageswitcher/`, `src/search/`,
+`src/draw/` and `src/map/` are all clear.
 
-Still on kvib — one subsystem, 9 files (plus `src/ui/Icon.tsx`, which
-re-exports the `MaterialSymbol` union, and `src/mainApp.tsx`, which mounts the
-provider; those two are the strip itself):
+**Nothing renders on kvib any more.** What is left is the strip itself, two
+files: `src/ui/Icon.tsx`, which re-exports the `MaterialSymbol` union, and
+`src/mainApp.tsx`, which mounts `<KvibProvider>` for the reset and the font.
 
-| Surface | Size | Note |
-|---|---|---|
-| `src/draw/**` | 9 files | the last one; inherited upstream, least-touched |
-
-The kit needs nothing more to absorb them. The list used to say `Accordion`,
-`Select`, `Pagination` and `Alert`:
+The kit needed nothing more to absorb the last of it. The list used to say
+`Accordion`, `Select`, `Pagination` and `Alert`:
 
 - **`Accordion` is not coming.** Every kvib accordion in this app is
   `collapsible multiple`, i.e. a stack of independent disclosures, which is
@@ -1014,9 +1043,12 @@ The kit needs nothing more to absorb them. The list used to say `Accordion`,
   container's state rather than owning it — `useAccordionContext`, to open
   itself on a single hit; with a controlled section that is just
   `onOpenChange(true)`.
-- **`Select` is not coming either.** The only two are the language picker and
-  the draw point-style picker, and a native `<select>` covers both — see
-  `src/languageswitcher/`. Anything that wants a richer list is a `Popover`.
+- **`Select` is not coming either.** The language picker is a native
+  `<select>` (`src/languageswitcher/`), and the other candidate — the draw
+  point-style picker — turned out not to want a list at all: its options *are*
+  glyphs, which a native option row can only name in English slugs, so it is a
+  `Popover` holding a grid of them. Anything else that wants a richer list goes
+  the same way.
 - **`Pagination` is not coming.** One consumer — place names are the only
   result set the API pages — so the prev/status/next row lives inline in
   `PlacesResults.tsx`.
@@ -1032,9 +1064,10 @@ Two decisions taken to keep that list short rather than long:
   ~900 lines, the nautical-mile unit and the only call for a `FileUpload`
   dropzone with them. Rationale and the one live thing that had to be rescued
   first: §9.
-- **The colour picker becomes `<input type="color">` plus the existing recent
+- **The colour picker became `<input type="color">` plus the existing recent
   swatches**, not a hand-built saturation/hue/alpha surface. That was the single
-  largest component the migration would otherwise have owed.
+  largest component the migration would otherwise have owed. Alpha it does owe:
+  see §9.
 
 Until the last of those goes, kvib's cost stays: it drags in Chakra, emotion,
 the `@zag-js` machine set, `react-select`, `react-day-picker`, `react-aria`,

@@ -4,6 +4,17 @@
     "confrimClear": "Now everything that has been drawn will be removed. Are you sure?",
     "controls": {
       "recentColors": "Recent colors",
+      "opacity": "Opacity",
+      "colorText": "Text color",
+      "colorBackground": "Background",
+      "colorPoint": "Point color",
+      "colorStroke": "Stroke color",
+      "colorFill": "Fill color",
+      "defaults": {
+        "primary": "Color",
+        "secondary": "Fill color"
+      },
+      "snap": "Snapping",
       "pointType": "Select icon",
       "showMeasurements": "Show measurements on map",
       "tool": {
@@ -24,6 +35,8 @@
       "color": "Colors",
       "edit": "Edit",
       "lineType": "Line type",
+      "lineTypeSolid": "Solid",
+      "lineTypeDashed": "Dashed",
       "editInstruction": "Select an element to edit or move"
     },
     "size": {

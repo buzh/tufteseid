@@ -1,4 +1,3 @@
-import { Flex, IconButton, Text } from '@kvib/react';
 import { useAtom, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import {
@@ -6,7 +5,8 @@ import {
   primaryColorAtom,
   secondaryColorAtom,
 } from '../settings/draw/atoms';
-import type { MaterialSymbol } from '../ui';
+import { cx, Icon, type MaterialSymbol } from '../ui';
+import styles from './Draw.module.css';
 import { DrawType } from './drawControls/hooks/drawSettings';
 
 export const DrawToolSelector = () => {
@@ -48,7 +48,7 @@ export const DrawToolSelector = () => {
     },
   ];
   return (
-    <Flex w="100%" justifyContent={'space-between'}>
+    <div className={styles.tools}>
       {drawTypeButtons.map((button) => (
         <DrawTypeButton
           key={button.value}
@@ -57,10 +57,13 @@ export const DrawToolSelector = () => {
           label={button.label}
         />
       ))}
-    </Flex>
+    </div>
   );
 };
 
+// Icon over label rather than a `Segmented` row: six tools with names do not
+// fit across the 320px the draft row gives the drawing column, and the name
+// is what tells a first-time user what the glyph is for.
 const DrawTypeButton = ({
   type,
   icon,
@@ -77,26 +80,26 @@ const DrawTypeButton = ({
   const setSecondaryColor = useSetAtom(secondaryColorAtom);
 
   return (
-    <Flex direction="column" align="center" gap={1}>
-      <IconButton
-        variant="ghost"
-        iconFill
-        icon={icon}
-        backgroundColor={isCurrentTool ? '#D0ECD6' : ''}
-        size={{ base: 'xs', md: 'sm' }}
-        onClick={() => {
-          if (isCurrentTool) {
-            return;
-          }
+    <button
+      type="button"
+      aria-pressed={isCurrentTool}
+      className={cx(styles.tool, isCurrentTool && styles.toolActive)}
+      onClick={() => {
+        if (isCurrentTool) {
+          return;
+        }
 
-          if (type === 'Text') {
-            setPrimaryColor('#000000');
-            setSecondaryColor('#ffffffff');
-          }
-          setDrawType(type);
-        }}
-      />
-      <Text fontSize={12}>{label}</Text>
-    </Flex>
+        // Text on the map is read against the terrain under it, so it starts
+        // black on white rather than inheriting the line colours.
+        if (type === 'Text') {
+          setPrimaryColor('#000000ff');
+          setSecondaryColor('#ffffffff');
+        }
+        setDrawType(type);
+      }}
+    >
+      <Icon icon={icon} filled size={20} />
+      <span className={styles.toolLabel}>{label}</span>
+    </button>
   );
 };
