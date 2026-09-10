@@ -9,6 +9,7 @@ import { cx, Segmented, type SegmentedOption } from '../ui';
 import { FlyfotoDatasetPicker } from './flyfoto/FlyfotoDatasetPicker';
 import { FlyfotoEraPicker } from './flyfoto/FlyfotoEraPicker';
 import type { FlyfotoControls } from './flyfoto/useFlyfotoControls';
+import { HybridContoursToggle } from './lidar/HybridContoursToggle';
 import { LidarDatasetPicker } from './lidar/LidarDatasetPicker';
 import { LidarModelToggle } from './lidar/LidarModelToggle';
 import { LidarStylePicker } from './lidar/LidarStylePicker';
@@ -144,6 +145,16 @@ export const RibbonSettingsRow = ({
             model={lidar.lidarModel}
             onSelect={lidar.setLidarModel}
           />
+          {/* Keyed on the *mode*, not the modifiers, and the only control on
+              this strip that is: contours are two more groups in the hybrid
+              overlay's own request, so in plain LiDAR there is no overlay for
+              them to ride on and the switch would toggle nothing. */}
+          {ground.mode === 'hybrid' && (
+            <HybridContoursToggle
+              contours={lidar.hybridContours}
+              onChange={lidar.setHybridContours}
+            />
+          )}
         </div>
       )}
 

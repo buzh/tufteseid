@@ -64,6 +64,17 @@ export const hybridOverlayHalves = halved<boolean>(
 );
 export const hybridOverlayAtom = hybridOverlayHalves.focused;
 
+// Contour lines on that overlay. A modifier on a modifier, and deliberately
+// so: they are two more group layers in the overlay's own GetMap, they only
+// mean anything where the overlay is, and they answer a different question —
+// the roads and names say *where* you are, the contours say what the relief
+// under the hillshade measures. Off by default, because a hillshade covered
+// in brown lines is a worse hillshade and the point of Hybrid is the terrain.
+export const hybridContoursHalves = halved<boolean>(
+  getUrlParameter('contours') === 'true',
+);
+export const hybridContoursAtom = hybridContoursHalves.focused;
+
 // Which run of the effect below is the current one. The effect builds
 // its stack asynchronously — a WMTS base still needs its capabilities
 // fetched the first time — while W/S and A/D fire the effect faster than
@@ -88,6 +99,7 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
   // 'flyfotoProject' is the background rebuilds its mosaicRule.
   const activeFlyfotoProject = get(activeFlyfotoProjectHalves.a);
   const hybridOverlay = get(hybridOverlayHalves.a);
+  const hybridContours = get(hybridContoursHalves.a);
 
   if (layerName === 'empty') {
     clearBackgroundLayer();
@@ -103,6 +115,7 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
     lidarModel: activeLidarModel,
     flyfotoProject: activeFlyfotoProject,
     hybridOverlay,
+    hybridContours,
   });
 
   if (!stack) {
@@ -144,6 +157,8 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
       // shared URL should reproduce what's on screen.
       if (stack.hybrid) setUrlParameter('hybrid', true);
       else removeUrlParameter('hybrid');
+      if (stack.contours) setUrlParameter('contours', true);
+      else removeUrlParameter('contours');
       if (LIDAR_LAYERS.has(layerName) && activeLidarModel === 'dom') {
         setUrlParameter('lidarModel', 'dom');
       } else {

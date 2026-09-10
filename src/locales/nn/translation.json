@@ -551,6 +551,10 @@
       "modelLabel": "Høgdemodell",
       "modelTip": "DTM = terreng (vegetasjon fjerna), DOM = overflate (bygg og tre). Byt med E"
     },
+    "hybrid": {
+      "contours": "Høgdekurver",
+      "contoursTip": "Teiknar høgdekurver saman med vegar og stadnamn. Skyggerelieffet viser at det er bratt; kurvene seier kor mange meter."
+    },
     "terrain": {
       "label": "Terreng",
       "tip": "Terrenganalyse av kartutsnittet — hent høgdedata og lys dei opp sjølv. Krev inga lokalitet",

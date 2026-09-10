@@ -361,6 +361,7 @@ subsume.
 - **Map core** — `mapAtom`, `currentZoomAtom`, `mapFullScreenAtom`,
   `trackPositionAtom`.
 - **Background** — `backgroundLayerAtom`, `hybridOverlayAtom`,
+  `hybridContoursAtom`,
   `activeLidarModelAtom`, `activeLidarStyleAtom`, `activeLidarProjectAtom`,
   `lidarPickerOpenAtom`, `lidarCyclingAtom`, `lidarAutoDatasetAtom`,
   `activeFlyfotoProjectAtom`, plus
@@ -368,10 +369,11 @@ subsume.
   nothing draws its footprints, so it is component state in
   `useFlyfotoControls`.
 
-  Six of those are **halved** (§5.8): `backgroundLayerAtom`,
-  `hybridOverlayAtom` and the four LiDAR/flyfoto dataset atoms are each the
-  `focused` facade over an `{ a, b }` pair from `halved()`, exported under the
-  name they always had. Everything reading them keeps working unchanged; the
+  Seven of those are **halved** (§5.8): `backgroundLayerAtom`,
+  `hybridOverlayAtom`, `hybridContoursAtom` and the four LiDAR/flyfoto dataset
+  atoms are each the `focused` facade over an `{ a, b }` pair from `halved()`,
+  exported under the name they always had. Everything reading them keeps
+  working unchanged; the
   two stack effects reach past the facade to `.a` and `.b`. `halved()` also
   registers a seeder, so a pair added later is copied A→B on entry for free.
 - **Sammenlign** — `compareOnAtom`, `compareFocusAtom` and the derived
@@ -417,9 +419,9 @@ navigation**, by omission rather than decision). There is also a migration path
 for the legacy Norgeskart `#!?` hash format.
 
 Live parameters: `lat`, `lon`, `zoom` (written on every map `moveend`),
-`backgroundLayer`, `hybrid`, `lidarModel`, `themeLayers`, `heritageDetails`,
-`heritageRender`, `heritageOpacity`, `sok`, `markerLat`, `markerLon`,
-`showSelection`.
+`backgroundLayer`, `hybrid`, `contours`, `lidarModel`, `themeLayers`,
+`heritageDetails`, `heritageRender`, `heritageOpacity`, `sok`, `markerLat`,
+`markerLon`, `showSelection`.
 
 The three `heritage*` ones are written from `themeLayerEffect`, not from their
 setters, so a link always describes what is on the map; each is *removed* at
@@ -524,7 +526,7 @@ returns you to exactly the dataset and style you left — 1→5→1 is free wher
 | Ground | Strip |
 |---|---|
 | Standard (1) | *absent* — no variants to choose between |
-| LiDAR (2), Hybrid (3) | Dataset pulldown — **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport · style pulldown (the active dataset's WMS styles, with a "flere stiler" second tier), only when the dataset publishes more than one · DTM/DOM segment |
+| LiDAR (2), Hybrid (3) | Dataset pulldown — **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport · style pulldown (the active dataset's WMS styles, with a "flere stiler" second tier), only when the dataset publishes more than one · DTM/DOM segment · **Høydekurver** switch, Hybrid only |
 | Flyfoto (4) | Acquisition pulldown — the seamless mosaic or any acquisition covering the viewport, newest first · period chips (Alle / 2010– / 1990–2009 / 1960–1989 / –1959), which narrow both that list and the W/S ring (§5.5) |
 | Terreng (5) | Visualization segment (five, each with its own explanation as a tooltip) · DTM/DOM segment · the resolution readout · "Flytt analysen hit" (standalone only) · "Lagre" — **plus a second row under the strip** holding the sliders the current visualization uses, three to four of azimuth / altitude / exaggeration / radius / opacity (§10) |
 
@@ -602,6 +604,16 @@ the LiDAR stack underneath rather than replacing it.
 Switching to Flyfoto deliberately leaves `hybridOverlayAtom` alone rather than
 clearing it: it is a LiDAR modifier, inert in flyfoto mode, and switching back
 should return you to the stack you left.
+
+**Høydekurver is a modifier on a modifier**, and the only control on the strip
+keyed on `ground.mode` rather than `ground.modifiers`. The contour groups ride
+inside the hybrid overlay's own GetMap, so in plain LiDAR there is no request
+for them to join and the switch would move without changing the map; it is
+rendered in Hybrid only. Its state (`hybridContoursAtom`, `?contours=true`)
+survives a trip through plain LiDAR untouched, for the same reason hybrid
+survives a trip through Flyfoto. What contours add over the hillshade is a
+number: relief shading says the ground is steep, a contour says it drops forty
+metres, and only the second can be written down in a report.
 
 ### 5.3 The map keyboard: grounds, and cycling within one
 
@@ -895,8 +907,9 @@ already making by hand.
 
 **One control surface, pointed at one half at a time.** The button is the whole
 of Sammenlign's own UI. Everything that describes a ground — the five mode
-buttons, the dataset and style pulldowns on the settings strip, DTM/DOM, hybrid,
-and the W/S/A/D/E rings — acts on whichever half the **A|B switch** names, and
+buttons, the dataset and style pulldowns on the settings strip, DTM/DOM,
+hybrid and its contours, and the W/S/A/D/E rings — acts on whichever half the
+**A|B switch** names, and
 that switch is the first control on the settings strip whenever the curtain is
 up. `C` flips it from the keyboard.
 
@@ -2084,14 +2097,17 @@ switch Standard / LiDAR / Hybrid / Flyfoto / Terreng, by button or by digits
 pick the national mosaic or any per-project LiDAR dataset; see datasets ranked
 by relevance to the current viewport and expand to the less relevant ones;
 preview a project's footprint on hover; pick a render style and expand to the
-full style list; switch DTM / DOM; pick the seamless ortofoto mosaic or any
+full style list; switch DTM / DOM; draw contour lines over the hybrid
+overlay, to put metres on the relief the hillshade is only shading; pick the
+seamless ortofoto mosaic or any
 historical acquisition covering the viewport; narrow those acquisitions to one
 period of the archive so both the list and the keyboard ring walk only it;
 cycle styles with A/D, the active
 mode's datasets with W/S, model with E, without opening any pulldown or
 occluding the map; put a second ground on the right of a draggable curtain
 (Sammenlign) and then describe *either* half with the whole of row 1 and its
-strip — ground, dataset, style, DTM/DOM, hybrid, A/D/W/S/E — switching between
+strip — ground, dataset, style, DTM/DOM, hybrid, contours, A/D/W/S/E —
+switching between
 them with the A|B control or C, so one acquisition can be compared against
 another of the same ground; drag the seam with the pointer or nudge it with
 the arrow keys once it has focus, and leave to take the second stack back down;

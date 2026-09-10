@@ -5,6 +5,7 @@ import { mapAtom } from '../atoms';
 import { BackgroundLayerName } from '../layers/backgroundLayers';
 import {
   backgroundLayerHalves,
+  hybridContoursHalves,
   hybridOverlayHalves,
 } from '../layers/config/backgroundLayers/atoms';
 import { activeFlyfotoProjectHalves } from '../layers/config/backgroundLayers/flyfotoBackground';
@@ -123,6 +124,7 @@ export const compareLayerAtomEffect = atomEffect((get) => {
   // The B half throughout, mirroring backgroundLayerAtomEffect's A half.
   const layerName = get(backgroundLayerHalves.b);
   const hybridOverlay = get(hybridOverlayHalves.b);
+  const hybridContours = get(hybridContoursHalves.b);
   const lidarProject = get(activeLidarProjectHalves.b);
   const lidarStyle = get(activeLidarStyleHalves.b);
   const lidarModel = get(activeLidarModelHalves.b);
@@ -144,6 +146,7 @@ export const compareLayerAtomEffect = atomEffect((get) => {
     lidarModel,
     flyfotoProject,
     hybridOverlay,
+    hybridContours,
   });
   if (!stack) return;
 

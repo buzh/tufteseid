@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { mapAtom } from '../../map/atoms';
 import {
   backgroundLayerAtom,
+  hybridContoursAtom,
   hybridOverlayAtom,
 } from '../../map/layers/config/backgroundLayers/atoms';
 import {
@@ -60,6 +61,9 @@ export const useLidarControls = () => {
   const map = useAtomValue(mapAtom);
   const [backgroundLayer, setBackgroundLayer] = useAtom(backgroundLayerAtom);
   const [hybridOverlay, setHybridOverlay] = useAtom(hybridOverlayAtom);
+  // Contours ride on that overlay, so they live with it rather than with the
+  // dataset — see the atom for why they are a modifier on a modifier.
+  const [hybridContours, setHybridContours] = useAtom(hybridContoursAtom);
   const [activeLidarProject, setActiveLidarProject] = useAtom(
     activeLidarProjectAtom,
   );
@@ -405,6 +409,8 @@ export const useLidarControls = () => {
     setBackgroundLayer,
     hybridOverlay,
     setHybridOverlay,
+    hybridContours,
+    setHybridContours,
     isLidarBackground,
     isLidarProject,
     isNationalMosaic,

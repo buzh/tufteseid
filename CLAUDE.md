@@ -248,12 +248,25 @@ terrain. State is `hybridOverlayAtom`, persisted as `?hybrid=true`. It is a
 and cycling all keep working underneath it — see `docs/ui-architecture.md`
 for the control and why that distinction matters.
 
-Config: `backgroundLayers/topoOverlay.ts` — `/wms/geonorge/wms.topo` with
-`LAYERS=kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,`
-`fkb_presentasjonsdata` and `TRANSPARENT=TRUE`. Asking that WMS for a subset
-of its groups yields a real overlay: no terrain, no landcover, no background
-fill. Both families are needed — the generalized `kd_*` groups stop rendering
-around 1:25 000 and the `fkb_*` ones take over.
+Config: `backgroundLayers/topoOverlay.ts` — `buildTopoOverlayConfig(contours)`
+over `/wms/geonorge/wms.topo` with `TRANSPARENT=TRUE`. `LAYERS` is always the
+five reference groups `kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,`
+`fkb_presentasjonsdata`. Asking that WMS for a subset of its groups yields a
+real overlay: no terrain, no landcover, no background fill. Both families are
+needed — the generalized `kd_*` groups stop rendering around 1:25 000 and the
+`fkb_*` ones take over.
+
+**Høydekurver** append `kd_hoydekurver,fkb_hoydekurver` to that same `LAYERS`
+value. State is `hybridContoursAtom`, persisted as `?contours=true`, and the
+control is a `Switch` on the settings strip rendered only in Hybrid — the
+lines ride on the overlay's own GetMap, so in plain LiDAR there is no request
+for them to join. That merge is the point: a second `TileWMS` would double the
+overlay's request count against a rate limit shared by every visitor, and the
+cost paid instead — toggling re-requests the reference groups once, since
+`buildOrReuseBackgroundLayer` keys on the params — is a one-off. The same
+`kd_`/`fkb_` handover applies and was re-measured per group, not assumed;
+`hoydekurver_1m` / `hoydekurver_5m` are the raw feature layers behind them and
+render nothing at any scale.
 
 Alternatives already ruled out: `cache.kartverket.no`'s WMTS has no
 transparent overlay layer (only full basemaps), `wms.topo4` is dead, and NiB

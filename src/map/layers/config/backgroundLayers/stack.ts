@@ -13,7 +13,7 @@ import {
   LidarProject,
   LIDAR_PROJECT_WMS_URL,
 } from './lidarProjects';
-import { TOPO_OVERLAY_CONFIG } from './topoOverlay';
+import { buildTopoOverlayConfig } from './topoOverlay';
 import {
   BackgroundLayer,
   EmptyBackgroundLayer,
@@ -115,6 +115,8 @@ export type StackOptions = {
   lidarModel: LidarModel;
   flyfotoProject: FlyfotoProject | null;
   hybridOverlay: boolean;
+  /** Contour lines on the hybrid overlay. Inert without `hybridOverlay`. */
+  hybridContours: boolean;
 };
 
 export type StackEntry = { config: BackgroundLayer; opacity: number };
@@ -128,6 +130,9 @@ export type ResolvedStack = {
       stack rather than the atom — a shared link should reproduce what is on
       screen, and `?hybrid=true` over a 1937 photograph would not. */
   hybrid: boolean;
+  /** Whether that overlay was asked for contours. Same rule, one level down:
+      contours ride on the hybrid overlay, so without it there are none. */
+  contours: boolean;
 };
 
 // The four dynamic layers are built from the options; everything else is a
@@ -203,10 +208,16 @@ export const resolveStack = (
   // Only meaningful over terrain — on the plain topo map it would just
   // redraw roads and names the base already has.
   const hybrid = opts.hybridOverlay && LIDAR_LAYERS.has(layerName);
+  // Contours are a modifier on the overlay, not on the ground: they arrive as
+  // two more groups in the same GetMap, so there is nothing to add when the
+  // overlay itself is not in the stack.
+  const contours = hybrid && opts.hybridContours;
   const over: StackEntry[] = [{ config: featured, opacity: 1 }];
-  if (hybrid) over.push({ config: TOPO_OVERLAY_CONFIG, opacity: 1 });
+  if (hybrid) {
+    over.push({ config: buildTopoOverlayConfig(contours), opacity: 1 });
+  }
 
-  return { under, over, hybrid };
+  return { under, over, hybrid, contours };
 };
 
 export type BuiltLayer = { layer: TileLayer; opacity: number };

@@ -551,6 +551,10 @@
       "modelLabel": "Elevation model",
       "modelTip": "DTM = terrain (vegetation removed), DOM = surface (buildings and trees). Switch with E"
     },
+    "hybrid": {
+      "contours": "Contours",
+      "contoursTip": "Draws contour lines alongside the roads and place names. The hillshade says it is steep; the contours say how many metres."
+    },
     "terrain": {
       "label": "Terrain",
       "tip": "Terrain analysis of the visible map — fetch the elevation data and light it yourself. No lokalitet required",
