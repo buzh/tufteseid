@@ -61,13 +61,16 @@ export const DockTool = ({
 }: {
   title: string;
   onClose?: () => void;
+  // Not optional decoration: the close button is icon-only, so this is the
+  // only thing a screen reader has to go on. A tool that passes `onClose`
+  // without it gets no button rather than an unlabelled one.
   closeLabel?: string;
   children: ReactNode;
 }) => (
   <div className={styles.tool}>
     <div className={styles.toolHead}>
       <h3 className={styles.toolTitle}>{title}</h3>
-      {onClose && (
+      {onClose && closeLabel && (
         <IconButton
           icon="close"
           size="xs"

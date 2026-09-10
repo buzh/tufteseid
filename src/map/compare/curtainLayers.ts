@@ -48,8 +48,19 @@ const getMap = () => getDefaultStore().get(mapAtom);
 // mid-frame with (during an animated zoom that is not identity). Translating
 // the four corners through it is the only way the clip lands where the CSS
 // divider is.
-const clipToRightOfSplit = (e: RenderEvent) => {
+// OL types `RenderEvent.context` as the union of every renderer's context,
+// WebGL included. Nothing here uses a WebGL layer class, so the map is always
+// Canvas-rendered — but the compiler only sees the union, so narrow it once
+// with an `in` check rather than casting at every call below.
+const canvas2d = (
+  e: RenderEvent,
+): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null => {
   const ctx = e.context;
+  return ctx && 'clip' in ctx ? ctx : null;
+};
+
+const clipToRightOfSplit = (e: RenderEvent) => {
+  const ctx = canvas2d(e);
   if (!ctx) return;
   const size = getMap().getSize();
   if (!size) return;
@@ -70,7 +81,7 @@ const clipToRightOfSplit = (e: RenderEvent) => {
   ctx.clip();
 };
 
-const unclip = (e: RenderEvent) => e.context?.restore();
+const unclip = (e: RenderEvent) => canvas2d(e)?.restore();
 
 const attachClip = (layer: TileLayer) => {
   // Layers survive across installs when the resolved stack is unchanged, and
