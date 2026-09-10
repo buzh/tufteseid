@@ -1,7 +1,7 @@
 /*
  * In-repo UI kit. Plain CSS Modules over design tokens, no runtime style
- * injection, no new dependencies — the replacement for @kvib/react as the
- * ribbon shell is built out. Rationale: docs/ui-architecture.md.
+ * injection, no new dependencies — what replaced @kvib/react, which the app
+ * no longer depends on at all. Rationale: docs/ui-architecture.md.
  *
  * Import from 'src/ui' rather than the individual files so the eventual
  * additions and removals are invisible to call sites.

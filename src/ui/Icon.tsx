@@ -1,16 +1,17 @@
-import type { MaterialSymbol } from '@kvib/react';
+import type { MaterialSymbol } from 'material-symbols';
 import { cx } from './cx';
 import styles from './Icon.module.css';
 
 /*
- * Material Symbols glyph. The font is already loaded app-wide —
- * `material-symbols/rounded.css` is imported directly in src/mainApp.tsx,
- * not pulled in by kvib — so this renders the ligature and nothing else.
+ * Material Symbols glyph. The font is loaded app-wide by
+ * `material-symbols/rounded.css` in src/mainApp.tsx, so this renders the
+ * ligature and nothing else.
  *
- * The MaterialSymbol union is still re-exported from kvib. That is the one
- * remaining kvib import in src/ui/, kept in a single place on purpose: when
- * kvib is dropped, `material-symbols` becomes a direct dependency and the
- * union is re-homed here, and this file is the only edit.
+ * The name union comes from the same package (`index.d.ts` — a tuple of every
+ * ligature, indexed into a string union). It used to be re-exported from kvib;
+ * every `MaterialSymbol` import in the app points here, so re-homing it was
+ * one line. A name that is not in the union fails the docker build — §11 of
+ * docs/ui-architecture.md has how to check one without local node_modules.
  */
 export type { MaterialSymbol };
 

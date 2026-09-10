@@ -1,6 +1,24 @@
 @import './ui/tokens.css';
 @import './map/map.css';
 
+/*
+ * The reset. `<KvibProvider>` supplied Chakra's preflight; this took over when
+ * kvib went. Deliberately the small version: every ported surface
+ * sets its own margins, sizes and list styling in its own module, so what is
+ * left here is what those modules assume rather than a full normalize.
+ *
+ * The element rules that look redundant against the modules are parity with
+ * preflight, not belt and braces — an element the modules do not reach (an
+ * unclassed <a>, a heading added later) should keep looking the way it did
+ * while Chakra was resetting it.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html,
 body,
 #root {
@@ -8,4 +26,67 @@ body,
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+}
+
+body {
+  font-family: Mulish, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: var(--font-md);
+  line-height: 1.5;
+  color: var(--c-fg);
+  background: var(--c-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+p,
+figure,
+blockquote,
+dl,
+dd {
+  margin: 0;
+}
+
+/* Headings drop the UA's size and weight along with the margin: every
+   heading in the app is classed and sets both itself, which is what it had
+   to do under preflight too. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Controls do not inherit the page font on their own. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+img,
+svg,
+video {
+  display: block;
+}
+
+img,
+video {
+  max-width: 100%;
 }

@@ -58,13 +58,6 @@
   user-select: text;
 }
 
-/* Until the global reset lands with kvib's removal, the margins have to go
-   off here — the flex gap is what spaces these. */
-.preamble p,
-.elevation p {
-  margin: 0;
-}
-
 .elevation {
   display: flex;
   align-items: center;

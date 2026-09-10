@@ -25,9 +25,12 @@ it before wiring it back in.
   and its slot geometry, the ribbon and its rows, the lokalitet surfaces,
   drawing, the analysis panels, search, state and URL persistence, the keyboard
   map, and an exhaustive inventory of every user-facing action as the contract
-  a redesign has to honour. The UI is mid-migration off kvib onto the in-repo
-  `src/ui` kit; §12 of that doc says what is still on kvib.
-  **Read it before touching anything under `src/` that renders.**
+  a redesign has to honour. The UI renders entirely through the in-repo
+  `src/ui` kit — plain CSS Modules over `src/ui/tokens.css`, no component
+  library. §12 of that doc records the migration off kvib and the primitives
+  deliberately not built. **Read it before touching anything under `src/`
+  that renders**, and don't reach for a new UI dependency: the workstation
+  can't regenerate `package-lock.json`.
 - `docs/wms-proxy-and-tiles.md` — how map requests are proxied (Caddy →
   wmscache → upstream, nib-proxy), the nginx cache rules, and the
   tile-loading constraints that keep request counts under Kartverket's rate
@@ -556,9 +559,10 @@ AuthDialog lists whatever is enabled via
   `docker compose ...` commands they should run.
 - Keep unused code out. If a helper (retry function, config field) has no
   live caller after a change, delete it — don't leave it in "for later".
-- `icon="…"` props are typed against a `MaterialSymbol` union that kvib pins,
-  and a plausible-looking name that isn't in it fails the docker build. How
-  to check a name without local `node_modules`: `docs/ui-architecture.md`.
+- `icon="…"` props are typed against the `MaterialSymbol` union that
+  `material-symbols` ships, re-exported from `src/ui/Icon.tsx`. A
+  plausible-looking name that isn't in it fails the docker build. How to check
+  a name without local `node_modules`: `docs/ui-architecture.md` §11.
 - Commits use short imperative subject lines. Body explains the *why* when
   the reasoning isn't obvious from the diff. The `Co-Authored-By` trailer is
   added by the commit workflow.
@@ -579,8 +583,9 @@ Deleted deliberately; if one of these reappears, something regressed.
   bind-mounted `config.js`. The `envName` and
   `layerProviderParameters.geoNorgeWMS` keys went with it.
 - **Google Fonts** (Raleway + Work Sans) in `index.html` — nothing set
-  `font-family`; kvib's theme supplies Mulish, self-hosted. `font-src 'self'`
-  is enough.
+  `font-family`. Mulish is self-hosted instead: `src/mainApp.tsx` imports the
+  four `@fontsource/mulish` weights the kit asks for, and `src/index.css` sets
+  the family on `body`. `font-src 'self'` is enough.
 - **Dead dependencies**: `maplibre-gl` and `@geoblocks/ol-maplibre-layer`
   (OpenLayers is the map engine and is the right one for WMS + EPSG:25833;
   MapLibre is vector-tile-first and weak on non-Mercator projections), and
@@ -589,5 +594,7 @@ Deleted deliberately; if one of these reappears, something regressed.
 The Caddyfile CSP is narrowed to what the browser actually contacts:
 `cache.kartverket.no` (WMTS tiles *and* its GetCapabilities fetch),
 `*.geonorge.no`, `*.norgeskart.no` and `hoydedata.no` (the ArcGIS identify
-call in `searchApi.ts`). `style-src 'unsafe-inline'` has to stay while the UI
-is on kvib/Chakra: emotion injects styles at runtime.
+call in `searchApi.ts`). `style-src` is `'self'` — nothing injects a
+stylesheet at runtime now that emotion is gone. Inline style *attributes* are
+governed by the separate `style-src-attr`, which keeps `'unsafe-inline'`
+because React sets positions, sizes and picked colours that way.

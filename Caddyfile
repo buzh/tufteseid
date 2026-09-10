@@ -13,13 +13,18 @@ route {
         header Referrer-Policy strict-origin
         @allowedOrigins header_regexp Origin ^https://(kartkatalog\.)?geonorge\.no$
         header @allowedOrigins Access-Control-Allow-Origin {http.request.header.Origin}
+        # style-src is 'self' now that emotion is gone with kvib: nothing
+        # injects a stylesheet at runtime any more, and the built CSS is a
+        # <link>. Inline style *attributes* are a separate directive, and they
+        # stay — React sets positions, sizes and picked colours that way.
         header Content-Security-Policy "
                 default-src 'self';
                 script-src 'self';
                 worker-src 'self' blob:;
                 img-src 'self' data: blob: cache.kartverket.no;
                 connect-src 'self' data: blob: *.geonorge.no *.norgeskart.no cache.kartverket.no hoydedata.no;
-                style-src 'self' 'unsafe-inline';
+                style-src 'self';
+                style-src-attr 'unsafe-inline';
                 font-src 'self';
                 frame-ancestors *;
         "

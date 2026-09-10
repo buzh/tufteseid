@@ -1,5 +1,10 @@
-import { KvibProvider } from '@kvib/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+// Self-hosted, and only the four weights the UI kit actually asks for — the
+// font used to arrive through kvib's theme, which shipped the whole family.
+import '@fontsource/mulish/latin-400.css';
+import '@fontsource/mulish/latin-500.css';
+import '@fontsource/mulish/latin-600.css';
+import '@fontsource/mulish/latin-700.css';
 import 'material-symbols/rounded.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -20,11 +25,7 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <AtomWrapper>
         <QueryClientProvider client={queryClient}>
-          <KvibProvider>
-            <App />
-          </KvibProvider>
-          {/* Outside KvibProvider: src/ui needs no theme context, and this
-              way the region survives kvib's removal untouched. */}
+          <App />
           <Toaster />
         </QueryClientProvider>
       </AtomWrapper>

@@ -1,12 +1,12 @@
 /*
  * Design tokens for the in-repo UI kit (src/ui/). Plain custom properties on
  * :root — no theme provider, no runtime style injection, so nothing here
- * needs `style-src 'unsafe-inline'` the way emotion does.
+ * needs the `style-src 'unsafe-inline'` that emotion used to force.
  *
  * The palette is deliberately our own rather than Kartverket's: CLAUDE.md
- * rules out reintroducing their visual identity. It stays close to the greys
- * the kvib components render while both systems coexist, so a half-migrated
- * screen doesn't look broken.
+ * rules out reintroducing their visual identity. It started out close to the
+ * greys kvib rendered, so that a half-migrated screen didn't look broken;
+ * nothing holds it there now that kvib is gone.
  */
 
 :root {

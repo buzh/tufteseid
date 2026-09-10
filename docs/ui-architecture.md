@@ -5,7 +5,7 @@ until it carried features it was never shaped for. It is being replaced. The
 first slice of that landed: the map is now the full window, the chrome is a
 **ribbon** floating over it, the lokalitet workspace lives in the ribbon rather
 than in a panel covering the terrain, and new code is on an in-repo plain-CSS
-kit (`src/ui`) instead of kvib. What is left on kvib is inventoried in §12.
+kit (`src/ui`) instead of kvib — which is now gone entirely (§12).
 
 This document exists so the rest can be planned without archaeology: what is on
 screen today, what holds it up, which parts are load-bearing engineering and
@@ -75,7 +75,7 @@ focus, so anything that renders without doing so needs the counter.
 | Framework | React 19 | `StrictMode` on, so effects double-invoke in dev |
 | Build | Vite 8, TypeScript ~7.0.2 | oxlint + prettier; vitest for the handful of unit tests |
 | Design system | `src/ui` + CSS Modules | in-repo, zero deps; see below |
-| Legacy design system | `@kvib/react` ^6.2.2 | Kartverket's Chakra v3 system, on its way out |
+| Fonts | `@fontsource/mulish` | four weights, self-hosted, imported in `mainApp.tsx` |
 | State | jotai ^2.20.3 + `jotai-effect` | default store, no `<Provider>` |
 | Map | OpenLayers ^10.10.0 | EPSG:25833 via proj4 |
 | Backend | PocketBase JS SDK ^0.28 | lokaliteter, auth, attachments |
@@ -84,15 +84,14 @@ focus, so anything that renders without doing so needs the counter.
 | Icons | `material-symbols` (rounded) | typed union, see §11 |
 | Routing | react-router-dom | two routes: `/` and `/hjelp` |
 
-**Two systems coexist, deliberately.** `src/ui/` is a small in-repo primitive
-kit — plain CSS Modules over custom properties, no new npm dependency, because
+**One system, in-repo.** `src/ui/` is a small primitive kit — plain CSS
+Modules over custom properties, no new npm dependency, because
 `package-lock.json` cannot be regenerated on the workstation this is developed
 on. It exports `Button` / `IconButton`, `Badge` / `CountBadge`, `Popover`,
 `Dialog`, `Tooltip`, `Switch`, `Segmented`, `Section`, `Field` (`Input` +
 `NoteInput`), `ConfirmPopover`, `Alert`, `Spinner`, `Icon`, `toast` /
-`Toaster`, `cx`, `useMediaQuery` and `overlayAtoms`. The shell, the lokalitet
-surfaces, the analysis panels, the map tool cards, the help page and both
-search surfaces are all on it.
+`Toaster`, `cx`, `useMediaQuery` and `overlayAtoms`. Every surface in the app
+renders through it.
 
 `src/ui/tokens.css` is the single source for colour, spacing, radius, shadow,
 control heights and — the one that was genuinely scattered before — the
@@ -117,8 +116,9 @@ A ported component gets a co-located `Foo.module.css` and writes plain
 `div` / `span` / `p` / `h2` with `font-size: var(--font-sm)` and
 `gap: var(--sp-4)`; the kit is only for things with behaviour or a shape worth
 sharing. Flexbox in a stylesheet is shorter than `<VStack align="flex-start"
-gap={2}>`, survives kvib's removal untouched, and keeps the styling of a
-surface in one readable place instead of spread across a hundred props.
+gap={2}>`, owes nothing to a component library that can be swapped out under
+it, and keeps the styling of a surface in one readable place instead of spread
+across a hundred props.
 
 Buttons colour themselves from `--c-fg` / `--c-bg-hover` / `--accent-*` rather
 than from literals, so a surface that needs a different ground overrides those
@@ -126,10 +126,10 @@ custom properties on its own container. `LidarExtractViewer.module.css` is the
 worked example: re-pointing two variables is the app's entire dark theme, and
 `Button.module.css` needed no dark variant.
 
-`<KvibProvider>` is still mounted, but nothing renders through it any more:
-every surface is on the kit, and kvib is down to the CSS reset, the font and
-the `MaterialSymbol` union (§12). There is no dark mode in either system — the
-extract viewer's dark chrome is local, not a mode.
+**kvib is gone** (§12). `src/index.css` carries the reset it used to supply,
+Mulish is imported directly, and the `MaterialSymbol` union comes from
+`material-symbols` itself. There is no dark mode — the extract viewer's dark
+chrome is local, not a mode.
 
 Hand-written CSS is now the `src/ui/*.module.css` files plus one module per
 ported component, on top of `src/index.css` and `src/map/map.css`
@@ -150,10 +150,13 @@ main.tsx → mainApp.tsx
     BrowserRouter
       AtomWrapper            ← hydrates activeThemeLayersAtom from ?themeLayers
         QueryClientProvider
-          KvibProvider
-            App              ← routes + F11 + LidarExtractViewer + auth sync
-            Toaster
+          App                ← routes + F11 + LidarExtractViewer + auth sync
+          Toaster
 ```
+
+`mainApp.tsx` also side-imports the four Mulish weights and
+`material-symbols/rounded.css`. No provider wraps the tree for styling: the
+kit reads `src/ui/tokens.css`, which `src/index.css` pulls in.
 
 `projInit()` runs at module scope in `mainApp.tsx`, before render — proj4 has to
 know EPSG:25833 before any atom touches a coordinate.
@@ -255,9 +258,8 @@ lidar footprints 3, localities 4, funn highlight 4.5, funn 5, locality draft 7,
 lidar extract selection 7, locality adjust 8. The fractional 4.5 is the tell
 that this ladder grew by insertion rather than design.
 
-**DOM `zIndex`** (chrome) is now named in `src/ui/tokens.css` and listed in §2.
-One raw number is left, kvib's: `BottomDrawToolSelector` at `1000`, which
-`--z-fixed` matches deliberately.
+**DOM `zIndex`** (chrome) is entirely named in `src/ui/tokens.css` and listed
+in §2 — no raw numbers left anywhere in `src/`.
 
 ---
 
@@ -734,9 +736,9 @@ between the list and the map.
 `src/localities/useWorkspaceKeys.ts`, capture phase, one `document` listener,
 bails on repeats, modifier keys, and anything typed into an input, textarea,
 select, `contenteditable`, or inside an open popover/dialog/select (matched via
-`[data-scope="popover"]` etc. — kvib's Ark-derived components tag themselves
-that way, and `src/ui`'s `Popover` and `Dialog` set the same attributes on
-purpose so the contract keeps holding as surfaces port across). Both also
+`[data-scope="popover"]` etc. — `src/ui`'s `Popover` and `Dialog` set those
+attributes for exactly this, and §12 records why the convention outlived the
+library it came from). Both also
 consult `anyOverlayOpenAtom`, since the attribute walk only reaches anything if
 the overlay actually took focus.
 
@@ -997,8 +999,9 @@ only the control surface.
 
 ## 11. Icons, and the build gotcha
 
-`icon="…"` props are typed against `MaterialSymbol` from `material-symbols`,
-which kvib pins. A plausible-looking name that is not in that union **fails the
+`icon="…"` props are typed against `MaterialSymbol`, re-exported by
+`src/ui/Icon.tsx` from `material-symbols` (a direct dependency since kvib
+went). A plausible-looking name that is not in that union **fails the
 docker build**, and plenty are missing: `terrain`, `filter_hdr` and `topography`
 do not exist; `elevation`, `landscape` and `altitude` do.
 
@@ -1012,10 +1015,10 @@ curl -sL https://registry.npmjs.org/material-symbols/-/material-symbols-0.40.2.t
 
 ---
 
-## 12. What is left on kvib
+## 12. The migration off kvib, and what it settled
 
-The migration is partial by design. Ported to `src/ui`: the whole shell and
-ribbon, the lokalitet surfaces (`FunnList`, `BilderSection`,
+**Done.** `@kvib/react` is no longer a dependency. Ported to `src/ui`: the
+whole shell and ribbon, the lokalitet surfaces (`FunnList`, `BilderSection`,
 `KulturminnerSection`, `LocalityDetails`, `LocalityDialogs`, `FunnDraft`,
 `LocalitiesPanel`), both analysis panels, `AuthButton`, `AuthDialog`,
 `ErrorBoundary`, the measure trigger, the toast region, `MapComponent`,
@@ -1026,12 +1029,8 @@ So `src/terrain/`, `src/settings/`, `src/auth/`, `src/lidarExtract/`,
 `src/localities/`, `src/help/`, `src/languageswitcher/`, `src/search/`,
 `src/draw/` and `src/map/` are all clear.
 
-**Nothing renders on kvib any more.** What is left is the strip itself, two
-files: `src/ui/Icon.tsx`, which re-exports the `MaterialSymbol` union, and
-`src/mainApp.tsx`, which mounts `<KvibProvider>` for the reset and the font.
-
-The kit needed nothing more to absorb the last of it. The list used to say
-`Accordion`, `Select`, `Pagination` and `Alert`:
+The kit needed nothing more to absorb the last of it. The wanted-primitives
+list used to say `Accordion`, `Select`, `Pagination` and `Alert`:
 
 - **`Accordion` is not coming.** Every kvib accordion in this app is
   `collapsible multiple`, i.e. a stack of independent disclosures, which is
@@ -1069,12 +1068,14 @@ Two decisions taken to keep that list short rather than long:
   largest component the migration would otherwise have owed. Alpha it does owe:
   see §9.
 
-Until the last of those goes, kvib's cost stays: it drags in Chakra, emotion,
-the `@zag-js` machine set, `react-select`, `react-day-picker`, `react-aria`,
-`react-stately`, `date-fns` and `react-icons`. And **`style-src
-'unsafe-inline'` has to stay in the Caddyfile CSP** because emotion injects
-styles at runtime — finishing the migration is the one change that would let
-that directive be tightened.
+**What removing it bought.** Chakra, emotion, the `@zag-js` machine set,
+`react-select`, `react-day-picker`, `react-aria`, `react-stately`, `date-fns`
+and `react-icons` are all off the dependency graph. And the CSP directive that
+was waiting on it is tightened: `style-src` is `'self'`, since nothing injects
+a stylesheet at runtime any more. Inline style *attributes* still need
+`'unsafe-inline'` — React sets positions, sizes and picked colours that way —
+so that is now its own `style-src-attr` directive instead of a hole in
+`style-src`.
 
 The specific places kvib was fought rather than used, which is what motivated
 `src/ui` in the first place, and which the ported code now solves properly:
@@ -1084,25 +1085,35 @@ performance; hand-rolled `ConfirmPopover` / `Segmented` / `NoteInput` /
 `WorkspaceSection`; `zIndex: 9999` on the language switcher because kvib's
 portal layering lost to the header; literal hex colours where a token belonged.
 
-One dependency on kvib internals survives on purpose: the `[data-scope="…"]`
-selectors in the keyboard layers (§1, §8.3). `src/ui`'s `Popover` and `Dialog`
-set the same attributes, so the contract holds across both systems rather than
-having to be replaced in one go.
+One inheritance from kvib survives on purpose: the `[data-scope="…"]`
+selectors in the keyboard layers (§1, §8.3). kvib's Ark primitives set those
+attributes and `src/ui`'s `Popover` and `Dialog` set the same ones, which is
+what let the contract hold across the migration instead of having to be
+replaced in one go. Keep setting them.
 
-**Two of kvib's own dependencies have to be promoted to direct ones when it
-goes**: `material-symbols`, which `src/mainApp.tsx` already imports while it is
-only transitive, and `@fontsource/mulish` — nothing in `src/` imports the font,
-so it arrives purely through kvib's theme and would vanish silently with it.
-`<KvibProvider>` also supplies the CSS reset, which `src/index.css` has to take
-over along with a `font-family`.
+**The strip itself**, for the record, since it is the part that could not be
+tested locally:
 
-Every `MaterialSymbol` import already points at `src/ui/Icon.tsx`, which
-re-exports the union from kvib; re-homing it there is one line. The Dockerfile
-runs `npm ci`, which fails on a package.json/lock mismatch, and the workstation
-cannot run `npm install` — but both packages are already locked as
-`node_modules/*` entries, so promoting them is a hand-edit of `package.json`
-plus the root `dependencies` block of `package-lock.json`. That is the whole
-dependency edit the migration requires.
+- Two of kvib's own dependencies were promoted to direct ones.
+  `material-symbols` was already imported by `src/mainApp.tsx` while merely
+  transitive; `@fontsource/mulish` was not imported anywhere at all — it
+  arrived through kvib's theme and would have vanished silently. It is now
+  four explicit weight imports (`latin-400/500/600/700`), which is what the
+  kit's stylesheets ask for.
+- `<KvibProvider>` supplied Chakra's preflight. `src/index.css` took over with
+  a deliberately small reset plus the `font-family`; every ported surface
+  already sets its own margins and sizes, so what is there is parity for the
+  elements the modules do not reach.
+- The `MaterialSymbol` union moved to `material-symbols`' own `index.d.ts`
+  (`type MaterialSymbol = MaterialSymbols[number]`), one line in
+  `src/ui/Icon.tsx`, because every import in the app already pointed there.
+- The Dockerfile runs `npm ci`, which fails on a package.json/lock mismatch,
+  and the workstation cannot run `npm install`. Both packages were already
+  locked as `node_modules/*` entries, so the edit was `package.json` plus the
+  root `dependencies` block of `package-lock.json`, by hand and in step. The
+  kvib subtree is still *in* the lock (nothing depends on it, and pruning it
+  by hand would be a hundred entries deep); the next person with a toolchain
+  should run `npm install` once to drop it.
 
 ---
 
