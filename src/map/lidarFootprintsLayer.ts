@@ -21,6 +21,10 @@ import { useEffect } from 'react';
 import { mapAtom } from './atoms';
 import { backgroundLayerAtom } from './layers/config/backgroundLayers/atoms';
 import {
+  AUTO_ENGAGE_M_PER_PX,
+  lidarAutoDatasetAtom,
+} from './layers/config/backgroundLayers/lidarAuto';
+import {
   fetchLidarFootprints,
   touchesExtent,
   viewportCoverage,
@@ -65,6 +69,13 @@ const MIN_FOOTPRINT_ZOOM = 7;
 // envelope-vs-polygon slack, and it's also the request budget: 60 name
 // queries at 6 concurrent is ~2 s cold and free once cached.
 const FOOTPRINT_FETCH_CAP = 60;
+
+// Auto (lidarAuto.ts) keeps this refreshing for a whole LiDAR session
+// rather than only while a pulldown is open, so a pan gesture that ends in
+// three quick moveends should cost one pass, not three. Short enough not to
+// be felt: the fetch behind it takes an order of magnitude longer cold, and
+// nothing longer once cached.
+const REFRESH_DEBOUNCE_MS = 250;
 
 type Tier = 'hover' | 'active';
 
@@ -127,6 +138,7 @@ export const useLidarFootprintsLayer = () => {
   const setViewport = useSetAtom(lidarViewportAtom);
   const pickerOpen = useAtomValue(lidarPickerOpenAtom);
   const cycling = useAtomValue(lidarCyclingAtom);
+  const autoDataset = useAtomValue(lidarAutoDatasetAtom);
   const hoveredProjectId = useAtomValue(hoveredLidarProjectIdAtom);
   const setHoveredProjectId = useSetAtom(hoveredLidarProjectIdAtom);
 
@@ -137,7 +149,14 @@ export const useLidarFootprintsLayer = () => {
   const picking = isLidarMode && pickerOpen;
   // Keyboard cycling walks the same list without opening anything, so it
   // needs the fetch but not the drawing.
-  const wantsViewport = picking || (isLidarMode && cycling);
+  //
+  // Auto is the third consumer, and the only one that isn't a transient
+  // interaction: while it is on, the list *is* the dataset selection, so it
+  // has to stay current for as long as LiDAR mode is. That would be
+  // expensive at every zoom, which is why `refresh` below additionally
+  // declines to fetch on auto's behalf out where auto already knows the
+  // answer without asking.
+  const wantsViewport = picking || (isLidarMode && (cycling || autoDataset));
 
   // Layer lifecycle: created lazily, visibility follows the pulldown.
   // Hover is cleared on the way out so a row the pointer happened to be
@@ -148,8 +167,8 @@ export const useLidarFootprintsLayer = () => {
     if (!picking) setHoveredProjectId(null);
   }, [map, picking, setHoveredProjectId]);
 
-  // Fetch + classify on viewport change while the pulldown is open or
-  // the keyboard is cycling datasets.
+  // Fetch + classify on viewport change, while the pulldown is open, the
+  // keyboard is cycling datasets, or auto is resolving them.
   useEffect(() => {
     if (!wantsViewport) {
       setViewport(emptyLidarViewport('idle'));
@@ -177,10 +196,29 @@ export const useLidarFootprintsLayer = () => {
         | undefined;
       if (!extentLonLat) return;
 
-      // Claimed before the zoom check too, so a fetch started while
+      // Claimed before the two scale guards too, so a fetch started while
       // zoomed in can't land afterwards and overwrite the guard state.
       const request = ++latestRequest;
       const isStale = () => cancelled || request !== latestRequest;
+
+      // Auto on its own doesn't need this list out where it would resolve
+      // to the national mosaic regardless — and that is most of the zoom
+      // range, including every view wide enough for the candidate set to be
+      // large. Skipping it there is what keeps always-on auto affordable.
+      // An open pulldown or an armed W/S ring still wants an answer at any
+      // zoom the WFS will give one, so this only applies when auto is the
+      // sole reason we're here.
+      const resolution = map.getView().getResolution();
+      if (
+        !picking &&
+        !cycling &&
+        (resolution == null || resolution > AUTO_ENGAGE_M_PER_PX)
+      ) {
+        setViewport((prev) =>
+          prev.status === 'idle' ? prev : emptyLidarViewport('idle'),
+        );
+        return;
+      }
 
       // getZoom() is a log2 of the resolution, so an integral zoom can
       // come back a hair under itself — don't lock the user out of the
@@ -246,13 +284,21 @@ export const useLidarFootprintsLayer = () => {
         });
     };
 
+    // Immediate on mount — opening the pulldown should not sit on an empty
+    // list for a quarter second — and debounced thereafter.
     refresh();
-    map.on('moveend', refresh);
+    let debounce: number | undefined;
+    const onMoveEnd = () => {
+      window.clearTimeout(debounce);
+      debounce = window.setTimeout(refresh, REFRESH_DEBOUNCE_MS);
+    };
+    map.on('moveend', onMoveEnd);
     return () => {
       cancelled = true;
-      map.un('moveend', refresh);
+      window.clearTimeout(debounce);
+      map.un('moveend', onMoveEnd);
     };
-  }, [map, wantsViewport, filters, setViewport]);
+  }, [map, wantsViewport, picking, cycling, filters, setViewport]);
 
   // Render: the hovered row's footprint plus the active dataset's, and
   // nothing else. Both come out of the same viewport lists the pulldown

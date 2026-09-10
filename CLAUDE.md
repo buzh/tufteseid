@@ -170,6 +170,13 @@ objects on top of the terrain relief, so the relief has to be the ground.
   and DTM/DOM pulldowns beside it. Strings live under `ribbon.*` in
   `src/locales/{nb,nn,en}/translation.json`.
 
+The dataset pulldown's default is **Automatisk**: the national 1 m mosaic when
+zoomed out, the best-covering per-project dataset (0.25 m) once the view is fine
+enough for that to show, unless the user has pinned one. Rules in
+`src/map/layers/config/backgroundLayers/lidarAuto.ts`, UI contract in
+`docs/ui-architecture.md` §5.7. It is a *pin flag*, not a fourth dataset — the
+resolver writes through the same selectors the picker does.
+
 The client hits `/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833`, not
 `wms.geonorge.no` directly — same-origin through wmscache, which also avoids
 the CORS issues seen calling `wms.geonorge.no` from `fetch()`. Same treatment

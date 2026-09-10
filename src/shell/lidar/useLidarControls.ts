@@ -1,12 +1,16 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { transformExtent } from 'ol/proj';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { lidarExtractViewerOpenAtom } from '../../lidarExtract/atoms';
 import { mapAtom } from '../../map/atoms';
 import {
   backgroundLayerAtom,
   hybridOverlayAtom,
 } from '../../map/layers/config/backgroundLayers/atoms';
+import {
+  chooseAutoDataset,
+  lidarAutoDatasetAtom,
+} from '../../map/layers/config/backgroundLayers/lidarAuto';
 import {
   activeLidarModelAtom,
   activeLidarProjectAtom,
@@ -59,6 +63,10 @@ export const useLidarControls = () => {
   );
   const [activeLidarStyle, setActiveLidarStyle] = useAtom(activeLidarStyleAtom);
   const [lidarModel, setLidarModel] = useAtom(activeLidarModelAtom);
+  // Whether the dataset follows the viewport rather than staying where the
+  // user put it. See lidarAuto.ts for the rules; the resolver effect is
+  // below, next to the two selectors it drives.
+  const [autoDataset, setAutoDataset] = useAtom(lidarAutoDatasetAtom);
 
   // Shared, not local state: the map-side footprint overlay is drawn only
   // while this pulldown is open, and only for the row under the pointer
@@ -167,29 +175,119 @@ export const useLidarControls = () => {
   const isNationalMosaic = backgroundLayer === 'lidarHillshade';
   const isLidarMode = isLidarProject || isNationalMosaic;
 
-  // Both activation paths clamp the style to what the target dataset
-  // actually publishes (see resolveLidarStyle) — the national mosaic
-  // publishes only skyggerelieff, so carrying e.g. helning_prosent over from
-  // a project would render an empty background.
-  const selectNational = () => {
+  // Map view resolution in metres per pixel — what the auto rules are
+  // expressed in, since the view is EPSG:25833 and the thresholds are about
+  // the source grids rather than about window size. Tracked as state rather
+  // than read on demand so the resolver effect re-runs when the user zooms
+  // without also panning.
+  const [resolution, setResolution] = useState<number | null>(null);
+  useEffect(() => {
+    const read = () => setResolution(map.getView().getResolution() ?? null);
+    read();
+    map.on('moveend', read);
+    return () => {
+      map.un('moveend', read);
+    };
+  }, [map]);
+
+  // Every path that changes the dataset goes through these two — the
+  // pulldown, the keyboard ring and the auto resolver alike — because both
+  // clamp the style to what the target dataset actually publishes (see
+  // resolveLidarStyle). The national mosaic publishes only skyggerelieff,
+  // so carrying e.g. helning_prosent over from a project would render an
+  // empty background.
+  //
+  // Neither touches autoDataset. Whether a selection counts as the user
+  // pinning something is the caller's business, not the selector's: the
+  // resolver drives these all day without the dataset ever stopping being
+  // automatic.
+  const selectNational = useCallback(() => {
     setBackgroundLayer('lidarHillshade');
     setActiveLidarStyle((prev) => resolveLidarStyle(nationalStyles, prev));
-  };
-  const selectProject = (p: LidarProject) => {
-    setActiveLidarProject(p);
-    setBackgroundLayer('lidarProject');
-    setActiveLidarStyle((prev) => resolveLidarStyle(p.styles, prev));
-  };
+  }, [nationalStyles, setBackgroundLayer, setActiveLidarStyle]);
+  const selectProject = useCallback(
+    (p: LidarProject) => {
+      setActiveLidarProject(p);
+      setBackgroundLayer('lidarProject');
+      setActiveLidarStyle((prev) => resolveLidarStyle(p.styles, prev));
+    },
+    [setActiveLidarProject, setBackgroundLayer, setActiveLidarStyle],
+  );
+
   // Clicking a row picks *and* dismisses; the keyboard path below picks
   // without closing, so you can watch the selection walk the open list.
+  // Both are the user speaking, so both pin.
   const activateNational = () => {
+    setAutoDataset(false);
     selectNational();
     setPickerOpen(false);
   };
   const activateProject = (p: LidarProject) => {
+    setAutoDataset(false);
     selectProject(p);
     setPickerOpen(false);
   };
+  const activateAuto = () => {
+    setAutoDataset(true);
+    // Decide afresh instead of letting the resolver inherit the pin. The
+    // stickiness that keeps the background calm while panning would
+    // otherwise read the pinned dataset as an incumbent worth keeping, and
+    // pressing "Automatisk" would look like it did nothing — when what the
+    // user asked for is precisely "give me the best one for here".
+    const choice = chooseAutoDataset({ resolution, viewport, current: null });
+    if (choice.kind === 'national') selectNational();
+    else if (choice.kind === 'project') selectProject(choice.project);
+    setPickerOpen(false);
+  };
+
+  // Switching *into* LiDAR mode from the ribbon. Not a dataset pick, so it
+  // must not pin — it only has to put something on screen for the mode to be
+  // about. With auto on that is the best dataset for the current view, chosen
+  // up front rather than by landing on the mosaic and letting the resolver
+  // correct it a beat later: two swaps in a row is two screenfuls of WMS
+  // requests for one keypress. Anything the resolver isn't sure of yet
+  // (coverage list still loading) starts on the mosaic, which always covers,
+  // and gets refined when the list lands.
+  const enterLidar = () => {
+    const choice = autoDataset
+      ? chooseAutoDataset({ resolution, viewport, current: null })
+      : ({ kind: 'hold' } as const);
+    if (choice.kind === 'project') selectProject(choice.project);
+    else selectNational();
+  };
+
+  // The resolver. Re-decides whenever the view moves or the coverage list
+  // changes, and writes through the same selectors the pulldown uses.
+  //
+  // It cannot loop: a 'hold' writes nothing, and the other two outcomes are
+  // compared against what is already showing before anything is set. The
+  // effect does re-run on its own writes — activeLidarProject is an input —
+  // but the second pass finds the dataset it just asked for and stops.
+  useEffect(() => {
+    if (!isLidarMode || !autoDataset) return;
+    const choice = chooseAutoDataset({
+      resolution,
+      viewport,
+      current: isLidarProject ? activeLidarProject : null,
+    });
+    if (choice.kind === 'national') {
+      if (!isNationalMosaic) selectNational();
+    } else if (choice.kind === 'project') {
+      if (!isLidarProject || activeLidarProject?.id !== choice.project.id) {
+        selectProject(choice.project);
+      }
+    }
+  }, [
+    isLidarMode,
+    autoDataset,
+    resolution,
+    viewport,
+    isLidarProject,
+    isNationalMosaic,
+    activeLidarProject,
+    selectNational,
+    selectProject,
+  ]);
 
   // Leaving LiDAR mode unmounts the pulldown without it ever firing its
   // open-change callback, so clear the shared flag by hand — otherwise the
@@ -287,6 +385,10 @@ export const useLidarControls = () => {
     const at = entries.findIndex((e) => e.project.id === activeLidarProject?.id);
     const from = isNationalMosaic ? 0 : at >= 0 ? at + 1 : step > 0 ? -1 : 0;
     const next = (from + step + ring) % ring;
+    // Walking the ring is the user choosing a dataset just as much as
+    // clicking a row is, so it pins. Otherwise the resolver would take the
+    // background back on the next pan and W/S would feel broken.
+    setAutoDataset(false);
     if (next === 0) selectNational();
     else selectProject(entries[next - 1].project);
     return true;
@@ -303,6 +405,7 @@ export const useLidarControls = () => {
     isLidarMode,
     isLidarProject,
     isNationalMosaic,
+    enterLidar,
     // Dataset
     activeLidarProject,
     allProjects,
@@ -314,6 +417,8 @@ export const useLidarControls = () => {
     setHoveredProjectId,
     activateNational,
     activateProject,
+    autoDataset,
+    activateAuto,
     // Style
     datasetStyles,
     tierAStyles,

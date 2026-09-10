@@ -21,22 +21,39 @@ const projectMeta = (entry: LidarViewportEntry): string =>
     .filter((s): s is string => !!s && s.length > 0)
     .join(' · ');
 
+// The glyph on whichever row "Automatisk" has landed on. Also the chip's
+// left icon, so the same symbol means the same thing whether the pulldown
+// is open or shut.
+const AUTO_ICON = 'bolt';
+
 /**
- * Which LiDAR dataset is painting the map: the seamless national mosaic, or
- * one specific acquisition. Coverage is confirmed against real WFS footprint
+ * Which LiDAR dataset is painting the map: the seamless national mosaic, one
+ * specific acquisition, or **Automatisk** — the mosaic when zoomed out, the
+ * best-covering acquisition once close enough in for its finer grid to show
+ * (see lidarAuto.ts). Coverage is confirmed against real WFS footprint
  * polygons rather than bounding boxes — see lidarFootprintsLayer.ts.
+ *
+ * Under auto the list marks the resolved row but does not make it *active*:
+ * the active row is "Automatisk", because that is the choice the user made.
+ * Two accented rows would leave it ambiguous which one a click would undo.
  */
 export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
   const { t } = useTranslation();
   const [filterOpen, setFilterOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const { viewport, allProjects } = lidar;
+  const { viewport, allProjects, autoDataset } = lidar;
 
-  const chipLabel =
+  const datasetLabel =
     lidar.isLidarProject && lidar.activeLidarProject
       ? lidar.activeLidarProject.projectName
       : t('ribbon.lidar.nationalMosaic');
+
+  const isAutoRow = (projectId: string | null) =>
+    autoDataset &&
+    (projectId == null
+      ? lidar.isNationalMosaic
+      : lidar.isLidarProject && lidar.activeLidarProject?.id === projectId);
 
   const renderRow = (entry: LidarViewportEntry) => (
     <PulldownItem
@@ -44,9 +61,12 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
       label={entry.project.projectName}
       meta={projectMeta(entry)}
       active={
+        !autoDataset &&
         lidar.isLidarProject &&
         lidar.activeLidarProject?.id === entry.project.id
       }
+      mark={isAutoRow(entry.project.id) ? AUTO_ICON : undefined}
+      markLabel={t('ribbon.lidar.autoMark')}
       onActivate={() => lidar.activateProject(entry.project)}
       onHover={(hovering) =>
         lidar.setHoveredProjectId(hovering ? entry.project.id : null)
@@ -68,11 +88,20 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
             variant="secondary"
             size="md"
             className={styles.triggerButton}
+            // The chip keeps naming the dataset actually on screen — that's
+            // the fact the user needs while reading terrain. Whether it got
+            // there by itself is the secondary fact, so it's the icon.
+            leftIcon={autoDataset ? AUTO_ICON : undefined}
+            title={
+              autoDataset
+                ? t('ribbon.lidar.autoChipTip', { dataset: datasetLabel })
+                : datasetLabel
+            }
             rightIcon={lidar.cyclingPending ? undefined : 'arrow_drop_down'}
             onClick={() => lidar.setPickerOpen(!lidar.pickerOpen)}
             aria-expanded={lidar.pickerOpen}
           >
-            <span className={styles.triggerLabel}>{chipLabel}</span>
+            <span className={styles.triggerLabel}>{datasetLabel}</span>
             {/* First W/S press after a pause only kicks off the footprint
                 fetch; without this the key looks dead. */}
             {lidar.cyclingPending && <Spinner size={14} />}
@@ -100,10 +129,22 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
 
       {filterOpen && <LidarFilters />}
 
+      {/* First, because it is the answer for most views and because the two
+          rows under it are what it chooses between. Its meta line names the
+          dataset it has currently settled on, so the row explains itself
+          without the user having to look at the chip. */}
+      <PulldownItem
+        label={t('ribbon.lidar.auto')}
+        meta={autoDataset ? datasetLabel : t('ribbon.lidar.autoMeta')}
+        active={autoDataset}
+        onActivate={lidar.activateAuto}
+      />
       <PulldownItem
         label={t('ribbon.lidar.nationalMosaic')}
         meta={t('ribbon.lidar.nationalMeta')}
-        active={lidar.isNationalMosaic}
+        active={!autoDataset && lidar.isNationalMosaic}
+        mark={isAutoRow(null) ? AUTO_ICON : undefined}
+        markLabel={t('ribbon.lidar.autoMark')}
         onActivate={lidar.activateNational}
       />
       <div className={styles.rule} />
