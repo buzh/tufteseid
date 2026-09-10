@@ -21,12 +21,12 @@ it before wiring it back in.
 
 ## Companion docs
 
-- `docs/ui-architecture.md` — **the whole user interface**: the kvib/Chakra
-  situation, the Layout shell and its slot geometry, the TopBar, the lokalitet
-  workspace, drawing, the analysis panels, search, state and URL persistence,
-  the keyboard map, and an exhaustive inventory of every user-facing action as
-  the contract a redesign has to honour. The UI is a placeholder awaiting a
-  full refresh, so that doc is written for whoever plans the replacement.
+- `docs/ui-architecture.md` — **the whole user interface**: the floating shell
+  and its slot geometry, the ribbon and its rows, the lokalitet surfaces,
+  drawing, the analysis panels, search, state and URL persistence, the keyboard
+  map, and an exhaustive inventory of every user-facing action as the contract
+  a redesign has to honour. The UI is mid-migration off kvib onto the in-repo
+  `src/ui` kit; §12 of that doc says what is still on kvib.
   **Read it before touching anything under `src/` that renders.**
 - `docs/wms-proxy-and-tiles.md` — how map requests are proxied (Caddy →
   wmscache → upstream, nib-proxy), the nginx cache rules, and the
@@ -155,20 +155,16 @@ which the parser wraps as `{ _html: ... }` and the UI shows an unhelpful
 
 ### LiDAR hillshade (background layer, Kartverket)
 
-Sits in the "Kart" (bottom-right) menu, not "Temakart", because the intent is
-to overlay Kulturminner objects on top of the terrain relief.
+A *background*, not a theme layer: the intent is to overlay Kulturminner
+objects on top of the terrain relief, so the relief has to be the ground.
 
 - Type registered in `src/map/layers/backgroundLayers.ts` (`lidarHillshade`
   in `WMSLayerName`).
-- Config: `src/map/layers/config/backgroundLayers/elevation.ts`. Registered
-  in `allConfiguredBackgroundLayers` (`atoms.ts`).
-- Ordering: entry in `backgroundLayerOrder` in
-  `src/map/backgroundLayer/utils.ts`.
-- Thumbnail: **still falls back** to `topograatone.png` via a case in
-  `getBackgroundLayerImageName` in `src/map/atoms.ts`. Drop a real
-  `lidarHillshade.png` in `public/backgroundlayerImages/` and remove that
-  case when a proper thumbnail is available.
-- Translations: `lidarHillshade` in `backgroundMaps` in
+- Config: `src/map/layers/config/backgroundLayers/elevation.ts`. Built by a
+  dynamic branch in `backgroundLayerAtomEffect` (`atoms.ts`) rather than a
+  static entry, because the style comes out of an atom.
+- Control: the "LiDAR" `ModeButton` in ribbon row 1, with the dataset, style
+  and DTM/DOM pulldowns beside it. Strings live under `ribbon.*` in
   `src/locales/{nb,nn,en}/translation.json`.
 
 The client hits `/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833`, not
@@ -181,13 +177,20 @@ for per-project LiDAR at `/wms/geonorge/wms.hoyde-dtm-prosjekt` (see
 
 `backgroundLayerAtomEffect` builds a stack, bottom-first, not a single layer:
 
-1. topo base (both LiDAR modes — the LiDAR WMS returns transparent PNGs
-   outside coverage);
-2. the national mosaic at `LIDAR_FALLBACK_OPACITY`, when a *per-project*
-   dataset is active, so the area the project doesn't cover keeps its relief
-   instead of dropping to plain topo;
+1. topo base, for everything in `NEEDS_TOPO_BASE` (both LiDAR modes and
+   `flyfotoProject` — those services return transparent PNGs outside coverage).
+   The seamless `flyfoto` mosaic is *not* in that set: it covers its whole
+   advertised extent, so a base under it would be invisible and still cost a
+   screenful of requests;
+2. the national mosaic at `FALLBACK_OPACITY`, when a *per-project* dataset is
+   active, so the area the project doesn't cover keeps its relief instead of
+   dropping to plain topo;
 3. the active dataset;
 4. the topo overlay, in hybrid mode.
+
+`LIDAR_LAYERS` is deliberately *not* `NEEDS_TOPO_BASE`: hybrid and the DTM/DOM
+choice are decisions about the LiDAR stack, and writing `?lidarModel=dom` while
+looking at a 1937 photograph would be a lie about what's on screen.
 
 `swapBackgroundLayers(under, over)` (`backgroundLayers/utils.ts`) swaps that
 stack in without ever showing a gap. The split matters: 1–2 go *under* the
@@ -255,10 +258,40 @@ The LiDAR *extract* tool stays DTM-only (`lidarExtract/sources.ts` pins
 
 ### Flyfoto (Norge i bilder ortofoto)
 
-A lokalitet's "Flyfoto" action (`LocalityWorkspace.tsx`) stitches NiB
-ortofoto over the authored bbox and saves it as an attachment of kind
-`flyfoto`. (The TopBar "Flyfoto ↗" external-link button is unrelated and
-still there.)
+Two distinct things, on the same imagery:
+
+1. **A background mode** — "Flyfoto" in ribbon row 1, beside Standard / LiDAR
+   / Hybrid, with the same shape of dataset pulldown and W/S cycling. Just
+   *looking*, so no licensing notice. Layer plumbing below; the control is in
+   `docs/ui-architecture.md` §5.5.
+2. **A lokalitet action** — "Flyfoto" in row 2 stitches NiB ortofoto over the
+   authored bbox and *keeps* it as an attachment of kind `flyfoto`. Gated by
+   the licensing notice, every time.
+
+The old TopBar "Flyfoto ↗" external link is gone — it navigated out of the app
+to do worse than what the background mode now does in place.
+
+#### The background mode
+
+Two dynamic branches of `backgroundLayerAtomEffect`, no static entry in
+`allConfiguredBackgroundLayers`, exactly like the LiDAR pair:
+
+- `flyfoto` — the seamless best-available mosaic, a plain `TileWMS` on
+  `/wms/nib/ortofoto`.
+- `flyfotoProject` — one acquisition. **Not a WMS**: NiB publishes no
+  per-project WMS, so this is `ol/source/TileArcGISRest` against
+  `/arcgis/nib/ortofoto_prosjekter/ImageServer/exportImage` with
+  `mosaicRule = {"mosaicMethod":"esriMosaicNone","where":"prosjektnavn='…'"}`.
+  `esriMosaicNone` is load-bearing — the default method blends neighbouring
+  projects back in, and the symptom is a picked year that looks almost right.
+  It stays out of `VALID_STARTUP_LAYERS` for the same reason `lidarProject`
+  does: its concrete acquisition starts null.
+
+`coverageExtent` comes from `project.bboxLonLat` per acquisition and a Norway
+extent for the mosaic. Cache rules for this request profile:
+`docs/wms-proxy-and-tiles.md`.
+
+#### The lokalitet grab
 
 The stitch (`src/localities/flyfoto.ts`) reuses the LiDAR extract machinery
 (`planTiles` / `fetchAndPaint` / `runWithConcurrency` from
@@ -276,9 +309,10 @@ Request path is same-origin like every other raster source:
 
 Licensing: NiB imagery is free for private, non-commercial use;
 publishing/commercial use is the user's responsibility. A notice dialog gates
-every grab (`localities.tools.flyfotoNotice*`), by deliberate product
+every **grab** (`localities.tools.flyfotoNotice*`), by deliberate product
 decision — this facilitates personal use, akin to hitting print. Attribution
-lives in that prose, not the chrome.
+lives in that prose, not the chrome. Browsing the same imagery as a background
+is not a grab and deliberately has no notice.
 
 `attachments.kind` includes `flyfoto` (migration
 `1700000300_attachments_flyfoto.js`; `AttachmentKind` in
@@ -352,10 +386,15 @@ The picker, the licensing gate and the batch cap are UI:
 
 ### Terrenganalyse (client-side relief from float DEMs)
 
-A lokalitet workspace action ("Terreng") that fetches the **raw float
-elevation grid** for the rectangle and computes its own relief
-visualizations in the browser, instead of restyling Kartverket's pre-baked
-hillshade. Rationale and endpoint details: `docs/terrain-analysis.md`.
+"Terreng" fetches the **raw float elevation grid** for a rectangle and computes
+its own relief visualizations in the browser, instead of restyling Kartverket's
+pre-baked hillshade. Rationale and endpoint details: `docs/terrain-analysis.md`.
+
+It has two entrances, and the surface is the same either way: **ribbon row 1**,
+over the visible map, with no lokalitet and no account; or **row 2**, over an
+open lokalitet's bbox. Reading the ground is not an act of ownership — only
+keeping the render is, and saving from row 1 signs you in and turns the
+analysed rectangle into a lokalitet.
 
 - Source is hoydedata.no's ArcGIS ImageServers via `exportImage` with
   `renderingRule={"rasterFunction":"None"}` — the service's *other* raster
@@ -374,7 +413,11 @@ hillshade. Rationale and endpoint details: `docs/terrain-analysis.md`.
   from rendering so the UI can cache the expensive pass while scrubbing the
   cheap one.
 - `src/terrain/TerrainPanel.tsx` — the control surface
-  (`docs/ui-architecture.md`). Output saves as an attachment of the existing
+  (`docs/ui-architecture.md` §10). Takes `bbox` and `locality` as **props**,
+  not from an atom: passing the lokalitet's own bbox through is what makes
+  "Juster området" refetch the DEM for free. `terrainStandaloneBboxAtom`
+  (`src/terrain/atoms.ts`) holds the row-1 rectangle, and the two entrances can
+  never be live at once. Output saves as an attachment of the existing
   `extract` kind (with `style` = the visualization), so no PocketBase
   migration was needed.
 
@@ -393,9 +436,10 @@ Load-bearing:
 
 The top-level user object is **an area to explore**, not a claim that
 something is there — mirroring Riksantikvaren's lokalitet → enkeltminne
-hierarchy. A lokalitet is an authored rectangle (created with one box-drag,
-resizable afterwards) holding *funn* (individually named and addressable
-drawn features) and *bilder* (kept LiDAR extracts, map screenshots, uploads).
+hierarchy. A lokalitet is an authored rectangle — framed from the visible map
+in one press, resizable afterwards — holding *funn* (individually named and
+addressable drawn features) and *bilder* (kept LiDAR extracts, terrain
+renders, map screenshots, flyfoto, uploads).
 
 Two rules that hold regardless of what the interface looks like:
 
@@ -405,10 +449,10 @@ Two rules that hold regardless of what the interface looks like:
 - `limited` visibility is a placeholder that behaves as `private` until
   groups exist.
 
-The workspace panel, the funn/bilder sections, the drawing tools and the
-policy decisions around them (bbox is authored not derived; drawing and
-extract exist only inside a workspace; measure stays global) are in
-`docs/ui-architecture.md`.
+The ribbon rows, the funn/bilder sections, the drawing tools and the policy
+decisions around them (bbox is authored not derived, only seeded from the
+viewport; drawing and extract exist only inside a lokalitet; measure and
+terrain analysis stay global) are in `docs/ui-architecture.md`.
 
 Key files (data side):
 
@@ -477,19 +521,26 @@ AuthDialog lists whatever is enabled via
 ## Adding another background layer
 
 1. Add id to the appropriate name union in
-   `src/map/layers/backgroundLayers.ts`.
+   `src/map/layers/backgroundLayers.ts` — `WMTSLayerName`, `WMSLayerName` or
+   `ArcGISImageLayerName`. The last is for ESRI ImageServer sources
+   (`TileArcGISRest` + a `mosaicRule`), which is how per-acquisition ortofoto
+   works; `LayerType` in `config/backgroundLayers/types.ts` is the matching
+   discriminant.
 2. Create/extend a config in `src/map/layers/config/backgroundLayers/` and
-   spread it into `allConfiguredBackgroundLayers` in `atoms.ts`. For a WMS
-   layer, `coverageExtent` is mandatory — see
-   `docs/wms-proxy-and-tiles.md`.
-3. Add priority in `backgroundLayerOrder` in
-   `src/map/backgroundLayer/utils.ts` (controls display order in the "Kart"
-   panel).
-4. Handle the thumbnail in `getBackgroundLayerImageName` in
-   `src/map/atoms.ts` — either add a `public/backgroundlayerImages/<id>.png`
-   asset or map to an existing image as a placeholder.
-5. Add translations under `map.settings.layers.mapNames.backgroundMaps.<id>`
-   in `src/locales/{nb,nn,en}/translation.json`.
+   spread it into `allConfiguredBackgroundLayers` in `atoms.ts`. For a WMS or
+   ArcGISImage layer, `coverageExtent` is mandatory — see
+   `docs/wms-proxy-and-tiles.md`. A layer whose concrete source is chosen at
+   runtime (`lidarProject`, `flyfotoProject`) instead gets a dynamic branch in
+   `backgroundLayerAtomEffect`, no static entry, and stays out of
+   `VALID_STARTUP_LAYERS` — a cold load onto it would render nothing.
+3. Give it a control in ribbon row 1 (`src/shell/RibbonGlobalRow.tsx`). There
+   is no thumbnail gallery any more: a *mode* is a `ModeButton`, and a choice
+   *within* a mode is a `Pulldown` (see `src/shell/lidar/` and
+   `src/shell/flyfoto/` for the two worked examples, incl. how a dataset ring
+   registers itself for W/S cycling). Decide which of the two it is before
+   writing anything — `docs/ui-architecture.md` §5.2 on modes vs modifiers.
+4. Add translations under `ribbon.*` in
+   `src/locales/{nb,nn,en}/translation.json`.
 
 ## Conventions specific to this fork
 
