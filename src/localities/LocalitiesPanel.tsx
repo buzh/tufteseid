@@ -162,10 +162,13 @@ export const LocalitiesPanel = () => {
     if (!items) return null;
     const q = query.trim().toLowerCase();
     if (!q) return items;
-    return items.filter(
-      (l) =>
-        l.name.toLowerCase().includes(q) ||
-        (l.description ?? '').toLowerCase().includes(q),
+    // Sted / kommune / matrikkel are searchable too — being able to type
+    // "Vang" or "12/6" and find the rectangle is most of the reason they are
+    // fields of their own rather than a paragraph of Beskrivelse.
+    return items.filter((l) =>
+      [l.name, l.description, l.place, l.municipality, l.matrikkel].some((s) =>
+        (s ?? '').toLowerCase().includes(q),
+      ),
     );
   }, [items, query]);
 

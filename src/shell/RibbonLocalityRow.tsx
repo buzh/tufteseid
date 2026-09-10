@@ -40,8 +40,10 @@ const LocalityName = ({
   onRename: (next: string) => Promise<boolean>;
 }) => {
   const { t } = useTranslation();
-  // Creation frames first and names after, so a record still carrying the
-  // default name opens straight into the field.
+  // A new lokalitet is normally named after the nearest stedsnavn, and an
+  // auto-name good enough to keep should not shove a cursor at you — click
+  // it to change it, like any other. The field only opens by itself when
+  // that lookup came back with nothing, i.e. the record really is unnamed.
   const [renaming, setRenaming] = useState(
     locality.name === t('localities.defaultName'),
   );

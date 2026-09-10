@@ -508,7 +508,7 @@ it would render nothing.
 The acquisition list comes from `fetchFlyfotoProjectsForBbox` refetched on
 moveend while the mode is active. **No licensing notice for viewing** —
 browsing NiB imagery as a background is what the old external link already
-did; the notice gates *grab-and-keep* (§8.5), which is a different act.
+did; the notice gates *grab-and-keep* (§8.6), which is a different act.
 
 ### 5.6 Ny lokalitet from the viewport
 
@@ -785,9 +785,48 @@ not silently unfold it again.
 (attachment gallery with lightbox), `KulturminnerSection` (the "kjente
 kulturminner her" readout from GeoNorge's WFS redistribution of the
 Riksantikvaren register — `kart.ra.no` has WFS disabled, hence the detour), and
-`LocalityDetails` (description, metadata) tucked under Kulturminner rather than
-given a fourth column, because it is the one section you set once and stop
-looking at.
+`LocalityDetails` (where it is, description, synlighet, metadata) tucked under
+Kulturminner rather than given a fourth column, because it is the one section
+you set once and stop looking at.
+
+`LocalityDetails` opens with the location group: **Sted**, **Kommune** and
+**Matrikkel** as ordinary text fields, then **Koordinater** and **Areal** as
+read-only facts. Nothing in it has a Lagre button — like Beskrivelse, each
+field commits on blur (Enter blurs, Escape reverts without blurring, or the
+stale draft in the closure would be saved anyway).
+
+The three fields are pre-filled at creation from the public registers
+(`src/localities/localityContext.ts`, §8.3) and are the user's afterwards. The
+only thing that overwrites them is the owner-only **"Hent stedsdata på nytt"**
+button below the facts, which re-asks for the rectangle as it now stands —
+"Juster området" would otherwise leave all three describing the old one, with
+retyping as the only recourse. Koordinater is not a field: it is computed from
+the bbox on every render (`formatBboxCentre`), so it cannot go stale at all.
+Sted, Kommune and Matrikkel are also matched by the Lokaliteter panel's search
+box, which is most of why they are fields rather than a paragraph of
+Beskrivelse.
+
+### 8.3 Auto-naming a new lokalitet
+
+A rectangle framed with "Ny lokalitet" arrives already called something —
+`createLocalityFromBbox` awaits `fetchLocalityContext(bbox)` and writes the
+nearest significant stedsnavn as the record's `name`, falling back to "Uten
+navn" only when the register has nothing (open sea, across the border, service
+down). The lookup happens **before** the record is written, not as a patch
+after: creating first would open the ribbon on "Uten navn", auto-focus its
+rename field — which fires on exactly that name — and then change the text
+under the user's cursor.
+
+That is also the whole rename contract. Row 2's name field still opens by
+itself for a record named "Uten navn", so a nameless lokalitet still asks to be
+named; an auto-name good enough to keep does not shove a cursor at you. Click
+it to change it, like any other.
+
+`fetchLocalityContext` never rejects and never takes longer than 6 s; both call
+sites (the ribbon button and TerrainPanel's save-with-no-lokalitet path)
+already disable themselves while it runs. Which registers it asks, and how the
+placename is ranked, is out of scope here — see the header comment in
+`src/localities/localityContext.ts`.
 
 `src/localities/ui.tsx` is gone: its vocabulary moved into `src/ui/` and is now
 shared with the shell. `WorkspaceSection` became `Section`; `NoteInput`,
@@ -798,7 +837,7 @@ blocks the event loop while the map keeps rendering behind it. The
 kvib `colorPalette` strings, and still keep funn status colours consistent
 between the list and the map.
 
-### 8.3 Keyboard
+### 8.4 Keyboard
 
 `src/localities/useWorkspaceKeys.ts`, capture phase, one `document` listener,
 bails on repeats, modifier keys, and anything typed into an input, textarea,
@@ -822,7 +861,7 @@ That Escape carve-out is deliberate: `DrawControls` binds Escape to abort the
 shape currently being sketched, and stealing it would throw away a drawing
 instead of a keystroke.
 
-### 8.4 The attachment pipeline
+### 8.5 The attachment pipeline
 
 Four producers converge on one sink, and that convergence is the part worth
 preserving:
@@ -842,7 +881,7 @@ key/label, `metresPerPx`, bbox, and for flyfoto the `projectName` / `year` /
 `protected` in PocketBase, so the gallery fetches short-lived file tokens for
 thumbnails — a new UI must keep doing that or every thumbnail 403s.
 
-### 8.5 The flyfoto picker
+### 8.6 The flyfoto picker
 
 "Flyfoto" → licensing notice dialog → picker listing the seamless best mosaic
 plus every ortofoto acquisition intersecting the bbox (label = year, subtitle =
@@ -939,7 +978,7 @@ behavioural wart to either accept explicitly or fix by storing centre+radius in
 feature properties.
 
 `drawControlsKeyboardEffects.ts` binds Escape (abort current shape) and Delete
-(remove selection) — see the Escape carve-out in §8.3.
+(remove selection) — see the Escape carve-out in §8.4.
 
 ---
 
@@ -1153,7 +1192,7 @@ performance; hand-rolled `ConfirmPopover` / `Segmented` / `NoteInput` /
 portal layering lost to the header; literal hex colours where a token belonged.
 
 One inheritance from kvib survives on purpose: the `[data-scope="…"]`
-selectors in the keyboard layers (§1, §8.3). kvib's Ark primitives set those
+selectors in the keyboard layers (§1, §8.4). kvib's Ark primitives set those
 attributes and `src/ui`'s `Popover` and `Dialog` set the same ones, which is
 what let the contract hold across the migration instead of having to be
 replaced in one go. Keep setting them.
@@ -1228,11 +1267,14 @@ heritage feature for its attributes; deep-link the active layers via
 distance and area, with live on-map tooltips; clear the measurement.
 
 **Own an area**
-sign in (OAuth or password); create a lokalitet from the visible map; rename it;
-describe it; set visibility (private / limited / public); adjust the rectangle
-afterwards (translate + modify); delete it; browse "Mine lokaliteter"; click a
-rectangle on the map to open it; see which known kulturminner already fall
-inside it.
+sign in (OAuth or password); create a lokalitet from the visible map and have it
+named after the nearest stedsnavn; rename it; describe it; read and edit its
+sted, kommune and matrikkel, pre-filled from the registers; re-ask the registers
+for them after moving the rectangle; read its centre coordinate and area; search
+your lokaliteter by any of those; set visibility (private / limited / public);
+adjust the rectangle afterwards (translate + modify); delete it; browse "Mine
+lokaliteter"; click a rectangle on the map to open it; see which known
+kulturminner already fall inside it.
 
 **Record what you find**
 create a funn; draw it as point, line, polygon, circle or text; style it

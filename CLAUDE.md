@@ -498,8 +498,12 @@ Key files (data side):
   DOM-parsed).
 - `src/auth/` — atoms (currentUserAtom, roleAtom, isAdminAtom), hooks
   (useOAuthProviders, useSignIn, useSignOut).
+- `src/localities/localityContext.ts` — what the public registers know about a
+  rectangle (see below).
 - `pocketbase/pb_migrations/1700000200_localities.js` — current schema.
-  `1700000000` adds `users.role`, `1700000100` relaxes it. **Leave the
+  `1700000000` adds `users.role`, `1700000100` relaxes it,
+  `1700000300` adds the `flyfoto` attachment kind, `1700000400` adds
+  `localities.place` / `.municipality` / `.matrikkel`. **Leave the
   filenames alone** — they're recorded in `_migrations`, so renaming one
   makes PB re-run it. Collection ids must not equal any collection name
   (0.23+ rejects that), hence `pbc_localities` / `finds2` /
@@ -508,8 +512,10 @@ Key files (data side):
 Data model:
 
 - **`localities`** — `owner` (relation → users, cascade), `name`,
-  `description`, `visibility` (private | limited | public), `bbox` (json,
-  `[minLon, minLat, maxLon, maxLat]` EPSG:4326).
+  `description`, `place`, `municipality`, `matrikkel` (all optional text),
+  `visibility` (private | limited | public), `bbox` (json,
+  `[minLon, minLat, maxLon, maxLat]` EPSG:4326). The centre coordinate is
+  deliberately **not** a field — see below.
 - **`finds`** — `locality` (relation, cascade), `owner` (denormalized so
   rules stay cheap), `title`, `note`, `status` (mulig | sannsynlig |
   avkreftet | rapportert), `geometry` (json GeoJSON FeatureCollection,
@@ -530,6 +536,38 @@ collection → Options → OAuth2 (since 0.23 the providers live on the auth
 collection, not in global settings). No code change needed — the SPA's
 AuthDialog lists whatever is enabled via
 `pb.collection('users').listAuthMethods()`, reading `oauth2.providers`.
+
+### Sted / kommune / matrikkel (what the registers already know)
+
+`src/localities/localityContext.ts` asks three anonymous GeoNorge endpoints
+what a rectangle is — `stedsnavn/v1/punkt`, `kommuneinfo/v1/punkt`,
+`eiendom/v1/punkt`, in parallel, centre-plus-radius, over `ws.geonorge.no`
+directly (already in the CSP, a few kB each, not worth a wmscache route).
+`createLocalityFromBbox` awaits it *before* writing the record, so a new
+lokalitet arrives named after the nearest stedsnavn with its three fields
+filled; UI consequences are `docs/ui-architecture.md` §8.3.
+
+- **Never fatal, never slow.** Every lookup degrades to `''` and the whole
+  thing is capped at 6 s. A lokalitet at sea, across the border or during a
+  GeoNorge outage is still a lokalitet.
+- **Pre-fill, not derivation.** The three are ordinary editable fields; only
+  the explicit "Hent stedsdata på nytt" button re-derives them. The register
+  cannot know the user means "the terrace above Storevike".
+- **The centre coordinate is not stored**, precisely because it *is* derivable
+  — `formatBboxCentre` computes it per render, so "Juster området" can never
+  leave it lying.
+- **Type, not distance, picks the name.** `navneobjekttype` is sorted into
+  deny (administrative and statistical geography), promote (gard, seter, tuft,
+  heller, …) and demote (built infrastructure) tiers, drawn from the register's
+  own 291-type vocabulary; the neutral middle is the natural landscape and
+  settlement words. Without that, cities auto-name lokaliteter "Oslo Spektrum"
+  and coasts name them after vannstandsmålere. Only `stedstatus = aktiv` names
+  are eligible, and a place with no `hovednavn` picks a settled spelling over
+  the first `foreslått` one.
+- `/eiendom/v1/punkt`, **not** `/punkt/omrader` — same list, minus teig
+  polygons nothing draws (4.5 kB vs 249 kB). Parcels with gnr ≥ 9000 (road,
+  rail, watercourse) and null-gnr water surfaces are dropped; the kommune
+  number is only prefixed on parcels outside the resolved kommune.
 
 ## Adding another theme layer
 

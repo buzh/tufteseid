@@ -5,9 +5,10 @@ import {
   LocalityRecord,
   LocalityVisibility,
 } from '../api/localities';
-import { NoteInput, Segmented } from '../ui';
-import { formatDate } from './format';
+import { Button, Input, NoteInput, Segmented } from '../ui';
+import { formatBboxArea, formatBboxCentre, formatDate } from './format';
 import styles from './LocalityDetails.module.css';
+import { fetchLocalityContext } from './localityContext';
 
 const VISIBILITY_ORDER: LocalityVisibility[] = ['private', 'limited', 'public'];
 
@@ -18,9 +19,165 @@ const Fact = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
+/*
+ * A labelled one-line field that saves on blur, like Beskrivelse saves on
+ * blur — there is no Lagre button anywhere in the workspace, so every field
+ * has to commit itself.
+ *
+ * Local draft state rather than writing straight through: `onCommit` round-
+ * trips to PocketBase, and typing against a value that only updates when the
+ * server answers loses characters.
+ */
+const TextRow = ({
+  label,
+  value,
+  placeholder,
+  maxLength,
+  disabled,
+  onCommit,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  maxLength: number;
+  disabled: boolean;
+  onCommit: (next: string) => void;
+}) => {
+  const [draft, setDraft] = useState(value);
+
+  // Follows the record: the refresh button below rewrites all three at once,
+  // and realtime can bring in an edit made in another tab.
+  useEffect(() => setDraft(value), [value]);
+
+  const commit = () => {
+    const next = draft.trim();
+    if (next === value) return;
+    onCommit(next);
+  };
+
+  return (
+    <div className={styles.group}>
+      <span className={styles.label}>{label}</span>
+      <Input
+        value={draft}
+        disabled={disabled}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          // Enter commits via blur. Escape reverts *without* blurring — a
+          // synchronous blur() here would still see the old draft in this
+          // render's closure and save it anyway.
+          if (e.key === 'Enter') e.currentTarget.blur();
+          if (e.key === 'Escape') setDraft(value);
+        }}
+      />
+    </div>
+  );
+};
+
+/*
+ * Where the lokalitet is. Sted / Kommune / Matrikkel are pre-filled from the
+ * public registers when the rectangle is first framed and are the user's
+ * afterwards; the refresh button re-asks for the rectangle as it now stands,
+ * which is the only thing that overwrites them, and only on request.
+ *
+ * Koordinater is *not* among them. It is computed from the bbox on every
+ * render, so it cannot fall out of step with a rectangle that "Juster
+ * området" has moved — see formatBboxCentre.
+ */
+const LocationGroup = ({
+  locality,
+  isMine,
+  onPatch,
+}: {
+  locality: LocalityRecord;
+  isMine: boolean;
+  onPatch: (patch: LocalityPatch) => void;
+}) => {
+  const { t, i18n } = useTranslation();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      const context = await fetchLocalityContext(locality.bbox);
+      onPatch({
+        place: context.place,
+        municipality: context.municipality,
+        matrikkel: context.matrikkel,
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  return (
+    <>
+      <TextRow
+        label={t('localities.workspace.place')}
+        value={locality.place ?? ''}
+        placeholder={t('localities.workspace.placePlaceholder')}
+        maxLength={200}
+        disabled={!isMine}
+        onCommit={(place) => onPatch({ place })}
+      />
+      <TextRow
+        label={t('localities.workspace.municipality')}
+        value={locality.municipality ?? ''}
+        placeholder={t('localities.workspace.municipalityPlaceholder')}
+        maxLength={200}
+        disabled={!isMine}
+        onCommit={(municipality) => onPatch({ municipality })}
+      />
+      <TextRow
+        label={t('localities.workspace.matrikkel')}
+        value={locality.matrikkel ?? ''}
+        placeholder={t('localities.workspace.matrikkelPlaceholder')}
+        maxLength={500}
+        disabled={!isMine}
+        onCommit={(matrikkel) => onPatch({ matrikkel })}
+      />
+
+      <div className={styles.group}>
+        <Fact
+          label={t('localities.workspace.coordinates')}
+          value={formatBboxCentre(locality.bbox)}
+        />
+        <Fact
+          label={t('localities.workspace.area')}
+          value={formatBboxArea(locality.bbox, i18n.language)}
+        />
+        {isMine && (
+          <>
+            <Button
+              className={styles.refresh}
+              variant="secondary"
+              size="xs"
+              leftIcon="refresh"
+              disabled={refreshing}
+              onClick={refresh}
+            >
+              {refreshing
+                ? t('localities.workspace.refreshingContext')
+                : t('localities.workspace.refreshContext')}
+            </Button>
+            <span className={styles.hint}>
+              {t('localities.workspace.refreshContextHint')}
+            </span>
+          </>
+        )}
+      </div>
+    </>
+  );
+};
+
 // Everything you set once and then stop looking at, folded away by
-// default. Saves on blur (description) or on click (synlighet); there is
-// no dirty-state Lagre button anywhere in the workspace.
+// default. Saves on blur (description, the location fields) or on click
+// (synlighet); there is no dirty-state Lagre button anywhere in the
+// workspace.
 export const LocalityDetails = ({
   locality,
   isMine,
@@ -45,6 +202,8 @@ export const LocalityDetails = ({
 
   return (
     <div className={styles.root}>
+      <LocationGroup locality={locality} isMine={isMine} onPatch={onPatch} />
+
       <div className={styles.group}>
         <span className={styles.label}>
           {t('localities.workspace.description')}

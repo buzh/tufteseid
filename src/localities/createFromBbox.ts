@@ -13,6 +13,7 @@ import { currentUserAtom } from '../auth/atoms';
 import { mapAtom } from '../map/atoms';
 import { toast } from '../ui';
 import { activeLocalityAtom } from './atoms';
+import { fetchLocalityContext } from './localityContext';
 import { upsertLocalityOnLayer } from './localityLayer';
 
 // "Ny lokalitet" takes the screen as the rectangle. The old flow armed a
@@ -108,15 +109,30 @@ export const viewportBbox = (map: Map): ViewportBboxResult => {
  * "Juster området" is pressed, so the caller must have the server record in
  * hand before it becomes the active lokalitet; an optimistic placeholder
  * would leave adjust editing a stale rectangle.
+ *
+ * The registers are asked what this rectangle is called *before* the record
+ * is written, not patched in afterwards: creating and then renaming would
+ * open the ribbon on "Uten navn", auto-focus its rename field (which fires
+ * on exactly that name), and then change the text under the user's cursor.
+ * `fallbackName` is what survives when GeoNorge has nothing — open sea,
+ * across the border, or the service being down.
  */
 export const createLocalityFromBbox = async (
   bbox: LocalityBbox,
   userId: string,
-  name: string,
+  fallbackName: string,
 ): Promise<LocalityRecord | null> => {
   try {
+    const context = await fetchLocalityContext(bbox);
     const rec = await createLocality(
-      { name, visibility: 'private', bbox },
+      {
+        name: context.place || fallbackName,
+        place: context.place,
+        municipality: context.municipality,
+        matrikkel: context.matrikkel,
+        visibility: 'private',
+        bbox,
+      },
       userId,
     );
     upsertLocalityOnLayer(rec);

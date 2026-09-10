@@ -19,6 +19,14 @@ export type LocalityRecord = {
   owner: string;
   name: string;
   description: string;
+  // Where it is, as three editable strings. Pre-filled at creation from
+  // GeoNorge (src/localities/localityContext.ts) and the user's afterwards
+  // — nothing downstream parses them, so a correction is always safe.
+  // Optional on the type because records created before the migration have
+  // no such keys until PocketBase next writes them.
+  place?: string;
+  municipality?: string;
+  matrikkel?: string;
   visibility: LocalityVisibility;
   bbox: LocalityBbox;
   created: string;
@@ -32,6 +40,9 @@ export type LocalityRecord = {
 export type NewLocalityInput = {
   name: string;
   description?: string;
+  place?: string;
+  municipality?: string;
+  matrikkel?: string;
   visibility: LocalityVisibility;
   bbox: LocalityBbox;
 };
@@ -74,6 +85,9 @@ export const createLocality = async (
       owner: ownerId,
       name: input.name,
       description: input.description ?? '',
+      place: input.place ?? '',
+      municipality: input.municipality ?? '',
+      matrikkel: input.matrikkel ?? '',
       visibility: input.visibility,
       bbox: input.bbox,
     },
@@ -84,6 +98,9 @@ export const createLocality = async (
 export type LocalityPatch = Partial<{
   name: string;
   description: string;
+  place: string;
+  municipality: string;
+  matrikkel: string;
   visibility: LocalityVisibility;
   bbox: LocalityBbox;
 }>;
