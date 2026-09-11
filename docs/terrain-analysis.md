@@ -309,12 +309,13 @@ model, and it's the single strongest argument for having float elevation.
 `Losmasser_temakart_sammenstilt` and a stack of sub-layers). Quaternary
 deposits. Tells you whether a bump is an anthropogenic mound or a kame, and
 whether ground is diggable. Straightforward theme-layer addition — follow the
-"Adding another theme layer" recipe in CLAUDE.md.
+"Adding another theme layer" recipe in `map-layers.md`.
 
-**Kartverket historiske kart.** Amtskart and rectified Økonomisk kartverk
-sheets. ØK in particular carries fornminne symbols surveyed before a lot of
-20th-century ploughing, plus pre-consolidation farm boundaries. Complements
-the flyfoto time series directly.
+**Kartverket historiske kart — the ØK sheets.** Amtskartserien is already a
+Standard variant (`map-layers.md`); rectified Økonomisk kartverk is not. ØK in
+particular carries fornminne symbols surveyed before a lot of 20th-century
+ploughing, plus pre-consolidation farm boundaries. Complements the flyfoto
+time series directly.
 
 **SSR toponyms as indicators.** Nearly free given the place-name search
 already exists: filtering for the *haug / borg / hov / ve / vang / ring /

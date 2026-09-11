@@ -44,8 +44,9 @@ reading as exactly 0.0, the fixed TIFF shape — are recorded in
 
 ## Tier 0 — built
 
-A "Terreng" action in the lokalitet workspace fetches the DEM for the
-rectangle once, then computes relief locally: hillshade with a **live azimuth
+A "Terreng" action — on ribbon row 1 over the visible map, or in the lokalitet
+row over an authored bbox — fetches the DEM for the rectangle once, then
+computes relief locally: hillshade with a **live azimuth
 slider**, multidirectional hillshade, slope, Local Relief Model, and Sky-View
 Factor. Output saves as an attachment.
 
@@ -148,8 +149,10 @@ Enumerated with reasoning in `terrain-analysis.md`. The ranking in short:
    The strongest argument for having done Tier 0 at all.
 2. **NGU Løsmasser** — Quaternary deposits; distinguishes an anthropogenic
    mound from a kame. Verified live, and a plain theme-layer addition.
-3. **Kartverket historiske kart** — ØK sheets carry fornminne symbols surveyed
-   before 20th-century ploughing. Complements the flyfoto time series directly.
+3. **Kartverket historiske kart — the ØK sheets.** Amtskartserien already ships
+   as a Standard variant (`map-layers.md`); ØK does not. Its sheets carry
+   fornminne symbols surveyed before 20th-century ploughing. Complements the
+   flyfoto time series directly.
 4. **SSR toponyms as indicators** — filtering the *haug / borg / hov / ve /
    vang* families needs no new data source at all. Highest signal per unit of
    effort on this list.
@@ -161,6 +164,6 @@ Enumerated with reasoning in `terrain-analysis.md`. The ranking in short:
 
 Nothing here is blocked on anything else. Ordered by value per unit of work:
 **SSR toponym filtering** (no new source), **NGU Løsmasser** (recipe already in
-CLAUDE.md), **Tier 2** (cheapest of the tiers, scales past us), **shoreline
+`map-layers.md`), **Tier 2** (cheapest of the tiers, scales past us), **shoreline
 displacement** (highest ceiling, needs the NGU isobase model probed first),
 **Tier 1** (only once Tier 0's client-side versions are shown insufficient).

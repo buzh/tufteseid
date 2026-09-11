@@ -21,6 +21,9 @@ it before wiring it back in.
 
 ## Companion docs
 
+Each of these owns its subject; this file keeps only what is true across
+all of them.
+
 - `docs/ui-architecture.md` — **the whole user interface**: the floating shell
   and its slot geometry, the ribbon and its rows, the lokalitet surfaces,
   drawing, the analysis panels, search, state and URL persistence, the keyboard
@@ -31,11 +34,21 @@ it before wiring it back in.
   deliberately not built. **Read it before touching anything under `src/`
   that renders**, and don't reach for a new UI dependency: the workstation
   can't regenerate `package-lock.json`.
+- `docs/map-layers.md` — **what is drawn on the map**: the background grounds
+  (Standard in its five cartographies, LiDAR hillshade, Hybrid, Flyfoto) and
+  how the background *stack* is assembled and swapped, the five Kulturminner
+  theme layers and the rendering axis `kulturminner2` exposes, what the public
+  registers can be asked about a point or a rectangle (stedsnavn, kommune,
+  matrikkel, the kulturminner WFS), and the step-by-step recipes for adding
+  another theme or background layer. Every service quirk in it was paid for
+  with a live probe. **Read it before touching `src/map/layers/`,
+  `src/localities/localityContext.ts`, or before adding a map source.**
 - `docs/wms-proxy-and-tiles.md` — how map requests are proxied (Caddy →
-  wmscache → upstream, nib-proxy), the nginx cache rules, and the
-  tile-loading constraints that keep request counts under Kartverket's rate
-  limit. **Read it before touching `Caddyfile`, `nginx/`, `nib-proxy/`, tile
-  grids, or adding a new external map source.** That machinery is working;
+  wmscache → upstream, nib-proxy), the nginx cache rules, the Caddyfile CSP
+  host list, and the tile-loading constraints that keep request counts under
+  Kartverket's rate limit. **Read it before touching `Caddyfile`, `nginx/`,
+  `nib-proxy/`, tile grids, layer preloading, anything that multiplies request
+  counts, or adding a new external map source.** That machinery is working;
   its details are deliberately out of this file.
 - `docs/terrain-analysis.md` — how we get **float elevation** (not shaded
   PNGs) out of hoydedata.no, the endpoint's quirks, and the designs for the
@@ -47,9 +60,63 @@ it before wiring it back in.
   GIS tool survey with verdicts and licences, and what's worth building next.
   **Read it before proposing a new analysis feature** — it records what was
   already rejected and why, so those don't get re-litigated.
-- `README.md` — third-party-facing install and admin guide (first-run
-  PocketBase setup, OAuth, TLS, backup, troubleshooting). Keep it accurate
-  when any of that changes.
+- `README.md` — third-party-facing install and admin guide (docker compose
+  install, first-run PocketBase superuser, OAuth redirect URL, granting the
+  app admin role, licence). Keep it accurate when any of that changes.
+
+The inventory of **deliberate deletions** — upstream Norgeskart machinery
+that must not come back, and why each went — is `docs/ui-architecture.md`
+§15. Check it before "restoring" anything.
+
+## What is already built
+
+One line each, so a plan can assume these exist without opening the doc
+that owns them.
+
+- **Five background grounds**, on digit keys 1–5: Standard, LiDAR hillshade,
+  Hybrid, Flyfoto, Terreng — `docs/map-layers.md`, keyboard in
+  `docs/ui-architecture.md` §5.3.
+- **A dataset ring inside most grounds** (W/S — cartographies, LiDAR projects,
+  ortofoto acquisitions; Terreng has none), plus **Sammenlign**, a
+  draggable curtain holding two full grounds on screen in register —
+  `docs/ui-architecture.md` §5.2, §5.3, §5.8.
+- **LiDAR relief at 0.25 m per project or 1 m nationally**, DTM or DOM, with
+  a style ring, and an *Automatisk* dataset that follows the viewport unless
+  pinned — `docs/map-layers.md`, `docs/ui-architecture.md` §5.7.
+- **Ortofoto back to the 1930s**: the seamless NiB mosaic as a ground, and
+  every acquisition intersecting a rectangle enumerable and grabbable as a
+  temporal stack — `docs/map-layers.md`.
+- **A LiDAR tile extract** — stitch the densest per-project hillshade over a
+  lokalitet's rectangle into one georeferenced image, kept as a Bilde or
+  downloaded as PNG; and **Hent grunnpakke**, one press that produces the
+  three-image starter set for a new lokalitet — `docs/ui-architecture.md`
+  §10, §8.9.
+- **Five Kulturminner theme layers** from Riksantikvaren with structured
+  GetFeatureInfo, and `kulturminner2` reshapeable by register, render and
+  vern subset — `docs/map-layers.md`, `docs/ui-architecture.md` §5.9.
+- **The registers, answerable per point**: stedsnavn, kommune, matrikkel and
+  the kulturminner WFS readout — `docs/map-layers.md`; the elevation readout
+  behind a clicked point is the hoydedata.no ArcGIS identify in
+  `src/search/searchApi.ts` — `docs/ui-architecture.md` §7, §7.1.
+- **Search** over place names, addresses and matrikkel, with an InfoBox for
+  the picked point — `docs/ui-architecture.md` §7.
+- **A float elevation grid for any rectangle**, with hillshade,
+  multidirectional hillshade, slope, local relief model and sky-view factor
+  computed in the browser — `docs/terrain-analysis.md` and below.
+- **Lokaliteter**: an authored rectangle holding named *funn* with full
+  drawing tools and *bilder* (extracts, terrain renders, screenshots,
+  flyfoto, uploads), behind sign-in — below, and
+  `docs/ui-architecture.md` §8, §9.
+- **Every raster the app keeps or hands out carries a provenance caption** —
+  dataset, acquisition, processing parameters, extent, licence — below, and
+  `docs/ui-architecture.md` §8.10.
+- **A ribbon + settings-strip UI kit** with URL-persisted state and a
+  keyboard map, so a new control has a place to go and a key to get it —
+  `docs/ui-architecture.md` §4.3, §5.1.
+- **Three languages throughout** — user-visible strings go through `t()` into
+  `src/locales/{nb,nn,en}/translation.json`, `ribbon.*` for the ribbon and
+  `localities.*` for the dock and the workspace, so a new string needs all
+  three files — `docs/ui-architecture.md` §5.4.
 
 ## Deploy
 
@@ -116,347 +183,16 @@ Ports: Caddy inside the container listens on `:3000`; docker-compose maps host
   JSVM API (`$app.findCollectionByNameOrId` / `app.save`, flattened field
   classes), *not* the 0.22 `Dao` API.
 - **nib-proxy** — token-injecting sidecar for Norge i bilder (NiB) ortofoto.
-  Only reachable from wmscache on the compose network.
+  Only reachable from wmscache on the compose network; the token handling and
+  routing are `docs/wms-proxy-and-tiles.md`.
 - **wmscache** — `nginx:1.27-alpine` reverse proxy + 25 GB disk cache in
   front of every external WMS/WFS/ArcGIS service the SPA uses (Kartverket,
-  Riksantikvaren, matrikkel, NiB). Caddy exposes each upstream under a
-  same-origin prefix (`/wms/geonorge/…`, `/wms/ra/…`, `/wms/nib/…`,
-  `/arcgis/nib/…`), so no external map host appears in the Caddyfile CSP.
+  Riksantikvaren, matrikkel, NiB, hoydedata). Caddy exposes each upstream
+  under a same-origin prefix (`/wms/geonorge/…`, `/wms/ra/…`, `/wms/nib/…`,
+  `/arcgis/nib/…`, `/arcgis/hoydedata/…`). Rules, cache lifetimes and
+  verification commands: `docs/wms-proxy-and-tiles.md`.
 
-  Details, rules and verification commands: `docs/wms-proxy-and-tiles.md`.
-
-## Tile loading
-
-Map performance rests on spending *few* WMS requests — Kartverket rate-limits
-GetMap per source IP (i.e. per server, shared across all visitors) and signals
-it with an HTTP 200 that OpenLayers turns into a permanently errored tile. The
-countermeasures (512 px tile grids, `maxTilesLoading`, `preload`,
-`coverageExtent` culling, cached no-data tiles, stock OL tile loading) are all
-load-bearing and documented in `docs/wms-proxy-and-tiles.md`. Read that before
-changing tile grids, layer preloading, or anything that multiplies request
-counts.
-
-## Added map content
-
-### Kulturminner (theme layers, Riksantikvaren)
-
-Config: `src/map/layers/config/themeLayers/culturalHeritage.ts`. Registered
-in `themeLayerConfigApi.ts` (added to `configs` array) and the layer id
-union in `themeWMS.ts` (`CulturalHeritageLayerName`).
-
-Five layers under the "Kulturminner" theme category, one per Riksantikvaren
-WMS service. URLs are same-origin (`/wms/ra/<name>`) and routed through
-`wmscache` to `kart.ra.no/wms/<name>`: `kulturminner2` (sites + monuments),
-`kulturmiljoer`, `sefrak`, `freda_bygninger`, `brukerminner`.
-
-`kulturminner2` is the one the user can reshape rather than just switch on.
-`src/map/layers/heritage.ts` holds the WMS tables — which of its six sublayers
-each of the three registers (lokaliteter / enkeltminner / sikringssoner)
-expands to, and the STYLES value each render maps to per sublayer — plus the
-three atoms and their URL persistence. Everything in it was read off live
-GetCapabilities and confirmed with GetMap probes, because both failure modes
-are hard to read from the document: an **unpublished** style is a
-ServiceException (loud, but a wall of broken tiles), and a **published but
-empty** style is a valid transparent PNG (indistinguishable from "no data",
-which for a vern subset is the correct answer). Do not derive a style name
-from a render name — `Enkeltminner`'s default is the *fill* and `grenser` is
-its outline, the inverse of `Lokaliteter`, and `Lokalitetsikoner` spells its
-vern style `Uavklart` where every other sublayer spells it `uavklart`.
-
-Rendering is deliberately **one axis** (outlines / filled / five vern subsets),
-not two: STYLES takes a single value per LAYERS entry and RA publishes no
-filled variant of any subset, so "filled *and* fredede only" is not a request
-that exists. FILTER (the MapServer OGC vendor parameter) does work on kart.ra.no
-and would compose, but it needs the `vernetype` *text* vocabulary enumerated
-client-side — and a value missed there under-reports silently, where a wrong
-style is a ServiceException. UI contract: `docs/ui-architecture.md` §5.9.
-
-Feature-info: the category sets `infoFormat: 'application/vnd.ogc.gml'` so
-the existing `parseXmlFeatureInfo` (which handles MapServer `msGMLOutput`)
-kicks in and shows structured fields. Left unset, the WMS returns HTML,
-which the parser wraps as `{ _html: ... }` and the UI shows an unhelpful
-"HTML-respons mottatt" placeholder.
-
-### Standard, and the amtskart series
-
-Standard is five cartographies of the same ground, not one: `topo`,
-`topograatone`, `toporaster`, `sjokartraster` (all WMTS out of
-`cache.kartverket.no`, one capabilities document between them) and `amtskart`.
-`STANDARD_VARIANTS` in
-`src/map/layers/config/backgroundLayers/standardVariants.ts` is the ring, the
-pulldown order and the type; UI contract in `docs/ui-architecture.md` §5.10.
-They are *variants*, not modes — the picker is on the settings strip and the
-ring is W/S, like LiDAR datasets and ortofoto acquisitions.
-
-`standardVariantAtom` is what Standard means, `backgroundLayerAtom` is what is
-drawn; the two diverge while another ground is up so pressing 1 returns to the
-map you left. There is no second URL parameter — a variant *is* a layer name,
-so `?backgroundLayer=amtskart` covers it, and the atom seeds itself from that.
-
-Amtskartserien: `/wms/geonorge/wms.historiskekart`, layer `amt1` (the seamless
-mosaic of the series; the service's other layer, `georefererte`, wants the id
-of one specific scanned sheet). Needed no proxy work — the nginx `location
-/skwms1/` rule already covers all of `wms.geonorge.no`.
-
-- **It is `TRANSPARENT` and in `NEEDS_TOPO_BASE`.** The series ran 1826 to
-  around 1917 and stopped before Nordland was ever mapped: a GetMap probe has
-  Bodø and Mosjøen coming back empty while Narvik, Tromsø and Alta draw. Bare,
-  that looks like a broken app rather than like a map nobody surveyed.
-- GetMap probes against this service need the bbox in **E,N** order for
-  EPSG:25833, despite what the layer's own metadata sample URL does.
-
-### LiDAR hillshade (background layer, Kartverket)
-
-A *background*, not a theme layer: the intent is to overlay Kulturminner
-objects on top of the terrain relief, so the relief has to be the ground.
-
-- Type registered in `src/map/layers/backgroundLayers.ts` (`lidarHillshade`
-  in `WMSLayerName`).
-- Config: `src/map/layers/config/backgroundLayers/elevation.ts`. Built by a
-  dynamic branch in `backgroundLayerAtomEffect` (`atoms.ts`) rather than a
-  static entry, because the style comes out of an atom.
-- Control: the "LiDAR" `ModeButton` in ribbon row 1; the dataset, style and
-  DTM/DOM pulldowns are on the settings strip below it (`RibbonSettingsRow`).
-  Strings live under `ribbon.*` in `src/locales/{nb,nn,en}/translation.json`.
-
-The dataset pulldown's default is **Automatisk**: the national 1 m mosaic when
-zoomed out, the best-covering per-project dataset (0.25 m) once the view is fine
-enough for that to show, unless the user has pinned one. Rules in
-`src/map/layers/config/backgroundLayers/lidarAuto.ts`, UI contract in
-`docs/ui-architecture.md` §5.7. It is a *pin flag*, not a fourth dataset — the
-resolver writes through the same selectors the picker does.
-
-The client hits `/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833`, not
-`wms.geonorge.no` directly — same-origin through wmscache, which also avoids
-the CORS issues seen calling `wms.geonorge.no` from `fetch()`. Same treatment
-for per-project LiDAR at `/wms/geonorge/wms.hoyde-dtm-prosjekt` (see
-`lidarProjects.ts`).
-
-### The background stack
-
-`backgroundLayerAtomEffect` builds a stack, bottom-first, not a single layer:
-
-1. topo base, for everything in `NEEDS_TOPO_BASE` (both LiDAR modes and
-   `flyfotoProject` — those services return transparent PNGs outside coverage).
-   The seamless `flyfoto` mosaic is *not* in that set: it covers its whole
-   advertised extent, so a base under it would be invisible and still cost a
-   screenful of requests;
-2. the national mosaic at `FALLBACK_OPACITY`, when a *per-project* dataset is
-   active, so the area the project doesn't cover keeps its relief instead of
-   dropping to plain topo;
-3. the active dataset;
-4. the topo overlay, in hybrid mode.
-
-`LIDAR_LAYERS` is deliberately *not* `NEEDS_TOPO_BASE`: hybrid and the DTM/DOM
-choice are decisions about the LiDAR stack, and writing `?lidarModel=dom` while
-looking at a 1937 photograph would be a lie about what's on screen.
-
-`swapBackgroundLayers(under, over)` (`backgroundLayers/utils.ts`) swaps that
-stack in without ever showing a gap. The split matters: 1–2 go *under* the
-outgoing layers (context the fading dataset should keep covering), 3–4 go
-*over* them, or the layer on its way out buries the one coming in.
-
-- Outgoing layers are **not** removed up front — they're dimmed to
-  `OUTGOING_OPACITY` immediately and removed on the next map
-  `rendercomplete` (8 s timeout as a backstop). Tearing down first made every
-  step of a W/S or A/D cycle flash topo while the new hillshade loaded; the
-  instant dim is what makes the incoming dataset's coverage edge readable
-  before its tiles are in.
-- `buildOrReuseBackgroundLayer` keeps an existing layer whose signature
-  (url + params + projection) matches, so cycling only rebuilds the layer
-  that changed. Reused layers may still carry an earlier fade, so the effect
-  sets opacity explicitly on every layer it passes in.
-
-### Hybrid mode
-
-The same LiDAR stack with Kartverket's roads/railways/place-names drawn
-transparently on top, for working out *where* a feature is without leaving the
-terrain. State is `hybridOverlayAtom`, persisted as `?hybrid=true`. It is a
-*modifier* on the background, not a background of its own, so dataset, style
-and cycling all keep working underneath it — see `docs/ui-architecture.md`
-for the control and why that distinction matters.
-
-Config: `backgroundLayers/topoOverlay.ts` — `buildTopoOverlayConfig(contours)`
-over `/wms/geonorge/wms.topo` with `TRANSPARENT=TRUE`. `LAYERS` is always the
-five reference groups `kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,`
-`fkb_presentasjonsdata`. Asking that WMS for a subset of its groups yields a
-real overlay: no terrain, no landcover, no background fill. Both families are
-needed — the generalized `kd_*` groups stop rendering around 1:25 000 and the
-`fkb_*` ones take over.
-
-**Høydekurver** append `kd_hoydekurver,fkb_hoydekurver` to that same `LAYERS`
-value. State is `hybridContoursAtom`, persisted as `?contours=true`, and the
-control is a `Switch` on the settings strip rendered only in Hybrid — the
-lines ride on the overlay's own GetMap, so in plain LiDAR there is no request
-for them to join. That merge is the point: a second `TileWMS` would double the
-overlay's request count against a rate limit shared by every visitor, and the
-cost paid instead — toggling re-requests the reference groups once, since
-`buildOrReuseBackgroundLayer` keys on the params — is a one-off. The same
-`kd_`/`fkb_` handover applies and was re-measured per group, not assumed;
-`hoydekurver_1m` / `hoydekurver_5m` are the raw feature layers behind them and
-render nothing at any scale.
-
-Alternatives already ruled out: `cache.kartverket.no`'s WMTS has no
-transparent overlay layer (only full basemaps), `wms.topo4` is dead, and NiB
-needs an API token.
-
-### DTM vs DOM
-
-Both the national mosaic and the per-project service exist in a terrain
-(DTM) and a surface (DOM) flavour. `activeLidarModelAtom`
-(`lidarProjects.ts`) picks between them; persisted as `?lidarModel=dom`,
-absent means DTM. Like hybrid it's a modifier rather than a fourth mode; the
-control is in `docs/ui-architecture.md`.
-
-URL pairs live in `LIDAR_PROJECT_WMS_URL` and `NATIONAL_WMS`
-(`wms.hoyde-dom-prosjekt` / `wms.hoyde-dom-nhm-25833`, layer prefix
-`NHM_DOM_25833`). Both go through `wmscache`.
-
-- The DTM and DOM per-project catalogues are **identical** (same 1936 project
-  names, verified by diffing both GetCapabilities), so `fetchLidarProjects()`
-  stays a single fetch and the footprint/relevance/picker machinery is
-  model-independent.
-- DOM publishes exactly one usable style, `skyggerelieff`, for every project.
-  `DOM_STYLES` is therefore a hard-coded constant, and `stylesForModel` /
-  `effectiveLidarStyle` clamp to it. The clamp isn't cosmetic: asking a DOM
-  layer for a DTM-only style (`helning_prosent`) fails silently — HTTP 200,
-  `Content-Type: image/png`, a ~100-byte JSON body the browser gives up on as
-  a broken image, i.e. a blank map with nothing in the console.
-  `activeLidarStyleAtom` keeps holding the user's DTM pick while in DOM mode
-  so it comes back on the way out.
-
-The LiDAR *extract* tool stays DTM-only (`lidarExtract/sources.ts` pins
-`LIDAR_PROJECT_WMS_URL.dtm`): an extract is meant to be read as terrain.
-
-### Flyfoto (Norge i bilder ortofoto)
-
-Two distinct things, on the same imagery:
-
-1. **A background mode** — "Flyfoto" in ribbon row 1, beside Standard / LiDAR
-   / Hybrid, with the same shape of dataset pulldown (on the settings strip)
-   and W/S cycling. Just *looking*, so no licensing notice. Layer plumbing
-   below; the control is in `docs/ui-architecture.md` §5.5.
-2. **A lokalitet action** — "Flyfoto" in the lokalitet row stitches NiB
-   ortofoto over the authored bbox and *keeps* it as an attachment of kind
-   `flyfoto`. Gated by the licensing notice, every time.
-
-The old TopBar "Flyfoto ↗" external link is gone — it navigated out of the app
-to do worse than what the background mode now does in place.
-
-#### The background mode
-
-Two dynamic branches of `backgroundLayerAtomEffect`, no static entry in
-`allConfiguredBackgroundLayers`, exactly like the LiDAR pair:
-
-- `flyfoto` — the seamless best-available mosaic, a plain `TileWMS` on
-  `/wms/nib/ortofoto`.
-- `flyfotoProject` — one acquisition. **Not a WMS**: NiB publishes no
-  per-project WMS, so this is `ol/source/TileArcGISRest` against
-  `/arcgis/nib/ortofoto_prosjekter/ImageServer/exportImage` with
-  `mosaicRule = {"mosaicMethod":"esriMosaicNone","where":"prosjektnavn='…'"}`.
-  `esriMosaicNone` is load-bearing — the default method blends neighbouring
-  projects back in, and the symptom is a picked year that looks almost right.
-  It stays out of `VALID_STARTUP_LAYERS` for the same reason `lidarProject`
-  does: its concrete acquisition starts null.
-
-`coverageExtent` comes from `project.bboxLonLat` per acquisition and a Norway
-extent for the mosaic. Cache rules for this request profile:
-`docs/wms-proxy-and-tiles.md`.
-
-#### The lokalitet grab
-
-The stitch (`src/localities/flyfoto.ts`) reuses the LiDAR extract machinery
-(`planTiles` / `fetchAndPaint` / `runWithConcurrency` from
-`src/lidarExtract/stitch.ts`) — WMS 1.3.0 GetMap, EPSG:25833, JPEG, target
-0.2 m/px, per-tile retry. `fetchAndPaint`'s uniform-image check drops
-no-coverage tiles, so a bbox entirely outside coverage returns null and the
-UI says so.
-
-Request path is same-origin like every other raster source:
-`/wms/nib/ortofoto` → Caddy → wmscache → **nib-proxy** →
-`services.norgeibilder.no/wms/ortofoto` (layer name `ortofoto`,
-`FLYFOTO_LAYER`). Old NiB WMS endpoints die **Sep 2026**; this uses the new
-`services.norgeibilder.no/wms/*`. Token handling is the sidecar's job — see
-`docs/wms-proxy-and-tiles.md`.
-
-Licensing: NiB imagery is free for private, non-commercial use;
-publishing/commercial use is the user's responsibility. A notice dialog gates
-every **grab** (`localities.tools.flyfotoNotice*`), by deliberate product
-decision — this facilitates personal use, akin to hitting print. Attribution
-lives in that prose, not the chrome. Browsing the same imagery as a background
-is not a grab and deliberately has no notice.
-
-`attachments.kind` includes `flyfoto` (migration
-`1700000300_attachments_flyfoto.js`; `AttachmentKind` in
-`src/api/attachments.ts`; `KIND_ICON` in `BilderSection.tsx`).
-
-#### Per-project flyfoto (every acquisition covering a lokalitet)
-
-Built. v1 grabs the single seamless **best mosaic** (`LAYERS=ortofoto`); on top
-of that the "Flyfoto" action now offers a temporal stack — every ortofoto
-acquisition intersecting the lokalitet bbox, the same ground in 1937, 1963 and
-2024, each stitched as its own `flyfoto` Bilde.
-
-**Discovery overturned the two-service model this section used to plan for.**
-Both halves live on NiB, and neither is a WMS:
-
-| Purpose | Service | Proxy path |
-|---|---|---|
-| Which acquisitions cover here | `prosjekter/MapServer/4/query` (layer 4 = "Prosjektomriss prosessert") | `/arcgis/nib/` |
-| The imagery pixels for one of them | `ortofoto_prosjekter/ImageServer/exportImage` | `/arcgis/nib/` |
-| The seamless mosaic (v1, unchanged) | `services.norgeibilder.no/wms/ortofoto` | `/wms/nib/` |
-
-Three findings worth not re-deriving:
-
-- **`wms.georef_nib` is the wrong index — do not go back to it.** The name
-  makes it look like the coverage register, but it is a *planning* layer:
-  GetFeatureInfo returns `prosjektfase` P/U with `r_pstart` in the future
-  (2026–2028) and the `prosjektna` / `nib_navn` fields **empty**. It describes
-  photography not yet flown. There is also no NiB WFS on geonorge
-  (`wfs.nib`, `wfs.georef_nib` → "UKJENT APPLIKASJON").
-- **Per-project imagery is not reachable over WMS at all.** `/wms/ortofoto`
-  publishes only the merged `ortofoto` layer, and `/wms/ortofoto_prosjekter`
-  403s — that service has no WMS endpoint. Selection happens instead through
-  the ImageServer's mosaic catalogue, which carries a `prosjektnavn` column:
-  `exportImage?...&mosaicRule={"mosaicMethod":"esriMosaicNone","where":`
-  `"prosjektnavn='Oslo 1937'"}`. `esriMosaicNone` matters — the service's
-  default method would blend other projects back in.
-- **The join is free.** `prosjektnavn` is the same column in the same database
-  behind both the footprint layer and the ImageServer catalogue, so there is
-  no name matching between index and renderer to get wrong.
-
-Also ruled out while probing: `returnDistinctValues=true` on the ImageServer
-`/query` silently returns zero features, and an undistinct catalogue query
-returns one row *per raster tile* (1000 rows / 24 MB for an Oslo-sized bbox),
-which is why enumeration uses the `prosjekter` MapServer instead — 121
-projects in ~25 KB for the same bbox.
-
-**Infra.** The sidecar routes `/arcgis/*` to NiB's REST base and everything
-else to its WMS base; chain is `/arcgis/nib/*` (Caddy) → `/nib-arcgis/*`
-(nginx) → `/arcgis/*` (sidecar). Routing and per-endpoint cache lifetimes:
-`docs/wms-proxy-and-tiles.md`.
-
-**Client.** `src/localities/flyfotoProjects.ts` — `FlyfotoProject { id
-(= prosjektnavn, the imagery selector), projectName, year, photoDate,
-metresPerPx, bboxLonLat }` and `fetchFlyfotoProjectsForBbox(bbox4326)`, newest
-first. The spatial filter runs server-side against real footprint polygons, not
-envelopes. `ortofototype = 6` ("Satellittbilde") is filtered out: those are the
-nationwide 10 m Sentinel-2 mosaics, which cover everywhere and are useless next
-to 0.1 m aerial photography. No localStorage cache — wmscache fronts the query.
-
-`fetchFlyfoto(bbox, { project?, signal? })` switches `buildUrl` between the WMS
-mosaic and `exportImage`; everything downstream (planTiles / fetchAndPaint /
-retry / blank-drop) is unchanged. It also clamps resolution to the project's own
-`pixelstorrelse` when that is coarser than the 0.2 m target — upsampling a 1937
-flight to 0.2 m is four times the tiles for the same detail.
-
-The batch grab runs **sequentially** — one project's tile burst already
-saturates `MAX_CONCURRENT` against the shared NiB edge. `meta` records
-`projectName` / `year` / `photoDate` so the gallery can caption "Flyfoto 1937".
-The picker, the licensing gate and the batch cap are UI:
-`docs/ui-architecture.md`.
-
-### Terrenganalyse (client-side relief from float DEMs)
+## Terrenganalyse (client-side relief from float DEMs)
 
 "Terreng" fetches the **raw float elevation grid** for a rectangle and computes
 its own relief visualizations in the browser, instead of restyling Kartverket's
@@ -567,10 +303,8 @@ Key files (data side):
 - `src/api/localities.ts`, `localityFinds.ts`, `attachments.ts` — CRUD +
   realtime per collection. Attachment files are `protected`, so the client
   fetches short-lived file tokens for thumbnails.
-- `src/api/kulturminnerWfs.ts` — the "kjente kulturminner her" readout.
-  kart.ra.no has WFS disabled, so this goes to GeoNorge's redistribution
-  (`wfs.kulturminner`, feature type `app:Lokalitet`, GML 3.2 only,
-  DOM-parsed).
+- `src/api/kulturminnerWfs.ts` — the "kjente kulturminner her" readout;
+  which service it has to ask and why is `docs/map-layers.md`.
 - `src/auth/` — atoms (currentUserAtom, roleAtom, isAdminAtom), hooks
   (useOAuthProviders, useSignIn, useSignOut).
 - `src/localities/localityContext.ts` — what the public registers know about a
@@ -644,79 +378,22 @@ and `docs/terrain-analysis.md` for which parameters each visualization records.
 
 ### Sted / kommune / matrikkel (what the registers already know)
 
-`src/localities/localityContext.ts` asks three anonymous GeoNorge endpoints
-what a rectangle is — `stedsnavn/v1/punkt`, `kommuneinfo/v1/punkt`,
-`eiendom/v1/punkt`, in parallel, centre-plus-radius, over `ws.geonorge.no`
-directly (already in the CSP, a few kB each, not worth a wmscache route).
-`createLocalityFromBbox` awaits it *before* writing the record, so a new
-lokalitet arrives named after the nearest stedsnavn with its three fields
-filled; UI consequences are `docs/ui-architecture.md` §8.3.
+`src/localities/localityContext.ts` asks three anonymous GeoNorge point
+endpoints what a rectangle is, and `createLocalityFromBbox` awaits that
+*before* writing the record, so a new lokalitet arrives named after the
+nearest stedsnavn with its place, kommune and matrikkel fields filled. Which
+endpoints, the `navneobjekttype` vocabulary that picks the name over mere
+distance, and the never-fatal-never-slow failure behaviour are in
+`docs/map-layers.md`; UI consequences are `docs/ui-architecture.md` §8.3.
 
-- **Never fatal, never slow.** Every lookup degrades to `''` and the whole
-  thing is capped at 6 s. A lokalitet at sea, across the border or during a
-  GeoNorge outage is still a lokalitet.
+Two policy facts that live here rather than with the endpoints:
+
 - **Pre-fill, not derivation.** The three are ordinary editable fields; only
   the explicit "Hent stedsdata på nytt" button re-derives them. The register
   cannot know the user means "the terrace above Storevike".
 - **The centre coordinate is not stored**, precisely because it *is* derivable
   — `formatBboxCentre` computes it per render, so "Juster området" can never
   leave it lying.
-- **Type, not distance, picks the name.** `navneobjekttype` is sorted into
-  deny (administrative and statistical geography), promote (gard, seter, tuft,
-  heller, …) and demote (built infrastructure) tiers, drawn from the register's
-  own 291-type vocabulary; the neutral middle is the natural landscape and
-  settlement words. Without that, cities auto-name lokaliteter "Oslo Spektrum"
-  and coasts name them after vannstandsmålere. Only `stedstatus = aktiv` names
-  are eligible, and a place with no `hovednavn` picks a settled spelling over
-  the first `foreslått` one.
-- `/eiendom/v1/punkt`, **not** `/punkt/omrader` — same list, minus teig
-  polygons nothing draws (4.5 kB vs 249 kB). Parcels with gnr ≥ 9000 (road,
-  rail, watercourse) and null-gnr water surfaces are dropped; the kommune
-  number is only prefixed on parcels outside the resolved kommune.
-
-## Adding another theme layer
-
-1. Create a config file in `src/map/layers/config/themeLayers/`. Export a
-   `ThemeLayerConfig` with `categories[]` and `layers[]`. Category holds
-   shared defaults (`wmsUrl`, `infoFormat`, `featureInfoFields`, etc.) that
-   cascade to layers via `getEffectiveWmsUrl` and the fallback chain in
-   `themeWMS.ts`.
-2. Import + append to the `configs` array in
-   `src/map/layers/themeLayerConfigApi.ts` inside `getThemeLayerConfig()`.
-3. Add the layer id(s) to a union in `src/map/layers/themeWMS.ts` and into
-   `ThemeLayerName`. It will appear in the Kulturminner "Oppsett" popover
-   automatically — that list is `themeLayerConfig.layers`.
-4. Route requests through `wmscache` rather than hitting the origin from the
-   browser, and use the same-origin `/wms/<host-slug>/...` prefix as `wmsUrl`
-   (recipe in `docs/wms-proxy-and-tiles.md`).
-5. If the WMS's GetFeatureInfo doesn't offer JSON, set `infoFormat` on the
-   category or layer to a format the parser can handle
-   (`application/vnd.ogc.gml` works for MapServer via `parseXmlFeatureInfo`).
-
-## Adding another background layer
-
-1. Add id to the appropriate name union in
-   `src/map/layers/backgroundLayers.ts` — `WMTSLayerName`, `WMSLayerName` or
-   `ArcGISImageLayerName`. The last is for ESRI ImageServer sources
-   (`TileArcGISRest` + a `mosaicRule`), which is how per-acquisition ortofoto
-   works; `LayerType` in `config/backgroundLayers/types.ts` is the matching
-   discriminant.
-2. Create/extend a config in `src/map/layers/config/backgroundLayers/` and
-   spread it into `allConfiguredBackgroundLayers` in `atoms.ts`. For a WMS or
-   ArcGISImage layer, `coverageExtent` is mandatory — see
-   `docs/wms-proxy-and-tiles.md`. A layer whose concrete source is chosen at
-   runtime (`lidarProject`, `flyfotoProject`) instead gets a dynamic branch in
-   `backgroundLayerAtomEffect`, no static entry, and stays out of
-   `VALID_STARTUP_LAYERS` — a cold load onto it would render nothing.
-3. Give it a control in ribbon row 1 (`src/shell/RibbonGlobalRow.tsx`). There
-   is no thumbnail gallery any more: a *mode* is a `ModeButton` in row 1, and
-   a choice *within* a mode is a `Pulldown` on the settings strip
-   (`src/shell/RibbonSettingsRow.tsx`) — see `src/shell/lidar/` and
-   `src/shell/flyfoto/` for the two worked examples, incl. how a dataset ring
-   registers itself for W/S cycling). Decide which of the two it is before
-   writing anything — `docs/ui-architecture.md` §5.2 on modes vs modifiers.
-4. Add translations under `ribbon.*` in
-   `src/locales/{nb,nn,en}/translation.json`.
 
 ## Conventions specific to this fork
 
@@ -732,43 +409,3 @@ filled; UI consequences are `docs/ui-architecture.md` §8.3.
 - Commits use short imperative subject lines. Body explains the *why* when
   the reasoning isn't obvious from the diff. The `Co-Authored-By` trailer is
   added by the commit workflow.
-
-## Removed upstream machinery — don't re-add
-
-Deleted deliberately; if one of these reappears, something regressed.
-
-- **The service-message banner** (`src/messages/`, `src/api/messageApi.ts`) —
-  fetched Markdown from `raw.githubusercontent.com/kartverket/nk3config/…`,
-  i.e. Norgeskart's operational announcements in Tufteseid's chrome plus a
-  GitHub ping on every page load. It was the only consumer of
-  `react-markdown` and of `getEnvName()`.
-- **Hostname-based environment detection** in `src/env.ts` — it matched
-  Kartverket's own domains, so every Tufteseid deployment fell through to
-  `console.error('Unknown domain')` and silently ran the DEV table. There is
-  now one `DEFAULT_ENV` plus the `window.__NK_CONFIG__` override from the
-  bind-mounted `config.js`. The `envName` and
-  `layerProviderParameters.geoNorgeWMS` keys went with it.
-- **Google Fonts** (Raleway + Work Sans) in `index.html` — nothing set
-  `font-family`. Mulish is self-hosted instead: `src/mainApp.tsx` imports the
-  four `@fontsource/mulish` weights the kit asks for, and `src/index.css` sets
-  the family on `body`. `font-src 'self'` is enough.
-- **The generic theme-layer tree** (`src/settings/map/themes/`,
-  `src/map/layers/themeLayers.ts`, `MapTool = 'layers'`) — categories,
-  expandable subthemes, per-subtheme "add all", a fifteen-layer performance
-  warning, and a whole card slot on top of the map to hold them, for one
-  category of five layers from one rights holder. Replaced by the Kulturminner
-  "Oppsett" popover in ribbon row 1, which offers the same five sources plus
-  the things the register can actually be asked (`docs/ui-architecture.md`
-  §5.9, §6.2).
-- **Dead dependencies**: `maplibre-gl` and `@geoblocks/ol-maplibre-layer`
-  (OpenLayers is the map engine and is the right one for WMS + EPSG:25833;
-  MapLibre is vector-tile-first and weak on non-Mercator projections), and
-  `fast-xml-parser` (all XML goes through native `DOMParser`).
-
-The Caddyfile CSP is narrowed to what the browser actually contacts:
-`cache.kartverket.no` (WMTS tiles *and* its GetCapabilities fetch),
-`*.geonorge.no`, `*.norgeskart.no` and `hoydedata.no` (the ArcGIS identify
-call in `searchApi.ts`). `style-src` is `'self'` — nothing injects a
-stylesheet at runtime now that emotion is gone. Inline style *attributes* are
-governed by the separate `style-src-attr`, which keeps `'unsafe-inline'`
-because React sets positions, sizes and picked colours that way.

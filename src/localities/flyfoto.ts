@@ -10,9 +10,9 @@
 // Requests go same-origin through /wms/nib/* (the mosaic) and
 // /arcgis/nib/* (one acquisition): Caddy → wmscache (cache) → the
 // nib-proxy sidecar (which injects NiB's anonymous access token) →
-// services.norgeibilder.no. See nib-proxy/server.mjs and the CLAUDE.md
-// "Flyfoto" section. The tiling/paint/concurrency machinery is shared
-// with the LiDAR extract (src/lidarExtract/stitch.ts).
+// services.norgeibilder.no. See nib-proxy/server.mjs and the "Flyfoto"
+// section of docs/map-layers.md. The tiling/paint/concurrency machinery is
+// shared with the LiDAR extract (src/lidarExtract/stitch.ts).
 
 import { transformExtent } from 'ol/proj';
 import type { LocalityBbox } from '../api/localities';

@@ -30,9 +30,11 @@ than reconstructed: *an amateur reads relief-shaded LiDAR terrain against the
 heritage record, spots something, boxes it, and works it up.* Every affordance
 below is either in service of that or is upstream residue.
 
-Companion reading: `docs/terrain-analysis.md` (what the Terreng panel is
-driving), `docs/wms-proxy-and-tiles.md` (why layer switching is shaped the way
-it is), `docs/analysis-roadmap.md` (what the workspace is expected to grow).
+Companion reading: `docs/map-layers.md` (what the grounds and theme layers
+actually are, and how to add another), `docs/terrain-analysis.md` (what the
+Terreng panel is driving), `docs/wms-proxy-and-tiles.md` (why layer switching is
+shaped the way it is), `docs/analysis-roadmap.md` (what the workspace is
+expected to grow).
 
 ---
 
@@ -753,27 +755,16 @@ i18next. A full i18n stack that one surface half-bypasses is the worst of both.
 
 ### 5.5 Flyfoto as a background mode
 
-Two layer names, both dynamic branches of `backgroundLayerAtomEffect` with no
-static entry in `allConfiguredBackgroundLayers`, exactly like the LiDAR pair:
-
-- **`flyfoto`** — the seamless best-available mosaic. A plain `TileWMS` on
-  `/wms/nib/ortofoto`.
-- **`flyfotoProject`** — one acquisition. **Not** a WMS: NiB has no per-project
-  WMS endpoint, so this is `ol/source/TileArcGISRest` against
-  `/arcgis/nib/ortofoto_prosjekter/ImageServer/exportImage` with a
-  `mosaicRule` of `{ mosaicMethod: 'esriMosaicNone', where:
-  "prosjektnavn='…'" }`. `esriMosaicNone` is load-bearing — the service's
-  default method blends the neighbouring projects back in, and the symptom is
-  a picked year that looks almost but not quite right.
-
-`flyfotoProject` stays out of `VALID_STARTUP_LAYERS` for the same reason
-`lidarProject` does: its concrete acquisition starts null, so a cold load onto
-it would render nothing.
+Two layer names, `flyfoto` (the seamless best-available mosaic) and
+`flyfotoProject` (one acquisition, served off NiB's ImageServer rather than a
+WMS). Neither has a static config entry and `flyfotoProject` stays out of
+`VALID_STARTUP_LAYERS`, since its acquisition starts null; the plumbing,
+including why `esriMosaicNone` is load-bearing, is `docs/map-layers.md`.
 
 The acquisition list comes from `fetchFlyfotoProjectsForBbox` refetched on
 moveend while the mode is active. **No licensing notice for viewing** —
 browsing NiB imagery as a background is what the old external link already
-did; the notice gates *grab-and-keep* (§8.6), which is a different act.
+did; the notice gates *grab-and-keep* (§8.8), which is a different act.
 
 **The period chips** (`src/shell/flyfoto/eras.ts`, `FlyfotoEraPicker`) are the
 mode's one filter, and they sit on the strip beside the acquisition chip rather
@@ -2284,3 +2275,49 @@ hard-coded `view.fit` paddings that could not know about it, the orange wash
 over the relief, funn that were only linked to the list in one direction,
 Terreng existing twice with two different rectangles, and the silent
 `cancelDraft` that discarded a drawing from five call sites.
+
+---
+
+## 15. Removed upstream machinery — don't re-add
+
+Deleted deliberately; if one of these reappears, something regressed. The
+kvib-specific removals are §12; this is the rest of what the fork threw out of
+the inherited Norgeskart app, with the reasoning that made each a deletion
+rather than a port.
+
+- **The service-message banner** (`src/messages/`, `src/api/messageApi.ts`) —
+  fetched Markdown from `raw.githubusercontent.com/kartverket/nk3config/…`,
+  i.e. Norgeskart's operational announcements in Tufteseid's chrome plus a
+  GitHub ping on every page load. It was the only consumer of
+  `react-markdown` and of `getEnvName()`.
+- **Hostname-based environment detection** in `src/env.ts` — it matched
+  Kartverket's own domains, so every Tufteseid deployment fell through to
+  `console.error('Unknown domain')` and silently ran the DEV table. There is
+  now one `DEFAULT_ENV` plus the `window.__NK_CONFIG__` override from the
+  bind-mounted `config.js`. The `envName` and
+  `layerProviderParameters.geoNorgeWMS` keys went with it.
+- **Google Fonts** (Raleway + Work Sans) in `index.html` — nothing set
+  `font-family`. Mulish is self-hosted instead: `src/mainApp.tsx` imports the
+  four `@fontsource/mulish` weights the kit asks for (§12 on how that package
+  went from transitive to direct), and `src/index.css` sets the family on
+  `body`. `font-src 'self'` is enough.
+- **The generic theme-layer tree** (`src/settings/map/themes/`,
+  `src/map/layers/themeLayers.ts`, `MapTool = 'layers'`) — categories,
+  expandable subthemes, per-subtheme "add all", a fifteen-layer performance
+  warning, and a whole card slot on top of the map to hold them, for one
+  category of five layers from one rights holder. Replaced by the Kulturminner
+  "Oppsett" popover in ribbon row 1, which offers the same five sources plus
+  the things the register can actually be asked: §5.9 for the popover, §6.2 for
+  what exactly was deleted. The catalogue of layers itself — what the five
+  sources are, and the recipe for adding a sixth — is
+  `docs/map-layers.md`.
+- **Dead dependencies**: `maplibre-gl` and `@geoblocks/ol-maplibre-layer`
+  (OpenLayers is the map engine and is the right one for WMS + EPSG:25833;
+  MapLibre is vector-tile-first and weak on non-Mercator projections), and
+  `fast-xml-parser` (all XML goes through native `DOMParser`).
+
+The Caddyfile CSP was narrowed to match: `style-src` lost its `'unsafe-inline'`
+when emotion went with kvib, and inline style *attributes* moved to their own
+`style-src-attr` directive (§12). The `img-src` / `connect-src` host list, and
+why no proxied upstream needs an entry in it, is
+`docs/wms-proxy-and-tiles.md`.

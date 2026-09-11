@@ -18,8 +18,9 @@ and were each paid for once. Don't "simplify" them without reading the rationale
   `services.norgeibilder.no`, and re-mints on auth failure (including the
   HTTP-200-with-JSON-error case). Only reachable from wmscache on the compose
   network.
-- **wmscache** — `nginx:1.27-alpine` sidecar. Reverse-proxies + caches
-  every external WMS the SPA uses. Currently fronts five upstreams:
+- **wmscache** — `nginx:1.27-alpine` reverse proxy + 25 GB disk cache in
+  front of every external WMS/WFS/ArcGIS service the SPA uses (Kartverket,
+  Riksantikvaren, matrikkel, NiB, hoydedata). Currently fronts six upstreams:
   - `wms.geonorge.no/skwms1/*` — Kartverket theme + LiDAR WMS.
   - `wfs.geonorge.no/skwms1/*` — Kartverket WFS (kulturminner readout,
     LiDAR project footprints). Proxied but **not** cached.
@@ -59,7 +60,16 @@ exposed on the host — only reachable from `tufteseid` over the compose
 network.
 
 Because everything is same-origin from the browser's POV, none of these
-hosts need to appear in the Caddyfile CSP `img-src` / `connect-src`.
+hosts need to appear in the Caddyfile CSP `img-src` / `connect-src`. Each is
+narrowed to what the browser actually contacts *itself*. `img-src` is
+`'self' data: blob: cache.kartverket.no` — the WMTS tiles are the only images
+not fetched same-origin. `connect-src` adds `*.geonorge.no`, `*.norgeskart.no`
+and `hoydedata.no` on top of `cache.kartverket.no` (whose GetCapabilities
+document is a `fetch()`), the last of them for the ArcGIS identify call in
+`src/search/searchApi.ts` — the proxied `/arcgis/hoydedata/*` terrain path is
+same-origin and is not what puts that host in the list. So routing a new
+upstream through wmscache is never a CSP change; calling one directly from the
+browser always is.
 
 ## nginx cache behavior (wmscache)
 
@@ -318,3 +328,9 @@ browser requests for free (no CSP entry needed).
 
 For a background layer, also set `coverageExtent` from the service's
 GetCapabilities `<BoundingBox>` (see above).
+
+That is the transport half of the recipe. The layer-config half — which name
+union the id goes in, where the config file lives, how it reaches
+`allConfiguredBackgroundLayers` or the exported `themeLayerConfig`, `infoFormat`
+for GetFeatureInfo, and the ribbon control it needs — is in
+`docs/map-layers.md`, which also catalogues every source already wired up.
