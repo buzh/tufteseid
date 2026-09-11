@@ -169,6 +169,11 @@ export const RibbonGlobalRow = () => {
       previous: () => groundRef.current.previous(),
       select: (next) => groundRef.current.select(next),
     });
+    // Cleared on unmount, which is how the `null` case gets to mean what
+    // `groundHandle.ts` says it means: if this row crashes into its own error
+    // boundary the two buttons on the sibling row go away, rather than staying
+    // clickable against controls that are no longer mounted.
+    return () => setGroundHandle(null);
   }, [groundMode, groundHalf, setGroundHandle]);
 
   /*

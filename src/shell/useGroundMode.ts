@@ -254,6 +254,12 @@ export const useGroundMode = (
     if (peekFromRef.current) return;
     const previous = previousRef.current;
     if (!previous || previous === mode) return;
+    // A peek is not an act of authorship, and `select('terreng')` with nothing
+    // open *creates* a lokalitet. Closing one leaves 'terreng' as the mode
+    // before this one, so delegating blindly would have a held X frame the
+    // viewport, save it, fetch its starter set and then snap straight back out
+    // of it on key release — or raise the sign-in dialog, signed out.
+    if (previous === 'terreng' && !locality) return;
     peekFromRef.current = mode;
     select(previous);
   };
