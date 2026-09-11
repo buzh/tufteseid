@@ -362,7 +362,6 @@
       "openOriginal": "Åpne originalen",
       "showOnMap": "Vis i ruta",
       "hideFromMap": "Ta av ruta",
-      "position": "{{index}} / {{count}}",
       "showStrip": "Vis bildestripen",
       "hideStrip": "Skjul bildestripen",
       "previous": "Forrige bilde",

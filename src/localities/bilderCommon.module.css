@@ -1,12 +1,266 @@
 /*
- * What the filmstrip and the edit carousel both need to draw a bilde —
- * docs/lokalitet-view.md §4.3. Two surfaces, one vocabulary: a meta line, a
- * caption field and a fade slider look the same in show and in edit, because
- * they are the same thing being shown and then edited.
+ * What the filmstrip and the edit carousel both need — docs/lokalitet-view.md
+ * §4.3. Two surfaces, one vocabulary.
  *
- * The layouts themselves are not here. A rail and a single big card have
- * nothing in common geometrically, which is the whole reason there are two.
+ * **The geometry is here too, and that is new.** Edit used to be one big card
+ * at a time, on the argument that curating means looking at each picture
+ * properly. It only half held: judging *one* image wants it large, but
+ * arranging a set wants the set, and reordering a card you cannot see move is
+ * the sharpest version of that. So both stances are the same rail now, and
+ * what differs is the row of verbs under it — which is also the only
+ * difference §2 ever wanted to be visible.
  */
+
+/*
+ * The surface both bottom-edge occupants sit in. Shallow on purpose — it
+ * floats over the ground the images are being read against, so it takes the
+ * least height that still lets a frame be recognised, and everything about
+ * the active one goes on one more line under it.
+ */
+.surface {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: calc(100% - 2 * var(--sp-5));
+  max-width: 1100px;
+  margin: 0 auto var(--sp-5);
+  padding: var(--sp-3);
+  border-radius: var(--radius-lg);
+  background: var(--c-bg);
+  box-shadow: var(--shadow-lg);
+  /* The slot around it is pointer-events: none so the map stays draggable. */
+  pointer-events: auto;
+}
+
+@media (max-width: 47.999rem) {
+  .surface {
+    width: calc(100% - 2 * var(--sp-3));
+    margin-bottom: var(--sp-3);
+  }
+}
+
+.railRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+/*
+ * The rail itself. Scrolls rather than wraps: wrapping would make the surface
+ * grow downwards into the map as images are added, and the one thing this
+ * surface may not do is get taller on its own.
+ */
+.rail {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-padding-inline: var(--sp-4);
+}
+
+/* While a frame is being dragged to a new position. `user-select` because the
+   pointer is down and moving over a row of buttons, and a drag that paints a
+   selection behind itself looks broken. */
+.railDragging {
+  user-select: none;
+  cursor: grabbing;
+}
+
+.frame {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: 88px;
+  height: 64px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-bg-muted);
+  cursor: pointer;
+}
+
+.frame:hover {
+  border-color: var(--c-accent);
+}
+
+.frame:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+/* The one on the map. A ring rather than a fill: the frame is an image, and
+   tinting it would change the thing being judged. */
+.frameOn {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 2px var(--c-accent);
+}
+
+/* Kept, not shown (§4.4). Marked rather than removed, because in edit the
+   whole point of concealment is that you can still find what you set aside —
+   an image you cannot get back to is a deleted one with extra steps. In show
+   this never fires: a hidden image is simply not on the rail there. */
+.frameHidden {
+  border-style: dashed;
+  opacity: 0.55;
+}
+
+/* Tombstoned by this edit session (§5.6, consequence 2). Further down than
+   concealment and drained of colour, because this one is not a curation state
+   the lokalitet will keep — it is a thing on its way out that `Lagre` has not
+   yet taken. */
+.frameDeleted {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+/* One of the original's, on a copy that did not carry it (§7). A dashed accent
+   border rather than a fade: this frame is not diminished, it is *somebody
+   else's* — full brightness so you can judge whether it is worth the twenty
+   megabytes, and an outline that says it is not in the exhibit. */
+.frameBorrowed {
+  border-style: dashed;
+  border-color: var(--c-accent);
+}
+
+/* The one under the pointer, mid-drag. It stays in place rather than
+   following the cursor: the insertion mark is what answers "where will it
+   land", and a frame flying over the rail would cover the answer. */
+.frameDragging {
+  opacity: 0.4;
+}
+
+/* Where it lands. Inside the frame at the edge it would be inserted against,
+   because `.frame` clips its overflow and a mark drawn in the gap between two
+   frames would be clipped away by both. */
+.insertMark {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--c-accent);
+}
+
+.insertMark[data-side='left'] {
+  left: 0;
+}
+
+.insertMark[data-side='right'] {
+  right: 0;
+}
+
+.frameImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.frameBusy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--c-fg-muted);
+}
+
+/* Which kind of image this is, legible over whatever it is sitting on. */
+.kindMark {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  display: flex;
+  padding: 0 2px;
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+}
+
+/* The corner chips: the cover star, and concealment. Same treatment as
+   .kindMark so three marks on one 88×64 frame still read as one vocabulary. */
+.mark {
+  position: absolute;
+  top: 2px;
+  display: flex;
+  padding: 0 2px;
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+}
+
+.coverMark {
+  left: 2px;
+}
+
+.hiddenMark {
+  right: 2px;
+}
+
+.busy {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 0 var(--sp-2);
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+.empty {
+  margin: 0;
+  padding: 0 var(--sp-2);
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+/*
+ * The active image's line: what it is, what it says, and what can be done to
+ * it. Wraps rather than scrolls, so a narrow screen stacks the three groups
+ * instead of hiding the last one.
+ */
+.detail {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--c-border);
+}
+
+.detailMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.detailHead {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+/* Why the row of verbs on a borrowed card is one button long (§7). In the
+   toolbar rather than beside the caption, because it is explaining the
+   *absence* of the verbs that would otherwise be here. */
+.borrowedNote {
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
 
 .metaLine {
   overflow: hidden;
@@ -18,8 +272,7 @@
 }
 
 /* Where the image goes on a View that has not been rendered yet (§4.1.2).
-   Fills whatever box it is dropped into — a 96 px frame in the strip, a
-   half-panel card in the carousel — because both surfaces reserve the
+   Fills whatever box it is dropped into, because the surface reserves the
    picture's space whether or not the picture has arrived, and a rail that
    reflows when the pixels land is a rail you lose your place in. */
 .pinFace {

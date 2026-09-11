@@ -1,123 +1,70 @@
-import { useSetAtom } from 'jotai';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AttachmentRecord } from '../api/attachments';
-import {
-  Button,
-  ConfirmPopover,
-  cx,
-  Icon,
-  IconButton,
-  Spinner,
-  Tooltip,
-} from '../ui';
+import { Button, ConfirmPopover, IconButton, Tooltip } from '../ui';
 import {
   BildeBadges,
+  BilderRail,
   CaptionField,
   FadeControl,
   MetaLine,
   Note,
   OpenOriginalButton,
-  PinFace,
   PinRetryButton,
   RecreateButton,
-  useAttachmentUrl,
-  usePinFace,
 } from './bilderCommon';
-import styles from './BilderCarousel.module.css';
-import { bilderStripOpenAtom } from './toolAtoms';
+import styles from './bilderCommon.module.css';
 import type { LocalityWorkspaceApi } from './useLocalityWorkspace';
 import { canPinBilde } from './usePinnedBilde';
-
-/** The card itself: one bilde, as large as the surface will allow. */
-const Card = ({
-  rec,
-  deleted,
-  borrowed,
-}: {
-  rec: AttachmentRecord;
-  deleted: boolean;
-  borrowed: boolean;
-}) => {
-  const { t } = useTranslation();
-  // The 800 px thumbnail rather than the original: a stitched extract is
-  // routinely 4000 px square, and this frame is 180 px tall. `Åpne original`
-  // is how you look at the real thing.
-  const { url, error, onError } = useAttachmentUrl(rec, '800x0');
-  // An unpinned View shows what it is waiting for instead of an image, and
-  // the card keeps its size either way: the carousel is one big frame, and a
-  // stage that collapses between cards is a stage you cannot walk (§4.1.2).
-  const face = usePinFace(rec);
-
-  return (
-    <div
-      className={cx(
-        styles.card,
-        rec.hidden && !borrowed && styles.cardHidden,
-        deleted && styles.cardDeleted,
-        borrowed && styles.cardBorrowed,
-      )}
-    >
-      {face ? (
-        <PinFace rec={rec} />
-      ) : url ? (
-        <img
-          src={url}
-          alt={rec.caption || rec.kind}
-          onError={onError}
-          className={styles.cardImage}
-        />
-      ) : (
-        <span className={styles.cardBusy}>
-          {error ? (
-            <>
-              <Icon icon="broken_image" size={18} />
-              {t('localities.bilder.loadFailed')}
-            </>
-          ) : (
-            <Spinner size={16} />
-          )}
-        </span>
-      )}
-    </div>
-  );
-};
 
 /**
  * Edit mode's bottom edge: the carousel (docs/lokalitet-view.md §4.3).
  *
- * The same slot show fills with a filmstrip, filled with one card at a time
- * instead — and everything that writes. Caption, position in the exhibit
- * order, hide, delete, and the original; §2's rule that show writes nothing
- * is enforced here, by the write verbs simply not existing in the other
+ * The same rail show fills, plus everything that writes: caption, position in
+ * the exhibit order, hide, delete, and the original. §2's rule that show
+ * writes nothing is enforced by those verbs simply not existing in the other
  * occupant rather than being greyed out in a shared one.
  *
- * Two differences from the rail that are easy to miss:
+ * It used to be one large card at a time, on the argument that deciding a
+ * caption off an 88×64 thumbnail is deciding it blind. That was true of
+ * judging one image and false of arranging a set: curating an exhibit is
+ * mostly deciding what follows what, and a reorder you cannot watch happen is
+ * a reorder you have to verify afterwards. So the rail is the shape in both
+ * stances, and the big look at one picture is `Åpne originalen` or
+ * `Vis i ruta` — which put it on the ground the render was made from, at full
+ * size, which is better than a 180 px letterbox ever was.
+ *
+ * Three things about it that are easy to miss:
  *
  * - The concealed images are here, marked. Concealment is one of the things
  *   you came to change, and a curation control whose effect you cannot see is
  *   not a control. That is `bilderItems` doing it, not this component.
- * - **Walking the carousel does not put images on the map.** The ground
- *   overlay is one slot shared with the live terrain render, so a card that
- *   claimed it on arrival would knock a render down every time `Behold`
- *   landed a new image and moved the cursor. `Vis i ruta` is a verb here.
+ * - **Walking the rail does not put images on the map.** The ground overlay
+ *   is one slot shared with the live terrain render, so a card that claimed it
+ *   on arrival would knock a render down every time `Behold` landed a new
+ *   image and moved the cursor. `Vis i ruta` is a verb here.
+ * - **Order is dragged or stepped.** The frames drag along the rail
+ *   (`useRailReorder`); the ←/→ buttons in this row do the same move for the
+ *   keyboard and for touch, where the drag gesture belongs to scrolling.
  *
  * One of three things that may occupy the bottom slot, and never at the same
  * time as another: `LocalityRibbon` enforces that.
  */
 export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
-  const setOpen = useSetAtom(bilderStripOpenAtom);
   const { pinned } = ws;
   const items = ws.bilderItems;
-  const count = items?.length ?? 0;
+  // The exhibit is the *own* records; the borrowed tail (§7) is a suffix of
+  // the rail that has no position in it. `reorderBilde` clamps to that
+  // boundary anyway, so counting the whole rail here would leave the last
+  // `→` enabled on a move it would then refuse to make.
+  const ownCount =
+    items?.filter((it) => !ws.inheritedIds.has(it.id)).length ?? 0;
   const index = items?.findIndex((it) => it.id === ws.activeBildeId) ?? -1;
   const active = index >= 0 ? (items?.[index] ?? null) : null;
-  const walkable = count > 1;
 
-  // A carousel with no card showing is a blank panel: unlike the rail, there
-  // is no other content to look at while nothing is selected. So it lands on
-  // the first image, and on the one that replaces a deleted one.
+  // Land on the first image rather than on nothing. The rail is legible
+  // either way, but entering edit is entering to change something, and a
+  // surface that opens with no subject makes you pick one before you can.
   const { selectBilde, activeBildeId } = ws;
   useEffect(() => {
     if (!items || items.length === 0 || activeBildeId) return;
@@ -125,8 +72,8 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   }, [items, activeBildeId, selectBilde]);
 
   const isPinned = active != null && pinned.pinnedId === active.id;
-  // Tombstoned by this session (§5.6, consequence 2). The card stays on the
-  // stage — walking past a gap is how you fail to notice you made one — but
+  // Tombstoned by this session (§5.6, consequence 2). The frame stays on the
+  // rail — walking past a gap is how you fail to notice you made one — but
   // every verb that would curate it is gone, because curating something you
   // have just thrown away is not a decision anyone needs to make.
   const deleted = active != null && ws.deletedIds.has(active.id);
@@ -138,78 +85,13 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const borrowed = active != null && ws.inheritedIds.has(active.id);
 
   return (
-    <div className={styles.carousel} data-chrome="bottom">
-      <div className={styles.head}>
-        {ws.starterBusy && (
-          <span className={styles.busy}>
-            <Spinner size={14} />
-            {t('localities.tools.starterBusy')}
-          </span>
-        )}
-        {count > 0 && (
-          <span className={styles.position}>
-            {t('localities.bilder.position', {
-              index: Math.max(index, 0) + 1,
-              count,
-            })}
-          </span>
-        )}
-        <span className={styles.spacer} />
-        <Tooltip label={t('localities.bilder.hideStrip')}>
-          <IconButton
-            icon="bottom_panel_close"
-            size="sm"
-            palette="gray"
-            aria-label={t('localities.bilder.hideStrip')}
-            onClick={() => setOpen(false)}
-          />
-        </Tooltip>
-      </div>
-
-      <div className={styles.stage}>
-        <IconButton
-          icon="chevron_left"
-          size="sm"
-          palette="gray"
-          disabled={!walkable}
-          aria-label={t('localities.bilder.previous')}
-          onClick={() => ws.stepBilde(-1)}
-        />
-        {items == null ? (
-          <div className={styles.card}>
-            <span className={styles.cardBusy}>
-              <Spinner size={16} />
-              {t('localities.bilder.loading')}
-            </span>
-          </div>
-        ) : active ? (
-          <Card
-            key={active.id}
-            rec={active}
-            deleted={deleted}
-            borrowed={borrowed}
-          />
-        ) : (
-          <div className={styles.card}>
-            <p className={styles.empty}>
-              {!ws.starterBusy && t('localities.bilder.empty')}
-            </p>
-          </div>
-        )}
-        <IconButton
-          icon="chevron_right"
-          size="sm"
-          palette="gray"
-          disabled={!walkable}
-          aria-label={t('localities.bilder.next')}
-          onClick={() => ws.stepBilde(1)}
-        />
-      </div>
+    <div className={styles.surface} data-chrome="bottom">
+      <BilderRail ws={ws} onReorder={ws.reorderBilde} />
 
       {active && (
-        <div className={styles.body}>
-          <div className={styles.bodyMain}>
-            <div className={styles.bodyHead}>
+        <div className={styles.detail}>
+          <div className={styles.detailMain}>
+            <div className={styles.detailHead}>
               <BildeBadges ws={ws} rec={active} borrowed={borrowed} />
               <MetaLine rec={active} />
             </div>
@@ -273,9 +155,11 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                 <PinRetryButton ws={ws} rec={active} />
                 <OpenOriginalButton ws={ws} rec={active} />
 
-                {/* Position in the exhibit order (§4.4). The index handed to
-                    `reorderBilde` is a position in the *unfiltered* list —
-                    which is the same array as `bilderItems` here, since edit
+                {/* Position in the exhibit order (§4.4), for the keyboard and
+                    for touch — dragging the frame itself is the other way,
+                    and neither is the primary one. The index handed to
+                    `reorderBilde` is a position in the *unfiltered* list,
+                    which is the same array as `bilderItems` here since edit
                     hides nothing from itself. */}
                 <Tooltip label={t('localities.bilder.moveEarlier')}>
                   <IconButton
@@ -292,7 +176,7 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                     icon="arrow_forward"
                     size="sm"
                     palette="gray"
-                    disabled={index < 0 || index >= count - 1}
+                    disabled={index < 0 || index >= ownCount - 1}
                     aria-label={t('localities.bilder.moveLater')}
                     onClick={() => ws.reorderBilde(active.id, index + 1)}
                   />

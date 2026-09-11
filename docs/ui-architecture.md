@@ -1401,7 +1401,7 @@ rows, the bottom edge of the map, a popover, a map callout and the dialogs:
 | What the rectangle holds | `FunnList`, in a popover on that row | the funn index |
 | The funn being drawn | `RibbonFunnDraftRow` (row 4) + `FunnDrawBar` (bottom slot) | title, save state, *Utvid området*; the pen — §8.5 |
 | The selected funn's note | `FunnCallout` (an `ol/Overlay` on the map) | title, status, note, beside the shape — §8.6 |
-| The images | `BilderStrip` / `BilderCarousel` / `BilderPicker` (bottom slot) | the filmstrip in show, the carousel in edit, a picker run borrowing the slot — §8.7.2, §8.9.3 |
+| The images | `BilderStrip` / `BilderCarousel` / `BilderPicker` (bottom slot) | the same rail in both stances — read-only in show, the write verbs and drag-to-reorder in edit; a picker run borrows the slot — §8.7.2, §8.9.3 |
 | Dialogs | `LocalityDialogs` | Detaljer, the two `Hent ▾` selection dialogs and the flyfoto licensing notice |
 
 **The row is four zones**, and each answers one question
@@ -1520,10 +1520,9 @@ opening anything else.
 
 **Nothing in show writes.** Not disabled verbs — *absent* ones: the middle
 zone does not render, the name is not clickable, the `⋮` menu holds only
-Detaljer and its fields are read-only, and the bottom edge is a filmstrip with
-no delete, no reordering,
-no hide and a read-only caption rather than the carousel that carries all
-four; funn are not editable, and N / U / B do nothing. Reading, pinning an image,
+Detaljer and its fields are read-only, and the bottom edge is a rail with
+no delete, no reordering, no hide and a read-only caption rather than the same
+rail carrying all four; funn are not editable, and N / U / B do nothing. Reading, pinning an image,
 `Gjenskap` and downloading a figure all stay, because none of them leaves a trace. The one way to write is
 to press `Rediger` first, which costs nothing: no fetch, no write, the map
 does not move.
@@ -1950,9 +1949,9 @@ way back, not the normal way up; there is no **Ta av ruta** on the rail,
 because clicking the selected frame again deselects it and that is the same
 gesture.
 
-**Selecting is pinning only in show.** In the carousel both verbs are explicit
-(`Vis i ruta` / `Ta av ruta`) and walking the cards moves nothing on the map,
-because the overlay slot is shared with the live terrain render: a card that
+**Selecting is pinning only in show.** In edit both verbs are explicit
+(`Vis i ruta` / `Ta av ruta`) and walking the rail moves nothing on the map,
+because the overlay slot is shared with the live terrain render: a frame that
 pinned itself on arrival would stand a render down every time `Behold` landed
 an image and moved the cursor onto it. `pinOnWalk` in `useLocalityWorkspace` is
 that one-line difference, and it is why the two stances need two surfaces
@@ -2014,7 +2013,7 @@ rather than one with the writes disabled.
 - **← / → walk the images again.** The lightbox's arrow keys came back with the
   filmstrip, on the terms in §8.7.2.
 
-#### 8.7.2 The bottom edge — the filmstrip and the carousel
+#### 8.7.2 The bottom edge — one rail, two stances
 
 `docs/lokalitet-view.md` §4.3. The images are the lokalitet's content, not a
 panel about it, so they sit **along the bottom of the map** rather than in a
@@ -2031,30 +2030,45 @@ transient by construction:
 
 | | show — `BilderStrip.tsx` | edit — `BilderCarousel.tsx` |
 |---|---|---|
-| shape | a rail of 88×64 frames | one card, 180 px tall, `object-fit: contain` |
-| hidden records | absent | present, dashed and faded |
+| shape | a rail of 88×64 frames, a detail line under it | the same |
+| hidden records | absent | present, dashed and marked |
 | caption | `readOnly` (§8.1) | editable, committed on blur |
 | the map | picking a frame pins it | an explicit `Vis i ruta` / `Ta av ruta` |
-| order | none | `arrow_back` / `arrow_forward` on the card |
-| conceal, delete | absent | on the card |
+| order | none | drag a frame along the rail, or `arrow_back` / `arrow_forward` in the detail row |
+| conceal, delete | absent | in the detail row |
 | both | Gjenskap, Åpne originalen, Toning, ← / →, `bottom_panel_close` | |
 
-Two things that reads as arbitrary until you try the alternative:
+**Edit used to be one large card at a time**, on the argument that judging a
+caption off an 88×64 thumbnail is judging it blind. That is true of looking at
+one image and false of arranging a set: curating an exhibit is mostly deciding
+what follows what, and a reorder you cannot watch happen is a reorder you have
+to go and verify. So both stances are the rail, `BilderRail` in
+`bilderCommon.tsx` renders it for both, and the big look at one picture is
+`Vis i ruta` — the image on the ground it is of, at full size, which the
+180 px letterbox never was — or `Åpne originalen`.
+
+Three things that read as arbitrary until you try the alternative:
 
 - **The write verbs are absent from the rail, not disabled on it.** That is §2
-  of the lokalitet-view doc, and it is the reason the two surfaces are two
-  files. A single component with `canEdit &&` scattered through it is how a
-  greyed-out delete button ends up on a stranger's lokalitet.
-- **Walking the carousel does not put images on the map** (`pinOnWalk` in
+  of the lokalitet-view doc, and it is the reason the two surfaces are still
+  two files even though they now look alike. A single component with
+  `canEdit &&` scattered through it is how a greyed-out delete button ends up
+  on a stranger's lokalitet — and the shared geometry does not weaken that,
+  because what the two files hold is the verb row, not the layout.
+- **Walking the rail in edit does not put images on the map** (`pinOnWalk` in
   `useLocalityWorkspace` — pinning follows the cursor only in show). The
   ground-overlay slot holds exactly one image and the live terrain render
-  wants it too, so a card that claimed it on arrival would knock a render down
+  wants it too, so a frame that claimed it on arrival would knock a render down
   every time `Behold` landed an image and moved the cursor onto it.
+- **Only edit passes `onReorder`.** `BilderRail` takes it as an optional prop
+  and `BilderStrip` omits it, so drag is not a thing show has and suppresses —
+  the hook is never armed there at all.
 
 The shared vocabulary — the tokened-URL dance, the meta line, the caption
-field, the fade slider, the pin face (§8.7.4), Gjenskap and Åpne originalen — is
-`src/localities/bilderCommon.tsx`. The geometry is not shared, because a rail
-and a single big card have nothing in common geometrically.
+field, the fade slider, the pin face (§8.7.4), Gjenskap and Åpne originalen —
+is `src/localities/bilderCommon.tsx`, and since the two stances are one shape
+the geometry is shared too: `bilderCommon.module.css` owns the whole bottom
+edge, and neither surface has a stylesheet of its own.
 
 - **The slot.** `bottomSlotAtom` (`src/shell/bottomSlot.ts`) publishes an
   element the shell owns and the ribbon portals into: the surface belongs to
@@ -2079,9 +2093,10 @@ and a single big card have nothing in common geometrically.
   with a kind mark; the selected one carries a ring and scrolls itself into
   view, which is what makes a keyboard step legible — otherwise ← / → would
   change the map and leave the active frame off-screen.
-- **The carousel selects for you.** Unlike the rail, a carousel with nothing
-  active is a blank panel, so it lands on the first image and on whatever
-  replaces a deleted one.
+- **Edit selects for you.** Show is legible with nothing active; edit is
+  entered in order to change something, and a surface that opens with no
+  subject makes you pick one before you can. So `BilderCarousel` lands on the
+  first image, and on whatever replaces a deleted one.
 - **← / →** are bound only while `stripOpen && !draftActive` and there is more
   than one image, so OpenLayers' `KeyboardPan` keeps horizontal panning
   whenever walking the strip would be meaningless.
@@ -2144,7 +2159,7 @@ that, and neither of them is a cover field.
   `bilderItems` (what the bottom edge walks) is the filtered list; every
   ordering call indexes into the hook's unfiltered `attachmentItems`. In edit —
   the only stance that can reorder — the two lists are the same array, so the
-  carousel may hand `reorderBilde` its own index; in show they are not, and an
+  rail may hand `reorderBilde` its own index; in show they are not, and an
   exhibit order that depended on who was looking would not be an order.
 - **The cover is not a field.** It is `coverBildeId` — the first non-hidden
   record in exhibit order — computed where it is needed, on the same argument
@@ -2158,13 +2173,37 @@ that, and neither of them is a cover field.
   knobs worth seeding from. Curation moves it exactly the way it moves the
   cover, which is the property that matters; the doc's phrase "the cover
   terrain render" reads as one derivation and is two.
-- **There is no drag.** `docs/lokalitet-view.md` §4.4 asks for drag-to-reorder
-  on the rail, and §2 of the same doc says nothing in show writes; the rail is
-  show's occupant, so the two cannot both hold. The verbs are `arrow_back` /
-  `arrow_forward` on the carousel card instead — which is also the accessible
-  answer, since HTML5 drag is neither keyboard- nor touch-operable and the
-  exhibit order is content. Reordering by dragging a *card* is possible later
-  if the carousel ever shows its neighbours; it is not worth a rail in edit.
+- **A move is dragged or stepped, and the arrows are not the fallback.**
+  `docs/lokalitet-view.md` §4.4 asks for drag-to-reorder on the rail; that read
+  as impossible while the rail was show's occupant only, since §2 of the same
+  doc says nothing in show writes. Now that edit is a rail too (§8.7.2) the
+  conflict is gone: `useRailReorder.ts` drags a frame to its place, and
+  `arrow_back` / `arrow_forward` in the detail row make the same move for the
+  keyboard and for touch. Both stay, because HTML5-style drag is neither
+  keyboard- nor touch-operable and the exhibit order is content.
+- **The drag is Pointer Events with capture, and it excludes touch.**
+  `pointerType === 'touch'` returns immediately, because on a horizontally
+  scrolling rail the horizontal drag gesture already belongs to scrolling and
+  a `touch-action` that took it away would cost more than it bought. Movement
+  arms only past a 4 px threshold, so a press that turns out to be a click
+  still selects; `setPointerCapture` on the frame is what makes the rest of the
+  gesture arrive without window listeners, and it is released in both `up` and
+  `cancel`. `Esc` cancels a live drag, captured and with `stopPropagation`, so
+  it does not also close the lokalitet.
+- **The insert mark lives inside the frame, at its edge.** `.frame` is
+  `overflow: hidden`, so a marker drawn in the gap between two frames would be
+  clipped by both; the rail instead marks the frame the drop lands before or
+  after, `data-side="left|right"`.
+- **The drop index is computed in *rest* space** — the list with the dragged
+  record already taken out — which is exactly the set of frames still on
+  screen during the drag, and exactly what `reorderBilde` expects. That
+  correspondence is why the computation needs no off-by-one anywhere; the
+  frames the pointer is being compared against *are* the gap list.
+- **The borrowed tail is not part of the exhibit** (§8.12), so it does not
+  drag and it does not count. `reorderBilde` clamps into the own-records
+  range regardless, which is why `arrow_forward` disables on `ownCount - 1`
+  rather than on the length of the rail: counting the whole rail leaves the
+  last one enabled on a move that would then be refused.
 
 #### 8.7.4 The View/File split, and the pin queue
 
@@ -2360,7 +2399,7 @@ Load-bearing choices:
   nothing worth aborting, and the pin queue that follows them is deliberately
   outside the component lifetime (§8.7.4).
 - **Progress renders on the bottom edge**, as one line with a spinner
-  (`starterBusy`), above the rail or in the carousel's head row; the edge
+  (`starterBusy`), above the rail in both stances; the edge
   unfolds itself when a pack starts, and `hasBilder` counts a running pack, so
   the bar is there before the first card is. It is now about a second rather
   than the old several minutes — what has to be seen arriving is the three
@@ -2614,7 +2653,8 @@ Load-bearing, in the order the mistakes would be made:
   `Åpne originalen`.
 - **Deferred deletion is published as one `Set`.** `deletedIds` spans both
   collections (PocketBase ids are unique across them) plus `restoreDeleted`.
-  The funn row and the carousel card grey, strike through, lose every verb but
+  The funn row and the bilde's frame and detail grey, strike through, lose
+  every verb but
   `Angre sletting`, and stay where they are — a row that vanished would be
   claiming a deletion that has not happened. The **counts** stay inclusive of
   tombstoned records, so the badge and the rail agree about what is on screen;
@@ -3367,10 +3407,11 @@ rectangle and fades it over what is there now, and in edit **Vis i ruta** /
 terrain render or flyfoto to set the map back to the view it was made from;
 see a card that is still a set of parameters say so, and retry it if its render
 failed; open the original in a tab, fetching it first where it does not exist
-yet; caption an attachment; delete one; step a card
-earlier or later with the two arrows to set the order the
+yet; caption an attachment; delete one; drag a frame along the rail to its
+place in the exhibit, or step it earlier or later with the two arrows, to set
+the order the
 images are read in, and so which one is the cover; hide one from the exhibit
-without deleting it, and see the hidden ones dashed and faded in the carousel
+without deleting it, and see the hidden ones dashed and marked on the rail
 while you are editing; fold the edge
 away and back with **Bilder ▾** to get the ground under it;
 see flyfoto captioned with its acquisition year; get every kept or downloaded

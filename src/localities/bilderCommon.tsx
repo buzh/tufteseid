@@ -1,22 +1,29 @@
 /*
  * The parts the two bottom-edge surfaces share (docs/lokalitet-view.md §4.3).
  *
- * Show gets a filmstrip and edit gets a carousel, and they are different
- * shapes on purpose — but they are showing the same records, so the token
- * dance that fetches an image, the line that says which dataset it came from,
- * the caption field and the fade slider have to behave identically in both.
- * Two copies of `useAttachmentUrl` in particular would be two chances to get
- * the protected-file fallback wrong.
+ * Both stances are a rail of the lokalitet's images with a line about the
+ * active one under it — the same geometry, because arranging a set needs to
+ * see the set, and that is as true of the stance that does the arranging as
+ * of the one that only walks it. So the surface, the rail, the frames and the
+ * detail layout are all here, and what the two surfaces still own is **the
+ * row of verbs**: show's are all reading, edit's include everything that
+ * writes. That is the only difference §2 ever asked to be visible, and
+ * keeping it in two components is what stops a write verb from being one
+ * boolean away from show.
  *
- * Verbs live here too when both stances have them (Gjenskap, the original,
- * Vis i ruta) and stay in the surface when only one does — deleting is
- * carousel-only because nothing in show writes (§2).
+ * The token dance that fetches an image, the line naming the dataset, the
+ * caption field and the fade slider are shared for the older reason: two
+ * copies of `useAttachmentUrl` would be two chances to get the protected-file
+ * fallback wrong.
  */
 
 import { useSetAtom } from 'jotai';
 import {
   type ReactNode,
+  useCallback,
   useEffect,
+  useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from 'react';
@@ -30,15 +37,20 @@ import { recreateViewAtom } from '../shell/useRecreateView';
 import {
   Badge,
   Button,
+  cx,
   Icon,
+  IconButton,
   Input,
   type MaterialSymbol,
   Spinner,
+  Tooltip,
 } from '../ui';
 import styles from './bilderCommon.module.css';
 import { isDraftId } from './draft';
 import { type PinState, pinStateOf, subscribePinQueue } from './pinQueue';
+import { bilderStripOpenAtom } from './toolAtoms';
 import type { LocalityWorkspaceApi } from './useLocalityWorkspace';
+import { type RailReorder, useRailReorder } from './useRailReorder';
 import { isPinned, viewSpecOf } from './viewSpec';
 
 // `landscape` is what the ribbon already uses for LiDAR mode, so an
@@ -196,6 +208,271 @@ export const PinRetryButton = ({
     <Button size="sm" leftIcon="redo" onClick={() => ws.retryPin(rec)}>
       {t('localities.bilder.pinRetry')}
     </Button>
+  );
+};
+
+/*
+ * One frame of the rail.
+ *
+ * Scrolls itself into view when it becomes the active one, because ←/→ walk
+ * the rail and the twelfth image is off the right-hand end of it — a keyboard
+ * step that changes the surface but not the rail would leave you unable to see
+ * what you are looking at.
+ *
+ * The three curation states are marked here rather than being filtered out,
+ * and only edit ever sees them: a concealed image is not on the rail in show
+ * at all, and a tombstoned one exists only inside an open transaction.
+ */
+const Frame = ({
+  rec,
+  selected,
+  isCover,
+  deleted,
+  borrowed,
+  drag,
+  insertSide,
+  onClick,
+}: {
+  rec: AttachmentRecord;
+  selected: boolean;
+  isCover: boolean;
+  /** Tombstoned by this edit session (§5.6, consequence 2). */
+  deleted: boolean;
+  /** One of the original's Files, on a copy that did not carry it (§7). */
+  borrowed: boolean;
+  /** Null in show — nothing there reorders anything. */
+  drag: RailReorder | null;
+  insertSide: 'left' | 'right' | null;
+  onClick: () => void;
+}) => {
+  const { url, error, onError } = useAttachmentUrl(rec, '200x200');
+  const face = usePinFace(rec);
+  const { t } = useTranslation();
+  const el = useRef<HTMLButtonElement | null>(null);
+
+  // One callback ref for two jobs: keeping our own handle for scrollIntoView,
+  // and telling the reorder hook where this frame is on screen.
+  const register = drag?.register;
+  const setRef = useCallback(
+    (node: HTMLButtonElement | null) => {
+      el.current = node;
+      register?.(rec.id, node);
+    },
+    [register, rec.id],
+  );
+
+  useEffect(() => {
+    if (!selected) return;
+    el.current?.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
+      behavior: 'smooth',
+    });
+  }, [selected]);
+
+  return (
+    <button
+      ref={setRef}
+      type="button"
+      className={cx(
+        styles.frame,
+        selected && styles.frameOn,
+        rec.hidden && !borrowed && styles.frameHidden,
+        deleted && styles.frameDeleted,
+        borrowed && styles.frameBorrowed,
+        drag?.dragId === rec.id && styles.frameDragging,
+      )}
+      aria-pressed={selected}
+      title={
+        face
+          ? // The pin state *is* the frame's sentence while there are no
+            // pixels: the caption describes an image nobody can see yet.
+            face.label
+          : error
+            ? t('localities.bilder.loadFailed')
+            : rec.caption || rec.kind
+      }
+      onPointerDown={drag ? (e) => drag.onPointerDown(e, rec.id) : undefined}
+      onPointerMove={drag?.onPointerMove}
+      onPointerUp={drag?.onPointerUp}
+      onPointerCancel={drag?.onPointerCancel}
+      onClick={() => {
+        // The pointerup that ended a drag also produces a click, and landing
+        // a card in its new place is not a request to select it.
+        if (drag?.consumeClick()) return;
+        onClick();
+      }}
+    >
+      {face ? (
+        <PinFace rec={rec} compact />
+      ) : url ? (
+        <img
+          src={url}
+          alt={rec.caption || rec.kind}
+          onError={onError}
+          className={styles.frameImage}
+        />
+      ) : (
+        <span className={styles.frameBusy}>
+          {error ? (
+            <Icon icon="broken_image" size={18} />
+          ) : (
+            <Spinner size={14} />
+          )}
+        </span>
+      )}
+      <span className={styles.kindMark}>
+        <Icon icon={KIND_ICON[rec.kind]} size={14} />
+      </span>
+      {/* The cover is derived, so this mark is the only place it is stated —
+          and it moves the moment something else is arranged in front of it. */}
+      {isCover && !borrowed && (
+        <span className={cx(styles.mark, styles.coverMark)}>
+          <Icon icon="star" size={13} filled />
+        </span>
+      )}
+      {rec.hidden && !borrowed && (
+        <span className={cx(styles.mark, styles.hiddenMark)}>
+          <Icon icon="hide_image" size={13} />
+        </span>
+      )}
+      {insertSide && (
+        <span className={styles.insertMark} data-side={insertSide} />
+      )}
+    </button>
+  );
+};
+
+/**
+ * The rail: every image this lokalitet holds, in exhibit order, with the
+ * active one ringed. Both stances mount it, and the ground does not move as
+ * you walk it — so stepping the rail is flipping between readings of one
+ * rectangle in register, which is the curtain's trick and the flyfoto temporal
+ * stack's trick applied to the images somebody already decided were worth
+ * keeping.
+ *
+ * `onReorder` is the whole of the stance difference here: with it the frames
+ * can be dragged into a new exhibit position, without it they cannot be
+ * dragged at all (§2, `useRailReorder`).
+ */
+export const BilderRail = ({
+  ws,
+  onReorder,
+}: {
+  ws: LocalityWorkspaceApi;
+  onReorder?: (id: string, toIndex: number) => void;
+}) => {
+  const { t } = useTranslation();
+  const setOpen = useSetAtom(bilderStripOpenAtom);
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const items = ws.bilderItems;
+  const walkable = (items?.length ?? 0) > 1;
+
+  // Only this lokalitet's own images have a position in its exhibit; the
+  // borrowed tail (§7) is a suffix that belongs to the original, so it is
+  // neither draggable nor a place to drop something.
+  const { inheritedIds } = ws;
+  const ownIds = useMemo(
+    () =>
+      (items ?? [])
+        .filter((rec) => !inheritedIds.has(rec.id))
+        .map((rec) => rec.id),
+    [items, inheritedIds],
+  );
+
+  const drag = useRailReorder(ownIds, railRef, onReorder ?? null);
+
+  // Which frame wears the insertion mark, and on which side. The gap index is
+  // in the list without the dragged frame, so the mark goes on the frame that
+  // would follow it — or on the trailing edge of the last one.
+  let markId: string | null = null;
+  let markSide: 'left' | 'right' = 'left';
+  if (drag.dragId != null && drag.insertAt != null) {
+    const rest = ownIds.filter((id) => id !== drag.dragId);
+    if (rest.length > 0) {
+      if (drag.insertAt < rest.length) {
+        markId = rest[drag.insertAt];
+      } else {
+        markId = rest[rest.length - 1];
+        markSide = 'right';
+      }
+    }
+  }
+
+  return (
+    <>
+      {/* Above the rail, not a frame in it: the images the starter set has
+          already saved are in that rail, and a placeholder among them would
+          be read as one more that failed. */}
+      {ws.starterBusy && (
+        <div className={styles.busy}>
+          <Spinner size={14} />
+          {t('localities.tools.starterBusy')}
+        </div>
+      )}
+
+      <div className={styles.railRow}>
+        <IconButton
+          icon="chevron_left"
+          size="sm"
+          palette="gray"
+          disabled={!walkable}
+          aria-label={t('localities.bilder.previous')}
+          onClick={() => ws.stepBilde(-1)}
+        />
+
+        <div
+          ref={railRef}
+          className={cx(styles.rail, drag.dragId && styles.railDragging)}
+        >
+          {items == null ? (
+            <div className={styles.busy}>
+              <Spinner size={14} />
+              {t('localities.bilder.loading')}
+            </div>
+          ) : items.length === 0 ? (
+            !ws.starterBusy && (
+              <p className={styles.empty}>{t('localities.bilder.empty')}</p>
+            )
+          ) : (
+            items.map((rec) => (
+              <Frame
+                key={rec.id}
+                rec={rec}
+                selected={rec.id === ws.activeBildeId}
+                isCover={rec.id === ws.coverBildeId}
+                deleted={ws.deletedIds.has(rec.id)}
+                borrowed={inheritedIds.has(rec.id)}
+                drag={
+                  onReorder != null && !inheritedIds.has(rec.id) ? drag : null
+                }
+                insertSide={rec.id === markId ? markSide : null}
+                onClick={() => ws.selectBilde(rec.id)}
+              />
+            ))
+          )}
+        </div>
+
+        <IconButton
+          icon="chevron_right"
+          size="sm"
+          palette="gray"
+          disabled={!walkable}
+          aria-label={t('localities.bilder.next')}
+          onClick={() => ws.stepBilde(1)}
+        />
+
+        <Tooltip label={t('localities.bilder.hideStrip')}>
+          <IconButton
+            icon="bottom_panel_close"
+            size="sm"
+            palette="gray"
+            aria-label={t('localities.bilder.hideStrip')}
+            onClick={() => setOpen(false)}
+          />
+        </Tooltip>
+      </div>
+    </>
   );
 };
 

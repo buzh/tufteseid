@@ -362,7 +362,6 @@
       "openOriginal": "Opne originalen",
       "showOnMap": "Vis i ruta",
       "hideFromMap": "Ta av ruta",
-      "position": "{{index}} / {{count}}",
       "showStrip": "Vis biletstripa",
       "hideStrip": "Skjul biletstripa",
       "previous": "Førre bilete",

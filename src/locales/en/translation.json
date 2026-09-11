@@ -362,7 +362,6 @@
       "openOriginal": "Open the original",
       "showOnMap": "Show on the map",
       "hideFromMap": "Take off the map",
-      "position": "{{index}} / {{count}}",
       "showStrip": "Show the filmstrip",
       "hideStrip": "Hide the filmstrip",
       "previous": "Previous image",

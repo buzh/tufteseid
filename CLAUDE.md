@@ -387,7 +387,8 @@ Two rules that hold regardless of what the interface looks like:
   groups exist.
 
 The ribbon rows, the funn list in its popover on the lokalitet row, the bottom
-edge the bilder live on — a filmstrip in show, a carousel in edit, the draw
+edge the bilder live on — one rail in both stances, read-only in show and with
+the write verbs and drag-to-reorder in edit, or the draw
 bar while a funn is being drawn (`docs/ui-architecture.md` §8.7.2) — the
 drawing tools and the policy
 decisions around them (bbox is authored not derived, only seeded from the

@@ -358,6 +358,16 @@ surface differs by stance because the jobs are not the same one:
 | **Show** | **filmstrip** — a rail of thumbnails | walk a curated sequence |
 | **Edit** | **carousel** — one card at a time, big | curate what is kept, and receive what arrives |
 
+**Built, then reversed on the second row.** Edit is a rail too — the same
+geometry as show, with the write verbs added under it. The argument for the big
+card was that judging a caption off an 88×64 thumbnail is judging it blind,
+which is true of looking at one image and false of arranging a set: curating an
+exhibit is mostly deciding what follows what, and one card at a time makes
+every reorder a move you have to go and verify afterwards. What the big card
+was for is better served by `Vis i ruta`, which puts the image on the ground it
+is of at full size. `docs/ui-architecture.md` §8.7.2 is what is actually there;
+the rest of this section still holds.
+
 Both declare `data-chrome="bottom"` and join `chromeInsets` with nothing to
 register — the mechanism the dock already used when it became a bottom sheet
 below the md breakpoint (§3.1). Both are collapsible to a tab.
