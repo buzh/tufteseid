@@ -4,7 +4,6 @@ import { Route, Routes } from 'react-router-dom';
 import { pbAuthSyncEffect } from './auth/atoms.ts';
 import { HelpPage } from './help/HelpPage.tsx';
 import './i18n';
-import { LidarExtractViewer } from './lidarExtract/LidarExtractViewer.tsx';
 import { useMapSettings } from './map/mapHooks.ts';
 import { AppShell } from './shell/AppShell.tsx';
 
@@ -32,13 +31,10 @@ export const App = () => {
   });
 
   return (
-    <>
-      <LidarExtractViewer />
-      <Routes>
-        <Route path="/" element={<AppShell />} />
-        <Route path="/hjelp" element={<HelpPage />} />
-      </Routes>
-    </>
+    <Routes>
+      <Route path="/" element={<AppShell />} />
+      <Route path="/hjelp" element={<HelpPage />} />
+    </Routes>
   );
 };
 

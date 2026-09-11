@@ -1,32 +1,92 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Dialog } from '../ui';
+import { LidarExtractDialog } from '../lidarExtract/LidarExtractDialog';
+import { Button, cx, Dialog } from '../ui';
+import { NIB_MOSAIC_KEY } from './behold';
+import type { FlyfotoProject } from './flyfotoProjects';
 import styles from './LocalityDialogs.module.css';
 import {
   FLYFOTO_BATCH_MAX,
-  FLYFOTO_MOSAIC,
   type LocalityWorkspaceApi,
 } from './useLocalityWorkspace';
 
 /**
- * The workspace's two modals, kept out of the ribbon rows.
+ * The workspace's modals, kept out of the ribbon rows.
  *
- * Neither is anchored to a control, and both are driven by controller state
- * rather than by whoever pressed the button — the flyfoto notice hands off to
- * the picker. Mounting them next to the trigger would tie their lifetime to
- * whichever row happens to be on screen.
+ * None of them is anchored to a control, and all are driven by controller
+ * state rather than by whoever pressed the button — the flyfoto notice hands
+ * off to the acquisition list. Mounting them next to the trigger would tie
+ * their lifetime to whichever row happens to be on screen.
  *
- * Grow-to-fit used to be a third one, raised from inside the funn save path.
- * It is an Alert in the draft band now: drawing past the edge of the
- * rectangle is worth remarking on, but not worth stopping the pen for.
+ * Two of the three are the selection dialogs behind `Hent ▾` (§4.3). Both
+ * survived the picker unchanged in what they *ask*; what changed is what
+ * happens after: they hand a list of proposals to a picker run instead of
+ * saving anything.
+ *
+ * Grow-to-fit used to be one of these, raised from inside the funn save path.
+ * It is an Alert in the draft band now: drawing past the edge of the rectangle
+ * is worth remarking on, but not worth stopping the pen for.
  */
 export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
+  // Which acquisitions are checked. `NIB_MOSAIC_KEY` stands for the seamless
+  // one, which is not a project and has no id of its own.
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const { flyfotoPicker, flyfotoProjects } = ws;
+
+  // A closed dialog remembers nothing: reopening it is a new question, and a
+  // list still checked from last time is how you grab eight photographs you
+  // meant to grab once.
+  useEffect(() => {
+    if (!flyfotoPicker) setPicked(new Set());
+  }, [flyfotoPicker]);
+
+  const toggle = (key: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const atCap = picked.size >= FLYFOTO_BATCH_MAX;
+  const check = (key: string) => ({
+    type: 'checkbox' as const,
+    checked: picked.has(key),
+    // The cap is enforced on the way in rather than by silently truncating
+    // the run: a checkbox you ticked that turns out not to count is worse
+    // than one you could not tick.
+    disabled: atCap && !picked.has(key),
+    onChange: () => toggle(key),
+  });
+
+  const selectNewest = () => {
+    const next = new Set<string>();
+    for (const p of (flyfotoProjects ?? []).slice(0, FLYFOTO_BATCH_MAX)) {
+      next.add(p.id);
+    }
+    setPicked(next);
+  };
+
+  const startRun = () => {
+    // The order the list is in — newest first, the mosaic ahead of it. The
+    // rail should walk the way the author read it.
+    const chosen: (FlyfotoProject | null)[] = picked.has(NIB_MOSAIC_KEY)
+      ? [null]
+      : [];
+    for (const p of flyfotoProjects ?? []) {
+      if (picked.has(p.id)) chosen.push(p);
+    }
+    ws.startFlyfotoPicker(chosen);
+  };
 
   return (
     <>
+      <LidarExtractDialog ws={ws} />
+
       {/* Licensing notice shown before every flyfoto grab: NiB imagery is
           free for private use, but publishing or commercial use is the
-          user's own responsibility. Only the acquisition picker waits behind
+          user's own responsibility. Only the acquisition list waits behind
           it — the starter set no longer fetches ortofoto, so nobody is asked
           to accept NiB's terms who has not asked for a photograph. */}
       <Dialog
@@ -52,27 +112,36 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         <p className={styles.text}>{t('localities.tools.flyfotoNotice')}</p>
       </Dialog>
 
-      {/* Acquisition picker. NiB keeps every ortofoto project flown over an
-          area back to the 1930s, so the same ground can be kept as a
-          temporal stack rather than only as today's best mosaic. */}
+      {/* The acquisition list. NiB keeps every ortofoto project flown over an
+          area back to the 1930s, so the same ground can be read as a temporal
+          stack rather than only as today's best mosaic — which is exactly the
+          "give me several of these at once so I can compare" question the
+          picker exists to answer. Checking is choosing what to be shown; only
+          `Behold` on a card writes anything. */}
       <Dialog
         open={ws.flyfotoPicker}
         onOpenChange={(next) => !next && ws.closeFlyfotoPicker()}
         title={t('localities.tools.flyfotoPickerTitle')}
         closeLabel={t('shared.close')}
         footer={
-          <Button
-            size="sm"
-            palette="gray"
-            disabled={ws.fetchingFlyfoto}
-            onClick={ws.closeFlyfotoPicker}
-          >
-            {t('localities.tools.flyfotoClose')}
-          </Button>
+          <>
+            <Button size="sm" palette="gray" onClick={ws.closeFlyfotoPicker}>
+              {t('shared.cancel')}
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={picked.size === 0}
+              onClick={startRun}
+            >
+              {t('localities.tools.flyfotoRun', { count: picked.size })}
+            </Button>
+          </>
         }
       >
         <div className={styles.picker}>
-          <div className={styles.mosaic}>
+          <label className={cx(styles.mosaic, styles.row)}>
+            <input {...check(NIB_MOSAIC_KEY)} />
             <div className={styles.projectMain}>
               <span className={styles.title}>
                 {t('localities.tools.flyfotoMosaic')}
@@ -81,17 +150,7 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                 {t('localities.tools.flyfotoMosaicHint')}
               </span>
             </div>
-            <Button
-              size="xs"
-              variant="primary"
-              disabled={ws.fetchingFlyfoto}
-              onClick={() => ws.runFlyfoto()}
-            >
-              {ws.flyfotoBusy === FLYFOTO_MOSAIC
-                ? t('localities.tools.flyfotoFetching')
-                : t('localities.tools.flyfotoGrab')}
-            </Button>
-          </div>
+          </label>
 
           {ws.flyfotoProjects === null && (
             <p className={styles.muted}>
@@ -121,13 +180,8 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                     count: ws.flyfotoProjects.length,
                   })}
                 </span>
-                <Button
-                  size="xs"
-                  variant="secondary"
-                  disabled={ws.fetchingFlyfoto}
-                  onClick={ws.runFlyfotoAll}
-                >
-                  {t('localities.tools.flyfotoGrabAll', {
+                <Button size="xs" variant="secondary" onClick={selectNewest}>
+                  {t('localities.tools.flyfotoSelectNewest', {
                     count: Math.min(
                       ws.flyfotoProjects.length,
                       FLYFOTO_BATCH_MAX,
@@ -136,17 +190,19 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                 </Button>
               </div>
 
-              {ws.flyfotoProjects.length > FLYFOTO_BATCH_MAX && (
-                <p className={styles.hint}>
-                  {t('localities.tools.flyfotoGrabAllHint', {
-                    count: FLYFOTO_BATCH_MAX,
-                  })}
-                </p>
-              )}
+              <p className={styles.hint}>
+                {t('localities.tools.flyfotoCapHint', {
+                  count: FLYFOTO_BATCH_MAX,
+                })}
+              </p>
 
               <div className={styles.projectList}>
                 {ws.flyfotoProjects.map((project) => (
-                  <div key={project.id} className={styles.project}>
+                  <label
+                    key={project.id}
+                    className={cx(styles.project, styles.row)}
+                  >
+                    <input {...check(project.id)} />
                     <div className={styles.projectMain}>
                       <span className={styles.title}>
                         {project.year ?? project.projectName}
@@ -157,17 +213,7 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                           : project.projectName}
                       </span>
                     </div>
-                    <Button
-                      size="xs"
-                      palette="gray"
-                      disabled={ws.fetchingFlyfoto}
-                      onClick={() => ws.runFlyfoto(project)}
-                    >
-                      {ws.flyfotoBusy === project.id
-                        ? t('localities.tools.flyfotoFetching')
-                        : t('localities.tools.flyfotoGrab')}
-                    </Button>
-                  </div>
+                  </label>
                 ))}
               </div>
             </div>

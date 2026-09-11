@@ -1,17 +1,17 @@
-// Orchestrates a single extraction run. Each (source × style) gets its
-// own canvas rendered at that source's native ground resolution — the
-// national mosaic at 1 m/px, per-project layers at whatever their point
-// density supports. Tiles that come back as blank PNGs (see
-// BLANK_RESPONSE_THRESHOLD_BYTES) don't get painted; a canvas that ends
-// with zero painted tiles is reported as noCoverage so the panel can
-// hide its empty preview.
+// Stitches one (source × style) into a canvas at that source's native ground
+// resolution — the national mosaic at 1 m/px, per-project layers at whatever
+// their point density supports. Tiles that come back as blank PNGs (see
+// BLANK_RESPONSE_THRESHOLD_BYTES) don't get painted; a canvas that ends with
+// zero painted tiles is `null`, i.e. the rectangle is outside this source's
+// coverage.
+//
+// There used to be a second, atom-driven entrance that ran every source ×
+// style of a multi-source Hent at once and reported per-tile progress into
+// `lidarExtractRunAtom` for the extract viewer to draw. The picker carousel
+// (docs/lokalitet-view.md §4.3) fetches one card ahead of where you are
+// standing instead, so the shared tile budget, the progress counters and the
+// run atom all went with it — there is only ever one canvas in flight now.
 
-import { getDefaultStore } from 'jotai';
-import {
-  LidarCanvas,
-  LidarExtractRun,
-  lidarExtractRunAtom,
-} from './atoms';
 import { LidarSource, nativeResolutionMetersPerPx } from './sources';
 import {
   buildGetMapUrl,
@@ -30,10 +30,6 @@ const MAX_CONCURRENT_TILES = 4;
 const TILE_MAX_RETRIES = 3;
 const TILE_RETRY_BASE_MS = 500;
 
-export type StylesBySource = Record<string, string[]>;
-
-let currentAbort: AbortController | null = null;
-
 type TileJob = {
   url: string;
   dx: number;
@@ -47,9 +43,8 @@ type TileJob = {
 // gone, and counting it would finish a canvas nobody is watching.
 type TileOutcomeKind = 'painted' | 'blank' | 'failed' | 'aborted';
 
-// The retry loop both entrances share. Progress reporting is deliberately not
-// in here: the interactive run pushes per-tile counters into an atom, the
-// headless one only cares how many tiles painted.
+// The retry loop. Reporting is deliberately not in here: the caller only
+// cares how many tiles painted.
 async function paintTile(
   item: TileJob,
   signal: AbortSignal,
@@ -91,19 +86,13 @@ export type ExtractedCanvas = {
 };
 
 /**
- * One source × one style, stitched, with no atom in sight — what "Hent
- * grunnpakke" runs.
- *
- * Separate from `startExtraction` rather than a special case of it: that one
- * exists to *report*, spending a shared tile budget across every canvas of a
- * multi-source run and pushing per-tile counters into `lidarExtractRunAtom`
- * as they land. This one has a single canvas and one thing to say about it at
- * the end. It also does not touch `currentAbort`, so a background grab can
- * never cancel the extract the user is watching.
+ * One source × one style, stitched. What "Hent grunnpakke", the pin queue and
+ * every picker card run.
  *
  * `null` when nothing painted, i.e. the rectangle is outside this source's
- * coverage or every tile failed — the same meaning `noCoverage` has in the
- * interactive run.
+ * coverage or every tile failed. There is no module-level abort controller:
+ * cancellation is the caller's `signal`, so a background grab can never
+ * cancel the extract somebody is watching.
  */
 export async function extractCanvas(
   bbox25833: [number, number, number, number],
@@ -158,91 +147,6 @@ export async function extractCanvas(
   };
 }
 
-export function startExtraction(
-  bbox25833: [number, number, number, number],
-  sources: LidarSource[],
-  stylesBySource: StylesBySource,
-): LidarExtractRun {
-  currentAbort?.abort();
-  const abort = new AbortController();
-  currentAbort = abort;
-
-  const store = getDefaultStore();
-  const runId = Date.now();
-
-  const canvases: LidarCanvas[] = [];
-  const workItems: Array<TileJob & { canvasId: string }> = [];
-
-  for (const source of sources) {
-    const styles = stylesBySource[source.key] ?? [];
-    const metresPerPx = nativeResolutionMetersPerPx(source);
-    for (const style of styles) {
-      const plan = planTiles(bbox25833, metresPerPx);
-      const canvas = document.createElement('canvas');
-      canvas.width = plan.widthPx;
-      canvas.height = plan.heightPx;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) continue;
-
-      const canvasId = `${source.key}::${style}`;
-      canvases.push({
-        id: canvasId,
-        sourceKey: source.key,
-        sourceLabel: source.label,
-        style,
-        metresPerPx,
-        widthPx: plan.widthPx,
-        heightPx: plan.heightPx,
-        canvas,
-        tilesTotal: plan.tiles.length,
-        tilesDone: 0,
-        tilesBlank: 0,
-        tilesFailed: 0,
-        status: plan.tiles.length === 0 ? 'done' : 'pending',
-      });
-
-      for (const tile of plan.tiles) {
-        workItems.push({
-          canvasId,
-          url: buildGetMapUrl(source, style, tile.bbox25833, tile.w, tile.h),
-          dx: tile.dx,
-          dy: tile.dy,
-          dw: tile.w,
-          dh: tile.h,
-          ctx,
-        });
-      }
-    }
-  }
-
-  const run: LidarExtractRun = {
-    runId,
-    bbox25833,
-    canvases,
-    startedAt: Date.now(),
-  };
-  store.set(lidarExtractRunAtom, run);
-
-  void runWithConcurrency(workItems, MAX_CONCURRENT_TILES, async (item) => {
-    if (abort.signal.aborted) return;
-    markStatus(runId, item.canvasId, 'fetching');
-    const outcome = await paintTile(item, abort.signal);
-    if (outcome.kind === 'aborted') return;
-    recordTileDone(runId, item.canvasId, {
-      blank: outcome.kind === 'blank',
-      failed: outcome.kind === 'failed',
-      errorMessage: outcome.errorMessage,
-    });
-  });
-
-  return run;
-}
-
-export function cancelExtraction(): void {
-  currentAbort?.abort();
-  currentAbort = null;
-}
-
 // Abortable sleep. Rejects immediately if the signal aborts; otherwise
 // resolves after `ms`. Wrapped so the retry loop can bail on Cancel.
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -259,64 +163,4 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
     };
     signal.addEventListener('abort', onAbort);
   });
-}
-
-function updateRun(
-  runId: number,
-  updater: (run: LidarExtractRun) => LidarExtractRun,
-) {
-  const store = getDefaultStore();
-  const current = store.get(lidarExtractRunAtom);
-  if (!current || current.runId !== runId) return;
-  store.set(lidarExtractRunAtom, updater(current));
-}
-
-function markStatus(
-  runId: number,
-  canvasId: string,
-  status: LidarCanvas['status'],
-) {
-  updateRun(runId, (run) => ({
-    ...run,
-    canvases: run.canvases.map((c) =>
-      c.id === canvasId && c.status === 'pending' ? { ...c, status } : c,
-    ),
-  }));
-}
-
-type TileOutcome = {
-  blank: boolean;
-  failed: boolean;
-  errorMessage?: string;
-};
-
-function recordTileDone(
-  runId: number,
-  canvasId: string,
-  outcome: TileOutcome,
-) {
-  updateRun(runId, (run) => ({
-    ...run,
-    canvases: run.canvases.map((c) => {
-      if (c.id !== canvasId) return c;
-      const tilesDone = c.tilesDone + 1;
-      const tilesBlank = c.tilesBlank + (outcome.blank ? 1 : 0);
-      const tilesFailed = c.tilesFailed + (outcome.failed ? 1 : 0);
-      const finished = tilesDone >= c.tilesTotal;
-      let status: LidarCanvas['status'] = c.status;
-      let error = c.error;
-      if (finished) {
-        const painted = tilesDone - tilesBlank - tilesFailed;
-        if (tilesFailed === c.tilesTotal) {
-          status = 'error';
-          error = outcome.errorMessage ?? c.error ?? 'Alle fliser feilet';
-        } else if (painted === 0) {
-          status = 'noCoverage';
-        } else {
-          status = 'done';
-        }
-      }
-      return { ...c, tilesDone, tilesBlank, tilesFailed, status, error };
-    }),
-  }));
 }

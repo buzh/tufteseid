@@ -1,7 +1,6 @@
 import { useAtom } from 'jotai';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LidarExtractPanel } from '../lidarExtract/LidarExtractPanel';
 import { openSectionsAtom, type WorkspaceSectionId } from '../localities/atoms';
 import { FunnDraft } from '../localities/FunnDraft';
 import { FunnList } from '../localities/FunnList';
@@ -56,15 +55,14 @@ export const LocalityDock = ({ ws }: { ws: LocalityWorkspaceApi }) => {
       }),
   });
 
-  // Starting the extract, or a funn draft, unfolds the dock: its controls are
-  // the tool. Terreng is deliberately not in that list — it is steered from
-  // the ribbon, so throwing the dock open for it would cover the map with a
-  // column the user has no business in.
-  const extractOpen = ws.tool === 'lidar';
+  // Starting a funn draft unfolds the dock: its controls are the tool.
+  // Neither Terreng nor LiDAR-uttrekk is in that list — the first is steered
+  // from the ribbon and the second is a dialog now, so throwing the dock open
+  // for either would cover the map with a column the user has no business in.
   const draftActive = ws.draftActive;
   useEffect(() => {
-    if (extractOpen || draftActive) setOpen(true);
-  }, [extractOpen, draftActive, setOpen]);
+    if (draftActive) setOpen(true);
+  }, [draftActive, setOpen]);
 
   return (
     <>
@@ -130,18 +128,6 @@ export const LocalityDock = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                 onGrow={ws.growToFitDrawing}
                 onDone={ws.stopDraft}
               />
-            </DockTool>
-          </ErrorBoundary>
-        )}
-
-        {ws.tool === 'lidar' && (
-          <ErrorBoundary name="DockLidarExtract">
-            <DockTool
-              title={t('localities.tools.lidarExtract')}
-              onClose={ws.closeLidar}
-              closeLabel={t('localities.tools.closeLidar')}
-            >
-              <LidarExtractPanel />
             </DockTool>
           </ErrorBoundary>
         )}

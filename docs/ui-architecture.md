@@ -83,8 +83,7 @@ document and does not check `defaultPrevented`. Any app-level key binding that
 must beat the map has to listen in the **capture** phase and call
 `preventDefault` + `stopPropagation` + `stopImmediatePropagation` — a
 bubble-phase listener will fire *and* pan the map out from under itself.
-`useWorkspaceKeys`, `useBackgroundCyclingKeys` and `LidarExtractViewer` all do
-this.
+`useWorkspaceKeys` and `useBackgroundCyclingKeys` both do this.
 
 The layers also have to stand down for each other. Each checks `event.target`
 for an input, a `contentEditable`, or an enclosing
@@ -148,14 +147,13 @@ across a hundred props.
 
 Buttons colour themselves from `--c-fg` / `--c-bg-hover` / `--accent-*` rather
 than from literals, so a surface that needs a different ground overrides those
-custom properties on its own container. `LidarExtractViewer.module.css` is the
-worked example: re-pointing two variables is the app's entire dark theme, and
-`Button.module.css` needed no dark variant.
+custom properties on its own container. That is what the deleted extract
+viewer's dark chrome was: re-pointing two variables, with no dark variant of
+`Button.module.css` anywhere.
 
 **kvib is gone** (§12). `src/index.css` carries the reset it used to supply,
 Mulish is imported directly, and the `MaterialSymbol` union comes from
-`material-symbols` itself. There is no dark mode — the extract viewer's dark
-chrome is local, not a mode.
+`material-symbols` itself. There is no dark mode.
 
 Hand-written CSS is now the `src/ui/*.module.css` files plus one module per
 ported component, on top of `src/index.css` and `src/map/map.css`
@@ -176,7 +174,7 @@ main.tsx → mainApp.tsx
     BrowserRouter
       AtomWrapper            ← hydrates activeThemeLayersAtom from ?themeLayers
         QueryClientProvider
-          App                ← routes + F11 + LidarExtractViewer + auth sync
+          App                ← routes + F11 + auth sync
           Toaster
 ```
 
@@ -193,10 +191,11 @@ in its default-init function, and hydrating it a second time here would bypass
 that check and could leave the atom on a value the effect cannot render (e.g.
 `lidarProject` with no active project), i.e. a blank map on cold load.
 
-`App.tsx` renders `<LidarExtractViewer />` **outside** the router, so the
-fullscreen extract viewer survives navigation, mounts `pbAuthSyncEffect` above
-the router for the same reason (signing in must not depend on which route is
-showing), then routes `/` → `AppShell` and `/hjelp` → `HelpPage`.
+`App.tsx` mounts `pbAuthSyncEffect` **above** the router — signing in must not
+depend on which route is showing — then routes `/` → `AppShell` and `/hjelp` →
+`HelpPage`. It used to hold `<LidarExtractViewer />` outside the router too, so
+that the fullscreen extract result survived navigation; the picker carousel
+(§8.9.3) took that job and lives in the bottom slot like everything else.
 
 ### 3.1 Shell geometry
 
@@ -1342,9 +1341,9 @@ is a context strip, a bottom edge and a (shrinking) dock column:
 | Region | Component | Contents |
 |---|---|---|
 | Identity, the work, the exits | `RibbonLocalityRow` (the lokalitet row) | three zones plus the read tools — see below |
-| The images | `BilderStrip` / `BilderCarousel` (bottom slot) | the filmstrip in show, the carousel in edit — §8.7.2 |
+| The images | `BilderStrip` / `BilderCarousel` / `BilderPicker` (bottom slot) | the filmstrip in show, the carousel in edit, a picker run borrowing the slot — §8.7.2, §8.9.3 |
 | Everything else with a body | `LocalityDock` (right slot) | the live tool band, then Funn · Kulturminner · Detaljer as sections |
-| Dialogs | `LocalityDialogs` | flyfoto licensing notice, flyfoto picker |
+| Dialogs | `LocalityDialogs` | the two `Hent ▾` selection dialogs and the flyfoto licensing notice |
 
 **The row is three zones**, and each answers one question
 (`docs/lokalitet-view.md` §5.1–5.4):
@@ -1352,7 +1351,7 @@ is a context strip, a bottom edge and a (shrinking) dock column:
 | Zone | Question | Present when | Contents |
 |---|---|---|---|
 | left — identity | *what am I looking at* | always | the literal word `Lokalitet:`, the inline-editable name, the short code chip (click to copy), the visibility badge, the banner slot, zoom-to |
-| middle — the work | *what can I do to it* | **edit only** | Nytt funn · LiDAR-uttrekk · Skjermbilde · Flyfoto |
+| middle — the work | *what can I do to it* | **edit only** | Nytt funn · Behold · `Hent ▾` · Skjermbilde |
 | the read tools | *what may I look at* | always | `Bilder ▾` (Terreng and Sammenlign join it at §12's step 15) |
 | right — the exits | *how do I get out of here* | always | show: `[Rediger]` `[Lukk]`; edit: `[Ferdig]` `[⋮]` |
 
@@ -1451,11 +1450,6 @@ lokalitet's own text on arrival, which reads as broken rather than as
 read-only. The one control still merely disabled is Synlighet's `Segmented`,
 where the value *is* the widget.
 
-The same `canAdd` test — permission *and* stance — is recomputed in
-`LidarExtractViewer` (the "Behold" button) because the extract tool hangs off
-`activeLocalityAtom` rather than the workspace hook; its `Last ned PNG` is a
-download, not a write, and stays.
-
 Terrenganalyse's **Lagre** used to be the one unguarded write — with somebody
 else's lokalitet open it targeted that lokalitet and failed with a toast. It is
 no longer reachable there: keeping a terrain render over an open lokalitet is
@@ -1480,13 +1474,13 @@ breakpoint the column has nowhere to go and becomes a bottom sheet;
 edge rather than assuming one (§3.1).
 
 **The tool band and the section list coexist.** A live tool — `FunnDraft` +
-`DrawControls`, or `LidarExtractPanel` — renders in a `DockTool` pinned above
-the sections, not instead of them. Under the old tray they were mutually
-exclusive, which meant starting to draw hid the list of what you had already
-drawn. Starting one of those two also unfolds the dock, since its controls
-*are* the tool. Terreng is deliberately not in that list even though it shares
-the extract's slot: it is steered from the ribbon, so throwing the dock open
-for it would cover the map with a column the user has no business in.
+`DrawControls` — renders in a `DockTool` pinned above the sections, not instead
+of them. Under the old tray they were mutually exclusive, which meant starting
+to draw hid the list of what you had already drawn. Starting a draft also
+unfolds the dock, since its controls *are* the tool. Neither Terreng nor
+LiDAR-uttrekk is in that list any more: the first is steered from the ribbon
+and the second is a modal (§8.9.3), so throwing the dock open for either would
+cover the map with a column the user has no business in.
 
 **Folding hides, it does not unmount.** Folding is what you do *to see the map*
 — most often the terrain render the panel inside just produced — and unmounting
@@ -1575,7 +1569,7 @@ the overlay actually took focus.
 | ← / → | Walk the filmstrip (only when `stripNavigable`) |
 | Enter | Zoom to selected funn (only when `navigable`) |
 | N | Arm drawing / put the pen down — the same toggle as the lokalitet-row button the key is advertised on |
-| U | Toggle LiDAR extract |
+| U | Toggle the LiDAR-uttrekk dialog |
 | B | Screenshot |
 | Escape | Close / back out — **except while a funn draft is open** |
 
@@ -1583,10 +1577,18 @@ N, U and B are **edit-only**, gated on the same `canAdd` as the buttons they
 are advertised on: a keystroke that writes is still a write, and an invisible
 shortcut is the easiest place for "nothing in show writes" to spring a leak.
 
-Escape backs out deepest-first, in the same order the row's right zone is
-stacked: extract → Juster området → funn selection → **edit** → close the
-lokalitet. Leaving the stance before leaving the record is what stops one
-press from throwing away both.
+**A picker run swallows the keyboard whole.** While one is up (§8.9.3) the
+handler takes ← / →, Enter/K, Delete/X and Escape for the run and returns
+before any of the rows above are consulted — the images you are walking are
+the proposals, not the collection, and `N` arming the pen behind a modal-ish
+surface is not what the key meant. `Esc` ends the run rather than backing out
+one level, which it can afford to do because nothing in the run is unsaved:
+keeping writes on the press.
+
+Escape otherwise backs out deepest-first, in the same order the row's right
+zone is stacked: picker run → extract dialog → Juster området → funn selection
+→ **edit** → close the lokalitet. Leaving the stance before leaving the record
+is what stops one press from throwing away both.
 
 `navigable` is off only while drawing: the funn list is always on screen in the
 dock, so arrows keep working with the extract and terrain panels open, and
@@ -1852,7 +1854,10 @@ scrolling grid in a 360 px column does.
 
 **The slot has two occupants, one per stance**, and which one is mounted is
 decided in `LocalityRibbon` (`ws.canEdit ? BilderCarousel : BilderStrip`)
-rather than by branches inside one component:
+rather than by branches inside one component. A third surface, `BilderPicker`,
+**borrows** the slot for the length of a picker run (§8.9.3) rather than being
+a co-occupant of it — one surface at a time is the whole rule, and a run is
+transient by construction:
 
 | | show — `BilderStrip.tsx` | edit — `BilderCarousel.tsx` |
 |---|---|---|
@@ -2075,12 +2080,13 @@ bufferable (§8.1), a fork cheap, and the picker carousels affordable.
   `Åpne originalen`; the second press is inside a gesture. `pinNow` jumps the
   queue and is awaitable for exactly this. Rapportpakke (§9 of the design doc)
   will force pins the same way when it is built.
-- **`LidarExtractViewer`'s own `Behold` still writes a File**, and that is not
-  an oversight. Its rectangle is the user-drawn selection rather than the
-  lokalitet's, and it is holding the stitched pixels already — turning it into
-  a spec would throw those away and immediately re-fetch them. The design doc's
-  build order does not mention this call site; the picker carousels replace the
-  viewer anyway.
+- **A picker keep writes a File-shaped `create`, not a spec.** Same reasoning
+  the deleted extract viewer's own `Behold` had, and the same exception:
+  a picker card is holding rendered pixels already, so asking the queue for a
+  second render of the same parameters would throw them away and re-fetch them.
+  `renderSpec` is exported from `pinQueue.ts` for exactly that (§8.9.3); the
+  record still carries the full `meta` and a `renderedAt`, so it is a pinned
+  View from the moment it exists rather than a File.
 - **Closing a lokalitet no longer cancels a running grunnpakke.** The old
   `AbortController` was aborted by the workspace's unmount cleanup; there is
   nothing slow left in the write path to abort, and the queue is deliberately
@@ -2088,18 +2094,21 @@ bufferable (§8.1), a fork cheap, and the picker carousels affordable.
   `starterBusy` boolean now — `starterStep`'s "Henter helning_prosent …" stopped
   describing anything the moment the set stopped fetching.
 
-### 8.8 The flyfoto picker
+### 8.8 The flyfoto selection dialog
 
-"Flyfoto" → licensing notice dialog → picker listing the seamless best mosaic
-plus every ortofoto acquisition intersecting the bbox (label = year, subtitle =
-photo date + project name), each with "Hent", plus "Hent alle" over the newest
-`FLYFOTO_BATCH_MAX` (8). `FLYFOTO_MOSAIC = '__mosaic__'` is the sentinel id for
-the mosaic row.
+`Hent ▾ → Flyfoto` → licensing notice dialog → a dialog listing the seamless
+best mosaic plus every ortofoto acquisition intersecting the bbox (label = year,
+subtitle = photo date + project name). Every row is a **checkbox** and the
+footer runs a picker carousel over what is ticked (§8.9.3); `NIB_MOSAIC_KEY`
+stands for the mosaic row, which is not a project and has no id of its own.
 
-The batch runs **sequentially** — a single project's tile burst already
-saturates the concurrency budget against the shared NiB edge — and reports how
-many of the attempted projects actually had coverage, because the uniform-image
-check in `fetchAndPaint` silently drops all-blank results.
+`FLYFOTO_BATCH_MAX` (8) caps the tick count, and what it bounds has changed:
+it used to bound *traffic*, because "Hent alle" fetched and saved every checked
+acquisition back to back. The picker fetches one card ahead of the cursor, so
+the cap now bounds the **judging** — eight is about as many photographs of one
+rectangle as anyone triages in a sitting, and a run of forty is a run nobody
+finishes. It is enforced on the way in (further boxes disable) rather than by
+silently truncating the run.
 
 The licensing notice gates *every* grab, by product decision, not by accident:
 NiB imagery is free for private non-commercial use and publishing is the user's
@@ -2115,7 +2124,7 @@ none of them is on the bottom edge (§8.7.2).
 |---|---|
 | the starter set | three readings of the best laser dataset, run without being asked on a lokalitet you just made |
 | `Behold` | whatever ground is on screen, kept at the source's own resolution |
-| the two pickers | LiDAR-uttrekk and Flyfoto — pick a *different* dataset than the one you are looking at |
+| the two pickers | LiDAR-uttrekk and Flyfoto, behind `Hent ▾` — propose a batch of *different* datasets and keep or discard each one (§8.9.3) |
 | Skjermbilde and Last opp | pixels, with no view behind them |
 
 #### 8.9.1 The starter set (grunnpakke)
@@ -2229,6 +2238,65 @@ times in a session.
   a terrain render has no dataset to name and is identified by its knobs, and a
   flyfoto grab says which acquisition it is in `meta.nibSource` /
   `meta.projectId`. Same distinction `viewSpecOf` makes (§8.7.1).
+
+#### 8.9.3 The picker carousels
+
+`docs/lokalitet-view.md` §4.3. Two of the four routes ask for *several* images
+at once, and both used to answer by saving all of them. They now open a **run
+of proposals** in the bottom slot, one card at a time, each keep or discard —
+`src/localities/usePickerRun.ts` for the state machine, `BilderPicker.tsx` for
+the surface.
+
+`Hent ▾` on the lokalitet row is the shared entrance: a two-item popover
+(`RibbonLocalityRow.tsx`'s `HentMenu`) holding `LiDAR-uttrekk` and `Flyfoto`.
+They belong together because they are the same gesture — choose a batch, triage
+it — and they are the two rarest things on the row, so a popover keeps it one
+line. Each item opens its own selection dialog (§8.8, §10) whose footer starts
+the run.
+
+Load-bearing choices:
+
+- **Enumerate everything; fetch one at a time.** `start()` takes the full
+  candidate list up front, so the rail and the progress line are honest from
+  the first frame. One worker then fetches the card the cursor is on and the
+  one after it, sequentially. Twelve proposals cost two requests until you
+  walk, and a run you abandon after card three never touched the other nine —
+  which is the actual saving over "Hent alle", not the writes.
+- **Discarded cards were never records.** Nothing is written until `Behold` on
+  a card, and the write happens **on the press** rather than at close. That
+  matters twice: `Esc` can then only cancel fetching and can never throw away a
+  decision, and the card can show a receipt. The design doc says the kept ones
+  "join the collection" when the picker closes, which stays literally true —
+  the collection carousel is not on screen while the picker owns the slot.
+- **Keeping does not re-render.** The card is holding the produced blob, so
+  `keep()` hands *those* bytes to `createAttachment` with
+  `{...candidate.meta, ...produced.meta, renderedAt}`. `renderSpec` is exported
+  from `pinQueue.ts` for the fetch side, so a picker card and a pin are the
+  same renderer with the same filenames (§8.7.4).
+- **Duplicates are filtered before the run starts.** A candidate whose
+  `BeholdKey` already matches a record (`attachmentMatchesKey`, hidden ones
+  included — §8.9.2) is dropped and counted as `skipped` in the header, rather
+  than fetched and then refused. The cheapest request is the one not made.
+- **`Esc` cancels with a generation counter, not an `AbortSignal`.**
+  `renderSpec` does not take one, and threading it through would mean an abort
+  path in the stitcher, the DEM reader and the NiB fetch. Instead `start()` and
+  `finish()` bump a counter and a landing result whose generation is stale is
+  dropped on the floor. The request finishes; nobody is listening.
+- **Discarding removes the frame; keeping marks it.** A discarded card leaves
+  the rail rather than greying out, so twelve proposals visibly become the four
+  you are still considering. A kept one stays with a check on it, because a
+  rail that forgets what you kept invites keeping it twice.
+- **It does not look like the collection.** A header naming the run and its
+  progress, a tally, an accent border and a `Ferdig` button — "these are
+  proposals" and "these are yours" must not look alike.
+- **`§6`: every image in a lokalitet covers the lokalitet's rectangle.** The
+  extract's drawable sub-selection was the one producer that could break that,
+  and it went with the demotion rather than surviving as a special case. The
+  filmstrip's whole value is that the ground does not move as you walk it; one
+  image over a hand-drawn sub-rectangle breaks register for the entire strip.
+
+Keys are in §8.4: ← / → walk, Enter/K keep, Delete/X discard, `Esc` ends the
+run. The run also ends itself if `canAdd` goes away underneath it.
 
 ### 8.10 Provenance figures — what a saved image carries
 
@@ -2422,21 +2490,23 @@ meant pressing `5` relocated the controls to a different part of the screen and
 then covered the terrain they were describing. Two thin rows over the map cost
 less of it than one panel beside it, and they are where the eye already is.
 
-**LiDAR extract** — `src/lidarExtract/LidarExtractPanel.tsx` drives style and
-source selection and shows progress. The selection size and the run controls
-share the top line so they stay reachable however many datasets cover the
-rectangle, and the sources are a wrapping grid of cards (`auto-fill`, so a
-single source stays card-sized instead of spanning a 27-inch screen). The
-whole card is the `<label>`, and an unchecked source is dimmed rather than
-hidden — which sources cover the rectangle is itself information.
+**LiDAR extract** — `src/lidarExtract/LidarExtractDialog.tsx` drives style and
+source selection, and that is now all it does: everything downstream of
+pressing go is the picker carousel (§8.9.3), so its whole output is a list of
+proposals. The sources are a wrapping grid of cards (`auto-fill`, so a single
+source stays card-sized instead of spanning a 27-inch screen), the whole card
+is the `<label>`, and an unchecked source is dimmed rather than hidden — which
+sources cover the rectangle is itself information. Styles are chosen once for
+the run and applied to every enabled source that advertises them, because the
+alternative is unchecking `skyggerelieff` on each dataset in turn. The extract
+is DTM-only on purpose: an extract is meant to be read as terrain.
 
-`LidarExtractViewer.tsx` is a separate fullscreen result viewer at `--z-fixed`,
-mounted way up at `App.tsx`. The viewer **moves the source
-canvas DOM node** into itself with `replaceChildren` rather than re-rendering
-it — a deliberate trap for anyone who assumes React owns that subtree, and the
-reason the viewer cannot be casually re-parented, or the same canvas rendered
-anywhere else. Its keys are capture-phase for the reason in §1. The extract is
-DTM-only on purpose: an extract is meant to be read as terrain.
+The extent is `locality.bbox`, and the drawable sub-selection that used to sit
+in front of this (`useDrawSelection`, `lidarExtractSelectionAtom`, `Tegn nytt`)
+is **gone** rather than disabled — see §8.9.3. So is `LidarExtractViewer`, the
+fullscreen result viewer that moved the stitched canvas DOM node into itself
+with `replaceChildren`; that trap, and the `lidarExtractViewerOpenAtom` guard
+it forced into `useGroundMode`'s cycling, went with it.
 
 **Terrain** — `src/shell/terrain/`: DTM/DOM toggle, eight visualizations
 (hillshade, multidirectional hillshade, VAT, sky-view factor, positive and
@@ -2703,14 +2773,14 @@ Two things in `useTerrainAnalysis` must not be undone:
 
 The canvas itself is **off-DOM**. React does not own it and neither does any
 row: it is the OL source's image, and the hook paints into that one element.
-Same trap as `LidarExtractViewer`'s moved canvas node, from the other
+Same trap the deleted extract viewer's moved canvas node was, from the other
 direction. Note that it is no longer what a save hands to the figure stage —
 the pin queue calls `renderTerrain` headlessly and gets its own canvas, which
 is what lets a pin outlive the strip that started it (§8.7.4).
 
-Neither tool's output leaves bare. "Behold", the viewer's PNG download and
-"Lagre" all reach `renderFigureBlob` — the first two directly, the terrain
-render through its pin — so the azimuth, altitude, z-factor, radii and stretch
+Neither tool's output leaves bare. "Behold", the picker card's `Last ned` and
+"Lagre" all reach `renderFigureBlob` — so the azimuth, altitude, z-factor,
+radii and stretch
 that produced it travel with the pixels (§8.10). On the no-lokalitet path the
 lokalitet is created *before* the spec, so the name the registers just derived
 can be its title.
@@ -2745,7 +2815,7 @@ whole shell and ribbon, the lokalitet surfaces (`FunnList`, `BilderStrip`,
 `KulturminnerSection`, `LocalityDetails`, `LocalityDialogs`, `FunnDraft`,
 `LocalitiesPanel`), both analysis panels, `AuthButton`, `AuthDialog`,
 `ErrorBoundary`, the measure trigger, the toast region, `MapComponent`,
-`SearchComponent`, `KulturminnerPopup`, `LidarExtractViewer`, `MapToolCards`,
+`SearchComponent`, `KulturminnerPopup`, `BilderPicker`, `MapToolCards`,
 `HelpPage`, `LanguageSwitcher`, the whole of
 `src/search/**` — results panel and infobox — and the whole of `src/draw/**`.
 So `src/terrain/`, `src/settings/`, `src/auth/`, `src/lidarExtract/`,

@@ -103,7 +103,17 @@ export const countAttachmentsByLocality = async (): Promise<
   return counts;
 };
 
-/** A File: bytes, and there is no other way to have them (§4.1.1). */
+/*
+ * A row that arrives with its pixels already in hand.
+ *
+ * That is every File — a screenshot or an upload is bytes and was never
+ * anything else (§4.1.1) — and one View case: a picker candidate (§4.3) was
+ * rendered in order to be *looked at*, so keeping it writes the figure it
+ * showed rather than a spec for the queue to render a second time. The record
+ * lands pinned, `renderedAt` and all, in one request.
+ *
+ * Every other View goes through `createAttachmentSpec` below.
+ */
 export const createAttachment = async (
   input: NewAttachmentInput,
   ownerId: string,

@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { LocalityRecord } from '../api/localities';
 import { BilderCarousel } from '../localities/BilderCarousel';
+import { BilderPicker } from '../localities/BilderPicker';
 import { BilderStrip } from '../localities/BilderStrip';
 import { LocalityDialogs } from '../localities/LocalityDialogs';
 import { bilderStripOpenAtom } from '../localities/toolAtoms';
@@ -45,11 +46,17 @@ export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
   }, [starterRunning, setStripOpen]);
 
   /*
-   * The one-occupant rule (§4.3). Three surfaces want the bottom edge — the
-   * filmstrip, the edit carousel and the draw toolbar while a funn draft is
-   * open — and none of them may stack, because all of them are over the map.
-   * Drawing yields the images: you are not curating a gallery while the pen
-   * is down.
+   * The one-occupant rule (§4.3). Four surfaces want the bottom edge — the
+   * filmstrip, the edit carousel, a picker run, and the draw toolbar while a
+   * funn draft is open — and none of them may stack, because all of them are
+   * over the map. Drawing yields the images: you are not curating a gallery
+   * while the pen is down.
+   *
+   * A picker **borrows** the slot rather than being a fifth occupant of it:
+   * while a run is live it is what the slot holds, and closing the run gives
+   * the collection back. That is why it is a branch here and not a fourth
+   * flag — "the kept ones join the collection when you close the picker" is
+   * literally true because the collection is not on screen until then.
    *
    * The draw toolbar is still mobile-only and still `position: fixed` from
    * AppShell (step 12 promotes it into this slot), so today the rule is
@@ -62,7 +69,8 @@ export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
    * their geometry, and a component that is a rail on Tuesday is how the
    * write verbs end up merely disabled in show instead of absent (§2).
    */
-  const showStrip = stripOpen && ws.hasBilder && !ws.draftActive;
+  const picking = ws.picker.run != null;
+  const showStrip = !picking && stripOpen && ws.hasBilder && !ws.draftActive;
 
   return (
     <>
@@ -75,6 +83,14 @@ export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
             <LocalityDock ws={ws} />
           </ErrorBoundary>,
           dockSlot,
+        )}
+      {bottomSlot &&
+        picking &&
+        createPortal(
+          <ErrorBoundary name="BilderPicker">
+            <BilderPicker picker={ws.picker} />
+          </ErrorBoundary>,
+          bottomSlot,
         )}
       {bottomSlot &&
         showStrip &&

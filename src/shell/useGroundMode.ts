@@ -1,6 +1,5 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useRef } from 'react';
-import { lidarExtractViewerOpenAtom } from '../lidarExtract/atoms';
 import { activeLocalityAtom } from '../localities/atoms';
 import { ribbonToolAtom } from '../localities/toolAtoms';
 import { focusedHalfAtom } from '../map/compare/halves';
@@ -100,7 +99,6 @@ export const useGroundMode = (
   const locality = useAtomValue(activeLocalityAtom);
   const [tool, setTool] = useAtom(ribbonToolAtom);
   const setStandaloneBbox = useSetAtom(terrainStandaloneBboxAtom);
-  const extractViewerOpen = useAtomValue(lidarExtractViewerOpenAtom);
   // Which half of the compare curtain the ribbon is pointed at, and therefore
   // which half everything below sets and reports. Always 'a' with the curtain
   // down, so nothing here changes for the ordinary single-ground case.
@@ -216,10 +214,6 @@ export const useGroundMode = (
   // not a dataset in the sense the other three mean: same elevation grid,
   // eight ways of drawing it.
   const cycle = (key: CycleKey): boolean => {
-    // The extract viewer covers the whole map, so no ground has anything to
-    // show: same reasoning, one level up. Not applied to 1–5, which stay a
-    // way of setting up what you will see on the way out.
-    if (extractViewerOpen) return false;
     switch (modifiers) {
       case 'standard':
         return standard.cycle(key);

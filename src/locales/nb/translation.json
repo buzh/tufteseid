@@ -85,14 +85,6 @@
     "tabHeading": "Språk"
   },
   "lidarExtract": {
-    "tabHeading": "LiDAR-uttrekk",
-    "instructions": {
-      "drawBox": "Tegn et rektangel på kartet for å velge område.",
-      "drawHint": "Trekk fra hjørne til hjørne. Hentes i EPSG:25833 via lokal cache."
-    },
-    "selection": {
-      "label": "Utvalg"
-    },
     "styles": {
       "label": "Stiler"
     },
@@ -101,24 +93,6 @@
       "loading": "Leser LiDAR-katalog …",
       "none": "Ingen LiDAR-kilder dekker dette området.",
       "capped": "kappet"
-    },
-    "actions": {
-      "redraw": "Tegn nytt",
-      "run": "Hent",
-      "download": "Last ned"
-    },
-    "viewer": {
-      "empty": "Ingen bilder ennå …",
-      "close": "Lukk visning",
-      "delete": "Fjern bilde (Del)",
-      "resetZoom": "Tilbakestill zoom (0)",
-      "keep": "Behold",
-      "kept": "Lagret",
-      "keepFailed": "Kunne ikke lagre bildet til lokaliteten. Prøv igjen."
-    },
-    "status": {
-      "done": "Ferdig",
-      "partial": "{{painted}}/{{total}} fliser hadde data"
     }
   },
   "locationType": {
@@ -378,17 +352,37 @@
       "pinRetry": "Prøv igjen",
       "pinNow": "Hent bildet"
     },
+    "picker": {
+      "headingLidar": "Forslag · LiDAR-uttrekk",
+      "headingFlyfoto": "Forslag · Flyfoto",
+      "progress": "{{index}} av {{count}}",
+      "tally": "{{kept}} beholdt · {{discarded}} forkastet",
+      "skipped": "{{count}} finnes fra før",
+      "done": "Ferdig",
+      "keep": "Behold",
+      "discard": "Forkast",
+      "download": "Last ned",
+      "kept": "Beholdt",
+      "waiting": "I kø …",
+      "fetching": "Henter …",
+      "empty": "Ingen data for dette området.",
+      "failed": "Kunne ikke hente dette bildet.",
+      "keepFailed": "Kunne ikke lagre bildet. Prøv igjen.",
+      "allDone": "Ingen flere forslag. Trykk Ferdig.",
+      "hint": "←/→ blar · Enter beholder · Delete forkaster · Esc avslutter"
+    },
     "tools": {
       "lidarExtract": "LiDAR-uttrekk",
-      "closeLidar": "Lukk LiDAR-uttrekk",
+      "hent": "Hent",
+      "hentHint": "Hent LiDAR-uttrekk eller flyfoto å velge mellom",
+      "lidarRun": "Hent {{count}} forslag",
+      "lidarExtent": "Området er {{width}} × {{height}}. Alle bilder dekker hele rektangelet.",
       "screenshot": "Skjermbilde",
       "screenshotCaption": "Skjermbilde",
       "screenshotFailed": "Kunne ikke ta skjermbilde. Sørg for at lokaliteten er synlig i kartet.",
-      "lidarExtractShort": "LiDAR",
       "screenshotShort": "Bilde",
       "screenshotSaved": "Skjermbildet er lagret under Bilder.",
       "flyfoto": "Hent flyfoto",
-      "flyfotoShort": "Flyfoto",
       "flyfotoCaption": "Flyfoto",
       "flyfotoSaved": "Flyfotoet er lagret under Bilder.",
       "flyfotoNoticeTitle": "Om bruk av flyfoto",
@@ -401,13 +395,10 @@
       "flyfotoProjectsLoading": "Henter oversikt over opptak …",
       "flyfotoProjectsFailed": "Kunne ikke hente oversikten over opptak.",
       "flyfotoProjectsNone": "Fant ingen enkeltopptak for dette området.",
-      "flyfotoGrab": "Hent",
-      "flyfotoGrabAll": "Hent alle ({{count}})",
-      "flyfotoGrabAllHint": "Henter de {{count}} nyeste opptakene, ett om gangen.",
-      "flyfotoFetching": "Henter …",
-      "flyfotoBatchDone": "Lagret {{saved}} av {{total}} opptak under Bilder.",
+      "flyfotoRun": "Hent {{count}} forslag",
+      "flyfotoSelectNewest": "Velg de {{count}} nyeste",
+      "flyfotoCapHint": "Du kan velge inntil {{count}} opptak om gangen.",
       "flyfotoFailedFor": "Kunne ikke hente flyfoto for {{label}}.",
-      "flyfotoClose": "Lukk",
       "behold": "Behold",
       "beholdDone": "Beholdt",
       "beholdHint": "Lagrer bakgrunnen som vises nå, med kilde, innstillinger og utstrekning påskrevet.",

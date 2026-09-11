@@ -2,12 +2,11 @@
 //
 // Interactions used to be located by scanning `map.getInteractions()` for
 // an `instanceof` match, which turned that collection into one global
-// namespace shared by every tool. Five of them add the same classes: the
-// draw tool (Draw/Select/Translate/Modify/Snap), measure (Draw),
-// "Juster området" (Translate/Modify) and the LiDAR extract (Draw). So
-// "remove every Draw" in one tool silently detached
-// another tool's, and `getDrawInteraction()` returned whichever Draw
-// happened to be first in the collection.
+// namespace shared by every tool. Several of them add the same classes: the
+// draw tool (Draw/Select/Translate/Modify/Snap), measure (Draw) and
+// "Juster området" (Translate/Modify). So "remove every Draw" in one tool
+// silently detached another tool's, and `getDrawInteraction()` returned
+// whichever Draw happened to be first in the collection.
 //
 // Tagging on the way in and filtering on the way out keeps each tool
 // looking only at its own.
@@ -18,8 +17,7 @@ import type Map from 'ol/Map';
 export type InteractionOwner =
   | 'draw'
   | 'measure'
-  | 'localityAdjust'
-  | 'lidarExtract';
+  | 'localityAdjust';
 
 const OWNER_KEY = 'tufteseidOwner';
 

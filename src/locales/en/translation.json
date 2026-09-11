@@ -85,14 +85,6 @@
     "tabHeading": "Language"
   },
   "lidarExtract": {
-    "tabHeading": "LiDAR extract",
-    "instructions": {
-      "drawBox": "Draw a rectangle on the map to select an area.",
-      "drawHint": "Drag corner to corner. Fetched in EPSG:25833 via the local cache."
-    },
-    "selection": {
-      "label": "Selection"
-    },
     "styles": {
       "label": "Styles"
     },
@@ -101,24 +93,6 @@
       "loading": "Loading LiDAR catalogue …",
       "none": "No LiDAR sources cover this area.",
       "capped": "capped"
-    },
-    "actions": {
-      "redraw": "Draw again",
-      "run": "Fetch",
-      "download": "Download"
-    },
-    "viewer": {
-      "empty": "No images yet …",
-      "close": "Close viewer",
-      "delete": "Remove image (Del)",
-      "resetZoom": "Reset zoom (0)",
-      "keep": "Keep",
-      "kept": "Saved",
-      "keepFailed": "Could not save the image to the locality. Try again."
-    },
-    "status": {
-      "done": "Done",
-      "partial": "{{painted}}/{{total}} tiles had data"
     }
   },
   "locationType": {
@@ -378,17 +352,37 @@
       "pinRetry": "Try again",
       "pinNow": "Render the image"
     },
+    "picker": {
+      "headingLidar": "Proposals · LiDAR extract",
+      "headingFlyfoto": "Proposals · Aerial photos",
+      "progress": "{{index}} of {{count}}",
+      "tally": "{{kept}} kept · {{discarded}} discarded",
+      "skipped": "{{count}} already in the collection",
+      "done": "Done",
+      "keep": "Keep",
+      "discard": "Discard",
+      "download": "Download",
+      "kept": "Kept",
+      "waiting": "Queued …",
+      "fetching": "Fetching …",
+      "empty": "No data for this area.",
+      "failed": "Could not fetch this image.",
+      "keepFailed": "Could not save the image. Try again.",
+      "allDone": "No proposals left. Press Done.",
+      "hint": "←/→ walk · Enter keeps · Delete discards · Esc ends the run"
+    },
     "tools": {
       "lidarExtract": "LiDAR extract",
-      "closeLidar": "Close LiDAR extract",
+      "hent": "Fetch",
+      "hentHint": "Fetch LiDAR extracts or aerial photos to pick between",
+      "lidarRun": "Fetch {{count}} proposals",
+      "lidarExtent": "The area is {{width}} × {{height}}. Every image covers the whole rectangle.",
       "screenshot": "Screenshot",
       "screenshotCaption": "Screenshot",
       "screenshotFailed": "Could not take a screenshot. Make sure the locality is visible on the map.",
-      "lidarExtractShort": "LiDAR",
       "screenshotShort": "Image",
       "screenshotSaved": "Screenshot saved under Images.",
       "flyfoto": "Fetch aerial photo",
-      "flyfotoShort": "Aerial",
       "flyfotoCaption": "Aerial photo",
       "flyfotoSaved": "Aerial photo saved under Images.",
       "flyfotoNoticeTitle": "About using aerial imagery",
@@ -401,13 +395,10 @@
       "flyfotoProjectsLoading": "Loading the list of acquisitions …",
       "flyfotoProjectsFailed": "Could not load the list of acquisitions.",
       "flyfotoProjectsNone": "No individual acquisitions found for this area.",
-      "flyfotoGrab": "Fetch",
-      "flyfotoGrabAll": "Fetch all ({{count}})",
-      "flyfotoGrabAllHint": "Fetches the {{count}} most recent acquisitions, one at a time.",
-      "flyfotoFetching": "Fetching …",
-      "flyfotoBatchDone": "Saved {{saved}} of {{total}} acquisitions under Images.",
+      "flyfotoRun": "Fetch {{count}} proposals",
+      "flyfotoSelectNewest": "Select the {{count}} newest",
+      "flyfotoCapHint": "You can pick up to {{count}} acquisitions at a time.",
       "flyfotoFailedFor": "Could not fetch aerial imagery for {{label}}.",
-      "flyfotoClose": "Close",
       "behold": "Keep",
       "beholdDone": "Kept",
       "beholdHint": "Saves the background on screen now, with its source, settings and extent written on it.",

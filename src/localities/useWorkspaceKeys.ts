@@ -11,8 +11,7 @@ import { anyOverlayOpenAtom } from '../ui/overlayAtoms';
 // KeyboardPan is attached to `document` too (see the map atom's
 // keyboardEventTarget) and does not look at defaultPrevented, so a
 // bubble-phase listener would move the funn selection *and* pan the map
-// out from under it. LidarExtractViewer does the same thing for the same
-// reason.
+// out from under it.
 //
 // Escape is deliberately NOT bound while a funn draft is open —
 // DrawControls binds it to abort the shape currently being sketched, and
@@ -26,6 +25,13 @@ export type WorkspaceKeyHandlers = {
   onZoomSelected: () => void;
   onStepBilde: (delta: 1 | -1) => void;
   onEscape: () => void;
+  // A picker run is up (docs/lokalitet-view.md §4.3) — depth 2 in §5.3's
+  // table, and it owns the keyboard outright while it lasts.
+  pickerActive: boolean;
+  onPickerStep: (delta: 1 | -1) => void;
+  onPickerKeep: () => void;
+  onPickerDiscard: () => void;
+  onPickerFinish: () => void;
   draftActive: boolean;
   // Arrows/Enter walk the funn list. The list is always on screen in the
   // dock, so this stays on while the extract and terrain panels are open —
@@ -68,6 +74,53 @@ export const useWorkspaceKeys = (handlers: WorkspaceKeyHandlers) => {
       // Second, focus-independent check on the same question — see
       // src/ui/overlayAtoms.ts.
       if (store.get(anyOverlayOpenAtom)) return;
+
+      /*
+       * A live picker run takes the whole keyboard.
+       *
+       * Not a layer *on top of* the others — a replacement for them. ←/→ are
+       * walking proposals rather than the filmstrip; `N`, `U` and `B` would
+       * start a second thing on a surface whose entire job is one decision at
+       * a time; and `Esc` ends the run rather than the stance behind it,
+       * which is what makes it the deepest thing in flight (§5.3).
+       *
+       * Enter/K keep and Delete/X discard, two spellings each, because one
+       * hand on the arrows should be able to finish the job.
+       */
+      if (h.pickerActive) {
+        switch (event.key) {
+          case 'ArrowRight':
+            h.onPickerStep(1);
+            break;
+          case 'ArrowLeft':
+            h.onPickerStep(-1);
+            break;
+          case 'Enter':
+            h.onPickerKeep();
+            break;
+          case 'Delete':
+            h.onPickerDiscard();
+            break;
+          case 'Escape':
+            h.onPickerFinish();
+            break;
+          default:
+            switch (event.key.toLowerCase()) {
+              case 'k':
+                h.onPickerKeep();
+                break;
+              case 'x':
+                h.onPickerDiscard();
+                break;
+              default:
+                return;
+            }
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        return;
+      }
 
       let handled = true;
       switch (event.key) {

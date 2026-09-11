@@ -29,7 +29,6 @@ import { useDrawSettings } from '../draw/drawControls/hooks/drawSettings';
 import { getDrawLayer } from '../draw/drawControls/hooks/mapLayers';
 import { renderFigureBlob } from '../figure/figure';
 import { describeHeritageRender, screenshotFigure } from '../figure/specs';
-import { lidarExtractSelectionAtom } from '../lidarExtract/atoms';
 import type { LidarSource } from '../lidarExtract/sources';
 import { mapAtom } from '../map/atoms';
 import { activeThemeLayersAtom } from '../map/layers/atoms';
@@ -78,7 +77,7 @@ import {
   setLocalityHighlight,
   upsertLocalityOnLayer,
 } from './localityLayer';
-import { enqueuePin, pinAttempted, pinNow } from './pinQueue';
+import { enqueuePin, pinAttempted, pinNow, type Produced } from './pinQueue';
 import { captureLocalityScreenshot } from './screenshot';
 import { getDrawLayerExtent4326 } from './serializeDrawLayer';
 import { planStarterPack } from './starterPack';
@@ -95,6 +94,7 @@ import {
   useLocalityAttachments,
   useLocalityFinds,
 } from './useLocalityContent';
+import { type PickerCandidate, usePickerRun } from './usePickerRun';
 import { canPinBilde, usePinnedBilde } from './usePinnedBilde';
 import { useWorkspaceKeys } from './useWorkspaceKeys';
 import { isPinned, viewSpecOf } from './viewSpec';
@@ -119,14 +119,19 @@ export type LocalityAccess = 'owner' | 'admin' | 'reader';
  */
 export type Stance = 'show' | 'edit';
 
-// Sentinel for the seamless best-available mosaic in flyfotoBusy, which
-// otherwise holds a project id.
-export const FLYFOTO_MOSAIC = '__mosaic__';
-
-// How many acquisitions "Hent alle" will take in one go. A busy area has
-// well over a hundred — Oslo lists 121 — so the batch is the newest slice,
-// not the whole list: each project is a full tile burst against NiB and a
-// separate Bilde, and nobody wants a gallery of 121 near-identical images.
+/*
+ * How many acquisitions one picker run will take.
+ *
+ * A busy area has well over a hundred — Oslo lists 121 — and the cap used to
+ * be about bandwidth: "Hent alle" fetched every one of them up front. Since
+ * §4.3 the run fetches one card ahead of where you are standing, so stopping
+ * at the third proposal costs three tile bursts whatever the cap says.
+ *
+ * It stays anyway, and now it bounds the *judging* rather than the traffic:
+ * a rail of 121 near-identical photographs of one valley is not a thing
+ * anybody triages, and a picker you abandon halfway is worse than a shorter
+ * list of the newest ones.
+ */
 export const FLYFOTO_BATCH_MAX = 8;
 
 // Extra breathing room when framing a single funn, on top of the chrome.
@@ -212,7 +217,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [adjusting, setAdjusting] = useAtom(adjustingLocalityAtom);
   const [selectedFunnId, setSelectedFunnId] = useAtom(selectedFunnIdAtom);
   const setMarksHidden = useSetAtom(marksHiddenAtom);
-  const setLidarSelection = useSetAtom(lidarExtractSelectionAtom);
   const [tool, setTool] = useAtom(ribbonToolAtom);
   const mode = useAtomValue(workspaceModeAtom);
   const stripOpen = useAtomValue(bilderStripOpenAtom);
@@ -253,9 +257,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     FlyfotoProject[] | null
   >(null);
   const [flyfotoProjectsError, setFlyfotoProjectsError] = useState(false);
-  // Which grab is running: a project id, or MOSAIC for the seamless one.
-  // Doubles as the per-row spinner flag, hence a value rather than a bool.
-  const [flyfotoBusy, setFlyfotoBusy] = useState<string | null>(null);
   const { setDrawLayerFeatures } = useDrawSettings();
 
   // What this user *is* to this record. A fact, not a choice.
@@ -893,43 +894,29 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     ],
   );
 
-  // LiDAR extract seeded with the lokalitet's rectangle — no manual box
-  // drag needed inside the workspace (the panel's "tegn på nytt" still
-  // allows a custom sub-box).
+  /*
+   * `Hent → LiDAR-uttrekk`: open the source-and-style dialog.
+   *
+   * There is nothing to seed any more. The extract used to carry a drawable
+   * sub-selection of its own, and §6 deleted it: **every image in a lokalitet
+   * covers the lokalitet's rectangle**. The filmstrip's whole value is that
+   * the ground does not move as you walk it, and one image over a hand-drawn
+   * sub-rectangle breaks register for the entire strip.
+   *
+   * So the tool is now a flag and the rectangle is `locality.bbox`, like it is
+   * for every other producer. The flag is still `ribbonToolAtom`, which is
+   * what keeps `U`, the Escape depth and the mutual exclusion with Terreng
+   * working unchanged.
+   */
   const openLidar = useCallback(() => {
     if (draftActive) stopDraft();
     setAdjusting(false);
-    const mapProjection = map.getView().getProjection().getCode();
-    setLidarSelection({
-      bboxMap: transformExtent(locality.bbox, 'EPSG:4326', mapProjection) as [
-        number,
-        number,
-        number,
-        number,
-      ],
-      mapProjection,
-      bbox25833: transformExtent(
-        locality.bbox,
-        'EPSG:4326',
-        'EPSG:25833',
-      ) as [number, number, number, number],
-      bboxLonLat: locality.bbox,
-    });
     setTool('lidar');
-  }, [
-    draftActive,
-    stopDraft,
-    setAdjusting,
-    map,
-    locality.bbox,
-    setLidarSelection,
-    setTool,
-  ]);
+  }, [draftActive, stopDraft, setAdjusting, setTool]);
 
   const closeLidar = useCallback(() => {
     setTool((cur) => (cur === 'lidar' ? null : cur));
-    setLidarSelection(null);
-  }, [setTool, setLidarSelection]);
+  }, [setTool]);
 
   const toggleLidar = useCallback(() => {
     if (tool === 'lidar') closeLidar();
@@ -948,8 +935,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   useEffect(() => {
     if (tool !== 'terrain') return;
     setAdjusting(false);
-    setLidarSelection(null);
-  }, [tool, setAdjusting, setLidarSelection]);
+  }, [tool, setAdjusting]);
 
   const toggleAdjusting = useCallback(() => {
     if (!adjusting && draftActive) stopDraft();
@@ -1236,51 +1222,29 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     ],
   );
 
+  /*
+   * The one remaining straight-to-record grab: `Behold` over the flyfoto
+   * ground.
+   *
+   * The acquisition list no longer comes through here — since §4.3 picking
+   * acquisitions opens a picker run instead, and nothing is written until a
+   * card is kept. `Behold` is the other gesture: it keeps *what is already on
+   * screen*, so there is nothing to propose and nothing to triage.
+   */
   const runFlyfoto = useCallback(
     async (project?: FlyfotoProject) => {
       if (fetchingFlyfoto) return;
-      setFlyfotoBusy(project?.id ?? FLYFOTO_MOSAIC);
       setFetchingFlyfoto(true);
       try {
         if (await grabFlyfoto(project)) {
           toast.success({ title: t('localities.tools.flyfotoSaved') });
         }
       } finally {
-        setFlyfotoBusy(null);
         setFetchingFlyfoto(false);
       }
     },
     [fetchingFlyfoto, grabFlyfoto, t],
   );
-
-  const runFlyfotoAll = useCallback(async () => {
-    if (fetchingFlyfoto || !flyfotoProjects) return;
-    const batch = flyfotoProjects.slice(0, FLYFOTO_BATCH_MAX);
-    if (batch.length === 0) return;
-    setFetchingFlyfoto(true);
-    let saved = 0;
-    try {
-      // Sequential, though it hardly costs anything now: since §4.1.2 each
-      // pass is one small POST rather than a tile burst. The argument that
-      // made it sequential — one stitch already saturates the concurrency
-      // budget against NiB's shared edge — moved into `pinQueue`, which is
-      // where the stitches happen. Kept in order here so the busy marker
-      // walks the picker rows the user is watching.
-      for (const project of batch) {
-        setFlyfotoBusy(project.id);
-        if (await grabFlyfoto(project)) saved++;
-      }
-    } finally {
-      setFlyfotoBusy(null);
-      setFetchingFlyfoto(false);
-    }
-    toast.success({
-      title: t('localities.tools.flyfotoBatchDone', {
-        saved,
-        total: batch.length,
-      }),
-    });
-  }, [fetchingFlyfoto, flyfotoProjects, grabFlyfoto, t]);
 
   /*
    * A LiDAR reading of this rectangle, kept as its parameters (§4.1.2).
@@ -1330,6 +1294,176 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       beholdBbox,
       setAttachmentItems,
     ],
+  );
+
+  /*
+   * The picker runs (docs/lokalitet-view.md §4.3).
+   *
+   * `LiDAR-uttrekk` and `Flyfoto` keep their selection dialogs and change what
+   * happens *after* one: instead of every result being saved, the results open
+   * a keep/discard run in the bottom slot. The dialogs below build candidates
+   * and hand them over; `usePickerRun` owns the rest.
+   *
+   * The duplicate guard lives here because the collection does. Under §4.1.2
+   * keeping is free, which removed the cost and therefore the brake — so this
+   * is the brake, and it fires before the tile burst rather than after it.
+   */
+  const isDuplicateKey = useCallback(
+    (key: BeholdKey) =>
+      (attachmentItems ?? []).some((rec) =>
+        attachmentMatchesKey(rec, key, beholdBbox),
+      ),
+    [attachmentItems, beholdBbox],
+  );
+
+  /*
+   * Keeping a proposal: `createAttachment`, not `createAttachmentSpec`.
+   *
+   * The one place a View is written with its pixels already attached. The card
+   * rendered the figure in order to be *looked at*, so keeping it stores those
+   * bytes rather than asking the pin queue for a second render of identical
+   * parameters — one fewer tile burst against a shared public edge, and the
+   * stored pin is literally what the author judged.
+   */
+  const keepPickerCandidate = useCallback(
+    async (candidate: PickerCandidate, produced: Produced) => {
+      if (!user || !canAdd) return false;
+      try {
+        const rec = await createAttachment(
+          {
+            locality: locality.id,
+            kind: candidate.kind,
+            caption: candidate.caption,
+            meta: {
+              ...candidate.meta,
+              ...produced.meta,
+              renderedAt: new Date().toISOString(),
+            },
+          },
+          user.id,
+          produced.blob,
+          produced.filename,
+        );
+        setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
+        return true;
+      } catch (e) {
+        console.warn('[localityWorkspace] picker keep failed', e);
+        toast.error({ title: t('localities.picker.keepFailed') });
+        return false;
+      }
+    },
+    [user, canAdd, locality.id, setAttachmentItems, t],
+  );
+
+  const picker = usePickerRun({
+    bbox4326: locality.bbox,
+    subject: locality.name || undefined,
+    isDuplicate: isDuplicateKey,
+    onKeep: keepPickerCandidate,
+  });
+  const startPicker = picker.start;
+  const finishPicker = picker.finish;
+
+  // A run is a write surface, so it cannot outlive the stance that allowed
+  // it: `Ferdig` on the row drops the picker along with the pen and the
+  // extract dialog. An effect rather than a line in `leaveEdit` because
+  // `canAdd` can also go false without that verb being pressed.
+  useEffect(() => {
+    if (!canAdd) finishPicker();
+  }, [canAdd, finishPicker]);
+
+  /*
+   * `Hent` in the LiDAR dialog: the checked datasets × the checked styles.
+   *
+   * The candidate's `meta` is the same block `saveExtractSpec` writes, so a
+   * kept proposal is indistinguishable from one `Behold` or the starter set
+   * produced — nothing downstream has to know which route an image came by.
+   */
+  const startLidarPicker = useCallback(
+    (plans: { source: LidarSource; styles: string[] }[]) => {
+      const candidates: PickerCandidate[] = [];
+      for (const { source, styles } of plans) {
+        // The same reading `viewSpecOf` takes off the stored meta: the source
+        // key is 'national' or 'project:<name>'.
+        const projectName = source.key.startsWith('project:')
+          ? source.key.slice('project:'.length)
+          : null;
+        const model = source.model;
+        for (const style of styles) {
+          candidates.push({
+            id: `${source.key}::${style}`,
+            title: source.label,
+            subtitle: style,
+            kind: 'extract',
+            caption: `${source.label} · ${style}`,
+            meta: {
+              sourceKey: source.key,
+              sourceLabel: source.label,
+              style,
+              model,
+              bbox25833: beholdBbox,
+            },
+            spec: projectName
+              ? { kind: 'lidar', source: { projectName }, style, model }
+              : { kind: 'lidar', source: 'national', style, model },
+            key: { kind: 'lidar', sourceKey: source.key, style, model },
+          });
+        }
+      }
+      closeLidar();
+      if (candidates.length > 0) startPicker('lidar', candidates);
+    },
+    [beholdBbox, closeLidar, startPicker],
+  );
+
+  /** `Hent` in the acquisition dialog. `null` is the seamless mosaic. */
+  const startFlyfotoPicker = useCallback(
+    (projects: (FlyfotoProject | null)[]) => {
+      const candidates: PickerCandidate[] = projects.map((project) => {
+        const label = project
+          ? (project.year?.toString() ?? project.projectName)
+          : t('localities.tools.flyfotoMosaic');
+        return {
+          id: project?.id ?? NIB_MOSAIC_KEY,
+          title: label,
+          subtitle: project
+            ? [project.photoDate, project.projectName]
+                .filter(Boolean)
+                .join(' · ')
+            : t('localities.tools.flyfotoMosaicHint'),
+          kind: 'flyfoto',
+          caption: `${t('localities.tools.flyfotoCaption')} ${
+            project ? label : new Date().toLocaleDateString(i18n.language)
+          }`,
+          meta: {
+            sourceLabel: 'Norge i bilder',
+            bbox25833: beholdBbox,
+            ...(project
+              ? {
+                  nibSource: 'project',
+                  projectId: project.id,
+                  projectName: project.projectName,
+                  projectMetresPerPx: project.metresPerPx,
+                  year: project.year,
+                  photoDate: project.photoDate,
+                }
+              : { nibSource: 'mosaic' }),
+          },
+          spec: project
+            ? { kind: 'flyfoto', source: { projectId: project.id } }
+            : { kind: 'flyfoto', source: 'mosaic' },
+          key: {
+            kind: 'flyfoto',
+            sourceKey: project?.id ?? NIB_MOSAIC_KEY,
+            style: '',
+            model: '',
+          },
+        };
+      });
+      setFlyfotoPicker(false);
+      if (candidates.length > 0) startPicker('flyfoto', candidates);
+    },
+    [beholdBbox, startPicker, t, i18n.language],
   );
 
   /*
@@ -1473,8 +1607,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   }, [beholdKey, beholdBbox, attachmentItems]);
 
   // One image from the ortofoto ground, once the notice has been accepted.
-  // Straight through `runFlyfoto`, which is the picker's own per-row grab:
-  // `Behold` over Flyfoto and pressing that row are the same act.
+  // Straight through `runFlyfoto`, which is now only this: the acquisition
+  // dialog stopped saving per row when it started handing its rows to a
+  // picker run (§4.3), so `Behold` over Flyfoto is its last caller.
   const beholdFlyfoto = useCallback(() => {
     if (!offer || offer.ground !== 'flyfoto') return;
     void runFlyfoto(offer.project ?? undefined);
@@ -1712,6 +1847,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // register.
     stripNavigable: stripOpen && !draftActive && (bilderItems?.length ?? 0) > 1,
     onStepBilde: stepBilde,
+
+    // The picker layer (§4.3). It stands every binding above down while a run
+    // is live, which is the keyboard saying the same thing the bottom slot
+    // says: one surface, one decision.
+    pickerActive: picker.run != null,
+    onPickerStep: picker.step,
+    onPickerKeep: () => void picker.keep(),
+    onPickerDiscard: picker.discard,
+    onPickerFinish: finishPicker,
     // Outside-in, the same order the row's right zone is stacked in (§5.3):
     // the deepest thing in flight goes first, and edit is a level of its own
     // above closing. Escaping out of edit rather than out of the lokalitet is
@@ -1930,9 +2074,13 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     closeFlyfotoPicker,
     flyfotoProjects,
     flyfotoProjectsError,
-    flyfotoBusy,
     runFlyfoto,
-    runFlyfotoAll,
+
+    // The picker runs (§4.3). The two dialogs above start one; `picker` is
+    // what `BilderPicker` renders and what the key layer drives.
+    picker,
+    startLidarPicker,
+    startFlyfotoPicker,
 
     // the starter set. No verb: it runs itself on a new lokalitet now, and
     // this is here because the rail has a moment — between the catalogue

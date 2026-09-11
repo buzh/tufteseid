@@ -42,9 +42,9 @@ import { infoToolAtom } from './featureInfo/infoTool';
  * mounted wins.
  *
  * Capture phase, and handled keys are stopped dead — the same treatment
- * useWorkspaceKeys and LidarExtractViewer already give theirs. OpenLayers'
- * KeyboardPan is attached to `document` (see the map atom's
- * keyboardEventTarget) and ignores defaultPrevented.
+ * useWorkspaceKeys already gives its own. OpenLayers' KeyboardPan is attached
+ * to `document` (see the map atom's keyboardEventTarget) and ignores
+ * defaultPrevented.
  */
 
 export type CycleKey = 'a' | 'd' | 'w' | 's' | 'e';

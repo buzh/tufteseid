@@ -258,6 +258,71 @@ const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
 };
 
 /*
+ * `Hent ▾` — docs/lokalitet-view.md §5.4.
+ *
+ * Two routes behind one control, and they belong together because they are
+ * the same gesture: choose a batch, then triage it in a picker carousel
+ * (§4.3). They are also the two rarest things on the row, and a popover is
+ * the sanctioned way to keep it one line.
+ *
+ * The button is `active` while the LiDAR dialog is up, so `U` toggling that
+ * dialog still lights something on the row — the key predates the popover and
+ * still opens the thing it always opened.
+ */
+const HentMenu = ({
+  ws,
+  active,
+}: {
+  ws: LocalityWorkspaceApi;
+  active: boolean;
+}) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const pick = (run: () => void) => () => {
+    setOpen(false);
+    run();
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      width={240}
+      label={t('localities.tools.hent')}
+      trigger={
+        <ModeButton
+          icon="download"
+          label={t('localities.tools.hent')}
+          tooltip={t('localities.tools.hentHint')}
+          active={active || open}
+          onClick={() => setOpen(!open)}
+        />
+      }
+    >
+      <div className={rowStyles.menu}>
+        <button
+          type="button"
+          className={cx(rowStyles.menuItem, active && rowStyles.menuItemActive)}
+          onClick={pick(ws.toggleLidar)}
+        >
+          <Icon icon="crop_free" size={16} />
+          {`${t('localities.tools.lidarExtract')} (U)`}
+        </button>
+        <button
+          type="button"
+          className={rowStyles.menuItem}
+          disabled={ws.fetchingFlyfoto}
+          onClick={pick(ws.openFlyfotoNotice)}
+        >
+          <Icon icon="satellite_alt" size={16} />
+          {t('localities.tools.flyfoto')}
+        </button>
+      </div>
+    </Popover>
+  );
+};
+
+/*
  * The banner slot — docs/lokalitet-view.md §5.7. It occupies the space the
  * summary used to, holds at most one sentence, and answers exactly one
  * question: whose is this and what state is it in.
@@ -352,9 +417,9 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
 
       {/* The middle zone: everything that leaves a trace, and therefore
           nothing at all in show (§2). Gated on `canAdd` as a block rather
-          than per button because all five create content, so for an admin —
-          who may edit this record but not add to it — the zone is empty and
-          should not render its gap. */}
+          than per button because every one of them creates content, so for an
+          admin — who may edit this record but not add to it — the zone is
+          empty and should not render its gap. */}
       {canAdd && (
         <div className={rowStyles.tools}>
           <ModeButton
@@ -367,9 +432,9 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           {/* The general answer to "how do I add an image": whatever the map
               is showing, kept at the source's own resolution rather than
               photographed off the screen (docs/lokalitet-view.md §4.3). It
-              stands in front of the three routes beside it because two of
-              them are pickers for a *different* dataset than the one you are
-              looking at, and this is the one for the one you are.
+              stands in front of `Hent ▾` because that one opens pickers for a
+              *different* dataset than the one you are looking at, and this is
+              the one for the one you are.
 
               Disabled rather than hidden on Standard and Hybrid: neither can
               be fetched as data, and the tooltip says which verb can. Hiding
@@ -391,26 +456,13 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             disabled={!ws.beholdReady || ws.beholding || ws.beholdDone}
             onClick={() => void ws.behold()}
           />
-          <ModeButton
-            icon="crop_free"
-            label={t('localities.tools.lidarExtractShort')}
-            tooltip={`${t('localities.tools.lidarExtract')} (U)`}
-            active={mode === 'lidar'}
-            onClick={ws.toggleLidar}
-          />
+          <HentMenu ws={ws} active={mode === 'lidar'} />
           <ModeButton
             icon="photo_camera"
             label={t('localities.tools.screenshotShort')}
             tooltip={`${t('localities.tools.screenshot')} (B)`}
             disabled={ws.shooting}
             onClick={ws.takeScreenshot}
-          />
-          <ModeButton
-            icon="satellite_alt"
-            label={t('localities.tools.flyfotoShort')}
-            tooltip={t('localities.tools.flyfoto')}
-            disabled={ws.fetchingFlyfoto}
-            onClick={ws.openFlyfotoNotice}
           />
         </div>
       )}

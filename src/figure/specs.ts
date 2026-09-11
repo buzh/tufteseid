@@ -16,7 +16,6 @@
  */
 
 import { t } from 'i18next';
-import type { LidarSource } from '../lidarExtract/sources';
 import type { FlyfotoProject } from '../localities/flyfotoProjects';
 import {
   HERITAGE_DETAILS,
@@ -99,14 +98,6 @@ export const lidarExtractFigure = (
   metresPerPx: input.metresPerPx,
   bbox25833: input.bbox25833,
   credits: [CREDITS.hoydedata],
-});
-
-/** Pull the acquisition facts off an enumerated source, when one is at hand. */
-export const lidarSourceFacts = (
-  source: LidarSource | undefined,
-): Pick<LidarExtractFigureInput, 'year' | 'pointDensity'> => ({
-  year: source?.year ?? null,
-  pointDensity: source?.pointDensity ?? null,
 });
 
 // ---------------------------------------------------------------------------

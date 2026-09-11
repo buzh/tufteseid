@@ -29,11 +29,16 @@
 .mosaic {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-5);
+  gap: var(--sp-4);
   padding: var(--sp-4);
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
+}
+
+/* Every row is a checkbox now, so the whole row is the label and the click
+   target is the row rather than a 13 px box at the start of it. */
+.row {
+  cursor: pointer;
 }
 
 .projects {
@@ -59,7 +64,6 @@
 .project {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--sp-4);
   padding: var(--sp-2) 0;
   border-bottom: 1px solid var(--c-border);

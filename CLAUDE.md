@@ -60,8 +60,13 @@ all of them.
   GIS tool survey with verdicts and licences, and what's worth building next.
   **Read it before proposing a new analysis feature** — it records what was
   already rejected and why, so those don't get re-litigated.
-- `docs/lokalitet-view.md` — **draft, nothing built**: the design for making
-  "a lokalitet is open" a view of its own — the two axes (owner/reader ×
+- `docs/lokalitet-view.md` — **partly built**: §12's build order is through
+  step 11, so the two axes, the View/File split, the three zones, the bottom
+  filmstrip/carousel, curation and the picker carousels are live and are
+  documented in `docs/ui-architecture.md`; removing the dock, the edit
+  transaction, the takeout bundle and moving Terreng/Sammenlign onto the row
+  are not. The whole design of making
+  "a lokalitet is open" a view of its own is here — the two axes (owner/reader ×
   show/edit), **show writes nothing and edit is a transaction** (`Lagre` /
   `Avbryt` over a client-side draft), the lokalitet row as three zones
   (identity + short code / the tools, edit only / the exits, deepest-first),
@@ -75,8 +80,8 @@ all of them.
   auto-sourced LiDAR styles, a general `Behold` for the ground on screen, and
   keep/discard picker carousels behind LiDAR-uttrekk and Flyfoto), curation
   and the takeout bundle, and moving Terreng and Sammenlign off row 1 onto
-  the lokalitet row. Read it before building any of that; it folds into
-  `docs/ui-architecture.md` §8 when it lands.
+  the lokalitet row. Read it before building any of that; each step folds into
+  `docs/ui-architecture.md` §8 as it lands.
 - `README.md` — third-party-facing install and admin guide (docker compose
   install, first-run PocketBase superuser, OAuth redirect URL, granting the
   app admin role, licence). Keep it accurate when any of that changes.
@@ -106,9 +111,12 @@ that owns them.
 - **A LiDAR tile extract** — stitch the densest per-project hillshade over a
   lokalitet's rectangle into one georeferenced image, kept as a Bilde or
   downloaded as PNG; a **starter set** of three readings of that dataset,
-  which a new lokalitet fetches for itself without being asked; and
-  **Behold**, one verb that keeps whatever ground is on screen at the
-  source's own resolution — `docs/ui-architecture.md` §10, §8.9.
+  which a new lokalitet fetches for itself without being asked; **Behold**,
+  one verb that keeps whatever ground is on screen at the source's own
+  resolution; and **picker carousels** behind `Hent ▾`, where a batch of
+  LiDAR readings or ortofoto acquisitions arrives as proposals to keep or
+  discard one at a time rather than as saved records —
+  `docs/ui-architecture.md` §10, §8.9.
 - **Five Kulturminner theme layers** from Riksantikvaren with structured
   GetFeatureInfo, and `kulturminner2` reshapeable by register, render and
   vern subset — `docs/map-layers.md`, `docs/ui-architecture.md` §5.9.

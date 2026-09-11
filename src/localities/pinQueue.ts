@@ -108,7 +108,7 @@ export const pinStateOf = (id: string): PinState | undefined => states.get(id);
 export const pinAttempted = (id: string): boolean => attempted.has(id);
 
 /** What a producer hands back: the figure, and what making it revealed. */
-type Produced = {
+export type Produced = {
   blob: Blob;
   filename: string;
   /** Merged over the spec — never replacing it. */
@@ -153,15 +153,22 @@ const rectangleOf = (rec: AttachmentRecord, fallback: LocalityBbox) => {
   ) as LocalityBbox;
 };
 
-/*
- * Spec → figure. The one place a stored View becomes pixels, whichever of the
- * three it is, and the mirror of `useRecreateView`: that one applies a spec to
- * the live map, this one applies it to a canvas nobody is watching.
+/**
+ * Spec → figure. The one place a View becomes pixels, whichever of the three it
+ * is, and the mirror of `useRecreateView`: that one applies a spec to the live
+ * map, this one applies it to a canvas nobody is watching.
  *
  * `null` is "the source has nothing here", which is not a failure. Anything
  * that throws is.
+ *
+ * Exported for the picker (§4.3), which is the one caller that renders a spec
+ * with no record behind it: a picker candidate is not an attachment until it is
+ * kept, so it has nothing to pin onto and nothing to enqueue. Keeping one then
+ * writes *these* bytes rather than asking the queue for a second render of the
+ * same parameters — which spares Kartverket a duplicate tile burst and makes
+ * the stored pin literally the pixels the author looked at when they decided.
  */
-const renderSpec = async (
+export const renderSpec = async (
   spec: ViewSpec,
   bbox4326: LocalityBbox,
   subject: string | undefined,

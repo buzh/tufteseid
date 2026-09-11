@@ -1,0 +1,242 @@
+/*
+ * The picker carousel — docs/lokalitet-view.md §4.3.
+ *
+ * It borrows the bottom slot from the lokalitet carousel, so it has to be
+ * unmistakably not that carousel: same geometry (a surface that may not grow
+ * downwards into the map), different dress. The accent-tinted header naming
+ * the run, the tally and the rail of proposals are the difference between
+ * "these are yours" and "these are offers".
+ */
+
+.picker {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: calc(100% - 2 * var(--sp-5));
+  max-width: 1100px;
+  margin: 0 auto var(--sp-5);
+  padding: var(--sp-3);
+  border: 1px solid var(--c-accent);
+  border-radius: var(--radius-lg);
+  background: var(--c-bg);
+  box-shadow: var(--shadow-lg);
+  /* The slot around it is pointer-events: none so the map stays draggable. */
+  pointer-events: auto;
+}
+
+@media (max-width: 47.999rem) {
+  .picker {
+    width: calc(100% - 2 * var(--sp-3));
+    margin-bottom: var(--sp-3);
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  min-width: 0;
+  margin: calc(-1 * var(--sp-3)) calc(-1 * var(--sp-3)) 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--c-accent-subtle);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+
+.progress,
+.tally {
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-fg-muted);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 180px;
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-bg-muted);
+}
+
+/* `contain`, not `cover`: the whole point of the card is that you are judging
+   this image, so the frame may not crop any of it away. */
+.cardImage {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.face {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+/* The receipt. Keeping writes the record on the press, so the card has
+   something true to say rather than a promise about what closing will do. */
+.keptMark {
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--c-accent);
+  color: var(--c-accent-fg);
+  font-size: 10px;
+  line-height: 18px;
+}
+
+/* The rail: where the fetch policy is visible. Card two spinning while you
+   judge card one, card five not started, and a discarded card simply gone. */
+.rail {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  overflow-x: auto;
+  padding-bottom: var(--sp-1);
+}
+
+.frame {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 48px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-bg-muted);
+  cursor: pointer;
+}
+
+.frameOn {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 2px var(--c-accent-subtle);
+}
+
+.thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbFace {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-fg-subtle);
+}
+
+.frameMark {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  background: var(--c-accent);
+  color: var(--c-accent-fg);
+}
+
+.body {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--c-border);
+}
+
+.bodyMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.cardTitle {
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+
+.cardSub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+/* An anchor rather than a Button: the blob is already in hand, so `download`
+   on an href is the whole implementation and a click handler would only be a
+   longer way to say it. Dressed as a secondary button. */
+.download {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 28px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-bg);
+  color: var(--c-fg);
+  font-size: var(--font-xs);
+  text-decoration: none;
+}
+
+.download:hover {
+  background: var(--c-bg-hover);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}

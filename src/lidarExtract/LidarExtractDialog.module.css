@@ -1,8 +1,14 @@
 /*
- * LiDAR-uttrekk in a ribbon row. The vertical version stacked selection,
- * styles, sources and actions down a 400 px column; here the run controls sit
- * on the top line where they are always reachable, and the sources spread
- * into a grid instead of stretching one card per line across the window.
+ * The LiDAR selection dialog. It was a 400 px dock column, then a ribbon row,
+ * and is now a modal — but the body has been the same thing throughout: pick
+ * styles once for the run, then pick datasets. The sources are a wrapping grid
+ * rather than a list, because as full-width `space-between` rows they
+ * degenerate into long thin lines with the name at one end and the badges at
+ * the other.
+ *
+ * The run controls are the Dialog's footer now, and the selection size is a
+ * line of prose: there is nothing to redraw since §6 made every image cover
+ * the lokalitet's rectangle.
  */
 
 .root {
@@ -11,43 +17,10 @@
   gap: var(--sp-4);
 }
 
-.empty {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-}
-
-.lead {
-  margin: 0;
-  font-size: var(--font-sm);
-}
-
 .hint {
   margin: 0;
   font-size: var(--font-xs);
   color: var(--c-fg-muted);
-}
-
-.bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--sp-3);
-}
-
-.selection {
-  display: flex;
-  align-items: baseline;
-  gap: var(--sp-2);
-  font-size: var(--font-sm);
-  font-variant-numeric: tabular-nums;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
 }
 
 .label {
