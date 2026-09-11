@@ -193,6 +193,7 @@ export const LocalityDock = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               uploading={ws.uploading}
               onUpload={ws.uploadFile}
               starterStep={ws.starterStep}
+              pinned={ws.pinned}
             />
           </Section>
         </ErrorBoundary>

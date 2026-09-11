@@ -1,8 +1,12 @@
 /*
- * The Bilder gallery and its lightbox. A square grid because the contents
- * are a mix of stitched extracts, screenshots and phone photos with no
- * aspect ratio in common — cropping them to a common tile is what makes the
- * column scannable.
+ * The Bilder gallery and the panel under it. A square grid because the
+ * contents are a mix of stitched extracts, screenshots and phone photos with
+ * no aspect ratio in common — cropping them to a common tile is what makes
+ * the column scannable.
+ *
+ * There is no lightbox any more. Picking a tile puts the image on the *map*
+ * (see usePinnedBilde) and opens the panel below with what can be done to it,
+ * so nothing covers the ground the image is being read against.
  */
 
 .grid {
@@ -40,6 +44,13 @@
   outline-offset: 2px;
 }
 
+/* The tile whose panel is open below. A ring rather than a fill: the tile is
+   an image and tinting it would change the thing being judged. */
+.tileOn {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 2px var(--c-accent);
+}
+
 .tileImage {
   display: block;
   width: 100%;
@@ -53,16 +64,6 @@
   justify-content: center;
   height: 100%;
   color: var(--c-fg-muted);
-}
-
-/* Over the dark lightbox stage, so not --c-fg-muted. */
-.stageError {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--sp-2);
-  color: var(--c-gray-400);
-  font-size: var(--font-sm);
 }
 
 /* Which kind of image this is, legible over whatever it is sitting on. */
@@ -128,76 +129,60 @@
 }
 
 /*
- * Lightbox. Wider than the default dialog cap — the point of it is looking
- * at the image. `dialog.lightbox` rather than `.lightbox` so it outranks
- * Dialog.module.css's own `.dialog` regardless of which module Vite
- * concatenates first.
+ * The selection panel. Under the grid rather than over the map: the whole
+ * point of pinning an image is to look at what is beneath it.
  */
-dialog.lightbox {
-  max-width: min(calc(100vw - 32px), 960px);
-}
-
-.viewer {
+.selection {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5);
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--c-border);
 }
 
-.stage {
-  position: relative;
+.selectionHead {
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 200px;
-  max-height: 60vh;
-  overflow: hidden;
-  border-radius: var(--radius-md);
-  background: var(--c-gray-900);
+  gap: var(--sp-3);
+  min-width: 0;
 }
 
-.stageImage {
-  display: block;
-  max-width: 100%;
-  max-height: 60vh;
-  object-fit: contain;
-}
-
-.navPrev,
-.navNext {
-  position: absolute;
-  border-radius: var(--radius-full);
-  background: var(--c-bg);
-  box-shadow: var(--shadow-md);
-}
-
-.navPrev {
-  left: 8px;
-}
-
-.navNext {
-  right: 8px;
-}
-
-.viewerMeta {
+.actions {
   display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-}
-
-.counter {
-  font-size: var(--font-xs);
-  color: var(--c-fg-subtle);
+  flex-wrap: wrap;
+  gap: var(--sp-2);
 }
 
 .metaLine {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--font-xs);
   color: var(--c-fg-subtle);
 }
 
-/* Inline delete confirmation, pushed left of the buttons in the footer. */
-.confirmText {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--font-sm);
+/* Same plain range input as the terrain sliders, for the same reason: the
+   fade has to stream while it is dragged, because what is being watched is
+   the map. */
+.fade {
+  display: block;
+}
+
+.fade input[type='range'] {
+  display: block;
+  width: 100%;
+  margin: 0;
+}
+
+.fadeHead {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: var(--font-xs);
   color: var(--c-fg-muted);
+}
+
+.fadeValue {
+  font-variant-numeric: tabular-nums;
 }

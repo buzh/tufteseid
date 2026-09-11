@@ -27,6 +27,7 @@ import { useStandardControls } from './standard/useStandardControls';
 import { TerrainSliders } from './terrain/TerrainSliders';
 import { useTerrainAnalysis } from './terrain/useTerrainAnalysis';
 import { GROUND_MODES, useGroundMode } from './useGroundMode';
+import { useRecreateView } from './useRecreateView';
 
 /**
  * Row 1 — always present, independent of any lokalitet: what the map shows
@@ -90,6 +91,9 @@ export const RibbonGlobalRow = () => {
   // takes nothing from `ground`, so the order is free.
   const terrain = useTerrainAnalysis();
   const ground = useGroundMode(standard, lidar, flyfoto, terrain, viewport);
+  // Gjenskap. Mounted here because this is where the four control hooks are,
+  // and a saved view is applied by writing all four — see useRecreateView.
+  useRecreateView(ground, lidar, flyfoto, terrain);
 
   // A/D/W/S/E. useGroundMode routes them to the ring of the ground on screen;
   // there is exactly one registered handler, so the two halves compose there

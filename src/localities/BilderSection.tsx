@@ -9,19 +9,21 @@ import {
   getAttachmentUrl,
   updateAttachmentCaption,
 } from '../api/attachments';
+import { recreateViewAtom } from '../shell/useRecreateView';
 import {
   Badge,
   Button,
-  Dialog,
+  ConfirmPopover,
+  cx,
   Icon,
-  IconButton,
   Input,
   type MaterialSymbol,
   Spinner,
   toast,
 } from '../ui';
-import { lightboxOpenAtom } from './atoms';
 import styles from './BilderSection.module.css';
+import { canPinBilde, type usePinnedBilde } from './usePinnedBilde';
+import { viewSpecOf } from './viewSpec';
 
 // `landscape` is what the ribbon already uses for LiDAR mode, so an
 // extract carries the same mark here. (Material Symbols' `terrain` isn't
@@ -89,10 +91,12 @@ const MetaLine = ({ rec }: { rec: AttachmentRecord }) => {
 
 const Thumb = ({
   rec,
-  onOpen,
+  selected,
+  onClick,
 }: {
   rec: AttachmentRecord;
-  onOpen: () => void;
+  selected: boolean;
+  onClick: () => void;
 }) => {
   const { url, error, onError } = useAttachmentUrl(rec, '200x200');
   const { t } = useTranslation();
@@ -100,11 +104,12 @@ const Thumb = ({
     <div className={styles.cell}>
       <button
         type="button"
-        className={styles.tile}
+        className={cx(styles.tile, selected && styles.tileOn)}
+        aria-pressed={selected}
         title={
           error ? t('localities.bilder.loadFailed') : rec.caption || rec.kind
         }
-        onClick={onOpen}
+        onClick={onClick}
       >
         {url ? (
           <img
@@ -131,58 +136,46 @@ const Thumb = ({
   );
 };
 
-// Full-size view. Previously this was window.open into a new tab, which
-// loses the caption, the metadata and the way back.
-const Lightbox = ({
-  items,
-  index,
+/**
+ * What you can do with the image you just picked.
+ *
+ * This replaced the lightbox, and the replacement is the point of the whole
+ * step (docs/lokalitet-view.md §4.2). A lightbox answers "what does this file
+ * look like", which for an image *of this rectangle* is the wrong question —
+ * so the image goes on the map instead, in register, under the funn and the
+ * Kulturminner layers, with a fade to compare it against whatever is beneath
+ * it. Everything else the lightbox carried moves here unchanged: the caption
+ * field, delete, the link to the original.
+ *
+ * Not a dialog and not anchored: a panel under the grid, so nothing the image
+ * is being compared with is covered while it is being compared.
+ */
+const SelectionBar = ({
+  rec,
   canEdit,
-  onIndex,
-  onClose,
+  pinned,
   onDeleted,
   onCaption,
 }: {
-  items: AttachmentRecord[];
-  index: number;
+  rec: AttachmentRecord;
   canEdit: boolean;
-  onIndex: (i: number) => void;
-  onClose: () => void;
+  pinned: ReturnType<typeof usePinnedBilde>;
   onDeleted: (rec: AttachmentRecord) => void;
   onCaption: (rec: AttachmentRecord, caption: string) => void;
 }) => {
   const { t } = useTranslation();
-  const rec = items[index] ?? null;
-  const { url, error, onError } = useAttachmentUrl(rec, '800x0');
-  const [caption, setCaption] = useState(rec?.caption ?? '');
-  // Confirm inline rather than with ConfirmPopover: a modal <dialog> paints
-  // in the browser's top layer, and Popover portals to <body> — which is
-  // underneath it and inert. Any anchored overlay inside a dialog has to be
-  // rendered as part of the dialog's own subtree.
-  const [confirming, setConfirming] = useState(false);
+  const recreate = useSetAtom(recreateViewAtom);
+  const [caption, setCaption] = useState(rec.caption ?? '');
 
   useEffect(() => {
-    setCaption(rec?.caption ?? '');
-  }, [rec?.id, rec?.caption]);
+    setCaption(rec.caption ?? '');
+  }, [rec.id, rec.caption]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target;
-      if (
-        target instanceof HTMLElement &&
-        ['INPUT', 'TEXTAREA'].includes(target.tagName)
-      ) {
-        return;
-      }
-      if (e.key === 'ArrowLeft' && index > 0) onIndex(index - 1);
-      if (e.key === 'ArrowRight' && index < items.length - 1) {
-        onIndex(index + 1);
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [index, items.length, onIndex]);
-
-  if (!rec) return null;
+  const isPinned = pinned.pinnedId === rec.id;
+  const pinnable = canPinBilde(rec);
+  // Absent rather than disabled, per §4.2: a screenshot has no view behind it
+  // to go back to, which is a different statement from "you may not".
+  const spec = viewSpecOf(rec);
 
   const openOriginal = () => {
     getAttachmentUrl(rec)
@@ -196,110 +189,87 @@ const Lightbox = ({
   };
 
   return (
-    <Dialog
-      open
-      onOpenChange={(next) => !next && onClose()}
-      title={t('localities.bilder.heading')}
-      closeLabel={t('shared.close')}
-      className={styles.lightbox}
-      footer={
-        confirming ? (
-          <>
-            <span className={styles.confirmText}>
-              {t('localities.bilder.confirmDelete')}
-            </span>
-            <Button
-              size="sm"
-              palette="gray"
-              onClick={() => setConfirming(false)}
-            >
-              {t('shared.cancel')}
-            </Button>
-            <Button
-              size="sm"
-              variant="primary"
-              palette="red"
-              onClick={() => onDeleted(rec)}
-            >
-              {t('localities.bilder.delete')}
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button size="sm" leftIcon="open_in_new" onClick={openOriginal}>
-              {t('localities.bilder.openOriginal')}
-            </Button>
-            {canEdit && (
-              <Button
-                size="sm"
-                palette="red"
-                leftIcon="delete"
-                onClick={() => setConfirming(true)}
-              >
+    <div className={styles.selection}>
+      <div className={styles.selectionHead}>
+        <Badge>{t(`localities.bilder.kind.${rec.kind}`)}</Badge>
+        <MetaLine rec={rec} />
+      </div>
+
+      <Input
+        value={caption}
+        disabled={!canEdit}
+        placeholder={t('localities.bilder.captionPlaceholder')}
+        maxLength={200}
+        onChange={(e) => setCaption(e.target.value)}
+        onBlur={commitCaption}
+      />
+
+      <div className={styles.actions}>
+        {pinnable && (
+          <Button
+            size="sm"
+            variant={isPinned ? 'primary' : undefined}
+            leftIcon={isPinned ? 'visibility_off' : 'visibility'}
+            onClick={() => pinned.pin(rec.id)}
+          >
+            {isPinned
+              ? t('localities.bilder.hideOnMap')
+              : t('localities.bilder.showOnMap')}
+          </Button>
+        )}
+        {spec && (
+          <Button
+            size="sm"
+            leftIcon="restart_alt"
+            title={t('localities.bilder.recreateHint')}
+            onClick={() => recreate(spec)}
+          >
+            {t('localities.bilder.recreate')}
+          </Button>
+        )}
+        <Button size="sm" leftIcon="open_in_new" onClick={openOriginal}>
+          {t('localities.bilder.openOriginal')}
+        </Button>
+        {canEdit && (
+          <ConfirmPopover
+            title={t('localities.bilder.confirmDelete')}
+            confirmLabel={t('localities.bilder.delete')}
+            cancelLabel={t('shared.cancel')}
+            onConfirm={() => onDeleted(rec)}
+            trigger={(props) => (
+              <Button {...props} size="sm" palette="red" leftIcon="delete">
                 {t('localities.bilder.delete')}
               </Button>
             )}
-          </>
-        )
-      }
-    >
-      <div className={styles.viewer}>
-        <div className={styles.stage}>
-          {url ? (
-            <img
-              src={url}
-              alt={rec.caption || rec.kind}
-              onError={onError}
-              className={styles.stageImage}
-            />
-          ) : error ? (
-            <span className={styles.stageError}>
-              <Icon icon="broken_image" size={28} />
-              {t('localities.bilder.loadFailed')}
-            </span>
-          ) : (
-            <Spinner size={28} />
-          )}
-          {items.length > 1 && (
-            <>
-              <IconButton
-                icon="chevron_left"
-                aria-label={t('localities.bilder.previous')}
-                palette="gray"
-                className={styles.navPrev}
-                disabled={index === 0}
-                onClick={() => onIndex(index - 1)}
-              />
-              <IconButton
-                icon="chevron_right"
-                aria-label={t('localities.bilder.next')}
-                palette="gray"
-                className={styles.navNext}
-                disabled={index === items.length - 1}
-                onClick={() => onIndex(index + 1)}
-              />
-            </>
-          )}
-        </div>
-
-        <div className={styles.viewerMeta}>
-          <Badge>{t(`localities.bilder.kind.${rec.kind}`)}</Badge>
-          <span className={styles.counter}>
-            {index + 1} / {items.length}
-          </span>
-        </div>
-
-        <Input
-          value={caption}
-          disabled={!canEdit}
-          placeholder={t('localities.bilder.captionPlaceholder')}
-          maxLength={200}
-          onChange={(e) => setCaption(e.target.value)}
-          onBlur={commitCaption}
-        />
-        <MetaLine rec={rec} />
+          />
+        )}
       </div>
-    </Dialog>
+
+      {pinned.pinnedFailed && isPinned && (
+        <p className={styles.metaLine}>{t('localities.bilder.loadFailed')}</p>
+      )}
+
+      {/* Only while it is actually on the map. A fade control over nothing is
+          a control with no effect, and the row is short enough that appearing
+          reads as "this is what you can do now". Same reasoning, and the same
+          plain range input, as the terrain sliders. */}
+      {isPinned && (
+        <label className={styles.fade}>
+          <span className={styles.fadeHead}>
+            <span>{t('localities.bilder.opacity')}</span>
+            <span className={styles.fadeValue}>{pinned.opacity}%</span>
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={pinned.opacity}
+            onChange={(e) => pinned.setOpacity(Number(e.target.value))}
+          />
+        </label>
+      )}
+    </div>
   );
 };
 
@@ -318,6 +288,7 @@ export const BilderSection = ({
   uploading,
   onUpload,
   starterStep,
+  pinned,
 }: {
   /** Delete an image, retitle one. An admin may; a reader may not. */
   canEdit: boolean;
@@ -329,17 +300,16 @@ export const BilderSection = ({
   onUpload: (file: File) => void;
   /** The style the starter set is fetching, or null when it is not running. */
   starterStep: string | null;
+  pinned: ReturnType<typeof usePinnedBilde>;
 }) => {
   const { t } = useTranslation();
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  // Seeded from the pin rather than starting empty: this section is inside a
+  // collapsible, and folding it away to look at the pinned image and then
+  // opening it again should come back to the image you are looking at.
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => pinned.pinnedId,
+  );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const setLightboxOpen = useSetAtom(lightboxOpenAtom);
-
-  // The workspace's keyboard layer stands down while this is up.
-  useEffect(() => {
-    setLightboxOpen(openIndex != null);
-    return () => setLightboxOpen(false);
-  }, [openIndex, setLightboxOpen]);
 
   const pickFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -347,11 +317,25 @@ export const BilderSection = ({
     if (file) onUpload(file);
   };
 
+  // One press does both: pick the image and put it on the map. Selecting
+  // without showing would be a second click for the thing the click was for,
+  // and the images that cannot be placed — uploads, which carry no extent —
+  // are exactly the ones with nothing to show.
+  const select = (rec: AttachmentRecord) => {
+    if (selectedId === rec.id) {
+      setSelectedId(null);
+      pinned.pin(null);
+      return;
+    }
+    setSelectedId(rec.id);
+    pinned.pin(canPinBilde(rec) ? rec.id : null);
+  };
+
   const remove = async (rec: AttachmentRecord) => {
     try {
       await deleteAttachment(rec.id);
       setItems((prev) => (prev ? prev.filter((it) => it.id !== rec.id) : prev));
-      setOpenIndex(null);
+      if (selectedId === rec.id) setSelectedId(null);
     } catch (e) {
       console.warn('[BilderSection] delete failed', e);
       toast.error({ title: t('localities.workspace.saveFailed') });
@@ -378,6 +362,8 @@ export const BilderSection = ({
       </div>
     );
   }
+
+  const selected = items.find((it) => it.id === selectedId) ?? null;
 
   return (
     <>
@@ -421,18 +407,22 @@ export const BilderSection = ({
             </button>
           </>
         )}
-        {items.map((rec, i) => (
-          <Thumb key={rec.id} rec={rec} onOpen={() => setOpenIndex(i)} />
+        {items.map((rec) => (
+          <Thumb
+            key={rec.id}
+            rec={rec}
+            selected={rec.id === selectedId}
+            onClick={() => select(rec)}
+          />
         ))}
       </div>
 
-      {openIndex != null && (
-        <Lightbox
-          items={items}
-          index={Math.min(openIndex, items.length - 1)}
+      {selected && (
+        <SelectionBar
+          key={selected.id}
+          rec={selected}
           canEdit={canEdit}
-          onIndex={setOpenIndex}
-          onClose={() => setOpenIndex(null)}
+          pinned={pinned}
           onDeleted={remove}
           onCaption={setCaption}
         />

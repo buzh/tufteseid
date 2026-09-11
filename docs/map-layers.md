@@ -71,11 +71,15 @@ outgoing layers (context the fading dataset should keep covering), 3–4 go
   sets opacity explicitly on every layer it passes in.
 
 Above the whole stack, and below the lokalitet rectangles, the funn and the
-Kulturminner theme layers, sits the terrain render —
-`src/terrain/terrainOverlayLayer.ts`, a georeferenced `ol/layer/Image` at
-`zIndex: 1`. The full ordering is `ui-architecture.md` §10; why it is a map
-layer rather than a thumbnail is CLAUDE.md's Terrenganalyse section, and the
-visualizations themselves are `terrain-analysis.md`.
+Kulturminner theme layers, sits the **ground overlay** —
+`src/map/groundOverlay.ts`, a georeferenced `ol/layer/Image` at `zIndex: 1`.
+Two things paint into it and only one at a time: a live terrain render, and a
+kept bilde pinned to its own rectangle with "Vis i ruta". The module carries
+the `owner` tag and the arbiter (pinning stands the render down, entering
+Terreng unpins the image); the callers carry neither. The full ordering is
+`ui-architecture.md` §10; why the render is a map layer rather than a thumbnail
+is CLAUDE.md's Terrenganalyse section, and the visualizations themselves are
+`terrain-analysis.md`.
 
 ## Standard, and the amtskart series
 

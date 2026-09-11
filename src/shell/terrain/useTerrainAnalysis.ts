@@ -7,10 +7,12 @@
 // those are: the controls it feeds are spread over two ribbon rows, and the
 // DEM, the canvas and the render are one thing that must not exist twice.
 //
-// The render goes on the **map**, never in a row: terrainOverlayLayer.ts puts
+// The render goes on the **map**, never in a row: map/groundOverlay.ts puts
 // the canvas down as a georeferenced image layer over the background, so
 // scrubbing the light re-lights the ground in place, under the Kulturminner
-// layers and the lokalitet's own drawing.
+// layers and the lokalitet's own drawing. That slot holds one image and a
+// pinned bilde wants it too, so taking it here is also what unpins a bilde —
+// the arbiter is in that module.
 //
 // Two entrances resolve to one rectangle here rather than in two callers. A
 // lokalitet's Terreng analyses its bbox and saves into its Bilder; row 1's
@@ -33,6 +35,11 @@ import { terrainFigure } from '../../figure/specs';
 import { activeLocalityAtom } from '../../localities/atoms';
 import { createLocalityFromBbox } from '../../localities/createFromBbox';
 import { ribbonToolAtom } from '../../localities/toolAtoms';
+import {
+  hideGroundOverlay,
+  setGroundOverlayOpacity,
+  showGroundOverlay,
+} from '../../map/groundOverlay';
 import type { CycleKey } from '../../map/useBackgroundCyclingKeys';
 import { terrainStandaloneBboxAtom } from '../../terrain/atoms';
 import { fetchDem, type Dem, type DemModel } from '../../terrain/dem';
@@ -51,11 +58,6 @@ import {
   usesHorizon,
 } from '../../terrain/render';
 import { computeHorizonFields, type Visualization } from '../../terrain/shade';
-import {
-  hideTerrainOverlay,
-  setTerrainOverlayOpacity,
-  showTerrainOverlay,
-} from '../../terrain/terrainOverlayLayer';
 import { useTerrainViewport } from '../../terrain/useTerrainViewport';
 import { toast } from '../../ui';
 
@@ -112,7 +114,7 @@ export const useTerrainAnalysis = () => {
   const [azimuth, setAzimuth] = useState(DEFAULT_AZIMUTH);
   const [altitude, setAltitude] = useState(DEFAULT_ALTITUDE);
   const [zFactor, setZFactor] = useState(DEFAULT_Z_FACTOR);
-  // Percent, mirrored onto the layer imperatively — see terrainOverlayLayer.
+  // Percent, mirrored onto the layer imperatively — see groundOverlay.
   const [opacity, setOpacity] = useState(100);
 
   // Two radii rather than one shared, and the split is by *quantity* rather
@@ -223,13 +225,15 @@ export const useTerrainAnalysis = () => {
     [dem, vis, azimuth, altitude, zFactor, staticField],
   );
 
-  // Paint, then hand the canvas to the map.
+  // Paint, then hand the canvas to the map. Taking the overlay slot here is
+  // also what stands a pinned bilde down (src/map/groundOverlay.ts): both are
+  // an image of the same rectangle, and the render is the live one.
   useEffect(() => {
     if (!dem || !field) {
       // Covers loading, the no-coverage case, a failed fetch and leaving the
       // tool alike: an earlier render must not stay on the map describing
       // ground nothing is analysing any more.
-      hideTerrainOverlay();
+      hideGroundOverlay('terrain');
       return;
     }
     // Reused rather than recreated: this exact element is what the map's
@@ -237,18 +241,24 @@ export const useTerrainAnalysis = () => {
     // rebuilding the layer's image too.
     const canvas = (canvasRef.current ??= document.createElement('canvas'));
     if (!paintTerrainField(field, dem, vis, canvas)) return;
-    showTerrainOverlay({ canvas, extent25833: demImageExtent(dem) });
+    showGroundOverlay({
+      owner: 'terrain',
+      source: canvas,
+      crop: { x: 0, y: 0, width: canvas.width, height: canvas.height },
+      extent25833: demImageExtent(dem),
+    });
   }, [dem, field, vis]);
 
   // After the paint effect on purpose: on the commit that first builds the
   // layer, this is what gives it the slider's own position rather than
   // whatever a previous session of the tool left behind.
   useEffect(() => {
-    setTerrainOverlayOpacity(opacity / 100);
+    setGroundOverlayOpacity('terrain', opacity / 100);
   }, [opacity]);
 
-  // Unmounting the ribbon takes the layer with it.
-  useEffect(() => hideTerrainOverlay, []);
+  // Unmounting the ribbon takes the layer with it — unless a bilde has taken
+  // the slot in the meantime, which `hideGroundOverlay` checks for us.
+  useEffect(() => () => hideGroundOverlay('terrain'), []);
 
   const save = useCallback(async () => {
     const canvas = canvasRef.current;
@@ -365,6 +375,39 @@ export const useTerrainAnalysis = () => {
     setPickerOpen(false);
   };
 
+  /**
+   * Put every knob back where a saved render had it — Gjenskap's terrain arm
+   * (`useRecreateView`).
+   *
+   * A method rather than the caller setting the six pieces itself, which is
+   * how the LiDAR and flyfoto arms work, because `setRadius` is not a plain
+   * setter: it routes to one of *two* stored radii depending on the current
+   * visualization (see the split above). A caller outside this hook would
+   * hand its number to whichever family was showing a moment ago, since the
+   * `vis` it just set is not visible until the next render. From in here the
+   * target visualization is simply an argument.
+   */
+  const restoreView = useCallback(
+    (v: {
+      vis: Visualization;
+      model: DemModel;
+      azimuth: number;
+      altitude: number;
+      zFactor: number;
+      radius?: number;
+    }) => {
+      setModel(v.model);
+      setVis(v.vis);
+      setAzimuth(v.azimuth);
+      setAltitude(v.altitude);
+      setZFactor(v.zFactor);
+      if (v.radius != null) {
+        (usesHorizon(v.vis) ? setSvfRadius : setLrmRadius)(v.radius);
+      }
+    },
+    [],
+  );
+
   // Called by useGroundMode when Terreng stops being the ground on screen. An
   // unmounted popover never fires its own open-change callback, so without
   // this it would come back open.
@@ -402,6 +445,7 @@ export const useTerrainAnalysis = () => {
     pickerOpen,
     setPickerOpen,
     activate,
+    restoreView,
     model,
     setModel,
     // No bare `setVis`: the two ways in are `activate` (a row click, which

@@ -270,13 +270,23 @@ turns the analysed rectangle into a lokalitet.
   (`src/terrain/atoms.ts`) for the row-1 rectangle, never both. Output saves as
   an attachment of the existing `extract` kind (with `style` = the
   visualization), so no PocketBase migration was needed.
-- `src/terrain/terrainOverlayLayer.ts` — the render goes **on the map**, as a
+- `src/map/groundOverlay.ts` — the render goes **on the map**, as a
   georeferenced `ol/layer/Image` (`ImageCanvasSource`, `zIndex: 1`) over the
   background and under the Kulturminner layers, not as a thumbnail in the
   ribbon. Reading relief *against* the heritage record is the whole point, so
   the relief has to be the ground. Imperative and module-level like
   `swapBackgroundLayers` — the pixels change every slider frame and no React
   component needs to see that.
+- **That slot holds exactly one image, and two features want it**: a live
+  terrain render and a bilde pinned with "Vis i ruta"
+  (`src/localities/usePinnedBilde.ts`). The arbiter is the module, not the two
+  callers — `showGroundOverlay({ owner })` takes the slot from whoever has it
+  and `hideGroundOverlay(owner)` no-ops unless you still hold it, so **pinning
+  an image stands the terrain render down, and entering Terreng unpins the
+  image**. The displaced side hears about it through `subscribeGroundOverlay`
+  and drops its own selection. There is deliberately no "take it away from
+  them" verb: an arbiter with two verbs is an arbiter two callers can disagree
+  with.
 
 Load-bearing:
 

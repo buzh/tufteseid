@@ -31,8 +31,6 @@ export type WorkspaceKeyHandlers = {
   // it is off only while drawing, where picking a different funn out from
   // under the pen is never what the arrow meant.
   navigable: boolean;
-  // Off while a modal owns the keyboard (the Bilder lightbox).
-  enabled: boolean;
 };
 
 export const useWorkspaceKeys = (handlers: WorkspaceKeyHandlers) => {
@@ -48,8 +46,6 @@ export const useWorkspaceKeys = (handlers: WorkspaceKeyHandlers) => {
         return;
       }
       const h = ref.current;
-      if (!h.enabled) return;
-
       const target = event.target;
       if (
         target instanceof HTMLElement &&

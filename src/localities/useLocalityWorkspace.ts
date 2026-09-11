@@ -48,7 +48,6 @@ import {
   activeLocalityAtom,
   adjustingLocalityAtom,
   funnDraftActiveAtom,
-  lightboxOpenAtom,
   marksHiddenAtom,
   selectedFunnIdAtom,
 } from './atoms';
@@ -85,6 +84,7 @@ import {
   useLocalityAttachments,
   useLocalityFinds,
 } from './useLocalityContent';
+import { usePinnedBilde } from './usePinnedBilde';
 import { useWorkspaceKeys } from './useWorkspaceKeys';
 
 /**
@@ -186,7 +186,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [adjusting, setAdjusting] = useAtom(adjustingLocalityAtom);
   const [selectedFunnId, setSelectedFunnId] = useAtom(selectedFunnIdAtom);
   const setMarksHidden = useSetAtom(marksHiddenAtom);
-  const lightboxOpen = useAtomValue(lightboxOpenAtom);
   const setLidarSelection = useSetAtom(lidarExtractSelectionAtom);
   const [tool, setTool] = useAtom(ribbonToolAtom);
   const mode = useAtomValue(workspaceModeAtom);
@@ -262,6 +261,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const { items: attachmentItems, setItems: setAttachmentItems } =
     useLocalityAttachments(locality.id);
   const kulturminner = useKulturminner(locality.bbox);
+  // "Vis i ruta". Mounted here rather than in BilderSection because that
+  // section is inside a collapsible and unmounts when it is folded away.
+  const pinned = usePinnedBilde(attachmentItems);
 
   // Funn draft. `draftFunnId` is the record the pen is bound to — null only
   // until the first shape closes, since drawing autosaves. `draftIsEdit`
@@ -1228,7 +1230,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   );
 
   useWorkspaceKeys({
-    enabled: !lightboxOpen,
     navigable: mode !== 'draft',
     draftActive,
     // Same toggle as the lokalitet-row button the key is advertised on: N
@@ -1296,6 +1297,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     findItems,
     attachmentItems,
     setAttachmentItems,
+    pinned,
     kulturminner,
     funnCount,
     bilderCount,

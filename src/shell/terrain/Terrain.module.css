@@ -1,6 +1,6 @@
 /*
  * Terrenganalyse on the ribbon. The render is on the map — see
- * terrainOverlayLayer.ts — so what is here is knobs, a resolution readout and
+ * map/groundOverlay.ts — so what is here is knobs, a resolution readout and
  * two verbs, spread over the settings strip and one slider row under it.
  *
  * Nothing here is a panel. Both rows are thin and both let the terrain

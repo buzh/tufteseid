@@ -24,18 +24,16 @@ export const Dialog = ({
   title,
   footer,
   children,
-  bare,
   flushBody,
   closeLabel = 'Lukk',
   className,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Omit together with `bare` for a chromeless dialog (the lightbox). */
+  /** Omit for a dialog with no header bar. */
   title?: string;
   footer?: ReactNode;
   children: ReactNode;
-  bare?: boolean;
   flushBody?: boolean;
   closeLabel?: string;
   className?: string;
@@ -58,7 +56,7 @@ export const Dialog = ({
     <dialog
       ref={ref}
       data-scope="dialog"
-      className={cx(styles.dialog, bare && styles.bare, className)}
+      className={cx(styles.dialog, className)}
       // Escape and the browser's own dismissal both land here; the element
       // has already decided to close, so mirror that into React state rather
       // than trying to prevent it.
@@ -80,27 +78,23 @@ export const Dialog = ({
         if (!inside) onOpenChange(false);
       }}
     >
-      {bare ? (
-        children
-      ) : (
-        <div className={styles.panel}>
-          {title != null && (
-            <div className={styles.header}>
-              <h2 className={styles.title}>{title}</h2>
-              <IconButton
-                icon="close"
-                aria-label={closeLabel}
-                palette="gray"
-                onClick={() => onOpenChange(false)}
-              />
-            </div>
-          )}
-          <div className={cx(styles.body, flushBody && styles.bodyFlush)}>
-            {children}
+      <div className={styles.panel}>
+        {title != null && (
+          <div className={styles.header}>
+            <h2 className={styles.title}>{title}</h2>
+            <IconButton
+              icon="close"
+              aria-label={closeLabel}
+              palette="gray"
+              onClick={() => onOpenChange(false)}
+            />
           </div>
-          {footer && <div className={styles.footer}>{footer}</div>}
+        )}
+        <div className={cx(styles.body, flushBody && styles.bodyFlush)}>
+          {children}
         </div>
-      )}
+        {footer && <div className={styles.footer}>{footer}</div>}
+      </div>
     </dialog>
   );
 };

@@ -312,7 +312,8 @@ unmounts.
 ### 3.3 Stacking order
 
 Two independent ladders. **OL layer `zIndex`** (map-internal): background stack
-at 0 (it sets none), terrain render 1, the compare curtain's B stack 1.5, draw
+at 0 (it sets none), the ground overlay 1 — a terrain render *or* a pinned
+bilde, one at a time (§8.7.1) — the compare curtain's B stack 1.5, draw
 layer 2, draw overlay / measure / theme layers 3, active theme layer promoted
 to 10, lidar footprints 3, localities 4, funn highlight 4.5, funn 5, locality
 draft 7, lidar extract selection 7, locality adjust 8. The fractional 4.5 and
@@ -411,8 +412,11 @@ subsume.
   measurement toggles, undo/redo stacks.
 - **Lokaliteter** — `activeLocalityAtom`, `funnDraftActiveAtom`,
   `adjustingLocalityAtom`, `selectedFunnIdAtom` / `hoveredFunnIdAtom` (written
-  from both the dock list and the map, §8.6), `lightboxOpenAtom`, content
-  caches.
+  from both the dock list and the map, §8.6), `pinnedAttachmentIdAtom` (which
+  bilde is on the map, §8.7.1), content caches. Plus `recreateViewAtom`
+  (`src/shell/useRecreateView.ts`) — a *command* atom rather than state: it
+  holds a `ViewSpec` only long enough for the hook mounted beside the control
+  hooks to apply it, then clears itself.
 - **LiDAR extract** — selection rectangle, run status, result canvas.
 - **Auth** — `currentUserAtom`, `roleAtom`, `isAdminAtom`, dialog open state.
 
@@ -1414,7 +1418,8 @@ file tokens and `KulturminnerSection` hits an external WFS, and either failing
 should cost you that section rather than the funn list above it.
 
 `FunnList` (per-row status, rename, zoom-to, delete), `BilderSection`
-(attachment gallery with lightbox), `KulturminnerSection` (the "kjente
+(attachment gallery; picking a tile opens a panel under the grid and puts the
+image on the map — §8.7.1), `KulturminnerSection` (the "kjente
 kulturminner her" readout from GeoNorge's WFS redistribution of the
 Riksantikvaren register — `kart.ra.no` has WFS disabled, hence the detour), and
 `LocalityDetails` (where it is, description, synlighet, metadata) last, because
@@ -1632,6 +1637,66 @@ key/label, `metresPerPx`, bbox, `imageRect` (§8.10), and for flyfoto the
 short-lived file tokens for thumbnails — a new UI must keep doing that or every
 thumbnail 403s.
 
+#### 8.7.1 The image on the map — Vis i ruta and Gjenskap
+
+**There is no lightbox.** Picking a tile in `BilderSection` selects it, opens a
+panel *under the grid*, and — where the record has an extent — puts the image
+back on the map at the rectangle it is of. A lightbox answers "what does this
+file look like", which for a picture of a place you are currently looking at is
+a question nobody has. Pinned, the 1937 ortofoto fades over today's hillshade
+with the funn drawn on top; in a lightbox it is a picture of somewhere you are
+no longer looking.
+
+The panel carries: the kind badge and provenance line, the caption field
+(`canEdit`, commits on blur), then **Vis i ruta / Skjul fra ruta**,
+**Gjenskap**, **Åpne originalen** and delete-behind-a-confirm. Under it, when
+the image is up, a **Toning** slider.
+
+- **The pixels.** `src/localities/usePinnedBilde.ts` decodes the **original**
+  file — never a thumbnail — and hands it to `showGroundOverlay` with
+  `meta.bbox25833` as the extent and `meta.imageRect` as the crop. It has to be
+  the original: `imageRect` is in the original file's own pixels and nothing
+  records the figure's overall size, so a thumb cannot be scaled back to the
+  ground without a guess, and a guess a pixel out is half a metre out on the
+  map. Records with no `bbox25833` (uploads) can still be selected — captioned,
+  opened, deleted — but the pin button is absent.
+- **Where it is mounted.** From `useLocalityWorkspace`, not from
+  `BilderSection`, and `pinnedAttachmentIdAtom` lives in
+  `src/localities/atoms.ts` for the same reason: the section is inside a
+  collapsible, and folding the list away to look at the map is the most likely
+  thing to do right after pinning something (§8.2 — folding hides, it does not
+  unmount, but the section still must not *own* the pin).
+- **The shared slot.** It paints into the same `zIndex: 1` overlay as a terrain
+  render, and `src/map/groundOverlay.ts` is the arbiter: pinning stands the
+  render down, entering Terreng unpins the image, and the displaced side hears
+  about it through `subscribeGroundOverlay` (§10).
+- **The fade is imperative.** Percent in `useState`, mirrored onto the layer
+  directly, exactly like Terrenganalyse's opacity — routing a dragged slider
+  through jotai would re-render the shell at 60 Hz to change a number
+  OpenLayers reads imperatively anyway.
+- **Gjenskap** puts the *map* back the way it was when the image was made, and
+  is the primitive `docs/lokalitet-view.md` §4.2 asks for rather than a button:
+  `src/localities/viewSpec.ts` reads a record's `meta` into a `ViewSpec`
+  (`lidar` | `terrain` | `flyfoto`) purely, `recreateViewAtom` carries it, and
+  `useRecreateView` — mounted in `RibbonGlobalRow`, the one place the four
+  control hooks live — applies it. Two later builds are written on that split:
+  a View is stored as a spec before it is pixels, and a forked lokalitet
+  carries its original's views without its files.
+- **Absent, not disabled.** A screenshot or an upload yields `null` from
+  `viewSpecOf` and gets no Gjenskap button at all. There is no view to go back
+  to, which is a different statement from "you may not go back to it". When a
+  spec exists but the dataset behind it does not any more — a LiDAR project
+  withdrawn from the WMS catalogue, an acquisition no longer listed for the
+  bbox — the attempt toasts and leaves the map alone.
+- **Restoring a terrain view is a method on the hook**
+  (`useTerrainAnalysis.restoreView`), not six setter calls from outside,
+  because the radius setter routes to one of two stored radii according to the
+  *current* visualization — which a caller cannot see until the next render.
+- **What was lost with the lightbox**: its ← / → walked the gallery. That
+  navigation is gone until the filmstrip in `docs/lokalitet-view.md` §12 step 7
+  brings it back, and `useWorkspaceKeys` lost its `enabled` flag with it (the
+  lightbox was its only reason to exist).
+
 ### 8.8 The flyfoto picker
 
 "Flyfoto" → licensing notice dialog → picker listing the seamless best mosaic
@@ -1737,6 +1802,13 @@ Load-bearing:
   its bbox, so every attachment records `meta.imageRect` (`{x, y, width,
   height}`) — where the image sits inside the file. Anything that later wants
   to georeference a saved raster reads that, not the canvas size.
+  **`imageRect` is in the original file's pixels and nothing records the
+  figure's overall size**, so it georeferences the original and nothing else: a
+  PocketBase thumbnail cannot be scaled back to the ground from it without
+  knowing the scale factor, and guessing one from the thumb's aspect ratio is
+  routinely a pixel out — half a metre on the map. "Vis i ruta" (§8.7.1)
+  therefore always loads the original. Recording a `figureSize` alongside it
+  would lift that restriction; nothing needs it yet.
 - **An image narrower than `MIN_FIGURE_WIDTH` (560 px) is matted, not
   squeezed.** Below that the caption wraps until it is taller than the picture.
   `imageRect.x` is the matte offset.
@@ -1986,7 +2058,7 @@ families must not carry the number across; switching *within* the horizon
 family must, or the render would change for a reason nobody asked for and the
 horizon cache would miss.
 
-**The render is on the map, not in the row.** `src/terrain/terrainOverlayLayer.ts`
+**The render is on the map, not in the row.** `src/map/groundOverlay.ts`
 puts the canvas down as a georeferenced `ol/layer/Image` at `zIndex: 1` — over
 the background stack (which sets no zIndex at all), under the lokalitet
 rectangles (4), the funn (5) and the theme layers (10). That ordering is the
@@ -1995,6 +2067,18 @@ the same argument that makes LiDAR hillshade a *background* rather than a theme
 layer. Scrubbing the light therefore re-lights the terrain in place, at full
 size, against everything else on screen. What is left on the ribbon is knobs, a
 resolution readout and the two verbs.
+
+**That slot is shared, and the module is the arbiter.** A bilde pinned with
+"Vis i ruta" (§8.7.1) wants the same `zIndex: 1`, and nothing else in the app is
+near it, so the collision is exactly two-way. `groundOverlay.ts` therefore
+carries an `owner` tag (`'terrain' | 'bilde'`) on the single placement:
+`showGroundOverlay({ owner })` takes the slot, `hideGroundOverlay(owner)`
+no-ops unless you still hold it, and `subscribeGroundOverlay` publishes owner
+changes so the displaced side can drop its own UI state. The rule that falls
+out is one sentence in one place: **pinning an image stands the terrain render
+down, and entering Terreng unpins the image.** Two layers racing, or a
+"take it from them" verb the callers could disagree about, is what this
+replaces.
 
 That is also the argument for the sliders being a **row** rather than a popover
 anchored to the strip, which is what §5.1's one-line contract would otherwise
@@ -2364,7 +2448,10 @@ three ways — hillshade, multidirectional hillshade and slope — fetched in
 sequence into Bilder, with progress in that section.
 
 **Keep it**
-browse the Bilder gallery; open the lightbox; caption an attachment; delete one;
+browse the Bilder gallery; pick a tile to put it back on the map at its own
+rectangle and fade it over what is there now; press **Gjenskap** on an extract,
+terrain render or flyfoto to set the map back to the view it was made from;
+open the original in a tab; caption an attachment; delete one;
 see flyfoto captioned with its acquisition year; get every kept or downloaded
 image back as a report-ready figure — scale bar, north arrow, dataset,
 acquisition, processing settings, extent, rights holder and licence burned into

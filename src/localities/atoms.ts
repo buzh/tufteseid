@@ -45,7 +45,9 @@ export const openSectionsAtom = atom<Set<WorkspaceSectionId>>(
   new Set<WorkspaceSectionId>(['funn', 'bilder']),
 );
 
-// The Bilder lightbox owns the arrow keys while it is up. Lifted out of
-// BilderSection so the workspace's own keyboard layer can stand down
-// instead of both reacting to the same press.
-export const lightboxOpenAtom = atom<boolean>(false);
+// Which bilde is pinned to the map ("Vis i ruta"), if any. Outside
+// BilderSection because that section is inside a collapsible and unmounts
+// when it is folded away — and folding the list away to look at the map is
+// exactly what you do after pinning something. usePinnedBilde, mounted from
+// the workspace, is what turns this into pixels.
+export const pinnedAttachmentIdAtom = atom<string | null>(null);
