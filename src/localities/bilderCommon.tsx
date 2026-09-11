@@ -36,6 +36,7 @@ import {
   Spinner,
 } from '../ui';
 import styles from './bilderCommon.module.css';
+import { isDraftId } from './draft';
 import { type PinState, pinStateOf, subscribePinQueue } from './pinQueue';
 import type { LocalityWorkspaceApi } from './useLocalityWorkspace';
 import { isPinned, viewSpecOf } from './viewSpec';
@@ -110,9 +111,10 @@ export const usePinState = (id: string): PinState | undefined =>
  *
  * A **quiet per-card state**, per §5.6: not a blocking spinner over the rail
  * and not a broken-image placeholder. An unpinned View is a normal record
- * that simply has not been rendered yet, and the four faces are four
- * different sentences — being made, not asked for, nothing there, went wrong
- * — because only one of them is worth pressing a button about.
+ * that simply has not been rendered yet, and the five faces are five
+ * different sentences — not written down yet, being made, not asked for,
+ * nothing there, went wrong — because only one of them is worth pressing a
+ * button about.
  */
 export const usePinFace = (
   rec: AttachmentRecord,
@@ -120,6 +122,13 @@ export const usePinFace = (
   const { t } = useTranslation();
   const state = usePinState(rec.id);
   if (isPinned(rec)) return null;
+  // A View buffered by the open transaction: the server has never heard of
+  // this record, so the queue cannot have an opinion about it and the face
+  // has to come from the draft instead. It says *when* rather than *what
+  // went wrong*, because nothing has yet gone anywhere.
+  if (isDraftId(rec.id)) {
+    return { icon: 'bookmark', label: t('localities.bilder.pinBuffered') };
+  }
   switch (state) {
     case 'queued':
     case 'running':
@@ -345,7 +354,10 @@ export const OpenOriginalButton = ({
   const target = isPinned(rec) ? rec : pinnedRec;
 
   if (!target) {
-    if (!ws.canAdd) return null;
+    // Nothing to force a pin against while the spec is still only in the
+    // draft: there is no record id the queue could PATCH. `Lagre` writes it
+    // and the queue picks it up a moment later (§5.6, consequence 3).
+    if (!ws.canAdd || isDraftId(rec.id)) return null;
     return (
       <Button
         size="sm"

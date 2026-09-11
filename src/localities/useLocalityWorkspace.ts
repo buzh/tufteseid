@@ -3,26 +3,16 @@ import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { transformExtent } from 'ol/proj';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  AttachmentRecord,
-  createAttachment,
-  createAttachmentSpec,
-  deleteAttachment,
-  updateAttachment,
-} from '../api/attachments';
+import { AttachmentRecord, createAttachment } from '../api/attachments';
 import {
   deleteLocality,
   LocalityBbox,
   LocalityPatch,
   LocalityRecord,
-  updateLocality,
 } from '../api/localities';
 import {
-  createLocalityFind,
-  deleteLocalityFind,
   LocalityFindRecord,
   LocalityFindStatus,
-  updateLocalityFind,
 } from '../api/localityFinds';
 import { currentUserAtom, isAdminAtom } from '../auth/atoms';
 import { useDrawSettings } from '../draw/drawControls/hooks/drawSettings';
@@ -63,12 +53,36 @@ import {
   NIB_MOSAIC_KEY,
 } from './behold';
 import {
+  attachmentBaseOf,
+  clearDraft,
+  type DraftFind,
+  type DraftLocality,
+  type DraftSpec,
+  draftCounts,
+  dropAttachment,
+  dropFind,
+  findBaseOf,
+  isDirty,
+  isDraftId,
+  mintDraftId,
+  overlayAttachments,
+  overlayFinds,
+  undelete,
+  withAttachment,
+  withEager,
+  withFind,
+  withLocality,
+  withNewFind,
+  withNewSpec,
+} from './draft';
+import {
   fetchFlyfotoProjectsForBbox,
   type FlyfotoProject,
 } from './flyfotoProjects';
 import {
   getFunnExtentOnLayer,
   hideFunnOnLayer,
+  refreshFunnLayer,
   removeFunnFromLayer,
   upsertFunnOnLayer,
 } from './funnLayer';
@@ -94,6 +108,7 @@ import {
   useLocalityAttachments,
   useLocalityFinds,
 } from './useLocalityContent';
+import { useLocalityDraft } from './useLocalityDraft';
 import { type PickerCandidate, usePickerRun } from './usePickerRun';
 import { canPinBilde, usePinnedBilde } from './usePinnedBilde';
 import { useWorkspaceKeys } from './useWorkspaceKeys';
@@ -237,7 +252,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const heritageOpacity = useAtomValue(heritageOpacityAtom);
   const [shooting, setShooting] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [fetchingFlyfoto, setFetchingFlyfoto] = useState(false);
   // Whether the licensing notice is up, and what accepting it does. Two
   // routes reach NiB now — the acquisition picker and `Behold` over the
   // flyfoto ground — and consent is owed on both, so the notice grew a
@@ -245,7 +259,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [flyfotoNotice, setFlyfotoNotice] = useState<
     'picker' | 'behold' | null
   >(null);
-  const [beholding, setBeholding] = useState(false);
   // Whether the starter set is being written. A plain bool since §4.1.2: it
   // used to name the style being fetched, because fetching three was minutes
   // and the rail had nothing else to say — now the three cards appear almost
@@ -296,15 +309,119 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const canEdit = mayEdit && stance === 'edit';
   const canAdd = mayAdd && stance === 'edit';
 
-  // Mounts the move/resize interactions while adjustingLocalityAtom is
-  // set; persists the bbox after every finished gesture.
-  useLocalityAdjust(locality);
+  /*
+   * The edit transaction (docs/lokalitet-view.md §5.6).
+   *
+   * Everything below that used to write now writes *here* instead, and
+   * `Lagre` plays the buffer out to PocketBase in one pass. The exception is
+   * the lokalitet's own fields, which keep going onto `activeLocalityAtom`
+   * as they always did — half the app reads the rectangle off it, and a
+   * buffered bbox those never saw would make "Juster området refetches the
+   * DEM for free" stop being true. So `applyLocality` moves the live record
+   * and the buffer keeps the copy to put back.
+   */
+  const localityRef = useRef(locality);
+  localityRef.current = locality;
 
-  const { items: findItems, setItems: setFindItems } = useLocalityFinds(
-    locality.id,
+  const applyLocality = useCallback(
+    (fields: Partial<DraftLocality>) => {
+      const next = { ...localityRef.current, ...fields };
+      upsertLocalityOnLayer(next);
+      setActiveLocality(next);
+    },
+    [setActiveLocality],
   );
-  const { items: attachmentItems, setItems: setAttachmentItems } =
-    useLocalityAttachments(locality.id);
+
+  const {
+    draft,
+    restoredAt,
+    begin: beginDraft,
+    mutate: mutateDraft,
+    commit: commitDraft,
+    rollback: rollbackDraft,
+  } = useLocalityDraft({
+    locality,
+    userId: user?.id ?? null,
+    recoverable: mayEdit,
+    applyLocality,
+  });
+
+  // Recovery enters edit by itself: the buffer is the session, and putting
+  // it back without the stance that owns it would leave the work on screen
+  // with no way to save it (§5.6, consequence 4).
+  useEffect(() => {
+    if (restoredAt != null) setEditingId(locality.id);
+  }, [restoredAt, locality.id, setEditingId]);
+
+  // …and the other direction. `enterEdit` opens the buffer, but it is not the
+  // only way into edit: a lokalitet made in this session arrives in it
+  // already, set by whichever creator made the record (§2). Stance without a
+  // buffer is the one state that would lose work silently — every write is a
+  // `mutateDraft`, and `mutate` is a no-op while `draft` is null — so the
+  // buffer follows the stance rather than the entrance.
+  useEffect(() => {
+    if (stance === 'edit') beginDraft();
+  }, [stance, beginDraft]);
+
+  /*
+   * Realtime stands down for the length of the transaction (§5.6,
+   * consequence 5): the subscription stays up, but an event raises a flag
+   * instead of reloading a list the buffer is describing.
+   */
+  const { items: serverFinds, changedElsewhere: findsChanged } =
+    useLocalityFinds(locality.id, stance === 'edit');
+  const {
+    items: serverAttachments,
+    setItems: setAttachmentItems,
+    changedElsewhere: attachmentsChanged,
+  } = useLocalityAttachments(locality.id, stance === 'edit');
+  const changedElsewhere = findsChanged || attachmentsChanged;
+
+  // What every surface reads: the server's lists with the session laid over
+  // them. Nothing downstream knows the difference — see `draft.ts`.
+  const ownerId = user?.id ?? locality.owner;
+  const findItems = useMemo(
+    () => overlayFinds(serverFinds, draft, locality.id, ownerId),
+    [serverFinds, draft, locality.id, ownerId],
+  );
+  const attachmentItems = useMemo(
+    () => overlayAttachments(serverAttachments, draft, locality.id, ownerId),
+    [serverAttachments, draft, locality.id, ownerId],
+  );
+
+  /*
+   * The deferred deletions (§5.6, consequence 2).
+   *
+   * One set for both collections — PocketBase ids are unique across them —
+   * because every surface that asks does so about one record at a time, and
+   * two sets would only be two things to remember to check.
+   */
+  const deletedIds = useMemo(
+    () =>
+      new Set<string>([
+        ...(draft?.findDeletes ?? []),
+        ...(draft?.attachmentDeletes ?? []),
+      ]),
+    [draft],
+  );
+
+  /** Whether `Avbryt` has anything to throw away, and what it would name. */
+  const dirty = isDirty(draft);
+  const counts = useMemo(
+    () => (draft ? draftCounts(draft) : null),
+    [draft],
+  );
+
+  /** Take a deferred deletion back — the verb on the greyed card. */
+  const restoreDeleted = useCallback(
+    (id: string) => {
+      mutateDraft((d) => undelete(d, id));
+      const rec = findItems?.find((f) => f.id === id);
+      if (rec) upsertFunnOnLayer(rec);
+    },
+    [mutateDraft, findItems],
+  );
+
   const kulturminner = useKulturminner(locality.bbox);
   // "Vis i ruta". Mounted here rather than in the strip because the strip is
   // collapsible and unmounts when it is folded away — and folding it away to
@@ -415,49 +532,28 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [bilderItems, activeBildeId, pinOnWalk],
   );
 
+  // Deferred, not done (§5.6). The record stays on the rail, greyed, and
+  // `Avbryt` — or `restoreDeleted` on the card — gives it back.
   const removeBilde = useCallback(
-    async (rec: AttachmentRecord) => {
-      try {
-        await deleteAttachment(rec.id);
-        setAttachmentItems((prev) =>
-          prev ? prev.filter((it) => it.id !== rec.id) : prev,
-        );
-        setActiveBildeId((cur) => (cur === rec.id ? null : cur));
-      } catch (e) {
-        console.warn('[localityWorkspace] bilde delete failed', e);
-        toast.error({ title: t('localities.workspace.saveFailed') });
-      }
+    (rec: AttachmentRecord) => {
+      mutateDraft((d) => dropAttachment(d, rec.id));
+      setActiveBildeId((cur) => (cur === rec.id ? null : cur));
     },
-    [setAttachmentItems, t],
+    [mutateDraft],
   );
 
-  // One patch, applied optimistically and rolled back on failure. The list is
-  // reloaded wholesale by realtime anyway; the optimistic step is what keeps
-  // a drag from snapping back for the length of a round trip.
+  // Into the buffer, which is also what makes the drag not snap back: there
+  // is no round trip to wait out any more.
   const patchBilde = useCallback(
-    async (
+    (
       rec: AttachmentRecord,
       patch: { caption?: string; sort?: number; hidden?: boolean },
     ) => {
-      setAttachmentItems((prev) =>
-        prev
-          ? prev.map((it) => (it.id === rec.id ? { ...it, ...patch } : it))
-          : prev,
+      mutateDraft((d) =>
+        withAttachment(d, rec.id, attachmentBaseOf(rec), patch),
       );
-      try {
-        const updated = await updateAttachment(rec.id, patch);
-        setAttachmentItems((prev) =>
-          prev ? prev.map((it) => (it.id === rec.id ? updated : it)) : prev,
-        );
-      } catch (e) {
-        console.warn('[localityWorkspace] bilde save failed', e);
-        toast.error({ title: t('localities.workspace.saveFailed') });
-        setAttachmentItems((prev) =>
-          prev ? prev.map((it) => (it.id === rec.id ? rec : it)) : prev,
-        );
-      }
     },
-    [setAttachmentItems, t],
+    [mutateDraft],
   );
 
   const setBildeCaption = useCallback(
@@ -486,9 +582,13 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * situations: neighbours one apart, and the first drag on a lokalitet whose
    * records all predate the field and so all carry 0. Both are self-healing —
    * once a run has been spaced out by `SORT_STEP` there is room again.
+   *
+   * Since step 13 both land in the buffer rather than on the server, so the
+   * renumber costs nothing at all until `Lagre` — but it is still worth
+   * avoiding, because at that point it becomes forty PATCHes in the commit.
    */
   const reorderBilde = useCallback(
-    async (id: string, toIndex: number) => {
+    (id: string, toIndex: number) => {
       const list = attachmentItems;
       if (!list) return;
       const from = list.findIndex((a) => a.id === id);
@@ -498,7 +598,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
       const rest = list.filter((a) => a.id !== id);
       const next = [...rest.slice(0, to), list[from], ...rest.slice(to)];
-      setAttachmentItems(next);
 
       const before = rest[to - 1] ?? null;
       const after = rest[to] ?? null;
@@ -512,25 +611,19 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         return SORT_STEP;
       };
 
-      try {
-        const value = between();
-        if (value != null) {
-          await updateAttachment(id, { sort: value });
-        } else {
-          // No room. Space the whole exhibit out again, in the order it now
-          // reads, and leave it that way — the values stay far below any
-          // clock reading, so the next image created still lands last.
-          for (let i = 0; i < next.length; i++) {
-            await updateAttachment(next[i].id, { sort: (i + 1) * SORT_STEP });
-          }
-        }
-      } catch (e) {
-        console.warn('[localityWorkspace] reorder failed', e);
-        toast.error({ title: t('localities.workspace.saveFailed') });
-        setAttachmentItems(list);
+      const value = between();
+      if (value != null) {
+        patchBilde(list[from], { sort: value });
+        return;
+      }
+      // No room. Space the whole exhibit out again, in the order it now
+      // reads, and leave it that way — the values stay far below any clock
+      // reading, so the next image created still lands last.
+      for (let i = 0; i < next.length; i++) {
+        patchBilde(next[i], { sort: (i + 1) * SORT_STEP });
       }
     },
-    [attachmentItems, setAttachmentItems, t],
+    [attachmentItems, patchBilde],
   );
 
   // Funn draft. `draftFunnId` is the record the pen is bound to — null only
@@ -540,8 +633,16 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [draftFunnId, setDraftFunnId] = useState<string | null>(null);
   const [draftIsEdit, setDraftIsEdit] = useState(false);
   const [funnTitle, setFunnTitle] = useState('');
-  const [savingFunn, setSavingFunn] = useState(false);
-  const [funnError, setFunnError] = useState<string | null>(null);
+  /*
+   * What "Rediger tegningen" started from, so `Forkast funn` can put it back.
+   *
+   * §5.3's second depth-2 exit used to be offered only for a *new* funn,
+   * because under autosave the old shape was overwritten the moment the new
+   * one closed and a button promising to restore it would have been lying.
+   * Nothing is overwritten now, so the promise is keepable — but only if
+   * somebody remembers what the shape was, and this is that somebody.
+   */
+  const [geometryBefore, setGeometryBefore] = useState<DraftFind | null>(null);
   // The autosave's controls, handed over once that hook has run further down.
   // Refs because the two halves point at each other: the hook is driven by
   // callbacks defined here (create the record, patch it), and those callbacks
@@ -592,23 +693,22 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setDraftFunnId(null);
     setDraftIsEdit(false);
     setFunnTitle('');
-    setFunnError(null);
+    setGeometryBefore(null);
   }, [locality.id]);
 
+  /*
+   * The lokalitet's own fields: onto the live record *and* into the buffer.
+   *
+   * The atom write is not an optimistic update waiting for a server to
+   * confirm it — there is no request. It is where the value lives until
+   * `Lagre`, because that is where every other module reads it from.
+   */
   const patchLocality = useCallback(
-    async (patch: LocalityPatch) => {
-      try {
-        const updated = await updateLocality(locality.id, patch);
-        upsertLocalityOnLayer(updated);
-        setActiveLocality(updated);
-        return updated;
-      } catch (e) {
-        console.warn('[localityWorkspace] save failed', e);
-        toast.error({ title: t('localities.workspace.saveFailed') });
-        return null;
-      }
+    (patch: LocalityPatch) => {
+      applyLocality(patch);
+      mutateDraft((d) => withLocality(d, patch));
     },
-    [locality.id, setActiveLocality, t],
+    [applyLocality, mutateDraft],
   );
 
   const close = useCallback(
@@ -618,9 +718,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
   // `Rediger`. Costs nothing on purpose (§2): no fetch, no write, the map
   // does not move and the render does not blink — which is what lets show
-  // mode be absolute about writing nothing without being in the way.
+  // mode be absolute about writing nothing without being in the way. All it
+  // does is set the stance; the buffer follows it, above.
   const enterEdit = useCallback(() => {
-    if (mayEdit) setEditingId(locality.id);
+    if (!mayEdit) return;
+    setEditingId(locality.id);
   }, [mayEdit, locality.id, setEditingId]);
 
   // Stance leaves on unmount, but only if it is still *this* record's. The
@@ -637,7 +739,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     async (next: string) => {
       const trimmed = next.trim();
       if (trimmed.length === 0 || trimmed === locality.name) return false;
-      await patchLocality({ name: trimmed });
+      patchLocality({ name: trimmed });
       return true;
     },
     [locality.name, patchLocality],
@@ -669,9 +771,13 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locality.id]);
 
+  // The one deletion that is not deferred, because there is nothing left to
+  // defer it into: the record this transaction is about is going away, so
+  // the buffer goes with it rather than waiting to be offered back.
   const removeLocality = useCallback(async () => {
     try {
       await deleteLocality(locality.id);
+      clearDraft(locality.id);
       removeLocalityFromLayer(locality.id);
       setActiveLocality(null);
     } catch (e) {
@@ -680,18 +786,18 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     }
   }, [locality.id, setActiveLocality, t]);
 
-  // Stopping is not discarding. The record exists from the moment the first
-  // shape closed and every change since has been written back, so this only
-  // puts the pen down: flush whatever is still settling, take the drawing off
-  // the shared draw layer, and let the funn layer show the saved copy again.
+  // Stopping is not discarding. The funn exists in the buffer from the moment
+  // the first shape closed and every change since has gone into it, so this
+  // only puts the pen down: flush whatever is still settling, take the drawing
+  // off the shared draw layer, and let the funn layer show the funn again.
   const stopDraft = useCallback(() => {
     flushDraftRef.current();
     getDrawLayer()?.getSource()?.clear();
     hideFunnOnLayer(null);
     if (draftFunnId) {
       const rec = findItems?.find((it) => it.id === draftFunnId);
-      // The flush a line ago may not have landed yet; the realtime event it
-      // causes re-hydrates this with the newer shape a moment later.
+      // The flush a line ago may not have landed in state yet; the buffer's
+      // own re-render puts the newer shape up a tick later.
       if (rec) upsertFunnOnLayer(rec);
     }
     setDraftFunnId(null);
@@ -699,105 +805,55 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setDraftActive(false);
   }, [draftFunnId, findItems, setDraftActive]);
 
-  // The way back out of an autosave, offered in the toast that reports it —
-  // which is what lets the first shape commit without asking first.
-  const undoFunn = useCallback(
-    async (id: string) => {
-      hideFunnOnLayer(null);
-      getDrawLayer()?.getSource()?.clear();
-      rebindDraftRef.current();
-      // The pen stays armed: the next shape starts a new funn.
-      setDraftFunnId((cur) => (cur === id ? null : cur));
-      try {
-        await deleteLocalityFind(id);
-        removeFunnFromLayer(id);
-        setFindItems((prev) =>
-          prev ? prev.filter((it) => it.id !== id) : prev,
-        );
-        setSelectedFunnId((cur) => (cur === id ? null : cur));
-      } catch (e) {
-        console.warn('[localityWorkspace] funn undo failed', e);
-        toast.error({ title: t('localities.funn.saveFailed') });
-      }
-    },
-    [setFindItems, setSelectedFunnId, t],
-  );
-
-  // First finished shape → the record. Title falls back to a running number
-  // rather than blocking on one being typed: a funn you can rename is worth
-  // more than a funn you have to name.
+  /*
+   * First finished shape → a row in the buffer.
+   *
+   * The autosave above this is unchanged and still fires on the same 700 ms
+   * settle: what changed is where it lands. That is the shape of §5.6 — the
+   * mechanism that keeps you from losing a stroke stays exactly as it was,
+   * and only the destination moves from PocketBase to a draft object, so
+   * "autosave suspended" costs nothing that was worth having.
+   *
+   * There is no undo toast any more, and it is not missed: the thing it
+   * undid was a write, and there is no longer a write to undo. `Forkast
+   * funn` on the row does the same job for the whole draft, and `Avbryt`
+   * does it for the session.
+   *
+   * Title falls back to a running number rather than blocking on one being
+   * typed: a funn you can rename is worth more than a funn you have to name.
+   */
   const createDraftFunn = useCallback(
     async (geometry: FeatureCollection): Promise<boolean> => {
       if (!user) return false;
-      setSavingFunn(true);
-      try {
-        const saved = await createLocalityFind(
-          {
-            locality: locality.id,
-            title:
-              funnTitle.trim() ||
-              t('localities.funn.autoName', {
-                n: (findItems?.length ?? 0) + 1,
-              }),
-            geometry,
-          },
-          user.id,
-        );
-        setFindItems((prev) => (prev ? [...prev, saved] : [saved]));
-        // The shapes are on the draw layer already; keep the funn layer's
-        // copy out from under them until drawing stops.
-        hideFunnOnLayer(saved.id);
-        setDraftFunnId(saved.id);
-        setFunnTitle(saved.title);
-        setSelectedFunnId(saved.id);
-        setFunnError(null);
-        toast.success({
-          title: t('localities.funn.autoSaved', { title: saved.title }),
-          action: {
-            label: t('localities.funn.undo'),
-            onClick: () => undoFunn(saved.id),
-          },
-        });
-        return true;
-      } catch (e) {
-        console.warn('[localityWorkspace] funn autosave (create) failed', e);
-        setFunnError(t('localities.funn.saveFailed'));
-        return false;
-      } finally {
-        setSavingFunn(false);
-      }
+      const id = mintDraftId();
+      const body: DraftFind = {
+        title:
+          funnTitle.trim() ||
+          t('localities.funn.autoName', { n: (findItems?.length ?? 0) + 1 }),
+        note: '',
+        status: 'mulig',
+        geometry,
+      };
+      mutateDraft((d) => withNewFind(d, id, body));
+      // The shapes are on the draw layer already; keep the funn layer's copy
+      // out from under them until drawing stops.
+      hideFunnOnLayer(id);
+      setDraftFunnId(id);
+      setFunnTitle(body.title);
+      setSelectedFunnId(id);
+      return true;
     },
-    [
-      user,
-      locality.id,
-      findItems,
-      funnTitle,
-      setFindItems,
-      setSelectedFunnId,
-      undoFunn,
-      t,
-    ],
+    [user, findItems, funnTitle, mutateDraft, setSelectedFunnId, t],
   );
 
   const updateDraftGeometry = useCallback(
     async (id: string, geometry: FeatureCollection): Promise<boolean> => {
-      setSavingFunn(true);
-      try {
-        const saved = await updateLocalityFind(id, { geometry });
-        setFindItems((prev) =>
-          prev ? prev.map((it) => (it.id === id ? saved : it)) : prev,
-        );
-        setFunnError(null);
-        return true;
-      } catch (e) {
-        console.warn('[localityWorkspace] funn autosave (geometry) failed', e);
-        setFunnError(t('localities.funn.saveFailed'));
-        return false;
-      } finally {
-        setSavingFunn(false);
-      }
+      const base = findItems?.find((it) => it.id === id);
+      if (!base) return false;
+      mutateDraft((d) => withFind(d, id, findBaseOf(base), { geometry }));
+      return true;
     },
-    [setFindItems, t],
+    [findItems, mutateDraft],
   );
 
   // A lokalitet is meant to hold the whole extent of its funn. Drawing past
@@ -822,13 +878,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // Recomputed from the live drawing rather than from whatever the flag was
   // raised with, so it can't grow the rectangle to fit a shape that has since
   // been moved back inside.
-  const growToFitDrawing = useCallback(async () => {
+  const growToFitDrawing = useCallback(() => {
     const projection = map.getView().getProjection().getCode();
     const drawn = getDrawLayerExtent4326(projection);
     if (!drawn) return;
-    if (await patchLocality({ bbox: bboxUnion(locality.bbox, drawn) })) {
-      setFunnOutside(false);
-    }
+    patchLocality({ bbox: bboxUnion(locality.bbox, drawn) });
+    setFunnOutside(false);
   }, [map, locality.bbox, patchLocality, setFunnOutside]);
 
   const startDraft = useCallback(() => {
@@ -849,7 +904,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setDraftFunnId(null);
     setDraftIsEdit(false);
     setFunnTitle('');
-    setFunnError(null);
+    setGeometryBefore(null);
     setDraftActive(true);
   }, [
     canAdd,
@@ -876,7 +931,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setDraftFunnId(f.id);
       setDraftIsEdit(true);
       setFunnTitle(f.title);
-      setFunnError(null);
+      // What `Forkast funn` will put back, taken from the overlaid record so
+      // that a second edit in the same session restores the first one's
+      // result rather than the server's copy.
+      setGeometryBefore(findBaseOf(f));
       setDraftActive(true);
     },
     [
@@ -932,27 +990,67 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setAdjusting(false);
   }, [tool, setAdjusting]);
 
+  /*
+   * `Juster området` — and its own little transaction inside the big one
+   * (§5.3, depth 2: `[Bruk] [Angre]`).
+   *
+   * The pair was already on the row before this step and only one of the two
+   * buttons was honest: the gesture PATCHed the record on every release, so
+   * `Angre` had nothing to undo. It has now, because the rectangle the drag
+   * moves is the buffered one — but `Avbryt` is the wrong grain for it. You
+   * adjust the area in the middle of a session that has also kept nine
+   * images, and "put the rectangle back" must not mean "throw the session
+   * away". So this remembers where the rectangle started.
+   */
+  const [bboxBefore, setBboxBefore] = useState<LocalityBbox | null>(null);
+
   const toggleAdjusting = useCallback(() => {
-    if (!adjusting && draftActive) stopDraft();
-    setAdjusting(!adjusting);
+    if (adjusting) {
+      setAdjusting(false);
+      setBboxBefore(null);
+      return;
+    }
+    if (draftActive) stopDraft();
+    setBboxBefore(localityRef.current.bbox);
+    setAdjusting(true);
   }, [adjusting, draftActive, stopDraft, setAdjusting]);
 
-  /**
-   * `Ferdig` — leave edit and go back to show.
+  /** `Bruk`: keep where the rectangle ended up (still buffered). */
+  const applyAdjust = useCallback(() => {
+    setAdjusting(false);
+    setBboxBefore(null);
+  }, [setAdjusting]);
+
+  /** `Angre`: put it back where the gesture started. */
+  const undoAdjust = useCallback(() => {
+    if (bboxBefore) patchLocality({ bbox: bboxBefore });
+    setAdjusting(false);
+    setBboxBefore(null);
+  }, [bboxBefore, patchLocality, setAdjusting]);
+
+  // Mounts the move/resize interactions while adjustingLocalityAtom is set,
+  // and reports the rectangle after every finished gesture. Into the buffer,
+  // like every other write in edit.
+  const onAdjustBbox = useCallback(
+    (bbox: LocalityBbox) => patchLocality({ bbox }),
+    [patchLocality],
+  );
+  useLocalityAdjust(locality, onAdjustBbox);
+
+  const [saving, setSaving] = useState(false);
+
+  /*
+   * Putting the edit-only tools down.
    *
-   * Not `Lagre`: the app still autosaves, so there is nothing here to commit.
-   * The transaction that turns this into `Lagre` / `Avbryt` is step 13 of
-   * docs/lokalitet-view.md §12, and until then `Ferdig` over autosave is the
-   * honest word for what the button does.
-   *
-   * It puts the edit-only tools down on the way out, because every one of
-   * them is a write surface: leaving the pen armed or the extract selection
-   * live in a stance whose whole promise is that nothing writes would be the
-   * invariant leaking through the one door that closes it.
+   * Both exits go through here, because every one of those tools is a write
+   * surface: leaving the pen armed or the extract selection live in a stance
+   * whose whole promise is that nothing writes would be the invariant
+   * leaking through the very door that closes it.
    */
-  const leaveEdit = useCallback(() => {
+  const standDown = useCallback(() => {
     if (draftActive) stopDraft();
     setAdjusting(false);
+    setBboxBefore(null);
     closeLidar();
     setEditingId((cur) => (cur === locality.id ? null : cur));
   }, [
@@ -963,6 +1061,86 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     locality.id,
     setEditingId,
   ]);
+
+  /**
+   * `Lagre` (§5.6).
+   *
+   * The stance drops as soon as the records land, and the *pixels* go out
+   * behind it — which is the third consequence taken at its word: the last
+   * step of a commit may be a tile burst that has not started yet, so
+   * holding the interface shut until every pixel exists would be holding it
+   * shut for a minute. What the author asked for was to be done editing, and
+   * they are.
+   *
+   * The specs that landed go to the pin queue on the way past. Everything
+   * else — the per-card state, the retry, `Last ned` waiting for its pin —
+   * is machinery §4.1.2 already built for exactly this moment.
+   */
+  const saveEdit = useCallback(async () => {
+    if (saving) return;
+    if (draftActive) flushDraftRef.current();
+    setSaving(true);
+    // Read before `standDown`, because the flush above may still be in the
+    // same tick as the state it wrote.
+    const wasChangedElsewhere = changedElsewhere;
+    try {
+      const result = await commitDraft();
+      if (result.ok) {
+        standDown();
+        // The buffered shapes on the map were pushed on under temporary ids;
+        // the records that just landed have real ones.
+        refreshFunnLayer();
+      }
+      for (const rec of result.created) {
+        enqueuePin({
+          rec,
+          bbox4326: localityRef.current.bbox,
+          subject: localityRef.current.name || undefined,
+        });
+      }
+      if (!result.ok) {
+        // Stay in edit. The buffer now holds exactly what did not land, the
+        // exits are still on the row, and pressing `Lagre` again retries
+        // precisely that remainder — which is the only reading of "still in
+        // the draft" that the toast can honestly make.
+        toast.error({
+          title: t('localities.edit.saveFailed', { count: result.failed }),
+        });
+      } else if (wasChangedElsewhere) {
+        // Last write wins, which is acceptable for one author with two tabs.
+        // Doing it silently would not be (§5.6, consequence 5).
+        toast.info({ title: t('localities.edit.changedElsewhere') });
+      }
+    } finally {
+      setSaving(false);
+    }
+  }, [saving, draftActive, changedElsewhere, commitDraft, standDown, t]);
+
+  /**
+   * `Avbryt`.
+   *
+   * The buffer is dropped and the eagerly written Files are deleted after
+   * it. The confirm that names what is being thrown away lives on the row,
+   * where the count is; by the time this runs the decision is made.
+   */
+  const cancelEdit = useCallback(async () => {
+    const eager = draft?.eagerIds ?? [];
+    standDown();
+    if (eager.length > 0) {
+      setAttachmentItems((prev) =>
+        prev ? prev.filter((it) => !eager.includes(it.id)) : prev,
+      );
+    }
+    // Buffered shapes, deleted funn and edited geometry all came and went on
+    // the layer by hand; the server's copy is the truth again.
+    refreshFunnLayer();
+    const stuck = await rollbackDraft();
+    if (stuck > 0) {
+      toast.error({
+        title: t('localities.edit.rollbackFailed', { count: stuck }),
+      });
+    }
+  }, [draft, standDown, setAttachmentItems, rollbackDraft, t]);
 
   // Capture the current view cropped to the rectangle → Bilder.
   const takeScreenshot = useCallback(async () => {
@@ -1046,6 +1224,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         'skjermbilde.png',
       );
       setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
+      // Written eagerly, so the transaction owes a DELETE on `Avbryt`
+      // (§5.6). The alternative is holding a multi-megabyte blob in the
+      // buffer, which `localStorage` cannot take and a crash would lose.
+      mutateDraft((d) => withEager(d, rec.id));
       toast.success({ title: t('localities.tools.screenshotSaved') });
     } catch (e) {
       console.warn('[localityWorkspace] screenshot failed', e);
@@ -1071,6 +1253,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     heritageRender,
     heritageOpacity,
     setAttachmentItems,
+    mutateDraft,
     t,
     i18n.language,
   ]);
@@ -1090,6 +1273,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           file.name,
         );
         setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
+        mutateDraft((d) => withEager(d, rec.id));
       } catch (e) {
         console.warn('[localityWorkspace] upload failed', e);
         toast.error({ title: t('localities.bilder.uploadFailed') });
@@ -1097,7 +1281,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         setUploading(false);
       }
     },
-    [user, canAdd, uploading, locality.id, setAttachmentItems, t],
+    [
+      user,
+      canAdd,
+      uploading,
+      locality.id,
+      setAttachmentItems,
+      mutateDraft,
+      t,
+    ],
   );
 
   // The acquisition list is per-rectangle, so drop it when the rectangle
@@ -1139,87 +1331,68 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * count now means "acquisitions kept" rather than "acquisitions that turned
    * out to have coverage" — which the picker could not know before either,
    * having no way to ask NiB without fetching.
+   *
+   * Since step 13 it is not even a POST: the row goes in the draft buffer and
+   * is written at `Lagre`, which is also when the pin queue first hears about
+   * it. That is the payoff §4.1.2 was for — a View small enough to buffer is
+   * a View `Avbryt` can drop without deleting anything.
    */
   const grabFlyfoto = useCallback(
-    async (project?: FlyfotoProject): Promise<boolean> => {
+    (project?: FlyfotoProject): boolean => {
       if (!user || !canAdd) return false;
       const label = project
         ? (project.year?.toString() ?? project.projectName)
         : t('localities.tools.flyfotoMosaic');
-      try {
-        const rec = await createAttachmentSpec(
-          {
-            locality: locality.id,
-            kind: 'flyfoto',
-            // A project's own year is what makes the gallery readable as a
-            // time series; the mosaic has no year, so it gets the date it
-            // was grabbed instead.
-            caption: `${t('localities.tools.flyfotoCaption')} ${
-              project ? label : new Date().toLocaleDateString(i18n.language)
-            }`,
-            meta: {
-              sourceLabel: 'Norge i bilder',
-              // The rectangle, but not the resolution: which acquisition over
-              // which ground is the spec, and what NiB actually serves for it
-              // is a fact about pixels that do not exist yet.
-              bbox25833: beholdBbox,
-              // Which NiB source this is, said in a way a machine can act on:
-              // the seamless mosaic and one acquisition are different
-              // requests, and "no projectName key" is a poor way to tell them
-              // apart once a reader has to re-lay this image on the map.
-              ...(project
-                ? {
-                    nibSource: 'project',
-                    // The ImageServer's own selector (prosjektnavn), which is
-                    // the same string as projectName today — kept as its own
-                    // key because the display name is free to stop being the
-                    // selector and matching an acquisition by its year label
-                    // breaks the day two projects share a year.
-                    projectId: project.id,
-                    projectName: project.projectName,
-                    // The acquisition's native resolution. `fetchFlyfoto`
-                    // needs it to plan the tile grid, and unlike the stitch's
-                    // own it is knowable before the stitch happens.
-                    projectMetresPerPx: project.metresPerPx,
-                    year: project.year,
-                    photoDate: project.photoDate,
-                  }
-                : { nibSource: 'mosaic' }),
-            },
-          },
-          user.id,
-        );
-        setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
-        enqueuePin({
-          rec,
-          bbox4326: locality.bbox,
-          subject: locality.name || undefined,
-        });
-        return true;
-      } catch (e) {
-        console.warn('[localityWorkspace] flyfoto failed', e);
-        toast.error({
-          title: t('localities.tools.flyfotoFailedFor', { label }),
-        });
-        return false;
-      }
+      const born = Date.now();
+      const spec: DraftSpec = {
+        kind: 'flyfoto',
+        // A project's own year is what makes the gallery readable as a
+        // time series; the mosaic has no year, so it gets the date it was
+        // grabbed instead.
+        caption: `${t('localities.tools.flyfotoCaption')} ${
+          project ? label : new Date().toLocaleDateString(i18n.language)
+        }`,
+        sort: born,
+        bornSort: born,
+        hidden: false,
+        meta: {
+          sourceLabel: 'Norge i bilder',
+          // The rectangle, but not the resolution: which acquisition over
+          // which ground is the spec, and what NiB actually serves for it
+          // is a fact about pixels that do not exist yet.
+          bbox25833: beholdBbox,
+          // Which NiB source this is, said in a way a machine can act on:
+          // the seamless mosaic and one acquisition are different
+          // requests, and "no projectName key" is a poor way to tell them
+          // apart once a reader has to re-lay this image on the map.
+          ...(project
+            ? {
+                nibSource: 'project',
+                // The ImageServer's own selector (prosjektnavn), which is
+                // the same string as projectName today — kept as its own
+                // key because the display name is free to stop being the
+                // selector and matching an acquisition by its year label
+                // breaks the day two projects share a year.
+                projectId: project.id,
+                projectName: project.projectName,
+                // The acquisition's native resolution. `fetchFlyfoto`
+                // needs it to plan the tile grid, and unlike the stitch's
+                // own it is knowable before the stitch happens.
+                projectMetresPerPx: project.metresPerPx,
+                year: project.year,
+                photoDate: project.photoDate,
+              }
+            : { nibSource: 'mosaic' }),
+        },
+      };
+      mutateDraft((d) => withNewSpec(d, mintDraftId(), spec));
+      return true;
     },
-    [
-      user,
-      canAdd,
-      locality.id,
-      locality.name,
-      locality.bbox,
-      beholdBbox,
-      setAttachmentItems,
-      t,
-      i18n.language,
-    ],
+    [user, canAdd, beholdBbox, mutateDraft, t, i18n.language],
   );
 
   /*
-   * The one remaining straight-to-record grab: `Behold` over the flyfoto
-   * ground.
+   * `Behold` over the flyfoto ground.
    *
    * The acquisition list no longer comes through here — since §4.3 picking
    * acquisitions opens a picker run instead, and nothing is written until a
@@ -1227,18 +1400,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * screen*, so there is nothing to propose and nothing to triage.
    */
   const runFlyfoto = useCallback(
-    async (project?: FlyfotoProject) => {
-      if (fetchingFlyfoto) return;
-      setFetchingFlyfoto(true);
-      try {
-        if (await grabFlyfoto(project)) {
-          toast.success({ title: t('localities.tools.flyfotoSaved') });
-        }
-      } finally {
-        setFetchingFlyfoto(false);
+    (project?: FlyfotoProject) => {
+      if (grabFlyfoto(project)) {
+        toast.success({ title: t('localities.tools.flyfotoSaved') });
       }
     },
-    [fetchingFlyfoto, grabFlyfoto, t],
+    [grabFlyfoto, t],
   );
 
   /*
@@ -1257,38 +1424,26 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * downstream has to know which route produced an image.
    */
   const saveExtractSpec = useCallback(
-    async (source: LidarSource, style: string) => {
+    (source: LidarSource, style: string) => {
       if (!user) return;
-      const rec = await createAttachmentSpec(
-        {
-          locality: locality.id,
-          kind: 'extract',
-          caption: `${source.label} · ${style}`,
-          meta: {
-            sourceKey: source.key,
-            sourceLabel: source.label,
-            style,
-            model: source.model,
-            bbox25833: beholdBbox,
-          },
+      const born = Date.now();
+      const spec: DraftSpec = {
+        kind: 'extract',
+        caption: `${source.label} · ${style}`,
+        sort: born,
+        bornSort: born,
+        hidden: false,
+        meta: {
+          sourceKey: source.key,
+          sourceLabel: source.label,
+          style,
+          model: source.model,
+          bbox25833: beholdBbox,
         },
-        user.id,
-      );
-      setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
-      enqueuePin({
-        rec,
-        bbox4326: locality.bbox,
-        subject: locality.name || undefined,
-      });
+      };
+      mutateDraft((d) => withNewSpec(d, mintDraftId(), spec));
     },
-    [
-      user,
-      locality.id,
-      locality.name,
-      locality.bbox,
-      beholdBbox,
-      setAttachmentItems,
-    ],
+    [user, beholdBbox, mutateDraft],
   );
 
   /*
@@ -1340,6 +1495,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           produced.filename,
         );
         setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
+        // The pixels are the point of the gesture, so this one is written
+        // eagerly like a screenshot and compensated on `Avbryt`.
+        mutateDraft((d) => withEager(d, rec.id));
         return true;
       } catch (e) {
         console.warn('[localityWorkspace] picker keep failed', e);
@@ -1347,7 +1505,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         return false;
       }
     },
-    [user, canAdd, locality.id, setAttachmentItems, t],
+    [user, canAdd, locality.id, setAttachmentItems, mutateDraft, t],
   );
 
   const picker = usePickerRun({
@@ -1360,9 +1518,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const finishPicker = picker.finish;
 
   // A run is a write surface, so it cannot outlive the stance that allowed
-  // it: `Ferdig` on the row drops the picker along with the pen and the
-  // extract dialog. An effect rather than a line in `leaveEdit` because
-  // `canAdd` can also go false without that verb being pressed.
+  // it: leaving edit drops the picker along with the pen and the extract
+  // dialog. An effect rather than a line in `standDown` because `canAdd` can
+  // also go false without either exit being pressed.
   useEffect(() => {
     if (!canAdd) finishPicker();
   }, [canAdd, finishPicker]);
@@ -1488,13 +1646,13 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * is three rows the author will find waiting next time, and abandoning them
    * unpinned would be the worse outcome.
    *
-   * Each write is independently fallible — so failures are counted, not
-   * thrown, and the toast says how many of the planned set arrived.
+   * Since step 13 the three writes are three lines in the draft buffer, so
+   * the only fallible thing left in here is the catalogue lookup: the set
+   * either lands whole or was never planned.
    */
   const runStarterPack = useCallback(async () => {
     if (!user || !canAdd || starterBusy) return;
     setStarterBusy(true);
-    let saved = 0;
     try {
       // The catalogue lookup is the first thing that can answer "is there any
       // laser data here at all", and it costs one cached request.
@@ -1504,25 +1662,16 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         return;
       }
 
-      for (const style of plan.styles) {
-        try {
-          await saveExtractSpec(plan.source, style);
-          saved++;
-        } catch (e) {
-          console.warn('[localityWorkspace] starter spec failed', e);
-        }
-      }
+      for (const style of plan.styles) saveExtractSpec(plan.source, style);
 
-      if (saved === 0) {
-        toast.error({ title: t('localities.tools.starterNone') });
-      } else {
-        toast.success({
-          title: t('localities.tools.starterDone', {
-            saved,
-            total: plan.styles.length,
-          }),
-        });
-      }
+      toast.success({
+        // One count, not "n of m": buffering three specs is not a thing that
+        // can partly fail, so the only fallible step left is the catalogue
+        // lookup above — and it answers before any of them are written.
+        title: t('localities.tools.starterDone', {
+          count: plan.styles.length,
+        }),
+      });
     } finally {
       setStarterBusy(false);
     }
@@ -1610,8 +1759,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     void runFlyfoto(offer.project ?? undefined);
   }, [offer, runFlyfoto]);
 
-  const behold = useCallback(async () => {
-    if (!user || !canAdd || beholding || !offer) return;
+  const behold = useCallback(() => {
+    if (!user || !canAdd || !offer) return;
 
     // Ortofoto is the one arm that cannot start with a fetch: NiB's terms
     // have to be shown and accepted first, so the button's job here is to
@@ -1621,59 +1770,36 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       return;
     }
 
-    setBeholding(true);
-    try {
-      if (offer.ground === 'lidar') {
-        if (!offer.source) return;
-        await saveExtractSpec(offer.source, offer.style);
-        toast.success({ title: t('localities.tools.beholdSaved') });
+    if (offer.ground === 'lidar') {
+      if (!offer.source) return;
+      saveExtractSpec(offer.source, offer.style);
+      toast.success({ title: t('localities.tools.beholdSaved') });
+      return;
+    }
+
+    if (offer.ground === 'terreng') {
+      // The only arm that cannot say what it is showing from a dataset
+      // name: eight visualizations and three sliders, all of it state row 1
+      // owns, so the offer carries a callback.
+      const spec = offer.describe();
+      if (!spec) {
+        toast.error({ title: t('localities.tools.beholdFailed') });
         return;
       }
-
-      if (offer.ground === 'terreng') {
-        // The only arm that cannot say what it is showing from a dataset
-        // name: eight visualizations and three sliders, all of it state row 1
-        // owns, so the offer carries a callback.
-        const spec = offer.describe();
-        if (!spec) {
-          toast.error({ title: t('localities.tools.beholdFailed') });
-          return;
-        }
-        const rec = await createAttachmentSpec(
-          {
-            locality: locality.id,
-            kind: spec.kind,
-            caption: spec.caption,
-            meta: spec.meta,
-          },
-          user.id,
-        );
-        setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
-        enqueuePin({
-          rec,
-          bbox4326: locality.bbox,
-          subject: locality.name || undefined,
-        });
-        toast.success({ title: t('localities.tools.beholdSaved') });
-      }
-    } catch (e) {
-      console.warn('[localityWorkspace] behold failed', e);
-      toast.error({ title: t('localities.tools.beholdFailed') });
-    } finally {
-      setBeholding(false);
+      const born = Date.now();
+      mutateDraft((d) =>
+        withNewSpec(d, mintDraftId(), {
+          kind: spec.kind,
+          caption: spec.caption,
+          meta: spec.meta,
+          sort: born,
+          bornSort: born,
+          hidden: false,
+        }),
+      );
+      toast.success({ title: t('localities.tools.beholdSaved') });
     }
-  }, [
-    user,
-    canAdd,
-    beholding,
-    offer,
-    locality.id,
-    locality.name,
-    locality.bbox,
-    saveExtractSpec,
-    setAttachmentItems,
-    t,
-  ]);
+  }, [user, canAdd, offer, saveExtractSpec, mutateDraft, t]);
 
   // The NiB licensing notice. The starter set no longer goes through it: it
   // stopped fetching ortofoto, so consent to NiB's terms is no longer being
@@ -1687,9 +1813,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     if (next === 'behold') beholdFlyfoto();
     else setFlyfotoPicker(true);
   }, [flyfotoNotice, beholdFlyfoto]);
-  const closeFlyfotoPicker = useCallback(() => {
-    if (!fetchingFlyfoto) setFlyfotoPicker(false);
-  }, [fetchingFlyfoto]);
+  const closeFlyfotoPicker = useCallback(() => setFlyfotoPicker(false), []);
 
   // Fetch the acquisition list lazily, the first time the picker is opened
   // for a given rectangle — and again if the rectangle is resized while it
@@ -1736,38 +1860,22 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   );
 
   const changeStatus = useCallback(
-    async (f: LocalityFindRecord, status: LocalityFindStatus) => {
-      try {
-        const updated = await updateLocalityFind(f.id, { status });
-        setFindItems((prev) =>
-          prev ? prev.map((it) => (it.id === f.id ? updated : it)) : prev,
-        );
-      } catch (e) {
-        console.warn('[localityWorkspace] status update failed', e);
-        toast.error({ title: t('localities.funn.saveFailed') });
-      }
+    (f: LocalityFindRecord, status: LocalityFindStatus) => {
+      mutateDraft((d) => withFind(d, f.id, findBaseOf(f), { status }));
     },
-    [setFindItems, t],
+    [mutateDraft],
   );
 
   const saveFunnMeta = useCallback(
-    async (f: LocalityFindRecord, title: string, note: string) => {
-      try {
-        const updated = await updateLocalityFind(f.id, { title, note });
-        setFindItems((prev) =>
-          prev ? prev.map((it) => (it.id === f.id ? updated : it)) : prev,
-        );
-      } catch (e) {
-        console.warn('[localityWorkspace] funn update failed', e);
-        toast.error({ title: t('localities.funn.saveFailed') });
-      }
+    (f: LocalityFindRecord, title: string, note: string) => {
+      mutateDraft((d) => withFind(d, f.id, findBaseOf(f), { title, note }));
     },
-    [setFindItems, t],
+    [mutateDraft],
   );
 
-  // The draft band's own title and note edit the live record, same as a row
-  // in the list: on blur, and never to an empty title — the auto-name exists
-  // precisely so a funn always has one.
+  // The draft band's own title and note edit the buffered record, same as a
+  // row in the list: on blur, and never to an empty title — the auto-name
+  // exists precisely so a funn always has one.
   const commitDraftMeta = useCallback(() => {
     const rec = findItems?.find((it) => it.id === draftFunnId);
     if (!rec) return;
@@ -1777,57 +1885,65 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       return;
     }
     if (title === rec.title) return;
-    saveFunnMeta(rec, title, rec.note ?? '');
+    saveFunnMeta(rec, title, rec.note);
   }, [findItems, draftFunnId, funnTitle, saveFunnMeta]);
 
+  /*
+   * `Slett` on a funn — deferred (§5.6, consequence 2).
+   *
+   * The record is not deleted; it is tombstoned, greyed in the list and
+   * taken off the map, and `Avbryt` gives it back. Which is why this is the
+   * one deletion in the app with no confirm of its own worth having: the
+   * decision is not final until `Lagre`, and the row offers `Angre sletting`
+   * for the whole of the session in between.
+   */
   const removeFunn = useCallback(
-    async (f: LocalityFindRecord) => {
+    (f: LocalityFindRecord) => {
       // Deleting the funn the pen is bound to would leave drawing armed
-      // against a record that no longer exists.
+      // against a record that is on its way out.
       if (f.id === draftFunnId) stopDraft();
-      try {
-        await deleteLocalityFind(f.id);
-        removeFunnFromLayer(f.id);
-        setFindItems((prev) =>
-          prev ? prev.filter((it) => it.id !== f.id) : prev,
-        );
-        if (selectedFunnId === f.id) setSelectedFunnId(null);
-      } catch (e) {
-        console.warn('[localityWorkspace] funn delete failed', e);
-        toast.error({ title: t('localities.funn.saveFailed') });
-      }
+      mutateDraft((d) => dropFind(d, f.id));
+      removeFunnFromLayer(f.id);
+      if (selectedFunnId === f.id) setSelectedFunnId(null);
     },
-    [
-      draftFunnId,
-      stopDraft,
-      setFindItems,
-      selectedFunnId,
-      setSelectedFunnId,
-      t,
-    ],
+    [draftFunnId, stopDraft, mutateDraft, selectedFunnId, setSelectedFunnId],
   );
 
   /**
    * Depth 2's other exit (§5.3): put the pen down *and* take back what it
    * made.
    *
-   * Offered only for a fresh draft, and the row only shows it there. Autosave
-   * is what makes that asymmetry real: for a new funn, "forkast" can mean
-   * delete the record the first closed shape created, and does. For a
-   * geometry edit the old shape was overwritten the moment the new one
-   * closed, so there is nothing left to restore and a button promising
-   * otherwise would be lying. Step 13's edit transaction is what turns this
-   * into a buffer discard for both cases; until then, the honest version of
-   * the second case is not to offer it.
+   * Offered for both arms since step 13, which is what the transaction bought
+   * here. It used to be new-funn-only, because a geometry edit had already
+   * overwritten the old shape by the time the new one closed and a button
+   * promising otherwise would have been lying. Now nothing has been written
+   * either way: a fresh funn is forgotten, and an edited one gets the shape
+   * `startGeometryEdit` stashed put back.
    */
   const discardDraft = useCallback(() => {
-    const rec =
-      !draftIsEdit && draftFunnId
-        ? (findItems?.find((it) => it.id === draftFunnId) ?? null)
-        : null;
+    const id = draftFunnId;
+    const rec = id ? (findItems?.find((it) => it.id === id) ?? null) : null;
     stopDraft();
-    if (rec) void removeFunn(rec);
-  }, [draftIsEdit, draftFunnId, findItems, stopDraft, removeFunn]);
+    if (!id || !rec) return;
+    if (draftIsEdit) {
+      if (!geometryBefore) return;
+      mutateDraft((d) => withFind(d, id, findBaseOf(rec), geometryBefore));
+      upsertFunnOnLayer({ ...rec, ...geometryBefore });
+    } else {
+      mutateDraft((d) => dropFind(d, id));
+      removeFunnFromLayer(id);
+      if (selectedFunnId === id) setSelectedFunnId(null);
+    }
+  }, [
+    draftIsEdit,
+    draftFunnId,
+    findItems,
+    geometryBefore,
+    stopDraft,
+    mutateDraft,
+    selectedFunnId,
+    setSelectedFunnId,
+  ]);
 
   useWorkspaceKeys({
     navigable: mode !== 'draft',
@@ -1881,12 +1997,19 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // the deepest thing in flight goes first, and edit is a level of its own
     // above closing. Escaping out of edit rather than out of the lokalitet is
     // what keeps the key from throwing away a stance in one press.
+    //
+    // The edit arm is the one that changed at step 13, and it changed by
+    // getting quieter: leaving edit now means committing or discarding, and
+    // neither is a thing a stray Escape should decide. So it leaves only when
+    // there is nothing to lose, and an author with a buffer full of work has
+    // to say which of `Lagre` and `Avbryt` they meant.
     onEscape: () => {
       if (mode === 'lidar') closeLidar();
-      else if (adjusting) setAdjusting(false);
+      else if (adjusting) undoAdjust();
       else if (selectedFunnId) setSelectedFunnId(null);
-      else if (stance === 'edit') leaveEdit();
-      else setActiveLocality(null);
+      else if (stance === 'edit') {
+        if (!dirty) void cancelEdit();
+      } else setActiveLocality(null);
     },
   });
 
@@ -1923,10 +2046,16 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * must not depend on who is looking: in edit the rail shows the hidden ones,
    * and a cover that changed when you pressed Rediger would be a different
    * lokalitet's cover.
+   *
+   * A card tombstoned this session is skipped even though it is still on the
+   * rail: the greying says it is leaving, and letting it stay the face of the
+   * lokalitet until `Lagre` would say the opposite.
    */
   const coverBildeId = useMemo(
-    () => attachmentItems?.find((a) => !a.hidden)?.id ?? null,
-    [attachmentItems],
+    () =>
+      attachmentItems?.find((a) => !a.hidden && !deletedIds.has(a.id))?.id ??
+      null,
+    [attachmentItems, deletedIds],
   );
 
   // The site's own terrain render, for §4.6 — entering Terreng over a
@@ -1942,12 +2071,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // attachments.
   const coverTerrainSpec = useMemo(() => {
     for (const rec of attachmentItems ?? []) {
-      if (rec.hidden) continue;
+      if (rec.hidden || deletedIds.has(rec.id)) continue;
       const spec = viewSpecOf(rec);
       if (spec?.kind === 'terrain') return spec;
     }
     return null;
-  }, [attachmentItems]);
+  }, [attachmentItems, deletedIds]);
 
   useEffect(() => {
     setCoverTerrainSpec(coverTerrainSpec);
@@ -1994,15 +2123,20 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * not been fetched, and an owner materialises it by pressing `Rediger` — the
    * same gate as every other write in this hook. It also means the sweep can
    * never fire on the public lokalitet you are only passing through.
+   *
+   * Buffered specs are skipped, and so are tombstoned ones: neither has a
+   * record on the server to PATCH a figure onto. The specs this session made
+   * reach the queue from `saveEdit`, once they do.
    */
   useEffect(() => {
     if (!canAdd || !attachmentItems) return;
     for (const rec of attachmentItems) {
+      if (isDraftId(rec.id) || deletedIds.has(rec.id)) continue;
       if (isPinned(rec) || pinAttempted(rec.id)) continue;
       if (!viewSpecOf(rec)) continue;
       enqueuePin(pinJob(rec));
     }
-  }, [canAdd, attachmentItems, pinJob]);
+  }, [canAdd, attachmentItems, deletedIds, pinJob]);
 
   return {
     // identity / permissions
@@ -2019,11 +2153,30 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     mode,
     close,
     enterEdit,
-    leaveEdit,
     rename,
     zoomToLocality,
     removeLocality,
     patchLocality,
+
+    /*
+     * The transaction (§5.6). `Lagre` and `Avbryt`, and what the row needs to
+     * ask before the second one: whether there is anything to lose and how
+     * much of it there is.
+     */
+    saveEdit,
+    cancelEdit,
+    saving,
+    dirty,
+    draftCounts: counts,
+    /** When a buffer came back off disk, for the recovery banner (§5.7). */
+    restoredAt,
+    /** `Forkast` on that banner: drop it and leave edit, nothing to confirm. */
+    discardRecovered: cancelEdit,
+    /** Something moved on the server while the buffer was open (§5.6). */
+    changedElsewhere,
+    /** Tombstoned this session — greyed, and `restoreDeleted` puts it back. */
+    deletedIds,
+    restoreDeleted,
 
     // content
     findItems,
@@ -2063,8 +2216,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     funnTitle,
     setFunnTitle,
     commitDraftMeta,
-    savingFunn,
-    funnError,
     startDraft,
     stopDraft,
     discardDraft,
@@ -2077,6 +2228,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     tool,
     adjusting,
     toggleAdjusting,
+    // `Juster området`'s own [Bruk] [Angre] (§5.3, depth 2). Nested inside
+    // the transaction rather than leaning on it: you reshape the rectangle
+    // in the middle of a session, and `Avbryt` is the wrong grain for taking
+    // back one gesture.
+    applyAdjust,
+    undoAdjust,
     toggleLidar,
     closeLidar,
     shooting,
@@ -2085,7 +2242,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     uploadFile,
 
     // flyfoto
-    fetchingFlyfoto,
     flyfotoNotice: flyfotoNotice != null,
     openFlyfotoNotice,
     closeFlyfotoNotice,
@@ -2115,7 +2271,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
     // Behold
     behold,
-    beholding,
     // Which of the five grounds is on screen — the button's label, its
     // tooltip and whether it is offered at all all read this.
     beholdGround: offer?.ground ?? null,

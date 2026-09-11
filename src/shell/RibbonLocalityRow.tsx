@@ -16,6 +16,7 @@ import {
   type BadgePalette,
   Button,
   cx,
+  Dialog,
   Icon,
   IconButton,
   Input,
@@ -342,7 +343,6 @@ const HentMenu = ({
         <button
           type="button"
           className={rowStyles.menuItem}
-          disabled={ws.fetchingFlyfoto}
           onClick={pick(ws.openFlyfotoNotice)}
         >
           <Icon icon="satellite_alt" size={16} />
@@ -396,6 +396,7 @@ const FunnMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         items={ws.findItems}
         editable={ws.canEdit}
         selectedId={ws.selectedFunnId}
+        deletedIds={ws.deletedIds}
         onSelect={(f) => {
           setOpen(false);
           ws.selectFunn(f);
@@ -407,6 +408,7 @@ const FunnMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           ws.startGeometryEdit(f);
         }}
         onDelete={ws.removeFunn}
+        onRestore={ws.restoreDeleted}
       />
     </Popover>
   );
@@ -459,15 +461,46 @@ const KulturminnerMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
  * summary used to, holds at most one sentence, and answers exactly one
  * question: whose is this and what state is it in.
  *
- * Only two of the five ranks exist yet; the other three arrive with the copy
- * (§7) and the transaction (§5.6). The `admin` one is keyed on the *stance*
- * rather than on access alone — the doc's table says "admin, not owner"
- * unqualified, but "Du redigerer …" printed over show mode would be a false
- * sentence, and this slot exists to say what state you are in.
+ * Ranked, and only one shows. Rank 1 is the recovered draft, which outranks
+ * the ownership lines because it is the only one that is *news*: the other
+ * two describe a standing fact the author already knows, and this one says
+ * something happened while they were not looking.
+ *
+ * The `admin` line is keyed on the *stance* rather than on access alone — the
+ * doc's table says "admin, not owner" unqualified, but "Du redigerer …"
+ * printed over show mode would be a false sentence, and this slot exists to
+ * say what state you are in.
+ *
+ * Rank 2 (the copy's "Kopi av …") arrives with §7 at step 14.
  */
 const Banner = ({ ws }: { ws: LocalityWorkspaceApi }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const owner = ws.locality.expand?.owner?.name;
+
+  if (ws.restoredAt != null) {
+    // Only the clock time. The buffer is keyed on the lokalitet and there is
+    // at most one, so "which session was this" is not a question the author
+    // has; "how long ago did I lose it" is, and the hour answers it.
+    const when = new Date(ws.restoredAt).toLocaleTimeString(i18n.language, {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const text = t('localities.edit.recovered', { time: when });
+    return (
+      <span className={cx(rowStyles.banner, rowStyles.bannerAlert)}>
+        {text}
+        <Button
+          size="xs"
+          variant="ghost"
+          palette="red"
+          onClick={() => void ws.discardRecovered()}
+        >
+          {t('localities.edit.recoveredDiscard')}
+        </Button>
+      </span>
+    );
+  }
+
   if (!owner || ws.access === 'owner') return null;
 
   const text =
@@ -479,6 +512,111 @@ const Banner = ({ ws }: { ws: LocalityWorkspaceApi }) => {
     <span className={rowStyles.banner} title={text}>
       {text}
     </span>
+  );
+};
+
+/**
+ * Depth 1's exits: `[Lagre] [Avbryt] [⋮]` (§5.3, §5.6).
+ *
+ * The pair the whole transaction is for. `Lagre` sends the buffer and drops
+ * the stance without waiting for the pixels; `Avbryt` throws it away, and
+ * asks first — but only when there is something to ask about. A confirm on an
+ * empty buffer is a dialog that teaches the author to dismiss dialogs.
+ *
+ * The sentence names *work*, not writes, and that is the point of counting it
+ * at all: "Forkast 12 bilder og 3 funn?" is a question about the afternoon,
+ * where "3 endringer forkastes" would be a question about the network.
+ */
+const EditExits = ({ ws }: { ws: LocalityWorkspaceApi }) => {
+  const { t, i18n } = useTranslation();
+  const [confirming, setConfirming] = useState(false);
+  const counts = ws.draftCounts;
+
+  const parts: string[] = [];
+  if (counts) {
+    if (counts.bilder > 0) {
+      parts.push(t('localities.summary.bilder', { count: counts.bilder }));
+    }
+    if (counts.finds > 0) {
+      parts.push(t('localities.summary.funn', { count: counts.finds }));
+    }
+    if (counts.deletions > 0) {
+      parts.push(
+        t('localities.edit.discardDeletions', { count: counts.deletions }),
+      );
+    }
+    if (counts.locality) parts.push(t('localities.edit.discardLocality'));
+  }
+
+  const cancel = () => {
+    if (!ws.dirty) {
+      void ws.cancelEdit();
+      return;
+    }
+    setConfirming(true);
+  };
+
+  return (
+    <>
+      <Button
+        variant="primary"
+        leftIcon="check"
+        disabled={ws.saving}
+        onClick={() => void ws.saveEdit()}
+      >
+        {t('localities.edit.save')}
+      </Button>
+      <Button
+        variant="ghost"
+        palette="gray"
+        disabled={ws.saving}
+        onClick={cancel}
+      >
+        {t('localities.edit.cancel')}
+      </Button>
+      <OverflowMenu ws={ws} />
+
+      <Dialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={t('localities.edit.discardTitle')}
+        closeLabel={t('shared.close')}
+        footer={
+          <>
+            <Button
+              size="sm"
+              palette="gray"
+              onClick={() => setConfirming(false)}
+            >
+              {t('localities.edit.discardKeep')}
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              palette="red"
+              onClick={() => {
+                setConfirming(false);
+                void ws.cancelEdit();
+              }}
+            >
+              {t('localities.edit.discardConfirm')}
+            </Button>
+          </>
+        }
+      >
+        <p className={rowStyles.discardBody}>
+          {/* `Intl.ListFormat` rather than a joined string with an "og" in
+              it: the conjunction is the one bit of this sentence the three
+              locale files should not have to spell, and it is in the
+              platform. */}
+          {t('localities.edit.discardBody', {
+            what: new Intl.ListFormat(i18n.language, {
+              type: 'conjunction',
+            }).format(parts),
+          })}
+        </p>
+      </Dialog>
+    </>
   );
 };
 
@@ -600,8 +738,8 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                   ? t('localities.tools.beholdHintDone')
                   : t('localities.tools.beholdHint')
             }
-            disabled={!ws.beholdReady || ws.beholding || ws.beholdDone}
-            onClick={() => void ws.behold()}
+            disabled={!ws.beholdReady || ws.beholdDone}
+            onClick={ws.behold}
           />
           <HentMenu ws={ws} active={mode === 'lidar'} />
           <ModeButton
@@ -664,42 +802,41 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             >
               {t('localities.funn.draft.done')}
             </Button>
-            {/* Only for a fresh funn. Autosave means discarding can only mean
-                deleting the record the first shape made; a geometry edit
-                overwrote the old shape when the new one closed, so there is
-                nothing left to put back and the button would be a lie. Step
-                13's transaction is what makes it honest for both. */}
-            {!ws.draftIsEdit && (
-              <Button
-                variant="ghost"
-                palette="red"
-                leftIcon="delete"
-                onClick={ws.discardDraft}
-              >
-                {t('localities.funn.draft.discard')}
-              </Button>
-            )}
+            {/* Both arms since step 13. Nothing has been written either way,
+                so `Forkast funn` can forget a fresh funn and put an edited
+                one's old shape back — which is exactly what §5.3 asked for
+                and what autosave could not honestly offer. */}
+            <Button
+              variant="ghost"
+              palette="red"
+              leftIcon="undo"
+              onClick={ws.discardDraft}
+            >
+              {t('localities.funn.draft.discard')}
+            </Button>
           </>
         ) : ws.adjusting ? (
-          /* §5.3 asks for [Bruk] [Angre] here. One button until step 13:
-             `Juster området` writes each finished gesture straight through, so
-             there is no buffer for `Bruk` to commit and nothing for `Angre` to
-             roll back to. Two buttons over one saved rectangle would be the
-             interface claiming a transaction it does not have. */
-          <Button
-            variant="primary"
-            leftIcon="check"
-            onClick={ws.toggleAdjusting}
-          >
-            {t('localities.workspace.adjustDone')}
-          </Button>
-        ) : editing ? (
+          /* §5.3's [Bruk] [Angre], and the transaction is what makes the
+             second one possible: the rectangle moves in the buffer, not on
+             the server, so `Angre` is a value being put back rather than a
+             second PATCH. Nested inside the session rather than deferred to
+             `Avbryt`, because you reshape the area in the middle of a
+             session and taking one gesture back should not cost the nine
+             images you kept before it. */
           <>
-            <Button variant="primary" leftIcon="check" onClick={ws.leaveEdit}>
-              {t('localities.workspace.done')}
+            <Button
+              variant="primary"
+              leftIcon="check"
+              onClick={ws.applyAdjust}
+            >
+              {t('localities.workspace.adjustApply')}
             </Button>
-            <OverflowMenu ws={ws} />
+            <Button variant="ghost" leftIcon="undo" onClick={ws.undoAdjust}>
+              {t('localities.workspace.adjustUndo')}
+            </Button>
           </>
+        ) : editing ? (
+          <EditExits ws={ws} />
         ) : (
           <>
             {mayEdit && (

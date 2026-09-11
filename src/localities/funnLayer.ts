@@ -187,6 +187,25 @@ export const getFunnExtentOnLayer = (
   return extent as [number, number, number, number] | null;
 };
 
+/*
+ * Re-hydrate the layer from the server, discarding whatever has been pushed
+ * onto it by hand.
+ *
+ * The edit transaction (docs/lokalitet-view.md §5.6) is what needs this. The
+ * layer follows the *server's* funn over realtime, and a buffered session
+ * writes nothing — so the workspace pushes its buffered shapes on with
+ * `upsertFunnOnLayer`, under temporary ids that will never match a record.
+ * Committing turns them into real records with different ids, and cancelling
+ * means the pushed shapes were never true; both end with a layer that has to
+ * be told to forget what it is holding and ask again.
+ *
+ * A module-level hook rather than a returned callback, because the two
+ * callers are inside `useLocalityWorkspace` and the layer is mounted from
+ * `useMapSideEffects`, on the far side of the tree.
+ */
+let reloadFunnLayer: (() => void) | null = null;
+export const refreshFunnLayer = () => reloadFunnLayer?.();
+
 // Mount from useMapSideEffects. Follows the open lokalitet: hydrates its
 // funn, keeps them synced via realtime, empties when the workspace closes.
 export const useFunnLayer = () => {
@@ -216,16 +235,26 @@ export const useFunnLayer = () => {
     const projection = map.getView().getProjection().getCode();
     let cancelled = false;
 
-    listLocalityFinds(localityId)
-      .then((records) => {
-        if (cancelled) return;
-        for (const rec of records) {
-          source.addFeatures(hydrateFeatures(rec, projection));
-        }
-      })
-      .catch((e) => {
-        console.warn('[funnLayer] initial load failed', e);
-      });
+    // A sequence number rather than the `cancelled` flag alone: `refresh`
+    // can start a second load while the first is in flight, and the older
+    // response must not be allowed to add its features on top.
+    let seq = 0;
+    const load = () => {
+      const mine = ++seq;
+      listLocalityFinds(localityId)
+        .then((records) => {
+          if (cancelled || seq !== mine) return;
+          source.clear();
+          for (const rec of records) {
+            source.addFeatures(hydrateFeatures(rec, projection));
+          }
+        })
+        .catch((e) => {
+          console.warn('[funnLayer] load failed', e);
+        });
+    };
+    load();
+    reloadFunnLayer = load;
 
     const unsub = subscribeLocalityFinds((action, rec) => {
       if (rec.locality !== localityId) return;
@@ -239,6 +268,7 @@ export const useFunnLayer = () => {
 
     return () => {
       cancelled = true;
+      if (reloadFunnLayer === load) reloadFunnLayer = null;
       unsub();
       source.clear();
     };

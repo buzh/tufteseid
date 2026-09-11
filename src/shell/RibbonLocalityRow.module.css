@@ -105,6 +105,22 @@
   color: var(--c-fg-muted);
 }
 
+/* Rank 1 — the recovered draft (§5.7). The only banner that is news rather
+   than a standing fact, and the only one with a verb in it, so it is the
+   only one that gets the ink. */
+.bannerAlert {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  color: var(--c-yellow-600);
+}
+
+.discardBody {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--c-fg);
+}
+
 /* What the rectangle holds — §5.5. Its own group between identity and the
    tools, and separated from both: these two are in every stance, the tools
    after them are edit-only, and the identity before them is not a control. */

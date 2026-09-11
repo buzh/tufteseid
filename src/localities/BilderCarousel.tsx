@@ -30,7 +30,13 @@ import type { LocalityWorkspaceApi } from './useLocalityWorkspace';
 import { canPinBilde } from './usePinnedBilde';
 
 /** The card itself: one bilde, as large as the surface will allow. */
-const Card = ({ rec }: { rec: AttachmentRecord }) => {
+const Card = ({
+  rec,
+  deleted,
+}: {
+  rec: AttachmentRecord;
+  deleted: boolean;
+}) => {
   const { t } = useTranslation();
   // The 800 px thumbnail rather than the original: a stitched extract is
   // routinely 4000 px square, and this frame is 180 px tall. `Åpne original`
@@ -42,7 +48,13 @@ const Card = ({ rec }: { rec: AttachmentRecord }) => {
   const face = usePinFace(rec);
 
   return (
-    <div className={cx(styles.card, rec.hidden && styles.cardHidden)}>
+    <div
+      className={cx(
+        styles.card,
+        rec.hidden && styles.cardHidden,
+        deleted && styles.cardDeleted,
+      )}
+    >
       {face ? (
         <PinFace rec={rec} />
       ) : url ? (
@@ -110,6 +122,11 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   }, [items, activeBildeId, selectBilde]);
 
   const isPinned = active != null && pinned.pinnedId === active.id;
+  // Tombstoned by this session (§5.6, consequence 2). The card stays on the
+  // stage — walking past a gap is how you fail to notice you made one — but
+  // every verb that would curate it is gone, because curating something you
+  // have just thrown away is not a decision anyone needs to make.
+  const deleted = active != null && ws.deletedIds.has(active.id);
 
   return (
     <div className={styles.carousel} data-chrome="bottom">
@@ -157,7 +174,7 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             </span>
           </div>
         ) : active ? (
-          <Card key={active.id} rec={active} />
+          <Card key={active.id} rec={active} deleted={deleted} />
         ) : (
           <div className={styles.card}>
             <p className={styles.empty}>
@@ -189,71 +206,89 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           </div>
 
           <div className={styles.actions}>
-            {/* An explicit verb here, unlike in show where picking a frame is
-                what puts the image down. Both directions, because the only
-                other way off the ground would be to walk to another card,
-                and "look at the next one" is not what "take this one off the
-                map" means. */}
-            {canPinBilde(active) && (
+            {deleted ? (
               <Button
                 size="sm"
-                leftIcon={isPinned ? 'visibility_off' : 'visibility'}
-                onClick={() => pinned.pin(isPinned ? null : active.id)}
+                variant="secondary"
+                leftIcon="undo"
+                onClick={() => ws.restoreDeleted(active.id)}
               >
-                {isPinned
-                  ? t('localities.bilder.hideFromMap')
-                  : t('localities.bilder.showOnMap')}
+                {t('localities.edit.restore')}
               </Button>
-            )}
-            <RecreateButton rec={active} />
-            <PinRetryButton ws={ws} rec={active} />
-            <OpenOriginalButton ws={ws} rec={active} />
+            ) : (
+              <>
+                {/* An explicit verb here, unlike in show where picking a frame
+                    is what puts the image down. Both directions, because the
+                    only other way off the ground would be to walk to another
+                    card, and "look at the next one" is not what "take this one
+                    off the map" means. */}
+                {canPinBilde(active) && (
+                  <Button
+                    size="sm"
+                    leftIcon={isPinned ? 'visibility_off' : 'visibility'}
+                    onClick={() => pinned.pin(isPinned ? null : active.id)}
+                  >
+                    {isPinned
+                      ? t('localities.bilder.hideFromMap')
+                      : t('localities.bilder.showOnMap')}
+                  </Button>
+                )}
+                <RecreateButton rec={active} />
+                <PinRetryButton ws={ws} rec={active} />
+                <OpenOriginalButton ws={ws} rec={active} />
 
-            {/* Position in the exhibit order (§4.4). The index handed to
-                `reorderBilde` is a position in the *unfiltered* list — which
-                is the same array as `bilderItems` here, since edit hides
-                nothing from itself. */}
-            <Tooltip label={t('localities.bilder.moveEarlier')}>
-              <IconButton
-                icon="arrow_back"
-                size="sm"
-                palette="gray"
-                disabled={index <= 0}
-                aria-label={t('localities.bilder.moveEarlier')}
-                onClick={() => ws.reorderBilde(active.id, index - 1)}
-              />
-            </Tooltip>
-            <Tooltip label={t('localities.bilder.moveLater')}>
-              <IconButton
-                icon="arrow_forward"
-                size="sm"
-                palette="gray"
-                disabled={index < 0 || index >= count - 1}
-                aria-label={t('localities.bilder.moveLater')}
-                onClick={() => ws.reorderBilde(active.id, index + 1)}
-              />
-            </Tooltip>
-            <Button
-              size="sm"
-              palette="gray"
-              leftIcon={active.hidden ? 'visibility' : 'hide_image'}
-              onClick={() => ws.setBildeHidden(active, !active.hidden)}
-            >
-              {active.hidden
-                ? t('localities.bilder.unhide')
-                : t('localities.bilder.hide')}
-            </Button>
-            <ConfirmPopover
-              title={t('localities.bilder.confirmDelete')}
-              confirmLabel={t('localities.bilder.delete')}
-              cancelLabel={t('shared.cancel')}
-              onConfirm={() => ws.removeBilde(active)}
-              trigger={(props) => (
-                <Button {...props} size="sm" palette="red" leftIcon="delete">
-                  {t('localities.bilder.delete')}
+                {/* Position in the exhibit order (§4.4). The index handed to
+                    `reorderBilde` is a position in the *unfiltered* list —
+                    which is the same array as `bilderItems` here, since edit
+                    hides nothing from itself. */}
+                <Tooltip label={t('localities.bilder.moveEarlier')}>
+                  <IconButton
+                    icon="arrow_back"
+                    size="sm"
+                    palette="gray"
+                    disabled={index <= 0}
+                    aria-label={t('localities.bilder.moveEarlier')}
+                    onClick={() => ws.reorderBilde(active.id, index - 1)}
+                  />
+                </Tooltip>
+                <Tooltip label={t('localities.bilder.moveLater')}>
+                  <IconButton
+                    icon="arrow_forward"
+                    size="sm"
+                    palette="gray"
+                    disabled={index < 0 || index >= count - 1}
+                    aria-label={t('localities.bilder.moveLater')}
+                    onClick={() => ws.reorderBilde(active.id, index + 1)}
+                  />
+                </Tooltip>
+                <Button
+                  size="sm"
+                  palette="gray"
+                  leftIcon={active.hidden ? 'visibility' : 'hide_image'}
+                  onClick={() => ws.setBildeHidden(active, !active.hidden)}
+                >
+                  {active.hidden
+                    ? t('localities.bilder.unhide')
+                    : t('localities.bilder.hide')}
                 </Button>
-              )}
-            />
+                <ConfirmPopover
+                  title={t('localities.bilder.confirmDelete')}
+                  confirmLabel={t('localities.bilder.delete')}
+                  cancelLabel={t('shared.cancel')}
+                  onConfirm={() => ws.removeBilde(active)}
+                  trigger={(props) => (
+                    <Button
+                      {...props}
+                      size="sm"
+                      palette="red"
+                      leftIcon="delete"
+                    >
+                      {t('localities.bilder.delete')}
+                    </Button>
+                  )}
+                />
+              </>
+            )}
           </div>
 
           {isPinned && <FadeControl pinned={pinned} />}

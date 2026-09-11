@@ -1381,25 +1381,26 @@ with two buttons that both say `Ferdig`:
 
 | Depth | When | Contents |
 |---|---|---|
-| 2 | a funn draft is open | `[Ferdig med funn]`, and `[Forkast funn]` only for a *new* funn |
-| 2 | Juster området is on | `[Ferdig]` |
-| 1 | edit, nothing deeper | `[Ferdig]` `[⋮]` (`[Lagre]` `[Avbryt]` at §12's step 13) |
+| 2 | a funn draft is open | `[Ferdig med funn]` `[Forkast funn]` |
+| 2 | Juster området is on | `[Bruk]` `[Angre]` |
+| 1 | edit, nothing deeper | `[Lagre]` `[Avbryt]` `[⋮]` |
 | 0 | show | `[Rediger]` `[Lukk]` `[⋮]` |
 
-`Forkast funn` is offered only for a new funn because autosave (§8.5) makes it
-the only case where discarding means anything: the record exists and can be
-deleted. A geometry edit overwrote the old shape the moment the new one closed,
-so there is nothing left to restore, and step 13's edit transaction is what
-will make the promise good for both. `Juster området`'s depth is one button for
-the same reason — `useLocalityAdjust` persists every finished gesture, so the
-`[Bruk]` / `[Angre]` pair the design asks for would be claiming a transaction
-that does not exist yet.
+Both depth-2 pairs are two buttons because both now have something to undo
+*to*. `Forkast funn` used to be offered only for a new funn — autosave had
+already overwritten the old shape by the time a geometry edit closed, so there
+was nothing left to restore — and the transaction (§8.11) is what made the
+promise good for both: the pre-edit geometry sits in the buffer, and discarding
+puts it back. `Juster området` gets a **nested** undo of its own for a
+different reason: the rectangle it changes is the one thing edit does *not*
+buffer (§8.11), so `[Angre]` restores a stashed `bboxBefore` rather than
+riding on `Avbryt`, whose grain is the whole session.
 
 There is no `[←]` back arrow: leaving is an exit, exits are on the right, and
 one lokalitet should not have two ways out at opposite ends of the same row.
 Edit tints the row (`.rowEdit`) — the zones already differ, so the tint is the
 confirmation rather than the signal. `Del` is absent until `?lok=CODE` exists;
-`Lag min kopi` and `Lagre` / `Avbryt` are later steps of the same build order.
+`Lag min kopi` is a later step of the same build order.
 
 The `[⋮]` menu is on the row in **both** stances, and it is how a reader opens
 Detaljer. Its two writing items (`Juster området`, `Slett`) are gated on
@@ -1407,11 +1408,19 @@ Detaljer. Its two writing items (`Juster området`, `Slett`) are gated on
 
 The **banner slot** takes the space the old summary line (`3 funn · 12 ha`)
 occupied, holds at most one sentence, and answers only *whose is this and what
-state is it in*: *Delt av X — du leser* for a reader, *Du redigerer Xs
-lokalitet som administrator* for an admin **in edit**. The design (§5.7) keys
-that second one on being an admin at all, which would print "Du redigerer" at
-somebody who is only looking; the stance test is deliberate. Deliberately not
-a notification area — everything else stays next to the thing it is about.
+state is it in*. Three sentences compete for it, and the rank is fixed:
+
+1. *Gjenopprettet ulagret arbeid fra 14:32* · **Forkast** — a buffer that came
+   back off disk (§8.11). The only banner that is news rather than a standing
+   fact, and the only one with a verb in it, so it is the only one that gets
+   colour (`.bannerAlert`).
+2. *Delt av X — du leser*, for a reader.
+3. *Du redigerer Xs lokalitet som administrator*, for an admin **in edit**.
+
+The design (§5.7) keys that last one on being an admin at all, which would
+print "Du redigerer" at somebody who is only looking; the stance test is
+deliberate. Deliberately not a notification area — everything else stays next
+to the thing it is about.
 
 Terreng is deliberately *not* in the lokalitet row — it is a ground mode in
 row 1 and works the same with or without a lokalitet (§5.1, §10).
@@ -1533,7 +1542,11 @@ popover that hid the number would have been a straight regression.
 **Matrikkel** as ordinary text fields, then **Koordinater** and **Areal** as
 read-only facts. Nothing in it has a Lagre button — like Beskrivelse, each
 field commits on blur (Enter blurs, Escape reverts without blurring, or the
-stale draft in the closure would be saved anyway). It is offered in **both**
+stale draft in the closure would be saved anyway), into the transaction's
+buffer (§8.11). Since that landed the missing footer is load-bearing rather
+than merely tidy: the only `Lagre` there is lives on the row behind this
+dialog, and a second one here would be a competing promise about when the
+change lands. It is offered in **both**
 stances and renders itself read-only without `canEdit`, which is why `[⋮]` is
 on the row in show mode at all.
 
@@ -1613,9 +1626,15 @@ one level, which it can afford to do because nothing in the run is unsaved:
 keeping writes on the press.
 
 Escape otherwise backs out deepest-first, in the same order the row's right
-zone is stacked: picker run → extract dialog → Juster området → funn selection
-→ **edit** → close the lokalitet. Leaving the stance before leaving the record
-is what stops one press from throwing away both.
+zone is stacked: picker run → extract dialog → Juster området (as `Angre`) →
+funn selection → **edit** → close the lokalitet. Leaving the stance before
+leaving the record is what stops one press from throwing away both.
+
+At the edit step it leaves **only when the buffer is clean** (§8.11). With
+`Ferdig` gone, Escape has no honest meaning over a dirty transaction: it would
+have to pick between `Lagre` and `Avbryt`, and a stray keypress does not get to
+make that choice. It does nothing at all instead, and the two buttons are
+right there.
 
 `navigable` is off only while drawing: picking a different funn out from under
 the pen is never what the arrow meant. It does **not** require the funn
@@ -1646,7 +1665,12 @@ working throughout; see §5.3.
 ### 8.5 Funn autosave
 
 **A funn is a record from the moment its first shape closes.** There is no
-Lagre button, no disabled-until-titled state, and nothing to discard.
+Lagre button on the draft and no disabled-until-titled state.
+
+Since §8.11 the record it becomes is a *buffered* one: autosave's destination
+moved from PocketBase to the draft, and nothing else about it changed. That is
+the whole of the transaction's effect on this section — `useFunnAutosave.ts` is
+byte-identical, because it never knew where its two callbacks wrote.
 
 That replaced a commit-or-discard form whose Cancel was called *silently* from
 five places — Escape, "Nytt funn" used as a toggle, opening the extract,
@@ -1677,7 +1701,8 @@ Six rules in there are load-bearing:
   own completion and could swallow the edit that followed it.
 - **Every exit flushes first.** `stopDraft`, `openLidar`, `toggleAdjusting`,
   deleting the drafted funn, and the workspace's unmount cleanup all call the
-  flush *before* clearing the layer.
+  flush *before* clearing the layer — and so does `Lagre`, which would
+  otherwise commit a buffer that is up to 700 ms behind the pen.
 - **The drafted funn stays hidden across re-hydration.** `hideFunnOnLayer(id)`
   sets a module-level id in `funnLayer.ts`, not a one-time style pass: every
   autosaved patch comes back as a realtime event that rebuilds that record's
@@ -1688,17 +1713,19 @@ Six rules in there are load-bearing:
   you can rename is worth more than a funn you have to name — and the draft
   band's title field reverts rather than clearing it.
 
-The receipt is a **toast carrying an "Angre"**, which is what lets the first
-shape commit without asking: undo deletes the record, clears the layer and
-leaves the pen armed, so the next shape starts a new funn. `src/ui/Toast.tsx`
-grew one optional `action` for this rather than the app growing a second
-transient surface.
+The receipt used to be a **toast carrying an "Angre"**, which is what let the
+first shape commit without asking. The transaction retired it: `Forkast funn`
+is now offered on both arms of the draft (§8.1) and `Avbryt` sits behind that,
+so an undo of the last create is one of three ways back and the loudest of the
+three. `src/ui/Toast.tsx` keeps its optional `action` — the picker runs use it.
 
 **The draft is accordingly not a form, and it is not one surface either.**
 There is nothing to submit, so what is left splits by what it is for.
 `RibbonFunnDraftRow` (ribbon row 4) carries the *identity* — the title,
-committing on blur like a row in the list, and beside it "Lagret" / "Lagrer…"
-as a receipt rather than a control. `FunnDrawBar` (the bottom slot, §8.7.2)
+committing on blur like a row in the list, and beside it the state word. That
+word is *"Lagres med lokaliteten"*, never "Lagret": saying a thing is saved
+when it exists only in this tab is the transaction's one unforgivable lie.
+`FunnDrawBar` (the bottom slot, §8.7.2)
 carries the *pen* — one line of instruction and the whole of `DrawControls`,
 at the bottom edge where the tool is, under the map it is drawing on. The
 exits are on neither: they are depth 2 of the lokalitet row's right zone
@@ -2015,7 +2042,8 @@ that, and neither of them is a cover field.
   *total*, and without it PocketBase may return two equal-`sort` rows either
   way round — a rail that reshuffles on every realtime event.
 - **A move costs one PATCH.** `reorderBilde` writes the moved record a value
-  *between* its two new neighbours and leaves every other record alone. This is
+  *between* its two new neighbours and leaves every other record alone — into
+  the draft since §8.11, and out to PocketBase as one PATCH at `Lagre`. This is
   not micro-optimisation: `useLocalityContent` reloads the whole list on every
   realtime event, so renumbering forty records to move one card would be forty
   reloads of forty records. The fallback, when there is no integer left between
@@ -2128,9 +2156,16 @@ bufferable (§8.1), a fork cheap, and the picker carousels affordable.
   and the subscription is per record id.
 - **A quiet per-card state, not a blocking spinner** — `docs/lokalitet-view.md`
   §5.6. `PinFace` fills the frame the picture would have filled, so the rail
-  never reflows when pixels land, and says one of four sentences: being made,
-  not asked for, nothing there, went wrong. Only the last gets a verb
-  (`PinRetryButton`).
+  never reflows when pixels land, and says one of five sentences: not written
+  down yet, being made, not asked for, nothing there, went wrong. Only the last
+  gets a verb (`PinRetryButton`).
+- **The queue does not run during a transaction, and cannot.** A View kept in
+  edit is buffered as a spec under a `draft:` id (§8.11), so there is no record
+  for the queue to PATCH — `usePinFace` reads the id rather than the queue for
+  those and says *"Hentes når du lagrer"*, and `OpenOriginalButton`'s
+  force-pin is absent on them for the same reason. `Lagre` creates the rows and
+  enqueues every one it got back, in that order, so the pixels start arriving a
+  moment after the stance drops. The sweep skips `draft:` ids too.
 - **Who may pin.** A pin is an `update`, and §2 says nothing in show writes —
   so the sweep that materialises unpinned specs on an open lokalitet is gated
   on `canAdd` (owner *and* edit stance), and so are both pin buttons. A reader
@@ -2447,6 +2482,112 @@ Load-bearing:
 - **The PocketBase `caption` field is untouched** — still the short human line
   the gallery shows ("Flyfoto 1937"). The long-form provenance lives in the
   pixels, where it survives being downloaded, emailed and pasted into a report.
+
+### 8.11 The edit transaction — `Lagre` / `Avbryt`
+
+`docs/lokalitet-view.md` §5.6. **Edit is a transaction over a client-side
+draft.** Nothing typed, drawn, curated or deleted in edit reaches PocketBase
+until `Lagre`; `Avbryt` throws the lot away.
+
+Two files hold it, and nothing else in the app knows it exists:
+
+| File | What |
+|---|---|
+| `src/localities/draft.ts` | the pure data layer — the `LocalityDraft` shape, one pure updater per kind of change, the two overlay functions, the counts, and `localStorage` load/save |
+| `src/localities/useLocalityDraft.ts` | the React half — recovery on arrival, persist-on-change, `commit()`, `rollback()` |
+
+**A delta, not a snapshot.** The buffer holds the fields that *changed*, keyed
+by record id, rather than a copy of the lokalitet. A snapshot would have to be
+diffed against the server at commit time to avoid clobbering fields nobody
+touched, and it would grow with the lokalitet rather than with the edit.
+
+**What is buffered, and what is not:**
+
+| Change | Where it goes |
+|---|---|
+| name, beskrivelse, sted, kommune, matrikkel, synlighet | buffered |
+| funn title, note, status, geometry | buffered — autosave's destination, §8.5 |
+| curation `sort` / `hidden` | buffered |
+| the rectangle (`Juster området`) | buffered, with its own nested `[Bruk]` / `[Angre]` |
+| a View kept (`Behold`, the starter set, both pickers, flyfoto) | buffered **as a spec**, under a `draft:` id |
+| a File made (skjermbilde, opplasting, a picker keep) | written **eagerly**, id tracked, deleted on `Avbryt` |
+| a deletion | **deferred** — a tombstone; the card greys and comes back on `Avbryt` |
+
+Files are the exception because they are bytes: buffering a 12 MB PNG in
+`localStorage` is not a thing, and holding it in memory for an hour is barely
+one. So they are written when they are made, their ids are collected in
+`eagerIds`, and `Avbryt` deletes them — which is the one place the transaction
+is a compensating action rather than a real rollback.
+
+Load-bearing, in the order the mistakes would be made:
+
+- **The lokalitet's own fields still flow through `activeLocalityAtom`.** Half
+  the app reads the rectangle off it — Terreng's DEM, `useKulturminner`, every
+  producer's `bbox25833` — and a buffered bbox those never saw would make
+  "Juster området refetches the DEM for free" (§10) quietly stop being true. So
+  `applyLocality` moves the live record and the buffer keeps `baseLocality` to
+  put back. It is the one thing edit changes outside the buffer, and it is why
+  `Juster området` needs an undo of its own.
+- **The overlays synthesise real record shapes.** `overlayFinds` and
+  `overlayAttachments` return `LocalityFindRecord[]` / `AttachmentRecord[]`
+  with the buffer laid over the server's lists — new ones minted under
+  `draft:`-prefixed ids. No card, list, callout or figure builder learns a
+  second type, and none of them can tell the difference. `isDraftId` is the
+  only test, and only three places make it: the pin sweep, the pin face and
+  `Åpne originalen`.
+- **Deferred deletion is published as one `Set`.** `deletedIds` spans both
+  collections (PocketBase ids are unique across them) plus `restoreDeleted`.
+  The funn row and the carousel card grey, strike through, lose every verb but
+  `Angre sletting`, and stay where they are — a row that vanished would be
+  claiming a deletion that has not happened. The **counts** stay inclusive of
+  tombstoned records, so the badge and the rail agree about what is on screen;
+  the **cover** and the **pin sweep** exclude them, because both are about what
+  the lokalitet will look like afterwards.
+- **`Lagre` returns before the pixels exist.** `commit()` plays the buffer out
+  in dependency order (locality → find deletes → find patches → new finds →
+  attachment deletes → attachment patches → new specs), enqueues every created
+  spec, and drops the stance. Each success is removed from a cloned remainder,
+  so a partial failure leaves a buffer describing exactly what is left, keeps
+  you in edit, and lets `Lagre` retry precisely that.
+- **The buffer survives a crash.** It is written to `localStorage` under
+  `tufteseid.draft.<localityId>` on every change — no debounce, because the two
+  writes that could be frequent are already debounced upstream (the pen settles
+  for 700 ms, text fields commit on blur). On next open it is read **once**,
+  keyed on the id alone, and re-entering edit is automatic: a buffer without
+  the stance that owns it is work on screen with no way to save it. The banner
+  says *Gjenopprettet ulagret arbeid fra 14:32* with a `Forkast` beside it
+  (§8.1). This is the part of the section not worth shipping without.
+- **Realtime stands down, and says so.** `useLocalityContent` keeps both
+  subscriptions up while paused but raises `changedElsewhere` instead of
+  reloading a list the buffer is describing, and reloads on unpause. Committing
+  over a changed record toasts *"Lokaliteten er endret et annet sted"*. Last
+  write wins is acceptable for one author with two tabs; a silent overwrite is
+  not.
+- **The funn layer is told to forget.** `useFunnLayer` runs its own fetch and
+  subscription and knows nothing about the buffer, so buffered shapes are
+  pushed onto it by hand under `draft:` ids. Both exits call
+  `refreshFunnLayer()` — a module-level hook into that effect, sequence-numbered
+  so a refresh racing the initial load cannot double-add.
+- **The buffer follows the stance, not the entrance.** `Rediger` is not the
+  only way into edit — a lokalitet created in this session arrives in it
+  already (§8.1) — and stance without a buffer is the one state that loses work
+  silently, since every write is a no-op `mutate`. So one effect opens it
+  whenever `stance === 'edit'`, and `begin()` is idempotent.
+- **Escape got quieter.** With `Ferdig` gone, Escape can no longer mean
+  "leave": it closes the deepest thing in flight, and at depth 1 it leaves only
+  when the buffer is clean. A stray keypress must not have to choose between
+  `Lagre` and `Avbryt`.
+- **`Slett lokaliteten` is not deferred.** Deleting the record the transaction
+  is *about* has nothing to be rolled back into, so it goes straight through
+  and clears the buffer on the way. The confirm it already had is the safety
+  net.
+
+`Avbryt` confirms only when the buffer is dirty, and the question names the
+count: *Forkast 12 bilder, 3 funn og 1 sletting?* The conjunction comes from
+`Intl.ListFormat` rather than a `shared.listJoin` key — it is in the platform,
+and it is the one bit of that sentence the three locale files should not have
+to spell. (`tsconfig.app.json` gained `ES2021.Intl` in its `lib` for the
+types; the emit target is unchanged.)
 
 ---
 

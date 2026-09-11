@@ -84,6 +84,15 @@
   opacity: 0.55;
 }
 
+/* Tombstoned by this edit session (§5.6, consequence 2). Further down than
+   concealment and drained of colour, because this one is not a curation
+   state the lokalitet will keep — it is a thing on its way out that `Lagre`
+   has not yet taken. */
+.cardDeleted {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
 /* `contain`, not `cover`: this is the image being judged, so none of it may
    be cropped away by the frame it happens to be sitting in. */
 .cardImage {

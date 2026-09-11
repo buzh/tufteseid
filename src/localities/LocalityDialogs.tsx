@@ -98,9 +98,12 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           once and then stop looking at, and because the fields are a form:
           they need width and a body, and neither fits on a ribbon row.
 
-          No footer. Every field in it writes on blur, the same as it did in
-          the dock, so a `Lagre` here would be a second, competing promise
-          about when the change lands. */}
+          No footer, and since §5.6 that is load-bearing rather than merely
+          tidy: every field in it commits to the draft on blur, and the only
+          `Lagre` there is lives on the row behind this dialog. A second one
+          here would be a competing promise about when the change lands — and
+          the honest answer, "when you save the lokalitet", is not something a
+          button inside a sub-dialog can say. */}
       <Dialog
         open={detailsOpen}
         onOpenChange={setDetailsOpen}

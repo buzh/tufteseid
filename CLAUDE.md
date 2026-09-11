@@ -61,11 +61,11 @@ all of them.
   **Read it before proposing a new analysis feature** — it records what was
   already rejected and why, so those don't get re-litigated.
 - `docs/lokalitet-view.md` — **partly built**: §12's build order is through
-  step 12, so the two axes, the View/File split, the row's zones, the bottom
-  filmstrip/carousel, curation, the picker carousels and **removing the dock**
-  are live and are documented in `docs/ui-architecture.md`; the edit
-  transaction, the takeout bundle and moving Terreng/Sammenlign onto the row
-  are not. The whole design of making
+  step 13, so the two axes, the View/File split, the row's zones, the bottom
+  filmstrip/carousel, curation, the picker carousels, **removing the dock** and
+  **the edit transaction** are live and are documented in
+  `docs/ui-architecture.md`; the copy, the takeout bundle and moving
+  Terreng/Sammenlign onto the row are not. The whole design of making
   "a lokalitet is open" a view of its own is here — the two axes (owner/reader ×
   show/edit), **show writes nothing and edit is a transaction** (`Lagre` /
   `Avbryt` over a client-side draft), the lokalitet row as three zones
@@ -141,6 +141,10 @@ that owns them.
   flyfoto grab is stored as a row of parameters and rendered into a figure PNG
   afterwards by a background queue (`src/localities/pinQueue.ts`); a screenshot
   or an upload is only ever bytes — `docs/ui-architecture.md` §8.7.4.
+- **Editing a lokalitet is a transaction.** Nothing typed, drawn, curated or
+  deleted in edit reaches PocketBase until `Lagre`; `Avbryt` throws it away,
+  and the buffer survives a crash via `localStorage` —
+  `docs/ui-architecture.md` §8.11.
 - **Every raster the app keeps or hands out carries a provenance caption** —
   dataset, acquisition, processing parameters, extent, licence — below, and
   `docs/ui-architecture.md` §8.10.

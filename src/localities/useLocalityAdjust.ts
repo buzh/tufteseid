@@ -1,4 +1,4 @@
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue } from 'jotai';
 import { Feature } from 'ol';
 import type { Coordinate } from 'ol/coordinate';
 import { boundingExtent } from 'ol/extent';
@@ -12,14 +12,10 @@ import VectorSource from 'ol/source/Vector';
 import { Fill, Stroke, Style } from 'ol/style';
 import CircleStyle from 'ol/style/Circle';
 import { useEffect, useRef } from 'react';
-import {
-  LocalityBbox,
-  LocalityRecord,
-  updateLocality,
-} from '../api/localities';
+import { LocalityBbox, LocalityRecord } from '../api/localities';
 import { mapAtom } from '../map/atoms';
 import { addOwnedInteraction } from '../map/interactions';
-import { activeLocalityAtom, adjustingLocalityAtom } from './atoms';
+import { adjustingLocalityAtom } from './atoms';
 import {
   hideLocalityOnLayer,
   upsertLocalityOnLayer,
@@ -30,7 +26,14 @@ import {
 // whole (Translate) or resized by its corners (Modify). Corner drags
 // deform the ring during the gesture and snap back to a rectangle on
 // release: the dragged corner plus the opposite original corner define
-// the new extent. Every finished gesture persists the bbox.
+// the new extent. Every finished gesture reports the bbox.
+//
+// *Reports*, not saves: the gesture used to PATCH the record directly, and
+// since step 13 the whole of edit is a transaction (§5.6), so the new
+// rectangle goes into the caller's draft buffer instead and reaches
+// PocketBase on `Lagre` with everything else. The hook still knows nothing
+// about where it goes — which is why `[Angre]` can put the old one back
+// without this file having an opinion about it.
 
 const ADJUST_LAYER_ID = 'localityAdjustLayer';
 const CORNER_GRAB_PX = 12;
@@ -48,15 +51,19 @@ const adjustStyle = new Style({
 const ring = (polygon: Polygon): Coordinate[] =>
   polygon.getCoordinates()[0].map((c) => [...c] as Coordinate);
 
-export const useLocalityAdjust = (locality: LocalityRecord) => {
+export const useLocalityAdjust = (
+  locality: LocalityRecord,
+  onBbox: (bbox: LocalityBbox) => void,
+) => {
   const map = useAtomValue(mapAtom);
   const adjusting = useAtomValue(adjustingLocalityAtom);
-  const setActiveLocality = useSetAtom(activeLocalityAtom);
 
-  // Latest persisted record, for the exit-cleanup upsert (the effect
-  // closure would otherwise re-render the pre-adjust rectangle).
+  // Latest record, for the exit-cleanup upsert (the effect closure would
+  // otherwise re-render the pre-adjust rectangle).
   const latestRef = useRef<LocalityRecord>(locality);
   latestRef.current = locality;
+  const onBboxRef = useRef(onBbox);
+  onBboxRef.current = onBbox;
 
   useEffect(() => {
     if (!adjusting) return;
@@ -80,14 +87,7 @@ export const useLocalityAdjust = (locality: LocalityRecord) => {
       const e = geom.getExtent();
       if (e[2] - e[0] <= 0 || e[3] - e[1] <= 0) return;
       const bbox = transformExtent(e, projection, 'EPSG:4326') as LocalityBbox;
-      updateLocality(locality.id, { bbox })
-        .then((updated) => {
-          latestRef.current = updated;
-          setActiveLocality(updated);
-        })
-        .catch((err) =>
-          console.warn('[useLocalityAdjust] bbox save failed', err),
-        );
+      onBboxRef.current(bbox);
     };
 
     const cornerAtPixel = (pixel: number[]): boolean => {
@@ -152,5 +152,5 @@ export const useLocalityAdjust = (locality: LocalityRecord) => {
       // Re-render the (possibly moved) rectangle on the shared layer.
       upsertLocalityOnLayer(latestRef.current);
     };
-  }, [adjusting, map, locality.id, setActiveLocality]);
+  }, [adjusting, map, locality.id]);
 };

@@ -50,8 +50,3 @@
   font-size: var(--font-xs);
   color: var(--c-yellow-600);
 }
-
-.error {
-  font-size: var(--font-xs);
-  color: var(--c-danger);
-}

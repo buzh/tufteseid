@@ -15,16 +15,22 @@ import rowStyles from './RibbonFunnDraftRow.module.css';
  *
  * Three things on it and nothing else:
  *
- * - **The title**, editing the live record on blur, exactly as a row in the
- *   funn list does. There is no `Lagre` here: the funn is a record from the
- *   moment its first shape closes (§8.5 of ui-architecture.md), so the state
- *   word beside the field says *whether that has happened yet* rather than
- *   offering to make it happen.
+ * - **The title**, editing the buffered record on blur, exactly as a row in
+ *   the funn list does. There is no `Lagre` here: the funn is a record in the
+ *   draft from the moment its first shape closes, and it reaches PocketBase
+ *   with everything else when the lokalitet row's `Lagre` is pressed (§5.6).
+ *   Which is what the state word beside the field now says. It used to report
+ *   a write — *Lagrer…* / *Lagret* / *Ikke lagret ennå* — and there is no
+ *   write to report; saying "lagret" of something that exists only in this
+ *   tab would be the transaction's one unforgivable lie.
  * - **`Utvid området`**, only while the drawing sticks out of the lokalitet's
  *   rectangle. Worth remarking on — a lokalitet is meant to hold the whole
  *   extent of its funn — but never worth stopping the pen for, so it is an
  *   inline warning rather than the modal it used to be.
- * - **The error**, when a write fails.
+ *
+ * There is no error line any more, for the same reason: nothing on this row
+ * talks to a server, so there is nothing here that can fail. A commit that
+ * half-lands is reported once, by the verb that started it.
  *
  * The note is deliberately absent: it moved to the funn popover (§6). A
  * textarea will not fit a ribbon row, and a note is written after you have
@@ -58,11 +64,11 @@ export const RibbonFunnDraftRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
       />
 
       <span className={rowStyles.state}>
-        {ws.savingFunn
-          ? t('localities.workspace.saving')
-          : ws.draftFunnId
-            ? t('localities.funn.draft.saved')
-            : t('localities.funn.draft.pending')}
+        {t(
+          ws.draftFunnId
+            ? 'localities.funn.draft.buffered'
+            : 'localities.funn.draft.pending',
+        )}
       </span>
 
       {ws.funnOutside && (
@@ -74,8 +80,6 @@ export const RibbonFunnDraftRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           </Button>
         </span>
       )}
-
-      {ws.funnError && <span className={rowStyles.error}>{ws.funnError}</span>}
     </div>
   );
 };

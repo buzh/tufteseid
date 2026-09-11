@@ -38,6 +38,21 @@
   background: transparent;
 }
 
+/* Tombstoned by this edit session (§5.6). Faded and struck through rather
+   than gone: the deletion has not happened yet, and a row that vanished
+   would be claiming it had. */
+.rowDeleted,
+.rowDeleted:hover {
+  cursor: default;
+  background: transparent;
+}
+
+.rowDeleted .title,
+.rowDeleted .note {
+  color: var(--c-fg-muted);
+  text-decoration: line-through;
+}
+
 .head {
   display: flex;
   align-items: flex-start;

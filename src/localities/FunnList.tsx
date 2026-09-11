@@ -110,7 +110,14 @@ const StatusPicker = ({
   );
 };
 
-// Delete confirms in place rather than nesting a second popover.
+/*
+ * Delete confirms in place rather than nesting a second popover.
+ *
+ * It confirms at all because the *card* is the reversible half: since §5.6
+ * the deletion is deferred until `Lagre`, and the row keeps offering `Angre
+ * sletting` for the rest of the session. That is the safety net, and this
+ * question is the one that stops a mis-click putting a funn in it.
+ */
 const RowMenu = ({
   onEditText,
   onEditGeometry,
@@ -223,20 +230,26 @@ const FunnRow = ({
   funn,
   editable,
   selected,
+  deleted,
   onSelect,
   onStatus,
   onSaveMeta,
   onEditGeometry,
   onDelete,
+  onRestore,
 }: {
   funn: LocalityFindRecord;
   editable: boolean;
   selected: boolean;
+  /** Tombstoned by this edit session — greyed, and one press from coming
+   *  back (§5.6, consequence 2). */
+  deleted: boolean;
   onSelect: (f: LocalityFindRecord) => void;
   onStatus: (f: LocalityFindRecord, s: LocalityFindStatus) => void;
   onSaveMeta: (f: LocalityFindRecord, title: string, note: string) => void;
   onEditGeometry: (f: LocalityFindRecord) => void;
   onDelete: (f: LocalityFindRecord) => void;
+  onRestore: (id: string) => void;
 }) => {
   const { t } = useTranslation();
   const setHovered = useSetAtom(hoveredFunnIdAtom);
@@ -283,11 +296,12 @@ const FunnRow = ({
         styles.row,
         selected && styles.rowSelected,
         editing && styles.rowEditing,
+        deleted && styles.rowDeleted,
       )}
       onMouseEnter={() => setHovered(funn.id)}
       onMouseLeave={() => setHovered(null)}
-      onClick={() => !editing && onSelect(funn)}
-      title={editing ? undefined : t('localities.funn.actions.zoom')}
+      onClick={() => !editing && !deleted && onSelect(funn)}
+      title={editing || deleted ? undefined : t('localities.funn.actions.zoom')}
     >
       <div className={styles.head}>
         <div className={styles.main}>
@@ -328,18 +342,34 @@ const FunnRow = ({
         </div>
         {!editing && (
           <div className={styles.actions}>
+            {/* A tombstoned row keeps its badge but loses every verb that
+                would change it: the only decision left on it is whether it
+                goes. */}
             <StatusPicker
               value={funn.status}
-              editable={editable}
+              editable={editable && !deleted}
               onChange={(s) => onStatus(funn, s)}
             />
-            {editable && (
-              <RowMenu
-                onEditText={() => setEditing(true)}
-                onEditGeometry={() => onEditGeometry(funn)}
-                onDelete={() => onDelete(funn)}
-              />
-            )}
+            {editable &&
+              (deleted ? (
+                <Button
+                  size="xs"
+                  variant="secondary"
+                  leftIcon="undo"
+                  onClick={(e: MouseEvent) => {
+                    e.stopPropagation();
+                    onRestore(funn.id);
+                  }}
+                >
+                  {t('localities.edit.restore')}
+                </Button>
+              ) : (
+                <RowMenu
+                  onEditText={() => setEditing(true)}
+                  onEditGeometry={() => onEditGeometry(funn)}
+                  onDelete={() => onDelete(funn)}
+                />
+              ))}
           </div>
         )}
       </div>
@@ -351,20 +381,24 @@ export const FunnList = ({
   items,
   editable,
   selectedId,
+  deletedIds,
   onSelect,
   onStatus,
   onSaveMeta,
   onEditGeometry,
   onDelete,
+  onRestore,
 }: {
   items: LocalityFindRecord[] | null;
   editable: boolean;
   selectedId: string | null;
+  deletedIds: ReadonlySet<string>;
   onSelect: (f: LocalityFindRecord) => void;
   onStatus: (f: LocalityFindRecord, s: LocalityFindStatus) => void;
   onSaveMeta: (f: LocalityFindRecord, title: string, note: string) => void;
   onEditGeometry: (f: LocalityFindRecord) => void;
   onDelete: (f: LocalityFindRecord) => void;
+  onRestore: (id: string) => void;
 }) => {
   const { t } = useTranslation();
   const setHovered = useSetAtom(hoveredFunnIdAtom);
@@ -393,11 +427,13 @@ export const FunnList = ({
           funn={f}
           editable={editable}
           selected={f.id === selectedId}
+          deleted={deletedIds.has(f.id)}
           onSelect={onSelect}
           onStatus={onStatus}
           onSaveMeta={onSaveMeta}
           onEditGeometry={onEditGeometry}
           onDelete={onDelete}
+          onRestore={onRestore}
         />
       ))}
     </div>
