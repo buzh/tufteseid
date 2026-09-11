@@ -3,7 +3,12 @@ import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { transformExtent } from 'ol/proj';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { createAttachment } from '../api/attachments';
+import {
+  AttachmentRecord,
+  createAttachment,
+  deleteAttachment,
+  updateAttachmentCaption,
+} from '../api/attachments';
 import {
   deleteLocality,
   LocalityBbox,
@@ -77,7 +82,12 @@ import {
   STARTER_STYLES,
   type StarterRaster,
 } from './starterPack';
-import { funnOutsideAtom, ribbonToolAtom, workspaceModeAtom } from './toolAtoms';
+import {
+  bilderStripOpenAtom,
+  funnOutsideAtom,
+  ribbonToolAtom,
+  workspaceModeAtom,
+} from './toolAtoms';
 import { useFunnAutosave } from './useFunnAutosave';
 import { useKulturminner } from './useKulturminner';
 import { useLocalityAdjust } from './useLocalityAdjust';
@@ -85,7 +95,7 @@ import {
   useLocalityAttachments,
   useLocalityFinds,
 } from './useLocalityContent';
-import { usePinnedBilde } from './usePinnedBilde';
+import { canPinBilde, usePinnedBilde } from './usePinnedBilde';
 import { useWorkspaceKeys } from './useWorkspaceKeys';
 import { viewSpecOf } from './viewSpec';
 
@@ -203,6 +213,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const setLidarSelection = useSetAtom(lidarExtractSelectionAtom);
   const [tool, setTool] = useAtom(ribbonToolAtom);
   const mode = useAtomValue(workspaceModeAtom);
+  const stripOpen = useAtomValue(bilderStripOpenAtom);
   const [funnOutside, setFunnOutside] = useAtom(funnOutsideAtom);
   const setTerrainStandaloneBbox = useSetAtom(terrainStandaloneBboxAtom);
   // Read only so a screenshot can say whose pixels are in it. Both halves of
@@ -285,9 +296,99 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const { items: attachmentItems, setItems: setAttachmentItems } =
     useLocalityAttachments(locality.id);
   const kulturminner = useKulturminner(locality.bbox);
-  // "Vis i ruta". Mounted here rather than in BilderSection because that
-  // section is inside a collapsible and unmounts when it is folded away.
+  // "Vis i ruta". Mounted here rather than in the strip because the strip is
+  // collapsible and unmounts when it is folded away — and folding it away to
+  // look at the map is exactly what you do after putting an image on it.
   const pinned = usePinnedBilde(attachmentItems);
+  const { pin } = pinned;
+
+  /*
+   * Which bilde the bottom edge is pointing at (docs/lokalitet-view.md §4.3).
+   *
+   * Up here rather than in BilderStrip for two reasons: the strip unmounts
+   * when it is folded away, and ←/→ walk it from `useWorkspaceKeys`, which is
+   * mounted here. It is deliberately *not* the same value as `pinned.pinnedId`
+   * — an upload carries no extent and so can be the active card without being
+   * on the ground, and Terreng taking the overlay slot drops the pin while
+   * leaving the card where it was.
+   */
+  const [activeBildeId, setActiveBildeId] = useState<string | null>(null);
+
+  // The record went away — deleted here, or by another session.
+  useEffect(() => {
+    if (
+      activeBildeId &&
+      attachmentItems &&
+      !attachmentItems.some((a) => a.id === activeBildeId)
+    ) {
+      setActiveBildeId(null);
+    }
+  }, [activeBildeId, attachmentItems]);
+
+  // Picking a thumbnail *is* "Vis i ruta" (§4.2) — there is no second verb for
+  // it. Pressing the active one again puts it down, which is the only way the
+  // strip has to mean "nothing", and the images that cannot be placed are
+  // exactly the ones with nothing to place.
+  const selectBilde = useCallback(
+    (id: string | null) => {
+      const next = id === activeBildeId ? null : id;
+      setActiveBildeId(next);
+      const rec = next ? attachmentItems?.find((a) => a.id === next) : null;
+      pin(rec && canPinBilde(rec) ? rec.id : null);
+    },
+    [activeBildeId, attachmentItems, pin],
+  );
+
+  // ←/→. Wraps, and never lands on nothing: walking a rail past its end and
+  // getting an empty strip would be a worse answer than starting over.
+  const stepBilde = useCallback(
+    (delta: 1 | -1) => {
+      const items = attachmentItems;
+      if (!items || items.length === 0) return;
+      const at = items.findIndex((a) => a.id === activeBildeId);
+      const next =
+        at < 0
+          ? delta > 0
+            ? 0
+            : items.length - 1
+          : (at + delta + items.length) % items.length;
+      const rec = items[next];
+      setActiveBildeId(rec.id);
+      pin(canPinBilde(rec) ? rec.id : null);
+    },
+    [attachmentItems, activeBildeId, pin],
+  );
+
+  const removeBilde = useCallback(
+    async (rec: AttachmentRecord) => {
+      try {
+        await deleteAttachment(rec.id);
+        setAttachmentItems((prev) =>
+          prev ? prev.filter((it) => it.id !== rec.id) : prev,
+        );
+        setActiveBildeId((cur) => (cur === rec.id ? null : cur));
+      } catch (e) {
+        console.warn('[localityWorkspace] bilde delete failed', e);
+        toast.error({ title: t('localities.workspace.saveFailed') });
+      }
+    },
+    [setAttachmentItems, t],
+  );
+
+  const setBildeCaption = useCallback(
+    async (rec: AttachmentRecord, caption: string) => {
+      try {
+        const updated = await updateAttachmentCaption(rec.id, caption);
+        setAttachmentItems((prev) =>
+          prev ? prev.map((it) => (it.id === rec.id ? updated : it)) : prev,
+        );
+      } catch (e) {
+        console.warn('[localityWorkspace] caption save failed', e);
+        toast.error({ title: t('localities.workspace.saveFailed') });
+      }
+    },
+    [setAttachmentItems, t],
+  );
 
   // Funn draft. `draftFunnId` is the record the pen is bound to — null only
   // until the first shape closes, since drawing autosaves. `draftIsEdit`
@@ -1323,6 +1424,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setSelectedFunnId(items[next].id);
     },
     onZoomSelected: () => selectedFunnId && zoomToFunn(selectedFunnId),
+    // ←/→ walk the filmstrip (§4.3), and only while there is a strip to walk:
+    // OpenLayers' KeyboardPan has these keys otherwise, and taking panning
+    // away from a map with no images on the edge of it would be a straight
+    // loss. The ground deliberately does not move as you step, which is the
+    // whole trick — each press is another reading of the same rectangle, in
+    // register.
+    stripNavigable:
+      stripOpen && !draftActive && (attachmentItems?.length ?? 0) > 1,
+    onStepBilde: stepBilde,
     // Outside-in, the same order the row's right zone is stacked in (§5.3):
     // the deepest thing in flight goes first, and edit is a level of its own
     // above closing. Escaping out of edit rather than out of the lokalitet is
@@ -1338,6 +1448,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
   const funnCount = findItems?.length ?? 0;
   const bilderCount = attachmentItems?.length ?? 0;
+  // Whether the bottom edge has anything to be. Published rather than
+  // recomputed at each end, so the row's `Bilder ▾` and the portal in
+  // `LocalityRibbon` cannot disagree about whether pressing it does anything.
+  //
+  // `canAdd` is in it because an empty lokalitet you may add to still wants
+  // the edge — that is where the empty line saying so goes, and where the
+  // first image will land. An empty one you may *not* add to gets no bar: a
+  // reader has no use for a strip that says "run an extract".
+  const hasBilder = bilderCount > 0 || starterStep != null || canAdd;
   const kmCount = kulturminner.result
     ? kulturminner.result.truncated
       ? `${kulturminner.result.items.length}+`
@@ -1392,12 +1511,19 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // content
     findItems,
     attachmentItems,
-    setAttachmentItems,
     pinned,
     kulturminner,
     funnCount,
     bilderCount,
+    hasBilder,
     kmCount,
+
+    // the bottom edge
+    activeBildeId,
+    selectBilde,
+    stepBilde,
+    removeBilde,
+    setBildeCaption,
 
     // funn list
     selectedFunnId,

@@ -212,10 +212,12 @@ decision everything else follows from.
     ├── .ribbon   flex:0 0 auto   pointer-events:auto   z --z-ribbon
     │     └── Ribbon                  ← row 1, the settings strip, the terrain
     │                                   sliders, the lokalitet row
-    └── .row      flex:1  min-height:0  position:relative  pointer-events:none
-          ├── .left    absolute top/left/bottom          SearchComponent + MapToolCards
-          └── .right   absolute top/right/bottom  360→400px
-                       InfoBox and the portalled LocalityDock
+    ├── .row      flex:1  min-height:0  position:relative  pointer-events:none
+    │     ├── .left    absolute top/left/bottom          SearchComponent + MapToolCards
+    │     └── .right   absolute top/right/bottom  360→400px
+    │                  InfoBox and the portalled LocalityDock
+    └── .bottom   flex:0 0 auto   pointer-events:none   z --z-ribbon
+          └── the bottom slot          ← the portalled BilderStrip (§8.7.2)
 ```
 
 Siblings of the whole thing: `BottomDrawToolSelector` (mobile only, only while
@@ -235,6 +237,11 @@ Details that are easy to lose:
   dock could grow past the bottom of the window. It is a flex column now: 360 px
   from `48rem`, 400 px from `62rem`, full width below that (where the dock is a
   bottom sheet), with the infobox keeping its own width against the right edge.
+- **`.bottom` is in flow, not floated.** It is a flex child of `.overlay`
+  *after* `.row`, exactly like `.ribbon` before it, for the reason above:
+  `.right` runs to `bottom: 0`, so an absolutely positioned bar along the
+  bottom would sit on top of the dock column. In flow, its own height shortens
+  `.row` and the dock stops above it — no media query, no z-index fight.
 - **`.map` must stay a *sibling* of `.overlay`, never its parent.** F11 calls
   `requestFullscreen()` on the map target element, and parenting the chrome
   inside it drags the chrome into fullscreen.
@@ -398,10 +405,12 @@ subsume.
   (`src/ui/overlayAtoms.ts`, incremented by every `Popover` and `Dialog` so the
   keyboard layers can stand down).
 - **Ribbon / workspace** — `ribbonToolAtom`, the derived `workspaceModeAtom`,
-  `dockOpenAtom`, `funnOutsideAtom` (`src/localities/toolAtoms.ts`),
-  `openSectionsAtom` (`src/localities/atoms.ts`), `dockSlotAtom`
-  (`src/shell/dockSlot.ts` — the portal target, a DOM node rather than a value)
-  and `terrainStandaloneBboxAtom` (`src/terrain/atoms.ts`).
+  `dockOpenAtom`, `bilderStripOpenAtom`, `funnOutsideAtom`
+  (`src/localities/toolAtoms.ts`), `openSectionsAtom`
+  (`src/localities/atoms.ts`), `dockSlotAtom` (`src/shell/dockSlot.ts` — the
+  portal target, a DOM node rather than a value), `bottomSlotAtom`
+  (`src/shell/bottomSlot.ts`, the same for the bottom edge — §8.7.2) and
+  `terrainStandaloneBboxAtom` (`src/terrain/atoms.ts`).
 - **Search** — query, results, selected result, marker, infobox visibility.
 - **Feature info** — the clicked-position readout and the Kulturminner popup,
   plus `infoToolAtom` / the derived `infoClickArmedAtom`
@@ -487,9 +496,10 @@ loop on the right, the rest behind an overflow menu.
 `useLocalityWorkspace` — that hook opens two PocketBase realtime subscriptions
 that reload the whole list on every event, so a second call site doubles both.
 It also portals `LocalityDock` into the shell's right slot through
-`dockSlotAtom`, rather than hoisting an 850-line hook to a common ancestor and
-making every one of its callbacks nullable: one React tree, two places in the
-DOM.
+`dockSlotAtom`, and `BilderStrip` into the bottom slot through
+`bottomSlotAtom` (§8.7.2), rather than hoisting an 850-line hook to a common
+ancestor and making every one of its callbacks nullable: one React tree,
+three places in the DOM.
 
 `data-chrome="top"` on the bar is how framing code learns how much of the map it
 covers (§3.1). Measured rather than a constant, because rows 2 and 3 come and go and
@@ -1327,12 +1337,13 @@ too (§10) because reading the ground is not an act of ownership.
 
 There is no workspace *panel*, and no workspace *rows* either. The state is one
 controller hook, `src/localities/useLocalityWorkspace.ts`, and the presentation
-is a context strip plus a dock column:
+is a context strip, a bottom edge and a (shrinking) dock column:
 
 | Region | Component | Contents |
 |---|---|---|
-| Identity, the work, the exits | `RibbonLocalityRow` (the lokalitet row) | three zones — see below |
-| Everything with a body | `LocalityDock` (right slot) | the live tool band, then Funn · Bilder · Kulturminner · Detaljer as sections |
+| Identity, the work, the exits | `RibbonLocalityRow` (the lokalitet row) | three zones plus the read tools — see below |
+| The images | `BilderStrip` (bottom slot) | the filmstrip — §8.7.2 |
+| Everything else with a body | `LocalityDock` (right slot) | the live tool band, then Funn · Kulturminner · Detaljer as sections |
 | Dialogs | `LocalityDialogs` | flyfoto licensing notice, flyfoto picker |
 
 **The row is three zones**, and each answers one question
@@ -1342,7 +1353,12 @@ is a context strip plus a dock column:
 |---|---|---|---|
 | left — identity | *what am I looking at* | always | the literal word `Lokalitet:`, the inline-editable name, the short code chip (click to copy), the visibility badge, the banner slot, zoom-to |
 | middle — the work | *what can I do to it* | **edit only** | Nytt funn · LiDAR-uttrekk · Skjermbilde · Flyfoto |
+| the read tools | *what may I look at* | always | `Bilder ▾` (Terreng and Sammenlign join it at §12's step 15) |
 | right — the exits | *how do I get out of here* | always | show: `[Rediger]` `[Lukk]`; edit: `[Ferdig]` `[⋮]` |
+
+The read tools sit between the middle zone and the exits and are present in
+**both** stances, because reading is not writing — the same argument that makes
+show mode absolute about the middle zone is what keeps `Bilder ▾` out of it.
 
 There is no `[←]` back arrow: leaving is an exit, exits are on the right, and
 one lokalitet should not have two ways out at opposite ends of the same row.
@@ -1380,9 +1396,9 @@ opening anything else.
 
 **Nothing in show writes.** Not disabled verbs — *absent* ones: the middle
 zone does not render, the name is not clickable, Detaljer's fields are
-read-only, the Bilder caption and delete are gone, funn are not editable, and
-N / U / B do nothing. Reading, pinning an image, `Gjenskap` and downloading a
-figure all stay, because none of them leaves a trace. The one way to write is
+read-only, the filmstrip's caption is read-only and its delete is gone, funn
+are not editable, and N / U / B do nothing. Reading, pinning an image,
+`Gjenskap` and downloading a figure all stay, because none of them leaves a trace. The one way to write is
 to press `Rediger` first, which costs nothing: no fetch, no write, the map
 does not move.
 
@@ -1412,9 +1428,9 @@ So an admin may rename somebody's lokalitet, retitle and delete its bilder,
 change a funn's status or geometry, reshape the rectangle and throw the whole
 thing away — but may not put new content in it, because the create rules also
 demand the *parent's* owner. Their overflow menu is Juster området and Slett;
-Nytt funn, Ta skjermbilde, Flyfoto, Hent grunnpakke, Last opp and the Bilder
-add-tile are not there. Showing an admin a button the server would 403 is the
-same lie as hiding one it would obey, pointing the other way.
+Nytt funn, Ta skjermbilde, Flyfoto, Hent grunnpakke and Last opp are not there.
+Showing an admin a button the server would 403 is the same lie as hiding one it
+would obey, pointing the other way.
 
 A reader — signed in, looking at a public lokalitet that is not theirs — gets
 neither, and the banner says *Delt av …* whenever `access !== 'owner'`. That
@@ -1477,17 +1493,16 @@ so folding away survives closing and reopening a lokalitet — the one gesture y
 make precisely because you want the map, undone by the next thing you open,
 would be worse than no fold at all.
 
-Each section keeps its own error boundary: `BilderSection` fetches short-lived
-file tokens and `KulturminnerSection` hits an external WFS, and either failing
-should cost you that section rather than the funn list above it.
+Each section keeps its own error boundary: `KulturminnerSection` hits an
+external WFS, and it failing should cost you that section rather than the funn
+list above it.
 
-`FunnList` (per-row status, rename, zoom-to, delete), `BilderSection`
-(attachment gallery; picking a tile opens a panel under the grid and puts the
-image on the map — §8.7.1), `KulturminnerSection` (the "kjente
-kulturminner her" readout from GeoNorge's WFS redistribution of the
-Riksantikvaren register — `kart.ra.no` has WFS disabled, hence the detour), and
-`LocalityDetails` (where it is, description, synlighet, metadata) last, because
-it is the one section you set once and stop looking at.
+`FunnList` (per-row status, rename, zoom-to, delete), then
+`KulturminnerSection` (the "kjente kulturminner her" readout from GeoNorge's
+WFS redistribution of the Riksantikvaren register — `kart.ra.no` has WFS
+disabled, hence the detour), and `LocalityDetails` (where it is, description,
+synlighet, metadata) last, because it is the one section you set once and stop
+looking at.
 
 `LocalityDetails` opens with the location group: **Sted**, **Kommune** and
 **Matrikkel** as ordinary text fields, then **Koordinater** and **Areal** as
@@ -1551,6 +1566,7 @@ the overlay actually took focus.
 | Key | Action |
 |---|---|
 | ↑ / ↓ | Move funn selection (only when `navigable`) |
+| ← / → | Walk the filmstrip (only when `stripNavigable`) |
 | Enter | Zoom to selected funn (only when `navigable`) |
 | N | Arm drawing / put the pen down — the same toggle as the lokalitet-row button the key is advertised on |
 | U | Toggle LiDAR extract |
@@ -1569,6 +1585,13 @@ press from throwing away both.
 `navigable` is off only while drawing: the funn list is always on screen in the
 dock, so arrows keep working with the extract and terrain panels open, and
 picking a different funn out from under the pen is never what the arrow meant.
+
+`stripNavigable` is narrower — the strip has to be unfolded, no draft open, and
+more than one image in it. Anything less and ← / → fall through to
+OpenLayers' `KeyboardPan`, which is what they mean when there is no strip to
+walk. Selecting a frame pins it (§8.7.1), so these two keys move the map as
+well as the rail; the selected frame scrolls itself into view so the two stay
+in agreement.
 
 That Escape carve-out is deliberate: `DrawControls` binds Escape to abort the
 shape currently being sketched, and stealing it would throw away a drawing
@@ -1694,7 +1717,7 @@ preserving:
 screenshot.ts         ─┐
 flyfoto.ts            ─┤
 lidarExtract "Behold" ─┼→ renderFigureBlob() → createAttachment() → PocketBase
-terrain "Lagre"       ─┤   (§8.10)                → realtime → BilderSection
+terrain "Lagre"       ─┤   (§8.10)                → realtime → BilderStrip
 starterPack.ts        ─┘
 ```
 
@@ -1705,25 +1728,30 @@ to draw a caption; only "Last opp" bypasses it (§8.10).
 reuse `extract` with the visualization recorded in `meta.style`, which is why
 adding terrain analysis needed no migration. `meta` also carries source
 key/label, `metresPerPx`, bbox, `imageRect` (§8.10), and for flyfoto the
-`projectName` / `year` / `photoDate` that the gallery captions from
-("Flyfoto 1937"). Files are `protected` in PocketBase, so the gallery fetches
+`projectName` / `year` / `photoDate` that the strip captions from
+("Flyfoto 1937"). Files are `protected` in PocketBase, so the strip fetches
 short-lived file tokens for thumbnails — a new UI must keep doing that or every
 thumbnail 403s.
 
 #### 8.7.1 The image on the map — Vis i ruta and Gjenskap
 
-**There is no lightbox.** Picking a tile in `BilderSection` selects it, opens a
-panel *under the grid*, and — where the record has an extent — puts the image
-back on the map at the rectangle it is of. A lightbox answers "what does this
-file look like", which for a picture of a place you are currently looking at is
-a question nobody has. Pinned, the 1937 ortofoto fades over today's hillshade
-with the funn drawn on top; in a lightbox it is a picture of somewhere you are
-no longer looking.
+**There is no lightbox.** Picking a frame in the filmstrip (§8.7.2) selects it,
+opens a detail panel *under the rail*, and — where the record has an extent —
+puts the image back on the map at the rectangle it is of. **Selecting is
+pinning**: there is no separate "put it up" press, because a lightbox answers
+"what does this file look like", which for a picture of a place you are
+currently looking at is a question nobody has. Pinned, the 1937 ortofoto fades
+over today's hillshade with the funn drawn on top; in a lightbox it is a
+picture of somewhere you are no longer looking.
 
-The panel carries: the kind badge and provenance line, the caption field
-(`canEdit`, commits on blur), then **Vis i ruta / Skjul fra ruta**,
-**Gjenskap**, **Åpne originalen** and delete-behind-a-confirm. Under it, when
-the image is up, a **Toning** slider.
+The detail panel carries: the kind badge and provenance line, the caption field
+(`readOnly` unless `canEdit`, commits on blur), then **Gjenskap**, **Åpne
+originalen** and delete-behind-a-confirm, plus a **Toning** slider whenever the
+image is up. **Vis i ruta** survives as a button for exactly one case — the
+record is pinnable but is not currently on the map, which happens when entering
+Terreng took the overlay slot away (below) while the frame stayed selected. It
+is the way back, not the normal way up; there is no **Skjul fra ruta**, because
+clicking the selected frame again deselects it and that is the same gesture.
 
 - **The pixels.** `src/localities/usePinnedBilde.ts` decodes the **original**
   file — never a thumbnail — and hands it to `showGroundOverlay` with
@@ -1733,12 +1761,16 @@ the image is up, a **Toning** slider.
   ground without a guess, and a guess a pixel out is half a metre out on the
   map. Records with no `bbox25833` (uploads) can still be selected — captioned,
   opened, deleted — but the pin button is absent.
-- **Where it is mounted.** From `useLocalityWorkspace`, not from
-  `BilderSection`, and `pinnedAttachmentIdAtom` lives in
-  `src/localities/atoms.ts` for the same reason: the section is inside a
-  collapsible, and folding the list away to look at the map is the most likely
-  thing to do right after pinning something (§8.2 — folding hides, it does not
-  unmount, but the section still must not *own* the pin).
+- **Where it is mounted.** From `useLocalityWorkspace`, not from `BilderStrip`,
+  and `pinnedAttachmentIdAtom` lives in `src/localities/atoms.ts` for the same
+  reason: the strip is collapsible and, unlike the dock, genuinely unmounts
+  when it is folded away — and folding it away to look at the map is the most
+  likely thing to do right after pinning something.
+- **`pin` is a plain setter, not a toggle.** The strip's selection is what
+  toggles (`selectBilde`), and the selected id and the pinned id are allowed to
+  differ: an upload has no extent, so it can be the active frame without being
+  on the ground. Folding the toggle into `pin` made "select this record" mean
+  "unpin" whenever the two had drifted apart.
 - **The shared slot.** It paints into the same `zIndex: 1` overlay as a terrain
   render, and `src/map/groundOverlay.ts` is the arbiter: pinning stands the
   render down, entering Terreng unpins the image, and the displaced side hears
@@ -1765,10 +1797,61 @@ the image is up, a **Toning** slider.
   (`useTerrainAnalysis.restoreView`), not six setter calls from outside,
   because the radius setter routes to one of two stored radii according to the
   *current* visualization — which a caller cannot see until the next render.
-- **What was lost with the lightbox**: its ← / → walked the gallery. That
-  navigation is gone until the filmstrip in `docs/lokalitet-view.md` §12 step 7
-  brings it back, and `useWorkspaceKeys` lost its `enabled` flag with it (the
-  lightbox was its only reason to exist).
+- **← / → walk the images again.** The lightbox's arrow keys came back with the
+  filmstrip, on the terms in §8.7.2.
+
+#### 8.7.2 The bottom edge — the filmstrip
+
+`docs/lokalitet-view.md` §4.3. The images are the lokalitet's content, not a
+panel about it, so they sit **along the bottom of the map** rather than in a
+column beside it: a rail is the shape of "walk a curated sequence", and a
+sequence read left to right does not move the ground under it the way a
+scrolling grid in a 360 px column does.
+
+- **The slot.** `bottomSlotAtom` (`src/shell/bottomSlot.ts`) publishes an
+  element the shell owns and the ribbon portals into — the same mechanism and
+  the same reason as `dockSlotAtom` (§5): the surface belongs to the shell,
+  the controller behind it is mounted exactly once from the ribbon, and the two
+  are on opposite sides of the tree. A second atom rather than a reused one
+  because both slots are live until the dock goes; when it does, this is the
+  one that survives.
+- **It is a flex child of `.overlay`, after `.row`**, exactly like `.ribbon`
+  before it — not an absolutely positioned bar. `.right` is `bottom: 0` inside
+  `.row`, so a floated bar would sit on top of the dock; in flow, the slot's
+  own height shortens `.row` and the dock column stops above the strip with no
+  media query and no z-index fight.
+- **`data-chrome="bottom"`.** The strip declares its edge like every other
+  surface and `chromeInsets` measures it on demand (§3.1); folding it away
+  makes it a zero-size element, which the measurement already skips.
+- **One occupant.** The filmstrip, the edit carousel and the draw toolbar are
+  mutually exclusive: **drawing yields the images**, so the strip is not
+  rendered while `draftActive`. The rule is enforced where the portal is
+  (`LocalityRibbon`) rather than by the slot, because the mobile draw toolbar
+  is still `position: fixed` and only moves into the slot when the dock does.
+- **Selecting is pinning** (§8.7.1). The rail is `Frame`s at 88×64 with a kind
+  mark; the selected one carries a ring and scrolls itself into view, which is
+  what makes a keyboard step legible — otherwise ← / → would change the map and
+  leave the active frame off-screen.
+- **← / →** are bound only while `stripOpen && !draftActive` and there is more
+  than one image, so OpenLayers' `KeyboardPan` keeps horizontal panning
+  whenever walking the strip would be meaningless.
+- **`bilderStripOpenAtom`** (`toolAtoms.ts`) is module-level, like
+  `dockOpenAtom` and for the same reason: this fold takes a slice of the map's
+  *height*, so it is a gesture made in order to see the ground, and having the
+  next lokalitet undo it would be worse than having no fold at all. It starts
+  **open**, unlike a tool.
+- **Two controls put it back**, and they are the same atom: the row's
+  `Bilder ▾` (§8.1, the read tools — present in both stances) and the strip's
+  own `bottom_panel_close`. The row's toggle carries the count and is disabled
+  when `hasBilder` is false.
+- **`hasBilder` is published by the hook**, not recomputed per surface —
+  `bilderCount > 0 || starterStep != null || canAdd` — so the row's toggle and
+  the portal cannot disagree about whether there is a strip. A reader on an
+  empty lokalitet gets no bar at all; an owner in edit gets the bar with the
+  empty prompt in it.
+- **Both stances render the strip today.** §12 gives edit its own carousel at
+  step 9; until then the filmstrip serves both, with caption and delete gated
+  on `canEdit`. Uploading is on the row's `⋮`, so the rail has no add-tile.
 
 ### 8.8 The flyfoto picker
 
@@ -1793,7 +1876,7 @@ add a "don't show this again" checkbox without thinking about it.
 The first item in the lokalitet row's overflow menu, and the only one there you
 press on a lokalitet you have just made and never again — hence its position.
 One press produces the images you would otherwise fetch by hand before starting
-to read a rectangle, into Bilder: **the laser, read three ways** —
+to read a rectangle, into the filmstrip: **the laser, read three ways** —
 `skyggerelieff` (the fixed north-west hillshade), `multiskyggerelieff` (every
 direction at once, so nothing hides along the sun) and `helning_prosent`
 (slope, which shows edges the light misses). All three are Kartverket's own
@@ -1804,7 +1887,7 @@ style in `meta.style` (§8.7), so there is no migration.
 `STARTER_STYLES` *is* `TIER_A_STYLES` (`lidarProjects.ts`) — one list, so the
 pack and the style ring can never drift apart.
 `src/localities/starterPack.ts` only *makes* the rasters; captions,
-`createAttachment` and the gallery's optimistic update stay in
+`createAttachment` and the strip's optimistic update stay in
 `runStarterPack` (`useLocalityWorkspace`), where the translations and record ids
 are.
 
@@ -1835,11 +1918,12 @@ Load-bearing choices:
   lokalitet stops spending tile requests on it. An aborted stitch paints nothing,
   which is indistinguishable from no coverage, so the "ingen dekning" toast is
   suppressed when the signal is aborted.
-- **Progress renders in the Bilder section**, as one line with a spinner naming
-  the style being fetched (`starterStep` is that style, or `null`), and the dock
-  unfolds and opens that section when a pack starts. Deliberately not a
-  placeholder tile among the saved ones — a tile that disappears would be read
-  as an image that failed.
+- **Progress renders in the filmstrip**, as one line with a spinner naming the
+  style being fetched (`starterStep` is that style, or `null`), above the rail;
+  the strip unfolds itself when a pack starts, and `hasBilder` counts a running
+  pack, so the bar is there before the first image is. Deliberately not a
+  placeholder frame among the saved ones — a frame that disappears would be
+  read as an image that failed.
 
 ### 8.10 Provenance figures — what a saved image carries
 
@@ -2334,7 +2418,7 @@ curl -sL https://registry.npmjs.org/material-symbols/-/material-symbols-0.40.2.t
 ## 12. The migration off kvib, and what it settled
 
 **Done.** `@kvib/react` is no longer a dependency. Ported to `src/ui`: the
-whole shell and ribbon, the lokalitet surfaces (`FunnList`, `BilderSection`,
+whole shell and ribbon, the lokalitet surfaces (`FunnList`, `BilderStrip`,
 `KulturminnerSection`, `LocalityDetails`, `LocalityDialogs`, `FunnDraft`,
 `LocalitiesPanel`), both analysis panels, `AuthButton`, `AuthDialog`,
 `ErrorBoundary`, the measure trigger, the toast region, `MapComponent`,
@@ -2539,13 +2623,15 @@ the seamless mosaic or any historical acquisition covering the area,
 individually or as a batch; take a map screenshot; upload an image; or press
 **Hent grunnpakke** once and get the best LiDAR dataset over the area read
 three ways — hillshade, multidirectional hillshade and slope — fetched in
-sequence into Bilder, with progress in that section.
+sequence into the filmstrip, with progress on it.
 
 **Keep it**
-browse the Bilder gallery; pick a tile to put it back on the map at its own
-rectangle and fade it over what is there now; press **Gjenskap** on an extract,
+walk the filmstrip along the bottom of the map, with ← / → or the rail's
+chevrons; picking a frame puts that image back on the map at its own
+rectangle and fades it over what is there now; press **Gjenskap** on an extract,
 terrain render or flyfoto to set the map back to the view it was made from;
-open the original in a tab; caption an attachment; delete one;
+open the original in a tab; caption an attachment; delete one; fold the strip
+away and back with **Bilder ▾** to get the ground under it;
 see flyfoto captioned with its acquisition year; get every kept or downloaded
 image back as a report-ready figure — scale bar, north arrow, dataset,
 acquisition, processing settings, extent, rights holder and licence burned into

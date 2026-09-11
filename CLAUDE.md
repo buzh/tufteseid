@@ -136,7 +136,7 @@ that owns them.
   `docs/ui-architecture.md` §4.3, §5.1.
 - **Three languages throughout** — user-visible strings go through `t()` into
   `src/locales/{nb,nn,en}/translation.json`, `ribbon.*` for the ribbon and
-  `localities.*` for the dock and the workspace, so a new string needs all
+  `localities.*` for the lokalitet surfaces, so a new string needs all
   three files — `docs/ui-architecture.md` §5.4.
 
 ## Deploy
@@ -342,7 +342,8 @@ Two rules that hold regardless of what the interface looks like:
 - `limited` visibility is a placeholder that behaves as `private` until
   groups exist.
 
-The ribbon rows, the funn/bilder sections, the drawing tools and the policy
+The ribbon rows, the funn list, the bottom filmstrip the bilder live on
+(`docs/ui-architecture.md` §8.7.2), the drawing tools and the policy
 decisions around them (bbox is authored not derived, only seeded from the
 viewport; drawing and extract exist only inside a lokalitet; measure and
 terrain analysis stay global) are in `docs/ui-architecture.md`.

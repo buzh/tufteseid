@@ -113,6 +113,15 @@
   gap: var(--sp-2);
 }
 
+/* The read tools — §5.5. Its own zone rather than part of `.tools` because
+   these are in both stances: reading is not writing. Terreng and Sammenlign
+   land here at step 15; today it holds the `Bilder ▾` toggle alone. */
+.reading {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
 /* The exits. `margin-left: auto` rather than a spacer element: the zone has
    to sit at the right edge of whichever line it lands on, and once the row
    wraps a spacer would be a stretched blank on the line above. */

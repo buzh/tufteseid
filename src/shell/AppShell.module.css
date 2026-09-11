@@ -139,3 +139,24 @@
     width: 400px;
   }
 }
+
+/*
+ * Bottom slot: the lokalitet's bottom edge (docs/lokalitet-view.md §4.3).
+ *
+ * In flow, not absolutely positioned. `.right` above is `bottom: 0`, so a
+ * bar floated over the bottom of `.row` would sit on top of the dock column
+ * and the two would have to be told about each other. As the last flex child
+ * of `.overlay` it takes its height out of `.row` instead, the same way the
+ * ribbon takes its own out of the top — the dock simply ends where the strip
+ * begins, and neither knows the other exists.
+ *
+ * Empty and zero-height until something portals in, so it costs nothing when
+ * no lokalitet is open. `pointer-events` stays off here and is turned back on
+ * by the occupant, per the rule at the top of this file.
+ */
+.bottom {
+  position: relative;
+  z-index: var(--z-ribbon);
+  flex: 0 0 auto;
+  pointer-events: none;
+}

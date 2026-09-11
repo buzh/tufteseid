@@ -11,6 +11,7 @@ import { InfoBox } from '../search/infobox/InfoBox';
 import { ErrorBoundary } from '../shared/ErrorBoundary';
 import { useIsMobileScreen } from '../shared/hooks';
 import styles from './AppShell.module.css';
+import { bottomSlotAtom } from './bottomSlot';
 import { dockSlotAtom } from './dockSlot';
 import { Ribbon } from './Ribbon';
 import { useMapSideEffects } from './useMapSideEffects';
@@ -19,6 +20,7 @@ export const AppShell = () => {
   const isMobile = useIsMobileScreen();
   const funnDraftActive = useAtomValue(funnDraftActiveAtom);
   const setDockSlot = useSetAtom(dockSlotAtom);
+  const setBottomSlot = useSetAtom(bottomSlotAtom);
 
   useMapSideEffects();
 
@@ -72,6 +74,13 @@ export const AppShell = () => {
               </ErrorBoundary>
             </div>
           </div>
+
+          {/* The bottom edge — the filmstrip today, the carousel and the draw
+              toolbar later (see bottomSlot.ts). A flex child of .overlay after
+              .row, exactly like .ribbon before it: the slot's own height then
+              shortens .row, so the dock column stops above it with no media
+              query and no z-index against the dock's `bottom: 0`. */}
+          <div className={styles.bottom} ref={setBottomSlot} />
         </div>
       </div>
 

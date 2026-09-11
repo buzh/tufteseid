@@ -1,7 +1,9 @@
+import { useAtom } from 'jotai';
 import type { ChangeEvent, MouseEvent } from 'react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LocalityRecord } from '../api/localities';
+import { bilderStripOpenAtom } from '../localities/toolAtoms';
 import type { LocalityWorkspaceApi } from '../localities/useLocalityWorkspace';
 import {
   Badge,
@@ -319,6 +321,7 @@ const Banner = ({ ws }: { ws: LocalityWorkspaceApi }) => {
 export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
   const { locality, stance, mayEdit, canAdd, mode } = ws;
+  const [stripOpen, setStripOpen] = useAtom(bilderStripOpenAtom);
   const editing = stance === 'edit';
 
   return (
@@ -397,6 +400,30 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           />
         </div>
       )}
+
+      {/* Between the middle zone and the exits sit the read tools (§5.5).
+          `Terreng` and `Sammenlign` join them at step 15; today it is the one
+          toggle for the bottom edge. Present in **both** stances, because
+          looking at the images is not writing to them — which is the whole
+          argument of §2 — and it is the only control that puts the strip back
+          once it has been folded away. */}
+      <div className={rowStyles.reading}>
+        <ModeButton
+          icon="photo_library"
+          label={t('localities.bilder.heading')}
+          tooltip={
+            stripOpen
+              ? t('localities.bilder.hideStrip')
+              : t('localities.bilder.showStrip')
+          }
+          active={stripOpen}
+          badge={ws.bilderCount || undefined}
+          // Nothing to show and no way to put anything there: a reader on an
+          // empty lokalitet. The button would open an empty bar.
+          disabled={!ws.hasBilder}
+          onClick={() => setStripOpen(!stripOpen)}
+        />
+      </div>
 
       {/* The right zone, deepest-first (§5.3). Depths 0 and 1 for now: the
           funn draft and Juster området keep their own controls in the dock

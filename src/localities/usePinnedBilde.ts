@@ -8,10 +8,10 @@
 // 1937 ortofoto fades over today's hillshade with the funn drawn on top; in a
 // lightbox it is a picture of a place you are no longer looking at.
 //
-// Mounted from useLocalityWorkspace rather than from BilderSection, because
-// the section is inside a collapsible and unmounts when it is folded away —
-// and folding the list away to see the map is the most likely thing to do
-// right after pinning something.
+// Mounted from useLocalityWorkspace rather than from the filmstrip, because
+// the strip is collapsible and unmounts when it is folded away — and folding
+// it away to see the map is the most likely thing to do right after pinning
+// something.
 //
 // The slot it paints into is shared with Terrenganalyse and there is exactly
 // one; `map/groundOverlay.ts` owns that rule. Here it means two things:
@@ -168,8 +168,13 @@ export const usePinnedBilde = (attachments: AttachmentRecord[] | null) => {
     setGroundOverlayOpacity('bilde', value / 100);
   }, []);
 
+  // A plain setter, not a toggle. The strip's own selection is what toggles
+  // (`selectBilde` in useLocalityWorkspace), and the two ids are not the same
+  // value — an upload carries no extent, so it can be the active card without
+  // being on the ground — so folding the toggle in here made the caller's
+  // "select this record" mean "unpin" whenever the two had drifted apart.
   const pin = useCallback(
-    (id: string | null) => setPinnedId((cur) => (cur === id ? null : id)),
+    (id: string | null) => setPinnedId(id),
     [setPinnedId],
   );
 

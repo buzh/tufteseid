@@ -25,6 +25,16 @@ export const workspaceModeAtom = atom<WorkspaceMode>((get) =>
 // undone by the next thing you open, would be worse than no fold at all.
 export const dockOpenAtom = atom(true);
 
+// Whether the bottom edge is unfolded — docs/lokalitet-view.md §4.3. Module
+// level for the same reason as `dockOpenAtom`: this one takes a slice of the
+// map's *height*, so folding it away is a gesture made in order to see the
+// ground, and having the next lokalitet undo it would be worse than having no
+// fold at all.
+//
+// Open by default, unlike a tool: the images are the lokalitet's content now,
+// not a panel about it. The row's `Bilder ▾` is what puts it back.
+export const bilderStripOpenAtom = atom(true);
+
 // The drawing in progress sticks out of the lokalitet's rectangle.
 //
 // A flag, not the union bbox it used to hold: this is read while the pen is

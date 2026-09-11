@@ -3,7 +3,6 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LidarExtractPanel } from '../lidarExtract/LidarExtractPanel';
 import { openSectionsAtom, type WorkspaceSectionId } from '../localities/atoms';
-import { BilderSection } from '../localities/BilderSection';
 import { FunnDraft } from '../localities/FunnDraft';
 import { FunnList } from '../localities/FunnList';
 import { KulturminnerSection } from '../localities/KulturminnerSection';
@@ -33,9 +32,13 @@ import styles from './LocalityDock.module.css';
  * tracing what it shows is the reason to have it up, so a draft and a terrain
  * render are deliberately live at the same time.
  *
- * Each section keeps its own error boundary. Bilder fetches short-lived file
- * tokens and Kulturminner hits an external WFS; either failing should cost
- * you that section, not the funn list above it.
+ * Each section keeps its own error boundary. Kulturminner hits an external
+ * WFS; it failing should cost you that section, not the funn list above it.
+ *
+ * Bilder is no longer one of them — it left for the bottom edge (§4.3). What
+ * is left here is on its way out too: step 12 turns Funn and Kulturminner
+ * into popovers on the row and Detaljer into a dialog, and this file goes
+ * with the column.
  */
 export const LocalityDock = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
@@ -62,15 +65,6 @@ export const LocalityDock = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   useEffect(() => {
     if (extractOpen || draftActive) setOpen(true);
   }, [extractOpen, draftActive, setOpen]);
-
-  // A grunnpakke is minutes long and started from a menu in the ribbon. Show
-  // it landing, or the only feedback for the first stitch is a menu closing.
-  const starterRunning = ws.starterStep != null;
-  useEffect(() => {
-    if (!starterRunning) return;
-    setOpen(true);
-    setOpenSections((prev) => new Set(prev).add('bilder'));
-  }, [starterRunning, setOpen, setOpenSections]);
 
   return (
     <>
@@ -178,25 +172,9 @@ export const LocalityDock = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           </Section>
         </ErrorBoundary>
 
-        <ErrorBoundary name="DockBilder">
-          <Section
-            title={t('localities.bilder.heading')}
-            count={ws.bilderCount}
-            scroll
-            {...sectionProps('bilder')}
-          >
-            <BilderSection
-              canEdit={ws.canEdit}
-              canAdd={ws.canAdd}
-              items={ws.attachmentItems}
-              setItems={ws.setAttachmentItems}
-              uploading={ws.uploading}
-              onUpload={ws.uploadFile}
-              starterStep={ws.starterStep}
-              pinned={ws.pinned}
-            />
-          </Section>
-        </ErrorBoundary>
+        {/* No Bilder section. The images are the bottom edge now — a rail
+            along the map rather than a grid down a column (§4.3, and
+            src/localities/BilderStrip.tsx). */}
 
         <ErrorBoundary name="DockKulturminner">
           <Section

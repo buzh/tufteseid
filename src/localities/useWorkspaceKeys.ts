@@ -24,6 +24,7 @@ export type WorkspaceKeyHandlers = {
   onScreenshot: () => void;
   onMoveSelection: (delta: 1 | -1) => void;
   onZoomSelected: () => void;
+  onStepBilde: (delta: 1 | -1) => void;
   onEscape: () => void;
   draftActive: boolean;
   // Arrows/Enter walk the funn list. The list is always on screen in the
@@ -31,6 +32,11 @@ export type WorkspaceKeyHandlers = {
   // it is off only while drawing, where picking a different funn out from
   // under the pen is never what the arrow meant.
   navigable: boolean;
+  // ←/→ walk the filmstrip. Off unless there is a strip with something in it:
+  // OpenLayers' KeyboardPan owns these keys otherwise (↑/↓ it has already
+  // lost to the funn list), and taking horizontal panning away from a map
+  // whose bottom edge is folded away would be a straight loss.
+  stripNavigable: boolean;
 };
 
 export const useWorkspaceKeys = (handlers: WorkspaceKeyHandlers) => {
@@ -71,6 +77,14 @@ export const useWorkspaceKeys = (handlers: WorkspaceKeyHandlers) => {
           break;
         case 'ArrowUp':
           if (h.navigable) h.onMoveSelection(-1);
+          else handled = false;
+          break;
+        case 'ArrowRight':
+          if (h.stripNavigable) h.onStepBilde(1);
+          else handled = false;
+          break;
+        case 'ArrowLeft':
+          if (h.stripNavigable) h.onStepBilde(-1);
           else handled = false;
           break;
         case 'Enter':
