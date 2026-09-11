@@ -394,19 +394,40 @@
     },
     "terrain": {
       "visualization": "Visualisering",
+      "visHead": "Visualisering · W/S",
       "vis": {
         "hillshade": "Skyggerelieff",
         "multiHillshade": "Fleirretning",
+        "vat": "VAT (arkeologisk)",
         "svf": "Himmelsyn",
+        "openPos": "Openheit, positiv",
+        "openNeg": "Openheit, negativ",
         "lrm": "Lokalrelieff",
         "slope": "Helling"
+      },
+      "visMeta": {
+        "hillshade": "éi sol, du styrer henne",
+        "multiHillshade": "seks soler, ingenting i mørke",
+        "vat": "fire lag i eitt bilete",
+        "svf": "kor mykje himmel",
+        "openPos": "haugar, kantar og ryggar",
+        "openNeg": "søkk, grøfter og holvegar",
+        "lrm": "småformer utan landskapet",
+        "slope": "bratthet"
       },
       "visHint": {
         "hillshade": "Éi lyskjelde. Dra på asimut for å sveipe lyset — strukturar som ligg parallelt med lyset er usynlege.",
         "multiHillshade": "Seks lysretningar vekta mot nordvest. Ingen retning blir liggjande i mørke.",
+        "vat": "RVT-oppskrifta «VAT – arkeologisk»: skuggerelieff, helling, positiv openheit og himmelsyn blanda i eitt gråtonebilete. Fast lys og faste kontrastgrenser, så to VAT-bilete av ulike stader viser det same.",
         "svf": "Kor mykje av himmelen som er synleg. Uavhengig av lysretning: søkk og grøfter blir mørke, haugar og vollar lyse.",
+        "openPos": "Gjennomsnittleg vinkel opp til horisonten i seksten retningar. Uavhengig av lysretning som himmelsyn, men framhevar det som stikk opp: haugar, kantar og ryggar.",
+        "openNeg": "Det same målt nedover, som om terrenget var snudd. Teikna med omvend gråskala, som helling og himmelsyn, så det som går ned blir mørkt: grøfter, kolgroper og holvegar.",
         "lrm": "Høgdemodellen minus ei glatta utgåve. Fjernar landskapsforma og lèt det småskala stå att.",
         "slope": "Bratthet i terrenget. Bratt er mørkt."
+      },
+      "visGroup": {
+        "vat": "Fleire mål blanda i eitt bilete.",
+        "svf": "Utan lyskjelde — same biletet uansett kvar sola står."
       },
       "azimuth": "Lysretning",
       "altitude": "Solhøgd",
@@ -622,14 +643,25 @@
       "multiAzimuths": "fleirretnings skuggerelieff, asimut {{azimuths}}°, vekt {{weights}}",
       "lrmRadius": "LRM-radius {{m}} m",
       "svfRadius": "SVF-radius {{m}} m",
+      "opennessRadius": "openheitsradius {{m}} m",
       "svfDirections": "{{n}} retningar",
+      "vatStack": "VAT-stabel: {{stack}}",
+      "vatLayer": "{{vis}} ({{blend}}, {{opacity}} %, {{min}}–{{max}})",
       "diverging": "divergerande fargeskala, symmetrisk om null",
+      "inverted": "omvend gråskala, høge verdiar mørke",
       "stretch": "kontraststrekk 2–98 %",
+      "absoluteStretch": "faste kontrastgrenser, ikkje persentilar",
       "resampled": "resampla frå {{m}} m/px",
       "ortofoto": "ortofoto, ubehandla",
       "composite": "sett saman av kartlaga",
       "heritageOpacity": "kulturminne {{percent}} % dekkevne",
       "heritageNone": "ingen dellag"
+    },
+    "blend": {
+      "normal": "normal",
+      "luminosity": "luminans",
+      "overlay": "overlegg",
+      "multiply": "multiplisering"
     }
   }
 }

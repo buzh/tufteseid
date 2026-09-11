@@ -76,8 +76,8 @@ that owns them.
 - **Five background grounds**, on digit keys 1–5: Standard, LiDAR hillshade,
   Hybrid, Flyfoto, Terreng — `docs/map-layers.md`, keyboard in
   `docs/ui-architecture.md` §5.3.
-- **A dataset ring inside most grounds** (W/S — cartographies, LiDAR projects,
-  ortofoto acquisitions; Terreng has none), plus **Sammenlign**, a
+- **A dataset ring inside every ground** (W/S — cartographies, LiDAR projects,
+  ortofoto acquisitions, terrain visualizations), plus **Sammenlign**, a
   draggable curtain holding two full grounds on screen in register —
   `docs/ui-architecture.md` §5.2, §5.3, §5.8.
 - **LiDAR relief at 0.25 m per project or 1 m nationally**, DTM or DOM, with
@@ -100,9 +100,11 @@ that owns them.
   `src/search/searchApi.ts` — `docs/ui-architecture.md` §7, §7.1.
 - **Search** over place names, addresses and matrikkel, with an InfoBox for
   the picked point — `docs/ui-architecture.md` §7.
-- **A float elevation grid for any rectangle**, with hillshade,
-  multidirectional hillshade, slope, local relief model and sky-view factor
-  computed in the browser — `docs/terrain-analysis.md` and below.
+- **A float elevation grid for any rectangle**, with eight relief
+  visualizations computed in the browser — hillshade, multidirectional
+  hillshade, VAT, sky-view factor, positive and negative openness, local relief
+  model, slope — on a pulldown and a W/S ring like every other ground's dataset
+  list — `docs/terrain-analysis.md` and below.
 - **Lokaliteter**: an authored rectangle holding named *funn* with full
   drawing tools and *bilder* (extracts, terrain renders, screenshots,
   flyfoto, uploads), behind sign-in — below, and
@@ -231,14 +233,17 @@ turns the analysed rectangle into a lokalitet.
   value or an error — those pixels become NaN and every operator is
   NaN-aware.
 - `src/terrain/shade.ts` — hillshade, multidirectional hillshade, slope,
-  local relief model, sky-view factor. Pure functions over a `Dem`, split
-  from rendering so the UI can cache the expensive pass while scrubbing the
-  cheap one.
+  local relief model, and `computeHorizonFields`, which returns sky-view
+  factor and both Yokoyama opennesses from one ray walk. `composeVat` blends
+  four of those into RVT's "VAT - Archaeological". Pure functions over a
+  `Dem`, split from rendering so the UI can cache the expensive pass while
+  scrubbing the cheap one.
 - `src/shell/terrain/` — the control surface (`docs/ui-architecture.md` §10),
   and it is **on the ribbon**, not in a dock panel: `useTerrainAnalysis.ts`
   holds all the state and is mounted once from `RibbonGlobalRow`,
-  `TerrainStrip.tsx` is its settings-strip half and `TerrainSliders.tsx` the
-  slider row under it. Terreng is one of the five grounds, so its modifiers
+  `TerrainStrip.tsx` is its settings-strip half, `TerrainVisPicker.tsx` the
+  visualization pulldown on it, and `TerrainSliders.tsx` the slider row under
+  it. Terreng is one of the five grounds, so its modifiers
   belong where every other ground's are — a column down the side of the map
   covered the terrain the knobs were describing. The hook resolves the two
   entrances to one rectangle: an open lokalitet's own bbox (which is what makes
@@ -261,18 +266,30 @@ Load-bearing:
   term by symmetry and silently collapses the result to `cos(zenith)·cos(slope)`
   — a slope map with a hillshade's name. The tell is a maximum of exactly
   0.7071 at altitude 45°, i.e. nothing brighter than flat ground.
-- **The two `useMemo`s in `useTerrainAnalysis` are split on purpose.** Sky-view
-  factor is ~800 ms on a 600² grid and must never be keyed on azimuth, or
+- **The `useMemo`s in `useTerrainAnalysis` are split on purpose.** The horizon
+  scan is ~800 ms on a 600² grid and must never be keyed on azimuth, or
   dragging the slider queues a multi-second recompute per frame. The radius
   knob is on the *expensive* side of that line, which is why its slider alone
   commits on release instead of streaming.
-- **`computeSvf` clamps its search radius to 24 px** — 6 m on a 0.25 m DEM —
-  whatever metre value it is handed, so a requested radius and an effective
-  one are routinely different numbers. Everything that renders or *describes*
-  a render goes through `clampRadius` (`render.ts`), and `radiusRange` derives
-  the slider's ceiling from the same cap. Skipping it puts "SVF-radius 20 m"
-  on the caption of a 6 m render, which is the one thing `src/figure/` exists
-  to prevent.
+- **The horizon memo is deliberately not keyed on `vis`.** Sky-view factor,
+  both opennesses and VAT are one ray walk read four ways (`usesHorizon` in
+  `render.ts`), so the scan gets a memo of its own keyed on
+  `[dem, usesHorizon(vis), horizonRadius]`, and the radius is clamped through
+  `'svf'` rather than through `vis` so all four resolve to the same number.
+  That is what makes W/S between them instant. Key it on `vis` and the ring
+  costs 800 ms a step while looking identical.
+- **VAT's sun is frozen** at 315°/35°, z-factor 1, and its four layers are
+  stretched on *absolute* bounds rather than this rectangle's percentiles
+  (`VAT_LAYERS`). Both are what make two VAT renders comparable, which is the
+  whole reason to have it; wiring the azimuth slider back up would break it
+  silently. It is also why VAT is on the static side of the memo split.
+- **`computeHorizonFields` clamps its search radius to 24 px** — 6 m on a
+  0.25 m DEM — whatever metre value it is handed, so a requested radius and an
+  effective one are routinely different numbers. Everything that renders or
+  *describes* a render goes through `clampRadius` (`render.ts`), and
+  `radiusRange` derives the slider's ceiling from the same cap. Skipping it
+  puts "SVF-radius 20 m" on the caption of a 6 m render, which is the one
+  thing `src/figure/` exists to prevent.
 
 ## Lokaliteter (user content)
 

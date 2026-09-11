@@ -394,19 +394,40 @@
     },
     "terrain": {
       "visualization": "Visualization",
+      "visHead": "Visualization · W/S",
       "vis": {
         "hillshade": "Hillshade",
         "multiHillshade": "Multidirectional",
+        "vat": "VAT (archaeological)",
         "svf": "Sky-view factor",
+        "openPos": "Openness, positive",
+        "openNeg": "Openness, negative",
         "lrm": "Local relief",
         "slope": "Slope"
+      },
+      "visMeta": {
+        "hillshade": "one sun, yours to move",
+        "multiHillshade": "six suns, nothing left unlit",
+        "vat": "four layers in one picture",
+        "svf": "how much sky",
+        "openPos": "mounds, edges and ridges",
+        "openNeg": "hollows, ditches and sunken roads",
+        "lrm": "small forms without the landform",
+        "slope": "steepness"
       },
       "visHint": {
         "hillshade": "One light source. Drag the azimuth to sweep it — features running parallel to the light are invisible.",
         "multiHillshade": "Six light directions weighted toward the north-west. No orientation is left unlit.",
+        "vat": "RVT's “VAT – Archaeological” recipe: hillshade, slope, positive openness and sky-view factor blended into one greyscale image. Fixed light and fixed contrast limits, so two VAT renders of different places mean the same thing.",
         "svf": "How much of the sky is visible. Independent of light direction: hollows and ditches go dark, mounds and banks go bright.",
+        "openPos": "Mean angle up to the horizon in sixteen directions. Independent of light direction like sky-view factor, but it brings out what stands proud: mounds, edges and ridges.",
+        "openNeg": "The same measured downwards, as if the terrain were inverted. Drawn on a reversed grey ramp, like slope and sky-view factor, so what cuts in goes dark: ditches, charcoal pits and sunken roads.",
         "lrm": "The elevation model minus a smoothed copy. Removes the landform trend and leaves the small scale standing.",
         "slope": "Steepness of the terrain. Steep is dark."
+      },
+      "visGroup": {
+        "vat": "Several measures blended into one picture.",
+        "svf": "No light source — the same picture wherever the sun is."
       },
       "azimuth": "Light direction",
       "altitude": "Sun altitude",
@@ -622,14 +643,25 @@
       "multiAzimuths": "multidirectional hillshade, azimuths {{azimuths}}°, weights {{weights}}",
       "lrmRadius": "LRM radius {{m}} m",
       "svfRadius": "SVF radius {{m}} m",
+      "opennessRadius": "openness radius {{m}} m",
       "svfDirections": "{{n}} directions",
+      "vatStack": "VAT stack: {{stack}}",
+      "vatLayer": "{{vis}} ({{blend}}, {{opacity}} %, {{min}}–{{max}})",
       "diverging": "diverging ramp, symmetric about zero",
+      "inverted": "reversed grey ramp, high values dark",
       "stretch": "contrast stretch 2–98 %",
+      "absoluteStretch": "fixed contrast limits, not percentiles",
       "resampled": "resampled from {{m}} m/px",
       "ortofoto": "orthophoto, unprocessed",
       "composite": "composite of the map layers",
       "heritageOpacity": "heritage at {{percent}} % opacity",
       "heritageNone": "no sublayers"
+    },
+    "blend": {
+      "normal": "normal",
+      "luminosity": "luminosity",
+      "overlay": "overlay",
+      "multiply": "multiply"
     }
   }
 }

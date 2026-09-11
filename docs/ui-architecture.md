@@ -536,7 +536,7 @@ returns you to exactly the dataset and style you left — 1→5→1 is free wher
 | Standard (1) | Karttype pulldown — the five cartographies (topografisk, gråtone, rasterkart, sjøkart, amtskart), also the W/S ring (§5.10) |
 | LiDAR (2), Hybrid (3) | Dataset pulldown — **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport · style pulldown (the active dataset's WMS styles, with a "flere stiler" second tier), only when the dataset publishes more than one · DTM/DOM segment · **Høydekurver** switch, Hybrid only |
 | Flyfoto (4) | Acquisition pulldown — the seamless mosaic or any acquisition covering the viewport, newest first · period chips (Alle / 2010– / 1990–2009 / 1960–1989 / –1959), which narrow both that list and the W/S ring (§5.5) |
-| Terreng (5) | Visualization segment (five, each with its own explanation as a tooltip) · DTM/DOM segment · the resolution readout · "Flytt analysen hit" (standalone only) · "Lagre" — **plus a second row under the strip** holding the sliders the current visualization uses, three to four of azimuth / altitude / exaggeration / radius / opacity (§10) |
+| Terreng (5) | Visualisering pulldown — the eight relief views, each with its own explanation as a tooltip, also the W/S ring (§10) · DTM/DOM segment · the resolution readout · "Flytt analysen hit" (standalone only) · "Lagre" — **plus a second row under the strip** holding the sliders the current visualization uses, two to four of azimuth / altitude / exaggeration / radius / opacity (§10) |
 
 **The strip is always on the bar.** It used to vanish under Standard, which had
 nothing to adjust; five cartographies filled that hole, and the fixture is the
@@ -613,6 +613,14 @@ topographic map, and because the comparison it is for — the 1890s survey
 against a hillshade of the same hillside — is what the curtain is already for
 (§5.8).
 
+Terreng's eight visualizations are the same call a third time, made in
+2026-09-11 when there stopped being five of them. One question — *what does the
+shape of this ground look like* — answered eight ways. The wrinkle worth noting
+is that the argument had to survive "a client-side render has no dataset":
+Terreng's ring walks its own arithmetic rather than a list of published
+products, and it turns out the ring was never about datasets, only about there
+being one question with many answers (§10).
+
 **Hybrid is nonetheless a button in the ground ring, and that is the one
 deliberate exception.** It is a modifier by mechanism and one of the five things
 you flip between by intent, and splitting the ring to say so would cost more
@@ -674,12 +682,19 @@ thing to peek back to.
 - **A / D** — previous / next LiDAR style, top tier only, wrapping at both ends.
 - **W / S** — previous / next dataset in **the active mode's ring**: the five
   cartographies in Standard (§5.10), LiDAR projects in LiDAR mode, ortofoto
-  acquisitions in flyfoto mode (as narrowed by the period chips, §5.5), nothing
-  in Terreng (a client-side render has no dataset ring). In LiDAR mode
+  acquisitions in flyfoto mode (as narrowed by the period chips, §5.5), the
+  eight visualizations in Terreng (§10). In LiDAR mode
   a press also pins the dataset (§5.7) — walking the ring is the user choosing,
   and otherwise the auto resolver would take the background back on the next
   pan and W/S would feel broken.
-- **E** — toggle DTM / DOM.
+- **E** — toggle DTM / DOM. In Terreng too: it has the same pair on its strip,
+  and it is the same question about the same laser data.
+
+Terreng was the exception here until 2026-09-11 — "a client-side render has no
+dataset ring", which was true of five visualizations on a segmented control and
+false the moment there were eight and they became a pulldown. What it walks is
+not a dataset in the sense the other three mean: one elevation grid, eight ways
+of drawing it. A/D have no analogue there and stay unhandled.
 
 W/S generalising across modes is the point of the flyfoto work: walking
 2024 → 1963 → 1937 over the same ground with one key is what makes a temporal
@@ -714,8 +729,10 @@ The listener itself is **not** in the ribbon. It lives in
 capture chain relative to the other keyboard layers. Row 1 publishes only the
 behaviour, via `useRegisterBackgroundCycle` and `useRegisterGroundKeys`, and
 what it publishes for cycling is `ground.cycle` — `useGroundMode` dispatches to
-the ring named by `groundModifiers(mode)` (§5.1) and returns false where there
-is none. The halves are *routed*, not chained past each other: neither hook
+the ring named by `groundModifiers(mode)` (§5.1), a switch with a case per
+modifier family and no `default`, so adding a fifth would fail the build rather
+than silently swallow the keys. The rings are *routed*, not chained past each
+other: neither hook
 tests the mode any more, because neither can see Terreng, and W/S falling
 through to a LiDAR background under a terrain render spends a screenful of tile
 requests per keypress on ground nobody is looking at. There is exactly one
@@ -1812,16 +1829,50 @@ reason the viewer cannot be casually re-parented, or the same canvas rendered
 anywhere else. Its keys are capture-phase for the reason in §1. The extract is
 DTM-only on purpose: an extract is meant to be read as terrain.
 
-**Terrain** — `src/shell/terrain/`: DTM/DOM toggle, five visualizations
-(hillshade, multidirectional hillshade, slope, local relief model, sky-view
-factor), and azimuth / altitude / exaggeration / radius / opacity sliders.
-Three files:
+**Terrain** — `src/shell/terrain/`: DTM/DOM toggle, eight visualizations
+(hillshade, multidirectional hillshade, VAT, sky-view factor, positive and
+negative openness, local relief model, slope), and azimuth / altitude /
+exaggeration / radius / opacity sliders. Four files:
 
 | File | What it is |
 |---|---|
 | `useTerrainAnalysis.ts` | All of the state — which rectangle, the DEM, the model, the visualization, the five knobs, the canvas, the save. Mounted **once**, from `RibbonGlobalRow`, beside `useLidarControls` and `useFlyfotoControls` |
-| `TerrainStrip.tsx` | The settings-strip half: visualization, DTM/DOM, the resolution readout, "Flytt analysen hit", "Lagre" |
+| `TerrainStrip.tsx` | The settings-strip half: the visualization pulldown, DTM/DOM, the resolution readout, "Flytt analysen hit", "Lagre" |
+| `TerrainVisPicker.tsx` | The pulldown itself, shaped like `StandardVariantPicker` |
 | `TerrainSliders.tsx` | The row beneath: azimuth, altitude, exaggeration, radius, opacity |
+
+The visualizations are **a pulldown with a W/S ring**, not eight buttons —
+§5.2's call for Standard's cartographies, applied to the same kind of list for
+the same reason: eight answers to one question about this ground, not eight
+things to flip between. They were a `Segmented` while there were five, which is
+about as many long Norwegian names as the app's tightest row can hold.
+
+The order in `VISUALIZATIONS` is load-bearing in a way Standard's is not, and
+it is a claim about cost. VAT sits directly above sky-view factor and the two
+opennesses because all four are read off one horizon scan, and VAT pays for it:
+walking down that stretch of the ring is free, where the same four views in
+another order would each be an ~800 ms wait. The pulldown derives its two group
+rules from position in the same array, so the list and the ring cannot disagree
+about the order.
+
+Each row carries a one-sentence `hint` as its tooltip (`PulldownItem`'s third
+text slot, added for this) plus a short nowrap `meta` beside the label. The
+sentence cannot be `meta` — that is `nowrap` by design, since a list of
+wrapping paragraphs stops being scannable — and it should not be body text
+either, because the explanation you want is of the option you are *considering*.
+
+Negative openness is painted on a **reversed** ramp, like slope: the raw field
+is high in a depression, so painting it straight would make it the one view in
+the ring that disagrees with its neighbours about which way is down. Its
+caption records the inversion (§8.10) — "these dark lines are ditches" and
+"these dark lines are ridges" are different claims about the same picture.
+
+VAT is the one view with **no** light controls: its sun is frozen at 315°/35°
+and its exaggeration at 1× (`VAT_AZIMUTH` and friends in `shade.ts`). Two VAT
+renders of two hillsides being the same picture made the same way is the whole
+value of the thing, and offering the knobs would be offering to break that
+quietly. It is also why VAT lands on the *static* side of the memo split
+despite containing a hillshade.
 
 The hook is mounted **unconditionally**, not behind `ground.modifiers ===
 'terrain'`: it decides for itself whether a rectangle is being analysed, and
@@ -1831,35 +1882,34 @@ light survives leaving and re-entering Terreng, which the old panel — mounted
 with the dock — did not.
 
 Only the sliders the current visualization uses are rendered: two for sky-view
-factor, four for a plain hillshade. Absent rather than disabled,
+factor and for VAT, four for a plain hillshade. Absent rather than disabled,
 because a slider that cannot move is indistinguishable from one that has no
 effect.
 
 **The radius slider is the one that commits on release**, and the reason is the
-memo split below rather than taste. Local relief and sky-view factor are the
-two views with a radius, and it is the only knob that feeds
-`terrainStaticField`: streaming it for sky-view factor would queue an ~800 ms
-pass per drag frame and lock the tab for the length of the gesture. `SliderRow`
-takes a `deferred` flag — the thumb and the readout follow the drag, the caller
-hears about it on `pointerup` / `keyup` / `blur` — and local relief, at 23 ms,
-streams like the rest.
+memo split below rather than taste. It is the only knob that feeds
+`terrainStaticField`: streaming it for anything that walks the horizon would
+queue an ~800 ms pass per drag frame and lock the tab for the length of the
+gesture. `SliderRow` takes a `deferred` flag — the thumb and the readout follow
+the drag, the caller hears about it on `pointerup` / `keyup` / `blur` — and
+local relief, at 23 ms, streams like the rest.
 
 Its two ends are also not the same kind of number. LRM's 60 m ceiling is a
-judgement about scale; **SVF's is measured off the grid**, because `computeSvf`
-clamps its search to `SVF_MAX_RADIUS_PX` (24) pixels whatever metre value it is
-handed — 6 m on a 0.25 m DEM. `radiusRange` and `clampRadius` in
-`src/terrain/render.ts` are what keep the slider's bounds, the pixels and the
-figure's caption agreeing on one value; before they existed the caption printed
-`DEFAULT_SVF_RADIUS` unconditionally, i.e. "20 m" under a render computed at
-6 m. The hook exposes the clamped number but stores the raw one, so a radius
-capped over a fine grid comes back at its full value over a coarse one. LRM and
-SVF hold **separate** values: same unit, different quantities — how far to
-smooth before subtracting, versus how far to look for a horizon.
+judgement about scale; **the horizon views' is measured off the grid**, because
+`computeHorizonFields` clamps its search to `SVF_MAX_RADIUS_PX` (24) pixels
+whatever metre value it is handed — 6 m on a 0.25 m DEM. `radiusRange` and
+`clampRadius` in `src/terrain/render.ts` are what keep the slider's bounds, the
+pixels and the figure's caption agreeing on one value; before they existed the
+caption printed `DEFAULT_SVF_RADIUS` unconditionally, i.e. "20 m" under a render
+computed at 6 m. The hook exposes the clamped number but stores the raw one, so
+a radius capped over a fine grid comes back at its full value over a coarse one.
 
-The five visualization names carry their explanation as a per-option `title`
-tooltip (`SegmentedOption.title`) rather than as a paragraph under the row. The
-hint is about the option you are *considering*, not the one already selected,
-and a strip has no room for a sentence.
+There are **two** stored radii for eight views, and the split is by quantity
+rather than by view: how far to smooth before subtracting (LRM) against how far
+to look for a horizon (the four in `usesHorizon`). Switching between the two
+families must not carry the number across; switching *within* the horizon
+family must, or the render would change for a reason nobody asked for and the
+horizon cache would miss.
 
 **The render is on the map, not in the row.** `src/terrain/terrainOverlayLayer.ts`
 puts the canvas down as a georeferenced `ol/layer/Image` at `zIndex: 1` — over
@@ -1976,16 +2026,23 @@ Two things in `useTerrainAnalysis` must not be undone:
   numeric value is rendered next to the label anyway. They are safe from W/S
   cycling because `useBackgroundCyclingKeys` bails on `INPUT` targets — which
   matters more now that they sit on the ribbon, inches from the ring.
-- The two `useMemo`s are **split on purpose**: sky-view factor takes ~800 ms on
-  a 600² grid and must never be keyed on azimuth, or dragging the azimuth
-  slider queues a multi-second recompute per frame. Radius is on the other side
-  of that line — it is a *key* of the expensive memo, which is exactly why its
+- The `useMemo`s are **split on purpose**: the horizon scan takes ~800 ms on a
+  600² grid and must never be keyed on azimuth, or dragging the azimuth slider
+  queues a multi-second recompute per frame. Radius is on the other side of
+  that line — it is a *key* of the expensive memo, which is exactly why its
   slider is the deferred one. The split survives the move
   of the arithmetic into `src/terrain/render.ts` — that module exports
   `terrainStaticField` (expensive, sun-independent) and `terrainField` (cheap,
   sun-dependent) as *two* functions for exactly this reason, and the hook
   memoizes each. Its one-call `renderTerrain` is for headless callers with no
   slider to drag (§8.9).
+- There is now a **third** memo above those two, holding the horizon scan
+  itself, and its keys are the subtle part: `[dem, usesHorizon(vis),
+  horizonRadius]` — deliberately *not* `vis`, and clamped through `'svf'`
+  rather than through `vis`. Both are what make the four horizon views resolve
+  to one cached triple, so W/S between them is a selection out of an array
+  instead of a fresh pass. Key it on `vis` and the ring silently costs 800 ms a
+  step; the render looks identical, which is what makes it worth writing down.
 
 The canvas itself is **off-DOM**. React does not own it and neither does any
 row: it is the OL source's image and what "Lagre" hands to the figure stage,
@@ -2212,9 +2269,10 @@ funn on the map to select it in the list, and the reverse; grow the lokalitet
 when a funn escapes it.
 
 **Analyse it**
-run terrain analysis (DTM or DOM) with five visualizations and live azimuth /
-altitude / exaggeration / opacity, plus a smoothing or search radius for the
-two views that have one, over *either* the visible map — signed out,
+run terrain analysis (DTM or DOM) with eight visualizations — pulldown or W/S —
+and live azimuth / altitude / exaggeration / opacity, plus a smoothing or
+horizon-search radius for the five views that have one, over *either* the
+visible map — signed out,
 with no lokalitet — or an open lokalitet's rectangle, with the render drawn on
 the map under the heritage layers and every knob on the ribbon's settings strip
 and its slider row rather than in a column beside the map; re-frame the

@@ -13,10 +13,17 @@ import styles from './Pulldown.module.css';
  *
  * The mark glyph is aria-hidden like every Icon, so `markLabel` folds into
  * the row's tooltip: that is the only place its meaning can live.
+ *
+ * `hint` is for a row whose explanation is a sentence. `meta` cannot carry one
+ * — it is `nowrap` beside the label, and rightly so, since a list of wrapping
+ * paragraphs stops being scannable — so the sentence goes in the tooltip
+ * instead, which is also where it belongs: the explanation you want is of the
+ * option you are *considering*, not the one already selected.
  */
 export const PulldownItem = ({
   label,
   meta,
+  hint,
   active,
   mark,
   markLabel,
@@ -25,6 +32,7 @@ export const PulldownItem = ({
 }: {
   label: string;
   meta?: string;
+  hint?: string;
   active: boolean;
   mark?: MaterialSymbol;
   markLabel?: string;
@@ -33,7 +41,13 @@ export const PulldownItem = ({
 }) => (
   <button
     type="button"
-    title={mark && markLabel ? `${label} — ${markLabel}` : label}
+    title={
+      hint
+        ? `${label} — ${hint}`
+        : mark && markLabel
+          ? `${label} — ${markLabel}`
+          : label
+    }
     aria-current={active}
     className={cx(styles.item, active && styles.itemActive)}
     onClick={onActivate}

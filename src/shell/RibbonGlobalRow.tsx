@@ -76,14 +76,18 @@ export const RibbonGlobalRow = () => {
   const lidar = useLidarControls();
   const flyfoto = useFlyfotoControls();
   const viewport = useTerrainViewport();
-  const ground = useGroundMode(standard, lidar, flyfoto, viewport);
   // The DEM, the render and every knob that shapes it. Mounted here with the
   // other three control hooks, and for the same reason: its controls are
   // spread over the two rows below, and the analysis behind them must not exist
   // twice. Unconditional — the hook itself decides whether a rectangle is
   // being analysed, and hiding it behind `ground.modifiers` would throw the
   // DEM away every time someone glanced at another ground.
+  //
+  // Above useGroundMode, because that is where its visualization ring is
+  // chained with the other three. It reads the atoms it needs directly and
+  // takes nothing from `ground`, so the order is free.
   const terrain = useTerrainAnalysis();
+  const ground = useGroundMode(standard, lidar, flyfoto, terrain, viewport);
 
   // A/D/W/S/E. useGroundMode routes them to the ring of the ground on screen;
   // there is exactly one registered handler, so the two halves compose there

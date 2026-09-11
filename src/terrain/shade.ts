@@ -1,24 +1,28 @@
 // Relief visualizations computed from a float DEM (see dem.ts).
 //
-// Why these five: a single-azimuth hillshade hides every feature running
+// Why not just a hillshade: a single-azimuth one hides every feature running
 // parallel to the light, which for earthwork spotting is its defining flaw —
 // a ditch lit end-on disappears. The illumination-independent visualizations
-// (sky-view factor, local relief) are what archaeological prospection
-// actually leans on; see docs/terrain-analysis.md for the references.
+// (sky-view factor, openness, local relief) are what archaeological
+// prospection actually leans on; see docs/terrain-analysis.md for the
+// references.
 //
 // Each compute* returns a Float32Array in the DEM's own grid, NaN where the
 // DEM has no coverage, and is deliberately separate from rendering so the
-// UI can cache an expensive pass (SVF) while scrubbing a cheap one
-// (hillshade azimuth).
+// UI can cache an expensive pass (the horizon scan) while scrubbing a cheap
+// one (hillshade azimuth).
 
 import type { Dem } from './dem';
 
 export type Visualization =
   | 'hillshade'
   | 'multiHillshade'
-  | 'slope'
+  | 'vat'
+  | 'svf'
+  | 'openPos'
+  | 'openNeg'
   | 'lrm'
-  | 'svf';
+  | 'slope';
 
 // Azimuths for the multidirectional blend, with weights.
 //
@@ -43,12 +47,14 @@ export const MULTI_AZIMUTHS = [
   { azimuth: 90, weight: 2 },
 ];
 
-// Sky-view factor cost is width × height × directions × radius. 16 is the
-// usual compromise in the literature — 8 leaves visible directional
-// banding, 32 doubles the cost for little gain.
+// How many directions the horizon scan walks. Its cost is width × height ×
+// directions × radius, and it is the expensive pass behind sky-view factor,
+// both opennesses and VAT alike. 16 is the usual compromise in the
+// literature — 8 leaves visible directional banding, 32 doubles the cost for
+// little gain.
 export const SVF_DIRECTIONS = 16;
 
-// Hard ceiling on the SVF search radius in *pixels*, whatever the metre
+// Hard ceiling on the horizon search radius in *pixels*, whatever the metre
 // value works out to. Keeps a fine-resolution DEM from turning a 3-second
 // pass into a 30-second one.
 //
@@ -268,18 +274,49 @@ function blurAxis(
 }
 
 // ---------------------------------------------------------------------------
-// Sky-view factor
+// The horizon scan: sky-view factor and openness, from one pass
 // ---------------------------------------------------------------------------
 
-// The proportion of the sky hemisphere visible from each cell (Zakšek,
-// Oštir & Kokalj 2011). Independent of any light direction, so nothing hides
+/** What one walk of the horizon yields. All three grids, always. */
+export type HorizonFields = {
+  /** Proportion of the sky hemisphere visible, 0..1. */
+  svf: Float32Array;
+  /** Yokoyama positive openness, degrees. Banks and mounds run high. */
+  openPos: Float32Array;
+  /** Yokoyama negative openness, degrees. Ditches and hollows run low. */
+  openNeg: Float32Array;
+};
+
+// Sky-view factor (Zakšek, Oštir & Kokalj 2011) and Yokoyama's positive and
+// negative openness, computed together because they are the same measurement
+// read three ways. Independent of any light direction, so nothing hides
 // because of its orientation: hollows and ditches go dark, banks and mounds
 // go bright, and it reads the same whichever way a feature runs.
 //
-// Cost is width × height × 16 directions × radius, all of it cache-hostile
-// pointer chasing. Expect seconds on a large lokalitet — the caller should
-// cache the result and only recompute when the radius changes.
-export function computeSvf(dem: Dem, radiusMetres: number): Float32Array {
+// **The three come as a set on purpose.** The cost here is entirely the ray
+// walk — width × height × 16 directions × radius of cache-hostile pointer
+// chasing, seconds on a large lokalitet — and tracking two extrema instead of
+// one costs nothing measurable next to it. Returning all three lets the caller
+// cache one result and switch between the views for free, which is what makes
+// them a keyboard ring rather than three separate waits.
+//
+// The two clamping rules are not the same, and that difference *is* the
+// difference between the measurements:
+//
+// - Sky-view caps the horizon at the horizontal. A cell can see at most a
+//   hemisphere, so a skyline that never rises above eye level contributes a
+//   full 1 and nothing below the horizontal is looked at.
+// - Openness does not clamp. The unclamped zenith angle is the whole point:
+//   it is what lets a cell on a ridge read above 90° and a cell in a pit read
+//   below it, and clamping would flatten every convexity to the same value.
+//
+// Negative openness is positive openness of the inverted surface. Inverting
+// negates every tangent, so `max(-tan) = -min(tan)` and the second extremum is
+// all the extra bookkeeping it needs.
+export function computeHorizonFields(
+  dem: Dem,
+  radiusMetres: number,
+): HorizonFields {
   const { width: w, height: h, data, metresPerPx } = dem;
   const radiusPx = Math.min(
     SVF_MAX_RADIUS_PX,
@@ -309,16 +346,28 @@ export function computeSvf(dem: Dem, radiusMetres: number): Float32Array {
     rays.push(steps);
   }
 
-  const out = new Float32Array(w * h).fill(NaN);
+  const svf = new Float32Array(w * h).fill(NaN);
+  const openPos = new Float32Array(w * h).fill(NaN);
+  const openNeg = new Float32Array(w * h).fill(NaN);
+  const toDeg = 180 / Math.PI;
+
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
       const z0 = data[i];
       if (Number.isNaN(z0)) continue;
 
-      let sum = 0;
+      let sky = 0;
+      let zenith = 0;
+      let nadir = 0;
       for (let d = 0; d < SVF_DIRECTIONS; d++) {
+        // Both start at 0 rather than at ±Infinity, so a direction with no
+        // readable cell at all — the grid edge, a coverage hole — reads as a
+        // flat horizon in every one of the three measurements instead of
+        // poisoning the cell.
         let maxTan = 0;
+        let minTan = 0;
+        let seen = false;
         for (const s of rays[d]) {
           const nx = x + s.dx;
           const ny = y + s.dy;
@@ -326,13 +375,123 @@ export function computeSvf(dem: Dem, radiusMetres: number): Float32Array {
           const z = data[i + s.off];
           if (Number.isNaN(z)) continue;
           const tan = (z - z0) / s.dist;
+          if (!seen) {
+            maxTan = tan;
+            minTan = tan;
+            seen = true;
+            continue;
+          }
           if (tan > maxTan) maxTan = tan;
+          if (tan < minTan) minTan = tan;
         }
-        // 1 - sin(horizon angle); a flat horizon contributes a full 1.
-        sum += 1 - maxTan / Math.hypot(1, maxTan);
+        // 1 - sin(horizon angle), the horizon floored at level ground.
+        const above = maxTan > 0 ? maxTan : 0;
+        sky += 1 - above / Math.hypot(1, above);
+        zenith += 90 - Math.atan(maxTan) * toDeg;
+        nadir += 90 + Math.atan(minTan) * toDeg;
       }
-      out[i] = sum / SVF_DIRECTIONS;
+      svf[i] = sky / SVF_DIRECTIONS;
+      openPos[i] = zenith / SVF_DIRECTIONS;
+      openNeg[i] = nadir / SVF_DIRECTIONS;
     }
+  }
+  return { svf, openPos, openNeg };
+}
+
+// ---------------------------------------------------------------------------
+// VAT — the archaeology default blend
+// ---------------------------------------------------------------------------
+
+// Visualization for Archaeological Topography, as the Relief Visualization
+// Toolbox defines it (`rvt/blend.py`, "VAT - Archaeological"; Kokalj et al.
+// 2019, Remote Sensing 11(24):2946). Four layers, bottom first.
+//
+// Exported, and printed on every figure, for the same reason MULTI_AZIMUTHS
+// is: changing a number here silently changes what an old render means
+// relative to a new one, and the caption is what keeps that honest.
+//
+// **The stretches are absolute, not percentiles.** That is the opposite call
+// from every other view here, where `paintTerrainField` stretches 2–98 % to
+// get a legible picture out of whatever range this hillside happens to have.
+// VAT is calibrated: the four layers are mixed on the assumption that 0.7
+// sky-view means the same thing on two different hillsides, and re-stretching
+// the inputs — or the composite — would break exactly the comparability the
+// blend exists for.
+export const VAT_LAYERS = [
+  { vis: 'hillshade', min: 0, max: 1, blend: 'normal', opacity: 100 },
+  { vis: 'slope', min: 0, max: 50, blend: 'luminosity', opacity: 50 },
+  { vis: 'openPos', min: 68, max: 93, blend: 'overlay', opacity: 50 },
+  { vis: 'svf', min: 0.7, max: 1, blend: 'multiply', opacity: 25 },
+] as const;
+
+// VAT's sun does not move, and the exaggeration is 1×.
+//
+// Both are deliberate departures from this app's own defaults, which light at
+// z-factor 2 because it reads better. VAT's slope layer is normalised against
+// a fixed 0–50° and its hillshade against 0–1, so exaggerating the terrain
+// first would push both off the range the blend was tuned on. Freezing the sun
+// costs the azimuth slider for this one view and buys the thing VAT is for:
+// two VAT renders of two hillsides are the same picture made the same way.
+export const VAT_AZIMUTH = 315;
+export const VAT_ALTITUDE = 35;
+export const VAT_Z_FACTOR = 1;
+
+const norm = (v: number, lo: number, hi: number): number => {
+  const t = (v - lo) / (hi - lo);
+  return t < 0 ? 0 : t > 1 ? 1 : t;
+};
+
+// rvt.blend_func.blend_overlay, which drives off the *background* rather than
+// the active layer.
+const overlay = (active: number, background: number): number =>
+  background > 0.5
+    ? 1 - (1 - 2 * (background - 0.5)) * (1 - active)
+    : 2 * background * active;
+
+/**
+ * Composite the four VAT layers. Inputs are the raw fields in their own units
+ * — hillshade 0..1, slope in radians, positive openness in degrees, sky-view
+ * 0..1 — and the result is 0..1, so it paints through the plain grey ramp with
+ * no stretch.
+ *
+ * Simpler than the layer table looks, because two of RVT's three blend modes
+ * collapse over single-band data: `blend_func.lum()` returns a greyscale image
+ * unchanged, so a luminosity blend *is* the active layer, and RVT's opacity is
+ * a plain linear mix (`active·o + background·(1−o)`). Only the overlay step
+ * keeps its arithmetic.
+ */
+export function composeVat(
+  hillshade: Float32Array,
+  slopeRadians: Float32Array,
+  openPosDegrees: Float32Array,
+  svf: Float32Array,
+): Float32Array {
+  const out = new Float32Array(hillshade.length).fill(NaN);
+  const toDeg = 180 / Math.PI;
+
+  for (let i = 0; i < out.length; i++) {
+    const hs = hillshade[i];
+    const sl = slopeRadians[i];
+    const op = openPosDegrees[i];
+    const sv = svf[i];
+    if (
+      Number.isNaN(hs) ||
+      Number.isNaN(sl) ||
+      Number.isNaN(op) ||
+      Number.isNaN(sv)
+    ) {
+      continue;
+    }
+
+    // Slope gradient renders inverted — steep is dark — which is also what
+    // paintTerrainField does for the standalone slope view.
+    let p = 0.5 * (1 - norm(sl * toDeg, 0, 50)) + 0.5 * hs;
+    const o = norm(op, 68, 93);
+    p = 0.5 * overlay(o, p) + 0.5 * p;
+    const v = norm(sv, 0.7, 1);
+    p = 0.25 * (v * p) + 0.75 * p;
+
+    out[i] = p < 0 ? 0 : p > 1 ? 1 : p;
   }
   return out;
 }

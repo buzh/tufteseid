@@ -200,6 +200,9 @@ into that caption:
 | slope | z-factor, 2–98 % stretch |
 | local relief model | smoothing radius, diverging ramp symmetric about zero, stretch |
 | sky-view factor | search radius, `SVF_DIRECTIONS`, stretch |
+| positive openness | search radius, `SVF_DIRECTIONS`, stretch |
+| negative openness | search radius, `SVF_DIRECTIONS`, reversed grey ramp, stretch |
+| VAT | the whole layer stack from `VAT_LAYERS` (visualization, blend mode, opacity, absolute stretch bounds), the frozen sun, search radius, `SVF_DIRECTIONS` |
 
 Plus, always: the model (DTM/DOM), the source mosaic, the EPSG:25833 extent,
 the geodetic centre, the grid resolution — and, when the rectangle was too
@@ -208,16 +211,35 @@ large for `MAX_DEM_PX_PER_SIDE`, the `nativeMetresPerPx` it was resampled
 is" and "there is more, ask for a smaller area", and two renders of
 different-sized areas are not comparable without it.
 
-Practical consequence for this module: **`MULTI_AZIMUTHS` and `SVF_DIRECTIONS`
-are exported and printed on figures.** Changing one silently changes what old
-and new renders mean relative to each other; the caption is what keeps that
-honest, so keep them exported. The figure machinery itself is
-`docs/ui-architecture.md` §8.10.
+Practical consequence for this module: **`MULTI_AZIMUTHS`, `SVF_DIRECTIONS`
+and `VAT_LAYERS` are exported and printed on figures.** Changing one silently
+changes what old and new renders mean relative to each other; the caption is
+what keeps that honest, so keep them exported. The VAT line is *assembled*
+from `VAT_LAYERS` rather than written out, so the caption cannot drift from
+the blend. The figure machinery itself is `docs/ui-architecture.md` §8.10.
+
+Slope and negative openness are the two views drawn on a **reversed** grey
+ramp, and both say so on the caption. Negative openness is *high* in a
+depression — it is positive openness of the flipped surface — so painted
+straight it would put ditches in white while sky-view factor beside it puts
+them in black. RVT inverts exactly these two in `normalize_image` for the same
+reason. "These dark lines are ditches" and "these dark lines are ridges" are
+different claims, and the caption is where the difference is recorded.
+
+VAT is the one view whose caption says its stretches are **absolute**. Every
+other view here is stretched 2–98 % to get a legible picture out of whatever
+range this particular hillside happens to have; VAT's four layers are mixed on
+fixed bounds, because the blend assumes 0.7 sky-view means the same thing
+everywhere. Two VAT renders are therefore comparable and two sky-view renders
+are not, and only the caption says which kind you are holding.
 
 The two radii are the user's now — a slider on the terrain row, defaulting to
 `DEFAULT_LRM_RADIUS` / `DEFAULT_SVF_RADIUS` — so the caption prints the value
-that was used rather than the constant. Getting that right needed one more
-thing than passing the number through: `computeSvf` **silently clamps** its
+that was used rather than the constant. Two, not five: the split is by
+*quantity*, so LRM's smoothing radius is one number and the horizon search
+radius shared by sky-view, both opennesses and VAT is the other
+(`usesHorizon` in `render.ts`). Getting that right needed one more thing than
+passing the number through: `computeHorizonFields` **silently clamps** its
 search to `SVF_MAX_RADIUS_PX` (24) pixels, i.e. 6 m on a 0.25 m DEM, so the
 requested radius and the effective one are routinely different numbers.
 `clampRadius(vis, dem, metres)` in `render.ts` is the single answer both the
@@ -226,13 +248,29 @@ ceiling from the same cap so the control cannot offer a position that renders
 identically to the one before it. A caption reading "SVF-radius 20 m" over a
 6 m render is exactly the failure the figure machinery exists to prevent.
 
-## Tier 1 — server-side visualization sidecar (design, not built)
+## Tier 1 — server-side visualization sidecar (design, not built, mostly moot)
 
-The client can do hillshade, slope, local relief and a serviceable sky-view
-factor (see `src/terrain/shade.ts`). What it can't reasonably do is the
-composite blends — VAT and e3MSTP need several layers computed at multiple
-scales and combined with specific opacity/blend stacks, and the reference
-implementation is Python.
+**Read the premise before the design.** This section used to say the client
+could not reasonably do the composite blends, because VAT needs several layers
+combined with specific opacity/blend stacks and the reference implementation is
+Python. That did not survive contact with the code (2026-09-11):
+
+- The whole cost of sky-view factor is the horizon ray walk, and positive and
+  negative openness are the *same walk* read differently — one extra extremum
+  per direction. `computeHorizonFields` returns all three.
+- RVT's blend modes collapse on single-band data. `blend_func.lum()` returns a
+  greyscale image unchanged, so a luminosity blend is the active layer outright,
+  and `apply_opacity` is a linear mix. VAT is then about three lines of
+  per-pixel arithmetic over fields we already have (`composeVat`).
+
+So four of the six visualizations this tier was going to serve — VAT, sky-view,
+positive openness, negative openness — are in the browser as of 2026-09-11, for
+roughly one horizon pass. What is genuinely left for a sidecar is the
+*multiscale* family: e3MSTP and multiscale topographic position compute several
+DEMs at different resolutions, which is a different shape of work rather than
+more of the same. Weigh that against the cost below before building anything —
+one always-on Python service for one visualization family is a much thinner
+case than the one this section was originally written to make.
 
 Shape, following the `nib-proxy` precedent:
 
@@ -249,15 +287,15 @@ Shape, following the `nib-proxy` precedent:
   `src/api/attachments.ts`, and `KIND_ICON` in `BilderSection.tsx` — the same
   three places `flyfoto` touched.
 
-Visualizations worth exposing, in rough order of value for earthwork
-detection: VAT (the archaeology default blend), sky-view factor, negative
-openness (ditches), positive openness (banks), local relief model,
-multiscale topographic position.
+Visualizations that would still be new here: multiscale topographic position,
+e3MSTP. The rest of the original list — VAT, sky-view factor, negative openness
+(ditches), positive openness (banks), local relief model — is Tier 0 now.
 
 The cost to weigh before building: it's a new always-on service and a new
-Python dependency chain, for output that is a static image per bbox. If the
-client-side versions turn out to be good enough in practice, this may not
-earn its keep — decide after Tier 0 has had some use.
+Python dependency chain, for output that is a static image per bbox. The
+client-side versions did turn out to be good enough in practice, which is what
+emptied most of this tier out; decide on the multiscale remainder on its own
+merits rather than on the momentum of this section.
 
 ## Tier 2 — QGIS handoff (design, not built)
 

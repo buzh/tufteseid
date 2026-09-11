@@ -1,10 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import type { DemModel } from '../../terrain/dem';
-import type { Visualization } from '../../terrain/shade';
 import { Button, Segmented, Spinner, type SegmentedOption } from '../../ui';
 import styles from './Terrain.module.css';
+import { TerrainVisPicker } from './TerrainVisPicker';
 import type { TerrainAnalysis } from './useTerrainAnalysis';
-import { VISUALIZATIONS } from './useTerrainAnalysis';
 
 const MODEL_OPTIONS: SegmentedOption<DemModel>[] = [
   { value: 'dtm', label: 'DTM' },
@@ -23,31 +22,18 @@ const MODEL_OPTIONS: SegmentedOption<DemModel>[] = [
  * Two thin rows over the map cost less of it than one panel beside it, and
  * they are in the place the eye is already looking.
  *
- * The five visualization names carry their explanation as a native tooltip
- * rather than as a paragraph under the row: the hint is about the option you
- * are considering, not the one you already picked, and a strip has no room
- * for a sentence.
+ * The eight visualizations are a pulldown with a W/S ring rather than a
+ * segmented control — TerrainVisPicker, and the argument is there. They were a
+ * segmented control while there were five of them, which is about as many long
+ * Norwegian names as this row can hold.
  */
 export const TerrainStrip = ({ terrain }: { terrain: TerrainAnalysis }) => {
   const { t } = useTranslation();
   const { dem, loading, error } = terrain;
 
-  const visOptions: SegmentedOption<Visualization>[] = VISUALIZATIONS.map(
-    (v) => ({
-      value: v,
-      label: t(`localities.terrain.vis.${v}`),
-      title: t(`localities.terrain.visHint.${v}`),
-    }),
-  );
-
   return (
     <>
-      <Segmented
-        value={terrain.vis}
-        options={visOptions}
-        onChange={terrain.setVis}
-        label={t('localities.terrain.visualization')}
-      />
+      <TerrainVisPicker terrain={terrain} />
       <Segmented
         value={terrain.model}
         options={MODEL_OPTIONS}

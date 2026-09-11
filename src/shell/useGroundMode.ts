@@ -10,6 +10,7 @@ import type { useTerrainViewport } from '../terrain/useTerrainViewport';
 import type { FlyfotoControls } from './flyfoto/useFlyfotoControls';
 import type { LidarControls } from './lidar/useLidarControls';
 import type { StandardControls } from './standard/useStandardControls';
+import type { TerrainAnalysis } from './terrain/useTerrainAnalysis';
 
 /**
  * The five grounds, as one control surface.
@@ -93,7 +94,8 @@ export const useGroundMode = (
   standard: StandardControls,
   lidar: LidarControls,
   flyfoto: FlyfotoControls,
-  terrain: ReturnType<typeof useTerrainViewport>,
+  terrain: TerrainAnalysis,
+  viewport: ReturnType<typeof useTerrainViewport>,
 ) => {
   const locality = useAtomValue(activeLocalityAtom);
   const [tool, setTool] = useAtom(ribbonToolAtom);
@@ -113,7 +115,7 @@ export const useGroundMode = (
   // render may well be up on the A side. That combination is supported, and
   // it is one of the better ones: relief left, photograph right.
   const terrainActive =
-    half === 'a' && (locality ? tool === 'terrain' : terrain.active);
+    half === 'a' && (locality ? tool === 'terrain' : viewport.active);
 
   // Terreng first, because it is the only ground that leaves another one's
   // background switched on beneath it. Reading the background atom below this
@@ -173,7 +175,7 @@ export const useGroundMode = (
         // frame() rather than toggle(): pressing 5 twice should be a no-op,
         // not a close, because the peek below re-selects the mode you are
         // already on when it snaps back.
-        else if (!terrain.active) terrain.frame();
+        else if (!viewport.active) viewport.frame();
         break;
     }
   };
@@ -186,18 +188,33 @@ export const useGroundMode = (
   const { standDown: standardStandDown } = standard;
   const { standDown: lidarStandDown } = lidar;
   const { standDown: flyfotoStandDown } = flyfoto;
+  const { standDown: terrainStandDown } = terrain;
   useEffect(() => {
     if (modifiers !== 'standard') standardStandDown();
     if (modifiers !== 'lidar') lidarStandDown();
     if (modifiers !== 'flyfoto') flyfotoStandDown();
-  }, [modifiers, standardStandDown, lidarStandDown, flyfotoStandDown]);
+    if (modifiers !== 'terrain') terrainStandDown();
+  }, [
+    modifiers,
+    standardStandDown,
+    lidarStandDown,
+    flyfotoStandDown,
+    terrainStandDown,
+  ]);
 
   // A/D/W/S/E go to the ring of the ground on screen, and nowhere else. The
-  // three control hooks each know *how* to walk their own ring but cannot see
-  // Terreng from where they sit, so whether they are asked at all is decided
-  // here — otherwise W/S in Terreng would walk an invisible background,
-  // spending a screenful of tile requests per keypress on imagery under a
-  // terrain render.
+  // four control hooks each know *how* to walk their own ring but cannot see
+  // which ground is up from where they sit, so whether they are asked at all
+  // is decided here — otherwise W/S in Terreng would walk an invisible
+  // background, spending a screenful of tile requests per keypress on imagery
+  // under a terrain render.
+  //
+  // Terreng is a case here rather than the `default` as of the openness work.
+  // It had no ring while its five visualizations were a segmented control on
+  // the strip — "a client-side render has no dataset" — but eight of them are
+  // a pulldown, and a pulldown in this app comes with W/S. What it walks is
+  // not a dataset in the sense the other three mean: same elevation grid,
+  // eight ways of drawing it.
   const cycle = (key: CycleKey): boolean => {
     // The extract viewer covers the whole map, so no ground has anything to
     // show: same reasoning, one level up. Not applied to 1–5, which stay a
@@ -210,8 +227,8 @@ export const useGroundMode = (
         return lidar.cycle(key);
       case 'flyfoto':
         return flyfoto.cycle(key);
-      default:
-        return false;
+      case 'terrain':
+        return terrain.cycle(key);
     }
   };
 

@@ -34,6 +34,10 @@ import {
 import {
   MULTI_AZIMUTHS,
   SVF_DIRECTIONS,
+  VAT_ALTITUDE,
+  VAT_AZIMUTH,
+  VAT_LAYERS,
+  VAT_Z_FACTOR,
   type Visualization,
 } from '../terrain/shade';
 import { dec, joinDot } from './draw';
@@ -115,9 +119,32 @@ export type TerrainFigureInput = {
   model: DemModel;
   light: TerrainLight;
   dem: Dem;
-  /** Metres; `lrm` and `svf` only. Omitted means the view's default. */
+  /**
+   * Metres; `lrm` and the four horizon views only (`usesHorizon` in
+   * render.ts). Omitted means the view's default.
+   */
   radius?: number;
 };
+
+/**
+ * VAT's layer stack, as one line: what was blended over what, at what opacity,
+ * stretched between what.
+ *
+ * Assembled from VAT_LAYERS rather than written out, because the whole point
+ * of printing it is that somebody can rebuild the same composite in RVT — and
+ * a hand-written caption is one edit away from describing a blend the code no
+ * longer performs.
+ */
+const vatStack = (): string =>
+  VAT_LAYERS.map((layer) =>
+    t('figure.set.vatLayer', {
+      vis: t(`localities.terrain.vis.${layer.vis}`),
+      blend: t(`figure.blend.${layer.blend}`),
+      opacity: layer.opacity,
+      min: dec(layer.min, 2),
+      max: dec(layer.max, 2),
+    }),
+  ).join(' + ');
 
 const terrainSettings = ({
   vis,
@@ -127,8 +154,8 @@ const terrainSettings = ({
 }: Pick<TerrainFigureInput, 'vis' | 'light' | 'dem' | 'radius'>): string[] => {
   const settings: string[] = [];
   // Through the same clamp the render used rather than the number the caller
-  // held: on a 0.25 m grid computeSvf caps its search at 6 m, and a caption
-  // claiming 20 m would describe a render nobody made.
+  // held: on a 0.25 m grid the horizon scan caps its search at 6 m, and a
+  // caption claiming 20 m would describe a render nobody made.
   const r = clampRadius(vis, dem, radius ?? defaultRadius(vis));
   switch (vis) {
     case 'hillshade':
@@ -151,6 +178,7 @@ const terrainSettings = ({
     case 'slope':
       settings.push(
         t('figure.set.zFactor', { z: light.zFactor }),
+        t('figure.set.inverted'),
         t('figure.set.stretch'),
       );
       break;
@@ -166,6 +194,47 @@ const terrainSettings = ({
         t('figure.set.svfRadius', { m: r }),
         t('figure.set.svfDirections', { n: SVF_DIRECTIONS }),
         t('figure.set.stretch'),
+      );
+      break;
+    // Both opennesses come off the same horizon scan as sky-view factor, so
+    // they record the same two numbers — the radius the horizon was searched
+    // to and how many directions it was searched in. Named separately from
+    // the SVF line because "SVF-radius" on a positive-openness caption reads
+    // as the wrong parameter.
+    //
+    // Negative openness additionally records that its ramp is inverted, which
+    // is the difference between "these ditches are dark" and "these ridges are
+    // dark" for a reader holding the image and not the code.
+    case 'openPos':
+      settings.push(
+        t('figure.set.opennessRadius', { m: r }),
+        t('figure.set.svfDirections', { n: SVF_DIRECTIONS }),
+        t('figure.set.stretch'),
+      );
+      break;
+    case 'openNeg':
+      settings.push(
+        t('figure.set.opennessRadius', { m: r }),
+        t('figure.set.svfDirections', { n: SVF_DIRECTIONS }),
+        t('figure.set.inverted'),
+        t('figure.set.stretch'),
+      );
+      break;
+    // The one view whose caption is longer than its controls. Nothing here is
+    // adjustable: the sun is frozen, the exaggeration is 1×, and the four
+    // layers are stretched between fixed values rather than to the
+    // rectangle's own percentiles — which is what lets two VAT renders of
+    // different hillsides be compared at all. Printing it is how a reader
+    // knows the picture was not tuned to flatter this particular ground.
+    case 'vat':
+      settings.push(
+        t('figure.set.vatStack', { stack: vatStack() }),
+        t('figure.set.azimuth', { deg: VAT_AZIMUTH }),
+        t('figure.set.altitude', { deg: VAT_ALTITUDE }),
+        t('figure.set.zFactor', { z: VAT_Z_FACTOR }),
+        t('figure.set.opennessRadius', { m: r }),
+        t('figure.set.svfDirections', { n: SVF_DIRECTIONS }),
+        t('figure.set.absoluteStretch'),
       );
       break;
   }

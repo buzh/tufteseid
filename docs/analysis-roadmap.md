@@ -46,14 +46,22 @@ reading as exactly 0.0, the fixed TIFF shape — are recorded in
 
 A "Terreng" action — on ribbon row 1 over the visible map, or in the lokalitet
 row over an authored bbox — fetches the DEM for the rectangle once, then
-computes relief locally: hillshade with a **live azimuth
-slider**, multidirectional hillshade, slope, Local Relief Model, and Sky-View
-Factor. Output saves as an attachment.
+computes relief locally. Eight views as of 2026-09-11: hillshade with a **live
+azimuth slider**, multidirectional hillshade, VAT, sky-view factor, positive
+and negative openness, Local Relief Model, and slope. Output saves as an
+attachment.
 
 The slider is the point, not a nicety. Sweeping the sun across terrain already
 in memory is the single most effective way to notice an earthwork, and it is
-exactly what a pre-rendered WMS cannot offer. The two illumination-independent
-views cover what no sun angle shows.
+exactly what a pre-rendered WMS cannot offer. The five illumination-independent
+views cover what no sun angle shows — and walking *them* with W/S is the
+counterpart gesture, which is why the picker became a pulldown with a keyboard
+ring (`docs/ui-architecture.md` §10).
+
+The three additions of 2026-09-11 cost almost nothing to compute, which is the
+finding worth carrying: openness is the sky-view ray walk with a second
+extremum tracked, and VAT is per-pixel arithmetic over fields that walk already
+produced. See Tier 1.
 
 Files: `src/terrain/{dem,shade,render}.ts`, `src/shell/terrain/*`.
 Proxy route `/arcgis/hoydedata/*`. Reuses `attachments.kind = 'extract'`, so no
@@ -69,25 +77,33 @@ should be judged on whether it is worth a press at all — the bar is no longer
 "better than nothing".
 
 Measured on a live 600×600 fetch: hillshade 32 ms, slope 18 ms, LRM 23 ms,
-multidirectional 149 ms, SVF 775 ms. That spread is why the panel's two
-`useMemo`s are split — see CLAUDE.md, along with the multidirectional-blend
-azimuth trap, which fails silently.
+multidirectional 149 ms, horizon scan 775 ms. That spread is why the hook's
+memos are split — three of them now, the third holding the horizon scan so
+that switching between the four views read off it is free. See CLAUDE.md,
+along with the multidirectional-blend azimuth trap, which fails silently.
 
 Deliberately **not** used: `geotiff.js`. The endpoint emits exactly one TIFF
 shape, and adding a dependency would mean regenerating `package-lock.json`,
 which the workstation can't do. ~120 lines of reader instead.
 
-## Tier 1 — server-side sidecar (designed)
+## Tier 1 — server-side sidecar (designed, mostly overtaken)
 
-What the browser can't reasonably do is the composite blends: VAT and e3MSTP
-need several layers at multiple scales combined with specific opacity stacks,
-and the reference implementation is Python. A small container following the
-`nib-proxy` precedent — GDAL base plus `rvt-py` — reachable only from wmscache.
+This tier's premise was that the browser can't reasonably do the composite
+blends, because they need several layers combined with specific opacity stacks
+and the reference implementation is Python. Checking that against RVT's actual
+source (2026-09-11) took most of it away: the blend modes collapse on
+single-band data — a luminosity blend of greyscale *is* the active layer, and
+opacity is a linear mix — so VAT is three lines of arithmetic, and openness is
+the sky-view ray walk read a second way. All four shipped client-side.
+
+What is genuinely left is the *multiscale* family — e3MSTP, multiscale
+topographic position — which needs DEMs at several resolutions and is a
+different shape of work, not more of the same.
 
 Full design in `terrain-analysis.md`. **The cost to weigh:** a new always-on
-service and a Python dependency chain, for output that is a static image per
-bbox. Decide after Tier 0 has had real use; if the client-side versions prove
-good enough in practice, this doesn't earn its keep.
+service and a Python dependency chain, for one visualization family. That is a
+much thinner case than the one this tier was written to make, and the client
+side did prove good enough in practice.
 
 ## Tier 2 — QGIS handoff (designed)
 
@@ -114,7 +130,7 @@ the sidecar shape anyway, so it constrains nothing we'd actually want to do.
 
 | Tool | Licence | Verdict |
 |---|---|---|
-| **RVT / rvt-py** | Apache-2.0 | **The one that matters.** Written by the authors of the archaeological-visualization literature, for this exact job. Tier 1's reason to exist. |
+| **RVT / rvt-py** | Apache-2.0 | **The one that matters.** Written by the authors of the archaeological-visualization literature, for this exact job. Was Tier 1's reason to exist; is now the *specification* Tier 0 follows — `blend.py` and `blend_func.py` are where VAT's layer stack and blend arithmetic were read off, and where to check them if a render looks wrong. |
 | **QGIS** | GPL-2.0+ | Tier 2's target. Not something we ship — something we hand off to. |
 | **GDAL** | MIT/X | Base image for any sidecar. Uncontroversial. |
 | **WhiteboxTools** | MIT core | Good multiscale topographic position. Its "Extension" toolsets are **proprietary** and must stay out. |
@@ -166,4 +182,11 @@ Nothing here is blocked on anything else. Ordered by value per unit of work:
 **SSR toponym filtering** (no new source), **NGU Løsmasser** (recipe already in
 `map-layers.md`), **Tier 2** (cheapest of the tiers, scales past us), **shoreline
 displacement** (highest ceiling, needs the NGU isobase model probed first),
-**Tier 1** (only once Tier 0's client-side versions are shown insufficient).
+**Tier 1** (now only worth it for the multiscale family — the rest of it
+shipped in the browser on 2026-09-11).
+
+One more thing that fell out of that day's work and is worth reusing: before
+building a sidecar for a visualization, read the reference implementation
+rather than its description. Tier 1 stood as "needs Python" for two days on the
+strength of a sentence in the literature; the source said three lines of
+arithmetic.

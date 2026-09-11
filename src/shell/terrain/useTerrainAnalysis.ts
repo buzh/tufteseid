@@ -33,6 +33,7 @@ import { terrainFigure } from '../../figure/specs';
 import { activeLocalityAtom } from '../../localities/atoms';
 import { createLocalityFromBbox } from '../../localities/createFromBbox';
 import { ribbonToolAtom } from '../../localities/toolAtoms';
+import type { CycleKey } from '../../map/useBackgroundCyclingKeys';
 import { terrainStandaloneBboxAtom } from '../../terrain/atoms';
 import { fetchDem, type Dem, type DemModel } from '../../terrain/dem';
 import {
@@ -47,8 +48,9 @@ import {
   radiusRange,
   terrainField,
   terrainStaticField,
+  usesHorizon,
 } from '../../terrain/render';
-import { type Visualization } from '../../terrain/shade';
+import { computeHorizonFields, type Visualization } from '../../terrain/shade';
 import {
   hideTerrainOverlay,
   setTerrainOverlayOpacity,
@@ -57,10 +59,24 @@ import {
 import { useTerrainViewport } from '../../terrain/useTerrainViewport';
 import { toast } from '../../ui';
 
+/**
+ * The eight views, in the order the pulldown lists them and W/S walks them.
+ *
+ * The order is an argument about cost as much as about kinship. The two shaded
+ * views come first because they are what someone arrives expecting; VAT next,
+ * because it is the answer to "if I only look at one"; then the three views
+ * read straight off the horizon scan, which VAT has just paid for — so a walk
+ * down the ring from VAT through sky-view and both opennesses is free, where
+ * the same four in any other order would each be an ~800 ms wait. Local relief
+ * and slope bring up the rear as the two that answer narrower questions.
+ */
 export const VISUALIZATIONS: Visualization[] = [
   'hillshade',
   'multiHillshade',
+  'vat',
   'svf',
+  'openPos',
+  'openNeg',
   'lrm',
   'slope',
 ];
@@ -99,22 +115,31 @@ export const useTerrainAnalysis = () => {
   // Percent, mirrored onto the layer imperatively — see terrainOverlayLayer.
   const [opacity, setOpacity] = useState(100);
 
-  // One radius each rather than one shared: they are different quantities
-  // measured in the same unit — how far to smooth before subtracting, versus
-  // how far to look for a horizon — and a good value for one is a poor value
-  // for the other, so switching views must not carry the number across.
+  // Two radii rather than one shared, and the split is by *quantity* rather
+  // than by view: how far to smooth before subtracting (LRM), versus how far
+  // to look for a horizon (sky-view, both opennesses, VAT). A good value for
+  // one is a poor value for the other, so switching between the two families
+  // must not carry the number across — but switching *within* the horizon
+  // family must, or the render would change for a reason the user did not ask
+  // for and the memo below would miss its cache.
   const [lrmRadius, setLrmRadius] = useState(DEFAULT_LRM_RADIUS);
   const [svfRadius, setSvfRadius] = useState(DEFAULT_SVF_RADIUS);
+  const horizonVis = usesHorizon(vis);
   // Exposed already clamped, so the slider's thumb, the number beside it, the
   // render and the caption are the same value. The *stored* number is left
   // alone: a 20 m sky-view radius that a 0.25 m grid caps at 6 m should come
   // back at 20 m over a 1 m one, not be quietly rewritten on the way past.
-  const rawRadius = vis === 'svf' ? svfRadius : lrmRadius;
+  const rawRadius = horizonVis ? svfRadius : lrmRadius;
   const radius = dem ? clampRadius(vis, dem, rawRadius) : rawRadius;
   const setRadius = useCallback(
-    (value: number) => (vis === 'svf' ? setSvfRadius : setLrmRadius)(value),
-    [vis],
+    (value: number) => (horizonVis ? setSvfRadius : setLrmRadius)(value),
+    [horizonVis],
   );
+
+  // The visualization pulldown, shaped exactly like Standard's cartography
+  // picker (useStandardControls) — for the same reason §5.2 gives there: eight
+  // ways of drawing one question are a list and a ring, not eight buttons.
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const [saving, setSaving] = useState(false);
   // Off-DOM: this canvas is the layer's image and the blob "Lagre" keeps, and
@@ -156,15 +181,31 @@ export const useTerrainAnalysis = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bboxKey, model]);
 
-  // Expensive, sun-independent passes. Keyed so that dragging the azimuth
-  // slider — which happens dozens of times a second — can never retrigger a
-  // multi-second sky-view factor. The two memos are split for that reason
-  // alone; see render.ts. Radius is the one knob that lands on *this* side of
-  // the line, which is why its slider commits on release instead of streaming
-  // like the other four (TerrainSliders).
+  // The horizon scan, and the only genuinely expensive thing here — ~800 ms on
+  // a 600² grid. Sky-view factor, both opennesses and VAT are all read off it,
+  // so it gets a memo of its own **above** the static one and, critically, is
+  // *not* keyed on `vis`: keying it there would make walking the ring from
+  // sky-view to positive openness — a selection out of an array this already
+  // holds — pay the whole pass again.
+  //
+  // Clamped through `'svf'` rather than through `vis` on purpose. All four
+  // horizon views share one range, so this is the same number for every one of
+  // them, which is exactly what lets the cache survive the walk.
+  const horizonRadius = dem ? clampRadius('svf', dem, svfRadius) : svfRadius;
+  const horizon = useMemo(
+    () => (dem && horizonVis ? computeHorizonFields(dem, horizonRadius) : null),
+    [dem, horizonVis, horizonRadius],
+  );
+
+  // Sun-independent, but cheap for everything the memo above did not already
+  // do: a selection out of the triple, or LRM's box blur. Still keyed so that
+  // dragging the azimuth slider — which happens dozens of times a second —
+  // can never retrigger a multi-second pass. Radius is the one knob that lands
+  // on this side of the line, which is why its slider commits on release
+  // instead of streaming like the other four (TerrainSliders).
   const staticField = useMemo(
-    () => (dem ? terrainStaticField(dem, vis, radius) : null),
-    [dem, vis, radius],
+    () => (dem ? terrainStaticField(dem, vis, radius, horizon) : null),
+    [dem, vis, radius, horizon],
   );
 
   // What the radius slider may offer, or null for the three views that have
@@ -316,13 +357,56 @@ export const useTerrainAnalysis = () => {
     t,
   ]);
 
+  // Clicking a row picks *and* dismisses; W/S below picks without closing, so
+  // the selection can be walked down an open list. Same split as the other
+  // three pulldowns.
+  const activate = (next: Visualization) => {
+    setVis(next);
+    setPickerOpen(false);
+  };
+
+  // Called by useGroundMode when Terreng stops being the ground on screen. An
+  // unmounted popover never fires its own open-change callback, so without
+  // this it would come back open.
+  const standDown = useCallback(() => setPickerOpen(false), []);
+
+  // Terreng's ring, walked by W/S. Terreng used to be the one ground with none
+  // — "a client-side render has no dataset" — which was true when there were
+  // five views on a segmented control and false the moment there were eight.
+  // The visualizations *are* its dataset: one question about this ground,
+  // answered eight ways, exactly like Standard's five cartographies.
+  //
+  // Walking it while watching the terrain is the illumination-independent
+  // counterpart to sweeping the azimuth, and it is cheap in the order
+  // VISUALIZATIONS lists them — see the note there.
+  const cycle = (key: CycleKey): boolean => {
+    // E toggles the model here as it does in LiDAR, since Terreng has the same
+    // DTM/DOM pair on its strip. A/D have no terrain analogue.
+    if (key === 'e') {
+      setModel((current) => (current === 'dtm' ? 'dom' : 'dtm'));
+      return true;
+    }
+    if (key !== 'w' && key !== 's') return false;
+    const step = key === 's' ? 1 : -1;
+    const at = VISUALIZATIONS.indexOf(vis);
+    const ring = VISUALIZATIONS.length;
+    setVis(VISUALIZATIONS[(at + step + ring) % ring]);
+    return true;
+  };
+
   return {
     hasLocality: locality != null,
     frame,
+    cycle,
+    standDown,
+    pickerOpen,
+    setPickerOpen,
+    activate,
     model,
     setModel,
+    // No bare `setVis`: the two ways in are `activate` (a row click, which
+    // also dismisses) and `cycle` (W/S, which does not).
     vis,
-    setVis,
     dem,
     loading,
     error,

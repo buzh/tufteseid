@@ -37,8 +37,13 @@ export const TerrainSliders = ({ terrain }: { terrain: TerrainAnalysis }) => {
   // while it loads, for the same reason the strip is absent for Standard.
   if (!dem || loading) return null;
 
+  // VAT is deliberately not in either list even though it contains a hillshade
+  // and a slope: its sun is frozen at 315°/35° and its exaggeration at 1×, so
+  // that two VAT renders are the same picture made the same way (VAT_LAYERS in
+  // shade.ts). Offering the knobs would be offering to break that quietly.
   const sunDependent = vis === 'hillshade';
-  const usesZFactor = vis !== 'svf' && vis !== 'lrm';
+  const usesZFactor =
+    vis === 'hillshade' || vis === 'multiHillshade' || vis === 'slope';
 
   return (
     <div
@@ -82,26 +87,30 @@ export const TerrainSliders = ({ terrain }: { terrain: TerrainAnalysis }) => {
         )}
         {/* Two different quantities sharing one control: how far to smooth
             the DEM before subtracting it from itself (LRM), and how far to
-            search for a horizon (SVF). Keyed on the visualization and on the
-            ceiling so the deferred draft cannot survive either a switch
-            between the two or a change of grid under it — those are the only
-            two ways the value can move without the slider moving. Not keyed
-            on the value itself: that would remount on every commit and drop
-            focus mid arrow-key. */}
+            search for a horizon (sky-view, both opennesses, VAT). Keyed on the
+            visualization and on the ceiling so the deferred draft cannot
+            survive either a switch between the two or a change of grid under
+            it — those are the only two ways the value can move without the
+            slider moving. Not keyed on the value itself: that would remount on
+            every commit and drop focus mid arrow-key.
+
+            Deferred for everything but LRM, because everything but LRM feeds
+            the horizon scan — one ~800 ms pass, so a streamed radius would
+            queue one per drag frame. LRM's box blur is 23 ms and streams. */}
         {radiusLimits && (
           <SliderRow
             key={`${vis}-${radiusLimits.max}`}
             label={t(
-              vis === 'svf'
-                ? 'localities.terrain.svfRadius'
-                : 'localities.terrain.lrmRadius',
+              vis === 'lrm'
+                ? 'localities.terrain.lrmRadius'
+                : 'localities.terrain.svfRadius',
             )}
             value={terrain.radius}
             min={radiusLimits.min}
             max={radiusLimits.max}
             step={radiusLimits.step}
             suffix=" m"
-            deferred={vis === 'svf'}
+            deferred={vis !== 'lrm'}
             onChange={terrain.setRadius}
           />
         )}

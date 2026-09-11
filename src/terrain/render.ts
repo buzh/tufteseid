@@ -17,14 +17,19 @@
 import type { LocalityBbox } from '../api/localities';
 import { fetchDem, type Dem, type DemModel } from './dem';
 import {
+  composeVat,
   computeHillshade,
+  computeHorizonFields,
   computeLrm,
   computeMultiHillshade,
   computeSlope,
-  computeSvf,
   percentileRange,
   SVF_MAX_RADIUS_PX,
   toImageData,
+  VAT_ALTITUDE,
+  VAT_AZIMUTH,
+  VAT_Z_FACTOR,
+  type HorizonFields,
   type Ramp,
   type Visualization,
 } from './shade';
@@ -41,26 +46,48 @@ export const DEFAULT_Z_FACTOR = 2;
 export const DEFAULT_LRM_RADIUS = 15;
 export const DEFAULT_SVF_RADIUS = 20;
 
-/** Where the radius starts for the two views that have one. */
+/**
+ * Which views are read off the horizon scan (`computeHorizonFields`) rather
+ * than computed in their own right.
+ *
+ * Worth knowing for two reasons beyond bookkeeping. They share one radius —
+ * *how far to look for a horizon* is the same question for all four — so
+ * walking between them never changes the number the caption prints. And they
+ * share one result, so the first of them to be asked for pays the whole cost
+ * and the rest are a selection: `useTerrainAnalysis` caches the triple, which
+ * is what makes them a keyboard ring instead of three separate waits.
+ */
+const HORIZON_VIS: readonly Visualization[] = [
+  'svf',
+  'openPos',
+  'openNeg',
+  'vat',
+];
+
+export const usesHorizon = (vis: Visualization): boolean =>
+  HORIZON_VIS.includes(vis);
+
+/** Where the radius starts for the views that have one. */
 export const defaultRadius = (vis: Visualization): number =>
-  vis === 'svf' ? DEFAULT_SVF_RADIUS : DEFAULT_LRM_RADIUS;
+  usesHorizon(vis) ? DEFAULT_SVF_RADIUS : DEFAULT_LRM_RADIUS;
 
 /**
  * What a radius control may offer for this visualization over this grid, in
- * metres, or `null` for the three views that have no radius.
+ * metres, or `null` for the views that have no radius.
  *
- * SVF's ceiling is measured off the DEM rather than chosen: `computeSvf`
- * clamps its search to `SVF_MAX_RADIUS_PX` pixels whatever metre value it is
- * handed, so on a 0.25 m grid every position past 6 m would render
- * identically. LRM has no such cap — its box blur is O(n) per pass whatever
- * the radius — so 60 m is a judgement about scale: past that the smoothed
- * copy stops being the landform trend and starts being a plane.
+ * The horizon views' ceiling is measured off the DEM rather than chosen:
+ * `computeHorizonFields` clamps its search to `SVF_MAX_RADIUS_PX` pixels
+ * whatever metre value it is handed, so on a 0.25 m grid every position past
+ * 6 m would render identically. LRM has no such cap — its box blur is O(n)
+ * per pass whatever the radius — so 60 m is a judgement about scale: past
+ * that the smoothed copy stops being the landform trend and starts being a
+ * plane.
  */
 export const radiusRange = (
   vis: Visualization,
   dem: Dem,
 ): { min: number; max: number; step: number } | null => {
-  if (vis === 'svf') {
+  if (usesHorizon(vis)) {
     return {
       min: 2,
       max: Math.max(3, Math.round(SVF_MAX_RADIUS_PX * dem.metresPerPx)),
@@ -103,24 +130,52 @@ export const DEFAULT_LIGHT: TerrainLight = {
  * have none — they are computed by `terrainField` instead, cheaply.
  *
  * `radiusMetres` is the one knob on this side of the split, which is exactly
- * why a control for it must not fire per drag frame: on a 600² grid this is
- * ~800 ms for sky-view factor.
+ * why a control for it must not fire per drag frame: on a 600² grid the
+ * horizon scan is ~800 ms.
+ *
+ * `horizon` lets a caller that has already walked the horizon at this radius
+ * hand the result back in — which is the whole reason switching between
+ * sky-view, the two opennesses and VAT is instant. Omit it and this recomputes
+ * it, so a headless caller needs to know nothing about the cache.
+ *
+ * VAT lands on *this* side of the split even though it contains a hillshade,
+ * because its sun is frozen (see VAT_AZIMUTH). That is what keeps the return
+ * type one array rather than a bag of layers, and it is the right trade: VAT
+ * is a calibrated product whose value is that two of them are comparable.
  */
 export const terrainStaticField = (
   dem: Dem,
   vis: Visualization,
   radiusMetres: number = defaultRadius(vis),
+  horizon?: HorizonFields | null,
 ): Float32Array | null => {
   const radius = clampRadius(vis, dem, radiusMetres);
-  if (vis === 'svf') return computeSvf(dem, radius);
   if (vis === 'lrm') return computeLrm(dem, radius);
-  return null;
+  if (!usesHorizon(vis)) return null;
+
+  const fields = horizon ?? computeHorizonFields(dem, radius);
+  switch (vis) {
+    case 'svf':
+      return fields.svf;
+    case 'openPos':
+      return fields.openPos;
+    case 'openNeg':
+      return fields.openNeg;
+    default:
+      return composeVat(
+        computeHillshade(dem, VAT_AZIMUTH, VAT_ALTITUDE, VAT_Z_FACTOR),
+        computeSlope(dem, VAT_Z_FACTOR),
+        fields.openPos,
+        fields.svf,
+      );
+  }
 };
 
 /**
  * The pass that reacts to the light. `staticField` is whatever the call above
- * returned for this `vis`, and is simply handed back for the two views that
- * are entirely sun-independent.
+ * returned for this `vis`, and is simply handed back for the five views that
+ * are entirely sun-independent — VAT among them, since its own hillshade was
+ * lit by the frozen sun on the static side and must not be re-lit here.
  */
 export const terrainField = (
   dem: Dem,
@@ -169,12 +224,27 @@ export const paintTerrainField = (
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
 
+  // VAT needs no case: it composites to 0..1 already, and the [0, 1] default
+  // is not laziness but the point — its four layers are mixed on *absolute*
+  // stretches (see VAT_LAYERS), so re-stretching the composite to this
+  // hillside's own percentiles would undo the calibration the blend exists
+  // for. Every other physical view wants the opposite.
   let ramp: Ramp = 'grey';
   let range: [number, number] = [0, 1];
   if (vis === 'slope') {
     ramp = 'greyInverted';
     range = [0, percentileRange(field, 0.02, 0.98)[1]];
-  } else if (vis === 'svf') {
+  } else if (vis === 'svf' || vis === 'openPos') {
+    range = percentileRange(field, 0.02, 0.98);
+  } else if (vis === 'openNeg') {
+    // Inverted, so that a hollow is dark here as it is in sky-view factor and
+    // in slope. Negative openness is *high* in a depression — it is positive
+    // openness of the flipped surface — so the raw field would paint ditches
+    // white and put the one view in the ring that disagrees with its
+    // neighbours about which way is down. RVT inverts it in the same place and
+    // for the same reason (`normalize_image`, which special-cases exactly
+    // "slope gradient" and "openness - negative").
+    ramp = 'greyInverted';
     range = percentileRange(field, 0.02, 0.98);
   } else if (vis === 'lrm') {
     ramp = 'diverging';
@@ -208,7 +278,7 @@ export type TerrainRenderOptions = {
   vis: Visualization;
   model?: DemModel;
   light?: TerrainLight;
-  /** Metres; only `lrm` and `svf` read it. Defaults per `defaultRadius`. */
+  /** Metres; only `lrm` and the horizon views read it. See `defaultRadius`. */
   radius?: number;
   signal?: AbortSignal;
 };
