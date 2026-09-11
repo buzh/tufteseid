@@ -38,6 +38,13 @@ export const LidarExtractViewer = () => {
   const sources = useAtomValue(lidarExtractSourcesAtom);
   const activeLocality = useAtomValue(activeLocalityAtom);
   const user = useAtomValue(currentUserAtom);
+  // The extract tool is open to anyone who can see the lokalitet, but
+  // `attachments`' create rule wants the parent's owner too, so an admin or
+  // a reader of a public lokalitet pressing "Behold" would do all the work
+  // and collect a 403. Same test as the workspace's `canAdd`, computed here
+  // because the viewer hangs off the atom rather than the workspace hook.
+  const canKeep =
+    activeLocality != null && user != null && activeLocality.owner === user.id;
   // Canvas ids already kept as attachments this run, plus in-flight ones.
   const [keptIds, setKeptIds] = useState<Set<string>>(new Set());
   const [keepingId, setKeepingId] = useState<string | null>(null);
@@ -312,7 +319,7 @@ export const LidarExtractViewer = () => {
   // instead of (only) downloading it. The workspace's Bilder section
   // picks it up via the attachments realtime subscription.
   const keep = async () => {
-    if (!selected || !run || !activeLocality || !user) return;
+    if (!selected || !run || !activeLocality || !user || !canKeep) return;
     if (keptIds.has(selected.id) || keepingId) return;
     const cur = selected;
     setKeepingId(cur.id);
@@ -423,7 +430,7 @@ export const LidarExtractViewer = () => {
               />
             </>
           )}
-          {activeLocality && (
+          {canKeep && (
             <Button
               size="xs"
               palette="gray"

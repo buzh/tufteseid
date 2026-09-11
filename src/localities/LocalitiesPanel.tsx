@@ -41,13 +41,13 @@ type Scope = 'mine' | 'all';
 
 const LocalityRow = ({
   locality,
-  isMine,
+  isOwner,
   funnCount,
   bilderCount,
   onOpen,
 }: {
   locality: LocalityRecord;
-  isMine: boolean;
+  isOwner: boolean;
   funnCount: number | null;
   bilderCount: number | null;
   onOpen: (l: LocalityRecord) => void;
@@ -85,7 +85,7 @@ const LocalityRow = ({
       )}
       <div className={styles.meta}>
         {meta.join(' · ')}
-        {!isMine && locality.expand?.owner
+        {!isOwner && locality.expand?.owner
           ? ` · ${t('localities.byOwner', { name: locality.expand.owner.name })}`
           : ''}
       </div>
@@ -233,7 +233,7 @@ export const LocalitiesPanel = () => {
           <LocalityRow
             key={l.id}
             locality={l}
-            isMine={l.owner === user.id}
+            isOwner={l.owner === user.id}
             funnCount={funnCounts?.get(l.id) ?? null}
             bilderCount={bilderCounts?.get(l.id) ?? null}
             onOpen={open}

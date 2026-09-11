@@ -89,11 +89,11 @@ const TextRow = ({
  */
 const LocationGroup = ({
   locality,
-  isMine,
+  canEdit,
   onPatch,
 }: {
   locality: LocalityRecord;
-  isMine: boolean;
+  canEdit: boolean;
   onPatch: (patch: LocalityPatch) => void;
 }) => {
   const { t, i18n } = useTranslation();
@@ -121,7 +121,7 @@ const LocationGroup = ({
         value={locality.place ?? ''}
         placeholder={t('localities.workspace.placePlaceholder')}
         maxLength={200}
-        disabled={!isMine}
+        disabled={!canEdit}
         onCommit={(place) => onPatch({ place })}
       />
       <TextRow
@@ -129,7 +129,7 @@ const LocationGroup = ({
         value={locality.municipality ?? ''}
         placeholder={t('localities.workspace.municipalityPlaceholder')}
         maxLength={200}
-        disabled={!isMine}
+        disabled={!canEdit}
         onCommit={(municipality) => onPatch({ municipality })}
       />
       <TextRow
@@ -137,7 +137,7 @@ const LocationGroup = ({
         value={locality.matrikkel ?? ''}
         placeholder={t('localities.workspace.matrikkelPlaceholder')}
         maxLength={500}
-        disabled={!isMine}
+        disabled={!canEdit}
         onCommit={(matrikkel) => onPatch({ matrikkel })}
       />
 
@@ -150,7 +150,7 @@ const LocationGroup = ({
           label={t('localities.workspace.area')}
           value={formatBboxArea(locality.bbox, i18n.language)}
         />
-        {isMine && (
+        {canEdit && (
           <>
             <Button
               className={styles.refresh}
@@ -180,11 +180,11 @@ const LocationGroup = ({
 // workspace.
 export const LocalityDetails = ({
   locality,
-  isMine,
+  canEdit,
   onPatch,
 }: {
   locality: LocalityRecord;
-  isMine: boolean;
+  canEdit: boolean;
   onPatch: (patch: LocalityPatch) => void;
 }) => {
   const { t, i18n } = useTranslation();
@@ -202,7 +202,7 @@ export const LocalityDetails = ({
 
   return (
     <div className={styles.root}>
-      <LocationGroup locality={locality} isMine={isMine} onPatch={onPatch} />
+      <LocationGroup locality={locality} canEdit={canEdit} onPatch={onPatch} />
 
       <div className={styles.group}>
         <span className={styles.label}>
@@ -214,7 +214,7 @@ export const LocalityDetails = ({
           onBlur={commitDescription}
           placeholder={t('localities.workspace.descriptionPlaceholder')}
           minRows={3}
-          disabled={!isMine}
+          disabled={!canEdit}
         />
       </div>
 
@@ -224,7 +224,7 @@ export const LocalityDetails = ({
         </span>
         <Segmented<LocalityVisibility>
           value={locality.visibility}
-          disabled={!isMine}
+          disabled={!canEdit}
           label={t('localities.workspace.visibility')}
           onChange={(v) => onPatch({ visibility: v })}
           options={VISIBILITY_ORDER.map((v) => ({

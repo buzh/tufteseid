@@ -18,7 +18,7 @@ import {
   LocalityFindStatus,
   updateLocalityFind,
 } from '../api/localityFinds';
-import { currentUserAtom } from '../auth/atoms';
+import { currentUserAtom, isAdminAtom } from '../auth/atoms';
 import { useDrawSettings } from '../draw/drawControls/hooks/drawSettings';
 import { getDrawLayer } from '../draw/drawControls/hooks/mapLayers';
 import { renderFigureBlob } from '../figure/figure';
@@ -86,6 +86,16 @@ import {
   useLocalityFinds,
 } from './useLocalityContent';
 import { useWorkspaceKeys } from './useWorkspaceKeys';
+
+/**
+ * What a signed-in user is to one lokalitet.
+ *
+ * Three values rather than a boolean because `admin` is neither of the other
+ * two: PocketBase lets an admin change and delete anybody's records, but not
+ * add content to them (see `canEdit` / `canAdd` below). Everyone else,
+ * signed out included, is a reader.
+ */
+export type LocalityAccess = 'owner' | 'admin' | 'reader';
 
 // Sentinel for the seamless best-available mosaic in flyfotoBusy, which
 // otherwise holds a project id.
@@ -170,6 +180,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const { t, i18n } = useTranslation();
   const map = useAtomValue(mapAtom);
   const user = useAtomValue(currentUserAtom);
+  const isAdmin = useAtomValue(isAdminAtom);
   const setActiveLocality = useSetAtom(activeLocalityAtom);
   const [draftActive, setDraftActive] = useAtom(funnDraftActiveAtom);
   const [adjusting, setAdjusting] = useAtom(adjustingLocalityAtom);
@@ -214,7 +225,32 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [flyfotoBusy, setFlyfotoBusy] = useState<string | null>(null);
   const { setDrawLayerFeatures } = useDrawSettings();
 
-  const isMine = user != null && user.id === locality.owner;
+  // What this user *is* to this record. A fact, not a choice — the stance
+  // you take inside it (looking at the reading, or doing the reading) is a
+  // separate axis and does not exist yet.
+  const access: LocalityAccess =
+    user == null
+      ? 'reader'
+      : user.id === locality.owner
+        ? 'owner'
+        : isAdmin
+          ? 'admin'
+          : 'reader';
+
+  // Two permissions, not one, because the server has two.
+  //
+  // `canEdit` mirrors the update and delete rules, which are the same on all
+  // three collections: `owner = @request.auth.id || @request.auth.role =
+  // "admin"`. Until now the UI hid those verbs from an admin the server
+  // would have obeyed.
+  //
+  // `canAdd` is stricter, and deliberately so. The *create* rules on `finds`
+  // and `attachments` also demand `locality.owner = @request.auth.id`, so an
+  // admin who pressed "Nytt funn" on somebody else's site would collect a
+  // 403 after doing the work. Showing them that button is the same lie as
+  // hiding Slett, pointing the other way.
+  const canEdit = access !== 'reader';
+  const canAdd = access === 'owner';
 
   // Mounts the move/resize interactions while adjustingLocalityAtom is
   // set; persists the bbox after every finished gesture.
@@ -517,7 +553,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   }, [map, locality.bbox, patchLocality, setFunnOutside]);
 
   const startDraft = useCallback(() => {
-    if (!isMine || draftActive) return;
+    if (!canAdd || draftActive) return;
     // Leftovers on the shared draw layer can only be a drawing that was
     // already saved and put down; drop them so the new funn starts clean.
     getDrawLayer()?.getSource()?.clear();
@@ -538,7 +574,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setFunnError(null);
     setDraftActive(true);
   }, [
-    isMine,
+    canAdd,
     draftActive,
     setMarksHidden,
     setAdjusting,
@@ -641,7 +677,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
   // Capture the current view cropped to the rectangle → Bilder.
   const takeScreenshot = useCallback(async () => {
-    if (!user || !isMine || shooting) return;
+    if (!user || !canAdd || shooting) return;
     setShooting(true);
     try {
       const shot = await captureLocalityScreenshot(map, locality.bbox);
@@ -730,7 +766,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     }
   }, [
     user,
-    isMine,
+    canAdd,
     shooting,
     map,
     locality.id,
@@ -755,7 +791,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // would be two places to keep the optimistic list update right.
   const uploadFile = useCallback(
     async (file: File) => {
-      if (!user || !isMine || uploading) return;
+      if (!user || !canAdd || uploading) return;
       setUploading(true);
       try {
         const rec = await createAttachment(
@@ -772,7 +808,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         setUploading(false);
       }
     },
-    [user, isMine, uploading, locality.id, setAttachmentItems, t],
+    [user, canAdd, uploading, locality.id, setAttachmentItems, t],
   );
 
   // The acquisition list is per-rectangle, so drop it when the rectangle
@@ -792,7 +828,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       project?: FlyfotoProject,
       signal?: AbortSignal,
     ): Promise<boolean> => {
-      if (!user || !isMine) return false;
+      if (!user || !canAdd) return false;
       const label = project
         ? (project.year?.toString() ?? project.projectName)
         : t('localities.tools.flyfotoMosaic');
@@ -884,7 +920,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     },
     [
       user,
-      isMine,
+      canAdd,
       locality.id,
       locality.name,
       locality.bbox,
@@ -989,7 +1025,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * thrown, and the toast says how many of the planned set arrived.
    */
   const runStarterPack = useCallback(async () => {
-    if (!user || !isMine || starterStep) return;
+    if (!user || !canAdd || starterStep) return;
     const ac = new AbortController();
     starterAbortRef.current = ac;
     const bbox25833 = transformExtent(
@@ -1052,7 +1088,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     }
   }, [
     user,
-    isMine,
+    canAdd,
     starterStep,
     locality.bbox,
     locality.name,
@@ -1235,7 +1271,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       ? t('localities.summary.bilder', { count: bilderCount })
       : null,
     formatBboxArea(locality.bbox, i18n.language),
-    !isMine && locality.expand?.owner
+    // Attribution, not permission: an admin may be able to change this
+    // record, but it is still somebody else's and the row has to say so.
+    access !== 'owner' && locality.expand?.owner
       ? t('localities.byOwner', { name: locality.expand.owner.name })
       : null,
   ].filter((s): s is string => !!s);
@@ -1244,7 +1282,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // identity / permissions
     locality,
     user,
-    isMine,
+    access,
+    canEdit,
+    canAdd,
     mode,
     close,
     rename,

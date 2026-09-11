@@ -136,7 +136,7 @@ const Thumb = ({
 const Lightbox = ({
   items,
   index,
-  isMine,
+  canEdit,
   onIndex,
   onClose,
   onDeleted,
@@ -144,7 +144,7 @@ const Lightbox = ({
 }: {
   items: AttachmentRecord[];
   index: number;
-  isMine: boolean;
+  canEdit: boolean;
   onIndex: (i: number) => void;
   onClose: () => void;
   onDeleted: (rec: AttachmentRecord) => void;
@@ -229,7 +229,7 @@ const Lightbox = ({
             <Button size="sm" leftIcon="open_in_new" onClick={openOriginal}>
               {t('localities.bilder.openOriginal')}
             </Button>
-            {isMine && (
+            {canEdit && (
               <Button
                 size="sm"
                 palette="red"
@@ -291,7 +291,7 @@ const Lightbox = ({
 
         <Input
           value={caption}
-          disabled={!isMine}
+          disabled={!canEdit}
           placeholder={t('localities.bilder.captionPlaceholder')}
           maxLength={200}
           onChange={(e) => setCaption(e.target.value)}
@@ -311,14 +311,18 @@ const Lightbox = ({
  * call would be two places to keep the optimistic list update right.
  */
 export const BilderSection = ({
-  isMine,
+  canEdit,
+  canAdd,
   items,
   setItems,
   uploading,
   onUpload,
   starterStep,
 }: {
-  isMine: boolean;
+  /** Delete an image, retitle one. An admin may; a reader may not. */
+  canEdit: boolean;
+  /** Put a new one in. Owners only — the create rule wants the parent too. */
+  canAdd: boolean;
   items: AttachmentRecord[] | null;
   setItems: Dispatch<SetStateAction<AttachmentRecord[] | null>>;
   uploading: boolean;
@@ -390,7 +394,7 @@ export const BilderSection = ({
         </div>
       )}
       <div className={styles.grid}>
-        {isMine && (
+        {canAdd && (
           <>
             <input
               ref={fileInputRef}
@@ -426,7 +430,7 @@ export const BilderSection = ({
         <Lightbox
           items={items}
           index={Math.min(openIndex, items.length - 1)}
-          isMine={isMine}
+          canEdit={canEdit}
           onIndex={setOpenIndex}
           onClose={() => setOpenIndex(null)}
           onDeleted={remove}

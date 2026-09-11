@@ -35,11 +35,11 @@ const VISIBILITY_PALETTE: Record<
  */
 const LocalityName = ({
   locality,
-  isMine,
+  canEdit,
   onRename,
 }: {
   locality: LocalityRecord;
-  isMine: boolean;
+  canEdit: boolean;
   onRename: (next: string) => Promise<boolean>;
 }) => {
   const { t } = useTranslation();
@@ -57,12 +57,12 @@ const LocalityName = ({
     if (!(await onRename(name))) setName(locality.name);
   };
 
-  if (!renaming || !isMine) {
+  if (!renaming || !canEdit) {
     return (
       <h2
-        className={cx(rowStyles.name, isMine && rowStyles.nameEditable)}
-        title={isMine ? t('localities.workspace.renameHint') : undefined}
-        onClick={() => isMine && setRenaming(true)}
+        className={cx(rowStyles.name, canEdit && rowStyles.nameEditable)}
+        title={canEdit ? t('localities.workspace.renameHint') : undefined}
+        onClick={() => canEdit && setRenaming(true)}
       >
         {locality.name}
       </h2>
@@ -205,33 +205,40 @@ const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           </>
         ) : (
           <div className={rowStyles.menu}>
-            {/* First in the list because it is the one thing here you do on
-                a lokalitet you have just made, and never again. */}
-            <button
-              type="button"
-              className={rowStyles.menuItem}
-              disabled={ws.starterStep != null}
-              title={t('localities.tools.starterHint')}
-              onClick={() => {
-                close();
-                void ws.runStarterPack();
-              }}
-            >
-              <Icon icon="library_add" size={16} />
-              {t('localities.tools.starter')}
-            </button>
-            <button
-              type="button"
-              className={rowStyles.menuItem}
-              disabled={ws.uploading}
-              onClick={() => {
-                close();
-                fileInputRef.current?.click();
-              }}
-            >
-              <Icon icon="add_photo_alternate" size={16} />
-              {t('localities.bilder.upload')}
-            </button>
+            {/* The two that put new content in are owner-only, so an admin's
+                menu is Juster området and Slett — the two the server would
+                actually let them through with. */}
+            {ws.canAdd && (
+              <>
+                {/* First in the list because it is the one thing here you do
+                    on a lokalitet you have just made, and never again. */}
+                <button
+                  type="button"
+                  className={rowStyles.menuItem}
+                  disabled={ws.starterStep != null}
+                  title={t('localities.tools.starterHint')}
+                  onClick={() => {
+                    close();
+                    void ws.runStarterPack();
+                  }}
+                >
+                  <Icon icon="library_add" size={16} />
+                  {t('localities.tools.starter')}
+                </button>
+                <button
+                  type="button"
+                  className={rowStyles.menuItem}
+                  disabled={ws.uploading}
+                  onClick={() => {
+                    close();
+                    fileInputRef.current?.click();
+                  }}
+                >
+                  <Icon icon="add_photo_alternate" size={16} />
+                  {t('localities.bilder.upload')}
+                </button>
+              </>
+            )}
             <button
               type="button"
               className={cx(
@@ -276,7 +283,7 @@ const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
  */
 export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
-  const { locality, isMine, mode } = ws;
+  const { locality, canEdit, canAdd, mode } = ws;
 
   return (
     <div className={cx(styles.row, styles.rowSub)}>
@@ -290,7 +297,7 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         <LocalityName
           key={locality.id}
           locality={locality}
-          isMine={isMine}
+          canEdit={canEdit}
           onRename={ws.rename}
         />
         {/* Guarded, not optional: every record has a code once 1700000500
@@ -318,7 +325,7 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
       </div>
 
       <div className={rowStyles.verbs}>
-        {isMine && (
+        {canAdd && (
           <ModeButton
             icon="add"
             label={t('localities.funn.new')}
@@ -334,7 +341,7 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           active={mode === 'lidar'}
           onClick={ws.toggleLidar}
         />
-        {isMine && (
+        {canAdd && (
           <ModeButton
             icon="photo_camera"
             label={t('localities.tools.screenshotShort')}
@@ -343,7 +350,7 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             onClick={ws.takeScreenshot}
           />
         )}
-        {isMine && (
+        {canAdd && (
           <ModeButton
             icon="satellite_alt"
             label={t('localities.tools.flyfotoShort')}
@@ -352,7 +359,7 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             onClick={ws.openFlyfotoNotice}
           />
         )}
-        {isMine && <OverflowMenu ws={ws} />}
+        {canEdit && <OverflowMenu ws={ws} />}
       </div>
     </div>
   );

@@ -167,7 +167,7 @@ export const LocalityDock = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           >
             <FunnList
               items={ws.findItems}
-              editable={ws.isMine}
+              editable={ws.canEdit}
               selectedId={ws.selectedFunnId}
               onSelect={ws.selectFunn}
               onStatus={ws.changeStatus}
@@ -186,7 +186,8 @@ export const LocalityDock = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             {...sectionProps('bilder')}
           >
             <BilderSection
-              isMine={ws.isMine}
+              canEdit={ws.canEdit}
+              canAdd={ws.canAdd}
               items={ws.attachmentItems}
               setItems={ws.setAttachmentItems}
               uploading={ws.uploading}
@@ -220,7 +221,7 @@ export const LocalityDock = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           >
             <LocalityDetails
               locality={ws.locality}
-              isMine={ws.isMine}
+              canEdit={ws.canEdit}
               onPatch={ws.patchLocality}
             />
           </Section>

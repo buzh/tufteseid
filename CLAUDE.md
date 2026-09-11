@@ -384,6 +384,14 @@ Rules (server-enforced by PB), same shape on all three:
 - create: signed in, owns the record, and owns the parent lokalitet
 - update/delete: owner or admin
 
+That asymmetry is why the UI carries **two** permissions rather than one.
+`useLocalityWorkspace` publishes `access` (`owner` | `admin` | `reader`),
+`canEdit` (update/delete — owner *and* admin) and `canAdd` (create — owner
+only, because the create rules also demand the parent lokalitet's owner). An
+admin can rename, retitle, reshape and delete anybody's lokalitet but cannot
+put new funn or bilder in it; every surface gates on whichever of the two
+matches the call it makes. Details: `docs/ui-architecture.md` §8.1.
+
 Adding an OAuth provider: PB admin UI → Collections → `users` → Edit
 collection → Options → OAuth2 (since 0.23 the providers live on the auth
 collection, not in global settings). No code change needed — the SPA's

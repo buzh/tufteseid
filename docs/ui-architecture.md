@@ -1343,6 +1343,37 @@ still keyed on `locality.id` for exactly that reason.
 the dock into the shell's right slot: the hook holds two PocketBase realtime
 subscriptions that reload the whole list on every event.
 
+#### Who may do what — `access`, `canEdit`, `canAdd`
+
+The controller answers this once and every surface reads it off the API. What
+you are to a record is `access: 'owner' | 'admin' | 'reader'`, and it drives
+**two** booleans rather than one, because PocketBase's rules are two:
+
+| | update / delete | create |
+|---|---|---|
+| PB rule | `owner = @request.auth.id \|\| @request.auth.role = "admin"` | `@request.auth.id = owner && locality.owner = @request.auth.id` |
+| UI | `canEdit` — owner *and* admin | `canAdd` — owner only |
+
+So an admin may rename somebody's lokalitet, retitle and delete its bilder,
+change a funn's status or geometry, reshape the rectangle and throw the whole
+thing away — but may not put new content in it, because the create rules also
+demand the *parent's* owner. Their overflow menu is Juster området and Slett;
+Nytt funn, Ta skjermbilde, Flyfoto, Hent grunnpakke, Last opp and the Bilder
+add-tile are not there. Showing an admin a button the server would 403 is the
+same lie as hiding one it would obey, pointing the other way.
+
+A reader — signed in, looking at a public lokalitet that is not theirs — gets
+neither, and the summary line says *Delt av …* whenever `access !== 'owner'`.
+That last test is attribution, not permission: an admin can change the record
+and it is still somebody else's.
+
+The same `canAdd` test is recomputed in `LidarExtractViewer` (the "Behold"
+button) because the extract tool hangs off `activeLocalityAtom` rather than the
+workspace hook. Terrenganalyse's **Lagre** is the one place still unguarded: with
+somebody else's lokalitet open it targets that lokalitet and fails with a toast.
+The honest fix is for it to fork rather than to disappear, which waits on
+`derivedFrom` (`docs/lokalitet-view.md` §7).
+
 ### 8.2 The dock
 
 `src/shell/Dock.tsx` is the frame — a header, then a body — and
@@ -1397,7 +1428,7 @@ stale draft in the closure would be saved anyway).
 
 The three fields are pre-filled at creation from the public registers
 (`src/localities/localityContext.ts`, §8.3) and are the user's afterwards. The
-only thing that overwrites them is the owner-only **"Hent stedsdata på nytt"**
+only thing that overwrites them is the `canEdit` **"Hent stedsdata på nytt"**
 button below the facts, which re-asks for the rectangle as it now stands —
 "Juster området" would otherwise leave all three describing the old one, with
 retyping as the only recourse. Koordinater is not a field: it is computed from
