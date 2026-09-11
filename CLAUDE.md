@@ -61,11 +61,11 @@ all of them.
   **Read it before proposing a new analysis feature** — it records what was
   already rejected and why, so those don't get re-litigated.
 - `docs/lokalitet-view.md` — **partly built**: §12's build order is through
-  step 13, so the two axes, the View/File split, the row's zones, the bottom
-  filmstrip/carousel, curation, the picker carousels, **removing the dock** and
-  **the edit transaction** are live and are documented in
-  `docs/ui-architecture.md`; the copy, the takeout bundle and moving
-  Terreng/Sammenlign onto the row are not. The whole design of making
+  step 14, so the two axes, the View/File split, the row's zones, the bottom
+  filmstrip/carousel, curation, the picker carousels, **removing the dock**,
+  **the edit transaction** and **the copy** are live and are documented in
+  `docs/ui-architecture.md`; the takeout bundle and moving Terreng/Sammenlign
+  onto the row are not. The whole design of making
   "a lokalitet is open" a view of its own is here — the two axes (owner/reader ×
   show/edit), **show writes nothing and edit is a transaction** (`Lagre` /
   `Avbryt` over a client-side draft), the lokalitet row as three zones
@@ -137,6 +137,12 @@ that owns them.
   drawing tools and *bilder* (extracts, terrain renders, screenshots,
   flyfoto, uploads), behind sign-in — below, and
   `docs/ui-architecture.md` §8, §9.
+- **A shared lokalitet can be forked.** `Lag min kopi` carries the rectangle,
+  the details, every funn and every View — as unpinned specs, so the pixels
+  are made again on the other side — into a private lokalitet of your own with
+  `derivedFrom` pointing back; the Files stay with the original and are shown
+  at the end of the copy's carousel with one `Ta med` each —
+  `docs/ui-architecture.md` §8.12.
 - **A View is a spec before it is pixels.** An extract, terrain render or
   flyfoto grab is stored as a row of parameters and rendered into a figure PNG
   afterwards by a background queue (`src/localities/pinQueue.ts`); a screenshot

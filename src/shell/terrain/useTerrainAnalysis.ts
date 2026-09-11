@@ -507,12 +507,30 @@ export const useTerrainAnalysis = () => {
    * knobs it just set — without this the seed would fire immediately after
    * and overwrite the image the user actually asked for with the cover's.
    */
+  //
+  // …with one lokalitet change that is not one: `Lag min kopi` (§7) swaps you
+  // to a fork of the site you were reading, and the likeliest path in the
+  // whole design ends there — open a shared site, dial up a better azimuth,
+  // copy it so you can keep the render. The rectangle is identical, so the
+  // DEM survives the swap for free (`bboxKey`); re-seeding would throw away
+  // the knobs that were the reason for copying, from the cover render of the
+  // very site those knobs were an improvement on.
+  //
   // Before the seed effect on purpose: effects run in declaration order, so
   // on the commit where the lokalitet changes this clears the flag and the
   // one below then seeds from the new record's cover.
+  const previousLocalityId = useRef(locality?.id ?? null);
   useEffect(() => {
+    const from = previousLocalityId.current;
+    const id = locality?.id ?? null;
+    // Depended on the whole record rather than its id, because `derivedFrom`
+    // is what has to be read — so the no-op case has to be checked by hand:
+    // the atom gets a fresh object on every rename and every bbox drag.
+    if (id === from) return;
+    previousLocalityId.current = id;
+    if (locality && from && locality.derivedFrom === from) return;
     seededRef.current = false;
-  }, [locality?.id]);
+  }, [locality]);
 
   useEffect(() => {
     if (tool !== 'terrain' || !coverTerrainSpec || seededRef.current) return;

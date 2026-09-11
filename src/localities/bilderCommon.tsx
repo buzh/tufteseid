@@ -219,19 +219,31 @@ export const MetaLine = ({ rec }: { rec: AttachmentRecord }) => {
 export const BildeBadges = ({
   ws,
   rec,
+  borrowed,
 }: {
   ws: LocalityWorkspaceApi;
   rec: AttachmentRecord;
+  /** One of the original's Files, on a copy that did not carry it (§7). */
+  borrowed?: boolean;
 }) => {
   const { t } = useTranslation();
   return (
     <>
       <Badge>{t(`localities.bilder.kind.${rec.kind}`)}</Badge>
-      {ws.coverBildeId === rec.id && (
-        <Badge palette="blue">{t('localities.bilder.cover')}</Badge>
-      )}
-      {rec.hidden && (
-        <Badge palette="yellow">{t('localities.bilder.hidden')}</Badge>
+      {/* Said first among the states, because it is the one that changes what
+          the card *is*: a borrowed image is not part of this exhibit yet, so
+          neither the cover nor the hidden mark would mean anything on it. */}
+      {borrowed ? (
+        <Badge palette="blue">{t('localities.copy.borrowed')}</Badge>
+      ) : (
+        <>
+          {ws.coverBildeId === rec.id && (
+            <Badge palette="blue">{t('localities.bilder.cover')}</Badge>
+          )}
+          {rec.hidden && (
+            <Badge palette="yellow">{t('localities.bilder.hidden')}</Badge>
+          )}
+        </>
       )}
     </>
   );
@@ -247,9 +259,17 @@ export const BildeBadges = ({
 export const CaptionField = ({
   ws,
   rec,
+  readOnly,
 }: {
   ws: LocalityWorkspaceApi;
   rec: AttachmentRecord;
+  /**
+   * Forced on for a borrowed card (§7). The record belongs to the original,
+   * so a caption typed here would either edit somebody else's lokalitet or —
+   * worse — go into this session's buffer under an id `Lagre` would then
+   * PATCH on their behalf. `Ta med` first; then it is yours to caption.
+   */
+  readOnly?: boolean;
 }) => {
   const { t } = useTranslation();
   const [caption, setCaption] = useState(rec.caption ?? '');
@@ -261,7 +281,7 @@ export const CaptionField = ({
   return (
     <Input
       value={caption}
-      readOnly={!ws.canEdit}
+      readOnly={readOnly || !ws.canEdit}
       placeholder={t('localities.bilder.captionPlaceholder')}
       maxLength={200}
       onChange={(e) => setCaption(e.target.value)}

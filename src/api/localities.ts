@@ -35,6 +35,14 @@ export type LocalityRecord = {
   matrikkel?: string;
   visibility: LocalityVisibility;
   bbox: LocalityBbox;
+  // What this was forked from (docs/lokalitet-view.md §7), and **not**
+  // cascade-deleted: a fork outlives its original, which is the point of a
+  // fork. The label denormalizes the original's name and owner at copy time
+  // for the same reason `finds.owner` is denormalized — attribution that
+  // vanishes when the original does is not attribution. Both optional on the
+  // type because records written before the migration have no such keys.
+  derivedFrom?: string;
+  derivedFromLabel?: string;
   created: string;
   updated: string;
   // PB's `expand` output when we ?expand=owner.
@@ -51,6 +59,8 @@ export type NewLocalityInput = {
   matrikkel?: string;
   visibility: LocalityVisibility;
   bbox: LocalityBbox;
+  derivedFrom?: string;
+  derivedFromLabel?: string;
 };
 
 const COLLECTION = 'localities';
@@ -122,6 +132,15 @@ export const createLocality = async (
     matrikkel: input.matrikkel ?? '',
     visibility: input.visibility,
     bbox: input.bbox,
+    // Only when there is one. A relation field sent as `''` is a value PB
+    // accepts and stores as "no relation", but writing it on every create
+    // would put the fork machinery in the path of the ordinary one.
+    ...(input.derivedFrom
+      ? {
+          derivedFrom: input.derivedFrom,
+          derivedFromLabel: input.derivedFromLabel ?? '',
+        }
+      : {}),
   };
 
   for (let attempt = 1; ; attempt++) {

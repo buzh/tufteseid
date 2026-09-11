@@ -287,6 +287,27 @@
       "discardConfirm": "Forkast",
       "restore": "Angre sletting"
     },
+    "copy": {
+      "action": "Lag min kopi",
+      "title": "Lag min kopi",
+      "body": "Funn, område og bilder du kan gjenskape følger med. Opplastede bilder og skjermbilder blir liggende hos originalen.",
+      "confirm": "Lag kopi",
+      "progress": "Lager din kopi…",
+      "progressFunn": "Lager din kopi… ({{done}} av {{total}} funn)",
+      "progressBilder": "Lager din kopi… ({{done}} av {{total}} bilder)",
+      "failed": "Kopien kunne ikke lages.",
+      "partial_one": "1 rad kom ikke med i kopien.",
+      "partial_other": "{{count}} rader kom ikke med i kopien.",
+      "banner": "Kopiert fra {{label}}",
+      "bannerGone": "Kopiert fra {{label}} — originalen er ikke lenger tilgjengelig.",
+      "openOriginal": "Åpne originalen",
+      "originalGone": "Originalen er ikke lenger tilgjengelig.",
+      "borrowed": "Fra originalen",
+      "borrowedHint": "Ligger hos originalen, ikke i denne kopien.",
+      "take": "Ta med",
+      "taking": "Henter…",
+      "takeFailed": "Bildet kunne ikke hentes."
+    },
     "funn": {
       "heading": "Funn",
       "listHint": "Funnene i denne lokaliteten",

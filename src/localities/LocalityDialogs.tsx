@@ -30,6 +30,10 @@ import {
  * by the controller for exactly that reason. It is here anyway because a
  * dialog raised from inside a popover would die with the popover.
  *
+ * The copy prompt is here for the Detaljer reason rather than the flyfoto
+ * one: it is raised from the lokalitet row, and the row it is raised from is
+ * about to be replaced by the copy's.
+ *
  * Grow-to-fit used to be one of these, raised from inside the funn save path.
  * It is an inline warning on the draft row now: drawing past the edge of the
  * rectangle is worth remarking on, but not worth stopping the pen for.
@@ -115,6 +119,39 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           canEdit={ws.canEdit}
           onPatch={ws.patchLocality}
         />
+      </Dialog>
+
+      {/* `Lag min kopi` (docs/lokalitet-view.md §7). One prompt, and its body
+          is the whole of §7's line about what does and does not come along:
+          the rectangle, the details, the funn and every image the app can
+          make again; not the screenshots and not the uploads.
+
+          Said before rather than reported after, because the split is not an
+          implementation detail the copier can be told about later — the one
+          photograph they wanted may be the one that stayed behind, and `Ta
+          med` on the copy's own carousel is the answer to that. */}
+      <Dialog
+        open={ws.copyPrompt}
+        onOpenChange={(next) => !next && ws.closeCopyPrompt()}
+        title={t('localities.copy.title')}
+        closeLabel={t('shared.close')}
+        footer={
+          <>
+            <Button size="sm" palette="gray" onClick={ws.closeCopyPrompt}>
+              {t('shared.cancel')}
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={ws.copyProgress != null}
+              onClick={() => void ws.confirmCopy()}
+            >
+              {t('localities.copy.confirm')}
+            </Button>
+          </>
+        }
+      >
+        <p className={styles.text}>{t('localities.copy.body')}</p>
       </Dialog>
 
       {/* Licensing notice shown before every flyfoto grab: NiB imagery is

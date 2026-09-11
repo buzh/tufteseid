@@ -43,6 +43,14 @@ export type NewAttachmentInput = {
   kind: AttachmentKind;
   caption?: string;
   meta?: AttachmentMeta;
+  // Only the copy (docs/lokalitet-view.md §7) passes these. Every other
+  // producer wants the defaults below — last in the exhibit, and shown — and
+  // saying so at each call site would be five chances to disagree about what
+  // "new image" means. A copy is the one case where the position and the
+  // concealment are *carried*: the original's arrangement is part of what was
+  // being shared.
+  sort?: number;
+  hidden?: boolean;
 };
 
 const COLLECTION = 'attachments';
@@ -126,7 +134,8 @@ export const createAttachment = async (
   form.append('kind', input.kind);
   form.append('caption', input.caption ?? '');
   if (input.meta) form.append('meta', JSON.stringify(input.meta));
-  form.append('sort', String(nextAttachmentSort()));
+  form.append('sort', String(input.sort ?? nextAttachmentSort()));
+  if (input.hidden) form.append('hidden', 'true');
   form.append('file', blob, filename);
   return pb.collection(COLLECTION).create<AttachmentRecord>(form);
 };
@@ -154,7 +163,8 @@ export const createAttachmentSpec = async (
     kind: input.kind,
     caption: input.caption ?? '',
     meta: input.meta ?? {},
-    sort: nextAttachmentSort(),
+    sort: input.sort ?? nextAttachmentSort(),
+    hidden: input.hidden ?? false,
   });
 
 /*

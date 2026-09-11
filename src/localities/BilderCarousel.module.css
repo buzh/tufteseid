@@ -93,6 +93,15 @@
   filter: grayscale(1);
 }
 
+/* One of the original's, on a copy that did not carry it (§7). A dashed
+   accent border rather than a fade: this card is not diminished, it is
+   *somebody else's* — full brightness so you can judge whether it is worth
+   the twenty megabytes, and an outline that says it is not in the exhibit. */
+.cardBorrowed {
+  border-style: dashed;
+  border-color: var(--c-accent);
+}
+
 /* `contain`, not `cover`: this is the image being judged, so none of it may
    be cropped away by the frame it happens to be sitting in. */
 .cardImage {
@@ -155,4 +164,12 @@
   padding: 0 var(--sp-2);
   font-size: var(--font-xs);
   color: var(--c-fg-muted);
+}
+
+/* Why the row of verbs is one button long (§7). In the toolbar rather than
+   beside the caption, because it is explaining the *absence* of the verbs
+   that would otherwise be here. */
+.borrowedNote {
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
 }

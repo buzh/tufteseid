@@ -287,6 +287,27 @@
       "discardConfirm": "Forkast",
       "restore": "Angre sletting"
     },
+    "copy": {
+      "action": "Lag min kopi",
+      "title": "Lag min kopi",
+      "body": "Funn, område og bilete du kan gjenskape følgjer med. Opplasta bilete og skjermbilete blir liggjande hos originalen.",
+      "confirm": "Lag kopi",
+      "progress": "Lagar din kopi…",
+      "progressFunn": "Lagar din kopi… ({{done}} av {{total}} funn)",
+      "progressBilder": "Lagar din kopi… ({{done}} av {{total}} bilete)",
+      "failed": "Kopien kunne ikkje lagast.",
+      "partial_one": "1 rad kom ikkje med i kopien.",
+      "partial_other": "{{count}} rader kom ikkje med i kopien.",
+      "banner": "Kopiert frå {{label}}",
+      "bannerGone": "Kopiert frå {{label}} — originalen er ikkje lenger tilgjengeleg.",
+      "openOriginal": "Opne originalen",
+      "originalGone": "Originalen er ikkje lenger tilgjengeleg.",
+      "borrowed": "Frå originalen",
+      "borrowedHint": "Ligg hos originalen, ikkje i denne kopien.",
+      "take": "Ta med",
+      "taking": "Hentar…",
+      "takeFailed": "Biletet kunne ikkje hentast."
+    },
     "funn": {
       "heading": "Funn",
       "listHint": "Funna i denne lokaliteten",

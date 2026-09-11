@@ -287,6 +287,27 @@
       "discardConfirm": "Discard",
       "restore": "Undo delete"
     },
+    "copy": {
+      "action": "Make my copy",
+      "title": "Make my copy",
+      "body": "The finds, the area and the images the app can recreate come along. Uploads and screenshots stay with the original.",
+      "confirm": "Make copy",
+      "progress": "Making your copy…",
+      "progressFunn": "Making your copy… ({{done}} of {{total}} finds)",
+      "progressBilder": "Making your copy… ({{done}} of {{total}} images)",
+      "failed": "The copy could not be made.",
+      "partial_one": "1 row did not make it into the copy.",
+      "partial_other": "{{count}} rows did not make it into the copy.",
+      "banner": "Copied from {{label}}",
+      "bannerGone": "Copied from {{label}} — the original is no longer available.",
+      "openOriginal": "Open the original",
+      "originalGone": "The original is no longer available.",
+      "borrowed": "From the original",
+      "borrowedHint": "Held by the original, not by this copy.",
+      "take": "Bring it over",
+      "taking": "Fetching…",
+      "takeFailed": "The image could not be fetched."
+    },
     "funn": {
       "heading": "Finds",
       "listHint": "The finds in this locality",

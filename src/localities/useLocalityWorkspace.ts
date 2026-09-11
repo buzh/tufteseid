@@ -3,9 +3,14 @@ import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { transformExtent } from 'ol/proj';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AttachmentRecord, createAttachment } from '../api/attachments';
+import {
+  AttachmentRecord,
+  createAttachment,
+  getAttachmentUrl,
+} from '../api/attachments';
 import {
   deleteLocality,
+  getLocality,
   LocalityBbox,
   LocalityPatch,
   LocalityRecord,
@@ -52,6 +57,7 @@ import {
   beholdOfferAtom,
   NIB_MOSAIC_KEY,
 } from './behold';
+import { copyLocality, type CopyProgress } from './copyLocality';
 import {
   attachmentBaseOf,
   clearDraft,
@@ -102,6 +108,7 @@ import {
   workspaceModeAtom,
 } from './toolAtoms';
 import { useFunnAutosave } from './useFunnAutosave';
+import { useInheritedBilder } from './useInheritedBilder';
 import { useKulturminner } from './useKulturminner';
 import { useLocalityAdjust } from './useLocalityAdjust';
 import {
@@ -252,6 +259,13 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const heritageOpacity = useAtomValue(heritageOpacityAtom);
   const [shooting, setShooting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Which borrowed File is being pulled across, if any (§7). An id rather
+  // than a bool because the tail can be a dozen cards long and the spinner
+  // belongs on the one that was pressed.
+  const [takingId, setTakingId] = useState<string | null>(null);
+  // `Lag min kopi`: whether the dialog is up, and how far the fork has got.
+  const [copyPrompt, setCopyPrompt] = useState(false);
+  const [copyProgress, setCopyProgress] = useState<CopyProgress | null>(null);
   // Whether the licensing notice is up, and what accepting it does. Two
   // routes reach NiB now — the acquisition picker and `Behold` over the
   // flyfoto ground — and consent is owed on both, so the notice grew a
@@ -443,10 +457,28 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * this list: an exhibit order that depended on who was looking would not be
    * an order.
    */
+  const { items: inheritedItems, unavailable: originalUnavailable } =
+    useInheritedBilder(locality, serverAttachments, canAdd);
+
+  /**
+   * The borrowed tail: `derivedFrom`'s Files, which the copy did not carry
+   * (§7). Publishing the ids rather than the records is what keeps every
+   * ordering call below honest — those index into `attachmentItems`, which
+   * has none of these in it, and the tail is a *suffix* of `bilderItems`, so
+   * a position in the one is still a position in the other.
+   */
+  const inheritedIds = useMemo(
+    () => new Set(inheritedItems.map((rec) => rec.id)),
+    [inheritedItems],
+  );
+
   const bilderItems = useMemo(() => {
     if (!attachmentItems) return null;
-    return canEdit ? attachmentItems : attachmentItems.filter((a) => !a.hidden);
-  }, [attachmentItems, canEdit]);
+    const own = canEdit
+      ? attachmentItems
+      : attachmentItems.filter((a) => !a.hidden);
+    return inheritedItems.length > 0 ? [...own, ...inheritedItems] : own;
+  }, [attachmentItems, canEdit, inheritedItems]);
 
   /*
    * Which bilde the bottom edge is pointing at (docs/lokalitet-view.md §4.3).
@@ -734,6 +766,86 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     () => () => setEditingId((cur) => (cur === locality.id ? null : cur)),
     [locality.id, setEditingId],
   );
+
+  /*
+   * `Lag min kopi` (§7) — the reader's half of the same slot `Rediger` fills
+   * for an owner, and the only escalation left in the design: it copies,
+   * swaps you to the copy, and drops you in edit there. One prompt in one
+   * place, rather than an "sign this over to you first?" wrapper around
+   * every write path in the app.
+   *
+   * The prompt is not a confirmation of a risk — nothing is at risk — it is
+   * where the sentence about what does and does not come along gets said, and
+   * that sentence is the whole of §7 in two lines. Which is also why it
+   * cannot be skipped for an empty lokalitet: a copy that silently left the
+   * screenshots behind would be found out later, over the one image that
+   * mattered.
+   */
+  const openCopyPrompt = useCallback(() => setCopyPrompt(true), []);
+  const closeCopyPrompt = useCallback(() => setCopyPrompt(false), []);
+
+  const confirmCopy = useCallback(async () => {
+    if (!user || copyProgress) return;
+    setCopyPrompt(false);
+    setCopyProgress({ stage: 'finds', done: 0, total: 0 });
+    try {
+      const result = await copyLocality({
+        source: locality,
+        finds: findItems ?? [],
+        attachments: attachmentItems ?? [],
+        userId: user.id,
+        onProgress: setCopyProgress,
+      });
+      if (!result) {
+        toast.error({ title: t('localities.copy.failed') });
+        return;
+      }
+      if (result.failed > 0) {
+        toast.error({
+          title: t('localities.copy.partial', { count: result.failed }),
+        });
+      }
+      // Straight into it, in edit — same batch, so the row never renders the
+      // copy in show first. The specs it carries have no pixels yet; the pin
+      // sweep in the copy's own workspace is what asks for them, which is
+      // also what keeps a fork from rendering a dozen figures for somebody
+      // who was only curious.
+      setActiveLocality(result.rec);
+      setEditingId(result.rec.id);
+    } finally {
+      setCopyProgress(null);
+    }
+  }, [
+    user,
+    copyProgress,
+    locality,
+    findItems,
+    attachmentItems,
+    setActiveLocality,
+    setEditingId,
+    t,
+  ]);
+
+  /*
+   * `Åpne originalen`, on the banner a copy carries (§5.7, rank 5).
+   *
+   * Fetched rather than assumed reachable: `derivedFrom` is
+   * `cascadeDelete: false`, so the relation outlives the record it points at
+   * and outlives being un-shared. That is the accepted cost of a fork, and
+   * this is where it has to be said out loud instead of opening nothing.
+   */
+  const openOriginal = useCallback(async () => {
+    const id = locality.derivedFrom;
+    if (!id) return;
+    try {
+      const rec = await getLocality(id);
+      upsertLocalityOnLayer(rec);
+      setActiveLocality(rec);
+    } catch (e) {
+      console.warn('[localityWorkspace] original unavailable', id, e);
+      toast.error({ title: t('localities.copy.originalGone') });
+    }
+  }, [locality.derivedFrom, setActiveLocality, t]);
 
   const rename = useCallback(
     async (next: string) => {
@@ -1290,6 +1402,57 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       mutateDraft,
       t,
     ],
+  );
+
+  /*
+   * `Ta med` — pull one of the original's Files into this copy (§7).
+   *
+   * The one route in the app that moves bytes sideways: down from the
+   * original's storage and back up into this record. Which is exactly why it
+   * is a button per card instead of part of the copy — twenty megabytes an
+   * image, paid once, by whoever decided the image was worth having.
+   *
+   * Eager and compensated, like every other File write in edit (§5.6): the
+   * blob cannot live in `localStorage`, so the record lands now and `Avbryt`
+   * owes it a DELETE. `meta.takenFrom` is what keeps the card from coming
+   * back on the borrowed tail afterwards.
+   */
+  const takeBilde = useCallback(
+    async (rec: AttachmentRecord) => {
+      if (!user || !canAdd || takingId) return;
+      setTakingId(rec.id);
+      try {
+        const url = await getAttachmentUrl(rec);
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const copy = await createAttachment(
+          {
+            locality: locality.id,
+            kind: rec.kind,
+            caption: rec.caption,
+            // Its place in the original's arrangement comes with it. The
+            // whole point of the borrowed tail is that these are the
+            // author's images, and where they sat was part of the reading.
+            sort: rec.sort,
+            hidden: rec.hidden,
+            meta: { ...(rec.meta ?? {}), takenFrom: rec.id },
+          },
+          user.id,
+          blob,
+          rec.file,
+        );
+        setAttachmentItems((prev) => (prev ? [...prev, copy] : [copy]));
+        mutateDraft((d) => withEager(d, copy.id));
+        setActiveBildeId(copy.id);
+      } catch (e) {
+        console.warn('[localityWorkspace] take failed', rec.id, e);
+        toast.error({ title: t('localities.copy.takeFailed') });
+      } finally {
+        setTakingId(null);
+      }
+    },
+    [user, canAdd, takingId, locality.id, setAttachmentItems, mutateDraft, t],
   );
 
   // The acquisition list is per-rectangle, so drop it when the rectangle
@@ -2153,6 +2316,23 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     mode,
     close,
     enterEdit,
+
+    /*
+     * The copy (§7) — the reader's way in, and the two things a copy knows
+     * about where it came from.
+     */
+    copyPrompt,
+    openCopyPrompt,
+    closeCopyPrompt,
+    confirmCopy,
+    /** Non-null while the fork is being written: the banner's rank 2. */
+    copyProgress,
+    /** The original's name and owner, frozen at copy time — banner rank 5. */
+    derivedLabel: locality.derivedFrom
+      ? locality.derivedFromLabel || null
+      : null,
+    openOriginal,
+
     rename,
     zoomToLocality,
     removeLocality,
@@ -2184,6 +2364,18 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // it is what the ordering calls index into, and publishing both would be
     // publishing two answers to "which images does this lokalitet have".
     bilderItems,
+    /*
+     * The borrowed tail (§7): which of `bilderItems` belong to the original
+     * rather than to this copy. A set rather than a second list, because the
+     * carousel walks one rail and only needs to know which verbs a card gets
+     * — and because appending them made `bilderItems` a superset of the
+     * exhibit rather than a different list.
+     */
+    inheritedIds,
+    /** The original could not be read at all — deleted, or no longer shared. */
+    originalUnavailable,
+    takeBilde,
+    takingBildeId: takingId,
     coverBildeId,
     pinned,
     kulturminner,

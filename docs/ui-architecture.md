@@ -1384,7 +1384,8 @@ with two buttons that both say `Ferdig`:
 | 2 | a funn draft is open | `[Ferdig med funn]` `[Forkast funn]` |
 | 2 | Juster området is on | `[Bruk]` `[Angre]` |
 | 1 | edit, nothing deeper | `[Lagre]` `[Avbryt]` `[⋮]` |
-| 0 | show | `[Rediger]` `[Lukk]` `[⋮]` |
+| 0 | show, and you may edit | `[Rediger]` `[Lukk]` `[⋮]` |
+| 0 | show, and you may not | `[Lag min kopi]` `[Lukk]` `[⋮]` |
 
 Both depth-2 pairs are two buttons because both now have something to undo
 *to*. `Forkast funn` used to be offered only for a new funn — autosave had
@@ -1399,8 +1400,12 @@ riding on `Avbryt`, whose grain is the whole session.
 There is no `[←]` back arrow: leaving is an exit, exits are on the right, and
 one lokalitet should not have two ways out at opposite ends of the same row.
 Edit tints the row (`.rowEdit`) — the zones already differ, so the tint is the
-confirmation rather than the signal. `Del` is absent until `?lok=CODE` exists;
-`Lag min kopi` is a later step of the same build order.
+confirmation rather than the signal. `Del` is absent until `?lok=CODE` exists.
+
+The two depth-0 rows are **one slot, filled two ways**: `mayEdit` decides which
+verb a lokalitet offers, and a reader gets `Lag min kopi` (§8.12) rather than a
+greyed `Rediger`. Signed out there is neither — the copy is a write like any
+other, and it needs somewhere to put the new record.
 
 The `[⋮]` menu is on the row in **both** stances, and it is how a reader opens
 Detaljer. Its two writing items (`Juster området`, `Slett`) are gated on
@@ -1411,16 +1416,22 @@ occupied, holds at most one sentence, and answers only *whose is this and what
 state is it in*. Three sentences compete for it, and the rank is fixed:
 
 1. *Gjenopprettet ulagret arbeid fra 14:32* · **Forkast** — a buffer that came
-   back off disk (§8.11). The only banner that is news rather than a standing
-   fact, and the only one with a verb in it, so it is the only one that gets
-   colour (`.bannerAlert`).
-2. *Delt av X — du leser*, for a reader.
-3. *Du redigerer Xs lokalitet som administrator*, for an admin **in edit**.
+   back off disk (§8.11).
+2. *Lager din kopi… (3 av 7 funn)* — a fork being written right now (§8.12).
+3. *Delt av X — du leser*, for a reader.
+4. *Du redigerer Xs lokalitet som administrator*, for an admin **in edit**.
+5. *Kopiert fra X (Y)* · **Åpne originalen** — you are in a copy (§8.12).
 
-The design (§5.7) keys that last one on being an admin at all, which would
-print "Du redigerer" at somebody who is only looking; the stance test is
-deliberate. Deliberately not a notification area — everything else stays next
-to the thing it is about.
+Ranks 1 and 2 are the two that are *news*, and they are the two that get colour
+(`.bannerAlert`); the rest are standing facts the reader already knows and can
+go on knowing a few seconds longer. Rank 5 is last precisely because it is
+permanent: a copy is a copy forever, so its line must never be what you read
+instead of "somebody is editing this out from under you".
+
+The design (§5.7) keys rank 4 on being an admin at all, which would print "Du
+redigerer" at somebody who is only looking; the stance test is deliberate.
+Deliberately not a notification area — everything else stays next to the thing
+it is about.
 
 Terreng is deliberately *not* in the lokalitet row — it is a ground mode in
 row 1 and works the same with or without a lokalitet (§5.1, §10).
@@ -1486,9 +1497,10 @@ would obey, pointing the other way.
 A reader — signed in, looking at a public lokalitet that is not theirs — gets
 neither, and the banner says *Delt av …* whenever `access !== 'owner'`. That
 test is attribution, not permission: an admin can change the record and it is
-still somebody else's. A reader's right zone is `[Lukk]` alone until
-`Lag min kopi` lands; a slot that would hold a button that cannot work is left
-empty rather than filled with a disabled one.
+still somebody else's. A reader's one verb is `Lag min kopi` (§8.12), which
+writes a *new* record and so needs neither `mayEdit` nor `mayAdd` on this one;
+a slot that would hold a button that cannot work is left empty rather than
+filled with a disabled one.
 
 **Absent applies to verbs; text fields go read-only instead.** Sted, Kommune,
 Matrikkel, Beskrivelse and a bilde's caption are content, not buttons — hiding
@@ -1507,7 +1519,7 @@ no longer reachable there: keeping a terrain render over an open lokalitet is
 `Behold` on the lokalitet row now (§8.9.2), which is gated like every other
 verb in that zone, and the terrain strip's own button survives **only when
 there is no lokalitet** (§10). Forking somebody else's rectangle instead of
-being refused still waits on `derivedFrom` (`docs/lokalitet-view.md` §7).
+being refused is §8.12.
 
 ### 8.2 The subjects, and Detaljer
 
@@ -2589,6 +2601,78 @@ and it is the one bit of that sentence the three locale files should not have
 to spell. (`tsconfig.app.json` gained `ES2021.Intl` in its `lib` for the
 types; the emit target is unchanged.)
 
+### 8.12 The copy — `Lag min kopi`
+
+A reader's one verb (`docs/lokalitet-view.md` §7). It forks somebody else's
+rectangle into one of your own instead of refusing you a pen, which is what
+makes a shared lokalitet useful to the person it was shared with: the argument
+someone else made is where you *start*, not something you can only read.
+
+**What comes along, and what does not.** `src/localities/copyLocality.ts`:
+
+| Carried | Left behind |
+|---|---|
+| `bbox`, `name`, `description`, `place`, `municipality`, `matrikkel` | `owner` — the copy is yours |
+| every funn: `title`, `note`, `status`, `geometry` | `visibility` — a copy starts `private` |
+| every **View**'s `meta`, `caption`, `sort`, `hidden`, as unpinned specs | every **File** — the screenshots and uploads (§8.7.4) |
+
+The View/File split (§8.7.4) is what makes that table possible. A View is a row
+of parameters, so copying it is one small write and the pin queue makes the
+pixels again on the other side; a File is twenty megabytes with nothing behind
+it, and duplicating a dozen of them through the browser would turn a fork into
+a multi-minute upload. So the dialog says so before it starts: *"Funn, område
+og bilder du kan gjenskape følger med. Opplastede bilder og skjermbilder blir
+liggende hos originalen."*
+
+The name is kept verbatim — no *"(kopi)"*. Attribution is the banner's job, and
+it is `derivedFrom` (a relation with **no** cascade delete — a fork outlives its
+original) plus `derivedFromLabel`, the original's name and owner frozen as prose
+at copy time. Denormalized for the same reason `finds.owner` is: attribution
+that vanishes when the original does is not attribution.
+
+Load-bearing details:
+
+- **It is deliberately not a transaction**, unlike edit (§8.11). Every step is
+  a create on records nobody else can see, so a half-written copy is a
+  lokalitet you can finish or throw away — where a rollback would be the same
+  failure with the evidence destroyed. Per-child failures are counted and
+  reported (*"3 rader kom ikke med i kopien"*), never fatal, and the banner
+  counts progress as it goes because forty funn over a slow link is long
+  enough for *is it stuck* to be a real question.
+- **The copy does not throw the DEM away.** `useTerrainAnalysis` keys its
+  elevation grid on the rectangle (`bboxKey`), not on the record id, so a copy
+  with an identical bbox costs one write and no megabytes. What did need
+  saying is the **seed** (§10): the knob seeding is once-per-lokalitet, and
+  swapping to a copy is a lokalitet change — so the reset is skipped when the
+  new record's `derivedFrom` is the one being left, or the tuned azimuth that
+  motivated the copy is destroyed by a re-seed the moment it lands.
+- **`imageRect` and `renderedAt` are stripped** from each carried spec: they
+  are facts about pixels that do not exist yet. `bbox25833` stays, so the pin
+  queue renders the spec's own rectangle rather than the copy's current one.
+- **`sort` and `hidden` carry**, which is why `NewAttachmentInput` takes them
+  at all. The original's arrangement is part of what was being shared.
+
+**The Files that stayed behind are still shown.** `useInheritedBilder` lists
+the original's Files and appends them to the copy's carousel as borrowed
+cards — dashed accent border, a *Fra originalen* badge, a read-only caption,
+and exactly one verb: **Ta med**, which fetches the bytes and writes them as a
+new attachment of the copy's own, marked `meta.takenFrom`. Elective, per image,
+paid for by whoever asked. Four things about that tail:
+
+- They are a **suffix of `bilderItems` and never enter `attachmentItems`**,
+  which is what keeps every ordering, cover and pin-sweep call correct without
+  learning about them — all of those index into `attachmentItems`.
+- The cards appear **only for an owner in edit** (`canAdd`), because their only
+  verb is a write and §2 says write verbs are absent in show, not greyed.
+- `Ta med` is an **eager, compensated write** like a screenshot or an upload
+  (§8.11): the bytes exist the moment it succeeds, and `Avbryt` deletes them.
+- The consequence to accept: **they stop resolving if the original is deleted
+  or turned private**. §7 asks for a *"Bildet er ikke lenger tilgjengelig"* per
+  card, but a copy stores nothing per borrowed file — only the one relation —
+  so there is no card left to put it on. The sentence moves to the banner,
+  which says it once and withdraws `Åpne originalen` rather than offering a
+  link known to be dead.
+
 ---
 
 ## 9. Drawing
@@ -2776,8 +2860,16 @@ already on file is a better guess than a constant. It is a *seed*, not a bind �
 move any slider and nothing writes back; the picked spec is not consulted
 again.
 
-Seeding is **once per lokalitet**, tracked by a ref that resets on
-`locality?.id`. Re-seeding on every entrance would silently undo an
+Seeding is **once per lokalitet**, tracked by a ref that resets when the open
+lokalitet changes — with one exception: **`Lag min kopi` is a lokalitet change
+that is not one** (§8.12). Swapping from an original to the copy just made of
+it keeps the seed flag, because the whole reason to fork was usually the render
+on screen, and re-seeding from the original's cover would throw it away in the
+same tick. The test is `next.derivedFrom === previous.id`, which is why the
+effect depends on the record rather than on `locality?.id` — and therefore has
+to check the unchanged-id case by hand, since a rename or a bbox drag hands it
+a fresh object for the same lokalitet. Re-seeding on every entrance would
+silently undo an
 adjustment as soon as the user glanced at another ground and came back, which
 is the same complaint the unconditional mount answers. `restoreView` sets that
 ref itself, which is what keeps the seed from stepping on Gjenskap: the
@@ -3191,7 +3283,11 @@ your lokaliteter by any of those; set visibility (private / limited / public);
 adjust the rectangle afterwards (translate + modify); delete it; browse "Mine
 lokaliteter"; click a rectangle on the map to open it; see which known
 kulturminner already fall inside it; read its details in a dialog off the
-row's `⋮`.
+row's `⋮`; on somebody else's, press **Lag min kopi** and get the rectangle,
+the details, every funn and every image the app can make again as a private
+lokalitet of your own, with the original named in the banner and one press away
+— and the screenshots and uploads that stayed behind still shown at the end of
+the carousel, one **Ta med** each.
 
 **Record what you find**
 arm the pen and have the first finished shape become a saved funn, auto-named

@@ -33,9 +33,11 @@ import { canPinBilde } from './usePinnedBilde';
 const Card = ({
   rec,
   deleted,
+  borrowed,
 }: {
   rec: AttachmentRecord;
   deleted: boolean;
+  borrowed: boolean;
 }) => {
   const { t } = useTranslation();
   // The 800 px thumbnail rather than the original: a stitched extract is
@@ -51,8 +53,9 @@ const Card = ({
     <div
       className={cx(
         styles.card,
-        rec.hidden && styles.cardHidden,
+        rec.hidden && !borrowed && styles.cardHidden,
         deleted && styles.cardDeleted,
+        borrowed && styles.cardBorrowed,
       )}
     >
       {face ? (
@@ -127,6 +130,12 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   // every verb that would curate it is gone, because curating something you
   // have just thrown away is not a decision anyone needs to make.
   const deleted = active != null && ws.deletedIds.has(active.id);
+  // One of the original's Files, on a copy that did not carry it (§7). It
+  // sits at the end of the same rail rather than in a shelf of its own: they
+  // are images of this rectangle and they belong where you are already
+  // looking. Every verb but `Ta med` is gone, because none of the others has
+  // anything to act on — the record is not in this lokalitet yet.
+  const borrowed = active != null && ws.inheritedIds.has(active.id);
 
   return (
     <div className={styles.carousel} data-chrome="bottom">
@@ -174,7 +183,12 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             </span>
           </div>
         ) : active ? (
-          <Card key={active.id} rec={active} deleted={deleted} />
+          <Card
+            key={active.id}
+            rec={active}
+            deleted={deleted}
+            borrowed={borrowed}
+          />
         ) : (
           <div className={styles.card}>
             <p className={styles.empty}>
@@ -196,17 +210,39 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         <div className={styles.body}>
           <div className={styles.bodyMain}>
             <div className={styles.bodyHead}>
-              <BildeBadges ws={ws} rec={active} />
+              <BildeBadges ws={ws} rec={active} borrowed={borrowed} />
               <MetaLine rec={active} />
             </div>
-            <CaptionField ws={ws} rec={active} />
+            <CaptionField ws={ws} rec={active} readOnly={borrowed} />
             {pinned.pinnedFailed && isPinned && (
               <Note>{t('localities.bilder.loadFailed')}</Note>
             )}
           </div>
 
           <div className={styles.actions}>
-            {deleted ? (
+            {borrowed ? (
+              <>
+                <span className={styles.borrowedNote}>
+                  {t('localities.copy.borrowedHint')}
+                </span>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  leftIcon="download"
+                  disabled={ws.takingBildeId != null}
+                  onClick={() => void ws.takeBilde(active)}
+                >
+                  {ws.takingBildeId === active.id
+                    ? t('localities.copy.taking')
+                    : t('localities.copy.take')}
+                </Button>
+                {/* Reading is not taking. The full-size file opens in a tab
+                    straight from the original — which is the whole reason
+                    the link back is worth having, and the reason `Ta med`
+                    can afford to be elective. */}
+                <OpenOriginalButton ws={ws} rec={active} />
+              </>
+            ) : deleted ? (
               <Button
                 size="sm"
                 variant="secondary"

@@ -461,17 +461,19 @@ const KulturminnerMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
  * summary used to, holds at most one sentence, and answers exactly one
  * question: whose is this and what state is it in.
  *
- * Ranked, and only one shows. Rank 1 is the recovered draft, which outranks
- * the ownership lines because it is the only one that is *news*: the other
- * two describe a standing fact the author already knows, and this one says
- * something happened while they were not looking.
+ * Ranked, and only one shows. Ranks 1 and 2 are the two that are *news* — a
+ * draft came back off disk, a fork is being written right now — and both
+ * outrank the ownership lines, which describe a standing fact the reader
+ * already knows and can go on knowing a few seconds longer.
  *
  * The `admin` line is keyed on the *stance* rather than on access alone — the
  * doc's table says "admin, not owner" unqualified, but "Du redigerer …"
  * printed over show mode would be a false sentence, and this slot exists to
  * say what state you are in.
  *
- * Rank 2 (the copy's "Kopi av …") arrives with §7 at step 14.
+ * Rank 5 is the one that is permanent, and it is last for that reason: a copy
+ * is a copy forever, so its line must never be what you read instead of
+ * "somebody is editing this out from under you".
  */
 const Banner = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t, i18n } = useTranslation();
@@ -501,18 +503,71 @@ const Banner = ({ ws }: { ws: LocalityWorkspaceApi }) => {
     );
   }
 
-  if (!owner || ws.access === 'owner') return null;
+  // Rank 2: the fork, while it is being written (§7). Counted rather than a
+  // spinner, because copying forty funn over a slow link is long enough that
+  // "is it stuck" is a real question, and the count answers it.
+  const progress = ws.copyProgress;
+  if (progress) {
+    const text =
+      progress.total === 0
+        ? t('localities.copy.progress')
+        : t(
+            progress.stage === 'finds'
+              ? 'localities.copy.progressFunn'
+              : 'localities.copy.progressBilder',
+            { done: progress.done, total: progress.total },
+          );
+    return (
+      <span className={cx(rowStyles.banner, rowStyles.bannerAlert)}>
+        {text}
+      </span>
+    );
+  }
 
-  const text =
-    ws.stance === 'edit' && ws.access === 'admin'
-      ? t('localities.workspace.bannerAdmin', { name: owner })
-      : t('localities.workspace.bannerReader', { name: owner });
+  if (owner && ws.access !== 'owner') {
+    const text =
+      ws.stance === 'edit' && ws.access === 'admin'
+        ? t('localities.workspace.bannerAdmin', { name: owner })
+        : t('localities.workspace.bannerReader', { name: owner });
 
-  return (
-    <span className={rowStyles.banner} title={text}>
-      {text}
-    </span>
-  );
+    return (
+      <span className={rowStyles.banner} title={text}>
+        {text}
+      </span>
+    );
+  }
+
+  // Rank 5: your own copy of somebody else's site. The label is frozen prose
+  // rather than a live read through the relation, so it still says who made
+  // the original after the original is gone — which is exactly when it
+  // matters, and why `Åpne originalen` has to be allowed to fail.
+  //
+  // §7 puts "the original is gone" on each borrowed card, but a copy stores
+  // nothing per borrowed file — only the one relation — so when the relation
+  // stops resolving there are no cards to put it on. The sentence belongs to
+  // the lokalitet, so it is said here, once, and the dead link is withdrawn
+  // rather than left to fail on a press.
+  if (ws.derivedLabel) {
+    const gone = ws.originalUnavailable;
+    const key = gone ? 'localities.copy.bannerGone' : 'localities.copy.banner';
+    const text = t(key, { label: ws.derivedLabel });
+    return (
+      <span className={rowStyles.banner} title={text}>
+        {text}
+        {!gone && (
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => void ws.openOriginal()}
+          >
+            {t('localities.copy.openOriginal')}
+          </Button>
+        )}
+      </span>
+    );
+  }
+
+  return null;
 };
 
 /**
@@ -839,7 +894,12 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           <EditExits ws={ws} />
         ) : (
           <>
-            {mayEdit && (
+            {/* One slot, two honest labels (§3). `Rediger` costs nothing and
+                says so; `Lag min kopi` costs a record and says that. The
+                alternative — one button that quietly forks the site the
+                first time a reader types in a field — is the escalation
+                this design deleted. */}
+            {mayEdit ? (
               <Button
                 variant="secondary"
                 leftIcon="edit"
@@ -847,6 +907,17 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               >
                 {t('localities.workspace.edit')}
               </Button>
+            ) : (
+              ws.user != null && (
+                <Button
+                  variant="secondary"
+                  leftIcon="content_copy"
+                  disabled={ws.copyProgress != null}
+                  onClick={ws.openCopyPrompt}
+                >
+                  {t('localities.copy.action')}
+                </Button>
+              )
             )}
             <Button variant="ghost" palette="gray" onClick={ws.close}>
               {t('localities.workspace.close')}
