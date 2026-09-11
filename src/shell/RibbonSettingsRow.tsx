@@ -65,11 +65,14 @@ const SUBJECT_KEY: Record<GroundMode, string> = {
  * you walk the ring makes the whole bar change height under the pointer, and
  * every control below row 1 move.
  *
- * Terreng is the one subject that also puts a second line under this one —
- * its four sliders, in `TerrainSliders`, rendered by row 1 as a sibling. That
- * is still "one line each": what the rule forbids is a *body*, and two thin
- * rows over the map cost less of it than the 360 px dock column those knobs
- * used to live in, which covered the terrain it was describing.
+ * Terreng is the one subject that can *wrap* this line, because it is the one
+ * that puts sliders on it (`TerrainSliders`, inline: label · track · readout).
+ * That is within the contract, which forbids a *body* — the 380 px panel, the
+ * 360 px dock column — rather than a second line of the same thin row; and
+ * the knobs had a dedicated second row until they were flattened, so wrapping
+ * on a narrow window costs exactly what that row cost on every window. If a
+ * ninth visualization ever needs a fifth slider, the answer is fewer knobs on
+ * the line, not a taller strip.
  *
  * With the compare curtain up the strip also carries the A|B switch, and both
  * questions above are then asked of the *focused* half — the controls on this

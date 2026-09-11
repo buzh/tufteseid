@@ -1,10 +1,11 @@
 /*
  * Terrenganalyse on the ribbon. The render is on the map — see
- * map/groundOverlay.ts — so what is here is knobs, a resolution readout and
- * two verbs, spread over the settings strip and one slider row under it.
+ * map/groundOverlay.ts — so what is here is knobs and a resolution readout,
+ * all of it on the one settings strip.
  *
- * Nothing here is a panel. Both rows are thin and both let the terrain
- * through, which is the whole reason the knobs left the dock column.
+ * Nothing here is a panel, and nothing here is a second row any more. One thin
+ * line that lets the terrain through is the whole reason the knobs left the
+ * dock column, and two of them was one more than the argument bought.
  */
 
 .status {
@@ -20,9 +21,8 @@
   color: var(--c-danger);
 }
 
-/* Fixed basis and no stretch: a light-sweep slider needs travel, and letting
-   four of them share the row's free space would give each about a
-   centimetre on a laptop. */
+/* Wraps as a unit inside the strip, so the knobs stay together when the line
+   runs out rather than leaving one orphan behind the resolution readout. */
 .sliders {
   display: flex;
   align-items: center;
@@ -30,24 +30,39 @@
   gap: var(--sp-2) var(--sp-4);
 }
 
+/* Label · track · readout on one line. Stacking the label over the track is
+   what made these a row of their own: it doubles the height of whatever it is
+   on, and this is chrome over the terrain it describes. */
 .slider {
-  flex: 0 1 200px;
-}
-
-.slider input[type='range'] {
-  width: 100%;
-  margin: 0;
-  display: block;
-}
-
-.sliderHead {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
   gap: var(--sp-2);
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: var(--font-xs);
   color: var(--c-fg-muted);
 }
 
+.sliderLabel {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* Travel matters more than tidiness — sweeping the azimuth is the most useful
+   gesture the tool has and a 40 px track cannot be swept — so the track
+   shrinks only so far and the strip wraps instead. */
+.slider input[type='range'] {
+  flex: 1 1 110px;
+  min-width: 64px;
+  max-width: 160px;
+  margin: 0;
+}
+
+/* Fixed width and right-aligned. The readout follows the track now, so a value
+   going from 5° to 315° would otherwise shove the thumb sideways mid-drag. */
 .sliderValue {
+  flex: none;
+  min-width: 4.5ch;
+  text-align: right;
   font-variant-numeric: tabular-nums;
 }

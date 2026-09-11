@@ -245,7 +245,7 @@ fixed bounds, because the blend assumes 0.7 sky-view means the same thing
 everywhere. Two VAT renders are therefore comparable and two sky-view renders
 are not, and only the caption says which kind you are holding.
 
-The two radii are the user's now — a slider on the terrain row, defaulting to
+The two radii are the user's now — a slider on the terrain strip, defaulting to
 `DEFAULT_LRM_RADIUS` / `DEFAULT_SVF_RADIUS` — so the caption prints the value
 that was used rather than the constant. Two, not five: the split is by
 *quantity*, so LRM's smoothing radius is one number and the horizon search

@@ -212,8 +212,8 @@ decision everything else follows from.
 └── .overlay  position:absolute inset:0  z --z-overlay
               display:flex  flex-direction:column  pointer-events:none
     ├── .ribbon   flex:0 0 auto   pointer-events:auto   z --z-ribbon
-    │     └── Ribbon                  ← row 1, the settings strip, the terrain
-    │                                   sliders, the lokalitet row
+    │     └── Ribbon                  ← row 1, the settings strip,
+    │                                   the lokalitet row
     ├── .row      flex:1  min-height:0  position:relative  pointer-events:none
     │     ├── .left    absolute top/left/bottom          SearchComponent + MapToolCards
     │     └── .right   absolute top/right  360→400px       InfoBox, and only that
@@ -572,7 +572,7 @@ returns you to exactly the dataset and style you left — 1→5→1 is free wher
 | Standard (1) | Karttype pulldown — the five cartographies (topografisk, gråtone, rasterkart, sjøkart, amtskart), also the W/S ring (§5.10) |
 | LiDAR (2), Hybrid (3) | Dataset pulldown — **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport · style pulldown (the active dataset's WMS styles, with a "flere stiler" second tier), only when the dataset publishes more than one · DTM/DOM segment · **Høydekurver** switch, Hybrid only |
 | Flyfoto (4) | Acquisition pulldown — the seamless mosaic or any acquisition covering the viewport, newest first · period chips (Alle / 2010– / 1990–2009 / 1960–1989 / –1959), which narrow both that list and the W/S ring (§5.5) |
-| Terreng (5) | Visualisering pulldown — the eight relief views, each with its own explanation as a tooltip, also the W/S ring (§10) · DTM/DOM segment · the resolution readout. No actions: keeping the render is `Behold` on row 2 (§8.9.2) and the rectangle is the lokalitet's, so "Juster området" owns it — **plus a second row under the strip** holding the sliders the current visualization uses, two to four of azimuth / altitude / exaggeration / radius / opacity (§10) |
+| Terreng (5) | Visualisering pulldown — the eight relief views, each with its own explanation as a tooltip, also the W/S ring (§10) · DTM/DOM segment · **the sliders the current visualization uses**, two to four of azimuth / altitude / exaggeration / radius / opacity, inline as label · track · readout (§10) · the resolution readout. No actions: keeping the render is `Behold` on row 2 (§8.9.2) and the rectangle is the lokalitet's, so "Juster området" owns it |
 
 **The strip is always on the bar.** It used to vanish under Standard, which had
 nothing to adjust; five cartographies filled that hole, and the fixture is the
@@ -604,11 +604,15 @@ Two constraints on the strip that are load-bearing rather than stylistic:
   popover anchored to a control already on the strip, the way the dataset
   pickers do. A subject whose controls stop fitting is the signal to move
   something into a popover, never to let the strip grow — that is how the
-  five-hundred-pixel bar happened the first time. Terreng's slider row is the
-  one thing that answers that signal with a *second line* instead, and it is
-  allowed for the reason the rule exists: what the rule forbids is a body, and
-  the sliders have to stay visible while they are being dragged, because what
-  you are watching is the terrain under them (§10).
+  five-hundred-pixel bar happened the first time. Terreng is the one subject
+  that can push past the line, and it does it by **wrapping** rather than by
+  adding a row: its two to four sliders are on the strip, because they have to
+  stay visible while they are being dragged — what you are watching is the
+  terrain under them (§10) — and a popover would cover it. That is within the
+  rule, which forbids a body rather than a second line of the same thin row,
+  and it is cheaper than what it replaced: the sliders had a dedicated row
+  until they were flattened onto one line each, so what now costs a wrap on a
+  narrow window used to cost a row on every window.
 - **Not registered with `anyOverlayOpenAtom`.** The strip is chrome, not an
   overlay. Counting it as one would disable 1–5 and W/S/A/D (§5.3) exactly
   while someone is using the controls those keys are the shortcut for.
@@ -1489,10 +1493,10 @@ their exits write, and those escalate on their own: keeping a terrain render is
 `Behold`, which is `canAdd` like every other write verb (§8.9.2).
 
 The machinery did not move with the buttons. `useGroundMode` and the four
-control hooks stay mounted once in `RibbonGlobalRow` — the settings strip and
-the slider row run off the same objects, and a second mount would mean a second
-DEM — and the two rows are siblings in separate error boundaries, so there is
-no parent to pass anything down from. `RibbonGlobalRow` publishes the four
+control hooks stay mounted once in `RibbonGlobalRow` — row 1 and the settings
+strip run off the same objects, and a second mount would mean a second DEM —
+and row 1 and the lokalitet row are siblings in separate error boundaries, so
+there is no parent to pass anything down from. `RibbonGlobalRow` publishes the four
 members these buttons need (`mode`, `half`, `previous()`, `select()`) on
 `groundHandleAtom` (`src/shell/groundHandle.ts`), through a ref so the atom
 changes only when `mode` or `half` does; `cycle` and the peek stay behind,
@@ -2874,14 +2878,20 @@ They no longer live in the same place, and the split is the point. The extract
 is a **dialog** off the lokalitet row's `Hent ▾`, because it is a lokalitet
 errand with a beginning and an end: pick sources, run it, keep the results
 (§8.9.3). Terrenganalyse is one of the five **grounds**, so its controls are on
-the ribbon with every other ground's — the settings strip plus one slider row
-under it.
+the ribbon with every other ground's — all of them on the settings strip.
 
-That move is what §5.1's strip table means by Terreng being the one subject
-with a second row. The knobs were in a column down the side of the map, which
-meant pressing `5` relocated the controls to a different part of the screen and
-then covered the terrain they were describing. Two thin rows over the map cost
-less of it than one panel beside it, and they are where the eye already is.
+The knobs were in a column down the side of the map, which meant pressing `5`
+relocated the controls to a different part of the screen and then covered the
+terrain they were describing. One thin row over the map costs less of it than
+one panel beside it, and it is where the eye already is.
+
+They arrived from that column as **two** rows, the strip plus a slider row
+under it, because each slider stacked its label over its track and four
+two-line sliders will not share a 40 px line. Laid out inline — label · track ·
+readout — they will, so the second row is gone and Terreng costs the same one
+line every other ground costs. It is the widest subject the strip carries and
+it wraps on a narrow window; that is the trade, and it is a better one than a
+row that was two lines tall on every window.
 
 **LiDAR extract** — `src/lidarExtract/LidarExtractDialog.tsx` drives style and
 source selection, and that is now all it does: everything downstream of
@@ -2909,9 +2919,9 @@ exaggeration / radius / opacity sliders. Four files:
 | File | What it is |
 |---|---|
 | `useTerrainAnalysis.ts` | All of the state — which rectangle, the DEM, the model, the visualization, the five knobs, the canvas — plus `describe()` and `beholdKey`, which is how row 2's `Behold` keeps the render (§8.9.2). Mounted **once**, from `RibbonGlobalRow`, beside `useLidarControls` and `useFlyfotoControls`. It holds no write of its own |
-| `TerrainStrip.tsx` | The settings-strip half, and knobs only: the visualization pulldown, DTM/DOM, the resolution readout |
+| `TerrainStrip.tsx` | The whole strip, and knobs only: the visualization pulldown, DTM/DOM, the sliders, the resolution readout |
 | `TerrainVisPicker.tsx` | The pulldown itself, shaped like `StandardVariantPicker` |
-| `TerrainSliders.tsx` | The row beneath: azimuth, altitude, exaggeration, radius, opacity |
+| `TerrainSliders.tsx` | The inline slider group on it: azimuth, altitude, exaggeration, radius, opacity |
 
 The visualizations are **a pulldown with a W/S ring**, not eight buttons —
 §5.2's call for Standard's cartographies, applied to the same kind of list for
@@ -3034,12 +3044,25 @@ down, and entering Terreng unpins the image.** Two layers racing, or a
 "take it from them" verb the callers could disagree about, is what this
 replaces.
 
-That is also the argument for the sliders being a **row** rather than a popover
-anchored to the strip, which is what §5.1's one-line contract would otherwise
-ask for. They have to stay on screen while they are being dragged — sweeping
-the azimuth to see which bumps stay lit is the single most useful thing the
-tool does — and a popover over the map covers the wrong half of the screen to
-do it in.
+That is also the argument for the sliders being **on the strip** rather than in
+a popover anchored to it, which is what §5.1's one-line contract would
+otherwise ask for. They have to stay on screen while they are being dragged —
+sweeping the azimuth to see which bumps stay lit is the single most useful
+thing the tool does — and a popover over the map covers the wrong half of the
+screen to do it in.
+
+Three details of the inline layout are load-bearing:
+
+- **The readout follows the track, at a fixed width.** It is after the thumb
+  now rather than above it, so letting it size to its content would shove the
+  thumb sideways as the value went from 5° to 315° — mid-drag, under the
+  finger doing the dragging.
+- **The track shrinks to 64 px and no further**, and the strip wraps instead.
+  A slider that cannot be swept is not worth the line it is on, and travel is
+  the whole point of these four.
+- **The `<input>` carries its own `aria-label`.** The label beside it is a
+  `span`, not a `<label for>`; it was a `span` in a head row above the track
+  before, where it named nothing either.
 
 `TerrainStrip` is rendered into the strip **without** a `group` wrapper, unlike
 the LiDAR and Flyfoto pickers. Terreng brings the most controls of any subject
@@ -3122,7 +3145,7 @@ Two things in `useTerrainAnalysis` must not be undone:
 - The sliders are **raw `<input type="range">`** (`SliderRow` in
   `TerrainSliders.tsx`) rather than a component-library slider: sweeping the
   light smoothly needs a continuous input stream during the drag, and the
-  numeric value is rendered next to the label anyway. They are safe from W/S
+  numeric value is rendered beside the track anyway. They are safe from W/S
   cycling because `useBackgroundCyclingKeys` bails on `INPUT` targets — which
   matters more now that they sit on the ribbon, inches from the ring.
 - The `useMemo`s are **split on purpose**: the horizon scan takes ~800 ms on a
@@ -3383,7 +3406,7 @@ horizon-search radius for the five views that have one, over *either* the
 visible map — signed out,
 with no lokalitet — or an open lokalitet's rectangle, with the render drawn on
 the map under the heritage layers and every knob on the ribbon's settings strip
-and its slider row rather than in a column beside the map; re-frame the
+rather than in a column beside the map; re-frame the
 analysed rectangle onto the current view; save the render as a new lokalitet
 when there is none open; press **Behold** to keep whatever ground is on screen
 — the LiDAR stitch at the dataset and style you are reading, the terrain render

@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import type { DemModel } from '../../terrain/dem';
 import { Segmented, Spinner, type SegmentedOption } from '../../ui';
 import styles from './Terrain.module.css';
+import { TerrainSliders } from './TerrainSliders';
 import { TerrainVisPicker } from './TerrainVisPicker';
 import type { TerrainAnalysis } from './useTerrainAnalysis';
 
@@ -11,9 +12,14 @@ const MODEL_OPTIONS: SegmentedOption<DemModel>[] = [
 ];
 
 /**
- * Terrenganalyse's own settings strip: which visualization, which model, how
- * much data there turned out to be, and the two verbs. The light and the
- * opacity are the row below (TerrainSliders).
+ * Terrenganalyse's own settings strip: which visualization, which model, the
+ * light and the opacity, and how much data there turned out to be.
+ *
+ * The knobs used to be a second ribbon row under this one, because each of
+ * them stacked its label over its track and four two-line sliders will not
+ * share a 40 px line. Laid out inline they will (`TerrainSliders`), so there
+ * is one strip again — Terreng costs the same line every other ground costs,
+ * and it is the same line the eye is already on when it presses 5.
  *
  * This is the whole reason the knobs left the dock. Every other ground puts
  * its modifiers on the strip and Terreng put them in a 360 px column down the
@@ -40,6 +46,12 @@ export const TerrainStrip = ({ terrain }: { terrain: TerrainAnalysis }) => {
         onChange={terrain.setModel}
         label={t('ribbon.lidar.modelLabel')}
       />
+
+      {/* Between the knobs that choose *what* is computed and the readout that
+          says what it was computed from. Only the ones this visualization uses
+          are here, which is what keeps the strip on one line for six of the
+          eight. */}
+      <TerrainSliders terrain={terrain} />
 
       <div className={styles.status}>
         {loading && <Spinner size={14} />}

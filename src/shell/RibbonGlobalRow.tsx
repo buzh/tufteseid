@@ -27,7 +27,6 @@ import { RibbonSearch } from './RibbonSearch';
 import { RibbonSettingsRow } from './RibbonSettingsRow';
 import styles from './Ribbon.module.css';
 import { useStandardControls } from './standard/useStandardControls';
-import { TerrainSliders } from './terrain/TerrainSliders';
 import { useTerrainAnalysis } from './terrain/useTerrainAnalysis';
 import { GROUND_MODES, useGroundMode } from './useGroundMode';
 import { useRecreateView } from './useRecreateView';
@@ -409,13 +408,6 @@ export const RibbonGlobalRow = () => {
         flyfoto={flyfoto}
         terrain={terrain}
       />
-
-      {/* Terreng's light, on a line of its own under the strip. The only
-          ground that needs a second row: four sliders will not share a line
-          with the visualization picker, and they have to stay on screen while
-          they are being dragged — sweeping the azimuth is how you tell a
-          mound from a shadow. */}
-      {ground.modifiers === 'terrain' && <TerrainSliders terrain={terrain} />}
     </>
   );
 };

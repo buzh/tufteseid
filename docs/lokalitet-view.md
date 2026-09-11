@@ -1069,7 +1069,7 @@ available to readers in full. Only their exits write, and those escalate (§2).
 ### Terreng stays a ground; only its button moves
 
 `GROUND_MODES` keeps five entries, digit `5` still selects it, the settings
-strip and the slider row still render from `RibbonGlobalRow`,
+strip still renders from `RibbonGlobalRow`,
 `useTerrainAnalysis` is still mounted once and unconditionally, and the memo
 split is untouched. What moves is the **`ModeButton`**, into the lokalitet row.
 The ring is a fact about digits and W/S, not about DOM order, and `GROUND_KEYS`

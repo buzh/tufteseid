@@ -307,9 +307,11 @@ the reason the seed can't step on "Gjenskap": `docs/ui-architecture.md` §10.
 - `src/shell/terrain/` — the control surface (`docs/ui-architecture.md` §10),
   and it is **on the ribbon**, not in a dock panel: `useTerrainAnalysis.ts`
   holds all the state and is mounted once from `RibbonGlobalRow`,
-  `TerrainStrip.tsx` is its settings-strip half, `TerrainVisPicker.tsx` the
-  visualization pulldown on it, and `TerrainSliders.tsx` the slider row under
-  it. Terreng is one of the five grounds, so its modifiers
+  `TerrainStrip.tsx` is its whole settings strip, `TerrainVisPicker.tsx` the
+  visualization pulldown on it, and `TerrainSliders.tsx` the inline slider
+  group beside that — one strip, not a strip plus a row of knobs, since a
+  slider laid out as label · track · readout fits the line it is on.
+  Terreng is one of the five grounds, so its modifiers
   belong where every other ground's are — a column down the side of the map
   covered the terrain the knobs were describing. The button itself is on the
   lokalitet row; what it needs from `useGroundMode` (which stays mounted once,

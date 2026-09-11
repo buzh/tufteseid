@@ -1,29 +1,35 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { cx } from '../../ui';
-import ribbon from '../Ribbon.module.css';
 import styles from './Terrain.module.css';
 import type { TerrainAnalysis } from './useTerrainAnalysis';
 
 /**
- * The light, the exaggeration and the opacity, as their own thin ribbon row
- * under the settings strip.
+ * The light, the exaggeration and the opacity — inline on Terreng's settings
+ * strip, between the model toggle and the resolution readout.
  *
- * A row rather than a popover anchored to the strip, which is what the strip's
- * contract asks for anything that does not fit on its line. Sliders are the
- * exception the contract already allows for: the rule forbids *bodies* — the
- * 380 px panel and the dock column — not another 40 px line. And these three
- * in particular have to stay visible while they are being dragged, because
- * what you are watching is the terrain, not the control: sweeping the azimuth
- * to see which bumps stay lit is the single most useful thing the tool does,
- * and a popover over the map is the wrong half of the screen to cover while
- * doing it.
+ * They had a ribbon row of their own, and that row was two lines tall: each
+ * slider stacked its label over its track, which doubles the height of
+ * whatever it is on, and this is chrome over the terrain it is describing.
+ * Laid out as label · track · readout they fit the strip's own 40 px line, so
+ * Terreng now costs what every other ground costs. On a narrow window the
+ * strip wraps to two lines — which is exactly what the dedicated row spent
+ * unconditionally, on every window.
+ *
+ * On the strip rather than in a popover, which is what the strip's contract
+ * asks for anything that does not fit on its line. Sliders are the exception
+ * the contract already allows for: the rule forbids *bodies* — the 380 px
+ * panel and the dock column — not controls on the line. And these have to stay
+ * visible while they are being dragged, because what you are watching is the
+ * terrain, not the control: sweeping the azimuth to see which bumps stay lit
+ * is the single most useful thing the tool does, and a popover over the map is
+ * the wrong half of the screen to cover while doing it.
  *
  * Only the sliders the current visualization actually uses are rendered, so
- * the row is two controls wide for sky-view factor and four for a plain
- * hillshade. Absent rather than disabled: a slider that cannot move is
- * indistinguishable from one that has no effect, and the row is short-lived
- * enough that the reflow reads as "this view has fewer knobs".
+ * the group is two controls wide for sky-view factor and four for a plain
+ * hillshade — which is also what keeps the strip on one line for six of the
+ * eight visualizations. Absent rather than disabled: a slider that cannot move
+ * is indistinguishable from one that has no effect, and the reflow reads as
+ * "this view has fewer knobs".
  *
  * The radius slider is the exception to "sliders stream": it feeds the
  * expensive side of the memo split, so for sky-view factor it commits on
@@ -33,8 +39,8 @@ export const TerrainSliders = ({ terrain }: { terrain: TerrainAnalysis }) => {
   const { t } = useTranslation();
   const { dem, loading, vis, radiusLimits } = terrain;
 
-  // Nothing to light until there is a DEM. The row is gone rather than empty
-  // while it loads, for the same reason the strip is absent for Standard.
+  // Nothing to light until there is a DEM. The knobs are gone rather than
+  // dead while it loads; the strip around them keeps the spinner.
   if (!dem || loading) return null;
 
   // VAT is deliberately not in either list even though it contains a hillshade
@@ -47,94 +53,93 @@ export const TerrainSliders = ({ terrain }: { terrain: TerrainAnalysis }) => {
 
   return (
     <div
-      className={cx(ribbon.row, ribbon.rowSub, ribbon.rowSettings)}
+      className={styles.sliders}
       role="group"
       aria-label={t('localities.terrain.lightLabel')}
     >
-      <div className={styles.sliders}>
-        {sunDependent && (
-          <SliderRow
-            label={t('localities.terrain.azimuth')}
-            value={terrain.azimuth}
-            min={0}
-            max={359}
-            step={1}
-            suffix="°"
-            onChange={terrain.setAzimuth}
-          />
-        )}
-        {(sunDependent || vis === 'multiHillshade') && (
-          <SliderRow
-            label={t('localities.terrain.altitude')}
-            value={terrain.altitude}
-            min={5}
-            max={85}
-            step={1}
-            suffix="°"
-            onChange={terrain.setAltitude}
-          />
-        )}
-        {usesZFactor && (
-          <SliderRow
-            label={t('localities.terrain.zFactor')}
-            value={terrain.zFactor}
-            min={1}
-            max={8}
-            step={0.5}
-            suffix="×"
-            onChange={terrain.setZFactor}
-          />
-        )}
-        {/* Two different quantities sharing one control: how far to smooth
-            the DEM before subtracting it from itself (LRM), and how far to
-            search for a horizon (sky-view, both opennesses, VAT). Keyed on the
-            visualization and on the ceiling so the deferred draft cannot
-            survive either a switch between the two or a change of grid under
-            it — those are the only two ways the value can move without the
-            slider moving. Not keyed on the value itself: that would remount on
-            every commit and drop focus mid arrow-key.
-
-            Deferred for everything but LRM, because everything but LRM feeds
-            the horizon scan — one ~800 ms pass, so a streamed radius would
-            queue one per drag frame. LRM's box blur is 23 ms and streams. */}
-        {radiusLimits && (
-          <SliderRow
-            key={`${vis}-${radiusLimits.max}`}
-            label={t(
-              vis === 'lrm'
-                ? 'localities.terrain.lrmRadius'
-                : 'localities.terrain.svfRadius',
-            )}
-            value={terrain.radius}
-            min={radiusLimits.min}
-            max={radiusLimits.max}
-            step={radiusLimits.step}
-            suffix=" m"
-            deferred={vis !== 'lrm'}
-            onChange={terrain.setRadius}
-          />
-        )}
-        {/* Fades the render towards whatever it is covering, which is the
-            only way to check a suspected feature against the ortofoto or the
-            topo map without losing the light you just dialled in. */}
+      {sunDependent && (
         <SliderRow
-          label={t('localities.terrain.opacity')}
-          value={terrain.opacity}
+          label={t('localities.terrain.azimuth')}
+          value={terrain.azimuth}
           min={0}
-          max={100}
-          step={5}
-          suffix="%"
-          onChange={terrain.setOpacity}
+          max={359}
+          step={1}
+          suffix="°"
+          onChange={terrain.setAzimuth}
         />
-      </div>
+      )}
+      {(sunDependent || vis === 'multiHillshade') && (
+        <SliderRow
+          label={t('localities.terrain.altitude')}
+          value={terrain.altitude}
+          min={5}
+          max={85}
+          step={1}
+          suffix="°"
+          onChange={terrain.setAltitude}
+        />
+      )}
+      {usesZFactor && (
+        <SliderRow
+          label={t('localities.terrain.zFactor')}
+          value={terrain.zFactor}
+          min={1}
+          max={8}
+          step={0.5}
+          suffix="×"
+          onChange={terrain.setZFactor}
+        />
+      )}
+      {/* Two different quantities sharing one control: how far to smooth
+          the DEM before subtracting it from itself (LRM), and how far to
+          search for a horizon (sky-view, both opennesses, VAT). Keyed on the
+          visualization and on the ceiling so the deferred draft cannot
+          survive either a switch between the two or a change of grid under
+          it — those are the only two ways the value can move without the
+          slider moving. Not keyed on the value itself: that would remount on
+          every commit and drop focus mid arrow-key.
+
+          Deferred for everything but LRM, because everything but LRM feeds
+          the horizon scan — one ~800 ms pass, so a streamed radius would
+          queue one per drag frame. LRM's box blur is 23 ms and streams. */}
+      {radiusLimits && (
+        <SliderRow
+          key={`${vis}-${radiusLimits.max}`}
+          label={t(
+            vis === 'lrm'
+              ? 'localities.terrain.lrmRadius'
+              : 'localities.terrain.svfRadius',
+          )}
+          value={terrain.radius}
+          min={radiusLimits.min}
+          max={radiusLimits.max}
+          step={radiusLimits.step}
+          suffix=" m"
+          deferred={vis !== 'lrm'}
+          onChange={terrain.setRadius}
+        />
+      )}
+      {/* Fades the render towards whatever it is covering, which is the
+          only way to check a suspected feature against the ortofoto or the
+          topo map without losing the light you just dialled in. */}
+      <SliderRow
+        label={t('localities.terrain.opacity')}
+        value={terrain.opacity}
+        min={0}
+        max={100}
+        step={5}
+        suffix="%"
+        onChange={terrain.setOpacity}
+      />
     </div>
   );
 };
 
-// A plain range input rather than a kit slider: this needs a continuous
-// `onInput` stream to sweep the light smoothly, and the value is rendered next
-// to the label anyway. Safe from W/S cycling because useBackgroundCyclingKeys
-// bails on INPUT targets.
+// Label, track and readout on one line, which is what lets these sit on the
+// strip at all. A plain range input rather than a kit slider: this needs a
+// continuous `onInput` stream to sweep the light smoothly, and the value is
+// rendered beside the track anyway. Safe from W/S cycling because
+// useBackgroundCyclingKeys bails on INPUT targets.
 //
 // `deferred` inverts that for the one knob that cannot stream: the thumb and
 // the readout track the drag, but the caller only hears about it on release.
@@ -171,15 +176,13 @@ const SliderRow = ({
 
   return (
     <div className={styles.slider}>
-      <div className={styles.sliderHead}>
-        <span>{label}</span>
-        <span className={styles.sliderValue}>
-          {shown}
-          {suffix}
-        </span>
-      </div>
+      <span className={styles.sliderLabel}>{label}</span>
       <input
         type="range"
+        // The label is a sibling `span` rather than a `<label for>`, so the
+        // input carries its own name. It had none at all while the label sat
+        // in a head row above it.
+        aria-label={label}
         min={min}
         max={max}
         step={step}
@@ -195,6 +198,10 @@ const SliderRow = ({
         onKeyUp={deferred ? commit : undefined}
         onBlur={deferred ? commit : undefined}
       />
+      <span className={styles.sliderValue}>
+        {shown}
+        {suffix}
+      </span>
     </div>
   );
 };
