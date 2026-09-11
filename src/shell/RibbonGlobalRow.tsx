@@ -118,17 +118,18 @@ export const RibbonGlobalRow = () => {
    * control hooks are mounted here and only here, so this is the one place
    * that can answer the question at all.
    *
-   * A description, not a producer, everywhere except terrain: the workspace
-   * can re-fetch a named LiDAR dataset or a named acquisition itself, and it
-   * is the side that holds `createAttachment` and the gallery's optimistic
-   * update. Terrain's pixels are a canvas this row owns, so that arm carries
-   * a callback.
+   * A dataset name, everywhere except terrain: the workspace can turn a named
+   * LiDAR dataset or a named acquisition into a spec itself, and it is the
+   * side that holds the write and the gallery's optimistic update. Terrain's
+   * parameters are state this row owns — eight visualizations and three
+   * sliders, none of it readable off the map — so that arm carries a
+   * callback that says what is currently on screen.
    */
   const setBeholdOffer = useSetAtom(beholdOfferAtom);
   // Destructured, because `lidar`, `flyfoto` and `terrain` are fresh objects
   // on every render and the effect below is keyed on what actually changed.
   const { activeLidarSource, shownStyle } = lidar;
-  const { produce: terrainProduce, beholdKey: terrainKey } = terrain;
+  const { describe: terrainDescribe, beholdKey: terrainKey } = terrain;
   const flyfotoProject = flyfoto.activeProject;
   const groundMode = ground.mode;
   useEffect(() => {
@@ -148,7 +149,7 @@ export const RibbonGlobalRow = () => {
         offer = {
           ground: 'terreng',
           key: terrainKey,
-          produce: terrainProduce,
+          describe: terrainDescribe,
         };
         break;
       default:
@@ -169,7 +170,7 @@ export const RibbonGlobalRow = () => {
     shownStyle,
     flyfotoProject,
     terrainKey,
-    terrainProduce,
+    terrainDescribe,
     setBeholdOffer,
   ]);
   // Row 1 outlives every lokalitet, so nothing here clears the offer on

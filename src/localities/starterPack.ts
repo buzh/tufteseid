@@ -15,15 +15,17 @@
 // cannot check — see docs/lokalitet-view.md §4.3 for why the terrain render
 // and the flyfoto left this set.
 //
-// This module only *makes* the images. Captions, `createAttachment` and the
-// gallery's optimistic update stay in useLocalityWorkspace, where the
-// translations and the record ids are — see `runStarterPack` there.
+// Since the View/File split (docs/ui-architecture.md §8.7.4) the set itself
+// fetches nothing: `planStarterPack` resolves the dataset and the style list,
+// `saveExtractSpec` in useLocalityWorkspace writes one spec per style, and the
+// pin queue renders them afterwards. So the two halves of this module are now
+// at opposite ends of that: the plan, up front, and `extractLidarFigure`, the
+// renderer the queue calls.
 //
 // `extractLidarFigure` is the general one-styled-view-of-the-rectangle call
-// and is not the starter set's alone: `Behold` over the LiDAR ground is the
-// same fetch at whichever dataset and style the map is showing, so it comes
-// through here too. One path means one place where the provenance figure and
-// the recorded meta can go wrong.
+// and is not the starter set's alone: a `Behold` over the LiDAR ground pins
+// through exactly the same function, so the provenance figure and the recorded
+// meta have one place to go wrong.
 //
 // Every image goes out as a provenance figure (src/figure), same as when it
 // is produced by hand: an image nobody chose the settings for is exactly the
@@ -46,7 +48,7 @@ import { TIER_A_STYLES } from '../map/layers/config/backgroundLayers/lidarProjec
  * they are the most diagnostic variants for reading archaeology in terrain.
  * One list, so the starter set and the ring can never drift apart.
  */
-export const STARTER_STYLES = TIER_A_STYLES;
+const STARTER_STYLES = TIER_A_STYLES;
 
 /** What a stitched view hands back, so every caller has one save path. */
 export type ExtractRaster = {
@@ -65,8 +67,8 @@ export type ExtractRaster = {
   imageRect: ImageRect;
 };
 
-/** The lokalitet's name for the figure's title line, and the abort signal. */
-export type ExtractOptions = { subject?: string; signal?: AbortSignal };
+/** The lokalitet's name, for the figure's title line. */
+export type ExtractOptions = { subject?: string };
 
 /** One dataset and the styles the set will actually ask it for. */
 export type StarterPlan = { source: LidarSource; styles: string[] };
@@ -124,9 +126,9 @@ export const extractLidarFigure = async (
   source: LidarSource,
   bbox25833: [number, number, number, number],
   style: string,
-  { subject, signal }: ExtractOptions = {},
+  { subject }: ExtractOptions = {},
 ): Promise<ExtractRaster | null> => {
-  const result = await extractCanvas(bbox25833, source, style, signal);
+  const result = await extractCanvas(bbox25833, source, style);
   if (!result) return null;
 
   const figure = await renderFigureBlob(

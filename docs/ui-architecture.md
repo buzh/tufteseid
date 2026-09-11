@@ -1716,27 +1716,41 @@ localities, funn, the selection halo — through `useMarksVisibility`
 
 ### 8.7 The attachment pipeline
 
-Four producers converge on one sink, and that convergence is the part worth
-preserving:
+Several producers converge on one sink, and that convergence is the part worth
+preserving. Since the View/File split (§8.7.4) they converge in **two** places,
+and which one a route takes is decided by its `kind`:
 
 ```
-screenshot.ts             ─┐
-flyfoto.ts                ─┤
-lidarExtract "Behold"     ─┼→ renderFigureBlob() → createAttachment() → PocketBase
-terrain render            ─┤   (§8.10)              → realtime → the bottom edge
-starterPack.ts            ─┤
-row 2 "Behold" (§8.9.2)   ─┘   — three of the above, chosen by the ground
+Views (extract | flyfoto) — a row of parameters, stored as one:
+
+  starterPack.ts           ─┐
+  row 2 "Behold" (§8.9.2)   ┼─→ createAttachmentSpec()   — meta, no file
+  the flyfoto grab         ─┘             │
+                                          │  afterwards, in the background:
+                                          └─→ pinQueue.ts → renderSpec()
+                                              → renderFigureBlob() (§8.10)
+                                              → pinAttachment()
+
+Files (screenshot | upload) — bytes, with nothing behind them:
+
+  screenshot.ts            ─┐
+  lidarExtract "Behold"     ┴─→ renderFigureBlob() → createAttachment()
+  "Last opp"                 ──→ createAttachment()  — the one exception
+
+Both land in `attachments`; the bottom edge sees them over realtime.
 ```
 
-Every producer hands a **canvas**, not bytes, so the figure stage has somewhere
-to draw a caption; only "Last opp" bypasses it (§8.10).
+Every producer of bytes hands a **canvas**, not a blob, so the figure stage has
+somewhere to draw a caption; only "Last opp" bypasses it (§8.10). The pin queue
+is a producer like any other and goes through the same stage — a pinned View
+and a File are the same kind of artifact once they exist.
 
 `kind` is one of `extract | screenshot | upload | flyfoto`; terrain renders
 reuse `extract` with the visualization recorded in `meta.style`, which is why
 adding terrain analysis needed no migration. `meta` also carries source
-key/label, `metresPerPx`, bbox, `imageRect` (§8.10), and for flyfoto the
-`projectName` / `year` / `photoDate` that the strip captions from
-("Flyfoto 1937"). Files are `protected` in PocketBase, so the strip fetches
+key/label, `metresPerPx`, bbox, `imageRect` (§8.10), `renderedAt` (§8.7.4), and
+for flyfoto the `projectName` / `year` / `photoDate` that the strip captions
+from ("Flyfoto 1937"). Files are `protected` in PocketBase, so the strip fetches
 short-lived file tokens for thumbnails — a new UI must keep doing that or every
 thumbnail 403s.
 
@@ -1803,9 +1817,18 @@ rather than one with the writes disabled.
   `src/localities/viewSpec.ts` reads a record's `meta` into a `ViewSpec`
   (`lidar` | `terrain` | `flyfoto`) purely, `recreateViewAtom` carries it, and
   `useRecreateView` — mounted in `RibbonGlobalRow`, the one place the four
-  control hooks live — applies it. Two later builds are written on that split:
-  a View is stored as a spec before it is pixels, and a forked lokalitet
-  carries its original's views without its files.
+  control hooks live — applies it. Two later builds are written on that split;
+  the first of them has landed (§8.7.4, a View is stored as a spec before it is
+  pixels) and the second is a forked lokalitet carrying its original's views
+  without its files.
+- **`Gjenskap` does not render.** It moves the map, and that is all it has ever
+  done — which matters more now that a View may have no pixels at all.
+  `docs/lokalitet-view.md` §4.2 reads as though `Vis i ruta` on an unpinned View
+  *is* `Gjenskap`, i.e. that walking onto a spec should recreate it; that
+  contradicts §4.3's rule that the ground does not move as you walk the rail,
+  and it would make selecting a frame an expensive fetch. So it does not:
+  `canPinBilde` already requires a file, an unpinned View simply shows what it
+  is waiting for (§8.7.4), and `Gjenskap` stays the verb it was.
 - **Absent, not disabled.** A screenshot or an upload yields `null` from
   `viewSpecOf` and gets no Gjenskap button at all. There is no view to go back
   to, which is a different statement from "you may not go back to it". When a
@@ -1854,7 +1877,7 @@ Two things that reads as arbitrary until you try the alternative:
   every time `Behold` landed an image and moved the cursor onto it.
 
 The shared vocabulary — the tokened-URL dance, the meta line, the caption
-field, the fade slider, Gjenskap and Åpne originalen — is
+field, the fade slider, the pin face (§8.7.4), Gjenskap and Åpne originalen — is
 `src/localities/bilderCommon.tsx`. The geometry is not shared, because a rail
 and a single big card have nothing in common geometrically.
 
@@ -1898,7 +1921,7 @@ and a single big card have nothing in common geometrically.
   own `bottom_panel_close`. The row's toggle carries the count and is disabled
   when `hasBilder` is false.
 - **`hasBilder` is published by the hook**, not recomputed per surface —
-  `bilderCount > 0 || starterStep != null || canAdd` — so the row's toggle and
+  `bilderCount > 0 || starterBusy || canAdd` — so the row's toggle and
   the portal cannot disagree about whether there is a strip. A reader on an
   empty lokalitet gets no bar at all; an owner in edit gets the bar with the
   empty prompt in it.
@@ -1969,6 +1992,102 @@ that, and neither of them is a cover field.
   exhibit order is content. Reordering by dragging a *card* is possible later
   if the carousel ever shows its neighbours; it is not worth a rail in edit.
 
+#### 8.7.4 The View/File split, and the pin queue
+
+`docs/lokalitet-view.md` §4.1.1, §4.1.2. **The record is the spec. The file is
+a pin on it.**
+
+Half the images in a lokalitet are not really images. A LiDAR extract, a
+terrain render and a flyfoto grab are each a short row of *parameters* —
+dataset, style, model, knobs, rectangle — and the pixels are what you get when
+you hand those parameters to a service. A screenshot and an upload are the
+opposite: bytes, with nothing behind them that could make the bytes again.
+That is the whole split, and it is **derivable from `kind`**: `extract` and
+`flyfoto` are Views, `screenshot` and `upload` are Files. There is no `spec`
+field and no `isView` field, deliberately — a flag that can disagree with
+`kind` is a flag that eventually will.
+
+A View therefore has three states, and `attachments.file` being optional
+(migration `1700000500`) is what allows the first of them:
+
+| state | on the record | what the surfaces show |
+|---|---|---|
+| **spec** | `meta`, no `file` | the pin face (below) |
+| **pinned** | `meta` + `file` + `meta.renderedAt` | the image |
+| **stale** | pinned, but the parameters have moved on | (not built — §13 of the design doc) |
+
+Why pin at all, when the parameters can make the pixels again: Kartverket
+re-flies projects and withdraws acquisitions from the catalogue, so the same
+spec asked twice, a year apart, is not guaranteed to answer the same picture.
+The pin is **not a cache** — it is the citable artifact, and `meta.renderedAt`
+records when the pixels were made so a figure in a report can be dated. What
+the split buys is that keeping an image is now one small `create` instead of a
+multi-second fetch-stitch-caption-upload, which is what makes the draft
+bufferable (§8.1), a fork cheap, and the picker carousels affordable.
+
+- **`src/localities/pinQueue.ts`** is the renderer, and it is module-level,
+  imperative and React-free — same shape and the same reason as
+  `map/groundOverlay.ts`. It has to **outlive the surface that started it**:
+  closing the lokalitet, folding the bottom edge or navigating to another
+  record must not orphan a render that is halfway through fetching tiles. A
+  hook would tie its lifetime to a component's.
+- **One job at a time.** `drain()` is a single sequential worker. A LiDAR
+  stitch is a burst of tile requests against the shared Kartverket edge and
+  three of them at once is how the rate limit is found; the starter set enqueues
+  three specs in a few milliseconds and they render one after another.
+- **The queue renders the *spec's* rectangle, not the lokalitet's.**
+  `rectangleOf` reads `meta.bbox25833` off the record and transforms it back to
+  4326, falling back to the job's rectangle only when the record has none. The
+  design doc does not say which, and it matters: "Juster området" can move the
+  lokalitet between the moment a spec is written and the moment it drains, and
+  the alternative is a picture of ground the author never asked to keep, under
+  a caption naming the extent they did.
+- **One writer per field.** The spec writes only what identifies it
+  (`sourceKey`, `sourceLabel`, `style`, `model`, `bbox25833`, the terrain
+  knobs); the pinner writes `metresPerPx`, `imageRect` and `renderedAt` in the
+  same `pinAttachment` PATCH, because none of the three are knowable until the
+  pixels exist. Terrain's *effective* SVF radius is written back here too — it
+  is clamped against the DEM inside `renderTerrain` (§10), so the number the
+  slider said and the number the render used are routinely different.
+- **Three end states, and only one of them is a bug.** `empty` means the source
+  has nothing over this rectangle — a real answer, and asking again would be
+  asking to re-learn it. `failed` means the render threw. Success deletes the
+  entry entirely, because the record now has a file and that is the state.
+- **The UI reads the queue through `useSyncExternalStore`** (`usePinState` in
+  `bilderCommon.tsx`) rather than through jotai: the queue is not React state
+  and the subscription is per record id.
+- **A quiet per-card state, not a blocking spinner** — `docs/lokalitet-view.md`
+  §5.6. `PinFace` fills the frame the picture would have filled, so the rail
+  never reflows when pixels land, and says one of four sentences: being made,
+  not asked for, nothing there, went wrong. Only the last gets a verb
+  (`PinRetryButton`).
+- **Who may pin.** A pin is an `update`, and §2 says nothing in show writes —
+  so the sweep that materialises unpinned specs on an open lokalitet is gated
+  on `canAdd` (owner *and* edit stance), and so are both pin buttons. A reader
+  over somebody else's spec sees "not fetched yet", which is true; an owner
+  materialises it by pressing `Rediger`. The sweep also checks
+  `pinAttempted(id)`, so a spec that came back `empty` is not retried on every
+  realtime reload.
+- **`Åpne originalen` forces a pin, in two presses.** There is no such thing as
+  downloading a row of parameters, so an unpinned View has to be rendered
+  first — and `window.open` several seconds after the click that caused it is a
+  popup and gets blocked. So the button reads `Hent bildet`, spins, and becomes
+  `Åpne originalen`; the second press is inside a gesture. `pinNow` jumps the
+  queue and is awaitable for exactly this. Rapportpakke (§9 of the design doc)
+  will force pins the same way when it is built.
+- **`LidarExtractViewer`'s own `Behold` still writes a File**, and that is not
+  an oversight. Its rectangle is the user-drawn selection rather than the
+  lokalitet's, and it is holding the stitched pixels already — turning it into
+  a spec would throw those away and immediately re-fetch them. The design doc's
+  build order does not mention this call site; the picker carousels replace the
+  viewer anyway.
+- **Closing a lokalitet no longer cancels a running grunnpakke.** The old
+  `AbortController` was aborted by the workspace's unmount cleanup; there is
+  nothing slow left in the write path to abort, and the queue is deliberately
+  outside the component lifetime. Progress on the bottom edge is a plain
+  `starterBusy` boolean now — `starterStep`'s "Henter helning_prosent …" stopped
+  describing anything the moment the set stopped fetching.
+
 ### 8.8 The flyfoto picker
 
 "Flyfoto" → licensing notice dialog → picker listing the seamless best mosaic
@@ -2004,28 +2123,26 @@ none of them is on the bottom edge (§8.7.2).
 **It is no longer a menu item.** It runs itself once, on a lokalitet that was
 just created — from the viewport or by saving a terrain render with none open.
 The hand-off is `pendingStarterLocalityIdAtom` (`src/localities/atoms.ts`),
-set by both creation sites and cleared by the workspace *before* the fetch
-starts, since the run takes tens of seconds and the effect re-fires on every
-image it lands. Deliberately not "notice the gallery is empty": that would
-refill a lokalitet somebody deliberately emptied.
+set by both creation sites and cleared by the workspace *before* the run
+starts, since the effect re-fires on every image it lands. Deliberately not
+"notice the gallery is empty": that would refill a lokalitet somebody
+deliberately emptied.
 
 The three images are the ones you would otherwise fetch by hand before starting
 to read a rectangle: **the laser, read three ways** —
 `skyggerelieff` (the fixed north-west hillshade), `multiskyggerelieff` (every
 direction at once, so nothing hides along the sun) and `helning_prosent`
 (slope, which shows edges the light misses). All three are Kartverket's own
-pre-baked renders of **one** acquisition, fetched through
-`extractLidarFigure` → `extractCanvas` and saved as the `extract` kind with the
+pre-baked renders of **one** acquisition, saved as the `extract` kind with the
 style in `meta.style` (§8.7), so there is no migration.
 
-`STARTER_STYLES` *is* `TIER_A_STYLES` (`lidarProjects.ts`) — one list, so the
-pack and the style ring can never drift apart.
-`src/localities/starterPack.ts` only *makes* the rasters; captions,
-`createAttachment` and the strip's optimistic update stay in
-`runStarterPack` (`useLocalityWorkspace`), where the translations and record ids
-are. `extractLidarFigure` there is **not** the pack's alone — `Behold` over the
-LiDAR ground is the same fetch with a style the user chose, so the provenance
-figure and the recorded `meta` have exactly one place to go wrong.
+Since the View/File split (§8.7.4) the pack **writes three specs and returns**.
+`planStarterPack` still resolves the dataset and the style list; the three
+`createAttachmentSpec` calls and the three `enqueuePin`s are `saveExtractSpec`
+in `useLocalityWorkspace`, which is also what row 2's `Behold` over the LiDAR
+ground calls — so the caption, the recorded `meta` and the pin have exactly one
+place to go wrong. `STARTER_STYLES` *is* `TIER_A_STYLES` (`lidarProjects.ts`) —
+one list, so the pack and the style ring can never drift apart.
 
 Load-bearing choices:
 
@@ -2048,18 +2165,20 @@ Load-bearing choices:
   upstream and a set of parameters the user never chose. Both are one press away
   by hand. `docs/lokalitet-view.md` §4.3 is the full argument.
 - **Each style is independently fallible.** Failures are counted, not thrown,
-  and the toast says how many of the planned images arrived.
-- **Cancellable.** An `AbortController` in a ref, aborted by the same cleanup
-  that closes the workspace, with an abort check between every step — closing a
-  lokalitet stops spending tile requests on it. An aborted stitch paints nothing,
-  which is indistinguishable from no coverage, so the "ingen dekning" toast is
-  suppressed when the signal is aborted.
-- **Progress renders on the bottom edge**, as one line with a spinner naming
-  the style being fetched (`starterStep` is that style, or `null`), above the
-  rail or in the carousel's head row; the edge unfolds itself when a pack
-  starts, and `hasBilder` counts a running pack, so the bar is there before
-  the first image is. Deliberately not a placeholder frame among the saved
-  ones — a frame that disappears would be read as an image that failed.
+  and the toast says how many of the planned images arrived. Since the split
+  that count is of *specs written*, not pictures — a style whose render comes
+  back empty says so on its own card afterwards (§8.7.4).
+- **No longer cancellable, and no longer wants to be.** It used to hold an
+  `AbortController` aborted by the workspace's unmount cleanup, so that closing
+  a lokalitet stopped spending tile requests on it. Three small `create`s have
+  nothing worth aborting, and the pin queue that follows them is deliberately
+  outside the component lifetime (§8.7.4).
+- **Progress renders on the bottom edge**, as one line with a spinner
+  (`starterBusy`), above the rail or in the carousel's head row; the edge
+  unfolds itself when a pack starts, and `hasBilder` counts a running pack, so
+  the bar is there before the first card is. It is now about a second rather
+  than the old several minutes — what has to be seen arriving is the three
+  cards, which then fill in.
 
 #### 8.9.2 `Behold` — keep the ground on screen
 
@@ -2068,12 +2187,17 @@ want it, then press one button. What comes out is the rectangle *in that
 ground* at the source's native resolution, not a photograph of the screen.
 `src/localities/behold.ts` holds the table and the guard.
 
-| Ground | What it produces |
+| Ground | What it writes |
 |---|---|
-| 2 LiDAR | `extractLidarFigure` at the active dataset, style and model |
-| 5 Terreng | the live render at the current visualization and knobs |
-| 4 Flyfoto | `fetchFlyfoto` for the active acquisition (raises the NiB notice first) |
+| 2 LiDAR | a spec naming the active dataset, style and model |
+| 5 Terreng | a spec of the current visualization and knobs |
+| 4 Flyfoto | a spec naming the active acquisition (raises the NiB notice first) |
 | 1 Standard, 3 Hybrid | nothing — disabled, tooltip says `Skjermbilde` |
+
+All three arms are Views, so all three are **specs** now (§8.7.4) and the press
+is one small `create` rather than a multi-second fetch. That is the point of
+doing the split before the pickers: `Behold` is the verb people press dozens of
+times in a session.
 
 - **The last row is a refusal, not an omission.** There is no rectangle-fetch
   path for the topo WMS, and Hybrid's overlay is a separate layer the extract
@@ -2086,10 +2210,12 @@ ground* at the source's native resolution, not a photograph of the screen.
   its ground could keep (`beholdOfferAtom`) and the workspace decides what to
   do with it — the same split `coverTerrainSpecAtom` crosses in the other
   direction (§10).
-- **Only the terrain arm carries a producer callback.** Its pixels are a canvas
-  the terrain hook owns and repaints every slider frame; the other two are
-  fetches the workspace can make from a dataset name, and it already holds
-  `createAttachment`, the optimistic list update and the NiB notice.
+- **Only the terrain arm carries a callback, and it is a `describe`, not a
+  producer.** The other two are identified by a dataset name the workspace can
+  read off the offer; a terrain render is identified by eight knobs that live
+  inside `useTerrainAnalysis`, so the hook has to say what they currently are.
+  It used to hand back a finished figure — since §8.7.4 it hands back a
+  `BeholdSpec` (`kind`, `caption`, `meta`) and produces no pixels at all.
 - **The duplicate guard is the `meta` block.** Same source, style, model and
   parameters over the same rectangle is the same image, so the button reads
   `Beholdt` and is disabled while a match exists (`attachmentMatchesKey`, bbox
@@ -2319,7 +2445,7 @@ exaggeration / radius / opacity sliders. Four files:
 
 | File | What it is |
 |---|---|
-| `useTerrainAnalysis.ts` | All of the state — which rectangle, the DEM, the model, the visualization, the five knobs, the canvas, the save — plus `produce()` and `beholdKey`, which is how row 2's `Behold` keeps the render (§8.9.2). Mounted **once**, from `RibbonGlobalRow`, beside `useLidarControls` and `useFlyfotoControls` |
+| `useTerrainAnalysis.ts` | All of the state — which rectangle, the DEM, the model, the visualization, the five knobs, the canvas, the save — plus `describe()` and `beholdKey`, which is how row 2's `Behold` keeps the render (§8.9.2). Mounted **once**, from `RibbonGlobalRow`, beside `useLidarControls` and `useFlyfotoControls` |
 | `TerrainStrip.tsx` | The settings-strip half: the visualization pulldown, DTM/DOM, the resolution readout, and — only when there is no lokalitet — "Flytt analysen hit" and "Lagre som ny lokalitet" |
 | `TerrainVisPicker.tsx` | The pulldown itself, shaped like `StandardVariantPicker` |
 | `TerrainSliders.tsx` | The row beneath: azimuth, altitude, exaggeration, radius, opacity |
@@ -2541,10 +2667,13 @@ starter set follows (§8.9.1). Signed out it opens `AuthDialog` instead; that is
 a normal state here, since the whole point of Terreng in row 1 is that reading
 the ground needs no account.
 
-The render itself is produced by `useTerrainAnalysis`'s `produce(subject?)`,
-which both paths call — row 1's save and `Behold`'s terrain arm, the latter
-through the callback on `beholdOfferAtom`. One place decides what a terrain
-figure's caption and `meta` say.
+What both paths call is `useTerrainAnalysis`'s **`describe()`** — row 1's save
+and `Behold`'s terrain arm, the latter through the callback on
+`beholdOfferAtom`. One place decides what a terrain View's caption and `meta`
+say. It used to be `produce(subject?)` and used to hand back a finished figure;
+since the View/File split (§8.7.4) a terrain render is stored as a spec and the
+pixels are the pin queue's job, so the hook describes and never renders. The
+`subject` argument went with the pixels — it was the figure's title line.
 
 Two things in `useTerrainAnalysis` must not be undone:
 
@@ -2573,15 +2702,18 @@ Two things in `useTerrainAnalysis` must not be undone:
   step; the render looks identical, which is what makes it worth writing down.
 
 The canvas itself is **off-DOM**. React does not own it and neither does any
-row: it is the OL source's image and what "Lagre" hands to the figure stage,
-and the hook paints into that one element. Same trap as
-`LidarExtractViewer`'s moved canvas node, from the other direction.
+row: it is the OL source's image, and the hook paints into that one element.
+Same trap as `LidarExtractViewer`'s moved canvas node, from the other
+direction. Note that it is no longer what a save hands to the figure stage —
+the pin queue calls `renderTerrain` headlessly and gets its own canvas, which
+is what lets a pin outlive the strip that started it (§8.7.4).
 
 Neither tool's output leaves bare. "Behold", the viewer's PNG download and
-"Lagre" all run their canvas through `renderFigureBlob` first, so the azimuth,
-altitude, z-factor, radii and stretch that produced the render travel with the
-pixels — §8.10. On the no-lokalitet path the lokalitet is created *before* the
-figure, so the name the registers just derived can be its title.
+"Lagre" all reach `renderFigureBlob` — the first two directly, the terrain
+render through its pin — so the azimuth, altitude, z-factor, radii and stretch
+that produced it travel with the pixels (§8.10). On the no-lokalitet path the
+lokalitet is created *before* the spec, so the name the registers just derived
+can be its title.
 
 The algorithmic side of all this is `docs/terrain-analysis.md`; the ribbon rows
 are only the control surface.
@@ -2817,8 +2949,8 @@ source and resolution, view it fullscreen, keep it as a Bilde; fetch flyfoto —
 the seamless mosaic or any historical acquisition covering the area,
 individually or as a batch; take a map screenshot; upload an image; and on a
 lokalitet you have just made, get the best LiDAR dataset over the area read
-three ways — hillshade, multidirectional hillshade and slope — fetched in
-sequence into the bottom edge without asking, with progress on it.
+three ways — hillshade, multidirectional hillshade and slope — landing in the
+bottom edge without asking and filling in as they render.
 
 **Keep it**
 walk the images along the bottom of the map, with ← / → or the chevrons — a
@@ -2827,7 +2959,9 @@ in show, picking a frame puts that image back on the map at its own
 rectangle and fades it over what is there now, and in edit **Vis i ruta** /
 **Ta av ruta** do it deliberately; press **Gjenskap** on an extract,
 terrain render or flyfoto to set the map back to the view it was made from;
-open the original in a tab; caption an attachment; delete one; step a card
+see a card that is still a set of parameters say so, and retry it if its render
+failed; open the original in a tab, fetching it first where it does not exist
+yet; caption an attachment; delete one; step a card
 earlier or later with the two arrows to set the order the
 images are read in, and so which one is the cover; hide one from the exhibit
 without deleting it, and see the hidden ones dashed and faded in the carousel

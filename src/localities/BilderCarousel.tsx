@@ -18,8 +18,11 @@ import {
   MetaLine,
   Note,
   OpenOriginalButton,
+  PinFace,
+  PinRetryButton,
   RecreateButton,
   useAttachmentUrl,
+  usePinFace,
 } from './bilderCommon';
 import styles from './BilderCarousel.module.css';
 import { bilderStripOpenAtom } from './toolAtoms';
@@ -33,10 +36,16 @@ const Card = ({ rec }: { rec: AttachmentRecord }) => {
   // routinely 4000 px square, and this frame is 180 px tall. `Åpne original`
   // is how you look at the real thing.
   const { url, error, onError } = useAttachmentUrl(rec, '800x0');
+  // An unpinned View shows what it is waiting for instead of an image, and
+  // the card keeps its size either way: the carousel is one big frame, and a
+  // stage that collapses between cards is a stage you cannot walk (§4.1.2).
+  const face = usePinFace(rec);
 
   return (
     <div className={cx(styles.card, rec.hidden && styles.cardHidden)}>
-      {url ? (
+      {face ? (
+        <PinFace rec={rec} />
+      ) : url ? (
         <img
           src={url}
           alt={rec.caption || rec.kind}
@@ -105,10 +114,10 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   return (
     <div className={styles.carousel} data-chrome="bottom">
       <div className={styles.head}>
-        {ws.starterStep != null && (
+        {ws.starterBusy && (
           <span className={styles.busy}>
             <Spinner size={14} />
-            {t('localities.tools.starterStep', { style: ws.starterStep })}
+            {t('localities.tools.starterBusy')}
           </span>
         )}
         {count > 0 && (
@@ -152,7 +161,7 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         ) : (
           <div className={styles.card}>
             <p className={styles.empty}>
-              {ws.starterStep == null && t('localities.bilder.empty')}
+              {!ws.starterBusy && t('localities.bilder.empty')}
             </p>
           </div>
         )}
@@ -197,7 +206,8 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               </Button>
             )}
             <RecreateButton rec={active} />
-            <OpenOriginalButton rec={active} />
+            <PinRetryButton ws={ws} rec={active} />
+            <OpenOriginalButton ws={ws} rec={active} />
 
             {/* Position in the exhibit order (§4.4). The index handed to
                 `reorderBilde` is a position in the *unfiltered* list — which

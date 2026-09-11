@@ -370,7 +370,13 @@
         "screenshot": "Screenshot",
         "upload": "Uploaded",
         "flyfoto": "Aerial photo"
-      }
+      },
+      "pinPending": "Rendering the image …",
+      "pinAbsent": "The image has not been rendered yet.",
+      "pinFailed": "Could not render the image.",
+      "pinEmpty": "No coverage for this rectangle.",
+      "pinRetry": "Try again",
+      "pinNow": "Render the image"
     },
     "tools": {
       "lidarExtract": "LiDAR extract",
@@ -400,7 +406,6 @@
       "flyfotoGrabAllHint": "Fetches the {{count}} most recent acquisitions, one at a time.",
       "flyfotoFetching": "Fetching …",
       "flyfotoBatchDone": "Saved {{saved}} of {{total}} acquisitions under Images.",
-      "flyfotoEmptyFor": "No aerial imagery coverage found for {{label}}.",
       "flyfotoFailedFor": "Could not fetch aerial imagery for {{label}}.",
       "flyfotoClose": "Close",
       "behold": "Keep",
@@ -410,9 +415,9 @@
       "beholdHintScreenshot": "This background cannot be fetched as a dataset. Use “Screenshot”.",
       "beholdSaved": "The image is saved under Images.",
       "beholdFailed": "Could not save the image. Try again.",
-      "starterStep": "Fetching {{style}} …",
       "starterDone": "Saved {{saved}} of {{total}} images under Images.",
-      "starterNone": "No data found for this area. The starter set produced no images."
+      "starterNone": "No data found for this area. The starter set produced no images.",
+      "starterBusy": "Setting up the starter set …"
     },
     "terrain": {
       "visualization": "Visualization",

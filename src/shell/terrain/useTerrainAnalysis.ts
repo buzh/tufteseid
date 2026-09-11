@@ -26,20 +26,19 @@
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { createAttachment } from '../../api/attachments';
+import { createAttachmentSpec } from '../../api/attachments';
 import type { LocalityBbox } from '../../api/localities';
 import { currentUserAtom } from '../../auth/atoms';
 import { isAuthDialogOpenAtom } from '../../auth/atoms-dialog';
-import { renderFigureBlob } from '../../figure/figure';
-import { terrainFigure } from '../../figure/specs';
 import {
   activeLocalityAtom,
   coverTerrainSpecAtom,
   editingLocalityIdAtom,
   pendingStarterLocalityIdAtom,
 } from '../../localities/atoms';
-import type { BeholdKey, BeholdProduct } from '../../localities/behold';
+import type { BeholdKey, BeholdSpec } from '../../localities/behold';
 import { createLocalityFromBbox } from '../../localities/createFromBbox';
+import { enqueuePin } from '../../localities/pinQueue';
 import { ribbonToolAtom } from '../../localities/toolAtoms';
 import {
   hideGroundOverlay,
@@ -274,73 +273,62 @@ export const useTerrainAnalysis = () => {
   useEffect(() => () => hideGroundOverlay('terrain'), []);
 
   /*
-   * The render as a keepable thing: the figure plus every record field that
-   * describes it. The one place that knows how a terrain render becomes an
-   * attachment.
+   * The render as a keepable thing — and since §4.1.2 that means *the row of
+   * parameters*, not the pixels. The one place that knows how a terrain
+   * render becomes an attachment.
    *
    * Two verbs call it. This tool's own `Lagre`, which turns the analysed
    * rectangle into a lokalitet — and the lokalitet row's `Behold`, which is
    * the same act said once for all five grounds (docs/lokalitet-view.md
-   * §4.3). It has to live here rather than there because the pixels do: the
-   * canvas is owned by this hook and re-painted every slider frame, so what
-   * crosses to the lokalitet row is this callback, not an image.
+   * §4.3). It has to live here rather than there because the *state* does:
+   * eight visualizations and three sliders, none of which is readable off the
+   * map. What crosses to the lokalitet row is this callback.
    *
-   * Null when there is nothing to keep — no DEM yet, or the figure renderer
-   * declined. Callers treat that as "not now", not as an error, because the
-   * only way to reach it is to press the button during a fetch.
+   * It used to render the figure too, and it does not any more. `renderTerrain`
+   * can re-fetch this DEM and repaint this canvas from nothing but the fields
+   * below, so pinning it here would be doing work the queue can do later with
+   * nobody waiting — and would put a multi-second freeze behind a button whose
+   * whole promise is that keeping is free.
+   *
+   * The corollary is that `metresPerPx` and `imageRect` are *absent* here.
+   * Both are properties of pixels, and there are none yet. Writing the DEM's
+   * numbers in anyway would be a small lie that survives until somebody trusts
+   * `imageRect` on an unpinned record.
+   *
+   * Null when there is nothing to keep — no DEM yet. Callers treat that as
+   * "not now", not as an error, because the only way to reach it is to press
+   * the button during a fetch.
    */
-  const produce = useCallback(
-    async (subject?: string): Promise<BeholdProduct | null> => {
-      const canvas = canvasRef.current;
-      if (!canvas || !dem) return null;
-
-      // What leaves the app is a figure, not a screengrab of the overlay:
-      // a hillshade at 315°/35° and one at 135°/20° disagree about whether
-      // there is a mound in that field, so the angles travel with the pixels.
-      const figure = await renderFigureBlob(
-        canvas,
-        terrainFigure({
-          subject,
-          vis,
-          model,
-          light: { azimuth, altitude, zFactor },
-          dem,
-          radius,
-        }),
-      );
-      if (!figure) return null;
-
-      const label = t(`localities.terrain.vis.${vis}`);
-      return {
-        // Reuses the existing `extract` kind rather than adding one: this is
-        // a LiDAR-derived raster of the rectangle, which is what that kind
-        // already means, and a new enum value would need a PocketBase
-        // migration for no user-visible gain.
-        kind: 'extract',
-        blob: figure.blob,
-        caption: `${label} · ${model.toUpperCase()}`,
-        filename: `terreng_${vis}_${model}.png`,
-        meta: {
-          sourceLabel: t('localities.terrain.sourceLabel'),
-          style: vis,
-          model,
-          metresPerPx: dem.metresPerPx,
-          bbox25833: dem.bbox25833,
-          // Where the render sits inside the file: the caption panel is
-          // drawn below it, so the image is no longer the whole PNG.
-          imageRect: figure.imageRect,
-          // Only meaningful for the sun-dependent views, but recording it
-          // unconditionally keeps the shape predictable.
-          ...(vis === 'hillshade' ? { azimuth } : {}),
-          altitude,
-          zFactor,
-          // Already clamped to the grid — see above.
-          ...(radiusLimits ? { radius } : {}),
-        },
-      };
-    },
-    [dem, vis, model, azimuth, altitude, zFactor, radius, radiusLimits, t],
-  );
+  const describe = useCallback((): BeholdSpec | null => {
+    if (!dem) return null;
+    const label = t(`localities.terrain.vis.${vis}`);
+    return {
+      // Reuses the existing `extract` kind rather than adding one: this is
+      // a LiDAR-derived raster of the rectangle, which is what that kind
+      // already means, and a new enum value would need a PocketBase
+      // migration for no user-visible gain.
+      kind: 'extract',
+      caption: `${label} · ${model.toUpperCase()}`,
+      meta: {
+        sourceLabel: t('localities.terrain.sourceLabel'),
+        style: vis,
+        model,
+        // Not the resolution — the *rectangle*. `viewSpecOf` does not read
+        // it, but the duplicate guard does (`attachmentMatchesKey`), and
+        // "same ground?" has to be answerable before the pixels exist or
+        // `Behold` would offer to keep the same view twice.
+        bbox25833: dem.bbox25833,
+        // Only meaningful for the sun-dependent views, but recording it
+        // unconditionally keeps the shape predictable.
+        ...(vis === 'hillshade' ? { azimuth } : {}),
+        altitude,
+        zFactor,
+        // Already clamped to the grid — see above. The pin clamps again
+        // against whatever grid it actually gets, and writes back.
+        ...(radiusLimits ? { radius } : {}),
+      },
+    };
+  }, [dem, vis, model, azimuth, altitude, zFactor, radius, radiusLimits, t]);
 
   /*
    * The same render, said as the duplicate guard's key (§4.3): what `Behold`
@@ -348,9 +336,11 @@ export const useTerrainAnalysis = () => {
    * to a light you have already saved reads `Beholdt` instead of saving it
    * twice.
    *
-   * Every field here is one `produce` writes into `meta` — kept adjacent for
+   * Every field here is one `describe` writes into `meta` — kept adjacent for
    * that reason, because a key that drifts from the record it is matching
-   * against silently stops matching anything.
+   * against silently stops matching anything. That the guard reads only spec
+   * fields is what lets it work on an unpinned View, which is now most of
+   * them.
    */
   const beholdKey = useMemo((): BeholdKey | null => {
     if (!dem) return null;
@@ -395,7 +385,7 @@ export const useTerrainAnalysis = () => {
       // not the current view — the map is live under the ribbon, so the user
       // has probably panned since pressing Terreng.
       //
-      // Before the render rather than after, so the figure's title can carry
+      // Before the spec rather than after, so the figure's title can carry
       // the name the registers just gave the rectangle.
       const target = await createLocalityFromBbox(
         bbox,
@@ -407,20 +397,24 @@ export const useTerrainAnalysis = () => {
         return;
       }
 
-      const product = await produce(target.name || undefined);
-      if (!product) return;
+      const spec = describe();
+      if (!spec) return;
 
-      await createAttachment(
+      // The row and then the pixels, in that order and with only the first
+      // one awaited (§4.1.2). The lokalitet opens two lines below this with
+      // the render already in its Bilder as a card that says it is being
+      // fetched — rather than after a five-second wait on a screen that has
+      // not changed since the press.
+      const rec = await createAttachmentSpec(
         {
           locality: target.id,
-          kind: product.kind,
-          caption: product.caption,
-          meta: product.meta,
+          kind: spec.kind,
+          caption: spec.caption,
+          meta: spec.meta,
         },
         user.id,
-        product.blob,
-        product.filename,
       );
+      enqueuePin({ rec, bbox4326: bbox, subject: target.name || undefined });
 
       // Opening the new lokalitet is the receipt: the ribbon rescopes to it
       // and the render is sitting in its Bilder. In edit, because you are
@@ -448,7 +442,7 @@ export const useTerrainAnalysis = () => {
     setPendingStarter,
     saving,
     dem,
-    produce,
+    describe,
     t,
   ]);
 
@@ -574,10 +568,10 @@ export const useTerrainAnalysis = () => {
     saving,
     save,
     // What the lokalitet row's `Behold` needs from this tool, and all it
-    // needs: how to make the image, and how to tell whether it is already in
+    // needs: what the render *is*, and how to tell whether it is already in
     // the Bilder. Published through `beholdOfferAtom`, not props — row 1 and
     // the lokalitet row are siblings.
-    produce,
+    describe,
     beholdKey,
     azimuth,
     setAzimuth,

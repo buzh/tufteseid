@@ -18,7 +18,12 @@ export type AttachmentRecord = {
   locality: string;
   owner: string;
   kind: AttachmentKind;
-  // Server-side filename within the record's storage dir.
+  // Server-side filename within the record's storage dir, and **empty until
+  // the pixels exist** (docs/lokalitet-view.md §4.1.2). A View — an extract, a
+  // terrain render, a flyfoto — is kept as its `meta` first and materialised
+  // by the pin queue afterwards, so an empty string here is a normal state
+  // rather than a broken record. `isPinned` in localities/viewSpec.ts is the
+  // predicate; nothing should compare this to '' by hand.
   file: string;
   caption: string;
   meta: AttachmentMeta | null;
@@ -98,6 +103,7 @@ export const countAttachmentsByLocality = async (): Promise<
   return counts;
 };
 
+/** A File: bytes, and there is no other way to have them (§4.1.1). */
 export const createAttachment = async (
   input: NewAttachmentInput,
   ownerId: string,
@@ -113,6 +119,56 @@ export const createAttachment = async (
   form.append('sort', String(nextAttachmentSort()));
   form.append('file', blob, filename);
   return pb.collection(COLLECTION).create<AttachmentRecord>(form);
+};
+
+/*
+ * A View: the row of parameters, with no pixels yet (§4.1.2).
+ *
+ * This is how `Behold`, the starter set and the terrain tool's own `Lagre`
+ * write. A few hundred bytes of JSON instead of up to twenty megabytes of
+ * PNG, which is what makes keeping an image free — and free keeps are what a
+ * carousel you triage in, and a picker you throw eight of twelve away in, both
+ * need in order to be reasonable things to put in front of someone.
+ *
+ * Plain JSON rather than the FormData above, deliberately: a multipart create
+ * with no file part is the same request said in a way that invites somebody to
+ * add one later.
+ */
+export const createAttachmentSpec = async (
+  input: NewAttachmentInput,
+  ownerId: string,
+): Promise<AttachmentRecord> =>
+  pb.collection(COLLECTION).create<AttachmentRecord>({
+    locality: input.locality,
+    owner: ownerId,
+    kind: input.kind,
+    caption: input.caption ?? '',
+    meta: input.meta ?? {},
+    sort: nextAttachmentSort(),
+  });
+
+/*
+ * …and the pin: the pixels for a spec that already exists.
+ *
+ * `meta` goes up with the file because materialising a View is what learns the
+ * three things the spec could not know — where the image sits inside the
+ * figure (`imageRect`), what resolution the source actually gave
+ * (`metresPerPx`) and when the pixels were made (`renderedAt`). One request,
+ * so a record can never hold a file the meta does not describe.
+ *
+ * The caller passes the *whole* meta, not a patch: PocketBase replaces a JSON
+ * field wholesale.
+ */
+export const pinAttachment = async (
+  id: string,
+  blob: Blob,
+  filename: string,
+  meta: AttachmentMeta,
+): Promise<AttachmentRecord> => {
+  const form = new FormData();
+  form.append('file', blob, filename);
+  form.append('meta', JSON.stringify(meta));
+  return pb.collection(COLLECTION).update<AttachmentRecord>(id, form);
 };
 
 /** Caption, exhibit position or concealment — everything an author edits. */

@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import {
   AttachmentRecord,
   createAttachment,
+  createAttachmentSpec,
   deleteAttachment,
   updateAttachment,
 } from '../api/attachments';
@@ -27,12 +28,9 @@ import { currentUserAtom, isAdminAtom } from '../auth/atoms';
 import { useDrawSettings } from '../draw/drawControls/hooks/drawSettings';
 import { getDrawLayer } from '../draw/drawControls/hooks/mapLayers';
 import { renderFigureBlob } from '../figure/figure';
-import {
-  describeHeritageRender,
-  flyfotoFigure,
-  screenshotFigure,
-} from '../figure/specs';
+import { describeHeritageRender, screenshotFigure } from '../figure/specs';
 import { lidarExtractSelectionAtom } from '../lidarExtract/atoms';
+import type { LidarSource } from '../lidarExtract/sources';
 import { mapAtom } from '../map/atoms';
 import { activeThemeLayersAtom } from '../map/layers/atoms';
 import {
@@ -65,7 +63,6 @@ import {
   beholdOfferAtom,
   NIB_MOSAIC_KEY,
 } from './behold';
-import { fetchFlyfoto } from './flyfoto';
 import {
   fetchFlyfotoProjectsForBbox,
   type FlyfotoProject,
@@ -81,14 +78,10 @@ import {
   setLocalityHighlight,
   upsertLocalityOnLayer,
 } from './localityLayer';
+import { enqueuePin, pinAttempted, pinNow } from './pinQueue';
 import { captureLocalityScreenshot } from './screenshot';
 import { getDrawLayerExtent4326 } from './serializeDrawLayer';
-import {
-  planStarterPack,
-  extractLidarFigure,
-  STARTER_STYLES,
-  type ExtractRaster,
-} from './starterPack';
+import { planStarterPack } from './starterPack';
 import {
   bilderStripOpenAtom,
   funnOutsideAtom,
@@ -104,7 +97,7 @@ import {
 } from './useLocalityContent';
 import { canPinBilde, usePinnedBilde } from './usePinnedBilde';
 import { useWorkspaceKeys } from './useWorkspaceKeys';
-import { viewSpecOf } from './viewSpec';
+import { isPinned, viewSpecOf } from './viewSpec';
 
 /**
  * What a signed-in user is to one lokalitet.
@@ -178,11 +171,6 @@ const groundLabelKey = (layer: BackgroundLayerName, hybrid: boolean): string =>
 // line has to name NiB as well as Kartverket.
 const NIB_GROUNDS = new Set<BackgroundLayerName>(['flyfoto', 'flyfotoProject']);
 
-// Attachment filenames go into a download dialog eventually, so keep them to
-// something a filesystem and a URL both accept.
-const sanitizeFilename = (s: string) =>
-  s.replace(/[^\p{L}\p{N}._-]+/gu, '_').slice(0, 80) || 'bilde';
-
 const bboxContains = (outer: LocalityBbox, inner: LocalityBbox): boolean =>
   inner[0] >= outer[0] &&
   inner[1] >= outer[1] &&
@@ -254,10 +242,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     'picker' | 'behold' | null
   >(null);
   const [beholding, setBeholding] = useState(false);
-  // The style the starter set is fetching, or null when it is not running. A
-  // value rather than a bool: the Bilder section names what it is waiting for.
-  const [starterStep, setStarterStep] = useState<string | null>(null);
-  const starterAbortRef = useRef<AbortController | null>(null);
+  // Whether the starter set is being written. A plain bool since §4.1.2: it
+  // used to name the style being fetched, because fetching three was minutes
+  // and the rail had nothing else to say — now the three cards appear almost
+  // at once and each says its own pin state.
+  const [starterBusy, setStarterBusy] = useState(false);
   // The acquisition picker, opened once the licensing notice is accepted.
   const [flyfotoPicker, setFlyfotoPicker] = useState(false);
   const [flyfotoProjects, setFlyfotoProjects] = useState<
@@ -577,11 +566,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       // Before the clear below, not after: closing the workspace mid-stroke
       // should write the stroke, and the draw layer is where it still is.
       flushDraftRef.current();
-      // A grunnpakke is minutes of tile bursts against two shared upstreams.
-      // Closing the lokalitet is as clear a "stop" as there is, and unlike a
-      // funn there is nothing half-written to lose — each image is saved
-      // whole or not at all.
-      starterAbortRef.current?.abort();
       setDraftActive(false);
       setAdjusting(false);
       setTool(null);
@@ -1144,50 +1128,45 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setFlyfotoProjectsError(false);
   }, [bboxKey]);
 
-  // One grab: stitch the requested source over the rectangle and keep it
-  // as a Bilde. Returns whether an image was saved, so the batch loop can
-  // report how many of the projects it tried actually had coverage.
+  // The rectangle in the projected CRS every producer and every stored `meta`
+  // works in. Up here rather than beside `Behold`, which is where it used to
+  // live, because since §4.1.2 every write in this hook records it: it is the
+  // "same ground?" half of the duplicate guard, and the guard now has to work
+  // against specs whose pixels do not exist yet.
+  const beholdBbox = useMemo(
+    () =>
+      transformExtent(locality.bbox, 'EPSG:4326', 'EPSG:25833') as [
+        number,
+        number,
+        number,
+        number,
+      ],
+    [locality.bbox],
+  );
+
+  /*
+   * One grab — which since §4.1.2 is one *row*, not one stitch.
+   *
+   * This used to be the slowest write in the app: a burst of NiB tiles, a
+   * stitch, a figure render and a multi-megabyte JPEG upload, all before the
+   * card appeared. It is now a POST of a few hundred bytes naming which
+   * acquisition the author wants, and `pinQueue` does the rest with nobody
+   * waiting. That is what makes the batch below — up to a dozen acquisitions
+   * of the same valley — a reasonable thing to offer.
+   *
+   * Returns whether the row was written. The batch counts those, and the
+   * count now means "acquisitions kept" rather than "acquisitions that turned
+   * out to have coverage" — which the picker could not know before either,
+   * having no way to ask NiB without fetching.
+   */
   const grabFlyfoto = useCallback(
-    async (
-      project?: FlyfotoProject,
-      signal?: AbortSignal,
-    ): Promise<boolean> => {
+    async (project?: FlyfotoProject): Promise<boolean> => {
       if (!user || !canAdd) return false;
       const label = project
         ? (project.year?.toString() ?? project.projectName)
         : t('localities.tools.flyfotoMosaic');
       try {
-        const result = await fetchFlyfoto(locality.bbox, { project, signal });
-        if (!result) {
-          // An aborted stitch also paints nothing. Saying "no coverage here"
-          // about a grab the user cancelled would be a lie about the ground.
-          if (signal?.aborted) return false;
-          toast.error({
-            title: t('localities.tools.flyfotoEmptyFor', { label }),
-          });
-          return false;
-        }
-        // JPEG all the way through, like the stitch itself: the caption is
-        // large flat type and survives it, and a lossless copy of a
-        // lossy-sourced photograph is several times the bytes for nothing.
-        const figure = await renderFigureBlob(
-          result.canvas,
-          flyfotoFigure({
-            subject: locality.name || undefined,
-            project,
-            metresPerPx: result.metresPerPx,
-            bbox25833: result.bbox25833,
-          }),
-          'image/jpeg',
-          0.9,
-        );
-        if (!figure) {
-          toast.error({
-            title: t('localities.tools.flyfotoFailedFor', { label }),
-          });
-          return false;
-        }
-        const rec = await createAttachment(
+        const rec = await createAttachmentSpec(
           {
             locality: locality.id,
             kind: 'flyfoto',
@@ -1199,9 +1178,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
             }`,
             meta: {
               sourceLabel: 'Norge i bilder',
-              metresPerPx: result.metresPerPx,
-              bbox25833: result.bbox25833,
-              imageRect: figure.imageRect,
+              // The rectangle, but not the resolution: which acquisition over
+              // which ground is the spec, and what NiB actually serves for it
+              // is a fact about pixels that do not exist yet.
+              bbox25833: beholdBbox,
               // Which NiB source this is, said in a way a machine can act on:
               // the seamless mosaic and one acquisition are different
               // requests, and "no projectName key" is a poor way to tell them
@@ -1216,10 +1196,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
                     // breaks the day two projects share a year.
                     projectId: project.id,
                     projectName: project.projectName,
-                    // The acquisition's native resolution, not the stitch's:
-                    // fetchFlyfoto needs it to plan the same tile grid again,
-                    // and metresPerPx above has already been coarsened by the
-                    // canvas cap on a large rectangle.
+                    // The acquisition's native resolution. `fetchFlyfoto`
+                    // needs it to plan the tile grid, and unlike the stitch's
+                    // own it is knowable before the stitch happens.
                     projectMetresPerPx: project.metresPerPx,
                     year: project.year,
                     photoDate: project.photoDate,
@@ -1228,13 +1207,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
             },
           },
           user.id,
-          figure.blob,
-          'flyfoto.jpg',
         );
         setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
+        enqueuePin({
+          rec,
+          bbox4326: locality.bbox,
+          subject: locality.name || undefined,
+        });
         return true;
       } catch (e) {
-        if (signal?.aborted) return false;
         console.warn('[localityWorkspace] flyfoto failed', e);
         toast.error({
           title: t('localities.tools.flyfotoFailedFor', { label }),
@@ -1248,6 +1229,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       locality.id,
       locality.name,
       locality.bbox,
+      beholdBbox,
       setAttachmentItems,
       t,
       i18n.language,
@@ -1278,10 +1260,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setFetchingFlyfoto(true);
     let saved = 0;
     try {
-      // Sequential on purpose. A single project's tile burst already
-      // saturates the stitcher's concurrency budget against NiB's shared
-      // edge, so overlapping two would not finish sooner — it would just
-      // make both slower and invite shed responses.
+      // Sequential, though it hardly costs anything now: since §4.1.2 each
+      // pass is one small POST rather than a tile burst. The argument that
+      // made it sequential — one stitch already saturates the concurrency
+      // budget against NiB's shared edge — moved into `pinQueue`, which is
+      // where the stitches happen. Kept in order here so the busy marker
+      // walks the picker rows the user is watching.
       for (const project of batch) {
         setFlyfotoBusy(project.id);
         if (await grabFlyfoto(project)) saved++;
@@ -1298,35 +1282,54 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     });
   }, [fetchingFlyfoto, flyfotoProjects, grabFlyfoto, t]);
 
-  // The starter set's rasters land as `extract` attachments, same as when one
-  // is produced by hand from the extract tool: a laser-derived picture of the
-  // rectangle is what that kind means. The meta is the same set of keys too,
-  // so nothing downstream has to know which route produced an image.
-  const saveExtractRaster = useCallback(
-    async (raster: ExtractRaster, caption: string, filename: string) => {
+  /*
+   * A LiDAR reading of this rectangle, kept as its parameters (§4.1.2).
+   *
+   * Both routes to one go through here — the starter set below and `Behold`
+   * over the LiDAR ground — and both used to hand this a finished
+   * `ExtractRaster`, i.e. a stitch that had already happened. A dataset, a
+   * style, a model and the rectangle is the entire question that stitch
+   * answers, so there is nothing left for the caller to fetch first: this
+   * takes the `LidarSource` straight from the catalogue and writes the row.
+   *
+   * The starter set's images land as `extract` attachments, same as one made
+   * by hand from the extract tool: a laser-derived picture of the rectangle is
+   * what that kind means, and the meta is the same set of keys, so nothing
+   * downstream has to know which route produced an image.
+   */
+  const saveExtractSpec = useCallback(
+    async (source: LidarSource, style: string) => {
       if (!user) return;
-      const rec = await createAttachment(
+      const rec = await createAttachmentSpec(
         {
           locality: locality.id,
           kind: 'extract',
-          caption,
+          caption: `${source.label} · ${style}`,
           meta: {
-            sourceKey: raster.sourceKey,
-            sourceLabel: raster.sourceLabel,
-            style: raster.style,
-            model: raster.model,
-            metresPerPx: raster.metresPerPx,
-            bbox25833: raster.bbox25833,
-            imageRect: raster.imageRect,
+            sourceKey: source.key,
+            sourceLabel: source.label,
+            style,
+            model: source.model,
+            bbox25833: beholdBbox,
           },
         },
         user.id,
-        raster.blob,
-        filename,
       );
       setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
+      enqueuePin({
+        rec,
+        bbox4326: locality.bbox,
+        subject: locality.name || undefined,
+      });
     },
-    [user, locality.id, setAttachmentItems],
+    [
+      user,
+      locality.id,
+      locality.name,
+      locality.bbox,
+      beholdBbox,
+      setAttachmentItems,
+    ],
   );
 
   /*
@@ -1340,62 +1343,47 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * ground no LiDAR project covers it is one, because the national mosaic
    * publishes only `skyggerelieff`.
    *
-   * Sequential, like the flyfoto batch and for the same reason: one stitch
-   * already saturates its concurrency budget against a shared public edge,
-   * so running them together would not finish sooner, it would just invite
-   * shed responses.
+   * It used to be minutes of tile bursts, reported style by style because
+   * there was that much to report. Since §4.1.2 the only slow thing left in
+   * it is the catalogue lookup, and the three writes after that are three
+   * small POSTs — so the whole run is over in about a second, and the rail
+   * fills with three cards that say they are being fetched. The images
+   * themselves arrive one at a time from `pinQueue`, which is where the
+   * sequencing argument moved: one stitch already saturates its concurrency
+   * budget against a shared public edge, so overlapping two would not finish
+   * sooner.
    *
-   * Each image is independently fallible — so failures are counted, not
+   * There is no abort any more, and that is the point rather than an
+   * omission. Closing the lokalitet used to cancel a run in flight because
+   * what was in flight was megabytes nobody would see; what is in flight now
+   * is three rows the author will find waiting next time, and abandoning them
+   * unpinned would be the worse outcome.
+   *
+   * Each write is independently fallible — so failures are counted, not
    * thrown, and the toast says how many of the planned set arrived.
    */
   const runStarterPack = useCallback(async () => {
-    if (!user || !canAdd || starterStep) return;
-    const ac = new AbortController();
-    starterAbortRef.current = ac;
-    const bbox25833 = transformExtent(
-      locality.bbox,
-      'EPSG:4326',
-      'EPSG:25833',
-    ) as [number, number, number, number];
+    if (!user || !canAdd || starterBusy) return;
+    setStarterBusy(true);
     let saved = 0;
-
     try {
       // The catalogue lookup is the first thing that can answer "is there any
       // laser data here at all", and it costs one cached request.
-      setStarterStep(STARTER_STYLES[0]);
       const plan = await planStarterPack(locality.bbox);
-      if (ac.signal.aborted) return;
       if (!plan) {
         toast.error({ title: t('localities.tools.starterNone') });
         return;
       }
 
       for (const style of plan.styles) {
-        if (ac.signal.aborted) return;
-        setStarterStep(style);
         try {
-          const extract = await extractLidarFigure(
-            plan.source,
-            bbox25833,
-            style,
-            { subject: locality.name || undefined, signal: ac.signal },
-          );
-          if (extract && !ac.signal.aborted) {
-            await saveExtractRaster(
-              extract,
-              `${extract.sourceLabel} · ${extract.style}`,
-              `${sanitizeFilename(extract.sourceLabel)}_${extract.style}.png`,
-            );
-            saved++;
-          }
+          await saveExtractSpec(plan.source, style);
+          saved++;
         } catch (e) {
-          if (!ac.signal.aborted) {
-            console.warn('[localityWorkspace] starter extract failed', e);
-          }
+          console.warn('[localityWorkspace] starter spec failed', e);
         }
       }
 
-      if (ac.signal.aborted) return;
       if (saved === 0) {
         toast.error({ title: t('localities.tools.starterNone') });
       } else {
@@ -1407,18 +1395,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         });
       }
     } finally {
-      if (starterAbortRef.current === ac) starterAbortRef.current = null;
-      setStarterStep(null);
+      setStarterBusy(false);
     }
-  }, [
-    user,
-    canAdd,
-    starterStep,
-    locality.bbox,
-    locality.name,
-    saveExtractRaster,
-    t,
-  ]);
+  }, [user, canAdd, starterBusy, locality.bbox, saveExtractSpec, t]);
 
   /*
    * …and on a brand-new lokalitet it runs itself (§4.3, §12).
@@ -1453,17 +1432,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * one optimistic update, one set of captions.
    */
   const offer = useAtomValue(beholdOfferAtom);
-
-  const beholdBbox = useMemo(
-    () =>
-      transformExtent(locality.bbox, 'EPSG:4326', 'EPSG:25833') as [
-        number,
-        number,
-        number,
-        number,
-      ],
-    [locality.bbox],
-  );
 
   // The offer said as the duplicate guard's key. Null where the ground has
   // nothing to keep (Standard, Hybrid) or is not ready to say what it would
@@ -1527,45 +1495,35 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     try {
       if (offer.ground === 'lidar') {
         if (!offer.source) return;
-        const raster = await extractLidarFigure(
-          offer.source,
-          beholdBbox,
-          offer.style,
-          { subject: locality.name || undefined },
-        );
-        if (!raster) {
-          toast.error({ title: t('localities.tools.beholdFailed') });
-          return;
-        }
-        await saveExtractRaster(
-          raster,
-          `${raster.sourceLabel} · ${raster.style}`,
-          `${sanitizeFilename(raster.sourceLabel)}_${raster.style}.png`,
-        );
+        await saveExtractSpec(offer.source, offer.style);
         toast.success({ title: t('localities.tools.beholdSaved') });
         return;
       }
 
       if (offer.ground === 'terreng') {
-        // The only arm that cannot make its own pixels: the render is a
-        // canvas row 1 owns, so the offer carries a callback.
-        const product = await offer.produce(locality.name || undefined);
-        if (!product) {
+        // The only arm that cannot say what it is showing from a dataset
+        // name: eight visualizations and three sliders, all of it state row 1
+        // owns, so the offer carries a callback.
+        const spec = offer.describe();
+        if (!spec) {
           toast.error({ title: t('localities.tools.beholdFailed') });
           return;
         }
-        const rec = await createAttachment(
+        const rec = await createAttachmentSpec(
           {
             locality: locality.id,
-            kind: product.kind,
-            caption: product.caption,
-            meta: product.meta,
+            kind: spec.kind,
+            caption: spec.caption,
+            meta: spec.meta,
           },
           user.id,
-          product.blob,
-          product.filename,
         );
         setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
+        enqueuePin({
+          rec,
+          bbox4326: locality.bbox,
+          subject: locality.name || undefined,
+        });
         toast.success({ title: t('localities.tools.beholdSaved') });
       }
     } catch (e) {
@@ -1579,10 +1537,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     canAdd,
     beholding,
     offer,
-    beholdBbox,
     locality.id,
     locality.name,
-    saveExtractRaster,
+    locality.bbox,
+    saveExtractSpec,
     setAttachmentItems,
     t,
   ]);
@@ -1781,7 +1739,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // the edge — that is where the empty line saying so goes, and where the
   // first image will land. An empty one you may *not* add to gets no bar: a
   // reader has no use for a strip that says "run an extract".
-  const hasBilder = bilderCount > 0 || starterStep != null || canAdd;
+  const hasBilder = bilderCount > 0 || starterBusy || canAdd;
   const kmCount = kulturminner.result
     ? kulturminner.result.truncated
       ? `${kulturminner.result.items.length}+`
@@ -1830,6 +1788,56 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setCoverTerrainSpec(coverTerrainSpec);
     return () => setCoverTerrainSpec(null);
   }, [coverTerrainSpec, setCoverTerrainSpec]);
+
+  /*
+   * The pin queue's three entrances from the UI (§4.1.2).
+   *
+   * A job needs the rectangle and the subject, and both are this hook's — so
+   * the cards get verbs rather than the module, and no surface has to know
+   * that a pin is anything but "press this".
+   */
+  const pinJob = useCallback(
+    (rec: AttachmentRecord) => ({
+      rec,
+      bbox4326: locality.bbox,
+      subject: locality.name || undefined,
+    }),
+    [locality.bbox, locality.name],
+  );
+
+  const retryPin = useCallback(
+    (rec: AttachmentRecord) => enqueuePin(pinJob(rec)),
+    [pinJob],
+  );
+
+  const forcePin = useCallback(
+    (rec: AttachmentRecord) => pinNow(pinJob(rec)),
+    [pinJob],
+  );
+
+  /*
+   * …and the sweep: unpinned Views this session has not yet offered the queue.
+   *
+   * A spec whose render failed — the tile burst timed out, the tab was closed
+   * mid-queue — stays a spec, and nothing would ever ask again. So opening the
+   * lokalitet asks, once per record per session (`pinAttempted`), which is the
+   * cheapest possible version of "retry when the queue fails" (§5.6).
+   *
+   * Gated on `canAdd`, and that is §2 being taken literally rather than
+   * caution: a pin is an `update`, an admin may make one and a reader may not,
+   * and *nothing in show writes*. So a reader sees the card say the image has
+   * not been fetched, and an owner materialises it by pressing `Rediger` — the
+   * same gate as every other write in this hook. It also means the sweep can
+   * never fire on the public lokalitet you are only passing through.
+   */
+  useEffect(() => {
+    if (!canAdd || !attachmentItems) return;
+    for (const rec of attachmentItems) {
+      if (isPinned(rec) || pinAttempted(rec.id)) continue;
+      if (!viewSpecOf(rec)) continue;
+      enqueuePin(pinJob(rec));
+    }
+  }, [canAdd, attachmentItems, pinJob]);
 
   return {
     // identity / permissions
@@ -1927,9 +1935,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     runFlyfotoAll,
 
     // the starter set. No verb: it runs itself on a new lokalitet now, and
-    // `starterStep` is here because the rail says which image it is waiting
-    // for while it does.
-    starterStep,
+    // this is here because the rail has a moment — between the catalogue
+    // lookup and the three rows landing — with nothing on it yet.
+    starterBusy,
+
+    // The pin queue (§4.1.2), for the cards. `retryPin` is the button on a
+    // card whose render failed; `forcePin` is what `Last ned` presses, and
+    // the only caller that waits.
+    retryPin,
+    forcePin,
 
     // Behold
     behold,

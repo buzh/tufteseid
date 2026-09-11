@@ -17,6 +17,26 @@
   color: var(--c-fg-subtle);
 }
 
+/* Where the image goes on a View that has not been rendered yet (§4.1.2).
+   Fills whatever box it is dropped into — a 96 px frame in the strip, a
+   half-panel card in the carousel — because both surfaces reserve the
+   picture's space whether or not the picture has arrived, and a rail that
+   reflows when the pixels land is a rail you lose your place in. */
+.pinFace {
+  display: flex;
+  position: absolute;
+  inset: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  text-align: center;
+  font-size: var(--font-xs);
+  line-height: 1.2;
+  color: var(--c-fg-subtle);
+}
+
 /* Beside the caption rather than under the images (§4.3). Same plain range
    input as the terrain sliders, for the same reason: the fade has to stream
    while it is dragged, because what is being watched is the map. */

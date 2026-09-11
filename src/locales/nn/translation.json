@@ -370,7 +370,13 @@
         "screenshot": "Skjermbilete",
         "upload": "Lasta opp",
         "flyfoto": "Flyfoto"
-      }
+      },
+      "pinPending": "Hentar biletet …",
+      "pinAbsent": "Biletet er ikkje henta enno.",
+      "pinFailed": "Kunne ikkje hente biletet.",
+      "pinEmpty": "Inga dekning for dette utsnittet.",
+      "pinRetry": "Prøv igjen",
+      "pinNow": "Hent biletet"
     },
     "tools": {
       "lidarExtract": "LiDAR-uttrekk",
@@ -400,7 +406,6 @@
       "flyfotoGrabAllHint": "Hentar dei {{count}} nyaste opptaka, eitt om gongen.",
       "flyfotoFetching": "Hentar …",
       "flyfotoBatchDone": "Lagra {{saved}} av {{total}} opptak under Bilete.",
-      "flyfotoEmptyFor": "Fann ingen flyfoto-dekning for {{label}}.",
       "flyfotoFailedFor": "Kunne ikkje hente flyfoto for {{label}}.",
       "flyfotoClose": "Lukk",
       "behold": "Behald",
@@ -410,9 +415,9 @@
       "beholdHintScreenshot": "Denne bakgrunnen kan ikkje hentast som datasett. Bruk «Skjermbilete».",
       "beholdSaved": "Biletet er lagra under Bilete.",
       "beholdFailed": "Kunne ikkje lagre biletet. Prøv igjen.",
-      "starterStep": "Hentar {{style}} …",
       "starterDone": "Lagra {{saved}} av {{total}} bilete under Bilete.",
-      "starterNone": "Fann ingen data for dette området. Grunnpakken gav ingen bilete."
+      "starterNone": "Fann ingen data for dette området. Grunnpakken gav ingen bilete.",
+      "starterBusy": "Set opp grunnpakken …"
     },
     "terrain": {
       "visualization": "Visualisering",

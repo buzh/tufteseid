@@ -52,6 +52,21 @@ export type ViewSpec =
 /** The terrain arm on its own — what §4.6's seeding hands the terrain hook. */
 export type TerrainSpec = Extract<ViewSpec, { kind: 'terrain' }>;
 
+/*
+ * Whether this record's pixels exist yet (docs/lokalitet-view.md §4.1.2).
+ *
+ * A View has three states — spec, pinned, and stale — and only the first two
+ * are distinguishable from the record: `file` is empty until the pin queue has
+ * rendered and uploaded the figure. An unpinned View is *not* a broken record.
+ * It has everything needed to make the image and simply has not been asked to
+ * yet, which is why the surfaces say "not fetched yet" rather than showing a
+ * failure.
+ *
+ * A File is pinned from the moment it exists — bytes are the only thing it
+ * ever was — so this is true for every screenshot and upload.
+ */
+export const isPinned = (rec: AttachmentRecord): boolean => rec.file !== '';
+
 const str = (v: unknown): string | null =>
   typeof v === 'string' && v !== '' ? v : null;
 

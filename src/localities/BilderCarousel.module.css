@@ -62,6 +62,8 @@
 }
 
 .card {
+  /* Positioned so the pin face (bilderCommon.module.css) can fill it. */
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;

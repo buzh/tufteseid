@@ -6,11 +6,11 @@
  * What comes out is the rectangle *in that ground*, at the source's native
  * resolution — not a screenshot of it.
  *
- * | Ground on screen | What it produces                                      |
+ * | Ground on screen | What it writes                                        |
  * |------------------|-------------------------------------------------------|
- * | 2 LiDAR          | `extractCanvas` at the active dataset, style and model |
- * | 5 Terreng        | the live render at the current visualization and knobs |
- * | 4 Flyfoto        | `fetchFlyfoto` for the active acquisition              |
+ * | 2 LiDAR          | a spec: the active dataset, style and model           |
+ * | 5 Terreng        | a spec: the current visualization and knobs           |
+ * | 4 Flyfoto        | a spec: the active acquisition                        |
  * | 1 Standard, 3 Hybrid | nothing — disabled, the tooltip says Skjermbilde   |
  *
  * The last row is a refusal, not an omission. There is no rectangle-fetch path
@@ -28,10 +28,15 @@
  * crosses in the other direction. So row 1 publishes what its ground can
  * offer, and `useLocalityWorkspace` decides what to do with it.
  *
- * Only the terrain arm carries a producer. Its pixels are a canvas the terrain
- * hook owns and re-paints every slider frame; the other two are fetches the
- * workspace can make itself from a dataset name, and it already has the
- * `createAttachment` call, the optimistic list update and the NiB notice.
+ * Only the terrain arm carries a describer, and since §4.1.2 that is all it
+ * carries: a spec, not a figure. Terrain is the one ground whose parameters
+ * are not recoverable from the map — eight visualizations, three sliders and
+ * a model, all of them state inside `useTerrainAnalysis` — so the hook has to
+ * say what it is currently showing. The other two arms name a dataset, and a
+ * dataset name is the whole spec.
+ *
+ * Nothing here produces pixels any more. Keeping a View writes the row and
+ * returns; `localities/pinQueue.ts` makes the image afterwards.
  */
 
 import { atom } from 'jotai';
@@ -43,12 +48,16 @@ import type {
 import type { LidarSource } from '../lidarExtract/sources';
 import type { FlyfotoProject } from './flyfotoProjects';
 
-/** A figure, and every field of the record that will carry it. */
-export type BeholdProduct = {
+/**
+ * A row of parameters, and the record that will carry it (§4.1.2).
+ *
+ * `meta` here is the *identifying* half only — what was asked for. What making
+ * the image reveals — `imageRect`, the resolution the source actually gave,
+ * `renderedAt` — is written by the pin, not by this.
+ */
+export type BeholdSpec = {
   kind: AttachmentKind;
-  blob: Blob;
   caption: string;
-  filename: string;
   meta: AttachmentMeta;
 };
 
@@ -70,7 +79,13 @@ export type BeholdOffer =
       ground: 'terreng';
       // Null until a DEM has been fetched and painted.
       key: BeholdKey | null;
-      produce: (subject?: string) => Promise<BeholdProduct | null>;
+      // Synchronous, because reading your own state is not work. That it costs
+      // nothing is the point: `Behold` on Terreng is now a POST of ~300 bytes.
+      //
+      // No `subject` argument, unlike the producer this replaced: the subject
+      // was for the figure's title line, and the figure is now the pin
+      // queue's business.
+      describe: () => BeholdSpec | null;
     }
   | { ground: 'flyfoto'; project: FlyfotoProject | null };
 

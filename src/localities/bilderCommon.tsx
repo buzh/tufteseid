@@ -14,7 +14,12 @@
  */
 
 import { useSetAtom } from 'jotai';
-import { type ReactNode, useEffect, useState } from 'react';
+import {
+  type ReactNode,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   type AttachmentKind,
@@ -22,10 +27,18 @@ import {
   getAttachmentUrl,
 } from '../api/attachments';
 import { recreateViewAtom } from '../shell/useRecreateView';
-import { Badge, Button, Input, type MaterialSymbol } from '../ui';
+import {
+  Badge,
+  Button,
+  Icon,
+  Input,
+  type MaterialSymbol,
+  Spinner,
+} from '../ui';
 import styles from './bilderCommon.module.css';
+import { type PinState, pinStateOf, subscribePinQueue } from './pinQueue';
 import type { LocalityWorkspaceApi } from './useLocalityWorkspace';
-import { viewSpecOf } from './viewSpec';
+import { isPinned, viewSpecOf } from './viewSpec';
 
 // `landscape` is what the ribbon already uses for LiDAR mode, so an
 // extract carries the same mark here. (Material Symbols' `terrain` isn't
@@ -56,7 +69,10 @@ export const useAttachmentUrl = (
   }, [rec?.id]);
 
   useEffect(() => {
-    if (!rec) return;
+    // An unpinned View has no file to ask for a token for, and asking anyway
+    // is a 404 that would light the error state on a record that is perfectly
+    // fine (§4.1.2). The surfaces show the pin face instead — `usePinFace`.
+    if (!rec || !isPinned(rec)) return;
     let cancelled = false;
     getAttachmentUrl(rec, failed ? undefined : thumb)
       .then((u) => {
@@ -78,6 +94,100 @@ export const useAttachmentUrl = (
   }, [rec?.id, rec?.file, thumb, failed]);
 
   return { url, error, onError: () => setFailed(true) };
+};
+
+/** What the pin queue is doing about this record right now. */
+export const usePinState = (id: string): PinState | undefined =>
+  useSyncExternalStore(
+    subscribePinQueue,
+    () => pinStateOf(id),
+    () => undefined,
+  );
+
+/**
+ * What to draw where the image would be, on a View whose pixels do not exist
+ * yet — and null on a record that has them, which is the common case.
+ *
+ * A **quiet per-card state**, per §5.6: not a blocking spinner over the rail
+ * and not a broken-image placeholder. An unpinned View is a normal record
+ * that simply has not been rendered yet, and the four faces are four
+ * different sentences — being made, not asked for, nothing there, went wrong
+ * — because only one of them is worth pressing a button about.
+ */
+export const usePinFace = (
+  rec: AttachmentRecord,
+): { icon: MaterialSymbol | null; label: string } | null => {
+  const { t } = useTranslation();
+  const state = usePinState(rec.id);
+  if (isPinned(rec)) return null;
+  switch (state) {
+    case 'queued':
+    case 'running':
+      // Spinner rather than a glyph: this one ends by itself.
+      return { icon: null, label: t('localities.bilder.pinPending') };
+    case 'empty':
+      return { icon: 'hide_image', label: t('localities.bilder.pinEmpty') };
+    case 'failed':
+      return { icon: 'broken_image', label: t('localities.bilder.pinFailed') };
+    default:
+      // Nobody has asked. A reader over somebody else's lokalitet, or an
+      // owner in show — §2 keeps the sweep on the edit side of the line.
+      return { icon: 'image', label: t('localities.bilder.pinAbsent') };
+  }
+};
+
+/**
+ * The face itself.
+ *
+ * `compact` for the strip's 88×64 frames, where the sentence does not fit and
+ * the frame's `title` is carrying it anyway; the carousel's card has room to
+ * say it out loud.
+ */
+export const PinFace = ({
+  rec,
+  compact,
+}: {
+  rec: AttachmentRecord;
+  compact?: boolean;
+}) => {
+  const face = usePinFace(rec);
+  if (!face) return null;
+  const size = compact ? 18 : 28;
+  return (
+    <div className={styles.pinFace}>
+      {face.icon ? (
+        <Icon icon={face.icon} size={size} />
+      ) : (
+        <Spinner size={compact ? 14 : 24} />
+      )}
+      {!compact && <span>{face.label}</span>}
+    </div>
+  );
+};
+
+/**
+ * …and the one case worth a verb: a render that failed.
+ *
+ * Only failures get a button. `empty` means the source has nothing over this
+ * rectangle, and offering to try again would be offering to re-learn the same
+ * fact; `queued` is already happening. Owner-only, because a pin is an
+ * `update` and nothing in show writes (§2).
+ */
+export const PinRetryButton = ({
+  ws,
+  rec,
+}: {
+  ws: LocalityWorkspaceApi;
+  rec: AttachmentRecord;
+}) => {
+  const { t } = useTranslation();
+  const state = usePinState(rec.id);
+  if (!ws.canAdd || isPinned(rec) || state !== 'failed') return null;
+  return (
+    <Button size="sm" leftIcon="redo" onClick={() => ws.retryPin(rec)}>
+      {t('localities.bilder.pinRetry')}
+    </Button>
+  );
 };
 
 /** A subtle one-liner: the meta line's twin, for anything else that small. */
@@ -203,15 +313,67 @@ export const RecreateButton = ({ rec }: { rec: AttachmentRecord }) => {
   );
 };
 
-/** The full-size file in a tab of its own — which is also how it is saved. */
-export const OpenOriginalButton = ({ rec }: { rec: AttachmentRecord }) => {
+/*
+ * The full-size file in a tab of its own — which is also how it is saved.
+ *
+ * One of the two places that **force a pin** (§4.1.2, §12): there is no such
+ * thing as downloading a row of parameters, so an unpinned View has to be
+ * rendered before this can do anything at all.
+ *
+ * Which makes it two presses, and that is a browser constraint rather than a
+ * design preference: `window.open` several seconds after the click that
+ * caused it is a popup, and gets blocked. So the button says `Hent bildet`
+ * while there are no pixels, spins while it makes them, and becomes `Åpne
+ * originalen` — the second press is inside a gesture and opens cleanly.
+ *
+ * Owner-gated in the same breath, for the same reason `PinRetryButton` is: a
+ * pin writes. A reader over a spec sees no button, which is honest — there is
+ * nothing there to open.
+ */
+export const OpenOriginalButton = ({
+  ws,
+  rec,
+}: {
+  ws: LocalityWorkspaceApi;
+  rec: AttachmentRecord;
+}) => {
   const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  // The record the pin handed back, so the label flips on the response rather
+  // than waiting for the realtime event to bring the list round again.
+  const [pinnedRec, setPinnedRec] = useState<AttachmentRecord | null>(null);
+  const target = isPinned(rec) ? rec : pinnedRec;
+
+  if (!target) {
+    if (!ws.canAdd) return null;
+    return (
+      <Button
+        size="sm"
+        leftIcon="photo_library"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          ws.forcePin(rec)
+            .then((pinned) => {
+              if (pinned) setPinnedRec(pinned);
+            })
+            .catch((e) => console.warn('[bilder] force pin failed', e))
+            .finally(() => setBusy(false));
+        }}
+      >
+        {busy
+          ? t('localities.bilder.pinPending')
+          : t('localities.bilder.pinNow')}
+      </Button>
+    );
+  }
+
   return (
     <Button
       size="sm"
       leftIcon="open_in_new"
       onClick={() => {
-        getAttachmentUrl(rec)
+        getAttachmentUrl(target)
           .then((u) => window.open(u, '_blank', 'noopener'))
           .catch((e) => console.warn('[bilder] open failed', e));
       }}

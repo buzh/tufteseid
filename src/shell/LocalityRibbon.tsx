@@ -34,11 +34,12 @@ export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
   const bottomSlot = useAtomValue(bottomSlotAtom);
   const [stripOpen, setStripOpen] = useAtom(bilderStripOpenAtom);
 
-  // A grunnpakke is minutes long and nobody presses anything to start it any
-  // more — it comes with a lokalitet you just made. Unfold the edge, or the
-  // first minutes of a new lokalitet are a shell that looks like it did
-  // nothing.
-  const starterRunning = ws.starterStep != null;
+  // Nobody presses anything to start a grunnpakke any more — it comes with a
+  // lokalitet you just made. Unfold the edge, or the first moments of a new
+  // lokalitet are a shell that looks like it did nothing. It is a second
+  // rather than the old several minutes since the set writes specs (§4.1.2),
+  // but the three cards that land are what has to be seen arriving.
+  const starterRunning = ws.starterBusy;
   useEffect(() => {
     if (starterRunning) setStripOpen(true);
   }, [starterRunning, setStripOpen]);

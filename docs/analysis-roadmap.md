@@ -73,7 +73,15 @@ it — that pack is three of Kartverket's own pre-baked LiDAR styles now, one
 service and one fetch path (`docs/ui-architecture.md` §8.9.1) — but the same
 split is what lets `Behold` keep the live render over the Terreng ground
 without going through the save button that used to be the only exit
-(§8.9.2), and it is what a background render queue would call.
+(§8.9.2).
+
+**That background render queue now exists** — `src/localities/pinQueue.ts`,
+§8.7.4 — and `renderTerrain` is one of the three things it calls. The
+consequence for this thread is that "keep this" and "make the picture" are no
+longer the same press: a Tier 1 product that takes eight seconds to compute
+costs the user nothing at the moment they ask for it, and lands on its card
+afterwards. Anything designed here from now on should assume a spec row and a
+renderer, not a blocking save.
 
 The consequence for this thread survives the correction and is if anything
 stronger: a new lokalitet now arrives with three readings of the laser in it

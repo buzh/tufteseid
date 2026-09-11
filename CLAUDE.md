@@ -129,6 +129,10 @@ that owns them.
   drawing tools and *bilder* (extracts, terrain renders, screenshots,
   flyfoto, uploads), behind sign-in — below, and
   `docs/ui-architecture.md` §8, §9.
+- **A View is a spec before it is pixels.** An extract, terrain render or
+  flyfoto grab is stored as a row of parameters and rendered into a figure PNG
+  afterwards by a background queue (`src/localities/pinQueue.ts`); a screenshot
+  or an upload is only ever bytes — `docs/ui-architecture.md` §8.7.4.
 - **Every raster the app keeps or hands out carries a provenance caption** —
   dataset, acquisition, processing parameters, extent, licence — below, and
   `docs/ui-architecture.md` §8.10.
@@ -231,8 +235,8 @@ lokalitet**, exactly like "Flytt analysen hit" beside it. With one open,
 keeping the render is `Behold` on the lokalitet row — one verb for whatever
 ground is up, gated on the same `canAdd` as every other write
 (`docs/ui-architecture.md` §8.9.2). `useTerrainAnalysis` publishes
-`produce()` and a `beholdKey` for that; both paths make the figure the same
-way.
+`describe()` and a `beholdKey` for that; both paths write the same spec, and
+the pixels are made later by the pin queue (see below).
 
 Entering it over a lokalitet **seeds the knobs from that lokalitet's cover
 terrain render**, once per lokalitet, so coming back to a place opens on the
@@ -364,7 +368,11 @@ Key files (data side):
   defaults `/pb`).
 - `src/api/localities.ts`, `localityFinds.ts`, `attachments.ts` — CRUD +
   realtime per collection. Attachment files are `protected`, so the client
-  fetches short-lived file tokens for thumbnails.
+  fetches short-lived file tokens for thumbnails. `createAttachmentSpec` writes
+  a fileless View row and `pinAttachment` puts the figure on it later.
+- `src/localities/pinQueue.ts` — the pinner: turns a stored spec into a
+  provenance figure and PATCHes it onto the record. Module-level and
+  imperative, like `map/groundOverlay.ts`.
 - `src/api/kulturminnerWfs.ts` — the "kjente kulturminner her" readout;
   which service it has to ask and why is `docs/map-layers.md`.
 - `src/auth/` — atoms (currentUserAtom, roleAtom, isAdminAtom), hooks
@@ -400,8 +408,21 @@ Data model:
 - **`attachments`** — `locality`, `owner`, `kind` (extract | screenshot |
   upload | flyfoto), `file` (protected, ≤20 MB, png/jpeg/webp, thumbs, and
   **optional** — a View is a spec before it is pixels), `caption`, `meta`
-  (json: source key/label, style, model, metresPerPx, bbox, `imageRect`),
-  `sort` and `hidden` for exhibit order and concealment.
+  (json: source key/label, style, model, metresPerPx, bbox, `imageRect`,
+  `renderedAt`), `sort` and `hidden` for exhibit order and concealment.
+
+**Views and Files.** `kind` decides which: `extract` and `flyfoto` are
+**Views** — producible from the record's own parameters, so they are written as
+a spec (`createAttachmentSpec`, `meta` only) and the figure PNG is pinned onto
+them afterwards by `src/localities/pinQueue.ts`. `screenshot` and `upload` are
+**Files**: bytes, with nothing behind them that could make the bytes again.
+There is no `spec` field and no `isView` field — a flag that can disagree with
+`kind` eventually will. The queue is module-level and React-free on purpose
+(it has to outlive the surface that started it), runs one job at a time
+against Kartverket's rate limit, renders the *spec's* rectangle rather than the
+lokalitet's current one, and only ever runs for `canAdd` — a pin is an `update`
+and nothing in show writes. Rationale, states and the two forced-pin call sites:
+`docs/ui-architecture.md` §8.7.4.
 
 Rules (server-enforced by PB), same shape on all three:
 

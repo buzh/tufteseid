@@ -286,11 +286,24 @@ export type TerrainRenderOptions = {
 export type TerrainRender = {
   canvas: HTMLCanvasElement;
   dem: Dem;
+  /**
+   * The radius the pixels were *actually* computed with, or undefined for the
+   * views that have none. Handed back rather than assumed because the caller
+   * cannot compute it: `clampRadius` needs the DEM, and the DEM is fetched in
+   * here. Whatever describes this render — a figure caption, a stored `meta` —
+   * has to print this number and not the requested one.
+   */
+  radius?: number;
 };
 
 /**
  * The whole path, for callers with no panel: fetch the float DEM for a
  * rectangle and paint one visualization of it.
+ *
+ * This is what the pin queue renders a stored terrain spec through
+ * (`localities/pinQueue.ts`), which is the reason it exists at all: a View is
+ * kept as its parameters and materialised later, with nobody watching and no
+ * control surface mounted.
  *
  * `null` when the rectangle has no laser data (`fetchDem` says so before a
  * megabyte moves) or the canvas could not be obtained. Fetch failures throw,
@@ -308,9 +321,14 @@ export const renderTerrain = async (
 ): Promise<TerrainRender | null> => {
   const dem = await fetchDem(bbox, { model, signal });
   if (!dem) return null;
-  const staticField = terrainStaticField(dem, vis, radius);
+  // Clamped here rather than by the caller, and against *this* grid: a 20 m
+  // sky-view radius is 20 m over a 1 m DEM and 6 m over a 0.25 m one, so a
+  // stored spec re-rendered over a rectangle that has since been resized is
+  // clamped again on the way in. Same rule the panel applies to its slider.
+  const effective = radius != null ? clampRadius(vis, dem, radius) : undefined;
+  const staticField = terrainStaticField(dem, vis, effective);
   const field = terrainField(dem, vis, light, staticField);
   if (!field) return null;
   const canvas = paintTerrainField(field, dem, vis);
-  return canvas ? { canvas, dem } : null;
+  return canvas ? { canvas, dem, radius: effective } : null;
 };

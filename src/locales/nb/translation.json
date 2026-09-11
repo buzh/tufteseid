@@ -370,7 +370,13 @@
         "screenshot": "Skjermbilde",
         "upload": "Opplastet",
         "flyfoto": "Flyfoto"
-      }
+      },
+      "pinPending": "Henter bildet …",
+      "pinAbsent": "Bildet er ikke hentet ennå.",
+      "pinFailed": "Kunne ikke hente bildet.",
+      "pinEmpty": "Ingen dekning for dette utsnittet.",
+      "pinRetry": "Prøv igjen",
+      "pinNow": "Hent bildet"
     },
     "tools": {
       "lidarExtract": "LiDAR-uttrekk",
@@ -400,7 +406,6 @@
       "flyfotoGrabAllHint": "Henter de {{count}} nyeste opptakene, ett om gangen.",
       "flyfotoFetching": "Henter …",
       "flyfotoBatchDone": "Lagret {{saved}} av {{total}} opptak under Bilder.",
-      "flyfotoEmptyFor": "Fant ingen flyfoto-dekning for {{label}}.",
       "flyfotoFailedFor": "Kunne ikke hente flyfoto for {{label}}.",
       "flyfotoClose": "Lukk",
       "behold": "Behold",
@@ -410,9 +415,9 @@
       "beholdHintScreenshot": "Denne bakgrunnen kan ikke hentes som datasett. Bruk «Skjermbilde».",
       "beholdSaved": "Bildet er lagret under Bilder.",
       "beholdFailed": "Kunne ikke lagre bildet. Prøv igjen.",
-      "starterStep": "Henter {{style}} …",
       "starterDone": "Lagret {{saved}} av {{total}} bilder under Bilder.",
-      "starterNone": "Fant ingen data for dette området. Grunnpakken ga ingen bilder."
+      "starterNone": "Fant ingen data for dette området. Grunnpakken ga ingen bilder.",
+      "starterBusy": "Setter opp grunnpakken …"
     },
     "terrain": {
       "visualization": "Visualisering",

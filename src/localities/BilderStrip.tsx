@@ -11,8 +11,10 @@ import {
   MetaLine,
   Note,
   OpenOriginalButton,
+  PinFace,
   RecreateButton,
   useAttachmentUrl,
+  usePinFace,
 } from './bilderCommon';
 import styles from './BilderStrip.module.css';
 import { bilderStripOpenAtom } from './toolAtoms';
@@ -39,6 +41,7 @@ const Frame = ({
   onClick: () => void;
 }) => {
   const { url, error, onError } = useAttachmentUrl(rec, '200x200');
+  const face = usePinFace(rec);
   const { t } = useTranslation();
   const ref = useRef<HTMLButtonElement | null>(null);
 
@@ -58,11 +61,19 @@ const Frame = ({
       className={cx(styles.frame, selected && styles.frameOn)}
       aria-pressed={selected}
       title={
-        error ? t('localities.bilder.loadFailed') : rec.caption || rec.kind
+        face
+          ? // The pin state *is* the frame's sentence while there are no
+            // pixels: the caption describes an image nobody can see yet.
+            face.label
+          : error
+            ? t('localities.bilder.loadFailed')
+            : rec.caption || rec.kind
       }
       onClick={onClick}
     >
-      {url ? (
+      {face ? (
+        <PinFace rec={rec} compact />
+      ) : url ? (
         <img
           src={url}
           alt={rec.caption || rec.kind}
@@ -128,6 +139,8 @@ const Detail = ({
             appears when the two have drifted apart, which happens exactly
             once — entering Terreng takes the overlay slot and the pin stands
             down (map/groundOverlay.ts), leaving the card still selected. */}
+        {/* Unpinned Views are not offerable to the map — `canPinBilde`
+            already refuses one, because there is nothing to lay down. */}
         {canPinBilde(rec) && !isPinned && (
           <Button
             size="sm"
@@ -138,7 +151,10 @@ const Detail = ({
           </Button>
         )}
         <RecreateButton rec={rec} />
-        <OpenOriginalButton rec={rec} />
+        {/* No retry here, and none is reachable: a pin is a write, so
+            `PinRetryButton` is the carousel's. This surface is only ever
+            mounted where `canAdd` is false. */}
+        <OpenOriginalButton ws={ws} rec={rec} />
       </div>
 
       {isPinned && <FadeControl pinned={pinned} />}
@@ -181,10 +197,10 @@ export const BilderStrip = ({ ws }: { ws: LocalityWorkspaceApi }) => {
       {/* Above the rail, not a frame in it: the images the starter set has
           already saved are in that rail, and a placeholder among them would
           be read as one more that failed. */}
-      {ws.starterStep != null && (
+      {ws.starterBusy && (
         <div className={styles.busy}>
           <Spinner size={14} />
-          {t('localities.tools.starterStep', { style: ws.starterStep })}
+          {t('localities.tools.starterBusy')}
         </div>
       )}
 
@@ -205,7 +221,7 @@ export const BilderStrip = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               {t('localities.bilder.loading')}
             </div>
           ) : items.length === 0 ? (
-            ws.starterStep == null && (
+            !ws.starterBusy && (
               <p className={styles.empty}>{t('localities.bilder.empty')}</p>
             )
           ) : (
