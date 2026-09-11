@@ -12,6 +12,7 @@ import {
   fetchNationalLidarStyles,
   LidarProject,
   LIDAR_PROJECT_WMS_URL,
+  type LidarModel,
   NATIONAL_WMS,
   sortProjectsByRelevance,
 } from '../map/layers/config/backgroundLayers/lidarProjects';
@@ -32,7 +33,14 @@ export type LidarSource = {
 // The extract tool is DTM-only for now: the DOM services exist (the map
 // background can show either), but an extract is meant to be read as
 // terrain.
-export const PROJECT_WMS_URL = LIDAR_PROJECT_WMS_URL.dtm;
+//
+// Named rather than implicit because every kept extract records which model
+// it is (`meta.model`), and a record whose model is "whatever the code did
+// that year" is one that cannot be re-drawn. The day this tool learns DOM
+// (docs/lokalitet-view.md §4.3), this constant and the URL below become the
+// one thing that has to change.
+export const EXTRACT_MODEL: LidarModel = 'dtm';
+export const PROJECT_WMS_URL = LIDAR_PROJECT_WMS_URL[EXTRACT_MODEL];
 
 // Produce the sortable, filtered list of sources for a selection bbox given
 // in EPSG:4326 (lon/lat). National mosaic is always first. Projects are

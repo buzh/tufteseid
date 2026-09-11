@@ -12,6 +12,7 @@ import {
   IconButton,
   Input,
   Popover,
+  toast,
   Tooltip,
 } from '../ui';
 import { ModeButton } from './ModeButton';
@@ -86,6 +87,36 @@ const LocalityName = ({
         }
       }}
     />
+  );
+};
+
+/*
+ * The short code, click to copy.
+ *
+ * Six characters that address this lokalitet without being its 15-character
+ * PB id: readable aloud, writable on paper, and stable across a rename and a
+ * "Juster området", which is what lets a report to Riksantikvaren cite it.
+ * It is the record's handle, so a reader sees it too, not just the owner.
+ */
+const LocalityCode = ({ code }: { code: string }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Tooltip label={t('localities.workspace.codeHint')}>
+      <button
+        type="button"
+        className={rowStyles.code}
+        onClick={() => {
+          navigator.clipboard.writeText(code);
+          toast.create({
+            title: t('localities.workspace.codeCopied', { code }),
+            duration: 2000,
+          });
+        }}
+      >
+        {code}
+      </button>
+    </Tooltip>
   );
 };
 
@@ -179,11 +210,11 @@ const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             <button
               type="button"
               className={rowStyles.menuItem}
-              disabled={ws.starterStep != null || ws.fetchingFlyfoto}
+              disabled={ws.starterStep != null}
               title={t('localities.tools.starterHint')}
               onClick={() => {
                 close();
-                ws.openStarterNotice();
+                void ws.runStarterPack();
               }}
             >
               <Icon icon="library_add" size={16} />
@@ -262,6 +293,10 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           isMine={isMine}
           onRename={ws.rename}
         />
+        {/* Guarded, not optional: every record has a code once 1700000500
+            has run. No chip is the honest symptom of a pocketbase that has
+            not been restarted since. */}
+        {locality.code && <LocalityCode code={locality.code} />}
         <div className={rowStyles.summary}>
           <Badge palette={VISIBILITY_PALETTE[locality.visibility]}>
             {t(`localities.visibility.${locality.visibility}`)}
@@ -313,7 +348,7 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             icon="satellite_alt"
             label={t('localities.tools.flyfotoShort')}
             tooltip={t('localities.tools.flyfoto')}
-            disabled={ws.fetchingFlyfoto || ws.starterStep != null}
+            disabled={ws.fetchingFlyfoto}
             onClick={ws.openFlyfotoNotice}
           />
         )}

@@ -72,11 +72,10 @@ import {
 import { captureLocalityScreenshot } from './screenshot';
 import { getDrawLayerExtent4326 } from './serializeDrawLayer';
 import {
-  STARTER_STEPS,
+  planStarterPack,
   starterExtract,
-  starterTerrain,
+  STARTER_STYLES,
   type StarterRaster,
-  type StarterStep,
 } from './starterPack';
 import { funnOutsideAtom, ribbonToolAtom, workspaceModeAtom } from './toolAtoms';
 import { useFunnAutosave } from './useFunnAutosave';
@@ -100,13 +99,6 @@ export const FLYFOTO_BATCH_MAX = 8;
 
 // Extra breathing room when framing a single funn, on top of the chrome.
 const FUNN_MARGIN_PX = 90;
-
-// What the NiB licensing notice is standing in front of. Both paths grab the
-// same imagery, so both are gated; only the continuation differs.
-export type FlyfotoNoticeFor = 'picker' | 'starter';
-
-// How many images a full grunnpakke is, for the "n of m" it reports.
-const STARTER_TOTAL = STARTER_STEPS.length;
 
 // What the ground was, for the screenshot figure's source line. Keyed on the
 // background layer rather than asked of useGroundMode, which needs the whole
@@ -205,13 +197,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [shooting, setShooting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fetchingFlyfoto, setFetchingFlyfoto] = useState(false);
-  // Which action the licensing notice is gating, or null when it is down.
-  const [flyfotoNotice, setFlyfotoNotice] = useState<FlyfotoNoticeFor | null>(
-    null,
-  );
-  // The step the starter pack is on, or null when it is not running. A value
-  // rather than a bool: the Bilder section names what it is waiting for.
-  const [starterStep, setStarterStep] = useState<StarterStep | null>(null);
+  // Whether the licensing notice is up in front of the acquisition picker.
+  const [flyfotoNotice, setFlyfotoNotice] = useState(false);
+  // The style the starter set is fetching, or null when it is not running. A
+  // value rather than a bool: the Bilder section names what it is waiting for.
+  const [starterStep, setStarterStep] = useState<string | null>(null);
   const starterAbortRef = useRef<AbortController | null>(null);
   // The acquisition picker, opened once the licensing notice is accepted.
   const [flyfotoPicker, setFlyfotoPicker] = useState(false);
@@ -699,6 +689,31 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
             bbox25833: shot.bbox25833,
             metresPerPx: shot.metresPerPx,
             imageRect: figure.imageRect,
+            // What was on the map when the shutter went. The figure caption
+            // already prints this, but only into the pixels — and a caption
+            // is prose. These are the same facts in the machine's copy, so
+            // the record can say what a screenshot is of without OCR.
+            //
+            // Not enough to *restore* the view, and it is not meant to be: a
+            // screenshot is a picture of other layers at a moment (labels,
+            // funn, zoom, theme rendering) and no realistic amount of
+            // recorded state reproduces that. See docs/lokalitet-view.md
+            // §4.1.1 — this kind is a File, not a View.
+            ground: background,
+            hybrid,
+            themeLayers: [...themeLayers],
+            ...(compareOn
+              ? { compare: { ground: backgroundB, hybrid: hybridB } }
+              : {}),
+            ...(themeLayers.has('heritageSites')
+              ? {
+                  heritage: {
+                    details: [...heritageDetails],
+                    render: heritageRender,
+                    opacity: heritageOpacity,
+                  },
+                }
+              : {}),
           },
         },
         user.id,
@@ -827,13 +842,29 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
               metresPerPx: result.metresPerPx,
               bbox25833: result.bbox25833,
               imageRect: figure.imageRect,
+              // Which NiB source this is, said in a way a machine can act on:
+              // the seamless mosaic and one acquisition are different
+              // requests, and "no projectName key" is a poor way to tell them
+              // apart once a reader has to re-lay this image on the map.
               ...(project
                 ? {
+                    nibSource: 'project',
+                    // The ImageServer's own selector (prosjektnavn), which is
+                    // the same string as projectName today — kept as its own
+                    // key because the display name is free to stop being the
+                    // selector and matching an acquisition by its year label
+                    // breaks the day two projects share a year.
+                    projectId: project.id,
                     projectName: project.projectName,
+                    // The acquisition's native resolution, not the stitch's:
+                    // fetchFlyfoto needs it to plan the same tile grid again,
+                    // and metresPerPx above has already been coarsened by the
+                    // canvas cap on a large rectangle.
+                    projectMetresPerPx: project.metresPerPx,
                     year: project.year,
                     photoDate: project.photoDate,
                   }
-                : {}),
+                : { nibSource: 'mosaic' }),
             },
           },
           user.id,
@@ -907,28 +938,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     });
   }, [fetchingFlyfoto, flyfotoProjects, grabFlyfoto, t]);
 
-  // The acquisition list, fetched if the picker has not already done it.
-  // Shares the same state, so opening the picker after a grunnpakke shows the
-  // list instantly — and wmscache fronts the query in any case.
-  const ensureFlyfotoProjects = useCallback(async (): Promise<
-    FlyfotoProject[]
-  > => {
-    if (flyfotoProjects) return flyfotoProjects;
-    try {
-      const list = await fetchFlyfotoProjectsForBbox(locality.bbox);
-      setFlyfotoProjects(list);
-      return list;
-    } catch (e) {
-      console.warn('[localityWorkspace] flyfoto project list failed', e);
-      setFlyfotoProjectsError(true);
-      setFlyfotoProjects([]);
-      return [];
-    }
-  }, [flyfotoProjects, locality.bbox]);
-
-  // The two derived rasters — LiDAR extract and terrain render — land as
-  // `extract` attachments, same as when they are produced by hand: both are
-  // laser-derived pictures of the rectangle, which is what that kind means.
+  // The starter set's rasters land as `extract` attachments, same as when one
+  // is produced by hand from the extract tool: a laser-derived picture of the
+  // rectangle is what that kind means. The meta is the same set of keys too,
+  // so nothing downstream has to know which route produced an image.
   const saveStarterRaster = useCallback(
     async (raster: StarterRaster, caption: string, filename: string) => {
       if (!user) return;
@@ -938,8 +951,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           kind: 'extract',
           caption,
           meta: {
+            sourceKey: raster.sourceKey,
             sourceLabel: raster.sourceLabel,
             style: raster.style,
+            model: raster.model,
             metresPerPx: raster.metresPerPx,
             bbox25833: raster.bbox25833,
             imageRect: raster.imageRect,
@@ -955,23 +970,26 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   );
 
   /*
-   * The one-press starter set: newest ortofoto, best LiDAR hillshade, a
-   * multidirectional relief render. Three things you would fetch by hand
-   * anyway, in the order you would want to look at them.
+   * The one-press starter set: the best LiDAR dataset over the rectangle,
+   * read three ways (docs/lokalitet-view.md §4.3). Three images you would
+   * fetch by hand anyway, in the order you would want to look at them.
+   *
+   * One dataset for all three, resolved once: three readings of the same
+   * acquisition are comparable, three readings of three acquisitions are
+   * not. `planStarterPack` also decides how many images this is — over
+   * ground no LiDAR project covers it is one, because the national mosaic
+   * publishes only `skyggerelieff`.
    *
    * Sequential, like the flyfoto batch and for the same reason: one stitch
    * already saturates its concurrency budget against a shared public edge,
-   * and these hit two different ones (NiB, then Kartverket twice). Running
-   * them together would not finish sooner, it would just invite shed
-   * responses from both.
+   * so running them together would not finish sooner, it would just invite
+   * shed responses.
    *
-   * Each step is independently fallible. A rectangle at the coast can easily
-   * have ortofoto and no laser data, and reporting that as a failed pack
-   * would be wrong — so failures are counted, not thrown, and the toast says
-   * how many of the three arrived.
+   * Each image is independently fallible — so failures are counted, not
+   * thrown, and the toast says how many of the planned set arrived.
    */
   const runStarterPack = useCallback(async () => {
-    if (!user || !isMine || starterStep || fetchingFlyfoto) return;
+    if (!user || !isMine || starterStep) return;
     const ac = new AbortController();
     starterAbortRef.current = ac;
     const bbox25833 = transformExtent(
@@ -982,60 +1000,38 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     let saved = 0;
 
     try {
-      setStarterStep('flyfoto');
-      // The list is newest-first; with nothing in it, `undefined` falls
-      // through to the seamless best-available mosaic.
-      const projects = await ensureFlyfotoProjects();
+      // The catalogue lookup is the first thing that can answer "is there any
+      // laser data here at all", and it costs one cached request.
+      setStarterStep(STARTER_STYLES[0]);
+      const plan = await planStarterPack(locality.bbox);
       if (ac.signal.aborted) return;
-      // Same flag the picker sets, so a pack and a hand-picked grab can never
-      // both be stitching against the NiB edge at once.
-      setFetchingFlyfoto(true);
-      try {
-        if (await grabFlyfoto(projects[0], ac.signal)) saved++;
-      } finally {
-        setFetchingFlyfoto(false);
+      if (!plan) {
+        toast.error({ title: t('localities.tools.starterNone') });
+        return;
       }
 
-      if (ac.signal.aborted) return;
-      setStarterStep('extract');
-      try {
-        const extract = await starterExtract(locality.bbox, bbox25833, {
-          subject: locality.name || undefined,
-          signal: ac.signal,
-        });
-        if (extract && !ac.signal.aborted) {
-          await saveStarterRaster(
-            extract,
-            `${extract.sourceLabel} · ${extract.style}`,
-            `${sanitizeFilename(extract.sourceLabel)}_${extract.style}.png`,
+      for (const style of plan.styles) {
+        if (ac.signal.aborted) return;
+        setStarterStep(style);
+        try {
+          const extract = await starterExtract(
+            plan.source,
+            bbox25833,
+            style,
+            { subject: locality.name || undefined, signal: ac.signal },
           );
-          saved++;
-        }
-      } catch (e) {
-        if (!ac.signal.aborted) {
-          console.warn('[localityWorkspace] starter extract failed', e);
-        }
-      }
-
-      if (ac.signal.aborted) return;
-      setStarterStep('terrain');
-      try {
-        const terrain = await starterTerrain(
-          locality.bbox,
-          t('localities.terrain.sourceLabel'),
-          { subject: locality.name || undefined, signal: ac.signal },
-        );
-        if (terrain && !ac.signal.aborted) {
-          await saveStarterRaster(
-            terrain,
-            `${t(`localities.terrain.vis.${terrain.style}`)} · DTM`,
-            `terreng_${terrain.style}_dtm.png`,
-          );
-          saved++;
-        }
-      } catch (e) {
-        if (!ac.signal.aborted) {
-          console.warn('[localityWorkspace] starter terrain failed', e);
+          if (extract && !ac.signal.aborted) {
+            await saveStarterRaster(
+              extract,
+              `${extract.sourceLabel} · ${extract.style}`,
+              `${sanitizeFilename(extract.sourceLabel)}_${extract.style}.png`,
+            );
+            saved++;
+          }
+        } catch (e) {
+          if (!ac.signal.aborted) {
+            console.warn('[localityWorkspace] starter extract failed', e);
+          }
         }
       }
 
@@ -1046,7 +1042,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         toast.success({
           title: t('localities.tools.starterDone', {
             saved,
-            total: STARTER_TOTAL,
+            total: plan.styles.length,
           }),
         });
       }
@@ -1058,27 +1054,22 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     user,
     isMine,
     starterStep,
-    fetchingFlyfoto,
     locality.bbox,
     locality.name,
-    ensureFlyfotoProjects,
-    grabFlyfoto,
     saveStarterRaster,
     t,
   ]);
 
-  // Notice → whichever grab asked for it. Both take the same imagery from
-  // the same service, so both go through the same gate; only what happens on
-  // "Fortsett" differs.
-  const openFlyfotoNotice = useCallback(() => setFlyfotoNotice('picker'), []);
-  const openStarterNotice = useCallback(() => setFlyfotoNotice('starter'), []);
-  const closeFlyfotoNotice = useCallback(() => setFlyfotoNotice(null), []);
+  // The NiB licensing notice, in front of the acquisition picker. The starter
+  // set no longer goes through it: it stopped fetching ortofoto, so consent
+  // to NiB's terms is no longer being asked of someone who never asked for a
+  // photograph (docs/lokalitet-view.md §4.3).
+  const openFlyfotoNotice = useCallback(() => setFlyfotoNotice(true), []);
+  const closeFlyfotoNotice = useCallback(() => setFlyfotoNotice(false), []);
   const acceptFlyfotoNotice = useCallback(() => {
-    const pending = flyfotoNotice;
-    setFlyfotoNotice(null);
-    if (pending === 'picker') setFlyfotoPicker(true);
-    else if (pending === 'starter') void runStarterPack();
-  }, [flyfotoNotice, runStarterPack]);
+    setFlyfotoNotice(false);
+    setFlyfotoPicker(true);
+  }, []);
   const closeFlyfotoPicker = useCallback(() => {
     if (!fetchingFlyfoto) setFlyfotoPicker(false);
   }, [fetchingFlyfoto]);
@@ -1322,9 +1313,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     runFlyfoto,
     runFlyfotoAll,
 
-    // grunnpakke
+    // the starter set
     starterStep,
-    openStarterNotice,
+    runStarterPack,
   };
 };
 

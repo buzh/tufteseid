@@ -282,6 +282,8 @@
       "saveFailed": "Kunne ikkje lagre. Prøv igjen.",
       "adjustShort": "Juster",
       "renameHint": "Klikk for å endre namnet",
+      "codeHint": "Kortkode for lokaliteten – klikk for å kopiere",
+      "codeCopied": "Kopierte {{code}}",
       "details": "Detaljar",
       "owner": "Eigar",
       "created": "Oppretta",
@@ -382,13 +384,8 @@
       "flyfotoFailedFor": "Kunne ikkje hente flyfoto for {{label}}.",
       "flyfotoClose": "Lukk",
       "starter": "Hent grunnpakke",
-      "starterHint": "Hentar nyaste flyfoto, beste LiDAR-skuggerelieff og ei fleirretnings terrengrendring inn i Bilete.",
-      "starterNotice": "Grunnpakken startar med eit flyfoto, og hentar deretter LiDAR-skuggerelieff og ei terrengrendring. Det tek nokre minutt.",
-      "starterStep": {
-        "flyfoto": "Hentar flyfoto …",
-        "extract": "Hentar LiDAR-skuggerelieff …",
-        "terrain": "Reknar ut terrengrendring …"
-      },
+      "starterHint": "Hentar skuggerelieff, fleirretnings skuggerelieff og helling frå det beste LiDAR-datasettet over området inn i Bilete.",
+      "starterStep": "Hentar {{style}} …",
       "starterDone": "Lagra {{saved}} av {{total}} bilete under Bilete.",
       "starterNone": "Fann ingen data for dette området. Grunnpakken gav ingen bilete."
     },

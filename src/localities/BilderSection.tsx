@@ -22,7 +22,6 @@ import {
 } from '../ui';
 import { lightboxOpenAtom } from './atoms';
 import styles from './BilderSection.module.css';
-import type { StarterStep } from './starterPack';
 
 // `landscape` is what the ribbon already uses for LiDAR mode, so an
 // extract carries the same mark here. (Material Symbols' `terrain` isn't
@@ -324,8 +323,8 @@ export const BilderSection = ({
   setItems: Dispatch<SetStateAction<AttachmentRecord[] | null>>;
   uploading: boolean;
   onUpload: (file: File) => void;
-  /** Which grunnpakke image is being fetched, or null when none is. */
-  starterStep: StarterStep | null;
+  /** The style the starter set is fetching, or null when it is not running. */
+  starterStep: string | null;
 }) => {
   const { t } = useTranslation();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -387,7 +386,7 @@ export const BilderSection = ({
       {starterStep != null && (
         <div className={styles.busy}>
           <Spinner size={14} />
-          {t(`localities.tools.starterStep.${starterStep}`)}
+          {t('localities.tools.starterStep', { style: starterStep })}
         </div>
       )}
       <div className={styles.grid}>

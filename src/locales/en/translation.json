@@ -282,6 +282,8 @@
       "saveFailed": "Could not save. Try again.",
       "adjustShort": "Adjust",
       "renameHint": "Click to rename",
+      "codeHint": "The locality's short code — click to copy",
+      "codeCopied": "Copied {{code}}",
       "details": "Details",
       "owner": "Owner",
       "created": "Created",
@@ -382,13 +384,8 @@
       "flyfotoFailedFor": "Could not fetch aerial imagery for {{label}}.",
       "flyfotoClose": "Close",
       "starter": "Fetch starter set",
-      "starterHint": "Fetches the newest aerial photo, the best LiDAR hillshade and a multidirectional terrain render into Images.",
-      "starterNotice": "The starter set begins with an aerial photo, then fetches a LiDAR hillshade and a terrain render. It takes a few minutes.",
-      "starterStep": {
-        "flyfoto": "Fetching aerial photo …",
-        "extract": "Fetching LiDAR hillshade …",
-        "terrain": "Computing terrain render …"
-      },
+      "starterHint": "Fetches hillshade, multidirectional hillshade and slope from the best LiDAR dataset over the area into Images.",
+      "starterStep": "Fetching {{style}} …",
       "starterDone": "Saved {{saved}} of {{total}} images under Images.",
       "starterNone": "No data found for this area. The starter set produced no images."
     },

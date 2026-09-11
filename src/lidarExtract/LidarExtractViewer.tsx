@@ -25,6 +25,7 @@ import {
   lidarExtractViewerOpenAtom,
 } from './atoms';
 import styles from './LidarExtractViewer.module.css';
+import { EXTRACT_MODEL } from './sources';
 
 const THUMB_SIZE = 96;
 
@@ -327,6 +328,10 @@ export const LidarExtractViewer = () => {
             sourceKey: cur.sourceKey,
             sourceLabel: cur.sourceLabel,
             style: cur.style,
+            // Implicit in the code (the extract WMS is the DTM one) but not
+            // in the record, and the record is what has to redraw this image
+            // once the tool can also read DOM.
+            model: EXTRACT_MODEL,
             metresPerPx: cur.metresPerPx,
             bbox25833: run.bbox25833,
             // The caption panel is drawn under the image, so the file is

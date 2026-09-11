@@ -17,6 +17,12 @@ export type LocalityBbox = [
 export type LocalityRecord = {
   id: string;
   owner: string;
+  // Six characters of Crockford base32, unique across the install. The
+  // short code on the lokalitet row: what you read down a phone or cite in
+  // a report. Generated at create (below) and never rewritten, so it
+  // survives a rename and a "Juster området" — which is the entire reason
+  // it is not derived from the id, the name or the bbox.
+  code: string;
   name: string;
   description: string;
   // Where it is, as three editable strings. Pre-filled at creation from
@@ -76,23 +82,60 @@ export const getLocality = async (id: string): Promise<LocalityRecord> => {
     .getOne<LocalityRecord>(id, { expand: 'owner' });
 };
 
+// Crockford base32: the digits and the consonants, minus I, L, O and U, so
+// a code can be read aloud without being spelled out. Exactly 32 symbols,
+// and a byte is exactly eight of those, so `% 32` is uniform — no rejection
+// sampling and no modulo bias.
+const CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+const newLocalityCode = (): string => {
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  let code = '';
+  for (const byte of bytes) code += CODE_ALPHABET[byte % 32];
+  return code;
+};
+
+// PB reports a unique-index violation as a 400 with a per-field entry in
+// `response.data`. Our field is *called* `code`, and PB's own name for the
+// error string is also `code`, hence `data.code.code` — the second one is
+// the error kind, not the value we sent.
+const isCodeTaken = (err: unknown): boolean =>
+  (err as { response?: { data?: Record<string, { code?: string }> } })?.response
+    ?.data?.code?.code === 'validation_not_unique';
+
+// 32^6 is about 1.07 billion, so at this scale a second draw is already an
+// event nobody will see; the unique index is what makes "no collisions" a
+// fact instead of a hope, and this loop is what keeps that fact from
+// surfacing to the user as a failed "Ny lokalitet".
+const CODE_ATTEMPTS = 2;
+
 export const createLocality = async (
   input: NewLocalityInput,
   ownerId: string,
 ): Promise<LocalityRecord> => {
-  return pb.collection(COLLECTION).create<LocalityRecord>(
-    {
-      owner: ownerId,
-      name: input.name,
-      description: input.description ?? '',
-      place: input.place ?? '',
-      municipality: input.municipality ?? '',
-      matrikkel: input.matrikkel ?? '',
-      visibility: input.visibility,
-      bbox: input.bbox,
-    },
-    { expand: 'owner' },
-  );
+  const record = {
+    owner: ownerId,
+    name: input.name,
+    description: input.description ?? '',
+    place: input.place ?? '',
+    municipality: input.municipality ?? '',
+    matrikkel: input.matrikkel ?? '',
+    visibility: input.visibility,
+    bbox: input.bbox,
+  };
+
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await pb
+        .collection(COLLECTION)
+        .create<LocalityRecord>(
+          { ...record, code: newLocalityCode() },
+          { expand: 'owner' },
+        );
+    } catch (err) {
+      if (attempt >= CODE_ATTEMPTS || !isCodeTaken(err)) throw err;
+    }
+  }
 };
 
 export type LocalityPatch = Partial<{

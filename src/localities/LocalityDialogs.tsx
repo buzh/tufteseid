@@ -26,11 +26,11 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
     <>
       {/* Licensing notice shown before every flyfoto grab: NiB imagery is
           free for private use, but publishing or commercial use is the
-          user's own responsibility. Two things can be waiting behind it —
-          the acquisition picker, or the whole grunnpakke, whose first image
-          is a flyfoto and which therefore needs the same consent. */}
+          user's own responsibility. Only the acquisition picker waits behind
+          it — the starter set no longer fetches ortofoto, so nobody is asked
+          to accept NiB's terms who has not asked for a photograph. */}
       <Dialog
-        open={ws.flyfotoNotice != null}
+        open={ws.flyfotoNotice}
         onOpenChange={(next) => !next && ws.closeFlyfotoNotice()}
         title={t('localities.tools.flyfotoNoticeTitle')}
         closeLabel={t('shared.close')}
@@ -50,9 +50,6 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         }
       >
         <p className={styles.text}>{t('localities.tools.flyfotoNotice')}</p>
-        {ws.flyfotoNotice === 'starter' && (
-          <p className={styles.text}>{t('localities.tools.starterNotice')}</p>
-        )}
       </Dialog>
 
       {/* Acquisition picker. NiB keeps every ortofoto project flown over an

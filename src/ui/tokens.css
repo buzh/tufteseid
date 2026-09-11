@@ -99,6 +99,10 @@
   --font-lg: 16px;
   --font-xl: 20px;
 
+  /* For strings that are transcribed rather than read: a lokalitet's short
+     code, and anything else where 0/O and 1/l have to be told apart. */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
   --ctl-h-sm: 24px;
   --ctl-h-md: 30px;
   --ctl-h-lg: 36px;

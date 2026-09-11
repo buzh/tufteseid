@@ -1327,7 +1327,7 @@ is a context strip plus a dock column:
 
 | Region | Component | Contents |
 |---|---|---|
-| Identity + verbs | `RibbonLocalityRow` (the lokalitet row) | back, inline-editable name, visibility badge, summary line, zoom-to; then Nytt funn · LiDAR-uttrekk · Bilde · Flyfoto, with Hent grunnpakke / Last opp / Juster området / Slett behind a `more_vert` menu |
+| Identity + verbs | `RibbonLocalityRow` (the lokalitet row) | back, inline-editable name, the short code chip (click to copy), visibility badge, summary line, zoom-to; then Nytt funn · LiDAR-uttrekk · Bilde · Flyfoto, with Hent grunnpakke / Last opp / Juster området / Slett behind a `more_vert` menu |
 | Everything with a body | `LocalityDock` (right slot) | the live tool band, then Funn · Bilder · Kulturminner · Detaljer as sections |
 | Dialogs | `LocalityDialogs` | flyfoto licensing notice, flyfoto picker |
 
@@ -1623,47 +1623,54 @@ add a "don't show this again" checkbox without thinking about it.
 
 The first item in the lokalitet row's overflow menu, and the only one there you
 press on a lokalitet you have just made and never again — hence its position.
-One press produces the three images you would otherwise fetch by hand before
-starting to read a rectangle, into Bilder:
+One press produces the images you would otherwise fetch by hand before starting
+to read a rectangle, into Bilder: **the laser, read three ways** —
+`skyggerelieff` (the fixed north-west hillshade), `multiskyggerelieff` (every
+direction at once, so nothing hides along the sun) and `helning_prosent`
+(slope, which shows edges the light misses). All three are Kartverket's own
+pre-baked renders of **one** acquisition, fetched through
+`starterExtract` → `extractCanvas` and saved as the `extract` kind with the
+style in `meta.style` (§8.7), so there is no migration.
 
-| Step | What | Producer |
-|---|---|---|
-| `flyfoto` | the newest ortofoto acquisition covering the bbox, or the seamless mosaic when the list is empty | the same `grabFlyfoto` the picker uses |
-| `extract` | a `skyggerelieff` LiDAR hillshade from the densest per-project dataset here | `starterExtract` → `extractCanvas` |
-| `terrain` | a **multidirectional** relief render computed from the float DEM | `starterTerrain` → `renderTerrain` |
-
+`STARTER_STYLES` *is* `TIER_A_STYLES` (`lidarProjects.ts`) — one list, so the
+pack and the style ring can never drift apart.
 `src/localities/starterPack.ts` only *makes* the rasters; captions,
 `createAttachment` and the gallery's optimistic update stay in
 `runStarterPack` (`useLocalityWorkspace`), where the translations and record ids
-are. Both derived rasters save as the existing `extract` kind with the
-visualization in `meta.style` (§8.7), so there is no migration.
+are.
 
 Load-bearing choices:
 
-- **It goes through the flyfoto licensing notice**, like every other NiB grab.
-  `flyfotoNotice` is therefore a `'picker' | 'starter' | null` target rather than
-  a boolean, and "Fortsett" dispatches on it. One notice covers the pack; the
-  two Kartverket steps need none.
-- **Sequential, and mutually exclusive with a hand-picked grab.** One stitch
-  already saturates its concurrency budget against a shared public edge, and
-  these hit two of them. The pack sets the same `fetchingFlyfoto` flag the picker
-  does while its first step runs, and both the Flyfoto verb and the menu item are
-  disabled whenever either is busy.
-- **Each step is independently fallible.** A rectangle at the coast can have
-  ortofoto and no laser data; that is not a failed pack. Failures are counted,
-  not thrown, and the toast says how many of the three arrived.
+- **The dataset is resolved once, by `planStarterPack`.** Three images cost one
+  catalogue lookup and are guaranteed to be three readings of the *same*
+  acquisition — which is the only thing that makes flipping between them mean
+  anything. `bestLidarSource` takes the first per-project source
+  `enumerateLidarSources` returns, or the national mosaic when none covers the
+  rectangle.
+- **The national mosaic publishes only `skyggerelieff`,** so the plan filters
+  `STARTER_STYLES` against `source.styles` and the pack is one image there, not
+  three. That filter is not defensive: asking the mosaic for a per-project style
+  answers HTTP 200 with `Content-Type: image/png` and a ~100-byte JSON error
+  body, which the browser decodes as a broken image. A dataset publishing none
+  of the three falls back to its own first style.
+- **No flyfoto step and no terrain step.** The pack is one service and one fetch
+  path. Ortofoto brought NiB's licensing notice into a press that is otherwise
+  all Kartverket — nobody should be asked to accept NiB's terms who has not
+  asked for a photograph — and the terrain render brought a second, much slower
+  upstream and a set of parameters the user never chose. Both are one press away
+  by hand. `docs/lokalitet-view.md` §4.3 is the full argument.
+- **Each style is independently fallible.** Failures are counted, not thrown,
+  and the toast says how many of the planned images arrived.
 - **Cancellable.** An `AbortController` in a ref, aborted by the same cleanup
   that closes the workspace, with an abort check between every step — closing a
   lokalitet stops spending tile requests on it. An aborted stitch paints nothing,
   which is indistinguishable from no coverage, so the "ingen dekning" toast is
   suppressed when the signal is aborted.
 - **Progress renders in the Bilder section**, as one line with a spinner naming
-  the current step, and the dock unfolds and opens that section when a pack
-  starts. Deliberately not a placeholder tile among the saved ones — a tile that
-  disappears would be read as a fourth image that failed.
-- **Multidirectional, not plain hillshade, for the terrain step.** It needs no
-  azimuth chosen for it, and a single sun angle hides whatever runs along it —
-  the failure that costs most in an image nobody will go back and re-light.
+  the style being fetched (`starterStep` is that style, or `null`), and the dock
+  unfolds and opens that section when a pack starts. Deliberately not a
+  placeholder tile among the saved ones — a tile that disappears would be read
+  as an image that failed.
 
 ### 8.10 Provenance figures — what a saved image carries
 
@@ -2321,9 +2328,9 @@ LiDAR extract over the rectangle at a chosen
 source and resolution, view it fullscreen, keep it as a Bilde; fetch flyfoto —
 the seamless mosaic or any historical acquisition covering the area,
 individually or as a batch; take a map screenshot; upload an image; or press
-**Hent grunnpakke** once and get the newest flyfoto, the best LiDAR hillshade
-and a multidirectional relief render fetched in sequence into Bilder, with
-progress in that section.
+**Hent grunnpakke** once and get the best LiDAR dataset over the area read
+three ways — hillshade, multidirectional hillshade and slope — fetched in
+sequence into Bilder, with progress in that section.
 
 **Keep it**
 browse the Bilder gallery; open the lightbox; caption an attachment; delete one;

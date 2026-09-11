@@ -1,44 +1,59 @@
-// "Hent grunnpakke" — the three images worth having before you start
-// reading a rectangle, produced without asking which.
+// The starter set — the images worth having before you start reading a
+// rectangle, produced without asking which.
 //
 // A lokalitet is made in one press from the visible map, and what you want
-// next is always the same three things: what the ground looks like from the
-// air, what the laser sees through the trees, and what the relief looks like
-// with the light moved off the pre-baked north-west. Picking each of those by
-// hand is three dialogs and half a dozen decisions the register can make
-// better than the user can — which acquisition is newest, which LiDAR project
-// covers here at the finest point density.
+// next is always the same thing: the laser, read three ways. Picking each of
+// those by hand is a dialog and half a dozen decisions the register can make
+// better than the user can — which LiDAR project covers here at the finest
+// point density, and which styled variants it actually publishes.
+//
+// Three styles, one service, one fetch path: `skyggerelieff` (the fixed
+// north-west hillshade every source advertises), `multiskyggerelieff` (every
+// direction at once, so nothing hides along the sun) and `helning_prosent`
+// (slope, which shows edges the light misses). They are Kartverket's own
+// pre-baked renders, so nothing here has settings a user did not choose and
+// cannot check — see docs/lokalitet-view.md §4.3 for why the terrain render
+// and the flyfoto left this set.
 //
 // This module only *makes* the images. Captions, `createAttachment` and the
 // gallery's optimistic update stay in useLocalityWorkspace, where the
 // translations and the record ids are — see `runStarterPack` there.
 //
-// Both images go out as provenance figures (src/figure), same as when they
-// are produced by hand: an image nobody chose the settings for is exactly the
+// Every image goes out as a provenance figure (src/figure), same as when it
+// is produced by hand: an image nobody chose the settings for is exactly the
 // one whose settings have to be written on it.
 
 import type { LocalityBbox } from '../api/localities';
 import { type ImageRect, renderFigureBlob } from '../figure/figure';
-import { lidarExtractFigure, terrainFigure } from '../figure/specs';
+import { lidarExtractFigure } from '../figure/specs';
 import { extractCanvas } from '../lidarExtract/run';
 import {
   enumerateLidarSources,
+  EXTRACT_MODEL,
   type LidarSource,
 } from '../lidarExtract/sources';
-import { DEFAULT_LIGHT, renderTerrain } from '../terrain/render';
-import type { Visualization } from '../terrain/shade';
+import { TIER_A_STYLES } from '../map/layers/config/backgroundLayers/lidarProjects';
 
-/** The order they are fetched in, and the order they appear in Bilder. */
-export const STARTER_STEPS = ['flyfoto', 'extract', 'terrain'] as const;
-export type StarterStep = (typeof STARTER_STEPS)[number];
+/**
+ * The three styles, in the order they are fetched and shown.
+ *
+ * The same three the style pulldown puts first, and for the same reason:
+ * they are the most diagnostic variants for reading archaeology in terrain.
+ * One list, so the starter set and the ring can never drift apart.
+ */
+export const STARTER_STYLES = TIER_A_STYLES;
 
 /** What every step hands back, so the caller has one save path. */
 export type StarterRaster = {
   blob: Blob;
+  /** Identifies the dataset well enough to fetch it again. */
+  sourceKey: string;
   /** Names the service in the Bilde's meta line. */
   sourceLabel: string;
-  /** The visualization, in the same `meta.style` slot an extract already uses. */
+  /** The styled variant, in the `meta.style` slot an extract already uses. */
   style: string;
+  /** DTM or DOM. Implicit in the extract path today; recorded anyway. */
+  model: string;
   metresPerPx: number;
   bbox25833: [number, number, number, number];
   /** Where the image sits inside the figure — the caption is below it. */
@@ -48,16 +63,8 @@ export type StarterRaster = {
 /** The lokalitet's name for the figure's title line, and the abort signal. */
 export type StarterOptions = { subject?: string; signal?: AbortSignal };
 
-// The hillshade every LiDAR source advertises. A starter pack is not the
-// place to offer helning_prosent — one legible image beats five to pick from,
-// and the extract tool is still right there for the rest.
-const STARTER_STYLE = 'skyggerelieff';
-
-// Multidirectional rather than the plain hillshade: it needs no azimuth
-// chosen for it, and a single sun angle hides whatever happens to run along
-// it — which for a starter image is the failure that costs the most, because
-// nobody goes back to re-light a render they were handed.
-const STARTER_VIS: Visualization = 'multiHillshade';
+/** One dataset and the styles the set will actually ask it for. */
+export type StarterPlan = { source: LidarSource; styles: string[] };
 
 /**
  * The best LiDAR source over this rectangle: the densest, newest per-project
@@ -72,20 +79,45 @@ const bestLidarSource = (sources: LidarSource[]): LidarSource | null => {
   return project ?? sources[0] ?? null;
 };
 
-/** A LiDAR hillshade of the rectangle, stitched from the WMS. */
-export const starterExtract = async (
+/**
+ * Which dataset the set comes from, and how many images it will be.
+ *
+ * Resolved once and handed to every `starterExtract` call, so three images
+ * cost one catalogue lookup and are guaranteed to be three readings of the
+ * *same* acquisition — which is the only way flipping between them means
+ * anything.
+ *
+ * The styles are filtered against what the chosen source publishes, and that
+ * filter is load-bearing rather than defensive: **the national mosaic
+ * publishes only `skyggerelieff`**, and asking it for a per-project style
+ * does not fail loudly — it answers HTTP 200, `Content-Type: image/png`,
+ * with a ~100 byte JSON error body that the browser decodes as a broken
+ * image. So where no project covers the rectangle the starter set is one
+ * image, not three silent failures.
+ */
+export const planStarterPack = async (
   bbox4326: LocalityBbox,
+): Promise<StarterPlan | null> => {
+  const source = bestLidarSource(await enumerateLidarSources(bbox4326));
+  if (!source) return null;
+  const styles = STARTER_STYLES.filter((s) => source.styles.includes(s));
+  // A dataset that publishes none of the three is not one we have seen, but
+  // it would produce an empty pack rather than an honest one image.
+  if (styles.length === 0) {
+    const fallback = source.styles[0];
+    if (!fallback) return null;
+    return { source, styles: [fallback] };
+  }
+  return { source, styles };
+};
+
+/** One styled LiDAR view of the rectangle, stitched from the WMS. */
+export const starterExtract = async (
+  source: LidarSource,
   bbox25833: [number, number, number, number],
+  style: string,
   { subject, signal }: StarterOptions = {},
 ): Promise<StarterRaster | null> => {
-  const sources = await enumerateLidarSources(bbox4326);
-  const source = bestLidarSource(sources);
-  if (!source) return null;
-  const style = source.styles.includes(STARTER_STYLE)
-    ? STARTER_STYLE
-    : source.styles[0];
-  if (!style) return null;
-
   const result = await extractCanvas(bbox25833, source, style, signal);
   if (!result) return null;
 
@@ -106,48 +138,11 @@ export const starterExtract = async (
   return {
     blob: figure.blob,
     imageRect: figure.imageRect,
+    sourceKey: source.key,
     sourceLabel: source.label,
     style,
+    model: EXTRACT_MODEL,
     metresPerPx: result.metresPerPx,
     bbox25833: result.bbox25833,
-  };
-};
-
-/**
- * A relief render computed here from the float DEM, which is a different
- * picture from the extract above even at the same resolution — that one is
- * Kartverket's fixed north-west hillshade, this one is every direction at
- * once. Seeing the two side by side is most of the point of the pack.
- */
-export const starterTerrain = async (
-  bbox4326: LocalityBbox,
-  sourceLabel: string,
-  { subject, signal }: StarterOptions = {},
-): Promise<StarterRaster | null> => {
-  const render = await renderTerrain(bbox4326, {
-    vis: STARTER_VIS,
-    signal,
-  });
-  if (!render) return null;
-
-  const figure = await renderFigureBlob(
-    render.canvas,
-    terrainFigure({
-      subject,
-      vis: STARTER_VIS,
-      model: 'dtm',
-      light: DEFAULT_LIGHT,
-      dem: render.dem,
-    }),
-  );
-  if (!figure) return null;
-
-  return {
-    blob: figure.blob,
-    imageRect: figure.imageRect,
-    sourceLabel,
-    style: STARTER_VIS,
-    metresPerPx: render.dem.metresPerPx,
-    bbox25833: render.dem.bbox25833,
   };
 };

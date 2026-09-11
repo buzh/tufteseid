@@ -36,6 +36,28 @@
   max-width: 320px;
 }
 
+/* The short code — docs/lokalitet-view.md §5.2. Monospace and uppercase
+   because it gets read down a phone and typed back in; gray and small
+   because it is a thing you reach for, not a thing you read, and it must not
+   compete with the name to its left or the visibility chip to its right. */
+.code {
+  padding: 1px var(--sp-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--c-bg-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  letter-spacing: 0.06em;
+  color: var(--c-fg-muted);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.code:hover {
+  background: var(--c-bg-active);
+  color: var(--c-fg);
+}
+
 /* Visibility chip plus the "1,4 km² · 3 funn" line. Hidden below md: the
    same facts are in the dock's Detaljer section, and the verbs matter more
    on a small screen. */

@@ -348,7 +348,10 @@ Key files (data side):
 - `pocketbase/pb_migrations/1700000200_localities.js` — current schema.
   `1700000000` adds `users.role`, `1700000100` relaxes it,
   `1700000300` adds the `flyfoto` attachment kind, `1700000400` adds
-  `localities.place` / `.municipality` / `.matrikkel`. **Leave the
+  `localities.place` / `.municipality` / `.matrikkel`, `1700000500` adds
+  everything the lokalitet view needs at once (`localities.code` +
+  backfill, `.derivedFrom`, `.derivedFromLabel`, `attachments.sort`,
+  `.hidden`, and `attachments.file` relaxed to optional). **Leave the
   filenames alone** — they're recorded in `_migrations`, so renaming one
   makes PB re-run it. Collection ids must not equal any collection name
   (0.23+ rejects that), hence `pbc_localities` / `finds2` /
@@ -356,19 +359,23 @@ Key files (data side):
 
 Data model:
 
-- **`localities`** — `owner` (relation → users, cascade), `name`,
-  `description`, `place`, `municipality`, `matrikkel` (all optional text),
-  `visibility` (private | limited | public), `bbox` (json,
-  `[minLon, minLat, maxLon, maxLat]` EPSG:4326). The centre coordinate is
-  deliberately **not** a field — see below.
+- **`localities`** — `owner` (relation → users, cascade), `code` (six
+  characters of Crockford base32, unique, generated client-side at create
+  and retried on the unique-index 400), `name`, `description`, `place`,
+  `municipality`, `matrikkel` (all optional text), `visibility` (private |
+  limited | public), `bbox` (json, `[minLon, minLat, maxLon, maxLat]`
+  EPSG:4326), `derivedFrom` (relation → localities, **no** cascade delete —
+  a fork outlives its original) + `derivedFromLabel`. The centre coordinate
+  is deliberately **not** a field — see below.
 - **`finds`** — `locality` (relation, cascade), `owner` (denormalized so
   rules stay cheap), `title`, `note`, `status` (mulig | sannsynlig |
   avkreftet | rapportert), `geometry` (json GeoJSON FeatureCollection,
   EPSG:4326 — Circles round-trip as 64-gons).
 - **`attachments`** — `locality`, `owner`, `kind` (extract | screenshot |
-  upload | flyfoto), `file` (protected, ≤20 MB, png/jpeg/webp, thumbs),
-  `caption`, `meta` (json: source key/label, style, metresPerPx, bbox,
-  `imageRect`).
+  upload | flyfoto), `file` (protected, ≤20 MB, png/jpeg/webp, thumbs, and
+  **optional** — a View is a spec before it is pixels), `caption`, `meta`
+  (json: source key/label, style, model, metresPerPx, bbox, `imageRect`),
+  `sort` and `hidden` for exhibit order and concealment.
 
 Rules (server-enforced by PB), same shape on all three:
 
