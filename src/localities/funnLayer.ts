@@ -266,8 +266,8 @@ const funnIdAtPixel = (map: Map, pixel: [number, number]): string | null => {
 };
 
 // The other half of the pointer link the list already had: hovering or
-// clicking a funn *on the map* selects it in the dock, so the two views of
-// the same set stay pointed at the same thing whichever one you touch.
+// clicking a funn *on the map* selects it, so the map, the `Funn ▾` list and
+// the callout stay pointed at the same thing whichever one you touch.
 //
 // Mount from useMapSideEffects, next to useFunnLayer. Only the open
 // lokalitet's funn are on the layer, so this is inert without one.

@@ -240,6 +240,7 @@
       "bannerAdmin": "You are editing {{name}}'s locality as an administrator",
       "zoom": "Zoom to the locality",
       "adjust": "Adjust the area (move it or drag the corners)",
+      "adjustDone": "Done",
       "deleteLocality": "Delete the locality",
       "confirmDelete": "Delete \"{{name}}\" with all its finds and images? This cannot be undone.",
       "namePlaceholder": "Name of the locality",
@@ -271,6 +272,7 @@
     },
     "funn": {
       "heading": "Finds",
+      "listHint": "The finds in this locality",
       "new": "New find",
       "loading": "Loading finds…",
       "empty": "No finds yet. Draw what you see in the terrain.",
@@ -285,7 +287,9 @@
         "headingEdit": "Edit find",
         "saved": "Saved",
         "pending": "Saved once you have drawn something",
-        "done": "Done"
+        "done": "Finish find",
+        "doneHint": "Put the pen down. The find is already saved.",
+        "discard": "Discard find"
       },
       "status": {
         "mulig": "Possible",
@@ -467,15 +471,13 @@
     },
     "kulturminner": {
       "heading": "Known cultural heritage",
+      "short": "Heritage",
+      "listHint": "Known cultural heritage in this area",
       "loading": "Checking the register…",
       "empty": "No registered cultural heritage in this area.",
       "error": "Could not check the heritage register.",
       "unnamed": "(unnamed)",
       "openLink": "Open in Kulturminnesøk"
-    },
-    "dock": {
-      "show": "Show locality panel",
-      "hide": "Hide locality panel"
     }
   },
   "helpPage": {

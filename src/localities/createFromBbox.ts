@@ -54,14 +54,15 @@ export type ViewportBboxResult =
  *
  * Pixel corners rather than `View#calculateExtent` and a ratio:
  * `calculateExtent` is symmetric about the view centre while the chrome is
- * not — a ribbon on top and a dock on the right — so no symmetric ratio can
- * clear it without over-insetting the other edges. Pixels are relative to the
- * map viewport element, which every surface floats over, so the measured
- * chrome insets map 1:1 onto the pixel insets.
+ * not — a ribbon on top, a filmstrip along the bottom, an infobox on the
+ * right — so no symmetric ratio can clear it without over-insetting the other
+ * edges. Pixels are relative to the map viewport element, which every surface
+ * floats over, so the measured chrome insets map 1:1 onto the pixel insets.
  *
  * Each edge takes whichever is larger, the chrome in front of it or the
- * proportional inset: with nothing docked this is exactly the old symmetric
- * rectangle, and with the dock open the right edge moves in to clear it.
+ * proportional inset: with the map bare this is exactly the old symmetric
+ * rectangle, and each surface that is up moves its own edge in to clear
+ * itself.
  *
  * Rotation is locked off, so the pixel rectangle stays axis-aligned and two
  * corners describe it.

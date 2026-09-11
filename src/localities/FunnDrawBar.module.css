@@ -1,0 +1,43 @@
+/*
+ * The draw bar — docs/lokalitet-view.md §6.
+ *
+ * Same card as the filmstrip it displaces, because it is the same slot: one
+ * occupant at a time, and the two should not look like different kinds of
+ * furniture. Wider than the strip, though — the controls are a row of six
+ * tools plus colours, widths and the edit buttons, and folding that into
+ * 1100 px would cost a second line of map.
+ */
+
+.bar {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: calc(100% - 2 * var(--sp-5));
+  margin: 0 auto var(--sp-5);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-lg);
+  background: var(--c-bg);
+  box-shadow: var(--shadow-lg);
+  /* The slot around it is pointer-events: none so the map stays draggable. */
+  pointer-events: auto;
+}
+
+@media (max-width: 47.999rem) {
+  .bar {
+    width: calc(100% - 2 * var(--sp-3));
+    margin-bottom: var(--sp-3);
+  }
+}
+
+/* One line saying what the pen is for. It is the only prose left from the
+   draft band, and it earns the row: "click the map to draw" is not obvious
+   from six unlabelled shapes. */
+.instructions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--c-fg-muted);
+}

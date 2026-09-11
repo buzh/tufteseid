@@ -7,7 +7,7 @@ import type Map from 'ol/Map';
  * map's own size says nothing about how much of it you can actually see. Any
  * code that frames something — fitting a lokalitet's rectangle, seeding a new
  * one from the viewport, zooming to a funn — has to work in the free area, or
- * it centres its subject underneath the ribbon or behind the dock.
+ * it centres its subject underneath the ribbon or behind the filmstrip.
  *
  * This replaced a lone `ribbonHeight()` that measured `[data-ribbon]` and knew
  * about no other edge. Surfaces opt in by carrying `data-chrome="<edge>"`,

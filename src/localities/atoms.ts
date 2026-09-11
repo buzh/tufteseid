@@ -66,20 +66,6 @@ export const selectedFunnIdAtom = atom<string | null>(null);
 // shared to show someone a funn must not arrive with the funn hidden.
 export const marksHiddenAtom = atom(false);
 
-// Which dock sections are expanded. Outside the component because the dock
-// is keyed by locality.id and remounts on every swap — folding "Detaljer"
-// away should stay folded for the next lokalitet too.
-//
-// `bilder` is no longer among them: the images left the dock for the bottom
-// edge (docs/lokalitet-view.md §4.3), and whether that edge is unfolded is
-// `bilderStripOpenAtom` in toolAtoms.ts — a different question from which
-// section of a column is expanded, and it outlives this set.
-export type WorkspaceSectionId = 'funn' | 'kulturminner' | 'detaljer';
-
-export const openSectionsAtom = atom<Set<WorkspaceSectionId>>(
-  new Set<WorkspaceSectionId>(['funn']),
-);
-
 // Which bilde is pinned to the map ("Vis i ruta"), if any. Outside the
 // filmstrip because the strip is collapsible and unmounts when it is folded
 // away — and folding it away to look at the map is exactly what you do after

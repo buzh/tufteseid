@@ -105,6 +105,15 @@
   color: var(--c-fg-muted);
 }
 
+/* What the rectangle holds — §5.5. Its own group between identity and the
+   tools, and separated from both: these two are in every stance, the tools
+   after them are edit-only, and the identity before them is not a control. */
+.subjects {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
 /* The middle zone. Wraps rather than scrolls, like every other ribbon row. */
 .tools {
   display: flex;

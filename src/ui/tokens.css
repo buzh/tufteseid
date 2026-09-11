@@ -119,7 +119,11 @@
   --z-map-controls: 1;
   --z-overlay: 2;
   --z-ribbon: 20;
-  --z-fixed: 1000; /* BottomDrawToolSelector */
+  /* No --z-fixed. Its one consumer was the phone-only draw toolbar, which was
+     `position: fixed` over everything because it had nowhere else to be; the
+     tools are an ordinary occupant of the bottom slot now
+     (docs/lokalitet-view.md §6), and nothing else in the app floats free of
+     the shell's own stacking order. */
   --z-popover: 1200;
   --z-tooltip: 1300;
   --z-toast: 1400; /* only reached where the popover API is missing */

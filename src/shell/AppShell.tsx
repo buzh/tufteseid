@@ -1,7 +1,5 @@
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useSetAtom } from 'jotai';
 import { AuthDialog } from '../auth/AuthDialog';
-import { BottomDrawToolSelector } from '../draw/BottomDrawToolSelector';
-import { funnDraftActiveAtom } from '../localities/atoms';
 import { CompareCurtain } from '../map/compare/CompareCurtain';
 import { KulturminnerPopup } from '../map/featureInfo/KulturminnerPopup';
 import { MapComponent } from '../map/MapComponent';
@@ -9,17 +7,12 @@ import { MapToolCards } from '../map/overlay/MapToolCards';
 import { SearchComponent } from '../search/SearchComponent';
 import { InfoBox } from '../search/infobox/InfoBox';
 import { ErrorBoundary } from '../shared/ErrorBoundary';
-import { useIsMobileScreen } from '../shared/hooks';
 import styles from './AppShell.module.css';
 import { bottomSlotAtom } from './bottomSlot';
-import { dockSlotAtom } from './dockSlot';
 import { Ribbon } from './Ribbon';
 import { useMapSideEffects } from './useMapSideEffects';
 
 export const AppShell = () => {
-  const isMobile = useIsMobileScreen();
-  const funnDraftActive = useAtomValue(funnDraftActiveAtom);
-  const setDockSlot = useSetAtom(dockSlotAtom);
   const setBottomSlot = useSetAtom(bottomSlotAtom);
 
   useMapSideEffects();
@@ -63,32 +56,28 @@ export const AppShell = () => {
               </ErrorBoundary>
             </div>
 
-            {/* Right slot: the dock column. The search-result infobox stacks
-                above the lokalitet dock, which `LocalityRibbon` portals in
-                here (see dockSlot.ts) — hence the ref. Terrenganalyse used to
-                have a dock of its own here; its knobs are on the ribbon
-                now. */}
-            <div className={styles.right} ref={setDockSlot}>
+            {/* Right slot: the search-result infobox, and nothing else. Two
+                docks have now left this column — Terrenganalyse's, whose knobs
+                are on the ribbon, and the lokalitet's, whose contents are on
+                the lokalitet row and the bottom edge (§6). What is left is the
+                one thing that was never chrome: the readout for a point you
+                asked about. */}
+            <div className={styles.right}>
               <ErrorBoundary name="InfoBox">
                 <InfoBox />
               </ErrorBoundary>
             </div>
           </div>
 
-          {/* The bottom edge — the filmstrip today, the carousel and the draw
-              toolbar later (see bottomSlot.ts). A flex child of .overlay after
-              .row, exactly like .ribbon before it: the slot's own height then
-              shortens .row, so the dock column stops above it with no media
-              query and no z-index against the dock's `bottom: 0`. */}
+          {/* The bottom edge — the filmstrip, the edit carousel, a picker run
+              or the draw bar, one at a time (see bottomSlot.ts). A flex child
+              of .overlay after .row, exactly like .ribbon before it: the
+              slot's own height then shortens .row, so the infobox column
+              stops above it with no media query and no z-index. */}
           <div className={styles.bottom} ref={setBottomSlot} />
         </div>
       </div>
 
-      {isMobile && funnDraftActive && (
-        <ErrorBoundary name="BottomDrawToolSelector">
-          <BottomDrawToolSelector />
-        </ErrorBoundary>
-      )}
       <ErrorBoundary name="KulturminnerPopup">
         <KulturminnerPopup />
       </ErrorBoundary>

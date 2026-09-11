@@ -193,12 +193,12 @@ const bboxUnion = (a: LocalityBbox, b: LocalityBbox): LocalityBbox => [
  * Everything the lokalitet workspace does, minus the rendering.
  *
  * The panel it was extracted from was one component, so its local state
- * survived only because Layout keyed it on `locality.id`. Splitting the
- * surface into a ribbon strip, a dock column and a pair of dialogs would
- * have scattered that state across siblings — in particular the funn draft,
- * whose pen is armed from the ribbon and whose fields are in the dock, and
- * the flyfoto notice → picker handoff, which is a four-flag conversation
- * between two dialogs.
+ * survived only because Layout keyed it on `locality.id`. The surface is now
+ * two ribbon rows, a bottom edge, a map callout, two popovers and four
+ * dialogs, and holding the state in any of them would scatter it across
+ * siblings — in particular the funn draft, whose pen is on the bottom edge
+ * and whose title is on a ribbon row, and the flyfoto notice → picker
+ * handoff, which is a four-flag conversation between two dialogs.
  *
  * Mount this **once**. `useLocalityFinds` / `useLocalityAttachments` each
  * open a PocketBase realtime subscription that reloads the whole list on
@@ -540,7 +540,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [draftFunnId, setDraftFunnId] = useState<string | null>(null);
   const [draftIsEdit, setDraftIsEdit] = useState(false);
   const [funnTitle, setFunnTitle] = useState('');
-  const [funnNote, setFunnNote] = useState('');
   const [savingFunn, setSavingFunn] = useState(false);
   const [funnError, setFunnError] = useState<string | null>(null);
   // The autosave's controls, handed over once that hook has run further down.
@@ -593,7 +592,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setDraftFunnId(null);
     setDraftIsEdit(false);
     setFunnTitle('');
-    setFunnNote('');
     setFunnError(null);
   }, [locality.id]);
 
@@ -649,18 +647,19 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     const projection = map.getView().getProjection().getCode();
     const extent = transformExtent(locality.bbox, 'EPSG:4326', projection);
     map.getView().fit(extent, {
-      // Measured, not guessed: the dock takes a fixed slice of the width and
-      // the ribbon an unpredictable slice of the height, and centring the
-      // rectangle in the whole canvas puts it half behind both.
+      // Measured, not guessed: the ribbon takes an unpredictable slice of
+      // the height at the top and the bottom edge another at the bottom, and
+      // centring the rectangle in the whole canvas puts it half behind
+      // both.
       padding: fitPadding(map),
       maxZoom: 18,
       duration: 400,
     });
   }, [map, locality.bbox]);
 
-  // Opening a lokalitet also opens the dock, which takes a column of the map
-  // away — frame the rectangle in what is left rather than leaving it half
-  // behind the chrome that just appeared.
+  // Opening a lokalitet also grows the chrome — a second ribbon row, and the
+  // filmstrip along the bottom edge — so frame the rectangle in what is left
+  // rather than leaving it half behind the surfaces that just appeared.
   //
   // Keyed on the id and not the bbox on purpose: re-fitting on every bbox
   // change would fight the "Juster området" drag, which persists a new
@@ -740,7 +739,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
               t('localities.funn.autoName', {
                 n: (findItems?.length ?? 0) + 1,
               }),
-            note: funnNote.trim() || undefined,
             geometry,
           },
           user.id,
@@ -774,7 +772,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       locality.id,
       findItems,
       funnTitle,
-      funnNote,
       setFindItems,
       setSelectedFunnId,
       undoFunn,
@@ -852,7 +849,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setDraftFunnId(null);
     setDraftIsEdit(false);
     setFunnTitle('');
-    setFunnNote('');
     setFunnError(null);
     setDraftActive(true);
   }, [
@@ -880,7 +876,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setDraftFunnId(f.id);
       setDraftIsEdit(true);
       setFunnTitle(f.title);
-      setFunnNote(f.note ?? '');
       setFunnError(null);
       setDraftActive(true);
     },
@@ -1777,14 +1772,13 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     const rec = findItems?.find((it) => it.id === draftFunnId);
     if (!rec) return;
     const title = funnTitle.trim();
-    const note = funnNote.trim();
     if (title.length === 0) {
       setFunnTitle(rec.title);
       return;
     }
-    if (title === rec.title && note === (rec.note ?? '')) return;
-    saveFunnMeta(rec, title, note);
-  }, [findItems, draftFunnId, funnTitle, funnNote, saveFunnMeta]);
+    if (title === rec.title) return;
+    saveFunnMeta(rec, title, rec.note ?? '');
+  }, [findItems, draftFunnId, funnTitle, saveFunnMeta]);
 
   const removeFunn = useCallback(
     async (f: LocalityFindRecord) => {
@@ -1813,6 +1807,28 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     ],
   );
 
+  /**
+   * Depth 2's other exit (§5.3): put the pen down *and* take back what it
+   * made.
+   *
+   * Offered only for a fresh draft, and the row only shows it there. Autosave
+   * is what makes that asymmetry real: for a new funn, "forkast" can mean
+   * delete the record the first closed shape created, and does. For a
+   * geometry edit the old shape was overwritten the moment the new one
+   * closed, so there is nothing left to restore and a button promising
+   * otherwise would be lying. Step 13's edit transaction is what turns this
+   * into a buffer discard for both cases; until then, the honest version of
+   * the second case is not to offer it.
+   */
+  const discardDraft = useCallback(() => {
+    const rec =
+      !draftIsEdit && draftFunnId
+        ? (findItems?.find((it) => it.id === draftFunnId) ?? null)
+        : null;
+    stopDraft();
+    if (rec) void removeFunn(rec);
+  }, [draftIsEdit, draftFunnId, findItems, stopDraft, removeFunn]);
+
   useWorkspaceKeys({
     navigable: mode !== 'draft',
     draftActive,
@@ -1837,6 +1853,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
             : items.length - 1
           : (at + delta + items.length) % items.length;
       setSelectedFunnId(items[next].id);
+      // In show, the funn are a tour: stepping through them takes the map
+      // with you (§6). In edit they are things you are working on and the
+      // view is where you put it, so ↑/↓ only move the selection and Enter
+      // is what flies.
+      if (stance === 'show') zoomToFunn(items[next].id);
     },
     onZoomSelected: () => selectedFunnId && zoomToFunn(selectedFunnId),
     // ←/→ walk the filmstrip (§4.3), and only while there is a strip to walk:
@@ -2041,13 +2062,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     draftIsEdit,
     funnTitle,
     setFunnTitle,
-    funnNote,
-    setFunnNote,
     commitDraftMeta,
     savingFunn,
     funnError,
     startDraft,
     stopDraft,
+    discardDraft,
 
     // grow-to-fit
     funnOutside,
@@ -2107,7 +2127,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   };
 };
 
-// What the ribbon row, the dock and the dialogs are handed. Derived
+// What the rows, the bottom edge and the dialogs are handed. Derived
 // from the hook rather than declared, so adding a member to the return above
 // is all it takes to make it available to every consumer.
 export type LocalityWorkspaceApi = ReturnType<typeof useLocalityWorkspace>;

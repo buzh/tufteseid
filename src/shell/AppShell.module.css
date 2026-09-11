@@ -94,33 +94,29 @@
 }
 
 /*
- * Right slot: the dock column — the search-result infobox on top, then
- * whichever dock is live under it.
+ * Right slot: the search-result infobox, and only that.
  *
- * `bottom: 0` is what makes this a column rather than a floating card: the
- * slot only had `top`/`right`, so a child asking for `max-height: 100%` had
- * no containing height to resolve against and the dock could grow past the
- * bottom of the window.
+ * It was a dock column — infobox on top, whichever dock was live under it —
+ * and both docks have since gone (docs/lokalitet-view.md §6). What is left is
+ * a card that sizes itself (`max-height: 52vh`), so the slot no longer needs
+ * `bottom: 0` to give it a height to resolve against, and no longer needs a
+ * phone breakpoint: there is nothing here that ever became a bottom sheet.
  */
 .right {
   position: absolute;
   top: 0;
   right: 0;
-  bottom: 0;
   display: flex;
   flex-direction: column;
-  /* Cross-axis: the infobox keeps its own width and sits against the right
-     edge; the dock asks for 100% and fills the column. */
+  /* The infobox keeps its own width and sits against the right edge. */
   align-items: flex-end;
-  justify-content: flex-end;
   gap: var(--sp-4);
   width: 100%;
   padding: var(--sp-5) var(--sp-5) var(--sp-5) 0;
   pointer-events: none;
 }
 
-/* Phone: the dock is a bottom sheet, so the slot spans the width and its
-   contents pile up against the bottom edge. */
+/* Phone: tighter gutters, like every other slot at this width. */
 @media (max-width: 47.999rem) {
   .right {
     padding: var(--sp-5) var(--sp-3) var(--sp-3);
@@ -130,7 +126,6 @@
 @media (min-width: 48rem) {
   .right {
     width: 360px;
-    justify-content: flex-start;
   }
 }
 
@@ -143,12 +138,11 @@
 /*
  * Bottom slot: the lokalitet's bottom edge (docs/lokalitet-view.md §4.3).
  *
- * In flow, not absolutely positioned. `.right` above is `bottom: 0`, so a
- * bar floated over the bottom of `.row` would sit on top of the dock column
- * and the two would have to be told about each other. As the last flex child
- * of `.overlay` it takes its height out of `.row` instead, the same way the
- * ribbon takes its own out of the top — the dock simply ends where the strip
- * begins, and neither knows the other exists.
+ * In flow, not absolutely positioned. As the last flex child of `.overlay` it
+ * takes its height out of `.row`, the same way the ribbon takes its own out
+ * of the top — so the left and right slots simply end where the strip begins,
+ * and neither knows the other exists. Floating it over `.row` instead would
+ * mean every card in those slots had to be told how tall this one is.
  *
  * Empty and zero-height until something portals in, so it costs nothing when
  * no lokalitet is open. `pointer-events` stays off here and is turned back on

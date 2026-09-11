@@ -61,9 +61,9 @@ all of them.
   **Read it before proposing a new analysis feature** — it records what was
   already rejected and why, so those don't get re-litigated.
 - `docs/lokalitet-view.md` — **partly built**: §12's build order is through
-  step 11, so the two axes, the View/File split, the three zones, the bottom
-  filmstrip/carousel, curation and the picker carousels are live and are
-  documented in `docs/ui-architecture.md`; removing the dock, the edit
+  step 12, so the two axes, the View/File split, the row's zones, the bottom
+  filmstrip/carousel, curation, the picker carousels and **removing the dock**
+  are live and are documented in `docs/ui-architecture.md`; the edit
   transaction, the takeout bundle and moving Terreng/Sammenlign onto the row
   are not. The whole design of making
   "a lokalitet is open" a view of its own is here — the two axes (owner/reader ×
@@ -363,9 +363,10 @@ Two rules that hold regardless of what the interface looks like:
 - `limited` visibility is a placeholder that behaves as `private` until
   groups exist.
 
-The ribbon rows, the funn list, the bottom edge the bilder live on — a
-filmstrip in show, a carousel in edit (`docs/ui-architecture.md` §8.7.2) —
-the drawing tools and the policy
+The ribbon rows, the funn list in its popover on the lokalitet row, the bottom
+edge the bilder live on — a filmstrip in show, a carousel in edit, the draw
+bar while a funn is being drawn (`docs/ui-architecture.md` §8.7.2) — the
+drawing tools and the policy
 decisions around them (bbox is authored not derived, only seeded from the
 viewport; drawing and extract exist only inside a lokalitet; measure and
 terrain analysis stay global) are in `docs/ui-architecture.md`.

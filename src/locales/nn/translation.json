@@ -240,6 +240,7 @@
       "bannerAdmin": "Du redigerer lokaliteten til {{name}} som administrator",
       "zoom": "Zoom til lokaliteten",
       "adjust": "Juster området (flytt eller dra i hjørna)",
+      "adjustDone": "Ferdig",
       "deleteLocality": "Slett lokaliteten",
       "confirmDelete": "Slette «{{name}}» med alle funn og bilete? Handlinga kan ikkje angrast.",
       "namePlaceholder": "Namn på lokaliteten",
@@ -271,6 +272,7 @@
     },
     "funn": {
       "heading": "Funn",
+      "listHint": "Funna i denne lokaliteten",
       "new": "Nytt funn",
       "loading": "Hentar funn…",
       "empty": "Ingen funn enno. Teikn det du ser i terrenget.",
@@ -285,7 +287,9 @@
         "headingEdit": "Rediger funn",
         "saved": "Lagra",
         "pending": "Blir lagra når du har teikna noko",
-        "done": "Ferdig"
+        "done": "Ferdig med funn",
+        "doneHint": "Legg frå deg pennen. Funnet er allereie lagra.",
+        "discard": "Forkast funn"
       },
       "status": {
         "mulig": "Mogleg",
@@ -467,15 +471,13 @@
     },
     "kulturminner": {
       "heading": "Kjende kulturminne",
+      "short": "Kulturminne",
+      "listHint": "Kjende kulturminne i området",
       "loading": "Sjekkar registeret…",
       "empty": "Ingen registrerte kulturminne i området.",
       "error": "Klarte ikkje å sjekke kulturminneregisteret.",
       "unnamed": "(utan namn)",
       "openLink": "Opne i Kulturminnesøk"
-    },
-    "dock": {
-      "show": "Vis lokalitetspanelet",
-      "hide": "Skjul lokalitetspanelet"
     }
   },
   "helpPage": {

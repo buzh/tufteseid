@@ -1,0 +1,57 @@
+/*
+ * Row 3 — the funn draft's naming line (docs/lokalitet-view.md §6).
+ *
+ * Tinted like the lokalitet row above it in edit, because it is inside that
+ * stance rather than beside it: the two read as one block that the ordinary
+ * rows are not part of.
+ */
+
+.row {
+  background: var(--c-accent-subtle);
+  border-top-color: var(--c-green-200);
+}
+
+/* "Nytt funn" / "Rediger tegningen" — the same quiet uppercase the lokalitet
+   row's own label uses, saying what this row is scoped to. */
+.label {
+  flex: none;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-fg-subtle);
+}
+
+.title {
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 360px;
+}
+
+/* Saving / saved / pending. A word, not a spinner: the write is a hundred
+   milliseconds and a spinner that flashes is worse than a label that
+   changes. */
+.state {
+  flex: none;
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+/* The grow-to-fit warning, inline. Amber rather than red — drawing past the
+   edge of the rectangle is a thing to notice, not a thing that failed. */
+.outside {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--c-yellow-400);
+  border-radius: var(--radius-md);
+  background: var(--c-yellow-50);
+  font-size: var(--font-xs);
+  color: var(--c-yellow-600);
+}
+
+.error {
+  font-size: var(--font-xs);
+  color: var(--c-danger);
+}

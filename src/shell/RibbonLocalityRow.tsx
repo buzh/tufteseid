@@ -1,10 +1,16 @@
-import { useAtom } from 'jotai';
+import { useAtom, useSetAtom } from 'jotai';
 import type { ChangeEvent, MouseEvent } from 'react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LocalityRecord } from '../api/localities';
-import { bilderStripOpenAtom } from '../localities/toolAtoms';
+import { FunnList } from '../localities/FunnList';
+import { KulturminnerSection } from '../localities/KulturminnerSection';
+import {
+  bilderStripOpenAtom,
+  localityDetailsOpenAtom,
+} from '../localities/toolAtoms';
 import type { LocalityWorkspaceApi } from '../localities/useLocalityWorkspace';
+import { ErrorBoundary } from '../shared/ErrorBoundary';
 import {
   Badge,
   type BadgePalette,
@@ -132,6 +138,7 @@ const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const setDetailsOpen = useSetAtom(localityDetailsOpenAtom);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const close = () => {
@@ -228,28 +235,52 @@ const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                 {t('localities.bilder.upload')}
               </button>
             )}
+            {/* Beskrivelse, sted, kommune, matrikkel, synlighet — the fields
+                you set once and stop looking at, so they are a dialog reached
+                from the menu rather than a panel that was permanently open
+                (§6). Both stances: a reader may read them, and
+                `LocalityDetails` renders itself read-only without
+                `canEdit`. */}
             <button
               type="button"
-              className={cx(
-                rowStyles.menuItem,
-                ws.adjusting && rowStyles.menuItemActive,
-              )}
+              className={rowStyles.menuItem}
               onClick={() => {
                 close();
-                ws.toggleAdjusting();
+                setDetailsOpen(true);
               }}
             >
-              <Icon icon="transform" size={16} />
-              {t('localities.workspace.adjust')}
+              <Icon icon="info" size={16} />
+              {t('localities.workspace.details')}
             </button>
-            <button
-              type="button"
-              className={cx(rowStyles.menuItem, rowStyles.menuItemDanger)}
-              onClick={() => setConfirming(true)}
-            >
-              <Icon icon="delete" size={16} />
-              {t('localities.workspace.deleteLocality')}
-            </button>
+            {/* The two that write are `canEdit`, not merely `mayEdit`: the
+                menu is on the row in show as well now — Detaljer above has to
+                be reachable by a reader — and nothing in show writes (§2). */}
+            {ws.canEdit && (
+              <>
+                <button
+                  type="button"
+                  className={cx(
+                    rowStyles.menuItem,
+                    ws.adjusting && rowStyles.menuItemActive,
+                  )}
+                  onClick={() => {
+                    close();
+                    ws.toggleAdjusting();
+                  }}
+                >
+                  <Icon icon="transform" size={16} />
+                  {t('localities.workspace.adjust')}
+                </button>
+                <button
+                  type="button"
+                  className={cx(rowStyles.menuItem, rowStyles.menuItemDanger)}
+                  onClick={() => setConfirming(true)}
+                >
+                  <Icon icon="delete" size={16} />
+                  {t('localities.workspace.deleteLocality')}
+                </button>
+              </>
+            )}
           </div>
         )}
       </Popover>
@@ -323,6 +354,107 @@ const HentMenu = ({
 };
 
 /*
+ * `Funn ▾` — docs/lokalitet-view.md §5.5, §6.
+ *
+ * The list that used to be the top half of the dock, in a popover on the row.
+ * It is an **index**: a line per funn, with the verbs that act on one. The
+ * content — the note you wrote about the mound — is beside the mound, in
+ * `FunnCallout`, which is why closing this on select is right rather than
+ * rude: you asked for a funn, so the map has flown to it and the note is up.
+ *
+ * A popover and not a dock is the whole bet of §6: this is a thing you consult
+ * a few times a session, and it was costing 360 px of terrain permanently for
+ * the privilege. The badge is what makes that safe — the count is on the row
+ * whether the list is open or not, so "does this rectangle have anything in
+ * it" never needs a click.
+ *
+ * Both stances. Reading your own index is not writing to it; `editable` is
+ * what decides whether the rows offer the verbs (§2).
+ */
+const FunnMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      width={360}
+      label={t('localities.funn.heading')}
+      trigger={
+        <ModeButton
+          icon="bookmark"
+          label={t('localities.funn.heading')}
+          tooltip={t('localities.funn.listHint')}
+          active={open}
+          badge={ws.funnCount || undefined}
+          onClick={() => setOpen(!open)}
+        />
+      }
+    >
+      <FunnList
+        items={ws.findItems}
+        editable={ws.canEdit}
+        selectedId={ws.selectedFunnId}
+        onSelect={(f) => {
+          setOpen(false);
+          ws.selectFunn(f);
+        }}
+        onStatus={ws.changeStatus}
+        onSaveMeta={ws.saveFunnMeta}
+        onEditGeometry={(f) => {
+          setOpen(false);
+          ws.startGeometryEdit(f);
+        }}
+        onDelete={ws.removeFunn}
+      />
+    </Popover>
+  );
+};
+
+/*
+ * `Kulturminner ▾` — the same move, for what the public register already knows
+ * about this rectangle (§5.5).
+ *
+ * Beside Funn because the two answer the same question about the same ground
+ * from opposite directions — what is recorded here, what have I recorded here
+ * — and reading them against each other is the point of the app.
+ *
+ * Its own error boundary, as it had in the dock: this one hits an external
+ * WFS, and it failing should cost you a popover rather than the row.
+ */
+const KulturminnerMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      width={340}
+      label={t('localities.kulturminner.heading')}
+      trigger={
+        <ModeButton
+          icon="castle"
+          label={t('localities.kulturminner.short')}
+          tooltip={t('localities.kulturminner.listHint')}
+          active={open}
+          badge={ws.kmCount || undefined}
+          onClick={() => setOpen(!open)}
+        />
+      }
+    >
+      <ErrorBoundary name="KulturminnerSection">
+        <KulturminnerSection
+          result={ws.kulturminner.result}
+          error={ws.kulturminner.error}
+        />
+      </ErrorBoundary>
+    </Popover>
+  );
+};
+
+/*
  * The banner slot — docs/lokalitet-view.md §5.7. It occupies the space the
  * summary used to, holds at most one sentence, and answers exactly one
  * question: whose is this and what state is it in.
@@ -365,10 +497,16 @@ const Banner = ({ ws }: { ws: LocalityWorkspaceApi }) => {
  * The `[←]` back arrow is gone. Leaving is an exit, exits are on the right,
  * and one lokalitet should not have two ways out at opposite ends of a row.
  *
- * Still a context strip, not a surface: everything with a body is in the dock
- * (until step 7 takes it), and nothing here opens downwards. Terreng is not
- * on it either — it is a ground mode and lives in row 1 with the other four
- * until §8's move.
+ * Still one line tall, but no longer a strip that owns nothing: with the dock
+ * gone (§6) this row is where the lokalitet's contents are reached from —
+ * `Funn ▾` and `Kulturminner ▾` as popovers between identity and the tools,
+ * `Bilder ▾` folding the bottom edge, `Detaljer` as a dialog off the `⋮`.
+ * That is the trade §6 makes: the bodies are still not *in* the row, but they
+ * are one press from it and they cost nothing when nobody is reading them,
+ * where the column cost 360 px of terrain always.
+ *
+ * Terreng and Sammenlign are not on it yet — they are ground modes and live
+ * in row 1 with the other four until step 15's move.
  */
 export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
@@ -413,6 +551,15 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             onClick={ws.zoomToLocality}
           />
         </Tooltip>
+      </div>
+
+      {/* What the rectangle holds, in two popovers (§5.5). Their own group
+          right after identity, ahead of the tools: they are part of the answer
+          to *what am I looking at*, and they are in both stances — the tools
+          beside them are not. */}
+      <div className={rowStyles.subjects}>
+        <FunnMenu ws={ws} />
+        <KulturminnerMenu ws={ws} />
       </div>
 
       {/* The middle zone: everything that leaves a trace, and therefore
@@ -491,9 +638,14 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         />
       </div>
 
-      {/* The right zone, deepest-first (§5.3). Depths 0 and 1 for now: the
-          funn draft and Juster området keep their own controls in the dock
-          until step 12 moves them up here as depth 2.
+      {/* The right zone, deepest-first (§5.3). The deepest thing in flight
+          owns it, and everything shallower is hidden while that is open —
+          which is what stops a row from offering to end two different things
+          with two buttons that both say `Ferdig`.
+
+          Depth 2 arrives here with the dock's removal: the funn draft and
+          Juster området used to keep their own exits in a dock band, and now
+          that both are gone from the column, this is where they go.
 
           `Lukk` is absent in edit — you leave the stance before you leave the
           record — and `Del` is absent everywhere until `?lok=CODE` exists,
@@ -502,7 +654,46 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           copy in step 14; until then that slot is empty rather than filled
           with a button that would lie. */}
       <div className={rowStyles.exits}>
-        {editing ? (
+        {ws.draftActive ? (
+          <>
+            <Button
+              variant="primary"
+              leftIcon="check"
+              onClick={ws.stopDraft}
+              title={t('localities.funn.draft.doneHint')}
+            >
+              {t('localities.funn.draft.done')}
+            </Button>
+            {/* Only for a fresh funn. Autosave means discarding can only mean
+                deleting the record the first shape made; a geometry edit
+                overwrote the old shape when the new one closed, so there is
+                nothing left to put back and the button would be a lie. Step
+                13's transaction is what makes it honest for both. */}
+            {!ws.draftIsEdit && (
+              <Button
+                variant="ghost"
+                palette="red"
+                leftIcon="delete"
+                onClick={ws.discardDraft}
+              >
+                {t('localities.funn.draft.discard')}
+              </Button>
+            )}
+          </>
+        ) : ws.adjusting ? (
+          /* §5.3 asks for [Bruk] [Angre] here. One button until step 13:
+             `Juster området` writes each finished gesture straight through, so
+             there is no buffer for `Bruk` to commit and nothing for `Angre` to
+             roll back to. Two buttons over one saved rectangle would be the
+             interface claiming a transaction it does not have. */
+          <Button
+            variant="primary"
+            leftIcon="check"
+            onClick={ws.toggleAdjusting}
+          >
+            {t('localities.workspace.adjustDone')}
+          </Button>
+        ) : editing ? (
           <>
             <Button variant="primary" leftIcon="check" onClick={ws.leaveEdit}>
               {t('localities.workspace.done')}
@@ -523,6 +714,10 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             <Button variant="ghost" palette="gray" onClick={ws.close}>
               {t('localities.workspace.close')}
             </Button>
+            {/* §5.3 puts `[⋮]` in show too, and now it earns its place: it is
+                how a reader opens Detaljer. Its write verbs are gated
+                inside. */}
+            <OverflowMenu ws={ws} />
           </>
         )}
       </div>

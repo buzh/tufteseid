@@ -5,33 +5,33 @@ import type { LocalityRecord } from '../api/localities';
 import { BilderCarousel } from '../localities/BilderCarousel';
 import { BilderPicker } from '../localities/BilderPicker';
 import { BilderStrip } from '../localities/BilderStrip';
+import { FunnCallout } from '../localities/FunnCallout';
+import { FunnDrawBar } from '../localities/FunnDrawBar';
 import { LocalityDialogs } from '../localities/LocalityDialogs';
 import { bilderStripOpenAtom } from '../localities/toolAtoms';
 import { useLocalityWorkspace } from '../localities/useLocalityWorkspace';
 import { ErrorBoundary } from '../shared/ErrorBoundary';
 import { bottomSlotAtom } from './bottomSlot';
-import { dockSlotAtom } from './dockSlot';
-import { LocalityDock } from './LocalityDock';
+import { RibbonFunnDraftRow } from './RibbonFunnDraftRow';
 import { RibbonLocalityRow } from './RibbonLocalityRow';
 
 /**
  * Everything the shell grows when a lokalitet is open.
  *
- * This is the one place `useLocalityWorkspace` is mounted. The context strip,
- * the dock, the bottom edge and the dialogs all need it, and the hook opens
+ * This is the one place `useLocalityWorkspace` is mounted. The rows, the
+ * bottom edge, the map callout and the dialogs all need it, and the hook opens
  * two PocketBase realtime subscriptions that reload the whole list on every
  * event — a second call site would double both.
  *
- * The dock and the bottom edge render through portals because they belong to
- * the shell's slots, on the far side of the tree from the ribbon row that
- * mounts the controller. Reasoning in `dockSlot.ts` and `bottomSlot.ts`.
+ * The bottom edge renders through a portal because it belongs to the shell's
+ * slot, on the far side of the tree from the ribbon row that mounts the
+ * controller. Reasoning in `bottomSlot.ts`.
  *
- * The context strip is outside the boundary that wraps the dock: if the
- * terrain panel throws, you still need the exits to get out of it.
+ * The rows are outside the boundary that wraps the bottom edge: if the
+ * carousel throws, you still need the exits to get out of the lokalitet.
  */
 export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
   const ws = useLocalityWorkspace(locality);
-  const dockSlot = useAtomValue(dockSlotAtom);
   const bottomSlot = useAtomValue(bottomSlotAtom);
   const [stripOpen, setStripOpen] = useAtom(bilderStripOpenAtom);
 
@@ -58,31 +58,38 @@ export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
    * flag — "the kept ones join the collection when you close the picker" is
    * literally true because the collection is not on screen until then.
    *
-   * The draw toolbar is still mobile-only and still `position: fixed` from
-   * AppShell (step 12 promotes it into this slot), so today the rule is
-   * enforced here rather than by the slot itself — which is also why the
-   * check is on `draftActive` rather than on what the slot happens to hold.
+   * The order of the branches is the priority: the pen outranks a picker,
+   * which outranks the collection. It is deepest-first, the same rule the
+   * right zone sorts its exits by (§5.3), for the same reason — the thing you
+   * are in the middle of is the thing the edge should be serving.
    *
-   * Which of the first two takes it is the stance, and it is decided here
+   * Which of the last two takes it is the stance, and it is decided here
    * rather than inside one component with branches through it: the rail and
    * the card share their vocabulary (localities/bilderCommon.tsx) but not
    * their geometry, and a component that is a rail on Tuesday is how the
    * write verbs end up merely disabled in show instead of absent (§2).
    */
-  const picking = ws.picker.run != null;
-  const showStrip = !picking && stripOpen && ws.hasBilder && !ws.draftActive;
+  const drawing = ws.draftActive;
+  const picking = !drawing && ws.picker.run != null;
+  const showStrip = !drawing && !picking && stripOpen && ws.hasBilder;
 
   return (
     <>
       <ErrorBoundary name="RibbonLocalityRow">
         <RibbonLocalityRow ws={ws} />
       </ErrorBoundary>
-      {dockSlot &&
+      {ws.draftActive && (
+        <ErrorBoundary name="RibbonFunnDraftRow">
+          <RibbonFunnDraftRow ws={ws} />
+        </ErrorBoundary>
+      )}
+      {bottomSlot &&
+        drawing &&
         createPortal(
-          <ErrorBoundary name="LocalityDock">
-            <LocalityDock ws={ws} />
+          <ErrorBoundary name="FunnDrawBar">
+            <FunnDrawBar editing={ws.draftIsEdit} />
           </ErrorBoundary>,
-          dockSlot,
+          bottomSlot,
         )}
       {bottomSlot &&
         picking &&
@@ -100,6 +107,11 @@ export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
           </ErrorBoundary>,
           bottomSlot,
         )}
+      {/* Not in a slot at all: an `ol/Overlay` anchored to the funn itself,
+          so it stays on the mound while you pan (§6). */}
+      <ErrorBoundary name="FunnCallout">
+        <FunnCallout items={ws.findItems} />
+      </ErrorBoundary>
       <ErrorBoundary name="LocalityDialogs">
         <LocalityDialogs ws={ws} />
       </ErrorBoundary>

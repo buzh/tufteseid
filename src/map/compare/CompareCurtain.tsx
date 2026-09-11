@@ -23,8 +23,8 @@ const clamp = (f: number) => Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, f));
  * viewport are the same rectangle, so a CSS percentage of the shell's width
  * is the same fraction the clip uses.
  *
- * It renders *under* the ribbon and the dock, like everything else that
- * belongs to the map. Dragging the seam under the dock is possible and
+ * It renders *under* the ribbon and the slots, like everything else that
+ * belongs to the map. Dragging the seam behind the infobox is possible and
  * pointless, which is why the clamp above is generous rather than tight —
  * fencing it off against measured chrome would be a rule to maintain for a
  * gesture nobody makes twice.

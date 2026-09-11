@@ -33,10 +33,12 @@ export type WorkspaceKeyHandlers = {
   onPickerDiscard: () => void;
   onPickerFinish: () => void;
   draftActive: boolean;
-  // Arrows/Enter walk the funn list. The list is always on screen in the
-  // dock, so this stays on while the extract and terrain panels are open —
-  // it is off only while drawing, where picking a different funn out from
-  // under the pen is never what the arrow meant.
+  // Arrows/Enter walk the funn — the list they are an index of is behind a
+  // popover now, but walking them is a way of reading the map rather than the
+  // list, so this stays on whether the popover is up or not, and while the
+  // extract and terrain panels are open. It is off only while drawing, where
+  // picking a different funn out from under the pen is never what the arrow
+  // meant.
   navigable: boolean;
   // ←/→ walk the filmstrip. Off unless there is a strip with something in it:
   // OpenLayers' KeyboardPan owns these keys otherwise (↑/↓ it has already

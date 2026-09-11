@@ -16,11 +16,11 @@ import { RibbonGlobalRow } from './RibbonGlobalRow';
  * Nothing with a body goes here. The rule is about **bodies, not rows** — the
  * tray and the tool rows that were deleted grew the bar to five hundred
  * pixels, over the terrain the panels were describing, and what remains of
- * them is the extract panel in the dock. A row that stays one line tall costs
- * ~40 px and keeps the controls next to the thing they name; a row that can
- * grow does not, which is why RibbonSettingsRow's one-line cap is a contract
- * rather than a suggestion — and why Terrenganalyse's knobs came back out of
- * the dock as a second *line* rather than as a panel.
+ * them is the extract dialog. A row that stays one line tall costs ~40 px and
+ * keeps the controls next to the thing they name; a row that can grow does
+ * not, which is why RibbonSettingsRow's one-line cap is a contract rather
+ * than a suggestion — and why Terrenganalyse's knobs came out of the dock as
+ * a second *line* rather than as a panel.
  *
  * `data-chrome="top"` is how `chromeInsets` finds out how much of the map the
  * bar is covering. Measured rather than a constant because the rows wrap on

@@ -60,12 +60,6 @@
   padding-left: var(--sp-1);
 }
 
-/* Dock sections want the body to scroll on its own rather than growing the
-   column; inline layouts leave this off and let the whole section grow. */
-.scroll {
-  overflow: auto;
-  overscroll-behavior: contain;
-}
 
 @media (prefers-reduced-motion: reduce) {
   .chevron {

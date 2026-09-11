@@ -1,0 +1,52 @@
+/*
+ * The selected funn's callout — docs/lokalitet-view.md §6.
+ *
+ * Same idiom as `KulturminnerPopup`: a small white card with a tail-less
+ * bottom-centre anchor, sitting just above the thing it names. The two say
+ * the same kind of sentence about the same kind of object — one from the
+ * public register, one from yours — so they should not look like different
+ * species.
+ *
+ * Narrow on purpose. A note is a sentence or two written in the field; if it
+ * runs longer, the popover row it was written in is where you read it whole.
+ */
+
+.callout {
+  box-sizing: border-box;
+  max-width: 280px;
+  min-width: 160px;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-bg);
+  box-shadow: var(--shadow-lg);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.title {
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+
+.note {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--font-xs);
+  line-height: 1.45;
+  color: var(--c-fg-muted);
+  /* Four lines and an ellipsis: this floats over the ground the note is
+     about, and a paragraph that grows downwards would cover it. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}

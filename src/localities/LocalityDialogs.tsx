@@ -1,10 +1,13 @@
+import { useAtom } from 'jotai';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LidarExtractDialog } from '../lidarExtract/LidarExtractDialog';
 import { Button, cx, Dialog } from '../ui';
 import { NIB_MOSAIC_KEY } from './behold';
 import type { FlyfotoProject } from './flyfotoProjects';
+import { LocalityDetails } from './LocalityDetails';
 import styles from './LocalityDialogs.module.css';
+import { localityDetailsOpenAtom } from './toolAtoms';
 import {
   FLYFOTO_BATCH_MAX,
   type LocalityWorkspaceApi,
@@ -18,17 +21,22 @@ import {
  * off to the acquisition list. Mounting them next to the trigger would tie
  * their lifetime to whichever row happens to be on screen.
  *
- * Two of the three are the selection dialogs behind `Hent ▾` (§4.3). Both
- * survived the picker unchanged in what they *ask*; what changed is what
- * happens after: they hand a list of proposals to a picker run instead of
- * saving anything.
+ * Two of them are the selection dialogs behind `Hent ▾` (§4.3). Both survived
+ * the picker unchanged in what they *ask*; what changed is what happens after:
+ * they hand a list of proposals to a picker run instead of saving anything.
+ *
+ * Detaljer is the newest and the odd one out — it *is* anchored to a control,
+ * the `⋮` menu on the lokalitet row, and it is driven by an atom rather than
+ * by the controller for exactly that reason. It is here anyway because a
+ * dialog raised from inside a popover would die with the popover.
  *
  * Grow-to-fit used to be one of these, raised from inside the funn save path.
- * It is an Alert in the draft band now: drawing past the edge of the rectangle
- * is worth remarking on, but not worth stopping the pen for.
+ * It is an inline warning on the draft row now: drawing past the edge of the
+ * rectangle is worth remarking on, but not worth stopping the pen for.
  */
 export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
+  const [detailsOpen, setDetailsOpen] = useAtom(localityDetailsOpenAtom);
   // Which acquisitions are checked. `NIB_MOSAIC_KEY` stands for the seamless
   // one, which is not a project and has no id of its own.
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -83,6 +91,28 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   return (
     <>
       <LidarExtractDialog ws={ws} />
+
+      {/* Beskrivelse, sted, kommune, matrikkel, synlighet — the lokalitet's
+          own fields, which used to be the section at the bottom of the dock
+          (§6). A dialog because it is the one part of a lokalitet you fill in
+          once and then stop looking at, and because the fields are a form:
+          they need width and a body, and neither fits on a ribbon row.
+
+          No footer. Every field in it writes on blur, the same as it did in
+          the dock, so a `Lagre` here would be a second, competing promise
+          about when the change lands. */}
+      <Dialog
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        title={t('localities.workspace.details')}
+        closeLabel={t('shared.close')}
+      >
+        <LocalityDetails
+          locality={ws.locality}
+          canEdit={ws.canEdit}
+          onPatch={ws.patchLocality}
+        />
+      </Dialog>
 
       {/* Licensing notice shown before every flyfoto grab: NiB imagery is
           free for private use, but publishing or commercial use is the

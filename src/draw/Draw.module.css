@@ -1,26 +1,22 @@
 /*
  * The drawing controls — one module for the whole subsystem, on the same
- * reasoning as the search panels: it is a single surface (the left column of
- * the funn draft row, plus the same tool strip pinned to the bottom edge on
- * a phone), and none of these controls has a life outside it.
+ * reasoning as the search panels: it is a single surface (the bar on the
+ * bottom edge while a funn draft is open), and none of these controls has a
+ * life outside it.
  *
- * Width budget: `.draw` in FunnDraft.module.css is `flex: 1 1 320px`, so
- * every group in here has to fold at ~300px rather than push the naming
- * column off the row.
+ * It used to be a column, because it used to be the left half of the funn
+ * draft band in the dock. The dock is gone (docs/lokalitet-view.md §6) and
+ * the pen went to the bottom edge, so the whole set is one wrapping row now —
+ * the same shape as every ribbon row, for the same reason: this floats over
+ * the ground being drawn on, and height here is map you cannot see.
  */
 
 .controls {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--sp-4);
+  flex-flow: row wrap;
+  align-items: center;
+  gap: var(--sp-5);
   width: 100%;
-}
-
-/* The bottom tool strip is fixed over the map, so the last control in the
-   panel would otherwise sit underneath it. */
-.mobileReserve {
-  padding-bottom: 15px;
 }
 
 .instruction {
@@ -58,21 +54,24 @@
   align-self: flex-end;
 }
 
+/* Last on the line and pushed to the far end: the one destructive control in
+   the bar has no business sitting a thumb's width from the pen. */
 .clear {
-  align-self: flex-start;
+  margin-left: auto;
 }
 
 /* --- tool selector ---------------------------------------------------- */
 
 .tools {
   display: flex;
-  justify-content: space-between;
+  flex: 0 0 auto;
   gap: var(--sp-1);
 }
 
 .tool {
   display: flex;
-  flex: 1 1 0;
+  flex: 0 0 auto;
+  min-width: 52px;
   flex-direction: column;
   align-items: center;
   gap: var(--sp-1);
@@ -104,32 +103,18 @@
   line-height: 1.2;
 }
 
-/* The same strip pinned to the bottom edge on a phone, where the funn row
-   is too short to hold it and the thumb is down there anyway. */
-.bottomBar {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: var(--z-fixed);
-  padding: var(--sp-4);
-  /* iPhone home indicator. */
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--sp-4));
-  background: var(--c-bg);
-  box-shadow: var(--shadow-md);
-}
-
 /* --- colours ---------------------------------------------------------- */
 
 .colorGrid {
   display: flex;
+  flex: 0 0 auto;
   flex-wrap: wrap;
   gap: var(--sp-5);
 }
 
 .colorColumn {
   display: flex;
-  flex: 1 1 130px;
+  flex: 0 0 130px;
   flex-direction: column;
   gap: var(--sp-2);
   min-width: 0;

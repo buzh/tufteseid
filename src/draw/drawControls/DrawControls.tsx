@@ -8,8 +8,7 @@ import {
   selectedFeatureAtom,
   snapEffect,
 } from '../../settings/draw/atoms.ts';
-import { useIsMobileScreen } from '../../shared/hooks.ts';
-import { Button, ConfirmPopover, cx } from '../../ui';
+import { Button, ConfirmPopover } from '../../ui';
 import { ColorControls } from '../ColorControls.tsx';
 import styles from '../Draw.module.css';
 import { DrawToolSelector } from '../DrawToolSelector.tsx';
@@ -41,7 +40,6 @@ const MEASUREMENT_TYPES: DrawType[] = [
 export const DrawControls = () => {
   const { drawType, clearDrawing } = useDrawSettings();
   const [selectedFeature] = useAtom(selectedFeatureAtom);
-  const isMobile = useIsMobileScreen();
   const { t } = useTranslation();
   useAtom(drawEnabledEffect);
   useAtom(drawTypeEffect);
@@ -72,10 +70,11 @@ export const DrawControls = () => {
     MEASUREMENT_TYPES.includes(currentType);
 
   return (
-    <div className={cx(styles.controls, isMobile && styles.mobileReserve)}>
-      {/* On a phone the same strip is pinned to the bottom edge, within
-          thumb reach — see BottomDrawToolSelector. */}
-      {!isMobile && <DrawToolSelector />}
+    <div className={styles.controls}>
+      {/* No longer conditional on the screen. The whole set is on the bottom
+          edge now, within thumb reach at every width, so the phone-only copy
+          of this strip (`BottomDrawToolSelector`) had nothing left to be. */}
+      <DrawToolSelector />
 
       {drawType === 'Move' && !selectedFeature && (
         <p className={styles.instruction}>
