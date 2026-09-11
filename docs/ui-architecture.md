@@ -1733,6 +1733,9 @@ key/label, `metresPerPx`, bbox, `imageRect` (§8.10), and for flyfoto the
 short-lived file tokens for thumbnails — a new UI must keep doing that or every
 thumbnail 403s.
 
+Two more fields sit on the record and belong to the exhibit rather than to the
+image: `sort` (int) and `hidden` (bool). They are §8.7.3.
+
 #### 8.7.1 The image on the map — Vis i ruta and Gjenskap
 
 **There is no lightbox.** Picking a frame in the filmstrip (§8.7.2) selects it,
@@ -1850,8 +1853,68 @@ scrolling grid in a 360 px column does.
   empty lokalitet gets no bar at all; an owner in edit gets the bar with the
   empty prompt in it.
 - **Both stances render the strip today.** §12 gives edit its own carousel at
-  step 9; until then the filmstrip serves both, with caption and delete gated
-  on `canEdit`. Uploading is on the row's `⋮`, so the rail has no add-tile.
+  step 9; until then the filmstrip serves both, with caption, delete and the
+  curation controls (§8.7.3) gated on `canEdit`. Uploading is on the row's
+  `⋮`, so the rail has no add-tile.
+
+#### 8.7.3 Curation — exhibit order, concealment, and the derived cover
+
+`docs/lokalitet-view.md` §4.4. A lokalitet's images accumulate in the order the
+work happened, which is rarely the order that explains the site. Two fields fix
+that, and neither of them is a cover field.
+
+- **`attachments.sort` is an opaque ordering key, not an index.** Newly created
+  records get `Date.now()`, minted inside `createAttachment` itself
+  (`src/api/attachments.ts`), and that is the whole reason it is opaque: two of
+  the producers — terrain **Lagre**, the extract's **Behold** — never hold the
+  attachment list, so "one more than the largest" is not a number they can
+  reach. "Later than everything that already exists" is a number a clock knows.
+  The list query is `sort: 'sort,created'`; `created` is what makes the order
+  *total*, and without it PocketBase may return two equal-`sort` rows either
+  way round — a rail that reshuffles on every realtime event.
+- **A move costs one PATCH.** `reorderBilde` writes the moved record a value
+  *between* its two new neighbours and leaves every other record alone. This is
+  not micro-optimisation: `useLocalityContent` reloads the whole list on every
+  realtime event, so renumbering forty records to drag one frame would be forty
+  reloads of forty records. The fallback, when there is no integer left between
+  the neighbours, is a full renumber to multiples of `SORT_STEP` (1000) — and
+  it is reached in exactly two situations, neighbours one apart and the first
+  drag on a lokalitet whose records all predate the field and so all carry `0`.
+  Both self-heal.
+- **The renumber values stay far below any clock reading**, deliberately. That
+  is what keeps an image created *after* a hand-arranged exhibit landing at the
+  end of it rather than in the middle.
+- **Existing lokaliteter changed order** when this landed: the list was
+  `-created` (newest first) and is now the exhibit (oldest first), because
+  every pre-existing record carries `sort = 0` and the tie breaks on `created`.
+  Nothing is lost, but a lokalitet somebody knew looks reversed until they drag
+  something.
+- **`attachments.hidden` is "keep it, do not show it".** The alternative is
+  deleting your working renders to make the exhibit tidy, and the seven
+  renders you rejected are the evidence that you checked. Hidden records are
+  filtered out of the strip in show and are *on the rail* in edit, faded and
+  marked — a curation control whose effect you cannot see is not one.
+- **That makes positions stance-dependent, so ordering never uses them.**
+  `bilderItems` (what the strip walks) is the filtered list; every ordering
+  call indexes into the hook's unfiltered `attachmentItems`, which is why the
+  drag is gated on `canEdit` rather than merely hidden in show — in edit the
+  two lists are the same array. An exhibit order that depended on who was
+  looking would not be an order.
+- **The cover is not a field.** It is `coverBildeId` — the first non-hidden
+  record in exhibit order — computed where it is needed, on the same argument
+  as the centre coordinate (§8.3): a stored `cover` relation and a `sort`
+  column can disagree, and then the exhibit has two first images. Dragging a
+  frame to the front is the only way to make it the cover; there is no verb.
+- **§4.6's terrain seed is a second derivation, not the same one.** Entering
+  Terreng over a lokalitet seeds from the first non-hidden record in exhibit
+  order *that is a terrain View* (`coverTerrainSpec`), because the cover is
+  usually the extract and a lokalitet whose first image is a flyfoto still has
+  knobs worth seeding from. Curation moves it exactly the way it moves the
+  cover, which is the property that matters; the doc's phrase "the cover
+  terrain render" reads as one derivation and is two.
+- **Drag is the quick gesture, not the only one.** The detail line carries
+  `arrow_back` / `arrow_forward` and a hide toggle, because HTML5 drag is
+  neither keyboard- nor touch-accessible and the exhibit order is content.
 
 ### 8.8 The flyfoto picker
 
@@ -2630,7 +2693,11 @@ walk the filmstrip along the bottom of the map, with ← / → or the rail's
 chevrons; picking a frame puts that image back on the map at its own
 rectangle and fades it over what is there now; press **Gjenskap** on an extract,
 terrain render or flyfoto to set the map back to the view it was made from;
-open the original in a tab; caption an attachment; delete one; fold the strip
+open the original in a tab; caption an attachment; delete one; in edit, drag a
+frame along the rail — or step it with the two arrows — to set the order the
+images are read in, and so which one is the cover; hide one from the exhibit
+without deleting it, and see the hidden ones faded on the rail while you are
+editing; fold the strip
 away and back with **Bilder ▾** to get the ground under it;
 see flyfoto captioned with its acquisition year; get every kept or downloaded
 image back as a report-ready figure — scale bar, north arrow, dataset,

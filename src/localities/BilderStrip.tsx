@@ -1,5 +1,5 @@
 import { useSetAtom } from 'jotai';
-import { useEffect, useRef, useState } from 'react';
+import { type DragEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   AttachmentKind,
@@ -96,15 +96,34 @@ const MetaLine = ({ rec }: { rec: AttachmentRecord }) => {
  * the strip and the twelfth image is off the right-hand end of it — a
  * keyboard step that changes the map but not the rail would leave you unable
  * to see what you are looking at.
+ *
+ * In edit it is also a drag handle (§4.4). The frame stays a button through
+ * it: dragging is the fast way to order the exhibit, not the only one, and
+ * the two arrows on the detail line are what a touchscreen and a keyboard
+ * use instead.
  */
 const Frame = ({
   rec,
   selected,
+  isCover,
+  draggable,
+  dragOver,
   onClick,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: {
   rec: AttachmentRecord;
   selected: boolean;
+  isCover: boolean;
+  draggable: boolean;
+  dragOver: boolean;
   onClick: () => void;
+  onDragStart: (e: DragEvent) => void;
+  onDragOver: () => void;
+  onDrop: () => void;
+  onDragEnd: () => void;
 }) => {
   const { url, error, onError } = useAttachmentUrl(rec, '200x200');
   const { t } = useTranslation();
@@ -123,12 +142,38 @@ const Frame = ({
     <button
       ref={ref}
       type="button"
-      className={cx(styles.frame, selected && styles.frameOn)}
+      className={cx(
+        styles.frame,
+        selected && styles.frameOn,
+        rec.hidden && styles.frameHidden,
+        dragOver && styles.frameDrop,
+      )}
       aria-pressed={selected}
       title={
         error ? t('localities.bilder.loadFailed') : rec.caption || rec.kind
       }
+      draggable={draggable || undefined}
       onClick={onClick}
+      onDragStart={onDragStart}
+      onDragOver={
+        draggable
+          ? (e) => {
+              // Without this the drop never fires: the default action of
+              // dragover is "refuse".
+              e.preventDefault();
+              onDragOver();
+            }
+          : undefined
+      }
+      onDrop={
+        draggable
+          ? (e) => {
+              e.preventDefault();
+              onDrop();
+            }
+          : undefined
+      }
+      onDragEnd={draggable ? onDragEnd : undefined}
     >
       {url ? (
         <img
@@ -149,6 +194,18 @@ const Frame = ({
       <span className={styles.kindMark}>
         <Icon icon={KIND_ICON[rec.kind]} size={14} />
       </span>
+      {/* The cover is derived, so this mark is the only place it is stated —
+          and it moves the moment something else is dragged in front of it. */}
+      {isCover && (
+        <span className={cx(styles.mark, styles.coverMark)}>
+          <Icon icon="star" size={13} filled />
+        </span>
+      )}
+      {rec.hidden && (
+        <span className={cx(styles.mark, styles.hiddenMark)}>
+          <Icon icon="visibility_off" size={13} />
+        </span>
+      )}
     </button>
   );
 };
@@ -165,9 +222,13 @@ const Frame = ({
 const Detail = ({
   ws,
   rec,
+  index,
+  count,
 }: {
   ws: LocalityWorkspaceApi;
   rec: AttachmentRecord;
+  index: number;
+  count: number;
 }) => {
   const { t } = useTranslation();
   const recreate = useSetAtom(recreateViewAtom);
@@ -200,6 +261,12 @@ const Detail = ({
       <div className={styles.detailMain}>
         <div className={styles.detailHead}>
           <Badge>{t(`localities.bilder.kind.${rec.kind}`)}</Badge>
+          {ws.coverBildeId === rec.id && (
+            <Badge palette="blue">{t('localities.bilder.cover')}</Badge>
+          )}
+          {rec.hidden && (
+            <Badge palette="yellow">{t('localities.bilder.hidden')}</Badge>
+          )}
           <MetaLine rec={rec} />
         </div>
         <Input
@@ -242,18 +309,53 @@ const Detail = ({
         <Button size="sm" leftIcon="open_in_new" onClick={openOriginal}>
           {t('localities.bilder.openOriginal')}
         </Button>
+        {/* Ordering without a mouse (§4.4). The rail's drag is the quick
+            gesture; these two are the ones a touchscreen, a keyboard and a
+            screen reader have, and they move the same key. */}
         {ws.canEdit && (
-          <ConfirmPopover
-            title={t('localities.bilder.confirmDelete')}
-            confirmLabel={t('localities.bilder.delete')}
-            cancelLabel={t('shared.cancel')}
-            onConfirm={() => ws.removeBilde(rec)}
-            trigger={(props) => (
-              <Button {...props} size="sm" palette="red" leftIcon="delete">
-                {t('localities.bilder.delete')}
-              </Button>
-            )}
-          />
+          <>
+            <Tooltip label={t('localities.bilder.moveEarlier')}>
+              <IconButton
+                icon="arrow_back"
+                size="sm"
+                palette="gray"
+                disabled={index <= 0}
+                aria-label={t('localities.bilder.moveEarlier')}
+                onClick={() => ws.reorderBilde(rec.id, index - 1)}
+              />
+            </Tooltip>
+            <Tooltip label={t('localities.bilder.moveLater')}>
+              <IconButton
+                icon="arrow_forward"
+                size="sm"
+                palette="gray"
+                disabled={index < 0 || index >= count - 1}
+                aria-label={t('localities.bilder.moveLater')}
+                onClick={() => ws.reorderBilde(rec.id, index + 1)}
+              />
+            </Tooltip>
+            <Button
+              size="sm"
+              palette="gray"
+              leftIcon={rec.hidden ? 'visibility' : 'visibility_off'}
+              onClick={() => ws.setBildeHidden(rec, !rec.hidden)}
+            >
+              {rec.hidden
+                ? t('localities.bilder.unhide')
+                : t('localities.bilder.hide')}
+            </Button>
+            <ConfirmPopover
+              title={t('localities.bilder.confirmDelete')}
+              confirmLabel={t('localities.bilder.delete')}
+              cancelLabel={t('shared.cancel')}
+              onConfirm={() => ws.removeBilde(rec)}
+              trigger={(props) => (
+                <Button {...props} size="sm" palette="red" leftIcon="delete">
+                  {t('localities.bilder.delete')}
+                </Button>
+              )}
+            />
+          </>
         )}
       </div>
 
@@ -305,9 +407,28 @@ const Detail = ({
 export const BilderStrip = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
   const setOpen = useSetAtom(bilderStripOpenAtom);
-  const items = ws.attachmentItems;
+  const items = ws.bilderItems;
   const active = items?.find((it) => it.id === ws.activeBildeId) ?? null;
+  const activeIndex =
+    items?.findIndex((it) => it.id === ws.activeBildeId) ?? -1;
   const walkable = (items?.length ?? 0) > 1;
+
+  /*
+   * Drag to reorder (§4.4), edit only.
+   *
+   * The index handed to `reorderBilde` is a position in the *unfiltered* list,
+   * and these are positions in `bilderItems` — which is the same array
+   * whenever `canEdit`, since nothing is filtered out in edit. That is why the
+   * drag is gated on `canEdit` rather than merely hidden in show.
+   */
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const canDrag = ws.canEdit && (items?.length ?? 0) > 1;
+
+  const endDrag = () => {
+    setDragId(null);
+    setOverId(null);
+  };
 
   return (
     <div className={styles.strip} data-chrome="bottom">
@@ -342,12 +463,32 @@ export const BilderStrip = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               <p className={styles.empty}>{t('localities.bilder.empty')}</p>
             )
           ) : (
-            items.map((rec) => (
+            items.map((rec, i) => (
               <Frame
                 key={rec.id}
                 rec={rec}
                 selected={rec.id === ws.activeBildeId}
+                isCover={rec.id === ws.coverBildeId}
+                draggable={canDrag}
+                dragOver={
+                  overId === rec.id && dragId !== null && dragId !== rec.id
+                }
                 onClick={() => ws.selectBilde(rec.id)}
+                onDragStart={(e) => {
+                  // Firefox refuses to start a drag with nothing on the
+                  // dataTransfer, whatever the handlers say.
+                  e.dataTransfer.setData('text/plain', rec.id);
+                  e.dataTransfer.effectAllowed = 'move';
+                  setDragId(rec.id);
+                }}
+                onDragOver={() => setOverId(rec.id)}
+                onDrop={() => {
+                  if (dragId && dragId !== rec.id) {
+                    ws.reorderBilde(dragId, i);
+                  }
+                  endDrag();
+                }}
+                onDragEnd={endDrag}
               />
             ))
           )}
@@ -373,7 +514,15 @@ export const BilderStrip = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         </Tooltip>
       </div>
 
-      {active && <Detail key={active.id} ws={ws} rec={active} />}
+      {active && (
+        <Detail
+          key={active.id}
+          ws={ws}
+          rec={active}
+          index={activeIndex}
+          count={items?.length ?? 0}
+        />
+      )}
     </div>
   );
 };

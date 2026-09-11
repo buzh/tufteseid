@@ -7,7 +7,7 @@ import {
   AttachmentRecord,
   createAttachment,
   deleteAttachment,
-  updateAttachmentCaption,
+  updateAttachment,
 } from '../api/attachments';
 import {
   deleteLocality,
@@ -131,6 +131,13 @@ export const FLYFOTO_BATCH_MAX = 8;
 
 // Extra breathing room when framing a single funn, on top of the chrome.
 const FUNN_MARGIN_PX = 90;
+
+// Spacing between exhibit positions when the whole list has to be renumbered
+// (§4.4, `reorderBilde`). Big enough that ten further moves fit between any
+// two neighbours by halving, small enough that the values stay far below the
+// epoch-millisecond keys `nextAttachmentSort` mints — which is what keeps a
+// newly created bilde at the end of a hand-arranged exhibit.
+const SORT_STEP = 1000;
 
 // What the ground was, for the screenshot figure's source line. Keyed on the
 // background layer rather than asked of useGroundMode, which needs the whole
@@ -303,6 +310,25 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const { pin } = pinned;
 
   /*
+   * The exhibit (docs/lokalitet-view.md §4.4).
+   *
+   * `attachmentItems` arrives in `sort` order from the server. What the strip
+   * walks is this list minus the concealed ones — in show. In edit the hidden
+   * records are on the rail too, marked: concealment is one of the things you
+   * are there to change, and a curation control you cannot see the effect of
+   * is not one.
+   *
+   * That makes the *positions* differ between the two stances, which is why
+   * every ordering call below indexes into `attachmentItems` and never into
+   * this list: an exhibit order that depended on who was looking would not be
+   * an order.
+   */
+  const bilderItems = useMemo(() => {
+    if (!attachmentItems) return null;
+    return canEdit ? attachmentItems : attachmentItems.filter((a) => !a.hidden);
+  }, [attachmentItems, canEdit]);
+
+  /*
    * Which bilde the bottom edge is pointing at (docs/lokalitet-view.md §4.3).
    *
    * Up here rather than in BilderStrip for two reasons: the strip unmounts
@@ -314,16 +340,24 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    */
   const [activeBildeId, setActiveBildeId] = useState<string | null>(null);
 
-  // The record went away — deleted here, or by another session.
+  // The record is no longer on the rail — deleted here or by another session,
+  // or concealed and then left behind when `Ferdig` drops the stance.
+  //
+  // The pin goes down with it. `usePinnedBilde` only unpins records that have
+  // left the *unfiltered* list, which is the right rule for a deletion and the
+  // wrong one for a concealment: hiding an image and pressing Ferdig would
+  // otherwise leave it lying on the map in show, which is precisely what
+  // `hidden` was asked to prevent.
   useEffect(() => {
     if (
       activeBildeId &&
-      attachmentItems &&
-      !attachmentItems.some((a) => a.id === activeBildeId)
+      bilderItems &&
+      !bilderItems.some((a) => a.id === activeBildeId)
     ) {
       setActiveBildeId(null);
+      pin(null);
     }
-  }, [activeBildeId, attachmentItems]);
+  }, [activeBildeId, bilderItems, pin]);
 
   // Picking a thumbnail *is* "Vis i ruta" (§4.2) — there is no second verb for
   // it. Pressing the active one again puts it down, which is the only way the
@@ -333,17 +367,17 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     (id: string | null) => {
       const next = id === activeBildeId ? null : id;
       setActiveBildeId(next);
-      const rec = next ? attachmentItems?.find((a) => a.id === next) : null;
+      const rec = next ? bilderItems?.find((a) => a.id === next) : null;
       pin(rec && canPinBilde(rec) ? rec.id : null);
     },
-    [activeBildeId, attachmentItems, pin],
+    [activeBildeId, bilderItems, pin],
   );
 
   // ←/→. Wraps, and never lands on nothing: walking a rail past its end and
   // getting an empty strip would be a worse answer than starting over.
   const stepBilde = useCallback(
     (delta: 1 | -1) => {
-      const items = attachmentItems;
+      const items = bilderItems;
       if (!items || items.length === 0) return;
       const at = items.findIndex((a) => a.id === activeBildeId);
       const next =
@@ -356,7 +390,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setActiveBildeId(rec.id);
       pin(canPinBilde(rec) ? rec.id : null);
     },
-    [attachmentItems, activeBildeId, pin],
+    [bilderItems, activeBildeId, pin],
   );
 
   const removeBilde = useCallback(
@@ -375,19 +409,106 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [setAttachmentItems, t],
   );
 
-  const setBildeCaption = useCallback(
-    async (rec: AttachmentRecord, caption: string) => {
+  // One patch, applied optimistically and rolled back on failure. The list is
+  // reloaded wholesale by realtime anyway; the optimistic step is what keeps
+  // a drag from snapping back for the length of a round trip.
+  const patchBilde = useCallback(
+    async (
+      rec: AttachmentRecord,
+      patch: { caption?: string; sort?: number; hidden?: boolean },
+    ) => {
+      setAttachmentItems((prev) =>
+        prev
+          ? prev.map((it) => (it.id === rec.id ? { ...it, ...patch } : it))
+          : prev,
+      );
       try {
-        const updated = await updateAttachmentCaption(rec.id, caption);
+        const updated = await updateAttachment(rec.id, patch);
         setAttachmentItems((prev) =>
           prev ? prev.map((it) => (it.id === rec.id ? updated : it)) : prev,
         );
       } catch (e) {
-        console.warn('[localityWorkspace] caption save failed', e);
+        console.warn('[localityWorkspace] bilde save failed', e);
         toast.error({ title: t('localities.workspace.saveFailed') });
+        setAttachmentItems((prev) =>
+          prev ? prev.map((it) => (it.id === rec.id ? rec : it)) : prev,
+        );
       }
     },
     [setAttachmentItems, t],
+  );
+
+  const setBildeCaption = useCallback(
+    (rec: AttachmentRecord, caption: string) => patchBilde(rec, { caption }),
+    [patchBilde],
+  );
+
+  // Keep it, do not show it (§4.4). The alternative to this field is deleting
+  // your working renders to make the exhibit tidy, and the seven you rejected
+  // are the evidence that you checked.
+  const setBildeHidden = useCallback(
+    (rec: AttachmentRecord, hidden: boolean) => patchBilde(rec, { hidden }),
+    [patchBilde],
+  );
+
+  /*
+   * Move a bilde to a position in the exhibit.
+   *
+   * `sort` is an opaque key, so the ordinary move is a *value between the two
+   * new neighbours* and costs one PATCH — which matters here more than it
+   * usually would, because every write comes back as a realtime event and
+   * every realtime event reloads the whole list. Renumbering forty records to
+   * drag one card would be forty reloads.
+   *
+   * The fallback is that renumber, and it is reached in exactly two
+   * situations: neighbours one apart, and the first drag on a lokalitet whose
+   * records all predate the field and so all carry 0. Both are self-healing —
+   * once a run has been spaced out by `SORT_STEP` there is room again.
+   */
+  const reorderBilde = useCallback(
+    async (id: string, toIndex: number) => {
+      const list = attachmentItems;
+      if (!list) return;
+      const from = list.findIndex((a) => a.id === id);
+      if (from < 0) return;
+      const to = Math.max(0, Math.min(list.length - 1, toIndex));
+      if (to === from) return;
+
+      const rest = list.filter((a) => a.id !== id);
+      const next = [...rest.slice(0, to), list[from], ...rest.slice(to)];
+      setAttachmentItems(next);
+
+      const before = rest[to - 1] ?? null;
+      const after = rest[to] ?? null;
+      const between = () => {
+        if (before && after) {
+          const mid = Math.floor((before.sort + after.sort) / 2);
+          return mid > before.sort && mid < after.sort ? mid : null;
+        }
+        if (before) return before.sort + SORT_STEP;
+        if (after) return after.sort - SORT_STEP;
+        return SORT_STEP;
+      };
+
+      try {
+        const value = between();
+        if (value != null) {
+          await updateAttachment(id, { sort: value });
+        } else {
+          // No room. Space the whole exhibit out again, in the order it now
+          // reads, and leave it that way — the values stay far below any
+          // clock reading, so the next image created still lands last.
+          for (let i = 0; i < next.length; i++) {
+            await updateAttachment(next[i].id, { sort: (i + 1) * SORT_STEP });
+          }
+        }
+      } catch (e) {
+        console.warn('[localityWorkspace] reorder failed', e);
+        toast.error({ title: t('localities.workspace.saveFailed') });
+        setAttachmentItems(list);
+      }
+    },
+    [attachmentItems, setAttachmentItems, t],
   );
 
   // Funn draft. `draftFunnId` is the record the pen is bound to — null only
@@ -927,7 +1048,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         figure.blob,
         'skjermbilde.png',
       );
-      setAttachmentItems((prev) => (prev ? [rec, ...prev] : [rec]));
+      setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
       toast.success({ title: t('localities.tools.screenshotSaved') });
     } catch (e) {
       console.warn('[localityWorkspace] screenshot failed', e);
@@ -971,7 +1092,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           file,
           file.name,
         );
-        setAttachmentItems((prev) => (prev ? [rec, ...prev] : [rec]));
+        setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
       } catch (e) {
         console.warn('[localityWorkspace] upload failed', e);
         toast.error({ title: t('localities.bilder.uploadFailed') });
@@ -1078,7 +1199,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           figure.blob,
           'flyfoto.jpg',
         );
-        setAttachmentItems((prev) => (prev ? [rec, ...prev] : [rec]));
+        setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
         return true;
       } catch (e) {
         if (signal?.aborted) return false;
@@ -1171,7 +1292,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         raster.blob,
         filename,
       );
-      setAttachmentItems((prev) => (prev ? [rec, ...prev] : [rec]));
+      setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
     },
     [user, locality.id, setAttachmentItems],
   );
@@ -1430,8 +1551,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // loss. The ground deliberately does not move as you step, which is the
     // whole trick — each press is another reading of the same rectangle, in
     // register.
-    stripNavigable:
-      stripOpen && !draftActive && (attachmentItems?.length ?? 0) > 1,
+    stripNavigable: stripOpen && !draftActive && (bilderItems?.length ?? 0) > 1,
     onStepBilde: stepBilde,
     // Outside-in, the same order the row's right zone is stacked in (§5.3):
     // the deepest thing in flight goes first, and edit is a level of its own
@@ -1447,7 +1567,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   });
 
   const funnCount = findItems?.length ?? 0;
-  const bilderCount = attachmentItems?.length ?? 0;
+  // What the badge on `Bilder ▾` counts: the strip's own list, so a reader is
+  // told how many images the exhibit has rather than how many exist. In edit
+  // the hidden ones are on the rail, so they are in the count too — the number
+  // and the rail always agree about what you are about to open.
+  const bilderCount = bilderItems?.length ?? 0;
   // Whether the bottom edge has anything to be. Published rather than
   // recomputed at each end, so the row's `Bilder ▾` and the portal in
   // `LocalityRibbon` cannot disagree about whether pressing it does anything.
@@ -1463,19 +1587,38 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       : kulturminner.result.items.length
     : null;
 
+  /*
+   * The cover (§4.4): the first non-hidden image in exhibit order.
+   *
+   * Derived, never stored, for the same reason the centre coordinate is not a
+   * field — a `cover` relation and a `sort` column can disagree, and then the
+   * exhibit has two first images. Dragging a frame to the front is what makes
+   * it the cover; there is no separate verb.
+   *
+   * Read off `attachmentItems` rather than `bilderItems` because the answer
+   * must not depend on who is looking: in edit the rail shows the hidden ones,
+   * and a cover that changed when you pressed Rediger would be a different
+   * lokalitet's cover.
+   */
+  const coverBildeId = useMemo(
+    () => attachmentItems?.find((a) => !a.hidden)?.id ?? null,
+    [attachmentItems],
+  );
+
   // The site's own terrain render, for §4.6 — entering Terreng over a
   // lokalitet starts from what its owner was looking at rather than from a
   // default hillshade at 315°/35°.
   //
-  // The cover is the first non-hidden image in `sort` order (§4.4) and is
-  // computed rather than stored; neither `sort` nor `hidden` is written yet
-  // — step 8 owns both, and `AttachmentRecord` does not carry them until it
-  // does — so the list is newest-first and nothing is concealed, and this is
-  // simply the most recent terrain render. Published as
-  // an atom because `useTerrainAnalysis` is mounted from row 1, on the far
-  // side of the tree from the hook that holds the attachments.
+  // Not `coverBildeId`: the cover is usually the extract, and a lokalitet
+  // whose first image is a flyfoto still has knobs worth seeding from. So this
+  // is the *first terrain render* in exhibit order, hidden ones skipped —
+  // curation moves it the same way it moves the cover, which is the property
+  // that matters. Published as an atom because `useTerrainAnalysis` is mounted
+  // from row 1, on the far side of the tree from the hook that holds the
+  // attachments.
   const coverTerrainSpec = useMemo(() => {
     for (const rec of attachmentItems ?? []) {
+      if (rec.hidden) continue;
       const spec = viewSpecOf(rec);
       if (spec?.kind === 'terrain') return spec;
     }
@@ -1510,7 +1653,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
     // content
     findItems,
-    attachmentItems,
+    // The exhibit, stance-filtered. The unfiltered list stays inside the hook:
+    // it is what the ordering calls index into, and publishing both would be
+    // publishing two answers to "which images does this lokalitet have".
+    bilderItems,
+    coverBildeId,
     pinned,
     kulturminner,
     funnCount,
@@ -1524,6 +1671,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     stepBilde,
     removeBilde,
     setBildeCaption,
+    setBildeHidden,
+    reorderBilde,
 
     // funn list
     selectedFunnId,

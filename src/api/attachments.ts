@@ -9,7 +9,7 @@ import { pb } from './pocketbase';
 export type AttachmentKind = 'extract' | 'screenshot' | 'upload' | 'flyfoto';
 
 // Free-form; extracts store sourceKey/sourceLabel/style/metresPerPx/
-// bbox25833 so the gallery can say what an image shows. Flyfoto stores
+// bbox25833 so the strip can say what an image shows. Flyfoto stores
 // source label + metresPerPx + bbox25833.
 export type AttachmentMeta = Record<string, unknown>;
 
@@ -22,6 +22,10 @@ export type AttachmentRecord = {
   file: string;
   caption: string;
   meta: AttachmentMeta | null;
+  // Exhibit order and concealment — docs/lokalitet-view.md §4.4. `sort` is an
+  // opaque ordering key, not an index: see `nextAttachmentSort` below.
+  sort: number;
+  hidden: boolean;
   created: string;
   updated: string;
   // Set by PB on fetched records; pb.files.getURL needs one of them.
@@ -38,12 +42,39 @@ export type NewAttachmentInput = {
 
 const COLLECTION = 'attachments';
 
+/*
+ * The sort key a newly created bilde gets: epoch milliseconds.
+ *
+ * An opaque ordering key rather than a 0..n index, and that is what lets the
+ * producers that do *not* hold the attachment list — terrain `Lagre`, the
+ * extract's `Behold` — land their image at the end of the exhibit without
+ * asking anybody what the end currently is. It is minted here rather than by
+ * the caller for exactly that reason: "later than everything that already
+ * exists" is a fact a clock knows and a caller would have to look up.
+ *
+ * Reordering rewrites the moved record to a value *between* its new
+ * neighbours (`useLocalityWorkspace.reorderBilde`), so a drag costs one PATCH
+ * rather than one per card. Those values are small — a renumbering pass uses
+ * multiples of 1000 — which keeps them below any future clock reading, so an
+ * image created after a reorder still arrives last.
+ *
+ * Records written before this field existed carry 0 and sort first, in
+ * creation order, which is the order they were displayed in anyway.
+ */
+const nextAttachmentSort = () => Date.now();
+
 export const listLocalityAttachments = async (
   localityId: string,
 ): Promise<AttachmentRecord[]> => {
   return pb.collection(COLLECTION).getFullList<AttachmentRecord>({
     filter: pb.filter('locality = {:lid}', { lid: localityId }),
-    sort: '-created',
+    // Exhibit order, oldest first — the sequence the author arranged, not the
+    // newest-first inventory this was before §4.4. `created` breaks the ties
+    // that legacy zeroes and same-millisecond batches leave behind, and it is
+    // what makes the order total: without it PocketBase is free to return two
+    // equal-`sort` rows in either order, and a rail that reshuffles itself on
+    // every realtime event is worse than no order at all.
+    sort: 'sort,created',
     // The list reloads on every realtime event, so two of these are
     // regularly in flight at once. The SDK's auto-cancellation would abort
     // the older one and reject its promise; the caller sequences results
@@ -79,15 +110,17 @@ export const createAttachment = async (
   form.append('kind', input.kind);
   form.append('caption', input.caption ?? '');
   if (input.meta) form.append('meta', JSON.stringify(input.meta));
+  form.append('sort', String(nextAttachmentSort()));
   form.append('file', blob, filename);
   return pb.collection(COLLECTION).create<AttachmentRecord>(form);
 };
 
-export const updateAttachmentCaption = async (
+/** Caption, exhibit position or concealment — everything an author edits. */
+export const updateAttachment = async (
   id: string,
-  caption: string,
+  patch: { caption?: string; sort?: number; hidden?: boolean },
 ): Promise<AttachmentRecord> => {
-  return pb.collection(COLLECTION).update<AttachmentRecord>(id, { caption });
+  return pb.collection(COLLECTION).update<AttachmentRecord>(id, patch);
 };
 
 export const deleteAttachment = async (id: string): Promise<void> => {
