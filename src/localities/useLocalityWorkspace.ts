@@ -109,7 +109,6 @@ import {
 } from './toolAtoms';
 import { useFunnAutosave } from './useFunnAutosave';
 import { useInheritedBilder } from './useInheritedBilder';
-import { useKulturminner } from './useKulturminner';
 import { useLocalityAdjust } from './useLocalityAdjust';
 import {
   useLocalityAttachments,
@@ -436,7 +435,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [mutateDraft, findItems],
   );
 
-  const kulturminner = useKulturminner(locality.bbox);
   // "Vis i ruta". Mounted here rather than in the strip because the strip is
   // collapsible and unmounts when it is folded away — and folding it away to
   // look at the map is exactly what you do after putting an image on it.
@@ -2189,11 +2187,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // first image will land. An empty one you may *not* add to gets no bar: a
   // reader has no use for a strip that says "run an extract".
   const hasBilder = bilderCount > 0 || starterBusy || canAdd;
-  const kmCount = kulturminner.result
-    ? kulturminner.result.truncated
-      ? `${kulturminner.result.items.length}+`
-      : kulturminner.result.items.length
-    : null;
 
   /*
    * The cover (§4.4): the first non-hidden image in exhibit order.
@@ -2376,11 +2369,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     takingBildeId: takingId,
     coverBildeId,
     pinned,
-    kulturminner,
     funnCount,
     bilderCount,
     hasBilder,
-    kmCount,
 
     // the bottom edge
     activeBildeId,

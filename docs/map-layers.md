@@ -399,13 +399,19 @@ stored) is in CLAUDE.md.
   rail, watercourse) and null-gnr water surfaces are dropped; the kommune
   number is only prefixed on parcels outside the resolved kommune.
 
-### Kjente kulturminner her
+### Kjente kulturminner her — removed
 
-`src/api/kulturminnerWfs.ts` — the "kjente kulturminner her" readout beside a
-lokalitet. kart.ra.no has WFS disabled, so this goes to GeoNorge's
-redistribution instead (`/wfs/geonorge/wfs.kulturminner`, feature type
-`app:Lokalitet`, GML 3.2 only, DOM-parsed). It is the same register the
-`kulturminner2` WMS draws, asked in text rather than in pixels.
+There was a `src/api/kulturminnerWfs.ts` asking GeoNorge's redistribution of
+the kulturminner register (`/wfs/geonorge/wfs.kulturminner`, feature type
+`app:Lokalitet`, GML 3.2 only, DOM-parsed — kart.ra.no has WFS disabled) what
+was already registered inside a lokalitet's rectangle, and rendering the
+answer as a list. It is gone; `docs/ui-architecture.md` §15 records why.
+
+If a text readout of that register is ever wanted again, the endpoint above is
+the one that works, and `/wfs/geonorge/` is still routed (it is how
+`lidarFootprints.ts` gets project boundaries). But the register is already on
+the map as `kulturminner2`, clickable through GetFeatureInfo (§ the theme
+layers above), which is the form this app is actually about.
 
 ## Adding another theme layer
 

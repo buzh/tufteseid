@@ -498,16 +498,6 @@
       "sourceLabel": "Elevation data (Kartverket)",
       "failed": "Could not fetch elevation data.",
       "empty": "No LiDAR data covers this rectangle."
-    },
-    "kulturminner": {
-      "heading": "Known cultural heritage",
-      "short": "Heritage",
-      "listHint": "Known cultural heritage in this area",
-      "loading": "Checking the register…",
-      "empty": "No registered cultural heritage in this area.",
-      "error": "Could not check the heritage register.",
-      "unnamed": "(unnamed)",
-      "openLink": "Open in Kulturminnesøk"
     }
   },
   "helpPage": {

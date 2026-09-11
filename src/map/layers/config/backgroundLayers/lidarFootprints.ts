@@ -5,7 +5,7 @@
 // viewport intersection, not the catalogue's envelope.
 //
 // Routed same-origin through wmscache (/wfs/geonorge/ →
-// wfs.geonorge.no/skwms1/ — same path shape as api/kulturminnerWfs.ts).
+// wfs.geonorge.no/skwms1/); it is the only user of that prefix.
 //
 // Footprints are fetched ONE PROJECT AT A TIME, by name, and never by
 // BBOX. See "Why not a BBOX query" below — that is the whole point of

@@ -4,13 +4,11 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LocalityRecord } from '../api/localities';
 import { FunnList } from '../localities/FunnList';
-import { KulturminnerSection } from '../localities/KulturminnerSection';
 import {
   bilderStripOpenAtom,
   localityDetailsOpenAtom,
 } from '../localities/toolAtoms';
 import type { LocalityWorkspaceApi } from '../localities/useLocalityWorkspace';
-import { ErrorBoundary } from '../shared/ErrorBoundary';
 import {
   Badge,
   type BadgePalette,
@@ -417,48 +415,6 @@ const FunnMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
 };
 
 /*
- * `Kulturminner ▾` — the same move, for what the public register already knows
- * about this rectangle (§5.5).
- *
- * Beside Funn because the two answer the same question about the same ground
- * from opposite directions — what is recorded here, what have I recorded here
- * — and reading them against each other is the point of the app.
- *
- * Its own error boundary, as it had in the dock: this one hits an external
- * WFS, and it failing should cost you a popover rather than the row.
- */
-const KulturminnerMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-
-  return (
-    <Popover
-      open={open}
-      onOpenChange={setOpen}
-      width={340}
-      label={t('localities.kulturminner.heading')}
-      trigger={
-        <ModeButton
-          icon="castle"
-          label={t('localities.kulturminner.short')}
-          tooltip={t('localities.kulturminner.listHint')}
-          active={open}
-          badge={ws.kmCount || undefined}
-          onClick={() => setOpen(!open)}
-        />
-      }
-    >
-      <ErrorBoundary name="KulturminnerSection">
-        <KulturminnerSection
-          result={ws.kulturminner.result}
-          error={ws.kulturminner.error}
-        />
-      </ErrorBoundary>
-    </Popover>
-  );
-};
-
-/*
  * The banner slot — docs/lokalitet-view.md §5.7. It occupies the space the
  * summary used to, holds at most one sentence, and answers exactly one
  * question: whose is this and what state is it in.
@@ -792,13 +748,12 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         </Tooltip>
       </div>
 
-      {/* What the rectangle holds, in two popovers (§5.5). Their own group
-          right after identity, ahead of the tools: they are part of the answer
-          to *what am I looking at*, and they are in both stances — the tools
-          beside them are not. */}
+      {/* What the rectangle holds, in a popover (§5.5). Its own group right
+          after identity, ahead of the tools: it is part of the answer to
+          *what am I looking at*, and it is in both stances — the tools beside
+          it are not. */}
       <div className={rowStyles.subjects}>
         <FunnMenu ws={ws} />
-        <KulturminnerMenu ws={ws} />
       </div>
 
       {/* The middle zone: everything that leaves a trace, and therefore

@@ -39,10 +39,10 @@ const INSET_MIN_PX = 48;
 // both bail on tiny boxes anyway).
 const MIN_SIDE_PX = 64;
 
-// minZoom is 3, so an unguarded viewport can be most of Norway — which
-// then fires a kulturminner WFS query over the whole country and reports
-// an area in six figures. 25 km a side is a generous upper bound on
-// something one person walks over.
+// minZoom is 3, so an unguarded viewport can be most of Norway — a
+// rectangle that reports an area in six figures and that no producer can
+// render. 25 km a side is a generous upper bound on something one person
+// walks over.
 const MAX_SPAN_M = 25_000;
 
 export type ViewportBboxResult =

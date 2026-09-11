@@ -24,8 +24,8 @@ import type {
  *
  * The one thing that is not a delta is `baseLocality`: the lokalitet's own
  * fields are edited *through* `activeLocalityAtom`, because half the app
- * reads the rectangle off it (Terreng's DEM, the kulturminner query, every
- * producer's bbox25833) and a buffered rectangle that those did not see would
+ * reads the rectangle off it (Terreng's DEM, every producer's bbox25833,
+ * the funn layer) and a buffered rectangle that those did not see would
  * make "Juster området refetches the DEM for free" stop being true. So the
  * atom holds the edited record and the draft holds the copy to put back.
  *

@@ -39,7 +39,7 @@ all of them.
   how the background *stack* is assembled and swapped, the five Kulturminner
   theme layers and the rendering axis `kulturminner2` exposes, what the public
   registers can be asked about a point or a rectangle (stedsnavn, kommune,
-  matrikkel, the kulturminner WFS), and the step-by-step recipes for adding
+  matrikkel), and the step-by-step recipes for adding
   another theme or background layer. Every service quirk in it was paid for
   with a live probe. **Read it before touching `src/map/layers/`,
   `src/localities/localityContext.ts`, or before adding a map source.**
@@ -122,8 +122,8 @@ that owns them.
 - **Five Kulturminner theme layers** from Riksantikvaren with structured
   GetFeatureInfo, and `kulturminner2` reshapeable by register, render and
   vern subset — `docs/map-layers.md`, `docs/ui-architecture.md` §5.9.
-- **The registers, answerable per point**: stedsnavn, kommune, matrikkel and
-  the kulturminner WFS readout — `docs/map-layers.md`; the elevation readout
+- **The registers, answerable per point**: stedsnavn, kommune and
+  matrikkel — `docs/map-layers.md`; the elevation readout
   behind a clicked point is the hoydedata.no ArcGIS identify in
   `src/search/searchApi.ts` — `docs/ui-architecture.md` §7, §7.1. Behind
   **Stedsinfo**, a ribbon toggle (`I`) that is off on arrival: a map click asks
@@ -405,8 +405,6 @@ Key files (data side):
 - `src/localities/pinQueue.ts` — the pinner: turns a stored spec into a
   provenance figure and PATCHes it onto the record. Module-level and
   imperative, like `map/groundOverlay.ts`.
-- `src/api/kulturminnerWfs.ts` — the "kjente kulturminner her" readout;
-  which service it has to ask and why is `docs/map-layers.md`.
 - `src/auth/` — atoms (currentUserAtom, roleAtom, isAdminAtom), hooks
   (useOAuthProviders, useSignIn, useSignOut).
 - `src/localities/localityContext.ts` — what the public registers know about a

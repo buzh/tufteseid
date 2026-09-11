@@ -498,16 +498,6 @@
       "sourceLabel": "Høgdedata (Kartverket)",
       "failed": "Klarte ikkje å hente høgdedata.",
       "empty": "Ingen laserdata dekkjer dette rektangelet."
-    },
-    "kulturminner": {
-      "heading": "Kjende kulturminne",
-      "short": "Kulturminne",
-      "listHint": "Kjende kulturminne i området",
-      "loading": "Sjekkar registeret…",
-      "empty": "Ingen registrerte kulturminne i området.",
-      "error": "Klarte ikkje å sjekke kulturminneregisteret.",
-      "unnamed": "(utan namn)",
-      "openLink": "Opne i Kulturminnesøk"
     }
   },
   "helpPage": {

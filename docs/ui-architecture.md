@@ -1393,12 +1393,12 @@ full, in both stances, and only its exits escalate (§8.1).
 
 There is no workspace *panel* and no dock. The state is one controller hook,
 `src/localities/useLocalityWorkspace.ts`, and the presentation is two ribbon
-rows, the bottom edge of the map, two popovers, a map callout and the dialogs:
+rows, the bottom edge of the map, a popover, a map callout and the dialogs:
 
 | Region | Component | Contents |
 |---|---|---|
 | Identity, the work, the exits | `RibbonLocalityRow` (the lokalitet row) | four zones — see below |
-| What the rectangle holds | `FunnList` / `KulturminnerSection`, in popovers on that row | the funn index; what the public register knows about this ground |
+| What the rectangle holds | `FunnList`, in a popover on that row | the funn index |
 | The funn being drawn | `RibbonFunnDraftRow` (row 4) + `FunnDrawBar` (bottom slot) | title, save state, *Utvid området*; the pen — §8.5 |
 | The selected funn's note | `FunnCallout` (an `ol/Overlay` on the map) | title, status, note, beside the shape — §8.6 |
 | The images | `BilderStrip` / `BilderCarousel` / `BilderPicker` (bottom slot) | the filmstrip in show, the carousel in edit, a picker run borrowing the slot — §8.7.2, §8.9.3 |
@@ -1410,7 +1410,7 @@ rows, the bottom edge of the map, two popovers, a map callout and the dialogs:
 | Zone | Question | Present when | Contents |
 |---|---|---|---|
 | left — identity | *what am I looking at* | always | the literal word `Lokalitet:`, the inline-editable name, the short code chip (click to copy), the visibility badge, the banner slot, zoom-to |
-| the subjects | *what is in here* | always | `Funn ▾` and `Kulturminner ▾`, each a popover with a count badge |
+| the subjects | *what is in here* | always | `Funn ▾`, a popover with a count badge |
 | middle — the work | *what can I do to it* | **edit only** | Nytt funn · Behold · `Hent ▾` · Skjermbilde |
 | the read tools | *what may I look at* | always | Terreng · Sammenlign · `Bilder ▾` |
 | right — the exits | *how do I get out of here* | always | deepest-first — see the depth table below |
@@ -1601,15 +1601,11 @@ So each one went to a surface priced like the use:
 |---|---|---|
 | the live tool band | `RibbonFunnDraftRow` + `FunnDrawBar` in the bottom slot (§8.5) | it *is* watched, continuously, while you draw — so it gets a permanent strip, at the bottom, where the map above it stays whole |
 | Funn | `FunnList` in a `Funn ▾` popover on the row, with a count badge | consulted; the count is the part you want at a glance, and a badge carries that without the list |
-| Kulturminner | `KulturminnerSection` in a `Kulturminner ▾` popover, likewise badged | same, plus it hits an external WFS — a popover that is closed is not fetching |
+| Kulturminner | nothing — deleted outright (§15) | the register it listed is already the map's headline overlay, clickable; a second, text-only copy of it inside a lokalitet was a duplicate wearing the same word |
 | Detaljer | a `Dialog` off the `[⋮]` menu | set once and stopped looking at; the one surface here you want *modal*, because you are typing prose into it |
 | a funn's note | `FunnCallout`, an `ol/Overlay` beside its shape (§8.6) | it is about a place, and a list row is not a place |
 
-Both popovers keep an error boundary around their body for the reason the dock
-gave each section one: `KulturminnerSection` talks to a service we do not run,
-and it failing should cost you that popover rather than the row it hangs from.
-
-The count badges are load-bearing, not decoration — see §8.1. *How many funn
+The count badge is load-bearing, not decoration — see §8.1. *How many funn
 are in this rectangle* was legible in the dock without opening anything, and a
 popover that hid the number would have been a straight regression.
 
@@ -2603,7 +2599,7 @@ is a compensating action rather than a real rollback.
 Load-bearing, in the order the mistakes would be made:
 
 - **The lokalitet's own fields still flow through `activeLocalityAtom`.** Half
-  the app reads the rectangle off it — Terreng's DEM, `useKulturminner`, every
+  the app reads the rectangle off it — Terreng's DEM, the funn layer, every
   producer's `bbox25833` — and a buffered bbox those never saw would make
   "Juster området refetches the DEM for free" (§10) quietly stop being true. So
   `applyLocality` moves the live record and the buffer keeps `baseLocality` to
@@ -3148,7 +3144,7 @@ curl -sL https://registry.npmjs.org/material-symbols/-/material-symbols-0.40.2.t
 
 **Done.** `@kvib/react` is no longer a dependency. Ported to `src/ui`: the
 whole shell and ribbon, the lokalitet surfaces (`FunnList`, `BilderStrip`,
-`KulturminnerSection`, `LocalityDetails`, `LocalityDialogs`,
+`LocalityDetails`, `LocalityDialogs`,
 `LocalitiesPanel`), both analysis panels, `AuthButton`, `AuthDialog`,
 `ErrorBoundary`, the measure trigger, the toast region, `MapComponent`,
 `SearchComponent`, `KulturminnerPopup`, `BilderPicker`, `MapToolCards`,
@@ -3492,6 +3488,26 @@ plausible-sounding reason to bring one back is exactly what the entry is for.
   one panel. Split into `RibbonFunnDraftRow` (identity, on the ribbon),
   `FunnDrawBar` (the pen, at the bottom edge), `FunnCallout` (the note, on the
   map beside its shape) and the row's depth-2 exits (§8.5).
+- **The `Kulturminner ▾` readout on the lokalitet row** — `KulturminnerSection`
+  and its stylesheet, `useKulturminner`, `src/api/kulturminnerWfs.ts`, the
+  workspace's `kulturminner` / `kmCount` and the `localities.kulturminner.*`
+  strings in all three locales. A list of what Riksantikvaren has already
+  registered inside the open rectangle, badged with a count, asked of
+  GeoNorge's WFS redistribution of the register (the endpoint is recorded in
+  `docs/map-layers.md` in case it is ever wanted again).
+
+  It went for two reasons that compound. It put a second button reading
+  **Kulturminner**, in the same `castle` icon, on screen beside row 1's
+  heritage toggle — one word for a layer switch and a register query is
+  exactly the failure §1's first invariant is about. And the thing it
+  answered is already answered better: the same register is one of the five
+  theme layers, drawn *on the ground you are reading*, with structured
+  GetFeatureInfo behind a click (§5.9, §7.1). A textual index of it, ranked by
+  nothing and detached from where the features are, is the weaker of the two
+  readings — and this app exists to read relief *against* the register, not
+  beside it. Do not rebuild it as a "quick check": the check is to turn the
+  layer on.
+
 - **`openSectionsAtom` / `WorkspaceSectionId`** — which of the dock's four
   sections were unfolded. Nothing folds any more: a popover is open or it is
   not, and it does not remember.
