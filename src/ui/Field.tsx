@@ -54,6 +54,7 @@ export const NoteInput = ({
   minRows = 2,
   maxRows = 12,
   disabled,
+  readOnly,
   autoFocus,
   className,
 }: {
@@ -65,6 +66,7 @@ export const NoteInput = ({
   minRows?: number;
   maxRows?: number;
   disabled?: boolean;
+  readOnly?: boolean;
   autoFocus?: boolean;
   className?: string;
 }) => {
@@ -97,6 +99,7 @@ export const NoteInput = ({
       placeholder={placeholder}
       maxLength={20000}
       disabled={disabled}
+      readOnly={readOnly}
       autoFocus={autoFocus}
       className={cx(styles.control, styles.note, className)}
     />

@@ -1,9 +1,13 @@
 /*
- * Row 2 — who this lokalitet is, then what you can do to it.
+ * Row 2 — the open lokalitet in three zones: identity, the work, the exits
+ * (docs/lokalitet-view.md §5.1).
  *
- * Identity on the left, verbs on the right, and the two are allowed to end
- * up on separate lines: on a phone the verb strip is seven buttons and there
- * is no arrangement in which it shares a line with a name field.
+ * Designed against 390 px, which is where the grammar has to survive rather
+ * than merely fit. Identity takes the slack on one line and collapses when
+ * the row wraps; the exits are pinned right by `margin-left: auto` so they
+ * stay the last thing on whichever line they end up on. On a phone that is
+ * identity on line one and tools + exits on line two — the two zones you
+ * reach for stay together, and the one you read stays whole.
  */
 
 .identity {
@@ -14,6 +18,18 @@
   /* Takes the slack while the row is on one line; collapses instead of
      forcing a line of its own once it wraps. */
   flex: 1 1 240px;
+}
+
+/* "Lokalitet:" — §5.2. The word is doing the job the back arrow used to:
+   saying that this row is scoped to a record rather than to the map. Quiet,
+   because it is a label and not the name. */
+.label {
+  flex: none;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-fg-subtle);
 }
 
 .name {
@@ -58,35 +74,65 @@
   color: var(--c-fg);
 }
 
-/* Visibility chip plus the "1,4 km² · 3 funn" line. Hidden below md: the
-   same facts are in the dock's Detaljer section, and the verbs matter more
-   on a small screen. */
-.summary {
+/* The visibility chip. Hidden below md, where the name, the code and the
+   exits are all competing for 390 px and this is the one of the four whose
+   answer is also in Detaljer.
+
+   Doubled selector for the same reason as `.rowEdit` below: it overrides
+   `Badge`'s own `display`, and the two rules are in different CSS modules,
+   so their order in the bundle is an import-order accident. */
+.visibility.visibility {
   display: none;
-  align-items: center;
-  gap: var(--sp-3);
-  min-width: 0;
+  flex: none;
 }
 
-.summaryText {
+@media (min-width: 48rem) {
+  .visibility.visibility {
+    display: inline-flex;
+  }
+}
+
+/* The banner slot — §5.7. Takes the space the summary vacated, holds at most
+   one sentence, and is *not* hidden on a phone: "this is somebody else's
+   site" is the one thing in this row that a small screen must not swallow.
+   Truncates instead, with the whole sentence on the title. */
+.banner {
   overflow: hidden;
+  min-width: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--font-xs);
   color: var(--c-fg-muted);
 }
 
-@media (min-width: 48rem) {
-  .summary {
-    display: flex;
-  }
-}
-
-.verbs {
+/* The middle zone. Wraps rather than scrolls, like every other ribbon row. */
+.tools {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--sp-2);
+}
+
+/* The exits. `margin-left: auto` rather than a spacer element: the zone has
+   to sit at the right edge of whichever line it lands on, and once the row
+   wraps a spacer would be a stretched blank on the line above. */
+.exits {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: auto;
+}
+
+/* Edit tints the row (§3). The stance is already legible from the zones —
+   this is the confirmation, not the signal, so it is the lightest tint in
+   the palette and the border is what carries it at a glance.
+
+   Doubled selector on purpose: it has to beat `.rowSub`'s background, and
+   the two rules live in different CSS modules, so their order in the bundle
+   is an import-order accident rather than something to rely on. */
+.rowEdit.rowEdit {
+  background: var(--c-accent-subtle);
+  border-top-color: var(--c-green-200);
 }
 
 /* The overflow menu. Same shape as the funn row's, on purpose: one idiom for

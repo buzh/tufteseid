@@ -1,7 +1,7 @@
 import type { FeatureCollection } from 'geojson';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { transformExtent } from 'ol/proj';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createAttachment } from '../api/attachments';
 import {
@@ -47,6 +47,8 @@ import { toast } from '../ui';
 import {
   activeLocalityAtom,
   adjustingLocalityAtom,
+  coverTerrainSpecAtom,
+  editingLocalityIdAtom,
   funnDraftActiveAtom,
   marksHiddenAtom,
   selectedFunnIdAtom,
@@ -56,7 +58,6 @@ import {
   fetchFlyfotoProjectsForBbox,
   type FlyfotoProject,
 } from './flyfotoProjects';
-import { formatBboxArea } from './format';
 import {
   getFunnExtentOnLayer,
   hideFunnOnLayer,
@@ -86,6 +87,7 @@ import {
 } from './useLocalityContent';
 import { usePinnedBilde } from './usePinnedBilde';
 import { useWorkspaceKeys } from './useWorkspaceKeys';
+import { viewSpecOf } from './viewSpec';
 
 /**
  * What a signed-in user is to one lokalitet.
@@ -96,6 +98,16 @@ import { useWorkspaceKeys } from './useWorkspaceKeys';
  * signed out included, is a reader.
  */
 export type LocalityAccess = 'owner' | 'admin' | 'reader';
+
+/**
+ * Which of the two things you are doing inside the record — reading it, or
+ * working on it (docs/lokalitet-view.md §1).
+ *
+ * The other axis entirely, and orthogonal to `LocalityAccess`: access is a
+ * fact about the record, stance is a choice made inside it. A copy is not a
+ * third stance.
+ */
+export type Stance = 'show' | 'edit';
 
 // Sentinel for the seamless best-available mosaic in flyfotoBusy, which
 // otherwise holds a project id.
@@ -182,6 +194,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const user = useAtomValue(currentUserAtom);
   const isAdmin = useAtomValue(isAdminAtom);
   const setActiveLocality = useSetAtom(activeLocalityAtom);
+  const [editingId, setEditingId] = useAtom(editingLocalityIdAtom);
+  const setCoverTerrainSpec = useSetAtom(coverTerrainSpecAtom);
   const [draftActive, setDraftActive] = useAtom(funnDraftActiveAtom);
   const [adjusting, setAdjusting] = useAtom(adjustingLocalityAtom);
   const [selectedFunnId, setSelectedFunnId] = useAtom(selectedFunnIdAtom);
@@ -224,9 +238,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [flyfotoBusy, setFlyfotoBusy] = useState<string | null>(null);
   const { setDrawLayerFeatures } = useDrawSettings();
 
-  // What this user *is* to this record. A fact, not a choice — the stance
-  // you take inside it (looking at the reading, or doing the reading) is a
-  // separate axis and does not exist yet.
+  // What this user *is* to this record. A fact, not a choice.
   const access: LocalityAccess =
     user == null
       ? 'reader'
@@ -236,20 +248,32 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           ? 'admin'
           : 'reader';
 
+  // And what they are *doing* in it. The other axis (§1): every lokalitet
+  // opens in show, and `Rediger` is the one way into the other stance.
+  const stance: Stance = editingId === locality.id ? 'edit' : 'show';
+
   // Two permissions, not one, because the server has two.
   //
-  // `canEdit` mirrors the update and delete rules, which are the same on all
+  // `mayEdit` mirrors the update and delete rules, which are the same on all
   // three collections: `owner = @request.auth.id || @request.auth.role =
-  // "admin"`. Until now the UI hid those verbs from an admin the server
-  // would have obeyed.
+  // "admin"`.
   //
-  // `canAdd` is stricter, and deliberately so. The *create* rules on `finds`
+  // `mayAdd` is stricter, and deliberately so. The *create* rules on `finds`
   // and `attachments` also demand `locality.owner = @request.auth.id`, so an
   // admin who pressed "Nytt funn" on somebody else's site would collect a
   // 403 after doing the work. Showing them that button is the same lie as
   // hiding Slett, pointing the other way.
-  const canEdit = access !== 'reader';
-  const canAdd = access === 'owner';
+  const mayEdit = access !== 'reader';
+  const mayAdd = access === 'owner';
+
+  // What the surfaces are actually handed: permission **and** stance. Folding
+  // the two together here rather than at each call site is what makes §2's
+  // invariant — *nothing in show writes* — hold everywhere at once, including
+  // in the places nobody remembers to check. A write verb whose gate is false
+  // is rendered absent, not disabled, so show mode has no write verbs at all
+  // rather than a row of greyed ones.
+  const canEdit = mayEdit && stance === 'edit';
+  const canAdd = mayAdd && stance === 'edit';
 
   // Mounts the move/resize interactions while adjustingLocalityAtom is
   // set; persists the bbox after every finished gesture.
@@ -353,6 +377,23 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const close = useCallback(
     () => setActiveLocality(null),
     [setActiveLocality],
+  );
+
+  // `Rediger`. Costs nothing on purpose (§2): no fetch, no write, the map
+  // does not move and the render does not blink — which is what lets show
+  // mode be absolute about writing nothing without being in the way.
+  const enterEdit = useCallback(() => {
+    if (mayEdit) setEditingId(locality.id);
+  }, [mayEdit, locality.id, setEditingId]);
+
+  // Stance leaves on unmount, but only if it is still *this* record's. The
+  // creators set the atom in the same batch as `activeLocalityAtom`, so a
+  // brand-new lokalitet's id is already in it by the time the outgoing
+  // workspace's cleanup runs; clearing unconditionally would put the new
+  // record straight back into show.
+  useEffect(
+    () => () => setEditingId((cur) => (cur === locality.id ? null : cur)),
+    [locality.id, setEditingId],
   );
 
   const rename = useCallback(
@@ -676,6 +717,33 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     if (!adjusting && draftActive) stopDraft();
     setAdjusting(!adjusting);
   }, [adjusting, draftActive, stopDraft, setAdjusting]);
+
+  /**
+   * `Ferdig` — leave edit and go back to show.
+   *
+   * Not `Lagre`: the app still autosaves, so there is nothing here to commit.
+   * The transaction that turns this into `Lagre` / `Avbryt` is step 13 of
+   * docs/lokalitet-view.md §12, and until then `Ferdig` over autosave is the
+   * honest word for what the button does.
+   *
+   * It puts the edit-only tools down on the way out, because every one of
+   * them is a write surface: leaving the pen armed or the extract selection
+   * live in a stance whose whole promise is that nothing writes would be the
+   * invariant leaking through the one door that closes it.
+   */
+  const leaveEdit = useCallback(() => {
+    if (draftActive) stopDraft();
+    setAdjusting(false);
+    closeLidar();
+    setEditingId((cur) => (cur === locality.id ? null : cur));
+  }, [
+    draftActive,
+    stopDraft,
+    setAdjusting,
+    closeLidar,
+    locality.id,
+    setEditingId,
+  ]);
 
   // Capture the current view cropped to the rectangle → Bilder.
   const takeScreenshot = useCallback(async () => {
@@ -1232,11 +1300,16 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   useWorkspaceKeys({
     navigable: mode !== 'draft',
     draftActive,
-    // Same toggle as the lokalitet-row button the key is advertised on: N
-    // puts the pen down again rather than doing nothing the second time.
-    onNewFunn: () => (draftActive ? stopDraft() : startDraft()),
-    onToggleLidar: toggleLidar,
-    onScreenshot: takeScreenshot,
+    // All three are middle-zone verbs, so all three are edit-only — a
+    // keystroke that writes is still a write, and a shortcut nobody can see
+    // is the easiest place for §2's invariant to spring a leak. They stay
+    // gated on the same permission as the button they are advertised on.
+    //
+    // N is the same toggle as its button: it puts the pen down again rather
+    // than doing nothing the second time.
+    onNewFunn: () => canAdd && (draftActive ? stopDraft() : startDraft()),
+    onToggleLidar: () => canAdd && toggleLidar(),
+    onScreenshot: () => canAdd && takeScreenshot(),
     onMoveSelection: (delta) => {
       const items = findItems;
       if (!items || items.length === 0) return;
@@ -1250,10 +1323,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setSelectedFunnId(items[next].id);
     },
     onZoomSelected: () => selectedFunnId && zoomToFunn(selectedFunnId),
+    // Outside-in, the same order the row's right zone is stacked in (§5.3):
+    // the deepest thing in flight goes first, and edit is a level of its own
+    // above closing. Escaping out of edit rather than out of the lokalitet is
+    // what keeps the key from throwing away a stance in one press.
     onEscape: () => {
       if (mode === 'lidar') closeLidar();
       else if (adjusting) setAdjusting(false);
       else if (selectedFunnId) setSelectedFunnId(null);
+      else if (stance === 'edit') leaveEdit();
       else setActiveLocality(null);
     },
   });
@@ -1266,28 +1344,46 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       : kulturminner.result.items.length
     : null;
 
-  const summary = [
-    funnCount > 0 ? t('localities.summary.funn', { count: funnCount }) : null,
-    bilderCount > 0
-      ? t('localities.summary.bilder', { count: bilderCount })
-      : null,
-    formatBboxArea(locality.bbox, i18n.language),
-    // Attribution, not permission: an admin may be able to change this
-    // record, but it is still somebody else's and the row has to say so.
-    access !== 'owner' && locality.expand?.owner
-      ? t('localities.byOwner', { name: locality.expand.owner.name })
-      : null,
-  ].filter((s): s is string => !!s);
+  // The site's own terrain render, for §4.6 — entering Terreng over a
+  // lokalitet starts from what its owner was looking at rather than from a
+  // default hillshade at 315°/35°.
+  //
+  // The cover is the first non-hidden image in `sort` order (§4.4) and is
+  // computed rather than stored; neither `sort` nor `hidden` is written yet
+  // — step 8 owns both, and `AttachmentRecord` does not carry them until it
+  // does — so the list is newest-first and nothing is concealed, and this is
+  // simply the most recent terrain render. Published as
+  // an atom because `useTerrainAnalysis` is mounted from row 1, on the far
+  // side of the tree from the hook that holds the attachments.
+  const coverTerrainSpec = useMemo(() => {
+    for (const rec of attachmentItems ?? []) {
+      const spec = viewSpecOf(rec);
+      if (spec?.kind === 'terrain') return spec;
+    }
+    return null;
+  }, [attachmentItems]);
+
+  useEffect(() => {
+    setCoverTerrainSpec(coverTerrainSpec);
+    return () => setCoverTerrainSpec(null);
+  }, [coverTerrainSpec, setCoverTerrainSpec]);
 
   return {
     // identity / permissions
     locality,
     user,
     access,
+    stance,
+    // Permission alone, for the one decision that is about what you *could*
+    // do rather than what you are doing: which button the row's `Rediger`
+    // slot holds.
+    mayEdit,
     canEdit,
     canAdd,
     mode,
     close,
+    enterEdit,
+    leaveEdit,
     rename,
     zoomToLocality,
     removeLocality,
@@ -1302,7 +1398,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     funnCount,
     bilderCount,
     kmCount,
-    summary,
 
     // funn list
     selectedFunnId,

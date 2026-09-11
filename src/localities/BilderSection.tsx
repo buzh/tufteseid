@@ -197,7 +197,7 @@ const SelectionBar = ({
 
       <Input
         value={caption}
-        disabled={!canEdit}
+        readOnly={!canEdit}
         placeholder={t('localities.bilder.captionPlaceholder')}
         maxLength={200}
         onChange={(e) => setCaption(e.target.value)}

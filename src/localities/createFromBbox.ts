@@ -13,7 +13,7 @@ import { currentUserAtom } from '../auth/atoms';
 import { mapAtom } from '../map/atoms';
 import { CHROME_MARGIN_PX, chromeInsets } from '../shell/chromeInsets';
 import { toast } from '../ui';
-import { activeLocalityAtom } from './atoms';
+import { activeLocalityAtom, editingLocalityIdAtom } from './atoms';
 import { fetchLocalityContext } from './localityContext';
 import { upsertLocalityOnLayer } from './localityLayer';
 
@@ -148,6 +148,7 @@ export const useCreateLocalityFromViewport = () => {
   const map = useAtomValue(mapAtom);
   const user = useAtomValue(currentUserAtom);
   const setActiveLocality = useSetAtom(activeLocalityAtom);
+  const setEditingLocalityId = useSetAtom(editingLocalityIdAtom);
   const [creating, setCreating] = useState(false);
 
   const create = useCallback(async () => {
@@ -173,11 +174,17 @@ export const useCreateLocalityFromViewport = () => {
         toast.error({ title: t('localities.createFailed') });
         return;
       }
+      // The one exception to "every lokalitet opens in show"
+      // (docs/lokalitet-view.md §3): a rectangle framed thirty seconds ago
+      // has nothing to show, and making the first press on every fresh site
+      // be "Rediger" is a click that teaches nothing. Set in the same batch
+      // as the active record, so the row never renders it in show first.
       setActiveLocality(rec);
+      setEditingLocalityId(rec.id);
     } finally {
       setCreating(false);
     }
-  }, [user, creating, map, t, setActiveLocality]);
+  }, [user, creating, map, t, setActiveLocality, setEditingLocalityId]);
 
   return { create, creating };
 };

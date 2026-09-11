@@ -1331,9 +1331,33 @@ is a context strip plus a dock column:
 
 | Region | Component | Contents |
 |---|---|---|
-| Identity + verbs | `RibbonLocalityRow` (the lokalitet row) | back, inline-editable name, the short code chip (click to copy), visibility badge, summary line, zoom-to; then Nytt funn · LiDAR-uttrekk · Bilde · Flyfoto, with Hent grunnpakke / Last opp / Juster området / Slett behind a `more_vert` menu |
+| Identity, the work, the exits | `RibbonLocalityRow` (the lokalitet row) | three zones — see below |
 | Everything with a body | `LocalityDock` (right slot) | the live tool band, then Funn · Bilder · Kulturminner · Detaljer as sections |
 | Dialogs | `LocalityDialogs` | flyfoto licensing notice, flyfoto picker |
+
+**The row is three zones**, and each answers one question
+(`docs/lokalitet-view.md` §5.1–5.4):
+
+| Zone | Question | Present when | Contents |
+|---|---|---|---|
+| left — identity | *what am I looking at* | always | the literal word `Lokalitet:`, the inline-editable name, the short code chip (click to copy), the visibility badge, the banner slot, zoom-to |
+| middle — the work | *what can I do to it* | **edit only** | Nytt funn · LiDAR-uttrekk · Skjermbilde · Flyfoto |
+| right — the exits | *how do I get out of here* | always | show: `[Rediger]` `[Lukk]`; edit: `[Ferdig]` `[⋮]` |
+
+There is no `[←]` back arrow: leaving is an exit, exits are on the right, and
+one lokalitet should not have two ways out at opposite ends of the same row.
+Edit tints the row (`.rowEdit`) — the zones already differ, so the tint is the
+confirmation rather than the signal. `Del` is absent until `?lok=CODE` exists;
+`Lag min kopi`, `Lagre` / `Avbryt` and the depth-2 stack
+(`Ferdig med funn` / `Bruk`) are later steps of the same build order.
+
+The **banner slot** takes the space the old summary line (`3 funn · 12 ha`)
+occupied, holds at most one sentence, and answers only *whose is this and what
+state is it in*: *Delt av X — du leser* for a reader, *Du redigerer Xs
+lokalitet som administrator* for an admin **in edit**. The design (§5.7) keys
+that second one on being an admin at all, which would print "Du redigerer" at
+somebody who is only looking; the stance test is deliberate. Deliberately not
+a notification area — everything else stays next to the thing it is about.
 
 Terreng is deliberately *not* in the lokalitet row — it is a ground mode in
 row 1 and works the same with or without a lokalitet (§5.1, §10).
@@ -1347,16 +1371,42 @@ still keyed on `locality.id` for exactly that reason.
 the dock into the shell's right slot: the hook holds two PocketBase realtime
 subscriptions that reload the whole list on every event.
 
-#### Who may do what — `access`, `canEdit`, `canAdd`
+#### Who may do what — `access`, `stance`, `canEdit`, `canAdd`
 
-The controller answers this once and every surface reads it off the API. What
-you are to a record is `access: 'owner' | 'admin' | 'reader'`, and it drives
-**two** booleans rather than one, because PocketBase's rules are two:
+Two axes, not one (`docs/lokalitet-view.md` §1). `access: 'owner' | 'admin' |
+'reader'` is a **fact about the record**; `stance: 'show' | 'edit'` is a
+**choice made inside it**, held in `editingLocalityIdAtom` and reset by
+opening anything else.
+
+**Nothing in show writes.** Not disabled verbs — *absent* ones: the middle
+zone does not render, the name is not clickable, Detaljer's fields are
+read-only, the Bilder caption and delete are gone, funn are not editable, and
+N / U / B do nothing. Reading, pinning an image, `Gjenskap` and downloading a
+figure all stay, because none of them leaves a trace. The one way to write is
+to press `Rediger` first, which costs nothing: no fetch, no write, the map
+does not move.
+
+Stance is per session and never stored on the record. Every lokalitet opens in
+show — including your own, including from a link — with one exception: a
+**brand-new** one opens in edit, because a rectangle framed thirty seconds ago
+has nothing to show. The two creators (`useCreateLocalityFromViewport` and
+Terrenganalyse's save) say so by setting `editingLocalityIdAtom` in the same
+batch as `activeLocalityAtom`. Keying that atom on the record *id* rather than
+using a boolean is what makes "opens in show" hold by construction rather than
+by clearing a flag in the right order.
+
+The controller folds the two axes together so the surfaces below it read one
+boolean each. Permission comes from PocketBase's rules, which are two:
 
 | | update / delete | create |
 |---|---|---|
 | PB rule | `owner = @request.auth.id \|\| @request.auth.role = "admin"` | `@request.auth.id = owner && locality.owner = @request.auth.id` |
-| UI | `canEdit` — owner *and* admin | `canAdd` — owner only |
+| May | `mayEdit` — owner *and* admin | `mayAdd` — owner only |
+| Published | `canEdit` = `mayEdit && stance === 'edit'` | `canAdd` = `mayAdd && stance === 'edit'` |
+
+Only `mayEdit` is published alongside them, for the one decision that is about
+what you *could* do rather than what you are doing: whether the right zone's
+first slot holds `Rediger`.
 
 So an admin may rename somebody's lokalitet, retitle and delete its bilder,
 change a funn's status or geometry, reshape the rectangle and throw the whole
@@ -1367,16 +1417,30 @@ add-tile are not there. Showing an admin a button the server would 403 is the
 same lie as hiding one it would obey, pointing the other way.
 
 A reader — signed in, looking at a public lokalitet that is not theirs — gets
-neither, and the summary line says *Delt av …* whenever `access !== 'owner'`.
-That last test is attribution, not permission: an admin can change the record
-and it is still somebody else's.
+neither, and the banner says *Delt av …* whenever `access !== 'owner'`. That
+test is attribution, not permission: an admin can change the record and it is
+still somebody else's. A reader's right zone is `[Lukk]` alone until
+`Lag min kopi` lands; a slot that would hold a button that cannot work is left
+empty rather than filled with a disabled one.
 
-The same `canAdd` test is recomputed in `LidarExtractViewer` (the "Behold"
-button) because the extract tool hangs off `activeLocalityAtom` rather than the
-workspace hook. Terrenganalyse's **Lagre** is the one place still unguarded: with
-somebody else's lokalitet open it targets that lokalitet and fails with a toast.
-The honest fix is for it to fork rather than to disappear, which waits on
-`derivedFrom` (`docs/lokalitet-view.md` §7).
+**Absent applies to verbs; text fields go read-only instead.** Sted, Kommune,
+Matrikkel, Beskrivelse and a bilde's caption are content, not buttons — hiding
+them in show would hide the record — so they render as `readOnly` rather than
+`disabled`, and `.control:read-only` (`src/ui/Field.module.css`) drops the
+border and background instead of dimming. This changed with stance: a
+`:disabled` field at 0.55 opacity used to be a thing only readers saw, and once
+show became the default stance for owners too it would have greyed out every
+lokalitet's own text on arrival, which reads as broken rather than as
+read-only. The one control still merely disabled is Synlighet's `Segmented`,
+where the value *is* the widget.
+
+The same `canAdd` test — permission *and* stance — is recomputed in
+`LidarExtractViewer` (the "Behold" button) because the extract tool hangs off
+`activeLocalityAtom` rather than the workspace hook; its `Last ned PNG` is a
+download, not a write, and stays. Terrenganalyse's **Lagre** is the one place
+still unguarded: with somebody else's lokalitet open it targets that lokalitet
+and fails with a toast. The honest fix is for it to fork rather than to
+disappear, which waits on `derivedFrom` (`docs/lokalitet-view.md` §7).
 
 ### 8.2 The dock
 
@@ -1492,6 +1556,15 @@ the overlay actually took focus.
 | U | Toggle LiDAR extract |
 | B | Screenshot |
 | Escape | Close / back out — **except while a funn draft is open** |
+
+N, U and B are **edit-only**, gated on the same `canAdd` as the buttons they
+are advertised on: a keystroke that writes is still a write, and an invisible
+shortcut is the easiest place for "nothing in show writes" to spring a leak.
+
+Escape backs out deepest-first, in the same order the row's right zone is
+stacked: extract → Juster området → funn selection → **edit** → close the
+lokalitet. Leaving the stance before leaving the record is what stops one
+press from throwing away both.
 
 `navigable` is off only while drawing: the funn list is always on screen in the
 dock, so arrows keep working with the extract and terrain panels open, and
@@ -2027,6 +2100,27 @@ unmounting it whenever the strip is not showing would throw a multi-megabyte
 DEM away every time someone glanced at another ground. It is also why the
 light survives leaving and re-entering Terreng, which the old panel — mounted
 with the dock — did not.
+
+**Entering Terreng over a lokalitet seeds the knobs from its cover render.**
+The workspace publishes the first terrain-kind attachment's spec on
+`coverTerrainSpecAtom` (`src/localities/atoms.ts`) and the hook, on becoming
+the active tool, feeds it to the same `restoreView` that "Gjenskap" uses. The
+argument is that the second visit to a lokalitet is nearly always the same
+reading as the first: someone dialled 315°/35° at a 6 m radius because that is
+what showed the feature, kept the render, and comes back to look again. Opening
+on the module defaults means re-finding those numbers by hand, and the render
+already on file is a better guess than a constant. It is a *seed*, not a bind —
+move any slider and nothing writes back; the picked spec is not consulted
+again.
+
+Seeding is **once per lokalitet**, tracked by a ref that resets on
+`locality?.id`. Re-seeding on every entrance would silently undo an
+adjustment as soon as the user glanced at another ground and came back, which
+is the same complaint the unconditional mount answers. `restoreView` sets that
+ref itself, which is what keeps the seed from stepping on Gjenskap: the
+recreate path calls `restoreView(spec)` and `ground.select('terreng')` in one
+tick, so the tool-change effect would otherwise fire *after* the explicit
+restore and overwrite the render the user actually asked for.
 
 Only the sliders the current visualization uses are rendered: two for sky-view
 factor and for VAT, four for a plain hillshade. Absent rather than disabled,

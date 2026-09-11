@@ -32,7 +32,11 @@ import { currentUserAtom } from '../../auth/atoms';
 import { isAuthDialogOpenAtom } from '../../auth/atoms-dialog';
 import { renderFigureBlob } from '../../figure/figure';
 import { terrainFigure } from '../../figure/specs';
-import { activeLocalityAtom } from '../../localities/atoms';
+import {
+  activeLocalityAtom,
+  coverTerrainSpecAtom,
+  editingLocalityIdAtom,
+} from '../../localities/atoms';
 import { createLocalityFromBbox } from '../../localities/createFromBbox';
 import { ribbonToolAtom } from '../../localities/toolAtoms';
 import {
@@ -89,6 +93,8 @@ export const useTerrainAnalysis = () => {
   const openAuthDialog = useSetAtom(isAuthDialogOpenAtom);
   const locality = useAtomValue(activeLocalityAtom);
   const setActiveLocality = useSetAtom(activeLocalityAtom);
+  const setEditingLocalityId = useSetAtom(editingLocalityIdAtom);
+  const coverTerrainSpec = useAtomValue(coverTerrainSpecAtom);
   const tool = useAtomValue(ribbonToolAtom);
   const standaloneBbox = useAtomValue(terrainStandaloneBboxAtom);
   // Only the standalone entrance can re-frame; with a lokalitet open the
@@ -148,6 +154,10 @@ export const useTerrainAnalysis = () => {
   // it is never shown in a row. React does not own it either — the OL source
   // draws from this exact element.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Whether this lokalitet's knobs have already been set from something
+  // other than the defaults — the §4.6 seed below, or a Gjenskap that beat
+  // it to it. Declared up here because `restoreView` closes over it.
+  const seededRef = useRef(false);
 
   const bboxKey = bbox ? bbox.join(',') : null;
 
@@ -341,8 +351,13 @@ export const useTerrainAnalysis = () => {
       );
 
       // Opening the new lokalitet is the receipt: the ribbon rescopes to it
-      // and the render is sitting in its Bilder.
-      if (!locality) setActiveLocality(target);
+      // and the render is sitting in its Bilder. In edit, because you are
+      // there to keep a render and the rest of the loop — name it, draw on
+      // it, keep another — is all on the far side of that stance (§3).
+      if (!locality) {
+        setActiveLocality(target);
+        setEditingLocalityId(target.id);
+      }
     } catch (e) {
       console.warn('[terrain] save failed', e);
       toast.error({ title: t('localities.terrain.saveFailed') });
@@ -355,6 +370,7 @@ export const useTerrainAnalysis = () => {
     user,
     openAuthDialog,
     setActiveLocality,
+    setEditingLocalityId,
     saving,
     vis,
     model,
@@ -386,6 +402,10 @@ export const useTerrainAnalysis = () => {
    * hand its number to whichever family was showing a moment ago, since the
    * `vis` it just set is not visible until the next render. From in here the
    * target visualization is simply an argument.
+   *
+   * It also stands the §4.6 seed down — see `seededRef` below. An explicit
+   * "put me back here" and an automatic "start from what they saw" are the
+   * same write, so the explicit one has to be able to say it happened.
    */
   const restoreView = useCallback(
     (v: {
@@ -396,6 +416,7 @@ export const useTerrainAnalysis = () => {
       zFactor: number;
       radius?: number;
     }) => {
+      seededRef.current = true;
       setModel(v.model);
       setVis(v.vis);
       setAzimuth(v.azimuth);
@@ -407,6 +428,33 @@ export const useTerrainAnalysis = () => {
     },
     [],
   );
+
+  /*
+   * §4.6 — entering Terreng over a lokalitet that already has a terrain
+   * render starts from *that render's* settings rather than from the app
+   * defaults, so pressing 5 on somebody else's site shows you what they saw,
+   * live and full-size, before you move a knob.
+   *
+   * Once per lokalitet, not once per entry: the second visit must not throw
+   * away knobs you deliberately moved on the first.
+   *
+   * `restoreView` sets the flag too, and that is what settles the one race
+   * here. Gjenskap on a terrain bilde calls `restoreView` and *then* enters
+   * the ground, so the tool flips to 'terrain' in the same commit as the
+   * knobs it just set — without this the seed would fire immediately after
+   * and overwrite the image the user actually asked for with the cover's.
+   */
+  // Before the seed effect on purpose: effects run in declaration order, so
+  // on the commit where the lokalitet changes this clears the flag and the
+  // one below then seeds from the new record's cover.
+  useEffect(() => {
+    seededRef.current = false;
+  }, [locality?.id]);
+
+  useEffect(() => {
+    if (tool !== 'terrain' || !coverTerrainSpec || seededRef.current) return;
+    restoreView(coverTerrainSpec);
+  }, [tool, coverTerrainSpec, restoreView]);
 
   // Called by useGroundMode when Terreng stops being the ground on screen. An
   // unmounted popover never fires its own open-change callback, so without

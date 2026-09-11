@@ -49,6 +49,9 @@ export type ViewSpec =
     }
   | { kind: 'flyfoto'; source: 'mosaic' | { projectId: string } };
 
+/** The terrain arm on its own — what §4.6's seeding hands the terrain hook. */
+export type TerrainSpec = Extract<ViewSpec, { kind: 'terrain' }>;
+
 const str = (v: unknown): string | null =>
   typeof v === 'string' && v !== '' ? v : null;
 

@@ -16,7 +16,10 @@ import { createAttachment } from '../api/attachments';
 import { currentUserAtom } from '../auth/atoms';
 import { renderFigureBlob } from '../figure/figure';
 import { lidarExtractFigure, lidarSourceFacts } from '../figure/specs';
-import { activeLocalityAtom } from '../localities/atoms';
+import {
+  activeLocalityAtom,
+  editingLocalityIdAtom,
+} from '../localities/atoms';
 import { Button, cx, IconButton } from '../ui';
 import {
   LidarCanvas,
@@ -37,14 +40,20 @@ export const LidarExtractViewer = () => {
   // acquisition year and point density the run itself doesn't keep.
   const sources = useAtomValue(lidarExtractSourcesAtom);
   const activeLocality = useAtomValue(activeLocalityAtom);
+  const editingLocalityId = useAtomValue(editingLocalityIdAtom);
   const user = useAtomValue(currentUserAtom);
-  // The extract tool is open to anyone who can see the lokalitet, but
-  // `attachments`' create rule wants the parent's owner too, so an admin or
-  // a reader of a public lokalitet pressing "Behold" would do all the work
-  // and collect a 403. Same test as the workspace's `canAdd`, computed here
-  // because the viewer hangs off the atom rather than the workspace hook.
+  // Permission and stance, the same pair as the workspace's `canAdd`,
+  // recomputed here because the viewer hangs off the atoms rather than the
+  // workspace hook. `attachments`' create rule wants the parent lokalitet's
+  // owner, so an admin or a reader pressing "Behold" would do all the work
+  // and collect a 403; and nothing in show writes, so keeping is edit-only
+  // even for the owner (docs/lokalitet-view.md §2). Downloading the PNG is
+  // not a write and stays available in both.
   const canKeep =
-    activeLocality != null && user != null && activeLocality.owner === user.id;
+    activeLocality != null &&
+    user != null &&
+    activeLocality.owner === user.id &&
+    editingLocalityId === activeLocality.id;
   // Canvas ids already kept as attachments this run, plus in-flight ones.
   const [keptIds, setKeptIds] = useState<Set<string>>(new Set());
   const [keepingId, setKeepingId] = useState<string | null>(null);

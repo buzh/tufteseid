@@ -258,7 +258,12 @@
       "noMatch": "No localities match \"{{query}}\"."
     },
     "workspace": {
-      "back": "Back",
+      "label": "Locality:",
+      "edit": "Edit",
+      "done": "Done",
+      "close": "Close",
+      "bannerReader": "Shared by {{name}} — you are reading",
+      "bannerAdmin": "You are editing {{name}}'s locality as an administrator",
       "zoom": "Zoom to the locality",
       "adjust": "Adjust the area (move it or drag the corners)",
       "deleteLocality": "Delete the locality",

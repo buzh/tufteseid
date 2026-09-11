@@ -225,6 +225,11 @@ row**, over an open lokalitet's bbox. Reading the ground is not an act of
 ownership — only keeping the render is, and saving from row 1 signs you in and
 turns the analysed rectangle into a lokalitet.
 
+Entering it over a lokalitet **seeds the knobs from that lokalitet's cover
+terrain render**, once per lokalitet, so coming back to a place opens on the
+light that showed the feature rather than on the module defaults. Details and
+the reason the seed can't step on "Gjenskap": `docs/ui-architecture.md` §10.
+
 - Source is hoydedata.no's ArcGIS ImageServers via `exportImage` with
   `renderingRule={"rasterFunction":"None"}` — the service's *other* raster
   function is `skyggerelieff`, i.e. the shaded product the WMS already
@@ -395,11 +400,26 @@ Rules (server-enforced by PB), same shape on all three:
 - update/delete: owner or admin
 
 That asymmetry is why the UI carries **two** permissions rather than one.
-`useLocalityWorkspace` publishes `access` (`owner` | `admin` | `reader`),
-`canEdit` (update/delete — owner *and* admin) and `canAdd` (create — owner
+`useLocalityWorkspace` computes `access` (`owner` | `admin` | `reader`),
+`mayEdit` (update/delete — owner *and* admin) and `mayAdd` (create — owner
 only, because the create rules also demand the parent lokalitet's owner). An
 admin can rename, retitle, reshape and delete anybody's lokalitet but cannot
-put new funn or bilder in it; every surface gates on whichever of the two
+put new funn or bilder in it.
+
+Crossed with that is a second, independent axis: **stance**, `show` | `edit`.
+Access is a fact about the record; stance is a choice made inside it. Every
+lokalitet opens in `show` and **nothing in show writes** — the write verbs are
+*absent* there, not disabled — with one exception: a lokalitet created in this
+session (from the viewport, or by saving a terrain render with none open)
+opens in `edit`, because it was made by an act of authorship. Stance is per
+session and never stored; it lives in `editingLocalityIdAtom`, keyed on the
+record id rather than a boolean, so "opens in show" holds by construction when
+the active lokalitet changes.
+
+What the surfaces actually gate on is the product, and that is what the hook
+publishes: `canEdit = mayEdit && stance === 'edit'`, `canAdd = mayAdd && stance
+=== 'edit'`. (`mayEdit` is published too — the lokalitet row needs it to decide
+whether to offer `Rediger` at all.) Every surface gates on whichever of the two
 matches the call it makes. Details: `docs/ui-architecture.md` §8.1.
 
 Adding an OAuth provider: PB admin UI → Collections → `users` → Edit

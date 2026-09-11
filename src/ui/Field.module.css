@@ -14,7 +14,7 @@
   color: var(--c-fg-subtle);
 }
 
-.control:hover:not(:disabled) {
+.control:hover:not(:disabled):not(:read-only) {
   border-color: var(--c-gray-400);
 }
 
@@ -28,6 +28,23 @@
   opacity: 0.55;
   cursor: not-allowed;
   background: var(--c-bg-subtle);
+}
+
+/* Read-only is not disabled, and the difference matters as of show mode
+   (docs/lokalitet-view.md §2). A field nobody may type in is now the *normal*
+   state of every lokalitet text field, including the owner's own, and
+   `:disabled`'s 0.55 opacity would dim the record's own content to make a
+   point the absent verbs have already made. This reads as text on the page,
+   which is what it is; the value stays at full contrast and stays
+   selectable. */
+.control:read-only {
+  border-color: transparent;
+  background: transparent;
+  cursor: default;
+}
+
+.control:read-only::placeholder {
+  color: transparent;
 }
 
 .invalid,

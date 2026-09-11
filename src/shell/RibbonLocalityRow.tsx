@@ -268,52 +268,88 @@ const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   );
 };
 
+/*
+ * The banner slot — docs/lokalitet-view.md §5.7. It occupies the space the
+ * summary used to, holds at most one sentence, and answers exactly one
+ * question: whose is this and what state is it in.
+ *
+ * Only two of the five ranks exist yet; the other three arrive with the copy
+ * (§7) and the transaction (§5.6). The `admin` one is keyed on the *stance*
+ * rather than on access alone — the doc's table says "admin, not owner"
+ * unqualified, but "Du redigerer …" printed over show mode would be a false
+ * sentence, and this slot exists to say what state you are in.
+ */
+const Banner = ({ ws }: { ws: LocalityWorkspaceApi }) => {
+  const { t } = useTranslation();
+  const owner = ws.locality.expand?.owner?.name;
+  if (!owner || ws.access === 'owner') return null;
+
+  const text =
+    ws.stance === 'edit' && ws.access === 'admin'
+      ? t('localities.workspace.bannerAdmin', { name: owner })
+      : t('localities.workspace.bannerReader', { name: owner });
+
+  return (
+    <span className={rowStyles.banner} title={text}>
+      {text}
+    </span>
+  );
+};
+
 /**
- * Row 2 — the open lokalitet, as one line: what it is on the left, the verbs
- * that are part of the loop on the right, the rest behind a menu.
+ * Row 2 — the open lokalitet, in three zones (docs/lokalitet-view.md §5.1).
  *
- * A context strip, not a surface. Everything with a body — the funn list, the
- * gallery, the draft form, the extract and terrain panels — is in the dock;
- * what is left here is identity and the verbs you reach for while reading the
- * ground. Nothing in this row opens downwards.
+ * | left   | identity  | *what am I looking at* | always    |
+ * | middle | the work  | *what can I do to it*  | edit only |
+ * | right  | the exits | *how do I get out*     | always    |
  *
- * Terreng is *not* one of them: it is a ground mode, lives in row 1 with the
- * other four, and works the same whether a lokalitet is open or not. It only
- * ever appeared here because row 1 hid its copy while a lokalitet was open.
+ * That grammar is the point: your eye goes left to know where you are and
+ * right to know what to press, and the space between them is either empty
+ * (show) or full of tools (edit), so the stance is legible from across the
+ * room without reading a word. The tint is the confirmation, not the signal.
+ *
+ * The `[←]` back arrow is gone. Leaving is an exit, exits are on the right,
+ * and one lokalitet should not have two ways out at opposite ends of a row.
+ *
+ * Still a context strip, not a surface: everything with a body is in the dock
+ * (until step 7 takes it), and nothing here opens downwards. Terreng is not
+ * on it either — it is a ground mode and lives in row 1 with the other four
+ * until §8's move.
  */
 export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
-  const { locality, canEdit, canAdd, mode } = ws;
+  const { locality, stance, mayEdit, canAdd, mode } = ws;
+  const editing = stance === 'edit';
 
   return (
-    <div className={cx(styles.row, styles.rowSub)}>
+    <div
+      className={cx(styles.row, styles.rowSub, editing && rowStyles.rowEdit)}
+    >
       <div className={rowStyles.identity}>
-        <IconButton
-          icon="arrow_back"
-          size="md"
-          aria-label={t('localities.workspace.back')}
-          onClick={ws.close}
-        />
+        {/* The literal word. The only chrome in the app scoped to a single
+            record, and cheap — it is what makes removing the back arrow safe,
+            because "a differently coloured row" is not the same statement as
+            "you are inside something". */}
+        <span className={rowStyles.label}>
+          {t('localities.workspace.label')}
+        </span>
         <LocalityName
           key={locality.id}
           locality={locality}
-          canEdit={canEdit}
+          canEdit={ws.canEdit}
           onRename={ws.rename}
         />
         {/* Guarded, not optional: every record has a code once 1700000500
             has run. No chip is the honest symptom of a pocketbase that has
             not been restarted since. */}
         {locality.code && <LocalityCode code={locality.code} />}
-        <div className={rowStyles.summary}>
-          <Badge palette={VISIBILITY_PALETTE[locality.visibility]}>
-            {t(`localities.visibility.${locality.visibility}`)}
-          </Badge>
-          {ws.summary.length > 0 && (
-            <span className={rowStyles.summaryText}>
-              {ws.summary.join(' · ')}
-            </span>
-          )}
-        </div>
+        <Badge
+          className={rowStyles.visibility}
+          palette={VISIBILITY_PALETTE[locality.visibility]}
+        >
+          {t(`localities.visibility.${locality.visibility}`)}
+        </Badge>
+        <Banner ws={ws} />
         <Tooltip label={t('localities.workspace.zoom')}>
           <IconButton
             icon="zoom_in_map"
@@ -324,8 +360,13 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         </Tooltip>
       </div>
 
-      <div className={rowStyles.verbs}>
-        {canAdd && (
+      {/* The middle zone: everything that leaves a trace, and therefore
+          nothing at all in show (§2). Gated on `canAdd` as a block rather
+          than per button because all four create content, so for an admin —
+          who may edit this record but not add to it — the zone is empty and
+          should not render its gap. */}
+      {canAdd && (
+        <div className={rowStyles.tools}>
           <ModeButton
             icon="add"
             label={t('localities.funn.new')}
@@ -333,15 +374,13 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             active={mode === 'draft'}
             onClick={() => (ws.draftActive ? ws.stopDraft() : ws.startDraft())}
           />
-        )}
-        <ModeButton
-          icon="crop_free"
-          label={t('localities.tools.lidarExtractShort')}
-          tooltip={`${t('localities.tools.lidarExtract')} (U)`}
-          active={mode === 'lidar'}
-          onClick={ws.toggleLidar}
-        />
-        {canAdd && (
+          <ModeButton
+            icon="crop_free"
+            label={t('localities.tools.lidarExtractShort')}
+            tooltip={`${t('localities.tools.lidarExtract')} (U)`}
+            active={mode === 'lidar'}
+            onClick={ws.toggleLidar}
+          />
           <ModeButton
             icon="photo_camera"
             label={t('localities.tools.screenshotShort')}
@@ -349,8 +388,6 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             disabled={ws.shooting}
             onClick={ws.takeScreenshot}
           />
-        )}
-        {canAdd && (
           <ModeButton
             icon="satellite_alt"
             label={t('localities.tools.flyfotoShort')}
@@ -358,8 +395,43 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             disabled={ws.fetchingFlyfoto}
             onClick={ws.openFlyfotoNotice}
           />
+        </div>
+      )}
+
+      {/* The right zone, deepest-first (§5.3). Depths 0 and 1 for now: the
+          funn draft and Juster området keep their own controls in the dock
+          until step 12 moves them up here as depth 2.
+
+          `Lukk` is absent in edit — you leave the stance before you leave the
+          record — and `Del` is absent everywhere until `?lok=CODE` exists,
+          since a share button that shares nothing is worse than none. For a
+          reader the `Rediger` slot is `Lag min kopi`, which arrives with the
+          copy in step 14; until then that slot is empty rather than filled
+          with a button that would lie. */}
+      <div className={rowStyles.exits}>
+        {editing ? (
+          <>
+            <Button variant="primary" leftIcon="check" onClick={ws.leaveEdit}>
+              {t('localities.workspace.done')}
+            </Button>
+            <OverflowMenu ws={ws} />
+          </>
+        ) : (
+          <>
+            {mayEdit && (
+              <Button
+                variant="secondary"
+                leftIcon="edit"
+                onClick={ws.enterEdit}
+              >
+                {t('localities.workspace.edit')}
+              </Button>
+            )}
+            <Button variant="ghost" palette="gray" onClick={ws.close}>
+              {t('localities.workspace.close')}
+            </Button>
+          </>
         )}
-        {canEdit && <OverflowMenu ws={ws} />}
       </div>
     </div>
   );

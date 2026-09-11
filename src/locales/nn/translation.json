@@ -258,7 +258,12 @@
       "noMatch": "Ingen lokalitetar samsvarar med «{{query}}»."
     },
     "workspace": {
-      "back": "Tilbake",
+      "label": "Lokalitet:",
+      "edit": "Rediger",
+      "done": "Ferdig",
+      "close": "Lukk",
+      "bannerReader": "Delt av {{name}} – du les",
+      "bannerAdmin": "Du redigerer lokaliteten til {{name}} som administrator",
       "zoom": "Zoom til lokaliteten",
       "adjust": "Juster området (flytt eller dra i hjørna)",
       "deleteLocality": "Slett lokaliteten",

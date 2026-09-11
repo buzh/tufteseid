@@ -1,10 +1,29 @@
 import { atom } from 'jotai';
 import { LocalityRecord } from '../api/localities';
+import type { TerrainSpec } from './viewSpec';
 
 // The open lokalitet — non-null means the workspace panel is showing and
 // the funn layer is hydrated for this record. Holds a snapshot; the
 // workspace refreshes it after its own updates.
 export const activeLocalityAtom = atom<LocalityRecord | null>(null);
+
+// Which lokalitet is open in *edit* rather than in show — the second axis
+// (docs/lokalitet-view.md §1). Nothing in show writes, so this is the atom
+// every write verb in the lokalitet surfaces is ultimately gated on.
+//
+// A record id rather than a boolean, and that is the whole trick: "opening a
+// lokalitet lands in show" (§3) then holds *by construction* rather than by
+// somebody remembering to clear a flag in the right order. A brand-new
+// lokalitet is the one exception, and its creators say so by setting this
+// alongside `activeLocalityAtom` — the two writes are one batch, so the
+// workspace never renders the record in show first.
+export const editingLocalityIdAtom = atom<string | null>(null);
+
+// The view behind the open lokalitet's cover terrain render, if it has one.
+// Published by the workspace (which is what holds the attachment list) and
+// read by `useTerrainAnalysis`, which is mounted on the other side of the
+// tree and seeds its knobs from it — docs/lokalitet-view.md §4.6.
+export const coverTerrainSpecAtom = atom<TerrainSpec | null>(null);
 
 // A funn is being drawn/edited in the workspace right now. The shell
 // uses this to mount the mobile bottom draw toolbar.

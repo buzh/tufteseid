@@ -33,14 +33,17 @@ const TextRow = ({
   value,
   placeholder,
   maxLength,
-  disabled,
+  readOnly,
   onCommit,
 }: {
   label: string;
   value: string;
   placeholder: string;
   maxLength: number;
-  disabled: boolean;
+  // Read-only, not disabled: in show mode this is every one of these fields,
+  // the owner's included, and dimming a record's own content to say "not
+  // now" is the wrong sentence. See `.control:read-only` in Field.module.css.
+  readOnly: boolean;
   onCommit: (next: string) => void;
 }) => {
   const [draft, setDraft] = useState(value);
@@ -60,7 +63,7 @@ const TextRow = ({
       <span className={styles.label}>{label}</span>
       <Input
         value={draft}
-        disabled={disabled}
+        readOnly={readOnly}
         placeholder={placeholder}
         maxLength={maxLength}
         onChange={(e) => setDraft(e.target.value)}
@@ -121,7 +124,7 @@ const LocationGroup = ({
         value={locality.place ?? ''}
         placeholder={t('localities.workspace.placePlaceholder')}
         maxLength={200}
-        disabled={!canEdit}
+        readOnly={!canEdit}
         onCommit={(place) => onPatch({ place })}
       />
       <TextRow
@@ -129,7 +132,7 @@ const LocationGroup = ({
         value={locality.municipality ?? ''}
         placeholder={t('localities.workspace.municipalityPlaceholder')}
         maxLength={200}
-        disabled={!canEdit}
+        readOnly={!canEdit}
         onCommit={(municipality) => onPatch({ municipality })}
       />
       <TextRow
@@ -137,7 +140,7 @@ const LocationGroup = ({
         value={locality.matrikkel ?? ''}
         placeholder={t('localities.workspace.matrikkelPlaceholder')}
         maxLength={500}
-        disabled={!canEdit}
+        readOnly={!canEdit}
         onCommit={(matrikkel) => onPatch({ matrikkel })}
       />
 
@@ -214,7 +217,7 @@ export const LocalityDetails = ({
           onBlur={commitDescription}
           placeholder={t('localities.workspace.descriptionPlaceholder')}
           minRows={3}
-          disabled={!canEdit}
+          readOnly={!canEdit}
         />
       </div>
 
