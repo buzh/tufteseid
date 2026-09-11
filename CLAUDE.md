@@ -60,6 +60,23 @@ all of them.
   GIS tool survey with verdicts and licences, and what's worth building next.
   **Read it before proposing a new analysis feature** — it records what was
   already rejected and why, so those don't get re-litigated.
+- `docs/lokalitet-view.md` — **draft, nothing built**: the design for making
+  "a lokalitet is open" a view of its own — the two axes (owner/reader ×
+  show/edit), **show writes nothing and edit is a transaction** (`Lagre` /
+  `Avbryt` over a client-side draft), the lokalitet row as three zones
+  (identity + short code / the tools, edit only / the exits, deepest-first),
+  **the split between a View and a File** — an extract, terrain render or
+  flyfoto is a row of parameters that is stored as a spec and pinned to a
+  figure PNG by a background queue after commit, while a screenshot or upload
+  is only ever bytes — which is what makes the draft bufferable, the copy
+  carry the images, and keeping one free; **removing
+  the right-hand dock** in favour of that row plus a bottom
+  filmstrip/carousel, the four routes an image takes into a lokalitet (three
+  auto-sourced LiDAR styles, a general `Behold` for the ground on screen, and
+  keep/discard picker carousels behind LiDAR-uttrekk and Flyfoto), curation
+  and the takeout bundle, and moving Terreng and Sammenlign off row 1 onto
+  the lokalitet row. Read it before building any of that; it folds into
+  `docs/ui-architecture.md` §8 when it lands.
 - `README.md` — third-party-facing install and admin guide (docker compose
   install, first-run PocketBase superuser, OAuth redirect URL, granting the
   app admin role, licence). Keep it accurate when any of that changes.
