@@ -11,6 +11,18 @@ proxied — the routing rules there apply unchanged. `analysis-roadmap.md` is
 the shorter overview of the same thread, including the tool survey and what
 was rejected.
 
+**One thing about scope, because it changed and the code no longer shows the
+seam.** The rectangle a DEM is fetched for is always an open lokalitet's bbox.
+There used to be a second, free-floating rectangle framed from the ribbon over
+the bare map, with a `Lagre` of its own that turned it into a lokalitet on the
+way out; it is gone, and pressing Terreng with nothing open now creates the
+lokalitet first (`docs/ui-architecture.md` §5.3, §10). The consequence to know
+before designing anything here: **computing relief requires an account.** A
+signed-out visitor can browse the map and read Kartverket's pre-baked
+hillshade, but not this. The tier-1 and tier-2 designs below assume a lokalitet
+exists, which they always did — what changed is that this is now true by
+construction rather than by convention.
+
 ## Why bother: hillshade is the weak visualization
 
 Everything the app renders today is Kartverket's *pre-baked* raster: the WMS

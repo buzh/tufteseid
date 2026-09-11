@@ -411,8 +411,10 @@ subsume.
   `localityDetailsOpenAtom`, `bilderStripOpenAtom`, `funnOutsideAtom`
   (`src/localities/toolAtoms.ts`), `bottomSlotAtom`
   (`src/shell/bottomSlot.ts` — the portal target for the bottom edge, a DOM
-  node rather than a value, §8.7.2) and `terrainStandaloneBboxAtom`
-  (`src/terrain/atoms.ts`).
+  node rather than a value, §8.7.2) and `groundHandleAtom`
+  (`src/shell/groundHandle.ts` — the slice of `useGroundMode` the lokalitet
+  row's Terreng and Sammenlign buttons render from, §8, published across the
+  sibling gap the same way `beholdOfferAtom` is).
 - **Search** — query, results, selected result, marker, infobox visibility.
 - **Feature info** — the clicked-position readout and the Kulturminner popup,
   plus `infoToolAtom` / the derived `infoClickArmedAtom`
@@ -528,8 +530,6 @@ looking at. Row 1 answers **what am I looking at**; the strip under it answers
 | **LiDAR** (2) | Background mode: hillshade stack |
 | **Hybrid** (3) | LiDAR stack + transparent roads/rail/place-names on top |
 | **Flyfoto** (4) | Background mode: NiB ortofoto (§5.5) |
-| **Terreng** (5) | Terrain analysis: relief computed here from float elevation, over the open lokalitet's rectangle if there is one and the visible map otherwise (§10) |
-| **Sammenlign** | Puts a second ground on the right of a draggable curtain; while it is on, everything in this table's ground rows describes the focused half (§5.8) |
 | **Skjul merker** (H) | Takes our own marks — funn, their halo, the lokalitet rectangles — off the map for as long as it is pressed in (§8.6) |
 | **Kulturminner** | Toggles `heritageSites`, the one register most readings start from |
 | **Oppsett** (`tune`) | Popover: the five RA sources, kulturminner2's three sublayers, how they are drawn and how strongly (§5.9) |
@@ -539,6 +539,15 @@ looking at. Row 1 answers **what am I looking at**; the strip under it answers
 | Ny lokalitet | Creates a lokalitet from the visible map (signed in only, §5.6) |
 | `RibbonAccount` | Sign in / account menu |
 
+**Terreng and Sammenlign are not in that table, and their absence is the
+point.** Both are on the *lokalitet* row now (§8.1): they read a rectangle, and
+the only rectangle in the app belongs to a lokalitet. Terreng is still the
+fifth ground and digit `5` still selects it — with nothing open, pressing `5`
+frames the visible map into a lokalitet and enters Terreng in it, or raises the
+sign-in dialog. Sammenlign has no digit and therefore no entrance at all
+without a lokalitet open, which is deliberate: `C` switches focus between the
+two halves and has never been a way of raising the curtain.
+
 The five grounds are **one ring**, in digit order, driven by
 `useGroundMode` (`src/shell/useGroundMode.ts`). Underneath they are three
 different mechanisms — a background-layer atom, a modifier flag, and a rectangle
@@ -547,7 +556,9 @@ a different group that *disappeared whenever a lokalitet was open* because the
 lokalitet row carried a second copy of the verb. Two controls for one surface disagreeing
 about which rectangle "Lagre" keeps is why there is one now. One list, one
 index, one setter; `GROUND_MODES` is the render order and the digit order at
-once, and `GROUND_KEYS` in `useBackgroundCyclingKeys` is positional against it.
+once, and `GROUND_KEYS` in `useBackgroundCyclingKeys` is positional against
+**the array**, not against what row 1 draws — which is what lets Terreng's
+button live on another row while `5` keeps meaning Terreng.
 
 Terreng belongs in that ring even though it is not a background: it does not
 replace the background, it covers it. Leaving therefore costs nothing and
@@ -561,7 +572,7 @@ returns you to exactly the dataset and style you left — 1→5→1 is free wher
 | Standard (1) | Karttype pulldown — the five cartographies (topografisk, gråtone, rasterkart, sjøkart, amtskart), also the W/S ring (§5.10) |
 | LiDAR (2), Hybrid (3) | Dataset pulldown — **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport · style pulldown (the active dataset's WMS styles, with a "flere stiler" second tier), only when the dataset publishes more than one · DTM/DOM segment · **Høydekurver** switch, Hybrid only |
 | Flyfoto (4) | Acquisition pulldown — the seamless mosaic or any acquisition covering the viewport, newest first · period chips (Alle / 2010– / 1990–2009 / 1960–1989 / –1959), which narrow both that list and the W/S ring (§5.5) |
-| Terreng (5) | Visualisering pulldown — the eight relief views, each with its own explanation as a tooltip, also the W/S ring (§10) · DTM/DOM segment · the resolution readout · "Flytt analysen hit" and "Lagre som ny lokalitet" (both standalone only; with a lokalitet open, keeping the render is `Behold` on row 2, §8.9.2) — **plus a second row under the strip** holding the sliders the current visualization uses, two to four of azimuth / altitude / exaggeration / radius / opacity (§10) |
+| Terreng (5) | Visualisering pulldown — the eight relief views, each with its own explanation as a tooltip, also the W/S ring (§10) · DTM/DOM segment · the resolution readout. No actions: keeping the render is `Behold` on row 2 (§8.9.2) and the rectangle is the lokalitet's, so "Juster området" owns it — **plus a second row under the strip** holding the sliders the current visualization uses, two to four of azimuth / altitude / exaggeration / radius / opacity (§10) |
 
 **The strip is always on the bar.** It used to vanish under Standard, which had
 nothing to adjust; five cartographies filled that hole, and the fixture is the
@@ -675,7 +686,17 @@ re-attaching the listener continuously.
 
 **Across grounds:**
 
-- **1–5** — select the ground outright, in the order row 1 renders the buttons.
+- **1–5** — select the ground outright, in `GROUND_MODES` order. Four of the
+  five buttons are on row 1 and in that order; the fifth, Terreng, renders on
+  the lokalitet row (§8.1), so with a lokalitet open the digits and the buttons
+  still line up and with none open `5` is the only entrance Terreng has. It is
+  not a refusal: **pressing `5` with nothing open creates the lokalitet** —
+  signed in, the visible map is framed exactly as "Ny lokalitet" frames it
+  (§5.6) and Terreng is entered in it, in edit; signed out, the sign-in dialog
+  comes up. Reading relief is the one thing here no WMS can do for us, so the
+  answer to "there is no rectangle" is a rectangle, not a shrug — and the bill
+  is stated rather than hidden: computing relief now needs an account, because
+  it now needs somewhere to put the result.
 - **Hold X** — peek at the ground you were on before, snapping back on release.
   Reading relief against a photograph means flipping dozens of times, and a
   hold-to-compare is the cheapest form of that.
@@ -952,11 +973,26 @@ ordinary background stack across the whole map (the *A* half) and clips a
 second stack to the right of a draggable edge (the *B* half).
 
 It is **not** one of the five ground buttons and has no digit key: it does not
-answer "what does the ground look like" but "against what". It sits in its own
-group beside the ring, and reads the ring's current and previous mode to choose
-a sensible other half — entering lands on the ground you were last on, which is
-almost always the one you just flipped away from, i.e. the comparison you were
-already making by hand.
+answer "what does the ground look like" but "against what". It reads the ring's
+current and previous mode to choose a sensible other half — entering lands on
+the ground you were last on, which is almost always the one you just flipped
+away from, i.e. the comparison you were already making by hand.
+
+**Its button is on the lokalitet row** (§8.1), beside Terreng, and it used to
+sit in its own group beside the ring on row 1. It is a read tool, so it renders
+in both stances and for a reader in full; what it needs from the ring reaches
+it across the sibling gap on `groundHandleAtom`. Two consequences follow, and
+both are accepted rather than worked around:
+
+- **The curtain cannot be raised with no lokalitet open.** `C` is only the
+  focus switch and has never raised it. Comparing two grounds is something you
+  do *to a place*, and the place is the lokalitet.
+- **Closing the lokalitet tears the curtain down** — `useLocalityWorkspace`'s
+  close/swap cleanup calls `leaveCompareAtom`. Not tidiness: the only control
+  that can lower the curtain leaves with the row, so without this a visitor
+  could strand a second live tile stack on screen with no way to close it,
+  which is Kartverket's request budget doubled, silently and indefinitely
+  (`docs/wms-proxy-and-tiles.md`).
 
 **One control surface, pointed at one half at a time.** The button is the whole
 of Sammenlign's own UI. Everything that describes a ground — the five mode
@@ -1335,11 +1371,23 @@ uploads). The bbox is authored, never derived from its content — if a drawn fu
 escapes the rectangle, the workspace offers to grow it rather than silently
 resizing.
 
-The workspace is the only route to drawing and LiDAR extract. There are no
-standalone `draw` / `lidarExtract` / `newFind` map tools. Two exceptions,
-both deliberate: **measure** stays global because it is ephemeral and leaves
-nothing behind, and **terrain analysis** is now reachable from the bare map
-too (§10) because reading the ground is not an act of ownership.
+The workspace is the only route to drawing, LiDAR extract **and terrain
+analysis**. There are no standalone `draw` / `lidarExtract` / `newFind` map
+tools, and since §12's step 15 there is no standalone Terreng either: reading
+relief is reading *a rectangle*, and the only rectangle in the app is a
+lokalitet's, so pressing Terreng with nothing open frames one (§5.3).
+**Measure** is the one exception left, and it earns it by being ephemeral —
+it leaves nothing behind, so there is nothing for a rectangle to hold.
+
+That is a reversal, and it is worth naming as one. The rule used to be
+*reading the ground is not an act of ownership*, and its consequence was a
+signed-out visitor who could compute relief over any rectangle in Norway. The
+cost of the change is exactly that: **relief now needs an account.** What was
+bought with it is one rectangle instead of two, one save path instead of two,
+and a `Lagre` that can no longer create a lokalitet nobody asked for. The
+principle that replaces it is narrower and holds better: *reading is not
+writing* — every read tool on the lokalitet row is available to a reader in
+full, in both stances, and only its exits escalate (§8.1).
 
 ### 8.1 Anatomy
 
@@ -1364,7 +1412,7 @@ rows, the bottom edge of the map, two popovers, a map callout and the dialogs:
 | left — identity | *what am I looking at* | always | the literal word `Lokalitet:`, the inline-editable name, the short code chip (click to copy), the visibility badge, the banner slot, zoom-to |
 | the subjects | *what is in here* | always | `Funn ▾` and `Kulturminner ▾`, each a popover with a count badge |
 | middle — the work | *what can I do to it* | **edit only** | Nytt funn · Behold · `Hent ▾` · Skjermbilde |
-| the read tools | *what may I look at* | always | `Bilder ▾` (Terreng and Sammenlign join it at §12's step 15) |
+| the read tools | *what may I look at* | always | Terreng · Sammenlign · `Bilder ▾` |
 | right — the exits | *how do I get out of here* | always | deepest-first — see the depth table below |
 
 The subjects and the read tools are present in **both** stances, because
@@ -1433,8 +1481,24 @@ redigerer" at somebody who is only looking; the stance test is deliberate.
 Deliberately not a notification area — everything else stays next to the thing
 it is about.
 
-Terreng is deliberately *not* in the lokalitet row — it is a ground mode in
-row 1 and works the same with or without a lokalitet (§5.1, §10).
+**Terreng and Sammenlign are read tools, and that is why they are here**
+(`docs/lokalitet-view.md` §8). Both read a rectangle — one asks what shape the
+ground is, the other asks it to hold still beside another ground — so both
+render in **both** stances and in full for a reader, gated on nothing. Only
+their exits write, and those escalate on their own: keeping a terrain render is
+`Behold`, which is `canAdd` like every other write verb (§8.9.2).
+
+The machinery did not move with the buttons. `useGroundMode` and the four
+control hooks stay mounted once in `RibbonGlobalRow` — the settings strip and
+the slider row run off the same objects, and a second mount would mean a second
+DEM — and the two rows are siblings in separate error boundaries, so there is
+no parent to pass anything down from. `RibbonGlobalRow` publishes the four
+members these buttons need (`mode`, `half`, `previous()`, `select()`) on
+`groundHandleAtom` (`src/shell/groundHandle.ts`), through a ref so the atom
+changes only when `mode` or `half` does; `cycle` and the peek stay behind,
+where the keyboard is registered. Same gap and same direction as
+`beholdOfferAtom`. A `null` handle means row 1 has not rendered yet or crashed
+inside its own boundary, and the two buttons are simply absent.
 
 Splitting the old panel up removed the `key={locality.id}` remount that used to
 reset its `useState`, which is why the state had to move into the controller
@@ -1514,11 +1578,10 @@ read-only. The one control still merely disabled is Synlighet's `Segmented`,
 where the value *is* the widget.
 
 Terrenganalyse's **Lagre** used to be the one unguarded write — with somebody
-else's lokalitet open it targeted that lokalitet and failed with a toast. It is
-no longer reachable there: keeping a terrain render over an open lokalitet is
-`Behold` on the lokalitet row now (§8.9.2), which is gated like every other
-verb in that zone, and the terrain strip's own button survives **only when
-there is no lokalitet** (§10). Forking somebody else's rectangle instead of
+else's lokalitet open it targeted that lokalitet and failed with a toast. It
+does not exist any more. Keeping a terrain render is `Behold` on the lokalitet
+row (§8.9.2), gated like every other verb in that zone, and the terrain strip
+carries no actions at all (§10). Forking somebody else's rectangle instead of
 being refused is §8.12.
 
 ### 8.2 The subjects, and Detaljer
@@ -1589,9 +1652,14 @@ itself for a record named "Uten navn", so a nameless lokalitet still asks to be
 named; an auto-name good enough to keep does not shove a cursor at you. Click
 it to change it, like any other.
 
-`fetchLocalityContext` never rejects and never takes longer than 6 s; both call
-sites (the ribbon button and Terreng's save-with-no-lokalitet path)
-already disable themselves while it runs. Which registers it asks, and how the
+`fetchLocalityContext` never rejects and never takes longer than 6 s, and the
+one place that calls it — `createLocalityFromBbox`, behind
+`useCreateLocalityFromViewport` — disables itself while it runs. Both entrances
+go through that hook now: the `Ny lokalitet` button, and pressing Terreng or
+`5` with nothing open (§5.3). The second is why `create` hands the record back
+rather than returning `void`: it has to arm `ribbonToolAtom` afterwards, and
+only on success, or a failed create would leave `'terrain'` armed for whichever
+lokalitet is opened next. Which registers it asks, and how the
 placename is ranked, is out of scope here — see the header comment in
 `src/localities/localityContext.ts`.
 
@@ -2047,7 +2115,7 @@ that, and neither of them is a cover field.
 - **`attachments.sort` is an opaque ordering key, not an index.** Newly created
   records get `Date.now()`, minted inside `createAttachment` itself
   (`src/api/attachments.ts`), and that is the whole reason it is opaque: two of
-  the producers — terrain **Lagre**, the extract's **Behold** — never hold the
+  the producers — `Behold`, and the pickers' keep — never hold the
   attachment list, so "one more than the largest" is not a number they can
   reach. "Later than everything that already exists" is a number a clock knows.
   The list query is `sort: 'sort,created'`; `created` is what makes the order
@@ -2242,9 +2310,10 @@ none of them is on the bottom edge (§8.7.2).
 #### 8.9.1 The starter set (grunnpakke)
 
 **It is no longer a menu item.** It runs itself once, on a lokalitet that was
-just created — from the viewport or by saving a terrain render with none open.
+just created — from the `Ny lokalitet` button, or by pressing Terreng with
+nothing open, which is the same code path (§5.3).
 The hand-off is `pendingStarterLocalityIdAtom` (`src/localities/atoms.ts`),
-set by both creation sites and cleared by the workspace *before* the run
+set at creation and cleared by the workspace *before* the run
 starts, since the effect re-fires on every image it lands. Deliberately not
 "notice the gallery is empty": that would refill a lokalitet somebody
 deliberately emptied.
@@ -2433,8 +2502,8 @@ the second kind.
 
 **Scope: everything but "Last opp".** Both LiDAR extract exits ("Behold" *and*
 the PNG download — the download is precisely the copy that ends up in someone
-else's report), terrain "Lagre", the flyfoto grab, "Ta skjermbilde" and all
-three steps of Hent grunnpakke. An upload's provenance is unknown to the app,
+else's report), `Behold` on any ground, the flyfoto grab, "Ta skjermbilde" and
+all three steps of the starter set. An upload's provenance is unknown to the app,
 so inventing a caption for it would be worse than none.
 
 Load-bearing:
@@ -2803,8 +2872,8 @@ exaggeration / radius / opacity sliders. Four files:
 
 | File | What it is |
 |---|---|
-| `useTerrainAnalysis.ts` | All of the state — which rectangle, the DEM, the model, the visualization, the five knobs, the canvas, the save — plus `describe()` and `beholdKey`, which is how row 2's `Behold` keeps the render (§8.9.2). Mounted **once**, from `RibbonGlobalRow`, beside `useLidarControls` and `useFlyfotoControls` |
-| `TerrainStrip.tsx` | The settings-strip half: the visualization pulldown, DTM/DOM, the resolution readout, and — only when there is no lokalitet — "Flytt analysen hit" and "Lagre som ny lokalitet" |
+| `useTerrainAnalysis.ts` | All of the state — which rectangle, the DEM, the model, the visualization, the five knobs, the canvas — plus `describe()` and `beholdKey`, which is how row 2's `Behold` keeps the render (§8.9.2). Mounted **once**, from `RibbonGlobalRow`, beside `useLidarControls` and `useFlyfotoControls`. It holds no write of its own |
+| `TerrainStrip.tsx` | The settings-strip half, and knobs only: the visualization pulldown, DTM/DOM, the resolution readout |
 | `TerrainVisPicker.tsx` | The pulldown itself, shaped like `StandardVariantPicker` |
 | `TerrainSliders.tsx` | The row beneath: azimuth, altitude, exaggeration, radius, opacity |
 
@@ -2914,8 +2983,8 @@ rectangles (4), the funn (5) and the theme layers (10). That ordering is the
 point: relief is the ground and the heritage record goes on top of it, which is
 the same argument that makes LiDAR hillshade a *background* rather than a theme
 layer. Scrubbing the light therefore re-lights the terrain in place, at full
-size, against everything else on screen. What is left on the ribbon is knobs, a
-resolution readout and the two verbs.
+size, against everything else on screen. What is left on the ribbon is knobs
+and a resolution readout.
 
 **That slot is shared, and the module is the arbiter.** A bilde pinned with
 "Vis i ruta" (§8.7.1) wants the same `zIndex: 1`, and nothing else in the app is
@@ -2939,21 +3008,10 @@ do it in.
 `TerrainStrip` is rendered into the strip **without** a `group` wrapper, unlike
 the LiDAR and Flyfoto pickers. Terreng brings the most controls of any subject
 and holding them on one unbreakable line is what would push the strip off a
-laptop; it supplies its own `.actions` grouping for the two verbs, which must
-not split, and lets the rest wrap. `Segmented`'s `wrap` prop went with the
+laptop, so it lets its controls wrap. `Segmented`'s `wrap` prop went with the
 column — it existed only to keep five long Norwegian names from being clipped
 mid-word by the root's `overflow: hidden` in 360 px, and the ribbon rows wrap
 between controls instead of inside one.
-
-**"Flytt analysen hit"** (`localities.terrain.reframe`) moves the analysed
-rectangle onto the map as it now stands. It exists because the standalone bbox
-is deliberately *held* rather than tracking the view — the DEM behind it is a
-real download, not a tile request — so panning off the render is a normal move
-and there has to be a way back without closing and reopening the tool. It is
-offered only without a lokalitet: with one, the rectangle is the lokalitet's and
-"Juster området" owns it. The label used to read "Analyser utsnittet", which
-named the mechanism rather than the effect and left it unclear what it did to
-the analysis already on screen.
 
 Consequences worth knowing:
 
@@ -2984,34 +3042,25 @@ Consequences worth knowing:
   the topo map without losing the light you just dialled in. It is hook state
   mirrored onto the layer, and the remembered value survives a DTM→DOM rebuild.
 
-There are *two entrances* — the same button in row 1 either way — and
-`useTerrainAnalysis` resolves them to one rectangle rather than making two
-callers do it:
-
-- **No lokalitet open**: `useTerrainViewport` frames the visible map into
-  `terrainStandaloneBboxAtom`. The bbox is held rather than recomputed from the
-  live view: the analysis is of one fixed rectangle and the user is expected to
-  pan underneath it while reading the render. **"Flytt analysen hit"** on the
-  strip re-frames it onto the view as it is now — the same `frame()` the ribbon
-  button calls. It exists because putting the render on the map makes panning
-  off the analysed rectangle a normal move, and there was otherwise no way back
-  short of leaving and re-entering the tool.
-  Note that the rectangle is `viewportBbox`'s **inset** viewport, the same one
-  "Ny lokalitet" uses, so the render stops short of the screen edges. That is
-  deliberate — the two have to agree about what "the visible map" means, the
-  span guard rides on it, the free area is what `chromeInsets` reports, and the
-  rectangle may become a lokalitet — and the visible margin doubles as the
-  affordance for exactly which ground is being analysed.
-- **A lokalitet open**: `ribbonToolAtom` goes to `'terrain'` and the rectangle
-  is that lokalitet's own bbox. "Juster området" owns it here.
-
-They can never both be live: `useGroundMode` routes the button to one or the
-other depending on whether a lokalitet is open, and opening a lokalitet clears
-the standalone bbox. That matters because two live controls for one surface
-would disagree about which rectangle "Lagre" keeps — which is exactly what row
-2's duplicate Terreng verb used to cause, and why it is gone. Reading the
-lokalitet's bbox directly rather than copying it into an atom is also what
+**There is one rectangle, and it is the open lokalitet's.** `bbox` is
+`locality && tool === 'terrain' ? locality.bbox : null` and nothing else —
+read straight off the record rather than copied into an atom, which is what
 makes "Juster området" refetch the DEM for free.
+
+There used to be a second entrance: `useTerrainViewport` framed the visible map
+into a free-floating `terrainStandaloneBboxAtom`, `useTerrainAnalysis` resolved
+the two, "Flytt analysen hit" re-framed the loose one, and a `Lagre` of its own
+turned it into a lokalitet on the way out. All of that is gone
+(`docs/lokalitet-view.md` §8, §15). Pressing Terreng or `5` with nothing open
+makes the lokalitet *first* (§5.3), so by the time a DEM is fetched there is
+exactly one answer to "what am I analysing" — and two controls for one surface
+disagreeing about which rectangle a save keeps, which is what the old row-2
+duplicate cost us, cannot come back.
+
+The rectangle is still `viewportBbox`'s **inset** viewport, since it is `Ny
+lokalitet`'s: the render stops short of the screen edges, the span guard rides
+on it, the free area is what `chromeInsets` reports, and the visible margin
+doubles as the affordance for exactly which ground is being analysed.
 
 **There is no close button, and that is not an omission.** Terreng is a ground:
 you leave it by picking another one from the ring, or by pressing its digit's
@@ -3019,24 +3068,15 @@ neighbour, and leaving costs nothing because the background underneath was
 never switched off (§5.1). The column the tool used to live in had to have a
 close control, since a panel that will not go away is a panel covering the map.
 
-**"Lagre" is on the strip only when there is no lokalitet.** With one open,
-keeping the render is `Behold` on the lokalitet row (§8.9.2) — one verb for
-whatever ground is up, rather than a save button per ground. Gated exactly like
-"Flytt analysen hit" beside it, and for the same reason: both are the
-standalone entrance's answer to something the lokalitet row answers better.
+**The strip has no actions at all.** Keeping the render is `Behold` on the
+lokalitet row (§8.9.2) — one verb for whatever ground is up, rather than a save
+button per ground — and the rectangle belongs to "Juster området". The strip
+holds knobs and what the DEM says about itself, which is what a settings strip
+is for.
 
-What survives is the row-1 path, which is not a duplicate of anything:
-`createLocalityFromBbox` over **the analysed rectangle** (not the current view
-— the map is live under the ribbon), then the save into it, opening the new
-lokalitet as the receipt and setting `pendingStarterLocalityIdAtom` so the
-starter set follows (§8.9.1). Signed out it opens `AuthDialog` instead; that is
-a normal state here, since the whole point of Terreng in row 1 is that reading
-the ground needs no account.
-
-What both paths call is `useTerrainAnalysis`'s **`describe()`** — row 1's save
-and `Behold`'s terrain arm, the latter through the callback on
-`beholdOfferAtom`. One place decides what a terrain View's caption and `meta`
-say. It used to be `produce(subject?)` and used to hand back a finished figure;
+The one thing the hook publishes for that write is **`describe()`**, read by
+`Behold`'s terrain arm through the callback on `beholdOfferAtom`. One place
+decides what a terrain View's caption and `meta` say. It used to be `produce(subject?)` and used to hand back a finished figure;
 since the View/File split (§8.7.4) a terrain render is stored as a spec and the
 pixels are the pin queue's job, so the hook describes and never renders. The
 `subject` argument went with the pixels — it was the figure's title line.
@@ -3431,7 +3471,7 @@ why no proxied upstream needs an entry in it, is
 
 ### Ours, not upstream's — the dock and what hung off it
 
-Written by this fork and deleted by it, at step 12 of
+Written by this fork and deleted by it, at steps 12 and 15 of
 `docs/lokalitet-view.md` §12. Listed here for the same reason as the rest: a
 plausible-sounding reason to bring one back is exactly what the entry is for.
 
@@ -3460,3 +3500,14 @@ plausible-sounding reason to bring one back is exactly what the entry is for.
   itself stays; it has around ten callers in `src/search/**` and
   `src/help/HelpPage.tsx`, contrary to what `docs/lokalitet-view.md` §6
   predicted.
+- **The standalone terrain entrance** (step 15) — `src/terrain/atoms.ts`
+  (`terrainStandaloneBboxAtom`), `src/terrain/useTerrainViewport.ts`, the
+  strip's "Flytt analysen hit" and "Lagre som ny lokalitet" buttons with the
+  `localities.terrain.reframe` / `reframeHint` / `saveNew` / `saving` /
+  `saveFailed` strings behind them, the `save` path in `useTerrainAnalysis`,
+  and `ribbon.terrain.tooLarge` / `.unavailable`. A second rectangle with a
+  second save that could create a lokalitet on its way out. Terreng now reads
+  the open lokalitet's bbox and nothing else, and pressing it with none open
+  creates one (§5.3, §10). Do not reintroduce a free-floating analysis
+  rectangle "just for signed-out visitors": the price of that convenience was
+  two owners of one surface, which is what §1's first invariant is about.

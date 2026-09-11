@@ -1,10 +1,12 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isSignedInAtom } from '../auth/atoms';
+import { isAuthDialogOpenAtom } from '../auth/atoms-dialog';
 import { marksHiddenAtom } from '../localities/atoms';
 import { type BeholdOffer, beholdOfferAtom } from '../localities/behold';
 import { useCreateLocalityFromViewport } from '../localities/createFromBbox';
+import { ribbonToolAtom } from '../localities/toolAtoms';
 import { infoToolAtom } from '../map/featureInfo/infoTool';
 import { activeThemeLayersAtom } from '../map/layers/atoms';
 import type { ThemeLayerName } from '../map/layers/themeWMS';
@@ -13,10 +15,9 @@ import {
   useRegisterBackgroundCycle,
   useRegisterGroundKeys,
 } from '../map/useBackgroundCyclingKeys';
-import { useTerrainViewport } from '../terrain/useTerrainViewport';
 import { IconButton, Tooltip } from '../ui';
-import { CompareControl } from './compare/CompareControl';
 import { useFlyfotoControls } from './flyfoto/useFlyfotoControls';
+import { groundHandleAtom } from './groundHandle';
 import { HeritagePicker } from './heritage/HeritagePicker';
 import { useLidarControls } from './lidar/useLidarControls';
 import { ModeButton } from './ModeButton';
@@ -48,26 +49,30 @@ import { useRecreateView } from './useRecreateView';
  * all of them run off the four control hooks below, which are mounted once
  * and only here.
  *
- * The five ground buttons are one ring, in digit order, driven by
- * useGroundMode — including Terreng, which is a render over the background
- * rather than a background of its own but is a *ground* as far as the person
- * reading it is concerned. Hybrid is the odd one out and stays a mode here on
- * purpose: it is a modifier on the LiDAR stack (which is why picking it
- * activates the national mosaic when nothing LiDAR is on yet), but it is also
- * one of the five things you flip between, and splitting the ring to say so
- * would cost more than it explains. DTM/DOM and the style pick remain
- * modifiers and stay on the settings strip. docs/ui-architecture.md §5.2.
+ * The ground buttons are one ring, in digit order, driven by useGroundMode.
+ * Four of the five are drawn here; the fifth, Terreng, renders on the
+ * lokalitet row (docs/lokalitet-view.md §8) because it reads a rectangle and
+ * the only rectangle in the app is a lokalitet's. Digit 5 still selects it —
+ * `GROUND_KEYS` is positional against GROUND_MODES, not against what this row
+ * draws — and with nothing open it creates the lokalitet first.
+ *
+ * Hybrid is the odd one out and stays a mode here on purpose: it is a modifier
+ * on the LiDAR stack (which is why picking it activates the national mosaic
+ * when nothing LiDAR is on yet), but it is also one of the five things you
+ * flip between, and splitting the ring to say so would cost more than it
+ * explains. DTM/DOM and the style pick remain modifiers and stay on the
+ * settings strip. docs/ui-architecture.md §5.2.
  *
  * Standard, LiDAR and Flyfoto each bring a dataset pulldown and a keyboard
  * ring, and only one of the three is ever on screen — this component is where
  * they are chained, because there is exactly one registered cycle handler. The
  * pulldowns themselves render on the strip.
  *
- * Sammenlign sits beside the ring rather than in it: it does not answer
- * "what does the ground look like" but "against what", and it needs the
- * ring's current and previous mode to pick a sensible other half. Once it is
- * on, this whole row — buttons, digits, W/S — describes whichever half of the
- * curtain the strip's A|B switch names. Nothing here has to know that; the
+ * Sammenlign has left this row too, for the same reason and to the same
+ * place. It still needs the ring's current and previous mode to pick a
+ * sensible other half, which is what `groundHandleAtom` below carries. Once it
+ * is on, this whole row — buttons, digits, W/S — describes whichever half of
+ * the curtain the strip's A|B switch names. Nothing here has to know that; the
  * ground atoms route themselves (src/map/compare/halves.ts).
  */
 export const RibbonGlobalRow = () => {
@@ -80,7 +85,38 @@ export const RibbonGlobalRow = () => {
   const standard = useStandardControls();
   const lidar = useLidarControls();
   const flyfoto = useFlyfotoControls();
-  const viewport = useTerrainViewport();
+  const openAuthDialog = useSetAtom(isAuthDialogOpenAtom);
+  const setRibbonTool = useSetAtom(ribbonToolAtom);
+  // "Ny lokalitet" frames the visible map rather than arming a box drag —
+  // and so, now, does pressing Terreng with nothing open.
+  const { create: createFromViewport, creating } =
+    useCreateLocalityFromViewport();
+
+  /*
+   * Terreng with no lokalitet open (docs/lokalitet-view.md §8).
+   *
+   * There used to be a second entrance here — a free-floating rectangle in
+   * `terrainStandaloneBboxAtom`, framed on the press and turned into a
+   * lokalitet later by a `Lagre` of its own. It is gone, and this is what
+   * replaced it: the rectangle is made first, and everything downstream has
+   * exactly one answer to "what am I analysing".
+   *
+   * The bill, stated rather than hidden: relief now needs an account. That
+   * was the price of the second entrance not existing, and the second
+   * entrance was two rectangles, two saves and a `Lagre` that could create a
+   * lokalitet nobody had asked for.
+   */
+  const enterTerrainHere = async () => {
+    if (!isSignedIn) {
+      openAuthDialog(true);
+      return;
+    }
+    const rec = await createFromViewport();
+    // Only on success: a failed create must not leave the tool armed for
+    // whichever lokalitet is opened next.
+    if (rec) setRibbonTool('terrain');
+  };
+
   // The DEM, the render and every knob that shapes it. Mounted here with the
   // other three control hooks, and for the same reason: its controls are
   // spread over the two rows below, and the analysis behind them must not exist
@@ -92,7 +128,9 @@ export const RibbonGlobalRow = () => {
   // chained with the other three. It reads the atoms it needs directly and
   // takes nothing from `ground`, so the order is free.
   const terrain = useTerrainAnalysis();
-  const ground = useGroundMode(standard, lidar, flyfoto, terrain, viewport);
+  const ground = useGroundMode(standard, lidar, flyfoto, terrain, () => {
+    void enterTerrainHere();
+  });
   // Gjenskap. Mounted here because this is where the four control hooks are,
   // and a saved view is applied by writing all four — see useRecreateView.
   useRecreateView(ground, lidar, flyfoto, terrain);
@@ -102,12 +140,36 @@ export const RibbonGlobalRow = () => {
   // rather than each registering. The document listener lives at the shell
   // root (useMapSideEffects).
   useRegisterBackgroundCycle(ground.cycle);
-  // 1–5 and hold-X, against the same button order rendered below.
+  // 1–5 and hold-X, positional against GROUND_MODES — which is the order the
+  // buttons render in, except that Terreng's is on the lokalitet row.
   useRegisterGroundKeys({
     select: (position) => ground.select(GROUND_MODES[position - 1]),
     peekStart: ground.peekStart,
     peekEnd: ground.peekEnd,
   });
+
+  /*
+   * Terreng and Sammenlign render on the lokalitet row now (§8), which is
+   * this row's sibling — so what they need crosses the gap on an atom, the
+   * way `beholdOfferAtom` already does in the same direction.
+   *
+   * Through a ref so the atom is written only when `mode` or `half` actually
+   * changes: `select` and `previous` are fresh closures every render, and
+   * publishing those directly would re-render the lokalitet row on every
+   * keystroke in the search field above it.
+   */
+  const setGroundHandle = useSetAtom(groundHandleAtom);
+  const groundRef = useRef(ground);
+  groundRef.current = ground;
+  const { mode: groundMode, half: groundHalf } = ground;
+  useEffect(() => {
+    setGroundHandle({
+      mode: groundMode,
+      half: groundHalf,
+      previous: () => groundRef.current.previous(),
+      select: (next) => groundRef.current.select(next),
+    });
+  }, [groundMode, groundHalf, setGroundHandle]);
 
   /*
    * What the ground on screen offers `Behold` (docs/lokalitet-view.md §4.3).
@@ -131,7 +193,6 @@ export const RibbonGlobalRow = () => {
   const { activeLidarSource, shownStyle } = lidar;
   const { describe: terrainDescribe, beholdKey: terrainKey } = terrain;
   const flyfotoProject = flyfoto.activeProject;
-  const groundMode = ground.mode;
   useEffect(() => {
     let offer: BeholdOffer;
     switch (groundMode) {
@@ -175,10 +236,6 @@ export const RibbonGlobalRow = () => {
   ]);
   // Row 1 outlives every lokalitet, so nothing here clears the offer on
   // unmount — the workspace is the shorter-lived side and stops reading it.
-
-  // "Ny lokalitet" frames the visible map rather than arming a box drag.
-  const { create: createFromViewport, creating } =
-    useCreateLocalityFromViewport();
 
   const toggleTool = (name: Exclude<MapTool, null>) =>
     setTool(tool === name ? null : name);
@@ -241,40 +298,19 @@ export const RibbonGlobalRow = () => {
             onClick={() => ground.select('flyfoto')}
           />
 
-          {/* Terrenganalyse: relief computed here from float elevation, over
-              the lokalitet's rectangle when one is open and over the visible
-              map otherwise. It stays on the bar with a lokalitet open — the
-              lokalitet row used to carry a second copy of this verb, and the
-              two disagreeing about which rectangle "Lagre" keeps is exactly
-              why there is one control now.
-
-              The one ground that cannot be half of a comparison: it is a
-              render over the whole map, not a background. Disabled rather
-              than hidden while the curtain's right half has focus, so the
-              ring keeps its five positions and 1-5 keep meaning what they
-              mean. A render already up on the left half stays up. */}
-          <ModeButton
-            icon="elevation"
-            label={t('ribbon.terrain.label')}
-            tooltip={
-              ground.half === 'b'
-                ? t('ribbon.compare.noTerrainRight')
-                : `${t('ribbon.terrain.tip')} (5)`
-            }
-            active={ground.mode === 'terreng'}
-            disabled={ground.half === 'b'}
-            onClick={() => ground.select('terreng')}
-          />
+          {/* Terreng is the fifth ground and digit 5 still selects it, but its
+              *button* is on the lokalitet row now (docs/lokalitet-view.md §8):
+              it reads a rectangle, and the only rectangle in the app belongs
+              to a lokalitet. The gap it leaves here is deliberate — four
+              buttons, five positions, and `GROUND_KEYS` is positional against
+              GROUND_MODES rather than against what this row draws. */}
         </div>
 
         <div className={styles.group}>
-          <CompareControl ground={ground} />
-          {/* Beside Sammenlign because it answers the question that comes up
-              the moment you have two acquisitions of the same ground side by
-              side: is that bump real, or is it my own outline? Global rather
-              than a lokalitet verb — the rectangles are on the map whether
-              or not a lokalitet is open, and hiding them is a way of looking,
-              not something you do to a lokalitet. */}
+          {/* Global rather than a lokalitet verb — the rectangles are on the
+              map whether or not a lokalitet is open, and hiding them is a way
+              of looking, not something you do to a lokalitet. (It used to sit
+              beside Sammenlign, which has left for the lokalitet row.) */}
           <ModeButton
             icon="visibility_off"
             label={t('ribbon.marks.label')}

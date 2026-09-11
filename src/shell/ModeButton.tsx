@@ -14,7 +14,7 @@ export const ModeButton = ({
   label: string;
   tooltip?: string;
   active?: boolean;
-  badge?: number;
+  badge?: number | string;
   disabled?: boolean;
   onClick: () => void;
 }) => (

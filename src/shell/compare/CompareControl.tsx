@@ -6,8 +6,8 @@ import {
   leaveCompareAtom,
 } from '../../map/compare/atoms';
 import { compareOnAtom } from '../../map/compare/halves';
+import type { GroundHandle } from '../groundHandle';
 import { ModeButton } from '../ModeButton';
-import type { GroundControls } from '../useGroundMode';
 
 /**
  * Sammenlign — put a second ground on the right of a draggable curtain.
@@ -26,8 +26,12 @@ import type { GroundControls } from '../useGroundMode';
  * the whole ribbon retargets to whichever half is focused, so choosing B's
  * ground is the same five buttons that choose A's, and the only new control
  * is the A|B switch on the settings strip.
+ *
+ * It renders on the *lokalitet* row (docs/lokalitet-view.md §8), so what it
+ * knows about the ring arrives as a `GroundHandle` rather than as the whole
+ * `GroundControls` — the hook itself is mounted once, a row away.
  */
-export const CompareControl = ({ ground }: { ground: GroundControls }) => {
+export const CompareControl = ({ ground }: { ground: GroundHandle }) => {
   const { t } = useTranslation();
   const on = useAtomValue(compareOnAtom);
   const enterCompare = useSetAtom(enterCompareAtom);

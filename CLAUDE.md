@@ -61,11 +61,11 @@ all of them.
   **Read it before proposing a new analysis feature** — it records what was
   already rejected and why, so those don't get re-litigated.
 - `docs/lokalitet-view.md` — **partly built**: §12's build order is through
-  step 14, so the two axes, the View/File split, the row's zones, the bottom
+  step 15, so the two axes, the View/File split, the row's zones, the bottom
   filmstrip/carousel, curation, the picker carousels, **removing the dock**,
-  **the edit transaction** and **the copy** are live and are documented in
-  `docs/ui-architecture.md`; the takeout bundle and moving Terreng/Sammenlign
-  onto the row are not. The whole design of making
+  **the edit transaction**, **the copy** and **Terreng/Sammenlign on the row**
+  are live and are documented in `docs/ui-architecture.md`; the takeout bundle
+  and sharing (`?lok=CODE`) are not. The whole design of making
   "a lokalitet is open" a view of its own is here — the two axes (owner/reader ×
   show/edit), **show writes nothing and edit is a transaction** (`Lagre` /
   `Avbryt` over a client-side draft), the lokalitet row as three zones
@@ -97,10 +97,12 @@ that owns them.
 
 - **Five background grounds**, on digit keys 1–5: Standard, LiDAR hillshade,
   Hybrid, Flyfoto, Terreng — `docs/map-layers.md`, keyboard in
-  `docs/ui-architecture.md` §5.3.
+  `docs/ui-architecture.md` §5.3. Four of the buttons are on ribbon row 1; the
+  fifth, Terreng, is on the lokalitet row, because it reads a rectangle.
 - **A dataset ring inside every ground** (W/S — cartographies, LiDAR projects,
   ortofoto acquisitions, terrain visualizations), plus **Sammenlign**, a
-  draggable curtain holding two full grounds on screen in register —
+  draggable curtain holding two full grounds on screen in register — on the
+  lokalitet row with Terreng, and torn down when the lokalitet closes —
   `docs/ui-architecture.md` §5.2, §5.3, §5.8.
 - **LiDAR relief at 0.25 m per project or 1 m nationally**, DTM or DOM, with
   a style ring, and an *Automatisk* dataset that follows the viewport unless
@@ -242,19 +244,28 @@ Ports: Caddy inside the container listens on `:3000`; docker-compose maps host
 its own relief visualizations in the browser, instead of restyling Kartverket's
 pre-baked hillshade. Rationale and endpoint details: `docs/terrain-analysis.md`.
 
-It has two entrances, and the surface is the same either way: **ribbon row 1**,
-over the visible map, with no lokalitet and no account; or **the lokalitet
-row**, over an open lokalitet's bbox. Reading the ground is not an act of
-ownership — only keeping the render is, and saving from row 1 signs you in and
-turns the analysed rectangle into a lokalitet.
+**One entrance, and it is a lokalitet.** The rectangle analysed is always the
+open lokalitet's bbox, the button is on the lokalitet row beside Sammenlign,
+and digit `5` still selects it. Pressing Terreng with nothing open **creates**
+the lokalitet — the visible map framed exactly as "Ny lokalitet" frames it,
+then Terreng entered in it — or raises the sign-in dialog.
 
-Which is why **the terrain strip's own "Lagre" only appears when there is no
-lokalitet**, exactly like "Flytt analysen hit" beside it. With one open,
-keeping the render is `Behold` on the lokalitet row — one verb for whatever
-ground is up, gated on the same `canAdd` as every other write
-(`docs/ui-architecture.md` §8.9.2). `useTerrainAnalysis` publishes
-`describe()` and a `beholdKey` for that; both paths write the same spec, and
-the pixels are made later by the pin queue (see below).
+That reverses an older rule here, *"reading the ground is not an act of
+ownership"*, and the reversal is deliberate. **Computing relief now requires an
+account.** What it buys is one rectangle instead of two and one save path
+instead of two: the standalone entrance was a free-floating bbox plus a `Lagre`
+that could create a lokalitet nobody had asked for, and two controls for one
+surface is the failure `docs/ui-architecture.md` §1 is about. The narrower
+principle that replaces it is *reading is not writing* — Terreng and Sammenlign
+are on the lokalitet row in **both** stances and available to a reader in full;
+only their exits escalate.
+
+So **the terrain strip carries no actions at all**. Keeping the render is
+`Behold` on the lokalitet row — one verb for whatever ground is up, gated on the
+same `canAdd` as every other write (`docs/ui-architecture.md` §8.9.2) — and
+the rectangle belongs to "Juster området". `useTerrainAnalysis` publishes
+`describe()` and a `beholdKey` for that, and holds no write of its own; the
+pixels are made later by the pin queue (see below).
 
 Entering it over a lokalitet **seeds the knobs from that lokalitet's cover
 terrain render**, once per lokalitet, so coming back to a place opens on the
@@ -300,12 +311,14 @@ the reason the seed can't step on "Gjenskap": `docs/ui-architecture.md` §10.
   visualization pulldown on it, and `TerrainSliders.tsx` the slider row under
   it. Terreng is one of the five grounds, so its modifiers
   belong where every other ground's are — a column down the side of the map
-  covered the terrain the knobs were describing. The hook resolves the two
-  entrances to one rectangle: an open lokalitet's own bbox (which is what makes
-  "Juster området" refetch the DEM for free) or `terrainStandaloneBboxAtom`
-  (`src/terrain/atoms.ts`) for the row-1 rectangle, never both. Output saves as
-  an attachment of the existing `extract` kind (with `style` = the
-  visualization), so no PocketBase migration was needed.
+  covered the terrain the knobs were describing. The button itself is on the
+  lokalitet row; what it needs from `useGroundMode` (which stays mounted once,
+  in row 1, because a second mount means a second DEM) crosses the sibling gap
+  on `groundHandleAtom` (`src/shell/groundHandle.ts`). The analysed rectangle
+  is `locality && tool === 'terrain' ? locality.bbox : null` — read off the
+  record rather than copied, which is what makes "Juster området" refetch the
+  DEM for free. Output saves as an attachment of the existing `extract` kind
+  (with `style` = the visualization), so no PocketBase migration was needed.
 - `src/map/groundOverlay.ts` — the render goes **on the map**, as a
   georeferenced `ol/layer/Image` (`ImageCanvasSource`, `zIndex: 1`) over the
   background and under the Kulturminner layers, not as a thumbnail in the

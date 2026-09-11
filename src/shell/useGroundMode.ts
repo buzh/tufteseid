@@ -1,11 +1,9 @@
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import { useEffect, useRef } from 'react';
 import { activeLocalityAtom } from '../localities/atoms';
 import { ribbonToolAtom } from '../localities/toolAtoms';
 import { focusedHalfAtom } from '../map/compare/halves';
 import type { CycleKey } from '../map/useBackgroundCyclingKeys';
-import { terrainStandaloneBboxAtom } from '../terrain/atoms';
-import type { useTerrainViewport } from '../terrain/useTerrainViewport';
 import type { FlyfotoControls } from './flyfoto/useFlyfotoControls';
 import type { LidarControls } from './lidar/useLidarControls';
 import type { StandardControls } from './standard/useStandardControls';
@@ -28,9 +26,11 @@ import type { TerrainAnalysis } from './terrain/useTerrainAnalysis';
  *
  * Terreng does not replace the background, it hides it. Leaving it therefore
  * costs nothing and returns you to exactly the dataset and style you left, so
- * 1→5→1 is free where 1→2→1 is a screenful of tile requests. Its rectangle
- * comes from the open lokalitet when there is one and from the viewport
- * otherwise, which is why entering it writes two different atoms.
+ * 1→5→1 is free where 1→2→1 is a screenful of tile requests. Its rectangle is
+ * the open lokalitet's, and there is no second answer any more: Terreng used
+ * to have a standalone entrance with a rectangle of its own, and selecting it
+ * with nothing open now **creates** the lokalitet instead (`createForTerrain`,
+ * docs/lokalitet-view.md §8). One rectangle, one owner of it.
  *
  * That cheapness has a price this hook pays for everyone: `mode` is the *only*
  * honest answer to "what ground is the user reading". The background layer is
@@ -94,26 +94,29 @@ export const useGroundMode = (
   lidar: LidarControls,
   flyfoto: FlyfotoControls,
   terrain: TerrainAnalysis,
-  viewport: ReturnType<typeof useTerrainViewport>,
+  /**
+   * What pressing Terreng with nothing open does: frame the visible map into
+   * a lokalitet and enter Terreng in it, or raise the sign-in dialog. The
+   * argument slot the standalone rectangle used to occupy.
+   */
+  createForTerrain: () => void,
 ) => {
   const locality = useAtomValue(activeLocalityAtom);
   const [tool, setTool] = useAtom(ribbonToolAtom);
-  const setStandaloneBbox = useSetAtom(terrainStandaloneBboxAtom);
   // Which half of the compare curtain the ribbon is pointed at, and therefore
   // which half everything below sets and reports. Always 'a' with the curtain
   // down, so nothing here changes for the ordinary single-ground case.
   const half = useAtomValue(focusedHalfAtom);
 
-  // Two entrances, never both live: with a lokalitet open the standalone
-  // rectangle is cleared and the panel runs off the lokalitet's own bbox.
+  // One entrance. Terreng is a reading *of a rectangle*, and the only
+  // rectangle in the app is a lokalitet's.
   //
   // Never on the B half. Terreng is a client-side render over the whole map
   // rather than a background, so it cannot be one side of a split — and while
   // focus is on B, `mode` has to name B's raster ground even though a terrain
   // render may well be up on the A side. That combination is supported, and
   // it is one of the better ones: relief left, photograph right.
-  const terrainActive =
-    half === 'a' && (locality ? tool === 'terrain' : viewport.active);
+  const terrainActive = half === 'a' && locality != null && tool === 'terrain';
 
   // Terreng first, because it is the only ground that leaves another one's
   // background switched on beneath it. Reading the background atom below this
@@ -131,8 +134,7 @@ export const useGroundMode = (
   const modifiers = groundModifiers(mode);
 
   const leaveTerrain = () => {
-    if (locality) setTool((cur) => (cur === 'terrain' ? null : cur));
-    else setStandaloneBbox(null);
+    setTool((cur) => (cur === 'terrain' ? null : cur));
   };
 
   // Deliberately not memoized: every branch closes over control objects that
@@ -169,11 +171,16 @@ export const useGroundMode = (
         flyfoto.enterFlyfoto();
         break;
       case 'terreng':
-        if (locality) setTool('terrain');
-        // frame() rather than toggle(): pressing 5 twice should be a no-op,
+        // Setting rather than toggling: pressing 5 twice should be a no-op,
         // not a close, because the peek below re-selects the mode you are
         // already on when it snaps back.
-        else if (!viewport.active) viewport.frame();
+        if (locality) setTool('terrain');
+        // Nothing open. Reading relief is the one thing here no WMS can do,
+        // so the answer is not a refusal — it is the rectangle, made. The
+        // cost is stated where it belongs (docs/lokalitet-view.md §8):
+        // computing relief now requires an account, because it now requires
+        // somewhere to put it.
+        else createForTerrain();
         break;
     }
   };

@@ -1,4 +1,4 @@
-import { useAtom, useSetAtom } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import type { ChangeEvent, MouseEvent } from 'react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +24,8 @@ import {
   toast,
   Tooltip,
 } from '../ui';
+import { CompareControl } from './compare/CompareControl';
+import { groundHandleAtom } from './groundHandle';
 import { ModeButton } from './ModeButton';
 import styles from './Ribbon.module.css';
 import rowStyles from './RibbonLocalityRow.module.css';
@@ -676,6 +678,48 @@ const EditExits = ({ ws }: { ws: LocalityWorkspaceApi }) => {
 };
 
 /**
+ * Terreng and Sammenlign, on the lokalitet row (docs/lokalitet-view.md §8).
+ *
+ * They read a rectangle and a second ground against the first, and neither is
+ * a thing you can do to the bare map any more: Terreng's standalone entrance
+ * is gone, and Sammenlign's only control left row 1 with it. Both are read
+ * tools, so they render in both stances and unabridged for a reader.
+ *
+ * The ring behind them is still `useGroundMode`, mounted once in
+ * `RibbonGlobalRow` — this reads the slice it publishes. `null` means row 1
+ * has not rendered yet (or crashed inside its own error boundary), and two
+ * buttons with nothing behind them are worse than a gap.
+ */
+const ReadTools = () => {
+  const { t } = useTranslation();
+  const ground = useAtomValue(groundHandleAtom);
+  if (!ground) return null;
+  return (
+    <>
+      {/* Digit 5 still selects it — the ring is a fact about GROUND_MODES,
+          not about which row draws the button. The one ground that cannot be
+          half of a comparison: it is a render over the whole map, not a
+          background. Disabled rather than hidden while the curtain's right
+          half has focus, so the row does not reflow as you flip A|B; a render
+          already up on the left half stays up. */}
+      <ModeButton
+        icon="elevation"
+        label={t('ribbon.terrain.label')}
+        tooltip={
+          ground.half === 'b'
+            ? t('ribbon.compare.noTerrainRight')
+            : `${t('ribbon.terrain.tip')} (5)`
+        }
+        active={ground.mode === 'terreng'}
+        disabled={ground.half === 'b'}
+        onClick={() => ground.select('terreng')}
+      />
+      <CompareControl ground={ground} />
+    </>
+  );
+};
+
+/**
  * Row 2 — the open lokalitet, in three zones (docs/lokalitet-view.md §5.1).
  *
  * | left   | identity  | *what am I looking at* | always    |
@@ -698,8 +742,10 @@ const EditExits = ({ ws }: { ws: LocalityWorkspaceApi }) => {
  * are one press from it and they cost nothing when nobody is reading them,
  * where the column cost 360 px of terrain always.
  *
- * Terreng and Sammenlign are not on it yet — they are ground modes and live
- * in row 1 with the other four until step 15's move.
+ * Terreng and Sammenlign are on it too (§8). They are read tools rather than
+ * ground picks — one asks the rectangle what shape it is, the other asks it
+ * to hold still beside another ground — so they sit with `Bilder ▾` in the
+ * reading zone, in both stances, and row 1 no longer offers either.
  */
 export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
@@ -807,13 +853,13 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         </div>
       )}
 
-      {/* Between the middle zone and the exits sit the read tools (§5.5).
-          `Terreng` and `Sammenlign` join them at step 15; today it is the one
-          toggle for the bottom edge. Present in **both** stances, because
-          looking at the images is not writing to them — which is the whole
-          argument of §2 — and it is the only control that puts the strip back
-          once it has been folded away. */}
+      {/* Between the middle zone and the exits sit the read tools (§5.5):
+          Terreng, Sammenlign, and the toggle for the bottom edge. All three
+          are present in **both** stances and in full for a reader, because
+          looking is not writing — which is the whole argument of §2. Only
+          their exits write, and those escalate on their own. */}
       <div className={rowStyles.reading}>
+        <ReadTools />
         <ModeButton
           icon="photo_library"
           label={t('localities.bilder.heading')}

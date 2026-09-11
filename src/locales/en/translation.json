@@ -495,11 +495,6 @@
       "lightLabel": "Light and opacity",
       "resolution": "{{m}} m/px · {{w}}×{{h}}",
       "resolutionCapped": "{{m}} m/px · {{w}}×{{h}} · source {{src}} m",
-      "reframe": "Move analysis here",
-      "reframeHint": "Fetches elevation data for the map view you are looking at now. The analysis sits on a fixed rectangle, so it does not follow when you pan.",
-      "saveNew": "Save as new lokalitet",
-      "saveFailed": "Could not save the image.",
-      "saving": "Saving …",
       "sourceLabel": "Elevation data (Kartverket)",
       "failed": "Could not fetch elevation data.",
       "empty": "No LiDAR data covers this rectangle."
@@ -651,9 +646,7 @@
     },
     "terrain": {
       "label": "Terrain",
-      "tip": "Terrain analysis of the visible map — fetch the elevation data and light it yourself. No lokalitet required",
-      "tooLarge": "The view covers too large an area for terrain analysis. Zoom in and try again.",
-      "unavailable": "Found no map view to analyse."
+      "tip": "Terrain analysis of the lokalitet's rectangle — fetch elevation data and light it yourself"
     }
   },
   "figure": {

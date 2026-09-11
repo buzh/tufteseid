@@ -32,6 +32,7 @@ import {
   heritageOpacityAtom,
   heritageRenderAtom,
 } from '../map/layers/heritage';
+import { leaveCompareAtom } from '../map/compare/atoms';
 import { compareOnAtom } from '../map/compare/halves';
 import type { BackgroundLayerName } from '../map/layers/backgroundLayers';
 import {
@@ -39,7 +40,6 @@ import {
   hybridOverlayHalves,
 } from '../map/layers/config/backgroundLayers/atoms';
 import { fitPadding } from '../shell/chromeInsets';
-import { terrainStandaloneBboxAtom } from '../terrain/atoms';
 import { toast } from '../ui';
 import {
   activeLocalityAtom,
@@ -243,7 +243,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const mode = useAtomValue(workspaceModeAtom);
   const stripOpen = useAtomValue(bilderStripOpenAtom);
   const [funnOutside, setFunnOutside] = useAtom(funnOutsideAtom);
-  const setTerrainStandaloneBbox = useSetAtom(terrainStandaloneBboxAtom);
+  const leaveCompare = useSetAtom(leaveCompareAtom);
   // Read only so a screenshot can say whose pixels are in it. Both halves of
   // the compare curtain, not the focused facade: a screenshot is of the whole
   // map, so a split one has two grounds in it and — where one of them is
@@ -691,10 +691,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // Draft/adjust/tool/selection cleanup when the workspace closes or
   // swaps lokalitet.
   useEffect(() => {
-    // A standalone terrain analysis may be up over the bare map. Opening a
-    // lokalitet rescopes the ribbon, and leaving a rectangle unrelated to it
-    // in row 3 would mean "Lagre" quietly created a *second* lokalitet.
-    setTerrainStandaloneBbox(null);
     return () => {
       // Before the clear below, not after: closing the workspace mid-stroke
       // should write the stroke, and the draw layer is where it still is.
@@ -702,21 +698,25 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setDraftActive(false);
       setAdjusting(false);
       setTool(null);
-      setLidarSelection(null);
       setSelectedFunnId(null);
       setFunnOutside(false);
       hideFunnOnLayer(null);
       getDrawLayer()?.getSource()?.clear();
+      // And the curtain comes down with the row that raised it
+      // (docs/lokalitet-view.md §8). Sammenlign's only control moved onto the
+      // lokalitet row, so leaving the lokalitet with it up would strand a
+      // second live tile stack on screen with no way to close it — which is
+      // Kartverket's request budget doubled, silently and indefinitely.
+      leaveCompare();
     };
   }, [
     locality.id,
     setDraftActive,
     setAdjusting,
     setTool,
-    setLidarSelection,
     setSelectedFunnId,
     setFunnOutside,
-    setTerrainStandaloneBbox,
+    leaveCompare,
   ]);
 
   // The funn draft used to be reset by the whole panel remounting on a
@@ -1012,7 +1012,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // Only the extract is dismissed — terrain is a read-only view of the
     // same rectangle and there is no reason drawing on top should close it.
     setTool((cur) => (cur === 'lidar' ? null : cur));
-    setLidarSelection(null);
     setDraftFunnId(null);
     setDraftIsEdit(false);
     setFunnTitle('');
@@ -1024,7 +1023,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setMarksHidden,
     setAdjusting,
     setTool,
-    setLidarSelection,
     setDraftActive,
   ]);
 
@@ -1221,7 +1219,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       } else if (wasChangedElsewhere) {
         // Last write wins, which is acceptable for one author with two tabs.
         // Doing it silently would not be (§5.6, consequence 5).
-        toast.info({ title: t('localities.edit.changedElsewhere') });
+        toast.create({ title: t('localities.edit.changedElsewhere') });
       }
     } finally {
       setSaving(false);

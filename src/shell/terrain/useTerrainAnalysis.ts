@@ -14,31 +14,26 @@
 // pinned bilde wants it too, so taking it here is also what unpins a bilde —
 // the arbiter is in that module.
 //
-// Two entrances resolve to one rectangle here rather than in two callers. A
-// lokalitet's Terreng analyses its bbox and saves into its Bilder; row 1's
-// Terreng with nothing open analyses the visible map and turns that rectangle
-// into a lokalitet on the way out. They can never both be live: opening a
-// lokalitet clears the standalone rectangle.
+// One rectangle, and it is always a lokalitet's. There used to be a second
+// entrance — a free-floating rectangle framed from row 1, with a `Lagre` that
+// created a lokalitet on the way out — and this hook existed partly to resolve
+// the two. It is gone (docs/lokalitet-view.md §8): pressing Terreng with
+// nothing open makes the lokalitet first, so by the time the DEM is fetched
+// there is exactly one answer to "what am I analysing", and keeping the render
+// is `Behold` like every other image.
 //
 // Why any of this: docs/terrain-analysis.md. The control surface:
 // docs/ui-architecture.md §10.
 
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { createAttachmentSpec } from '../../api/attachments';
 import type { LocalityBbox } from '../../api/localities';
-import { currentUserAtom } from '../../auth/atoms';
-import { isAuthDialogOpenAtom } from '../../auth/atoms-dialog';
 import {
   activeLocalityAtom,
   coverTerrainSpecAtom,
-  editingLocalityIdAtom,
-  pendingStarterLocalityIdAtom,
 } from '../../localities/atoms';
 import type { BeholdKey, BeholdSpec } from '../../localities/behold';
-import { createLocalityFromBbox } from '../../localities/createFromBbox';
-import { enqueuePin } from '../../localities/pinQueue';
 import { ribbonToolAtom } from '../../localities/toolAtoms';
 import {
   hideGroundOverlay,
@@ -46,7 +41,6 @@ import {
   showGroundOverlay,
 } from '../../map/groundOverlay';
 import type { CycleKey } from '../../map/useBackgroundCyclingKeys';
-import { terrainStandaloneBboxAtom } from '../../terrain/atoms';
 import { fetchDem, type Dem, type DemModel } from '../../terrain/dem';
 import {
   clampRadius,
@@ -63,8 +57,6 @@ import {
   usesHorizon,
 } from '../../terrain/render';
 import { computeHorizonFields, type Visualization } from '../../terrain/shade';
-import { useTerrainViewport } from '../../terrain/useTerrainViewport';
-import { toast } from '../../ui';
 
 /**
  * The eight views, in the order the pulldown lists them and W/S walks them.
@@ -90,28 +82,15 @@ export const VISUALIZATIONS: Visualization[] = [
 
 export const useTerrainAnalysis = () => {
   const { t } = useTranslation();
-  const user = useAtomValue(currentUserAtom);
-  const openAuthDialog = useSetAtom(isAuthDialogOpenAtom);
   const locality = useAtomValue(activeLocalityAtom);
-  const setActiveLocality = useSetAtom(activeLocalityAtom);
-  const setEditingLocalityId = useSetAtom(editingLocalityIdAtom);
-  const setPendingStarter = useSetAtom(pendingStarterLocalityIdAtom);
   const coverTerrainSpec = useAtomValue(coverTerrainSpecAtom);
   const tool = useAtomValue(ribbonToolAtom);
-  const standaloneBbox = useAtomValue(terrainStandaloneBboxAtom);
-  // Only the standalone entrance can re-frame; with a lokalitet open the
-  // rectangle is the lokalitet's, and "Juster området" in the lokalitet row
-  // owns it.
-  const { frame } = useTerrainViewport();
 
   // Which rectangle is being analysed, or null when the tool is not up. The
   // lokalitet's own bbox rather than a copy: that is what makes "Juster
   // området" refetch the DEM for free.
-  const bbox: LocalityBbox | null = locality
-    ? tool === 'terrain'
-      ? locality.bbox
-      : null
-    : standaloneBbox;
+  const bbox: LocalityBbox | null =
+    locality && tool === 'terrain' ? locality.bbox : null;
 
   const [model, setModel] = useState<DemModel>('dtm');
   const [dem, setDem] = useState<Dem | null>(null);
@@ -151,8 +130,7 @@ export const useTerrainAnalysis = () => {
   // ways of drawing one question are a list and a ring, not eight buttons.
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  const [saving, setSaving] = useState(false);
-  // Off-DOM: this canvas is the layer's image and the blob "Lagre" keeps, and
+  // Off-DOM: this canvas is the layer's image and the one `Behold` keeps, and
   // it is never shown in a row. React does not own it either — the OL source
   // draws from this exact element.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -360,92 +338,6 @@ export const useTerrainAnalysis = () => {
     };
   }, [dem, vis, model, azimuth, altitude, zFactor, radius, radiusLimits]);
 
-  /*
-   * "Lagre som ny lokalitet" — the row-1 entrance's one write.
-   *
-   * It no longer has a second path. Keeping a render into a lokalitet that is
-   * already open is `Behold` on the lokalitet row (`localities/behold.ts`),
-   * where it is gated on `canAdd` like every other write verb; this used to
-   * be the one place a stranger's lokalitet could be written to by accident.
-   * So the `locality` guard here is not defensive tidiness — it is the
-   * statement that this function only ever creates.
-   */
-  const save = useCallback(async () => {
-    if (locality || !canvasRef.current || !dem || !bbox || saving) return;
-    // Signed out is a normal state here — the whole point of Terreng in row 1
-    // is that reading the ground needs no account. Only keeping the render
-    // does.
-    if (!user) {
-      openAuthDialog(true);
-      return;
-    }
-    setSaving(true);
-    try {
-      // The analysed rectangle becomes the lokalitet. Deliberately `bbox` and
-      // not the current view — the map is live under the ribbon, so the user
-      // has probably panned since pressing Terreng.
-      //
-      // Before the spec rather than after, so the figure's title can carry
-      // the name the registers just gave the rectangle.
-      const target = await createLocalityFromBbox(
-        bbox,
-        user.id,
-        t('localities.defaultName'),
-      );
-      if (!target) {
-        toast.error({ title: t('localities.createFailed') });
-        return;
-      }
-
-      const spec = describe();
-      if (!spec) return;
-
-      // The row and then the pixels, in that order and with only the first
-      // one awaited (§4.1.2). The lokalitet opens two lines below this with
-      // the render already in its Bilder as a card that says it is being
-      // fetched — rather than after a five-second wait on a screen that has
-      // not changed since the press.
-      const rec = await createAttachmentSpec(
-        {
-          locality: target.id,
-          kind: spec.kind,
-          caption: spec.caption,
-          meta: spec.meta,
-        },
-        user.id,
-      );
-      enqueuePin({ rec, bbox4326: bbox, subject: target.name || undefined });
-
-      // Opening the new lokalitet is the receipt: the ribbon rescopes to it
-      // and the render is sitting in its Bilder. In edit, because you are
-      // there to keep a render and the rest of the loop — name it, draw on
-      // it, keep another — is all on the far side of that stance (§3).
-      setActiveLocality(target);
-      setEditingLocalityId(target.id);
-      // The starter set follows it in, same as a lokalitet framed from the
-      // viewport: this render is one reading of the ground and the three
-      // laser readings are the ones you compare it against.
-      setPendingStarter(target.id);
-    } catch (e) {
-      console.warn('[terrain] save failed', e);
-      toast.error({ title: t('localities.terrain.saveFailed') });
-    } finally {
-      setSaving(false);
-    }
-  }, [
-    locality,
-    bbox,
-    user,
-    openAuthDialog,
-    setActiveLocality,
-    setEditingLocalityId,
-    setPendingStarter,
-    saving,
-    dem,
-    describe,
-    t,
-  ]);
-
   // Clicking a row picks *and* dismisses; W/S below picks without closing, so
   // the selection can be walked down an open list. Same split as the other
   // three pulldowns.
@@ -567,8 +459,6 @@ export const useTerrainAnalysis = () => {
   };
 
   return {
-    hasLocality: locality != null,
-    frame,
     cycle,
     standDown,
     pickerOpen,
@@ -583,8 +473,6 @@ export const useTerrainAnalysis = () => {
     dem,
     loading,
     error,
-    saving,
-    save,
     // What the lokalitet row's `Behold` needs from this tool, and all it
     // needs: what the render *is*, and how to tell whether it is already in
     // the Bilder. Published through `beholdOfferAtom`, not props — row 1 and

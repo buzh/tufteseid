@@ -495,11 +495,6 @@
       "lightLabel": "Lys og dekkraft",
       "resolution": "{{m}} m/px · {{w}}×{{h}}",
       "resolutionCapped": "{{m}} m/px · {{w}}×{{h}} · kilde {{src}} m",
-      "reframe": "Flytt analysen hit",
-      "reframeHint": "Henter høydedata for kartutsnittet du ser nå. Analysen står på et fast rektangel, så den følger ikke med når du panorerer.",
-      "saveNew": "Lagre som ny lokalitet",
-      "saveFailed": "Klarte ikke å lagre bildet.",
-      "saving": "Lagrer …",
       "sourceLabel": "Høydedata (Kartverket)",
       "failed": "Klarte ikke å hente høydedata.",
       "empty": "Ingen laserdata dekker dette rektangelet."
@@ -651,9 +646,7 @@
     },
     "terrain": {
       "label": "Terreng",
-      "tip": "Terrenganalyse av kartutsnittet — hent høydedata og belys dem selv. Krever ingen lokalitet",
-      "tooLarge": "Utsnittet dekker for stort område for terrenganalyse. Zoom inn og prøv igjen.",
-      "unavailable": "Fant ikke noe kartutsnitt å analysere."
+      "tip": "Terrenganalyse av lokalitetens rektangel — hent høydedata og belys dem selv"
     }
   },
   "figure": {

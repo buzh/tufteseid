@@ -20,15 +20,6 @@
   color: var(--c-danger);
 }
 
-/* The two verbs stay glued when the strip wraps: "Flytt analysen hit" and
-   "Lagre som ny lokalitet" are a pair of decisions about the same rectangle,
-   and one of them arriving alone on a line reads as a different control. */
-.actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-
 /* Fixed basis and no stretch: a light-sweep slider needs travel, and letting
    four of them share the row's free space would give each about a
    centimetre on a laptop. */

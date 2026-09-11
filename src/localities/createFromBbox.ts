@@ -157,8 +157,12 @@ export const useCreateLocalityFromViewport = () => {
   const setPendingStarter = useSetAtom(pendingStarterLocalityIdAtom);
   const [creating, setCreating] = useState(false);
 
-  const create = useCallback(async () => {
-    if (!user || creating) return;
+  // Hands the record back, for the one caller that has something to do to it
+  // afterwards: pressing Terreng with nothing open (docs/lokalitet-view.md
+  // §8) creates the rectangle and then enters the tool in it, and "then"
+  // needs to know whether there is a rectangle to enter.
+  const create = useCallback(async (): Promise<LocalityRecord | null> => {
+    if (!user || creating) return null;
     const result = viewportBbox(map);
     if (!result.ok) {
       toast.error({
@@ -167,7 +171,7 @@ export const useCreateLocalityFromViewport = () => {
             ? t('localities.createTooLarge')
             : t('localities.createFailed'),
       });
-      return;
+      return null;
     }
     setCreating(true);
     try {
@@ -178,7 +182,7 @@ export const useCreateLocalityFromViewport = () => {
       );
       if (!rec) {
         toast.error({ title: t('localities.createFailed') });
-        return;
+        return null;
       }
       // The one exception to "every lokalitet opens in show"
       // (docs/lokalitet-view.md §3): a rectangle framed thirty seconds ago
@@ -192,6 +196,7 @@ export const useCreateLocalityFromViewport = () => {
       // anyway, and the press that used to do it was a menu item you had to
       // know about (docs/lokalitet-view.md §4.3, §12).
       setPendingStarter(rec.id);
+      return rec;
     } finally {
       setCreating(false);
     }
