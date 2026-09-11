@@ -4,8 +4,8 @@ import { Geometry } from 'ol/geom';
 import { useCallback, useEffect } from 'react';
 import { mapAtom } from '../map/atoms';
 import { hasVisibleLayerWithIdIn } from '../map/featureInfo/featureInfoService';
+import { infoClickArmedAtom } from '../map/featureInfo/infoTool';
 import { CULTURAL_HERITAGE_LAYER_IDS } from '../map/layers/config/themeLayers/culturalHeritage';
-import { mapToolAtom } from '../map/overlay/atoms';
 import { ProjectionIdentifier } from '../map/projections/types';
 import { ParsedCoordinate } from '../shared/utils/coordinateParser';
 import { SearchResult } from '../types/searchTypes';
@@ -74,11 +74,11 @@ export const useMapClickSearch = () => {
   const mapClickHandler = useCallback(
     (e: MapBrowserEvent) => {
       const store = getDefaultStore();
-      // A tool owns the map click while it is open. 'layers' used to be the
-      // exception — clicking the map dismissed the theme-layer card first and
-      // then acted normally — but that card is gone; the heritage settings
-      // are a popover now, which closes itself on any outside pointerdown.
-      if (store.get(mapToolAtom)) {
+      // The coordinate readout is half of Stedsinfo — the other half is
+      // useFeatureInfoClick — so it answers to the same arming flag, which
+      // also stands the two of them down while measure or drawing owns the
+      // click (src/map/featureInfo/infoTool.ts).
+      if (!store.get(infoClickArmedAtom)) {
         return;
       }
 

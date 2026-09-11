@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { marksHiddenAtom } from '../localities/atoms';
 import { anyOverlayOpenAtom } from '../ui/overlayAtoms';
 import { compareFocusAtom, compareOnAtom } from './compare/halves';
+import { infoToolAtom } from './featureInfo/infoTool';
 
 /*
  * The map's keyboard layer: which ground you are on, and which variant of it.
@@ -17,10 +18,11 @@ import { compareFocusAtom, compareOnAtom } from './compare/halves';
  * ortofoto acquisitions in flyfoto mode. A/D and E are LiDAR-only.
  * docs/ui-architecture.md §5.3.
  *
- * H takes our own marks off the map and puts them back, and C flips which
- * half of the compare curtain everything above is aimed at. Neither needs a
+ * H takes our own marks off the map and puts them back, I arms Stedsinfo so
+ * a click asks the registers about a point, and C flips which half of the
+ * compare curtain everything above is aimed at. None of the three needs a
  * registered handler — one atom each and no mode owns them — so they are the
- * two keys here written straight against atoms.
+ * keys here written straight against atoms.
  *
  * C is what keeps the curtain usable from the keyboard at all: with it, "the
  * 1937 flight on the right against 2024 on the left" is C W W C, and without
@@ -67,6 +69,8 @@ const GROUND_KEYS: readonly string[] = ['1', '2', '3', '4', '5'];
 const PEEK_KEY = 'x';
 // Hide/show funn, their halo and the lokalitet rectangles.
 const MARKS_KEY = 'h';
+// Arm/disarm Stedsinfo, the click-the-map-for-a-readout tool.
+const INFO_KEY = 'i';
 // Point the ribbon at the other half of the compare curtain. Inert while the
 // curtain is down, and deliberately not a way of raising it: entering compare
 // is a decision about how many tile stacks this deployment is paying for.
@@ -131,8 +135,10 @@ export const useBackgroundCyclingKeys = () => {
       const isGround = GROUND_KEYS.includes(key);
       const isPeek = key === PEEK_KEY;
       const isMarks = key === MARKS_KEY;
+      const isInfo = key === INFO_KEY;
       const isHalf = key === HALF_KEY;
-      if (!isCycle && !isGround && !isPeek && !isMarks && !isHalf) return;
+      if (!isCycle && !isGround && !isPeek && !isMarks && !isInfo && !isHalf)
+        return;
 
       const target = event.target;
       if (
@@ -155,6 +161,8 @@ export const useBackgroundCyclingKeys = () => {
 
       if (isMarks) {
         store.set(marksHiddenAtom, (prev) => !prev);
+      } else if (isInfo) {
+        store.set(infoToolAtom, !store.get(infoToolAtom));
       } else if (isHalf) {
         if (!store.get(compareOnAtom)) return;
         store.set(compareFocusAtom, (prev) => (prev === 'a' ? 'b' : 'a'));

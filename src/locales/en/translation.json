@@ -502,6 +502,10 @@
       "label": "Hide marks",
       "tip": "Hide finds and locality frames so they do not cover what you are comparing"
     },
+    "info": {
+      "label": "Point info",
+      "tip": "Click the map for place name, property, elevation and heritage records"
+    },
     "heritage": {
       "label": "Heritage",
       "tip": "Heritage sites and monuments",

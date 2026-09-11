@@ -502,6 +502,10 @@
       "label": "Skjul merker",
       "tip": "Skjul funn og lokalitetsrammer, så de ikke dekker det du sammenligner"
     },
+    "info": {
+      "label": "Stedsinfo",
+      "tip": "Klikk i kartet for stedsnavn, eiendom, høyde og kulturminner"
+    },
     "heritage": {
       "label": "Kulturminner",
       "tip": "Lokaliteter og enkeltminner",

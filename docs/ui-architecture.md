@@ -402,7 +402,10 @@ subsume.
   (`src/shell/dockSlot.ts` — the portal target, a DOM node rather than a value)
   and `terrainStandaloneBboxAtom` (`src/terrain/atoms.ts`).
 - **Search** — query, results, selected result, marker, infobox visibility.
-- **Feature info** — the clicked-position readout and the Kulturminner popup.
+- **Feature info** — the clicked-position readout and the Kulturminner popup,
+  plus `infoToolAtom` / the derived `infoClickArmedAtom`
+  (`src/map/featureInfo/infoTool.ts`), which decide whether a map click asks
+  anything at all (§7.1). Not persisted to the URL.
 - **Draw** — the largest single cluster (`src/settings/draw/atoms.ts`, 375
   lines): active tool, colour, line width, line style, point style, text style,
   measurement toggles, undo/redo stacks.
@@ -509,6 +512,7 @@ looking at. Row 1 answers **what am I looking at**; the strip under it answers
 | **Skjul merker** (H) | Takes our own marks — funn, their halo, the lokalitet rectangles — off the map for as long as it is pressed in (§8.6) |
 | **Kulturminner** | Toggles `heritageSites`, the one register most readings start from |
 | **Oppsett** (`tune`) | Popover: the five RA sources, kulturminner2's three sublayers, how they are drawn and how strongly (§5.9) |
+| **Stedsinfo** (I) | Arms the point readout: while it is on, a click asks the registers about that spot (§7.1). Off on arrival |
 | Mål | Popover with the measure tools |
 | Mine lokaliteter | Opens the localities card (signed in only) |
 | Ny lokalitet | Creates a lokalitet from the visible map (signed in only, §5.6) |
@@ -659,6 +663,8 @@ re-attaching the listener continuously.
   boolean and no mode owns it, so there is nothing for a component to
   contribute. It is a press rather than a hold because judging a bump against a
   1937 photograph takes longer than a key can comfortably be held down.
+- **I** — arm/disarm Stedsinfo, the click-the-map-for-a-readout tool (§7.1).
+  Written straight against `infoToolAtom` for the same reason H is.
 - **C** — flip which half of the compare curtain everything else describes
   (§5.8); a no-op when the curtain is down. Written against `compareFocusAtom`
   directly, for the same reason H is. It is what keeps the curtain usable from
@@ -1239,7 +1245,38 @@ they stay.
 
 ### 7.1 Feature info
 
-Two surfaces, which is one more than a user needs:
+**It is a tool now, and it is off on arrival.** Stedsinfo — the ribbon toggle
+beside Mål, or `I` — arms the readout; until it is armed, clicking the map does
+nothing at all. Until 2026-09-11 every click on the map queried stedsnavn,
+matrikkel, elevation and every visible WMS, dropped a marker and opened a panel
+over the terrain. That makes the map's primary gesture a question nobody asked:
+reading relief means clicking around constantly — to pan from, to check a
+coordinate against the dock — and each of those clicks cost a panel to dismiss
+and a request to the registers. Arming is cheap and one press; asking by
+accident is not.
+
+`src/map/featureInfo/infoTool.ts` holds both atoms and is the whole of the
+policy:
+
+- `infoToolAtom` — the button and the key. Writing `false` also clears the
+  Kulturminner popup, the feature-info panel and a *coordinate* selected result;
+  a search result is left alone, since the panel is its surface too and the
+  search did not come from this tool.
+- `infoClickArmedAtom` — what the two `singleclick` handlers actually read:
+  armed, **and** neither measure nor funn drawing owns the click. Suspension
+  rather than disarming, exactly as `drawEnabledAtom` already does for measure
+  — leaving measure or closing the draft puts the tool back as it was found.
+
+Both halves of the readout answer to it, because it takes two handlers to
+produce one panel: `useFeatureInfoClick` (GetFeatureInfo, the Kulturminner
+popup) and `useMapClickSearch` (the coordinate marker and `selectedResultAtom`,
+which is what actually opens the InfoBox). The second used to bail on *any*
+`mapToolAtom`, so the localities card suppressed the readout as a side effect of
+being open; it no longer does, and the one rule is the arming flag. The armed
+map carries a `crosshair` cursor, since a mode with no cursor of its own is a
+mode you forget you left on.
+
+The two surfaces below are one more than a user needs:
 
 - `src/search/infobox/InfoBox.tsx` + `FeatureInfoSection.tsx` — the right-column
   panel, showing coordinates, elevation, and WMS GetFeatureInfo results for the
@@ -2203,7 +2240,8 @@ scale bar; F11 fullscreen; deep-link to a view via `?lat/lon/zoom`.
 **Find a place**
 search place names; search addresses; search cadastral properties; filter the
 search by source; clear the search; select a result (marker + fly-to + InfoBox);
-click the map for a coordinate + elevation readout.
+arm Stedsinfo (button or `I`) and click the map for a coordinate + elevation
+readout.
 
 **Choose what the terrain looks like** — the core of the tool
 switch Standard / LiDAR / Hybrid / Flyfoto / Terreng, by button or by digits
@@ -2239,8 +2277,9 @@ individually; see the active-source count on the trigger; clear them all; pick
 which of kulturminner2's three registers (lokaliteter / enkeltminner /
 sikringssoner) are drawn; draw them as outlines or filled; narrow the map to one
 vern class (fredede, verneverdige, listeførte, uten vern, uavklart); dim the
-whole overlay with a slider so the relief under it stays readable; click a
-heritage feature for its attributes; deep-link all of it via `?themeLayers`,
+whole overlay with a slider so the relief under it stays readable; with
+Stedsinfo armed, click a heritage feature for its attributes; deep-link all of
+it via `?themeLayers`,
 `?heritageDetails`, `?heritageRender` and `?heritageOpacity`.
 
 **Measure**

@@ -20,6 +20,7 @@ import {
   hasVisibleLayerWithIdIn,
   hasVisibleQueryableLayers,
 } from './featureInfoService';
+import { infoClickArmedAtom } from './infoTool';
 
 export const buildCoordinateResult = (
   coordinate: [number, number],
@@ -42,6 +43,7 @@ export const buildCoordinateResult = (
 };
 
 export const useFeatureInfoClick = () => {
+  const armed = useAtomValue(infoClickArmedAtom);
   const setFeatureInfoResult = useSetAtom(featureInfoResultAtom);
   const setFeatureInfoLoading = useSetAtom(featureInfoLoadingAtom);
   const setFeatureInfoPanelOpen = useSetAtom(featureInfoPanelOpenAtom);
@@ -50,7 +52,13 @@ export const useFeatureInfoClick = () => {
 
   const handleMapClick = useCallback(
     async (e: Event | BaseEvent) => {
-      const map = getDefaultStore().get(mapAtom);
+      const store = getDefaultStore();
+      // Stedsinfo is a tool, and it is off until someone arms it: the map's
+      // primary gesture is looking, not asking. src/map/featureInfo/infoTool.ts.
+      if (!store.get(infoClickArmedAtom)) {
+        return;
+      }
+      const map = store.get(mapAtom);
       const contextMenuOpen = document.querySelector(
         '[data-context-menu-open]',
       );
@@ -138,6 +146,17 @@ export const useFeatureInfoClick = () => {
       map.un('singleclick', handleMapClick);
     };
   }, [handleMapClick]);
+
+  // A mode with no cursor of its own is a mode you forget you left on, and
+  // this one only answers when it is clicked — so the pointer says so.
+  useEffect(() => {
+    if (!armed) return;
+    const viewport = getDefaultStore().get(mapAtom).getViewport();
+    viewport.style.cursor = 'crosshair';
+    return () => {
+      viewport.style.cursor = '';
+    };
+  }, [armed]);
 
   const closeFeatureInfoPanel = useCallback(() => {
     setFeatureInfoPanelOpen(false);

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { isSignedInAtom } from '../auth/atoms';
 import { marksHiddenAtom } from '../localities/atoms';
 import { useCreateLocalityFromViewport } from '../localities/createFromBbox';
+import { infoToolAtom } from '../map/featureInfo/infoTool';
 import { activeThemeLayersAtom } from '../map/layers/atoms';
 import type { ThemeLayerName } from '../map/layers/themeWMS';
 import { type MapTool, mapToolAtom } from '../map/overlay/atoms';
@@ -70,6 +71,7 @@ export const RibbonGlobalRow = () => {
   const { t } = useTranslation();
   const isSignedIn = useAtomValue(isSignedInAtom);
   const [tool, setTool] = useAtom(mapToolAtom);
+  const [infoTool, setInfoTool] = useAtom(infoToolAtom);
   const [marksHidden, setMarksHidden] = useAtom(marksHiddenAtom);
   const [themeLayers, setThemeLayers] = useAtom(activeThemeLayersAtom);
   const standard = useStandardControls();
@@ -228,6 +230,18 @@ export const RibbonGlobalRow = () => {
         <div className={styles.divider} />
 
         <div className={styles.group}>
+          {/* Stedsinfo. Beside Mål because they are the same kind of thing —
+              a question you put to the map by clicking it, and a mode you
+              stay in while you do. It is off on arrival: clicking used to
+              interrogate every register unasked, which turned panning away
+              from a click into a panel to dismiss. */}
+          <ModeButton
+            icon="info"
+            label={t('ribbon.info.label')}
+            tooltip={`${t('ribbon.info.tip')} (I)`}
+            active={infoTool}
+            onClick={() => setInfoTool(!infoTool)}
+          />
           <RibbonMeasure />
         </div>
 

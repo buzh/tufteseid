@@ -97,7 +97,9 @@ that owns them.
 - **The registers, answerable per point**: stedsnavn, kommune, matrikkel and
   the kulturminner WFS readout — `docs/map-layers.md`; the elevation readout
   behind a clicked point is the hoydedata.no ArcGIS identify in
-  `src/search/searchApi.ts` — `docs/ui-architecture.md` §7, §7.1.
+  `src/search/searchApi.ts` — `docs/ui-architecture.md` §7, §7.1. Behind
+  **Stedsinfo**, a ribbon toggle (`I`) that is off on arrival: a map click asks
+  the registers nothing until the tool is armed.
 - **Search** over place names, addresses and matrikkel, with an InfoBox for
   the picked point — `docs/ui-architecture.md` §7.
 - **A float elevation grid for any rectangle**, with eight relief
