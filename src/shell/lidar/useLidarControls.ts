@@ -1,6 +1,11 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { transformExtent } from 'ol/proj';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type LidarSource,
+  nationalLidarSource,
+  projectLidarSource,
+} from '../../lidarExtract/sources';
 import { mapAtom } from '../../map/atoms';
 import {
   backgroundLayerAtom,
@@ -325,6 +330,28 @@ export const useLidarControls = () => {
   // model's own style rather than the DTM pick being held for later.
   const shownStyle = effectiveLidarStyle(activeLidarStyle, lidarModel);
 
+  /*
+   * The same dataset, said in the extract tool's vocabulary — what `Behold`
+   * stitches when the LiDAR ground is the one on screen
+   * (docs/lokalitet-view.md §4.3).
+   *
+   * Built here rather than by re-enumerating from a bbox, because "which
+   * dataset" is a question this hook has already answered: `Behold` keeps the
+   * ground *you are looking at*, so going back to the catalogue could only
+   * produce a different answer, and a different answer is the bug.
+   *
+   * Null while the national mosaic's style list is still in flight. It is
+   * cached and normally instant, but a source advertising no styles at all
+   * would let a stitch ask for one the service does not publish.
+   */
+  const activeLidarSource = useMemo((): LidarSource | null => {
+    if (isLidarProject && activeLidarProject) {
+      return projectLidarSource(activeLidarProject, lidarModel);
+    }
+    if (nationalStyles.length === 0) return null;
+    return nationalLidarSource(nationalStyles, lidarModel);
+  }, [isLidarProject, activeLidarProject, nationalStyles, lidarModel]);
+
   // Armed by a keypress, list not back yet — 'idle' covers the tick between
   // arming and the fetch effect starting.
   const cyclingPending =
@@ -433,6 +460,8 @@ export const useLidarControls = () => {
     tierBStyles,
     shownStyle,
     setActiveLidarStyle,
+    // Dataset + style + model as one thing the stitcher can take
+    activeLidarSource,
     // Model
     lidarModel,
     setLidarModel,

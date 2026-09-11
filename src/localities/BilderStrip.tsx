@@ -1,93 +1,23 @@
 import { useSetAtom } from 'jotai';
-import { type DragEvent, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { AttachmentRecord } from '../api/attachments';
+import { Button, cx, Icon, IconButton, Spinner, Tooltip } from '../ui';
 import {
-  AttachmentKind,
-  AttachmentRecord,
-  getAttachmentUrl,
-} from '../api/attachments';
-import { recreateViewAtom } from '../shell/useRecreateView';
-import {
-  Badge,
-  Button,
-  ConfirmPopover,
-  cx,
-  Icon,
-  IconButton,
-  Input,
-  type MaterialSymbol,
-  Spinner,
-  Tooltip,
-} from '../ui';
+  BildeBadges,
+  CaptionField,
+  FadeControl,
+  KIND_ICON,
+  MetaLine,
+  Note,
+  OpenOriginalButton,
+  RecreateButton,
+  useAttachmentUrl,
+} from './bilderCommon';
 import styles from './BilderStrip.module.css';
 import { bilderStripOpenAtom } from './toolAtoms';
 import type { LocalityWorkspaceApi } from './useLocalityWorkspace';
 import { canPinBilde } from './usePinnedBilde';
-import { viewSpecOf } from './viewSpec';
-
-// `landscape` is what the ribbon already uses for LiDAR mode, so an
-// extract carries the same mark here. (Material Symbols' `terrain` isn't
-// in the set material-symbols ships types for.)
-const KIND_ICON: Record<AttachmentKind, MaterialSymbol> = {
-  extract: 'landscape',
-  screenshot: 'photo_camera',
-  upload: 'image',
-  flyfoto: 'satellite_alt',
-};
-
-// Tokened URLs are async (the file field is protected), so every image
-// needs a small fetch-then-render dance. `thumb` falls back to the
-// original when PB can't generate one — it regularly can't for the huge
-// stitched extract PNGs.
-const useAttachmentUrl = (
-  rec: AttachmentRecord | null,
-  thumb?: '200x200' | '800x0',
-) => {
-  const [url, setUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    setUrl(null);
-    setFailed(false);
-    setError(false);
-  }, [rec?.id]);
-
-  useEffect(() => {
-    if (!rec) return;
-    let cancelled = false;
-    getAttachmentUrl(rec, failed ? undefined : thumb)
-      .then((u) => {
-        if (!cancelled) setUrl(u);
-      })
-      .catch((e) => {
-        console.warn('[BilderStrip] url failed', e);
-        // Say so. Left to itself the tile keeps its spinner up forever,
-        // which reads as "still loading" for something that will never
-        // arrive.
-        if (!cancelled) setError(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // `rec` is read, not depended on: the list reloads on every realtime
-    // event and a fresh object identity would refetch every token.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rec?.id, rec?.file, thumb, failed]);
-
-  return { url, error, onError: () => setFailed(true) };
-};
-
-const MetaLine = ({ rec }: { rec: AttachmentRecord }) => {
-  const meta = rec.meta ?? {};
-  const parts = [
-    typeof meta.sourceLabel === 'string' ? meta.sourceLabel : null,
-    typeof meta.style === 'string' ? meta.style : null,
-    typeof meta.metresPerPx === 'number' ? `${meta.metresPerPx} m/px` : null,
-  ].filter((s): s is string => !!s);
-  if (parts.length === 0) return null;
-  return <p className={styles.metaLine}>{parts.join(' · ')}</p>;
-};
 
 /*
  * One frame of the rail.
@@ -96,34 +26,17 @@ const MetaLine = ({ rec }: { rec: AttachmentRecord }) => {
  * the strip and the twelfth image is off the right-hand end of it — a
  * keyboard step that changes the map but not the rail would leave you unable
  * to see what you are looking at.
- *
- * In edit it is also a drag handle (§4.4). The frame stays a button through
- * it: dragging is the fast way to order the exhibit, not the only one, and
- * the two arrows on the detail line are what a touchscreen and a keyboard
- * use instead.
  */
 const Frame = ({
   rec,
   selected,
   isCover,
-  draggable,
-  dragOver,
   onClick,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
 }: {
   rec: AttachmentRecord;
   selected: boolean;
   isCover: boolean;
-  draggable: boolean;
-  dragOver: boolean;
   onClick: () => void;
-  onDragStart: (e: DragEvent) => void;
-  onDragOver: () => void;
-  onDrop: () => void;
-  onDragEnd: () => void;
 }) => {
   const { url, error, onError } = useAttachmentUrl(rec, '200x200');
   const { t } = useTranslation();
@@ -142,38 +55,12 @@ const Frame = ({
     <button
       ref={ref}
       type="button"
-      className={cx(
-        styles.frame,
-        selected && styles.frameOn,
-        rec.hidden && styles.frameHidden,
-        dragOver && styles.frameDrop,
-      )}
+      className={cx(styles.frame, selected && styles.frameOn)}
       aria-pressed={selected}
       title={
         error ? t('localities.bilder.loadFailed') : rec.caption || rec.kind
       }
-      draggable={draggable || undefined}
       onClick={onClick}
-      onDragStart={onDragStart}
-      onDragOver={
-        draggable
-          ? (e) => {
-              // Without this the drop never fires: the default action of
-              // dragover is "refuse".
-              e.preventDefault();
-              onDragOver();
-            }
-          : undefined
-      }
-      onDrop={
-        draggable
-          ? (e) => {
-              e.preventDefault();
-              onDrop();
-            }
-          : undefined
-      }
-      onDragEnd={draggable ? onDragEnd : undefined}
     >
       {url ? (
         <img
@@ -195,15 +82,10 @@ const Frame = ({
         <Icon icon={KIND_ICON[rec.kind]} size={14} />
       </span>
       {/* The cover is derived, so this mark is the only place it is stated —
-          and it moves the moment something else is dragged in front of it. */}
+          and it moves the moment something else is arranged in front of it. */}
       {isCover && (
         <span className={cx(styles.mark, styles.coverMark)}>
           <Icon icon="star" size={13} filled />
-        </span>
-      )}
-      {rec.hidden && (
-        <span className={cx(styles.mark, styles.hiddenMark)}>
-          <Icon icon="visibility_off" size={13} />
         </span>
       )}
     </button>
@@ -211,74 +93,33 @@ const Frame = ({
 };
 
 /*
- * What you can do with the image the strip is pointing at.
- *
- * The four verbs of §4.2, and all four are reads: Vis i ruta (which picking
- * the frame already did), Toning, Gjenskap, and the original. Delete and the
- * caption are the writes, and they are the two things the strip hides in show
- * — the caption as `readOnly` rather than absent, because a caption is the
- * record's content and dimming it would hide what the exhibit says.
+ * What you can do with the image the strip is pointing at, and it is all
+ * reading: Vis i ruta (which picking the frame already did), Toning, Gjenskap
+ * and the original. The caption is here too, `readOnly` rather than absent,
+ * because a caption is the record's content and hiding what the exhibit says
+ * would be a strange way to show it (§8.1).
  */
 const Detail = ({
   ws,
   rec,
-  index,
-  count,
 }: {
   ws: LocalityWorkspaceApi;
   rec: AttachmentRecord;
-  index: number;
-  count: number;
 }) => {
   const { t } = useTranslation();
-  const recreate = useSetAtom(recreateViewAtom);
-  const [caption, setCaption] = useState(rec.caption ?? '');
-
-  useEffect(() => {
-    setCaption(rec.caption ?? '');
-  }, [rec.id, rec.caption]);
-
   const { pinned } = ws;
   const isPinned = pinned.pinnedId === rec.id;
-  const pinnable = canPinBilde(rec);
-  // Absent rather than disabled, per §4.2: a screenshot has no view behind it
-  // to go back to, which is a different statement from "you may not".
-  const spec = viewSpecOf(rec);
-
-  const openOriginal = () => {
-    getAttachmentUrl(rec)
-      .then((u) => window.open(u, '_blank', 'noopener'))
-      .catch((e) => console.warn('[BilderStrip] open failed', e));
-  };
-
-  const commitCaption = () => {
-    if (caption.trim() === (rec.caption ?? '')) return;
-    ws.setBildeCaption(rec, caption.trim());
-  };
 
   return (
     <div className={styles.detail}>
       <div className={styles.detailMain}>
         <div className={styles.detailHead}>
-          <Badge>{t(`localities.bilder.kind.${rec.kind}`)}</Badge>
-          {ws.coverBildeId === rec.id && (
-            <Badge palette="blue">{t('localities.bilder.cover')}</Badge>
-          )}
-          {rec.hidden && (
-            <Badge palette="yellow">{t('localities.bilder.hidden')}</Badge>
-          )}
+          <BildeBadges ws={ws} rec={rec} />
           <MetaLine rec={rec} />
         </div>
-        <Input
-          value={caption}
-          readOnly={!ws.canEdit}
-          placeholder={t('localities.bilder.captionPlaceholder')}
-          maxLength={200}
-          onChange={(e) => setCaption(e.target.value)}
-          onBlur={commitCaption}
-        />
+        <CaptionField ws={ws} rec={rec} />
         {pinned.pinnedFailed && isPinned && (
-          <p className={styles.metaLine}>{t('localities.bilder.loadFailed')}</p>
+          <Note>{t('localities.bilder.loadFailed')}</Note>
         )}
       </div>
 
@@ -287,7 +128,7 @@ const Detail = ({
             appears when the two have drifted apart, which happens exactly
             once — entering Terreng takes the overlay slot and the pin stands
             down (map/groundOverlay.ts), leaving the card still selected. */}
-        {pinnable && !isPinned && (
+        {canPinBilde(rec) && !isPinned && (
           <Button
             size="sm"
             leftIcon="visibility"
@@ -296,90 +137,11 @@ const Detail = ({
             {t('localities.bilder.showOnMap')}
           </Button>
         )}
-        {spec && (
-          <Button
-            size="sm"
-            leftIcon="restart_alt"
-            title={t('localities.bilder.recreateHint')}
-            onClick={() => recreate(spec)}
-          >
-            {t('localities.bilder.recreate')}
-          </Button>
-        )}
-        <Button size="sm" leftIcon="open_in_new" onClick={openOriginal}>
-          {t('localities.bilder.openOriginal')}
-        </Button>
-        {/* Ordering without a mouse (§4.4). The rail's drag is the quick
-            gesture; these two are the ones a touchscreen, a keyboard and a
-            screen reader have, and they move the same key. */}
-        {ws.canEdit && (
-          <>
-            <Tooltip label={t('localities.bilder.moveEarlier')}>
-              <IconButton
-                icon="arrow_back"
-                size="sm"
-                palette="gray"
-                disabled={index <= 0}
-                aria-label={t('localities.bilder.moveEarlier')}
-                onClick={() => ws.reorderBilde(rec.id, index - 1)}
-              />
-            </Tooltip>
-            <Tooltip label={t('localities.bilder.moveLater')}>
-              <IconButton
-                icon="arrow_forward"
-                size="sm"
-                palette="gray"
-                disabled={index < 0 || index >= count - 1}
-                aria-label={t('localities.bilder.moveLater')}
-                onClick={() => ws.reorderBilde(rec.id, index + 1)}
-              />
-            </Tooltip>
-            <Button
-              size="sm"
-              palette="gray"
-              leftIcon={rec.hidden ? 'visibility' : 'visibility_off'}
-              onClick={() => ws.setBildeHidden(rec, !rec.hidden)}
-            >
-              {rec.hidden
-                ? t('localities.bilder.unhide')
-                : t('localities.bilder.hide')}
-            </Button>
-            <ConfirmPopover
-              title={t('localities.bilder.confirmDelete')}
-              confirmLabel={t('localities.bilder.delete')}
-              cancelLabel={t('shared.cancel')}
-              onConfirm={() => ws.removeBilde(rec)}
-              trigger={(props) => (
-                <Button {...props} size="sm" palette="red" leftIcon="delete">
-                  {t('localities.bilder.delete')}
-                </Button>
-              )}
-            />
-          </>
-        )}
+        <RecreateButton rec={rec} />
+        <OpenOriginalButton rec={rec} />
       </div>
 
-      {/* Beside the caption, not under the rail (§4.3), and only while the
-          image is actually on the map — a fade control over nothing is a
-          control with no effect. Same plain range input as the terrain
-          sliders, because what is being watched while it is dragged is the
-          ground underneath. */}
-      {isPinned && (
-        <label className={styles.fade}>
-          <span className={styles.fadeHead}>
-            <span>{t('localities.bilder.opacity')}</span>
-            <span className={styles.fadeValue}>{pinned.opacity}%</span>
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={5}
-            value={pinned.opacity}
-            onChange={(e) => pinned.setOpacity(Number(e.target.value))}
-          />
-        </label>
-      )}
+      {isPinned && <FadeControl pinned={pinned} />}
     </div>
   );
 };
@@ -396,10 +158,13 @@ const Detail = ({
  *
  * It replaced the dock's Bilder section, and the shape changed with the edge:
  * a grid of squares down a column reads as an inventory, a rail along the
- * bottom reads as a sequence. Nothing here writes in show — the caption goes
- * `readOnly` and Slett is absent — and the upload tile is gone entirely,
- * because that verb is on the row's `⋮` and two copies of it were two places
- * to keep the optimistic list update right.
+ * bottom reads as a sequence.
+ *
+ * **Nothing here writes.** Not "is disabled" — is absent: the concealed
+ * images are not on the rail, there is no delete, no reordering and no hide,
+ * and the caption is read-only. Every one of those is in the carousel that
+ * takes this slot in edit (BilderCarousel), which is what §2 means by the
+ * stance being legible from across the room.
  *
  * This is one of three things that may occupy the bottom slot, and never at
  * the same time as another: `LocalityRibbon` is where that rule is enforced.
@@ -409,32 +174,13 @@ export const BilderStrip = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const setOpen = useSetAtom(bilderStripOpenAtom);
   const items = ws.bilderItems;
   const active = items?.find((it) => it.id === ws.activeBildeId) ?? null;
-  const activeIndex =
-    items?.findIndex((it) => it.id === ws.activeBildeId) ?? -1;
   const walkable = (items?.length ?? 0) > 1;
-
-  /*
-   * Drag to reorder (§4.4), edit only.
-   *
-   * The index handed to `reorderBilde` is a position in the *unfiltered* list,
-   * and these are positions in `bilderItems` — which is the same array
-   * whenever `canEdit`, since nothing is filtered out in edit. That is why the
-   * drag is gated on `canEdit` rather than merely hidden in show.
-   */
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [overId, setOverId] = useState<string | null>(null);
-  const canDrag = ws.canEdit && (items?.length ?? 0) > 1;
-
-  const endDrag = () => {
-    setDragId(null);
-    setOverId(null);
-  };
 
   return (
     <div className={styles.strip} data-chrome="bottom">
-      {/* Above the rail, not a frame in it: the images the pack has already
-          saved are in that rail, and a placeholder among them would be read
-          as one more that failed. */}
+      {/* Above the rail, not a frame in it: the images the starter set has
+          already saved are in that rail, and a placeholder among them would
+          be read as one more that failed. */}
       {ws.starterStep != null && (
         <div className={styles.busy}>
           <Spinner size={14} />
@@ -463,32 +209,13 @@ export const BilderStrip = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               <p className={styles.empty}>{t('localities.bilder.empty')}</p>
             )
           ) : (
-            items.map((rec, i) => (
+            items.map((rec) => (
               <Frame
                 key={rec.id}
                 rec={rec}
                 selected={rec.id === ws.activeBildeId}
                 isCover={rec.id === ws.coverBildeId}
-                draggable={canDrag}
-                dragOver={
-                  overId === rec.id && dragId !== null && dragId !== rec.id
-                }
                 onClick={() => ws.selectBilde(rec.id)}
-                onDragStart={(e) => {
-                  // Firefox refuses to start a drag with nothing on the
-                  // dataTransfer, whatever the handlers say.
-                  e.dataTransfer.setData('text/plain', rec.id);
-                  e.dataTransfer.effectAllowed = 'move';
-                  setDragId(rec.id);
-                }}
-                onDragOver={() => setOverId(rec.id)}
-                onDrop={() => {
-                  if (dragId && dragId !== rec.id) {
-                    ws.reorderBilde(dragId, i);
-                  }
-                  endDrag();
-                }}
-                onDragEnd={endDrag}
               />
             ))
           )}
@@ -514,15 +241,7 @@ export const BilderStrip = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         </Tooltip>
       </div>
 
-      {active && (
-        <Detail
-          key={active.id}
-          ws={ws}
-          rec={active}
-          index={activeIndex}
-          count={items?.length ?? 0}
-        />
-      )}
+      {active && <Detail key={active.id} ws={ws} rec={active} />}
     </div>
   );
 };

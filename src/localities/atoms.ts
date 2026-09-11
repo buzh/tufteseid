@@ -19,6 +19,21 @@ export const activeLocalityAtom = atom<LocalityRecord | null>(null);
 // workspace never renders the record in show first.
 export const editingLocalityIdAtom = atom<string | null>(null);
 
+// A lokalitet made moments ago that has not been given its starter set yet —
+// the best LiDAR dataset over its rectangle, read three ways
+// (docs/lokalitet-view.md §4.3).
+//
+// Set by the two places that create one and open it, cleared by the workspace
+// when it starts the fetch, so the set arrives once and never on a lokalitet
+// being revisited. An id rather than a boolean for the same reason
+// `editingLocalityIdAtom` is: it cannot survive into the wrong record.
+//
+// Why a hand-off atom at all, rather than the workspace noticing an empty
+// gallery: "no bilder yet" is also true of a lokalitet somebody deliberately
+// emptied, and fetching three images into it every time they open it is the
+// one behaviour worse than not fetching them at all.
+export const pendingStarterLocalityIdAtom = atom<string | null>(null);
+
 // The view behind the open lokalitet's cover terrain render, if it has one.
 // Published by the workspace (which is what holds the attachment list) and
 // read by `useTerrainAnalysis`, which is mounted on the other side of the

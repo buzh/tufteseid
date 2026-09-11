@@ -1,0 +1,44 @@
+/*
+ * What the filmstrip and the edit carousel both need to draw a bilde —
+ * docs/lokalitet-view.md §4.3. Two surfaces, one vocabulary: a meta line, a
+ * caption field and a fade slider look the same in show and in edit, because
+ * they are the same thing being shown and then edited.
+ *
+ * The layouts themselves are not here. A rail and a single big card have
+ * nothing in common geometrically, which is the whole reason there are two.
+ */
+
+.metaLine {
+  overflow: hidden;
+  margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+/* Beside the caption rather than under the images (§4.3). Same plain range
+   input as the terrain sliders, for the same reason: the fade has to stream
+   while it is dragged, because what is being watched is the map. */
+.fade {
+  display: block;
+  flex: 0 1 180px;
+}
+
+.fade input[type='range'] {
+  display: block;
+  width: 100%;
+  margin: 0;
+}
+
+.fadeHead {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+.fadeValue {
+  font-variant-numeric: tabular-nums;
+}

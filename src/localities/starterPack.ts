@@ -19,6 +19,12 @@
 // gallery's optimistic update stay in useLocalityWorkspace, where the
 // translations and the record ids are — see `runStarterPack` there.
 //
+// `extractLidarFigure` is the general one-styled-view-of-the-rectangle call
+// and is not the starter set's alone: `Behold` over the LiDAR ground is the
+// same fetch at whichever dataset and style the map is showing, so it comes
+// through here too. One path means one place where the provenance figure and
+// the recorded meta can go wrong.
+//
 // Every image goes out as a provenance figure (src/figure), same as when it
 // is produced by hand: an image nobody chose the settings for is exactly the
 // one whose settings have to be written on it.
@@ -29,7 +35,6 @@ import { lidarExtractFigure } from '../figure/specs';
 import { extractCanvas } from '../lidarExtract/run';
 import {
   enumerateLidarSources,
-  EXTRACT_MODEL,
   type LidarSource,
 } from '../lidarExtract/sources';
 import { TIER_A_STYLES } from '../map/layers/config/backgroundLayers/lidarProjects';
@@ -43,8 +48,8 @@ import { TIER_A_STYLES } from '../map/layers/config/backgroundLayers/lidarProjec
  */
 export const STARTER_STYLES = TIER_A_STYLES;
 
-/** What every step hands back, so the caller has one save path. */
-export type StarterRaster = {
+/** What a stitched view hands back, so every caller has one save path. */
+export type ExtractRaster = {
   blob: Blob;
   /** Identifies the dataset well enough to fetch it again. */
   sourceKey: string;
@@ -61,7 +66,7 @@ export type StarterRaster = {
 };
 
 /** The lokalitet's name for the figure's title line, and the abort signal. */
-export type StarterOptions = { subject?: string; signal?: AbortSignal };
+export type ExtractOptions = { subject?: string; signal?: AbortSignal };
 
 /** One dataset and the styles the set will actually ask it for. */
 export type StarterPlan = { source: LidarSource; styles: string[] };
@@ -82,7 +87,7 @@ const bestLidarSource = (sources: LidarSource[]): LidarSource | null => {
 /**
  * Which dataset the set comes from, and how many images it will be.
  *
- * Resolved once and handed to every `starterExtract` call, so three images
+ * Resolved once and handed to every `extractLidarFigure` call, so three images
  * cost one catalogue lookup and are guaranteed to be three readings of the
  * *same* acquisition — which is the only way flipping between them means
  * anything.
@@ -98,7 +103,10 @@ const bestLidarSource = (sources: LidarSource[]): LidarSource | null => {
 export const planStarterPack = async (
   bbox4326: LocalityBbox,
 ): Promise<StarterPlan | null> => {
-  const source = bestLidarSource(await enumerateLidarSources(bbox4326));
+  // DTM, always. Two of the three styles are DTM-only, and the starter set is
+  // what a lokalitet gets before anybody has expressed a preference — reading
+  // the bare ground is the one that answers the archaeological question.
+  const source = bestLidarSource(await enumerateLidarSources(bbox4326, 'dtm'));
   if (!source) return null;
   const styles = STARTER_STYLES.filter((s) => source.styles.includes(s));
   // A dataset that publishes none of the three is not one we have seen, but
@@ -112,12 +120,12 @@ export const planStarterPack = async (
 };
 
 /** One styled LiDAR view of the rectangle, stitched from the WMS. */
-export const starterExtract = async (
+export const extractLidarFigure = async (
   source: LidarSource,
   bbox25833: [number, number, number, number],
   style: string,
-  { subject, signal }: StarterOptions = {},
-): Promise<StarterRaster | null> => {
+  { subject, signal }: ExtractOptions = {},
+): Promise<ExtractRaster | null> => {
   const result = await extractCanvas(bbox25833, source, style, signal);
   if (!result) return null;
 
@@ -141,7 +149,7 @@ export const starterExtract = async (
     sourceKey: source.key,
     sourceLabel: source.label,
     style,
-    model: EXTRACT_MODEL,
+    model: source.model,
     metresPerPx: result.metresPerPx,
     bbox25833: result.bbox25833,
   };

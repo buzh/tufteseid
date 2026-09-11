@@ -1,7 +1,9 @@
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isSignedInAtom } from '../auth/atoms';
 import { marksHiddenAtom } from '../localities/atoms';
+import { type BeholdOffer, beholdOfferAtom } from '../localities/behold';
 import { useCreateLocalityFromViewport } from '../localities/createFromBbox';
 import { infoToolAtom } from '../map/featureInfo/infoTool';
 import { activeThemeLayersAtom } from '../map/layers/atoms';
@@ -106,6 +108,72 @@ export const RibbonGlobalRow = () => {
     peekStart: ground.peekStart,
     peekEnd: ground.peekEnd,
   });
+
+  /*
+   * What the ground on screen offers `Behold` (docs/lokalitet-view.md §4.3).
+   *
+   * Published rather than passed, because the button that reads it is on the
+   * lokalitet row and that row is this one's *sibling*, not its child — the
+   * same gap `coverTerrainSpecAtom` crosses in the other direction. The four
+   * control hooks are mounted here and only here, so this is the one place
+   * that can answer the question at all.
+   *
+   * A description, not a producer, everywhere except terrain: the workspace
+   * can re-fetch a named LiDAR dataset or a named acquisition itself, and it
+   * is the side that holds `createAttachment` and the gallery's optimistic
+   * update. Terrain's pixels are a canvas this row owns, so that arm carries
+   * a callback.
+   */
+  const setBeholdOffer = useSetAtom(beholdOfferAtom);
+  // Destructured, because `lidar`, `flyfoto` and `terrain` are fresh objects
+  // on every render and the effect below is keyed on what actually changed.
+  const { activeLidarSource, shownStyle } = lidar;
+  const { produce: terrainProduce, beholdKey: terrainKey } = terrain;
+  const flyfotoProject = flyfoto.activeProject;
+  const groundMode = ground.mode;
+  useEffect(() => {
+    let offer: BeholdOffer;
+    switch (groundMode) {
+      case 'lidar':
+        offer = {
+          ground: 'lidar',
+          source: activeLidarSource,
+          style: shownStyle,
+        };
+        break;
+      case 'flyfoto':
+        offer = { ground: 'flyfoto', project: flyfotoProject };
+        break;
+      case 'terreng':
+        offer = {
+          ground: 'terreng',
+          key: terrainKey,
+          produce: terrainProduce,
+        };
+        break;
+      default:
+        // Standard and Hybrid. Hybrid *is* the LiDAR stack underneath, but its
+        // roads-and-names overlay is a separate layer the extract path cannot
+        // see — so keeping it would hand back a bare hillshade under the name
+        // of the view being read. Skjermbilde is the honest verb there.
+        //
+        // The two are carried separately rather than collapsed to one refusal
+        // because they are refused for different reasons, and the row is free
+        // to say which.
+        offer = { ground: groundMode };
+    }
+    setBeholdOffer(offer);
+  }, [
+    groundMode,
+    activeLidarSource,
+    shownStyle,
+    flyfotoProject,
+    terrainKey,
+    terrainProduce,
+    setBeholdOffer,
+  ]);
+  // Row 1 outlives every lokalitet, so nothing here clears the offer on
+  // unmount — the workspace is the shorter-lived side and stops reading it.
 
   // "Ny lokalitet" frames the visible map rather than arming a box drag.
   const { create: createFromViewport, creating } =

@@ -67,14 +67,19 @@ Files: `src/terrain/{dem,shade,render}.ts`, `src/shell/terrain/*`.
 Proxy route `/arcgis/hoydedata/*`. Reuses `attachments.kind = 'extract'`, so no
 PocketBase migration.
 
-Since 2026-09-10 it also runs **headless**: `render.ts` holds the arithmetic
-between a knob position and a canvas, and "Hent grunnpakke" uses it to drop a
-multidirectional render into a new lokalitet's Bilder alongside an ortofoto and
-a LiDAR hillshade, without anyone opening the panel (`docs/ui-architecture.md`
-§8.9). The relevant consequence for this thread: an analysis nobody was asked
-to configure is now the *first* thing a lokalitet has, so any Tier 1 product
-should be judged on whether it is worth a press at all — the bar is no longer
-"better than nothing".
+Since 2026-09-10 `render.ts` holds the arithmetic between a knob position and
+a canvas, and can therefore run **headless**. The starter set no longer uses
+it — that pack is three of Kartverket's own pre-baked LiDAR styles now, one
+service and one fetch path (`docs/ui-architecture.md` §8.9.1) — but the same
+split is what lets `Behold` keep the live render over the Terreng ground
+without going through the save button that used to be the only exit
+(§8.9.2), and it is what a background render queue would call.
+
+The consequence for this thread survives the correction and is if anything
+stronger: a new lokalitet now arrives with three readings of the laser in it
+before anyone presses anything, so any Tier 1 product should be judged on
+whether it is worth a press at all — the bar is no longer "better than
+nothing".
 
 Measured on a live 600×600 fetch: hillshade 32 ms, slope 18 ms, LRM 23 ms,
 multidirectional 149 ms, horizon scan 775 ms. That spread is why the hook's

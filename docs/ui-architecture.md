@@ -554,7 +554,7 @@ returns you to exactly the dataset and style you left — 1→5→1 is free wher
 | Standard (1) | Karttype pulldown — the five cartographies (topografisk, gråtone, rasterkart, sjøkart, amtskart), also the W/S ring (§5.10) |
 | LiDAR (2), Hybrid (3) | Dataset pulldown — **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport · style pulldown (the active dataset's WMS styles, with a "flere stiler" second tier), only when the dataset publishes more than one · DTM/DOM segment · **Høydekurver** switch, Hybrid only |
 | Flyfoto (4) | Acquisition pulldown — the seamless mosaic or any acquisition covering the viewport, newest first · period chips (Alle / 2010– / 1990–2009 / 1960–1989 / –1959), which narrow both that list and the W/S ring (§5.5) |
-| Terreng (5) | Visualisering pulldown — the eight relief views, each with its own explanation as a tooltip, also the W/S ring (§10) · DTM/DOM segment · the resolution readout · "Flytt analysen hit" (standalone only) · "Lagre" — **plus a second row under the strip** holding the sliders the current visualization uses, two to four of azimuth / altitude / exaggeration / radius / opacity (§10) |
+| Terreng (5) | Visualisering pulldown — the eight relief views, each with its own explanation as a tooltip, also the W/S ring (§10) · DTM/DOM segment · the resolution readout · "Flytt analysen hit" and "Lagre som ny lokalitet" (both standalone only; with a lokalitet open, keeping the render is `Behold` on row 2, §8.9.2) — **plus a second row under the strip** holding the sliders the current visualization uses, two to four of azimuth / altitude / exaggeration / radius / opacity (§10) |
 
 **The strip is always on the bar.** It used to vanish under Standard, which had
 nothing to adjust; five cartographies filled that hole, and the fixture is the
@@ -1342,7 +1342,7 @@ is a context strip, a bottom edge and a (shrinking) dock column:
 | Region | Component | Contents |
 |---|---|---|
 | Identity, the work, the exits | `RibbonLocalityRow` (the lokalitet row) | three zones plus the read tools — see below |
-| The images | `BilderStrip` (bottom slot) | the filmstrip — §8.7.2 |
+| The images | `BilderStrip` / `BilderCarousel` (bottom slot) | the filmstrip in show, the carousel in edit — §8.7.2 |
 | Everything else with a body | `LocalityDock` (right slot) | the live tool band, then Funn · Kulturminner · Detaljer as sections |
 | Dialogs | `LocalityDialogs` | flyfoto licensing notice, flyfoto picker |
 
@@ -1396,8 +1396,9 @@ opening anything else.
 
 **Nothing in show writes.** Not disabled verbs — *absent* ones: the middle
 zone does not render, the name is not clickable, Detaljer's fields are
-read-only, the filmstrip's caption is read-only and its delete is gone, funn
-are not editable, and N / U / B do nothing. Reading, pinning an image,
+read-only, and the bottom edge is a filmstrip with no delete, no reordering,
+no hide and a read-only caption rather than the carousel that carries all
+four; funn are not editable, and N / U / B do nothing. Reading, pinning an image,
 `Gjenskap` and downloading a figure all stay, because none of them leaves a trace. The one way to write is
 to press `Rediger` first, which costs nothing: no fetch, no write, the map
 does not move.
@@ -1428,7 +1429,7 @@ So an admin may rename somebody's lokalitet, retitle and delete its bilder,
 change a funn's status or geometry, reshape the rectangle and throw the whole
 thing away — but may not put new content in it, because the create rules also
 demand the *parent's* owner. Their overflow menu is Juster området and Slett;
-Nytt funn, Ta skjermbilde, Flyfoto, Hent grunnpakke and Last opp are not there.
+Nytt funn, Behold, Ta skjermbilde, Flyfoto and Last opp are not there.
 Showing an admin a button the server would 403 is the same lie as hiding one it
 would obey, pointing the other way.
 
@@ -1453,10 +1454,15 @@ where the value *is* the widget.
 The same `canAdd` test — permission *and* stance — is recomputed in
 `LidarExtractViewer` (the "Behold" button) because the extract tool hangs off
 `activeLocalityAtom` rather than the workspace hook; its `Last ned PNG` is a
-download, not a write, and stays. Terrenganalyse's **Lagre** is the one place
-still unguarded: with somebody else's lokalitet open it targets that lokalitet
-and fails with a toast. The honest fix is for it to fork rather than to
-disappear, which waits on `derivedFrom` (`docs/lokalitet-view.md` §7).
+download, not a write, and stays.
+
+Terrenganalyse's **Lagre** used to be the one unguarded write — with somebody
+else's lokalitet open it targeted that lokalitet and failed with a toast. It is
+no longer reachable there: keeping a terrain render over an open lokalitet is
+`Behold` on the lokalitet row now (§8.9.2), which is gated like every other
+verb in that zone, and the terrain strip's own button survives **only when
+there is no lokalitet** (§10). Forking somebody else's rectangle instead of
+being refused still waits on `derivedFrom` (`docs/lokalitet-view.md` §7).
 
 ### 8.2 The dock
 
@@ -1714,11 +1720,12 @@ Four producers converge on one sink, and that convergence is the part worth
 preserving:
 
 ```
-screenshot.ts         ─┐
-flyfoto.ts            ─┤
-lidarExtract "Behold" ─┼→ renderFigureBlob() → createAttachment() → PocketBase
-terrain "Lagre"       ─┤   (§8.10)                → realtime → BilderStrip
-starterPack.ts        ─┘
+screenshot.ts             ─┐
+flyfoto.ts                ─┤
+lidarExtract "Behold"     ─┼→ renderFigureBlob() → createAttachment() → PocketBase
+terrain render            ─┤   (§8.10)              → realtime → the bottom edge
+starterPack.ts            ─┤
+row 2 "Behold" (§8.9.2)   ─┘   — three of the above, chosen by the ground
 ```
 
 Every producer hands a **canvas**, not bytes, so the figure stage has somewhere
@@ -1749,12 +1756,21 @@ picture of somewhere you are no longer looking.
 
 The detail panel carries: the kind badge and provenance line, the caption field
 (`readOnly` unless `canEdit`, commits on blur), then **Gjenskap**, **Åpne
-originalen** and delete-behind-a-confirm, plus a **Toning** slider whenever the
-image is up. **Vis i ruta** survives as a button for exactly one case — the
-record is pinnable but is not currently on the map, which happens when entering
-Terreng took the overlay slot away (below) while the frame stayed selected. It
-is the way back, not the normal way up; there is no **Skjul fra ruta**, because
-clicking the selected frame again deselects it and that is the same gesture.
+originalen**, plus a **Toning** slider whenever the image is up. In show,
+**Vis i ruta** survives as a button for exactly one case — the record is
+pinnable but is not currently on the map, which happens when entering Terreng
+took the overlay slot away (below) while the frame stayed selected. It is the
+way back, not the normal way up; there is no **Ta av ruta** on the rail,
+because clicking the selected frame again deselects it and that is the same
+gesture.
+
+**Selecting is pinning only in show.** In the carousel both verbs are explicit
+(`Vis i ruta` / `Ta av ruta`) and walking the cards moves nothing on the map,
+because the overlay slot is shared with the live terrain render: a card that
+pinned itself on arrival would stand a render down every time `Behold` landed
+an image and moved the cursor onto it. `pinOnWalk` in `useLocalityWorkspace` is
+that one-line difference, and it is why the two stances need two surfaces
+rather than one with the writes disabled.
 
 - **The pixels.** `src/localities/usePinnedBilde.ts` decodes the **original**
   file — never a thumbnail — and hands it to `showGroundOverlay` with
@@ -1803,13 +1819,44 @@ clicking the selected frame again deselects it and that is the same gesture.
 - **← / → walk the images again.** The lightbox's arrow keys came back with the
   filmstrip, on the terms in §8.7.2.
 
-#### 8.7.2 The bottom edge — the filmstrip
+#### 8.7.2 The bottom edge — the filmstrip and the carousel
 
 `docs/lokalitet-view.md` §4.3. The images are the lokalitet's content, not a
 panel about it, so they sit **along the bottom of the map** rather than in a
 column beside it: a rail is the shape of "walk a curated sequence", and a
 sequence read left to right does not move the ground under it the way a
 scrolling grid in a 360 px column does.
+
+**The slot has two occupants, one per stance**, and which one is mounted is
+decided in `LocalityRibbon` (`ws.canEdit ? BilderCarousel : BilderStrip`)
+rather than by branches inside one component:
+
+| | show — `BilderStrip.tsx` | edit — `BilderCarousel.tsx` |
+|---|---|---|
+| shape | a rail of 88×64 frames | one card, 180 px tall, `object-fit: contain` |
+| hidden records | absent | present, dashed and faded |
+| caption | `readOnly` (§8.1) | editable, committed on blur |
+| the map | picking a frame pins it | an explicit `Vis i ruta` / `Ta av ruta` |
+| order | none | `arrow_back` / `arrow_forward` on the card |
+| conceal, delete | absent | on the card |
+| both | Gjenskap, Åpne originalen, Toning, ← / →, `bottom_panel_close` | |
+
+Two things that reads as arbitrary until you try the alternative:
+
+- **The write verbs are absent from the rail, not disabled on it.** That is §2
+  of the lokalitet-view doc, and it is the reason the two surfaces are two
+  files. A single component with `canEdit &&` scattered through it is how a
+  greyed-out delete button ends up on a stranger's lokalitet.
+- **Walking the carousel does not put images on the map** (`pinOnWalk` in
+  `useLocalityWorkspace` — pinning follows the cursor only in show). The
+  ground-overlay slot holds exactly one image and the live terrain render
+  wants it too, so a card that claimed it on arrival would knock a render down
+  every time `Behold` landed an image and moved the cursor onto it.
+
+The shared vocabulary — the tokened-URL dance, the meta line, the caption
+field, the fade slider, Gjenskap and Åpne originalen — is
+`src/localities/bilderCommon.tsx`. The geometry is not shared, because a rail
+and a single big card have nothing in common geometrically.
 
 - **The slot.** `bottomSlotAtom` (`src/shell/bottomSlot.ts`) publishes an
   element the shell owns and the ribbon portals into — the same mechanism and
@@ -1827,14 +1874,17 @@ scrolling grid in a 360 px column does.
   surface and `chromeInsets` measures it on demand (§3.1); folding it away
   makes it a zero-size element, which the measurement already skips.
 - **One occupant.** The filmstrip, the edit carousel and the draw toolbar are
-  mutually exclusive: **drawing yields the images**, so the strip is not
-  rendered while `draftActive`. The rule is enforced where the portal is
+  mutually exclusive: **drawing yields the images**, so neither is rendered
+  while `draftActive`. The rule is enforced where the portal is
   (`LocalityRibbon`) rather than by the slot, because the mobile draw toolbar
   is still `position: fixed` and only moves into the slot when the dock does.
-- **Selecting is pinning** (§8.7.1). The rail is `Frame`s at 88×64 with a kind
-  mark; the selected one carries a ring and scrolls itself into view, which is
-  what makes a keyboard step legible — otherwise ← / → would change the map and
-  leave the active frame off-screen.
+- **Selecting is pinning, in show** (§8.7.1). The rail is `Frame`s at 88×64
+  with a kind mark; the selected one carries a ring and scrolls itself into
+  view, which is what makes a keyboard step legible — otherwise ← / → would
+  change the map and leave the active frame off-screen.
+- **The carousel selects for you.** Unlike the rail, a carousel with nothing
+  active is a blank panel, so it lands on the first image and on whatever
+  replaces a deleted one.
 - **← / →** are bound only while `stripOpen && !draftActive` and there is more
   than one image, so OpenLayers' `KeyboardPan` keeps horizontal panning
   whenever walking the strip would be meaningless.
@@ -1852,10 +1902,9 @@ scrolling grid in a 360 px column does.
   the portal cannot disagree about whether there is a strip. A reader on an
   empty lokalitet gets no bar at all; an owner in edit gets the bar with the
   empty prompt in it.
-- **Both stances render the strip today.** §12 gives edit its own carousel at
-  step 9; until then the filmstrip serves both, with caption, delete and the
-  curation controls (§8.7.3) gated on `canEdit`. Uploading is on the row's
-  `⋮`, so the rail has no add-tile.
+- **Neither surface has an add-tile.** Every route in is on the lokalitet row
+  — `Behold` (§8.9), the two pickers, Skjermbilde and the `⋮` upload — so the
+  bottom edge is only ever about images that already exist.
 
 #### 8.7.3 Curation — exhibit order, concealment, and the derived cover
 
@@ -1875,11 +1924,11 @@ that, and neither of them is a cover field.
 - **A move costs one PATCH.** `reorderBilde` writes the moved record a value
   *between* its two new neighbours and leaves every other record alone. This is
   not micro-optimisation: `useLocalityContent` reloads the whole list on every
-  realtime event, so renumbering forty records to drag one frame would be forty
+  realtime event, so renumbering forty records to move one card would be forty
   reloads of forty records. The fallback, when there is no integer left between
   the neighbours, is a full renumber to multiples of `SORT_STEP` (1000) — and
   it is reached in exactly two situations, neighbours one apart and the first
-  drag on a lokalitet whose records all predate the field and so all carry `0`.
+  move on a lokalitet whose records all predate the field and so all carry `0`.
   Both self-heal.
 - **The renumber values stay far below any clock reading**, deliberately. That
   is what keeps an image created *after* a hand-arranged exhibit landing at the
@@ -1887,24 +1936,24 @@ that, and neither of them is a cover field.
 - **Existing lokaliteter changed order** when this landed: the list was
   `-created` (newest first) and is now the exhibit (oldest first), because
   every pre-existing record carries `sort = 0` and the tie breaks on `created`.
-  Nothing is lost, but a lokalitet somebody knew looks reversed until they drag
+  Nothing is lost, but a lokalitet somebody knew looks reversed until they move
   something.
 - **`attachments.hidden` is "keep it, do not show it".** The alternative is
   deleting your working renders to make the exhibit tidy, and the seven
   renders you rejected are the evidence that you checked. Hidden records are
-  filtered out of the strip in show and are *on the rail* in edit, faded and
-  marked — a curation control whose effect you cannot see is not one.
+  filtered out of the filmstrip and are *in the carousel*, dashed and faded —
+  a curation control whose effect you cannot see is not one.
 - **That makes positions stance-dependent, so ordering never uses them.**
-  `bilderItems` (what the strip walks) is the filtered list; every ordering
-  call indexes into the hook's unfiltered `attachmentItems`, which is why the
-  drag is gated on `canEdit` rather than merely hidden in show — in edit the
-  two lists are the same array. An exhibit order that depended on who was
-  looking would not be an order.
+  `bilderItems` (what the bottom edge walks) is the filtered list; every
+  ordering call indexes into the hook's unfiltered `attachmentItems`. In edit —
+  the only stance that can reorder — the two lists are the same array, so the
+  carousel may hand `reorderBilde` its own index; in show they are not, and an
+  exhibit order that depended on who was looking would not be an order.
 - **The cover is not a field.** It is `coverBildeId` — the first non-hidden
   record in exhibit order — computed where it is needed, on the same argument
   as the centre coordinate (§8.3): a stored `cover` relation and a `sort`
-  column can disagree, and then the exhibit has two first images. Dragging a
-  frame to the front is the only way to make it the cover; there is no verb.
+  column can disagree, and then the exhibit has two first images. Moving a
+  card to the front is the only way to make it the cover; there is no verb.
 - **§4.6's terrain seed is a second derivation, not the same one.** Entering
   Terreng over a lokalitet seeds from the first non-hidden record in exhibit
   order *that is a terrain View* (`coverTerrainSpec`), because the cover is
@@ -1912,9 +1961,13 @@ that, and neither of them is a cover field.
   knobs worth seeding from. Curation moves it exactly the way it moves the
   cover, which is the property that matters; the doc's phrase "the cover
   terrain render" reads as one derivation and is two.
-- **Drag is the quick gesture, not the only one.** The detail line carries
-  `arrow_back` / `arrow_forward` and a hide toggle, because HTML5 drag is
-  neither keyboard- nor touch-accessible and the exhibit order is content.
+- **There is no drag.** `docs/lokalitet-view.md` §4.4 asks for drag-to-reorder
+  on the rail, and §2 of the same doc says nothing in show writes; the rail is
+  show's occupant, so the two cannot both hold. The verbs are `arrow_back` /
+  `arrow_forward` on the carousel card instead — which is also the accessible
+  answer, since HTML5 drag is neither keyboard- nor touch-operable and the
+  exhibit order is content. Reordering by dragging a *card* is possible later
+  if the carousel ever shows its neighbours; it is not worth a rail in edit.
 
 ### 8.8 The flyfoto picker
 
@@ -1934,17 +1987,35 @@ NiB imagery is free for private non-commercial use and publishing is the user's
 responsibility, so the notice is the point at which that is communicated. Do not
 add a "don't show this again" checkbox without thinking about it.
 
-### 8.9 Hent grunnpakke
+### 8.9 The four routes an image takes in
 
-The first item in the lokalitet row's overflow menu, and the only one there you
-press on a lokalitet you have just made and never again — hence its position.
-One press produces the images you would otherwise fetch by hand before starting
-to read a rectangle, into the filmstrip: **the laser, read three ways** —
+`docs/lokalitet-view.md` §4.3. Every one of them is on the lokalitet row, and
+none of them is on the bottom edge (§8.7.2).
+
+| Route | What it is |
+|---|---|
+| the starter set | three readings of the best laser dataset, run without being asked on a lokalitet you just made |
+| `Behold` | whatever ground is on screen, kept at the source's own resolution |
+| the two pickers | LiDAR-uttrekk and Flyfoto — pick a *different* dataset than the one you are looking at |
+| Skjermbilde and Last opp | pixels, with no view behind them |
+
+#### 8.9.1 The starter set (grunnpakke)
+
+**It is no longer a menu item.** It runs itself once, on a lokalitet that was
+just created — from the viewport or by saving a terrain render with none open.
+The hand-off is `pendingStarterLocalityIdAtom` (`src/localities/atoms.ts`),
+set by both creation sites and cleared by the workspace *before* the fetch
+starts, since the run takes tens of seconds and the effect re-fires on every
+image it lands. Deliberately not "notice the gallery is empty": that would
+refill a lokalitet somebody deliberately emptied.
+
+The three images are the ones you would otherwise fetch by hand before starting
+to read a rectangle: **the laser, read three ways** —
 `skyggerelieff` (the fixed north-west hillshade), `multiskyggerelieff` (every
 direction at once, so nothing hides along the sun) and `helning_prosent`
 (slope, which shows edges the light misses). All three are Kartverket's own
 pre-baked renders of **one** acquisition, fetched through
-`starterExtract` → `extractCanvas` and saved as the `extract` kind with the
+`extractLidarFigure` → `extractCanvas` and saved as the `extract` kind with the
 style in `meta.style` (§8.7), so there is no migration.
 
 `STARTER_STYLES` *is* `TIER_A_STYLES` (`lidarProjects.ts`) — one list, so the
@@ -1952,7 +2023,9 @@ pack and the style ring can never drift apart.
 `src/localities/starterPack.ts` only *makes* the rasters; captions,
 `createAttachment` and the strip's optimistic update stay in
 `runStarterPack` (`useLocalityWorkspace`), where the translations and record ids
-are.
+are. `extractLidarFigure` there is **not** the pack's alone — `Behold` over the
+LiDAR ground is the same fetch with a style the user chose, so the provenance
+figure and the recorded `meta` have exactly one place to go wrong.
 
 Load-bearing choices:
 
@@ -1981,12 +2054,55 @@ Load-bearing choices:
   lokalitet stops spending tile requests on it. An aborted stitch paints nothing,
   which is indistinguishable from no coverage, so the "ingen dekning" toast is
   suppressed when the signal is aborted.
-- **Progress renders in the filmstrip**, as one line with a spinner naming the
-  style being fetched (`starterStep` is that style, or `null`), above the rail;
-  the strip unfolds itself when a pack starts, and `hasBilder` counts a running
-  pack, so the bar is there before the first image is. Deliberately not a
-  placeholder frame among the saved ones — a frame that disappears would be
-  read as an image that failed.
+- **Progress renders on the bottom edge**, as one line with a spinner naming
+  the style being fetched (`starterStep` is that style, or `null`), above the
+  rail or in the carousel's head row; the edge unfolds itself when a pack
+  starts, and `hasBilder` counts a running pack, so the bar is there before
+  the first image is. Deliberately not a placeholder frame among the saved
+  ones — a frame that disappears would be read as an image that failed.
+
+#### 8.9.2 `Behold` — keep the ground on screen
+
+The general answer to "how do I add an image": dial the ground up the way you
+want it, then press one button. What comes out is the rectangle *in that
+ground* at the source's native resolution, not a photograph of the screen.
+`src/localities/behold.ts` holds the table and the guard.
+
+| Ground | What it produces |
+|---|---|
+| 2 LiDAR | `extractLidarFigure` at the active dataset, style and model |
+| 5 Terreng | the live render at the current visualization and knobs |
+| 4 Flyfoto | `fetchFlyfoto` for the active acquisition (raises the NiB notice first) |
+| 1 Standard, 3 Hybrid | nothing — disabled, tooltip says `Skjermbilde` |
+
+- **The last row is a refusal, not an omission.** There is no rectangle-fetch
+  path for the topo WMS, and Hybrid's overlay is a separate layer the extract
+  path cannot see — a `Behold` there would hand back a plain LiDAR hillshade
+  labelled as the hybrid view the user was reading. It is *disabled* rather
+  than hidden so the row does not reflow as you walk the ground ring.
+- **It crosses the tree through an atom.** The button is on the lokalitet row;
+  the answer is in `RibbonGlobalRow`, which mounts the four control hooks and
+  is a *sibling* rather than a parent. So row 1 publishes a description of what
+  its ground could keep (`beholdOfferAtom`) and the workspace decides what to
+  do with it — the same split `coverTerrainSpecAtom` crosses in the other
+  direction (§10).
+- **Only the terrain arm carries a producer callback.** Its pixels are a canvas
+  the terrain hook owns and repaints every slider frame; the other two are
+  fetches the workspace can make from a dataset name, and it already holds
+  `createAttachment`, the optimistic list update and the NiB notice.
+- **The duplicate guard is the `meta` block.** Same source, style, model and
+  parameters over the same rectangle is the same image, so the button reads
+  `Beholdt` and is disabled while a match exists (`attachmentMatchesKey`, bbox
+  to 1 m, floats to 1e-6). Without it a session of scrubbing the azimuth
+  slider leaves forty near-identical renders and `hidden` (§8.7.3) becomes
+  curation against a mess this made. It counts **hidden records too**:
+  fetching a second copy of something the author put away is exactly that
+  clutter.
+- **The `kind` in the key is load-bearing.** The three producers do not write
+  the same fields — a LiDAR extract names its WMS dataset in `meta.sourceKey`,
+  a terrain render has no dataset to name and is identified by its knobs, and a
+  flyfoto grab says which acquisition it is in `meta.nibSource` /
+  `meta.projectId`. Same distinction `viewSpecOf` makes (§8.7.1).
 
 ### 8.10 Provenance figures — what a saved image carries
 
@@ -2203,8 +2319,8 @@ exaggeration / radius / opacity sliders. Four files:
 
 | File | What it is |
 |---|---|
-| `useTerrainAnalysis.ts` | All of the state — which rectangle, the DEM, the model, the visualization, the five knobs, the canvas, the save. Mounted **once**, from `RibbonGlobalRow`, beside `useLidarControls` and `useFlyfotoControls` |
-| `TerrainStrip.tsx` | The settings-strip half: the visualization pulldown, DTM/DOM, the resolution readout, "Flytt analysen hit", "Lagre" |
+| `useTerrainAnalysis.ts` | All of the state — which rectangle, the DEM, the model, the visualization, the five knobs, the canvas, the save — plus `produce()` and `beholdKey`, which is how row 2's `Behold` keeps the render (§8.9.2). Mounted **once**, from `RibbonGlobalRow`, beside `useLidarControls` and `useFlyfotoControls` |
+| `TerrainStrip.tsx` | The settings-strip half: the visualization pulldown, DTM/DOM, the resolution readout, and — only when there is no lokalitet — "Flytt analysen hit" and "Lagre som ny lokalitet" |
 | `TerrainVisPicker.tsx` | The pulldown itself, shaped like `StandardVariantPicker` |
 | `TerrainSliders.tsx` | The row beneath: azimuth, altitude, exaggeration, radius, opacity |
 
@@ -2411,12 +2527,24 @@ neighbour, and leaving costs nothing because the background underneath was
 never switched off (§5.1). The dock the tool used to live in had to have a
 close control, since a panel that will not go away is a panel covering the map.
 
-"Lagre" has two paths: with a lokalitet, save the attachment; with none,
+**"Lagre" is on the strip only when there is no lokalitet.** With one open,
+keeping the render is `Behold` on the lokalitet row (§8.9.2) — one verb for
+whatever ground is up, rather than a save button per ground. Gated exactly like
+"Flytt analysen hit" beside it, and for the same reason: both are the
+standalone entrance's answer to something the lokalitet row answers better.
+
+What survives is the row-1 path, which is not a duplicate of anything:
 `createLocalityFromBbox` over **the analysed rectangle** (not the current view
-— the map is live under the ribbon) and then save into it, opening the new
-lokalitet as the receipt. Signed out it opens `AuthDialog` instead; that is a
-normal state here, since the whole point of Terreng in row 1 is that reading
+— the map is live under the ribbon), then the save into it, opening the new
+lokalitet as the receipt and setting `pendingStarterLocalityIdAtom` so the
+starter set follows (§8.9.1). Signed out it opens `AuthDialog` instead; that is
+a normal state here, since the whole point of Terreng in row 1 is that reading
 the ground needs no account.
+
+The render itself is produced by `useTerrainAnalysis`'s `produce(subject?)`,
+which both paths call — row 1's save and `Behold`'s terrain arm, the latter
+through the callback on `beholdOfferAtom`. One place decides what a terrain
+figure's caption and `meta` say.
 
 Two things in `useTerrainAnalysis` must not be undone:
 
@@ -2678,26 +2806,32 @@ visible map — signed out,
 with no lokalitet — or an open lokalitet's rectangle, with the render drawn on
 the map under the heritage layers and every knob on the ribbon's settings strip
 and its slider row rather than in a column beside the map; re-frame the
-analysed rectangle onto the current view; save the render (creating the
-lokalitet if there is none); run a
+analysed rectangle onto the current view; save the render as a new lokalitet
+when there is none open; press **Behold** to keep whatever ground is on screen
+— the LiDAR stitch at the dataset and style you are reading, the terrain render
+at the knobs you set, the ortofoto acquisition you picked — at the source's own
+resolution rather than as a photograph of the screen, with the button reading
+**Beholdt** while that exact view is already kept; run a
 LiDAR extract over the rectangle at a chosen
 source and resolution, view it fullscreen, keep it as a Bilde; fetch flyfoto —
 the seamless mosaic or any historical acquisition covering the area,
-individually or as a batch; take a map screenshot; upload an image; or press
-**Hent grunnpakke** once and get the best LiDAR dataset over the area read
+individually or as a batch; take a map screenshot; upload an image; and on a
+lokalitet you have just made, get the best LiDAR dataset over the area read
 three ways — hillshade, multidirectional hillshade and slope — fetched in
-sequence into the filmstrip, with progress on it.
+sequence into the bottom edge without asking, with progress on it.
 
 **Keep it**
-walk the filmstrip along the bottom of the map, with ← / → or the rail's
-chevrons; picking a frame puts that image back on the map at its own
-rectangle and fades it over what is there now; press **Gjenskap** on an extract,
+walk the images along the bottom of the map, with ← / → or the chevrons — a
+rail of small frames while you are reading, one big card while you are editing;
+in show, picking a frame puts that image back on the map at its own
+rectangle and fades it over what is there now, and in edit **Vis i ruta** /
+**Ta av ruta** do it deliberately; press **Gjenskap** on an extract,
 terrain render or flyfoto to set the map back to the view it was made from;
-open the original in a tab; caption an attachment; delete one; in edit, drag a
-frame along the rail — or step it with the two arrows — to set the order the
+open the original in a tab; caption an attachment; delete one; step a card
+earlier or later with the two arrows to set the order the
 images are read in, and so which one is the cover; hide one from the exhibit
-without deleting it, and see the hidden ones faded on the rail while you are
-editing; fold the strip
+without deleting it, and see the hidden ones dashed and faded in the carousel
+while you are editing; fold the edge
 away and back with **Bilder ▾** to get the ground under it;
 see flyfoto captioned with its acquisition year; get every kept or downloaded
 image back as a report-ready figure — scale bar, north arrow, dataset,

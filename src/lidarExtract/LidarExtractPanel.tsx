@@ -60,7 +60,9 @@ export const LidarExtractPanel = () => {
     }
     let cancelled = false;
     setEnumerating(true);
-    enumerateLidarSources(selection.bboxLonLat)
+    // DTM: this dialog is the multi-source grid, and it has never offered a
+    // model. `Behold` is the entrance that follows the ground on screen.
+    enumerateLidarSources(selection.bboxLonLat, 'dtm')
       .then((list) => {
         if (cancelled) return;
         setSources(list);

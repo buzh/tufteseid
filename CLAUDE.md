@@ -105,9 +105,10 @@ that owns them.
   temporal stack — `docs/map-layers.md`.
 - **A LiDAR tile extract** — stitch the densest per-project hillshade over a
   lokalitet's rectangle into one georeferenced image, kept as a Bilde or
-  downloaded as PNG; and **Hent grunnpakke**, one press that produces the
-  three-image starter set for a new lokalitet — `docs/ui-architecture.md`
-  §10, §8.9.
+  downloaded as PNG; a **starter set** of three readings of that dataset,
+  which a new lokalitet fetches for itself without being asked; and
+  **Behold**, one verb that keeps whatever ground is on screen at the
+  source's own resolution — `docs/ui-architecture.md` §10, §8.9.
 - **Five Kulturminner theme layers** from Riksantikvaren with structured
   GetFeatureInfo, and `kulturminner2` reshapeable by register, render and
   vern subset — `docs/map-layers.md`, `docs/ui-architecture.md` §5.9.
@@ -224,6 +225,14 @@ over the visible map, with no lokalitet and no account; or **the lokalitet
 row**, over an open lokalitet's bbox. Reading the ground is not an act of
 ownership — only keeping the render is, and saving from row 1 signs you in and
 turns the analysed rectangle into a lokalitet.
+
+Which is why **the terrain strip's own "Lagre" only appears when there is no
+lokalitet**, exactly like "Flytt analysen hit" beside it. With one open,
+keeping the render is `Behold` on the lokalitet row — one verb for whatever
+ground is up, gated on the same `canAdd` as every other write
+(`docs/ui-architecture.md` §8.9.2). `useTerrainAnalysis` publishes
+`produce()` and a `beholdKey` for that; both paths make the figure the same
+way.
 
 Entering it over a lokalitet **seeds the knobs from that lokalitet's cover
 terrain render**, once per lokalitet, so coming back to a place opens on the
@@ -342,8 +351,9 @@ Two rules that hold regardless of what the interface looks like:
 - `limited` visibility is a placeholder that behaves as `private` until
   groups exist.
 
-The ribbon rows, the funn list, the bottom filmstrip the bilder live on
-(`docs/ui-architecture.md` §8.7.2), the drawing tools and the policy
+The ribbon rows, the funn list, the bottom edge the bilder live on — a
+filmstrip in show, a carousel in edit (`docs/ui-architecture.md` §8.7.2) —
+the drawing tools and the policy
 decisions around them (bbox is authored not derived, only seeded from the
 viewport; drawing and extract exist only inside a lokalitet; measure and
 terrain analysis stay global) are in `docs/ui-architecture.md`.
@@ -445,8 +455,9 @@ a picture and evidence, and reporting a find to Riksantikvaren means handing
 over the second kind.
 
 - Scope is **everything but "Last opp"**: both extract exits (Behold *and* the
-  PNG download), terrain Lagre, the flyfoto grab, Ta skjermbilde, all three
-  steps of Hent grunnpakke. An upload's provenance is unknown to the app.
+  PNG download), Behold on any ground, terrain Lagre, the flyfoto grab, Ta
+  skjermbilde, all three steps of the starter set. An upload's provenance is
+  unknown to the app.
 - Because the caption is a panel below rather than an overlay, the file is no
   longer pixel-registered to `bbox25833` — every attachment records
   `meta.imageRect` for where the image sits inside it.

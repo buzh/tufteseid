@@ -36,7 +36,9 @@ import {
   activeLocalityAtom,
   coverTerrainSpecAtom,
   editingLocalityIdAtom,
+  pendingStarterLocalityIdAtom,
 } from '../../localities/atoms';
+import type { BeholdKey, BeholdProduct } from '../../localities/behold';
 import { createLocalityFromBbox } from '../../localities/createFromBbox';
 import { ribbonToolAtom } from '../../localities/toolAtoms';
 import {
@@ -94,6 +96,7 @@ export const useTerrainAnalysis = () => {
   const locality = useAtomValue(activeLocalityAtom);
   const setActiveLocality = useSetAtom(activeLocalityAtom);
   const setEditingLocalityId = useSetAtom(editingLocalityIdAtom);
+  const setPendingStarter = useSetAtom(pendingStarterLocalityIdAtom);
   const coverTerrainSpec = useAtomValue(coverTerrainSpecAtom);
   const tool = useAtomValue(ribbonToolAtom);
   const standaloneBbox = useAtomValue(terrainStandaloneBboxAtom);
@@ -270,9 +273,115 @@ export const useTerrainAnalysis = () => {
   // the slot in the meantime, which `hideGroundOverlay` checks for us.
   useEffect(() => () => hideGroundOverlay('terrain'), []);
 
+  /*
+   * The render as a keepable thing: the figure plus every record field that
+   * describes it. The one place that knows how a terrain render becomes an
+   * attachment.
+   *
+   * Two verbs call it. This tool's own `Lagre`, which turns the analysed
+   * rectangle into a lokalitet — and the lokalitet row's `Behold`, which is
+   * the same act said once for all five grounds (docs/lokalitet-view.md
+   * §4.3). It has to live here rather than there because the pixels do: the
+   * canvas is owned by this hook and re-painted every slider frame, so what
+   * crosses to the lokalitet row is this callback, not an image.
+   *
+   * Null when there is nothing to keep — no DEM yet, or the figure renderer
+   * declined. Callers treat that as "not now", not as an error, because the
+   * only way to reach it is to press the button during a fetch.
+   */
+  const produce = useCallback(
+    async (subject?: string): Promise<BeholdProduct | null> => {
+      const canvas = canvasRef.current;
+      if (!canvas || !dem) return null;
+
+      // What leaves the app is a figure, not a screengrab of the overlay:
+      // a hillshade at 315°/35° and one at 135°/20° disagree about whether
+      // there is a mound in that field, so the angles travel with the pixels.
+      const figure = await renderFigureBlob(
+        canvas,
+        terrainFigure({
+          subject,
+          vis,
+          model,
+          light: { azimuth, altitude, zFactor },
+          dem,
+          radius,
+        }),
+      );
+      if (!figure) return null;
+
+      const label = t(`localities.terrain.vis.${vis}`);
+      return {
+        // Reuses the existing `extract` kind rather than adding one: this is
+        // a LiDAR-derived raster of the rectangle, which is what that kind
+        // already means, and a new enum value would need a PocketBase
+        // migration for no user-visible gain.
+        kind: 'extract',
+        blob: figure.blob,
+        caption: `${label} · ${model.toUpperCase()}`,
+        filename: `terreng_${vis}_${model}.png`,
+        meta: {
+          sourceLabel: t('localities.terrain.sourceLabel'),
+          style: vis,
+          model,
+          metresPerPx: dem.metresPerPx,
+          bbox25833: dem.bbox25833,
+          // Where the render sits inside the file: the caption panel is
+          // drawn below it, so the image is no longer the whole PNG.
+          imageRect: figure.imageRect,
+          // Only meaningful for the sun-dependent views, but recording it
+          // unconditionally keeps the shape predictable.
+          ...(vis === 'hillshade' ? { azimuth } : {}),
+          altitude,
+          zFactor,
+          // Already clamped to the grid — see above.
+          ...(radiusLimits ? { radius } : {}),
+        },
+      };
+    },
+    [dem, vis, model, azimuth, altitude, zFactor, radius, radiusLimits, t],
+  );
+
+  /*
+   * The same render, said as the duplicate guard's key (§4.3): what `Behold`
+   * compares against the bilder already kept, so scrubbing the azimuth back
+   * to a light you have already saved reads `Beholdt` instead of saving it
+   * twice.
+   *
+   * Every field here is one `produce` writes into `meta` — kept adjacent for
+   * that reason, because a key that drifts from the record it is matching
+   * against silently stops matching anything.
+   */
+  const beholdKey = useMemo((): BeholdKey | null => {
+    if (!dem) return null;
+    return {
+      kind: 'terrain',
+      // A terrain render has no WMS dataset to name — that absence is what
+      // tells it from a LiDAR extract, which shares its attachment kind.
+      sourceKey: '',
+      style: vis,
+      model,
+      params: {
+        ...(vis === 'hillshade' ? { azimuth } : {}),
+        altitude,
+        zFactor,
+        ...(radiusLimits ? { radius } : {}),
+      },
+    };
+  }, [dem, vis, model, azimuth, altitude, zFactor, radius, radiusLimits]);
+
+  /*
+   * "Lagre som ny lokalitet" — the row-1 entrance's one write.
+   *
+   * It no longer has a second path. Keeping a render into a lokalitet that is
+   * already open is `Behold` on the lokalitet row (`localities/behold.ts`),
+   * where it is gated on `canAdd` like every other write verb; this used to
+   * be the one place a stranger's lokalitet could be written to by accident.
+   * So the `locality` guard here is not defensive tidiness — it is the
+   * statement that this function only ever creates.
+   */
   const save = useCallback(async () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !dem || !bbox || saving) return;
+    if (locality || !canvasRef.current || !dem || !bbox || saving) return;
     // Signed out is a normal state here — the whole point of Terreng in row 1
     // is that reading the ground needs no account. Only keeping the render
     // does.
@@ -282,82 +391,47 @@ export const useTerrainAnalysis = () => {
     }
     setSaving(true);
     try {
-      // No lokalitet yet: the analysed rectangle becomes one. Deliberately
-      // `bbox` and not the current view — the map is live under the ribbon,
-      // so the user has probably panned since pressing Terreng.
+      // The analysed rectangle becomes the lokalitet. Deliberately `bbox` and
+      // not the current view — the map is live under the ribbon, so the user
+      // has probably panned since pressing Terreng.
       //
       // Before the render rather than after, so the figure's title can carry
       // the name the registers just gave the rectangle.
-      let target = locality;
+      const target = await createLocalityFromBbox(
+        bbox,
+        user.id,
+        t('localities.defaultName'),
+      );
       if (!target) {
-        target = await createLocalityFromBbox(
-          bbox,
-          user.id,
-          t('localities.defaultName'),
-        );
-        if (!target) {
-          toast.error({ title: t('localities.createFailed') });
-          return;
-        }
+        toast.error({ title: t('localities.createFailed') });
+        return;
       }
 
-      // What leaves the app is a figure, not a screengrab of the overlay:
-      // a hillshade at 315°/35° and one at 135°/20° disagree about whether
-      // there is a mound in that field, so the angles travel with the pixels.
-      const figure = await renderFigureBlob(
-        canvas,
-        terrainFigure({
-          subject: target.name || undefined,
-          vis,
-          model,
-          light: { azimuth, altitude, zFactor },
-          dem,
-          radius,
-        }),
-      );
-      if (!figure) return;
+      const product = await produce(target.name || undefined);
+      if (!product) return;
 
-      const label = t(`localities.terrain.vis.${vis}`);
       await createAttachment(
         {
           locality: target.id,
-          // Reuses the existing `extract` kind rather than adding one: this
-          // is a LiDAR-derived raster of the rectangle, which is what that
-          // kind already means, and a new enum value would need a
-          // PocketBase migration for no user-visible gain.
-          kind: 'extract',
-          caption: `${label} · ${model.toUpperCase()}`,
-          meta: {
-            sourceLabel: t('localities.terrain.sourceLabel'),
-            style: vis,
-            model,
-            metresPerPx: dem.metresPerPx,
-            bbox25833: dem.bbox25833,
-            // Where the render sits inside the file: the caption panel is
-            // drawn below it, so the image is no longer the whole PNG.
-            imageRect: figure.imageRect,
-            // Only meaningful for the sun-dependent views, but recording it
-            // unconditionally keeps the shape predictable.
-            ...(vis === 'hillshade' ? { azimuth } : {}),
-            altitude,
-            zFactor,
-            // Already clamped to the grid — see above.
-            ...(radiusLimits ? { radius } : {}),
-          },
+          kind: product.kind,
+          caption: product.caption,
+          meta: product.meta,
         },
         user.id,
-        figure.blob,
-        `terreng_${vis}_${model}.png`,
+        product.blob,
+        product.filename,
       );
 
       // Opening the new lokalitet is the receipt: the ribbon rescopes to it
       // and the render is sitting in its Bilder. In edit, because you are
       // there to keep a render and the rest of the loop — name it, draw on
       // it, keep another — is all on the far side of that stance (§3).
-      if (!locality) {
-        setActiveLocality(target);
-        setEditingLocalityId(target.id);
-      }
+      setActiveLocality(target);
+      setEditingLocalityId(target.id);
+      // The starter set follows it in, same as a lokalitet framed from the
+      // viewport: this render is one reading of the ground and the three
+      // laser readings are the ones you compare it against.
+      setPendingStarter(target.id);
     } catch (e) {
       console.warn('[terrain] save failed', e);
       toast.error({ title: t('localities.terrain.saveFailed') });
@@ -371,15 +445,10 @@ export const useTerrainAnalysis = () => {
     openAuthDialog,
     setActiveLocality,
     setEditingLocalityId,
+    setPendingStarter,
     saving,
-    vis,
-    model,
     dem,
-    azimuth,
-    altitude,
-    zFactor,
-    radius,
-    radiusLimits,
+    produce,
     t,
   ]);
 
@@ -504,6 +573,12 @@ export const useTerrainAnalysis = () => {
     error,
     saving,
     save,
+    // What the lokalitet row's `Behold` needs from this tool, and all it
+    // needs: how to make the image, and how to tell whether it is already in
+    // the Bilder. Published through `beholdOfferAtom`, not props — row 1 and
+    // the lokalitet row are siblings.
+    produce,
+    beholdKey,
     azimuth,
     setAzimuth,
     altitude,

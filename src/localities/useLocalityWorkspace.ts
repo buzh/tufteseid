@@ -56,8 +56,15 @@ import {
   editingLocalityIdAtom,
   funnDraftActiveAtom,
   marksHiddenAtom,
+  pendingStarterLocalityIdAtom,
   selectedFunnIdAtom,
 } from './atoms';
+import {
+  attachmentMatchesKey,
+  type BeholdKey,
+  beholdOfferAtom,
+  NIB_MOSAIC_KEY,
+} from './behold';
 import { fetchFlyfoto } from './flyfoto';
 import {
   fetchFlyfotoProjectsForBbox,
@@ -78,9 +85,9 @@ import { captureLocalityScreenshot } from './screenshot';
 import { getDrawLayerExtent4326 } from './serializeDrawLayer';
 import {
   planStarterPack,
-  starterExtract,
+  extractLidarFigure,
   STARTER_STYLES,
-  type StarterRaster,
+  type ExtractRaster,
 } from './starterPack';
 import {
   bilderStripOpenAtom,
@@ -239,8 +246,14 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [shooting, setShooting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fetchingFlyfoto, setFetchingFlyfoto] = useState(false);
-  // Whether the licensing notice is up in front of the acquisition picker.
-  const [flyfotoNotice, setFlyfotoNotice] = useState(false);
+  // Whether the licensing notice is up, and what accepting it does. Two
+  // routes reach NiB now — the acquisition picker and `Behold` over the
+  // flyfoto ground — and consent is owed on both, so the notice grew a
+  // destination rather than a second copy.
+  const [flyfotoNotice, setFlyfotoNotice] = useState<
+    'picker' | 'behold' | null
+  >(null);
+  const [beholding, setBeholding] = useState(false);
   // The style the starter set is fetching, or null when it is not running. A
   // value rather than a bool: the Bilder section names what it is waiting for.
   const [starterStep, setStarterStep] = useState<string | null>(null);
@@ -359,18 +372,37 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     }
   }, [activeBildeId, bilderItems, pin]);
 
-  // Picking a thumbnail *is* "Vis i ruta" (§4.2) — there is no second verb for
-  // it. Pressing the active one again puts it down, which is the only way the
-  // strip has to mean "nothing", and the images that cannot be placed are
-  // exactly the ones with nothing to place.
+  /*
+   * Picking a thumbnail *is* "Vis i ruta" — in show (§4.2). Pressing the
+   * active one again puts it down, which is the only way the filmstrip has to
+   * mean "nothing", and the images that cannot be placed are exactly the ones
+   * with nothing to place.
+   *
+   * In edit it is not, and that asymmetry is deliberate. The ground overlay is
+   * one slot with two contenders (map/groundOverlay.ts), and the other is a
+   * live terrain render — so a carousel that laid every card it walked past
+   * onto the map would knock the render down the instant a `Behold` result
+   * landed and moved the cursor onto it. In edit, laying an image on the
+   * ground is a verb on the card, pressed on purpose.
+   *
+   * Walking away from a card still puts its image down either way: a pin that
+   * outlived the card it belongs to points at something the surface is no
+   * longer showing.
+   */
+  const pinOnWalk = useCallback(
+    (rec: AttachmentRecord | null | undefined) => {
+      pin(!canEdit && rec && canPinBilde(rec) ? rec.id : null);
+    },
+    [canEdit, pin],
+  );
+
   const selectBilde = useCallback(
     (id: string | null) => {
       const next = id === activeBildeId ? null : id;
       setActiveBildeId(next);
-      const rec = next ? bilderItems?.find((a) => a.id === next) : null;
-      pin(rec && canPinBilde(rec) ? rec.id : null);
+      pinOnWalk(next ? bilderItems?.find((a) => a.id === next) : null);
     },
-    [activeBildeId, bilderItems, pin],
+    [activeBildeId, bilderItems, pinOnWalk],
   );
 
   // ←/→. Wraps, and never lands on nothing: walking a rail past its end and
@@ -388,9 +420,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           : (at + delta + items.length) % items.length;
       const rec = items[next];
       setActiveBildeId(rec.id);
-      pin(canPinBilde(rec) ? rec.id : null);
+      pinOnWalk(rec);
     },
-    [bilderItems, activeBildeId, pin],
+    [bilderItems, activeBildeId, pinOnWalk],
   );
 
   const removeBilde = useCallback(
@@ -1270,8 +1302,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // is produced by hand from the extract tool: a laser-derived picture of the
   // rectangle is what that kind means. The meta is the same set of keys too,
   // so nothing downstream has to know which route produced an image.
-  const saveStarterRaster = useCallback(
-    async (raster: StarterRaster, caption: string, filename: string) => {
+  const saveExtractRaster = useCallback(
+    async (raster: ExtractRaster, caption: string, filename: string) => {
       if (!user) return;
       const rec = await createAttachment(
         {
@@ -1342,14 +1374,14 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         if (ac.signal.aborted) return;
         setStarterStep(style);
         try {
-          const extract = await starterExtract(
+          const extract = await extractLidarFigure(
             plan.source,
             bbox25833,
             style,
             { subject: locality.name || undefined, signal: ac.signal },
           );
           if (extract && !ac.signal.aborted) {
-            await saveStarterRaster(
+            await saveExtractRaster(
               extract,
               `${extract.sourceLabel} · ${extract.style}`,
               `${sanitizeFilename(extract.sourceLabel)}_${extract.style}.png`,
@@ -1384,20 +1416,189 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     starterStep,
     locality.bbox,
     locality.name,
-    saveStarterRaster,
+    saveExtractRaster,
     t,
   ]);
 
-  // The NiB licensing notice, in front of the acquisition picker. The starter
-  // set no longer goes through it: it stopped fetching ortofoto, so consent
-  // to NiB's terms is no longer being asked of someone who never asked for a
-  // photograph (docs/lokalitet-view.md §4.3).
-  const openFlyfotoNotice = useCallback(() => setFlyfotoNotice(true), []);
-  const closeFlyfotoNotice = useCallback(() => setFlyfotoNotice(false), []);
+  /*
+   * …and on a brand-new lokalitet it runs itself (§4.3, §12).
+   *
+   * It used to be a menu item, which meant the three images most worth having
+   * arrived only for the people who already knew to ask. Framing a rectangle
+   * *is* the request: nothing else you would do first makes sense without
+   * them on the rail.
+   *
+   * Only ever from the creation sites' hand-off atom, so revisiting a
+   * lokalitet whose bilder were deliberately deleted does not refill it.
+   */
+  const [pendingStarter, setPendingStarter] = useAtom(
+    pendingStarterLocalityIdAtom,
+  );
+  useEffect(() => {
+    if (pendingStarter !== locality.id) return;
+    // Cleared before the fetch rather than after: the run takes tens of
+    // seconds and this effect re-runs on every image it lands.
+    setPendingStarter(null);
+    void runStarterPack();
+  }, [pendingStarter, locality.id, setPendingStarter, runStarterPack]);
+
+  /*
+   * `Behold` — keep the ground on screen, whatever it is
+   * (docs/lokalitet-view.md §4.3, and `behold.ts` for the four-ground table).
+   *
+   * Row 1 publishes what its ground can offer; this is the side that turns
+   * that into a record. Which of the three fetches runs is decided here
+   * rather than there because two of them are the calls this hook already
+   * makes for the starter set and the acquisition picker — one save path,
+   * one optimistic update, one set of captions.
+   */
+  const offer = useAtomValue(beholdOfferAtom);
+
+  const beholdBbox = useMemo(
+    () =>
+      transformExtent(locality.bbox, 'EPSG:4326', 'EPSG:25833') as [
+        number,
+        number,
+        number,
+        number,
+      ],
+    [locality.bbox],
+  );
+
+  // The offer said as the duplicate guard's key. Null where the ground has
+  // nothing to keep (Standard, Hybrid) or is not ready to say what it would
+  // keep — a style list still in flight, a DEM still downloading.
+  const beholdKey = useMemo((): BeholdKey | null => {
+    if (!offer) return null;
+    switch (offer.ground) {
+      case 'lidar':
+        return offer.source
+          ? {
+              kind: 'lidar',
+              sourceKey: offer.source.key,
+              style: offer.style,
+              model: offer.source.model,
+            }
+          : null;
+      case 'terreng':
+        return offer.key;
+      case 'flyfoto':
+        return {
+          kind: 'flyfoto',
+          sourceKey: offer.project?.id ?? NIB_MOSAIC_KEY,
+          style: '',
+          model: '',
+        };
+      default:
+        return null;
+    }
+  }, [offer]);
+
+  // Hidden bilder count. Concealment is curation (§4.4), not deletion, and
+  // fetching a second copy of something the author put away is exactly the
+  // clutter the guard exists to prevent.
+  const beholdDone = useMemo(() => {
+    if (!beholdKey || !attachmentItems) return false;
+    return attachmentItems.some((rec) =>
+      attachmentMatchesKey(rec, beholdKey, beholdBbox),
+    );
+  }, [beholdKey, beholdBbox, attachmentItems]);
+
+  // One image from the ortofoto ground, once the notice has been accepted.
+  // Straight through `runFlyfoto`, which is the picker's own per-row grab:
+  // `Behold` over Flyfoto and pressing that row are the same act.
+  const beholdFlyfoto = useCallback(() => {
+    if (!offer || offer.ground !== 'flyfoto') return;
+    void runFlyfoto(offer.project ?? undefined);
+  }, [offer, runFlyfoto]);
+
+  const behold = useCallback(async () => {
+    if (!user || !canAdd || beholding || !offer) return;
+
+    // Ortofoto is the one arm that cannot start with a fetch: NiB's terms
+    // have to be shown and accepted first, so the button's job here is to
+    // raise the notice and hand the work to `acceptFlyfotoNotice`.
+    if (offer.ground === 'flyfoto') {
+      setFlyfotoNotice('behold');
+      return;
+    }
+
+    setBeholding(true);
+    try {
+      if (offer.ground === 'lidar') {
+        if (!offer.source) return;
+        const raster = await extractLidarFigure(
+          offer.source,
+          beholdBbox,
+          offer.style,
+          { subject: locality.name || undefined },
+        );
+        if (!raster) {
+          toast.error({ title: t('localities.tools.beholdFailed') });
+          return;
+        }
+        await saveExtractRaster(
+          raster,
+          `${raster.sourceLabel} · ${raster.style}`,
+          `${sanitizeFilename(raster.sourceLabel)}_${raster.style}.png`,
+        );
+        toast.success({ title: t('localities.tools.beholdSaved') });
+        return;
+      }
+
+      if (offer.ground === 'terreng') {
+        // The only arm that cannot make its own pixels: the render is a
+        // canvas row 1 owns, so the offer carries a callback.
+        const product = await offer.produce(locality.name || undefined);
+        if (!product) {
+          toast.error({ title: t('localities.tools.beholdFailed') });
+          return;
+        }
+        const rec = await createAttachment(
+          {
+            locality: locality.id,
+            kind: product.kind,
+            caption: product.caption,
+            meta: product.meta,
+          },
+          user.id,
+          product.blob,
+          product.filename,
+        );
+        setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
+        toast.success({ title: t('localities.tools.beholdSaved') });
+      }
+    } catch (e) {
+      console.warn('[localityWorkspace] behold failed', e);
+      toast.error({ title: t('localities.tools.beholdFailed') });
+    } finally {
+      setBeholding(false);
+    }
+  }, [
+    user,
+    canAdd,
+    beholding,
+    offer,
+    beholdBbox,
+    locality.id,
+    locality.name,
+    saveExtractRaster,
+    setAttachmentItems,
+    t,
+  ]);
+
+  // The NiB licensing notice. The starter set no longer goes through it: it
+  // stopped fetching ortofoto, so consent to NiB's terms is no longer being
+  // asked of someone who never asked for a photograph
+  // (docs/lokalitet-view.md §4.3).
+  const openFlyfotoNotice = useCallback(() => setFlyfotoNotice('picker'), []);
+  const closeFlyfotoNotice = useCallback(() => setFlyfotoNotice(null), []);
   const acceptFlyfotoNotice = useCallback(() => {
-    setFlyfotoNotice(false);
-    setFlyfotoPicker(true);
-  }, []);
+    const next = flyfotoNotice;
+    setFlyfotoNotice(null);
+    if (next === 'behold') beholdFlyfoto();
+    else setFlyfotoPicker(true);
+  }, [flyfotoNotice, beholdFlyfoto]);
   const closeFlyfotoPicker = useCallback(() => {
     if (!fetchingFlyfoto) setFlyfotoPicker(false);
   }, [fetchingFlyfoto]);
@@ -1713,7 +1914,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
     // flyfoto
     fetchingFlyfoto,
-    flyfotoNotice,
+    flyfotoNotice: flyfotoNotice != null,
     openFlyfotoNotice,
     closeFlyfotoNotice,
     acceptFlyfotoNotice,
@@ -1725,9 +1926,22 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     runFlyfoto,
     runFlyfotoAll,
 
-    // the starter set
+    // the starter set. No verb: it runs itself on a new lokalitet now, and
+    // `starterStep` is here because the rail says which image it is waiting
+    // for while it does.
     starterStep,
-    runStarterPack,
+
+    // Behold
+    behold,
+    beholding,
+    // Which of the five grounds is on screen — the button's label, its
+    // tooltip and whether it is offered at all all read this.
+    beholdGround: offer?.ground ?? null,
+    // The ground can say what it would keep. False on Standard and Hybrid,
+    // and briefly false on the other three while a style list or a DEM is
+    // still in flight.
+    beholdReady: beholdKey != null,
+    beholdDone,
   };
 };
 

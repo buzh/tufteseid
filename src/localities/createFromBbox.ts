@@ -13,7 +13,11 @@ import { currentUserAtom } from '../auth/atoms';
 import { mapAtom } from '../map/atoms';
 import { CHROME_MARGIN_PX, chromeInsets } from '../shell/chromeInsets';
 import { toast } from '../ui';
-import { activeLocalityAtom, editingLocalityIdAtom } from './atoms';
+import {
+  activeLocalityAtom,
+  editingLocalityIdAtom,
+  pendingStarterLocalityIdAtom,
+} from './atoms';
 import { fetchLocalityContext } from './localityContext';
 import { upsertLocalityOnLayer } from './localityLayer';
 
@@ -149,6 +153,7 @@ export const useCreateLocalityFromViewport = () => {
   const user = useAtomValue(currentUserAtom);
   const setActiveLocality = useSetAtom(activeLocalityAtom);
   const setEditingLocalityId = useSetAtom(editingLocalityIdAtom);
+  const setPendingStarter = useSetAtom(pendingStarterLocalityIdAtom);
   const [creating, setCreating] = useState(false);
 
   const create = useCallback(async () => {
@@ -181,10 +186,23 @@ export const useCreateLocalityFromViewport = () => {
       // as the active record, so the row never renders it in show first.
       setActiveLocality(rec);
       setEditingLocalityId(rec.id);
+      // And the starter set follows it in, unasked. Three readings of the
+      // best laser dataset over the rectangle are what you would fetch next
+      // anyway, and the press that used to do it was a menu item you had to
+      // know about (docs/lokalitet-view.md §4.3, §12).
+      setPendingStarter(rec.id);
     } finally {
       setCreating(false);
     }
-  }, [user, creating, map, t, setActiveLocality, setEditingLocalityId]);
+  }, [
+    user,
+    creating,
+    map,
+    t,
+    setActiveLocality,
+    setEditingLocalityId,
+    setPendingStarter,
+  ]);
 
   return { create, creating };
 };

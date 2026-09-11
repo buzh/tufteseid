@@ -207,39 +207,26 @@ const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           </>
         ) : (
           <div className={rowStyles.menu}>
-            {/* The two that put new content in are owner-only, so an admin's
-                menu is Juster området and Slett — the two the server would
-                actually let them through with. */}
+            {/* Putting new content in is owner-only, so an admin's menu is
+                Juster området and Slett — the two the server would actually
+                let them through with. */}
+            {/* "Hent grunnpakke" was here, and is gone: the starter set now
+                arrives with the lokalitet instead of waiting to be found in a
+                menu (docs/lokalitet-view.md §4.3). What is left is the one
+                image route that is not a fetch at all. */}
             {ws.canAdd && (
-              <>
-                {/* First in the list because it is the one thing here you do
-                    on a lokalitet you have just made, and never again. */}
-                <button
-                  type="button"
-                  className={rowStyles.menuItem}
-                  disabled={ws.starterStep != null}
-                  title={t('localities.tools.starterHint')}
-                  onClick={() => {
-                    close();
-                    void ws.runStarterPack();
-                  }}
-                >
-                  <Icon icon="library_add" size={16} />
-                  {t('localities.tools.starter')}
-                </button>
-                <button
-                  type="button"
-                  className={rowStyles.menuItem}
-                  disabled={ws.uploading}
-                  onClick={() => {
-                    close();
-                    fileInputRef.current?.click();
-                  }}
-                >
-                  <Icon icon="add_photo_alternate" size={16} />
-                  {t('localities.bilder.upload')}
-                </button>
-              </>
+              <button
+                type="button"
+                className={rowStyles.menuItem}
+                disabled={ws.uploading}
+                onClick={() => {
+                  close();
+                  fileInputRef.current?.click();
+                }}
+              >
+                <Icon icon="add_photo_alternate" size={16} />
+                {t('localities.bilder.upload')}
+              </button>
             )}
             <button
               type="button"
@@ -365,7 +352,7 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
 
       {/* The middle zone: everything that leaves a trace, and therefore
           nothing at all in show (§2). Gated on `canAdd` as a block rather
-          than per button because all four create content, so for an admin —
+          than per button because all five create content, so for an admin —
           who may edit this record but not add to it — the zone is empty and
           should not render its gap. */}
       {canAdd && (
@@ -376,6 +363,33 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             tooltip={`${t('localities.funn.new')} (N)`}
             active={mode === 'draft'}
             onClick={() => (ws.draftActive ? ws.stopDraft() : ws.startDraft())}
+          />
+          {/* The general answer to "how do I add an image": whatever the map
+              is showing, kept at the source's own resolution rather than
+              photographed off the screen (docs/lokalitet-view.md §4.3). It
+              stands in front of the three routes beside it because two of
+              them are pickers for a *different* dataset than the one you are
+              looking at, and this is the one for the one you are.
+
+              Disabled rather than hidden on Standard and Hybrid: neither can
+              be fetched as data, and the tooltip says which verb can. Hiding
+              it would make the row reflow as you walked the ground ring. */}
+          <ModeButton
+            icon={ws.beholdDone ? 'check' : 'library_add'}
+            label={
+              ws.beholdDone
+                ? t('localities.tools.beholdDone')
+                : t('localities.tools.behold')
+            }
+            tooltip={
+              ws.beholdGround === 'standard' || ws.beholdGround === 'hybrid'
+                ? t('localities.tools.beholdHintScreenshot')
+                : ws.beholdDone
+                  ? t('localities.tools.beholdHintDone')
+                  : t('localities.tools.beholdHint')
+            }
+            disabled={!ws.beholdReady || ws.beholding || ws.beholdDone}
+            onClick={() => void ws.behold()}
           />
           <ModeButton
             icon="crop_free"

@@ -88,22 +88,33 @@ export const TerrainStrip = ({ terrain }: { terrain: TerrainAnalysis }) => {
             {t('localities.terrain.reframe')}
           </Button>
         )}
-        {/* The verb stays put through a reload rather than appearing with the
+        {/* Keeping a render is `Behold` on the lokalitet row now, along with
+            every other ground's (docs/lokalitet-view.md §4.3) — so with a
+            lokalitet open this strip holds knobs and nothing else.
+
+            It survives here for the row-1 entrance, which has no lokalitet
+            row to put the verb on: saving with nothing open is what turns the
+            analysed rectangle into a lokalitet, and that is the one act this
+            strip is still the only place for. Same `!hasLocality` gate as the
+            button above, for the mirror-image reason: both are the standalone
+            entrance's answer to something the lokalitet row answers better.
+
+            The verb stays put through a reload rather than appearing with the
             render, so the row does not reflow under the pointer — but there
             is nothing to keep until a DEM is painted, and the canvas may
             still be holding the previous rectangle. */}
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={terrain.saving || loading || !dem}
-          onClick={terrain.save}
-        >
-          {terrain.saving
-            ? t('localities.terrain.saving')
-            : terrain.hasLocality
-              ? t('localities.terrain.save')
+        {!terrain.hasLocality && (
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={terrain.saving || loading || !dem}
+            onClick={terrain.save}
+          >
+            {terrain.saving
+              ? t('localities.terrain.saving')
               : t('localities.terrain.saveNew')}
-        </Button>
+          </Button>
+        )}
       </div>
     </>
   );

@@ -85,23 +85,6 @@
   box-shadow: 0 0 0 2px var(--c-accent);
 }
 
-/*
- * Kept, not shown (§4.4). Faded rather than removed, because in edit the whole
- * point of the mark is that you can see what you have set aside — a concealed
- * image you cannot find again is a deleted one with extra steps.
- */
-.frameHidden {
-  opacity: 0.45;
-  border-style: dashed;
-}
-
-/* Where the dragged frame would land. On the left edge because the drop puts
-   the moved image *at* this position and shoves this one right. */
-.frameDrop {
-  border-color: var(--c-accent);
-  box-shadow: inset 3px 0 0 0 var(--c-accent);
-}
-
 .frameImage {
   display: block;
   width: 100%;
@@ -129,8 +112,9 @@
   color: #fff;
 }
 
-/* Corner chips: the cover star and the concealed eye. Same treatment as
-   .kindMark so three marks on one 88×64 frame still read as one vocabulary. */
+/* The corner chip: the cover star. Same treatment as .kindMark so two marks
+   on one 88×64 frame still read as one vocabulary. Concealment has no chip
+   here — a hidden image is simply not on the rail in show. */
 .mark {
   position: absolute;
   top: 2px;
@@ -143,10 +127,6 @@
 
 .coverMark {
   left: 2px;
-}
-
-.hiddenMark {
-  right: 2px;
 }
 
 .busy {
@@ -199,39 +179,4 @@
   align-items: center;
   flex-wrap: wrap;
   gap: var(--sp-2);
-}
-
-.metaLine {
-  overflow: hidden;
-  margin: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-xs);
-  color: var(--c-fg-subtle);
-}
-
-/* Beside the caption rather than under the rail (§4.3). Same plain range
-   input as the terrain sliders, for the same reason: the fade has to stream
-   while it is dragged, because what is being watched is the map. */
-.fade {
-  display: block;
-  flex: 0 1 180px;
-}
-
-.fade input[type='range'] {
-  display: block;
-  width: 100%;
-  margin: 0;
-}
-
-.fadeHead {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--sp-2);
-  font-size: var(--font-xs);
-  color: var(--c-fg-muted);
-}
-
-.fadeValue {
-  font-variant-numeric: tabular-nums;
 }
