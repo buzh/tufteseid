@@ -1,5 +1,6 @@
 import { useStore } from 'jotai';
 import { useEffect, useRef } from 'react';
+import { funnSessionAtom } from '../funn/session';
 import { anyOverlayOpenAtom } from '../ui/overlayAtoms';
 
 // Keyboard for the open lokalitet, same shape as the background cycling keys
@@ -59,6 +60,11 @@ export const useWorkspaceKeys = (handlers: WorkspaceKeyHandlers) => {
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) {
         return;
       }
+      // While the pen is down the drawing surface owns the keyboard — see the
+      // same guard in map/useBackgroundCyclingKeys.ts. N, U and B would start
+      // a second thing over a frozen map, and Excalidraw needs Delete,
+      // Escape and the arrows for the shapes.
+      if (store.get(funnSessionAtom)) return;
       const h = ref.current;
       const target = event.target;
       if (

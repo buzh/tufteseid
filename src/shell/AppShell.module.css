@@ -154,3 +154,19 @@
   flex: 0 0 auto;
   pointer-events: none;
 }
+
+/*
+ * While a funn is being drawn, the two slots get out of the way.
+ *
+ * The drawing surface is the whole of `.row` and it is *registered to the
+ * ground underneath it* (src/funn/frame.ts), so a search card floating over
+ * it is both in the way of the pen and covering the terrain being traced.
+ *
+ * `visibility` rather than unmounting: it takes the slots out of hit-testing
+ * too, so this is one property rather than two, and the components keep their
+ * state — a search result you had open is still open when the pen comes back
+ * up, which it would not be if the subtree had been thrown away and remade.
+ */
+.standDown {
+  visibility: hidden;
+}

@@ -22,6 +22,15 @@
   min-height: 48px;
 }
 
+/* Row 1 while a funn is being drawn: still there, visibly not available.
+   `inert` does the disabling (Ribbon.tsx); this only says so. Opacity sits on
+   the wrapper inside the bar, so `.bar`'s own white stays opaque behind it and
+   the map does not show through the chrome. */
+.standDown {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
 /* Rows below the first read as subordinate: tinted, and separated by a rule
    rather than by whitespace the bar does not have to spare. */
 .rowSub {

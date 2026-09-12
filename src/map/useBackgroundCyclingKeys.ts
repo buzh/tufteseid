@@ -1,5 +1,6 @@
 import { atom, useAtomValue, useStore } from 'jotai';
 import { useEffect } from 'react';
+import { funnSessionAtom } from '../funn/session';
 import { funnHiddenAtom } from '../localities/atoms';
 import { anyOverlayOpenAtom } from '../ui/overlayAtoms';
 import { compareFocusAtom, compareOnAtom } from './compare/halves';
@@ -131,6 +132,12 @@ export const useBackgroundCyclingKeys = () => {
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) {
         return;
       }
+      // The drawing surface takes the whole keyboard. Excalidraw's own tool
+      // shortcuts are the digits, so 1-5 would pick a shape *and* swap the
+      // ground under a drawing registered to a photograph of the old one —
+      // and these listeners are on the capture phase at the document, which
+      // `inert` on the row (Ribbon.tsx) does nothing about.
+      if (store.get(funnSessionAtom)) return;
       const key = event.key.toLowerCase();
       const isCycle = CYCLE_KEYS.includes(key);
       const isGround = GROUND_KEYS.includes(key);

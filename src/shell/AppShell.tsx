@@ -1,5 +1,7 @@
-import { useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { AuthDialog } from '../auth/AuthDialog';
+import { FunnSurface } from '../funn/FunnSurface';
+import { funnSessionAtom } from '../funn/session';
 import { CompareCurtain } from '../map/compare/CompareCurtain';
 import { KulturminnerPopup } from '../map/featureInfo/KulturminnerPopup';
 import { MapComponent } from '../map/MapComponent';
@@ -7,6 +9,7 @@ import { MapToolCards } from '../map/overlay/MapToolCards';
 import { SearchComponent } from '../search/SearchComponent';
 import { InfoBox } from '../search/infobox/InfoBox';
 import { ErrorBoundary } from '../shared/ErrorBoundary';
+import { cx } from '../ui';
 import styles from './AppShell.module.css';
 import { bottomSlotAtom } from './bottomSlot';
 import { Ribbon } from './Ribbon';
@@ -14,6 +17,10 @@ import { useMapSideEffects } from './useMapSideEffects';
 
 export const AppShell = () => {
   const setBottomSlot = useSetAtom(bottomSlotAtom);
+  // The session, not "the user pressed the pen": the two differ for as long
+  // as the map takes to settle, and nothing should stand down before there is
+  // something to stand down *for* (funn/session.ts).
+  const drawing = useAtomValue(funnSessionAtom) != null;
 
   useMapSideEffects();
 
@@ -47,7 +54,7 @@ export const AppShell = () => {
             {/* The left slot used to arbitrate between a MapTool card and
                 the lokalitet workspace. The workspace is in the ribbon now,
                 so there is nothing left to arbitrate and both render. */}
-            <div className={styles.left}>
+            <div className={cx(styles.left, drawing && styles.standDown)}>
               <ErrorBoundary name="SearchComponent">
                 <SearchComponent />
               </ErrorBoundary>
@@ -62,11 +69,22 @@ export const AppShell = () => {
                 the lokalitet row and the bottom edge (§6). What is left is the
                 one thing that was never chrome: the readout for a point you
                 asked about. */}
-            <div className={styles.right}>
+            <div className={cx(styles.right, drawing && styles.standDown)}>
               <ErrorBoundary name="InfoBox">
                 <InfoBox />
               </ErrorBoundary>
             </div>
+
+            {/* The drawing surface, last so it paints over the two slots it
+                just stood down — and inside .row rather than as a layer of
+                its own over the map, so that Excalidraw's islands land in the
+                gap the chrome leaves instead of under the ribbon
+                (funn/FunnCanvas.module.css). Renders nothing until the pen
+                goes down; it owns the session, so it has to outlive it in
+                both directions. */}
+            <ErrorBoundary name="FunnSurface">
+              <FunnSurface />
+            </ErrorBoundary>
           </div>
 
           {/* The bottom edge — the filmstrip, the edit carousel, a picker run

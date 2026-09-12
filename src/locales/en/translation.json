@@ -376,6 +376,7 @@
       },
       "confirmDeleteShort": "Delete the find?",
       "growConfirmAction": "Grow the area",
+      "freezeFailed": "The map never finished drawing. Try again once it has loaded.",
       "autoName": "Find {{n}}",
       "growHint": "The drawing extends beyond the locality's area."
     },

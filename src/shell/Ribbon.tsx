@@ -1,6 +1,8 @@
 import { useAtomValue } from 'jotai';
+import { funnSessionAtom } from '../funn/session';
 import { activeLocalityAtom } from '../localities/atoms';
 import { ErrorBoundary } from '../shared/ErrorBoundary';
+import { cx } from '../ui';
 import { LocalityRibbon } from './LocalityRibbon';
 import styles from './Ribbon.module.css';
 import { RibbonGlobalRow } from './RibbonGlobalRow';
@@ -35,12 +37,27 @@ import { RibbonGlobalRow } from './RibbonGlobalRow';
  */
 export const Ribbon = () => {
   const activeLocality = useAtomValue(activeLocalityAtom);
+  const drawing = useAtomValue(funnSessionAtom) != null;
 
   return (
     <div className={styles.bar} data-chrome="top">
-      <ErrorBoundary name="RibbonGlobalRow">
-        <RibbonGlobalRow />
-      </ErrorBoundary>
+      {/*
+        Row 1 stands down while a funn is being drawn. Everything on it —
+        the grounds, the dataset ring, Stedsinfo, the settings strip under
+        it — changes what is on the map, and the drawing is registered to a
+        photograph of the map as it was (src/funn/frame.ts): swap the ground
+        underneath and the strokes are over terrain nobody traced.
+
+        Inert rather than absent so the bar does not change height mid-
+        session, and greyed so that reads as deliberate rather than as a
+        control that stopped working. The *lokalitet* row deliberately stays
+        live: the pen that ends the session is on it.
+      */}
+      <div className={cx(drawing && styles.standDown)} inert={drawing}>
+        <ErrorBoundary name="RibbonGlobalRow">
+          <RibbonGlobalRow />
+        </ErrorBoundary>
+      </div>
       {activeLocality && (
         // Keyed so swapping lokalitet remounts the controller with fresh
         // form state rather than carrying the previous one's draft across.

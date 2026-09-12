@@ -1,0 +1,100 @@
+/*
+ * Excalidraw, made to look like it belongs here.
+ *
+ * Theme it, trim it — not rebuild it. Its toolbar and style island are good
+ * at what they do and reimplementing them over `excalidrawAPI` would be a
+ * second UI kit to maintain for no gain. What they cannot be is *someone
+ * else's* toolbar sitting in the middle of this app, so every colour, radius
+ * and shadow is re-pointed at `src/ui/tokens.css` and the parts that describe
+ * a document rather than a drawing are taken out.
+ *
+ * `:global(...)` throughout because the class names belong to the library.
+ * They are internal, so they can move in a version bump; each block below
+ * says what it is for so a broken selector can be recognised as broken rather
+ * than deleted.
+ */
+
+/*
+ * A sibling of the left and right slots inside `.row` (AppShell.module.css) —
+ * which is to say: the map minus the chrome. That is the whole reason it sits
+ * there rather than as a layer of its own over the map. Excalidraw's own
+ * islands position themselves against this box, so they land clear of the
+ * ribbon above and the bottom slot below without a single offset being
+ * measured; and the strip of map the chrome covers is opaque anyway, so
+ * nothing is lost by not painting there. The scene is scrolled to compensate
+ * (FunnCanvas.tsx).
+ *
+ * `isolation` contains Excalidraw's internal z-ladder, which climbs past
+ * 1000. Without it, its popovers would paint over the ribbon and the bottom
+ * slot; with it they stop below both, like everything else in `.row`.
+ *
+ * pointer-events back on — the rule at the top of AppShell.module.css. This
+ * is a leaf surface, and while the pen is down it is *the* surface.
+ */
+.surface {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  isolation: isolate;
+  pointer-events: auto;
+}
+
+.surface :global(.excalidraw) {
+  /* Surfaces and text. */
+  --island-bg-color: var(--c-bg);
+  --default-bg-color: var(--c-bg);
+  --popup-bg-color: var(--c-bg);
+  --popup-secondary-bg-color: var(--c-bg-subtle);
+  --popup-text-color: var(--c-fg);
+  --text-primary-color: var(--c-fg);
+  --icon-fill-color: var(--c-fg);
+  --dialog-border-color: var(--c-border);
+
+  /* Accent. Excalidraw's own is indigo; ours is the map green. */
+  --color-primary: var(--c-accent);
+  --color-primary-hover: var(--c-accent-hover);
+  --color-primary-darker: var(--c-accent-hover);
+  --color-primary-darkest: var(--c-green-700);
+  --color-primary-light: var(--c-accent-subtle);
+  --color-primary-light-darker: var(--c-green-100);
+
+  /* Controls. */
+  --button-color: var(--c-fg);
+  --button-bg: transparent;
+  --button-border: transparent;
+  --button-hover-bg: var(--c-bg-hover);
+  --button-hover-border: var(--c-border);
+  --button-hover-color: var(--c-fg);
+  --button-active-bg: var(--c-bg-active);
+  --button-active-border: var(--c-border-strong);
+  --button-destructive-bg-color: var(--c-red-50);
+  --button-destructive-color: var(--c-danger);
+  --input-bg-color: var(--c-bg);
+  --input-border-color: var(--c-border);
+  --input-hover-bg-color: var(--c-bg-hover);
+  --input-label-color: var(--c-fg-muted);
+
+  --border-radius-md: var(--radius-md);
+  --border-radius-lg: var(--radius-lg);
+  --shadow-island: var(--shadow-md);
+}
+
+/*
+ * What comes out.
+ *
+ * The hamburger holds Excalidraw's document verbs — open, save, export,
+ * canvas background, reset. A funn is not a document: it is saved with the
+ * lokalitet by `Lagre`, there is nothing to open, and the background is the
+ * map. `UIOptions.canvasActions` empties the menu but still renders the
+ * button, so the button goes here.
+ *
+ * The library is a shape palette hosted by excalidraw.com, which is a
+ * different app's content inside this one and a fetch `connect-src` would
+ * have to be widened for. Help is a shortcut sheet for features that are
+ * mostly turned off, and it opens a dialog over the map.
+ */
+.surface :global(.main-menu-trigger),
+.surface :global(.sidebar-triggers),
+.surface :global(.help-icon) {
+  display: none;
+}

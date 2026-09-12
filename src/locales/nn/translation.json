@@ -376,6 +376,7 @@
       },
       "confirmDeleteShort": "Slette funnet?",
       "growConfirmAction": "Utvid området",
+      "freezeFailed": "Kartet vart ikkje ferdig teikna. Prøv igjen når det har lasta.",
       "autoName": "Funn {{n}}",
       "growHint": "Teikninga går utanfor området til lokaliteten."
     },

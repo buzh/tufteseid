@@ -39,6 +39,7 @@ import {
   getDrawOverlayLayer,
 } from '../../map/vectorLayers';
 import { getHighestZIndex } from '../../draw/drawControls/hooks/verticalMove';
+import { funnSessionAtom } from '../../funn/session';
 import { funnDraftActiveAtom } from '../../localities/atoms';
 import { mapAtom } from '../../map/atoms';
 import {
@@ -121,7 +122,15 @@ export const textStyleReadAtom = atom((get) => {
 // and the LiDAR extract; measure is the one tool outside it.) Suspending
 // rather than cancelling: the draft form and anything already drawn
 // survive, and closing measure puts the interactions back.
+//
+// And suspended outright once the Excalidraw surface is up (src/funn/). The
+// two draw the same funn and would both be listening for the same clicks —
+// and the OpenLayers side would be drawing onto a map the user cannot see,
+// since what is on screen by then is a photograph of it. This whole subsystem
+// goes when the surface is finished; until then, one line keeps it out of the
+// way.
 export const drawEnabledAtom = atom<boolean>((get) => {
+  if (get(funnSessionAtom)) return false;
   return get(funnDraftActiveAtom) && get(mapToolAtom) !== 'measure';
 });
 
