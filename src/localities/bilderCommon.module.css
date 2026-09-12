@@ -289,29 +289,3 @@
   line-height: 1.2;
   color: var(--c-fg-subtle);
 }
-
-/* Beside the caption rather than under the images (§4.3). Same plain range
-   input as the terrain sliders, for the same reason: the fade has to stream
-   while it is dragged, because what is being watched is the map. */
-.fade {
-  display: block;
-  flex: 0 1 180px;
-}
-
-.fade input[type='range'] {
-  display: block;
-  width: 100%;
-  margin: 0;
-}
-
-.fadeHead {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--sp-2);
-  font-size: var(--font-xs);
-  color: var(--c-fg-muted);
-}
-
-.fadeValue {
-  font-variant-numeric: tabular-nums;
-}

@@ -374,9 +374,13 @@ export const describeHeritageRender = (
         .join(', ') || t('figure.set.heritageNone'),
     );
   }
+  // Printed as transparency, like the slider that set it: a caption that
+  // disagrees with the control it records is worse than no caption.
   if (opacity < 1) {
     parts.push(
-      t('figure.set.heritageOpacity', { percent: Math.round(opacity * 100) }),
+      t('figure.set.heritageTransparency', {
+        percent: Math.round(100 - opacity * 100),
+      }),
     );
   }
   if (parts.length === 1 && render === 'omriss') return undefined;

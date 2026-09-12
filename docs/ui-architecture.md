@@ -574,7 +574,7 @@ returns you to exactly the dataset and style you left — 1→5→1 is free wher
 | Standard (1) | Karttype pulldown — the five cartographies (topografisk, gråtone, rasterkart, sjøkart, amtskart), also the W/S ring (§5.10) |
 | LiDAR (2), Hybrid (3) | Dataset pulldown — **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport · style pulldown (the active dataset's WMS styles, with a "flere stiler" second tier), only when the dataset publishes more than one · DTM/DOM segment · **Høydekurver** switch, Hybrid only |
 | Flyfoto (4) | Acquisition pulldown — the seamless mosaic or any acquisition covering the viewport, newest first · period chips (Alle / 2010– / 1990–2009 / 1960–1989 / –1959), which narrow both that list and the W/S ring (§5.5) |
-| Terreng (5) | Visualisering pulldown — the eight relief views, each with its own explanation as a tooltip, also the W/S ring (§10) · DTM/DOM segment · **the sliders the current visualization uses**, two to four of azimuth / altitude / exaggeration / radius / opacity, inline as label · track · readout (§10) · the resolution readout. No actions: keeping the render is `Behold` on row 2 (§8.9.2) and the rectangle is the lokalitet's, so "Juster området" owns it |
+| Terreng (5) | Visualisering pulldown — the eight relief views, each with its own explanation as a tooltip, also the W/S ring (§10) · DTM/DOM segment · **the sliders the current visualization uses**, two to four of azimuth / altitude / exaggeration / radius / Transparens, inline as label · track · readout (§10) · the resolution readout. No actions: keeping the render is `Behold` on row 2 (§8.9.2) and the rectangle is the lokalitet's, so "Juster området" owns it |
 
 **The strip is always on the bar.** It used to vanish under Standard, which had
 nothing to adjust; five cartographies filled that hole, and the fixture is the
@@ -620,8 +620,8 @@ Two constraints on the strip that are load-bearing rather than stylistic:
   while someone is using the controls those keys are the shortcut for.
 
 Changing the ground *beneath* a terrain render therefore means leaving Terreng
-first. That is the accepted cost: the opacity slider fades the render towards
-whichever ground you entered from, which is the comparison it is for.
+first. That is the accepted cost: the Transparens slider fades the render
+towards whichever ground you entered from, which is the comparison it is for.
 
 The dataset and style pulldowns are still the most complicated things here:
 each row needs a two-line label, a relevance badge, an on-hover map preview of
@@ -824,6 +824,22 @@ Norgeskart features.
 The decision is still open and should be taken deliberately: either commit to
 three locales and finish `src/search/**`, or drop to Norwegian-only and delete
 i18next. A full i18n stack that one surface half-bypasses is the worst of both.
+
+**One word for fading a layer: Transparens** (`Transparency` in `en`). There
+were four sliders doing the identical thing under three different Norwegian
+names — *Toning* on a pinned bilde, *Dekkraft* on a terrain render, *Dekkevne*
+on the heritage overlay and again on a drawing colour — so a user who learned
+one control learned nothing about the next. The keys are `*.transparency`
+throughout.
+
+**They count transparency, so 0 % is opaque.** The word names the gap, not the
+cover, and a slider that reads `Transparens 100 %` under an image you can see
+perfectly is a control arguing with its own label. What is *stored* is still
+opacity everywhere — the atoms, `usePinnedBilde`, the `#rrggbbaa` alpha,
+`?heritageOpacity`, `layer.setOpacity` — because that is what OpenLayers and
+CSS take; every surface flips at the point it prints the number, and so does
+`describeHeritageRender`, since a caption that disagrees with the control it
+records is worse than no caption.
 
 ### 5.5 Flyfoto as a background mode
 
@@ -1153,8 +1169,8 @@ show someone a heritage feature must not arrive with the register hidden.
 
 The panel has four parts, top to bottom: the five RA services as
 `PulldownCheck` rows; kulturminner2's three registers (lokaliteter,
-enkeltminner, sikringssoner) indented under it; how they are drawn; and an
-opacity slider for the whole overlay.
+enkeltminner, sikringssoner) indented under it; how they are drawn; and a
+Transparens slider for the whole overlay.
 
 **A popover, not a row on the settings strip.** The strip belongs to the ground
 on screen and follows the ground ring (§5.1). The heritage overlay is not a
@@ -1181,9 +1197,10 @@ GetMap probes rather than inferred.
 **Outlines is the default**, where the service's own default fills enkeltminner
 in cyan. The register is here to be read against the relief, and a filled
 polygon is an opaque lid over the one thing the app exists to show. For the
-same reason the opacity slider bottoms out at 20 % rather than 0: a fully
+same reason the Transparens slider tops out at 80 % rather than 100: a fully
 invisible overlay that still counts as "on" is a state nobody can debug from
-looking at the screen.
+looking at the screen. The atom is still opacity and `MIN_HERITAGE_OPACITY` is
+still 0.2 — the floor is a ceiling only in what the control prints.
 
 **Reshaping happens in `themeLayerEffect`, not at construction.** The effect
 reads the three atoms, so any change re-runs it; the add/remove diff is a no-op
@@ -1197,7 +1214,7 @@ instead of built wrong and corrected a frame later — at RA's MapServer that
 difference is a screenful of GetMaps.
 
 **Saved images carry it.** `describeHeritageRender` (`src/figure/specs.ts`)
-puts the render, the omitted sublayers and any reduced opacity on the
+puts the render, the omitted sublayers and any transparency on the
 screenshot's caption. "Outlines of the automatically protected sites only" and
 "every register, filled" are different claims about what the blank ground in
 the picture means, and only one of them says nothing was recorded there (§8.10).
@@ -2057,15 +2074,23 @@ over today's hillshade with the funn drawn on top; in a lightbox it is a
 picture of somewhere you are no longer looking.
 
 The detail panel carries: the kind badge and provenance line, the caption field
-(`readOnly` unless `canEdit`, commits on blur), then **Gjenskap**, **Åpne
-originalen**, plus a **Toning** slider whenever the image is up. Beside them, in
-**both** stances, one button that is a **toggle**: **Vis i ruta** when the
-record is pinnable and not up, **Ta av ruta** when it is.
+(`readOnly` unless `canEdit`, commits on blur), then **Gjenskap** and **Åpne
+originalen**. Beside them, in **both** stances, one button that is a **toggle**:
+**Vis i ruta** when the record is pinnable and not up, **Ta av ruta** when it
+is.
+
+**Transparens is not in the panel** — it is on the rectangle's top-right
+corner, opposite the name chip (§8.7.5). It lived here, beside the caption, and
+the panel was the wrong home for it twice over: it was only rendered while the
+*selected* card was also the *pinned* one, so walking the rail to read another
+caption took the slider away from an image that was still on the ground, and it
+asked you to look at the bottom edge of the screen while dragging something
+whose entire effect is in the middle of it.
 
 Show had only the way back on — the argument being that picking the selected
 frame again takes the image off, so the two gestures are one. They are not. That
-press spends the *selection* to put the image down, so the caption, the
-provenance line and the Toning slider of the thing you were reading go with it,
+press spends the *selection* to put the image down, so the caption and the
+provenance line of the thing you were reading go with it,
 and the surface you were using to think about the image is the price of
 un-showing it. Taking a picture off the map is not a write, so §2 has nothing to
 say here: show is short of verbs, not entitled to fewer. The toggle also absorbs
@@ -2133,9 +2158,9 @@ together.
   render down, entering Terreng unpins the image, and the displaced side hears
   about it through `subscribeGroundOverlay` (§10).
 - **The fade is imperative.** Percent in `useState`, mirrored onto the layer
-  directly, exactly like Terrenganalyse's opacity — routing a dragged slider
+  directly, exactly like Terrenganalyse's — routing a dragged slider
   through jotai would re-render the shell at 60 Hz to change a number
-  OpenLayers reads imperatively anyway.
+  OpenLayers reads imperatively anyway. Where the slider *is* is §8.7.5.
 - **Gjenskap** puts the *map* back the way it was when the image was made, and
   is the primitive `docs/lokalitet-view.md` §4.2 asks for rather than a button:
   `src/localities/viewSpec.ts` reads a record's `meta` into a `ViewSpec`
@@ -2190,7 +2215,7 @@ transient by construction:
 | the map | picking a frame pins it | the same, plus `Vis i ruta` as a toggle |
 | order | none | drag a frame along the rail, or `arrow_back` / `arrow_forward` in the detail row |
 | conceal, delete | absent | in the detail row |
-| both | Gjenskap, Åpne originalen, Toning, ← / →, `bottom_panel_close` | |
+| both | Gjenskap, Åpne originalen, ← / →, `bottom_panel_close` | |
 
 **Edit used to be one large card at a time**, on the argument that judging a
 caption off an 88×64 thumbnail is judging it blind. That is true of looking at
@@ -2498,6 +2523,39 @@ bufferable (§8.1), a fork cheap, and the picker carousels affordable.
   outside the component lifetime. Progress on the bottom edge is a plain
   `starterBusy` boolean now — `starterStep`'s "Henter helning_prosent …" stopped
   describing anything the moment the set stopped fetching.
+
+#### 8.7.5 Transparens — on the rectangle, not in the strip
+
+The pinned image's fade is an `ol/Overlay` hung off the lokalitet rectangle's
+**top-right** corner, opposite the name chip `localityLayer.ts` draws on the
+top-left (`src/localities/BildeTransparency.tsx`, mounted from
+`LocalityRibbon` beside `FunnCallout`). Label · track · readout on one line,
+the same shape the terrain sliders settled on.
+
+It used to be `FadeControl` in the detail row of both bottom-edge surfaces, and
+that was wrong on both counts:
+
+- **It belonged to the selection, and the selection is not the image.** The
+  slider rendered only while the card you had picked was also the card on the
+  ground. Those two ids are allowed to differ (§8.7.1), so reading a second
+  caption silently took the fade away from an image that was still up.
+- **It was at the bottom of the screen and its effect was in the middle.**
+  Fading a 1937 ortofoto off today's hillshade is a comparison, and a
+  comparison is watched at the thing being compared. The two corners now divide
+  the frame's labour honestly: the left one says which lokalitet this is, the
+  right one says how much of it you are seeing through.
+
+Load-bearing:
+
+- **Absent while "Juster området" is live.** That corner is a resize handle
+  then, and a slider over a handle is a slider you grab by accident.
+- **`stopEvent: true`**, like `FunnCallout`: without it OpenLayers reads the
+  press on the track as the start of a pan and the thumb never moves.
+- **Seated on `locality.bbox.join(',')`, not on the array.** A patched record is
+  a new array on every realtime event, and re-seating the overlay on each one
+  would fight the drag that caused the patch.
+- **Bilde only.** A live terrain render holds the same ground slot (§10) but
+  keeps its own slider on the terrain strip, where the rest of its knobs are.
 
 ### 8.8 The flyfoto selection dialog
 
@@ -3045,7 +3103,7 @@ kit `Switch` — and it finally has a translated label instead of a hardcoded
 
 **Colour is the one place the port changed the control rather than its
 clothes.** kvib's `ColorPicker` gave a saturation/hue/alpha surface; the
-replacement is the native colour well plus a separate opacity slider, over the
+replacement is the native colour well plus a separate Transparens slider, over the
 same recent-colour swatches. The split is forced: `<input type="color">` is
 six hex digits by definition, and alpha is load-bearing here —
 `DEFAULT_SECONDARY_COLOR` is `#1d823b80`, i.e. fills are half-transparent so
@@ -3121,14 +3179,14 @@ it forced into `useGroundMode`'s cycling, went with it.
 **Terrain** — `src/shell/terrain/`: DTM/DOM toggle, eight visualizations
 (hillshade, multidirectional hillshade, VAT, sky-view factor, positive and
 negative openness, local relief model, slope), and azimuth / altitude /
-exaggeration / radius / opacity sliders. Four files:
+exaggeration / radius / Transparens sliders. Four files:
 
 | File | What it is |
 |---|---|
 | `useTerrainAnalysis.ts` | All of the state — which rectangle, the DEM, the model, the visualization, the five knobs, the canvas — plus `describe()` and `beholdKey`, which is how row 2's `Behold` keeps the render (§8.9.2). Mounted **once**, from `RibbonGlobalRow`, beside `useLidarControls` and `useFlyfotoControls`. It holds no write of its own |
 | `TerrainStrip.tsx` | The whole strip, and knobs only: the visualization pulldown, DTM/DOM, the sliders, the resolution readout |
 | `TerrainVisPicker.tsx` | The pulldown itself, shaped like `StandardVariantPicker` |
-| `TerrainSliders.tsx` | The inline slider group on it: azimuth, altitude, exaggeration, radius, opacity |
+| `TerrainSliders.tsx` | The inline slider group on it: azimuth, altitude, exaggeration, radius, Transparens |
 
 The visualizations are **a pulldown with a W/S ring**, not eight buttons —
 §5.2's call for Standard's cartographies, applied to the same kind of list for
@@ -3306,7 +3364,7 @@ Consequences worth knowing:
 - The image extent is derived from `dem.width/height × metresPerPx`, not from
   `dem.bbox25833`: the grid is sized from the bbox *width*, so the last row
   lands a fraction of a pixel short of the southern edge.
-- An **opacity slider** joins the light controls. Fading the render towards what
+- A **Transparens slider** joins the light controls. Fading the render towards what
   it covers is the only way to check a suspected feature against the ortofoto or
   the topo map without losing the light you just dialled in. It is hook state
   mirrored onto the layer, and the remembered value survives a DTM→DOM rebuild.
@@ -3659,7 +3717,7 @@ when a funn escapes it.
 
 **Analyse it**
 run terrain analysis (DTM or DOM) with eight visualizations — pulldown or W/S —
-and live azimuth / altitude / exaggeration / opacity, plus a smoothing or
+and live azimuth / altitude / exaggeration / Transparens, plus a smoothing or
 horizon-search radius for the five views that have one, over *either* the
 visible map — signed out,
 with no lokalitet — or an open lokalitet's rectangle, with the render drawn on

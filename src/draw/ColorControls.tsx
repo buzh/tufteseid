@@ -12,7 +12,7 @@ import { useDrawSettings } from './drawControls/hooks/drawSettings';
 
 /*
  * Colour pair for the active tool: the native colour well plus a separate
- * opacity slider, over the swatches of what has been picked before.
+ * transparency slider, over the swatches of what has been picked before.
  *
  * The well cannot express alpha — `<input type="color">` is six digits by
  * definition — and alpha is not decoration here: fills default to
@@ -87,16 +87,19 @@ const ColorRow = ({
         <span className={styles.colorLabel}>{label}</span>
       </label>
 
+      {/* Transparency, not alpha: 0 % is the solid colour. The stored value is
+          still the alpha channel the swatch joins onto the hex — only the
+          number the user reads is turned round. */}
       <input
         type="range"
         className={styles.opacity}
         min={0}
         max={100}
-        value={Math.round(alpha * 100)}
-        aria-label={`${label} – ${t('draw.controls.opacity')}`}
-        title={`${t('draw.controls.opacity')}: ${Math.round(alpha * 100)} %`}
+        value={Math.round(100 - alpha * 100)}
+        aria-label={`${label} – ${t('draw.controls.transparency')}`}
+        title={`${t('draw.controls.transparency')}: ${Math.round(100 - alpha * 100)} %`}
         onChange={(e) =>
-          onSetColor(joinColor(hex, Number(e.target.value) / 100))
+          onSetColor(joinColor(hex, (100 - Number(e.target.value)) / 100))
         }
         onPointerUp={remember}
         onBlur={remember}

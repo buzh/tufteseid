@@ -4,8 +4,8 @@ import styles from './Terrain.module.css';
 import type { TerrainAnalysis } from './useTerrainAnalysis';
 
 /**
- * The light, the exaggeration and the opacity — inline on Terreng's settings
- * strip, between the model toggle and the resolution readout.
+ * The light, the exaggeration and the transparency — inline on Terreng's
+ * settings strip, between the model toggle and the resolution readout.
  *
  * They had a ribbon row of their own, and that row was two lines tall: each
  * slider stacked its label over its track, which doubles the height of
@@ -121,15 +121,20 @@ export const TerrainSliders = ({ terrain }: { terrain: TerrainAnalysis }) => {
       )}
       {/* Fades the render towards whatever it is covering, which is the
           only way to check a suspected feature against the ortofoto or the
-          topo map without losing the light you just dialled in. */}
+          topo map without losing the light you just dialled in.
+
+          Counted as transparency — 0 % is the render covering the ground
+          completely — because that is what the label says it is. The hook
+          still holds opacity, since that is what OpenLayers wants; the flip
+          is here, at the surface that prints the word. */}
       <SliderRow
-        label={t('localities.terrain.opacity')}
-        value={terrain.opacity}
+        label={t('localities.terrain.transparency')}
+        value={100 - terrain.opacity}
         min={0}
         max={100}
         step={5}
         suffix="%"
-        onChange={terrain.setOpacity}
+        onChange={(v) => terrain.setOpacity(100 - v)}
       />
     </div>
   );

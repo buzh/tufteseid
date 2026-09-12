@@ -217,21 +217,26 @@ export const HeritageControl = () => {
         )}
 
         <div className={pulldown.rule} />
+        {/* Counted as transparency, so 0 % is the overlay at full strength.
+            The atom still holds opacity — it is what the WMS layers take and
+            what `?heritageOpacity` has always meant — so the flip lives here
+            and the floor becomes a ceiling: `MIN_HERITAGE_OPACITY` is why the
+            track stops at 80 % rather than letting the record vanish. */}
         <div className={styles.opacity}>
           <label className={styles.opacityLabel} htmlFor="heritage-opacity">
-            {t('ribbon.heritage.opacity', {
-              percent: Math.round(opacity * 100),
+            {t('ribbon.heritage.transparency', {
+              percent: Math.round(100 - opacity * 100),
             })}
           </label>
           <input
             id="heritage-opacity"
             type="range"
             className={styles.range}
-            min={Math.round(MIN_HERITAGE_OPACITY * 100)}
-            max={100}
+            min={0}
+            max={Math.round(100 - MIN_HERITAGE_OPACITY * 100)}
             step={5}
-            value={Math.round(opacity * 100)}
-            onChange={(e) => setOpacity(Number(e.target.value) / 100)}
+            value={Math.round(100 - opacity * 100)}
+            onChange={(e) => setOpacity((100 - Number(e.target.value)) / 100)}
           />
         </div>
       </Popover>

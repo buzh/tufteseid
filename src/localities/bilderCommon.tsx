@@ -570,31 +570,6 @@ export const CaptionField = ({
   );
 };
 
-/** How strongly the pinned image covers the ground under it. */
-export const FadeControl = ({
-  pinned,
-}: {
-  pinned: LocalityWorkspaceApi['pinned'];
-}) => {
-  const { t } = useTranslation();
-  return (
-    <label className={styles.fade}>
-      <span className={styles.fadeHead}>
-        <span>{t('localities.bilder.opacity')}</span>
-        <span className={styles.fadeValue}>{pinned.opacity}%</span>
-      </span>
-      <input
-        type="range"
-        min={0}
-        max={100}
-        step={5}
-        value={pinned.opacity}
-        onChange={(e) => pinned.setOpacity(Number(e.target.value))}
-      />
-    </label>
-  );
-};
-
 /**
  * Put the map back the way it was when this image was taken.
  *

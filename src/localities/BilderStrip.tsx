@@ -5,7 +5,6 @@ import {
   BildeBadges,
   BilderRail,
   CaptionField,
-  FadeControl,
   MetaLine,
   Note,
   OpenOriginalButton,
@@ -18,7 +17,10 @@ import { canPinBilde } from './usePinnedBilde';
 /*
  * What you can do with the image the rail is pointing at, and it is all
  * reading: Vis i ruta / Ta av ruta (the first of which picking the frame
- * already did), Toning, Gjenskap and the original. The caption is here too,
+ * already did), Gjenskap and the original. Transparens is not here — it is on
+ * the rectangle's own corner (BildeTransparency), because it belongs to the
+ * image that is on the ground rather than to the card you have selected, and
+ * those two drift apart the moment you walk the rail. The caption is here too,
  * `readOnly` rather than absent, because a caption is the record's content and
  * hiding what the exhibit says would be a strange way to show it (§8.1).
  */
@@ -74,8 +76,6 @@ const Detail = ({
             mounted where `canAdd` is false. */}
         <OpenOriginalButton ws={ws} rec={rec} />
       </div>
-
-      {isPinned && <FadeControl pinned={pinned} />}
     </div>
   );
 };

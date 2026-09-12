@@ -1,0 +1,46 @@
+/*
+ * One line, hung off the rectangle's top-right corner — see the component.
+ *
+ * Small and quiet on purpose. It floats over the ground it is revealing, so
+ * anything taller than the name chip opposite it would cover the strip of
+ * terrain nearest the corner, which is terrain somebody framed deliberately.
+ * Label · track · readout on one line is the same shape the terrain sliders
+ * settled on, for the same reason.
+ */
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  box-sizing: border-box;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-border);
+  /* The frame's own colour along the edge nearest the rectangle: the chip
+     belongs to that orange box, not to the app chrome above it. */
+  border-top: 2px solid var(--c-draft);
+  border-radius: var(--radius-md);
+  background: var(--c-bg);
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+}
+
+.label {
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}
+
+/* Plain range input, like the terrain sliders and for the same reason: it has
+   to stream while dragged, and the kit has no slider primitive. */
+.range {
+  width: 110px;
+  margin: 0;
+  accent-color: var(--c-draft);
+}
+
+.value {
+  min-width: 3.2em;
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--c-fg-muted);
+}

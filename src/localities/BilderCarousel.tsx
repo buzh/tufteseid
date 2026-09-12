@@ -5,7 +5,6 @@ import {
   BildeBadges,
   BilderRail,
   CaptionField,
-  FadeControl,
   MetaLine,
   Note,
   OpenOriginalButton,
@@ -220,8 +219,6 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               </>
             )}
           </div>
-
-          {isPinned && <FadeControl pinned={pinned} />}
         </div>
       )}
     </div>
