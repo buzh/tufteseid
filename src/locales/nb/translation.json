@@ -366,6 +366,7 @@
       "hideFromMap": "Ta av ruta",
       "showStrip": "Vis bildestripen",
       "hideStrip": "Skjul bildestripen",
+      "hideStripAndMap": "Ta bildet av kartet og skjul bildestripen",
       "previous": "Forrige bilde",
       "next": "Neste bilde",
       "opacity": "Toning",

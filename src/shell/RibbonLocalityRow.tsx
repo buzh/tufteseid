@@ -384,14 +384,17 @@ const FunnControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           onRestore={ws.restoreDeleted}
         />
       </Popover>
-      {/* Lit while they are hidden, like every other engaged tool on the
-          ribbon: the unusual state is the one worth a colour, and "why can I
-          not see my funn" must be answerable by looking at the row. */}
+      {/* Lit while the funn are on the map — a switch, read in the same
+          direction as every other lit thing on this ribbon. The state it
+          marks is still the hidden one, and it marks it the way a layer
+          switch does: the tint goes out and the icon picks up the slash.
+          No `aria-pressed`, because the accessible name is the *verb* and
+          changes with the state; saying both is how a screen reader ends up
+          announcing "Vis merker, pressed". */}
       <Tooltip label={`${eyeLabel} (H)`}>
         <button
           type="button"
-          className={cx(rowStyles.eye, hidden && rowStyles.eyeOn)}
-          aria-pressed={hidden}
+          className={cx(rowStyles.eye, !hidden && rowStyles.eyeOn)}
           aria-label={eyeLabel}
           onClick={() => setHidden(!hidden)}
         >
@@ -758,15 +761,30 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             `Rediger` must not move `Funn` out from under the pointer. */}
         <div className={rowStyles.contents}>
           <FunnControl ws={ws} />
+          {/* Lit when a bilde is **on the ground**, not when the rail is
+              open. The rail is open by default (toolAtoms.ts), so the old
+              reading put an engaged-looking button on the row of every
+              lokalitet you walked into while the map underneath it was
+              untouched — a control announcing a state the map flatly
+              contradicted. What it lights for now is the one thing about
+              `Bilder` that changes what you are looking at.
+
+              Folding the rail puts that image down (useLocalityWorkspace), so
+              `lit` implies `open` and the press does the two together: the
+              rail goes away and the ground comes back. Whether the rail is
+              open needs no light of its own — it is a bar across the bottom
+              of the screen. */}
           <ModeButton
             icon="photo_library"
             label={t('localities.bilder.heading')}
             tooltip={
-              stripOpen
-                ? t('localities.bilder.hideStrip')
-                : t('localities.bilder.showStrip')
+              ws.pinned.pinnedId != null
+                ? t('localities.bilder.hideStripAndMap')
+                : stripOpen
+                  ? t('localities.bilder.hideStrip')
+                  : t('localities.bilder.showStrip')
             }
-            active={stripOpen}
+            active={ws.pinned.pinnedId != null}
             badge={ws.bilderCount || undefined}
             // Nothing to show and no way to put anything there: a reader on an
             // empty lokalitet. The button would open an empty bar.

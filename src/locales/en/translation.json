@@ -366,6 +366,7 @@
       "hideFromMap": "Take off the map",
       "showStrip": "Show the filmstrip",
       "hideStrip": "Hide the filmstrip",
+      "hideStripAndMap": "Take the image off the map and hide the filmstrip",
       "previous": "Previous image",
       "next": "Next image",
       "opacity": "Fade",

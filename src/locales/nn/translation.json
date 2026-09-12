@@ -366,6 +366,7 @@
       "hideFromMap": "Ta av ruta",
       "showStrip": "Vis biletstripa",
       "hideStrip": "Skjul biletstripa",
+      "hideStripAndMap": "Ta biletet av kartet og skjul biletstripa",
       "previous": "Førre bilete",
       "next": "Neste bilete",
       "opacity": "Toning",

@@ -252,13 +252,33 @@
   outline-offset: 1px;
 }
 
-/* Lit while the funn are hidden. The unusual state is the one worth a colour:
-   "where did my funn go" has to be answerable by looking at the row. */
-.eyeOn,
+/* Lit while the funn are *on the map*, not while they are hidden.
+ *
+ * It was the other way round, on the argument that the unusual state is the
+ * one worth a colour. That argument is right about which state needs marking
+ * and wrong about which colour to mark it with: everywhere else on this
+ * ribbon accent means *engaged* — a tool armed, a ground selected, a popover
+ * open — so an accent-filled eye read as "the eye is on", i.e. exactly the
+ * opposite of what it meant. Polarity beats emphasis; a control cannot borrow
+ * the row's one colour to say the row's one colour's opposite.
+ *
+ * A tint rather than the fill, because "shown" is the normal state and this
+ * segment is therefore lit most of the time: at full accent it would read as
+ * a second engaged control glued to `Funn`. Hidden is then the untinted grey
+ * of the base rule, with `visibility_off` in it — the off-language every
+ * layer switch already speaks.
+ */
+.eyeOn {
+  background: var(--c-accent-subtle);
+  color: var(--c-green-600);
+}
+
+/* Its own rule rather than grouped with the above: `.eye:hover` is the same
+   specificity and would otherwise be the last word on the lit state, leaving
+   the one segment on the row that does not answer the pointer. */
 .eyeOn:hover {
-  background: var(--c-accent);
-  border-color: var(--c-accent);
-  color: var(--c-accent-fg);
+  background: var(--c-green-100);
+  color: var(--c-green-700);
 }
 
 /* The exits — the third grid cell in its own right, now that the contents

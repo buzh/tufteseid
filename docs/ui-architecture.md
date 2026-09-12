@@ -1551,8 +1551,9 @@ opening anything else.
 zone does not render, the name renames nobody (it zooms to the rectangle
 instead), the `⋮` menu holds only zoom and Detaljer and its fields are
 read-only, and the bottom edge is a rail with
-no delete, no reordering, no hide and a read-only caption rather than the same
-rail carrying all four; funn are not editable, and N / U / B do nothing. Reading, pinning an image,
+no delete, no reordering, no hide-from-exhibit and a read-only caption rather
+than the same
+rail carrying all four; funn are not editable, and N / U / B do nothing. Reading, putting an image on the map and taking it off again,
 `Gjenskap` and downloading a figure all stay, because none of them leaves a trace. The one way to write is
 to press `Rediger` first, which costs nothing: no fetch, no write, the map
 does not move.
@@ -1915,6 +1916,19 @@ through `useFunnVisibility` (`src/localities/funnVisibility.ts`).
   invisible is how you end up drawing the one you already have.
 - Not persisted to the URL, on the same grounds as the compare curtain: a link
   shared to show someone a funn must not arrive with the funn hidden.
+- **The segment is lit while the funn are *on the map*.** It lit while they
+  were hidden at first, on the argument that the unusual state is the one
+  worth a colour. That argument is right about which state needs marking and
+  wrong about which colour marks it: on this ribbon accent means *engaged* —
+  a tool armed, a ground selected, a popover open — so an accent-filled eye
+  read as "the eye is on", the exact opposite of what it meant. Polarity beats
+  emphasis. Hidden is now said the way every layer switch says it, by the
+  tint going out and `visibility_off` replacing `visibility`, and the lit
+  state is a tint (`--c-accent-subtle`) rather than the full fill, because
+  "shown" is the normal state and a second saturated chip glued to `Funn`
+  would read as a second engaged control. No `aria-pressed`: the accessible
+  name is the verb and changes with the state, and saying both announces
+  "Vis merker, pressed".
 
 **This used to be `Skjul merker`, on row 1, and it also hid the lokalitet
 rectangles.** Two things were wrong with that. It was grouped beside
@@ -1995,13 +2009,20 @@ picture of somewhere you are no longer looking.
 
 The detail panel carries: the kind badge and provenance line, the caption field
 (`readOnly` unless `canEdit`, commits on blur), then **Gjenskap**, **Åpne
-originalen**, plus a **Toning** slider whenever the image is up. In show,
-**Vis i ruta** survives as a button for exactly one case — the record is
-pinnable but is not currently on the map, which happens when entering Terreng
-took the overlay slot away (below) while the frame stayed selected. It is the
-way back, not the normal way up; there is no **Ta av ruta** on the rail,
-because clicking the selected frame again deselects it and that is the same
-gesture.
+originalen**, plus a **Toning** slider whenever the image is up. Beside them, in
+**both** stances, one button that is a **toggle**: **Vis i ruta** when the
+record is pinnable and not up, **Ta av ruta** when it is.
+
+Show had only the way back on — the argument being that picking the selected
+frame again takes the image off, so the two gestures are one. They are not. That
+press spends the *selection* to put the image down, so the caption, the
+provenance line and the Toning slider of the thing you were reading go with it,
+and the surface you were using to think about the image is the price of
+un-showing it. Taking a picture off the map is not a write, so §2 has nothing to
+say here: show is short of verbs, not entitled to fewer. The toggle also absorbs
+the case it used to exist for on its own — the record is pinnable but is not up,
+because entering Terreng took the overlay slot (below) while the frame stayed
+selected.
 
 **Selecting is pinning in both stances.** It was show-only, on the argument
 that the overlay slot is shared with the live terrain render (below): a frame
@@ -2193,6 +2214,26 @@ edge, and neither surface has a stylesheet of its own.
   `Bilder ▾` (§8.1, the read tools — present in both stances) and the strip's
   own `bottom_panel_close`. The row's toggle carries the count and is disabled
   when `hasBilder` is false.
+- **Folding it puts the pinned image down and clears the selection**
+  (`useLocalityWorkspace`, keyed on `stripOpen`). The rail and the image it
+  laid on the ground are one gesture and used to be two states: `Bilder` could
+  be pressed shut with a 1937 ortofoto still over the hillshade and nothing
+  left on screen that named it or could take it off — a map that is not the
+  map, with no way back short of finding the rail again. The *selection* goes
+  with the pin, not just the pin: reopening onto a still-selected card that is
+  no longer on the ground makes the obvious next press — click the selected
+  frame to get it back — mean **deselect**, which is what `selectBilde` does
+  to the active id. It reads `stripOpen` rather than "is the strip mounted",
+  because the pen and a picker *borrow* the bottom slot, and drawing a funn
+  over a pinned ortofoto is a use of this feature rather than a lapse in it.
+- **The row's `Bilder` is lit when a bilde is on the ground, not when the rail
+  is open.** The rail starts open, so the old reading put an engaged-looking
+  button on the row of every lokalitet you walked into while the map
+  underneath it was untouched — a control announcing a state the map
+  contradicted. Whether the rail is open needs no light of its own: it is a
+  bar across the bottom of the screen. Because folding puts the image down,
+  `lit` implies `open`, and one press does the pair — the rail goes away and
+  the ground comes back.
 - **`hasBilder` is published by the hook**, not recomputed per surface —
   `bilderCount > 0 || starterBusy || canAdd` — so the row's toggle and
   the portal cannot disagree about whether there is a strip. A reader on an
@@ -3539,8 +3580,9 @@ bottom edge without asking and filling in as they render.
 walk the images along the bottom of the map, with ← / → or the chevrons — a
 rail of small frames in both stances, with the write verbs under it while you
 are editing; picking a frame puts that image back on the map at its own
-rectangle and fades it over what is there now, either stance, and in edit
-**Vis i ruta** / **Ta av ruta** toggle it without giving up the selection;
+rectangle and fades it over what is there now, either stance, with
+**Vis i ruta** / **Ta av ruta** to toggle it without giving up the selection,
+in either stance;
 press **Gjenskap** on an extract,
 terrain render or flyfoto to set the map back to the view it was made from;
 see a card that is still a set of parameters say so, and retry it if its render
@@ -3551,7 +3593,9 @@ the order the
 images are read in, and so which one is the cover; hide one from the exhibit
 without deleting it, and see the hidden ones dashed and marked on the rail
 while you are editing; fold the edge
-away and back with **Bilder ▾** to get the ground under it;
+away and back with **Bilder ▾** to get the ground under it — folding it also
+takes the pinned image off the map, and the button is lit only while one is on
+it;
 see flyfoto captioned with its acquisition year; get every kept or downloaded
 image back as a report-ready figure — scale bar, north arrow, dataset,
 acquisition, processing settings, extent, rights holder and licence burned into

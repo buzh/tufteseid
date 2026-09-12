@@ -510,6 +510,32 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   }, [activeBildeId, bilderItems, pin]);
 
   /*
+   * Folding the rail away puts the ground back.
+   *
+   * The rail and the image it laid down are one gesture, and they were two
+   * states: `Bilder` could be pressed shut while a 1937 ortofoto stayed over
+   * the hillshade with nothing left on screen that named it or could take it
+   * off. An overlay whose only controls have been folded away is stranded —
+   * you are looking at a map that is not the map, with no way back to it
+   * short of finding the rail again.
+   *
+   * The cursor goes down with the pin, not just the pin. Reopening onto a
+   * still-selected card that is no longer on the ground makes the obvious
+   * next press — click the selected frame to get it back — mean *deselect*,
+   * because that is what `selectBilde` does to the active id.
+   *
+   * Only an explicit fold, which is why this reads `stripOpen` rather than
+   * whether the strip is mounted: the pen and a picker borrow the bottom slot
+   * (LocalityRibbon), and drawing a funn over a pinned ortofoto is a use of
+   * this feature, not a lapse in it.
+   */
+  useEffect(() => {
+    if (stripOpen) return;
+    setActiveBildeId(null);
+    pin(null);
+  }, [stripOpen, pin]);
+
+  /*
    * Picking a thumbnail *is* "Vis i ruta" (§4.2), in both stances. Pressing
    * the active one again puts it down, which is the only way the rail has to
    * mean "nothing", and the images that cannot be placed are exactly the ones

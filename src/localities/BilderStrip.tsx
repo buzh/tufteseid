@@ -17,10 +17,10 @@ import { canPinBilde } from './usePinnedBilde';
 
 /*
  * What you can do with the image the rail is pointing at, and it is all
- * reading: Vis i ruta (which picking the frame already did), Toning, Gjenskap
- * and the original. The caption is here too, `readOnly` rather than absent,
- * because a caption is the record's content and hiding what the exhibit says
- * would be a strange way to show it (§8.1).
+ * reading: Vis i ruta / Ta av ruta (the first of which picking the frame
+ * already did), Toning, Gjenskap and the original. The caption is here too,
+ * `readOnly` rather than absent, because a caption is the record's content and
+ * hiding what the exhibit says would be a strange way to show it (§8.1).
  */
 const Detail = ({
   ws,
@@ -47,19 +47,25 @@ const Detail = ({
       </div>
 
       <div className={styles.actions}>
-        {/* Only the way *back* on: picking a frame already laid it down. This
-            appears when the two have drifted apart, which happens exactly
-            once — entering Terreng takes the overlay slot and the pin stands
-            down (map/groundOverlay.ts), leaving the card still selected. */}
-        {/* Unpinned Views are not offerable to the map — `canPinBilde`
+        {/* A toggle, as in edit. It was the way *back* on only, on the
+            argument that picking the frame had already laid the image down
+            and picking it again would take it off — true, and useless as the
+            answer to "how do I stop looking at this": it spends the selection
+            to do it, so the caption and the meta line of the thing you were
+            reading go with the image. Taking a picture off the map is not a
+            write, and show is short of verbs, not entitled to fewer.
+
+            Unpinned Views are not offerable to the map — `canPinBilde`
             already refuses one, because there is nothing to lay down. */}
-        {canPinBilde(rec) && !isPinned && (
+        {canPinBilde(rec) && (
           <Button
             size="sm"
-            leftIcon="visibility"
-            onClick={() => pinned.pin(rec.id)}
+            leftIcon={isPinned ? 'visibility_off' : 'visibility'}
+            onClick={() => pinned.pin(isPinned ? null : rec.id)}
           >
-            {t('localities.bilder.showOnMap')}
+            {isPinned
+              ? t('localities.bilder.hideFromMap')
+              : t('localities.bilder.showOnMap')}
           </Button>
         )}
         <RecreateButton rec={rec} />
@@ -83,8 +89,8 @@ const Detail = ({
  * as a sequence.
  *
  * **Nothing here writes.** Not "is disabled" — is absent: the concealed images
- * are not on the rail, there is no delete, no reordering and no hide, and the
- * caption is read-only. Every one of those is in the carousel that takes this
+ * are not on the rail, there is no delete, no reordering and no
+ * hide-from-exhibit, and the caption is read-only. Every one of those is in the carousel that takes this
  * slot in edit (BilderCarousel), which is what §2 means by the stance being
  * legible from across the room. The two are the same geometry on purpose —
  * the verbs are what you read the stance off, not the layout.
