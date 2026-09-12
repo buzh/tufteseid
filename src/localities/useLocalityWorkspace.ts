@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import {
   AttachmentRecord,
   createAttachment,
+  deleteAttachment,
   getAttachmentUrl,
 } from '../api/attachments';
 import {
@@ -69,6 +70,7 @@ import {
   dropAttachment,
   dropFind,
   findBaseOf,
+  forgetAttachment,
   isDirty,
   isDraftId,
   mintDraftId,
@@ -647,21 +649,51 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [bilderItems, activeBildeId, pinOnWalk],
   );
 
-  // Deferred, not done (§5.6). The record stays on the rail, greyed, and
-  // `Avbryt` — or `restoreDeleted` on the card — gives it back.
-  //
-  // The pin goes down with it. The tombstone stays in `bilderItems`, so the
-  // sweep above will not do it, and now that picking a frame lays it on the
-  // ground the ordinary path — pick it, decide against it, press `Slett` —
-  // ends with the selection cleared and the image still on the map, named by
-  // nothing.
+  /*
+   * `Slett bildet` — **not** deferred, unlike every other write in edit.
+   *
+   * It was, and the deferral cost more than it bought. The confirm on the
+   * button already says the action cannot be undone, so the greyed card that
+   * followed was contradicting it; and getting the deletion to actually
+   * happen meant `Lagre`, which also ends the session — so tidying an exhibit
+   * of twelve renders was twelve rounds of leaving edit and coming back. That
+   * is the same reasoning `Slett lokaliteten` already runs on: a confirmed
+   * deletion is a decision, not a draft.
+   *
+   * So the request goes out here and the buffer forgets the record entirely
+   * (`forgetAttachment`). What is left is narrow and worth stating:
+   *
+   * - **A buffered spec never reached the server**, so there is nothing to
+   *   delete — dropping it from `newSpecs` is the whole operation.
+   * - **Realtime stands down in edit**, so the list will not notice on its
+   *   own; `setAttachmentItems` takes the record off it.
+   * - **A failure falls back to the old behaviour.** The tombstone stays, the
+   *   card greys, `Angre sletting` is on it and `Lagre` retries the DELETE.
+   *   That is the one path on which `deletedIds` still covers an attachment.
+   *
+   * The pin goes down with it either way: picking a frame lays it on the
+   * ground, so the ordinary path — pick it, decide against it, press `Slett`
+   * — would otherwise end with the image still on the map, named by nothing.
+   */
   const removeBilde = useCallback(
-    (rec: AttachmentRecord) => {
+    async (rec: AttachmentRecord) => {
       mutateDraft((d) => dropAttachment(d, rec.id));
       setActiveBildeId((cur) => (cur === rec.id ? null : cur));
       if (pinnedId === rec.id) pin(null);
+      if (isDraftId(rec.id)) return;
+      try {
+        await deleteAttachment(rec.id);
+      } catch (e) {
+        console.warn('[locality] bilde delete failed', e);
+        toast.error({ title: t('localities.bilder.deleteFailed') });
+        return;
+      }
+      mutateDraft((d) => forgetAttachment(d, rec.id));
+      setAttachmentItems((prev) =>
+        prev ? prev.filter((it) => it.id !== rec.id) : prev,
+      );
     },
-    [mutateDraft, pin, pinnedId],
+    [mutateDraft, pin, pinnedId, setAttachmentItems, t],
   );
 
   // Into the buffer, which is also what makes the drag not snap back: there

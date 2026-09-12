@@ -79,10 +79,12 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   }, [items, activeBildeId, focusBilde]);
 
   const isPinned = active != null && pinned.pinnedId === active.id;
-  // Tombstoned by this session (§5.6, consequence 2). The frame stays on the
-  // rail — walking past a gap is how you fail to notice you made one — but
-  // every verb that would curate it is gone, because curating something you
-  // have just thrown away is not a decision anyone needs to make.
+  // Tombstoned: a `Slett bildet` whose DELETE did not get through, which is
+  // the only way an attachment stays on the rail after the confirm now that
+  // the deletion is written straight away (§5.6, consequence 2). The frame
+  // stays where it was, but every verb that would curate it is gone except
+  // the one that takes the deletion back — `Lagre` will retry the DELETE, and
+  // curating something on its way out is not a decision anyone needs to make.
   const deleted = active != null && ws.deletedIds.has(active.id);
   // One of the original's Files, on a copy that did not carry it (§7). It
   // sits at the end of the same rail rather than in a shelf of its own: they
@@ -203,7 +205,7 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                   title={t('localities.bilder.confirmDelete')}
                   confirmLabel={t('localities.bilder.delete')}
                   cancelLabel={t('shared.cancel')}
-                  onConfirm={() => ws.removeBilde(active)}
+                  onConfirm={() => void ws.removeBilde(active)}
                   trigger={(props) => (
                     <Button
                       {...props}

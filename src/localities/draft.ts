@@ -268,6 +268,34 @@ export const dropAttachment = (
   return { ...d, attachmentDeletes: [...d.attachmentDeletes, id] };
 };
 
+/*
+ * The record is gone from the server — drop everything the buffer had to say
+ * about it.
+ *
+ * A confirmed `Slett bildet` writes straight through (§5.6's second
+ * not-deferred case, beside `Slett lokaliteten`), and after that every arm of
+ * the buffer that still mentions the id is a write against a 404: the
+ * tombstone would DELETE it again at commit, a buffered caption would PATCH
+ * it, and `Avbryt` would try to compensate an eager File that is already
+ * gone. So the id leaves all four at once.
+ */
+export const forgetAttachment = (
+  d: LocalityDraft,
+  id: string,
+): LocalityDraft => {
+  const attachments = { ...d.attachments };
+  delete attachments[id];
+  const newSpecs = { ...d.newSpecs };
+  delete newSpecs[id];
+  return {
+    ...d,
+    attachments,
+    newSpecs,
+    attachmentDeletes: d.attachmentDeletes.filter((x) => x !== id),
+    eagerIds: d.eagerIds.filter((x) => x !== id),
+  };
+};
+
 /** Take a deferred deletion back — the other half of the greyed card. */
 export const undelete = (d: LocalityDraft, id: string): LocalityDraft => ({
   ...d,

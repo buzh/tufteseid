@@ -359,6 +359,7 @@
       "empty": "Ingen bilete enno. Køyr eit LiDAR-uttrekk og trykk «Behald», eller last opp eit bilete.",
       "confirmDelete": "Slette biletet? Handlinga kan ikkje angrast.",
       "uploadFailed": "Kunne ikkje laste opp biletet. Prøv igjen.",
+      "deleteFailed": "Kunne ikkje slette biletet. Det blir forsøkt på nytt når du lagrar.",
       "delete": "Slett biletet",
       "captionPlaceholder": "Bilettekst…",
       "openOriginal": "Opne originalen",

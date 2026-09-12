@@ -149,9 +149,10 @@ that owns them.
   flyfoto grab is stored as a row of parameters and rendered into a figure PNG
   afterwards by a background queue (`src/localities/pinQueue.ts`); a screenshot
   or an upload is only ever bytes — `docs/ui-architecture.md` §8.7.4.
-- **Editing a lokalitet is a transaction.** Nothing typed, drawn, curated or
-  deleted in edit reaches PocketBase until `Lagre`; `Avbryt` throws it away,
-  and the buffer survives a crash via `localStorage` —
+- **Editing a lokalitet is a transaction.** Nothing typed, drawn or curated in
+  edit reaches PocketBase until `Lagre`; `Avbryt` throws it away, and the
+  buffer survives a crash via `localStorage`. Two confirmed deletions are
+  outside it and go straight through: the lokalitet itself, and a bilde —
   `docs/ui-architecture.md` §8.11.
 - **Every raster the app keeps or hands out carries a provenance caption** —
   dataset, acquisition, processing parameters, extent, licence — below, and

@@ -359,6 +359,7 @@
       "empty": "No images yet. Run a LiDAR extract and press \"Keep\", or upload an image.",
       "confirmDelete": "Delete the image? This cannot be undone.",
       "uploadFailed": "Could not upload the image. Try again.",
+      "deleteFailed": "Could not delete the image. It will be retried when you save.",
       "delete": "Delete the image",
       "captionPlaceholder": "Caption…",
       "openOriginal": "Open the original",

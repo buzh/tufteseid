@@ -9,10 +9,14 @@ import styles from './Popover.module.css';
 /*
  * Anchored overlay, portalled to <body>.
  *
- * Deliberately simple: ribbon pulldowns only ever drop straight down from a
- * control on the top edge of the window, so there is no flip logic and no
- * placement solver — just "below the anchor, clamped into the viewport, tall
- * as the remaining space allows".
+ * Deliberately simple: below the anchor, clamped into the viewport, tall as
+ * the remaining space allows — no placement solver. The one exception is a
+ * **flip**, and it is not a nicety: the bilder rail sits on the *bottom* edge
+ * of the window (BilderCarousel), so a confirm dropping down from a button
+ * there gets a few dozen pixels of room and becomes a scrolling sliver half
+ * off the screen. When the panel does not fit below and there is more room
+ * above, it opens upwards instead. Everything anchored to the top edge still
+ * drops down, because there is always more room below it.
  *
  * Two things here are load-bearing rather than cosmetic:
  *
@@ -28,6 +32,7 @@ import styles from './Popover.module.css';
 
 const MARGIN = 8;
 const GAP = 6;
+const MIN_HEIGHT = 80;
 
 type Align = 'start' | 'center' | 'end';
 
@@ -61,7 +66,11 @@ export const Popover = ({
 }) => {
   const anchorRef = useRef<HTMLSpanElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    maxHeight: number;
+  } | null>(null);
   const bumpOverlayCount = useSetAtom(overlayOpenCountAtom);
 
   // Position: measured after the content is in the DOM, then kept in step
@@ -77,7 +86,21 @@ export const Popover = ({
       if (!anchor || !content) return;
       const rect = anchor.getBoundingClientRect();
       const cw = content.offsetWidth;
-      const top = rect.bottom + GAP;
+      // `scrollHeight` rather than `offsetHeight`: once a maxHeight is on the
+      // panel the measured box is the clamped one, and re-measuring it would
+      // latch the first cramped answer for the rest of the session. Plus the
+      // 1 px border on each side, which scrollHeight leaves out.
+      const wanted = content.scrollHeight + 2;
+      const below = window.innerHeight - rect.bottom - GAP - MARGIN;
+      const above = rect.top - GAP - MARGIN;
+      const flip = wanted > below && above > below;
+      // Floored: an anchor pressed right up against an edge would otherwise
+      // clamp its panel to nothing, and a zero-height dialog is worse than one
+      // that overhangs.
+      const maxHeight = Math.max(flip ? above : below, MIN_HEIGHT);
+      const top = flip
+        ? Math.max(MARGIN, rect.top - GAP - Math.min(wanted, maxHeight))
+        : rect.bottom + GAP;
       const raw =
         align === 'end'
           ? rect.right - cw
@@ -88,7 +111,14 @@ export const Popover = ({
         Math.max(MARGIN, raw),
         Math.max(MARGIN, window.innerWidth - cw - MARGIN),
       );
-      setPos({ top, left });
+      setPos((cur) =>
+        cur &&
+        cur.top === top &&
+        cur.left === left &&
+        cur.maxHeight === maxHeight
+          ? cur
+          : { top, left, maxHeight },
+      );
     };
     update();
     window.addEventListener('resize', update);
@@ -133,8 +163,6 @@ export const Popover = ({
       document.removeEventListener('pointerdown', onPointerDown, true);
   }, [open, onOpenChange]);
 
-  const maxHeight = pos ? window.innerHeight - pos.top - MARGIN : undefined;
-
   return (
     <>
       <span ref={anchorRef} className={cx(styles.anchor, className)}>
@@ -157,7 +185,9 @@ export const Popover = ({
             style={{
               width,
               minWidth,
-              ...(pos ? { top: pos.top, left: pos.left, maxHeight } : null),
+              ...(pos
+                ? { top: pos.top, left: pos.left, maxHeight: pos.maxHeight }
+                : null),
             }}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {

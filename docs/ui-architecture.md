@@ -2047,11 +2047,13 @@ What the reversal needs to hold:
   nothing to resolve it against; reading one is `Åpne originalen`, and `Ta med`
   is what makes it this lokalitet's. It refuses unpinnable records for the
   older reason — `canPinBilde`, no file or no extent, nothing to lay down.
-- **Deleting takes the pin down with it.** A tombstone stays in `bilderItems`,
-  so the sweep that unpins a vanished record does not fire for it, and the
-  ordinary path — pick a frame, decide against it, press `Slett` — would
-  otherwise end with the selection cleared and the image still on the ground,
-  named by nothing. `removeBilde` unpins explicitly.
+- **Deleting takes the pin down with it**, explicitly, in `removeBilde` rather
+  than by waiting for the sweep that unpins a record which has left
+  `bilderItems`. The DELETE is a round trip and a failed one leaves a tombstone
+  on the rail (§8.11), so between the press and the answer the sweep has
+  nothing to fire on — and the ordinary path, pick a frame and decide against
+  it, would end with the selection cleared and the image still on the ground,
+  named by nothing.
 
 In edit `Vis i ruta` remains, and remains a *toggle* rather than show's
 way-back-on only: edit is the stance with something else to do with the
@@ -2741,8 +2743,10 @@ Load-bearing:
 ### 8.11 The edit transaction — `Lagre` / `Avbryt`
 
 `docs/lokalitet-view.md` §5.6. **Edit is a transaction over a client-side
-draft.** Nothing typed, drawn, curated or deleted in edit reaches PocketBase
-until `Lagre`; `Avbryt` throws the lot away.
+draft.** Nothing typed, drawn or curated in edit reaches PocketBase until
+`Lagre`; `Avbryt` throws the lot away. Two deletions are outside it, both
+because a confirmed deletion is a decision rather than a draft: `Slett
+lokaliteten` and `Slett bildet` (below).
 
 Two files hold it, and nothing else in the app knows it exists:
 
@@ -2766,7 +2770,8 @@ touched, and it would grow with the lokalitet rather than with the edit.
 | the rectangle (`Juster området`) | buffered, with its own nested `[Bruk]` / `[Angre]` |
 | a View kept (`Behold`, the starter set, both pickers, flyfoto) | buffered **as a spec**, under a `draft:` id |
 | a File made (skjermbilde, opplasting, a picker keep) | written **eagerly**, id tracked, deleted on `Avbryt` |
-| a deletion | **deferred** — a tombstone; the card greys and comes back on `Avbryt` |
+| a funn deleted | **deferred** — a tombstone; the row greys and comes back on `Avbryt` |
+| a bilde deleted | **written through** on confirm, and the buffer forgets the record; only a *failed* DELETE leaves a tombstone |
 
 Files are the exception because they are bytes: buffering a 12 MB PNG in
 `localStorage` is not a thing, and holding it in memory for an hour is barely
@@ -2792,8 +2797,9 @@ Load-bearing, in the order the mistakes would be made:
   `Åpne originalen`.
 - **Deferred deletion is published as one `Set`.** `deletedIds` spans both
   collections (PocketBase ids are unique across them) plus `restoreDeleted`.
-  The funn row and the bilde's frame and detail grey, strike through, lose
-  every verb but
+  The funn row — and a bilde's frame and detail on the one path that still
+  produces a tombstone for one, a DELETE that failed — grey, strike through,
+  lose every verb but
   `Angre sletting`, and stay where they are — a row that vanished would be
   claiming a deletion that has not happened. The **counts** stay inclusive of
   tombstoned records, so the badge and the rail agree about what is on screen;
@@ -2837,6 +2843,23 @@ Load-bearing, in the order the mistakes would be made:
   is *about* has nothing to be rolled back into, so it goes straight through
   and clears the buffer on the way. The confirm it already had is the safety
   net.
+- **`Slett bildet` is not deferred either**, and that one was a reversal. The
+  deferral cost two things it never repaid: the confirm on the button says the
+  action cannot be undone, which the greyed card that followed was quietly
+  contradicting; and the only way to make the deletion *happen* was `Lagre`,
+  which also ends the session — so pruning an exhibit of twelve working renders
+  was twelve rounds of leaving edit and pressing `Rediger` again. Now
+  `removeBilde` awaits the DELETE and then calls `forgetAttachment`, which
+  takes the id out of all four arms of the buffer at once (tombstone, buffered
+  caption/sort/hidden, buffered spec, `eagerIds`) — each of the four would
+  otherwise become a write against a 404 at commit or at `Avbryt`. Realtime is
+  stood down in edit, so the record is taken off the list by hand. A **failed**
+  DELETE falls back to exactly the old behaviour: the tombstone stays, the card
+  greys with `Angre sletting` on it, `Lagre` retries it, and a toast says so.
+  A buffered spec is the trivial case — it never reached the server, so
+  dropping it from `newSpecs` is the whole operation. Funn deletion stays
+  deferred: a funn is geometry you may have spent ten minutes drawing, and it
+  is deleted from a list where the next row is one keystroke away.
 
 `Avbryt` confirms only when the buffer is dirty, and the question names the
 count: *Forkast 12 bilder, 3 funn og 1 sletting?* The conjunction comes from
@@ -3409,6 +3432,22 @@ list used to say `Accordion`, `Select`, `Pagination` and `Alert`:
   item is `ws.canAdd && { … }` inline. The falsy slots stay put, which is what
   makes the array index a stable key.
 
+- **`Popover` learned to flip**, and only because the bottom edge grew
+  controls. It was written for the ribbon — every anchor on the top edge of the
+  window, so "below the anchor, clamped, as tall as the room left" needed no
+  placement solver. Then the dock went and the bilder rail took the bottom edge
+  (§8.7.2): the `Slett bildet` confirm dropped *downwards* out of a button
+  sitting 40 px off the floor, got a `maxHeight` of about that, and became a
+  scrolling sliver of a two-line question. So one rule was added and no more:
+  when the panel does not fit below and there is more room above, it opens
+  upwards. Anything anchored at the top is unaffected, since there is always
+  more room below it. The one detail it needs to be true: the natural height is
+  read off `scrollHeight`, not `offsetHeight`, because after the first pass the
+  offset box *is* the clamped one and re-measuring it would latch the cramped
+  answer for the rest of the session. A panel that changes size after it opens
+  is still measured once — `Menu`'s in-place `confirm` is the only body that
+  does, and all four `Menu`s hang off the top edge, so none of them flips.
+
 Layout and typography need nothing — see §2 on why there are no
 `Box`/`Stack`/`Text` primitives.
 
@@ -3600,7 +3639,8 @@ press **Gjenskap** on an extract,
 terrain render or flyfoto to set the map back to the view it was made from;
 see a card that is still a set of parameters say so, and retry it if its render
 failed; open the original in a tab, fetching it first where it does not exist
-yet; caption an attachment; delete one; drag a frame along the rail to its
+yet; caption an attachment; delete one and have it gone on confirm, without
+leaving edit to make it happen; drag a frame along the rail to its
 place in the exhibit, or step it earlier or later with the two arrows, to set
 the order the
 images are read in, and so which one is the cover; hide one from the exhibit

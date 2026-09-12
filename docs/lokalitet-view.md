@@ -838,7 +838,8 @@ is only true because of §4.1.2, and it is the main thing §4.1.2 buys:
 | `bbox` (Juster området) | buffered | dropped |
 | **Views** (`Behold`, the starter three, both pickers) | buffered as **specs** — a few hundred bytes each | dropped, nothing to undo |
 | **Files** (screenshot, upload) | written **eagerly**, id tracked in the draft | **deleted** |
-| **deletions** of funn or attachments | deferred — a tombstone in the draft, card greyed | dropped, the record comes back |
+| **deletions** of funn | deferred — a tombstone in the draft, row greyed | dropped, the record comes back |
+| **deletions** of a bilde | written through on confirm (see consequence 2) | nothing left to drop |
 
 The version of this section that this document carried until now had *every*
 attachment on the eager row, and reasoned about it correctly: a session that
@@ -862,9 +863,22 @@ Five consequences, each of which needs building rather than assuming:
    the work is real even when the rollback is free — but the progress state and
    the partial-failure report are now for the rare session that took a
    screenshot or uploaded a photograph, not for every session.
-2. **Deferred deletion is a feature, not a workaround.** `Slett` on a card
-   inside edit greys it and it returns on `Avbryt` — free undo, and the only
-   way to make deletion compensable without keeping the blob.
+2. **Deferred deletion is a feature, not a workaround** — for funn. `Slett` on
+   a funn inside edit greys it and it returns on `Avbryt`: free undo, and the
+   only way to make deletion compensable without keeping the blob.
+
+   **It did not survive contact for bilder**, and the build reversed it there
+   (`docs/ui-architecture.md` §8.11). Two reasons, both about the same card.
+   The confirm on `Slett bildet` says the action cannot be undone — so the
+   greyed card offering `Angre sletting` was contradicting the sentence the
+   user had just agreed to. And the deletion only *happened* on `Lagre`, which
+   also ends the session: pruning an exhibit of twelve working renders down to
+   the three worth showing meant twelve rounds of leaving edit and pressing
+   `Rediger` again. So a confirmed `Slett bildet` writes through and the buffer
+   forgets the record; a failed DELETE falls back to the tombstone, which is
+   the only path that still greys a frame. A funn keeps the deferral because a
+   funn is geometry that took ten minutes to draw, deleted from a list where
+   the next row is one keystroke away.
 3. **`Lagre` returns before the pixels exist**, and the interface has to be
    truthful about that without being alarming. The commit writes rows and
    closes the transaction; the pin queue then runs. A View that is not pinned
