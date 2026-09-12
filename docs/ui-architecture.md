@@ -1518,8 +1518,45 @@ that was measured rather than guessed — a sweep of 14 dense areas returning
   No glyph can carry that, so it stays text, as the card's subtitle, or as its
   title when the record is unnamed. That last part is why the word
   "Kulturminne" no longer repeats down a multi-hit popup.
-- `fylke` — does not exist. Not once in 1300 features. "Beliggenhet" was only
-  ever the kommune, which is why it is now a pin and a word.
+- `fylke` — does not exist *in kulturminner2*. Not once in 1300 features, which
+  is why "beliggenhet" is a pin and a word. Brukerminner do serve it, and there
+  the chip takes both, since a kommune name alone is ambiguous nationally.
+
+**The other four registers serve the same facts under other names, and the card
+reads all of them.** kulturminner2 and `freda_bygninger` share one vocabulary;
+`kulturmiljoer`, `sefrak` and `brukerminner` each brought their own, and a card
+that looked up only the first left a brukerminne showing the register's name
+("Brukerminner"), one kommune chip, and nothing else — no title, no text, no
+link, even though the service had served all three. The field lists at the top
+of `KulturminnerPopup.tsx` (`NAME_FIELDS`, `DESCRIPTION_FIELDS`, `ART_FIELDS`,
+`DATERING_FIELDS`, `ID_FIELDS`) are the translation, and every one was read off
+a live GetFeatureInfo rather than guessed:
+
+| | name | description | art | datering | id |
+|---|---|---|---|---|---|
+| kulturminner2, freda_bygninger | `navn` | `informasjon` | `lokalitetsart` / `enkeltminneart` | `datering` | `lokalid` |
+| kulturmiljoer | `navn` | `informasjon` | `kulturmiljokategori` | — | `lokalid` |
+| sefrak | `objektnavn` | — | `bygningstypetekst` | `tidsangivelsetekst` | `askeladdenid` |
+| brukerminner | `tittel` | `beskrivelse` | — | — | **none** |
+
+Three consequences worth keeping:
+
+- **A brukerminne has no id at all**, so `identityOf` falls back to its
+  kulturminnesøk URL, which ends in the record's uuid. That is the only thing on
+  the wire that separates two of them — without it the `*ikoner` dedupe collapsed
+  every brukerminne in a click into one, and a spot with three showed one. A
+  record with no identity *whatever* gets a per-feature key, so it can never
+  dedupe against a sibling. The URL is a grouping key and never printed: the
+  card's id corner shows only ids the register owns.
+- **A served link is always shown**; only the *synthesized* `askeladden?kid=`
+  URL keeps the "real POI" guard, since a kid built from a sikringssone's id
+  404s. Suppressing served links for the non-kulturminner2 kinds took away a
+  brukerminne's only exit.
+- **The leading glyph and its tooltip name the register** for the three that
+  aren't kulturminner2 (`house`, `landscape`, `person_pin_circle`) — "Enkeltminne"
+  over a SEFRAK building is the wrong noun — and a brukerminne's `opprettet_av`
+  / `opprettet` become chips, because who reported it and when is that
+  register's standing, in the place vernestatus holds elsewhere.
 
 Two contingencies for `informasjon`, which runs from empty to several
 paragraphs: it is **open** and clamped to four lines rather than hidden behind

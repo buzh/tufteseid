@@ -18,8 +18,9 @@ import type { MaterialSymbol } from '../../ui';
  * at 12 and 20 respectively, so the tables are complete by construction and
  * the fallbacks exist for a service change rather than for a gap.
  *
- * `fylke` is deliberately absent from both this file and the popup: the WMS
- * does not serve it. Not once in 1300 features.
+ * `fylke` is absent from this file because kulturminner2 does not serve it —
+ * not once in 1300 features. The brukerminner WMS does, and the popup prints
+ * it there; it is a plain string either way, so it needs no vocabulary.
  */
 
 const normalize = (value: string): string =>

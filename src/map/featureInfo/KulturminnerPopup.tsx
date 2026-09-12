@@ -89,6 +89,60 @@ const stringify = (v: unknown): string => {
   return String(v);
 };
 
+const firstOf = (
+  properties: Record<string, unknown>,
+  keys: readonly string[],
+): string => {
+  for (const key of keys) {
+    const value = stringify(properties[key]);
+    if (value) return value;
+  }
+  return '';
+};
+
+/*
+ * The five registers agree on what a card says and disagree on what to call
+ * every field of it. kulturminner2 and freda_bygninger share one vocabulary
+ * (`navn` / `informasjon` / `datering` / `lokalid`); the other three each
+ * brought their own, and reading only the first is what used to leave a
+ * brukerminne showing the word "Brukerminner" and a kommune chip — its title,
+ * its whole description and its one link all sit under names nothing looked up.
+ *
+ * Verified against live GetFeatureInfo on all five, not guessed:
+ *   kulturmiljoer  navn · informasjon · kulturmiljokategori · lokalid
+ *   sefrak         objektnavn · — · bygningstypetekst · tidsangivelsetekst ·
+ *                  askeladdenid
+ *   brukerminner   tittel · beskrivelse · opprettet_av · opprettet · (no id)
+ */
+const NAME_FIELDS = ['navn', 'objektnavn', 'tittel'] as const;
+const DESCRIPTION_FIELDS = ['informasjon', 'beskrivelse'] as const;
+const ART_FIELDS = [
+  'lokalitetsart',
+  'enkeltminneart',
+  'kulturmiljokategori',
+  'bygningstypetekst',
+  'sefrakstatustekst',
+] as const;
+const DATERING_FIELDS = ['datering', 'tidsangivelsetekst'] as const;
+/** Ids the register owns and a user can quote back at it. */
+const ID_FIELDS = ['lokalid', 'kulturminneid', 'askeladdenid'] as const;
+
+/*
+ * A stable handle on one record, for grouping and for killing the `*ikoner`
+ * twins. Brukerminner serve no id at all — their kulturminnesøk link ends in
+ * the record's uuid, and that is the only thing on the wire that separates two
+ * of them. Without it every brukerminne in a click deduped against every
+ * other, so a spot with three showed one.
+ */
+const identityOf = (properties: Record<string, unknown>): string =>
+  firstOf(properties, ID_FIELDS) || stringify(properties['linkkulturminnesok']);
+
+const KIND_ICONS: Partial<Record<FeatureKind, MaterialSymbol>> = {
+  sefrak: 'house',
+  kulturmiljo: 'landscape',
+  brukerminne: 'person_pin_circle',
+};
+
 const getParentId = (feature: HeritageFeature, fallbackIndex: number): string => {
   const p = feature.properties;
   if (feature.kind === 'enkeltminne') {
@@ -113,12 +167,7 @@ const getParentId = (feature: HeritageFeature, fallbackIndex: number): string =>
     // Sikringssoner have their own id space; keep them as their own group.
     return 'sz-' + (stringify(p['lokalid']) || stringify(p['kulturminneid']) || fallbackIndex);
   }
-  return (
-    stringify(p['lokalid']) ||
-    stringify(p['kulturminneid']) ||
-    stringify(p['objid']) ||
-    `other-${fallbackIndex}`
-  );
+  return identityOf(p) || stringify(p['objid']) || `other-${fallbackIndex}`;
 };
 
 const toHeritageFeatures = (
@@ -145,9 +194,13 @@ const toHeritageFeatures = (
 const groupFeatures = (layers: LayerFeatureInfo[]): HeritageGroup[] => {
   const features = toHeritageFeatures(layers);
 
-  // Dedupe *ikoner duplicates: same kind + same identifying id.
+  // Dedupe *ikoner duplicates: same kind + same identifying id. A record with
+  // no identity at all (SEFRAK serves none the icons share, brukerminner serve
+  // none full stop) is never a duplicate of another one, so it gets a key of
+  // its own rather than colliding with every sibling of its kind.
+  let anonymous = 0;
   const dedupeKey = (f: HeritageFeature) =>
-    `${f.kind}::${stringify(f.properties['lokalid']) || stringify(f.properties['kulturminneid'])}`;
+    `${f.kind}::${identityOf(f.properties) || `#${anonymous++}`}`;
   const seen = new Map<string, HeritageFeature>();
   for (const f of features) {
     const k = dedupeKey(f);
@@ -189,7 +242,9 @@ const groupFeatures = (layers: LayerFeatureInfo[]): HeritageGroup[] => {
     const fromEnkeltminne = stringify(g.enkeltminner[0]?.properties['navn']);
     if (fromLokalitet) g.navn = fromLokalitet;
     else if (fromEnkeltminne) g.navn = fromEnkeltminne;
-    else if (g.others.length > 0) g.navn = g.others[0].layerTitle;
+    else if (g.others.length > 0)
+      g.navn =
+        firstOf(g.others[0].properties, NAME_FIELDS) || g.others[0].layerTitle;
   }
 
   const all = Array.from(groups.values());
@@ -428,27 +483,32 @@ const HeritageCard = ({
   // or its title when the record is unnamed. `kategori` is the 12-value bucket
   // above it and is the leading glyph; printing both was printing the second
   // one twice.
-  const art =
-    stringify(props['lokalitetsart']) || stringify(props['enkeltminneart']);
+  const art = firstOf(props, ART_FIELDS);
   const kategori =
     stringify(props['lokaliteteskategori']) ||
     stringify(props['enkeltminnekategori']);
 
-  // The WMS serves no `fylke` — beliggenhet is the kommune and nothing else.
-  const kommune = stringify(props['kommune']);
+  // kulturminner2 serves no `fylke` — there, beliggenhet is the kommune and
+  // nothing else. Brukerminner serve both, and a kommune name alone is
+  // ambiguous across the country, so the chip takes the fylke when it is there.
+  const kommune = [stringify(props['kommune']), stringify(props['fylke'])]
+    .filter(Boolean)
+    .join(', ');
 
   // Roll up vernetype + datering across the lokalitet's own field AND all
   // its nested enkeltminner. If they agree, show the value; if not, show
   // the "Ulike vernestatus" / "Flere dateringer" aggregate label the way
-  // Kulturminnesøk does.
-  const memberProps = [
+  // Kulturminnesøk does. A register with no lokalitet/enkeltminne hierarchy
+  // rolls up over the one record it has.
+  const members = [
     ...(group.lokalitet ? [group.lokalitet.properties] : []),
     ...group.enkeltminner.map((em) => em.properties),
   ];
+  const memberProps = members.length > 0 ? members : [props];
   const vernetypes = memberProps.map((p) => stringify(p['vernetype']));
   const vernetype = rollup(vernetypes, t('kulturminner.ulikeVernestatus'));
   const datering = rollup(
-    memberProps.map((p) => stringify(p['datering'])),
+    memberProps.map((p) => firstOf(p, DATERING_FIELDS)),
     t('kulturminner.flereDateringer'),
   );
   // vernedato only if there's a single shared vernetype AND a single shared
@@ -466,17 +526,23 @@ const HeritageCard = ({
       : '';
   const antall =
     group.lokalitet && stringify(group.lokalitet.properties['antallenkeltminner']);
-  const informasjon = stringify(props['informasjon']);
-  // Links only apply to real POIs — sikringssoner have their own id space
-  // and a synthesized askeladden URL for a sikringssone id doesn't resolve.
+  const informasjon = firstOf(props, DESCRIPTION_FIELDS);
+  // A link the register *served* is always good, whatever the kind — that is
+  // how a brukerminne gets back to its kulturminnesøk page, and it is the only
+  // exit it has. Only the **synthesized** askeladden URL needs the guard:
+  // sikringssoner have their own id space, so a kid= built from one 404s.
   const hasReal = !!group.lokalitet || group.enkeltminner.length > 0;
-  const askeladden = hasReal
-    ? stringify(props['linkaskeladden']) ||
-      (props['lokalid']
-        ? `https://askeladden.ra.no/askeladden/?kid=${stringify(props['lokalid'])}`
-        : '')
-    : '';
-  const kulturminnesok = hasReal ? stringify(props['linkkulturminnesok']) : '';
+  const askeladden =
+    stringify(props['linkaskeladden']) ||
+    (hasReal && props['lokalid']
+      ? `https://askeladden.ra.no/askeladden/?kid=${stringify(props['lokalid'])}`
+      : '');
+  const kulturminnesok = stringify(props['linkkulturminnesok']);
+
+  // Who reported it and when. Brukerminner are the one register where that is
+  // the record's standing, so it takes the place vernestatus holds elsewhere.
+  const opprettetAv = stringify(props['opprettet_av']);
+  const opprettet = formatDate(props['opprettet']);
 
   // Colour the vernestatus chip by bucket even when the labels disagreed: two
   // members reading "Automatisk fredet" and "Vedtaksfredet" are both fredet,
@@ -493,23 +559,37 @@ const HeritageCard = ({
     : group.enkeltminner.slice(1);
   const isSikringssone = !group.lokalitet && group.sikringssoner.length > 0;
 
+  // What the card is *of*. The first four are kulturminner2's own hierarchy;
+  // the rest name their register, because "Enkeltminne" over a SEFRAK building
+  // or a user's report is the wrong noun.
+  const kind: FeatureKind = group.lokalitet
+    ? 'lokalitet'
+    : isSikringssone
+      ? 'sikringssone'
+      : group.enkeltminner.length > 0
+        ? 'enkeltminne'
+        : (group.others[0]?.kind ?? 'enkeltminne');
+  const kindLabel = t(`kulturminner.${kind}`, {
+    defaultValue: primary?.layerTitle ?? '',
+  });
+  const kindIcon =
+    KIND_ICONS[kind] ?? (kategori ? kategoriIcon(kategori) : 'castle');
+
+  // Ids the register owns, only. The synthetic grouping keys — `other-3`, and
+  // the kulturminnesøk URL a brukerminne is keyed on for want of anything
+  // better — are ours, and printing one in the corner of a card would invite
+  // someone to quote it back at Riksantikvaren.
+  const cardId =
+    hasReal || isSikringssone
+      ? group.parentId.replace(/^sz-/, '')
+      : firstOf(props, ID_FIELDS);
+
   return (
     <div className={styles.card}>
       <div className={styles.cardHead}>
-        <Tooltip
-          label={[
-            group.lokalitet
-              ? t('kulturminner.lokalitet')
-              : isSikringssone
-                ? t('kulturminner.sikringssone')
-                : t('kulturminner.enkeltminne'),
-            kategori,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        >
+        <Tooltip label={[kindLabel, kategori].filter(Boolean).join(' · ')}>
           <span className={styles.kindIcon} tabIndex={0}>
-            <Icon icon={kategori ? kategoriIcon(kategori) : 'castle'} size={20} />
+            <Icon icon={kindIcon} size={20} />
           </span>
         </Tooltip>
         <div className={styles.cardTitles}>
@@ -520,9 +600,7 @@ const HeritageCard = ({
             <div className={styles.cardSubtitle}>{art}</div>
           )}
         </div>
-        <span className={styles.cardId}>
-          {group.parentId.replace(/^sz-/, '')}
-        </span>
+        <span className={styles.cardId}>{cardId}</span>
       </div>
 
       <div className={styles.chips}>
@@ -560,6 +638,22 @@ const HeritageCard = ({
             label={t('kulturminner.antallEnkeltminner')}
             value={antall}
             withText
+          />
+        )}
+        {opprettetAv && (
+          <MetaChip
+            icon="person"
+            label={t('kulturminner.registrertAv')}
+            value={opprettetAv}
+            withText={withText}
+          />
+        )}
+        {opprettet && (
+          <MetaChip
+            icon="event"
+            label={t('kulturminner.registrert')}
+            value={opprettet}
+            withText={withText}
           />
         )}
       </div>
