@@ -2226,6 +2226,19 @@ edge, and neither surface has a stylesheet of its own.
   to the active id. It reads `stripOpen` rather than "is the strip mounted",
   because the pen and a picker *borrow* the bottom slot, and drawing a funn
   over a pinned ortofoto is a use of this feature rather than a lapse in it.
+- **Unfolding it puts the same image back**, card and pin both, from a ref in
+  the hook (nothing renders it, and putting it in state would re-render the
+  workspace to record something that has just left the screen). Folding the
+  edge away is how you look at the ground *under* an image — a glance, like
+  the funn eye and the ground peek — and a glance that costs you your place is
+  a glance you stop taking. The ref dies with the hook, which is
+  remount-per-record, so a remembered id is always this lokalitet's; one
+  deleted meanwhile is cleared by the sweep and by `usePinnedBilde`'s own.
+  **The restore yields the ground slot**: if `groundOverlayOwner()` is not
+  free — Terreng is the other contender — the card comes back and the image
+  does not, because pinning is a press and unfolding the rail is not a press
+  on this image. `Vis i ruta` is then the press that takes the slot, which is
+  the escalation the arbiter asks of every caller.
 - **The row's `Bilder` is lit when a bilde is on the ground, not when the rail
   is open.** The rail starts open, so the old reading put an engaged-looking
   button on the row of every lokalitet you walked into while the map
