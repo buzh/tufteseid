@@ -47,7 +47,7 @@ import {
   coverTerrainSpecAtom,
   editingLocalityIdAtom,
   funnDraftActiveAtom,
-  marksHiddenAtom,
+  funnHiddenAtom,
   pendingStarterLocalityIdAtom,
   selectedFunnIdAtom,
 } from './atoms';
@@ -237,7 +237,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [draftActive, setDraftActive] = useAtom(funnDraftActiveAtom);
   const [adjusting, setAdjusting] = useAtom(adjustingLocalityAtom);
   const [selectedFunnId, setSelectedFunnId] = useAtom(selectedFunnIdAtom);
-  const setMarksHidden = useSetAtom(marksHiddenAtom);
+  const setFunnHidden = useSetAtom(funnHiddenAtom);
   const [tool, setTool] = useAtom(ribbonToolAtom);
   const mode = useAtomValue(workspaceModeAtom);
   const stripOpen = useAtomValue(bilderStripOpenAtom);
@@ -1032,10 +1032,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // already saved and put down; drop them so the new funn starts clean.
     getDrawLayer()?.getSource()?.clear();
     hideFunnOnLayer(null);
-    // "Skjul markeringer" is a way of looking at the ground, not a way of
+    // The eye on `Funn` is a way of looking at the ground, not a way of
     // working on it: drawing with the existing funn invisible is how you end
     // up drawing the one you already have.
-    setMarksHidden(false);
+    setFunnHidden(false);
     setAdjusting(false);
     // Only the extract is dismissed — terrain is a read-only view of the
     // same rectangle and there is no reason drawing on top should close it.
@@ -1048,7 +1048,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   }, [
     canAdd,
     draftActive,
-    setMarksHidden,
+    setFunnHidden,
     setAdjusting,
     setTool,
     setDraftActive,

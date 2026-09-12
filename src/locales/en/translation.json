@@ -311,6 +311,8 @@
     "funn": {
       "heading": "Finds",
       "listHint": "The finds in this locality",
+      "hide": "Hide the finds on the map",
+      "show": "Show the finds on the map again",
       "new": "New find",
       "loading": "Loading finds…",
       "empty": "No finds yet. Draw what you see in the terrain.",
@@ -535,10 +537,6 @@
       "halfB": "Right",
       "noTerrainRight": "Terrain cannot be the right half — it is an analysis of the whole map",
       "divider": "Move the divider"
-    },
-    "marks": {
-      "label": "Hide marks",
-      "tip": "Hide finds and locality frames so they do not cover what you are comparing"
     },
     "info": {
       "label": "Point info",

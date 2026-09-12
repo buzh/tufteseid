@@ -37,9 +37,20 @@ let highlightedLocalityId: string | null = null;
  * cased in white so it survives both dark relief and bright ortofoto, corner
  * brackets to say "this one is open", and the name in a chip pinned to the
  * top-left corner instead of a haloed word across the middle of the view.
+ *
+ * Two strengths, and the gap between them is wide on purpose. The open
+ * lokalitet is the boundary of what you are working in and draws at full
+ * weight. Every *other* one draws faint — dashed, half-alpha, its name chip
+ * barely there — because the only question it has to answer is "somebody has
+ * framed this ground", and answering it at full weight over the site you are
+ * actually reading is what "Skjul merker" used to exist to undo. Fading is
+ * the better answer than a switch: it leaves the rectangle clickable, so the
+ * way to open a neighbour is still to press it.
  */
 const FRAME = '#FF6A00';
 const CASING = 'rgba(255, 255, 255, 0.9)';
+const FRAME_FAINT = 'rgba(255, 106, 0, 0.45)';
+const CASING_FAINT = 'rgba(255, 255, 255, 0.4)';
 // Bracket arms are a constant length on screen, not on the ground.
 const BRACKET_PX = 18;
 
@@ -85,9 +96,14 @@ const nameChip = (name: string, corner: number[], highlighted: boolean) =>
     text: new Text({
       text: name,
       font: `${highlighted ? 600 : 500} 12px sans-serif`,
-      fill: new Fill({ color: highlighted ? '#ffffff' : '#3a1800' }),
+      // Faint, but not so faint it stops being readable over a bright
+      // ortofoto — the chip is the only thing that says *which* lokalitet
+      // the rectangle you are about to click is.
+      fill: new Fill({
+        color: highlighted ? '#ffffff' : 'rgba(58, 24, 0, 0.65)',
+      }),
       backgroundFill: new Fill({
-        color: highlighted ? FRAME : 'rgba(255, 255, 255, 0.82)',
+        color: highlighted ? FRAME : 'rgba(255, 255, 255, 0.45)',
       }),
       padding: [2, 5, 2, 5],
       textAlign: 'left',
@@ -116,14 +132,14 @@ const styleFor = (feature: FeatureLike, resolution: number): Style[] => {
     }),
     new Style({
       stroke: new Stroke({
-        color: CASING,
-        width: highlighted ? 4 : 3,
+        color: highlighted ? CASING : CASING_FAINT,
+        width: highlighted ? 4 : 2,
         lineDash: highlighted ? undefined : [7, 7],
       }),
     }),
     new Style({
       stroke: new Stroke({
-        color: FRAME,
+        color: highlighted ? FRAME : FRAME_FAINT,
         width: highlighted ? 2 : 1,
         lineDash: highlighted ? undefined : [7, 7],
       }),

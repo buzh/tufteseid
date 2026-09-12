@@ -399,8 +399,8 @@ subsume.
   read by the OL render handlers through
   `setCurtainSplit`, so `compareLayerAtomEffect` deliberately does *not* depend
   on it — dragging the divider must not rebuild a tile stack.
-- **Skjul merker** — `marksHiddenAtom` (`src/localities/atoms.ts`), read by
-  `useMarksVisibility` (§8.6). Not persisted to the URL.
+- **The funn eye** — `funnHiddenAtom` (`src/localities/atoms.ts`), read by
+  `useFunnVisibility` (§8.6). Not persisted to the URL.
 - **Theme layers** — `activeThemeLayersAtom` (a `Set<ThemeLayerName>`), plus
   `heritageDetailsAtom` / `heritageRenderAtom` / `heritageOpacityAtom` in
   `src/map/layers/heritage.ts` for how the Kulturminner overlay is drawn.
@@ -530,7 +530,6 @@ looking at. Row 1 answers **what am I looking at**; the strip under it answers
 | **LiDAR** (2) | Background mode: hillshade stack |
 | **Hybrid** (3) | LiDAR stack + transparent roads/rail/place-names on top |
 | **Flyfoto** (4) | Background mode: NiB ortofoto (§5.5) |
-| **Skjul merker** (H) | Takes our own marks — funn, their halo, the lokalitet rectangles — off the map for as long as it is pressed in (§8.6) |
 | **Kulturminner** | Toggles `heritageSites`, the one register most readings start from |
 | **Oppsett** (`tune`) | Popover: the five RA sources, kulturminner2's three sublayers, how they are drawn and how strongly (§5.9) |
 | **Stedsinfo** (I) | Arms the point readout: while it is on, a click asks the registers about that spot (§7.1). Off on arrival |
@@ -704,11 +703,12 @@ re-attaching the listener continuously.
 - **Hold X** — peek at the ground you were on before, snapping back on release.
   Reading relief against a photograph means flipping dozens of times, and a
   hold-to-compare is the cheapest form of that.
-- **H** — hide/show our own marks (§8.6). The one key here written straight
-  against an atom rather than through a registered handler: there is a single
-  boolean and no mode owns it, so there is nothing for a component to
-  contribute. It is a press rather than a hold because judging a bump against a
-  1937 photograph takes longer than a key can comfortably be held down.
+- **H** — hide/show the funn, the same switch as the eye on `Funn` (§8.6). The
+  one key here written straight against an atom rather than through a
+  registered handler: there is a single boolean and no mode owns it, so there
+  is nothing for a component to contribute. It is a press rather than a hold
+  because judging a bump against a 1937 photograph takes longer than a key can
+  comfortably be held down.
 - **I** — arm/disarm Stedsinfo, the click-the-map-for-a-readout tool (§7.1).
   Written straight against `infoToolAtom` for the same reason H is.
 - **C** — flip which half of the compare curtain everything else describes
@@ -1408,20 +1408,35 @@ rows, the bottom edge of the map, a popover, a map callout and the dialogs:
 | The images | `BilderStrip` / `BilderCarousel` / `BilderPicker` (bottom slot) | the same rail in both stances — read-only in show, the write verbs and drag-to-reorder in edit; a picker run borrows the slot — §8.7.2, §8.9.3 |
 | Dialogs | `LocalityDialogs` | Detaljer, the two `Hent ▾` selection dialogs and the flyfoto licensing notice |
 
-**The row is four zones**, and each answers one question
-(`docs/lokalitet-view.md` §5.1–5.5):
+**The row is five zones in three grid cells**, and each zone answers one
+question (`docs/lokalitet-view.md` §5.1–5.5):
 
-| Zone | Question | Present when | Contents |
-|---|---|---|---|
-| left — identity | *what am I looking at* | always | the literal word `Lokalitet:`, the inline-editable name, the short code chip (click to copy), the visibility badge, the banner slot, zoom-to |
-| the subjects | *what is in here* | always | `Funn ▾`, a popover with a count badge |
-| middle — the work | *what can I do to it* | **edit only** | Nytt funn · Behold · `Hent ▾` · Skjermbilde |
-| the read tools | *what may I look at* | always | Terreng · Sammenlign · `Bilder ▾` |
-| right — the exits | *how do I get out of here* | always | deepest-first — see the depth table below |
+| Cell | Zone | Question | Present when | Contents |
+|---|---|---|---|---|
+| left | identity | *what am I looking at* | always | the literal word `Lokalitet:`, the inline-editable name, the short code chip (click to copy), the visibility badge, the banner slot, zoom-to |
+| left | the work | *what can I do to it* | **edit only** | Nytt funn · Behold · `Hent ▾` · Skjermbilde |
+| centre | the ground tools | *what does this ground look like* | always | Terreng · Sammenlign |
+| right | the contents | *what did someone put here* | always | `Funn` + its eye · `Bilder ▾`, both with a count badge |
+| right | the exits | *how do I get out of here* | always | deepest-first — see the depth table below |
 
-The subjects and the read tools are present in **both** stances, because
+**A grid of `1fr auto 1fr`, not a flex row** (`RibbonLocalityRow.module.css`).
+The `auto` column is what puts Terreng and Sammenlign on the row's own
+midpoint instead of on the midpoint of whatever the lokalitet's name leaves
+over — a control that walks sideways as you move between sites is one you have
+to look for. The side cells are `min-width: 0`, or an over-long name grows its
+column and takes the centre with it. Below 48 rem the grid collapses to a flex
+row with the exits pinned right by an `auto` margin; the cells are real
+elements, so the grouping survives the collapse.
+
+**Centre and right split by kind of tool, not to fill three columns.** Terreng
+and Sammenlign interrogate the ground and the data answers; `Funn` and `Bilder`
+interrogate what a person put here and you answer. The exits go with the second
+group because leaving is something you do, and the write verbs go with identity
+because they are aimed at this record.
+
+The ground tools and the contents are present in **both** stances, because
 reading is not writing — the same argument that makes show mode absolute about
-the middle zone is what keeps `Funn ▾` and `Bilder ▾` out of it. The count
+the write verbs is what keeps `Funn` and `Bilder ▾` out of them. The count
 badges are what make a popover an acceptable home for the list at all: *how
 many funn are in this rectangle* is on the row whether anything is open or not,
 so consulting the index is a choice rather than a tax.
@@ -1603,7 +1618,7 @@ So each one went to a surface priced like the use:
 | Was a dock section | Is now | Because |
 |---|---|---|
 | the live tool band | `RibbonFunnDraftRow` + `FunnDrawBar` in the bottom slot (§8.5) | it *is* watched, continuously, while you draw — so it gets a permanent strip, at the bottom, where the map above it stays whole |
-| Funn | `FunnList` in a `Funn ▾` popover on the row, with a count badge | consulted; the count is the part you want at a glance, and a badge carries that without the list |
+| Funn | `FunnList` in a popover behind the `Funn` control on the row, with a count badge | consulted; the count is the part you want at a glance, and a badge carries that without the list |
 | Kulturminner | nothing — deleted outright (§15) | the register it listed is already the map's headline overlay, clickable; a second, text-only copy of it inside a lokalitet was a duplicate wearing the same word |
 | Detaljer | a `Dialog` off the `[⋮]` menu | set once and stopped looking at; the one surface here you want *modal*, because you are typing prose into it |
 | a funn's note | `FunnCallout`, an `ol/Overlay` beside its shape (§8.6) | it is about a place, and a list row is not a place |
@@ -1865,29 +1880,53 @@ wrote about a mound is not editing it.
 - The note is clamped to four lines. It is a glance at the map, not the record
   — a long note is read in the funn list, and the callout that tried to hold
   one would cover the ground it is pointing at.
-- **`marksHiddenAtom` takes it down with the layers.** It is a mark: the whole
-  point of **H** is an unobstructed look at the relief, and an overlay that
-  survived the flag would be the loudest thing left on screen.
+- **`funnHiddenAtom` takes it down with the layers.** It is part of the
+  drawing: the whole point of the eye is an unobstructed look at the relief,
+  and an overlay that survived the flag would be the loudest thing left on
+  screen.
 
-**Skjul merker.** Restraint in the styling only goes so far: a cased outline
-sitting exactly on the bump you are judging is still on it, and the point of
-the curtain and the digit keys is to look at the *ground* in two acquisitions.
-`marksHiddenAtom` (row 1, key **H**) takes all three mark layers off —
-localities, funn, the selection halo — through `useMarksVisibility`
-(`src/localities/marksVisibility.ts`).
+**The eye on `Funn`.** Restraint in the styling only goes so far: a cased
+outline sitting exactly on the bump you are judging is still on it, and the
+point of the curtain and the digit keys is to look at the *ground* in two
+acquisitions. `funnHiddenAtom` — the eye segment of the `Funn` control on the
+lokalitet row, or key **H** — takes the funn layer and the selection halo off
+through `useFunnVisibility` (`src/localities/funnVisibility.ts`).
 
 - **`setVisible(false)`, never removal.** Everything the glance must leave
   alone hangs off those layers: the hydrated features, two realtime
   subscriptions, the selection, and the draw layer's idea of which funn it is
   holding.
 - It re-applies on the layer collection's `add` as well as on the flag, because
-  each of the three layers is created by its own hook and one arriving while
-  marks are hidden would default to visible.
+  each layer is created by its own hook and one arriving while the funn are
+  hidden would default to visible.
 - **The draw layer is not in the set**, and `startDraft` lifts the flag. You
   cannot draw a shape you cannot see, and drawing with the existing funn
   invisible is how you end up drawing the one you already have.
 - Not persisted to the URL, on the same grounds as the compare curtain: a link
   shared to show someone a funn must not arrive with the funn hidden.
+
+**This used to be `Skjul merker`, on row 1, and it also hid the lokalitet
+rectangles.** Two things were wrong with that. It was grouped beside
+Sammenlign by an argument about comparing ground, and when Sammenlign left for
+the lokalitet row the switch stayed behind — three rows away from the count of
+what it hid. And it was global by an argument that had stopped being true: the
+funn layer only ever holds the *open* lokalitet's funn, and a signed-out
+visitor loads no rectangles at all, so for half the app it was a dead button.
+
+The two halves went separate ways. The funn half is a segment of the button
+that lists them — one visual object, two hit targets, and the count stays
+legible while they are hidden, so hiding never costs you the answer to "is
+there anything in this rectangle". It is a segment rather than an item inside
+the list because hiding the funn is what you do *while* dragging the compare
+curtain, and that has to stay one press.
+
+The rectangles have no switch at all now. A lokalitet that is not the open one
+draws faint instead — dashed, half-alpha casing and frame, its name chip at
+45 % (`styleFor` in `localityLayer.ts`) — which answers the same complaint
+without a control to find, and leaves the rectangle clickable, so opening a
+neighbour is still a press on it. The open one keeps its full-strength frame
+and corner brackets: it is the boundary of what you are working in, and it is
+a frame rather than a fill, so it is not the thing in your way.
 
 ### 8.7 The attachment pipeline
 
@@ -3286,8 +3325,8 @@ list used to say `Accordion`, `Select`, `Pagination` and `Alert`:
 
   It is a list of *verbs*, which is why it is not the `Select` above: a
   pulldown that picks a dataset stays a `Popover` with bespoke content, and
-  `FunnMenu` — a `Popover` holding `FunnList` — was left alone for the same
-  reason. Three things it owns that the call sites were each re-deriving:
+  the `Funn` control — a `Popover` holding `FunnList` — was left alone for
+  the same reason. Three things it owns that the call sites were each re-deriving:
   holding `open` (the trigger is a render prop, as on `ConfirmPopover`, and
   gets `{ open, onClick }`); closing itself *before* the verb runs; and
   `stopPropagation` at the panel boundary, since the panel is portalled but
@@ -3418,8 +3457,8 @@ switching between
 them with the A|B control or C, so one acquisition can be compared against
 another of the same ground; drag the seam with the pointer or nudge it with
 the arrow keys once it has focus, and leave to take the second stack back down;
-hide your own marks with H or the ribbon button so they do not cover the ground
-you are judging, and bring them back the same way.
+hide the funn with H or the eye on `Funn` so they do not cover the ground you
+are judging, and bring them back the same way.
 
 **Overlay the heritage record**
 toggle the register most readings start from in one press; open the Oppsett

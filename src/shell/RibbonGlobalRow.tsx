@@ -3,7 +3,6 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isSignedInAtom } from '../auth/atoms';
 import { isAuthDialogOpenAtom } from '../auth/atoms-dialog';
-import { marksHiddenAtom } from '../localities/atoms';
 import { type BeholdOffer, beholdOfferAtom } from '../localities/behold';
 import { useCreateLocalityFromViewport } from '../localities/createFromBbox';
 import { ribbonToolAtom } from '../localities/toolAtoms';
@@ -79,7 +78,6 @@ export const RibbonGlobalRow = () => {
   const isSignedIn = useAtomValue(isSignedInAtom);
   const [tool, setTool] = useAtom(mapToolAtom);
   const [infoTool, setInfoTool] = useAtom(infoToolAtom);
-  const [marksHidden, setMarksHidden] = useAtom(marksHiddenAtom);
   const [themeLayers, setThemeLayers] = useAtom(activeThemeLayersAtom);
   const standard = useStandardControls();
   const lidar = useLidarControls();
@@ -310,19 +308,16 @@ export const RibbonGlobalRow = () => {
               GROUND_MODES rather than against what this row draws. */}
         </div>
 
-        <div className={styles.group}>
-          {/* Global rather than a lokalitet verb — the rectangles are on the
-              map whether or not a lokalitet is open, and hiding them is a way
-              of looking, not something you do to a lokalitet. (It used to sit
-              beside Sammenlign, which has left for the lokalitet row.) */}
-          <ModeButton
-            icon="visibility_off"
-            label={t('ribbon.marks.label')}
-            tooltip={`${t('ribbon.marks.tip')} (H)`}
-            active={marksHidden}
-            onClick={() => setMarksHidden(!marksHidden)}
-          />
-        </div>
+        {/* "Skjul merker" stood here, and it is gone rather than moved twice.
+            It was global by an argument that had stopped being true: it hid
+            the lokalitet rectangles *and* the funn, but the funn layer only
+            ever holds the open lokalitet's, and for a signed-out visitor no
+            rectangles load at all — so for half the app it was a dead button,
+            and for the other half it was a switch sitting three rows away
+            from the count of what it hid. The two halves went separate ways:
+            the funn half is the eye on `Funn` (H still works), and the
+            rectangles no longer need hiding because they draw faint unless
+            they are the one you have open (localityLayer.ts). */}
 
         <div className={styles.divider} />
 

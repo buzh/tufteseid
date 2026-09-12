@@ -8,6 +8,7 @@ export const ModeButton = ({
   active,
   badge,
   disabled,
+  joinedRight,
   onClick,
 }: {
   icon: MaterialSymbol;
@@ -16,10 +17,14 @@ export const ModeButton = ({
   active?: boolean;
   badge?: number | string;
   disabled?: boolean;
+  /** This button is the left half of a split control and something is butted
+   *  against it — square that edge off and pull the badge in off it. The only
+   *  one is `Funn` and its eye (RibbonLocalityRow). */
+  joinedRight?: boolean;
   onClick: () => void;
 }) => (
   <Tooltip label={tooltip ?? label}>
-    <span className={styles.wrap}>
+    <span className={cx(styles.wrap, joinedRight && styles.joinedRight)}>
       <button
         type="button"
         className={cx(styles.button, active && styles.active)}

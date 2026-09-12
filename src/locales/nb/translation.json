@@ -311,6 +311,8 @@
     "funn": {
       "heading": "Funn",
       "listHint": "Funnene i denne lokaliteten",
+      "hide": "Skjul funnene på kartet",
+      "show": "Vis funnene på kartet igjen",
       "new": "Nytt funn",
       "loading": "Henter funn…",
       "empty": "Ingen funn enda. Tegn det du ser i terrenget.",
@@ -535,10 +537,6 @@
       "halfB": "Høyre",
       "noTerrainRight": "Terreng kan ikke være høyre halvdel — det er en analyse over hele kartet",
       "divider": "Flytt skillet"
-    },
-    "marks": {
-      "label": "Skjul merker",
-      "tip": "Skjul funn og lokalitetsrammer, så de ikke dekker det du sammenligner"
     },
     "info": {
       "label": "Stedsinfo",

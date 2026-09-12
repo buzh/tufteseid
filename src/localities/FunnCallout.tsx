@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import type { LocalityFindRecord } from '../api/localityFinds';
 import { mapAtom } from '../map/atoms';
 import { Badge, type BadgePalette, IconButton } from '../ui';
-import { marksHiddenAtom, selectedFunnIdAtom } from './atoms';
+import { funnHiddenAtom, selectedFunnIdAtom } from './atoms';
 import styles from './FunnCallout.module.css';
 import { getFunnExtentOnLayer } from './funnLayer';
 
@@ -35,7 +35,7 @@ const STATUS_PALETTE: Record<LocalityFindRecord['status'], BadgePalette> = {
  * the link have to be clickable, and OpenLayers would otherwise read the
  * press as the start of a drag.
  *
- * `marksHidden` takes it down with the drawing it annotates — H is a way of
+ * `funnHidden` takes it down with the drawing it annotates — H is a way of
  * looking at the bare ground, and a label sitting exactly where the outline
  * was would defeat the whole gesture.
  */
@@ -47,7 +47,7 @@ export const FunnCallout = ({
   const { t } = useTranslation();
   const map = useAtomValue(mapAtom);
   const selectedId = useAtomValue(selectedFunnIdAtom);
-  const marksHidden = useAtomValue(marksHiddenAtom);
+  const funnHidden = useAtomValue(funnHiddenAtom);
   const setSelected = useSetAtom(selectedFunnIdAtom);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<Overlay | null>(null);
@@ -84,14 +84,14 @@ export const FunnCallout = ({
   // where the geometry has been reprojected into the view's coordinates, and
   // it is also what an in-flight geometry edit updates first.
   useEffect(() => {
-    const visible = funn && !marksHidden;
+    const visible = funn && !funnHidden;
     const extent = visible ? getFunnExtentOnLayer(funn.id) : null;
     overlayRef.current?.setPosition(
       extent ? [(extent[0] + extent[2]) / 2, extent[3]] : undefined,
     );
-  }, [funn, marksHidden, items]);
+  }, [funn, funnHidden, items]);
 
-  if (!funn || marksHidden || !containerRef.current) return null;
+  if (!funn || funnHidden || !containerRef.current) return null;
 
   return createPortal(
     <div className={styles.callout}>

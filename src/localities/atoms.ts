@@ -56,15 +56,23 @@ export const adjustingLocalityAtom = atom<boolean>(false);
 export const hoveredFunnIdAtom = atom<string | null>(null);
 export const selectedFunnIdAtom = atom<string | null>(null);
 
-// Take everything *we* drew off the map for a moment — the funn, their
-// selection halo and the lokalitet rectangles. Comparing two acquisitions of
-// the same ground means looking at the ground, and a cased outline sitting
-// exactly on the bump you are trying to judge is the one thing guaranteed to
-// be in the way of judging it.
+// Take the funn off the map for a moment — the drawings, their selection halo
+// and the callout that annotates them. Comparing two acquisitions of the same
+// ground means looking at the ground, and a cased outline sitting exactly on
+// the bump you are trying to judge is the one thing guaranteed to be in the
+// way of judging it.
+//
+// The lokalitet rectangles used to go with them, under one "Skjul merker" on
+// row 1. They no longer do, and there is no switch for them at all: a
+// rectangle that is not the open one now draws faint (localityLayer.ts), which
+// answers the same complaint — it says a lokalitet is here without covering
+// the ground it frames — without a control to find. What is left is exactly
+// the set of things `Funn` lists, which is why the switch is a segment of
+// that button, beside the count of what it hides.
 //
 // Not persisted to the URL: it is a glance, like the ground peek, and a link
 // shared to show someone a funn must not arrive with the funn hidden.
-export const marksHiddenAtom = atom(false);
+export const funnHiddenAtom = atom(false);
 
 // Which bilde is pinned to the map ("Vis i ruta"), if any. Outside the
 // filmstrip because the strip is collapsible and unmounts when it is folded

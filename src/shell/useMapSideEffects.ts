@@ -4,7 +4,7 @@ import {
   useLocalitiesLayer,
   useLocalityClick,
 } from '../localities/localityLayer';
-import { useMarksVisibility } from '../localities/marksVisibility';
+import { useFunnVisibility } from '../localities/funnVisibility';
 import { useFeatureInfoClick } from '../map/featureInfo/useFeatureInfo';
 import { useLidarFootprintsLayer } from '../map/lidarFootprintsLayer';
 import { useBackgroundCyclingKeys } from '../map/useBackgroundCyclingKeys';
@@ -44,7 +44,7 @@ export const useMapSideEffects = () => {
   useFunnPointer();
   useLocalityClick();
   // After the three layers it hides, so the first pass finds them.
-  useMarksVisibility();
+  useFunnVisibility();
   useLidarFootprintsLayer();
   // A/D/W/S/E background cycling. Mounted at the shell root rather than in
   // the ribbon so the document listener's position in the capture chain

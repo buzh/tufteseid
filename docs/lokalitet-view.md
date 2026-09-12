@@ -76,9 +76,9 @@ That is worth having as a hard rule rather than a tendency for three reasons:
 
 ### Show has no write verbs at all
 
-Not disabled ones, not escalating ones — **absent**. The middle zone of the
-row, which is where every verb that leaves something behind lives (§5), simply
-does not render in show mode. There is exactly one way to write to a
+Not disabled ones, not escalating ones — **absent**. The write-verb zone of
+the row, which is where every verb that leaves something behind lives (§5),
+simply does not render in show mode. There is exactly one way to write to a
 lokalitet, and it is to press `Rediger` first.
 
 An earlier draft had write verbs *escalate* — press `Lagre` in show and the
@@ -609,7 +609,7 @@ nothing about why the owner thought there was something there.
 ## 5. The lokalitet row
 
 ```
-┌─ row 1 ── search · [1 Standard][2 LiDAR][3 Hybrid][4 Flyfoto] · Skjul merker
+┌─ row 1 ── search · [1 Standard][2 LiDAR][3 Hybrid][4 Flyfoto]
 │           · Kulturminner ⚙ · Stedsinfo · Mål · Mine lok. · Ny lok. · konto
 ├─ row 2 ── settings strip for the ground on screen        (A|B when comparing)
 ├─ row 3 ── terrain sliders                                  (only in Terreng)
@@ -621,14 +621,37 @@ nothing about why the owner thought there was something there.
 | Zone | Question | Present when |
 |---|---|---|
 | **left** — identity | *what am I looking at* | always |
-| **middle** — the work | *what can I do to it* | **edit only** |
+| **left** — the work | *what can I do to it* | **edit only** |
+| **centre** — the ground tools | *what does this ground look like* | always |
+| **right** — the contents | *what did someone put here* | always |
 | **right** — the exits | *how do I get out of here* | always |
 
-Left is fixed, right is a stack, middle is a list. That is the whole grammar,
-and it is what makes the row readable at a glance: your eye goes left to know
-where you are and right to know what to press, and the space between them is
-either empty (show) or full of tools (edit). Stance is legible from ten feet
-away without reading a word.
+Left is fixed, right is a stack, the work is a list. That is the whole
+grammar, and it is what makes the row readable at a glance: your eye goes left
+to know where you are and right to know what to press, and the left-hand cell
+is either just the name (show) or the name plus a list of tools (edit). Stance
+is legible from ten feet away without reading a word.
+
+**Five zones in three cells, and the cells are a CSS grid of `1fr auto 1fr`.**
+The reason for a grid rather than a flex row is the middle one: `Terreng` and
+`Sammenlign` sit on the row's own midpoint, so the pair holds position however
+long the lokalitet's name is. A control that walks sideways as you move
+between sites is a control you have to look for each time.
+
+**Why the centre is the ground tools and the right is the contents.**
+`Terreng` and `Sammenlign` interrogate the ground — one asks the rectangle
+what shape it is, the other holds two acquisitions of it side by side — and
+the data answers. `Funn` and `Bilder` interrogate what a *person* put here,
+and you answer. Two different questions deserve two different places to point
+at, and the exits belong with the second group because leaving is also
+something you do rather than something the ground does. The write verbs sit
+with identity for the mirror-image reason: they are aimed at this record.
+
+Below 48 rem the grid collapses back to a flex row, because three columns of
+wrapped buttons on a phone is three columns of nothing. The cells are real
+elements, so the *grouping* survives the collapse: they become flex items and
+the exits are pinned right by an `auto` margin, which is the layout this row
+was designed against at 390 px.
 
 The `[←]` back arrow **goes away**. Leaving is an exit, exits are on the
 right, and one lokalitet should not have two ways out sitting at opposite ends
@@ -699,7 +722,7 @@ the same popover later. Until that parameter exists the button is absent
 rather than disabled; a share button that shares nothing is worse than no
 share button.
 
-### 5.4 The middle zone
+### 5.4 The write verbs
 
 ```
 Nytt funn  ·  Behold  ·  Hent ▾  ·  Skjermbilde
@@ -733,39 +756,56 @@ Everything else in §4.3 is unchanged; only the label moves.
 **Show, as owner:**
 
 ```
-Lokalitet: Storevike [K7M2QX] [privat] ⤢ ┊ ⛨Funn 3 · 🏛Kulturminner 4
-        ┊ Terreng · Sammenlign ┊ Bilder ▾ ┊ [Rediger] [Del] [Lukk] [⋮]
+Lokalitet: Storevike [K7M2QX] [privat] ⤢
+       ┊ Terreng · Sammenlign ┊ ⛨Funn 3|👁 · Bilder ▾ ┊ [Rediger] [Del] [Lukk] [⋮]
 ```
 
 **Show, as reader:**
 
 ```
 Lokalitet: Storevike [K7M2QX] [offentlig] · Delt av Ola Nordmann ⤢
-   ┊ ⛨Funn 3 · 🏛4 ┊ Terreng · Sammenlign ┊ Bilder ▾
-                              ┊ [Lag min kopi] [Del] [Lukk] [⋮]
+       ┊ Terreng · Sammenlign ┊ ⛨Funn 3|👁 · Bilder ▾
+                                      ┊ [Lag min kopi] [Del] [Lukk] [⋮]
 ```
 
 **Edit, idle:**
 
 ```
-Lokalitet: Storevike [K7M2QX] [privat] ⤢ ┊ ⛨Funn 3 · 🏛Kulturminner 4
-  ┊ Nytt funn · Behold · Hent ▾ · Skjermbilde ┊ Terreng · Sammenlign
-                                 ┊ Bilder ▾ ┊ [Lagre] [Avbryt] [⋮]
+Lokalitet: Storevike [K7M2QX] [privat] ⤢
+  · Nytt funn · Behold · Hent ▾ · Skjermbilde
+       ┊ Terreng · Sammenlign ┊ ⛨Funn 3|👁 · Bilder ▾ ┊ [Lagre] [Avbryt] [⋮]
 ```
 
-**Edit, drawing a funn:** the middle zone stays (you may still want a
-screenshot of what you are drawing), the right zone collapses to depth 2.
+**Edit, drawing a funn:** the write verbs stay (you may still want a
+screenshot of what you are drawing), the exits collapse to depth 2.
 
 ```
-Lokalitet: Storevike [K7M2QX] [privat] ⤢ ┊ ⛨Funn 3 · 🏛Kulturminner 4
-  ┊ Nytt funn · Behold · Hent ▾ · Skjermbilde ┊ Terreng · Sammenlign
-                          ┊ [Ferdig med funn] [Forkast funn]
+Lokalitet: Storevike [K7M2QX] [privat] ⤢
+  · Nytt funn · Behold · Hent ▾ · Skjermbilde
+       ┊ Terreng · Sammenlign ┊ ⛨Funn 3|👁 · Bilder ▾
+                                      ┊ [Ferdig med funn] [Forkast funn]
 ```
 
-Between the middle and the right sit the two read tools (`Terreng`,
-`Sammenlign` — §8) and the `Bilder ▾` toggle for the bottom edge. They are in
-both stances because reading is not writing, which is the whole argument of
-§2.
+The centre pair (`Terreng`, `Sammenlign` — §8) and the right-hand pair
+(`Funn`, `Bilder ▾`) are in both stances because reading is not writing, which
+is the whole argument of §2.
+
+**`Funn` is one control with a seam in it**, written `⛨Funn 3|👁` above: press
+the labelled half to open the index, press the eye to take the funn off the
+map. The eye is what used to be `Skjul merker` on row 1, and it is here
+because this is the button that lists exactly what it hides — the funn layer
+only ever holds the open lokalitet's funn. Two segments rather than an item
+inside the list, because hiding the funn is something you do *while* dragging
+the Sammenlign curtain and it has to stay one press; and the count stays on
+the labelled half while they are hidden, so hiding never costs you the answer
+to "is there anything in this rectangle". **H** still works.
+
+The other half of `Skjul merker` — the lokalitet rectangles — has no control
+at all now. A rectangle that is not the one you have open draws faint
+(`localityLayer.ts`): dashed, half-alpha, its name chip barely there. That
+answers the same complaint the switch existed for, without a control to find,
+and it leaves the rectangle clickable, so opening a neighbour is still a
+press on it.
 
 ### 5.6 What the transaction actually costs
 
@@ -982,7 +1022,7 @@ sees the funn appear. Nothing to build; worth not breaking.
 
 ### The honest worry: the row is now long
 
-Identity, two popover buttons, four middle entries, two read tools, the strip
+Identity, four write verbs, two ground tools, `Funn` with its eye, the strip
 toggle, the stance button and the menu. On a laptop it fits; on a phone the
 ribbon wraps, and it will wrap to three or four lines with the settings strip
 above it. The mitigations available, in order of preference: icon-only popover
