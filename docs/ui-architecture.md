@@ -421,9 +421,10 @@ subsume.
   sibling gap the same way `beholdOfferAtom` is).
 - **Search** — query, results, selected result, marker, infobox visibility.
 - **Feature info** — the clicked-position readout and the Kulturminner popup,
-  plus `infoToolAtom` / the derived `infoClickArmedAtom`
-  (`src/map/featureInfo/infoTool.ts`), which decide whether a map click asks
-  anything at all (§7.1). Not persisted to the URL.
+  plus `infoToolAtom` and the two derived `heritageClickArmedAtom` /
+  `infoClickArmedAtom` (`src/map/featureInfo/infoTool.ts`), which decide what a
+  map click asks — the heritage overlay answers on its own, the point readout
+  waits for the tool (§7.1). Not persisted to the URL.
 - **Draw** — the largest single cluster (`src/settings/draw/atoms.ts`, 375
   lines): active tool, colour, line width, line style, point style, text style,
   measurement toggles, undo/redo stacks.
@@ -535,7 +536,7 @@ looking at. Row 1 answers **what am I looking at**; the strip under it answers
 | **Hybrid** (3) | LiDAR stack + transparent roads/rail/place-names on top |
 | **Flyfoto** (4) | Background mode: NiB ortofoto (§5.5) |
 | **Kulturminner** + its eye | One split control: the noun opens a popover over the five RA sources, kulturminner2's three sublayers, how they are drawn and how strongly; the eye puts the overlay on the map or takes it off (§5.9) |
-| **Stedsinfo** (I) | Arms the point readout: while it is on, a click asks the registers about that spot (§7.1). Off on arrival |
+| **Stedsinfo** (I) | Arms the point readout: while it is on, a click asks the registers about that spot (§7.1). Off on arrival. It does *not* gate the Kulturminner popup — a visible heritage feature answers a click either way |
 | Mål | Popover with the measure tools |
 | Mine lokaliteter | Opens the localities card (signed in only) |
 | Ny lokalitet | Creates a lokalitet from the visible map (signed in only, §5.6) |
@@ -1408,7 +1409,8 @@ they stay.
 
 **It is a tool now, and it is off on arrival.** Stedsinfo — the ribbon toggle
 beside Mål, or `I` — arms the readout; until it is armed, clicking the map does
-nothing at all. Until 2026-09-11 every click on the map queried stedsnavn,
+nothing at all *except* answer for a heritage feature, on which see below.
+Until 2026-09-11 every click on the map queried stedsnavn,
 matrikkel, elevation and every visible WMS, dropped a marker and opened a panel
 over the terrain. That makes the map's primary gesture a question nobody asked:
 reading relief means clicking around constantly — to pan from, to check a
@@ -1416,26 +1418,49 @@ coordinate against a readout — and each of those clicks cost a panel to dismis
 and a request to the registers. Arming is cheap and one press; asking by
 accident is not.
 
-`src/map/featureInfo/infoTool.ts` holds both atoms and is the whole of the
+**The Kulturminner popup is outside the tool.** A click on a heritage feature
+that is on the map opens its popup whether or not Stedsinfo is armed. Putting
+it behind the tool was one gate too many: switching the overlay on is *already*
+the act of asking for the heritage record, so a mark drawn at your request that
+will not say what it is until you find a second, differently named control is
+two controls for one surface — the failure §1 is about. The distinction that
+replaces it is **asked for versus asked about**. The register you switched on
+answers; a point you merely clicked does not volunteer its stedsnavn, its
+matrikkel and its elevation until you say you want them. What stays behind
+Stedsinfo is therefore the whole point readout — the coordinate marker, the
+InfoBox, the elevation — including the fall-back marker for a heritage click
+that *missed*: a miss is not a request for a coordinate.
+
+`src/map/featureInfo/infoTool.ts` holds the three atoms and is the whole of the
 policy:
 
 - `infoToolAtom` — the button and the key. Writing `false` also clears the
-  Kulturminner popup, the feature-info panel and a *coordinate* selected result;
-  a search result is left alone, since the panel is its surface too and the
-  search did not come from this tool.
-- `infoClickArmedAtom` — what the two `singleclick` handlers actually read:
-  armed, **and** neither measure nor funn drawing owns the click. Suspension
-  rather than disarming, exactly as `drawEnabledAtom` already does for measure
-  — leaving measure or closing the draft puts the tool back as it was found.
+  feature-info panel and a *coordinate* selected result; a search result is left
+  alone, since the panel is its surface too and the search did not come from
+  this tool. It no longer clears the Kulturminner popup either, for the same
+  reason the popup no longer waits on it — the tool would be closing somebody
+  else's window, and the popup has a close button.
+- `heritageClickArmedAtom` — nobody else owns the click: neither measure nor
+  funn drawing. Suspension rather than disarming, exactly as `drawEnabledAtom`
+  already does for measure — leaving measure or closing the draft puts the
+  readout back as it was found. On its own it is the whole gate on the popup.
+- `infoClickArmedAtom` — that, **and** the tool is on. What the point readout
+  reads.
 
-Both halves of the readout answer to it, because it takes two handlers to
-produce one panel: `useFeatureInfoClick` (GetFeatureInfo, the Kulturminner
-popup) and `useMapClickSearch` (the coordinate marker and `selectedResultAtom`,
-which is what actually opens the InfoBox). The second used to bail on *any*
-`mapToolAtom`, so the localities card suppressed the readout as a side effect of
-being open; it no longer does, and the one rule is the arming flag. The armed
-map carries a `crosshair` cursor, since a mode with no cursor of its own is a
-mode you forget you left on.
+It takes two handlers to produce one panel: `useFeatureInfoClick`
+(GetFeatureInfo, the Kulturminner popup) and `useMapClickSearch` (the coordinate
+marker and `selectedResultAtom`, which is what actually opens the InfoBox). The
+second answers to `infoClickArmedAtom` alone; the first tests both atoms,
+because it is the one that produces both kinds of answer. It also bails early
+when unarmed and no heritage layer is showing, so an unarmed map sends no
+GetFeatureInfo at all. `useMapClickSearch` used to bail on *any* `mapToolAtom`,
+so the localities card suppressed the readout as a side effect of being open; it
+no longer does.
+
+The **armed** map carries a `crosshair` cursor, since a mode with no cursor of
+its own is a mode you forget you left on. An unarmed map with the overlay on
+does not, and deliberately: the cursor says "every click here asks a question",
+which is true of the tool and not of a map where only the marks answer.
 
 The two surfaces below are one more than a user needs:
 
@@ -3720,7 +3745,8 @@ which of kulturminner2's three registers (lokaliteter / enkeltminner /
 sikringssoner) are drawn; draw them as outlines or filled; narrow the map to one
 vern class (fredede, verneverdige, listeførte, uten vern, uavklart); dim the
 whole overlay with a slider so the relief under it stays readable; with
-Stedsinfo armed, click a heritage feature for its attributes; deep-link all of
+the overlay on, click a heritage feature for its attributes — no tool to arm
+first; deep-link all of
 it via `?themeLayers`,
 `?heritageDetails`, `?heritageRender` and `?heritageOpacity`.
 

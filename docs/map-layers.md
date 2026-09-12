@@ -351,6 +351,19 @@ from a render name — `Enkeltminner`'s default is the *fill* and `grenser` is
 its outline, the inverse of `Lokaliteter`, and `Lokalitetsikoner` spells its
 vern style `Uavklart` where every other sublayer spells it `uavklart`.
 
+The order of the `LAYERS` list is **cartography, not bookkeeping** — the WMS
+paints it front to back, so the last name wins the pixel. `PAINT_ORDER` in the
+same module is that order, bottom to top: Sikringssoner, Lokaliteter,
+Enkeltminner, then the two icon layers. It is a second axis from the
+register → sublayer table beside it and deliberately separate: that table is
+grouped by register so the polygon/icon pairing is visible, and building the
+request straight out of it puts each register's icon under the *next*
+register's polygon. The symptom was the dark blue R of a lokalitet coming back
+with the enkeltminne's periwinkle mark painted over its face — two marks on one
+point, the one you were aiming at underneath. The check is RA's own root layer
+`Kulturminner`, which draws the clean R; if a change here makes the two
+disagree at a single-monument lokalitet, the order is wrong again.
+
 Rendering is deliberately **one axis** (outlines / filled / five vern subsets),
 not two: STYLES takes a single value per LAYERS entry and RA publishes no
 filled variant of any subset, so "filled *and* fredede only" is not a request

@@ -2,7 +2,7 @@ import { atom } from 'jotai';
 import { selectedResultAtom } from '../../search/atoms';
 import { drawEnabledAtom } from '../../settings/draw/atoms';
 import { mapToolAtom } from '../overlay/atoms';
-import { featureInfoPanelOpenAtom, kulturminnerPopupAtom } from './atoms';
+import { featureInfoPanelOpenAtom } from './atoms';
 
 /**
  * Stedsinfo — the point readout, and whether a map click asks for it.
@@ -23,9 +23,14 @@ const infoToolStateAtom = atom(false);
 
 /**
  * The button and the I key. Writing `false` also puts away whatever the
- * tool last produced: leaving a popup and a panel on screen after the tool
- * that opened them is gone means the only way to clear the map is to close
- * three things in the right order.
+ * tool last produced: leaving a panel on screen after the tool that opened it
+ * is gone means the only way to clear the map is to close two things in the
+ * right order.
+ *
+ * The Kulturminner popup is **not** one of them any more. It is no longer the
+ * tool's output — the overlay answers a click on its own (see
+ * `heritageClickArmedAtom`) — so disarming Stedsinfo would be closing
+ * somebody else's window. It has a close button of its own.
  *
  * A search result is left alone — the panel is its surface too, and the
  * search did not come from this tool. Only a coordinate readout, which
@@ -36,7 +41,6 @@ export const infoToolAtom = atom(
   (get, set, next: boolean) => {
     set(infoToolStateAtom, next);
     if (next) return;
-    set(kulturminnerPopupAtom, null);
     set(featureInfoPanelOpenAtom, false);
     if (get(selectedResultAtom)?.type === 'Coordinate') {
       set(selectedResultAtom, null);
@@ -45,15 +49,29 @@ export const infoToolAtom = atom(
 );
 
 /**
- * What the two `singleclick` handlers read. Armed, and no other tool owns
- * the click: measure and funn drawing both want the same clicks, and OL will
- * happily hand a click to all three (`drawEnabledAtom` makes the same call
- * about measure). Suspension rather than disarming — leaving measure or
- * closing the draft puts the tool back the way it was found.
+ * Nobody else owns the click. Measure and funn drawing both want the same
+ * clicks, and OL will happily hand one to all three (`drawEnabledAtom` makes
+ * the same call about measure). Suspension rather than disarming — leaving
+ * measure or closing the draft puts the readout back the way it was found.
+ *
+ * It is also, on its own, the whole gate on **the Kulturminner popup**: a
+ * click on a heritage feature that is on the map answers whether or not
+ * Stedsinfo is armed. Switching the overlay on is already the act of asking
+ * for the heritage record, and making the answer wait on a second, differently
+ * named tool is two controls for one surface — the failure
+ * `docs/ui-architecture.md` §1 is about. What stays behind the tool is the
+ * part the overlay did not ask for: the coordinate marker, the elevation
+ * readout and the InfoBox, i.e. the interrogation of every register at a point
+ * nobody said was interesting.
+ */
+export const heritageClickArmedAtom = atom(
+  (get) => get(mapToolAtom) !== 'measure' && !get(drawEnabledAtom),
+);
+
+/**
+ * What the point readout reads: the tool is on, and nobody else owns the
+ * click.
  */
 export const infoClickArmedAtom = atom(
-  (get) =>
-    get(infoToolStateAtom) &&
-    get(mapToolAtom) !== 'measure' &&
-    !get(drawEnabledAtom),
+  (get) => get(infoToolStateAtom) && get(heritageClickArmedAtom),
 );

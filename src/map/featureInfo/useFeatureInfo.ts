@@ -20,7 +20,7 @@ import {
   hasVisibleLayerWithIdIn,
   hasVisibleQueryableLayers,
 } from './featureInfoService';
-import { infoClickArmedAtom } from './infoTool';
+import { heritageClickArmedAtom, infoClickArmedAtom } from './infoTool';
 
 export const buildCoordinateResult = (
   coordinate: [number, number],
@@ -53,9 +53,17 @@ export const useFeatureInfoClick = () => {
   const handleMapClick = useCallback(
     async (e: Event | BaseEvent) => {
       const store = getDefaultStore();
-      // Stedsinfo is a tool, and it is off until someone arms it: the map's
-      // primary gesture is looking, not asking. src/map/featureInfo/infoTool.ts.
-      if (!store.get(infoClickArmedAtom)) {
+      // Two gates, not one, because this handler produces two things.
+      //
+      // The Kulturminner popup answers whenever the overlay is on the map:
+      // switching the register on is already the act of asking for it, and a
+      // second tool between a visible mark and what it is would be two
+      // controls for one surface. The rest — the coordinate marker, the
+      // elevation readout, the InfoBox — is Stedsinfo's, and Stedsinfo is off
+      // until someone arms it, because the map's primary gesture is looking,
+      // not asking. src/map/featureInfo/infoTool.ts.
+      const armed = store.get(infoClickArmedAtom);
+      if (!armed && !store.get(heritageClickArmedAtom)) {
         return;
       }
       const map = store.get(mapAtom);
@@ -78,6 +86,12 @@ export const useFeatureInfoClick = () => {
         map,
         CULTURAL_HERITAGE_LAYER_IDS,
       );
+
+      // Unarmed, the overlay is the only thing that can have been asked. With
+      // no heritage on the map there is no question, so the click is a click.
+      if (!armed && !heritageLayerVisible) {
+        return;
+      }
 
       if (!hasWmsLayers && !hasVectorLayers) {
         setFeatureInfoPanelOpen(false);
@@ -113,17 +127,19 @@ export const useFeatureInfoClick = () => {
         } else {
           // Kulturminner layer was visible so useMapClickSearch skipped its
           // usual setSelectedResult; do it here now that we know no heritage
-          // POI was actually hit.
-          if (heritageLayerVisible) {
+          // POI was actually hit. Only while armed — a miss on the overlay is
+          // not a request for the coordinate readout, and unarmed it is not a
+          // request for anything at all.
+          if (armed && heritageLayerVisible) {
             setSelectedResult(buildCoordinateResult(coordinate, projection));
           }
-          setFeatureInfoPanelOpen(result.layers.length > 0);
+          setFeatureInfoPanelOpen(armed && result.layers.length > 0);
         }
       } catch (error) {
         console.error('Error fetching feature info:', error);
         setFeatureInfoResult(null);
         setFeatureInfoPanelOpen(false);
-        if (heritageLayerVisible) {
+        if (armed && heritageLayerVisible) {
           setSelectedResult(buildCoordinateResult(coordinate, projection));
         }
       } finally {

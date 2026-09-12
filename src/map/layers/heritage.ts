@@ -104,8 +104,12 @@ const VERN: Partial<Record<HeritageRender, string>> = {
 };
 
 /**
- * Each detail expands to the polygon layer *and* its icon twin, in that
- * order. The pairing is load-bearing rather than decorative: the polygon
+ * Each detail expands to the polygon layer *and* its icon twin. Grouped by
+ * register, **not** in request order — the order the WMS is asked for them in
+ * is `PAINT_ORDER` below, and reading it off this table instead is the bug
+ * that put the enkeltminne's mark on top of the lokalitet's R.
+ *
+ * The pairing is load-bearing rather than decorative: the polygon
  * layers stop rendering at 1:25 000 (`MaxScaleDenominator`) while the icons
  * carry to 1:450 000, so a request for the polygons alone empties the map the
  * moment you zoom out past a neighbourhood. Sikringssoner has no twin and
@@ -149,31 +153,64 @@ const DETAIL_SUBLAYERS: Record<HeritageDetail, Sublayer[]> = {
 };
 
 /**
+ * Bottom to top, which is what `LAYERS` order *means*: the WMS paints the
+ * list front to back, so the last name wins every pixel the others also
+ * claimed.
+ *
+ * This is a second axis from `DETAIL_SUBLAYERS` and cannot be folded into it.
+ * That table is grouped by register, because the pairing of a polygon with
+ * its icon twin is the thing worth stating there; reading the request
+ * straight out of it put each register's icon *under* the next register's
+ * polygon, so the dark blue R that marks a lokalitet came back with the
+ * enkeltminne's periwinkle blob painted over its face — two marks on one
+ * point, and the one you were aiming at underneath. RA's own root layer draws
+ * the clean R, which is how the fault was found.
+ *
+ * The order is areas before points and wide before narrow. Sikringssoner is
+ * the widest and the least interesting — a legal buffer, not a find — so it
+ * goes at the bottom; then the lokalitet outline, then the enkeltminne
+ * outline inside it; then the two icon layers, which are the marks a user
+ * actually aims a click at and must not be occluded by anything.
+ */
+const PAINT_ORDER: readonly string[] = [
+  'Sikringssoner',
+  'Lokaliteter',
+  'Enkeltminner',
+  'Lokalitetsikoner',
+  'Enkeltminneikoner',
+];
+
+/**
  * The `LAYERS`/`STYLES` pair for the current settings, or null when the
  * combination selects nothing at all — every detail switched off, or only
  * Sikringssoner left under a vern subset. Null means hide the layer rather
  * than send a request that can only come back empty.
  *
  * Both lists are positional and must stay the same length; that is the whole
- * contract with the WMS, and it is why they are built in one pass.
+ * contract with the WMS, and it is why the pairs are carried together through
+ * the sort and only split into two strings at the end.
  */
 export const heritageSitesParams = (
   details: ReadonlySet<HeritageDetail>,
   render: HeritageRender,
 ): { LAYERS: string; STYLES: string } | null => {
-  const names: string[] = [];
-  const styles: string[] = [];
+  const picked: { name: string; style: string }[] = [];
   for (const detail of HERITAGE_DETAILS) {
     if (!details.has(detail)) continue;
     for (const sublayer of DETAIL_SUBLAYERS[detail]) {
       const style = sublayer.styles[render];
       if (style === undefined) continue;
-      names.push(sublayer.name);
-      styles.push(style);
+      picked.push({ name: sublayer.name, style });
     }
   }
-  if (names.length === 0) return null;
-  return { LAYERS: names.join(','), STYLES: styles.join(',') };
+  if (picked.length === 0) return null;
+  picked.sort(
+    (a, b) => PAINT_ORDER.indexOf(a.name) - PAINT_ORDER.indexOf(b.name),
+  );
+  return {
+    LAYERS: picked.map((p) => p.name).join(','),
+    STYLES: picked.map((p) => p.style).join(','),
+  };
 };
 
 // ---------------------------------------------------------------------------
