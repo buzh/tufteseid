@@ -263,3 +263,22 @@
   color: var(--c-blue-600);
   text-decoration: underline;
 }
+
+/* Kulturminnesøk has no entry behind this one. Still a link — the record is
+   real and the URL is the register's own — but it lands on a blank page, so
+   it reads as a caveat rather than an exit. */
+.linkMissing {
+  /* Containing block for .srOnly, which is absolutely positioned. */
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--c-fg-muted);
+  text-decoration-style: dotted;
+}
+
+.linkNote {
+  margin-top: var(--sp-2);
+  font-size: var(--font-xs);
+  color: var(--c-fg-muted);
+}

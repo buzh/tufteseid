@@ -195,7 +195,8 @@
     "descriptionLess": "Less",
     "enkeltminner_one": "1 monument",
     "enkeltminner_other": "{{count}} monuments",
-    "enkeltminneNumber": "Monument #{{id}}"
+    "enkeltminneNumber": "Monument #{{id}}",
+    "kulturminnesokMangler": "Kulturminnesøk has no entry for this record — the link opens a blank page."
   },
   "about": {
     "heading": "About us",

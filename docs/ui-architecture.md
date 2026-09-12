@@ -1558,6 +1558,27 @@ Three consequences worth keeping:
   / `opprettet` become chips, because who reported it and when is that
   register's standing, in the place vernestatus holds elsewhere.
 
+**A shown link is not the same as a link that works.** The
+`linkkulturminnesok` on a kulturminner2 or freda_bygninger record resolves
+through `kulturminnesok.no/ra/lokalitet/<id>`, and a large minority of the
+register simply is not in Kulturminnesøk's index — 3 of 7 lokaliteter around
+Gimsø in Skien, 4 of 18 around Borre, with nothing on the WMS wire to tell
+them apart from the ones that are. A miss is quiet: the resolver answers 200,
+echoes the raw id into the URL, and the page renders a blank entry. So the
+card **asks**, through `/kms/*` (`wms-proxy-and-tiles.md`), and marks the link
+— muted, dotted underline, an `info` glyph, and a tooltip saying Kulturminnesøk
+has no entry; `(hover: none)` gets the sentence written out under the row, the
+same trade the chips make.
+
+Marked, not hidden, and that is the whole decision. The record is real and the
+URL is Riksantikvaren's own statement about where it lives; a missing page is a
+fact about Kulturminnesøk's index, and hiding the link would hide that fact
+too. The probe is also allowed to fail: `useKulturminnesokStatus` starts at
+`unknown`, so the link renders immediately and is only ever *decorated* later
+— a dead probe costs the mark, never the exit. Brukerminner (uuid links) and
+SEFRAK (no link at all) fall outside the resolver's URL shape and are left
+alone rather than guessed at.
+
 Two contingencies for `informasjon`, which runs from empty to several
 paragraphs: it is **open** and clamped to four lines rather than hidden behind
 a button, and the `Mer` toggle appears only when the clamp actually bit —

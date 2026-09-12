@@ -61,6 +61,19 @@ route {
                 reverse_proxy http://wmscache
         }
 
+        # kms-api.kulturminnesok.no/api/* — Kulturminnesøk's own record API.
+        # Not a map source: the only thing asked of it is whether the
+        # `linkkulturminnesok` URL Riksantikvaren serves on a feature will
+        # actually resolve. Roughly a fifth to a third of the lokaliteter in
+        # kart.ra.no's WMS are absent from Kulturminnesøk's index, and its
+        # resolver answers a miss with a 200 and an all-null record rather
+        # than a 404 — so the link looks fine and lands on a blank page.
+        # Same-origin through wmscache because the API sends no CORS headers.
+        handle_path /kms/* {
+                rewrite * /kms-api{http.request.uri.path}
+                reverse_proxy http://wmscache
+        }
+
         # testapi.norgeskart.no/v1/* — matrikkel (cadastral) WMS.
         handle_path /wms/testapi/* {
                 rewrite * /v1{http.request.uri.path}

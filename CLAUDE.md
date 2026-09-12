@@ -234,10 +234,12 @@ Ports: Caddy inside the container listens on `:3000`; docker-compose maps host
   routing are `docs/wms-proxy-and-tiles.md`.
 - **wmscache** — `nginx:1.27-alpine` reverse proxy + 25 GB disk cache in
   front of every external WMS/WFS/ArcGIS service the SPA uses (Kartverket,
-  Riksantikvaren, matrikkel, NiB, hoydedata). Caddy exposes each upstream
+  Riksantikvaren, matrikkel, NiB, hoydedata), plus Kulturminnesøk's record
+  API, which is not a map source — it answers whether the link Riksantikvaren
+  puts on a heritage feature goes anywhere. Caddy exposes each upstream
   under a same-origin prefix (`/wms/geonorge/…`, `/wms/ra/…`, `/wms/nib/…`,
-  `/arcgis/nib/…`, `/arcgis/hoydedata/…`). Rules, cache lifetimes and
-  verification commands: `docs/wms-proxy-and-tiles.md`.
+  `/arcgis/nib/…`, `/arcgis/hoydedata/…`, `/kms/…`). Rules, cache lifetimes
+  and verification commands: `docs/wms-proxy-and-tiles.md`.
 
 ## Terrenganalyse (client-side relief from float DEMs)
 

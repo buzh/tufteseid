@@ -24,6 +24,7 @@ import {
   type VernBucket,
 } from './heritageVocabulary';
 import styles from './KulturminnerPopup.module.css';
+import { useKulturminnesokStatus } from './kulturminnesok';
 import type { LayerFeatureInfo } from './types';
 import { buildCoordinateResult } from './useFeatureInfo';
 
@@ -538,6 +539,12 @@ const HeritageCard = ({
       ? `https://askeladden.ra.no/askeladden/?kid=${stringify(props['lokalid'])}`
       : '');
   const kulturminnesok = stringify(props['linkkulturminnesok']);
+  // Riksantikvaren links every record to Kulturminnesøk; Kulturminnesøk does
+  // not have every record, and says so with a 200 and a blank page. See
+  // `kulturminnesok.ts`. The answer arrives after this first render, so the
+  // link is never withheld — only marked.
+  const kulturminnesokMissing =
+    useKulturminnesokStatus(kulturminnesok) === 'missing';
 
   // Who reported it and when. Brukerminner are the one register where that is
   // the record's standing, so it takes the place vernestatus holds elsewhere.
@@ -669,28 +676,58 @@ const HeritageCard = ({
       )}
 
       {(askeladden || kulturminnesok) && (
-        <div className={styles.links}>
-          {askeladden && (
-            <a
-              className={styles.link}
-              href={askeladden}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Askeladden ↗
-            </a>
+        <>
+          <div className={styles.links}>
+            {askeladden && (
+              <a
+                className={styles.link}
+                href={askeladden}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Askeladden ↗
+              </a>
+            )}
+            {kulturminnesok &&
+              (kulturminnesokMissing ? (
+                <Tooltip label={t('kulturminner.kulturminnesokMangler')}>
+                  <a
+                    className={cx(styles.link, styles.linkMissing)}
+                    href={kulturminnesok}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Kulturminnesøk ↗
+                    <Icon icon="info" size={14} />
+                    {/* The glyph says nothing to a screen reader, and the
+                        tooltip only exists while it is open. Below, the note
+                        is on the page already. */}
+                    {!withText && (
+                      <span className={styles.srOnly}>
+                        {t('kulturminner.kulturminnesokMangler')}
+                      </span>
+                    )}
+                  </a>
+                </Tooltip>
+              ) : (
+                <a
+                  className={styles.link}
+                  href={kulturminnesok}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Kulturminnesøk ↗
+                </a>
+              ))}
+          </div>
+          {/* Nothing to hover with, so the warning has to be written out —
+              the same trade MetaChip makes. */}
+          {kulturminnesokMissing && withText && (
+            <div className={styles.linkNote}>
+              {t('kulturminner.kulturminnesokMangler')}
+            </div>
           )}
-          {kulturminnesok && (
-            <a
-              className={styles.link}
-              href={kulturminnesok}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Kulturminnesøk ↗
-            </a>
-          )}
-        </div>
+        </>
       )}
     </div>
   );

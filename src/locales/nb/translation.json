@@ -195,7 +195,8 @@
     "descriptionLess": "Mindre",
     "enkeltminner_one": "1 enkeltminne",
     "enkeltminner_other": "{{count}} enkeltminner",
-    "enkeltminneNumber": "Enkeltminne #{{id}}"
+    "enkeltminneNumber": "Enkeltminne #{{id}}",
+    "kulturminnesokMangler": "Kulturminnesøk har ingen oppføring for dette kulturminnet – lenken åpner en tom side."
   },
   "about": {
     "heading": "Om oss",

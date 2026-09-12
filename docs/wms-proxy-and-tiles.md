@@ -20,11 +20,15 @@ and were each paid for once. Don't "simplify" them without reading the rationale
   network.
 - **wmscache** — `nginx:1.27-alpine` reverse proxy + 25 GB disk cache in
   front of every external WMS/WFS/ArcGIS service the SPA uses (Kartverket,
-  Riksantikvaren, matrikkel, NiB, hoydedata). Currently fronts six upstreams:
+  Riksantikvaren, matrikkel, NiB, hoydedata). Currently fronts seven upstreams:
   - `wms.geonorge.no/skwms1/*` — Kartverket theme + LiDAR WMS.
   - `wfs.geonorge.no/skwms1/*` — Kartverket WFS (kulturminner readout,
     LiDAR project footprints). Proxied but **not** cached.
   - `kart.ra.no/wms/*` — Riksantikvaren Kulturminner WMS.
+  - `kms-api.kulturminnesok.no/api/*` — Kulturminnesøk's record API. The
+    only upstream here that isn't a map source: it is asked one yes/no
+    question, whether the `linkkulturminnesok` URL on a heritage feature
+    resolves to a real page. See "Does the Kulturminnesøk link work" below.
   - `testapi.norgeskart.no/v1/*` — matrikkel (cadastral) WMS.
   - `hoydedata.no/arcgis/rest/services/*` — Kartverket's elevation
     ImageServers. Not another source of shaded tiles: this is the **float
@@ -41,6 +45,7 @@ the upstream namespace before forwarding:
 /wms/geonorge/wms.foo    →  wms.geonorge.no/skwms1/wms.foo
 /wfs/geonorge/wfs.foo    →  wfs.geonorge.no/skwms1/wfs.foo
 /wms/ra/kulturminner2    →  kart.ra.no/wms/kulturminner2
+/kms/api/v2/search/123   →  kms-api.kulturminnesok.no/api/v2/search/123
 /wms/testapi/matrikkel   →  testapi.norgeskart.no/v1/matrikkel
 /wms/nib/ortofoto        →  nib-proxy → services.norgeibilder.no/wms/ortofoto
 /arcgis/nib/*            →  nib-proxy → services.norgeibilder.no/arcgis/rest/services/*
@@ -168,6 +173,41 @@ no-coverage gaps opaque black, and `png32` is eight times the bytes for the
 same pixels (measured on one 512 px tile over Oslo: 68 kB vs 555 kB). The
 transparent no-coverage PNG is 1097 bytes, comfortably over `$skip_cache`'s
 300-byte floor, so those tiles do get cached.
+
+### Does the Kulturminnesøk link work
+
+`/kms/*` → `kms-api.kulturminnesok.no`. The odd one out: no tiles, no imagery,
+one small JSON lookup per heritage card in the Kulturminner popup.
+
+Every record in `kulturminner2` and `freda_bygninger` carries a
+`linkkulturminnesok` pointing at `kulturminnesok.no/ra/lokalitet/<id>`, which
+is a resolver — it maps the Askeladden id onto Kulturminnesøk's own record
+uuid and redirects to `/kart/?q=<id>&id=<uuid>`. **A large minority of the
+register is not in that index**, and the resolver says so by echoing the raw
+number back as `id=41826` with a 200; the page then asks its own API for a
+record by that id and gets another 200 carrying an all-null shell typed
+`brukerminne`. Net effect: the link opens a blank entry, and nothing on the
+WMS wire predicts it.
+
+Measured over every lokalitet in two 2.4 km boxes (2026-09), by probing
+GetFeatureInfo at each rendered polygon and checking each id against the API:
+3 of 7 missing around Gimsø in Skien, 4 of 18 around Borre. The misses span
+automatisk fredet and vedtaksfredet, gravfelt and prestegård, fylkeskommune
+and Riksantikvaren as `opphav`, all `synlig=true` — field for field they are
+indistinguishable from the ones that resolve.
+
+So `src/map/featureInfo/kulturminnesok.ts` asks the question the destination
+page asks, same endpoint and same id, and treats a null `externalid` as the
+miss; the popup then marks the link instead of hiding it
+(`ui-architecture.md` §7.2). It has to be proxied because the API sends **no
+CORS headers** at all. Cached 7 days rather than the usual 180: a missing
+record is one Riksantikvaren reindex away from existing. The API's own
+`Cache-Control: no-cache, private` is a WordPress default and is ignored.
+
+```
+curl -s "http://localhost:3030/kms/api/v2/search/23070" | head -c 120   # externalid: "23070"
+curl -s "http://localhost:3030/kms/api/v2/search/41826" | head -c 120   # externalid: null
+```
 
 ### Verifying
 
