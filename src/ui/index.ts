@@ -20,6 +20,12 @@ export { cx } from './cx';
 export { Dialog } from './Dialog';
 export { Field, Input, NoteInput } from './Field';
 export { Icon, type MaterialSymbol } from './Icon';
+export {
+  Menu,
+  type MenuConfirm,
+  type MenuItemSpec,
+  type MenuTriggerProps,
+} from './Menu';
 export { anyOverlayOpenAtom, overlayOpenCountAtom } from './overlayAtoms';
 export { Popover } from './Popover';
 export { Section } from './Section';

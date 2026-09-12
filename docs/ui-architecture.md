@@ -3275,6 +3275,35 @@ list used to say `Accordion`, `Select`, `Pagination` and `Alert`:
   `PlacesResults.tsx`.
 - **`Alert` was built** (`src/ui/Alert.tsx`, `info` / `warning`): a standing
   remark in the flow, as opposed to `toast`, which is a reply to an action.
+- **`Menu` was built later** (`src/ui/Menu.tsx`), and is the one addition the
+  list above did not anticipate. kvib's menu was the thing this app fought
+  hardest — "custom disclosures instead of menus for the pulldowns", below —
+  so the migration deliberately shipped none, and the ribbon then grew four
+  hand-rolled ones: `OverflowMenu` and `HentMenu` in `RibbonLocalityRow`,
+  `StatusPicker` and `RowMenu` in `FunnList`. The `.menu` / `.menuItem` /
+  `.menuTitle` block was copied verbatim between the two stylesheets, and one
+  copy's comment said so.
+
+  It is a list of *verbs*, which is why it is not the `Select` above: a
+  pulldown that picks a dataset stays a `Popover` with bespoke content, and
+  `FunnMenu` — a `Popover` holding `FunnList` — was left alone for the same
+  reason. Three things it owns that the call sites were each re-deriving:
+  holding `open` (the trigger is a render prop, as on `ConfirmPopover`, and
+  gets `{ open, onClick }`); closing itself *before* the verb runs; and
+  `stopPropagation` at the panel boundary, since the panel is portalled but
+  React events still bubble the component tree, and two of the four sit in a
+  clickable row.
+
+  **`confirm` on an item is why this is not `ConfirmPopover`.** A destructive
+  item that opened a second popover would stack two overlays over the thing
+  being deleted, so `confirm` swaps the menu's own body for the question in
+  place. `ConfirmPopover` stays for a destructive *button*; `Menu` for a
+  destructive *item*.
+
+  Items are data (`items: (MenuItemSpec | false | null | undefined)[]`), not
+  children, so no context is needed — the kit has none — and a conditional
+  item is `ws.canAdd && { … }` inline. The falsy slots stay put, which is what
+  makes the array index a stable key.
 
 Layout and typography need nothing — see §2 on why there are no
 `Box`/`Stack`/`Text` primitives.

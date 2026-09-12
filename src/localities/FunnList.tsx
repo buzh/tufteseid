@@ -11,8 +11,8 @@ import {
   Icon,
   IconButton,
   Input,
+  Menu,
   NoteInput,
-  Popover,
   Spinner,
 } from '../ui';
 import { hoveredFunnIdAtom } from './atoms';
@@ -36,7 +36,8 @@ const STATUS_PALETTE: Record<LocalityFindStatus, BadgePalette> = {
  * Every control in here calls stopPropagation on its click. The row itself
  * is clickable (it zooms the map to the funn), and React events bubble
  * through the component tree — so even the portalled popover bodies would
- * otherwise fire the row's handler.
+ * otherwise fire the row's handler. `Menu` does that for its own trigger and
+ * body; the controls written out longhand below have to do it themselves.
  */
 
 const StatusPicker = ({
@@ -49,7 +50,6 @@ const StatusPicker = ({
   onChange: (v: LocalityFindStatus) => void;
 }) => {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
 
   const badge = (
     <Badge palette={STATUS_PALETTE[value]}>
@@ -60,53 +60,37 @@ const StatusPicker = ({
   if (!editable) return badge;
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={setOpen}
+    <Menu
       align="end"
       width={190}
       label={t('localities.funn.status.heading')}
-      trigger={
+      title={t('localities.funn.status.heading')}
+      trigger={(p) => (
         <button
           type="button"
           className={styles.statusTrigger}
           title={t('localities.funn.status.pickHint')}
-          aria-expanded={open}
-          onClick={(e: MouseEvent) => {
-            e.stopPropagation();
-            setOpen(!open);
-          }}
+          aria-expanded={p.open}
+          onClick={p.onClick}
         >
           {badge}
           <Icon icon="keyboard_arrow_down" size={14} />
         </button>
-      }
-    >
-      <p className={styles.menuTitle}>{t('localities.funn.status.heading')}</p>
-      <div className={styles.menu}>
-        {STATUS_ORDER.map((s) => (
-          <button
-            key={s}
-            type="button"
-            className={cx(
-              styles.menuItem,
-              s === value && styles.menuItemActive,
-            )}
-            onClick={(e: MouseEvent) => {
-              e.stopPropagation();
-              setOpen(false);
-              if (s !== value) onChange(s);
-            }}
-          >
-            {/* The same badge the row shows, so picking is recognition
-                rather than reading a word list. */}
-            <Badge palette={STATUS_PALETTE[s]}>
-              {t(`localities.funn.status.${s}`)}
-            </Badge>
-          </button>
-        ))}
-      </div>
-    </Popover>
+      )}
+      items={STATUS_ORDER.map((s) => ({
+        // The same badge the row shows, so picking is recognition rather
+        // than reading a word list.
+        label: (
+          <Badge palette={STATUS_PALETTE[s]}>
+            {t(`localities.funn.status.${s}`)}
+          </Badge>
+        ),
+        active: s === value,
+        onSelect: () => {
+          if (s !== value) onChange(s);
+        },
+      }))}
+    />
   );
 };
 
@@ -128,101 +112,46 @@ const RowMenu = ({
   onDelete: () => void;
 }) => {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-
-  const close = () => {
-    setOpen(false);
-    setConfirming(false);
-  };
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) setConfirming(false);
-      }}
+    <Menu
       align="end"
       width={230}
       label={t('localities.funn.actions.menu')}
-      trigger={
+      trigger={(p) => (
         <IconButton
           icon="more_vert"
           size="xs"
           palette="gray"
           aria-label={t('localities.funn.actions.menu')}
-          aria-expanded={open}
-          onClick={(e: MouseEvent) => {
-            e.stopPropagation();
-            setOpen(!open);
-          }}
+          aria-expanded={p.open}
+          onClick={p.onClick}
         />
-      }
-    >
-      <div onClick={(e: MouseEvent) => e.stopPropagation()}>
-        {confirming ? (
-          <>
-            <p className={styles.menuTitle}>
-              {t('localities.funn.confirmDeleteShort')}
-            </p>
-            <div className={styles.confirmActions}>
-              <Button
-                size="xs"
-                palette="gray"
-                onClick={() => setConfirming(false)}
-              >
-                {t('localities.funn.draft.cancel')}
-              </Button>
-              <Button
-                size="xs"
-                variant="primary"
-                palette="red"
-                onClick={() => {
-                  close();
-                  onDelete();
-                }}
-              >
-                {t('localities.funn.actions.delete')}
-              </Button>
-            </div>
-          </>
-        ) : (
-          <div className={styles.menu}>
-            <button
-              type="button"
-              className={styles.menuItem}
-              onClick={() => {
-                close();
-                onEditText();
-              }}
-            >
-              <Icon icon="edit" size={16} />
-              {t('localities.funn.actions.edit')}
-            </button>
-            <button
-              type="button"
-              className={styles.menuItem}
-              onClick={() => {
-                close();
-                onEditGeometry();
-              }}
-            >
-              <Icon icon="draw" size={16} />
-              {t('localities.funn.actions.editGeometry')}
-            </button>
-            <button
-              type="button"
-              className={cx(styles.menuItem, styles.menuItemDanger)}
-              onClick={() => setConfirming(true)}
-            >
-              <Icon icon="delete" size={16} />
-              {t('localities.funn.actions.delete')}
-            </button>
-          </div>
-        )}
-      </div>
-    </Popover>
+      )}
+      items={[
+        {
+          icon: 'edit',
+          label: t('localities.funn.actions.edit'),
+          onSelect: onEditText,
+        },
+        {
+          icon: 'draw',
+          label: t('localities.funn.actions.editGeometry'),
+          onSelect: onEditGeometry,
+        },
+        {
+          icon: 'delete',
+          label: t('localities.funn.actions.delete'),
+          danger: true,
+          confirm: {
+            title: t('localities.funn.confirmDeleteShort'),
+            confirmLabel: t('localities.funn.actions.delete'),
+            cancelLabel: t('localities.funn.draft.cancel'),
+          },
+          onSelect: onDelete,
+        },
+      ]}
+    />
   );
 };
 

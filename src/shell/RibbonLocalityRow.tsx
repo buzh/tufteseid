@@ -1,5 +1,5 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import type { ChangeEvent, MouseEvent } from 'react';
+import type { ChangeEvent } from 'react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LocalityRecord } from '../api/localities';
@@ -15,9 +15,9 @@ import {
   Button,
   cx,
   Dialog,
-  Icon,
   IconButton,
   Input,
+  Menu,
   Popover,
   toast,
   Tooltip,
@@ -137,15 +137,8 @@ const LocalityCode = ({ code }: { code: string }) => {
  */
 const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const setDetailsOpen = useSetAtom(localityDetailsOpenAtom);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  const close = () => {
-    setOpen(false);
-    setConfirming(false);
-  };
 
   const pickFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -162,129 +155,68 @@ const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         hidden
         onChange={pickFile}
       />
-      <Popover
-        open={open}
-        onOpenChange={(next) => {
-          setOpen(next);
-          if (!next) setConfirming(false);
-        }}
+      <Menu
         align="end"
         width={240}
         label={t('localities.workspace.more')}
-        trigger={
+        trigger={(p) => (
           <IconButton
             icon="more_vert"
             size="md"
             palette="gray"
             aria-label={t('localities.workspace.more')}
-            aria-expanded={open}
-            onClick={(e: MouseEvent) => {
-              e.stopPropagation();
-              setOpen(!open);
-            }}
+            aria-expanded={p.open}
+            onClick={p.onClick}
           />
-        }
-      >
-        {confirming ? (
-          <>
-            <p className={rowStyles.menuTitle}>
-              {t('localities.workspace.confirmDelete', {
-                name: ws.locality.name,
-              })}
-            </p>
-            <div className={rowStyles.confirmActions}>
-              <Button
-                size="xs"
-                palette="gray"
-                onClick={() => setConfirming(false)}
-              >
-                {t('shared.cancel')}
-              </Button>
-              <Button
-                size="xs"
-                variant="primary"
-                palette="red"
-                onClick={() => {
-                  close();
-                  ws.removeLocality();
-                }}
-              >
-                {t('localities.workspace.deleteLocality')}
-              </Button>
-            </div>
-          </>
-        ) : (
-          <div className={rowStyles.menu}>
-            {/* Putting new content in is owner-only, so an admin's menu is
-                Juster området and Slett — the two the server would actually
-                let them through with. */}
-            {/* "Hent grunnpakke" was here, and is gone: the starter set now
-                arrives with the lokalitet instead of waiting to be found in a
-                menu (docs/lokalitet-view.md §4.3). What is left is the one
-                image route that is not a fetch at all. */}
-            {ws.canAdd && (
-              <button
-                type="button"
-                className={rowStyles.menuItem}
-                disabled={ws.uploading}
-                onClick={() => {
-                  close();
-                  fileInputRef.current?.click();
-                }}
-              >
-                <Icon icon="add_photo_alternate" size={16} />
-                {t('localities.bilder.upload')}
-              </button>
-            )}
-            {/* Beskrivelse, sted, kommune, matrikkel, synlighet — the fields
-                you set once and stop looking at, so they are a dialog reached
-                from the menu rather than a panel that was permanently open
-                (§6). Both stances: a reader may read them, and
-                `LocalityDetails` renders itself read-only without
-                `canEdit`. */}
-            <button
-              type="button"
-              className={rowStyles.menuItem}
-              onClick={() => {
-                close();
-                setDetailsOpen(true);
-              }}
-            >
-              <Icon icon="info" size={16} />
-              {t('localities.workspace.details')}
-            </button>
-            {/* The two that write are `canEdit`, not merely `mayEdit`: the
-                menu is on the row in show as well now — Detaljer above has to
-                be reachable by a reader — and nothing in show writes (§2). */}
-            {ws.canEdit && (
-              <>
-                <button
-                  type="button"
-                  className={cx(
-                    rowStyles.menuItem,
-                    ws.adjusting && rowStyles.menuItemActive,
-                  )}
-                  onClick={() => {
-                    close();
-                    ws.toggleAdjusting();
-                  }}
-                >
-                  <Icon icon="transform" size={16} />
-                  {t('localities.workspace.adjust')}
-                </button>
-                <button
-                  type="button"
-                  className={cx(rowStyles.menuItem, rowStyles.menuItemDanger)}
-                  onClick={() => setConfirming(true)}
-                >
-                  <Icon icon="delete" size={16} />
-                  {t('localities.workspace.deleteLocality')}
-                </button>
-              </>
-            )}
-          </div>
         )}
-      </Popover>
+        items={[
+          /* Putting new content in is owner-only, so an admin's menu is
+             Juster området and Slett — the two the server would actually let
+             them through with. */
+          /* "Hent grunnpakke" was here, and is gone: the starter set now
+             arrives with the lokalitet instead of waiting to be found in a
+             menu (docs/lokalitet-view.md §4.3). What is left is the one image
+             route that is not a fetch at all. */
+          ws.canAdd && {
+            icon: 'add_photo_alternate',
+            label: t('localities.bilder.upload'),
+            disabled: ws.uploading,
+            onSelect: () => fileInputRef.current?.click(),
+          },
+          /* Beskrivelse, sted, kommune, matrikkel, synlighet — the fields you
+             set once and stop looking at, so they are a dialog reached from
+             the menu rather than a panel that was permanently open (§6). Both
+             stances: a reader may read them, and `LocalityDetails` renders
+             itself read-only without `canEdit`. */
+          {
+            icon: 'info',
+            label: t('localities.workspace.details'),
+            onSelect: () => setDetailsOpen(true),
+          },
+          /* The two that write are `canEdit`, not merely `mayEdit`: the menu
+             is on the row in show as well now — Detaljer above has to be
+             reachable by a reader — and nothing in show writes (§2). */
+          ws.canEdit && {
+            icon: 'transform',
+            label: t('localities.workspace.adjust'),
+            active: ws.adjusting,
+            onSelect: ws.toggleAdjusting,
+          },
+          ws.canEdit && {
+            icon: 'delete',
+            label: t('localities.workspace.deleteLocality'),
+            danger: true,
+            confirm: {
+              title: t('localities.workspace.confirmDelete', {
+                name: ws.locality.name,
+              }),
+              confirmLabel: t('localities.workspace.deleteLocality'),
+              cancelLabel: t('shared.cancel'),
+            },
+            onSelect: ws.removeLocality,
+          },
+        ]}
+      />
     </>
   );
 };
@@ -309,47 +241,34 @@ const HentMenu = ({
   active: boolean;
 }) => {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const pick = (run: () => void) => () => {
-    setOpen(false);
-    run();
-  };
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={setOpen}
+    <Menu
       width={240}
       label={t('localities.tools.hent')}
-      trigger={
+      trigger={(p) => (
         <ModeButton
           icon="download"
           label={t('localities.tools.hent')}
           tooltip={t('localities.tools.hentHint')}
-          active={active || open}
-          onClick={() => setOpen(!open)}
+          active={active || p.open}
+          onClick={p.onClick}
         />
-      }
-    >
-      <div className={rowStyles.menu}>
-        <button
-          type="button"
-          className={cx(rowStyles.menuItem, active && rowStyles.menuItemActive)}
-          onClick={pick(ws.toggleLidar)}
-        >
-          <Icon icon="crop_free" size={16} />
-          {`${t('localities.tools.lidarExtract')} (U)`}
-        </button>
-        <button
-          type="button"
-          className={rowStyles.menuItem}
-          onClick={pick(ws.openFlyfotoNotice)}
-        >
-          <Icon icon="satellite_alt" size={16} />
-          {t('localities.tools.flyfoto')}
-        </button>
-      </div>
-    </Popover>
+      )}
+      items={[
+        {
+          icon: 'crop_free',
+          label: `${t('localities.tools.lidarExtract')} (U)`,
+          active,
+          onSelect: ws.toggleLidar,
+        },
+        {
+          icon: 'satellite_alt',
+          label: t('localities.tools.flyfoto'),
+          onSelect: ws.openFlyfotoNotice,
+        },
+      ]}
+    />
   );
 };
 

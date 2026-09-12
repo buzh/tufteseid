@@ -169,56 +169,6 @@
   border-top-color: var(--c-green-200);
 }
 
-/* The overflow menu. Same shape as the funn row's, on purpose: one idiom for
-   "the rest of what you can do to this thing". */
-.menu {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-}
-
-.menuTitle {
-  margin-bottom: var(--sp-3);
-  font-size: var(--font-xs);
-  color: var(--c-fg-subtle);
-}
-
-.menuItem {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  width: 100%;
-  padding: var(--sp-2) var(--sp-3);
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  font: inherit;
-  font-size: var(--font-sm);
-  color: var(--c-fg);
-  text-align: left;
-  cursor: pointer;
-}
-
-.menuItem:hover:not(:disabled) {
-  background: var(--c-bg-hover);
-}
-
-.menuItem:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.menuItemActive {
-  background: var(--c-bg-active);
-}
-
-.menuItemDanger {
-  color: var(--c-danger);
-}
-
-.confirmActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--sp-3);
-  margin-top: var(--sp-4);
-}
+/* The overflow menu and `Hent ▾` are both `Menu`; the "same shape as the funn
+   row's" this file used to spell out is now literally the same file —
+   src/ui/Menu.module.css. */

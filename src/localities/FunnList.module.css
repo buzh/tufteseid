@@ -121,53 +121,8 @@
   outline-offset: 2px;
 }
 
-/* Popover bodies: the status list and the row menu. */
-.menu {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-}
-
-.menuTitle {
-  margin-bottom: var(--sp-3);
-  font-size: var(--font-xs);
-  color: var(--c-fg-subtle);
-}
-
-.menuItem {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  width: 100%;
-  padding: var(--sp-2) var(--sp-3);
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  font: inherit;
-  font-size: var(--font-sm);
-  color: var(--c-fg);
-  text-align: left;
-  cursor: pointer;
-}
-
-.menuItem:hover {
-  background: var(--c-bg-hover);
-}
-
-.menuItemActive {
-  background: var(--c-bg-active);
-}
-
-.menuItemDanger {
-  color: var(--c-danger);
-}
-
-.confirmActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--sp-3);
-  margin-top: var(--sp-4);
-}
+/* The status list and the row menu are both `Menu` — body styling is
+   src/ui/Menu.module.css. */
 
 .busy {
   display: flex;

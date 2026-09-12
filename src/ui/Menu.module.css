@@ -1,0 +1,60 @@
+/*
+ * The menu body — one idiom for a list of verbs, wherever it is anchored.
+ * This block used to be copied verbatim into FunnList.module.css and
+ * RibbonLocalityRow.module.css, whose own comment said as much.
+ */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+/* Heading above the list, and the question that replaces it — the same
+   quiet line in both cases, because both are the menu talking rather than
+   something you can press. */
+.title {
+  margin-bottom: var(--sp-3);
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-sm);
+  color: var(--c-fg);
+  text-align: left;
+  cursor: pointer;
+}
+
+.item:hover:not(:disabled) {
+  background: var(--c-bg-hover);
+}
+
+.item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.itemActive {
+  background: var(--c-bg-active);
+}
+
+.itemDanger {
+  color: var(--c-danger);
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+}
