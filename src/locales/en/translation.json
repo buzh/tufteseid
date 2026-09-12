@@ -170,6 +170,28 @@
     "title": "Object information",
     "loading": "Loading information..."
   },
+  "kulturminner": {
+    "title_one": "Heritage site",
+    "title_other": "{{count}} heritage sites",
+    "close": "Close",
+    "showMore": "Show more",
+    "fallbackName": "Unnamed",
+    "lokalitet": "Locality",
+    "enkeltminne": "Monument",
+    "sikringssone": "Protection zone",
+    "kategori": "Category",
+    "vernestatus": "Protection status",
+    "datering": "Dating",
+    "kommune": "Municipality",
+    "antallEnkeltminner": "Monuments in total",
+    "ulikeVernestatus": "Mixed protection status",
+    "flereDateringer": "Several datings",
+    "descriptionMore": "More",
+    "descriptionLess": "Less",
+    "enkeltminner_one": "1 monument",
+    "enkeltminner_other": "{{count}} monuments",
+    "enkeltminneNumber": "Monument #{{id}}"
+  },
   "about": {
     "heading": "About us",
     "textone": "Tufteseid is a map tool for armchair archaeology: read LiDAR hillshade against Riksantikvaren’s heritage register and spot house sites, burial mounds and other traces in the terrain without leaving your chair.",

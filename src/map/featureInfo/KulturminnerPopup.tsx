@@ -2,11 +2,27 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { Overlay } from 'ol';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { selectedResultAtom } from '../../search/atoms';
-import { Badge, Button, IconButton } from '../../ui';
+import {
+  Badge,
+  Button,
+  Icon,
+  IconButton,
+  Tooltip,
+  cx,
+  useMediaQuery,
+  type MaterialSymbol,
+} from '../../ui';
 import { mapAtom } from '../atoms';
 import { ProjectionIdentifier } from '../projections/types';
 import { kulturminnerPopupAtom } from './atoms';
+import {
+  VERN_ICONS,
+  kategoriIcon,
+  vernBucket,
+  type VernBucket,
+} from './heritageVocabulary';
 import styles from './KulturminnerPopup.module.css';
 import type { LayerFeatureInfo } from './types';
 import { buildCoordinateResult } from './useFeatureInfo';
@@ -163,16 +179,17 @@ const groupFeatures = (layers: LayerFeatureInfo[]): HeritageGroup[] => {
     else g.others.push(f);
   }
 
-  // Fill navn: lokalitet.navn → first enkeltminne.navn → fallback per-kind.
+  // Fill navn: lokalitet.navn → first enkeltminne.navn → the layer's own
+  // title for the four registers that aren't kulturminner2. Left **empty**
+  // when the record is genuinely unnamed — a great many are — so the card can
+  // fall back to its `art`, which is both more informative and not the word
+  // "Kulturminne" repeated down the popup.
   for (const g of groups.values()) {
     const fromLokalitet = stringify(g.lokalitet?.properties['navn']);
     const fromEnkeltminne = stringify(g.enkeltminner[0]?.properties['navn']);
     if (fromLokalitet) g.navn = fromLokalitet;
     else if (fromEnkeltminne) g.navn = fromEnkeltminne;
-    else if (g.sikringssoner.length > 0) g.navn = `Sikringssone`;
-    else if (g.others.length > 0)
-      g.navn = g.others[0].layerTitle;
-    else g.navn = 'Kulturminne';
+    else if (g.others.length > 0) g.navn = g.others[0].layerTitle;
   }
 
   const all = Array.from(groups.values());
@@ -209,70 +226,216 @@ const formatDate = (v: unknown): string => {
   return m ? m[0] : s;
 };
 
-const FieldRow = ({ label, value }: { label: string; value: string }) => (
-  <div className={styles.fieldRow}>
-    <span className={styles.fieldLabel}>{label}</span>
-    <span className={styles.fieldValue}>{value}</span>
-  </div>
+/*
+ * One fact, as a glyph. The label:value list this replaced spent a line and a
+ * 100 px label column on each of five fields — for values that are mostly one
+ * word out of a closed vocabulary ("Tønsberg", "Automatisk fredet") — which
+ * left a three-hit click needing a scroll before the first `informasjon` was
+ * in view.
+ *
+ * Hover or focus names the field and spells the value out. On a device with
+ * no hover there is nothing to hover *with*, so the chip carries its text
+ * instead: `(hover: none)` is the one case where the density is not worth it.
+ * The value is in the DOM either way, for a screen reader.
+ */
+const MetaChip = ({
+  icon,
+  label,
+  value,
+  tone,
+  withText,
+}: {
+  icon: MaterialSymbol;
+  label: string;
+  value: string;
+  tone?: VernBucket;
+  withText: boolean;
+}) => (
+  // The tooltip stays on even when the text is showing: the chip's *value* is
+  // then visible but its field name never is, and "Tønsberg" alone does not
+  // say kommune.
+  <Tooltip label={`${label}: ${value}`}>
+    <span
+      className={cx(styles.chip, tone && styles[tone])}
+      // Icon-only, focus is the only keyboard route to the value, so it needs
+      // a tab stop. With the text out it would only be a tab stop.
+      tabIndex={withText ? undefined : 0}
+    >
+      <Icon icon={icon} size={16} />
+      {withText ? (
+        <span className={styles.chipText}>{value}</span>
+      ) : (
+        <span className={styles.srOnly}>{`${label}: ${value}`}</span>
+      )}
+    </span>
+  </Tooltip>
 );
+
+/*
+ * `informasjon` runs from empty to several paragraphs and is the field most
+ * worth reading, so it is open by default and clamped rather than hidden
+ * behind a button. The toggle appears only when the clamp actually bit, which
+ * has to be measured: a character count and a line clamp disagree at the
+ * popup's narrow width, and a "Mer" that expands nothing is worse than none.
+ *
+ * Two reasons that measurement is an observer rather than one layout effect.
+ * The overlay's element is `display: none` until the OL `Overlay` is given a
+ * position, which happens in an effect of the *parent* — i.e. after this
+ * one — so a single measurement at mount reads 0 for both heights and the
+ * toggle never appears. And the popup can be resized under an open card.
+ * Nothing observes while expanded: with the clamp off the two heights agree by
+ * construction, and measuring then would retract the button that undoes it.
+ */
+const Description = ({ text }: { text: string }) => {
+  const { t } = useTranslation();
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [clipped, setClipped] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (open || !el) return;
+    const measure = () => setClipped(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [text, open]);
+
+  return (
+    <div className={styles.descriptionBlock}>
+      <div
+        ref={ref}
+        className={cx(styles.description, !open && styles.clamped)}
+      >
+        {text}
+      </div>
+      {clipped && (
+        <button
+          type="button"
+          className={styles.moreButton}
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open
+            ? t('kulturminner.descriptionLess')
+            : t('kulturminner.descriptionMore')}
+        </button>
+      )}
+    </div>
+  );
+};
 
 const NestedEnkeltminner = ({
   features,
+  defaultOpen,
+  withText,
 }: {
   features: HeritageFeature[];
-}) => (
-  <div className={styles.nested}>
-    <div className={styles.nestedHeading}>
-      Enkeltminner ved klikket ({features.length})
-    </div>
-    <div className={styles.nestedList}>
-      {features.map((em, i) => {
-        const p = em.properties;
-        const emNavn = stringify(p['navn']);
-        const emArt = stringify(p['enkeltminneart']);
-        const emKategori = stringify(p['enkeltminnekategori']);
-        const emId = stringify(p['lokalid']);
-        const emVerne = stringify(p['vernetype']);
-        const emDatering = stringify(p['datering']);
-        const subtitle = [emArt, emKategori].filter(Boolean).join(' — ');
-        return (
-          <div key={i} className={styles.nestedItem}>
-            <div className={styles.nestedName}>
-              {emNavn || emArt || `Enkeltminne #${emId}`}
-            </div>
-            {subtitle && emNavn && (
-              <div className={styles.nestedSubtitle}>{subtitle}</div>
-            )}
-            {(emVerne || emDatering) && (
-              <div className={styles.nestedTags}>
-                {emVerne && <Badge palette="green">{emVerne}</Badge>}
-                {emDatering && (
-                  <span className={styles.nestedDatering}>{emDatering}</span>
+  defaultOpen: boolean;
+  withText: boolean;
+}) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <div className={styles.nested}>
+      <button
+        type="button"
+        className={styles.nestedToggle}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <Icon
+          icon={open ? 'keyboard_arrow_down' : 'chevron_right'}
+          size={16}
+        />
+        {t('kulturminner.enkeltminner', { count: features.length })}
+      </button>
+      {open && (
+        <div className={styles.nestedList}>
+          {features.map((em, i) => {
+            const p = em.properties;
+            const emNavn = stringify(p['navn']);
+            const emArt = stringify(p['enkeltminneart']);
+            const emKategori = stringify(p['enkeltminnekategori']);
+            const emId = stringify(p['lokalid']);
+            const emVerne = stringify(p['vernetype']);
+            const emDatering = stringify(p['datering']);
+            const bucket = vernBucket(emVerne);
+            return (
+              <div key={i} className={styles.nestedItem}>
+                <div className={styles.nestedName}>
+                  {emNavn ||
+                    emArt ||
+                    t('kulturminner.enkeltminneNumber', { id: emId })}
+                </div>
+                {emArt && emNavn && (
+                  <div className={styles.nestedSubtitle}>{emArt}</div>
+                )}
+                {(emVerne || emDatering || emKategori) && (
+                  <div className={styles.chips}>
+                    {emKategori && (
+                      <MetaChip
+                        icon={kategoriIcon(emKategori)}
+                        label={t('kulturminner.kategori')}
+                        value={emKategori}
+                        withText={withText}
+                      />
+                    )}
+                    {emVerne && (
+                      <MetaChip
+                        icon={VERN_ICONS[bucket]}
+                        label={t('kulturminner.vernestatus')}
+                        value={emVerne}
+                        tone={bucket}
+                        withText={withText}
+                      />
+                    )}
+                    {emDatering && (
+                      <MetaChip
+                        icon="history"
+                        label={t('kulturminner.datering')}
+                        value={emDatering}
+                        withText={withText}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
-const HeritageCard = ({ group }: { group: HeritageGroup }) => {
-  const [descOpen, setDescOpen] = useState(false);
+const HeritageCard = ({
+  group,
+  solo,
+  withText,
+}: {
+  group: HeritageGroup;
+  solo: boolean;
+  withText: boolean;
+}) => {
+  const { t } = useTranslation();
   const primary = group.lokalitet ?? group.enkeltminner[0] ?? group.sikringssoner[0] ?? group.others[0];
   const props = primary?.properties ?? {};
 
-  const artRaw =
+  // `art` is the informative one — 159 values, from "Gravfelt" to
+  // "Tjærebrenningsanlegg" — so it stays text and becomes the card's subtitle,
+  // or its title when the record is unnamed. `kategori` is the 12-value bucket
+  // above it and is the leading glyph; printing both was printing the second
+  // one twice.
+  const art =
     stringify(props['lokalitetsart']) || stringify(props['enkeltminneart']);
-  const kategoriRaw =
+  const kategori =
     stringify(props['lokaliteteskategori']) ||
     stringify(props['enkeltminnekategori']);
-  const artKategori = [artRaw, kategoriRaw].filter(Boolean).join(' — ');
 
+  // The WMS serves no `fylke` — beliggenhet is the kommune and nothing else.
   const kommune = stringify(props['kommune']);
-  const fylke = stringify(props['fylke']);
-  const beliggenhet = [fylke, kommune].filter(Boolean).join(', ');
 
   // Roll up vernetype + datering across the lokalitet's own field AND all
   // its nested enkeltminner. If they agree, show the value; if not, show
@@ -282,13 +445,11 @@ const HeritageCard = ({ group }: { group: HeritageGroup }) => {
     ...(group.lokalitet ? [group.lokalitet.properties] : []),
     ...group.enkeltminner.map((em) => em.properties),
   ];
-  const vernetype = rollup(
-    memberProps.map((p) => stringify(p['vernetype'])),
-    'Ulike vernestatus',
-  );
+  const vernetypes = memberProps.map((p) => stringify(p['vernetype']));
+  const vernetype = rollup(vernetypes, t('kulturminner.ulikeVernestatus'));
   const datering = rollup(
     memberProps.map((p) => stringify(p['datering'])),
-    'Flere dateringer',
+    t('kulturminner.flereDateringer'),
   );
   // vernedato only if there's a single shared vernetype AND a single shared
   // date across all members; otherwise a single date next to "Ulike
@@ -317,52 +478,100 @@ const HeritageCard = ({ group }: { group: HeritageGroup }) => {
     : '';
   const kulturminnesok = hasReal ? stringify(props['linkkulturminnesok']) : '';
 
+  // Colour the vernestatus chip by bucket even when the labels disagreed: two
+  // members reading "Automatisk fredet" and "Vedtaksfredet" are both fredet,
+  // so "Ulike vernestatus" in red is the true statement. Only a genuine
+  // disagreement about *how protected* it is falls back to neutral.
+  const vernBuckets = new Set(vernetypes.filter(Boolean).map(vernBucket));
+  const vernTone: VernBucket =
+    vernBuckets.size === 1 ? [...vernBuckets][0] : 'ukjent';
+
+  // If we have a lokalitet, all enkeltminner nest below it. Otherwise the
+  // first enkeltminne IS the primary card, so nest the remaining.
+  const nested = group.lokalitet
+    ? group.enkeltminner
+    : group.enkeltminner.slice(1);
+  const isSikringssone = !group.lokalitet && group.sikringssoner.length > 0;
+
   return (
     <div className={styles.card}>
       <div className={styles.cardHead}>
-        <div className={styles.cardTitle}>{group.navn}</div>
-        <div className={styles.cardTags}>
-          <span className={styles.cardId}>
-            #{group.parentId.replace(/^sz-/, '')}
+        <Tooltip
+          label={[
+            group.lokalitet
+              ? t('kulturminner.lokalitet')
+              : isSikringssone
+                ? t('kulturminner.sikringssone')
+                : t('kulturminner.enkeltminne'),
+            kategori,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        >
+          <span className={styles.kindIcon} tabIndex={0}>
+            <Icon icon={kategori ? kategoriIcon(kategori) : 'castle'} size={20} />
           </span>
-          {group.lokalitet && <Badge palette="blue">Lokalitet</Badge>}
-          {!group.lokalitet && group.sikringssoner.length > 0 && (
-            <Badge palette="yellow">Sikringssone</Badge>
+        </Tooltip>
+        <div className={styles.cardTitles}>
+          <div className={styles.cardTitle}>
+            {group.navn || art || t('kulturminner.fallbackName')}
+          </div>
+          {group.navn && art && (
+            <div className={styles.cardSubtitle}>{art}</div>
           )}
         </div>
+        <span className={styles.cardId}>
+          {group.parentId.replace(/^sz-/, '')}
+        </span>
       </div>
 
-      <div className={styles.fields}>
-        {artKategori && <FieldRow label="Kategori" value={artKategori} />}
-        {beliggenhet && <FieldRow label="Beliggenhet" value={beliggenhet} />}
+      <div className={styles.chips}>
+        {isSikringssone && (
+          <Badge palette="yellow">{t('kulturminner.sikringssone')}</Badge>
+        )}
         {vernetype && (
-          <FieldRow
-            label="Vernestatus"
+          <MetaChip
+            icon={VERN_ICONS[vernTone]}
+            label={t('kulturminner.vernestatus')}
             value={vernedato ? `${vernetype} (${vernedato})` : vernetype}
+            tone={vernTone}
+            withText={withText}
           />
         )}
-        {datering && <FieldRow label="Datering" value={datering} />}
-        {antall && <FieldRow label="Enkeltminner totalt" value={antall} />}
+        {datering && (
+          <MetaChip
+            icon="history"
+            label={t('kulturminner.datering')}
+            value={datering}
+            withText={withText}
+          />
+        )}
+        {kommune && (
+          <MetaChip
+            icon="location_on"
+            label={t('kulturminner.kommune')}
+            value={kommune}
+            withText={withText}
+          />
+        )}
+        {antall && (
+          <MetaChip
+            icon="scatter_plot"
+            label={t('kulturminner.antallEnkeltminner')}
+            value={antall}
+            withText
+          />
+        )}
       </div>
 
-      {(() => {
-        // If we have a lokalitet, all enkeltminner nest below it. Otherwise
-        // the first enkeltminne IS the primary card, so nest the remaining.
-        const nested = group.lokalitet
-          ? group.enkeltminner
-          : group.enkeltminner.slice(1);
-        return nested.length > 0 ? (
-          <NestedEnkeltminner features={nested} />
-        ) : null;
-      })()}
+      {informasjon && <Description text={informasjon} />}
 
-      {informasjon && (
-        <div className={styles.descriptionBlock}>
-          <Button size="xs" onClick={() => setDescOpen((v) => !v)}>
-            {descOpen ? 'Skjul beskrivelse' : 'Vis beskrivelse'}
-          </Button>
-          {descOpen && <div className={styles.description}>{informasjon}</div>}
-        </div>
+      {nested.length > 0 && (
+        <NestedEnkeltminner
+          features={nested}
+          defaultOpen={solo}
+          withText={withText}
+        />
       )}
 
       {(askeladden || kulturminnesok) && (
@@ -402,24 +611,33 @@ const PopupContent = ({
   onClose: () => void;
   onShowMore: () => void;
 }) => {
+  const { t } = useTranslation();
+  // A glyph nobody can hover over is a blank. Coarse pointers get the value
+  // spelled out on the chip instead — see MetaChip.
+  const withText = useMediaQuery('(hover: none)');
+
   return (
     <div className={styles.popup}>
       <div className={styles.header}>
         <span className={styles.headerTitle}>
-          Kulturminne
-          {groups.length > 1 ? ` (${groups.length})` : ''}
+          {t('kulturminner.title', { count: groups.length })}
         </span>
         <IconButton
           onClick={onClose}
           icon="close"
           size="xs"
           palette="gray"
-          aria-label="Lukk"
+          aria-label={t('kulturminner.close')}
         />
       </div>
       <div className={styles.cards}>
         {groups.map((g) => (
-          <HeritageCard key={g.key} group={g} />
+          <HeritageCard
+            key={g.key}
+            group={g}
+            solo={groups.length === 1}
+            withText={withText}
+          />
         ))}
       </div>
       <Button
@@ -428,7 +646,7 @@ const PopupContent = ({
         variant="secondary"
         fullWidth
       >
-        Vis mer
+        {t('kulturminner.showMore')}
       </Button>
     </div>
   );

@@ -170,6 +170,28 @@
     "title": "Objektinformasjon",
     "loading": "Henter informasjon..."
   },
+  "kulturminner": {
+    "title_one": "Kulturminne",
+    "title_other": "{{count}} kulturminner",
+    "close": "Lukk",
+    "showMore": "Vis mer",
+    "fallbackName": "Uten navn",
+    "lokalitet": "Lokalitet",
+    "enkeltminne": "Enkeltminne",
+    "sikringssone": "Sikringssone",
+    "kategori": "Kategori",
+    "vernestatus": "Vernestatus",
+    "datering": "Datering",
+    "kommune": "Kommune",
+    "antallEnkeltminner": "Enkeltminner totalt",
+    "ulikeVernestatus": "Ulike vernestatus",
+    "flereDateringer": "Flere dateringer",
+    "descriptionMore": "Mer",
+    "descriptionLess": "Mindre",
+    "enkeltminner_one": "1 enkeltminne",
+    "enkeltminner_other": "{{count}} enkeltminner",
+    "enkeltminneNumber": "Enkeltminne #{{id}}"
+  },
   "about": {
     "heading": "Om oss",
     "textone": "Tufteseid er et kartverktøy for lenestolsarkeologi: les skyggerelieff fra LiDAR mot Riksantikvarens kulturminneregister, og finn tufter, gravhauger og andre spor i terrenget hjemmefra.",

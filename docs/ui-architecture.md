@@ -1488,6 +1488,47 @@ the WMS returns HTML and the parser can only wrap it as an unhelpful
 "HTML-respons mottatt" placeholder). Unifying the two presentation surfaces is
 obvious rewrite work; the service underneath them should be left alone.
 
+### 7.2 The Kulturminner popup reads its card as a glyph row
+
+A heritage card is a name, and then a **row of icons**. `kategori`,
+`vernestatus`, `datering` and `kommune` used to be four labelled `label: value`
+lines with a 100 px label column, which is four lines and a column spent on
+values that are almost always one word out of a closed list — so a click that
+answered with three lokaliteter needed a scroll before the first `informasjon`
+was on screen, and `informasjon` is the field worth reading. Now each is one
+16 px glyph; hover, focus or a screen reader gets `Vernestatus: Automatisk
+fredet`. The one exception is `(hover: none)`, where a glyph nobody can hover
+over is a blank and the chips carry their text instead.
+
+What decides whether a field can be a glyph is how big its vocabulary is, and
+that was measured rather than guessed — a sweep of 14 dense areas returning
+~1300 features, recorded in `src/map/featureInfo/heritageVocabulary.ts`:
+
+- `lokaliteteskategori` / `enkeltminnekategori` — 12 values. One glyph each,
+  and it is the card's **leading** icon, since it says what kind of thing this
+  is before the name does.
+- `vernetype` — 20 values, mapped onto the same five vern buckets the
+  Kulturminner pulldown filters by (§5.9), so a chip's colour means what the
+  filter means. An unmapped label gets a sixth, deliberately neutral `ukjent`
+  rather than being folded into `uavklart`: "the register says unclear" and "we
+  did not recognise what the register said" are different claims.
+- `datering` — 66 values, mostly period names and year ranges. One clock glyph,
+  value as text.
+- `lokalitetsart` / `enkeltminneart` — **159** values, and the informative one.
+  No glyph can carry that, so it stays text, as the card's subtitle, or as its
+  title when the record is unnamed. That last part is why the word
+  "Kulturminne" no longer repeats down a multi-hit popup.
+- `fylke` — does not exist. Not once in 1300 features. "Beliggenhet" was only
+  ever the kommune, which is why it is now a pin and a word.
+
+Two contingencies for `informasjon`, which runs from empty to several
+paragraphs: it is **open** and clamped to four lines rather than hidden behind
+a button, and the `Mer` toggle appears only when the clamp actually bit —
+measured, because a character count and a line clamp disagree at the popup's
+width and a `Mer` that expands nothing is worse than no `Mer`. The nested
+enkeltminne list is a disclosure, open only when a single card answered the
+click.
+
 ---
 
 ## 8. The lokalitet workspace

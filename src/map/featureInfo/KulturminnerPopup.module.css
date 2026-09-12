@@ -51,11 +51,30 @@
   border-radius: var(--radius-md);
 }
 
+/* Glyph · name over art · id, on one line. */
 .cardHead {
   display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  margin-bottom: var(--sp-4);
+  align-items: flex-start;
+  gap: var(--sp-4);
+}
+
+.kindIcon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  margin-top: 1px;
+  color: var(--c-fg-muted);
+}
+
+.kindIcon:focus-visible {
+  outline: 2px solid var(--c-blue-600);
+  outline-offset: 1px;
+}
+
+.cardTitles {
+  flex: 1;
+  min-width: 0;
 }
 
 .cardTitle {
@@ -64,65 +83,131 @@
   overflow-wrap: anywhere;
 }
 
-.cardTags {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-4);
-}
-
-.cardId {
+.cardSubtitle {
   font-size: var(--font-xs);
   color: var(--c-fg-subtle);
-}
-
-.fields {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-}
-
-.fieldRow {
-  display: flex;
-  align-items: baseline;
-  gap: var(--sp-4);
-  font-size: var(--font-sm);
-}
-
-.fieldLabel {
-  flex: none;
-  min-width: 100px;
-  max-width: 120px;
-  font-weight: 500;
-  color: var(--c-fg-muted);
-}
-
-.fieldValue {
-  flex: 1;
-  min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.nested {
-  margin-top: var(--sp-5);
+.cardId {
+  flex: none;
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-fg-subtle);
 }
 
-.nestedHeading {
-  margin-bottom: var(--sp-2);
+/*
+ * The metadata row. Icon-only by default — hover or focus spells the field and
+ * its value out — so the four closed vocabularies that used to cost four
+ * labelled lines cost one wrapping line between them.
+ */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+}
+
+.chip {
+  /* Containing block for .srOnly, which is absolutely positioned. */
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 2px var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--c-bg-muted);
+  font-size: var(--font-xs);
+  line-height: 1.4;
+  color: var(--c-fg-muted);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--c-blue-600);
+  outline-offset: 1px;
+}
+
+.chipText {
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Vernestatus tones, matching the five vern subsets in the Kulturminner
+ * pulldown so a chip's colour means what the filter means. `ukjent` has no
+ * rule: it stays the neutral .chip background, which is the point of it.
+ */
+.fredede {
+  background: var(--c-red-100);
+  color: var(--c-red-600);
+}
+
+.verneverdige {
+  background: var(--c-green-100);
+  color: var(--c-green-700);
+}
+
+.listefoerte {
+  background: var(--c-blue-100);
+  color: var(--c-blue-600);
+}
+
+.utenVern {
+  background: var(--c-gray-200);
+  color: var(--c-gray-600);
+}
+
+.uavklart {
+  background: var(--c-yellow-100);
+  color: var(--c-yellow-600);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.nested {
+  margin-top: var(--sp-4);
+}
+
+.nestedToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 0;
+  border: none;
+  background: none;
   font-size: var(--font-xs);
   font-weight: 700;
   color: var(--c-fg-muted);
+  cursor: pointer;
+}
+
+.nestedToggle:hover {
+  color: var(--c-fg);
 }
 
 .nestedList {
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);
+  margin-top: var(--sp-2);
 }
 
 .nestedItem {
   padding-left: var(--sp-4);
   border-left: 2px solid var(--c-border);
+}
+
+.nestedItem .chips {
+  margin-top: var(--sp-1);
 }
 
 .nestedName {
@@ -136,36 +221,41 @@
   overflow-wrap: anywhere;
 }
 
-.nestedTags {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-4);
-  margin-top: var(--sp-1);
-}
-
-.nestedDatering {
-  font-size: var(--font-xs);
-  color: var(--c-fg-muted);
-}
-
 .descriptionBlock {
-  margin-top: var(--sp-5);
+  margin-top: var(--sp-4);
 }
 
 .description {
-  margin-top: var(--sp-4);
   font-size: var(--font-sm);
   color: var(--c-gray-700);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
+/* Four lines is where `informasjon`'s first sentence usually lands. */
+.clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.moreButton {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: var(--font-xs);
+  font-weight: 700;
+  color: var(--c-blue-600);
+  cursor: pointer;
+}
+
 .links {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-5);
-  margin-top: var(--sp-5);
+  margin-top: var(--sp-4);
 }
 
 .link {
