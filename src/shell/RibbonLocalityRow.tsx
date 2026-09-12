@@ -40,18 +40,32 @@ const VISIBILITY_PALETTE: Record<
 };
 
 /*
- * Name display and inline rename. A component of its own so the parent can
- * key it on locality.id: without that, swapping lokalitet shows the previous
- * one's half-typed name, and a fresh record does not re-open the field.
+ * Name display, inline rename, and — in show — zoom-to.
+ *
+ * A component of its own so the parent can key it on locality.id: without
+ * that, swapping lokalitet shows the previous one's half-typed name, and a
+ * fresh record does not re-open the field.
+ *
+ * The name is the row's one clickable noun and it means "this record", so it
+ * carries whichever verb the stance has for that: rename in edit, frame it on
+ * the map in show. That is what replaced the `⤢` button that used to sit at
+ * the end of the identity zone — a whole control for a verb the thing beside
+ * it could say by itself. Zoom keeps a second, stance-independent home in the
+ * `⋮` menu, so it is still reachable while the name means rename.
+ *
+ * A real <button> inside the heading rather than a click handler on the <h2>:
+ * the control it replaced was keyboard-reachable and this one has to stay so.
  */
 const LocalityName = ({
   locality,
   canEdit,
   onRename,
+  onZoom,
 }: {
   locality: LocalityRecord;
   canEdit: boolean;
   onRename: (next: string) => Promise<boolean>;
+  onZoom: () => void;
 }) => {
   const { t } = useTranslation();
   // A new lokalitet is normally named after the nearest stedsnavn, and an
@@ -70,12 +84,22 @@ const LocalityName = ({
 
   if (!renaming || !canEdit) {
     return (
-      <h2
-        className={cx(rowStyles.name, canEdit && rowStyles.nameEditable)}
-        title={canEdit ? t('localities.workspace.renameHint') : undefined}
-        onClick={() => canEdit && setRenaming(true)}
-      >
-        {locality.name}
+      <h2 className={rowStyles.name}>
+        <button
+          type="button"
+          className={cx(
+            rowStyles.nameButton,
+            canEdit && rowStyles.nameEditable,
+          )}
+          title={
+            canEdit
+              ? t('localities.workspace.renameHint')
+              : t('localities.workspace.zoom')
+          }
+          onClick={() => (canEdit ? setRenaming(true) : onZoom())}
+        >
+          {locality.name}
+        </button>
       </h2>
     );
   }
@@ -179,6 +203,15 @@ const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
              arrives with the lokalitet instead of waiting to be found in a
              menu (docs/lokalitet-view.md §4.3). What is left is the one image
              route that is not a fetch at all. */
+          /* Zoom-to, in both stances and for everybody. The name in the
+             identity zone is the fast way to it, but only while it is not
+             busy meaning rename — so the verb keeps one place that does not
+             depend on which stance you are in. */
+          {
+            icon: 'zoom_in_map',
+            label: t('localities.workspace.zoom'),
+            onSelect: ws.zoomToLocality,
+          },
           ws.canAdd && {
             icon: 'add_photo_alternate',
             label: t('localities.bilder.upload'),
@@ -699,6 +732,7 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             locality={locality}
             canEdit={ws.canEdit}
             onRename={ws.rename}
+            onZoom={ws.zoomToLocality}
           />
           {/* Guarded, not optional: every record has a code once 1700000500
               has run. No chip is the honest symptom of a pocketbase that has
@@ -711,14 +745,34 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             {t(`localities.visibility.${locality.visibility}`)}
           </Badge>
           <Banner ws={ws} />
-          <Tooltip label={t('localities.workspace.zoom')}>
-            <IconButton
-              icon="zoom_in_map"
-              size="md"
-              aria-label={t('localities.workspace.zoom')}
-              onClick={ws.zoomToLocality}
-            />
-          </Tooltip>
+        </div>
+
+        {/* What a person put in this rectangle: the funn and the bilder, the
+            two things that would not exist if nobody had come here. Beside the
+            identity rather than out by the exits, because they describe *this
+            record* the way the name and the code do — the centre cell is the
+            one aimed at the ground instead.
+
+            In front of the write verbs, not behind them, so the pair keeps its
+            place when `.tools` appears and disappears with the stance: pressing
+            `Rediger` must not move `Funn` out from under the pointer. */}
+        <div className={rowStyles.contents}>
+          <FunnControl ws={ws} />
+          <ModeButton
+            icon="photo_library"
+            label={t('localities.bilder.heading')}
+            tooltip={
+              stripOpen
+                ? t('localities.bilder.hideStrip')
+                : t('localities.bilder.showStrip')
+            }
+            active={stripOpen}
+            badge={ws.bilderCount || undefined}
+            // Nothing to show and no way to put anything there: a reader on an
+            // empty lokalitet. The button would open an empty bar.
+            disabled={!ws.hasBilder}
+            onClick={() => setStripOpen(!stripOpen)}
+          />
         </div>
 
         {/* Everything that leaves a trace, and therefore nothing at all in show
@@ -727,10 +781,10 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             this record but not add to it — the zone is empty and should not
             render its gap.
 
-            In the left cell with identity, because a write verb is aimed at
-            *this* record: it reads as "the lokalitet, and what I can add to
-            it". The two inspection zones to the right of it are aimed at the
-            ground and at what is already there. */}
+            Last in the left cell, so it reads left to right as the record, what
+            is in it, and what I can put in it next — three statements about the
+            same lokalitet, with the ground tools in the middle of the row and
+            the ways out at the end of it. */}
         {canAdd && (
           <div className={rowStyles.tools}>
             <ModeButton
@@ -788,128 +842,106 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         <ReadTools />
       </div>
 
-      <div className={rowStyles.right}>
-        {/* What a person put in this rectangle: the funn and the bilder, the
-            two things that would not exist if nobody had come here. They are
-            the counterpart to the centre cell rather than more of it, which is
-            why they are over here beside the exits and not next to Terreng. */}
-        <div className={rowStyles.contents}>
-          <FunnControl ws={ws} />
-          <ModeButton
-            icon="photo_library"
-            label={t('localities.bilder.heading')}
-            tooltip={
-              stripOpen
-                ? t('localities.bilder.hideStrip')
-                : t('localities.bilder.showStrip')
-            }
-            active={stripOpen}
-            badge={ws.bilderCount || undefined}
-            // Nothing to show and no way to put anything there: a reader on an
-            // empty lokalitet. The button would open an empty bar.
-            disabled={!ws.hasBilder}
-            onClick={() => setStripOpen(!stripOpen)}
-          />
-        </div>
+      {/* The right cell, and since the contents moved over to the left it holds
+          nothing but the ways out — which is what a right edge is for.
 
-        {/* The right zone, deepest-first (§5.3). The deepest thing in flight
-            owns it, and everything shallower is hidden while that is open —
-            which is what stops a row from offering to end two different things
-            with two buttons that both say `Ferdig`.
+          Deepest-first (§5.3): the deepest thing in flight owns the zone, and
+          everything shallower is hidden while that is open —
+          which is what stops a row from offering to end two different things
+          with two buttons that both say `Ferdig`.
 
-            Depth 2 arrives here with the dock's removal: the funn draft and
-            Juster området used to keep their own exits in a dock band, and now
-            that both are gone from the column, this is where they go.
+          Depth 2 arrives here with the dock's removal: the funn draft and
+          Juster området used to keep their own exits in a dock band, and now
+          that both are gone from the column, this is where they go.
 
-            `Lukk` is absent in edit — you leave the stance before you leave the
-            record — and `Del` is absent everywhere until `?lok=CODE` exists,
-            since a share button that shares nothing is worse than none. For a
-            reader the `Rediger` slot is `Lag min kopi`, which arrives with the
-            copy in step 14; until then that slot is empty rather than filled
-            with a button that would lie. */}
-        <div className={rowStyles.exits}>
-          {ws.draftActive ? (
-            <>
+          `Lukk` is absent in edit — you leave the stance before you leave the
+          record — and `Del` is absent everywhere until `?lok=CODE` exists,
+          since a share button that shares nothing is worse than none. For a
+          reader the `Rediger` slot is `Lag min kopi`, which arrives with the
+          copy in step 14; until then that slot is empty rather than filled
+          with a button that would lie. */}
+      <div className={rowStyles.exits}>
+        {ws.draftActive ? (
+          <>
+            <Button
+              variant="primary"
+              leftIcon="check"
+              onClick={ws.stopDraft}
+              title={t('localities.funn.draft.doneHint')}
+            >
+              {t('localities.funn.draft.done')}
+            </Button>
+            {/* Both arms since step 13. Nothing has been written either way,
+                so `Forkast funn` can forget a fresh funn and put an edited
+                one's old shape back — which is exactly what §5.3 asked for
+                and what autosave could not honestly offer. */}
+            <Button
+              variant="ghost"
+              palette="red"
+              leftIcon="undo"
+              onClick={ws.discardDraft}
+            >
+              {t('localities.funn.draft.discard')}
+            </Button>
+          </>
+        ) : ws.adjusting ? (
+          /* §5.3's [Bruk] [Angre], and the transaction is what makes the
+             second one possible: the rectangle moves in the buffer, not on
+             the server, so `Angre` is a value being put back rather than a
+             second PATCH. Nested inside the session rather than deferred to
+             `Avbryt`, because you reshape the area in the middle of a
+             session and taking one gesture back should not cost the nine
+             images you kept before it. */
+          <>
+            <Button
+              variant="primary"
+              leftIcon="check"
+              onClick={ws.applyAdjust}
+            >
+              {t('localities.workspace.adjustApply')}
+            </Button>
+            <Button variant="ghost" leftIcon="undo" onClick={ws.undoAdjust}>
+              {t('localities.workspace.adjustUndo')}
+            </Button>
+          </>
+        ) : editing ? (
+          <EditExits ws={ws} />
+        ) : (
+          <>
+            {/* One slot, two honest labels (§3). `Rediger` costs nothing and
+                says so; `Lag min kopi` costs a record and says that. The
+                alternative — one button that quietly forks the site the
+                first time a reader types in a field — is the escalation
+                this design deleted. */}
+            {mayEdit ? (
               <Button
-                variant="primary"
-                leftIcon="check"
-                onClick={ws.stopDraft}
-                title={t('localities.funn.draft.doneHint')}
+                variant="secondary"
+                leftIcon="edit"
+                onClick={ws.enterEdit}
               >
-                {t('localities.funn.draft.done')}
+                {t('localities.workspace.edit')}
               </Button>
-              {/* Both arms since step 13. Nothing has been written either way,
-                  so `Forkast funn` can forget a fresh funn and put an edited
-                  one's old shape back — which is exactly what §5.3 asked for
-                  and what autosave could not honestly offer. */}
-              <Button
-                variant="ghost"
-                palette="red"
-                leftIcon="undo"
-                onClick={ws.discardDraft}
-              >
-                {t('localities.funn.draft.discard')}
-              </Button>
-            </>
-          ) : ws.adjusting ? (
-            /* §5.3's [Bruk] [Angre], and the transaction is what makes the
-               second one possible: the rectangle moves in the buffer, not on
-               the server, so `Angre` is a value being put back rather than a
-               second PATCH. Nested inside the session rather than deferred to
-               `Avbryt`, because you reshape the area in the middle of a
-               session and taking one gesture back should not cost the nine
-               images you kept before it. */
-            <>
-              <Button
-                variant="primary"
-                leftIcon="check"
-                onClick={ws.applyAdjust}
-              >
-                {t('localities.workspace.adjustApply')}
-              </Button>
-              <Button variant="ghost" leftIcon="undo" onClick={ws.undoAdjust}>
-                {t('localities.workspace.adjustUndo')}
-              </Button>
-            </>
-          ) : editing ? (
-            <EditExits ws={ws} />
-          ) : (
-            <>
-              {/* One slot, two honest labels (§3). `Rediger` costs nothing and
-                  says so; `Lag min kopi` costs a record and says that. The
-                  alternative — one button that quietly forks the site the
-                  first time a reader types in a field — is the escalation
-                  this design deleted. */}
-              {mayEdit ? (
+            ) : (
+              ws.user != null && (
                 <Button
                   variant="secondary"
-                  leftIcon="edit"
-                  onClick={ws.enterEdit}
+                  leftIcon="content_copy"
+                  disabled={ws.copyProgress != null}
+                  onClick={ws.openCopyPrompt}
                 >
-                  {t('localities.workspace.edit')}
+                  {t('localities.copy.action')}
                 </Button>
-              ) : (
-                ws.user != null && (
-                  <Button
-                    variant="secondary"
-                    leftIcon="content_copy"
-                    disabled={ws.copyProgress != null}
-                    onClick={ws.openCopyPrompt}
-                  >
-                    {t('localities.copy.action')}
-                  </Button>
-                )
-              )}
-              <Button variant="ghost" palette="gray" onClick={ws.close}>
-                {t('localities.workspace.close')}
-              </Button>
-              {/* §5.3 puts `[⋮]` in show too, and now it earns its place: it is
-                  how a reader opens Detaljer. Its write verbs are gated
-                  inside. */}
-              <OverflowMenu ws={ws} />
-            </>
-          )}
-        </div>
+              )
+            )}
+            <Button variant="ghost" palette="gray" onClick={ws.close}>
+              {t('localities.workspace.close')}
+            </Button>
+            {/* §5.3 puts `[⋮]` in show too, and now it earns its place: it is
+                how a reader opens Detaljer. Its write verbs are gated
+                inside. */}
+            <OverflowMenu ws={ws} />
+          </>
+        )}
       </div>
     </div>
   );

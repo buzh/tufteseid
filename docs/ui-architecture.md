@@ -1413,10 +1413,10 @@ question (`docs/lokalitet-view.md` §5.1–5.5):
 
 | Cell | Zone | Question | Present when | Contents |
 |---|---|---|---|---|
-| left | identity | *what am I looking at* | always | the literal word `Lokalitet:`, the inline-editable name, the short code chip (click to copy), the visibility badge, the banner slot, zoom-to |
+| left | identity | *what am I looking at* | always | the literal word `Lokalitet:`, the name (click to rename in edit, click to zoom in show), the short code chip (click to copy), the visibility badge, the banner slot |
+| left | the contents | *what did someone put here* | always | `Funn` + its eye · `Bilder ▾`, both with a count badge |
 | left | the work | *what can I do to it* | **edit only** | Nytt funn · Behold · `Hent ▾` · Skjermbilde |
 | centre | the ground tools | *what does this ground look like* | always | Terreng · Sammenlign |
-| right | the contents | *what did someone put here* | always | `Funn` + its eye · `Bilder ▾`, both with a count badge |
 | right | the exits | *how do I get out of here* | always | deepest-first — see the depth table below |
 
 **A grid of `1fr auto 1fr`, not a flex row** (`RibbonLocalityRow.module.css`).
@@ -1428,11 +1428,18 @@ column and takes the centre with it. Below 48 rem the grid collapses to a flex
 row with the exits pinned right by an `auto` margin; the cells are real
 elements, so the grouping survives the collapse.
 
-**Centre and right split by kind of tool, not to fill three columns.** Terreng
-and Sammenlign interrogate the ground and the data answers; `Funn` and `Bilder`
-interrogate what a person put here and you answer. The exits go with the second
-group because leaving is something you do, and the write verbs go with identity
-because they are aimed at this record.
+**The centre is set apart by kind of tool, not to fill three columns.**
+Terreng and Sammenlign interrogate the ground and the data answers; everything
+in the left cell is a statement about the *record* — what it is, what is in it,
+what you can put in it next, read left to right — and the ground tools are the
+odd group out, which is why they get the middle to themselves. The right cell
+holds only the ways out, which is what a right edge is for.
+
+Inside the left cell the contents come **before** the write verbs, so the pair
+keeps its place when the verbs appear and disappear with the stance: pressing
+`Rediger` must not move `Funn` out from under the pointer. `.identity` is
+`flex: 0 1 auto` for the same reason — it used to take the row's slack, and
+growing would now push the two zones after it out to the cell's far edge.
 
 The ground tools and the contents are present in **both** stances, because
 reading is not writing — the same argument that makes show mode absolute about
@@ -1476,7 +1483,10 @@ other, and it needs somewhere to put the new record.
 
 The `[⋮]` menu is on the row in **both** stances, and it is how a reader opens
 Detaljer. Its two writing items (`Juster området`, `Slett`) are gated on
-`canEdit` inside it, so in show it holds exactly one entry.
+`canEdit` inside it, so in show it holds two entries: `Zoom til lokaliteten`
+and Detaljer. Zoom is there unconditionally because the name — the fast way to
+it — means *rename* in edit, and a verb that changes homes with the stance is
+a verb you have to hunt for.
 
 The **banner slot** takes the space the old summary line (`3 funn · 12 ha`)
 occupied, holds at most one sentence, and answers only *whose is this and what
@@ -1537,9 +1547,10 @@ Two axes, not one (`docs/lokalitet-view.md` §1). `access: 'owner' | 'admin' |
 **choice made inside it**, held in `editingLocalityIdAtom` and reset by
 opening anything else.
 
-**Nothing in show writes.** Not disabled verbs — *absent* ones: the middle
-zone does not render, the name is not clickable, the `⋮` menu holds only
-Detaljer and its fields are read-only, and the bottom edge is a rail with
+**Nothing in show writes.** Not disabled verbs — *absent* ones: the write-verb
+zone does not render, the name renames nobody (it zooms to the rectangle
+instead), the `⋮` menu holds only zoom and Detaljer and its fields are
+read-only, and the bottom edge is a rail with
 no delete, no reordering, no hide and a read-only caption rather than the same
 rail carrying all four; funn are not editable, and N / U / B do nothing. Reading, pinning an image,
 `Gjenskap` and downloading a figure all stay, because none of them leaves a trace. The one way to write is
@@ -3481,7 +3492,8 @@ named after the nearest stedsnavn; rename it; describe it; read and edit its
 sted, kommune and matrikkel, pre-filled from the registers; re-ask the registers
 for them after moving the rectangle; read its centre coordinate and area; search
 your lokaliteter by any of those; set visibility (private / limited / public);
-adjust the rectangle afterwards (translate + modify); delete it; browse "Mine
+adjust the rectangle afterwards (translate + modify); delete it; frame the map
+back on it by clicking its name or from the row's `⋮`; browse "Mine
 lokaliteter"; click a rectangle on the map to open it; see which known
 kulturminner already fall inside it; read its details in a dialog off the
 row's `⋮`; on somebody else's, press **Lag min kopi** and get the rectangle,

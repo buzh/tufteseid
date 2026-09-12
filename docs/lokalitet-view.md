@@ -621,16 +621,16 @@ nothing about why the owner thought there was something there.
 | Zone | Question | Present when |
 |---|---|---|
 | **left** — identity | *what am I looking at* | always |
+| **left** — the contents | *what did someone put here* | always |
 | **left** — the work | *what can I do to it* | **edit only** |
 | **centre** — the ground tools | *what does this ground look like* | always |
-| **right** — the contents | *what did someone put here* | always |
 | **right** — the exits | *how do I get out of here* | always |
 
 Left is fixed, right is a stack, the work is a list. That is the whole
 grammar, and it is what makes the row readable at a glance: your eye goes left
 to know where you are and right to know what to press, and the left-hand cell
-is either just the name (show) or the name plus a list of tools (edit). Stance
-is legible from ten feet away without reading a word.
+is either the record and its contents (show) or those plus a list of tools
+(edit). Stance is legible from ten feet away without reading a word.
 
 **Five zones in three cells, and the cells are a CSS grid of `1fr auto 1fr`.**
 The reason for a grid rather than a flex row is the middle one: `Terreng` and
@@ -638,14 +638,21 @@ The reason for a grid rather than a flex row is the middle one: `Terreng` and
 long the lokalitet's name is. A control that walks sideways as you move
 between sites is a control you have to look for each time.
 
-**Why the centre is the ground tools and the right is the contents.**
+**Why the centre is the ground tools and everything else is on the left.**
 `Terreng` and `Sammenlign` interrogate the ground — one asks the rectangle
 what shape it is, the other holds two acquisitions of it side by side — and
 the data answers. `Funn` and `Bilder` interrogate what a *person* put here,
-and you answer. Two different questions deserve two different places to point
-at, and the exits belong with the second group because leaving is also
-something you do rather than something the ground does. The write verbs sit
-with identity for the mirror-image reason: they are aimed at this record.
+and you answer; so do the write verbs, which are aimed at this record. Those
+belong with the name, and they are what the left-hand cell is: the record,
+what is in it, what you can put in it next — three statements about the same
+lokalitet, read left to right. The ground tools are the odd group out, which
+is exactly why they get the middle to themselves. The right-hand cell holds
+only the ways out, which is what a right edge is for.
+
+`Funn` and `Bilder` come *before* the write verbs inside that cell rather than
+after, so the pair keeps its position when `.tools` appears and disappears
+with the stance: pressing `Rediger` must not move `Funn` out from under the
+pointer.
 
 Below 48 rem the grid collapses back to a flex row, because three columns of
 wrapped buttons on a phone is three columns of nothing. The cells are real
@@ -660,21 +667,29 @@ of the same row.
 ### 5.2 The left zone
 
 ```
-Lokalitet: Storevike  [K7M2QX]  [privat]  ⤢
+Lokalitet: Storevike  [K7M2QX]  [privat]
 ```
 
 - **`Lokalitet:`** — the literal word. The row already looks different from
   row 1, but "different-looking row" is not the same as "you are inside
   something", and this is the only chrome in the app that is *scoped* to a
   record. Cheap, and it is what makes the `[←]` removal safe.
-- **The name** — click to rename, as today. Under the transaction that write
-  goes to the draft rather than to PB, which incidentally removes today's
-  commit-on-blur.
+- **The name** — the row's one clickable noun, and it carries whichever verb
+  the stance has for the record: **click to rename** in edit, **click to zoom
+  to the rectangle** in show. Under the transaction the rename goes to the
+  draft rather than to PB, which incidentally removes today's commit-on-blur.
 - **`[K7M2QX]`** — the short code (§11). Click to copy. Monospace, uppercase,
   gray badge — deliberately quieter than the name and the visibility chip,
   because it is a thing you *reach for*, not a thing you read.
 - **`[privat]`** — the visibility badge, unchanged (`VISIBILITY_PALETTE`).
-- **`⤢`** — zoom to the rectangle, unchanged.
+
+**The `⤢` zoom button is gone**, and the name is what replaced it: a whole
+control for a verb the thing beside it could say by itself. It is not lost in
+edit, where the name means rename — `Zoom til lokaliteten` is the first item
+in `[⋮]`, unconditionally and in both stances, so the verb keeps one place
+that does not depend on which stance you are in. The name is a real `<button>`
+inside the `<h2>` rather than a click handler on the heading, because the
+control it replaced was keyboard-reachable and this one has to stay so.
 
 **What leaves the left zone:** today's `ws.summary` (`3 funn · 12 ha`). The
 funn count is already a badge on the funn popover and the area belongs in
@@ -682,7 +697,7 @@ Detaljer, so the summary was two facts rendered twice. Dropping it is what
 pays for the code chip, and it frees the slot the banner needs (below).
 
 For a reader the visibility badge is followed by attribution rather than a
-summary: `Lokalitet: Storevike [K7M2QX] [offentlig] · Delt av Ola Nordmann ⤢`.
+summary: `Lokalitet: Storevike [K7M2QX] [offentlig] · Delt av Ola Nordmann`.
 
 ### 5.3 The right zone is a stack, and depth wins
 
@@ -710,9 +725,9 @@ Three things this table is saying on purpose:
   committing the session are different acts a keystroke apart, so they get
   different words. `Ferdig med funn` closes the funn *into the draft*; the
   funn is not in PocketBase until you press `Lagre` one level up.
-- **`⋮` survives both stances**, holding what is not part of any loop:
-  Detaljer, Juster området, Last opp, Rapportpakke, Slett. `Slett` stays
-  hidden for readers.
+- **`⋮` survives both stances**, holding what is not part of any loop: Zoom
+  til lokaliteten, Detaljer, Juster området, Last opp, Rapportpakke, Slett.
+  `Slett` stays hidden for readers.
 
 **`Del` is buildable before sharing is designed.** Its first version is a
 popover with the visibility control (which exists) and *Kopier lenke*, which
@@ -756,39 +771,38 @@ Everything else in §4.3 is unchanged; only the label moves.
 **Show, as owner:**
 
 ```
-Lokalitet: Storevike [K7M2QX] [privat] ⤢
-       ┊ Terreng · Sammenlign ┊ ⛨Funn 3|👁 · Bilder ▾ ┊ [Rediger] [Del] [Lukk] [⋮]
+Lokalitet: Storevike [K7M2QX] [privat] · ⛨Funn 3|👁 · Bilder ▾
+                    ┊ Terreng · Sammenlign ┊ [Rediger] [Del] [Lukk] [⋮]
 ```
 
 **Show, as reader:**
 
 ```
-Lokalitet: Storevike [K7M2QX] [offentlig] · Delt av Ola Nordmann ⤢
-       ┊ Terreng · Sammenlign ┊ ⛨Funn 3|👁 · Bilder ▾
-                                      ┊ [Lag min kopi] [Del] [Lukk] [⋮]
+Lokalitet: Storevike [K7M2QX] [offentlig] · Delt av Ola Nordmann
+  · ⛨Funn 3|👁 · Bilder ▾
+                    ┊ Terreng · Sammenlign ┊ [Lag min kopi] [Del] [Lukk] [⋮]
 ```
 
 **Edit, idle:**
 
 ```
-Lokalitet: Storevike [K7M2QX] [privat] ⤢
+Lokalitet: Storevike [K7M2QX] [privat] · ⛨Funn 3|👁 · Bilder ▾
   · Nytt funn · Behold · Hent ▾ · Skjermbilde
-       ┊ Terreng · Sammenlign ┊ ⛨Funn 3|👁 · Bilder ▾ ┊ [Lagre] [Avbryt] [⋮]
+                    ┊ Terreng · Sammenlign ┊ [Lagre] [Avbryt] [⋮]
 ```
 
 **Edit, drawing a funn:** the write verbs stay (you may still want a
 screenshot of what you are drawing), the exits collapse to depth 2.
 
 ```
-Lokalitet: Storevike [K7M2QX] [privat] ⤢
+Lokalitet: Storevike [K7M2QX] [privat] · ⛨Funn 3|👁 · Bilder ▾
   · Nytt funn · Behold · Hent ▾ · Skjermbilde
-       ┊ Terreng · Sammenlign ┊ ⛨Funn 3|👁 · Bilder ▾
-                                      ┊ [Ferdig med funn] [Forkast funn]
+                    ┊ Terreng · Sammenlign ┊ [Ferdig med funn] [Forkast funn]
 ```
 
-The centre pair (`Terreng`, `Sammenlign` — §8) and the right-hand pair
-(`Funn`, `Bilder ▾`) are in both stances because reading is not writing, which
-is the whole argument of §2.
+The centre pair (`Terreng`, `Sammenlign` — §8) and the contents pair (`Funn`,
+`Bilder ▾`) are in both stances because reading is not writing, which is the
+whole argument of §2.
 
 **`Funn` is one control with a seam in it**, written `⛨Funn 3|👁` above: press
 the labelled half to open the index, press the eye to take the funn off the
