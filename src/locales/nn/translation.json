@@ -685,6 +685,7 @@
       "svfRadius": "SVF-radius {{m}} m",
       "opennessRadius": "openheitsradius {{m}} m",
       "svfDirections": "{{n}} retningar",
+      "horizonGrid": "horisontsøk i {{m}} m rutenett",
       "vatStack": "VAT-stabel: {{stack}}",
       "vatLayer": "{{vis}} ({{blend}}, {{opacity}} %, {{min}}–{{max}})",
       "diverging": "divergerande fargeskala, symmetrisk om null",

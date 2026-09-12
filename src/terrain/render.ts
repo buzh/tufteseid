@@ -23,8 +23,8 @@ import {
   computeLrm,
   computeMultiHillshade,
   computeSlope,
+  horizonMaxRadiusMetres,
   percentileRange,
-  SVF_MAX_RADIUS_PX,
   toImageData,
   VAT_ALTITUDE,
   VAT_AZIMUTH,
@@ -75,13 +75,16 @@ export const defaultRadius = (vis: Visualization): number =>
  * What a radius control may offer for this visualization over this grid, in
  * metres, or `null` for the views that have no radius.
  *
- * The horizon views' ceiling is measured off the DEM rather than chosen:
- * `computeHorizonFields` clamps its search to `SVF_MAX_RADIUS_PX` pixels
- * whatever metre value it is handed, so on a 0.25 m grid every position past
- * 6 m would render identically. LRM has no such cap — its box blur is O(n)
- * per pass whatever the radius — so 60 m is a judgement about scale: past
- * that the smoothed copy stops being the landform trend and starts being a
- * plane.
+ * The horizon views' ceiling is still measured off the DEM rather than chosen,
+ * but it is no longer the DEM's own resolution that sets it: the scan decimates
+ * when the radius asks for more reach than its step budget allows, so what
+ * bounds the slider is how far `horizonMaxRadiusMetres` says that can go — 24 m
+ * on any grid at 1 m or finer, and 24 × the cell size on a grid coarser than
+ * that. It used to be 6 m on a 0.25 m DEM, which is shorter than the features.
+ *
+ * LRM has no such cap — its box blur is O(n) per pass whatever the radius — so
+ * 60 m is a judgement about scale: past that the smoothed copy stops being the
+ * landform trend and starts being a plane.
  */
 export const radiusRange = (
   vis: Visualization,
@@ -90,7 +93,7 @@ export const radiusRange = (
   if (usesHorizon(vis)) {
     return {
       min: 2,
-      max: Math.max(3, Math.round(SVF_MAX_RADIUS_PX * dem.metresPerPx)),
+      max: Math.round(horizonMaxRadiusMetres(dem.metresPerPx)),
       step: 1,
     };
   }

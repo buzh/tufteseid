@@ -363,13 +363,22 @@ Load-bearing:
   (`VAT_LAYERS`). Both are what make two VAT renders comparable, which is the
   whole reason to have it; wiring the azimuth slider back up would break it
   silently. It is also why VAT is on the static side of the memo split.
-- **`computeHorizonFields` clamps its search radius to 24 px** — 6 m on a
-  0.25 m DEM — whatever metre value it is handed, so a requested radius and an
-  effective one are routinely different numbers. Everything that renders or
-  *describes* a render goes through `clampRadius` (`render.ts`), and
-  `radiusRange` derives the slider's ceiling from the same cap. Skipping it
-  puts "SVF-radius 20 m" on the caption of a 6 m render, which is the one
-  thing `src/figure/` exists to prevent.
+- **`computeHorizonFields` buys its reach by decimating, not by walking
+  further.** The ray walk is width × height × directions × steps, so the step
+  budget is fixed at `SVF_MAX_RADIUS_PX` (24); what used to make that a limit
+  in *metres* was scanning the DEM at its own cell size, which put the horizon
+  at 6 m on a 0.25 m grid — shorter than the mounds the tool is pointed at.
+  Now `horizonDecimation` averages the grid down to no coarser than
+  `HORIZON_MIN_M_PER_PX` (1 m) when the requested radius asks for it, scans
+  that, and interpolates the three fields back, so the ceiling is a flat 24 m
+  on any grid at 1 m or finer (`horizonMaxRadiusMetres`) and the pass is
+  factor² cheaper besides. Two consequences: the horizon views are read off a
+  coarser surface than the hillshade beside them, which `figure.set.horizonGrid`
+  prints when it happens; and a requested radius and an effective one can still
+  differ, so everything that renders or *describes* a render goes through
+  `clampRadius` (`render.ts`) and `radiusRange` derives the slider's ceiling
+  from the same rule. Skipping that puts "SVF-radius 40 m" on the caption of a
+  24 m render, which is the one thing `src/figure/` exists to prevent.
 
 ## Lokaliteter (user content)
 

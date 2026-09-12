@@ -685,6 +685,7 @@
       "svfRadius": "SVF radius {{m}} m",
       "opennessRadius": "openness radius {{m}} m",
       "svfDirections": "{{n}} directions",
+      "horizonGrid": "horizon searched on a {{m}} m grid",
       "vatStack": "VAT stack: {{stack}}",
       "vatLayer": "{{vis}} ({{blend}}, {{opacity}} %, {{min}}–{{max}})",
       "diverging": "diverging ramp, symmetric about zero",

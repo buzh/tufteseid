@@ -116,8 +116,12 @@ export const useTerrainAnalysis = () => {
   const horizonVis = usesHorizon(vis);
   // Exposed already clamped, so the slider's thumb, the number beside it, the
   // render and the caption are the same value. The *stored* number is left
-  // alone: a 20 m sky-view radius that a 0.25 m grid caps at 6 m should come
-  // back at 20 m over a 1 m one, not be quietly rewritten on the way past.
+  // alone, so a radius one grid caps comes back at its full value over another
+  // rather than being quietly rewritten on the way past. That still happens,
+  // just far less than it used to: since the horizon scan decimates instead of
+  // truncating, the ceiling is a flat 24 m on any grid at 1 m or finer and
+  // 24 × the cell size above that — so it only binds when a wide search dialled
+  // in over a big rectangle meets the finer grid of a smaller one.
   const rawRadius = horizonVis ? svfRadius : lrmRadius;
   const radius = dem ? clampRadius(vis, dem, rawRadius) : rawRadius;
   const setRadius = useCallback(

@@ -3037,9 +3037,12 @@ the drag, the caller hears about it on `pointerup` / `keyup` / `blur` — and
 local relief, at 23 ms, streams like the rest.
 
 Its two ends are also not the same kind of number. LRM's 60 m ceiling is a
-judgement about scale; **the horizon views' is measured off the grid**, because
-`computeHorizonFields` clamps its search to `SVF_MAX_RADIUS_PX` (24) pixels
-whatever metre value it is handed — 6 m on a 0.25 m DEM. `radiusRange` and
+judgement about scale; **the horizon views' comes out of the ray walk's step
+budget**, `SVF_MAX_RADIUS_PX` (24). That used to be measured off the grid, so
+the ceiling was 6 m on a 0.25 m DEM; `computeHorizonFields` now averages the
+DEM down to at most 1 m per pixel before scanning it, which makes the ceiling a
+flat 24 m at any cell size of 1 m or finer (`horizonMaxRadiusMetres`, see
+`docs/terrain-analysis.md`). `radiusRange` and
 `clampRadius` in `src/terrain/render.ts` are what keep the slider's bounds, the
 pixels and the figure's caption agreeing on one value; before they existed the
 caption printed `DEFAULT_SVF_RADIUS` unconditionally, i.e. "20 m" under a render

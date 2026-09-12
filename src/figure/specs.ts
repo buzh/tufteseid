@@ -28,9 +28,11 @@ import type { Dem, DemModel } from '../terrain/dem';
 import {
   clampRadius,
   defaultRadius,
+  usesHorizon,
   type TerrainLight,
 } from '../terrain/render';
 import {
+  horizonDecimation,
   MULTI_AZIMUTHS,
   SVF_DIRECTIONS,
   VAT_ALTITUDE,
@@ -228,6 +230,19 @@ const terrainSettings = ({
         t('figure.set.absoluteStretch'),
       );
       break;
+  }
+  // To reach past 24 steps of this grid the horizon scan averages the DEM down
+  // first, so the four views in `usesHorizon` are read off a coarser surface
+  // than the hillshade beside them and than the resolution line below claims.
+  // Printed because it changes the picture: the same radius over a 1 m surface
+  // and over a 0.25 m one are two different measurements of the same ground.
+  if (usesHorizon(vis)) {
+    const factor = horizonDecimation(dem.metresPerPx, r);
+    if (factor > 1) {
+      settings.push(
+        t('figure.set.horizonGrid', { m: dec(dem.metresPerPx * factor, 2) }),
+      );
+    }
   }
   // The grid is capped, so a large rectangle is served coarser than the
   // acquisition under it publishes. Anyone comparing two renders of

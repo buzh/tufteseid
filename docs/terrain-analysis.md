@@ -251,14 +251,54 @@ that was used rather than the constant. Two, not five: the split is by
 *quantity*, so LRM's smoothing radius is one number and the horizon search
 radius shared by sky-view, both opennesses and VAT is the other
 (`usesHorizon` in `render.ts`). Getting that right needed one more thing than
-passing the number through: `computeHorizonFields` **silently clamps** its
-search to `SVF_MAX_RADIUS_PX` (24) pixels, i.e. 6 m on a 0.25 m DEM, so the
-requested radius and the effective one are routinely different numbers.
-`clampRadius(vis, dem, metres)` in `render.ts` is the single answer both the
-render and the caption go through, and `radiusRange` derives the slider's
-ceiling from the same cap so the control cannot offer a position that renders
-identically to the one before it. A caption reading "SVF-radius 20 m" over a
-6 m render is exactly the failure the figure machinery exists to prevent.
+passing the number through: what the horizon scan can reach is not what it is
+asked for.
+
+### The horizon radius is a distance, and that costs a decimation
+
+The ray walk costs width × height × directions × steps, and `SVF_MAX_RADIUS_PX`
+(24) is the budget on the last of those — the thing that keeps the pass a pass.
+For a long time the walk stepped one DEM cell at a time, which quietly turned
+that budget into a limit in metres as well: 24 steps of 0.25 m is **6 m**, and
+6 m is shorter than a burial mound. The per-project DTM being the *finest*
+source available therefore bought the horizon views the *shortest* search, and
+there was no way to trade the resolution back.
+
+The fix is to separate the two. `horizonDecimation(metresPerPx, radiusMetres)`
+returns how far the grid has to be averaged down for the requested radius to
+fit in 24 steps, capped at `HORIZON_MIN_M_PER_PX` (1 m per pixel);
+`computeHorizonFields` block-averages the DEM by that factor, scans the coarse
+copy, and bilinearly interpolates sky-view, positive and negative openness back
+onto the full grid, masked against the original NaNs so the fields cannot bleed
+into cells with no elevation. Reach on a 0.25 m DEM goes 6 m → 24 m, and the
+pass gets *cheaper* by factor² on the way — a wider horizon over a sixteenth of
+the cells is less work, not more (≈20 s → ≈1.3 s on a 3000² grid).
+
+Why 1 m is the floor, in both directions. Below it there is little to lose: the
+acquisitions behind the 0.25 m mosaic are mostly 4–5 points/m², i.e. a mean
+point spacing of 0.45–0.50 m, so a 0.25 m grid is around three-quarters
+interpolation and averaging four of its cells throws away very little that was
+ever measured — Kartverket's own national product is 1 m, and the prospection
+literature computes sky-view factor on 0.5–1 m DEMs. Above it there is: past a
+metre the surface stops resolving the features whose horizon is being measured,
+and a ditch two cells wide has no horizon worth finding.
+
+Coarsening is not free of *meaning*, though, only of cost — the same radius
+over a 1 m surface and over a 0.25 m one are two different measurements of the
+same ground. So when the factor is above 1 the caption says so, on a line of
+its own (`figure.set.horizonGrid`, "horisontsøk i 1 m rutenett"), because the
+resolution line below it is describing the DEM and no longer describes what
+these four views were computed from.
+
+The requested radius and the effective one can still differ — the ceiling is
+`horizonMaxRadiusMetres`, 24 m on any grid at 1 m or finer and 24 × the cell
+size on a coarser one, and a spec saved over one rectangle can be replayed over
+another. `clampRadius(vis, dem, metres)` in `render.ts` is the single answer
+both the render and the caption go through, and `radiusRange` derives the
+slider's ceiling from the same rule so the control cannot offer a position that
+renders identically to the one before it. A caption reading "SVF-radius 40 m"
+over a 24 m render is exactly the failure the figure machinery exists to
+prevent.
 
 ## Tier 1 — server-side visualization sidecar (design, not built, mostly moot)
 

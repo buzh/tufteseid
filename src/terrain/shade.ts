@@ -54,15 +54,73 @@ export const MULTI_AZIMUTHS = [
 // little gain.
 export const SVF_DIRECTIONS = 16;
 
-// Hard ceiling on the horizon search radius in *pixels*, whatever the metre
-// value works out to. Keeps a fine-resolution DEM from turning a 3-second
-// pass into a 30-second one.
+// Hard ceiling on the horizon search radius in *steps*, whatever the metre
+// value works out to. The scan costs width × height × directions × steps, so
+// this is what keeps it a pass and not a coffee break.
 //
-// Exported because it silently caps what the caller asked for: on a 0.25 m
-// grid this is 6 m, so a control offering 20 m would be a knob that moves
-// without changing anything, and a caption reading "20 m" would be false.
-// `radiusRange` in render.ts derives the slider's maximum from it.
+// It is a budget in pixels, and that used to make it a limit in metres too: on
+// a 0.25 m grid, 24 steps is 6 m, and 6 m is shorter than the earthworks the
+// tool exists to find. `horizonDecimation` below is how the two were separated.
 export const SVF_MAX_RADIUS_PX = 24;
+
+// The coarsest grid the horizon scan will decimate down to, in metres per
+// pixel — and therefore, with the step budget above, what sets how far the
+// radius can reach: 24 steps of 1 m is 24 m, which covers a burial mound.
+//
+// Why 1 m and not finer: the horizon is a question about landform, and the
+// per-project DTM does not carry landform detail below about here anyway. The
+// acquisitions behind the 0.25 m mosaic are mostly 4–5 points/m² — mean point
+// spacing 0.45–0.50 m — so a 0.25 m grid is roughly three-quarters
+// interpolation, and averaging four of its cells together throws away very
+// little that was ever measured. Kartverket's own national product is 1 m and
+// the prospection literature computes sky-view factor on 0.5–1 m DEMs.
+//
+// Why not coarser: past a metre the surface stops resolving the features whose
+// horizon is being measured, and a ditch that is two cells wide has no horizon
+// worth finding.
+export const HORIZON_MIN_M_PER_PX = 1;
+
+// How far the scan may be decimated on this grid. 1 on anything at or coarser
+// than HORIZON_MIN_M_PER_PX, i.e. the whole rule is inert there.
+const maxDecimation = (metresPerPx: number): number =>
+  Math.max(1, Math.floor(HORIZON_MIN_M_PER_PX / metresPerPx));
+
+/**
+ * The decimation this radius needs on this grid, and 1 when it needs none.
+ *
+ * Only as much as the radius asks for, which is the point: a 2 m search on a
+ * 0.25 m grid is 8 steps, fits the budget, and runs at full resolution. The
+ * coarsening arrives with the reach that requires it and no sooner, so the
+ * fine end of the slider keeps every pixel the DEM has.
+ *
+ * Exported because a figure caption has to print it — the four horizon views
+ * are then read off a different surface from the hillshade beside them, and
+ * two renders at the same radius over different grids are different pictures.
+ */
+export const horizonDecimation = (
+  metresPerPx: number,
+  radiusMetres: number,
+): number =>
+  Math.min(
+    maxDecimation(metresPerPx),
+    Math.max(
+      1,
+      Math.ceil(radiusMetres / (metresPerPx * SVF_MAX_RADIUS_PX)),
+    ),
+  );
+
+/**
+ * The longest horizon search this grid can actually deliver, in metres.
+ *
+ * Derived from the two constants rather than chosen, and derived through
+ * `maxDecimation` rather than from `HORIZON_MIN_M_PER_PX` directly, because
+ * the decimation is an integer: on a 0.3 m grid it is 3, so the reach is 21.6 m
+ * and not the 24 m a metre-based calculation would promise. `radiusRange` in
+ * render.ts takes the slider's ceiling from here, so the control cannot offer
+ * a position the scan would then quietly clamp.
+ */
+export const horizonMaxRadiusMetres = (metresPerPx: number): number =>
+  SVF_MAX_RADIUS_PX * metresPerPx * maxDecimation(metresPerPx);
 
 // ---------------------------------------------------------------------------
 // Gradients
@@ -300,6 +358,12 @@ export type HorizonFields = {
 // cache one result and switch between the views for free, which is what makes
 // them a keyboard ring rather than three separate waits.
 //
+// **It scans a decimated copy when the radius asks for more reach than the step
+// budget allows**, and interpolates the three fields back. That is what lets a
+// radius be a distance rather than a pixel count: the budget is 24 steps, so on
+// a 0.25 m grid the search used to stop at 6 m — shorter than the mounds and
+// hollow ways it was being pointed at. See `horizonDecimation`.
+//
 // The two clamping rules are not the same, and that difference *is* the
 // difference between the measurements:
 //
@@ -317,7 +381,149 @@ export function computeHorizonFields(
   dem: Dem,
   radiusMetres: number,
 ): HorizonFields {
-  const { width: w, height: h, data, metresPerPx } = dem;
+  const factor = horizonDecimation(dem.metresPerPx, radiusMetres);
+  if (factor === 1) return scanHorizon(dem, radiusMetres);
+
+  // Averaged down, scanned, and interpolated back — which buys the reach the
+  // step budget would otherwise cost (24 steps of 1 m instead of 24 of 0.25 m)
+  // *and* makes the pass factor² cheaper, because a wider horizon over fewer
+  // cells is the same walk over a sixteenth of the grid.
+  const coarse = decimate(dem, factor);
+  const scanned = scanHorizon(coarse, radiusMetres);
+  const back = (field: Float32Array) =>
+    upsample(field, coarse, dem.width, dem.height, factor, dem.data);
+  return {
+    svf: back(scanned.svf),
+    openPos: back(scanned.openPos),
+    openNeg: back(scanned.openNeg),
+  };
+}
+
+/** The subset of a `Dem` the scan and its two resamplers need. */
+type Grid = {
+  width: number;
+  height: number;
+  data: Float32Array;
+  metresPerPx: number;
+};
+
+// Block mean, NaN-aware, and a mean rather than a subsample on purpose: the
+// scan is looking for a skyline, and point-sampling a 0.25 m DTM every fourth
+// cell would hand it that grid's interpolation noise as if it were relief.
+// A block with no readable cell stays NaN, so a coverage hole survives the
+// round trip as a hole.
+function decimate(grid: Grid, factor: number): Grid {
+  const w = Math.max(1, Math.ceil(grid.width / factor));
+  const h = Math.max(1, Math.ceil(grid.height / factor));
+  const data = new Float32Array(w * h).fill(NaN);
+
+  for (let y = 0; y < h; y++) {
+    const y0 = y * factor;
+    const y1 = Math.min(grid.height, y0 + factor);
+    for (let x = 0; x < w; x++) {
+      const x0 = x * factor;
+      const x1 = Math.min(grid.width, x0 + factor);
+      let sum = 0;
+      let n = 0;
+      for (let sy = y0; sy < y1; sy++) {
+        const row = sy * grid.width;
+        for (let sx = x0; sx < x1; sx++) {
+          const v = grid.data[row + sx];
+          if (!Number.isNaN(v)) {
+            sum += v;
+            n++;
+          }
+        }
+      }
+      if (n > 0) data[y * w + x] = sum / n;
+    }
+  }
+  return { width: w, height: h, data, metresPerPx: grid.metresPerPx * factor };
+}
+
+// Bilinear, back to the DEM's own grid. Bilinear rather than nearest because
+// the result is looked at: sky-view factor blown up 4× by replication is a
+// field of 4×4 squares, and the eye reads those as structure.
+//
+// Two rules make it safe at a coverage edge. Corners with no value are dropped
+// from the weighted mean rather than poisoning it, so the field stays defined
+// right up to the hole; and `mask` — the DEM's own data — then cuts it back to
+// exactly the cells that have an elevation, since the averaged grid otherwise
+// bleeds up to `factor` pixels into ground nothing was measured on.
+function upsample(
+  field: Float32Array,
+  src: Grid,
+  width: number,
+  height: number,
+  factor: number,
+  mask: Float32Array,
+): Float32Array {
+  const out = new Float32Array(width * height).fill(NaN);
+  const { width: sw, height: sh } = src;
+  const clampX = (v: number) => (v < 0 ? 0 : v >= sw ? sw - 1 : v);
+
+  for (let y = 0; y < height; y++) {
+    // Pixel centres, not corners: the coarse cell's value belongs at the
+    // middle of the block it was averaged from, and half a coarse cell of
+    // offset is a visible shift of the whole field at factor 4.
+    const fy = (y + 0.5) / factor - 0.5;
+    const yf = Math.floor(fy);
+    const ty = fy - yf;
+    const rowA = (yf < 0 ? 0 : yf >= sh ? sh - 1 : yf) * sw;
+    const yb = yf + 1;
+    const rowB = (yb < 0 ? 0 : yb >= sh ? sh - 1 : yb) * sw;
+
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      if (Number.isNaN(mask[i])) continue;
+
+      const fx = (x + 0.5) / factor - 0.5;
+      const xf = Math.floor(fx);
+      const tx = fx - xf;
+      const xa = clampX(xf);
+      const xb = clampX(xf + 1);
+
+      const w00 = (1 - tx) * (1 - ty);
+      const w10 = tx * (1 - ty);
+      const w01 = (1 - tx) * ty;
+      const w11 = tx * ty;
+      const v00 = field[rowA + xa];
+      const v10 = field[rowA + xb];
+      const v01 = field[rowB + xa];
+      const v11 = field[rowB + xb];
+
+      let sum = 0;
+      let weight = 0;
+      if (!Number.isNaN(v00)) {
+        sum += v00 * w00;
+        weight += w00;
+      }
+      if (!Number.isNaN(v10)) {
+        sum += v10 * w10;
+        weight += w10;
+      }
+      if (!Number.isNaN(v01)) {
+        sum += v01 * w01;
+        weight += w01;
+      }
+      if (!Number.isNaN(v11)) {
+        sum += v11 * w11;
+        weight += w11;
+      }
+      if (weight > 0) out[i] = sum / weight;
+    }
+  }
+  return out;
+}
+
+// The walk itself, over whatever grid it is handed — the DEM's own when the
+// radius fits in the step budget, a decimated copy when it does not.
+function scanHorizon(grid: Grid, radiusMetres: number): HorizonFields {
+  const { width: w, height: h, data, metresPerPx } = grid;
+  // Still clamped, though `clampRadius` in render.ts now caps the request at
+  // what this grid can deliver, so it should never bind. Kept because a
+  // headless caller can reach this with any number at all, and the failure it
+  // prevents — a 30-second pass — is worse than the one it causes.
   const radiusPx = Math.min(
     SVF_MAX_RADIUS_PX,
     Math.max(1, Math.round(radiusMetres / metresPerPx)),
