@@ -1,6 +1,6 @@
 import { atom } from 'jotai';
 import { atomEffect } from 'jotai-effect';
-import { getMeasureLayer } from '../draw/drawControls/hooks/mapLayers';
+import { getMeasureLayer } from '../map/vectorLayers';
 import { mapAtom } from '../map/atoms';
 
 import { removeOwnedInteractions } from '../map/interactions';

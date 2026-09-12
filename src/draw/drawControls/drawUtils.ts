@@ -13,7 +13,7 @@ import {
   MEASUREMNT_ELEMENT_PREFIX,
   MEASUREMNT_OVERLAY_PREFIX,
 } from './hooks/drawSettings';
-import { getDrawOverlayLayer } from './hooks/mapLayers';
+import { getDrawOverlayLayer } from '../../map/vectorLayers';
 
 const getMeasurementText = (geometry: Geometry, projection: string) => {
   if (geometry instanceof Polygon) {

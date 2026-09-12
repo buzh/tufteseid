@@ -6,7 +6,7 @@ import VectorLayer from 'ol/layer/Vector';
 import Map from 'ol/Map';
 import Cluster from 'ol/source/Cluster';
 import VectorSource from 'ol/source/Vector';
-import { getMarkerLayer } from '../../draw/drawControls/hooks/mapLayers';
+import { getMarkerLayer } from '../../map/vectorLayers';
 import { mapAtom } from '../../map/atoms';
 import { fitPadding } from '../../shell/chromeInsets';
 import { SearchResult } from '../../types/searchTypes';

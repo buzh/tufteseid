@@ -22,7 +22,7 @@ import {
 } from '../api/localityFinds';
 import { currentUserAtom, isAdminAtom } from '../auth/atoms';
 import { useDrawSettings } from '../draw/drawControls/hooks/drawSettings';
-import { getDrawLayer } from '../draw/drawControls/hooks/mapLayers';
+import { getDrawLayer } from '../map/vectorLayers';
 import { renderFigureBlob } from '../figure/figure';
 import { describeHeritageRender, screenshotFigure } from '../figure/specs';
 import type { LidarSource } from '../lidarExtract/sources';

@@ -37,7 +37,7 @@ import { getDrawInteraction } from '../../draw/drawControls/hooks/mapInterations
 import {
   getDrawLayer,
   getDrawOverlayLayer,
-} from '../../draw/drawControls/hooks/mapLayers';
+} from '../../map/vectorLayers';
 import { getHighestZIndex } from '../../draw/drawControls/hooks/verticalMove';
 import { funnDraftActiveAtom } from '../../localities/atoms';
 import { mapAtom } from '../../map/atoms';

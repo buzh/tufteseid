@@ -2,7 +2,7 @@ import type { FeatureCollection } from 'geojson';
 import { useAtomValue } from 'jotai';
 import { useCallback, useEffect, useRef } from 'react';
 import type { LocalityBbox } from '../api/localities';
-import { getDrawLayer } from '../draw/drawControls/hooks/mapLayers';
+import { getDrawLayer } from '../map/vectorLayers';
 import { mapAtom } from '../map/atoms';
 import {
   getDrawLayerExtent4326,

@@ -32,7 +32,7 @@ import {
 import { getFeatureIcon } from '../../utils/featureUtils';
 import { isDrawIconFilled } from '../drawUtils';
 import { getDrawInteraction, getSelectInteraction } from './mapInterations';
-import { getDrawLayer } from './mapLayers';
+import { getDrawLayer } from '../../../map/vectorLayers';
 
 export const MEASUREMNT_OVERLAY_PREFIX = 'measurement-overlay-';
 export const INTERACTIVE_OVERLAY_PREFIX = 'interactive-overlay-';

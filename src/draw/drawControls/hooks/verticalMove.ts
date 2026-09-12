@@ -1,7 +1,7 @@
 import { Feature } from 'ol';
 import { Geometry } from 'ol/geom';
 import { getSelectInteraction } from './mapInterations';
-import { getDrawLayer } from './mapLayers';
+import { getDrawLayer } from '../../../map/vectorLayers';
 
 type MoveDirection = 'up' | 'down';
 

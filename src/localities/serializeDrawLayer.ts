@@ -5,7 +5,7 @@ import { Circle as CircleGeom } from 'ol/geom';
 import { fromCircle } from 'ol/geom/Polygon';
 import { transformExtent } from 'ol/proj';
 import { LocalityBbox } from '../api/localities';
-import { getDrawLayer } from '../draw/drawControls/hooks/mapLayers';
+import { getDrawLayer } from '../map/vectorLayers';
 import { getFeaturePropertiesForExport } from '../draw/utils/featureUtils';
 
 // Serialize everything currently on the shared draw layer to a GeoJSON
