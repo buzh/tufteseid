@@ -530,7 +530,7 @@ looking at. Row 1 answers **what am I looking at**; the strip under it answers
 | Control | What it does |
 |---|---|
 | `RibbonSearch` | Place/address/property search field; results render in the left slot (§7) |
-| **Standard** (1) | Background mode: an ordinary map, in one of five cartographies (§5.10) |
+| **Kart** (1) | Background mode: an ordinary map, in one of five cartographies (§5.10) |
 | **LiDAR** (2) | Background mode: hillshade stack |
 | **Hybrid** (3) | LiDAR stack + transparent roads/rail/place-names on top |
 | **Flyfoto** (4) | Background mode: NiB ortofoto (§5.5) |
@@ -571,17 +571,27 @@ returns you to exactly the dataset and style you left — 1→5→1 is free wher
 
 | Ground | Strip |
 |---|---|
-| Standard (1) | Karttype pulldown — the five cartographies (topografisk, gråtone, rasterkart, sjøkart, amtskart), also the W/S ring (§5.10) |
+| Kart (1) | **None.** Its one control, the Karttype pulldown over the five cartographies, hangs off the `Kart` button itself as a caret (§5.10); W/S still walks the ring |
 | LiDAR (2), Hybrid (3) | Dataset pulldown — **Automatisk** (§5.7), the national mosaic, or one of ~1936 per-project datasets ranked by relevance to the viewport · style pulldown (the active dataset's WMS styles, with a "flere stiler" second tier), only when the dataset publishes more than one · DTM/DOM segment · **Høydekurver** switch, Hybrid only |
 | Flyfoto (4) | Acquisition pulldown — the seamless mosaic or any acquisition covering the viewport, newest first · period chips (Alle / 2010– / 1990–2009 / 1960–1989 / –1959), which narrow both that list and the W/S ring (§5.5) |
 | Terreng (5) | Visualisering pulldown — the eight relief views, each with its own explanation as a tooltip, also the W/S ring (§10) · DTM/DOM segment · **the sliders the current visualization uses**, two to four of azimuth / altitude / exaggeration / radius / Transparens, inline as label · track · readout (§10) · the resolution readout. No actions: keeping the render is `Behold` on row 2 (§8.9.2) and the rectangle is the lokalitet's, so "Juster området" owns it |
 
-**The strip is always on the bar.** It used to vanish under Standard, which had
-nothing to adjust; five cartographies filled that hole, and the fixture is the
-better shape anyway — a line of chrome appearing and disappearing as you walk
-the ring changes the whole bar's height under the pointer and moves every
-control below row 1. With the compare curtain up it also carries the A|B switch
-ahead of the subject label (§5.8).
+**The strip is on the bar for four grounds out of five, and absent under
+Kart.** It was a fixture for a while. The argument for that was real — a line
+of chrome appearing and disappearing as you walk the ring changes the whole
+bar's height under the pointer and moves every control below row 1 — but it
+priced the cost wrong: the height only changes on 1↔2, a deliberate press,
+never on W/S *inside* a ground. What the fixture was buying under Standard was
+a 40 px row carrying one pulldown and a subject label that repeated the lit
+button above it, and 40 px of a bar that floats over the terrain is not free
+either. So Standard's pulldown moved onto the `Kart` button (§5.10) and the row
+went with it. The other four bring two to six controls each and earn the line.
+
+One exception, and it is the A|B switch: with the compare curtain up the strip
+stays even under Kart, carrying the switch and the subject label and nothing
+else (§5.8) — "Høyre — Kart", which is the phrase that is wanted. Without it
+there would be no way to aim the ribbon at the other half while reading an
+ordinary map.
 
 `RibbonSettingsRow` splits the two questions deliberately. `ground.modifiers`
 picks the **controls**, because they act on a stack and Hybrid is a modifier on
@@ -1221,9 +1231,18 @@ the picture means, and only one of them says nothing was recorded there (§8.10)
 
 ### 5.10 Standard — five cartographies of the same ground
 
-Standard's strip carries one control, the **Karttype** pulldown
-(`src/shell/standard/StandardVariantPicker.tsx`), over the ring in
-`STANDARD_VARIANTS`:
+**The button reads `Kart`** (`Map` in English); the ground, the mode key, the
+atoms and this doc still call it Standard. The label changed because "Standard"
+named it by contrast with the other four — the *not*-LiDAR, *not*-photograph
+one — which only means anything to someone who already knows the other four
+exist. `Kart` says what it is to someone who has just arrived, and the four
+buttons then read as four kinds of thing rather than as one default and three
+alternatives.
+
+Standard is the one ground with **no settings strip**. Its single control, the
+**Karttype** pulldown (`src/shell/standard/StandardVariantPicker.tsx`), is a
+caret welded to the `Kart` button's right edge — the same seam as `EyeSplit`,
+one object with two hit targets. It walks the ring in `STANDARD_VARIANTS`:
 
 | Variant | What it is |
 |---|---|
@@ -1253,6 +1272,26 @@ with a hillshade of the same hillside. Two things follow for the UI:
   variants to their own label rather than to "Standard": a screenshot over an
   1890s survey and one over the current topographic map are different
   documents, and the caption is the only place the file says which (§8.10).
+
+Three things follow from the pulldown hanging off the button rather than off a
+strip, and they are the whole of what the move changed:
+
+- **The active cartography is no longer written on the bar.** It is in the
+  caret's tooltip (`ribbon.standard.triggerTip`), in the list's active row, and
+  — the reason that is enough — on the map: the five look nothing alike, in the
+  way two LiDAR acquisitions of the same hillside do.
+- **The list opens from any ground**, which the strip could not do; it only
+  existed while Standard was already up, so "give me the nautical chart" from
+  LiDAR was two presses. Picking a row therefore goes through
+  `ground.select('standard')` before it applies the variant (`onPickGround`).
+  Setting the background alone would leave a pick made from Hybrid with the
+  hybrid overlay still switched on over a topo base, and one made from Terreng
+  changing the ground under a render nobody can see through.
+- **`useStandardControls` has no `standDown`**, unlike the other three control
+  hooks. Theirs exists because an unmounted popover never fires its own
+  open-change callback; this one lives on a button that is on row 1 whatever
+  ground is up, and closing it when Standard stops being the ground would undo
+  the point above.
 
 The pulldown has no count badge, no spinner and no relevance tier, unlike the
 LiDAR and ortofoto ones. Nothing is queried — all five are national products,

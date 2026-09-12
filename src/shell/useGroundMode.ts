@@ -54,10 +54,11 @@ export type GroundMode = (typeof GROUND_MODES)[number];
  * strip puts under row 1, and — for the three raster families — the ring W/S
  * walks.
  *
- * Total, with no `null` case. Standard used to be one: it meant the topo map
- * and nothing else, so the strip was simply absent under it. It now offers
- * the same ground drawn five ways, which is what makes the strip a permanent
- * fixture rather than something that appears when you leave the default.
+ * Total, with no `null` case, even though Standard's arm no longer draws a
+ * strip. The value still has work to do there — it is what `cycle` routes W/S
+ * by, and what RibbonSettingsRow tests to decide it has nothing to render —
+ * so collapsing it to `null` would trade one honest name for two special
+ * cases.
  *
  * Terreng is in the list like the rest of them. Its knobs used to live in a
  * dock column down the side of the map, so pressing 5 moved the controls to a
@@ -190,22 +191,18 @@ export const useGroundMode = (
   // open-change callback — and LiDAR's open flag is what paints footprint
   // polygons on the map. Only the *controls* stand down; the background stays
   // exactly as it was, which is what makes coming back out of Terreng free.
-  const { standDown: standardStandDown } = standard;
+  //
+  // Three of the four, not all four: Standard's pulldown hangs off the `Kart`
+  // button rather than off the strip, so it never leaves the bar and there is
+  // nothing to stand down — see useStandardControls.
   const { standDown: lidarStandDown } = lidar;
   const { standDown: flyfotoStandDown } = flyfoto;
   const { standDown: terrainStandDown } = terrain;
   useEffect(() => {
-    if (modifiers !== 'standard') standardStandDown();
     if (modifiers !== 'lidar') lidarStandDown();
     if (modifiers !== 'flyfoto') flyfotoStandDown();
     if (modifiers !== 'terrain') terrainStandDown();
-  }, [
-    modifiers,
-    standardStandDown,
-    lidarStandDown,
-    flyfotoStandDown,
-    terrainStandDown,
-  ]);
+  }, [modifiers, lidarStandDown, flyfotoStandDown, terrainStandDown]);
 
   // A/D/W/S/E go to the ring of the ground on screen, and nowhere else. The
   // four control hooks each know *how* to walk their own ring but cannot see

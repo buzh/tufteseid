@@ -15,8 +15,6 @@ import { LidarModelToggle } from './lidar/LidarModelToggle';
 import { LidarStylePicker } from './lidar/LidarStylePicker';
 import type { LidarControls } from './lidar/useLidarControls';
 import styles from './Ribbon.module.css';
-import { StandardVariantPicker } from './standard/StandardVariantPicker';
-import type { StandardControls } from './standard/useStandardControls';
 import { TerrainStrip } from './terrain/TerrainStrip';
 import type { TerrainAnalysis } from './terrain/useTerrainAnalysis';
 import type { GroundControls, GroundMode } from './useGroundMode';
@@ -59,11 +57,22 @@ const SUBJECT_KEY: Record<GroundMode, string> = {
  * - `ground.mode` picks the **label**, because that is the ground actually on
  *   screen.
  *
- * Always present. It used to disappear under Standard, which had nothing to
- * adjust; now that Standard is five cartographies the strip is a fixture, and
- * that is the better shape anyway — a line of chrome that comes and goes as
- * you walk the ring makes the whole bar change height under the pointer, and
- * every control below row 1 move.
+ * **Absent under Standard**, and present under the other four. The strip was
+ * a fixture for a while, on the argument that a line of chrome coming and
+ * going as you walk the ring changes the bar's height under the pointer and
+ * moves everything below row 1. That argument is right about the cost and
+ * wrong about the size of it: the height only changes on 1↔2, a deliberate
+ * press, never on W/S inside a ground — and what it was buying under Standard
+ * was a 40 px row carrying one pulldown and a subject label that repeated the
+ * lit button above it. So Standard's pulldown moved onto the `Kart` button
+ * (StandardVariantPicker) and the row went with it. The other four bring two
+ * to six controls each and earn the line.
+ *
+ * The exception is the compare curtain: the A|B switch lives here, so with the
+ * curtain up the strip stays even under Standard — otherwise there would be no
+ * way to aim the ribbon at the other half. It carries the switch and the
+ * subject and nothing else there, which is exactly the phrase that is wanted:
+ * "Høyre — Kart".
  *
  * Terreng is the one subject that can *wrap* this line, because it is the one
  * that puts sliders on it (`TerrainSliders`, inline: label · track · readout).
@@ -86,13 +95,11 @@ const SUBJECT_KEY: Record<GroundMode, string> = {
  */
 export const RibbonSettingsRow = ({
   ground,
-  standard,
   lidar,
   flyfoto,
   terrain,
 }: {
   ground: GroundControls;
-  standard: StandardControls;
   lidar: LidarControls;
   flyfoto: FlyfotoControls;
   terrain: TerrainAnalysis;
@@ -102,6 +109,10 @@ export const RibbonSettingsRow = ({
   const [focus, setFocus] = useAtom(compareFocusAtom);
 
   const subject = t(SUBJECT_KEY[ground.mode]);
+
+  // Standard's controls are on its own button, so there is nothing for this
+  // row to hold — except the A|B switch, which has nowhere else to go.
+  if (ground.modifiers === 'standard' && !compareOn) return null;
 
   const halfOptions: SegmentedOption<CompareHalf>[] = [
     { value: 'a', label: t('ribbon.compare.halfA') },
@@ -128,11 +139,9 @@ export const RibbonSettingsRow = ({
 
       <span className={styles.settingsSubject}>{subject}</span>
 
-      {ground.modifiers === 'standard' && (
-        <div className={styles.group}>
-          <StandardVariantPicker standard={standard} />
-        </div>
-      )}
+      {/* No `standard` arm. Under Standard this row only ever renders with
+          the curtain up, and then it is the A|B switch and the subject —
+          the cartography pulldown is on the `Kart` button above. */}
 
       {ground.modifiers === 'flyfoto' && (
         <div className={styles.group}>

@@ -50,6 +50,14 @@
   color: var(--c-fg-subtle);
 }
 
+/* A control with a seam down it — the `Kart` button and its cartography
+   caret. Same geometry as EyeSplit: one object, two hit targets, stretched so
+   the narrow half matches whatever height the labelled half decides on. */
+.split {
+  display: inline-flex;
+  align-items: stretch;
+}
+
 /* Keeps a set of controls together when the row wraps. */
 .group {
   display: flex;

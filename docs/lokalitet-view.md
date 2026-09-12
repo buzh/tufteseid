@@ -609,9 +609,10 @@ nothing about why the owner thought there was something there.
 ## 5. The lokalitet row
 
 ```
-┌─ row 1 ── search · [1 Standard][2 LiDAR][3 Hybrid][4 Flyfoto]
+┌─ row 1 ── search · [1 Kart|▾][2 LiDAR][3 Hybrid][4 Flyfoto]
 │           · 🏛Kulturminner|👁 · Stedsinfo · Mål · Mine lok. · Ny lok. · konto
 ├─ row 2 ── settings strip for the ground on screen        (A|B when comparing)
+│           — absent under Kart, whose one pulldown is the ▾ above
 ├─ row 3 ── terrain sliders                                  (only in Terreng)
 └─ row 4 ── the lokalitet
 ```

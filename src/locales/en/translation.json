@@ -522,7 +522,7 @@
   },
   "ribbon": {
     "mode": {
-      "standard": "Standard",
+      "standard": "Map",
       "standardTip": "Ordinary map — topographic, greyscale, raster, nautical chart or amtskart",
       "lidar": "LiDAR",
       "lidarTip": "LiDAR relief (national mosaic or per project)",
@@ -590,6 +590,7 @@
     "standard": {
       "datasetLabel": "Map type",
       "datasetHead": "Map type · W/S",
+      "triggerTip": "Map type: {{name}} — pick another (W/S)",
       "historicHint": "Older surveys, drawn before the twentieth century rearranged the landscape.",
       "topo": "Topographic",
       "topoMeta": "the ordinary map",

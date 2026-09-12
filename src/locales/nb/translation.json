@@ -522,7 +522,7 @@
   },
   "ribbon": {
     "mode": {
-      "standard": "Standard",
+      "standard": "Kart",
       "standardTip": "Vanlig kart — topografisk, gråtone, raster, sjøkart eller amtskart",
       "lidar": "LiDAR",
       "lidarTip": "LiDAR-relieff (nasjonal mosaikk eller per prosjekt)",
@@ -590,6 +590,7 @@
     "standard": {
       "datasetLabel": "Karttype",
       "datasetHead": "Karttype · W/S",
+      "triggerTip": "Karttype: {{name}} — velg en annen (W/S)",
       "historicHint": "Eldre kartverk, tegnet før 1900-tallet endret landskapet.",
       "topo": "Topografisk",
       "topoMeta": "det vanlige kartet",

@@ -23,6 +23,7 @@ import { RibbonMeasure } from './RibbonMeasure';
 import { RibbonSearch } from './RibbonSearch';
 import { RibbonSettingsRow } from './RibbonSettingsRow';
 import styles from './Ribbon.module.css';
+import { StandardVariantPicker } from './standard/StandardVariantPicker';
 import { useStandardControls } from './standard/useStandardControls';
 import { useTerrainAnalysis } from './terrain/useTerrainAnalysis';
 import { GROUND_MODES, useGroundMode } from './useGroundMode';
@@ -61,8 +62,9 @@ import { useRecreateView } from './useRecreateView';
  *
  * Standard, LiDAR and Flyfoto each bring a dataset pulldown and a keyboard
  * ring, and only one of the three is ever on screen — this component is where
- * they are chained, because there is exactly one registered cycle handler. The
- * pulldowns themselves render on the strip.
+ * they are chained, because there is exactly one registered cycle handler.
+ * LiDAR's and Flyfoto's pulldowns render on the strip; Standard's hangs off
+ * the `Kart` button here, and is the reason that ground has no strip at all.
  *
  * Sammenlign has left this row too, for the same reason and to the same
  * place. It still needs the ring's current and previous mode to pick a
@@ -246,13 +248,24 @@ export const RibbonGlobalRow = () => {
 
         {/* The ring. Order is GROUND_MODES, which is also 1–5. */}
         <div className={styles.group}>
-          <ModeButton
-            icon="map"
-            label={t('ribbon.mode.standard')}
-            tooltip={`${t('ribbon.mode.standardTip')} (1)`}
-            active={ground.mode === 'standard'}
-            onClick={() => ground.select('standard')}
-          />
+          {/* The one ground whose dataset list hangs off its own button
+              rather than off the settings strip, which is why it is also the
+              one ground with no strip. Five cartographies were never enough
+              to earn a row — see StandardVariantPicker. */}
+          <div className={styles.split}>
+            <ModeButton
+              icon="map"
+              label={t('ribbon.mode.standard')}
+              tooltip={`${t('ribbon.mode.standardTip')} (1)`}
+              active={ground.mode === 'standard'}
+              joinedRight
+              onClick={() => ground.select('standard')}
+            />
+            <StandardVariantPicker
+              standard={standard}
+              onPickGround={() => ground.select('standard')}
+            />
+          </div>
 
           {/* Activating LiDAR lands on whatever the dataset pulldown is set to
               — the best acquisition for this view while it says Automatisk,
@@ -375,7 +388,8 @@ export const RibbonGlobalRow = () => {
         <RibbonAccount />
       </div>
 
-      {/* The settings strip for whatever the ring above has selected. Rendered
+      {/* The settings strip for whatever the ring above has selected — absent
+          under Kart, which keeps its one pulldown on its own button. Rendered
           from here rather than as a sibling in Ribbon.tsx because it runs off
           the same control hooks, which are mounted once and only here —
           hoisting them into a context to gain a second error boundary would
@@ -383,7 +397,6 @@ export const RibbonGlobalRow = () => {
           hooks. */}
       <RibbonSettingsRow
         ground={ground}
-        standard={standard}
         lidar={lidar}
         flyfoto={flyfoto}
         terrain={terrain}

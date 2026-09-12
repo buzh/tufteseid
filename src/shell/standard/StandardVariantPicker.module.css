@@ -1,0 +1,46 @@
+/*
+ * The caret welded to the right edge of the `Kart` button — the whole of
+ * Standard's control surface, now that it no longer has a settings strip to
+ * live on.
+ *
+ * Same seam as EyeSplit's eye and deliberately so: no gap, a hairline, a
+ * square inner corner, and no fixed height, so it stretches to whatever the
+ * ModeButton beside it decides on and the pair stays one object when the
+ * ribbon shrinks its buttons on a phone. Narrower than the eye (24 px against
+ * 28) because a caret is a glyph you aim at rather than a switch you hit
+ * repeatedly, and every pixel on row 1 is width the search field wants.
+ */
+
+.caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-left: 1px solid var(--c-border);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: transparent;
+  color: var(--c-fg-muted);
+  cursor: pointer;
+}
+
+.caret:hover {
+  background: var(--c-bg-hover);
+  color: var(--c-fg);
+}
+
+.caret:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 1px;
+}
+
+/* Held down while the list is up. Not the accent fill: on this row accent
+   means "this is the ground you are on", which is the half to the left's job
+   to say — and a lit caret beside a lit Kart button would read as two
+   selections rather than one control with a list open. */
+.caretOpen,
+.caretOpen:hover {
+  background: var(--c-bg-active);
+  color: var(--c-fg);
+}

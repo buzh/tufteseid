@@ -1,5 +1,5 @@
 import { useAtom } from 'jotai';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { backgroundLayerAtom } from '../../map/layers/config/backgroundLayers/atoms';
 import {
   isStandardVariant,
@@ -54,11 +54,13 @@ export const useStandardControls = () => {
     setPickerOpen(false);
   };
 
-  // Called by useGroundMode when Standard stops being the ground on screen.
-  // Nothing on the map depends on the pulldown being open the way LiDAR's
-  // footprints do, but an unmounted popover never fires its own
-  // open-change callback, so it would come back open.
-  const standDown = useCallback(() => setPickerOpen(false), []);
+  // There is no `standDown` here, unlike the other three control hooks. Theirs
+  // exists because their pulldowns leave the bar when their ground does, and
+  // an unmounted popover never fires its own open-change callback, so it would
+  // come back open. This one hangs off the `Kart` button, which is on row 1
+  // whatever ground is up — it is never unmounted, and closing it from
+  // useGroundMode would mean the list could not be opened from another ground
+  // at all, which is the thing the move onto the button bought.
 
   // W/S walks the five in the order they are listed, which puts the three
   // modern renderings of the same ground next to each other and amtskart at
@@ -75,7 +77,6 @@ export const useStandardControls = () => {
   return {
     cycle,
     isStandardBackground,
-    standDown,
     active,
     pickerOpen,
     setPickerOpen,
