@@ -38,10 +38,12 @@ import { canPinBilde } from './usePinnedBilde';
  * - The concealed images are here, marked. Concealment is one of the things
  *   you came to change, and a curation control whose effect you cannot see is
  *   not a control. That is `bilderItems` doing it, not this component.
- * - **Walking the rail does not put images on the map.** The ground overlay
- *   is one slot shared with the live terrain render, so a card that claimed it
- *   on arrival would knock a render down every time `Behold` landed a new
- *   image and moved the cursor. `Vis i ruta` is a verb here.
+ * - **Picking a frame lays it on the map**, the same as in show. It did not,
+ *   on the argument that the overlay slot is shared with the live terrain
+ *   render — but nothing that adds a record moves the cursor, and the one
+ *   thing that selects for you goes through `focusBilde`, which does not pin.
+ *   `Vis i ruta` survives as a toggle for taking it off again without giving
+ *   up the selection.
  * - **Order is dragged or stepped.** The frames drag along the rail
  *   (`useRailReorder`); the ←/→ buttons in this row do the same move for the
  *   keyboard and for touch, where the drag gesture belongs to scrolling.
@@ -65,11 +67,16 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   // Land on the first image rather than on nothing. The rail is legible
   // either way, but entering edit is entering to change something, and a
   // surface that opens with no subject makes you pick one before you can.
-  const { selectBilde, activeBildeId } = ws;
+  //
+  // `focusBilde`, not `selectBilde`: this is the surface choosing, and a
+  // choice the user did not make must not move the ground under them —
+  // pressing `Rediger` while reading a terrain render would otherwise lay the
+  // cover image over it.
+  const { focusBilde, activeBildeId } = ws;
   useEffect(() => {
     if (!items || items.length === 0 || activeBildeId) return;
-    selectBilde(items[0].id);
-  }, [items, activeBildeId, selectBilde]);
+    focusBilde(items[0].id);
+  }, [items, activeBildeId, focusBilde]);
 
   const isPinned = active != null && pinned.pinnedId === active.id;
   // Tombstoned by this session (§5.6, consequence 2). The frame stays on the
@@ -135,11 +142,12 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               </Button>
             ) : (
               <>
-                {/* An explicit verb here, unlike in show where picking a frame
-                    is what puts the image down. Both directions, because the
-                    only other way off the ground would be to walk to another
-                    card, and "look at the next one" is not what "take this one
-                    off the map" means. */}
+                {/* Picking the frame already laid it down, here as in show.
+                    This stays, and stays a *toggle* rather than show's
+                    way-back-on only, because edit is the stance with something
+                    else to do with a selected record: captioning it against
+                    the ground it covers needs the ground, and deselecting to
+                    get it would take away the caption field too. */}
                 {canPinBilde(active) && (
                   <Button
                     size="sm"

@@ -439,7 +439,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // collapsible and unmounts when it is folded away — and folding it away to
   // look at the map is exactly what you do after putting an image on it.
   const pinned = usePinnedBilde(attachmentItems);
-  const { pin } = pinned;
+  const { pin, pinnedId } = pinned;
 
   /*
    * The exhibit (docs/lokalitet-view.md §4.4).
@@ -510,28 +510,51 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   }, [activeBildeId, bilderItems, pin]);
 
   /*
-   * Picking a thumbnail *is* "Vis i ruta" — in show (§4.2). Pressing the
-   * active one again puts it down, which is the only way the filmstrip has to
+   * Picking a thumbnail *is* "Vis i ruta" (§4.2), in both stances. Pressing
+   * the active one again puts it down, which is the only way the rail has to
    * mean "nothing", and the images that cannot be placed are exactly the ones
    * with nothing to place.
    *
-   * In edit it is not, and that asymmetry is deliberate. The ground overlay is
-   * one slot with two contenders (map/groundOverlay.ts), and the other is a
-   * live terrain render — so a carousel that laid every card it walked past
-   * onto the map would knock the render down the instant a `Behold` result
-   * landed and moved the cursor onto it. In edit, laying an image on the
-   * ground is a verb on the card, pressed on purpose.
+   * It was show-only, and the asymmetry was a fear about the wrong caller. The
+   * ground overlay is one slot with two contenders (map/groundOverlay.ts) and
+   * the other is a live terrain render, so the worry was that a rail laying
+   * every card it walked past onto the map would knock the render down the
+   * instant a `Behold` result landed and moved the cursor onto it. `Behold`
+   * does not move the cursor; nothing that adds a record does. The only thing
+   * that selects a card for you is the auto-select in `BilderCarousel`, and
+   * that goes through `focusBilde`, which does not pin. What was left of the
+   * rule was two identical rails (§8.7.2) answering a click differently.
    *
-   * Walking away from a card still puts its image down either way: a pin that
-   * outlived the card it belongs to points at something the surface is no
-   * longer showing.
+   * Two records it refuses. One with no file or no extent cannot be laid down
+   * at all — `canPinBilde`. A borrowed one (§7) is the *original's* file and is
+   * not in `attachmentItems`, so `usePinnedBilde` has nothing to resolve it
+   * against; reading one is `Åpne originalen`, and `Ta med` is what makes it
+   * this lokalitet's.
+   *
+   * Walking away from a card still puts its image down: a pin that outlived
+   * the card it belongs to points at something the surface is no longer
+   * showing.
    */
   const pinOnWalk = useCallback(
     (rec: AttachmentRecord | null | undefined) => {
-      pin(!canEdit && rec && canPinBilde(rec) ? rec.id : null);
+      pin(rec && canPinBilde(rec) && !inheritedIds.has(rec.id) ? rec.id : null);
     },
-    [canEdit, pin],
+    [inheritedIds, pin],
   );
+
+  /**
+   * Point the rail at a record without touching the map — for the surface
+   * selecting *for* you, as against `selectBilde`, which is a press.
+   *
+   * `BilderCarousel` lands on the first image when edit opens, because a
+   * surface entered in order to change something should not make you pick a
+   * subject before you can. That is a good default for the cursor and a bad
+   * one for the ground: the terrain render you were reading when you pressed
+   * `Rediger` is not something the rail gets to replace on its own.
+   */
+  const focusBilde = useCallback((id: string | null) => {
+    setActiveBildeId(id);
+  }, []);
 
   const selectBilde = useCallback(
     (id: string | null) => {
@@ -564,12 +587,19 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
   // Deferred, not done (§5.6). The record stays on the rail, greyed, and
   // `Avbryt` — or `restoreDeleted` on the card — gives it back.
+  //
+  // The pin goes down with it. The tombstone stays in `bilderItems`, so the
+  // sweep above will not do it, and now that picking a frame lays it on the
+  // ground the ordinary path — pick it, decide against it, press `Slett` —
+  // ends with the selection cleared and the image still on the map, named by
+  // nothing.
   const removeBilde = useCallback(
     (rec: AttachmentRecord) => {
       mutateDraft((d) => dropAttachment(d, rec.id));
       setActiveBildeId((cur) => (cur === rec.id ? null : cur));
+      if (pinnedId === rec.id) pin(null);
     },
-    [mutateDraft],
+    [mutateDraft, pin, pinnedId],
   );
 
   // Into the buffer, which is also what makes the drag not snap back: there
@@ -2376,6 +2406,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // the bottom edge
     activeBildeId,
     selectBilde,
+    focusBilde,
     stepBilde,
     removeBilde,
     setBildeCaption,

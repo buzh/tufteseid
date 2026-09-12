@@ -1953,13 +1953,40 @@ way back, not the normal way up; there is no **Ta av ruta** on the rail,
 because clicking the selected frame again deselects it and that is the same
 gesture.
 
-**Selecting is pinning only in show.** In edit both verbs are explicit
-(`Vis i ruta` / `Ta av ruta`) and walking the rail moves nothing on the map,
-because the overlay slot is shared with the live terrain render: a frame that
-pinned itself on arrival would stand a render down every time `Behold` landed
-an image and moved the cursor onto it. `pinOnWalk` in `useLocalityWorkspace` is
-that one-line difference, and it is why the two stances need two surfaces
-rather than one with the writes disabled.
+**Selecting is pinning in both stances.** It was show-only, on the argument
+that the overlay slot is shared with the live terrain render (below): a frame
+that pinned itself on arrival would stand a render down every time `Behold`
+landed an image and moved the cursor onto it. That caller does not exist —
+**nothing that adds a record moves the cursor**, `Behold` included, so the rule
+was defending against a sequence no code performs, at the price of two
+identical-looking rails (§8.7.2) answering the same click two different ways.
+`pinOnWalk` in `useLocalityWorkspace` is the one function both stances now go
+through.
+
+What the reversal needs to hold:
+
+- **The one surface that selects *for* you does not pin.** `BilderCarousel`
+  lands on the first image when edit opens (below), and that is the cursor's
+  default, not the map's: the terrain render you were reading when you pressed
+  `Rediger` is not something the rail gets to replace unasked. That path goes
+  through **`focusBilde`**, a plain `setActiveBildeId` with no pin in it, and
+  it is the only difference left between the surface choosing and you choosing.
+- **`pinOnWalk` refuses borrowed records** (§8.12). A borrowed frame is the
+  *original's* file and is not in `attachmentItems`, so `usePinnedBilde` has
+  nothing to resolve it against; reading one is `Åpne originalen`, and `Ta med`
+  is what makes it this lokalitet's. It refuses unpinnable records for the
+  older reason — `canPinBilde`, no file or no extent, nothing to lay down.
+- **Deleting takes the pin down with it.** A tombstone stays in `bilderItems`,
+  so the sweep that unpins a vanished record does not fire for it, and the
+  ordinary path — pick a frame, decide against it, press `Slett` — would
+  otherwise end with the selection cleared and the image still on the ground,
+  named by nothing. `removeBilde` unpins explicitly.
+
+In edit `Vis i ruta` remains, and remains a *toggle* rather than show's
+way-back-on only: edit is the stance with something else to do with the
+selected record, and captioning an image against the ground it covers needs
+both the ground and the caption field, which deselecting would take away
+together.
 
 - **The pixels.** `src/localities/usePinnedBilde.ts` decodes the **original**
   file — never a thumbnail — and hands it to `showGroundOverlay` with
@@ -1999,9 +2026,10 @@ rather than one with the writes disabled.
 - **`Gjenskap` does not render.** It moves the map, and that is all it has ever
   done — which matters more now that a View may have no pixels at all.
   `docs/lokalitet-view.md` §4.2 reads as though `Vis i ruta` on an unpinned View
-  *is* `Gjenskap`, i.e. that walking onto a spec should recreate it; that
-  contradicts §4.3's rule that the ground does not move as you walk the rail,
-  and it would make selecting a frame an expensive fetch. So it does not:
+  *is* `Gjenskap`, i.e. that walking onto a spec should recreate it. Picking a
+  frame does lay its image down (§8.7.1), but laying down a *file* is a decode
+  and recreating a spec is a Kartverket fetch and a render — one is a click,
+  the other is a click that costs seconds and rate limit. So it does not:
   `canPinBilde` already requires a file, an unpinned View simply shows what it
   is waiting for (§8.7.4), and `Gjenskap` stays the verb it was.
 - **Absent, not disabled.** A screenshot or an upload yields `null` from
@@ -2037,7 +2065,7 @@ transient by construction:
 | shape | a rail of 88×64 frames, a detail line under it | the same |
 | hidden records | absent | present, dashed and marked |
 | caption | `readOnly` (§8.1) | editable, committed on blur |
-| the map | picking a frame pins it | an explicit `Vis i ruta` / `Ta av ruta` |
+| the map | picking a frame pins it | the same, plus `Vis i ruta` as a toggle |
 | order | none | drag a frame along the rail, or `arrow_back` / `arrow_forward` in the detail row |
 | conceal, delete | absent | in the detail row |
 | both | Gjenskap, Åpne originalen, Toning, ← / →, `bottom_panel_close` | |
@@ -2059,11 +2087,11 @@ Three things that read as arbitrary until you try the alternative:
   `canEdit &&` scattered through it is how a greyed-out delete button ends up
   on a stranger's lokalitet — and the shared geometry does not weaken that,
   because what the two files hold is the verb row, not the layout.
-- **Walking the rail in edit does not put images on the map** (`pinOnWalk` in
-  `useLocalityWorkspace` — pinning follows the cursor only in show). The
-  ground-overlay slot holds exactly one image and the live terrain render
-  wants it too, so a frame that claimed it on arrival would knock a render down
-  every time `Behold` landed an image and moved the cursor onto it.
+- **Walking the rail puts images on the map in both stances** (`pinOnWalk` in
+  `useLocalityWorkspace`, §8.7.1). Edit used to be the exception, out of a
+  worry about the shared overlay slot that turned out to name a caller that
+  does not exist. What survives of it is `focusBilde`: the carousel's
+  auto-select-first moves the cursor without moving the ground.
 - **Only edit passes `onReorder`.** `BilderRail` takes it as an optional prop
   and `BilderStrip` omits it, so drag is not a thing show has and suppresses —
   the hook is never armed there at all.
@@ -2093,14 +2121,17 @@ edge, and neither surface has a stylesheet of its own.
   yields to nothing but drawing. Enforcing it at the portal is what keeps the
   rule readable as three lines of boolean in one file instead of four
   components each guessing about the other three.
-- **Selecting is pinning, in show** (§8.7.1). The rail is `Frame`s at 88×64
-  with a kind mark; the selected one carries a ring and scrolls itself into
-  view, which is what makes a keyboard step legible — otherwise ← / → would
-  change the map and leave the active frame off-screen.
-- **Edit selects for you.** Show is legible with nothing active; edit is
-  entered in order to change something, and a surface that opens with no
-  subject makes you pick one before you can. So `BilderCarousel` lands on the
-  first image, and on whatever replaces a deleted one.
+- **Selecting is pinning** (§8.7.1), in both stances. The rail is `Frame`s at
+  88×64 with a kind mark; the selected one carries a ring and scrolls itself
+  into view, which is what makes a keyboard step legible — otherwise ← / →
+  would change the map and leave the active frame off-screen.
+- **Edit selects for you, without pinning.** Show is legible with nothing
+  active; edit is entered in order to change something, and a surface that
+  opens with no subject makes you pick one before you can. So `BilderCarousel`
+  lands on the first image whenever nothing is active — on arrival, and again
+  after the selected record is deleted. Through `focusBilde`, so the ground
+  stays whatever the user last put there; the press-to-pin rule is about
+  presses.
 - **← / →** are bound only while `stripOpen && !draftActive` and there is more
   than one image, so OpenLayers' `KeyboardPan` keeps horizontal panning
   whenever walking the strip would be meaningless.
@@ -3423,10 +3454,11 @@ bottom edge without asking and filling in as they render.
 
 **Keep it**
 walk the images along the bottom of the map, with ← / → or the chevrons — a
-rail of small frames while you are reading, one big card while you are editing;
-in show, picking a frame puts that image back on the map at its own
-rectangle and fades it over what is there now, and in edit **Vis i ruta** /
-**Ta av ruta** do it deliberately; press **Gjenskap** on an extract,
+rail of small frames in both stances, with the write verbs under it while you
+are editing; picking a frame puts that image back on the map at its own
+rectangle and fades it over what is there now, either stance, and in edit
+**Vis i ruta** / **Ta av ruta** toggle it without giving up the selection;
+press **Gjenskap** on an extract,
 terrain render or flyfoto to set the map back to the view it was made from;
 see a card that is still a set of parameters say so, and retry it if its render
 failed; open the original in a tab, fetching it first where it does not exist
