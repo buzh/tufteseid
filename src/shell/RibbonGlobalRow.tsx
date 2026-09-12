@@ -7,8 +7,6 @@ import { type BeholdOffer, beholdOfferAtom } from '../localities/behold';
 import { useCreateLocalityFromViewport } from '../localities/createFromBbox';
 import { ribbonToolAtom } from '../localities/toolAtoms';
 import { infoToolAtom } from '../map/featureInfo/infoTool';
-import { activeThemeLayersAtom } from '../map/layers/atoms';
-import type { ThemeLayerName } from '../map/layers/themeWMS';
 import { type MapTool, mapToolAtom } from '../map/overlay/atoms';
 import {
   useRegisterBackgroundCycle,
@@ -17,7 +15,7 @@ import {
 import { IconButton, Tooltip } from '../ui';
 import { useFlyfotoControls } from './flyfoto/useFlyfotoControls';
 import { groundHandleAtom } from './groundHandle';
-import { HeritagePicker } from './heritage/HeritagePicker';
+import { HeritageControl } from './heritage/HeritageControl';
 import { useLidarControls } from './lidar/useLidarControls';
 import { ModeButton } from './ModeButton';
 import { RibbonAccount } from './RibbonAccount';
@@ -78,7 +76,6 @@ export const RibbonGlobalRow = () => {
   const isSignedIn = useAtomValue(isSignedInAtom);
   const [tool, setTool] = useAtom(mapToolAtom);
   const [infoTool, setInfoTool] = useAtom(infoToolAtom);
-  const [themeLayers, setThemeLayers] = useAtom(activeThemeLayersAtom);
   const standard = useStandardControls();
   const lidar = useLidarControls();
   const flyfoto = useFlyfotoControls();
@@ -242,14 +239,6 @@ export const RibbonGlobalRow = () => {
   const toggleTool = (name: Exclude<MapTool, null>) =>
     setTool(tool === name ? null : name);
 
-  const toggleThemeLayer = (name: ThemeLayerName) =>
-    setThemeLayers((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-
   return (
     <>
       <div className={styles.row}>
@@ -322,17 +311,13 @@ export const RibbonGlobalRow = () => {
         <div className={styles.divider} />
 
         <div className={styles.group}>
-          {/* One-click toggle for the most-used heritage layer; the other four
-              services, the sublayers, the rendering and the opacity are in the
-              submenu next to it. */}
-          <ModeButton
-            icon="castle"
-            label={t('ribbon.heritage.label')}
-            tooltip={t('ribbon.heritage.tip')}
-            active={themeLayers.has('heritageSites')}
-            onClick={() => toggleThemeLayer('heritageSites')}
-          />
-          <HeritagePicker />
+          {/* One control with a seam in it: the noun opens the panel — the
+              five services, kulturminner2's registers, the rendering, the
+              opacity — and the eye beside it puts the overlay on the map or
+              takes it off. It was two buttons, `Kulturminner` toggling one of
+              the five sources and `Oppsett` holding the rest; see
+              HeritageControl for why the split was in the wrong place. */}
+          <HeritageControl />
         </div>
 
         <div className={styles.divider} />

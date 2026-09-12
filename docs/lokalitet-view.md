@@ -610,7 +610,7 @@ nothing about why the owner thought there was something there.
 
 ```
 ┌─ row 1 ── search · [1 Standard][2 LiDAR][3 Hybrid][4 Flyfoto]
-│           · Kulturminner ⚙ · Stedsinfo · Mål · Mine lok. · Ny lok. · konto
+│           · 🏛Kulturminner|👁 · Stedsinfo · Mål · Mine lok. · Ny lok. · konto
 ├─ row 2 ── settings strip for the ground on screen        (A|B when comparing)
 ├─ row 3 ── terrain sliders                                  (only in Terreng)
 └─ row 4 ── the lokalitet
@@ -1054,7 +1054,7 @@ Identity, four write verbs, two ground tools, `Funn` with its eye, the strip
 toggle, the stance button and the menu. On a laptop it fits; on a phone the
 ribbon wraps, and it will wrap to three or four lines with the settings strip
 above it. The mitigations available, in order of preference: icon-only popover
-buttons with count badges (already the pattern for `HeritagePicker`), the
+buttons with count badges (already the pattern for `HeritageControl`), the
 stance button collapsing into the `⋮`, `Skjermbilde` joining `Hent ▾`, and
 below the md breakpoint moving the read tools into the menu too. `Lagre` is
 the one that must survive every one of those cuts — it is the general route

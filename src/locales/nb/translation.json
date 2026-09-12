@@ -546,9 +546,9 @@
     },
     "heritage": {
       "label": "Kulturminner",
-      "tip": "Lokaliteter og enkeltminner",
+      "hide": "Skjul kulturminnene på kartet",
+      "show": "Vis kulturminnene på kartet",
       "settings": "Kulturminner: kilder, visning og dekkevne",
-      "settingsShort": "Oppsett",
       "sourcesHead": "Kilder",
       "renderHead": "Visning",
       "subsetHead": "Bare disse",

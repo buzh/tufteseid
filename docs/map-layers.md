@@ -424,7 +424,7 @@ layers above), which is the form this app is actually about.
    exported `themeLayerConfig` (today that is the Kulturminner config
    outright, since it is the only one).
 3. Add the layer id(s) to `ThemeLayerName` in `src/map/layers/themeWMS.ts`.
-   It will appear in the Kulturminner "Oppsett" popover automatically — that
+   It will appear in the popover on `Kulturminner` automatically — that
    list is `themeLayerConfig.layers`.
 4. Route requests through `wmscache` rather than hitting the origin from the
    browser, and use the same-origin `/wms/<host-slug>/...` prefix as `wmsUrl`

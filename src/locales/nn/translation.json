@@ -546,9 +546,9 @@
     },
     "heritage": {
       "label": "Kulturminne",
-      "tip": "Lokalitetar og enkeltminne",
+      "hide": "Skjul kulturminna på kartet",
+      "show": "Vis kulturminna på kartet",
       "settings": "Kulturminne: kjelder, vising og dekkevne",
-      "settingsShort": "Oppsett",
       "sourcesHead": "Kjelder",
       "renderHead": "Vising",
       "subsetHead": "Berre desse",

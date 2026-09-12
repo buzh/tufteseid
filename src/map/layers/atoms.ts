@@ -12,6 +12,7 @@ import {
 import {
   type HeritageDetail,
   heritageDetailsAtom,
+  heritageHiddenAtom,
   heritageOpacityAtom,
   type HeritageRender,
   heritageRenderAtom,
@@ -22,6 +23,24 @@ import { getThemeLayerById, themeLayerConfig } from './themeLayerConfigApi';
 import { createThemeLayerFromConfig, ThemeLayerName } from './themeWMS';
 
 export const activeThemeLayersAtom = atom<Set<ThemeLayerName>>(new Set([]));
+
+/** Module-level so the derived atom below returns a stable identity while the
+ *  overlay is hidden — a fresh `new Set()` per read re-runs every effect that
+ *  depends on it. */
+const NO_THEME_LAYERS: ReadonlySet<ThemeLayerName> = new Set();
+
+/**
+ * Which sources are *on the map*, as opposed to which are ticked. The eye
+ * (`heritageHiddenAtom`) is the difference.
+ *
+ * Anything describing what a reader can see reads this one: the figure caption
+ * on a screenshot names the layers in the pixels, and a hidden overlay put no
+ * pixels there. The picker reads `activeThemeLayersAtom` instead, because a
+ * checkbox is about the selection and the selection is what the eye preserves.
+ */
+export const shownThemeLayersAtom = atom<ReadonlySet<ThemeLayerName>>((get) =>
+  get(heritageHiddenAtom) ? NO_THEME_LAYERS : get(activeThemeLayersAtom),
+);
 
 /**
  * The one theme layer whose WMS request the user can reshape. The other four
@@ -43,6 +62,7 @@ export const themeLayerEffect = atomEffect((get) => {
   const heritageDetails = get(heritageDetailsAtom);
   const heritageRender = get(heritageRenderAtom);
   const heritageOpacity = get(heritageOpacityAtom);
+  const heritageHidden = get(heritageHiddenAtom);
   const store = getDefaultStore();
   const map = store.get(mapAtom);
   const mapProjection = map.getView().getProjection().getCode();
@@ -140,12 +160,22 @@ export const themeLayerEffect = atomEffect((get) => {
       layer.setOpacity(heritageOpacity);
 
       const layerName = id.substring(6) as ThemeLayerName;
-      if (layerName !== RESHAPEABLE) return;
       const params = paramsFor(layerName, heritageDetails, heritageRender);
-      // Nothing selected renders nothing, so say so by hiding the layer
-      // rather than by sending a request whose only possible answer is a
-      // transparent tile.
-      layer.setVisible(params !== null);
+      // Two reasons a theme layer draws nothing, and they are independent.
+      // The eye takes the whole overlay off while the selection stands; and
+      // kulturminner2 with none of its three registers ticked renders nothing
+      // anyway, so say so by hiding it rather than by sending a request whose
+      // only possible answer is a transparent tile.
+      //
+      // Visible rather than removed, in both cases: the layer stays on the
+      // map, so the URL still describes what is selected, the tile cache
+      // survives, and `isRendering` in featureInfoService — which is
+      // `Layer#isVisible` — stops a click asking RA about a register the
+      // reader cannot see.
+      const empty = layerName === RESHAPEABLE && params === null;
+      layer.setVisible(!heritageHidden && !empty);
+      // `paramsFor` is null for the other four sources as well as for an
+      // empty kulturminner2, and neither has anything left to reshape.
       if (!params) return;
 
       const source = (layer as { getSource?: () => unknown }).getSource?.();

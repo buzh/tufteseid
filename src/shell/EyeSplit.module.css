@@ -1,0 +1,66 @@
+/*
+ * A ribbon control with a seam down it: a labelled half that opens something,
+ * and an eye that takes what it lists off the map. One object, two hit
+ * targets — not two buttons that happen to be adjacent. No gap, a hairline
+ * between them, and the eye stretches to whatever height the ModeButton
+ * beside it decides on, so the pair stays square when the ribbon shrinks its
+ * buttons on a phone.
+ */
+
+.split {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-left: 1px solid var(--c-border);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: transparent;
+  color: var(--c-fg-muted);
+  cursor: pointer;
+}
+
+.eye:hover {
+  background: var(--c-bg-hover);
+  color: var(--c-fg);
+}
+
+.eye:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 1px;
+}
+
+/* Lit while the thing is *on the map*, not while it is hidden.
+ *
+ * It was the other way round, on the argument that the unusual state is the
+ * one worth a colour. That argument is right about which state needs marking
+ * and wrong about which colour to mark it with: everywhere else on this
+ * ribbon accent means *engaged* — a tool armed, a ground selected, a popover
+ * open — so an accent-filled eye read as "the eye is on", i.e. exactly the
+ * opposite of what it meant. Polarity beats emphasis; a control cannot borrow
+ * the row's one colour to say the row's one colour's opposite.
+ *
+ * A tint rather than the fill, because "shown" is the normal state and this
+ * segment is therefore lit most of the time: at full accent it would read as
+ * a second engaged control glued to the half beside it. Hidden is then the
+ * untinted grey of the base rule, with `visibility_off` in it — the
+ * off-language every layer switch already speaks.
+ */
+.eyeOn {
+  background: var(--c-accent-subtle);
+  color: var(--c-green-600);
+}
+
+/* Its own rule rather than grouped with the above: `.eye:hover` is the same
+   specificity and would otherwise be the last word on the lit state, leaving
+   the one segment on the row that does not answer the pointer. */
+.eyeOn:hover {
+  background: var(--c-green-100);
+  color: var(--c-green-700);
+}

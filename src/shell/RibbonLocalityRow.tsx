@@ -16,7 +16,6 @@ import {
   Button,
   cx,
   Dialog,
-  Icon,
   IconButton,
   Input,
   Menu,
@@ -25,6 +24,7 @@ import {
   Tooltip,
 } from '../ui';
 import { CompareControl } from './compare/CompareControl';
+import { EyeSplit } from './EyeSplit';
 import { groundHandleAtom } from './groundHandle';
 import { ModeButton } from './ModeButton';
 import styles from './Ribbon.module.css';
@@ -331,11 +331,9 @@ const HentMenu = ({
  * lokalitet's funn — and because the two questions are one question: how many
  * are there, and are they in my way right now.
  *
- * Two segments and not a menu item, deliberately. Hiding the funn is what you
- * do *while* dragging the Sammenlign curtain, so it has to stay one press; an
- * item inside the list would be three, one of which covers the ground you
- * were looking at. And the count stays on the labelled half while they are
- * hidden, so hiding never costs you the answer to "is there anything here".
+ * The seam itself — the geometry, the polarity of the light, why it is two
+ * segments rather than an item inside the list — is `EyeSplit`, shared with
+ * `Kulturminner` on row 1.
  *
  * Both stances. Reading your own index is not writing to it; `editable` is
  * what decides whether the rows offer the verbs (§2).
@@ -344,10 +342,14 @@ const FunnControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useAtom(funnHiddenAtom);
-  const eyeLabel = t(hidden ? 'localities.funn.show' : 'localities.funn.hide');
 
   return (
-    <div className={rowStyles.split}>
+    <EyeSplit
+      shown={!hidden}
+      label={t(hidden ? 'localities.funn.show' : 'localities.funn.hide')}
+      hint="H"
+      onToggle={() => setHidden(!hidden)}
+    >
       <Popover
         open={open}
         onOpenChange={setOpen}
@@ -384,24 +386,7 @@ const FunnControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           onRestore={ws.restoreDeleted}
         />
       </Popover>
-      {/* Lit while the funn are on the map — a switch, read in the same
-          direction as every other lit thing on this ribbon. The state it
-          marks is still the hidden one, and it marks it the way a layer
-          switch does: the tint goes out and the icon picks up the slash.
-          No `aria-pressed`, because the accessible name is the *verb* and
-          changes with the state; saying both is how a screen reader ends up
-          announcing "Vis merker, pressed". */}
-      <Tooltip label={`${eyeLabel} (H)`}>
-        <button
-          type="button"
-          className={cx(rowStyles.eye, !hidden && rowStyles.eyeOn)}
-          aria-label={eyeLabel}
-          onClick={() => setHidden(!hidden)}
-        >
-          <Icon icon={hidden ? 'visibility_off' : 'visibility'} size={18} />
-        </button>
-      </Tooltip>
-    </div>
+    </EyeSplit>
   );
 };
 

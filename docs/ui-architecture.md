@@ -404,6 +404,10 @@ subsume.
 - **Theme layers** — `activeThemeLayersAtom` (a `Set<ThemeLayerName>`), plus
   `heritageDetailsAtom` / `heritageRenderAtom` / `heritageOpacityAtom` in
   `src/map/layers/heritage.ts` for how the Kulturminner overlay is drawn.
+- **The heritage eye** — `heritageHiddenAtom` (`src/map/layers/heritage.ts`),
+  read by `themeLayerEffect`, which hides the layers without touching the
+  selection; `shownThemeLayersAtom` is the two combined, i.e. what is actually
+  drawn (§5.9). Not persisted to the URL.
 - **Chrome** — `mapToolAtom`, `overlayOpenCountAtom` / `anyOverlayOpenAtom`
   (`src/ui/overlayAtoms.ts`, incremented by every `Popover` and `Dialog` so the
   keyboard layers can stand down).
@@ -530,8 +534,7 @@ looking at. Row 1 answers **what am I looking at**; the strip under it answers
 | **LiDAR** (2) | Background mode: hillshade stack |
 | **Hybrid** (3) | LiDAR stack + transparent roads/rail/place-names on top |
 | **Flyfoto** (4) | Background mode: NiB ortofoto (§5.5) |
-| **Kulturminner** | Toggles `heritageSites`, the one register most readings start from |
-| **Oppsett** (`tune`) | Popover: the five RA sources, kulturminner2's three sublayers, how they are drawn and how strongly (§5.9) |
+| **Kulturminner** + its eye | One split control: the noun opens a popover over the five RA sources, kulturminner2's three sublayers, how they are drawn and how strongly; the eye puts the overlay on the map or takes it off (§5.9) |
 | **Stedsinfo** (I) | Arms the point readout: while it is on, a click asks the registers about that spot (§7.1). Off on arrival |
 | Mål | Popover with the measure tools |
 | Mine lokaliteter | Opens the localities card (signed in only) |
@@ -1099,14 +1102,54 @@ photograph on the right is one of the better things this mode does, and the
 `cmp.` layers sit above the terrain overlay's `zIndex` so the curtain reads
 correctly over it.
 
-### 5.9 Kulturminner — the source and rendering popover
+### 5.9 Kulturminner — one control with a seam in it
 
-Two controls in row 1, next to each other:
+**Kulturminner** (`castle`) in row 1, with an eye welded to its right edge
+(`src/shell/heritage/HeritageControl.tsx`, split by the shared `EyeSplit` —
+§8.6 for the other one). The labelled half opens the settings `Popover` and
+carries a `CountBadge` of how many sources are on; the eye puts the overlay on
+the map or takes it off.
 
-- **Kulturminner** (`castle`) — a plain toggle for `heritageSites`, the one
-  register most readings start from. One press, no menu.
-- **Oppsett** (`tune`) — a `Popover` (`src/shell/heritage/HeritagePicker.tsx`)
-  with a `CountBadge` of how many sources are on, holding everything else.
+**It used to be two buttons** — a `castle` that toggled `heritageSites` and an
+**Oppsett** (`tune`) beside it holding the panel — and the split was in the
+wrong place. The first could only ever say *one* of the five sources while the
+count of how many were on lived on the second, so with three services ticked
+the button labelled `Kulturminner` was a switch for one of them: press it and
+two stayed behind, on a map whose only remaining explanation was a number on
+the neighbouring control. Now the noun names the whole overlay, the badge is on
+the noun, and on/off is the eye.
+
+**The eye has three states and one press.** Shown → hide; hidden → show; and
+with *no source ticked at all* it arms the overlay instead of raising an empty
+blind, turning on `heritageSites`. That third case is what keeps the merge from
+costing anything: the route to the heritage record for someone who has never
+opened the panel has to be one press on a control named after it, and without
+it that person would have to know which of five Riksantikvaren services to
+tick. Its label is the verb and changes with the state, which is also its
+accessible name.
+
+**Hiding is a blind, not a switch** — `heritageHiddenAtom`
+(`src/map/layers/heritage.ts`), read by `themeLayerEffect`, which calls
+`setVisible(false)` on the theme layers rather than removing them. Emptying
+`activeThemeLayersAtom` instead would take the five checkboxes, the badge and
+the `themeLayers` URL parameter with it, and bringing them back would be a
+guess about what had been on. Three consequences worth stating: the URL keeps
+describing the selection while the map shows none of it; the tile cache
+survives, so unhiding is instant; and because `isRendering` in
+`featureInfoService` is `Layer#isVisible`, a click cannot ask RA about a
+register the reader cannot see. An info panel *already open* about a heritage
+feature stays — you may well have hidden the drawing in order to read it — but
+nothing new arrives while the eye is down.
+
+**Ticking a source in the panel raises the blind.** Otherwise a checkbox
+answers with nothing on the map and no visible reason why.
+
+`shownThemeLayersAtom` (`src/map/layers/atoms.ts`) is the derived "what is
+actually drawn", and everything that *describes* what a reader can see reads
+that rather than the selection — today that is the figure caption on a
+screenshot (§8.10), which must not name a layer that put no pixels in the
+image. Not URL-persisted, on the same grounds as the funn eye: a link shared to
+show someone a heritage feature must not arrive with the register hidden.
 
 The panel has four parts, top to bottom: the five RA services as
 `PulldownCheck` rows; kulturminner2's three registers (lokaliteter,
@@ -1929,6 +1972,12 @@ through `useFunnVisibility` (`src/localities/funnVisibility.ts`).
   would read as a second engaged control. No `aria-pressed`: the accessible
   name is the verb and changes with the state, and saying both announces
   "Vis merker, pressed".
+- **The seam is a shared component**, `src/shell/EyeSplit.tsx`: the geometry,
+  the hairline, the polarity above and the `joinedRight` contract with
+  `ModeButton`, with the labelled half passed in as children. Two controls use
+  it — `Funn` here and `Kulturminner` on row 1 (§5.9) — and they are the same
+  idiom rather than two lookalikes that drift apart the first time one of them
+  is restyled.
 
 **This used to be `Skjul merker`, on row 1, and it also hid the lokalitet
 rectangles.** Two things were wrong with that. It was grouped beside
@@ -3565,8 +3614,10 @@ hide the funn with H or the eye on `Funn` so they do not cover the ground you
 are judging, and bring them back the same way.
 
 **Overlay the heritage record**
-toggle the register most readings start from in one press; open the Oppsett
-popover and switch any of the five Riksantikvaren services on or off
+put the whole overlay on the map or take it off with the eye on `Kulturminner`,
+one press, which also arms the register most readings start from when nothing
+is on yet; open the popover beside it and switch any of the five
+Riksantikvaren services on or off
 individually; see the active-source count on the trigger; clear them all; pick
 which of kulturminner2's three registers (lokaliteter / enkeltminner /
 sikringssoner) are drawn; draw them as outlines or filled; narrow the map to one
@@ -3724,8 +3775,8 @@ rather than a port.
   `src/map/layers/themeLayers.ts`, `MapTool = 'layers'`) — categories,
   expandable subthemes, per-subtheme "add all", a fifteen-layer performance
   warning, and a whole card slot on top of the map to hold them, for one
-  category of five layers from one rights holder. Replaced by the Kulturminner
-  "Oppsett" popover in ribbon row 1, which offers the same five sources plus
+  category of five layers from one rights holder. Replaced by the popover on
+  `Kulturminner` in ribbon row 1, which offers the same five sources plus
   the things the register can actually be asked: §5.9 for the popover, §6.2 for
   what exactly was deleted. The catalogue of layers itself — what the five
   sources are, and the recipe for adding a sixth — is

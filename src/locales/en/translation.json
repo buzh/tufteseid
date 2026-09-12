@@ -546,9 +546,9 @@
     },
     "heritage": {
       "label": "Heritage",
-      "tip": "Heritage sites and monuments",
+      "hide": "Hide the heritage record on the map",
+      "show": "Show the heritage record on the map",
       "settings": "Heritage: sources, rendering and opacity",
-      "settingsShort": "Options",
       "sourcesHead": "Sources",
       "renderHead": "Rendering",
       "subsetHead": "Only these",

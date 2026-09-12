@@ -28,7 +28,7 @@ import { describeHeritageRender, screenshotFigure } from '../figure/specs';
 import type { LidarSource } from '../lidarExtract/sources';
 import { mapAtom } from '../map/atoms';
 import { groundOverlayOwner } from '../map/groundOverlay';
-import { activeThemeLayersAtom } from '../map/layers/atoms';
+import { shownThemeLayersAtom } from '../map/layers/atoms';
 import {
   heritageDetailsAtom,
   heritageOpacityAtom,
@@ -255,7 +255,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const compareOn = useAtomValue(compareOnAtom);
   const backgroundB = useAtomValue(backgroundLayerHalves.b);
   const hybridB = useAtomValue(hybridOverlayHalves.b);
-  const themeLayers = useAtomValue(activeThemeLayersAtom);
+  // What the heritage overlay is *drawing*, not what is ticked: a screenshot
+  // taken with the eye down has no heritage in its pixels, and the figure
+  // caption below names what is in the pixels.
+  const themeLayers = useAtomValue(shownThemeLayersAtom);
   const heritageDetails = useAtomValue(heritageDetailsAtom);
   const heritageRender = useAtomValue(heritageRenderAtom);
   const heritageOpacity = useAtomValue(heritageOpacityAtom);

@@ -226,6 +226,21 @@ export const heritageRenderAtom = atom<HeritageRender>(readRender());
 export const heritageOpacityAtom = atom<number>(readOpacity());
 
 /**
+ * The eye on `Kulturminner` — the whole overlay off the map without
+ * forgetting which sources are ticked.
+ *
+ * Separate from `activeThemeLayersAtom` precisely so the selection survives:
+ * emptying the set to hide would take the five checkboxes, the count badge and
+ * the `themeLayers` URL parameter with it, and bringing them back would be a
+ * guess about what was on. This is the same shape as `funnHiddenAtom` and for
+ * the same reason — a blind, not a switch.
+ *
+ * Not URL-persisted, on the same grounds as the funn eye: a link shared to
+ * show someone a heritage feature must not arrive with the register hidden.
+ */
+export const heritageHiddenAtom = atom(false);
+
+/**
  * URL persistence, written from the layer effect rather than from the setters
  * so a link always describes what is actually on the map. Defaults are
  * *removed* rather than written, keeping a shared URL down to what the sender
