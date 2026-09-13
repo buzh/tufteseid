@@ -34,6 +34,12 @@ export type CommitResult = {
    * queue: the specs this commit created, and any sketch it re-drew.
    */
   created: AttachmentRecord[];
+  /**
+   * Temp spec id → the real one, for callers holding an id the buffer minted.
+   * A shown sketch is remembered by id, and the id it went up under was a
+   * draft id this commit has just replaced.
+   */
+  renamedSpecs: Map<string, string>;
 };
 
 /**
@@ -135,7 +141,7 @@ export const useLocalityDraft = ({
       setDraft(null);
       setRestoredAt(null);
       clearDraft(localityId);
-      return { ok: true, failed: 0, created: [] };
+      return { ok: true, failed: 0, created: [], renamedSpecs: new Map() };
     }
 
     // The remainder, narrowed as each write lands. Cloned up front so a
@@ -282,12 +288,12 @@ export const useLocalityDraft = ({
 
     if (failed > 0) {
       setDraft(rest);
-      return { ok: false, failed, created };
+      return { ok: false, failed, created, renamedSpecs: realSpecId };
     }
     setDraft(null);
     setRestoredAt(null);
     clearDraft(localityId);
-    return { ok: true, failed: 0, created };
+    return { ok: true, failed: 0, created, renamedSpecs: realSpecId };
   }, [localityId, userId]);
 
   /**

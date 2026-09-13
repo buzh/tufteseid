@@ -1601,6 +1601,19 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         reloadFinds();
         reloadAttachments();
       }
+      /*
+       * A sketch that went up on the map when it was kept is remembered by
+       * the id it was kept under, and that was a draft id the commit has just
+       * replaced. Without this the overlay comes off the ground on `Lagre` —
+       * the record is still there, still shown, and the eye on its card reads
+       * the wrong way round.
+       */
+      const renamed = result.renamedSpecs;
+      if (renamed.size > 0) {
+        setSketchShown(
+          (cur) => new Set([...cur].map((id) => renamed.get(id) ?? id)),
+        );
+      }
       for (const rec of result.created) {
         enqueuePin({
           rec,
@@ -1633,6 +1646,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     commitDraft,
     reloadFinds,
     reloadAttachments,
+    setSketchShown,
     applyPinned,
     t,
   ]);
