@@ -1053,8 +1053,10 @@ and removing it has to be paid for rather than waved through.
 It splits in two, along a line that is arguably better than the column was:
 
 - **The draw tools go to the bottom edge**, taking the slot the carousel yields
-  (§4.3). `BottomDrawToolSelector` already exists for exactly this on mobile;
-  it stops being mobile-only. Tools belong near the hand.
+  (§4.3). Tools belong near the hand. (What landed is one step further out:
+  the pen is Excalidraw's, over a frozen map, so the tools are that surface's
+  own island rather than a bar of ours — `docs/ui-architecture.md` §9. The
+  OpenLayers draw subsystem this bullet assumed is gone, §15.)
 - **The draft's metadata becomes a thin ribbon row** under the lokalitet row,
   for as long as the draft is open: `title` input · *Utvid området* when the
   drawing escapes the rectangle · **Ferdig**. One line, no body, which is what

@@ -15,6 +15,7 @@ import {
   clearDraft,
   type DraftLocality,
   isDirty,
+  isDraftId,
   loadDraft,
   type LocalityDraft,
   localityFieldsOf,
@@ -28,7 +29,10 @@ export type CommitResult = {
   ok: boolean;
   /** How many writes failed, for the toast. */
   failed: number;
-  /** The specs that landed, so the caller can hand them to the pin queue. */
+  /**
+   * The records whose pixels are owed, for the caller to hand to the pin
+   * queue: the specs this commit created, and any sketch it re-drew.
+   */
   created: AttachmentRecord[];
 };
 
@@ -184,9 +188,24 @@ export const useLocalityDraft = ({
         failed++;
       }
     }
+    /*
+     * Temp id → the real one, for the sketches below.
+     *
+     * A sketch kept in the same session that invented the funn it is about
+     * holds that funn's *temp* id, and posting it verbatim would be a relation
+     * to a record that does not exist — which PocketBase rejects, so the whole
+     * sketch would fail over a field that is not what the author was doing.
+     * The funn are written first, so by the time the specs go out every id
+     * that was going to become real has.
+     */
+    const realFindId = new Map<string, string>();
     for (const [tmp, body] of Object.entries(d.newFinds)) {
       try {
-        await createLocalityFind({ locality: localityId, ...body }, userId);
+        const rec = await createLocalityFind(
+          { locality: localityId, ...body },
+          userId,
+        );
+        realFindId.set(tmp, rec.id);
         delete rest.newFinds[tmp];
       } catch (e) {
         console.warn('[localityDraft] funn create failed', e);
@@ -205,13 +224,29 @@ export const useLocalityDraft = ({
     }
     for (const [id, body] of Object.entries(d.attachments)) {
       try {
-        await updateAttachment(id, body);
+        const rec = await updateAttachment(id, body);
+        // A sketch that has been drawn on again is the one patch that changes
+        // what the record *is* rather than how it is displayed, so its figure
+        // is now a picture of the previous drawing. Onto the queue with the
+        // new specs: the caller does not need to know which of the two a
+        // record got there by, only that its pixels are owed.
+        if (body.meta) created.push(rec);
         delete rest.attachments[id];
       } catch (e) {
         console.warn('[localityDraft] bilde update failed', e);
         failed++;
       }
     }
+    const realSpecId = new Map<string, string>();
+    // A relation to something the buffer invented and could not write is
+    // dropped rather than sent: a sketch about a funn whose create just failed
+    // is still a sketch, and refusing to save it would lose the drawing over
+    // the label on it.
+    const resolve = (
+      ids: string[] | undefined,
+      map: Map<string, string>,
+    ): string[] =>
+      (ids ?? []).map((id) => map.get(id) ?? id).filter((id) => !isDraftId(id));
     for (const [tmp, body] of Object.entries(d.newSpecs)) {
       try {
         const rec = await createAttachmentSpec(
@@ -220,9 +255,12 @@ export const useLocalityDraft = ({
             kind: body.kind,
             caption: body.caption,
             meta: body.meta,
+            funn: resolve(body.funn, realFindId),
+            over: resolve(body.over, realSpecId),
           },
           userId,
         );
+        realSpecId.set(tmp, rec.id);
         // The exhibit position the buffer gave it, but only where the author
         // put it there: `createAttachmentSpec` mints its own clock-derived
         // `sort`, which is the right answer for a record created now and the

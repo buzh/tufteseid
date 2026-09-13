@@ -52,7 +52,8 @@ import {
 } from '../api/attachments';
 import type { LocalityBbox } from '../api/localities';
 import { renderFigureBlob } from '../figure/figure';
-import { flyfotoFigure, terrainFigure } from '../figure/specs';
+import { flyfotoFigure, sketchFigure, terrainFigure } from '../figure/specs';
+import { renderScene } from '../funn/render';
 import { enumerateLidarSources } from '../lidarExtract/sources';
 import { withDeadline } from '../shared/utils/deadline';
 import { renderTerrain } from '../terrain/render';
@@ -309,6 +310,46 @@ const renderSpecWithin = async (
           // asked for 20 m and got 6 m should say 6 m from now on, or the
           // duplicate guard would offer to fetch it again forever.
           ...(render.radius != null ? { radius: render.radius } : {}),
+        },
+      };
+    }
+
+    case 'sketch': {
+      /*
+       * The only producer here that asks nothing of the network, so the
+       * rectangle and the signal both go unused: the strokes are in the spec
+       * and the scene is its own extent. Rendered at scale 1 — the resolution
+       * the frozen viewport had when it was drawn — because that is the
+       * resolution the author was judging at, and inventing more of it would
+       * put a metres-per-pixel on the caption that no hand ever worked to.
+       *
+       * On **white paper**, unlike the same scene on the map. The overlay is
+       * transparent because it is a layer over the ground; this is the figure
+       * that goes in a card, a report and a takeout bundle, and a transparent
+       * PNG in any of the three is a picture of nothing.
+       */
+      const render = await renderScene(spec.scene.frame, spec.scene.elements, {
+        scale: 1,
+        background: '#ffffff',
+      });
+      if (!render) return null;
+      const figure = await renderFigureBlob(
+        render.canvas,
+        sketchFigure({
+          subject,
+          elements: spec.scene.elements.length,
+          metresPerPx: render.metresPerPx,
+          bbox25833: render.bbox25833,
+        }),
+      );
+      if (!figure) return null;
+      return {
+        blob: figure.blob,
+        filename: 'skisse.png',
+        meta: {
+          metresPerPx: figure.metresPerPx,
+          bbox25833: render.bbox25833,
+          imageRect: figure.imageRect,
         },
       };
     }

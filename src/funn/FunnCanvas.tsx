@@ -7,15 +7,21 @@ import type {
   ExcalidrawInitialDataState,
   NormalizedZoomValue,
 } from '@excalidraw/excalidraw/types';
-import { useAtomValue } from 'jotai';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useAtomValue, useSetAtom } from 'jotai';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { mapAtom } from '../map/atoms';
 import styles from './FunnCanvas.module.css';
-import { slaveMapToScene } from './session';
+import type { SceneElement } from './scene';
+import {
+  funnSceneAtom,
+  funnSessionAtom,
+  initialSceneView,
+  slaveMapToScene,
+} from './session';
 
 /*
- * The drawing surface — docs/ui-architecture.md §8.7.2.
+ * The drawing surface — docs/ui-architecture.md §8.7.2, §9.
  *
  * Excalidraw over a frozen map, and nothing but the user's own strokes in the
  * scene: the canvas is transparent and what shows through it is the map
@@ -37,6 +43,14 @@ import { slaveMapToScene } from './session';
  * so a circle comes out the way it does in Excalidraw — hand-drawn. These are
  * sketches over terrain, not scientific annotation, and a sketch that looks
  * like a measurement claims more than it knows.
+ *
+ * **The mode is not visible here**, and that is the point of putting it in the
+ * session rather than in this component. Funn mode and tegning mode are the
+ * same surface with the same tools; what differs is what the *end* of the
+ * session reads off the scene — a `FeatureCollection` through `geometry.ts`,
+ * or the scene itself through `scene.ts`. Excalidraw offers no supported way
+ * to withdraw a tool from its island anyway, so a restriction expressed in the
+ * UI would be a restriction the UI could not keep (§9.2).
  */
 
 // Excalidraw carries its own translations, including both Norwegian written
@@ -48,17 +62,38 @@ const LANG_CODES = { nb: 'nb-NO', nn: 'nn-NO', en: 'en' } as const;
 const excalidrawLang = (language: string) =>
   LANG_CODES[language.slice(0, 2) as keyof typeof LANG_CODES] ?? 'en';
 
-type Offset = { x: number; y: number };
+/*
+ * How long the scene may lag behind the pen.
+ *
+ * `onChange` fires on every pointer sample, and publishing each one would
+ * re-render every subscriber of `funnSceneAtom` sixty times a second for a
+ * stroke that is not finished yet. Nothing downstream is in a hurry: the
+ * autosave settles for 700 ms on top of this (§8.5), and the other reader is a
+ * ribbon button whose only question is whether the scene has anything in it.
+ * A quarter of the time it takes to move a hand from the canvas to the ribbon
+ * is well under the gap between the last stroke and any decision about it.
+ */
+const SCENE_SETTLE_MS = 150;
 
-const buildInitialData = (offset: Offset): ExcalidrawInitialDataState => ({
+type Offset = { x: number; y: number; zoom: number };
+
+const buildInitialData = (
+  offset: Offset,
+  elements: readonly SceneElement[],
+): ExcalidrawInitialDataState => ({
+  // A resumed sketch opens on its own strokes; a new session opens on nothing.
+  // Passing `[]` rather than omitting the key is the same thing to Excalidraw
+  // and one fewer branch here.
+  elements,
   appState: {
     // The map is the background. Anything opaque here would hide it.
     viewBackgroundColor: 'transparent',
     theme: 'light',
-    // 1:1. A scene unit is a CSS pixel of the frozen viewport, and at any
-    // other starting zoom the strokes would not begin over the map they are
-    // aimed at.
-    zoom: { value: 1 as NormalizedZoomValue },
+    // Whatever puts the scene over the ground it belongs on with the map
+    // untransformed — 1:1 for a session that framed the view it is looking at,
+    // and the frame's own pixel scale for one that was flown back to a stored
+    // rectangle (`initialSceneView`).
+    zoom: { value: offset.zoom as NormalizedZoomValue },
     scrollX: offset.x,
     scrollY: offset.y,
   },
@@ -68,12 +103,27 @@ const buildInitialData = (offset: Offset): ExcalidrawInitialDataState => ({
 export const FunnCanvas = () => {
   const { i18n } = useTranslation();
   const map = useAtomValue(mapAtom);
+  const session = useAtomValue(funnSessionAtom);
+  const setScene = useSetAtom(funnSceneAtom);
   const hostRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState<Offset | null>(null);
   // The last view pushed at the map, so the transform is only rewritten when
   // it has actually changed: `onChange` fires on every pointer sample while a
   // stroke is being drawn, and almost none of those move the canvas.
   const lastView = useRef('');
+  const settle = useRef<number | null>(null);
+
+  /*
+   * The scene the surface *opens* on, read once.
+   *
+   * Held rather than re-read: `funnSceneAtom` is written from this component
+   * on every change, and feeding that back into `initialData` would rebuild
+   * the scene mid-stroke. What the surface starts with is a fact about the
+   * session, and the session does not change while it is up.
+   */
+  const [opening] = useState<readonly SceneElement[]>(
+    () => session?.resume?.elements ?? [],
+  );
 
   /*
    * Scene (0, 0) is the top-left of the *frozen viewport*, but this surface
@@ -90,22 +140,30 @@ export const FunnCanvas = () => {
     const host = hostRef.current;
     if (!host) return;
     const here = host.getBoundingClientRect();
-    setOffset({ x: -here.left, y: -here.top });
+    const view = initialSceneView(here);
+    setOffset({ x: view.scrollX, y: view.scrollY, zoom: view.zoom });
   }, []);
+
+  useEffect(
+    () => () => {
+      if (settle.current != null) window.clearTimeout(settle.current);
+    },
+    [],
+  );
 
   return (
     <div className={styles.surface} ref={hostRef}>
       {offset && (
         <Excalidraw
-          initialData={buildInitialData(offset)}
+          initialData={buildInitialData(offset, opening)}
           langCode={excalidrawLang(i18n.language)}
-          /*
-           * Excalidraw's own offsets rather than the measured ones above:
-           * they are the numbers it actually positions the scene with, and it
-           * re-reads them on resize, so the map follows a ribbon row
-           * appearing mid-session without anything here observing the DOM.
-           */
-          onChange={(_elements, appState) => {
+          onChange={(elements, appState) => {
+            /*
+             * Excalidraw's own offsets rather than the measured ones above:
+             * they are the numbers it actually positions the scene with, and
+             * it re-reads them on resize, so the map follows a ribbon row
+             * appearing mid-session without anything here observing the DOM.
+             */
             const view = {
               scrollX: appState.scrollX,
               scrollY: appState.scrollY,
@@ -114,9 +172,19 @@ export const FunnCanvas = () => {
               offsetTop: appState.offsetTop,
             };
             const key = Object.values(view).join();
-            if (key === lastView.current) return;
-            lastView.current = key;
-            slaveMapToScene(map, view);
+            if (key !== lastView.current) {
+              lastView.current = key;
+              slaveMapToScene(map, view);
+            }
+            // The strokes themselves, on a settle — see SCENE_SETTLE_MS. Kept
+            // whole, tombstones included: undo has to keep working right up to
+            // the moment something is saved, and stripping is what happens
+            // then (`scene.ts`).
+            if (settle.current != null) window.clearTimeout(settle.current);
+            settle.current = window.setTimeout(() => {
+              settle.current = null;
+              setScene(elements);
+            }, SCENE_SETTLE_MS);
           }}
           /*
            * Excalidraw listens on this surface only, not on the document.
@@ -130,9 +198,9 @@ export const FunnCanvas = () => {
           UIOptions={{
             canvasActions: {
               // Every one of these is about Excalidraw's document, and the
-              // document here is a funn: it is saved by `Lagre` with the rest
-              // of the lokalitet, and there is no file to load, export or
-              // clear. The background belongs to the map.
+              // document here is a funn or a bilde: it is saved by `Lagre`
+              // with the rest of the lokalitet, and there is no file to load,
+              // export or clear. The background belongs to the map.
               changeViewBackgroundColor: false,
               clearCanvas: false,
               export: false,

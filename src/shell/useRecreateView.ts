@@ -23,14 +23,17 @@
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { frameExtentIn } from '../funn/frame';
 import { activeLocalityAtom } from '../localities/atoms';
 import { fetchFlyfotoProjectsForBbox } from '../localities/flyfotoProjects';
 import type { ViewSpec } from '../localities/viewSpec';
+import { mapAtom } from '../map/atoms';
 import {
   fetchLidarProjects,
   stylesForModel,
 } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { toast } from '../ui';
+import { fitPadding } from './chromeInsets';
 import type { FlyfotoControls } from './flyfoto/useFlyfotoControls';
 import type { LidarControls } from './lidar/useLidarControls';
 import type { TerrainAnalysis } from './terrain/useTerrainAnalysis';
@@ -53,19 +56,21 @@ export const useRecreateView = (
   const { t } = useTranslation();
   const [spec, setSpec] = useAtom(recreateViewAtom);
   const locality = useAtomValue(activeLocalityAtom);
+  const map = useAtomValue(mapAtom);
 
   // The four control objects are rebuilt on every render, and this effect must
   // run when a *spec* arrives and at no other time — a re-run would re-enter
   // the ground under a user who has since moved on. Everything it writes is
   // either an atom setter or a `useState` setter, so a closure one render
   // stale is the same closure.
-  const latest = useRef({ ground, lidar, flyfoto, terrain, locality, t });
-  latest.current = { ground, lidar, flyfoto, terrain, locality, t };
+  const latest = useRef({ ground, lidar, flyfoto, terrain, locality, map, t });
+  latest.current = { ground, lidar, flyfoto, terrain, locality, map, t };
 
   useEffect(() => {
     if (!spec) return;
     let cancelled = false;
-    const { ground, lidar, flyfoto, terrain, locality, t } = latest.current;
+    const { ground, lidar, flyfoto, terrain, locality, map, t } =
+      latest.current;
     // Applied or given up, either way it is spent. Clearing on failure too is
     // what makes a second press a second attempt.
     const done = () => setSpec(null);
@@ -152,6 +157,33 @@ export const useRecreateView = (
           .catch(() => {
             if (!cancelled) giveUp(wantedId);
           });
+        break;
+      }
+
+      case 'sketch': {
+        /*
+         * A sketch names no ground, so there is none to enter: it is a layer
+         * over whatever the reader has up, and changing that would be this
+         * button deciding something it was not asked about. What it *can* do is
+         * the part that is actually lost — where the author was standing. The
+         * view goes back to the frame the strokes were drawn on, at the scale
+         * they were drawn at, and the sketch is then legible over today's
+         * ground rather than over a rectangle it has nothing to say about.
+         */
+        const view = map.getView();
+        const size = map.getSize();
+        if (size) {
+          const extent = frameExtentIn(
+            spec.scene.frame,
+            view.getProjection().getCode(),
+          );
+          view.fit(extent, {
+            size,
+            padding: fitPadding(map),
+            duration: 400,
+          });
+        }
+        done();
         break;
       }
     }

@@ -19,6 +19,7 @@
 // Applying a spec is `useRecreateView`; this module only reads.
 
 import type { AttachmentRecord } from '../api/attachments';
+import { sketchSceneOf, type SketchScene } from '../funn/scene';
 import type { LidarModel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { VISUALIZATIONS } from '../shell/terrain/useTerrainAnalysis';
 import type { DemModel } from '../terrain/dem';
@@ -47,7 +48,26 @@ export type ViewSpec =
       // clamped again on the way in.
       radius?: number;
     }
-  | { kind: 'flyfoto'; source: 'mosaic' | { projectId: string } };
+  | { kind: 'flyfoto'; source: 'mosaic' | { projectId: string } }
+  | {
+      kind: 'sketch';
+      /*
+       * The strokes and the frame they are registered to — `funn/scene.ts`.
+       *
+       * The odd one out, and worth saying why it belongs in this union at all.
+       * The other three specs name an *upstream*: a dataset, an acquisition, a
+       * set of knobs, and the pixels come back from a service that may since
+       * have changed its mind. A sketch's upstream is the author's own hand and
+       * it is stored right here, so re-rendering it is not merely reproducible
+       * but exact.
+       *
+       * What makes it the same kind of thing regardless is the consequence:
+       * this is enough to make the picture again, so the record is written
+       * without a file and pinned afterwards like any other View, it survives a
+       * fork intact (`copyLocality.ts`), and Gjenskap has somewhere to go.
+       */
+      scene: SketchScene;
+    };
 
 /** The terrain arm on its own — what §4.6's seeding hands the terrain hook. */
 export type TerrainSpec = Extract<ViewSpec, { kind: 'terrain' }>;
@@ -87,6 +107,11 @@ const isVisualization = (v: unknown): v is Visualization =>
 export const viewSpecOf = (rec: AttachmentRecord): ViewSpec | null => {
   const meta = rec.meta;
   if (!meta) return null;
+
+  if (rec.kind === 'sketch') {
+    const scene = sketchSceneOf(meta);
+    return scene ? { kind: 'sketch', scene } : null;
+  }
 
   if (rec.kind === 'flyfoto') {
     const projectId = str(meta.projectId);

@@ -1,51 +1,4 @@
 {
-  "draw": {
-    "clear": "Fjern teikninga",
-    "confrimClear": "No blir alt som er teikna, fjerna. Er du sikker?",
-    "controls": {
-      "recentColors": "Nylege fargar",
-      "transparency": "Transparens",
-      "colorText": "Tekstfarge",
-      "colorBackground": "Bakgrunn",
-      "colorPoint": "Punktfarge",
-      "colorStroke": "Strekfarge",
-      "colorFill": "Fyllfarge",
-      "defaults": {
-        "primary": "Farge",
-        "secondary": "Fyllfarge"
-      },
-      "snap": "Snapping",
-      "pointType": "Punkttype",
-      "showMeasurements": "Vis målingar",
-      "tool": {
-        "label": {
-          "circle": "Sirkel",
-          "edit": "Rediger",
-          "linestring": "Linje",
-          "point": "Punkt",
-          "polygon": "Flate",
-          "text": "Tekst"
-        },
-        "tooltip": {
-          "undo": "Angre",
-          "redo": "Gjer om",
-          "deleteselected": "Slett valde element"
-        }
-      },
-      "color": "Fargar",
-      "edit": "Rediger",
-      "lineType": "Linjetype",
-      "lineTypeSolid": "Heiltrekt",
-      "lineTypeDashed": "Stipla",
-      "editInstruction": "Vel eit element du vil redigere eller flytte"
-    },
-    "size": {
-      "label": "Linjetjukkleik",
-      "pointLabel": "Punktstorleik",
-      "textLabel": "Tekststorleik"
-    },
-    "textInputLabel": "Skriv inn tekst"
-  },
   "infoBox": {
     "address": "Adresse",
     "cadastralIdentifier": "Gards- og bruksnummer",
@@ -396,6 +349,21 @@
       "growHint": "Teikninga går utanfor området til lokaliteten.",
       "growTooLarge": "Området ville blitt større enn {{max}} m på ei side. Flytt teikninga nærare, eller lag ein eigen lokalitet."
     },
+    "sketch": {
+      "keep": "Behald skissa",
+      "keepHint": "Legg teikninga til som eit eige gjennomsiktig lag. Ho blir skriven når du lagrar lokaliteten.",
+      "cancel": "Avbryt",
+      "caption": "Skisse {{n}}",
+      "empty": "Ingenting er teikna enno.",
+      "tooBig": "Skissa er for stor til å lagrast. Fjern nokre element og prøv igjen.",
+      "kept": "Skissa er lagt til. Ho blir lagra saman med lokaliteten.",
+      "unreadable": "Denne skissa kan ikkje lesast tilbake.",
+      "show": "Vis skissa",
+      "hide": "Skjul skissa",
+      "showHint": "Legg skissa over kartet som eit gjennomsiktig lag. Fleire skisser kan visast samstundes.",
+      "edit": "Rediger skissa",
+      "editHint": "Opne strekane under pennen igjen."
+    },
     "bilder": {
       "heading": "Bilete",
       "upload": "Last opp",
@@ -429,7 +397,8 @@
         "extract": "LiDAR-uttrekk",
         "screenshot": "Skjermbilete",
         "upload": "Lasta opp",
-        "flyfoto": "Flyfoto"
+        "flyfoto": "Flyfoto",
+        "sketch": "Skisse"
       },
       "pinPending": "Hentar biletet …",
       "pinAbsent": "Biletet er ikkje henta enno.",
@@ -706,7 +675,8 @@
       "extract": "LiDAR-uttrekk",
       "terrain": "Terrenganalyse",
       "flyfoto": "Flyfoto",
-      "screenshot": "Kartutsnitt"
+      "screenshot": "Kartutsnitt",
+      "sketch": "Skisse"
     },
     "source": {
       "lidarWms": "Kartverket høgdedata (WMS, ferdigskugga)",
@@ -714,7 +684,8 @@
       "nibProject": "Norge i bilder, enkeltprosjekt",
       "nibMosaic": "Norge i bilder, saumlaus mosaikk",
       "map": "Kartvising",
-      "compareGrounds": "{{left}} til venstre, {{right}} til høgre"
+      "compareGrounds": "{{left}} til venstre, {{right}} til høgre",
+      "sketch": "Handteikna tolking"
     },
     "acq": {
       "year": "opptaksår {{year}}",
@@ -746,7 +717,9 @@
       "ortofoto": "ortofoto, ubehandla",
       "composite": "sett saman av kartlaga",
       "heritageTransparency": "kulturminne {{percent}} % transparens",
-      "heritageNone": "ingen dellag"
+      "heritageNone": "ingen dellag",
+      "sketchElements_one": "1 element",
+      "sketchElements_other": "{{count}} element"
     },
     "blend": {
       "normal": "normal",

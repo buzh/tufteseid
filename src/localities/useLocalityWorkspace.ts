@@ -22,8 +22,23 @@ import {
   LocalityFindStatus,
 } from '../api/localityFinds';
 import { currentUserAtom, isAdminAtom } from '../auth/atoms';
-import { useDrawSettings } from '../draw/drawControls/hooks/drawSettings';
-import { getDrawLayer } from '../map/vectorLayers';
+import {
+  SCENE_BUDGET_BYTES,
+  sceneBytes,
+  sketchSceneOf,
+  storableScene,
+  type SketchScene,
+} from '../funn/scene';
+import {
+  drawRequestedAtom,
+  funnSceneAtom,
+  funnSessionAtom,
+} from '../funn/session';
+import {
+  setSketchOverlays,
+  sketchShownAtom,
+  type SketchOverlay,
+} from '../map/sketchOverlay';
 import { renderFigureBlob } from '../figure/figure';
 import { describeHeritageRender, screenshotFigure } from '../figure/specs';
 import type { LidarSource } from '../lidarExtract/sources';
@@ -42,7 +57,7 @@ import {
   backgroundLayerHalves,
   hybridOverlayHalves,
 } from '../map/layers/config/backgroundLayers/atoms';
-import { fitPadding } from '../shell/chromeInsets';
+import { fitPadding, FUNN_MARGIN_PX } from '../shell/chromeInsets';
 import { toast } from '../ui';
 import {
   activeLocalityAtom,
@@ -104,7 +119,6 @@ import {
 } from './localityLayer';
 import { enqueuePin, pinAttempted, pinNow, type Produced } from './pinQueue';
 import { captureLocalityScreenshot } from './screenshot';
-import { getDrawLayerExtent4326 } from './serializeDrawLayer';
 import { planStarterPack } from './starterPack';
 import {
   bilderStripOpenAtom,
@@ -159,9 +173,6 @@ export type Stance = 'show' | 'edit';
  * list of the newest ones.
  */
 export const FLYFOTO_BATCH_MAX = 8;
-
-// Extra breathing room when framing a single funn, on top of the chrome.
-const FUNN_MARGIN_PX = 90;
 
 // Spacing between exhibit positions when the whole list has to be renumbered
 // (§4.4, `reorderBilde`). Big enough that ten further moves fit between any
@@ -239,7 +250,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const setActiveLocality = useSetAtom(activeLocalityAtom);
   const [editingId, setEditingId] = useAtom(editingLocalityIdAtom);
   const setCoverTerrainSpec = useSetAtom(coverTerrainSpecAtom);
-  const [draftActive, setDraftActive] = useAtom(funnDraftActiveAtom);
+  // The pen: what has been asked for, what is actually up, and what is on it.
+  // The request is written here; the session and the scene are the surface's
+  // answer, and everything below reads them rather than a flag of its own.
+  const setDrawRequested = useSetAtom(drawRequestedAtom);
+  const drawSession = useAtomValue(funnSessionAtom);
+  const scene = useAtomValue(funnSceneAtom);
+  const draftActive = useAtomValue(funnDraftActiveAtom);
+  const sketchActive = drawSession?.mode === 'sketch';
+  const [sketchShown, setSketchShown] = useAtom(sketchShownAtom);
   const [adjusting, setAdjusting] = useAtom(adjustingLocalityAtom);
   const [selectedFunnId, setSelectedFunnId] = useAtom(selectedFunnIdAtom);
   const setFunnHidden = useSetAtom(funnHiddenAtom);
@@ -291,7 +310,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     FlyfotoProject[] | null
   >(null);
   const [flyfotoProjectsError, setFlyfotoProjectsError] = useState(false);
-  const { setDrawLayerFeatures } = useDrawSettings();
 
   // What this user *is* to this record. A fact, not a choice.
   const access: LocalityAccess =
@@ -834,13 +852,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * somebody remembers what the shape was, and this is that somebody.
    */
   const [geometryBefore, setGeometryBefore] = useState<DraftFind | null>(null);
-  // The autosave's controls, handed over once that hook has run further down.
-  // Refs because the two halves point at each other: the hook is driven by
+  // The autosave's flush, handed over once that hook has run further down. A
+  // ref because the two halves point at each other: the hook is driven by
   // callbacks defined here (create the record, patch it), and those callbacks
-  // in turn have to be able to flush a pending write or re-point the pen. The
-  // unmount path above needs the flush for the same reason.
+  // in turn have to be able to write out whatever is still settling. The
+  // unmount path above needs it for the same reason.
   const flushDraftRef = useRef<() => void>(() => {});
-  const rebindDraftRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     setLocalityHighlight(locality.id);
@@ -851,16 +868,20 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // swaps lokalitet.
   useEffect(() => {
     return () => {
-      // Before the clear below, not after: closing the workspace mid-stroke
-      // should write the stroke, and the draw layer is where it still is.
+      // Before the pen goes up, not after: closing the workspace mid-stroke
+      // should write the stroke, and the scene is still on the surface.
       flushDraftRef.current();
-      setDraftActive(false);
+      setDrawRequested(null);
       setAdjusting(false);
       setTool(null);
       setSelectedFunnId(null);
       setFunnOutside(false);
       hideFunnOnLayer(null);
-      getDrawLayer()?.getSource()?.clear();
+      // The overlays belong to this lokalitet's bilder, and the next one's
+      // ids are not these. Both halves: the layers come off the map and the
+      // set that decides which are up is emptied.
+      setSketchOverlays([]);
+      setSketchShown(new Set());
       // And the curtain comes down with the row that raised it
       // (docs/lokalitet-view.md §8). Sammenlign's only control moved onto the
       // lokalitet row, so leaving the lokalitet with it up would strand a
@@ -870,11 +891,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     };
   }, [
     locality.id,
-    setDraftActive,
+    setDrawRequested,
     setAdjusting,
     setTool,
     setSelectedFunnId,
     setFunnOutside,
+    setSketchShown,
     leaveCompare,
   ]);
 
@@ -1059,11 +1081,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
   // Stopping is not discarding. The funn exists in the buffer from the moment
   // the first shape closed and every change since has gone into it, so this
-  // only puts the pen down: flush whatever is still settling, take the drawing
-  // off the shared draw layer, and let the funn layer show the funn again.
+  // only puts the pen down: flush whatever is still settling, take the surface
+  // away, and let the funn layer show the funn again.
   const stopDraft = useCallback(() => {
     flushDraftRef.current();
-    getDrawLayer()?.getSource()?.clear();
+    setDrawRequested(null);
     hideFunnOnLayer(null);
     if (draftFunnId) {
       const rec = findItems?.find((it) => it.id === draftFunnId);
@@ -1073,8 +1095,21 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     }
     setDraftFunnId(null);
     setDraftIsEdit(false);
-    setDraftActive(false);
-  }, [draftFunnId, findItems, setDraftActive]);
+  }, [draftFunnId, findItems, setDrawRequested]);
+
+  /*
+   * The pen up, whichever of the two it was holding.
+   *
+   * Everything that takes the map back — opening the extract, grabbing the
+   * rectangle handles, leaving edit — has to end a drawing session, and since
+   * §9.3 there are two kinds of session to end. A funn draft has a record to
+   * settle and a layer to restore; a sketch has neither, so taking the surface
+   * away is all of it. Callers should not have to know which is up.
+   */
+  const putPenDown = useCallback(() => {
+    if (draftActive) stopDraft();
+    else setDrawRequested(null);
+  }, [draftActive, stopDraft, setDrawRequested]);
 
   /*
    * First finished shape → a row in the buffer.
@@ -1130,9 +1165,18 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // A lokalitet is meant to hold the whole extent of its funn. Drawing past
   // the edge is therefore worth saying — as a standing remark in the draft
   // band, not as a modal in the way of the pen.
+  //
+  // The extent is kept as well as compared, because `Utvid området` needs the
+  // rectangle and not just the verdict. It comes from the same place the flag
+  // does — the autosave, on every settle — so the two can never describe
+  // different drawings, which is what growing the lokalitet to fit a shape
+  // that had since been moved back inside used to look like.
+  const drawnExtent = useRef<LocalityBbox | null>(null);
   const reportDrawnExtent = useCallback(
-    (extent: LocalityBbox | null) =>
-      setFunnOutside(extent != null && !bboxContains(locality.bbox, extent)),
+    (extent: LocalityBbox | null) => {
+      drawnExtent.current = extent;
+      setFunnOutside(extent != null && !bboxContains(locality.bbox, extent));
+    },
     [locality.bbox, setFunnOutside],
   );
 
@@ -1144,14 +1188,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     onExtent: reportDrawnExtent,
   });
   flushDraftRef.current = autosave.flush;
-  rebindDraftRef.current = autosave.rebind;
 
-  // Recomputed from the live drawing rather than from whatever the flag was
-  // raised with, so it can't grow the rectangle to fit a shape that has since
-  // been moved back inside.
   const growToFitDrawing = useCallback(() => {
-    const projection = map.getView().getProjection().getCode();
-    const drawn = getDrawLayerExtent4326(projection);
+    const drawn = drawnExtent.current;
     if (!drawn) return;
     const grown = bboxUnion(locality.bbox, drawn);
     // The one place in the app where the size band is a refusal rather than a
@@ -1168,47 +1207,52 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     }
     patchLocality({ bbox: grown });
     setFunnOutside(false);
-  }, [map, locality.bbox, patchLocality, setFunnOutside, t]);
+  }, [locality.bbox, patchLocality, setFunnOutside, t]);
+
+  /*
+   * What every entrance to the pen has to do before it presses it.
+   *
+   * Three of them — `Nytt funn`, `Rediger tegningen`, `Tegn` — and the
+   * difference between them is one line each, at the end. The surface freezes
+   * the map and takes the screen, so anything that also wants the map has to be
+   * put down first: another drawing session, the rectangle handles, the
+   * extract dialog. Terreng stays, deliberately — it is a read-only view of the
+   * same rectangle and tracing what it shows is the whole reason to have it up.
+   */
+  const clearForPen = useCallback(() => {
+    putPenDown();
+    setAdjusting(false);
+    setTool((cur) => (cur === 'lidar' ? null : cur));
+  }, [putPenDown, setAdjusting, setTool]);
 
   const startDraft = useCallback(() => {
     if (!canAdd || draftActive) return;
-    // Leftovers on the shared draw layer can only be a drawing that was
-    // already saved and put down; drop them so the new funn starts clean.
-    getDrawLayer()?.getSource()?.clear();
+    clearForPen();
     hideFunnOnLayer(null);
     // The eye on `Funn` is a way of looking at the ground, not a way of
     // working on it: drawing with the existing funn invisible is how you end
     // up drawing the one you already have.
     setFunnHidden(false);
-    setAdjusting(false);
-    // Only the extract is dismissed — terrain is a read-only view of the
-    // same rectangle and there is no reason drawing on top should close it.
-    setTool((cur) => (cur === 'lidar' ? null : cur));
     setDraftFunnId(null);
     setDraftIsEdit(false);
     setFunnTitle('');
     setGeometryBefore(null);
-    setDraftActive(true);
-  }, [
-    canAdd,
-    draftActive,
-    setFunnHidden,
-    setAdjusting,
-    setTool,
-    setDraftActive,
-  ]);
+    setDrawRequested({ mode: 'funn' });
+  }, [canAdd, draftActive, clearForPen, setFunnHidden, setDrawRequested]);
 
+  /*
+   * `Rediger tegningen`: the funn's own shape, back under the pen.
+   *
+   * The geometry goes up as the request's `seed` and the surface converts it
+   * into whatever frame it captures (`funn/geometry.ts`). Not a `resume`: a
+   * funn is geometry and has never had a scene, so there is nothing registered
+   * to a frame to put back — which is why the two arrive on the request as
+   * different fields rather than one nullable one.
+   */
   const startGeometryEdit = useCallback(
     (f: LocalityFindRecord) => {
-      // Reachable from the list while another funn is being drawn, so put
-      // that one down first — including anything of it still settling.
-      if (draftActive) stopDraft();
-      getDrawLayer()?.getSource()?.clear();
-      setAdjusting(false);
-      setTool((cur) => (cur === 'lidar' ? null : cur));
-      setDrawLayerFeatures(f.geometry, 'EPSG:4326', true);
-      // Its own shapes, not an edit of them.
-      rebindDraftRef.current();
+      if (!canAdd) return;
+      clearForPen();
       hideFunnOnLayer(f.id);
       setDraftFunnId(f.id);
       setDraftIsEdit(true);
@@ -1217,17 +1261,196 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       // that a second edit in the same session restores the first one's
       // result rather than the server's copy.
       setGeometryBefore(findBaseOf(f));
-      setDraftActive(true);
+      setDrawRequested({ mode: 'funn', seed: f.geometry });
     },
-    [
-      draftActive,
-      stopDraft,
-      setAdjusting,
-      setTool,
-      setDrawLayerFeatures,
-      setDraftActive,
-    ],
+    [canAdd, clearForPen, setDrawRequested],
   );
+
+  /*
+   * `Tegn`: the same pen, making a *layer* instead of a funn (§9.3).
+   *
+   * A funn is a claim about the ground — this ditch is here, at these
+   * coordinates — and it is stored as geometry because that is what a claim
+   * can be checked against. A sketch is a reading of an image: the mound this
+   * shadow implies, the outline the hillshade nearly shows, the arrow saying
+   * *look here*. Converting that to GeoJSON would be pretending it was a
+   * measurement, so the strokes themselves are what is kept.
+   *
+   * Hence two entrances rather than a mode switch inside one. Which of the two
+   * you are making is decided before the pen goes down, because it decides
+   * what the surface's tools are *for*, and a control that changed the meaning
+   * of everything already drawn would be the worst button in the app.
+   */
+  const startSketch = useCallback(() => {
+    if (!canAdd || sketchActive) return;
+    clearForPen();
+    setDrawRequested({ mode: 'sketch' });
+  }, [canAdd, sketchActive, clearForPen, setDrawRequested]);
+
+  /**
+   * `Rediger skissen`: a stored scene back under the pen, on its own frame.
+   *
+   * A resume, not a seed: the scene is registered to the rectangle it was
+   * drawn over, and the surface flies back to that rectangle rather than
+   * re-registering the strokes to wherever the map happens to be standing.
+   */
+  const resumeSketch = useCallback(
+    (rec: AttachmentRecord) => {
+      if (!canAdd) return;
+      const stored = sketchSceneOf(rec.meta);
+      if (!stored) {
+        toast.error({ title: t('localities.sketch.unreadable') });
+        return;
+      }
+      clearForPen();
+      setDrawRequested({ mode: 'sketch', resume: { id: rec.id, scene: stored } });
+    },
+    [canAdd, clearForPen, setDrawRequested, t],
+  );
+
+  /** Putting the pen down without keeping anything. Also `Avbryt` on the bar. */
+  const stopSketch = useCallback(
+    () => setDrawRequested(null),
+    [setDrawRequested],
+  );
+
+  const sketchCount = useMemo(
+    () => (attachmentItems ?? []).filter((it) => it.kind === 'sketch').length,
+    [attachmentItems],
+  );
+
+  /*
+   * `Behold skissen` — the scene into the buffer, as a View (§4.1.2).
+   *
+   * A sketch is a View like an extract is: `meta` is the whole of it, the
+   * figure PNG is made afterwards by the pin queue, and that is what makes it
+   * something `Avbryt` can drop without deleting anything. What it stores that
+   * no other View does is `frame` — the rectangle the strokes are registered
+   * to — because a scene without one is a drawing of nowhere.
+   *
+   * The two relations are seeded from what was on screen and never asked
+   * about: the funn you had selected is what the drawing is about, the bilde
+   * on the ground is what it is a layer on (§9.3). Guessing is right here
+   * because the alternative is a dialog between the stroke and the record, and
+   * a wrong guess costs nothing — nothing cascades off either field.
+   */
+  const keepSketch = useCallback(() => {
+    if (!user || !canAdd) return;
+    if (!drawSession || drawSession.mode !== 'sketch') return;
+    const elements = storableScene(scene);
+    if (elements.length === 0) {
+      toast.error({ title: t('localities.sketch.empty') });
+      return;
+    }
+    // Refused here, with a sentence, rather than at `Lagre` — where it would
+    // be one failed row among the session's writes — or silently in
+    // `localStorage`, where it would be a recovery copy that is not one.
+    if (sceneBytes(elements) > SCENE_BUDGET_BYTES) {
+      toast.error({ title: t('localities.sketch.tooBig') });
+      return;
+    }
+    const meta = { frame: drawSession.frame, scene: elements };
+    const resumed = drawSession.resume;
+    if (resumed) {
+      const rec = attachmentItems?.find((it) => it.id === resumed.id);
+      // Gone while it was being drawn on — deleted in another tab, or
+      // tombstoned in this session's own list. Keeping it would resurrect a
+      // record the author has already said goodbye to.
+      if (!rec) {
+        toast.error({ title: t('localities.sketch.unreadable') });
+        setDrawRequested(null);
+        return;
+      }
+      mutateDraft((d) =>
+        withAttachment(d, resumed.id, attachmentBaseOf(rec), { meta }),
+      );
+    } else {
+      const born = Date.now();
+      const id = mintDraftId();
+      mutateDraft((d) =>
+        withNewSpec(d, id, {
+          kind: 'sketch',
+          caption: t('localities.sketch.caption', { n: sketchCount + 1 }),
+          sort: born,
+          bornSort: born,
+          hidden: false,
+          meta,
+          funn: selectedFunnId ? [selectedFunnId] : [],
+          over: pinnedId ? [pinnedId] : [],
+        }),
+      );
+      // Shown straight away. Everything else about keeping an image leaves it
+      // on the rail to be looked at later; a transparent overlay that is not
+      // over anything is a card of nothing, so this one goes up on the ground
+      // it was just traced off.
+      setSketchShown((cur) => new Set(cur).add(id));
+    }
+    setDrawRequested(null);
+    toast.success({ title: t('localities.sketch.kept') });
+  }, [
+    user,
+    canAdd,
+    drawSession,
+    scene,
+    attachmentItems,
+    sketchCount,
+    selectedFunnId,
+    pinnedId,
+    mutateDraft,
+    setSketchShown,
+    setDrawRequested,
+    t,
+  ]);
+
+  /** The eye on a sketch card: put this overlay up, or take it down. */
+  const toggleSketch = useCallback(
+    (id: string) =>
+      setSketchShown((cur) => {
+        const next = new Set(cur);
+        if (!next.delete(id)) next.add(id);
+        return next;
+      }),
+    [setSketchShown],
+  );
+
+  /*
+   * The shown sketches, onto the map (`map/sketchOverlay.ts`).
+   *
+   * Declared as a whole set on every change rather than added and removed one
+   * at a time: hiding a card, deleting one, rolling the session back and
+   * closing the lokalitet are four paths to the same map and only one of them
+   * is a removal.
+   *
+   * The parse is cached on the `meta` object's identity, which is what stops
+   * this from being an export storm. `sketchSceneOf` builds a new scene object
+   * each call, and the overlay module decides whether to re-render by
+   * comparing element arrays by reference — so an uncached parse would look
+   * like a new drawing on every keystroke in the name field.
+   */
+  const sceneCache = useRef(new WeakMap<object, SketchScene | null>());
+  useEffect(() => {
+    const cache = sceneCache.current;
+    const overlays: SketchOverlay[] = [];
+    for (const rec of attachmentItems ?? []) {
+      if (rec.kind !== 'sketch' || !rec.meta) continue;
+      if (!sketchShown.has(rec.id) || deletedIds.has(rec.id)) continue;
+      // The one under the pen is on the surface already; a second copy of it
+      // on the map is the pre-edit strokes showing through the drawing.
+      if (drawSession?.resume?.id === rec.id) continue;
+      let stored = cache.get(rec.meta);
+      if (stored === undefined) {
+        stored = sketchSceneOf(rec.meta);
+        cache.set(rec.meta, stored);
+      }
+      if (!stored) continue;
+      overlays.push({
+        id: rec.id,
+        frame: stored.frame,
+        elements: stored.elements,
+      });
+    }
+    setSketchOverlays(overlays);
+  }, [attachmentItems, sketchShown, deletedIds, drawSession]);
 
   /*
    * `Hent → LiDAR-uttrekk`: open the source-and-style dialog.
@@ -1244,10 +1467,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * working unchanged.
    */
   const openLidar = useCallback(() => {
-    if (draftActive) stopDraft();
+    putPenDown();
     setAdjusting(false);
     setTool('lidar');
-  }, [draftActive, stopDraft, setAdjusting, setTool]);
+  }, [putPenDown, setAdjusting, setTool]);
 
   const closeLidar = useCallback(() => {
     setTool((cur) => (cur === 'lidar' ? null : cur));
@@ -1292,10 +1515,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setBboxBefore(null);
       return;
     }
-    if (draftActive) stopDraft();
+    putPenDown();
     setBboxBefore(localityRef.current.bbox);
     setAdjusting(true);
-  }, [adjusting, draftActive, stopDraft, setAdjusting]);
+  }, [adjusting, putPenDown, setAdjusting]);
 
   /** `Bruk`: keep where the rectangle ended up (still buffered). */
   const applyAdjust = useCallback(() => {
@@ -1330,19 +1553,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * leaking through the very door that closes it.
    */
   const standDown = useCallback(() => {
-    if (draftActive) stopDraft();
+    putPenDown();
     setAdjusting(false);
     setBboxBefore(null);
     closeLidar();
     setEditingId((cur) => (cur === locality.id ? null : cur));
-  }, [
-    draftActive,
-    stopDraft,
-    setAdjusting,
-    closeLidar,
-    locality.id,
-    setEditingId,
-  ]);
+  }, [putPenDown, setAdjusting, closeLidar, locality.id, setEditingId]);
 
   /**
    * `Lagre` (§5.6) — and it no longer ends the session.
@@ -2673,10 +2889,32 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     startDraft,
     stopDraft,
     discardDraft,
+    /** Either kind of session, ended — for callers that do not know which. */
+    putPenDown,
 
     // grow-to-fit
     funnOutside,
     growToFitDrawing,
+
+    /*
+     * The sketch arm of the same pen (§9.3).
+     *
+     * `sketchActive` is read off the session rather than a flag of its own, so
+     * it is true exactly while the surface is up — which is what the exits
+     * zone needs, since `Behold skissen` and `Avbryt` are the only way out of
+     * a frozen map.
+     *
+     * `sketchShown` is a set, not a slot: two readings of the same mound,
+     * traced off two different grounds, shown together over either, is the
+     * analysis the whole feature is for.
+     */
+    sketchActive,
+    startSketch,
+    stopSketch,
+    keepSketch,
+    resumeSketch,
+    sketchShown,
+    toggleSketch,
 
     // tools
     tool,

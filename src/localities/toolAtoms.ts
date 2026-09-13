@@ -2,8 +2,8 @@ import { atom } from 'jotai';
 import { funnDraftActiveAtom } from './atoms';
 
 // Which tool surface the workspace is showing. Drawing is deliberately not
-// a member: it already has funnDraftActiveAtom, which the draw settings read
-// to arm the pen, and a second flag for the same state would drift. Ask
+// a member: it is answered by the drawing session itself, through
+// funnDraftActiveAtom, and a flag for the same state would drift. Ask
 // workspaceModeAtom for the combined answer.
 export type RibbonTool = 'lidar' | 'terrain' | null;
 

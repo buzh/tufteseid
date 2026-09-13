@@ -14,7 +14,6 @@ import {
   LocalityFindRecord,
   subscribeLocalityFinds,
 } from '../api/localityFinds';
-import { getStyleFromProperties } from '../draw/featureStyle';
 import { mapAtom } from '../map/atoms';
 import {
   activeLocalityAtom,
@@ -22,10 +21,15 @@ import {
   selectedFunnIdAtom,
 } from './atoms';
 
-// Renders the funn of the OPEN lokalitet only. Features keep the style
-// they were drawn with (round-tripped through geometry properties by
-// serializeDrawLayer); this default is the fallback for features that
-// carry none.
+// Renders the funn of the OPEN lokalitet only, all of them in one style.
+//
+// Features used to carry their own colour, width and dash, round-tripped
+// through the geometry's properties by the OpenLayers pen. They do not any
+// more: a funn is geometry (§9.2) and the pen that makes it is the Excalidraw
+// surface, which keeps its own appearance in a sketch's scene rather than in
+// a find's coordinates. What a funn looks like on the map is therefore a
+// decision of this layer's, made once, which is also what makes twenty of
+// them read as one set.
 export const FUNN_ID_PROPERTY = '__funnId';
 export const FUNN_LAYER_ID = 'funnLayer';
 
@@ -49,13 +53,13 @@ const defaultFunnStyle = [
 ];
 
 // A style with nothing in it draws nothing — how a funn is kept off the map
-// while the draw layer is holding its shapes.
+// while the pen is holding its shapes.
 const INVISIBLE = new Style(undefined);
 
 // The funn currently being drawn, if any. It has to stay hidden across
 // re-hydration, not just once: every autosaved geometry patch comes back as a
 // realtime update, which rebuilds the record's features from scratch and would
-// otherwise put the persisted copy back underneath the one on the draw layer.
+// otherwise put the persisted copy back underneath the one under the pen.
 let hiddenFunnId: string | null = null;
 
 const geoJson = new GeoJSON();
@@ -100,19 +104,7 @@ const hydrateFeatures = (
       f.setStyle(INVISIBLE);
       continue;
     }
-    let styled = getStyleFromProperties(f.getProperties());
-    // Icon points were drawn with a transparent hit-area style plus a DOM
-    // overlay; the round-tripped Style has no image, which would render
-    // an invisible point here. Fall back to the visible default instead.
-    if (
-      styled &&
-      f.getGeometry()?.getType() === 'Point' &&
-      !styled.getImage() &&
-      !styled.getText()
-    ) {
-      styled = null;
-    }
-    f.setStyle(styled ?? defaultFunnStyle);
+    f.setStyle(defaultFunnStyle);
   }
   return features;
 };

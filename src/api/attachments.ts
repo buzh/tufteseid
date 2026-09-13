@@ -1,16 +1,23 @@
 import { pb } from './pocketbase';
 
 // Bilder attached to a lokalitet: kept LiDAR extracts, map screenshots,
-// and plain uploads. Visibility follows the parent lokalitet via the
-// collection rules, and the file field is *protected* — image bytes are
+// plain uploads, and sketches. Visibility follows the parent lokalitet via
+// the collection rules, and the file field is *protected* — image bytes are
 // only served with a short-lived file token (see getAttachmentUrl).
 // Keep in sync with the attachments.kind select values in the PocketBase
-// migrations (1700000300 adds 'flyfoto').
-export type AttachmentKind = 'extract' | 'screenshot' | 'upload' | 'flyfoto';
+// migrations (1700000300 adds 'flyfoto', 1700000700 adds 'sketch').
+export type AttachmentKind =
+  | 'extract'
+  | 'screenshot'
+  | 'upload'
+  | 'flyfoto'
+  | 'sketch';
 
 // Free-form; extracts store sourceKey/sourceLabel/style/metresPerPx/
 // bbox25833 so the strip can say what an image shows. Flyfoto stores
-// source label + metresPerPx + bbox25833.
+// source label + metresPerPx + bbox25833. A sketch stores {frame, scene} —
+// the Excalidraw elements and the rectangle they were drawn over — which is
+// why the field's server-side ceiling is 2 MB rather than 10 kB.
 export type AttachmentMeta = Record<string, unknown>;
 
 export type AttachmentRecord = {
@@ -31,6 +38,21 @@ export type AttachmentRecord = {
   // opaque ordering key, not an index: see `nextAttachmentSort` below.
   sort: number;
   hidden: boolean;
+  /*
+   * Two relations, only ever set on a sketch, neither cascading (1700000700).
+   *
+   * `funn` is what the drawing is *about* and `over` is which bilder it is a
+   * layer *on*. Both are seeded at creation from what was on screen — the
+   * selected funn, the pinned bilde — and neither has an editor yet: the
+   * field exists so the answer has somewhere to live, and the day a sketch
+   * needs re-pointing is the day it gets a control.
+   *
+   * PocketBase returns `[]` for an unset multiple relation, so these are not
+   * optional, but records written before the migration have no key at all —
+   * read them through `?? []` rather than trusting the type on a cached row.
+   */
+  funn: string[];
+  over: string[];
   created: string;
   updated: string;
   // Set by PB on fetched records; pb.files.getURL needs one of them.
@@ -51,6 +73,9 @@ export type NewAttachmentInput = {
   // being shared.
   sort?: number;
   hidden?: boolean;
+  // Sketches only, and set once at creation — see AttachmentRecord above.
+  funn?: string[];
+  over?: string[];
 };
 
 const COLLECTION = 'attachments';
@@ -136,6 +161,10 @@ export const createAttachment = async (
   if (input.meta) form.append('meta', JSON.stringify(input.meta));
   form.append('sort', String(input.sort ?? nextAttachmentSort()));
   if (input.hidden) form.append('hidden', 'true');
+  // Multiple relations go up one value per key in multipart; an empty list is
+  // simply no keys, which is what PocketBase stores anyway.
+  for (const id of input.funn ?? []) form.append('funn', id);
+  for (const id of input.over ?? []) form.append('over', id);
   form.append('file', blob, filename);
   return pb.collection(COLLECTION).create<AttachmentRecord>(form);
 };
@@ -165,6 +194,8 @@ export const createAttachmentSpec = async (
     meta: input.meta ?? {},
     sort: input.sort ?? nextAttachmentSort(),
     hidden: input.hidden ?? false,
+    funn: input.funn ?? [],
+    over: input.over ?? [],
   });
 
 /*
@@ -194,7 +225,23 @@ export const pinAttachment = async (
 /** Caption, exhibit position or concealment — everything an author edits. */
 export const updateAttachment = async (
   id: string,
-  patch: { caption?: string; sort?: number; hidden?: boolean },
+  patch: {
+    caption?: string;
+    sort?: number;
+    hidden?: boolean;
+    /**
+     * The spec itself, replaced wholesale — PocketBase has no JSON merge.
+     *
+     * One writer: a sketch that has been drawn on again (§9.3). Every other
+     * View's parameters are fixed at the moment it is kept, and the pin is the
+     * only thing that ever adds to them, which `pinAttachment` above does with
+     * the file in the same request.
+     */
+    meta?: AttachmentMeta;
+    /** A sketch's two relations; see `AttachmentRecord`. */
+    funn?: string[];
+    over?: string[];
+  },
 ): Promise<AttachmentRecord> => {
   return pb.collection(COLLECTION).update<AttachmentRecord>(id, patch);
 };

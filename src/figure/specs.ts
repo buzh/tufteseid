@@ -319,6 +319,43 @@ export const flyfotoFigure = ({
 });
 
 // ---------------------------------------------------------------------------
+// Skisse — the author's own hand, re-exported
+// ---------------------------------------------------------------------------
+
+export type SketchFigureInput = {
+  subject?: string;
+  /** How many strokes and shapes the scene holds. */
+  elements: number;
+  metresPerPx: number;
+  bbox25833: Bbox25833;
+};
+
+/**
+ * The one figure with **no credits line**, and that is the correct reading
+ * rather than an omission: nothing in the pixels came from a public register.
+ * A sketch is an interpretation, and the caption says so instead of naming a
+ * rights holder who never saw it. `captionLayout` skips empty rows, so an
+ * empty list simply leaves the row out (`draw.ts`).
+ *
+ * It is also the one figure whose extent is the *drawing's* rather than the
+ * lokalitet's — a sketch is its strokes, so the rectangle printed is the one
+ * `funn/render.ts` framed them in.
+ */
+export const sketchFigure = ({
+  subject,
+  elements,
+  metresPerPx,
+  bbox25833,
+}: SketchFigureInput): FigureSpec => ({
+  title: titleOf(subject, t('figure.title.sketch')),
+  source: t('figure.source.sketch'),
+  settings: [t('figure.set.sketchElements', { count: elements })],
+  metresPerPx,
+  bbox25833,
+  credits: [],
+});
+
+// ---------------------------------------------------------------------------
 // Screenshot — whatever was on the map, composited
 // ---------------------------------------------------------------------------
 

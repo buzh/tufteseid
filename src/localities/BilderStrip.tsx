@@ -9,6 +9,7 @@ import {
   Note,
   OpenOriginalButton,
   RecreateButton,
+  SketchToggleButton,
 } from './bilderCommon';
 import styles from './bilderCommon.module.css';
 import type { LocalityWorkspaceApi } from './useLocalityWorkspace';
@@ -70,6 +71,11 @@ const Detail = ({
               : t('localities.bilder.showOnMap')}
           </Button>
         )}
+        {/* And here in show as well, because turning a layer on is reading:
+            a sketch is only worth storing separately from its ground if it
+            can be held up against it and taken away again. `Rediger skissen`
+            is the carousel's — that one writes. */}
+        <SketchToggleButton ws={ws} rec={rec} />
         <RecreateButton rec={rec} />
         {/* No retry here, and none is reachable: a pin is a write, so
             `PinRetryButton` is the carousel's. This surface is only ever

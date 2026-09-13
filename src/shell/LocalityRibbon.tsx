@@ -2,13 +2,11 @@ import { useAtom, useAtomValue } from 'jotai';
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { LocalityRecord } from '../api/localities';
-import { funnSessionAtom } from '../funn/session';
 import { BilderCarousel } from '../localities/BilderCarousel';
 import { BilderPicker } from '../localities/BilderPicker';
 import { BilderStrip } from '../localities/BilderStrip';
 import { BildeTransparency } from '../localities/BildeTransparency';
 import { FunnCallout } from '../localities/FunnCallout';
-import { FunnDrawBar } from '../localities/FunnDrawBar';
 import { LocalityDialogs } from '../localities/LocalityDialogs';
 import { bilderStripOpenAtom } from '../localities/toolAtoms';
 import { useLocalityWorkspace } from '../localities/useLocalityWorkspace';
@@ -48,15 +46,17 @@ export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
   }, [starterRunning, setStripOpen]);
 
   /*
-   * The one-occupant rule (§4.3). Four surfaces want the bottom edge — the
-   * filmstrip, the edit carousel, a picker run, and the draw toolbar while a
-   * funn draft is open — and none of them may stack, because all of them are
-   * over the map. Drawing yields the images: you are not curating a gallery
-   * while the pen is down.
+   * The one-occupant rule (§4.3). Three surfaces want the bottom edge — the
+   * filmstrip, the edit carousel and a picker run — and none of them may
+   * stack, because all of them are over the map. The pen takes it from all
+   * three without being a fourth: while a drawing session is up the Excalidraw
+   * surface covers the map and carries its own tools, so there is nothing for
+   * this edge to hold and nothing to curate. (There used to be a fourth, the
+   * `FunnDrawBar` that drove the OpenLayers pen; it went with src/draw/.)
    *
-   * A picker **borrows** the slot rather than being a fifth occupant of it:
+   * A picker **borrows** the slot rather than being a third occupant of it:
    * while a run is live it is what the slot holds, and closing the run gives
-   * the collection back. That is why it is a branch here and not a fourth
+   * the collection back. That is why it is a branch here and not a third
    * flag — "the kept ones join the collection when you close the picker" is
    * literally true because the collection is not on screen until then.
    *
@@ -71,15 +71,7 @@ export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
    * their geometry, and a component that is a rail on Tuesday is how the
    * write verbs end up merely disabled in show instead of absent (§2).
    */
-  const drawing = ws.draftActive;
-  // Once the Excalidraw surface is up it carries its own tools, and the
-  // OpenLayers ones behind this bar are switched off (settings/draw/atoms.ts):
-  // leaving it on the edge would be a toolbar that does nothing under a
-  // toolbar that does. The two are separate entrances for now — `Nytt funn`
-  // and `Tegn` (src/funn/session.ts) — so both flags can be up at once, and
-  // when they are, the one with the live tools wins. It goes entirely when
-  // src/draw/ does.
-  const session = useAtomValue(funnSessionAtom) != null;
+  const drawing = ws.draftActive || ws.sketchActive;
   const picking = !drawing && ws.picker.run != null;
   const showStrip = !drawing && !picking && stripOpen && ws.hasBilder;
 
@@ -93,15 +85,6 @@ export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
           <RibbonFunnDraftRow ws={ws} />
         </ErrorBoundary>
       )}
-      {bottomSlot &&
-        drawing &&
-        !session &&
-        createPortal(
-          <ErrorBoundary name="FunnDrawBar">
-            <FunnDrawBar editing={ws.draftIsEdit} />
-          </ErrorBoundary>,
-          bottomSlot,
-        )}
       {bottomSlot &&
         picking &&
         createPortal(

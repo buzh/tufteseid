@@ -80,6 +80,18 @@ const clampPair = (a: number, b: number, size: number): [number, number] => {
 };
 
 /**
+ * Extra room for a *funn*, on top of the chrome.
+ *
+ * A funn is small — metres across, not hundreds — so fitting one to the free
+ * area alone puts it edge to edge with nothing around it to read it against.
+ * Shared with `funn/FunnSurface.tsx`, which flies to the same rectangle before
+ * opening it for editing: framing the same thing two different ways depending
+ * on which verb you pressed is exactly the kind of small incoherence the
+ * insets module exists to remove.
+ */
+export const FUNN_MARGIN_PX = 90;
+
+/**
  * `View#fit` padding that clears the chrome. Use this instead of a hard-coded
  * `[80, 80, 80, 80]`: the numbers those guessed at are exactly what the
  * floating shell made unknowable.

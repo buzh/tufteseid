@@ -1,6 +1,6 @@
 import { atom } from 'jotai';
+import { funnSessionAtom } from '../../funn/session';
 import { selectedResultAtom } from '../../search/atoms';
-import { drawEnabledAtom } from '../../settings/draw/atoms';
 import { mapToolAtom } from '../overlay/atoms';
 import { featureInfoPanelOpenAtom } from './atoms';
 
@@ -15,9 +15,9 @@ import { featureInfoPanelOpenAtom } from './atoms';
  * ribbon and **off on arrival**. Arm it, then click the point you actually
  * want to know about.
  *
- * Kept in its own module rather than in `atoms.ts` because the armed atom
- * has to see the two other click owners, and one of them (`drawEnabledAtom`)
- * sits in a module graph that reaches back to `featureInfo/atoms`.
+ * Kept in its own module rather than in `atoms.ts` because the armed atom has
+ * to see the two other click owners, and one of them (the pen) sits in a
+ * module graph that reaches back to `featureInfo/atoms`.
  */
 const infoToolStateAtom = atom(false);
 
@@ -49,10 +49,15 @@ export const infoToolAtom = atom(
 );
 
 /**
- * Nobody else owns the click. Measure and funn drawing both want the same
- * clicks, and OL will happily hand one to all three (`drawEnabledAtom` makes
- * the same call about measure). Suspension rather than disarming — leaving
- * measure or closing the draft puts the readout back the way it was found.
+ * Nobody else owns the click. Measure and the pen both want the same clicks,
+ * and OL will happily hand one to all three. Suspension rather than disarming
+ * — leaving measure or putting the pen down puts the readout back the way it
+ * was found.
+ *
+ * The pen's arm is belt and braces since §9.2: the Excalidraw surface covers
+ * the map, so a click never reaches OpenLayers while a session is up. It is
+ * stated anyway because "nothing can reach the map" is a fact about a
+ * stylesheet, and this atom is about who owns the gesture.
  *
  * It is also, on its own, the whole gate on **the Kulturminner popup**: a
  * click on a heritage feature that is on the map answers whether or not
@@ -65,7 +70,7 @@ export const infoToolAtom = atom(
  * nobody said was interesting.
  */
 export const heritageClickArmedAtom = atom(
-  (get) => get(mapToolAtom) !== 'measure' && !get(drawEnabledAtom),
+  (get) => get(mapToolAtom) !== 'measure' && get(funnSessionAtom) == null,
 );
 
 /**

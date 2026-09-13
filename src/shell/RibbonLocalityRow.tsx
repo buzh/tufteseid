@@ -3,7 +3,6 @@ import type { ChangeEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LocalityRecord } from '../api/localities';
-import { drawRequestedAtom } from '../funn/session';
 import { funnHiddenAtom } from '../localities/atoms';
 import { FunnList } from '../localities/FunnList';
 import {
@@ -763,28 +762,22 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
   const { locality, stance, mayEdit, canAdd, mode } = ws;
   const [stripOpen, setStripOpen] = useAtom(bilderStripOpenAtom);
-  // Straight off the atom rather than through `ws`, and deliberately: the
-  // Excalidraw surface is not wired into the funn draft yet, and routing its
-  // one flag through the workspace hook would entangle the two before the
-  // question of how they merge has been answered (src/funn/session.ts).
-  const [drawing, setDrawing] = useAtom(drawRequestedAtom);
   const editing = stance === 'edit';
 
   /*
    * The pen goes up if this row stops being able to put it up.
    *
-   * `Tegn` is both the entrance and the exit, and while the surface is
-   * covering the map it is the *only* exit — row 1 is inert and the surface
-   * takes the keyboard (src/funn/FunnCanvas.tsx). So anything that takes the
-   * button away has to end the session on the way past: leaving edit, or
-   * losing the right to add, which is the first effect; and closing or
-   * switching lokalitet, which is the second, since this row is keyed on the
-   * record and therefore unmounts when you leave one.
+   * While the surface is covering the map, this row holds the only way out of
+   * it — row 1 is inert and the surface takes the keyboard
+   * (src/funn/FunnCanvas.tsx). So losing the right to add has to end the
+   * session on the way past rather than merely hiding the exit. Closing or
+   * switching lokalitet is the workspace's own cleanup, since that is what
+   * unmounts this row.
    */
+  const { putPenDown } = ws;
   useEffect(() => {
-    if (!canAdd) setDrawing(false);
-  }, [canAdd, setDrawing]);
-  useEffect(() => () => setDrawing(false), [setDrawing]);
+    if (!canAdd) putPenDown();
+  }, [canAdd, putPenDown]);
 
   return (
     <div
@@ -886,20 +879,22 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               active={mode === 'draft'}
               onClick={() => (ws.draftActive ? ws.stopDraft() : ws.startDraft())}
             />
-            {/* The Excalidraw surface, on a button of its own while it grows
-                up. It will end up *being* `Nytt funn` — that is the whole
-                point of it — but until it can name a funn and store one, the
-                two entrances are kept apart so that neither has to pretend to
-                be the other, and so this one can be pressed without creating
-                a record. It is also its own exit: row 1 goes inert while the
-                pen is down and this row does not, so the way out is the
-                button you came in by. */}
+            {/* The other thing the same pen makes (§9.3): a transparent
+                overlay, kept as its strokes rather than converted to geometry.
+                Two buttons rather than a mode switch on one, because which of
+                the two you are making decides what the tools are *for* — a
+                funn is a claim about the ground and a sketch is a reading of
+                an image, and nothing about a drawing says which it was meant
+                to be. It is also its own exit: row 1 goes inert while the pen
+                is down and this row does not. */}
             <ModeButton
               icon="draw"
               label={t('localities.tools.draw')}
               tooltip={t('localities.tools.drawHint')}
-              active={drawing}
-              onClick={() => setDrawing(!drawing)}
+              active={ws.sketchActive}
+              onClick={() =>
+                ws.sketchActive ? ws.stopSketch() : ws.startSketch()
+              }
             />
             {/* The general answer to "how do I add an image": whatever the map
                 is showing, kept at the source's own resolution rather than
@@ -989,6 +984,26 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               onClick={ws.discardDraft}
             >
               {t('localities.funn.draft.discard')}
+            </Button>
+          </>
+        ) : ws.sketchActive ? (
+          /* The sketch's own pair, and the asymmetry with the funn draft above
+             is the point: a funn is committed stroke by stroke to the buffer
+             as it is drawn, so its exit is `Ferdig`; a sketch is not written
+             anywhere until this button, so its exit is `Behold skissen`. The
+             ghost arm is `Avbryt` rather than `Forkast`, for the same reason —
+             there is nothing yet to forget. */
+          <>
+            <Button
+              variant="primary"
+              leftIcon="check"
+              onClick={ws.keepSketch}
+              title={t('localities.sketch.keepHint')}
+            >
+              {t('localities.sketch.keep')}
+            </Button>
+            <Button variant="ghost" leftIcon="undo" onClick={ws.stopSketch}>
+              {t('localities.sketch.cancel')}
             </Button>
           </>
         ) : ws.adjusting ? (

@@ -63,9 +63,21 @@ const cropOf = (meta: Record<string, unknown>, img: HTMLImageElement) => {
     : { x: 0, y: 0, width: img.naturalWidth, height: img.naturalHeight };
 };
 
-/** Whether this record has enough recorded about it to be placed on the map. */
+/**
+ * Whether this record has enough recorded about it to be placed on the map.
+ *
+ * A sketch is refused although a pinned one has both a file and an extent, and
+ * that is about the slot rather than the record: this one holds a *ground*,
+ * one at a time, and a sketch is a transparent layer over one. It has its own
+ * way onto the map — `sketchOverlay.ts`, a set rather than a slot (§9.3) — and
+ * laying its figure down here would put a white sheet with a caption panel on
+ * it over the very image it was drawn to annotate.
+ */
 export const canPinBilde = (rec: AttachmentRecord): boolean =>
-  rec.file !== '' && rec.meta != null && extentOf(rec.meta) != null;
+  rec.kind !== 'sketch' &&
+  rec.file !== '' &&
+  rec.meta != null &&
+  extentOf(rec.meta) != null;
 
 export const usePinnedBilde = (attachments: AttachmentRecord[] | null) => {
   const [pinnedId, setPinnedId] = useAtom(pinnedAttachmentIdAtom);

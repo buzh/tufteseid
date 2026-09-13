@@ -1,51 +1,4 @@
 {
-  "draw": {
-    "clear": "Clear drawing",
-    "confrimClear": "Now everything that has been drawn will be removed. Are you sure?",
-    "controls": {
-      "recentColors": "Recent colors",
-      "transparency": "Transparency",
-      "colorText": "Text color",
-      "colorBackground": "Background",
-      "colorPoint": "Point color",
-      "colorStroke": "Stroke color",
-      "colorFill": "Fill color",
-      "defaults": {
-        "primary": "Color",
-        "secondary": "Fill color"
-      },
-      "snap": "Snapping",
-      "pointType": "Select icon",
-      "showMeasurements": "Show measurements on map",
-      "tool": {
-        "label": {
-          "circle": "Circle",
-          "edit": "Edit",
-          "linestring": "Line",
-          "point": "Point",
-          "polygon": "Polygon",
-          "text": "Text"
-        },
-        "tooltip": {
-          "undo": "Undo",
-          "redo": "Redo",
-          "deleteselected": "Delete selected"
-        }
-      },
-      "color": "Colors",
-      "edit": "Edit",
-      "lineType": "Line type",
-      "lineTypeSolid": "Solid",
-      "lineTypeDashed": "Dashed",
-      "editInstruction": "Select an element to edit or move"
-    },
-    "size": {
-      "label": "Stroke width",
-      "pointLabel": "Point size",
-      "textLabel": "Text size"
-    },
-    "textInputLabel": "Enter text"
-  },
   "infoBox": {
     "address": "Address",
     "cadastralIdentifier": "Cadastral identifier",
@@ -396,6 +349,21 @@
       "growHint": "The drawing extends beyond the locality's area.",
       "growTooLarge": "The area would end up larger than {{max}} m on a side. Move the drawing closer, or make it a locality of its own."
     },
+    "sketch": {
+      "keep": "Keep the sketch",
+      "keepHint": "Add the drawing as a transparent layer of its own. It is written when you save the lokalitet.",
+      "cancel": "Cancel",
+      "caption": "Sketch {{n}}",
+      "empty": "Nothing has been drawn yet.",
+      "tooBig": "The sketch is too large to store. Remove some elements and try again.",
+      "kept": "Sketch added. It is saved along with the lokalitet.",
+      "unreadable": "This sketch cannot be read back.",
+      "show": "Show the sketch",
+      "hide": "Hide the sketch",
+      "showHint": "Lay the sketch over the map as a transparent layer. Several sketches can be shown at once.",
+      "edit": "Edit the sketch",
+      "editHint": "Open the strokes under the pen again."
+    },
     "bilder": {
       "heading": "Images",
       "upload": "Upload",
@@ -429,7 +397,8 @@
         "extract": "LiDAR extract",
         "screenshot": "Screenshot",
         "upload": "Uploaded",
-        "flyfoto": "Aerial photo"
+        "flyfoto": "Aerial photo",
+        "sketch": "Sketch"
       },
       "pinPending": "Rendering the image …",
       "pinAbsent": "The image has not been rendered yet.",
@@ -706,7 +675,8 @@
       "extract": "LiDAR extract",
       "terrain": "Terrain analysis",
       "flyfoto": "Aerial photo",
-      "screenshot": "Map view"
+      "screenshot": "Map view",
+      "sketch": "Sketch"
     },
     "source": {
       "lidarWms": "Kartverket elevation data (WMS, pre-shaded)",
@@ -714,7 +684,8 @@
       "nibProject": "Norge i bilder, single acquisition",
       "nibMosaic": "Norge i bilder, seamless mosaic",
       "map": "Map view",
-      "compareGrounds": "{{left}} on the left, {{right}} on the right"
+      "compareGrounds": "{{left}} on the left, {{right}} on the right",
+      "sketch": "Hand-drawn interpretation"
     },
     "acq": {
       "year": "flown {{year}}",
@@ -746,7 +717,9 @@
       "ortofoto": "orthophoto, unprocessed",
       "composite": "composite of the map layers",
       "heritageTransparency": "heritage at {{percent}} % transparency",
-      "heritageNone": "no sublayers"
+      "heritageNone": "no sublayers",
+      "sketchElements_one": "1 element",
+      "sketchElements_other": "{{count}} elements"
     },
     "blend": {
       "normal": "normal",

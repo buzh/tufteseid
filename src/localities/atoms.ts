@@ -1,5 +1,6 @@
 import { atom } from 'jotai';
 import { LocalityRecord } from '../api/localities';
+import { funnSessionAtom } from '../funn/session';
 import type { TerrainSpec } from './viewSpec';
 
 // The open lokalitet — non-null means the workspace panel is showing and
@@ -40,9 +41,24 @@ export const pendingStarterLocalityIdAtom = atom<string | null>(null);
 // tree and seeds its knobs from it — docs/lokalitet-view.md §4.6.
 export const coverTerrainSpecAtom = atom<TerrainSpec | null>(null);
 
-// A funn is being drawn/edited in the workspace right now. The shell
-// uses this to mount the mobile bottom draw toolbar.
-export const funnDraftActiveAtom = atom<boolean>(false);
+/*
+ * A funn is being drawn or edited in the workspace right now.
+ *
+ * Derived from the drawing session rather than held, since the pen became one
+ * surface with two modes (`funn/session.ts`). It used to be a flag the
+ * workspace set on the way in and cleared on the way out, and a flag beside
+ * the session is a flag that can disagree with it — "the draft band is up but
+ * the canvas never opened" is precisely the state a frame capture can fail
+ * into. So the question is asked of the session, which is the thing that
+ * either exists or does not.
+ *
+ * A *sketch* session is not a funn draft: same surface, different thing being
+ * made, and the draft band, the autosave and `workspaceModeAtom`'s 'draft' all
+ * belong to the funn arm alone.
+ */
+export const funnDraftActiveAtom = atom(
+  (get) => get(funnSessionAtom)?.mode === 'funn',
+);
 
 // "Juster området": the open lokalitet's rectangle is move/resizable on
 // a temp layer (see useLocalityAdjust). Mutually exclusive with the

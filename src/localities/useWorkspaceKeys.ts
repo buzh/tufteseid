@@ -14,9 +14,10 @@ import { anyOverlayOpenAtom } from '../ui/overlayAtoms';
 // bubble-phase listener would move the funn selection *and* pan the map
 // out from under it.
 //
-// Escape is deliberately NOT bound while a funn draft is open —
-// DrawControls binds it to abort the shape currently being sketched, and
-// stealing it there would throw away a drawing instead of a keystroke.
+// Escape is deliberately NOT bound while the pen is down — the Excalidraw
+// surface has the keyboard and binds it to abort the shape currently being
+// drawn, and stealing it there would throw away a drawing instead of a
+// keystroke.
 
 export type WorkspaceKeyHandlers = {
   onNewFunn: () => void;

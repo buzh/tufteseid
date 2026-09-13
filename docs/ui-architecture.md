@@ -48,12 +48,15 @@ and each has already cost a debugging session.
 **One slot, one occupant — but only where the slot is really one.** Running a
 LiDAR extract and reading terrain are the same slot: `ribbonToolAtom`
 (`src/localities/toolAtoms.ts`) holds at most one of `'lidar' | 'terrain'`, and
-picking one drops the other. Drawing is deliberately *not* in that slot. It has
-its own flag, `funnDraftActiveAtom`, and a funn draft and a terrain render can
-be live together — terrain is a read-only view of the same rectangle and
-tracing what it shows is the reason to have it up. They do not compete for a
-surface: the draft owns the bottom edge and a thin ribbon row, and Terreng's
-knobs are on the settings strip.
+picking one drops the other. Drawing is deliberately *not* in that slot. It is
+its own question, asked of the drawing session — `funnDraftActiveAtom` is
+derived from `funnSessionAtom?.mode === 'funn'` rather than held, because a
+flag beside the session is a flag that can disagree with it, and "the draft
+band is up but the canvas never opened" is exactly the state a failed frame
+capture falls into. A funn draft and a terrain render can be live together:
+terrain is a read-only view of the same rectangle and tracing what it shows is
+the reason to have it up. They do not compete for a surface — the draft owns a
+thin ribbon row, and Terreng's knobs are on the settings strip.
 
 `workspaceModeAtom` still derives the single answer
 (`'draft' | 'lidar' | 'terrain' | 'browse'`) and is what the ribbon's button
@@ -219,7 +222,7 @@ decision everything else follows from.
     │     └── .right   absolute top/right  360→400px       InfoBox, and only that
     └── .bottom   flex:0 0 auto   pointer-events:none   z --z-ribbon
           └── the bottom slot   ← one of: BilderStrip, BilderCarousel,
-                                  BilderPicker, FunnDrawBar (§8.7.2)
+                                  BilderPicker (§8.7.2)
 ```
 
 Siblings of the whole thing: `KulturminnerPopup`, `AuthDialog`.
@@ -425,9 +428,18 @@ subsume.
   `infoClickArmedAtom` (`src/map/featureInfo/infoTool.ts`), which decide what a
   map click asks — the heritage overlay answers on its own, the point readout
   waits for the tool (§7.1). Not persisted to the URL.
-- **Draw** — the largest single cluster (`src/settings/draw/atoms.ts`, 375
-  lines): active tool, colour, line width, line style, point style, text style,
-  measurement toggles, undo/redo stacks.
+- **Drawing** — three, all in `src/funn/session.ts`: `drawRequestedAtom` (the
+  pen was pressed, and a `DrawRequest` rather than a boolean — which of the two
+  things the pen makes is being made, `mode: 'funn' | 'sketch'`, plus the
+  geometry to open on when a funn is being re-drawn and the stored scene to
+  open on when a sketch is), `funnSessionAtom` (the map is frozen and the
+  surface is live, holding the frame and the request that opened it), and
+  `funnSceneAtom` (what is currently drawn).
+  The asymmetry between the first two is load-bearing and §9.1 explains it;
+  only the second may be used to decide that something else is inop. This used
+  to be the largest cluster in the app — `src/settings/draw/atoms.ts`, 375 lines
+  of tool, colour, width, line style, point style, text style, measurement
+  toggles and undo/redo stacks — and Excalidraw owns all of that now (§15).
 - **Lokaliteter** — `activeLocalityAtom`, `localityPlacementAtom`
   (`src/localities/placement.ts` — the rectangle being placed before there is a
   record under it, §5.6; mutually exclusive with `activeLocalityAtom` by
@@ -1560,10 +1572,12 @@ policy:
   this tool. It no longer clears the Kulturminner popup either, for the same
   reason the popup no longer waits on it — the tool would be closing somebody
   else's window, and the popup has a close button.
-- `heritageClickArmedAtom` — nobody else owns the click: neither measure nor
-  funn drawing. Suspension rather than disarming, exactly as `drawEnabledAtom`
-  already does for measure — leaving measure or closing the draft puts the
-  readout back as it was found. On its own it is the whole gate on the popup.
+- `heritageClickArmedAtom` — nobody else owns the click: neither measure
+  (`mapToolAtom`) nor the drawing surface (`funnSessionAtom`). Suspension rather
+  than disarming — leaving measure or putting the pen down restores the readout
+  as it was found. On its own it is the whole gate on the popup. The drawing
+  half is belt and braces since §9: a transparent canvas over the whole map
+  takes every pointer event, so no click reaches OpenLayers while it is up.
 - `infoClickArmedAtom` — that, **and** the tool is on. What the point readout
   reads.
 
@@ -1746,7 +1760,7 @@ rows, the bottom edge of the map, a popover, a map callout and the dialogs:
 |---|---|---|
 | Identity, the work, the exits | `RibbonLocalityRow` (the lokalitet row) | four zones — see below |
 | What the rectangle holds | `FunnList`, in a popover on that row | the funn index |
-| The funn being drawn | `RibbonFunnDraftRow` (row 4) + `FunnDrawBar` (bottom slot) | title, save state, *Utvid området*; the pen — §8.5 |
+| The funn being drawn | `RibbonFunnDraftRow` (row 4); the pen is `FunnSurface` over the map | title, save state, *Utvid området* — §8.5, §9 |
 | The selected funn's note | `FunnCallout` (an `ol/Overlay` on the map) | title, status, note, beside the shape — §8.6 |
 | The images | `BilderStrip` / `BilderCarousel` / `BilderPicker` (bottom slot) | the same rail in both stances — read-only in show, the write verbs and drag-to-reorder in edit; a picker run borrows the slot — §8.7.2, §8.9.3 |
 | Dialogs | `LocalityDialogs` | Detaljer, the two `Hent ▾` selection dialogs and the flyfoto licensing notice |
@@ -1983,7 +1997,7 @@ So each one went to a surface priced like the use:
 
 | Was a dock section | Is now | Because |
 |---|---|---|
-| the live tool band | `RibbonFunnDraftRow` + `FunnDrawBar` in the bottom slot (§8.5) | it *is* watched, continuously, while you draw — so it gets a permanent strip, at the bottom, where the map above it stays whole |
+| the live tool band | `RibbonFunnDraftRow` (§8.5), and since §9 the tools themselves are Excalidraw's own, on the canvas | it *is* watched, continuously, while you draw — so it belongs where the hand is, and the hand is on the map |
 | Funn | `FunnList` in a popover behind the `Funn` control on the row, with a count badge | consulted; the count is the part you want at a glance, and a badge carries that without the list |
 | Kulturminner | nothing — deleted outright (§15) | the register it listed is already the map's headline overlay, clickable; a second, text-only copy of it inside a lokalitet was a duplicate wearing the same word |
 | Detaljer | a `Dialog` off the `[⋮]` menu | set once and stopped looking at; the one surface here you want *modal*, because you are typing prose into it |
@@ -2121,10 +2135,11 @@ walk. Selecting a frame pins it (§8.7.1), so these two keys move the map as
 well as the rail; the selected frame scrolls itself into view so the two stay
 in agreement.
 
-That Escape carve-out is deliberate: `DrawControls` binds Escape to abort the
-shape currently being sketched, and stealing it would throw away a drawing
-instead of a keystroke. Under autosave (§8.5) it is also no longer the
-data-loss risk it was — everything already drawn is a record by then.
+That Escape carve-out is deliberate: Excalidraw binds Escape to abort the
+shape currently being drawn and to drop a selection, and stealing it would
+throw away a drawing instead of a keystroke. Under autosave (§8.5) it is also
+no longer the data-loss risk it was — everything already drawn is a buffered
+record by then.
 
 Row 1's map keys (1–5, hold X, A/D/W/S/E) are a separate listener and keep
 working throughout; see §5.3.
@@ -2146,35 +2161,40 @@ and threw the drawing away. The trade-off, taken deliberately: a stray click can
 leave a junk funn to delete, which is a recoverable annoyance where the old
 failure was not.
 
-`src/localities/useFunnAutosave.ts` is the mechanism. It watches the shared draw
-layer's source (`addfeature` / `changefeature` / `removefeature`), debounces
-`SETTLE_MS = 700` — long enough that dragging a vertex is one save and not
-forty — and then either creates the record or patches its geometry.
-`useLocalityWorkspace` supplies both callbacks and holds the two the hook
-returns (`flush`, `rebind`) in refs, because the halves point at each other.
+`src/localities/useFunnAutosave.ts` is the mechanism. It watches the drawing
+scene (`funnSceneAtom`, written by the surface on every Excalidraw `onChange`),
+debounces `SETTLE_MS = 700` — long enough that dragging a vertex is one save and
+not forty — converts the elements to a `FeatureCollection` through the session's
+frame (§9.2) and then either creates the record or patches its geometry.
+`useLocalityWorkspace` supplies both callbacks and holds the one the hook
+returns (`flush`) in a ref, because the halves point at each other.
 
 Six rules in there are load-bearing:
 
-- **An empty layer is never a delete.** Clearing the draw layer is how *every*
-  exit path takes the drawing back off the map; if that serialized to "no
-  features" and got written, putting the pen down would erase the funn.
+- **An empty scene is never a delete.** Putting the pen down takes the surface
+  away, and a scene that serialized to "no features" on the way out would erase
+  the funn. Removing one is the list's job.
 - **One write at a time.** Two creates in flight is two funn, so a second change
   during a request sets a dirty flag and re-arms the timer instead.
-- **The baseline is seeded, not observed.** `rebind()` re-points the pen and
-  records what is already on the layer as "written", which is what stops
-  "Rediger tegningen" from immediately re-saving the geometry it just loaded.
-  It is called explicitly at the two call sites that know a swap happened,
-  rather than keyed on the funn id changing — keying it would race the create's
-  own completion and could swallow the edit that followed it.
+- **The first scene after arming is a baseline, not a change.** "Rediger
+  tegningen" round-trips the record's `FeatureCollection` back through
+  `geometryToScene` (`src/funn/geometry.ts`) and opens the surface with those
+  shapes already in it — and that arrival must not immediately re-save the
+  geometry it just loaded. Nor must the pen going down over an empty canvas.
+  The hook answers both by taking its baseline from the first scene it sees
+  after the session arms, rather than from a `rebind()` the caller has to
+  remember to make: there is no third way in, so there is nothing for a caller
+  to know that the arming effect does not.
 - **Every exit flushes first.** `stopDraft`, `openLidar`, `toggleAdjusting`,
   deleting the drafted funn, and the workspace's unmount cleanup all call the
-  flush *before* clearing the layer — and so does `Lagre`, which would
+  flush *before* the session ends — and so does `Lagre`, which would
   otherwise commit a buffer that is up to 700 ms behind the pen.
-- **The drafted funn stays hidden across re-hydration.** `hideFunnOnLayer(id)`
-  sets a module-level id in `funnLayer.ts`, not a one-time style pass: every
-  autosaved patch comes back as a realtime event that rebuilds that record's
-  features from scratch, and without the id the persisted copy would reappear
-  underneath the one on the draw layer. `hideFunnOnLayer(null)` lifts it.
+- **The drafted funn stays hidden while the pen is on it.**
+  `hideFunnOnLayer(id)` sets a module-level id in `funnLayer.ts`, not a one-time
+  style pass: every buffered patch re-renders that record's features from
+  scratch, and without the id the saved copy would sit under the Excalidraw
+  strokes drawing the same shape twice — once in orange vectors, once in a
+  hand-drawn line. `hideFunnOnLayer(null)` lifts it.
 - **Titles are never empty.** The create names the funn `Funn n`
   (`localities.funn.autoName`) rather than blocking on one being typed — a funn
   you can rename is worth more than a funn you have to name — and the draft
@@ -2192,9 +2212,10 @@ There is nothing to submit, so what is left splits by what it is for.
 committing on blur like a row in the list, and beside it the state word. That
 word is *"Lagres med lokaliteten"*, never "Lagret": saying a thing is saved
 when it exists only in this tab is the transaction's one unforgivable lie.
-`FunnDrawBar` (the bottom slot, §8.7.2)
-carries the *pen* — one line of instruction and the whole of `DrawControls`,
-at the bottom edge where the tool is, under the map it is drawing on. The
+The *pen* is not a second surface at all any more: Excalidraw brings its own
+toolbar and puts it on the canvas, over the map it is drawing on, so
+`FunnDrawBar` and the whole of `DrawControls` behind it went with `src/draw/`
+(§9, §15) and the bottom slot has one occupant fewer to arbitrate (§8.7.2). The
 exits are on neither: they are depth 2 of the lokalitet row's right zone
 (§8.1), because a draft is a thing you are inside of, and the row is where
 this app says how to get out.
@@ -2209,8 +2230,9 @@ of the rectangle is worth remarking on and not worth stopping the pen for.
 `funnOutsideAtom` is a **flag**, not the union bbox it used to hold: it is
 written while the pen is moving, and re-publishing a rectangle that grows with
 every frame of a drag would re-render the row per frame to say the same thing.
-"Utvid området" recomputes the union from the live drawing at press time, which
-also means it cannot grow the rectangle to fit a shape since moved back inside.
+"Utvid området" recomputes the union at press time — `sceneExtentToBbox4326`
+over the live scene (§9.1) — which also means it cannot grow the rectangle to
+fit a shape since moved back inside.
 
 ### 8.6 How a lokalitet and its funn draw on the map
 
@@ -2267,14 +2289,15 @@ through `useFunnVisibility` (`src/localities/funnVisibility.ts`).
 
 - **`setVisible(false)`, never removal.** Everything the glance must leave
   alone hangs off those layers: the hydrated features, two realtime
-  subscriptions, the selection, and the draw layer's idea of which funn it is
-  holding.
+  subscriptions, the selection, and `funnLayer`'s idea of which funn is hidden
+  because the pen is on it (§8.5).
 - It re-applies on the layer collection's `add` as well as on the flag, because
   each layer is created by its own hook and one arriving while the funn are
   hidden would default to visible.
-- **The draw layer is not in the set**, and `startDraft` lifts the flag. You
-  cannot draw a shape you cannot see, and drawing with the existing funn
-  invisible is how you end up drawing the one you already have.
+- **`startDraft` lifts the flag.** Drawing with the existing funn invisible is
+  how you end up drawing the one you already have. The shape being drawn is
+  never in the set to begin with: it is Excalidraw's, on a canvas above the map
+  rather than on a layer in it.
 - Not persisted to the URL, on the same grounds as the compare curtain: a link
   shared to show someone a funn must not arrive with the funn hidden.
 - **The segment is lit while the funn are *on the map*.** It lit while they
@@ -2562,17 +2585,26 @@ edge, and neither surface has a stylesheet of its own.
 - **`data-chrome="bottom"`.** The strip declares its edge like every other
   surface and `chromeInsets` measures it on demand (§3.1); folding it away
   makes it a zero-size element, which the measurement already skips.
-- **One occupant, deepest first.** Four surfaces want this slot — `FunnDrawBar`
-  while a draft is open, a picker run (§8.9.3), the edit carousel, the
-  filmstrip — and exactly one gets it, chosen by depth in `LocalityRibbon`
-  rather than by the slot: **drawing yields the images**, and a picker run
-  yields to nothing but drawing. Enforcing it at the portal is what keeps the
-  rule readable as three lines of boolean in one file instead of four
-  components each guessing about the other three.
+- **One occupant, deepest first.** Three surfaces want this slot — a picker run
+  (§8.9.3), the edit carousel, the filmstrip — and exactly one gets it, chosen
+  by depth in `LocalityRibbon` rather than by the slot. There used to be a
+  fourth, `FunnDrawBar`, and **drawing yielded the images**; Excalidraw carries
+  its own toolbar on the canvas (§9), so the pen no longer asks for the bottom
+  edge and the rule lost its deepest case. Enforcing what is left at the portal
+  is what keeps it readable as two lines of boolean in one file instead of
+  three components each guessing about the other two.
 - **Selecting is pinning** (§8.7.1), in both stances. The rail is `Frame`s at
   88×64 with a kind mark; the selected one carries a ring and scrolls itself
   into view, which is what makes a keyboard step legible — otherwise ← / →
   would change the map and leave the active frame off-screen.
+- **A sketch is the one card that does not pin.** It is transparent (§9.3), so
+  it takes nothing from the ground slot and there is nothing for it to displace:
+  its frame carries an eye instead of a ring, pressing it adds or removes the id
+  from `sketchShownAtom`, and any number can be on at once. Selecting a bilde
+  that has sketches `over` it switches those on with it, and clearing the
+  selection switches them back off — the drawing was made about *that* image,
+  and leaving it hanging over the next one would be a caption on the wrong
+  photograph.
 - **Edit selects for you, without pinning.** Show is legible with nothing
   active; edit is entered in order to change something, and a surface that
   opens with no subject makes you pick one before you can. So `BilderCarousel`
@@ -2731,10 +2763,19 @@ terrain render and a flyfoto grab are each a short row of *parameters* —
 dataset, style, model, knobs, rectangle — and the pixels are what you get when
 you hand those parameters to a service. A screenshot and an upload are the
 opposite: bytes, with nothing behind them that could make the bytes again.
-That is the whole split, and it is **derivable from `kind`**: `extract` and
-`flyfoto` are Views, `screenshot` and `upload` are Files. There is no `spec`
-field and no `isView` field, deliberately — a flag that can disagree with
-`kind` is a flag that eventually will.
+That is the whole split, and it is **derivable from `kind`**: `extract`,
+`flyfoto` and `sketch` are Views, `screenshot` and `upload` are Files. There is
+no `spec` field and no `isView` field, deliberately — a flag that can disagree
+with `kind` is a flag that eventually will.
+
+A sketch (§9.3) is the odd one and belongs on the View side anyway. Its
+parameters are not a dataset and a set of knobs — they are a frame and the
+elements the user drew — but everything the split is *for* holds: the row is a
+few kilobytes rather than a few megabytes, so it buffers in the draft and is
+carried by a fork; the pixels are made afterwards by the same queue; and asking
+for them again gives back the same drawing at today's resolution instead of the
+one it was saved at. What it does not get is `Gjenskap`: there is no view of the
+map to go back to, because the figure holds no ground.
 
 A View therefore has three states, and `attachments.file` being optional
 (migration `1700000500`) is what allows the first of them:
@@ -3491,85 +3532,177 @@ paid for by whoever asked. Four things about that tail:
 
 ## 9. Drawing
 
-`src/draw/` plus `src/settings/draw/` — 23 files, ~3500 lines, the largest
-subsystem in the app. Inherited from upstream and the least-touched part of the
-fork; trimmed once, ahead of the port off kvib.
+`src/funn/` — Excalidraw on a transparent canvas over a frozen map. One pen,
+and **two different things come off it**: a *funn*, which is geometry on the
+ground, and a *tegning*, which is an overlay you can switch on and off over any
+ground you like. Which one you get is decided by the entrance and fixed for the
+session.
 
-`DrawType` is exactly six: point, line, polygon, circle, text, and `Move` (the
-edit/select tool). Editing: select, translate, modify, delete, plus a
-vertical-move hook. Styling: colour, line width, line style, point style, text
-style. Plus undo/redo and measurement readouts.
+This replaced `src/draw/` plus `src/settings/draw/` — 23 files and ~3500 lines
+of inherited Norgeskart drawing subsystem, the largest single thing the fork
+has deleted (§15).
 
-**What the trim removed, and why it isn't coming back.** The file
-import/export dialogs (`dialogs/import/`, `dialogs/ExportDialog.tsx`,
-`export/`) let a drawing be written out as GeoJSON/GPX and read back in. A funn
-already persists to PocketBase as it is drawn (§8.5); the dialogs were an
-upstream answer to a question this fork doesn't ask, and the export half wrote
-Norgeskart-branded filenames. `DrawControlsFooter.tsx` existed only to hold
-their buttons plus the clear-drawing confirm — that confirm now lives inline in
-`DrawControls.tsx` as a `ConfirmPopover`. The nautical-mile unit went with them
-(upstream is a sea-chart viewer; this one reads inland relief), so
-`MeasurementControls` is a single show/hide `Switch` on `showMeasurementsAtom`
-and `formatDistance` / `formatArea` are metric-only.
+### 9.1 The map is frozen, not photographed
 
-One live thing was buried in the import dialog's utils: `getStyleFromProperties`
-and its two siblings, which are the *load* half of the round-trip
-`serializeDrawLayer.ts` writes and are read by both the editable draw layer and
-the read-only funn layer. They now live in `src/draw/featureStyle.ts`, together
-with the `StyleForStorage` shape that had been sitting in `src/api/nkApiClient.ts`.
+Pressing the pen stops the map and draws over it. `freezeMap` (`session.ts`)
+cancels any easing view animation, then switches off every interaction that was
+active and remembers which — blunter than the owner tagging in
+`map/interactions.ts` on purpose, because that registry exists so one feature
+can remove its own interactions without disturbing another's and this has the
+opposite requirement: *nothing* may move the view, including the pan and zoom
+OpenLayers installs by default, which no owner ever claimed.
 
-`DrawToolSelector`, inside `DrawControls`, renders the tools. There used to be
-a second surface for them — `BottomDrawToolSelector`, a `position: fixed` bar
-at `zIndex 1000` mounted at the shell root and shown only on a phone with a
-draft open — because the dock column had nowhere to put six named tools at
-that width. `FunnDrawBar` is a full-width strip at the bottom of the screen on
-every size, so the phone case stopped being a special one and the second
-surface, its `useIsMobileScreen` gate and the `--z-fixed` token it was the
-only consumer of all went with it (§15).
+`captureFunnFrame` (`frame.ts`) is then read once and never again while the pen
+is down, which is what lets a frame be four numbers and a size rather than a
+live projection:
 
-The tools are icon-over-label buttons rather than a `Segmented` row: the name
-is what tells a first-time user what the glyph means, and six of them wrap
-onto a second line rather than scrolling when the strip is narrow.
+- **Scene units are the CSS pixels of the frozen viewport**, origin top-left,
+  y down. So a scene coordinate *is* a pixel of the map the user was looking at.
+- **The extent is stored in the view projection at freeze**, not in EPSG:4326
+  like `localities.bbox`. Rotation is locked off (`map/atoms.ts`), so in a
+  projected CRS the scene↔ground mapping is exactly linear; degrees would make
+  the y axis subtly non-linear across a tall viewport for no gain. Degrees are
+  derived at the edges, where something wants them
+  (`sceneExtentToBbox4326`, `frameExtentIn`, `metresPerScenePx`).
 
-**The port off kvib.** One `src/draw/Draw.module.css` for the subsystem, on
-the same reasoning as the two search modules. Line style, line width and text
-size are `Segmented` — three closed sets of two or three values, which is what
-that primitive is for; the graduated circles the widths used to render as were
-decoration over the same S/M/L labels. Point style is a `Popover` holding a
-grid of the 18 glyphs, each drawn in the current point colour (§12 on why not
-a `<select>`). Undo/redo/delete are `IconButton`s under `Tooltip`, snap is the
-kit `Switch` — and it finally has a translated label instead of a hardcoded
-"Snap".
+**What is under a stroke is the real map, not a picture of one.** The canvas is
+transparent and the map is still on screen behind it. That was not free: the
+Excalidraw scene can be panned and zoomed, and an overlay that moved while the
+map did not would put every stroke over ground nobody traced. So the map is
+**slaved to the scene** — `slaveMapToScene` CSS-transforms the map element to
+match whatever the scene is looking at, which keeps the frame valid, requests no
+tile, and asks Kartverket for nothing when the user zooms in to trace a detail.
+A transform is invisible to OpenLayers (`map.getSize()` reads layout, and the
+ResizeObserver behind it watches the content box), which is what makes it safe.
+Move the view instead and the frame every stroke is registered to goes stale
+under them.
 
-**Colour is the one place the port changed the control rather than its
-clothes.** kvib's `ColorPicker` gave a saturation/hue/alpha surface; the
-replacement is the native colour well plus a separate Transparens slider, over the
-same recent-colour swatches. The split is forced: `<input type="color">` is
-six hex digits by definition, and alpha is load-bearing here —
-`DEFAULT_SECONDARY_COLOR` is `#1d823b80`, i.e. fills are half-transparent so
-the terrain stays readable under a drawn polygon. The two halves compose back
-into the `#rrggbbaa` the OpenLayers styles already accept, and `splitColor`
-tolerates `#rgb` / `#rrggbb` / `#rrggbbaa` because all three turn up (the
-defaults carry alpha, the Text tool writes flat black and white, and the
-recent list is whatever an earlier version left in localStorage). Recents are
-recorded on release — blur of the well, pointer-up on the slider — not on
-every frame, or the strip fills with the colours passed through on the way.
+There used to be a `snapshot.ts` here that flattened the layers into a locked
+background element in the scene. It is gone: the still was a second copy of
+what was already on screen, and the live map under a transparent canvas is both
+cheaper and honest about what it is.
 
-The colour labels were also an i18n hole: `draw.controls.colorStroke`,
-`colorFill`, `colorText`, `colorBackground`, `colorPoint` and
-`defaults.primary` / `defaults.secondary` were read by `useColorLabels` but
-missing from all three locale files, so every label rendered as its own key.
-They exist now, along with `opacity`, `snap` and the two line-style names.
+### 9.2 Funn mode — the pen makes geometry
 
-Drawn geometry serializes through `src/localities/serializeDrawLayer.ts` into a
-GeoJSON `FeatureCollection` in EPSG:4326 on the funn record. **Circles
-round-trip as 64-gons** — GeoJSON has no circle primitive, so a circle drawn and
-reloaded is a polygon, and re-editing it edits vertices. That is a real
-behavioural wart to either accept explicitly or fix by storing centre+radius in
-feature properties.
+Entered with **Nytt funn** (`N`). The pen itself is not cut down — the
+restriction is at the *conversion*, not in the UI: the surface offers the same
+tools in both modes, and `sceneToCoord` decides at commit which elements can be
+a feature. Two reasons. A tool palette that changes shape under you is a second
+thing to learn, and the funn arm would be the impoverished one; and the
+elements that do not convert are not useless in funn mode — a text label placed
+while tracing is a note to yourself, and it survives in the scene the autosave
+keeps even though it never reaches `finds.geometry`. At commit `sceneToCoord`
+takes each convertible element back to the ground as a GeoJSON
+`FeatureCollection` in EPSG:4326 on the funn record —
+`finds.geometry`, unchanged in shape and meaning from what the OpenLayers draw
+layer used to write. The autosave rules that surround it are §8.5.
 
-`drawControlsKeyboardEffects.ts` binds Escape (abort current shape) and Delete
-(remove selection) — see the Escape carve-out in §8.4.
+- **Ellipses become 64-gons and freedraw becomes a dense `LineString`.** GeoJSON
+  has no circle and no stroke; a shape drawn round comes back as a polygon and
+  re-editing it edits vertices. Inherited wart, same as before, now stated at
+  the one place the conversion happens.
+- **Text elements are not geometry and do not convert.** A funn has a `title`
+  and a `note`, both better places for words than a label floating in a
+  `FeatureCollection`, and §8.6 draws the note as a callout anchored to the
+  shape.
+- **The stroke's own styling does not survive**, and that is a change. A funn
+  renders in `funnLayer`'s one cased-orange style on every background, because
+  the expressive drawing is now a separate object that keeps its colours
+  exactly. Per-feature colour, width, line style and point style — and
+  `getStyleFromProperties` / `getFeaturePropertiesForExport`, the round-trip
+  that carried them — went with `src/draw/`.
+
+### 9.3 Tegning mode — the pen makes an overlay
+
+Entered with **Tegn**. Nothing is restricted: the whole Excalidraw tool set,
+its own hand-drawn defaults, and no override of them — these are sketches over
+terrain, not scientific annotation, and a sketch that looks like a measurement
+claims more than it knows.
+
+What is kept is **the scene, not a picture of the ground**. A sketch is an
+`attachments` row of `kind: 'sketch'` whose `meta` carries `{ frame, scene }`,
+and whose pinned file is a **transparent** figure. It is never composited with
+the terrain it was drawn over, and three things follow from that:
+
+- **The ground ceases to be part of the decision.** `Behold` refuses Standard
+  and Hybrid because there is no rectangle-fetch path for the topo WMS
+  (§8.9.2). A sketch has no such refusal to inherit: one drawn over the
+  topographic map is exactly as good a record as one drawn over a LiDAR
+  hillshade, because neither contains a ground.
+- **It does not compete for the ground slot.** `map/groundOverlay.ts` holds
+  exactly one image and arbitrates between two callers (§8.7.1). Sketches are
+  transparent, so they take nothing from anybody: `map/sketchOverlay.ts` holds
+  a *set* of them, each on its own `ImageCanvasSource` at `zIndex: 2` — the
+  slot `drawLayer` vacated, over the ground and the pinned bilde and *under*
+  the funn, the measure line and the heritage layers, because a sketch is a
+  reading of the image beneath it and the register's own answer has to stay
+  legible through it — each switched on and off independently.
+- **Display re-exports the scene rather than stretching the file.** The layer
+  re-runs Excalidraw's `exportToCanvas` at whatever resolution the view
+  currently needs, the way `groundOverlay` re-renders rather than scaling, so
+  strokes stay crisp at any zoom instead of blurring past the resolution the
+  frame happened to be captured at. The renderer is behind a dynamic import: a
+  reader who opens a lokalitet with no sketches in it never loads it.
+
+**A sketch knows where it belongs.** Two relations, neither cascading:
+
+| field | → | means | set from |
+|---|---|---|---|
+| `over` | `attachments` | the bilder this drawing is a layer on | the pinned bilde at the moment it is kept |
+| `funn` | `finds` | what the drawing is *about* | the selected funn at that moment |
+
+Selecting a bilde brings its sketches up with it; selecting a funn brings up
+the drawings of it. A sketch tied to nothing is simply one you switch on
+yourself from the rail. Both are seeded automatically and **there is no editor
+for them yet** — deliberately deferred, and the first thing to build if the
+seeding turns out to guess wrong often.
+
+**Where the verbs are.** `Tegn` on the lokalitet row puts the pen down in
+sketch mode and is its own toggle; while the surface is up the row's exits zone
+holds the only way out of it, `[Behold skissen] [Avbryt]`, deepest-first beside
+the funn draft's own pair (§5.3). Neither writes to PocketBase: `Behold
+skissen` buffers a new spec — or, on a re-draw, the whole replacement `meta` —
+into the edit transaction, and `Lagre` is still what commits it (§8.11). On the
+bilder rail a sketch card carries two verbs no other bilde has: an eye
+(`Vis skissen` / `Skjul skissen`) in **both** stances, because turning a layer
+on writes nothing and holding a reading up against the image it was made over
+is the whole reason the two are stored apart; and `Rediger skissen` in edit,
+which is `resumeSketch` — the scene back under the pen, the stored copy taken
+off the map while it is there so the old strokes do not show through the new
+ones. A sketch is **not** offered `Vis i ruta`: that verb is the one-image
+ground slot, and `canPinBilde` refuses a sketch outright rather than laying a
+white figure with a caption panel over the image it annotates.
+
+**Flattening a composition is `Ta skjermbilde`, and it already works.**
+`compositeMapCanvases` walks every `.ol-layer` canvas in layer order honouring
+opacity and transform (`map/composite.ts`), so the moment sketches are OL
+layers a screenshot catches the whole reading — ground, pinned bilde, whichever
+sketches are switched on, the heritage layers, the funn — as one File cropped to
+the lokalitet's rectangle. That is the answer to "keep what I am looking at",
+and it is why the sketch itself never needed to be composited.
+
+### 9.4 What the surface deliberately does not offer
+
+`UIOptions` in `FunnCanvas.tsx` turns off every canvas action that is about
+*Excalidraw's document*, because the document here is a funn or a bilde: change
+background colour, clear canvas, export, load scene, save, save as image,
+toggle theme. The background belongs to the map; saving belongs to §8.11.
+
+The image tool is off too. A lokalitet's images are bilder and every one of
+them carries a provenance caption (§8.10); a PNG dropped into a drawing would
+be a picture inside the record with nothing behind it.
+
+`handleKeyboardGlobally={false}` keeps Excalidraw's single-letter shortcuts on
+its own surface. The funn's title field is a ribbon row above it, and typing a
+name into it would otherwise also be picking tools; the app's own keyboard map
+stands down from the other side for the same reason
+(`map/useBackgroundCyclingKeys.ts`, `localities/useWorkspaceKeys.ts`, both
+gated on `funnSessionAtom`).
+
+Excalidraw carries its own translations including both Norwegian written
+standards, so the toolbar speaks whatever the rest of the app does. Its codes
+are regioned and ours are not, hence the `LANG_CODES` map rather than a
+pass-through; anything unrecognised falls to English, as `i18n.ts` does.
 
 ---
 
@@ -3927,7 +4060,10 @@ whole shell and ribbon, the lokalitet surfaces (`FunnList`, `BilderStrip`,
 `src/search/**` — results panel and infobox — and the whole of `src/draw/**`.
 So `src/terrain/`, `src/settings/`, `src/auth/`, `src/lidarExtract/`,
 `src/localities/`, `src/help/`, `src/languageswitcher/`, `src/search/`,
-`src/draw/` and `src/map/` are all clear.
+`src/draw/` and `src/map/` are all clear. (`src/draw/` has since been deleted
+outright — §15 — which is worth reading as a note on this whole section: the
+largest thing the port carried across turned out to be the thing the fork did
+not need.)
 
 The kit needed nothing more to absorb the last of it. The wanted-primitives
 list used to say `Accordion`, `Select`, `Pagination` and `Alert`:
@@ -4158,15 +4294,24 @@ lokalitet of your own, with the original named in the banner and one press away
 the carousel, one **Ta med** each.
 
 **Record what you find**
-arm the pen and have the first finished shape become a saved funn, auto-named
-and undoable from its toast; draw as point, line, polygon, circle or text; style
-it (colour, width, line style, point style, text style); select, move, reshape,
-vertex-edit and delete geometry, with every change written back on its own;
-undo/redo; show or hide measurements on the drawing; rename a funn; note it; set
-its status (mulig / sannsynlig / avkreftet / rapportert); re-edit an existing
-funn's drawing; zoom to it; walk the funn list with ↑/↓/Enter; click or hover a
-funn on the map to select it in the list, and the reverse; grow the lokalitet
-when a funn escapes it, unless that would take it past the size band.
+arm the pen over the map itself — frozen, not photographed, and zoomable under
+the canvas without asking Kartverket for a tile — and have the first finished
+shape become a buffered funn, auto-named; draw it as line, rectangle, ellipse,
+arrow or freehand, with every change written back on its own; undo/redo; rename
+a funn; note it; set its status (mulig / sannsynlig / avkreftet / rapportert);
+re-edit an existing funn's drawing; zoom to it; walk the funn list with
+↑/↓/Enter; click or hover a funn on the map to select it in the list, and the
+reverse; grow the lokalitet when a funn escapes it, unless that would take it
+past the size band.
+
+**Draw over what you are reading**
+put a hand-drawn overlay on the ground with the full Excalidraw tool set and
+keep it as a transparent bilde registered to the ground it was drawn on; switch
+any number of them on and off over any background, so an interpretation can be
+held against the relief and then taken off it; have the drawing come up with
+the image or the funn it was made about; and flatten whatever composition is on
+screen — ground, pinned image, sketches, heritage layers, funn — into one
+screenshot.
 
 **Analyse it**
 run terrain analysis (DTM or DOM) with eight visualizations — pulldown or W/S —
@@ -4292,6 +4437,32 @@ rather than a port.
   what exactly was deleted. The catalogue of layers itself — what the five
   sources are, and the recipe for adding a sixth — is
   `docs/map-layers.md`.
+- **The whole OpenLayers drawing subsystem** (`src/draw/`, `src/settings/draw/`,
+  `src/localities/FunnDrawBar.tsx`, `src/localities/serializeDrawLayer.ts`, the
+  `drawLayer` and `drawOverlayLayer` entries in `map/layers.ts`) — 23 files and
+  ~3500 lines: six tools, select/translate/modify/delete, a vertical-move hook,
+  five style controls with their recent-colour memory, undo/redo, snap,
+  measurement readouts, and the atom graph under all of it. Replaced by
+  Excalidraw over the frozen map (§9), which is one surface with its own
+  toolbar, its own undo and its own styling, and which the fork did not have to
+  write.
+
+  Three things went with it that were load-bearing for something else and now
+  are not. `getStyleFromProperties` / `getFeaturePropertiesForExport` were the
+  round-trip that let a funn keep the colour it was drawn in — funn now render
+  in one style and the expressive drawing is a sketch (§9.2). `drawEnabledAtom`
+  was one of the two click owners `heritageClickArmedAtom` had to see
+  (§7.1); the drawing surface covers the map and takes every pointer event, so
+  the guard there is `funnSessionAtom`. And the `Escape` / `Delete` bindings in
+  `drawControlsKeyboardEffects.ts` belonged to a tool that no longer listens on
+  the document (§9.4) — see the Escape carve-out in §8.4. The whole top-level
+  `draw.*` block in all three locale files went with the controls that read it;
+  Excalidraw carries its own translations.
+
+  Do not port a single control back in because "Excalidraw cannot snap" or
+  "there is no vertex editor". Both are true; neither was worth 3500 lines of
+  fork-local surface to keep, and a funn is a rectangle-sized sketch of a mound
+  rather than a cadastral boundary.
 - **Dead dependencies**: `maplibre-gl` and `@geoblocks/ol-maplibre-layer`
   (OpenLayers is the map engine and is the right one for WMS + EPSG:25833;
   MapLibre is vector-tile-first and weak on non-Mercator projections), and
@@ -4318,14 +4489,15 @@ plausible-sounding reason to bring one back is exactly what the entry is for.
   moved onto the ribbon (§10).
 - **`BottomDrawToolSelector`** — the phone-only, `position: fixed` copy of the
   draw tools, which existed because six named tools did not fit across the
-  dock column. `FunnDrawBar` is full width on every size, so there is one
-  selector again (§9). `--z-fixed` was its only consumer and is gone with it;
+  dock column. `FunnDrawBar` made it one selector again, and then Excalidraw
+  made it none (§9). `--z-fixed` was its only consumer and is gone with it;
   `tokens.css` keeps a comment where it was, because nothing in the app should
   float free of the shell's stacking order again.
 - **`FunnDraft`** — the dock's draft band: title, note, state, and the pen in
   one panel. Split into `RibbonFunnDraftRow` (identity, on the ribbon),
   `FunnDrawBar` (the pen, at the bottom edge), `FunnCallout` (the note, on the
-  map beside its shape) and the row's depth-2 exits (§8.5).
+  map beside its shape) and the row's depth-2 exits (§8.5). Of those four the
+  pen is gone again: the toolbar is on the canvas now.
 - **The `Kulturminner ▾` readout on the lokalitet row** — `KulturminnerSection`
   and its stylesheet, `useKulturminner`, `src/api/kulturminnerWfs.ts`, the
   workspace's `kulturminner` / `kmCount` and the `localities.kulturminner.*`

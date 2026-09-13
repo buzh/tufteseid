@@ -10,8 +10,6 @@ export type MapLayer = {
 };
 
 export type MapLayers = {
-  drawLayer: MapLayer;
-  drawOverlayLayer: MapLayer;
   markerLayer: MapLayer;
   posterMarkerLayer: MapLayer;
   propertyGeometryLayer: MapLayer;
@@ -19,24 +17,6 @@ export type MapLayers = {
 };
 
 const mapLayers: MapLayers = {
-  drawLayer: {
-    getLayer: () => {
-      return new VectorLayer({
-        zIndex: 2,
-        source: new VectorSource({ wrapX: false }),
-        properties: { id: 'drawLayer' },
-      });
-    },
-  },
-  drawOverlayLayer: {
-    getLayer: () => {
-      return new VectorLayer({
-        zIndex: 3,
-        source: new VectorSource({ wrapX: false }),
-        properties: { id: 'drawOverlayLayer' },
-      });
-    },
-  },
   markerLayer: {
     getLayer: () => {
       return new VectorLayer({

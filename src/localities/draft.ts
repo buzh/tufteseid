@@ -55,12 +55,39 @@ export type DraftAttachment = {
   caption: string;
   sort: number;
   hidden: boolean;
+  /**
+   * A re-drawn sketch's new scene (§9.3), and nothing else ever.
+   *
+   * Absent on every other patch, which is what keeps it honest: PocketBase
+   * replaces a JSON field wholesale, so a patch that carried a partial `meta`
+   * would quietly delete the rest of the spec. Present means "this whole spec
+   * is the new one", and the commit re-pins the record because the pixels on
+   * it are now a picture of the old drawing.
+   */
+  meta?: Record<string, unknown>;
 };
 
 /** A View kept during the session: a spec, with no pixels behind it yet. */
 export type DraftSpec = DraftAttachment & {
   kind: AttachmentKind;
   meta: Record<string, unknown>;
+  /**
+   * A sketch's two relations, seeded when it is kept (§9.3). Buffered with the
+   * rest of the spec because they are part of what the record *is* — a layer
+   * on that bilde, about those funn — and a commit that wrote the row first
+   * and the relations afterwards would leave a sketch attached to nothing if
+   * the second write failed. Empty for every other kind.
+   *
+   * A `funn` id here may be a temp one: sketching over a funn invented in the
+   * same session is the ordinary case, and the commit maps it to the real id
+   * once that funn has been written.
+   *
+   * Optional rather than `[]` at every producer, for the same reason
+   * `NewAttachmentInput.sort` is: the other four kinds have no opinion about
+   * these, and asking each of them to say so is four chances to disagree.
+   */
+  funn?: string[];
+  over?: string[];
   /**
    * The exhibit position it was minted with, so the commit can tell an
    * arranged spec from an untouched one. PocketBase mints its own `sort` on
@@ -380,6 +407,8 @@ export const overlayAttachments = (
       file: '',
       caption: body.caption,
       meta: body.meta,
+      funn: body.funn ?? [],
+      over: body.over ?? [],
       sort: body.sort,
       hidden: body.hidden,
       created: '',

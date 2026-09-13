@@ -10,6 +10,8 @@ import {
   OpenOriginalButton,
   PinRetryButton,
   RecreateButton,
+  SketchEditButton,
+  SketchToggleButton,
 } from './bilderCommon';
 import styles from './bilderCommon.module.css';
 import type { LocalityWorkspaceApi } from './useLocalityWorkspace';
@@ -160,6 +162,11 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                       : t('localities.bilder.showOnMap')}
                   </Button>
                 )}
+                {/* The sketch's pair, in the slot the ground verb leaves
+                    empty on it: the eye that puts the layer up, and the way
+                    back under the pen. */}
+                <SketchToggleButton ws={ws} rec={active} />
+                <SketchEditButton ws={ws} rec={active} />
                 <RecreateButton rec={active} />
                 <PinRetryButton ws={ws} rec={active} />
                 <OpenOriginalButton ws={ws} rec={active} />

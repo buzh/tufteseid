@@ -61,6 +61,7 @@ export const KIND_ICON: Record<AttachmentKind, MaterialSymbol> = {
   screenshot: 'photo_camera',
   upload: 'image',
   flyfoto: 'satellite_alt',
+  sketch: 'draw',
 };
 
 // Tokened URLs are async (the file field is protected), so every image
@@ -567,6 +568,74 @@ export const CaptionField = ({
         ws.setBildeCaption(rec, caption.trim());
       }}
     />
+  );
+};
+
+/*
+ * A sketch's own eye, and it is deliberately not `Vis i ruta`.
+ *
+ * That verb is the ground-overlay slot (`usePinnedBilde`), which holds exactly
+ * one image, and a sketch is not a ground: it is a transparent layer over one,
+ * so the answer to "show it" is a *set* — two readings of the same mound can
+ * both be up, and either can come off without disturbing the other (§9.3).
+ * `canPinBilde` refuses a sketch for the same reason, so the two never both
+ * appear on one card.
+ *
+ * Present in show as well as edit: turning a layer on writes nothing, and
+ * comparing the drawings against the image they were made over is the whole
+ * reason they are stored as overlays rather than flattened into one.
+ */
+export const SketchToggleButton = ({
+  ws,
+  rec,
+}: {
+  ws: LocalityWorkspaceApi;
+  rec: AttachmentRecord;
+}) => {
+  const { t } = useTranslation();
+  if (rec.kind !== 'sketch') return null;
+  const shown = ws.sketchShown.has(rec.id);
+  return (
+    <Button
+      size="sm"
+      leftIcon={shown ? 'visibility_off' : 'visibility'}
+      title={t('localities.sketch.showHint')}
+      onClick={() => ws.toggleSketch(rec.id)}
+    >
+      {shown ? t('localities.sketch.hide') : t('localities.sketch.show')}
+    </Button>
+  );
+};
+
+/**
+ * …and the way back into it: the scene, under the pen again.
+ *
+ * The one entrance a sketch has that no other bilde does, and the mirror of
+ * `Rediger tegningen` on a funn. Owner-gated, because `Behold skissen` at the
+ * other end of it is an update; buffered until then, so a re-draw you abandon
+ * with `Avbryt` costs the record nothing.
+ *
+ * Absent on a sketch whose spec cannot be read back — `resumeSketch` says so
+ * rather than opening an empty canvas over the drawing it failed to load.
+ */
+export const SketchEditButton = ({
+  ws,
+  rec,
+}: {
+  ws: LocalityWorkspaceApi;
+  rec: AttachmentRecord;
+}) => {
+  const { t } = useTranslation();
+  if (rec.kind !== 'sketch' || !ws.canAdd) return null;
+  return (
+    <Button
+      size="sm"
+      leftIcon="draw"
+      title={t('localities.sketch.editHint')}
+      onClick={() => ws.resumeSketch(rec)}
+    >
+      {t('localities.sketch.edit')}
+    </Button>
   );
 };
 

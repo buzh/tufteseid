@@ -28,6 +28,7 @@ import {
   type AttachmentMeta,
   type AttachmentRecord,
   createAttachmentSpec,
+  updateAttachment,
 } from '../api/attachments';
 import {
   createLocality,
@@ -131,11 +132,23 @@ export const copyLocality = async ({
 
   let failed = 0;
 
+  /*
+   * The original's ids → the copy's, for a sketch's two relations.
+   *
+   * A sketch says which bilde it is a layer on and which funn it is about, and
+   * those ids mean nothing in a lokalitet that has just minted its own. Left
+   * alone they would be relations to somebody else's records — which the
+   * create rules refuse anyway — so they are translated, and whatever cannot
+   * be translated is dropped: a File stayed with the original (§8.12) and is
+   * not in this lokalitet at all until `Ta med` brings it over.
+   */
+  const copiedId = new Map<string, string>();
+
   onProgress({ stage: 'finds', done: 0, total: finds.length });
   for (let i = 0; i < finds.length; i++) {
     const f = finds[i];
     try {
-      await createLocalityFind(
+      const made = await createLocalityFind(
         {
           locality: rec.id,
           title: f.title,
@@ -145,6 +158,7 @@ export const copyLocality = async ({
         },
         userId,
       );
+      copiedId.set(f.id, made.id);
     } catch (e) {
       console.warn('[copyLocality] find failed', f.id, e);
       failed++;
@@ -156,7 +170,7 @@ export const copyLocality = async ({
   for (let i = 0; i < views.length; i++) {
     const v = views[i];
     try {
-      await createAttachmentSpec(
+      const made = await createAttachmentSpec(
         {
           locality: rec.id,
           kind: v.kind,
@@ -172,11 +186,40 @@ export const copyLocality = async ({
         },
         userId,
       );
+      copiedId.set(v.id, made.id);
     } catch (e) {
       console.warn('[copyLocality] view failed', v.id, e);
       failed++;
     }
     onProgress({ stage: 'bilder', done: i + 1, total: views.length });
+  }
+
+  /*
+   * The relations, in a second pass.
+   *
+   * They cannot go on the create: a sketch may be a layer on a bilde further
+   * down the same list, and the copy of that bilde does not exist yet. By here
+   * every record that is going to exist does, so one PATCH per sketch wires
+   * the whole graph at once. A failure is not counted — the sketch itself
+   * arrived, and a fork whose overlay lost track of which photograph it was
+   * traced off is a smaller loss than one that did not copy.
+   */
+  for (const v of views) {
+    if (v.kind !== 'sketch') continue;
+    const id = copiedId.get(v.id);
+    if (!id) continue;
+    const translate = (ids: string[] | undefined) =>
+      (ids ?? [])
+        .map((x) => copiedId.get(x))
+        .filter((x): x is string => x != null);
+    const funn = translate(v.funn);
+    const over = translate(v.over);
+    if (funn.length === 0 && over.length === 0) continue;
+    try {
+      await updateAttachment(id, { funn, over });
+    } catch (e) {
+      console.warn('[copyLocality] sketch relations failed', v.id, e);
+    }
   }
 
   return { rec, failed };
