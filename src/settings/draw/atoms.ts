@@ -124,11 +124,11 @@ export const textStyleReadAtom = atom((get) => {
 // survive, and closing measure puts the interactions back.
 //
 // And suspended outright once the Excalidraw surface is up (src/funn/). The
-// two draw the same funn and would both be listening for the same clicks —
-// and the OpenLayers side would be drawing onto a map the user cannot see,
-// since what is on screen by then is a photograph of it. This whole subsystem
-// goes when the surface is finished; until then, one line keeps it out of the
-// way.
+// two draw the same funn, and the surface is a transparent pane over the
+// whole map that takes every pointer event — so the OpenLayers side would be
+// listening for clicks it can no longer receive while still holding its
+// interactions on the map. This whole subsystem goes when the surface is
+// finished; until then, one line keeps it out of the way.
 export const drawEnabledAtom = atom<boolean>((get) => {
   if (get(funnSessionAtom)) return false;
   return get(funnDraftActiveAtom) && get(mapToolAtom) !== 'measure';

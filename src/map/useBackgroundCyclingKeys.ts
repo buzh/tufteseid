@@ -134,7 +134,7 @@ export const useBackgroundCyclingKeys = () => {
       }
       // The drawing surface takes the whole keyboard. Excalidraw's own tool
       // shortcuts are the digits, so 1-5 would pick a shape *and* swap the
-      // ground under a drawing registered to a photograph of the old one —
+      // ground out from under a drawing registered to the old one —
       // and these listeners are on the capture phase at the document, which
       // `inert` on the row (Ribbon.tsx) does nothing about.
       if (store.get(funnSessionAtom)) return;

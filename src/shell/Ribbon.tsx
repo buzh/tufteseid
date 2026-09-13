@@ -44,9 +44,9 @@ export const Ribbon = () => {
       {/*
         Row 1 stands down while a funn is being drawn. Everything on it —
         the grounds, the dataset ring, Stedsinfo, the settings strip under
-        it — changes what is on the map, and the drawing is registered to a
-        photograph of the map as it was (src/funn/frame.ts): swap the ground
-        underneath and the strokes are over terrain nobody traced.
+        it — changes what is on the map, and the drawing is registered to the
+        map as it stood when the pen went down (src/funn/frame.ts): swap the
+        ground underneath and the strokes are over terrain nobody traced.
 
         Inert rather than absent so the bar does not change height mid-
         session, and greyed so that reads as deliberate rather than as a

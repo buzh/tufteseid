@@ -376,7 +376,6 @@
       },
       "confirmDeleteShort": "Delete the find?",
       "growConfirmAction": "Grow the area",
-      "freezeFailed": "The map never finished drawing. Try again once it has loaded.",
       "autoName": "Find {{n}}",
       "growHint": "The drawing extends beyond the locality's area."
     },
@@ -443,6 +442,9 @@
       "hint": "←/→ walk · Enter keeps · Delete discards · Esc ends the run"
     },
     "tools": {
+      "draw": "Draw",
+      "drawHint": "Draw on the map as it stands. The map is frozen while the pen is down.",
+      "drawFailed": "The map has no size to draw on yet. Try again in a moment.",
       "lidarExtract": "LiDAR extract",
       "hent": "Fetch",
       "hentHint": "Fetch LiDAR extracts or aerial photos to pick between",

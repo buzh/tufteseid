@@ -75,9 +75,10 @@ export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
   // Once the Excalidraw surface is up it carries its own tools, and the
   // OpenLayers ones behind this bar are switched off (settings/draw/atoms.ts):
   // leaving it on the edge would be a toolbar that does nothing under a
-  // toolbar that does. The gap between the two flags is the second or so the
-  // map takes to settle before the freeze, and the bar is still the truth
-  // there. It goes entirely when src/draw/ does.
+  // toolbar that does. The two are separate entrances for now — `Nytt funn`
+  // and `Tegn` (src/funn/session.ts) — so both flags can be up at once, and
+  // when they are, the one with the live tools wins. It goes entirely when
+  // src/draw/ does.
   const session = useAtomValue(funnSessionAtom) != null;
   const picking = !drawing && ws.picker.run != null;
   const showStrip = !drawing && !picking && stripOpen && ws.hasBilder;

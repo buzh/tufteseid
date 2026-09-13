@@ -1,8 +1,9 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import type { ChangeEvent } from 'react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LocalityRecord } from '../api/localities';
+import { drawRequestedAtom } from '../funn/session';
 import { funnHiddenAtom } from '../localities/atoms';
 import { FunnList } from '../localities/FunnList';
 import {
@@ -695,7 +696,28 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
   const { locality, stance, mayEdit, canAdd, mode } = ws;
   const [stripOpen, setStripOpen] = useAtom(bilderStripOpenAtom);
+  // Straight off the atom rather than through `ws`, and deliberately: the
+  // Excalidraw surface is not wired into the funn draft yet, and routing its
+  // one flag through the workspace hook would entangle the two before the
+  // question of how they merge has been answered (src/funn/session.ts).
+  const [drawing, setDrawing] = useAtom(drawRequestedAtom);
   const editing = stance === 'edit';
+
+  /*
+   * The pen goes up if this row stops being able to put it up.
+   *
+   * `Tegn` is both the entrance and the exit, and while the surface is
+   * covering the map it is the *only* exit — row 1 is inert and the surface
+   * takes the keyboard (src/funn/FunnCanvas.tsx). So anything that takes the
+   * button away has to end the session on the way past: leaving edit, or
+   * losing the right to add, which is the first effect; and closing or
+   * switching lokalitet, which is the second, since this row is keyed on the
+   * record and therefore unmounts when you leave one.
+   */
+  useEffect(() => {
+    if (!canAdd) setDrawing(false);
+  }, [canAdd, setDrawing]);
+  useEffect(() => () => setDrawing(false), [setDrawing]);
 
   return (
     <div
@@ -796,6 +818,21 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               tooltip={`${t('localities.funn.new')} (N)`}
               active={mode === 'draft'}
               onClick={() => (ws.draftActive ? ws.stopDraft() : ws.startDraft())}
+            />
+            {/* The Excalidraw surface, on a button of its own while it grows
+                up. It will end up *being* `Nytt funn` — that is the whole
+                point of it — but until it can name a funn and store one, the
+                two entrances are kept apart so that neither has to pretend to
+                be the other, and so this one can be pressed without creating
+                a record. It is also its own exit: row 1 goes inert while the
+                pen is down and this row does not, so the way out is the
+                button you came in by. */}
+            <ModeButton
+              icon="draw"
+              label={t('localities.tools.draw')}
+              tooltip={t('localities.tools.drawHint')}
+              active={drawing}
+              onClick={() => setDrawing(!drawing)}
             />
             {/* The general answer to "how do I add an image": whatever the map
                 is showing, kept at the source's own resolution rather than

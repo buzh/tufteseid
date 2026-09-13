@@ -5,19 +5,16 @@ import type { LocalityBbox } from '../api/localities';
 /*
  * The one transform between an Excalidraw scene and the ground.
  *
- * Drawing a funn freezes the map: the view stops moving, the pixels on screen
- * become a locked background image, and Excalidraw draws on top of them in
- * its own scene coordinates. A frame is what makes those coordinates mean
- * something — it is captured once when the pen goes down and never changes
- * while it is down, which is the whole reason this can be four numbers and a
- * size rather than a live projection.
+ * Drawing a funn freezes the map: the view stops moving, and Excalidraw draws
+ * over it on a transparent canvas in its own scene coordinates. A frame is
+ * what makes those coordinates mean something — it is captured once when the
+ * pen goes down and never changes while it is down, which is the whole reason
+ * this can be four numbers and a size rather than a live projection.
  *
  * Scene units are the **CSS pixels of the frozen viewport**, origin top-left,
- * y downwards. The snapshot image is placed at (0, 0) at exactly
- * `widthPx × heightPx`, so a scene coordinate is a pixel of the view the user
- * was looking at when they started. (The snapshot's *image* carries more
- * pixels than that on a HiDPI screen — see `snapshot.ts` — which makes it
- * crisp without moving the coordinate system.)
+ * y downwards — so a scene coordinate is a pixel of the view the user was
+ * looking at when they started, and the map element can be transformed to
+ * follow the scene rather than the other way round (`session.ts`).
  *
  * The extent is stored in the **view projection at freeze**, not in EPSG:4326
  * like `localities.bbox`. That is deliberate: rotation is locked off

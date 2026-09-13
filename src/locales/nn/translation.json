@@ -376,7 +376,6 @@
       },
       "confirmDeleteShort": "Slette funnet?",
       "growConfirmAction": "Utvid området",
-      "freezeFailed": "Kartet vart ikkje ferdig teikna. Prøv igjen når det har lasta.",
       "autoName": "Funn {{n}}",
       "growHint": "Teikninga går utanfor området til lokaliteten."
     },
@@ -443,6 +442,9 @@
       "hint": "←/→ blar · Enter behaldar · Delete forkastar · Esc avsluttar"
     },
     "tools": {
+      "draw": "Teikn",
+      "drawHint": "Teikn på kartet slik det står no. Kartet blir frose medan pennen er nede.",
+      "drawFailed": "Kartet har ingen storleik å teikne på enno. Prøv igjen om eit augneblikk.",
       "lidarExtract": "LiDAR-uttrekk",
       "hent": "Hent",
       "hentHint": "Hent LiDAR-uttrekk eller flyfoto å velje mellom",

@@ -4,11 +4,14 @@ import { unByKey } from 'ol/Observable';
 /*
  * Flattening the map's layer canvases into one.
  *
- * Two callers want this and want it differently: `localities/screenshot.ts`
- * composites at CSS resolution and crops to the lokalitet's rectangle, and
- * `funn/snapshot.ts` composites the whole viewport at device resolution to
- * freeze under the drawing surface. The recipe underneath is the same
- * standard OpenLayers canvas-export dance, so it lives here once.
+ * `localities/screenshot.ts` composites at CSS resolution and crops to the
+ * lokalitet's rectangle. It is the only caller today — the drawing surface
+ * briefly wanted a device-resolution still of the whole viewport to freeze
+ * under itself, and does not any more, since what is under a stroke is the
+ * real map (`funn/session.ts`). The recipe is the standard OpenLayers
+ * canvas-export dance and keeps its own file regardless: it is about the map,
+ * not about screenshots, and the next thing that wants a picture of the map
+ * should not have to find it at the bottom of one.
  *
  * What this catches is every `.ol-layer` canvas — which is to say the map.
  * What it does *not* catch is `ol/Overlay`, which is DOM: the funn callout,

@@ -17,9 +17,9 @@ import { useMapSideEffects } from './useMapSideEffects';
 
 export const AppShell = () => {
   const setBottomSlot = useSetAtom(bottomSlotAtom);
-  // The session, not "the user pressed the pen": the two differ for as long
-  // as the map takes to settle, and nothing should stand down before there is
-  // something to stand down *for* (funn/session.ts).
+  // The session, not "the user pressed the pen": the surface is the thing
+  // being made room for, and the pen can be pressed at a moment the map has
+  // no size to frame, in which case there is never a surface (funn/session.ts).
   const drawing = useAtomValue(funnSessionAtom) != null;
 
   useMapSideEffects();
