@@ -249,9 +249,10 @@ pre-baked hillshade. Rationale and endpoint details: `docs/terrain-analysis.md`.
 
 **One entrance, and it is a lokalitet.** The rectangle analysed is always the
 open lokalitet's bbox, the button is on the lokalitet row beside Sammenlign,
-and digit `5` still selects it. Pressing Terreng with nothing open **creates**
-the lokalitet — the visible map framed exactly as "Ny lokalitet" frames it,
-then Terreng entered in it — or raises the sign-in dialog.
+and digit `5` still selects it. Pressing Terreng with nothing open **places**
+the lokalitet — a rectangle proposed exactly as "Ny lokalitet" proposes one,
+and Terreng entered in the record `Opprett` makes — or raises the sign-in
+dialog.
 
 That reverses an older rule here, *"reading the ground is not an act of
 ownership"*, and the reversal is deliberate. **Computing relief now requires an
@@ -387,10 +388,13 @@ Load-bearing:
 
 The top-level user object is **an area to explore**, not a claim that
 something is there — mirroring Riksantikvaren's lokalitet → enkeltminne
-hierarchy. A lokalitet is an authored rectangle — framed from the visible map
-in one press, resizable afterwards — holding *funn* (individually named and
-addressable drawn features) and *bilder* (kept LiDAR extracts, terrain
-renders, map screenshots, flyfoto, uploads).
+hierarchy. A lokalitet is an authored rectangle — proposed from the visible map,
+then moved and sized by hand before anything is written, and resizable
+afterwards — holding *funn* (individually named and addressable drawn features)
+and *bilder* (kept LiDAR extracts, terrain renders, map screenshots, flyfoto,
+uploads). It is bounded to **50–1500 m per side**, a band read off what the
+producers can actually render (`src/localities/bboxLimits.ts`,
+`docs/ui-architecture.md` §5.6).
 
 Two rules that hold regardless of what the interface looks like:
 
@@ -491,7 +495,7 @@ Crossed with that is a second, independent axis: **stance**, `show` | `edit`.
 Access is a fact about the record; stance is a choice made inside it. Every
 lokalitet opens in `show` and **nothing in show writes** — the write verbs are
 *absent* there, not disabled — with one exception: a lokalitet created in this
-session (from the viewport, or by saving a terrain render with none open)
+session, i.e. one whose rectangle was just placed and committed with `Opprett`,
 opens in `edit`, because it was made by an act of authorship. Stance is per
 session and never stored; it lives in `editingLocalityIdAtom`, keyed on the
 record id rather than a boolean, so "opens in show" holds by construction when

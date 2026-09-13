@@ -1,33 +1,23 @@
-import { useAtomValue, useSetAtom } from 'jotai';
 import { boundingExtent } from 'ol/extent';
 import type Map from 'ol/Map';
 import { transformExtent } from 'ol/proj';
-import { useCallback, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   createLocality,
   LocalityBbox,
   LocalityRecord,
 } from '../api/localities';
-import { currentUserAtom } from '../auth/atoms';
-import { mapAtom } from '../map/atoms';
 import { CHROME_MARGIN_PX, chromeInsets } from '../shell/chromeInsets';
-import { toast } from '../ui';
-import {
-  activeLocalityAtom,
-  editingLocalityIdAtom,
-  pendingStarterLocalityIdAtom,
-} from './atoms';
 import { fetchLocalityContext } from './localityContext';
 import { upsertLocalityOnLayer } from './localityLayer';
 
-// "Ny lokalitet" takes the screen as the rectangle. The old flow armed a
-// box-drag and then opened a panel on top of the area just framed, which
-// is backwards: what the user wants a lokalitet for is precisely the view
-// they are already looking at.
+// Where a new lokalitet's rectangle starts, and how one is written.
 //
-// The bbox stays *authored*, not derived — the viewport only seeds it, and
-// "Juster området" reshapes it afterwards.
+// "Ny lokalitet" does not create anything any more: it seeds a rectangle from
+// the visible map and hands it to the author to move and size, and `Opprett` is
+// what writes (`placement.ts`, docs/ui-architecture.md §5.6). So the viewport is
+// the *seed* and nothing else — the bbox was always authored rather than
+// derived, and now the authoring happens before the record exists rather than
+// after.
 
 // Inset: enough to prove the rectangle is fully on screen, and
 // at ≥8% also enough that transformExtent's corner-only reprojection has
@@ -35,22 +25,13 @@ import { upsertLocalityOnLayer } from './localityLayer';
 const INSET_FRACTION = 0.08;
 const INSET_MIN_PX = 48;
 
-// Below this the rectangle is not worth creating (and screenshot/extract
-// both bail on tiny boxes anyway).
+// Below this there is nothing on screen worth seeding from — chrome plus
+// insets can eat a short window whole.
 const MIN_SIDE_PX = 64;
 
-// minZoom is 3, so an unguarded viewport can be most of Norway — a
-// rectangle that reports an area in six figures and that no producer can
-// render. 25 km a side is a generous upper bound on something one person
-// walks over.
-const MAX_SPAN_M = 25_000;
-
-export type ViewportBboxResult =
-  | { ok: true; bbox: LocalityBbox }
-  | { ok: false; reason: 'unavailable' | 'tooLarge' };
-
 /**
- * The visible map inset away from the chrome, as EPSG:4326.
+ * The visible map inset away from the chrome, as EPSG:4326. `null` when the
+ * chrome leaves nothing to frame.
  *
  * Pixel corners rather than `View#calculateExtent` and a ratio:
  * `calculateExtent` is symmetric about the view centre while the chrome is
@@ -67,9 +48,9 @@ export type ViewportBboxResult =
  * Rotation is locked off, so the pixel rectangle stays axis-aligned and two
  * corners describe it.
  */
-export const viewportBbox = (map: Map): ViewportBboxResult => {
+export const viewportBbox = (map: Map): LocalityBbox | null => {
   const size = map.getSize();
-  if (!size) return { ok: false, reason: 'unavailable' };
+  if (!size) return null;
   const [width, height] = size;
 
   const insetX = Math.max(INSET_MIN_PX, Math.round(width * INSET_FRACTION));
@@ -81,28 +62,21 @@ export const viewportBbox = (map: Map): ViewportBboxResult => {
   const right = width - Math.max(insetX, clear(chromeRight));
   const top = Math.max(insetY, clear(chromeTop));
   const bottom = height - Math.max(insetY, clear(chromeBottom));
-  if (right - left < MIN_SIDE_PX || bottom - top < MIN_SIDE_PX) {
-    return { ok: false, reason: 'unavailable' };
-  }
+  if (right - left < MIN_SIDE_PX || bottom - top < MIN_SIDE_PX) return null;
 
   const topLeft = map.getCoordinateFromPixel([left, top]);
   const bottomRight = map.getCoordinateFromPixel([right, bottom]);
-  if (!topLeft || !bottomRight) return { ok: false, reason: 'unavailable' };
+  if (!topLeft || !bottomRight) return null;
 
+  // No ceiling here any more. The viewport can be most of Norway (minZoom is
+  // 3) and that used to be a refusal — `MAX_SPAN_M`, 25 km, a number about the
+  // view rather than about anything that has to render it. It is the placement
+  // step's job now: the seed is clamped into the size band on the way in
+  // (`clampBboxSize`), so zooming out gets you a 1500 m rectangle on the middle
+  // of the screen instead of a toast.
   const projection = map.getView().getProjection();
   const extent = boundingExtent([topLeft, bottomRight]);
-  const perUnit = projection.getMetersPerUnit() ?? 1;
-  if (
-    (extent[2] - extent[0]) * perUnit > MAX_SPAN_M ||
-    (extent[3] - extent[1]) * perUnit > MAX_SPAN_M
-  ) {
-    return { ok: false, reason: 'tooLarge' };
-  }
-
-  return {
-    ok: true,
-    bbox: transformExtent(extent, projection, 'EPSG:4326') as LocalityBbox,
-  };
+  return transformExtent(extent, projection, 'EPSG:4326') as LocalityBbox;
 };
 
 /**
@@ -146,69 +120,4 @@ export const createLocalityFromBbox = async (
     console.warn('[createFromBbox] create failed', e);
     return null;
   }
-};
-
-export const useCreateLocalityFromViewport = () => {
-  const { t } = useTranslation();
-  const map = useAtomValue(mapAtom);
-  const user = useAtomValue(currentUserAtom);
-  const setActiveLocality = useSetAtom(activeLocalityAtom);
-  const setEditingLocalityId = useSetAtom(editingLocalityIdAtom);
-  const setPendingStarter = useSetAtom(pendingStarterLocalityIdAtom);
-  const [creating, setCreating] = useState(false);
-
-  // Hands the record back, for the one caller that has something to do to it
-  // afterwards: pressing Terreng with nothing open (docs/lokalitet-view.md
-  // §8) creates the rectangle and then enters the tool in it, and "then"
-  // needs to know whether there is a rectangle to enter.
-  const create = useCallback(async (): Promise<LocalityRecord | null> => {
-    if (!user || creating) return null;
-    const result = viewportBbox(map);
-    if (!result.ok) {
-      toast.error({
-        title:
-          result.reason === 'tooLarge'
-            ? t('localities.createTooLarge')
-            : t('localities.createFailed'),
-      });
-      return null;
-    }
-    setCreating(true);
-    try {
-      const rec = await createLocalityFromBbox(
-        result.bbox,
-        user.id,
-        t('localities.defaultName'),
-      );
-      if (!rec) {
-        toast.error({ title: t('localities.createFailed') });
-        return null;
-      }
-      // The one exception to "every lokalitet opens in show"
-      // (docs/lokalitet-view.md §3): a rectangle framed thirty seconds ago
-      // has nothing to show, and making the first press on every fresh site
-      // be "Rediger" is a click that teaches nothing. Set in the same batch
-      // as the active record, so the row never renders it in show first.
-      setActiveLocality(rec);
-      setEditingLocalityId(rec.id);
-      // And the starter set follows it in, unasked. Three readings of the
-      // best laser dataset over the rectangle are what you would fetch next
-      // anyway, and the press that used to do it was a menu item you had to
-      // know about (docs/lokalitet-view.md §4.3, §12).
-      setPendingStarter(rec.id);
-      return rec;
-    } finally {
-      setCreating(false);
-    }
-  }, [
-    user,
-    creating,
-    map,
-    t,
-    setActiveLocality,
-    setEditingLocalityId,
-    setPendingStarter,
-  ]);
-
-  return { create, creating };
 };

@@ -428,7 +428,10 @@ subsume.
 - **Draw** — the largest single cluster (`src/settings/draw/atoms.ts`, 375
   lines): active tool, colour, line width, line style, point style, text style,
   measurement toggles, undo/redo stacks.
-- **Lokaliteter** — `activeLocalityAtom`, `funnDraftActiveAtom`,
+- **Lokaliteter** — `activeLocalityAtom`, `localityPlacementAtom`
+  (`src/localities/placement.ts` — the rectangle being placed before there is a
+  record under it, §5.6; mutually exclusive with `activeLocalityAtom` by
+  construction), `funnDraftActiveAtom`,
   `adjustingLocalityAtom`, `selectedFunnIdAtom` / `hoveredFunnIdAtom` (written
   from the `Funn ▾` list and from the map, §8.6), `pinnedAttachmentIdAtom` (which
   bilde is on the map, §8.7.1), content caches. Plus `recreateViewAtom`
@@ -539,7 +542,7 @@ looking at. Row 1 answers **what am I looking at**; the strip under it answers
 | **Stedsinfo** (I) | Arms the point readout: while it is on, a click asks the registers about that spot (§7.1). Off on arrival. It does *not* gate the Kulturminner popup — a visible heritage feature answers a click either way |
 | Mål | Popover with the measure tools |
 | Mine lokaliteter | Opens the localities card (signed in only) |
-| Ny lokalitet | Creates a lokalitet from the visible map (signed in only, §5.6) |
+| Ny lokalitet | Proposes a rectangle seeded from the visible map, to move and size before `Opprett` writes it (signed in only, §5.6) |
 | `RibbonAccount` | Sign in / account menu |
 
 **Terreng and Sammenlign are not in that table, and their absence is the
@@ -707,10 +710,12 @@ re-attaching the listener continuously.
   five buttons are on row 1 and in that order; the fifth, Terreng, renders on
   the lokalitet row (§8.1), so with a lokalitet open the digits and the buttons
   still line up and with none open `5` is the only entrance Terreng has. It is
-  not a refusal: **pressing `5` with nothing open creates the lokalitet** —
-  signed in, the visible map is framed exactly as "Ny lokalitet" frames it
-  (§5.6) and Terreng is entered in it, in edit; signed out, the sign-in dialog
-  comes up. Reading relief is the one thing here no WMS can do for us, so the
+  not a refusal: **pressing `5` with nothing open places the lokalitet** —
+  signed in, a rectangle is proposed exactly as "Ny lokalitet" proposes one
+  (§5.6) and Terreng is entered in the record `Opprett` makes, in edit; signed
+  out, the sign-in dialog comes up. `Avbryt` there leaves nothing behind, and
+  in particular does not arm Terreng for whichever lokalitet is opened next.
+  Reading relief is the one thing here no WMS can do for us, so the
   answer to "there is no rectangle" is a rectangle, not a shrug — and the bill
   is stated rather than hidden: computing relief now needs an account, because
   it now needs somewhere to put the result.
@@ -730,6 +735,14 @@ re-attaching the listener continuously.
   directly, for the same reason H is. It is what keeps the curtain usable from
   the keyboard at all: with it, "the 1937 flight on the right against 2024 on
   the left" is `C W W C`.
+
+**While a rectangle is being placed** (§5.6) a fourth keyboard layer is up, from
+`useLocalityPlacement`: **Escape** is Avbryt and **Enter** is Opprett. Same
+terms as every other layer here — capture phase, inert while something is being
+typed into or an overlay is open — and mounted with the placement row, so it is
+gone the moment the session ends. The ground keys keep working underneath it:
+framing a rectangle against LiDAR relief and then against a 1937 photograph is
+exactly what placing it is for.
 
 `PEEK_KEY` is **not** the backtick, which was the obvious pick: on the
 Norwegian layout it is a dead key and arrives as `key: "Dead"`, unusable for
@@ -892,44 +905,130 @@ and every row is equally relevant to the screen. What differs is *when*.
 - Undated rows appear only under "Alle". A period is a claim about when, and a
   row that cannot support the claim should not answer it.
 
-### 5.6 Ny lokalitet from the viewport
+### 5.6 Ny lokalitet — place the rectangle, then create
 
-Pressing it creates a lokalitet immediately from the rectangle you can see. No
-box-drag to arm, no dialog to fill in: `viewportBbox` in
-`src/localities/createFromBbox.ts` insets the visible map and
-`createLocalityFromBbox` turns the result into a record.
+Pressing it writes nothing. A rectangle appears on the map, seeded from what
+you can see, and a one-line row appears under row 1; you move and size the
+rectangle against the terrain you are framing, and `Opprett` is what creates
+the record.
 
-Each of the four edges takes **whichever is larger, the chrome in front of it
-(`chromeInsets(map)` plus `CHROME_MARGIN_PX`, §3.1) or a proportional inset**
-(8 % of the dimension, at least 48 px). With nothing floating over the map
-that is exactly the old symmetric rectangle; with the ribbon up and a strip
-along the bottom, the top and bottom edges move in to clear them. The proportional floor is not just cosmetic — at
-≥8 % it also guarantees `transformExtent`'s corner-only reprojection cannot clip
-something the user could see inside the box.
+```
+├ NY LOKALITET · 620 × 480 m · 29,8 ha   Flytt og endre …   [Opprett] [Avbryt] │
+```
 
-Details worth not re-deriving:
+It used to create on the press, straight off the viewport. The rectangle that
+produced was always wrong by a little — and by the time you could see that, it
+had already cost a stedsnavn lookup, a WFS query and a three-image starter set
+over the wrong ground, with the reshape ("Juster området") still to do. Placing
+first makes the first rectangle the authored one and `Avbryt` free: there is
+nothing to undo, because nothing was written.
+
+The pieces:
+
+- `localityPlacementAtom` (`src/localities/placement.ts`) holds the pending
+  `{ id, bbox, then }`. An atom rather than component state because two
+  unrelated places read it — `Ribbon` decides whether the row exists,
+  `localityLayer` stops opening neighbouring lokaliteter while it is set — and
+  because "who holds the pending rectangle" wants one answer.
+  `useStartLocalityPlacement` is what both entrances call: it raises the
+  sign-in dialog for a guest, closes
+  whatever lokalitet was open (its edit buffer survives in `localStorage`
+  exactly as it does for `Lukk`), clears `mapToolAtom` and sets the atom.
+- `RibbonPlaceLocalityRow` is the surface, in the `RibbonFunnDraftRow` idiom —
+  one line, no body. A floating card would be the one surface guaranteed to
+  cover the ground being framed.
+- `useLocalityPlacement` is the session, mounted once by that row. The
+  authoritative rectangle is the atom's, written on each finished gesture; the
+  one the row prints is the live one, so the readout follows the hand mid-drag
+  while nothing downstream ever sees an unclamped extent. `Escape` = Avbryt,
+  `Enter` = Opprett, on a capture-phase listener with `useWorkspaceKeys`'
+  guards (§8.4).
+- `useBboxHandles` (`src/localities/useBboxHandles.ts`) is the gesture itself —
+  a `Translate` for the body, a `Modify` on the corners, `CORNER_GRAB_PX` to
+  keep the two apart, and the rebuild-from-the-opposite-corner that keeps the
+  result axis-aligned. Lifted out of `useLocalityAdjust`, which is now a thin
+  wrapper over it, so placing and "Juster området" are one gesture with two
+  entrances.
+
+**The seed.** `viewportBbox` insets the visible map, then
+`clampBboxSize(seed, 'centre')` brings it into the band. Each of the four edges
+takes **whichever is larger, the chrome in front of it (`chromeInsets(map)` plus
+`CHROME_MARGIN_PX`, §3.1) or a proportional inset** (8 % of the dimension, at
+least 48 px). With nothing floating over the map that is exactly the old
+symmetric rectangle; with the ribbon up and a strip along the bottom, the top
+and bottom edges move in to clear them. The proportional floor is not just
+cosmetic — at ≥8 % it also guarantees `transformExtent`'s corner-only
+reprojection cannot clip something the user could see inside the box.
 
 - **Inset pixel corners through `map.getCoordinateFromPixel`**, not
   `calculateExtent` with a ratio. `calculateExtent` is symmetric about the view
   centre and the chrome is not — a ribbon on top, a strip along the bottom, a
-  card down the left — so no
-  symmetric ratio clears it without over-insetting the opposite edges. Pixels
-  are relative to the map viewport element, which every surface floats over, so
-  the measured chrome insets map 1:1 onto the pixel insets. Rotation is locked
-  off, so two corners describe the rectangle.
+  card down the left — so no symmetric ratio clears it without over-insetting
+  the opposite edges. Pixels are relative to the map viewport element, which
+  every surface floats over, so the measured chrome insets map 1:1 onto the
+  pixel insets. Rotation is locked off, so two corners describe the rectangle.
 - **A floor on the result.** Chrome plus insets can leave nothing worth framing
-  (a short window with a carousel up); under `MIN_SIDE_PX` the press is
-  refused as `unavailable` rather than creating a sliver.
-- **A zoom guard.** `minZoom: 3` means the viewport can be most of Norway, and
-  opening the workspace fires a WFS BBOX query over whatever you framed. Too
-  large a span is refused with a toast rather than created.
-- **The workspace opens only after `createLocality` resolves.** "Juster
-  området" builds its extent from the bbox in the closure when `adjusting`
-  flipped true, so an optimistic placeholder record would have it edit a stale
-  rectangle.
+  (a short window with a carousel up); under `MIN_SIDE_PX` `viewportBbox`
+  answers `null` and the press toasts instead of entering placement.
+- **No zoom guard any more.** The old one refused the press when the viewport
+  spanned more than 25 km; there is nothing to refuse now that the seed is
+  clamped, so zoomed out to the whole country you get the largest allowed
+  rectangle on the middle of the screen. `MAX_SPAN_M` and
+  `localities.createTooLarge` are gone.
 
-The bbox stays **authored, not derived**: the viewport only seeds it, and
-"Juster området" still translates and reshapes it afterwards.
+**The size band** — `src/localities/bboxLimits.ts`, `MIN_SIDE_M = 50`,
+`MAX_SIDE_M = 1500`. Both numbers are read off what the producers can render,
+not off what the map will let you frame:
+
+| side | extract px @ 0.25 m | canvas | WMS tiles | stored m/px |
+|---|---|---|---|---|
+| 50 m | 200² | 0.2 MB | 1 | 0.25 |
+| 1500 m | 6000² | 144 MB | 9 (27 for a starter set) | 0.25 |
+| 3000 m | 12000² | 576 MB | 36 (108) | 0.5 |
+
+1500 m is the largest rectangle whose **finest LiDAR extract still fits the
+store at its own resolution**: `renderFigureBlob` caps a figure at
+`MAX_STORED_PIXELS` = 40 Mpx (§8.10) and √40 Mpx × 0.25 m is 1581 m. Past it
+every kept extract is quietly coarser than the source it names. 50 m is where a
+figure's caption panel stops being shorter than the image it captions; below
+that the thing being framed is one object, and one object is a *funn*.
+
+Three things about the band that are easy to get wrong:
+
+- **It is measured in EPSG:25833, not in the view projection.** The view is
+  URL-selectable and can be `EPSG:3857`, where `getMetersPerUnit()` answers 1
+  while a metre at 60° N is really half of one — the old `MAX_SPAN_M` check was
+  out by 2× there. 25833 is also the projection every producer renders in, so a
+  rectangle bounded there is the raster that actually gets built, bounded.
+- **The ceiling ratchets down, it never snaps.** Nothing migrates existing
+  records and the old guard allowed 25 km, so a resize is clamped to whichever
+  is larger, the band or the rectangle as it stood when the gesture started.
+  You may always shrink, never grow past the band, and a rectangle already past
+  it can only come down. Without that, nudging one corner of an old 5 km
+  lokalitet would destroy it.
+- **It is a clamp everywhere except one place.** A drag stops at the limit (and
+  the row says which limit, so the number is taught rather than merely
+  enforced); `growToFitDrawing` — "Utvid området", which unions the rectangle
+  with a funn drawn outside it — *refuses* with a toast instead, because a
+  clamped union would put the drawing back outside the rectangle it was grown
+  to hold. `copyLocality` is exempt: a fork carries its original's rectangle
+  whatever size that is.
+
+**The commit.** `createLocalityFromBbox` is unchanged — the stedsnavn lookup
+still runs before the write (§8.3), it just runs on a rectangle somebody chose.
+On success the record is set active, `editingLocalityIdAtom` and
+`pendingStarterLocalityIdAtom` are set in the same batch, `ribbonToolAtom` is
+armed if the placement was started by Terreng (§10), and the placement atom is
+cleared last. On failure the session stays up rather than throwing the placing
+away. The workspace still opens only after `createLocality` resolves: "Juster
+området" builds its extent from the bbox in the closure when `adjusting` flipped
+true, so an optimistic placeholder record would have it edit a stale rectangle.
+
+A placement and an open lokalitet are **mutually exclusive by construction** —
+starting one closes the other, committing one opens the record it made — so the
+bar never carries two sets of exits.
+
+The bbox stays **authored, not derived**: the viewport only seeds it.
 
 ### 5.7 Automatisk — the LiDAR dataset following the viewport
 
@@ -1783,9 +1882,9 @@ does not move.
 
 Stance is per session and never stored on the record. Every lokalitet opens in
 show — including your own, including from a link — with one exception: a
-**brand-new** one opens in edit, because a rectangle framed thirty seconds ago
-has nothing to show. The two creators (`useCreateLocalityFromViewport` and
-Terrenganalyse's save) say so by setting `editingLocalityIdAtom` in the same
+**brand-new** one opens in edit, because a rectangle placed thirty seconds ago
+has nothing to show. There is one creator now — `useLocalityPlacement`'s
+`Opprett` (§5.6) — and it says so by setting `editingLocalityIdAtom` in the same
 batch as `activeLocalityAtom`. Keying that atom on the record *id* rather than
 using a boolean is what makes "opens in show" hold by construction rather than
 by clearing a flag in the right order.
@@ -1887,7 +1986,7 @@ Beskrivelse.
 
 ### 8.3 Auto-naming a new lokalitet
 
-A rectangle framed with "Ny lokalitet" arrives already called something —
+A rectangle placed with "Ny lokalitet" arrives already called something —
 `createLocalityFromBbox` awaits `fetchLocalityContext(bbox)` and writes the
 nearest significant stedsnavn as the record's `name`, falling back to "Uten
 navn" only when the register has nothing (open sea, across the border, service
@@ -1901,14 +2000,19 @@ itself for a record named "Uten navn", so a nameless lokalitet still asks to be
 named; an auto-name good enough to keep does not shove a cursor at you. Click
 it to change it, like any other.
 
+It runs **at the commit**, which is the placement step's one effect on this
+section (§5.6): the lookup is now spent on a rectangle the author framed
+deliberately rather than on whatever the screen happened to show. The ordering
+argument above is untouched — still before the write, still awaited.
+
 `fetchLocalityContext` never rejects and never takes longer than 6 s, and the
 one place that calls it — `createLocalityFromBbox`, behind
-`useCreateLocalityFromViewport` — disables itself while it runs. Both entrances
-go through that hook now: the `Ny lokalitet` button, and pressing Terreng or
-`5` with nothing open (§5.3). The second is why `create` hands the record back
-rather than returning `void`: it has to arm `ribbonToolAtom` afterwards, and
-only on success, or a failed create would leave `'terrain'` armed for whichever
-lokalitet is opened next. Which registers it asks, and how the
+`useLocalityPlacement`'s `Opprett` — disables the button while it runs. Both
+entrances arrive here through the same placement session: the `Ny lokalitet`
+button, and pressing Terreng or `5` with nothing open (§5.3). The second is why
+`create` hands the record back rather than returning `void`: the commit has to
+arm `ribbonToolAtom` afterwards, and only on success, or a failed create would
+leave `'terrain'` armed for whichever lokalitet is opened next. Which registers it asks, and how the
 placename is ranked, is out of scope here — see the header comment in
 `src/localities/localityContext.ts`.
 
@@ -2779,8 +2883,11 @@ none of them is on the bottom edge (§8.7.2).
 #### 8.9.1 The starter set (grunnpakke)
 
 **It is no longer a menu item.** It runs itself once, on a lokalitet that was
-just created — from the `Ny lokalitet` button, or by pressing Terreng with
-nothing open, which is the same code path (§5.3).
+just created — `Opprett` at the end of a placement session, whether that session
+was started by the `Ny lokalitet` button or by pressing Terreng with nothing
+open, which is the same code path (§5.3, §5.6). Its three images therefore land
+over ground the author framed on purpose, which is most of the argument for
+placing before creating.
 The hand-off is `pendingStarterLocalityIdAtom` (`src/localities/atoms.ts`),
 set at creation and cleared by the workspace *before* the run
 starts, since the effect re-fires on every image it lands. Deliberately not
@@ -3599,15 +3706,19 @@ into a free-floating `terrainStandaloneBboxAtom`, `useTerrainAnalysis` resolved
 the two, "Flytt analysen hit" re-framed the loose one, and a `Lagre` of its own
 turned it into a lokalitet on the way out. All of that is gone
 (`docs/lokalitet-view.md` §8, §15). Pressing Terreng or `5` with nothing open
-makes the lokalitet *first* (§5.3), so by the time a DEM is fetched there is
-exactly one answer to "what am I analysing" — and two controls for one surface
-disagreeing about which rectangle a save keeps, which is what the old row-2
-duplicate cost us, cannot come back.
+places the lokalitet *first* (§5.3, §5.6), so by the time a DEM is fetched there
+is exactly one answer to "what am I analysing" — and two controls for one
+surface disagreeing about which rectangle a save keeps, which is what the old
+row-2 duplicate cost us, cannot come back. `then: 'terrain'` on the placement is
+what carries the intent across: the tool is armed at the commit, and only on a
+create that worked.
 
-The rectangle is still `viewportBbox`'s **inset** viewport, since it is `Ny
-lokalitet`'s: the render stops short of the screen edges, the span guard rides
-on it, the free area is what `chromeInsets` reports, and the visible margin
-doubles as the affordance for exactly which ground is being analysed.
+The rectangle is `viewportBbox`'s **inset** viewport as *placed* — the seed
+still stops short of the screen edges, the free area is what `chromeInsets`
+reports, and the visible margin doubles as the affordance for exactly which
+ground is being analysed — and then moved and sized by the author inside the
+size band, which is now what keeps a DEM request to something the browser can
+shade (§5.6).
 
 **There is no close button, and that is not an omission.** Terreng is a ground:
 you leave it by picking another one from the ring, or by pressing its digit's
@@ -3910,8 +4021,11 @@ it via `?themeLayers`,
 distance and area, with live on-map tooltips; clear the measurement.
 
 **Own an area**
-sign in (OAuth or password); create a lokalitet from the visible map and have it
-named after the nearest stedsnavn; rename it; describe it; read and edit its
+sign in (OAuth or password); propose a lokalitet's rectangle from the visible
+map, move and resize it against the terrain with the readout tracking the hand,
+and create it — or cancel with nothing written — and have it named after the
+nearest stedsnavn; be stopped at 1500 m and 50 m per side, and told which limit
+and what it is; rename it; describe it; read and edit its
 sted, kommune and matrikkel, pre-filled from the registers; re-ask the registers
 for them after moving the rectangle; read its centre coordinate and area; search
 your lokaliteter by any of those; set visibility (private / limited / public);
@@ -3934,18 +4048,17 @@ undo/redo; show or hide measurements on the drawing; rename a funn; note it; set
 its status (mulig / sannsynlig / avkreftet / rapportert); re-edit an existing
 funn's drawing; zoom to it; walk the funn list with ↑/↓/Enter; click or hover a
 funn on the map to select it in the list, and the reverse; grow the lokalitet
-when a funn escapes it.
+when a funn escapes it, unless that would take it past the size band.
 
 **Analyse it**
 run terrain analysis (DTM or DOM) with eight visualizations — pulldown or W/S —
 and live azimuth / altitude / exaggeration / Transparens, plus a smoothing or
-horizon-search radius for the five views that have one, over *either* the
-visible map — signed out,
-with no lokalitet — or an open lokalitet's rectangle, with the render drawn on
+horizon-search radius for the five views that have one, over the open
+lokalitet's rectangle — or, with none open, over one placed for the purpose on
+the spot (§5.6) — with the render drawn on
 the map under the heritage layers and every knob on the ribbon's settings strip
-rather than in a column beside the map; re-frame the
-analysed rectangle onto the current view; save the render as a new lokalitet
-when there is none open; press **Behold** to keep whatever ground is on screen
+rather than in a column beside the map; change what is analysed by moving the
+rectangle itself, under "Juster området"; press **Behold** to keep whatever ground is on screen
 — the LiDAR stitch at the dataset and style you are reading, the terrain render
 at the knobs you set, the ortofoto acquisition you picked — at the source's own
 resolution rather than as a photograph of the screen, with the button reading

@@ -53,6 +53,7 @@ import {
   pendingStarterLocalityIdAtom,
   selectedFunnIdAtom,
 } from './atoms';
+import { bboxExceedsMax, MAX_SIDE_M } from './bboxLimits';
 import {
   attachmentMatchesKey,
   type BeholdKey,
@@ -1119,9 +1120,22 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     const projection = map.getView().getProjection().getCode();
     const drawn = getDrawLayerExtent4326(projection);
     if (!drawn) return;
-    patchLocality({ bbox: bboxUnion(locality.bbox, drawn) });
+    const grown = bboxUnion(locality.bbox, drawn);
+    // The one place in the app where the size band is a refusal rather than a
+    // clamp. Everywhere else the rectangle is the thing being dragged, so
+    // stopping it at the ceiling is what the author asked for; here it is
+    // *derived* from a drawing, and a clamped union would put the funn back
+    // outside the rectangle it was grown to hold — the verb would appear to
+    // have done its job and not have done it.
+    if (bboxExceedsMax(grown)) {
+      toast.error({
+        title: t('localities.funn.growTooLarge', { max: MAX_SIDE_M }),
+      });
+      return;
+    }
+    patchLocality({ bbox: grown });
     setFunnOutside(false);
-  }, [map, locality.bbox, patchLocality, setFunnOutside]);
+  }, [map, locality.bbox, patchLocality, setFunnOutside, t]);
 
   const startDraft = useCallback(() => {
     if (!canAdd || draftActive) return;

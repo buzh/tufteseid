@@ -227,8 +227,17 @@
   "localities": {
     "defaultName": "Uten navn",
     "createFailed": "Kunne ikke opprette lokaliteten. Sjekk at du er innlogget og at serveren kjører oppdatert skjema (detaljer i nettleserkonsollen).",
-    "createTooLarge": "Skjermbildet dekker for stort område til å bli én lokalitet. Zoom inn og prøv igjen.",
     "byOwner": "av {{name}}",
+    "placing": {
+      "heading": "Ny lokalitet",
+      "hint": "Flytt og endre størrelsen på rammen, og trykk Opprett.",
+      "atMax": "Maks {{max}} m per side",
+      "atMin": "Minst {{min}} m per side",
+      "create": "Opprett",
+      "creating": "Oppretter…",
+      "createHint": "Opprett lokaliteten med denne rammen",
+      "cancel": "Avbryt"
+    },
     "summary": {
       "funn_one": "1 funn",
       "funn_other": "{{count}} funn",
@@ -377,7 +386,8 @@
       "confirmDeleteShort": "Slette funnet?",
       "growConfirmAction": "Utvid området",
       "autoName": "Funn {{n}}",
-      "growHint": "Tegningen går utenfor lokalitetens område."
+      "growHint": "Tegningen går utenfor lokalitetens område.",
+      "growTooLarge": "Området ville blitt større enn {{max}} m på en side. Flytt tegningen nærmere, eller lag en egen lokalitet."
     },
     "bilder": {
       "heading": "Bilder",

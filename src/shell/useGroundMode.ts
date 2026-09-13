@@ -29,7 +29,7 @@ import type { TerrainAnalysis } from './terrain/useTerrainAnalysis';
  * 1→5→1 is free where 1→2→1 is a screenful of tile requests. Its rectangle is
  * the open lokalitet's, and there is no second answer any more: Terreng used
  * to have a standalone entrance with a rectangle of its own, and selecting it
- * with nothing open now **creates** the lokalitet instead (`createForTerrain`,
+ * with nothing open now **places** the lokalitet instead (`placeForTerrain`,
  * docs/lokalitet-view.md §8). One rectangle, one owner of it.
  *
  * That cheapness has a price this hook pays for everyone: `mode` is the *only*
@@ -96,11 +96,12 @@ export const useGroundMode = (
   flyfoto: FlyfotoControls,
   terrain: TerrainAnalysis,
   /**
-   * What pressing Terreng with nothing open does: frame the visible map into
-   * a lokalitet and enter Terreng in it, or raise the sign-in dialog. The
-   * argument slot the standalone rectangle used to occupy.
+   * What pressing Terreng with nothing open does: propose a rectangle seeded
+   * from the visible map, to be placed and then created with Terreng armed in
+   * it — or raise the sign-in dialog. The argument slot the standalone
+   * rectangle used to occupy.
    */
-  createForTerrain: () => void,
+  placeForTerrain: () => void,
 ) => {
   const locality = useAtomValue(activeLocalityAtom);
   const [tool, setTool] = useAtom(ribbonToolAtom);
@@ -177,11 +178,11 @@ export const useGroundMode = (
         // already on when it snaps back.
         if (locality) setTool('terrain');
         // Nothing open. Reading relief is the one thing here no WMS can do,
-        // so the answer is not a refusal — it is the rectangle, made. The
+        // so the answer is not a refusal — it is the rectangle, proposed. The
         // cost is stated where it belongs (docs/lokalitet-view.md §8):
         // computing relief now requires an account, because it now requires
         // somewhere to put it.
-        else createForTerrain();
+        else placeForTerrain();
         break;
     }
   };
@@ -252,10 +253,11 @@ export const useGroundMode = (
     const previous = previousRef.current;
     if (!previous || previous === mode) return;
     // A peek is not an act of authorship, and `select('terreng')` with nothing
-    // open *creates* a lokalitet. Closing one leaves 'terreng' as the mode
-    // before this one, so delegating blindly would have a held X frame the
-    // viewport, save it, fetch its starter set and then snap straight back out
-    // of it on key release — or raise the sign-in dialog, signed out.
+    // open starts *placing* a lokalitet. Closing one leaves 'terreng' as the
+    // mode before this one, so delegating blindly would have a held X put a
+    // rectangle and a row on the screen and then snap straight back out of the
+    // mode on key release, leaving the placement behind it — or raise the
+    // sign-in dialog, signed out.
     if (previous === 'terreng' && !locality) return;
     peekFromRef.current = mode;
     select(previous);

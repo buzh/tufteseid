@@ -1405,6 +1405,18 @@ worth more than the list:
 15. **Move Terreng and Sammenlign**, delete the standalone terrain entrance.
 16. Later: sharing and `Del` (§10), then the Rapportpakke (§9).
 
+**Placing the rectangle** (2026-09-13) is not a step in this list and is not a
+depth in the row's exits. It happens *before* there is a record, so it is a
+state outside the lokalitet rather than inside it: `Ny lokalitet` — and Terreng
+with nothing open, which is the same entrance — proposes a rectangle seeded from
+the visible map, the author moves and sizes it within a 50–1500 m band, and
+`Opprett` is the first write. Everything in this document starts one beat later
+than it used to, at a rectangle somebody chose; `Avbryt` has nothing to undo,
+which is the point. The row it uses is `RibbonPlaceLocalityRow`, in the
+`RibbonFunnDraftRow` idiom, and it is mutually exclusive with an open lokalitet
+by construction, so the deepest-first exit rule (§5.4) is untouched. Design and
+the two numbers: `docs/ui-architecture.md` §5.6.
+
 ### Why the transaction is last, not sixth
 
 An earlier version of this list had it at step 6, on the argument that the

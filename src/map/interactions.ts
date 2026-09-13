@@ -17,7 +17,8 @@ import type Map from 'ol/Map';
 export type InteractionOwner =
   | 'draw'
   | 'measure'
-  | 'localityAdjust';
+  | 'localityAdjust'
+  | 'localityPlace';
 
 const OWNER_KEY = 'tufteseidOwner';
 

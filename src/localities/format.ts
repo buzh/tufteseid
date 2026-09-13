@@ -1,6 +1,7 @@
 import { fromExtent as polygonFromExtent } from 'ol/geom/Polygon';
 import { getArea } from 'ol/sphere';
 import { LocalityBbox } from '../api/localities';
+import { bboxSpanMetres } from './bboxLimits';
 
 // How big is the area I'm looking at — the one number about a lokalitet
 // rectangle that isn't obvious from the map. Hectares up to a square
@@ -13,6 +14,27 @@ export const formatBboxArea = (bbox: LocalityBbox, locale: string): string => {
     maximumFractionDigits: value < 10 ? 1 : 0,
   }).format(value);
   return `${formatted} ${inHectares ? 'ha' : 'km²'}`;
+};
+
+/*
+ * The two sides on the ground — "620 × 480 m".
+ *
+ * Beside the area rather than instead of it, while a rectangle is being
+ * placed: the area is what the site *is*, but the sides are what the size band
+ * is written in (`bboxLimits.ts`), so a drag that stops has to be readable in
+ * the same units as the rule that stopped it.
+ *
+ * Kilometres above 2 km, which only an old record can reach — the band tops
+ * out at 1500 m.
+ */
+export const formatBboxSpan = (bbox: LocalityBbox, locale: string): string => {
+  const [width, height] = bboxSpanMetres(bbox);
+  const inKm = Math.max(width, height) >= 2000;
+  const format = (metres: number) =>
+    new Intl.NumberFormat(locale, {
+      maximumFractionDigits: inKm ? 1 : 0,
+    }).format(inKm ? metres / 1000 : metres);
+  return `${format(width)} × ${format(height)} ${inKm ? 'km' : 'm'}`;
 };
 
 /*

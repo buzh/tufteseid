@@ -227,8 +227,17 @@
   "localities": {
     "defaultName": "Utan namn",
     "createFailed": "Kunne ikkje opprette lokaliteten. Sjekk at du er innlogga og at serveren køyrer oppdatert skjema (detaljar i nettlesarkonsollen).",
-    "createTooLarge": "Skjermbiletet dekkjer for stort område til å bli éin lokalitet. Zoom inn og prøv igjen.",
     "byOwner": "av {{name}}",
+    "placing": {
+      "heading": "Ny lokalitet",
+      "hint": "Flytt og endre storleiken på ramma, og trykk Opprett.",
+      "atMax": "Maks {{max}} m per side",
+      "atMin": "Minst {{min}} m per side",
+      "create": "Opprett",
+      "creating": "Opprettar…",
+      "createHint": "Opprett lokaliteten med denne ramma",
+      "cancel": "Avbryt"
+    },
     "summary": {
       "funn_one": "1 funn",
       "funn_other": "{{count}} funn",
@@ -377,7 +386,8 @@
       "confirmDeleteShort": "Slette funnet?",
       "growConfirmAction": "Utvid området",
       "autoName": "Funn {{n}}",
-      "growHint": "Teikninga går utanfor området til lokaliteten."
+      "growHint": "Teikninga går utanfor området til lokaliteten.",
+      "growTooLarge": "Området ville blitt større enn {{max}} m på ei side. Flytt teikninga nærare, eller lag ein eigen lokalitet."
     },
     "bilder": {
       "heading": "Bilete",

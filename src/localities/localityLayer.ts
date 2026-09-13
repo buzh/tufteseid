@@ -20,6 +20,7 @@ import {
 import { currentUserAtom } from '../auth/atoms';
 import { mapAtom } from '../map/atoms';
 import { activeLocalityAtom } from './atoms';
+import { localityPlacementAtom } from './placement';
 
 export const LOCALITY_ID_PROPERTY = '__localityId';
 export const LOCALITIES_LAYER_ID = 'localitiesLayer';
@@ -323,6 +324,14 @@ export const useLocalityClick = () => {
 
     const onClick = (e: Event | BaseEvent) => {
       if (!(e instanceof MapBrowserEvent)) return;
+      // Deaf while a rectangle is being placed. The placement covers the same
+      // ground these rectangles are drawn on, so a drag that ends over a
+      // neighbouring lokalitet would otherwise open it out from under the
+      // session — and opening one closes the placement, taking the rectangle
+      // with it. Read from the store rather than through the hook: this
+      // listener is registered once and must see the flag as it is at click
+      // time, not as it was when the effect last ran.
+      if (getDefaultStore().get(localityPlacementAtom)) return;
       let hitId: string | null = null;
       map.forEachFeatureAtPixel(
         e.pixel as [number, number],

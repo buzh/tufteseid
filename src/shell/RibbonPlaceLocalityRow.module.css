@@ -1,0 +1,68 @@
+/*
+ * The placement row — the rectangle on the map, before there is a record
+ * (docs/ui-architecture.md §5.6).
+ *
+ * Tinted like the funn draft row, and for the same reason: it is a session you
+ * are inside rather than a strip beside the others, and the tint is what says
+ * the bar is in a state you have to leave.
+ */
+
+.row {
+  background: var(--c-accent-subtle);
+  border-top-color: var(--c-border);
+}
+
+/* "NY LOKALITET" — the same quiet uppercase the lokalitet row's label uses. */
+.label {
+  flex: none;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-fg-subtle);
+}
+
+/* 620 × 480 m · 29,8 ha. Tabular figures so the numbers do not jitter sideways
+   while a corner is being dragged — the readout is being watched, which is the
+   one place proportional digits are actually distracting. */
+.span {
+  flex: none;
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-fg);
+}
+
+/* Sitting on the band's edge. Amber: the drag stopped where it had to, which
+   is a thing to notice rather than a thing that failed. */
+.limit {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--c-yellow-400);
+  border-radius: var(--radius-md);
+  background: var(--c-yellow-50);
+  font-size: var(--font-xs);
+  color: var(--c-yellow-600);
+}
+
+/* What to do with the rectangle, in the words the map cannot say itself. */
+.hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+/* The exits, last and right — the same place row 2 keeps its own. */
+.actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: auto;
+}

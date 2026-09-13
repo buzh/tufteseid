@@ -2,10 +2,8 @@ import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isSignedInAtom } from '../auth/atoms';
-import { isAuthDialogOpenAtom } from '../auth/atoms-dialog';
 import { type BeholdOffer, beholdOfferAtom } from '../localities/behold';
-import { useCreateLocalityFromViewport } from '../localities/createFromBbox';
-import { ribbonToolAtom } from '../localities/toolAtoms';
+import { useStartLocalityPlacement } from '../localities/placement';
 import { infoToolAtom } from '../map/featureInfo/infoTool';
 import { type MapTool, mapToolAtom } from '../map/overlay/atoms';
 import {
@@ -51,7 +49,7 @@ import { useRecreateView } from './useRecreateView';
  * lokalitet row (docs/lokalitet-view.md §8) because it reads a rectangle and
  * the only rectangle in the app is a lokalitet's. Digit 5 still selects it —
  * `GROUND_KEYS` is positional against GROUND_MODES, not against what this row
- * draws — and with nothing open it creates the lokalitet first.
+ * draws — and with nothing open it places the lokalitet's rectangle first.
  *
  * Hybrid is the odd one out and stays a mode here on purpose: it is a modifier
  * on the LiDAR stack (which is why picking it activates the national mosaic
@@ -81,37 +79,12 @@ export const RibbonGlobalRow = () => {
   const standard = useStandardControls();
   const lidar = useLidarControls();
   const flyfoto = useFlyfotoControls();
-  const openAuthDialog = useSetAtom(isAuthDialogOpenAtom);
-  const setRibbonTool = useSetAtom(ribbonToolAtom);
-  // "Ny lokalitet" frames the visible map rather than arming a box drag —
-  // and so, now, does pressing Terreng with nothing open.
-  const { create: createFromViewport, creating } =
-    useCreateLocalityFromViewport();
-
-  /*
-   * Terreng with no lokalitet open (docs/lokalitet-view.md §8).
-   *
-   * There used to be a second entrance here — a free-floating rectangle in
-   * `terrainStandaloneBboxAtom`, framed on the press and turned into a
-   * lokalitet later by a `Lagre` of its own. It is gone, and this is what
-   * replaced it: the rectangle is made first, and everything downstream has
-   * exactly one answer to "what am I analysing".
-   *
-   * The bill, stated rather than hidden: relief now needs an account. That
-   * was the price of the second entrance not existing, and the second
-   * entrance was two rectangles, two saves and a `Lagre` that could create a
-   * lokalitet nobody had asked for.
-   */
-  const enterTerrainHere = async () => {
-    if (!isSignedIn) {
-      openAuthDialog(true);
-      return;
-    }
-    const rec = await createFromViewport();
-    // Only on success: a failed create must not leave the tool armed for
-    // whichever lokalitet is opened next.
-    if (rec) setRibbonTool('terrain');
-  };
+  // "Ny lokalitet" seeds a rectangle from the visible map and hands it to the
+  // author to place — and so, now, does pressing Terreng with nothing open.
+  // Neither writes anything; `Opprett` on the placement row does
+  // (docs/ui-architecture.md §5.6). The hook raises the sign-in dialog for a
+  // guest, which is why there is no `isSignedIn` check at either call site.
+  const startPlacement = useStartLocalityPlacement();
 
   // The DEM, the render and every knob that shapes it. Mounted here with the
   // other three control hooks, and for the same reason: its controls are
@@ -124,8 +97,23 @@ export const RibbonGlobalRow = () => {
   // chained with the other three. It reads the atoms it needs directly and
   // takes nothing from `ground`, so the order is free.
   const terrain = useTerrainAnalysis();
+  /*
+   * Terreng with no lokalitet open (docs/lokalitet-view.md §8): place the
+   * rectangle, and the tool is armed at the commit.
+   *
+   * There used to be a second entrance here — a free-floating rectangle in
+   * `terrainStandaloneBboxAtom`, framed on the press and turned into a
+   * lokalitet later by a `Lagre` of its own. It is gone, and this is what
+   * replaced it: the rectangle is made first, and everything downstream has
+   * exactly one answer to "what am I analysing".
+   *
+   * The bill, stated rather than hidden: relief needs an account. That was the
+   * price of the second entrance not existing, and the second entrance was two
+   * rectangles, two saves and a `Lagre` that could create a lokalitet nobody
+   * had asked for.
+   */
   const ground = useGroundMode(standard, lidar, flyfoto, terrain, () => {
-    void enterTerrainHere();
+    startPlacement('terrain');
   });
   // Gjenskap. Mounted here because this is where the four control hooks are,
   // and a saved view is applied by writing all four — see useRecreateView.
@@ -372,12 +360,8 @@ export const RibbonGlobalRow = () => {
                   icon="add_location_alt"
                   size="md"
                   variant="secondary"
-                  disabled={creating}
                   aria-label={t('localities.topbar.newLocality')}
-                  onClick={() => {
-                    setTool(null);
-                    createFromViewport();
-                  }}
+                  onClick={() => startPlacement()}
                 />
               </Tooltip>
             </div>

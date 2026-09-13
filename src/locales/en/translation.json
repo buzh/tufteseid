@@ -227,8 +227,17 @@
   "localities": {
     "defaultName": "Untitled",
     "createFailed": "Could not create the locality. Check that you are signed in and the server runs the current schema (details in the browser console).",
-    "createTooLarge": "The view covers too large an area for one locality. Zoom in and try again.",
     "byOwner": "by {{name}}",
+    "placing": {
+      "heading": "New locality",
+      "hint": "Move and resize the frame, then press Create.",
+      "atMax": "Max {{max}} m per side",
+      "atMin": "Min {{min}} m per side",
+      "create": "Create",
+      "creating": "Creating…",
+      "createHint": "Create the locality with this frame",
+      "cancel": "Cancel"
+    },
     "summary": {
       "funn_one": "1 find",
       "funn_other": "{{count}} finds",
@@ -377,7 +386,8 @@
       "confirmDeleteShort": "Delete the find?",
       "growConfirmAction": "Grow the area",
       "autoName": "Find {{n}}",
-      "growHint": "The drawing extends beyond the locality's area."
+      "growHint": "The drawing extends beyond the locality's area.",
+      "growTooLarge": "The area would end up larger than {{max}} m on a side. Move the drawing closer, or make it a locality of its own."
     },
     "bilder": {
       "heading": "Images",

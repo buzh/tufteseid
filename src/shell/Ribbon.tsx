@@ -1,11 +1,13 @@
 import { useAtomValue } from 'jotai';
 import { funnSessionAtom } from '../funn/session';
 import { activeLocalityAtom } from '../localities/atoms';
+import { localityPlacementAtom } from '../localities/placement';
 import { ErrorBoundary } from '../shared/ErrorBoundary';
 import { cx } from '../ui';
 import { LocalityRibbon } from './LocalityRibbon';
 import styles from './Ribbon.module.css';
 import { RibbonGlobalRow } from './RibbonGlobalRow';
+import { RibbonPlaceLocalityRow } from './RibbonPlaceLocalityRow';
 
 /**
  * The bar across the top of the map. Four thin rows at most, in the order a
@@ -37,6 +39,7 @@ import { RibbonGlobalRow } from './RibbonGlobalRow';
  */
 export const Ribbon = () => {
   const activeLocality = useAtomValue(activeLocalityAtom);
+  const placement = useAtomValue(localityPlacementAtom);
   const drawing = useAtomValue(funnSessionAtom) != null;
 
   return (
@@ -58,6 +61,18 @@ export const Ribbon = () => {
           <RibbonGlobalRow />
         </ErrorBoundary>
       </div>
+      {/* A rectangle being placed and an open lokalitet are mutually exclusive
+          by construction: starting a placement closes whatever was open
+          (placement.ts), and committing one opens the record it made. So the
+          bar never carries two sets of exits, and neither branch has to know
+          about the other. Keyed on the session so a second `Ny lokalitet`
+          re-seeds from the screen rather than leaving the old rectangle where
+          it was. */}
+      {placement && (
+        <ErrorBoundary name="RibbonPlaceLocalityRow">
+          <RibbonPlaceLocalityRow key={placement.id} placement={placement} />
+        </ErrorBoundary>
+      )}
       {activeLocality && (
         // Keyed so swapping lokalitet remounts the controller with fresh
         // form state rather than carrying the previous one's draft across.
