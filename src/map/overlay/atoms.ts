@@ -1,8 +1,9 @@
 import { atom } from 'jotai';
 
-// The left-hand card slot has one occupant at a time. Drawing, LiDAR
-// extract and the lokalitet workspace are deliberately NOT MapTools — they
-// are owned by their own state and take the slot from the other side. See
+// The left-hand card slot has one occupant at a time. `localities` is the
+// list of them; the *open* lokalitet is deliberately not a MapTool, and
+// neither are the LiDAR extract or the drawing surface — each is owned by
+// its own state and takes the slot from the other side. See
 // docs/ui-architecture.md §1.
 export type MapTool = 'measure' | 'localities' | null;
 

@@ -11,7 +11,6 @@ export type MapLayer = {
 
 export type MapLayers = {
   markerLayer: MapLayer;
-  posterMarkerLayer: MapLayer;
   propertyGeometryLayer: MapLayer;
   measureLayer: MapLayer;
 };
@@ -26,16 +25,6 @@ const mapLayers: MapLayers = {
       });
     },
   },
-  posterMarkerLayer: {
-    getLayer: () => {
-      return new VectorLayer({
-        zIndex: 6,
-        source: new VectorSource({ wrapX: false }),
-        properties: { id: 'posterMarkerLayer' },
-      });
-    },
-  },
-
   propertyGeometryLayer: {
     getLayer: () => {
       return new VectorLayer({

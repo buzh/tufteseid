@@ -102,11 +102,3 @@
     gap: var(--sp-2);
   }
 }
-
-/* Text chip for a pulldown trigger: truncates rather than stretching the
-   row, since a LiDAR project name can run to sixty characters. */
-.chipLabel {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}

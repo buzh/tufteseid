@@ -34,8 +34,7 @@
     "placesNearby": "Stader i nærleiken"
   },
   "languageSelector": {
-    "chooseLanguage": "Vel språk",
-    "tabHeading": "Språk"
+    "chooseLanguage": "Vel språk"
   },
   "lidarExtract": {
     "styles": {
@@ -59,8 +58,6 @@
     "errorMessage": "Noko gjekk gale med kartet"
   },
   "placeInfo": {
-    "errorPlaceNameInfo": "Feil ved henting av stadnamninformasjon",
-    "loadingPlaceNameInfo": "Lastar stadnamninformasjon",
     "locationNumber": "Stadnummer",
     "nameObjectType": "Namnobjekttype",
     "moreInfo": "Meir informasjon"
@@ -80,7 +77,6 @@
   },
   "search": {
     "addresses": "Adresser",
-    "coordinates": "Koordinatar",
     "houseNumber": "Husnummer",
     "placeholder": "Søk i Tufteseid",
     "pagination": {
@@ -91,15 +87,12 @@
     "placeName": "Stadnamn",
     "properties": "Eigedomar",
     "roads": "Vegar",
-    "tabHeading": "Søk",
     "noResults": "Ingen treff",
     "coordinateSwapWarning": "Koordinatane ser ikkje ut til å vere i Noreg. Dei kan ha vore limt inn i feil rekkefølgje (lon/lat i staden for lat/lon).",
-    "coordinateSwapButton": "Byt rekkefølgje",
-    "maxLength": "Maks 100 teikn"
+    "coordinateSwapButton": "Byt rekkefølgje"
   },
   "shared": {
     "close": "Lukk",
-    "yes": "Ja",
     "cancel": "Avbryt",
     "errorBoundary": {
       "title": "Noko gjekk gale her",
@@ -108,8 +101,6 @@
   },
   "tipsandtricks": {
     "heading": "Tips og triks",
-    "headingClosed": "Vis tips og triks",
-    "headingOpen": "Lukk",
     "description": "Vanlege spørsmål og nyttige tips",
     "categories": {
       "propertyInfo": "Eigedomsinformasjon",
@@ -314,8 +305,6 @@
       "loading": "Hentar funn…",
       "empty": "Ingen funn enno. Teikn det du ser i terrenget.",
       "draft": {
-        "instructions": "Teikn funnet på kartet. Det blir lagra saman med lokaliteten når du trykkjer Lagre.",
-        "instructionsEdit": "Endre teikninga på kartet. Endringane blir lagra saman med lokaliteten.",
         "titlePlaceholder": "T.d. gravhaug?",
         "notePlaceholder": "Kvifor trur du det er noko her?",
         "cancel": "Avbryt",

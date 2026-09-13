@@ -562,20 +562,6 @@ export const fetchAllFeatureInfo = async (
   };
 };
 
-export const isQueryableLayer = (layer: BaseLayer): boolean => {
-  const isTileWMS =
-    layer instanceof TileLayer && layer.getSource() instanceof TileWMS;
-  const isImageWMS =
-    layer instanceof ImageLayer && layer.getSource() instanceof ImageWMS;
-  if (!isTileWMS && !isImageWMS) return false;
-
-  const id = layer.get('id');
-  const isThemeLayer = typeof id === 'string' && id.startsWith('theme.');
-  const isQueryable = layer.get('queryable') === true;
-
-  return isThemeLayer && isQueryable;
-};
-
 export const hasVisibleQueryableLayers = (map: Map): boolean => {
   return getQueryableWMSLayers(map).length > 0;
 };

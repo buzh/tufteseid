@@ -258,7 +258,8 @@ is not a grab and deliberately has no notice.
 
 `attachments.kind` includes `flyfoto` (migration
 `1700000300_attachments_flyfoto.js`; `AttachmentKind` in
-`src/api/attachments.ts`; `KIND_ICON` in `BilderSection.tsx`).
+`src/api/attachments.ts`; `KIND_ICON` in `src/localities/bilderCommon.tsx`;
+`localities.bilder.kind.flyfoto` in all three locale files).
 
 ### Per-project flyfoto (every acquisition covering a lokalitet)
 
@@ -452,8 +453,8 @@ layers above), which is the form this app is actually about.
    `src/map/layers/backgroundLayers.ts` — `WMTSLayerName`, `WMSLayerName` or
    `ArcGISImageLayerName`. The last is for ESRI ImageServer sources
    (`TileArcGISRest` + a `mosaicRule`), which is how per-acquisition ortofoto
-   works; `LayerType` in `config/backgroundLayers/types.ts` is the matching
-   discriminant.
+   works. The matching discriminant is the `type` field on each member of
+   `BackgroundLayer` in `config/backgroundLayers/types.ts`.
 2. Create/extend a config in `src/map/layers/config/backgroundLayers/` and
    spread it into `allConfiguredBackgroundLayers` in `stack.ts`. For a WMS or
    ArcGISImage layer, `coverageExtent` is mandatory — see

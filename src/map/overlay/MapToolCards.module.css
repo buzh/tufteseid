@@ -22,13 +22,6 @@
   margin-bottom: var(--sp-5);
 }
 
-.layersHeader {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-  min-width: 0;
-}
-
 .title {
   margin: 0;
   font-size: var(--font-lg);

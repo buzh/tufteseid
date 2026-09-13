@@ -336,8 +336,9 @@ Shape, following the `nib-proxy` precedent:
   exposes it under a same-origin prefix.
 - Results land as attachments with a new `kind` (`analyse`), which needs a
   migration extending the `attachments.kind` enum, `AttachmentKind` in
-  `src/api/attachments.ts`, and `KIND_ICON` in `BilderSection.tsx` — the same
-  three places `flyfoto` touched.
+  `src/api/attachments.ts`, `KIND_ICON` in `src/localities/bilderCommon.tsx`,
+  and a `localities.bilder.kind.analyse` string in all three locale files —
+  the same four places `flyfoto` and `sketch` touched.
 
 Visualizations that would still be new here: multiscale topographic position,
 e3MSTP. The rest of the original list — VAT, sky-view factor, negative openness

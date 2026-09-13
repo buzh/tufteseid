@@ -114,15 +114,29 @@ focus, so anything that renders without doing so needs the counter.
 | i18n | i18next / react-i18next | nb, nn, en |
 | Icons | `material-symbols` (rounded) | typed union, see §11 |
 | Routing | react-router-dom | two routes: `/` and `/hjelp` |
+| Drawing | `@excalidraw/excalidraw` ^0.18.1 | the whole pen surface, §9; assets served locally, see below |
 
 **One system, in-repo.** `src/ui/` is a small primitive kit — plain CSS
 Modules over custom properties, no new npm dependency, because
 `package-lock.json` cannot be regenerated on the workstation this is developed
 on. It exports `Button` / `IconButton`, `Badge` / `CountBadge`, `Popover`,
-`Dialog`, `Tooltip`, `Switch`, `Segmented`, `Section`, `Field` (`Input` +
-`NoteInput`), `ConfirmPopover`, `Alert`, `Spinner`, `Icon`, `toast` /
+`Menu`, `Dialog`, `Tooltip`, `Switch`, `Segmented`, `Section`, `Field`
+(`Input` + `NoteInput`), `ConfirmPopover`, `Alert`, `Spinner`, `Icon`, `toast` /
 `Toaster`, `cx`, `useMediaQuery` and `overlayAtoms`. Every surface in the app
 renders through it.
+
+**The no-new-dependency rule has been broken exactly once, on purpose.**
+`@excalidraw/excalidraw` came in to replace ~3500 lines of fork-local drawing
+code (§15), which is the trade that justifies the cost of regenerating the
+lockfile off-workstation; it is not a precedent for a component library. It
+also brings one deploy-relevant detail: Excalidraw fetches its fonts from a CDN
+unless told otherwise, which `font-src 'self'` in the Caddyfile forbids. Two
+halves fix that and both are load-bearing — `src/funn/excalidrawAssets.ts` sets
+`window.EXCALIDRAW_ASSET_PATH = '/'` (a module of its own, imported first,
+because the same assignment inside `FunnCanvas.tsx` would run *after* the
+Excalidraw import), and the `excalidrawFonts` plugin in `vite.config.ts` copies
+the font directory out of `node_modules` into the build and streams it in dev.
+Drop either and text on a funn 404s under CSP, in production only.
 
 `src/ui/tokens.css` is the single source for colour, spacing, radius, shadow,
 control heights and — the one that was genuinely scattered before — the
@@ -326,11 +340,15 @@ unmounts.
 
 Two independent ladders. **OL layer `zIndex`** (map-internal): background stack
 at 0 (it sets none), the ground overlay 1 — a terrain render *or* a pinned
-bilde, one at a time (§8.7.1) — the compare curtain's B stack 1.5, draw
-layer 2, draw overlay / measure / theme layers 3, active theme layer promoted
-to 10, lidar footprints 3, localities 4, funn highlight 4.5, funn 5, locality
-draft 7, lidar extract selection 7, locality adjust 8. The fractional 4.5 and
-1.5 are the tell that this ladder grew by insertion rather than design.
+bilde, one at a time (§8.7.1) — the compare curtain's B stack 1.5, the shown
+sketch overlays 2 (`Z_INDEX` in `src/map/sketchOverlay.ts`, §9.3; several at
+once, unlike the slot below them), measure / theme layers 3, active theme layer
+promoted to 10, lidar footprints 3, localities 4, funn highlight 4.5, funn 5,
+`propertyGeometryLayer` 5, `markerLayer` 6, locality adjust 8. The fractional
+4.5 and 1.5 are the tell that this ladder grew by insertion rather than design.
+Nothing sits at 7 any more: the old `drawLayer` / `drawOverlayLayer` went with
+`src/draw/` (§15) and the lidar extract's own selection rectangle went with the
+picker carousels (§8.9.3).
 
 `COMPARE_Z = 1.5` (`src/map/compare/curtainLayers.ts`) is a real constraint,
 not a free choice: the B half has to cover the A background *and* the terrain
@@ -374,8 +392,10 @@ EPSG:25833, default centre `[396722, 7197860]`.
 Grouped by owner; this is the state a replacement has to keep, rename or
 subsume.
 
-- **Map core** — `mapAtom`, `currentZoomAtom`, `mapFullScreenAtom`,
-  `trackPositionAtom`.
+- **Map core** — `mapAtom` (`src/map/atoms.ts`, which also holds the
+  `DEFAULT_PROJECTION` / `DEFAULT_ZOOM_LEVEL` / `DEFAULT_CENTER` constants) and
+  `trackPositionAtom` (`src/map/geolocation/atoms.ts`). Zoom and full-screen
+  are read off the OL view and the DOM rather than mirrored into atoms.
 - **Background** — `backgroundLayerAtom`, `standardVariantAtom`,
   `hybridOverlayAtom`, `hybridContoursAtom`,
   `activeLidarModelAtom`, `activeLidarStyleAtom`, `activeLidarProjectAtom`,
@@ -435,6 +455,9 @@ subsume.
   open on when a sketch is), `funnSessionAtom` (the map is frozen and the
   surface is live, holding the frame and the request that opened it), and
   `funnSceneAtom` (what is currently drawn).
+  A fourth sits with the overlays rather than the session: `sketchShownAtom`
+  (`src/map/sketchOverlay.ts`), the set of sketch ids currently on the map,
+  which is a set rather than an id because several may be shown at once (§9.3).
   The asymmetry between the first two is load-bearing and §9.1 explains it;
   only the second may be used to decide that something else is inop. This used
   to be the largest cluster in the app — `src/settings/draw/atoms.ts`, 375 lines
@@ -450,7 +473,10 @@ subsume.
   (`src/shell/useRecreateView.ts`) — a *command* atom rather than state: it
   holds a `ViewSpec` only long enough for the hook mounted beside the control
   hooks to apply it, then clears itself.
-- **LiDAR extract** — selection rectangle, run status, result canvas.
+- **LiDAR extract** — no atoms. `src/lidarExtract/` holds run status and the
+  result canvas as component state in `LidarExtractDialog`, and the selection
+  rectangle went with the picker carousels (§8.9.3): the rectangle extracted
+  is the lokalitet's own.
 - **Auth** — `currentUserAtom`, `roleAtom`, `isAdminAtom`, dialog open state.
 
 ### 4.3 URL persistence is hand-rolled
@@ -2350,11 +2376,12 @@ preserving. Since the View/File split (§8.7.4) they converge in **two** places,
 and which one a route takes is decided by its `kind`:
 
 ```
-Views (extract | flyfoto) — a row of parameters, stored as one:
+Views (extract | flyfoto | sketch) — a row of parameters, stored as one:
 
   starterPack.ts           ─┐
-  row 2 "Behold" (§8.9.2)   ┼─→ createAttachmentSpec()   — meta, no file
-  the flyfoto grab         ─┘             │
+  row 2 "Behold" (§8.9.2)   │
+  the flyfoto grab          ┼─→ createAttachmentSpec()   — meta, no file
+  "Behold skissen" (§9.3)  ─┘             │
                                           │  afterwards, in the background:
                                           └─→ pinQueue.ts → renderSpec()
                                               → renderFigureBlob() (§8.10)
@@ -2374,17 +2401,22 @@ somewhere to draw a caption; only "Last opp" bypasses it (§8.10). The pin queue
 is a producer like any other and goes through the same stage — a pinned View
 and a File are the same kind of artifact once they exist.
 
-`kind` is one of `extract | screenshot | upload | flyfoto`; terrain renders
-reuse `extract` with the visualization recorded in `meta.style`, which is why
-adding terrain analysis needed no migration. `meta` also carries source
-key/label, `metresPerPx`, bbox, `imageRect` (§8.10), `renderedAt` (§8.7.4), and
+`kind` is one of `extract | screenshot | upload | flyfoto | sketch`; terrain
+renders reuse `extract` with the visualization recorded in `meta.style`, which
+is why adding terrain analysis needed no migration. `meta` also carries source
+key/label, `metresPerPx`, bbox, `imageRect` (§8.10), `renderedAt` (§8.7.4),
 for flyfoto the `projectName` / `year` / `photoDate` that the strip captions
-from ("Flyfoto 1937"). Files are `protected` in PocketBase, so the strip fetches
+from ("Flyfoto 1937"), and for a sketch the `frame` and the Excalidraw `scene`
+itself — which is why `meta` is sized at 2 MB rather than the 10 kB the other
+kinds need. Files are `protected` in PocketBase, so the strip fetches
 short-lived file tokens for thumbnails — a new UI must keep doing that or every
 thumbnail 403s.
 
-Two more fields sit on the record and belong to the exhibit rather than to the
-image: `sort` (int) and `hidden` (bool). They are §8.7.3.
+Four more fields sit on the record and belong to the exhibit or to the
+sketch rather than to the image: `sort` (int) and `hidden` (bool), which are
+§8.7.3, and the two uncascaded relations `funn` (→ finds: what a sketch is
+about) and `over` (→ attachments: which bilder it is a layer on), which are
+§9.3.
 
 #### 8.7.1 The image on the map — Vis i ruta and Gjenskap
 
@@ -3983,9 +4015,10 @@ Consequences worth knowing:
   an atom plus a hook. The pixels change on every slider frame and the opacity
   on every drag of its own; pushing either through jotai would re-render the
   whole shell dozens of times a second for a change no component needs to see.
-  `showTerrainOverlay` / `setTerrainOverlayOpacity` / `hideTerrainOverlay` is
-  the whole surface.
-- `showTerrainOverlay` is show, move *and* repaint in one call, because
+  `showGroundOverlay` / `setGroundOverlayOpacity` / `hideGroundOverlay` is the
+  surface, plus `groundOverlayOwner` / `subscribeGroundOverlay` for the arbiter
+  that decides which of the two features holds the slot (see below).
+- `showGroundOverlay` is show, move *and* repaint in one call, because
   `ImageCanvasSource` caches one image and `changed()` is the only way to
   invalidate it — the canvas element identity never changes, since the hook
   repaints in place.

@@ -34,8 +34,7 @@
     "placesNearby": "Places nearby"
   },
   "languageSelector": {
-    "chooseLanguage": "Select language",
-    "tabHeading": "Language"
+    "chooseLanguage": "Select language"
   },
   "lidarExtract": {
     "styles": {
@@ -59,8 +58,6 @@
     "errorMessage": "Something went very wrong with the map"
   },
   "placeInfo": {
-    "errorPlaceNameInfo": "Error fetching place name information",
-    "loadingPlaceNameInfo": "Loading place name information",
     "locationNumber": "Location number",
     "nameObjectType": "Name object type",
     "moreInfo": "More info"
@@ -80,7 +77,6 @@
   },
   "search": {
     "addresses": "Addresses",
-    "coordinates": "Coordinates",
     "houseNumber": "House nr.",
     "placeholder": "Search Tufteseid",
     "pagination": {
@@ -91,15 +87,12 @@
     "placeName": "Placenames",
     "properties": "Properties",
     "roads": "Roads",
-    "tabHeading": "Search",
     "noResults": "No results found",
     "coordinateSwapWarning": "These coordinates do not appear to be in Norway. They may have been pasted in the wrong order (lon/lat instead of lat/lon).",
-    "coordinateSwapButton": "Swap order",
-    "maxLength": "Max 100 characters"
+    "coordinateSwapButton": "Swap order"
   },
   "shared": {
     "close": "Close",
-    "yes": "Yes",
     "cancel": "Cancel",
     "errorBoundary": {
       "title": "Something went wrong here",
@@ -108,8 +101,6 @@
   },
   "tipsandtricks": {
     "heading": "Tips and tricks",
-    "headingClosed": "Show tips and tricks",
-    "headingOpen": "Close tips and tricks",
     "description": "Common questions and useful tips",
     "categories": {
       "propertyInfo": "Property information",
@@ -314,8 +305,6 @@
       "loading": "Loading finds…",
       "empty": "No finds yet. Draw what you see in the terrain.",
       "draft": {
-        "instructions": "Draw the find on the map. It is saved with the locality when you press Save.",
-        "instructionsEdit": "Change the drawing on the map. The changes are saved with the locality.",
         "titlePlaceholder": "E.g. burial mound?",
         "notePlaceholder": "Why do you think something is here?",
         "cancel": "Cancel",

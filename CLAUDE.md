@@ -33,7 +33,9 @@ all of them.
   library. §12 of that doc records the migration off kvib and the primitives
   deliberately not built. **Read it before touching anything under `src/`
   that renders**, and don't reach for a new UI dependency: the workstation
-  can't regenerate `package-lock.json`.
+  can't regenerate `package-lock.json`. The one exception ever made is
+  `@excalidraw/excalidraw`, which bought the deletion of ~3500 lines of
+  fork-local drawing code; §2 of that doc records what it cost.
 - `docs/map-layers.md` — **what is drawn on the map**: the background grounds
   (Standard in its five cartographies, LiDAR hillshade, Hybrid, Flyfoto) and
   how the background *stack* is assembled and swapped, the five Kulturminner
@@ -65,14 +67,16 @@ all of them.
   filmstrip/carousel, curation, the picker carousels, **removing the dock**,
   **the edit transaction**, **the copy** and **Terreng/Sammenlign on the row**
   are live and are documented in `docs/ui-architecture.md`; the takeout bundle
-  and sharing (`?lok=CODE`) are not. The whole design of making
+  and sharing (`?lok=CODE`) are not. Two builds landed *outside* the numbered
+  list and so are not in it at all: placing the rectangle before creating it,
+  and sketches as overlays. The whole design of making
   "a lokalitet is open" a view of its own is here — the two axes (owner/reader ×
   show/edit), **show writes nothing and edit is a transaction** (`Lagre` /
   `Avbryt` over a client-side draft), the lokalitet row as three zones
   (identity + short code / the tools, edit only / the exits, deepest-first),
-  **the split between a View and a File** — an extract, terrain render or
-  flyfoto is a row of parameters that is stored as a spec and pinned to a
-  figure PNG by a background queue after commit, while a screenshot or upload
+  **the split between a View and a File** — an extract, terrain render,
+  flyfoto or sketch is a row of parameters that is stored as a spec and pinned
+  to a figure PNG by a background queue after commit, while a screenshot or upload
   is only ever bytes — which is what makes the draft bufferable, the copy
   carry the images, and keeping one free; **removing
   the right-hand dock** in favour of that row plus a bottom
@@ -135,20 +139,31 @@ that owns them.
   hillshade, VAT, sky-view factor, positive and negative openness, local relief
   model, slope — on a pulldown and a W/S ring like every other ground's dataset
   list — `docs/terrain-analysis.md` and below.
-- **Lokaliteter**: an authored rectangle holding named *funn* with full
-  drawing tools and *bilder* (extracts, terrain renders, screenshots,
-  flyfoto, uploads), behind sign-in — below, and
+- **Lokaliteter**: an authored rectangle holding named *funn* drawn in
+  Excalidraw over the frozen map, and *bilder* (extracts, terrain renders,
+  screenshots, flyfoto, uploads, sketches), behind sign-in — below, and
   `docs/ui-architecture.md` §8, §9.
+- **Sketches — drawing *on* the ground rather than of it.** The same
+  Excalidraw surface that makes a funn also makes a *tegning*: a transparent
+  overlay registered to the lokalitet's rectangle, kept as a bilde of kind
+  `sketch` and put back on the map as its own `ol/layer/Image`
+  (`src/map/sketchOverlay.ts`, zIndex 2), so several can be shown at once over
+  whatever ground is up. The scene is the spec — a sketch is a View, pinned to
+  a figure PNG afterwards like any extract — and it can be re-opened and
+  re-drawn. `src/funn/` is the surface: `session.ts` (what a drawing session
+  is), `scene.ts`, `geometry.ts`, `render.ts`, `FunnCanvas.tsx`,
+  `FunnSurface.tsx` — `docs/ui-architecture.md` §9, §9.3.
 - **A shared lokalitet can be forked.** `Lag min kopi` carries the rectangle,
   the details, every funn and every View — as unpinned specs, so the pixels
   are made again on the other side — into a private lokalitet of your own with
   `derivedFrom` pointing back; the Files stay with the original and are shown
   at the end of the copy's carousel with one `Ta med` each —
   `docs/ui-architecture.md` §8.12.
-- **A View is a spec before it is pixels.** An extract, terrain render or
-  flyfoto grab is stored as a row of parameters and rendered into a figure PNG
-  afterwards by a background queue (`src/localities/pinQueue.ts`); a screenshot
-  or an upload is only ever bytes — `docs/ui-architecture.md` §8.7.4.
+- **A View is a spec before it is pixels.** An extract, terrain render,
+  flyfoto grab or sketch is stored as a row of parameters and rendered into a
+  figure PNG afterwards by a background queue (`src/localities/pinQueue.ts`); a
+  screenshot or an upload is only ever bytes — `docs/ui-architecture.md`
+  §8.7.4.
 - **Editing a lokalitet is a transaction, and it ends when you say so.**
   Nothing typed, drawn or curated in edit reaches PocketBase until `Lagre`;
   `Avbryt` throws it away, and the buffer survives a crash via `localStorage`.
@@ -395,7 +410,7 @@ hierarchy. A lokalitet is an authored rectangle — proposed from the visible ma
 then moved and sized by hand before anything is written, and resizable
 afterwards — holding *funn* (individually named and addressable drawn features)
 and *bilder* (kept LiDAR extracts, terrain renders, map screenshots, flyfoto,
-uploads). It is bounded to **50–1500 m per side**, a band read off what the
+uploads, sketches). It is bounded to **50–1500 m per side**, a band read off what the
 producers can actually render (`src/localities/bboxLimits.ts`,
 `docs/ui-architecture.md` §5.6).
 
@@ -409,9 +424,8 @@ Two rules that hold regardless of what the interface looks like:
 
 The ribbon rows, the funn list in its popover on the lokalitet row, the bottom
 edge the bilder live on — one rail in both stances, read-only in show and with
-the write verbs and drag-to-reorder in edit, or the draw
-bar while a funn is being drawn (`docs/ui-architecture.md` §8.7.2) — the
-drawing tools and the policy
+the write verbs and drag-to-reorder in edit (`docs/ui-architecture.md` §8.7.2)
+— the drawing surface and the policy
 decisions around them (bbox is authored not derived, only seeded from the
 viewport; drawing and extract exist only inside a lokalitet; measure and
 terrain analysis stay global) are in `docs/ui-architecture.md`.
@@ -441,7 +455,10 @@ Key files (data side):
   everything the lokalitet view needs at once (`localities.code` +
   backfill, `.derivedFrom`, `.derivedFromLabel`, `attachments.sort`,
   `.hidden`, and `attachments.file` relaxed to optional), `1700000600`
-  raises `attachments.file` to 50 MB. **Leave the
+  raises `attachments.file` to 50 MB, `1700000700` adds the `sketch`
+  attachment kind together with `attachments.funn` and `.over` (both
+  uncascaded relations) and raises `attachments.meta` to 2 MB so a sketch
+  can carry its scene. **Leave the
   filenames alone** — they're recorded in `_migrations`, so renaming one
   makes PB re-run it. Collection ids must not equal any collection name
   (0.23+ rejects that), hence `pbc_localities` / `finds2` /
@@ -460,15 +477,20 @@ Data model:
 - **`finds`** — `locality` (relation, cascade), `owner` (denormalized so
   rules stay cheap), `title`, `note`, `status` (mulig | sannsynlig |
   avkreftet | rapportert), `geometry` (json GeoJSON FeatureCollection,
-  EPSG:4326 — Circles round-trip as 64-gons).
+  EPSG:4326 — curves are sampled on the way in, so an ellipse is stored as a
+  64-gon and stays one; the record never knew it had been a curve).
 - **`attachments`** — `locality`, `owner`, `kind` (extract | screenshot |
-  upload | flyfoto), `file` (protected, ≤50 MB, png/jpeg/webp, thumbs, and
+  upload | flyfoto | sketch), `file` (protected, ≤50 MB, png/jpeg/webp,
+  thumbs, and
   **optional** — a View is a spec before it is pixels), `caption`, `meta`
-  (json: source key/label, style, model, metresPerPx, bbox, `imageRect`,
-  `renderedAt`), `sort` and `hidden` for exhibit order and concealment.
+  (json, ≤2 MB: source key/label, style, model, metresPerPx, bbox,
+  `imageRect`, `renderedAt`, and for a sketch the Excalidraw scene itself),
+  `funn` and `over` (uncascaded relations → finds and → attachments: what a
+  sketch is about, and which bilder it is a layer on), `sort` and `hidden`
+  for exhibit order and concealment.
 
-**Views and Files.** `kind` decides which: `extract` and `flyfoto` are
-**Views** — producible from the record's own parameters, so they are written as
+**Views and Files.** `kind` decides which: `extract`, `flyfoto` and `sketch`
+are **Views** — producible from the record's own parameters, so they are written as
 a spec (`createAttachmentSpec`, `meta` only) and the figure PNG is pinned onto
 them afterwards by `src/localities/pinQueue.ts`. `screenshot` and `upload` are
 **Files**: bytes, with nothing behind them that could make the bytes again.

@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from 'react';
 
 // Plain matchMedia. Replaces kvib's useKvibContext + getBreakpointCondition +
-// useMediaQuery trio, which was the only reason src/shared/hooks.ts imported
-// from the component library at all.
+// useMediaQuery trio, which was the only reason the app imported from the
+// component library to make a responsive decision at all.
 
 const subscribe = (query: string) => (onChange: () => void) => {
   const mql = window.matchMedia(query);

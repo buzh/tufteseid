@@ -349,7 +349,8 @@ Three details this pins down:
 - **One image at a time, and it takes the terrain render's slot.** Both are "an
   image of this rectangle" at `zIndex: 1`, and two of them stacked is a
   question nobody asked. Showing a bilde hides a live terrain render and vice
-  versa. The layer itself is `terrainOverlayLayer.ts` generalised — an
+  versa. The layer itself is `terrainOverlayLayer.ts` generalised — it shipped
+  under the name that generalisation earned it, `src/map/groundOverlay.ts` — an
   `ol/layer/Image` over an `ImageCanvasSource` pinned to `EPSG:25833`,
   imperative and module-level so a dragged opacity slider does not re-render
   the shell.
@@ -479,8 +480,10 @@ Three changes from today's `Hent grunnpakke`:
   pick.
 
 `starterPack.ts` therefore loses its `flyfoto` and `terrain` steps and becomes
-three calls to `starterExtract` with three styles. `STARTER_VIS` and the
-`terrainFigure` import go with them.
+three calls to one extract with three styles. `STARTER_VIS` and the
+`terrainFigure` import go with them. (As built the two exports are
+`planStarterPack` and `extractLidarFigure`; `starterExtract` and `STARTER_VIS`
+are this document's names for them and never existed in the code.)
 
 A fourth change the build added: **the three specs are written straight to
 PocketBase, not into the draft** — the one View in the app that skips the
@@ -1203,7 +1206,7 @@ The ring is a fact about digits and W/S, not about DOM order, and `GROUND_KEYS`
 is positional against the array.
 
 **Pressing Terreng (or `5`) with no lokalitet open creates one** — signed in,
-`createLocalityFromViewport()` over the inset viewport, then enter Terreng in it
+`createLocalityFromBbox()` over the inset viewport, then enter Terreng in it
 in **edit** stance; signed out, `AuthDialog`. `useGroundMode` takes the create
 callback in the argument slot `viewport` occupies today.
 
@@ -1322,6 +1325,13 @@ create rule covers it. Known and accepted: nothing server-side stops a client
 writing a `derivedFrom` it invented. For an amateur tool that is not worth a
 hook.
 
+Two later migrations have touched `attachments` since, neither of them part of
+this design: `1700000600` raises `file` to 50 MB, and `1700000700` adds the
+`sketch` kind with the uncascaded `funn` and `over` relations and a 2 MB `meta`
+(see the dated note at the end of §12). The claim below that the View/File
+split costs one line of migration still holds — those two are paying for other
+things.
+
 **No `spec` field, and no `isView` field.** Both were tempting and both are
 redundant: `meta` already holds every parameter a View needs, because the
 figure caption needs to print the same set, and the category is a function of
@@ -1408,7 +1418,8 @@ worth more than the list:
 4. **`access` / `canEdit`** — replace `isMine` (~50 lines, six files), give
    admins the verbs the server already grants them. No visible change for
    owners.
-5. **The image on the map** — generalise `terrainOverlayLayer` to paint any
+5. **The image on the map** — generalise `terrainOverlayLayer` (it landed as
+   `src/map/groundOverlay.ts`) to paint any
    attachment at its `bbox25833`/`imageRect`, plus the opacity slider and
    `Gjenskap`. Ships inside the existing Bilder section and **deletes the
    lightbox** on its own. Needs the zIndex arbiter (below). Build `Gjenskap`
@@ -1451,7 +1462,9 @@ worth more than the list:
     reasonable thing to put in front of someone.
 12. **Remove the dock** — the funn popover and its map callout, the
     kulturminner popover, the Detaljer dialog, the draft metadata row, the
-    draw toolbar promoted off mobile. **Depth 2 arrives here**
+    draw toolbar promoted off mobile. (That last part was overtaken: the
+    OpenLayers pen went entirely, so there is no toolbar of ours to promote —
+    see §6 and `docs/ui-architecture.md` §9.) **Depth 2 arrives here**
     (`Ferdig med funn` / `Forkast funn`), because this is where the funn
     draft's own controls leave the dock and stop competing with the row's.
 13. **The transaction** (§5.6) — the draft buffer, suspended autosave,
@@ -1474,6 +1487,18 @@ which is the point. The row it uses is `RibbonPlaceLocalityRow`, in the
 `RibbonFunnDraftRow` idiom, and it is mutually exclusive with an open lokalitet
 by construction, so the deepest-first exit rule (§5.4) is untouched. Design and
 the two numbers: `docs/ui-architecture.md` §5.6.
+
+**Sketches as overlays** (2026-09-13) is likewise outside the list. The pen
+that makes a funn also makes a *tegning*: the same Excalidraw session over the
+same frozen map, kept not as geometry but as a transparent image registered to
+the rectangle, which goes back on the map as its own layer at `zIndex: 2` —
+several at once, unlike the single ground slot under it. It is a bilde of kind
+`sketch` and therefore a View, so §4.1.2 covers it unchanged: the scene is the
+spec, the figure PNG is pinned afterwards, the copy carries it as a spec, and
+the edit transaction buffers it. `Gjenskap` means something narrower here than
+elsewhere: a sketch names no ground, so the button restores only the frame the
+strokes were drawn on, leaving whatever ground the reader has up alone. Design:
+`docs/ui-architecture.md` §9.3; schema: migration `1700000700`.
 
 ### Why the transaction is last, not sixth
 
@@ -1521,7 +1546,8 @@ the field rather than an error. Same for relaxing `attachments.file` at step
 several migration files with a `docker compose restart pocketbase` each. One
 file is better.
 
-**Step 5 needs an owner for `zIndex: 1`.** `terrainOverlayLayer` uses it
+**Step 5 needs an owner for `zIndex: 1`.** `terrainOverlayLayer` (now
+`src/map/groundOverlay.ts`) uses it
 (`Z_INDEX = 1`), and a pinned attachment wants the same slot — nothing else
 in the app is near it (the lokalitet rectangle is 4, funn highlight 4.5, funn
 5, adjust handles 8), so the collision is exactly two-way and exactly the one

@@ -11,7 +11,10 @@ import type { MapLayers } from './layers';
  * upstream accident: most of them have nothing to do with drawing, and the
  * measure tool, the property InfoBox and the search markers all had to reach
  * into the drawing subsystem to find their own layer. That subsystem is gone
- * now (§9.2) and its two layers with it; these are the four that outlived it.
+ * now (§9.2) and its two layers with it; these are the three that outlived it.
+ * A fourth, `posterMarkerLayer`, went the same way — it belonged to upstream's
+ * poster print, which this fork does not have, and nothing had written to it
+ * since.
  *
  * A file of their own rather than the bottom of `layers.ts`, where they would
  * sit better: `atoms.ts` imports `mapLayers` and *builds the map with it at
@@ -36,9 +39,6 @@ const layerById = (id: keyof MapLayers) =>
  */
 export const getMarkerLayer = (): VectorLayer =>
   layerById('markerLayer') as VectorLayer;
-
-export const getPosterMarkerLayer = (): VectorLayer =>
-  layerById('posterMarkerLayer') as VectorLayer;
 
 export const getMeasureLayer = (): VectorLayer =>
   layerById('measureLayer') as VectorLayer;

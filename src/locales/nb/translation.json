@@ -34,8 +34,7 @@
     "placesNearby": "Steder i nærheten"
   },
   "languageSelector": {
-    "chooseLanguage": "Velg språk",
-    "tabHeading": "Språk"
+    "chooseLanguage": "Velg språk"
   },
   "lidarExtract": {
     "styles": {
@@ -59,8 +58,6 @@
     "errorMessage": "Noe gikk veldig galt med kartet"
   },
   "placeInfo": {
-    "errorPlaceNameInfo": "Feil ved henting av stedsnavninformasjon",
-    "loadingPlaceNameInfo": "Laster stedsnavninformasjon",
     "locationNumber": "Stedsnummer",
     "nameObjectType": "Navneobjekttype",
     "moreInfo": "Mer info"
@@ -80,7 +77,6 @@
   },
   "search": {
     "addresses": "Adresser",
-    "coordinates": "Koordinater",
     "houseNumber": "Husnr",
     "placeholder": "Søk i Tufteseid",
     "pagination": {
@@ -91,15 +87,12 @@
     "placeName": "Stedsnavn",
     "properties": "Eiendommer",
     "roads": "Veger",
-    "tabHeading": "Søk",
     "noResults": "Ingen treff",
     "coordinateSwapWarning": "Koordinatene ser ikke ut til å være i Norge. De kan ha blitt limt inn i feil rekkefølge (lon/lat i stedet for lat/lon).",
-    "coordinateSwapButton": "Bytt rekkefølge",
-    "maxLength": "Maks 100 tegn"
+    "coordinateSwapButton": "Bytt rekkefølge"
   },
   "shared": {
     "close": "Lukk",
-    "yes": "Ja",
     "cancel": "Avbryt",
     "errorBoundary": {
       "title": "Noe gikk galt her",
@@ -108,8 +101,6 @@
   },
   "tipsandtricks": {
     "heading": "Tips og triks",
-    "headingClosed": "Vis tips og triks",
-    "headingOpen": "Lukk",
     "description": "Vanlige spørsmål og nyttige tips",
     "categories": {
       "propertyInfo": "Eiendomsinformasjon",
@@ -314,8 +305,6 @@
       "loading": "Henter funn…",
       "empty": "Ingen funn enda. Tegn det du ser i terrenget.",
       "draft": {
-        "instructions": "Tegn funnet på kartet. Det lagres sammen med lokaliteten når du trykker Lagre.",
-        "instructionsEdit": "Endre tegningen på kartet. Endringene lagres sammen med lokaliteten.",
         "titlePlaceholder": "F.eks. gravhaug?",
         "notePlaceholder": "Hvorfor tror du det er noe her?",
         "cancel": "Avbryt",

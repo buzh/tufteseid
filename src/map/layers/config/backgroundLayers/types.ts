@@ -7,8 +7,6 @@ import {
   WMTSLayerName,
 } from '../../backgroundLayers';
 
-export type LayerType = 'WMTS' | 'WMS' | 'ArcGISImage' | 'Empty';
-
 // Where a layer actually has data. Transformed to the view projection and
 // set as the layer's `extent`, so OL culls tiles outside coverage instead
 // of asking the origin to render them. Mandatory in practice for anything
