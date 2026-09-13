@@ -83,6 +83,64 @@ const excalidrawLang = (language: string) =>
  */
 const SCENE_SETTLE_MS = 150;
 
+/*
+ * The wheel zooms, the way it does everywhere else here.
+ *
+ * Excalidraw's wheel scrolls the scene and its zoom is Ctrl+wheel; OpenLayers'
+ * wheel zooms, and this canvas is transparent over that map. The ground the
+ * wheel appears to be pointed at is the map's, so the two cannot disagree
+ * about what a notch means — and since the map is slaved to the scene, a scene
+ * zoom is what a map zoom looks like from in here anyway.
+ *
+ * There is no prop for it, so the event is rewritten rather than the handler
+ * replaced: a plain notch over the canvas is stopped in the capture phase and
+ * re-dispatched at the same target with `ctrlKey` set. That is the same event
+ * a trackpad pinch already sends, so nothing is being asked of Excalidraw that
+ * it does not do on its own — and the zoom stays anchored, stepped and
+ * clamped exactly as its own does. Its listener is on its container
+ * (bubble phase), which is inside this surface, so capturing here is early
+ * enough.
+ *
+ * Left alone: Ctrl/Cmd+wheel, which is the pinch and already zooms;
+ * Shift+wheel, which stays Excalidraw's horizontal scroll; and anything whose
+ * target is not the canvas, so the tool islands keep scrolling. With the
+ * vertical scroll spent on zoom, panning the scene is space-drag, middle-drag
+ * and the hand tool — the same three it always was.
+ */
+const PX_PER_LINE = 16;
+
+/*
+ * Excalidraw reads `deltaY` as pixels and clamps a notch to one zoom step, so
+ * the normalization only matters at the bottom: Firefox reports plain wheels
+ * in *lines* (deltaY 3), which would be a 3% zoom step where Chrome gets 10%.
+ */
+const pixelDeltaY = (event: WheelEvent) =>
+  event.deltaMode === 0
+    ? event.deltaY
+    : event.deltaY * (event.deltaMode === 1 ? PX_PER_LINE : window.innerHeight);
+
+const zoomOnWheel = (event: WheelEvent) => {
+  // `isTrusted` is the recursion guard — a dispatched event is never trusted,
+  // so the copy below passes straight through to Excalidraw's own handler.
+  if (!event.isTrusted || event.ctrlKey || event.metaKey || event.shiftKey) {
+    return;
+  }
+  if (!(event.target instanceof HTMLCanvasElement)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  event.target.dispatchEvent(
+    new WheelEvent('wheel', {
+      deltaY: pixelDeltaY(event),
+      deltaMode: 0,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+};
+
 type Offset = { x: number; y: number; zoom: number };
 
 const buildInitialData = (
@@ -163,6 +221,20 @@ export const FunnCanvas = () => {
     },
     [],
   );
+
+  // See `zoomOnWheel`. On this surface rather than on the canvas because the
+  // canvas is Excalidraw's and is replaced under us; capture, so the notch is
+  // rewritten before its own listener inside here sees it.
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    host.addEventListener('wheel', zoomOnWheel, {
+      capture: true,
+      passive: false,
+    });
+    return () =>
+      host.removeEventListener('wheel', zoomOnWheel, { capture: true });
+  }, []);
 
   /*
    * The surface's scene, lent out for as long as it is up (`sceneNow`).

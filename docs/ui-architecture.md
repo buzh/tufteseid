@@ -3577,6 +3577,21 @@ ResizeObserver behind it watches the content box), which is what makes it safe.
 Move the view instead and the frame every stroke is registered to goes stale
 under them.
 
+**And the wheel zooms**, as it does on the map and everywhere else here.
+Excalidraw's own wheel scrolls the scene and reserves zoom for Ctrl+wheel,
+which would mean one gesture meaning two things on two sides of a transparent
+canvas — and since the map is slaved to the scene, a scene zoom is what a map
+zoom looks like from in here anyway. There is no prop for it, so `zoomOnWheel`
+(`FunnCanvas.tsx`) rewrites the event rather than replacing the handler: a
+plain notch over the canvas is stopped in the capture phase and re-dispatched
+at the same target with `ctrlKey` set, which is the event a trackpad pinch
+already sends, so the zoom stays anchored, stepped and clamped by Excalidraw's
+own code. `isTrusted` is the recursion guard; Firefox's line-mode delta is
+normalized to pixels on the way through, or a notch there would be a 3% step
+against Chrome's 10%. Ctrl+wheel, Shift+wheel (horizontal scroll) and anything
+whose target is not the canvas (the tool islands scroll) are left alone, and
+panning the scene stays space-drag, middle-drag and the hand tool.
+
 There used to be a `snapshot.ts` here that flattened the layers into a locked
 background element in the scene. It is gone: the still was a second copy of
 what was already on screen, and the live map under a transparent canvas is both
