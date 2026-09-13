@@ -112,6 +112,33 @@ export const funnSessionAtom = atom<FunnSession | null>(null);
 export const funnSceneAtom = atom<readonly SceneElement[]>([]);
 
 /*
+ * The scene as the surface has it *right now*.
+ *
+ * `funnSceneAtom` lags the pen by a settle (`FunnCanvas`), which is right for
+ * everything that watches the drawing and wrong for the two things that end
+ * it: `Ferdig` and `Behold skissen` pressed on the tail of a stroke would
+ * commit a drawing without that stroke in it, and for a sketch whose only
+ * stroke is still settling, refuse to keep anything at all.
+ *
+ * So the surface lends its reader out while it is up, and anything reading the
+ * scene *in order to keep it* goes through `sceneNow`. Module-level rather than
+ * an atom because there is nothing to render here and because two of the three
+ * callers are timers.
+ */
+let readLiveScene: (() => readonly SceneElement[]) | null = null;
+
+export const setLiveSceneReader = (
+  read: (() => readonly SceneElement[]) | null,
+) => {
+  readLiveScene = read;
+};
+
+/** The settled scene, or the live one when a surface is up to ask. */
+export const sceneNow = (
+  settled: readonly SceneElement[],
+): readonly SceneElement[] => readLiveScene?.() ?? settled;
+
+/*
  * The freeze itself.
  *
  * Every interaction that was live goes inactive and is remembered, rather

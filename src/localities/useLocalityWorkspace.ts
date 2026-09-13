@@ -33,6 +33,7 @@ import {
   drawRequestedAtom,
   funnSceneAtom,
   funnSessionAtom,
+  sceneNow,
 } from '../funn/session';
 import {
   setSketchOverlays,
@@ -1337,7 +1338,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const keepSketch = useCallback(() => {
     if (!user || !canAdd) return;
     if (!drawSession || drawSession.mode !== 'sketch') return;
-    const elements = storableScene(scene);
+    // The live scene, not the settled one: a sketch whose only stroke is still
+    // inside the settle would be refused as empty by the next line.
+    const elements = storableScene(sceneNow(scene));
     if (elements.length === 0) {
       toast.error({ title: t('localities.sketch.empty') });
       return;

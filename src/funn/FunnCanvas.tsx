@@ -4,11 +4,18 @@ import './excalidrawAssets';
 import { Excalidraw } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
 import type {
+  ExcalidrawImperativeAPI,
   ExcalidrawInitialDataState,
   NormalizedZoomValue,
 } from '@excalidraw/excalidraw/types';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { mapAtom } from '../map/atoms';
 import styles from './FunnCanvas.module.css';
@@ -17,6 +24,7 @@ import {
   funnSceneAtom,
   funnSessionAtom,
   initialSceneView,
+  setLiveSceneReader,
   slaveMapToScene,
 } from './session';
 
@@ -156,11 +164,26 @@ export const FunnCanvas = () => {
     [],
   );
 
+  /*
+   * The surface's scene, lent out for as long as it is up (`sceneNow`).
+   *
+   * `Ferdig` and `Behold skissen` read the drawing in order to keep it, and
+   * the settle below means the atom they would read is up to 150 ms behind the
+   * pen — one stroke's worth, and for a sketch that has only just been started,
+   * the whole drawing. Handed back on unmount, so a reader is never a door into
+   * a canvas that has gone.
+   */
+  const registerApi = useCallback((api: ExcalidrawImperativeAPI) => {
+    setLiveSceneReader(() => api.getSceneElementsIncludingDeleted());
+  }, []);
+  useEffect(() => () => setLiveSceneReader(null), []);
+
   return (
     <div className={styles.surface} ref={hostRef}>
       {offset && (
         <Excalidraw
           initialData={buildInitialData(offset, opening)}
+          excalidrawAPI={registerApi}
           langCode={excalidrawLang(i18n.language)}
           onChange={(elements, appState) => {
             /*

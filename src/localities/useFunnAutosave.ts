@@ -5,7 +5,7 @@ import type { LocalityBbox } from '../api/localities';
 import type { FunnFrame } from '../funn/frame';
 import { geometryExtent4326, sceneToGeometry } from '../funn/geometry';
 import type { SceneElement } from '../funn/scene';
-import { funnSceneAtom, funnSessionAtom } from '../funn/session';
+import { funnSceneAtom, funnSessionAtom, sceneNow } from '../funn/session';
 
 // How still the pen has to be before the drawing is written back. Long enough
 // that dragging a vertex is one save and not forty, short enough that the gap
@@ -99,9 +99,12 @@ export const useFunnAutosave = (handlers: FunnAutosaveHandlers) => {
     }, SETTLE_MS);
   }, []);
 
+  // Through `sceneNow` rather than off the atom: this runs from a timer and
+  // from `Ferdig`, and the settle in front of the atom is half a stroke's
+  // worth of drawing that the flush would otherwise write the funn without.
   const geometryNow = (): FeatureCollection | null => {
     const src = input.current;
-    return src ? sceneToGeometry(src.frame, src.elements) : null;
+    return src ? sceneToGeometry(src.frame, sceneNow(src.elements)) : null;
   };
 
   const flush = useCallback(() => {
