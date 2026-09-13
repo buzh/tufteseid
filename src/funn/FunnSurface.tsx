@@ -116,7 +116,8 @@ export const FunnSurface = () => {
     setSession({
       mode: requested.mode,
       frame,
-      resume: resume ? { id: resume.id, elements } : null,
+      opening: elements,
+      resume: resume ? { id: resume.id } : null,
     });
     return () => {
       thawMap(map);

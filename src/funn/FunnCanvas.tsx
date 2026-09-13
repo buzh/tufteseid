@@ -120,9 +120,14 @@ export const FunnCanvas = () => {
    * on every change, and feeding that back into `initialData` would rebuild
    * the scene mid-stroke. What the surface starts with is a fact about the
    * session, and the session does not change while it is up.
+   *
+   * Off `session.opening`, not off `session.resume`: `Rediger tegningen` seeds
+   * a converted geometry with no resume behind it, and reading the resume
+   * would open that on a blank canvas over a funn whose shape the first stroke
+   * then replaces.
    */
   const [opening] = useState<readonly SceneElement[]>(
-    () => session?.resume?.elements ?? [],
+    () => session?.opening ?? [],
   );
 
   /*

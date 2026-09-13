@@ -53,8 +53,17 @@ export type FunnSession = {
   mode: FunnDrawMode;
   /** What gives scene coordinates a place on the ground (`frame.ts`). */
   frame: FunnFrame;
-  /** The record being changed and its strokes, when this is a resume. */
-  resume: { id: string; elements: readonly SceneElement[] } | null;
+  /**
+   * What the surface opens on, whichever way in it came: a resumed sketch's
+   * own strokes, a funn's geometry converted into the frame, or nothing at
+   * all for a blank session. Held here rather than derived from `resume`
+   * because a seeded session has no resume and would otherwise open blank —
+   * with the autosave's baseline set to the old geometry, so the first stroke
+   * would be the whole of the funn.
+   */
+  opening: readonly SceneElement[];
+  /** The record being changed, when this is a resume. */
+  resume: { id: string } | null;
 };
 
 /*
