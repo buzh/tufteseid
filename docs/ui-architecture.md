@@ -3642,7 +3642,12 @@ the terrain it was drawn over, and three things follow from that:
   currently needs, the way `groundOverlay` re-renders rather than scaling, so
   strokes stay crisp at any zoom instead of blurring past the resolution the
   frame happened to be captured at. The renderer is behind a dynamic import: a
-  reader who opens a lokalitet with no sketches in it never loads it.
+  reader who opens a lokalitet with no sketches in it never loads it. An export
+  takes about as long as a re-draw plus a `Lagre`, so each entry **counts its
+  scenes** and a landing export is only taken if the count has not moved under
+  it — otherwise a sketch that was drawn on again while its first export was
+  running would have the previous strokes installed as current, and keep them
+  until the view zoomed past the rescale tolerance.
 
 **A sketch knows where it belongs.** Two relations, neither cascading:
 
@@ -3662,7 +3667,11 @@ sketch mode and is its own toggle; while the surface is up the row's exits zone
 holds the only way out of it, `[Behold skissen] [Avbryt]`, deepest-first beside
 the funn draft's own pair (§5.3). Neither writes to PocketBase: `Behold
 skissen` buffers a new spec — or, on a re-draw, the whole replacement `meta` —
-into the edit transaction, and `Lagre` is still what commits it (§8.11). On the
+into the edit transaction, and `Lagre` is still what commits it (§8.11). A
+newly kept sketch goes up on the ground at once, under the draft id the buffer
+minted for it, so the commit hands its temp→real mapping back and the shown set
+is rewritten through it: otherwise the drawing comes off the map at the moment
+it becomes a record. On the
 bilder rail a sketch card carries two verbs no other bilde has: an eye
 (`Vis skissen` / `Skjul skissen`) in **both** stances, because turning a layer
 on writes nothing and holding a reading up against the image it was made over
@@ -3703,6 +3712,46 @@ Excalidraw carries its own translations including both Norwegian written
 standards, so the toolbar speaks whatever the rest of the app does. Its codes
 are regioned and ours are not, hence the `LANG_CODES` map rather than a
 pass-through; anything unrecognised falls to English, as `i18n.ts` does.
+
+### 9.5 A session is a thing, and the scene has two speeds
+
+Two invariants that are not visible anywhere in the interface and that both
+paid for a lost drawing before they were stated.
+
+**Each session is a different canvas, and it says which.** Every entrance to
+the pen — `Nytt funn`, `Tegn`, `Rediger tegningen`, `Rediger skissen` — goes
+through `clearForPen`, which puts the pen down and presses it again *in the
+same callback*. React batches the two, so `drawRequestedAtom` is never
+observed as null and the surface is never rendered without a session: one
+session follows another with no gap in between. An unkeyed `FunnCanvas` is
+therefore not remounted across that gap, and everything it reads once — the
+opening scene, the measured offset, Excalidraw's own live elements — survives
+into the next session, which is how a funn's strokes end up kept as a sketch.
+So a session carries an `id` (`nextSessionId`) and the surface is keyed on it.
+A new session is a new canvas, stated where the code can act on it.
+
+**The surface opens on what the session hands it**, `session.opening`, and not
+on a reading of `session.resume`. The two ways in that open on something
+already drawn are different shapes: a *resume* is a stored scene with the frame
+it was drawn on, and a *seed* is a funn's geometry converted into a frame
+captured now (§9.2) with no record of a scene behind it. Deriving the opening
+elements from the resume gives the seeded path a blank canvas over a funn that
+has just been hidden on the map, with the autosave's baseline still pointing at
+the old geometry — so the first stroke is written back as the whole of the
+funn and the shape it was opened to correct is gone.
+
+**`funnSceneAtom` lags the pen by 150 ms, and two callers may not.**
+`onChange` fires on every pointer sample, so the atom is published on a settle;
+nothing that *watches* the drawing is in a hurry (the autosave settles for
+700 ms on top of it, and the other subscriber is a button asking whether
+anything has been drawn at all). But the verbs that *end* a session read the
+scene in order to keep it, and pressing one on the tail of a stroke reads the
+atom as of the last render: `Ferdig` commits a funn without its last stroke,
+and `Behold skissen` on a sketch whose only stroke is still settling refuses to
+keep anything. So the surface lends out a reader of Excalidraw's live scene
+while it is up (`setLiveSceneReader`), and the three keep-paths — the autosave's
+flush, its timer, `keepSketch` — go through `sceneNow`. The settle stays where
+it belongs, in front of the subscribers and not in front of the exits.
 
 ---
 
