@@ -48,8 +48,23 @@ export type DrawRequest = {
  */
 export const drawRequestedAtom = atom<DrawRequest | null>(null);
 
+/*
+ * One number, so a session can be told from the one before it.
+ *
+ * Two sessions in a row are the ordinary case — `Tegn` pressed while a funn
+ * draft is up, `Nytt funn` pressed over a sketch — and every entrance puts the
+ * pen down and presses it again in the same callback, so React never renders
+ * the gap. Without an identity to key the surface on, the canvas is not
+ * remounted and the previous session's strokes are still in it, which is how a
+ * funn's shape ends up kept as a sketch.
+ */
+let sessions = 0;
+export const nextSessionId = () => (sessions += 1);
+
 /** The map stopped, and handed to Excalidraw. */
 export type FunnSession = {
+  /** This session, told apart from the one before it — see `nextSessionId`. */
+  id: number;
   mode: FunnDrawMode;
   /** What gives scene coordinates a place on the ground (`frame.ts`). */
   frame: FunnFrame;

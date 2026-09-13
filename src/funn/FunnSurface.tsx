@@ -15,6 +15,7 @@ import {
   freezeMap,
   funnSceneAtom,
   funnSessionAtom,
+  nextSessionId,
   thawMap,
 } from './session';
 
@@ -114,6 +115,7 @@ export const FunnSurface = () => {
         : [];
     setScene(elements);
     setSession({
+      id: nextSessionId(),
       mode: requested.mode,
       frame,
       opening: elements,
@@ -126,6 +128,15 @@ export const FunnSurface = () => {
     };
   }, [requested, map, setRequested, setSession, setScene, t]);
 
+  /*
+   * Keyed on the session, because one drawing session can follow another
+   * without a render in between: every entrance puts the pen down and presses
+   * it again in one callback, React batches the two, and an unkeyed surface is
+   * therefore never unmounted. What survives is everything the canvas reads
+   * once — the opening scene, the measured offset, and Excalidraw's own live
+   * elements — so the new session would open on the old session's strokes and
+   * save them as whatever it is making.
+   */
   if (!session) return null;
-  return <FunnCanvas />;
+  return <FunnCanvas key={session.id} />;
 };
