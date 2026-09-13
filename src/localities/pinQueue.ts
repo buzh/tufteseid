@@ -54,6 +54,7 @@ import type { LocalityBbox } from '../api/localities';
 import { renderFigureBlob } from '../figure/figure';
 import { flyfotoFigure, terrainFigure } from '../figure/specs';
 import { enumerateLidarSources } from '../lidarExtract/sources';
+import { withDeadline } from '../shared/utils/deadline';
 import { renderTerrain } from '../terrain/render';
 import { fetchFlyfoto } from './flyfoto';
 import { fetchFlyfotoProjectsForBbox } from './flyfotoProjects';
@@ -73,6 +74,29 @@ export type PinJob = {
   /** The lokalitet's name, for the figure's title line. */
   subject?: string;
 };
+
+/*
+ * Nothing here may wait forever, and the reason is the queue rather than any
+ * one image.
+ *
+ * One job at a time is what makes a stall expensive: a render that never
+ * settles is not one card spinning, it is `drain` parked on an `await` with
+ * every queued job behind it, and a spinner is exactly what the surface shows
+ * while it waits. There is no upstream that guarantees an answer — the
+ * requests underneath have their own per-request ceilings now
+ * (src/shared/utils/deadline.ts), but "the producer ran out of ways to fail"
+ * is not a property this module can check, so it puts a clock on the whole
+ * thing and treats expiry as an ordinary failure: `failed`, with a retry
+ * button, which is the honest state for "we do not know, ask again".
+ *
+ * Both numbers are ceilings on a stall, not budgets. A 40 Mpx stitch of
+ * sixteen tiles at four at a time is well under a minute; five is where a
+ * render has clearly stopped making progress rather than being slow. The
+ * upload gets the same, which is 50 MB — the field's cap — at about
+ * 1.5 Mbit/s up.
+ */
+const RENDER_DEADLINE_MS = 300_000;
+const UPLOAD_DEADLINE_MS = 300_000;
 
 // Filenames end up in a download dialog and in a takeout bundle, so keep them
 // to something a filesystem and a URL both accept.
@@ -175,7 +199,10 @@ const rectangleOf = (rec: AttachmentRecord, fallback: LocalityBbox) => {
  * map, this one applies it to a canvas nobody is watching.
  *
  * `null` is "the source has nothing here", which is not a failure. Anything
- * that throws is.
+ * that throws is — including running out of time: the deadline is applied
+ * here, not in the queue's `runJob`, so the picker gets it too. A card stuck
+ * on `fetching` and a card stuck on a spinner are the same bug on two
+ * surfaces.
  *
  * Exported for the picker (§4.3), which is the one caller that renders a spec
  * with no record behind it: a picker candidate is not an attachment until it is
@@ -184,10 +211,20 @@ const rectangleOf = (rec: AttachmentRecord, fallback: LocalityBbox) => {
  * same parameters — which spares Kartverket a duplicate tile burst and makes
  * the stored pin literally the pixels the author looked at when they decided.
  */
-export const renderSpec = async (
+export const renderSpec = (
   spec: ViewSpec,
   bbox4326: LocalityBbox,
   subject: string | undefined,
+): Promise<Produced | null> =>
+  withDeadline(RENDER_DEADLINE_MS, `${spec.kind} render`, (signal) =>
+    renderSpecWithin(spec, bbox4326, subject, signal),
+  );
+
+const renderSpecWithin = async (
+  spec: ViewSpec,
+  bbox4326: LocalityBbox,
+  subject: string | undefined,
+  signal: AbortSignal,
 ): Promise<Produced | null> => {
   switch (spec.kind) {
     case 'lidar': {
@@ -208,7 +245,7 @@ export const renderSpec = async (
         source,
         to25833(bbox4326),
         spec.style,
-        { subject },
+        { subject, signal },
       );
       if (!raster) return null;
       return {
@@ -233,6 +270,7 @@ export const renderSpec = async (
         model: spec.model,
         light,
         radius: spec.radius,
+        signal,
       });
       if (!render) return null;
       const figure = await renderFigureBlob(
@@ -271,11 +309,11 @@ export const renderSpec = async (
       const project =
         source === 'mosaic'
           ? undefined
-          : (await fetchFlyfotoProjectsForBbox(bbox4326)).find(
+          : (await fetchFlyfotoProjectsForBbox(bbox4326, signal)).find(
               (p) => p.id === source.projectId,
             );
       if (source !== 'mosaic' && !project) return null;
-      const result = await fetchFlyfoto(bbox4326, { project });
+      const result = await fetchFlyfoto(bbox4326, { project, signal });
       if (!result) return null;
       // JPEG all the way through, like the stitch itself: the caption is large
       // flat type and survives it, and a lossless copy of a lossy-sourced
@@ -321,18 +359,21 @@ const runJob = async (job: PinJob): Promise<AttachmentRecord | null> => {
     states.set(job.rec.id, 'empty');
     return null;
   }
-  const pinned = await pinAttachment(
-    job.rec.id,
-    produced.blob,
-    produced.filename,
-    {
+  // The upload is the other half that can hang, and the SDK's own
+  // auto-cancellation is keyed on request identity rather than on time. No
+  // signal goes in: a multipart PATCH already on the wire cannot be taken back,
+  // so this is the rejection guarantee only — the queue moves on and the card
+  // offers a retry, while the browser finishes or drops the transfer in its
+  // own time.
+  const pinned = await withDeadline(UPLOAD_DEADLINE_MS, 'pin upload', () =>
+    pinAttachment(job.rec.id, produced.blob, produced.filename, {
       ...(job.rec.meta ?? {}),
       ...produced.meta,
       // Provenance, so a pin and its spec can be compared later rather than
       // merely trusted. It lives inside `meta` because provenance already has
       // a home there and this needs no column of its own.
       renderedAt: new Date().toISOString(),
-    },
+    }),
   );
   states.delete(job.rec.id);
   return pinned;

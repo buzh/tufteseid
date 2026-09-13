@@ -89,8 +89,9 @@ export type ExtractedCanvas = {
  * One source × one style, stitched. What "Hent grunnpakke", the pin queue and
  * every picker card run.
  *
- * `null` when nothing painted, i.e. the rectangle is outside this source's
- * coverage or every tile failed. There is no module-level abort controller:
+ * `null` when nothing painted *and* nothing failed, i.e. the rectangle is
+ * outside this source's coverage. A run where every tile errored or timed out
+ * throws instead. There is no module-level abort controller:
  * cancellation is the caller's `signal`, so a background grab can never
  * cancel the extract somebody is watching.
  */
@@ -115,6 +116,7 @@ export async function extractCanvas(
   signal?.addEventListener('abort', abort);
 
   let painted = 0;
+  let failed = 0;
   try {
     await runWithConcurrency(plan.tiles, MAX_CONCURRENT_TILES, async (tile) => {
       const outcome = await paintTile(
@@ -129,12 +131,28 @@ export async function extractCanvas(
         ac.signal,
       );
       if (outcome.kind === 'painted') painted++;
+      else if (outcome.kind === 'failed') failed++;
     });
   } finally {
     signal?.removeEventListener('abort', abort);
   }
 
-  if (painted === 0 || signal?.aborted) return null;
+  // A cancelled run has no answer, and whoever cancelled it is not waiting for
+  // one. Throwing rather than returning null keeps it out of the null case,
+  // which means something specific — see below.
+  if (signal?.aborted) throw new Error('extract cancelled');
+
+  // Nothing painted, and *requests* are the reason. That is a fault, not a
+  // fact about the ground, and the difference is load-bearing now that a tile
+  // can also be given up on for taking too long (`TILE_TIMEOUT_MS` in
+  // stitch.ts): `null` here reaches the pin queue as `empty`, the one state
+  // whose card offers no retry. A network blip would have silently retired
+  // three starter images. Same distinction `fetchDem` draws, for the same
+  // reason.
+  if (painted === 0 && failed > 0) {
+    throw new Error(`every tile failed: ${source.label} / ${style}`);
+  }
+  if (painted === 0) return null;
   return {
     canvas,
     // What the stitch actually produced: planTiles scales both axes down

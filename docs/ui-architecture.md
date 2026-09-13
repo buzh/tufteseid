@@ -2644,6 +2644,29 @@ bufferable (§8.1), a fork cheap, and the picker carousels affordable.
   has nothing over this rectangle — a real answer, and asking again would be
   asking to re-learn it. `failed` means the render threw. Success deletes the
   entry entirely, because the record now has a file and that is the state.
+- **Nothing in the path may wait forever** (`src/shared/utils/deadline.ts`).
+  `fetch` has no timeout of its own, and a connection that is accepted and then
+  goes quiet never rejects — so no retry loop here notices it, because every
+  one of them is driven by rejections. With one worker that is not one image
+  lost: `drain()` parks on the `await` and every job behind it stays `queued`
+  until the page is reloaded, with a spinner on each. Two ceilings answer it.
+  `fetchWithin` bounds a single request *including its body read* — `fetch`
+  resolves on the headers, so a deadline that ends there would leave the
+  multi-megabyte half unbounded — which turns a stalled socket back into the
+  transient error the retry loops already handle. `withDeadline` bounds a whole
+  render (5 minutes) and the upload that follows it (the same), and it is
+  applied around `renderSpec` rather than inside `runJob` so the picker, which
+  renders specs with no record behind them, is covered by the same clock: a
+  card stuck on `fetching` is the same bug as a card stuck on a spinner.
+  Expiry is an ordinary failure, which is the honest state for "we do not
+  know, ask again".
+- **"Nothing came back" is not "nothing is there."** Now that a tile can be
+  given up on for taking too long, that distinction decides whether a card
+  offers a retry at all — `empty` is the state that says asking again is
+  pointless. So `extractCanvas`, `fetchFlyfoto` and `fetchDem` each return
+  `null` only when nothing painted *and* nothing failed, and throw when every
+  request errored. A network blip would otherwise have permanently retired
+  three starter images as "no coverage here".
 - **The UI reads the queue through `useSyncExternalStore`** (`usePinState` in
   `bilderCommon.tsx`) rather than through jotai: the queue is not React state
   and the subscription is per record id.

@@ -105,7 +105,8 @@ export const usePickerRun = ({
 
   // Bumped whenever a run ends. `renderSpec` takes no AbortSignal — a tile
   // burst already in flight cannot actually be stopped — so Esc stops
-  // *starting* fetches and drops the result of the one that is out.
+  // *starting* fetches and drops the result of the one that is out. It does
+  // carry its own deadline, so the one that is out always ends.
   const generation = useRef(0);
   // The generation the in-flight fetch belongs to, or null. Comparing against
   // `generation` rather than holding a bare boolean is what lets a new run

@@ -2,7 +2,17 @@
 // same-origin /wms/geonorge/* Caddy handlers (so wmscache picks them up),
 // and paints each response into a shared per-canvas destination.
 
+import { fetchWithin } from '../shared/utils/deadline';
 import { LidarSource } from './sources';
+
+// How long one tile may take before it counts as a failure rather than as
+// work in progress. Generous, because a cold 2048² GetMap through wmscache to
+// Kartverket genuinely can take tens of seconds under load — but finite,
+// because the alternative is not slowness, it is a promise that never settles
+// and a caller that waits on it forever (src/shared/utils/deadline.ts). Every
+// caller of `fetchAndPaint` retries, so a tile that trips this gets three more
+// chances before it costs anything.
+const TILE_TIMEOUT_MS = 45_000;
 
 // Kartverket's WMS caps GetMap size around 4096 pixels per side; we tile
 // below that to stay under any per-request limit and to keep individual
@@ -150,9 +160,11 @@ export async function fetchAndPaint(
   dh: number,
   signal?: AbortSignal,
 ): Promise<TileResult> {
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const blob = await res.blob();
+  const blob = await fetchWithin(
+    url,
+    { ms: TILE_TIMEOUT_MS, what: 'tile', signal },
+    (res) => res.blob(),
+  );
   const objectUrl = URL.createObjectURL(blob);
   try {
     const img = await loadImage(objectUrl);

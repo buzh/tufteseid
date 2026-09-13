@@ -68,8 +68,12 @@ export type ExtractRaster = {
   imageRect: ImageRect;
 };
 
-/** The lokalitet's name, for the figure's title line. */
-export type ExtractOptions = { subject?: string };
+export type ExtractOptions = {
+  /** The lokalitet's name, for the figure's title line. */
+  subject?: string;
+  /** Threaded into the stitch, so a caller with a deadline can stop it. */
+  signal?: AbortSignal;
+};
 
 /** One dataset and the styles the set will actually ask it for. */
 export type StarterPlan = { source: LidarSource; styles: string[] };
@@ -127,9 +131,9 @@ export const extractLidarFigure = async (
   source: LidarSource,
   bbox25833: [number, number, number, number],
   style: string,
-  { subject }: ExtractOptions = {},
+  { subject, signal }: ExtractOptions = {},
 ): Promise<ExtractRaster | null> => {
-  const result = await extractCanvas(bbox25833, source, style);
+  const result = await extractCanvas(bbox25833, source, style, signal);
   if (!result) return null;
 
   const figure = await renderFigureBlob(

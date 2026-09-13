@@ -17,6 +17,12 @@
 
 import { transformExtent } from 'ol/proj';
 import type { LocalityBbox } from '../api/localities';
+import { fetchWithin } from '../shared/utils/deadline';
+
+// One attribute query, a few kilobytes of JSON. The ceiling is on a stalled
+// connection, not on the query (src/shared/utils/deadline.ts) — and it matters
+// here because the pin queue waits on this before a flyfoto spec renders.
+const PROJECTS_TIMEOUT_MS = 20_000;
 
 // Layer 4 of the prosjekter MapServer. Layer 1 ("Prosjektomriss original")
 // holds the same rows but the unprocessed outlines; 2 and 3 are seam lines
@@ -127,9 +133,11 @@ export async function fetchFlyfotoProjectsForBbox(
     returnGeometry: 'false',
   });
 
-  const res = await fetch(`${PROJECTS_URL}?${params.toString()}`, { signal });
-  if (!res.ok) throw new Error(`flyfoto projects HTTP ${res.status}`);
-  const body = await res.json();
+  const body = await fetchWithin(
+    `${PROJECTS_URL}?${params.toString()}`,
+    { ms: PROJECTS_TIMEOUT_MS, what: 'flyfoto projects', signal },
+    (res) => res.json(),
+  );
   // ArcGIS reports failures as a 200 with an error envelope.
   if (body?.error) {
     throw new Error(`flyfoto projects: ${body.error.message ?? 'query failed'}`);

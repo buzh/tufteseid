@@ -5,8 +5,16 @@
 // The XML is proxied + long-cached through wmscache; we additionally
 // keep a week-long localStorage cache to avoid re-parsing on every load.
 
+import { fetchWithin } from '../../../../shared/utils/deadline';
 import { getUrlParameter } from '../../../../shared/utils/urlUtils';
 import { halved } from '../../../compare/halves';
+
+// The per-project document is some 8 MB of XML over a proxy that may be
+// fetching it cold from Kartverket, so the ceiling is roomy; it is there so a
+// stalled connection cannot hold an in-flight promise — and with it every
+// caller sharing that promise, including a pin queue job — open forever
+// (src/shared/utils/deadline.ts).
+const CAPS_TIMEOUT_MS = 60_000;
 
 // Terrengmodell vs overflatemodell: the same acquisitions with
 // vegetation and buildings stripped away (DTM) or left standing (DOM).
@@ -152,9 +160,11 @@ export function fetchLidarProjects(): Promise<LidarProject[]> {
   const cached = readCache();
   if (cached) return Promise.resolve(cached);
   inflight = (async () => {
-    const res = await fetch(CAPS_URL);
-    if (!res.ok) throw new Error(`GetCapabilities HTTP ${res.status}`);
-    const xml = await res.text();
+    const xml = await fetchWithin(
+      CAPS_URL,
+      { ms: CAPS_TIMEOUT_MS, what: 'LiDAR GetCapabilities' },
+      (res) => res.text(),
+    );
     const projects = parseCapabilities(xml);
     writeCache(projects);
     return projects;
@@ -382,9 +392,11 @@ export function fetchNationalLidarStyles(): Promise<string[]> {
   if (cached) return Promise.resolve(cached);
   nationalInflight = (async () => {
     try {
-      const res = await fetch(NATIONAL_CAPS_URL);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const xml = await res.text();
+      const xml = await fetchWithin(
+        NATIONAL_CAPS_URL,
+        { ms: CAPS_TIMEOUT_MS, what: 'national GetCapabilities' },
+        (res) => res.text(),
+      );
       const styles = parseStylesForPrefix(xml, NATIONAL_WMS.dtm.prefix);
       const out = styles.length > 0 ? styles : NATIONAL_FALLBACK_STYLES;
       writeNationalCache(out);

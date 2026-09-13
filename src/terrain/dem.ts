@@ -14,6 +14,7 @@
 import { transformExtent } from 'ol/proj';
 import type { LocalityBbox } from '../api/localities';
 import { planTiles, runWithConcurrency } from '../lidarExtract/stitch';
+import { fetchWithin } from '../shared/utils/deadline';
 
 const IMAGE_SERVER_BASE = '/arcgis/hoydedata';
 
@@ -76,6 +77,14 @@ const MAX_DEM_PX_PER_SIDE = 3000;
 // request.
 const MAX_CONCURRENT = 3;
 const TILE_RETRIES = 3;
+
+// How long each of the two requests may stay quiet before it counts as
+// failed (src/shared/utils/deadline.ts). The catalogue query is a few hundred
+// bytes and answers in well under a second; a tile is a 2048² float TIFF the
+// service renders on demand, which is the slow one. Both are ceilings on a
+// stall, not budgets anything normal comes near.
+const CATALOGUE_TIMEOUT_MS = 20_000;
+const TILE_TIMEOUT_MS = 60_000;
 
 export type Dem = {
   width: number;
@@ -180,9 +189,11 @@ function probeCoverage(
   const url = `${IMAGE_SERVER_BASE}/${SERVICE[model]}/ImageServer/query?${params.toString()}`;
 
   const pending = (async (): Promise<Coverage> => {
-    const res = await fetch(url, { signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const body = await res.json();
+    const body = await fetchWithin(
+      url,
+      { ms: CATALOGUE_TIMEOUT_MS, what: 'DEM catalogue query', signal },
+      (res) => res.json(),
+    );
     if (body?.error) throw new Error('catalogue query rejected');
     // Two quirks of the reply, both load-bearing: the service upper-cases
     // outStatisticFieldName, and "nothing covers this" arrives as one
@@ -242,9 +253,13 @@ export async function fetchDem(
     const url = buildUrl(model, tile.bbox25833, tile.w, tile.h);
     for (let attempt = 0; attempt < TILE_RETRIES; attempt++) {
       try {
-        const res = await fetch(url, { signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const raster = readFloatTiff(await res.arrayBuffer());
+        const raster = readFloatTiff(
+          await fetchWithin(
+            url,
+            { ms: TILE_TIMEOUT_MS, what: 'DEM tile', signal },
+            (res) => res.arrayBuffer(),
+          ),
+        );
         if (blitTile(raster, data, plan.widthPx, tile.dx, tile.dy)) covered++;
         return;
       } catch {

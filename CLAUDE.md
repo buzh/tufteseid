@@ -419,7 +419,10 @@ Key files (data side):
   a fileless View row and `pinAttachment` puts the figure on it later.
 - `src/localities/pinQueue.ts` — the pinner: turns a stored spec into a
   provenance figure and PATCHes it onto the record. Module-level and
-  imperative, like `map/groundOverlay.ts`.
+  imperative, like `map/groundOverlay.ts`. Everything it waits on is on a
+  clock — `src/shared/utils/deadline.ts` bounds each request and each whole
+  render, because one stalled `fetch` would park the single worker and leave
+  every card behind it spinning.
 - `src/auth/` — atoms (currentUserAtom, roleAtom, isAdminAtom), hooks
   (useOAuthProviders, useSignIn, useSignOut).
 - `src/localities/localityContext.ts` — what the public registers know about a

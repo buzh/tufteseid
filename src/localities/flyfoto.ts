@@ -129,8 +129,9 @@ export type FlyfotoOptions = {
   signal?: AbortSignal;
 };
 
-// Returns null when nothing painted — the bbox is entirely outside NiB
-// coverage (or outside this project's), or every tile failed.
+// Returns null when nothing painted and nothing failed — the bbox is entirely
+// outside NiB coverage, or outside this project's. A grab where every tile
+// errored or timed out throws instead.
 export async function fetchFlyfoto(
   bbox4326: LocalityBbox,
   { project, signal }: FlyfotoOptions = {},
@@ -159,6 +160,7 @@ export async function fetchFlyfoto(
   ctx.fillRect(0, 0, plan.widthPx, plan.heightPx);
 
   let painted = 0;
+  let failed = 0;
   await runWithConcurrency(plan.tiles, MAX_CONCURRENT, async (tile) => {
     const url = project
       ? buildProjectUrl(project, tile.bbox25833, tile.w, tile.h)
@@ -178,12 +180,24 @@ export async function fetchFlyfoto(
         return;
       } catch {
         if (signal?.aborted) return;
-        if (attempt === TILE_RETRIES - 1) return;
+        if (attempt === TILE_RETRIES - 1) {
+          failed++;
+          return;
+        }
         await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
       }
     }
   });
 
+  if (signal?.aborted) throw new Error('flyfoto grab cancelled');
+  // "Nothing came back" is not "nothing is there" — a tile can now also be
+  // given up on for taking too long. Reported as null this would reach the pin
+  // queue as `empty`, which is the state that says the acquisition does not
+  // reach this valley and offers no retry. Same rule as `fetchDem` and
+  // `extractCanvas`.
+  if (painted === 0 && failed > 0) {
+    throw new Error('every flyfoto tile request failed');
+  }
   if (painted === 0) return null;
 
   return {
