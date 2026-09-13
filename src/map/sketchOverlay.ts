@@ -76,6 +76,12 @@ type Entry = {
   renderedScale: number | null;
   /** Non-null while an export is in flight, so only one ever is. */
   pendingScale: number | null;
+  /**
+   * Bumped every time the scene is replaced. An export in flight is about the
+   * drawing as it was when it started, and the entry it lands on is the same
+   * object, so identity alone cannot tell the two apart.
+   */
+  generation: number;
 };
 
 const entries = new Map<string, Entry>();
@@ -96,13 +102,19 @@ const ensureRender = (entry: Entry, scale: number) => {
     return;
   }
   entry.pendingScale = scale;
+  const generation = entry.generation;
   void renderScene(entry.spec.frame, entry.spec.elements, { scale }).then(
     (render) => {
-      entry.pendingScale = null;
-      // The sketch may have been hidden, or its scene replaced, while the
-      // export was running; either way this entry is no longer the one on the
-      // map and its canvas belongs nowhere.
+      // The sketch may have been hidden, or drawn on again, while the export
+      // was running; either way this canvas is a picture of a drawing that is
+      // not the one on the map, and taking it would pin the old strokes there
+      // until the view zoomed far enough to ask for pixels again.
+      //
+      // `pendingScale` is cleared inside the guard, not before it: a
+      // superseded export must not clear the marker a newer one is holding.
       if (entries.get(entry.spec.id) !== entry) return;
+      if (entry.generation !== generation) return;
+      entry.pendingScale = null;
       entry.renderedScale = scale;
       if (!render) return;
       entry.render = render;
@@ -171,6 +183,7 @@ const addEntry = (spec: SketchOverlay): Entry => {
     render: null,
     renderedScale: null,
     pendingScale: null,
+    generation: 0,
   };
   entry.layer = new ImageLayer({
     source: new ImageCanvasSource({
@@ -220,8 +233,12 @@ export const setSketchOverlays = (next: readonly SketchOverlay[]) => {
       continue;
     }
     existing.spec = spec;
+    existing.generation += 1;
     existing.render = null;
     existing.renderedScale = null;
+    // Whatever is in flight is now about the previous drawing, and leaving the
+    // marker set would keep `ensureRender` from ever queueing this one.
+    existing.pendingScale = null;
     existing.layer.getSource()?.changed();
   }
 };
