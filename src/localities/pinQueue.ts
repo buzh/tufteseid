@@ -73,6 +73,15 @@ export type PinJob = {
   bbox4326: LocalityBbox;
   /** The lokalitet's name, for the figure's title line. */
   subject?: string;
+  /**
+   * The pinned record, handed back to whoever is showing it.
+   *
+   * Realtime would carry the PATCH back by itself, except that it is held
+   * back for the length of an edit session — and edit is when pins happen.
+   * So the caller gets told directly. Optional, and the queue does not care
+   * whether anybody is still listening: a pin is worth landing either way.
+   */
+  onPinned?: (rec: AttachmentRecord) => void;
 };
 
 /*
@@ -376,6 +385,7 @@ const runJob = async (job: PinJob): Promise<AttachmentRecord | null> => {
     }),
   );
   states.delete(job.rec.id);
+  job.onPinned?.(pinned);
   return pinned;
 };
 

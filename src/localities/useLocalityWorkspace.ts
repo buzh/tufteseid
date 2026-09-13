@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import {
   AttachmentRecord,
   createAttachment,
+  createAttachmentSpec,
   deleteAttachment,
   getAttachmentUrl,
 } from '../api/attachments';
@@ -379,21 +380,32 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // buffer is the one state that would lose work silently — every write is a
   // `mutateDraft`, and `mutate` is a no-op while `draft` is null — so the
   // buffer follows the stance rather than the entrance.
+  //
+  // Which is also how a session survives its own `Lagre` and `Avbryt`: both
+  // empty the buffer without touching the stance, and this puts a fresh one
+  // back. Reopening *here* rather than at the end of those two is what keeps
+  // `baseLocality` honest — this runs on the render after the commit or the
+  // rollback has settled, so the new buffer's base is the record as it now
+  // stands rather than the one the callback closed over.
   useEffect(() => {
-    if (stance === 'edit') beginDraft();
-  }, [stance, beginDraft]);
+    if (stance === 'edit' && !draft) beginDraft();
+  }, [stance, draft, beginDraft]);
 
   /*
    * Realtime stands down for the length of the transaction (§5.6,
    * consequence 5): the subscription stays up, but an event raises a flag
    * instead of reloading a list the buffer is describing.
    */
-  const { items: serverFinds, changedElsewhere: findsChanged } =
-    useLocalityFinds(locality.id, stance === 'edit');
+  const {
+    items: serverFinds,
+    changedElsewhere: findsChanged,
+    reload: reloadFinds,
+  } = useLocalityFinds(locality.id, stance === 'edit');
   const {
     items: serverAttachments,
     setItems: setAttachmentItems,
     changedElsewhere: attachmentsChanged,
+    reload: reloadAttachments,
   } = useLocalityAttachments(locality.id, stance === 'edit');
   const changedElsewhere = findsChanged || attachmentsChanged;
 
@@ -423,6 +435,27 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         ...(draft?.attachmentDeletes ?? []),
       ]),
     [draft],
+  );
+
+  /*
+   * A figure the pin queue just landed, put on the card it belongs to.
+   *
+   * The queue PATCHes the record and realtime would normally carry that back
+   * — but realtime is held back for the length of an edit session, and edit is
+   * exactly when pins happen: the sweep runs there, and so does the starter
+   * set on a lokalitet thirty seconds old. Without this the three cards the
+   * author is watching stay blank until they leave the stance, which is the
+   * whole complaint the write-through was for.
+   *
+   * Up here rather than beside the queue's other verbs because the starter set
+   * enqueues before those are declared.
+   */
+  const applyPinned = useCallback(
+    (rec: AttachmentRecord) =>
+      setAttachmentItems((prev) =>
+        prev ? prev.map((it) => (it.id === rec.id ? rec : it)) : prev,
+      ),
+    [setAttachmentItems],
   );
 
   /** Whether `Avbryt` has anything to throw away, and what it would name. */
@@ -1312,46 +1345,59 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   ]);
 
   /**
-   * `Lagre` (§5.6).
+   * `Lagre` (§5.6) — and it no longer ends the session.
    *
-   * The stance drops as soon as the records land, and the *pixels* go out
-   * behind it — which is the third consequence taken at its word: the last
-   * step of a commit may be a tile burst that has not started yet, so
-   * holding the interface shut until every pixel exists would be holding it
-   * shut for a minute. What the author asked for was to be done editing, and
-   * they are.
+   * Saving and leaving used to be one press, which made the transaction's
+   * only commit also its only exit: an author who wanted the last hour on the
+   * server before carrying on had to save, be thrown back into show, and
+   * press `Rediger` again. The three exits are orthogonal now — `Lagre` and
+   * `Avbryt` are about the buffer, `Avslutt` is about the stance — so this
+   * commits and hands the stance straight back. The buffer reopens by itself:
+   * see the effect that keeps one open for as long as edit lasts.
    *
-   * The specs that landed go to the pin queue on the way past. Everything
-   * else — the per-card state, the retry, `Last ned` waiting for its pin —
-   * is machinery §4.1.2 already built for exactly this moment.
+   * The *pixels* still go out behind it, which is the third consequence taken
+   * at its word: the last step of a commit may be a tile burst that has not
+   * started yet, and holding the interface shut until every pixel exists
+   * would be holding it shut for a minute.
+   *
+   * Returns whether everything landed, because "Lagre og avslutt" in the exit
+   * confirm must not leave on a commit that half-failed.
    */
-  const saveEdit = useCallback(async () => {
-    if (saving) return;
+  const saveEdit = useCallback(async (): Promise<boolean> => {
+    if (saving) return false;
     if (draftActive) flushDraftRef.current();
     setSaving(true);
-    // Read before `standDown`, because the flush above may still be in the
+    // Read before the commit, because the flush above may still be in the
     // same tick as the state it wrote.
     const wasChangedElsewhere = changedElsewhere;
     try {
       const result = await commitDraft();
       if (result.ok) {
-        standDown();
         // The buffered shapes on the map were pushed on under temporary ids;
         // the records that just landed have real ones.
         refreshFunnLayer();
+        // …and the lists have to be asked again, because the stance is still
+        // up and realtime is still held back. The buffer the overlay was
+        // reading the new funn and specs out of is empty now, so without this
+        // they would be nowhere for as long as the session lasts. Safe here
+        // and nowhere else: the buffer is empty because it was just played
+        // out, so there is nothing left to reload underneath.
+        reloadFinds();
+        reloadAttachments();
       }
       for (const rec of result.created) {
         enqueuePin({
           rec,
           bbox4326: localityRef.current.bbox,
           subject: localityRef.current.name || undefined,
+          onPinned: applyPinned,
         });
       }
       if (!result.ok) {
-        // Stay in edit. The buffer now holds exactly what did not land, the
-        // exits are still on the row, and pressing `Lagre` again retries
-        // precisely that remainder — which is the only reading of "still in
-        // the draft" that the toast can honestly make.
+        // The buffer now holds exactly what did not land, the exits are still
+        // on the row, and pressing `Lagre` again retries precisely that
+        // remainder — which is the only reading of "still in the draft" that
+        // the toast can honestly make.
         toast.error({
           title: t('localities.edit.saveFailed', { count: result.failed }),
         });
@@ -1360,21 +1406,33 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         // Doing it silently would not be (§5.6, consequence 5).
         toast.create({ title: t('localities.edit.changedElsewhere') });
       }
+      return result.ok;
     } finally {
       setSaving(false);
     }
-  }, [saving, draftActive, changedElsewhere, commitDraft, standDown, t]);
+  }, [
+    saving,
+    draftActive,
+    changedElsewhere,
+    commitDraft,
+    reloadFinds,
+    reloadAttachments,
+    applyPinned,
+    t,
+  ]);
 
   /**
-   * `Avbryt`.
+   * `Avbryt` — and it does not end the session either.
    *
    * The buffer is dropped and the eagerly written Files are deleted after
-   * it. The confirm that names what is being thrown away lives on the row,
-   * where the count is; by the time this runs the decision is made.
+   * it; the stance stays, and a fresh buffer opens behind this one. Undoing
+   * an afternoon's work and leaving the record are two different decisions,
+   * and `Avslutt` is the second one. The confirm that names what is being
+   * thrown away lives on the row, where the count is; by the time this runs
+   * the decision is made.
    */
   const cancelEdit = useCallback(async () => {
     const eager = draft?.eagerIds ?? [];
-    standDown();
     if (eager.length > 0) {
       setAttachmentItems((prev) =>
         prev ? prev.filter((it) => !eager.includes(it.id)) : prev,
@@ -1389,7 +1447,22 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         title: t('localities.edit.rollbackFailed', { count: stuck }),
       });
     }
-  }, [draft, standDown, setAttachmentItems, rollbackDraft, t]);
+  }, [draft, setAttachmentItems, rollbackDraft, t]);
+
+  /**
+   * `Avslutt`: put the edit-only tools down and leave the stance.
+   *
+   * The rollback rides along rather than being skipped when the buffer is
+   * clean, because a clean buffer is exactly the case where it costs nothing
+   * — and leaving one open in show would leave a `baseLocality` behind that
+   * the record could drift away from. The dirty case is the same call: the
+   * row asks first (`Forkast og avslutt`), and by the time this runs the
+   * decision is made.
+   */
+  const exitEdit = useCallback(async () => {
+    standDown();
+    await cancelEdit();
+  }, [standDown, cancelEdit]);
 
   // Capture the current view cropped to the rectangle → Bilder.
   const takeScreenshot = useCallback(async () => {
@@ -1711,17 +1784,17 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   /*
    * A LiDAR reading of this rectangle, kept as its parameters (§4.1.2).
    *
-   * Both routes to one go through here — the starter set below and `Behold`
-   * over the LiDAR ground — and both used to hand this a finished
+   * `Behold` over the LiDAR ground. It used to hand this a finished
    * `ExtractRaster`, i.e. a stitch that had already happened. A dataset, a
    * style, a model and the rectangle is the entire question that stitch
    * answers, so there is nothing left for the caller to fetch first: this
    * takes the `LidarSource` straight from the catalogue and writes the row.
    *
-   * The starter set's images land as `extract` attachments, same as one made
-   * by hand from the extract tool: a laser-derived picture of the rectangle is
-   * what that kind means, and the meta is the same set of keys, so nothing
-   * downstream has to know which route produced an image.
+   * Into the buffer, because this one is a decision made *inside* a session —
+   * the starter set writes the same row straight through, and the difference
+   * is which act it belongs to rather than what the row says. Either way it
+   * lands as an `extract` attachment with the same set of meta keys, so
+   * nothing downstream has to know which route produced an image.
    */
   const saveExtractSpec = useCallback(
     (source: LidarSource, style: string) => {
@@ -1933,8 +2006,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * It used to be minutes of tile bursts, reported style by style because
    * there was that much to report. Since §4.1.2 the only slow thing left in
    * it is the catalogue lookup, and the three writes after that are three
-   * small POSTs — so the whole run is over in about a second, and the rail
-   * fills with three cards that say they are being fetched. The images
+   * small POSTs — so the whole run is over in about a second and the images
    * themselves arrive one at a time from `pinQueue`, which is where the
    * sequencing argument moved: one stitch already saturates its concurrency
    * budget against a shared public edge, so overlapping two would not finish
@@ -1946,9 +2018,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * is three rows the author will find waiting next time, and abandoning them
    * unpinned would be the worse outcome.
    *
-   * Since step 13 the three writes are three lines in the draft buffer, so
-   * the only fallible thing left in here is the catalogue lookup: the set
-   * either lands whole or was never planned.
+   * **These three writes are outside the transaction**, unlike every other
+   * View this hook keeps. `Opprett` already wrote the lokalitet straight
+   * through — the starter set is the rest of that same act of creation, not
+   * an edit made inside it — and buffering it bought nothing but three blank
+   * frames on the rail with no way to fill them short of `Lagre`. Written
+   * through, they reach the pin queue immediately and the rail fills with
+   * pixels while the author is still typing the name. `Avbryt` therefore does
+   * not take them back, for the same reason it does not un-create the
+   * lokalitet.
    */
   const runStarterPack = useCallback(async () => {
     if (!user || !canAdd || starterBusy) return;
@@ -1962,20 +2040,62 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         return;
       }
 
-      for (const style of plan.styles) saveExtractSpec(plan.source, style);
+      const written: AttachmentRecord[] = [];
+      for (const style of plan.styles) {
+        try {
+          written.push(
+            await createAttachmentSpec(
+              {
+                locality: locality.id,
+                kind: 'extract',
+                caption: `${plan.source.label} · ${style}`,
+                meta: {
+                  sourceKey: plan.source.key,
+                  sourceLabel: plan.source.label,
+                  style,
+                  model: plan.source.model,
+                  bbox25833: beholdBbox,
+                },
+              },
+              user.id,
+            ),
+          );
+        } catch (e) {
+          console.warn('[localityWorkspace] starter spec failed', style, e);
+        }
+      }
+
+      if (written.length === 0) {
+        toast.error({ title: t('localities.tools.starterFailed') });
+        return;
+      }
+      setAttachmentItems((prev) => (prev ? [...prev, ...written] : written));
+      for (const rec of written) {
+        enqueuePin({
+          rec,
+          bbox4326: localityRef.current.bbox,
+          subject: localityRef.current.name || undefined,
+          onPinned: applyPinned,
+        });
+      }
 
       toast.success({
-        // One count, not "n of m": buffering three specs is not a thing that
-        // can partly fail, so the only fallible step left is the catalogue
-        // lookup above — and it answers before any of them are written.
-        title: t('localities.tools.starterDone', {
-          count: plan.styles.length,
-        }),
+        title: t('localities.tools.starterDone', { count: written.length }),
       });
     } finally {
       setStarterBusy(false);
     }
-  }, [user, canAdd, starterBusy, locality.bbox, saveExtractSpec, t]);
+  }, [
+    user,
+    canAdd,
+    starterBusy,
+    locality.id,
+    locality.bbox,
+    beholdBbox,
+    setAttachmentItems,
+    applyPinned,
+    t,
+  ]);
 
   /*
    * …and on a brand-new lokalitet it runs itself (§4.3, §12).
@@ -2302,13 +2422,14 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // getting quieter: leaving edit now means committing or discarding, and
     // neither is a thing a stray Escape should decide. So it leaves only when
     // there is nothing to lose, and an author with a buffer full of work has
-    // to say which of `Lagre` and `Avbryt` they meant.
+    // to say which of `Lagre`, `Avbryt` and `Avslutt` they meant — the key is
+    // `Avslutt` and nothing else.
     onEscape: () => {
       if (mode === 'lidar') closeLidar();
       else if (adjusting) undoAdjust();
       else if (selectedFunnId) setSelectedFunnId(null);
       else if (stance === 'edit') {
-        if (!dirty) void cancelEdit();
+        if (!dirty) void exitEdit();
       } else setActiveLocality(null);
     },
   });
@@ -2390,8 +2511,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       rec,
       bbox4326: locality.bbox,
       subject: locality.name || undefined,
+      onPinned: applyPinned,
     }),
-    [locality.bbox, locality.name],
+    [locality.bbox, locality.name, applyPinned],
   );
 
   const retryPin = useCallback(
@@ -2477,13 +2599,22 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
      */
     saveEdit,
     cancelEdit,
+    /** `Avslutt`: the stance verb, and the only one of the three that leaves. */
+    exitEdit,
     saving,
     dirty,
     draftCounts: counts,
     /** When a buffer came back off disk, for the recovery banner (§5.7). */
     restoredAt,
-    /** `Forkast` on that banner: drop it and leave edit, nothing to confirm. */
-    discardRecovered: cancelEdit,
+    /**
+     * `Forkast` on that banner: drop it and leave edit, nothing to confirm.
+     *
+     * `exitEdit` rather than `cancelEdit`, which is the one place the two
+     * still differ in the old way: the stance was not asked for here — it came
+     * with the recovered buffer — so throwing the buffer away should hand it
+     * back too.
+     */
+    discardRecovered: exitEdit,
     /** Something moved on the server while the buffer was open (§5.6). */
     changedElsewhere,
     /** Tombstoned this session — greyed, and `restoreDeleted` puts it back. */

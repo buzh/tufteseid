@@ -322,6 +322,13 @@
       "discardLocality": "endringer i lokaliteten",
       "discardKeep": "Fortsett å redigere",
       "discardConfirm": "Forkast",
+      "exit": "Avslutt",
+      "exitHint": "Avslutt redigeringen og gå tilbake til visning",
+      "exitTitle": "Ulagrede endringer",
+      "exitBody": "Du har ulagret arbeid: {{what}}.",
+      "exitStay": "Fortsett å redigere",
+      "exitDiscard": "Forkast og avslutt",
+      "exitSave": "Lagre og avslutt",
       "restore": "Angre sletting"
     },
     "copy": {
@@ -488,9 +495,10 @@
       "beholdHintScreenshot": "Denne bakgrunnen kan ikke hentes som datasett. Bruk «Skjermbilde».",
       "beholdSaved": "Bildet ligger under Bilder. Det lagres med lokaliteten.",
       "beholdFailed": "Kunne ikke lagre bildet. Prøv igjen.",
-      "starterDone_one": "1 bilde ligger under Bilder. Det lagres med lokaliteten.",
-      "starterDone_other": "{{count}} bilder ligger under Bilder. De lagres med lokaliteten.",
+      "starterDone_one": "1 bilde ligger under Bilder. Det hentes nå.",
+      "starterDone_other": "{{count}} bilder ligger under Bilder. De hentes nå.",
       "starterNone": "Fant ingen data for dette området. Grunnpakken ga ingen bilder.",
+      "starterFailed": "Kunne ikke sette opp grunnpakken. Hent bildene med «Hent» når du vil.",
       "starterBusy": "Setter opp grunnpakken …"
     },
     "terrain": {

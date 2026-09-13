@@ -322,6 +322,13 @@
       "discardLocality": "changes to the locality",
       "discardKeep": "Keep editing",
       "discardConfirm": "Discard",
+      "exit": "Finish",
+      "exitHint": "Finish editing and go back to viewing",
+      "exitTitle": "Unsaved changes",
+      "exitBody": "You have unsaved work: {{what}}.",
+      "exitStay": "Keep editing",
+      "exitDiscard": "Discard and finish",
+      "exitSave": "Save and finish",
       "restore": "Undo delete"
     },
     "copy": {
@@ -488,9 +495,10 @@
       "beholdHintScreenshot": "This background cannot be fetched as a dataset. Use “Screenshot”.",
       "beholdSaved": "The image is under Images. It is saved with the locality.",
       "beholdFailed": "Could not save the image. Try again.",
-      "starterDone_one": "1 image is under Images. It is saved with the locality.",
-      "starterDone_other": "{{count}} images are under Images. They are saved with the locality.",
+      "starterDone_one": "1 image is under Images. It is being fetched now.",
+      "starterDone_other": "{{count}} images are under Images. They are being fetched now.",
       "starterNone": "No data found for this area. The starter set produced no images.",
+      "starterFailed": "Could not set up the starter set. Fetch the images with “Fetch” whenever you like.",
       "starterBusy": "Setting up the starter set …"
     },
     "terrain": {

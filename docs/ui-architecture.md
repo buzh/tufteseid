@@ -1032,7 +1032,16 @@ On success the record is set active, `editingLocalityIdAtom` and
 `pendingStarterLocalityIdAtom` are set in the same batch, `ribbonToolAtom` is
 armed if the placement was started by Terreng (§10), and the placement atom is
 cleared last. On failure the session stays up rather than throwing the placing
-away. The workspace still opens only after `createLocality` resolves: "Juster
+away.
+
+Those two atoms in one batch are the whole hand-off: **`Opprett` lands you in
+edit with the starter set already running.** The record was made by an act of
+authorship, so the stance that follows it is edit (§8.1), and the three images
+are fetched without being asked and written straight through, so the rail fills
+with pixels rather than with frames waiting for a `Lagre` (§8.9.1). That is why
+the placement row's verbs are `Opprett` / `Avbryt` and edit's are `Lagre` /
+`Avbryt` / `Avslutt`: creating and editing are two different acts, and the only
+one with a point of no return is the first. The workspace still opens only after `createLocality` resolves: "Juster
 området" builds its extent from the bbox in the closure when `adjusting` flipped
 true, so an optimistic placeholder record would have it edit a stale rectangle.
 
@@ -1791,9 +1800,20 @@ with two buttons that both say `Ferdig`:
 |---|---|---|
 | 2 | a funn draft is open | `[Ferdig med funn]` `[Forkast funn]` |
 | 2 | Juster området is on | `[Bruk]` `[Angre]` |
-| 1 | edit, nothing deeper | `[Lagre]` `[Avbryt]` `[⋮]` |
+| 1 | edit, nothing deeper | `[Lagre]` `[Avbryt]`* `[Avslutt]` `[⋮]` |
 | 0 | show, and you may edit | `[Rediger]` `[Lukk]` `[⋮]` |
 | 0 | show, and you may not | `[Lag min kopi]` `[Lukk]` `[⋮]` |
+
+\* **Depth 1 is three buttons on two axes, and `Avbryt` is conditional.**
+`Lagre` and `Avbryt` are about the *buffer* — commit it, throw it away — and
+`Avslutt` is about the *stance*. Neither buffer verb ends the session any more
+(§8.11), so an author can save five times in an afternoon without being thrown
+back into show and having to press `Rediger` again, and `Avbryt` is rendered
+only while there is something to discard: a button offering to undo nothing is
+a button that has to be read before it can be ignored. Leaving with a dirty
+buffer asks, and the question has three answers — *Bli værende*, *Forkast og
+avslutt*, *Lagre og avslutt* — because an author on their way out usually meant
+the third one.
 
 Both depth-2 pairs are two buttons because both now have something to undo
 *to*. `Forkast funn` used to be offered only for a new funn — autosave had
@@ -2075,10 +2095,12 @@ zone is stacked: picker run → extract dialog → Juster området (as `Angre`) 
 funn selection → **edit** → close the lokalitet. Leaving the stance before
 leaving the record is what stops one press from throwing away both.
 
-At the edit step it leaves **only when the buffer is clean** (§8.11). With
-`Ferdig` gone, Escape has no honest meaning over a dirty transaction: it would
-have to pick between `Lagre` and `Avbryt`, and a stray keypress does not get to
-make that choice. It does nothing at all instead, and the two buttons are
+At the edit step it is `Avslutt`, and **only when the buffer is clean**
+(§8.11). Over a dirty transaction Escape has no honest meaning: it would have
+to pick between `Lagre` and `Avbryt`, and a stray keypress does not get to make
+that choice — nor to raise the three-answer exit confirm the button raises,
+since a dialog opened by a fumbled keystroke is one more thing to read before
+it can be dismissed. It does nothing at all instead, and the three buttons are
 right there.
 
 `navigable` is off only while drawing: picking a different funn out from under
@@ -2797,7 +2819,19 @@ bufferable (§8.1), a fork cheap, and the picker carousels affordable.
   those and says *"Hentes når du lagrer"*, and `OpenOriginalButton`'s
   force-pin is absent on them for the same reason. `Lagre` creates the rows and
   enqueues every one it got back, in that order, so the pixels start arriving a
-  moment after the stance drops. The sweep skips `draft:` ids too.
+  moment later — in the session that asked for them, since `Lagre` no longer
+  ends it (§8.11). The sweep skips `draft:` ids too. The starter set is the one
+  View that is never buffered and therefore the one that pins mid-session
+  without a commit first (§8.9.1).
+- **A pinned record has to be handed back, because realtime is off.** `PinJob`
+  carries an optional `onPinned(rec)`, called with the PATCHed record the
+  moment it lands. The queue otherwise just forgets the job and lets a realtime
+  event refresh the list — but every pin happens in edit by construction (a pin
+  is an `update`, and `canAdd` means the edit stance), and edit is exactly when
+  both subscriptions are held back. Without the callback the card stays on its
+  pin face until the session ends. It is a callback rather than a store the UI
+  subscribes to because the queue already has one of those for *states*, and
+  the record is not a state.
 - **Who may pin.** A pin is an `update`, and §2 says nothing in show writes —
   so the sweep that materialises unpinned specs on an open lokalitet is gated
   on `canAdd` (owner *and* edit stance), and so are both pin buttons. A reader
@@ -2915,12 +2949,29 @@ pre-baked renders of **one** acquisition, saved as the `extract` kind with the
 style in `meta.style` (§8.7), so there is no migration.
 
 Since the View/File split (§8.7.4) the pack **writes three specs and returns**.
-`planStarterPack` still resolves the dataset and the style list; the three
-`createAttachmentSpec` calls and the three `enqueuePin`s are `saveExtractSpec`
-in `useLocalityWorkspace`, which is also what row 2's `Behold` over the LiDAR
-ground calls — so the caption, the recorded `meta` and the pin have exactly one
-place to go wrong. `STARTER_STYLES` *is* `TIER_A_STYLES` (`lidarProjects.ts`) —
-one list, so the pack and the style ring can never drift apart.
+`planStarterPack` resolves the dataset and the style list; `runStarterPack` in
+`useLocalityWorkspace` makes the three `createAttachmentSpec` calls and the
+three `enqueuePin`s. `STARTER_STYLES` *is* `TIER_A_STYLES`
+(`lidarProjects.ts`) — one list, so the pack and the style ring can never
+drift apart.
+
+**Those three writes go straight to PocketBase, not into the draft buffer** —
+the one View in the app that does (§8.11). It shares its `meta` block and its
+caption with `saveExtractSpec`, which is what `Behold` over the LiDAR ground
+calls, but not its destination. Buffered, the pack produced three `draft:`
+rows the pin queue will not touch — the queue only ever renders records that
+exist on the server — so a brand-new lokalitet opened on three blank frames
+that could not be filled short of pressing `Lagre`, which is a strange first
+thing to ask of someone who has not typed the name yet. Written through, the
+rail fills with pixels while they are still typing. The justification is that
+`Opprett` already wrote the lokalitet straight through: the starter set is the
+rest of that same act of creation, and `Avbryt` does not take it back for the
+same reason it does not un-create the record. Two consequences worth naming:
+the pack's records are appended to `attachmentItems` by hand, since realtime
+is paused for the session it lands in; and each pin calls back through
+`PinJob.onPinned` to swap the pinned record into that list, because nothing
+else would — the queue otherwise just drops what it pinned, trusting a
+realtime event that is being held back.
 
 Load-bearing choices:
 
@@ -2945,7 +2996,8 @@ Load-bearing choices:
 - **Each style is independently fallible.** Failures are counted, not thrown,
   and the toast says how many of the planned images arrived. Since the split
   that count is of *specs written*, not pictures — a style whose render comes
-  back empty says so on its own card afterwards (§8.7.4).
+  back empty says so on its own card afterwards (§8.7.4). Nought of three is
+  the one case with an error toast of its own: there is no card to say it on.
 - **No longer cancellable, and no longer wants to be.** It used to hold an
   `AbortController` aborted by the workspace's unmount cleanup, so that closing
   a lokalitet stopped spending tile requests on it. Three small `create`s have
@@ -3186,13 +3238,24 @@ Load-bearing:
   the gallery shows ("Flyfoto 1937"). The long-form provenance lives in the
   pixels, where it survives being downloaded, emailed and pasted into a report.
 
-### 8.11 The edit transaction — `Lagre` / `Avbryt`
+### 8.11 The edit transaction — `Lagre` / `Avbryt` / `Avslutt`
 
 `docs/lokalitet-view.md` §5.6. **Edit is a transaction over a client-side
 draft.** Nothing typed, drawn or curated in edit reaches PocketBase until
-`Lagre`; `Avbryt` throws the lot away. Two deletions are outside it, both
-because a confirmed deletion is a decision rather than a draft: `Slett
-lokaliteten` and `Slett bildet` (below).
+`Lagre`; `Avbryt` throws the lot away. Three things are outside it: two
+deletions, because a confirmed deletion is a decision rather than a draft
+(`Slett lokaliteten` and `Slett bildet`, below), and the starter set, because
+it is the tail end of `Opprett` rather than an edit made afterwards (§8.9.1).
+
+**The buffer and the stance are two different things, and there is a verb for
+each.** `Lagre` commits and `Avbryt` rolls back; both leave you in edit, with a
+fresh buffer opened behind them. `Avslutt` is the only way out. Those were one
+press until the session that placed the rectangle before creating it: saving
+also ended the stance, so "put the last hour on the server and carry on" was
+save · `Rediger` · find your place again, and the pin queue's pixels landed on
+a surface you had just been thrown out of. Splitting them costs one button on
+the row and buys the thing edit is for — a session you leave when you are
+done, not when you last saved.
 
 Two files hold it, and nothing else in the app knows it exists:
 
@@ -3214,7 +3277,8 @@ touched, and it would grow with the lokalitet rather than with the edit.
 | funn title, note, status, geometry | buffered — autosave's destination, §8.5 |
 | curation `sort` / `hidden` | buffered |
 | the rectangle (`Juster området`) | buffered, with its own nested `[Bruk]` / `[Angre]` |
-| a View kept (`Behold`, the starter set, both pickers, flyfoto) | buffered **as a spec**, under a `draft:` id |
+| a View kept (`Behold`, both pickers, flyfoto) | buffered **as a spec**, under a `draft:` id |
+| the starter set's three specs | written **through**, at `Opprett` (§8.9.1) |
 | a File made (skjermbilde, opplasting, a picker keep) | written **eagerly**, id tracked, deleted on `Avbryt` |
 | a funn deleted | **deferred** — a tombstone; the row greys and comes back on `Avbryt` |
 | a bilde deleted | **written through** on confirm, and the buffer forgets the record; only a *failed* DELETE leaves a tombstone |
@@ -3253,10 +3317,19 @@ Load-bearing, in the order the mistakes would be made:
   the lokalitet will look like afterwards.
 - **`Lagre` returns before the pixels exist.** `commit()` plays the buffer out
   in dependency order (locality → find deletes → find patches → new finds →
-  attachment deletes → attachment patches → new specs), enqueues every created
-  spec, and drops the stance. Each success is removed from a cloned remainder,
-  so a partial failure leaves a buffer describing exactly what is left, keeps
-  you in edit, and lets `Lagre` retry precisely that.
+  attachment deletes → attachment patches → new specs) and enqueues every
+  created spec. Each success is removed from a cloned remainder, so a partial
+  failure leaves a buffer describing exactly what is left and lets `Lagre`
+  retry precisely that — and `saveEdit` returns that verdict as a boolean,
+  because `Lagre og avslutt` must not walk out of a commit that half-failed.
+- **A successful commit reloads both lists.** Realtime is still held back — the
+  stance did not end — so the funn and specs the commit just created would be
+  nowhere: the buffer the overlay was reading them out of is empty now, and no
+  event will put them back until `Avslutt`. `saveEdit` therefore calls
+  `reloadFinds()` and `reloadAttachments()` (and `refreshFunnLayer()`, for the
+  shapes that were on the map under `draft:` ids). Reloading under an open
+  buffer is exactly the thing §8.5 forbids everywhere else; it is safe here and
+  only here, because the buffer is empty *because* it was just played out.
 - **The buffer survives a crash.** It is written to `localStorage` under
   `tufteseid.draft.<localityId>` on every change — no debounce, because the two
   writes that could be frequent are already debounced upstream (the pen settles
@@ -3265,12 +3338,20 @@ Load-bearing, in the order the mistakes would be made:
   the stance that owns it is work on screen with no way to save it. The banner
   says *Gjenopprettet ulagret arbeid fra 14:32* with a `Forkast` beside it
   (§8.1). This is the part of the section not worth shipping without.
-- **Realtime stands down, and says so.** `useLocalityContent` keeps both
-  subscriptions up while paused but raises `changedElsewhere` instead of
-  reloading a list the buffer is describing, and reloads on unpause. Committing
-  over a changed record toasts *"Lokaliteten er endret et annet sted"*. Last
-  write wins is acceptable for one author with two tabs; a silent overwrite is
-  not.
+- **Realtime stands down, and says so — but it does not count our own
+  writes.** `useLocalityContent` keeps both subscriptions up while paused and
+  records what arrived instead of reloading a list the buffer is describing.
+  What it records is a *map* of record id → `{ deleted, updated }`, and
+  `changedElsewhere` is a comparison against what this client already holds,
+  made at read time: an event reporting the `updated` we are already looking at
+  is our own echo, and a delete of a record we have already dropped is the
+  same. A sticky boolean was wrong twice over once the starter set and the pin
+  queue began writing inside a paused session — every new lokalitet's first
+  `Lagre` would have toasted *"endret et annet sted"* at the author about their
+  own three images — and weighing at read time also makes the answer
+  independent of whether an event or its own POST response gets back first.
+  Committing over a genuinely changed record still toasts. Last write wins is
+  acceptable for one author with two tabs; a silent overwrite is not.
 - **The funn layer is told to forget.** `useFunnLayer` runs its own fetch and
   subscription and knows nothing about the buffer, so buffered shapes are
   pushed onto it by hand under `draft:` ids. Both exits call
@@ -3280,11 +3361,16 @@ Load-bearing, in the order the mistakes would be made:
   only way into edit — a lokalitet created in this session arrives in it
   already (§8.1) — and stance without a buffer is the one state that loses work
   silently, since every write is a no-op `mutate`. So one effect opens it
-  whenever `stance === 'edit'`, and `begin()` is idempotent.
+  whenever `stance === 'edit'`, and `begin()` is idempotent. That effect is
+  also what makes `Lagre` and `Avbryt` survivable as non-exits: both end with
+  no buffer and the stance still up, and the next render opens a fresh one with
+  a `baseLocality` read off the record as it now stands.
 - **Escape got quieter.** With `Ferdig` gone, Escape can no longer mean
-  "leave": it closes the deepest thing in flight, and at depth 1 it leaves only
-  when the buffer is clean. A stray keypress must not have to choose between
-  `Lagre` and `Avbryt`.
+  "leave": it closes the deepest thing in flight, and at depth 1 it calls
+  `exitEdit` only when the buffer is clean. A stray keypress must not have to
+  choose between `Lagre` and `Avbryt`, and must not raise the exit confirm
+  either — a dialog a keypress opened is a dialog you have to read before you
+  can dismiss it.
 - **`Slett lokaliteten` is not deferred.** Deleting the record the transaction
   is *about* has nothing to be rolled back into, so it goes straight through
   and clears the buffer on the way. The confirm it already had is the safety
@@ -3293,8 +3379,11 @@ Load-bearing, in the order the mistakes would be made:
   deferral cost two things it never repaid: the confirm on the button says the
   action cannot be undone, which the greyed card that followed was quietly
   contradicting; and the only way to make the deletion *happen* was `Lagre`,
-  which also ends the session — so pruning an exhibit of twelve working renders
-  was twelve rounds of leaving edit and pressing `Rediger` again. Now
+  which at the time also ended the session — so pruning an exhibit of twelve
+  working renders was twelve rounds of leaving edit and pressing `Rediger`
+  again. Splitting the exits has since taken the second half of that argument
+  away, and the first half is still enough: a confirm that says "cannot be
+  undone" has to be telling the truth. Now
   `removeBilde` awaits the DELETE and then calls `forgetAttachment`, which
   takes the id out of all four arms of the buffer at once (tombstone, buffered
   caption/sort/hidden, buffered spec, `eagerIds`) — each of the four would
@@ -3307,12 +3396,24 @@ Load-bearing, in the order the mistakes would be made:
   deferred: a funn is geometry you may have spent ten minutes drawing, and it
   is deleted from a list where the next row is one keystroke away.
 
-`Avbryt` confirms only when the buffer is dirty, and the question names the
-count: *Forkast 12 bilder, 3 funn og 1 sletting?* The conjunction comes from
-`Intl.ListFormat` rather than a `shared.listJoin` key — it is in the platform,
-and it is the one bit of that sentence the three locale files should not have
-to spell. (`tsconfig.app.json` gained `ES2021.Intl` in its `lib` for the
-types; the emit target is unchanged.)
+**Both destructive exits confirm, and both name the work.** `Avbryt` is only
+on the row when the buffer is dirty, so its dialog always has a count to
+print: *Forkast 12 bilder, 3 funn og 1 sletting?* `Avslutt` leaves silently on
+a clean buffer and otherwise asks the same question with one more answer —
+*Du har ulagret arbeid: 12 bilder, 3 funn og 1 sletting.* over `Bli værende` /
+`Forkast og avslutt` / `Lagre og avslutt`, the last of them the primary. Three
+answers rather than two because the two-answer version makes the common case
+(save, then go) two presses, and makes discarding the default reading of the
+other button. The conjunction comes from `Intl.ListFormat` rather than a
+`shared.listJoin` key — it is in the platform, and it is the one bit of that
+sentence the three locale files should not have to spell.
+(`tsconfig.app.json` gained `ES2021.Intl` in its `lib` for the types; the emit
+target is unchanged.)
+
+`exitEdit` rolls back on the way out even when the buffer is clean, which is
+also what the recovery banner's `Forkast` now calls: a rollback of nothing
+costs nothing, and a buffer left open in show would hold a `baseLocality` the
+live record can drift away from.
 
 ### 8.12 The copy — `Lag min kopi`
 
@@ -4042,7 +4143,11 @@ and what it is; rename it; describe it; read and edit its
 sted, kommune and matrikkel, pre-filled from the registers; re-ask the registers
 for them after moving the rectangle; read its centre coordinate and area; search
 your lokaliteter by any of those; set visibility (private / limited / public);
-adjust the rectangle afterwards (translate + modify); delete it; frame the map
+adjust the rectangle afterwards (translate + modify); edit it in a session you
+end yourself — **Lagre** as often as you like without being put back into show,
+**Avbryt** back to the last save, offered only when there is something to
+discard, and **Avslutt** when you are done, with any unsaved work named and
+three ways past the question; delete it; frame the map
 back on it by clicking its name or from the row's `⋮`; browse "Mine
 lokaliteter"; click a rectangle on the map to open it; see which known
 kulturminner already fall inside it; read its details in a dialog off the
@@ -4082,7 +4187,8 @@ the seamless mosaic or any historical acquisition covering the area,
 individually or as a batch; take a map screenshot; upload an image; and on a
 lokalitet you have just made, get the best LiDAR dataset over the area read
 three ways — hillshade, multidirectional hillshade and slope — landing in the
-bottom edge without asking and filling in as they render.
+bottom edge without asking, before you have saved anything, and filling in as
+they render.
 
 **Keep it**
 walk the images along the bottom of the map, with ← / → or the chevrons — a

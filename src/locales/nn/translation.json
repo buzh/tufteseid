@@ -322,6 +322,13 @@
       "discardLocality": "endringar i lokaliteten",
       "discardKeep": "Hald fram å redigere",
       "discardConfirm": "Forkast",
+      "exit": "Avslutt",
+      "exitHint": "Avslutt redigeringa og gå tilbake til vising",
+      "exitTitle": "Ulagra endringar",
+      "exitBody": "Du har ulagra arbeid: {{what}}.",
+      "exitStay": "Hald fram å redigere",
+      "exitDiscard": "Forkast og avslutt",
+      "exitSave": "Lagre og avslutt",
       "restore": "Angre sletting"
     },
     "copy": {
@@ -488,9 +495,10 @@
       "beholdHintScreenshot": "Denne bakgrunnen kan ikkje hentast som datasett. Bruk «Skjermbilete».",
       "beholdSaved": "Biletet ligg under Bilete. Det blir lagra med lokaliteten.",
       "beholdFailed": "Kunne ikkje lagre biletet. Prøv igjen.",
-      "starterDone_one": "1 bilete ligg under Bilete. Det blir lagra med lokaliteten.",
-      "starterDone_other": "{{count}} bilete ligg under Bilete. Dei blir lagra med lokaliteten.",
+      "starterDone_one": "1 bilete ligg under Bilete. Det blir henta no.",
+      "starterDone_other": "{{count}} bilete ligg under Bilete. Dei blir henta no.",
       "starterNone": "Fann ingen data for dette området. Grunnpakken gav ingen bilete.",
+      "starterFailed": "Kunne ikkje setje opp grunnpakken. Hent bileta med «Hent» når du vil.",
       "starterBusy": "Set opp grunnpakken …"
     },
     "terrain": {

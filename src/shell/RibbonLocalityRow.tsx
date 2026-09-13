@@ -506,20 +506,27 @@ const Banner = ({ ws }: { ws: LocalityWorkspaceApi }) => {
 };
 
 /**
- * Depth 1's exits: `[Lagre] [Avbryt] [⋮]` (§5.3, §5.6).
+ * Depth 1's exits: `[Lagre] [Avbryt] [Avslutt] [⋮]` (§5.3, §5.6).
  *
- * The pair the whole transaction is for. `Lagre` sends the buffer and drops
- * the stance without waiting for the pixels; `Avbryt` throws it away, and
- * asks first — but only when there is something to ask about. A confirm on an
- * empty buffer is a dialog that teaches the author to dismiss dialogs.
+ * Three verbs on two axes. `Lagre` and `Avbryt` are about the **buffer** —
+ * send it, or throw it away — and neither one ends the session; `Avslutt` is
+ * about the **stance**, and is the only one that does. Saving used to be the
+ * way out, which made every commit a round trip through show and back
+ * `Rediger` again: a session that wanted its last hour on the server had to
+ * end to get it there.
  *
- * The sentence names *work*, not writes, and that is the point of counting it
+ * `Avbryt` is *absent* on a clean buffer rather than greyed, because there is
+ * nothing to cancel and a live-looking button that undoes nothing is one to
+ * be afraid of. `Lagre` stays and greys, because a third button appearing and
+ * disappearing under the cursor on every keystroke is worse than a dull one.
+ *
+ * Both dialogs name *work*, not writes, and that is the point of counting it
  * at all: "Forkast 12 bilder og 3 funn?" is a question about the afternoon,
  * where "3 endringer forkastes" would be a question about the network.
  */
 const EditExits = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t, i18n } = useTranslation();
-  const [confirming, setConfirming] = useState(false);
+  const [confirming, setConfirming] = useState<'discard' | 'exit' | null>(null);
   const counts = ws.draftCounts;
 
   const parts: string[] = [];
@@ -538,12 +545,29 @@ const EditExits = ({ ws }: { ws: LocalityWorkspaceApi }) => {
     if (counts.locality) parts.push(t('localities.edit.discardLocality'));
   }
 
-  const cancel = () => {
-    if (!ws.dirty) {
-      void ws.cancelEdit();
-      return;
-    }
-    setConfirming(true);
+  /* `Intl.ListFormat` rather than a joined string with an "og" in it: the
+     conjunction is the one bit of this sentence the three locale files should
+     not have to spell, and it is in the platform. */
+  const what = new Intl.ListFormat(i18n.language, {
+    type: 'conjunction',
+  }).format(parts);
+
+  const close = () => setConfirming(null);
+
+  // The exit asks the same question `Avbryt` does and offers one more answer:
+  // most of the time an author on their way out meant to keep the work, and
+  // making them press `Lagre` and then `Avslutt` to say so is making them
+  // press twice for the common case.
+  const exit = () => {
+    if (!ws.dirty) void ws.exitEdit();
+    else setConfirming('exit');
+  };
+
+  const saveAndExit = async () => {
+    close();
+    // Only on a clean commit: a half-failed save leaves the remainder in the
+    // buffer, and walking out of the stance would strand it there.
+    if (await ws.saveEdit()) void ws.exitEdit();
   };
 
   return (
@@ -551,33 +575,42 @@ const EditExits = ({ ws }: { ws: LocalityWorkspaceApi }) => {
       <Button
         variant="primary"
         leftIcon="check"
-        disabled={ws.saving}
+        disabled={ws.saving || !ws.dirty}
         onClick={() => void ws.saveEdit()}
       >
         {t('localities.edit.save')}
       </Button>
+      {ws.dirty && (
+        <Button
+          variant="ghost"
+          palette="gray"
+          disabled={ws.saving}
+          onClick={() => setConfirming('discard')}
+        >
+          {t('localities.edit.cancel')}
+        </Button>
+      )}
       <Button
-        variant="ghost"
-        palette="gray"
+        variant="secondary"
+        leftIcon="edit_off"
         disabled={ws.saving}
-        onClick={cancel}
+        onClick={exit}
+        title={t('localities.edit.exitHint')}
       >
-        {t('localities.edit.cancel')}
+        {t('localities.edit.exit')}
       </Button>
       <OverflowMenu ws={ws} />
 
       <Dialog
-        open={confirming}
-        onOpenChange={setConfirming}
+        open={confirming === 'discard'}
+        onOpenChange={(open) => {
+          if (!open) close();
+        }}
         title={t('localities.edit.discardTitle')}
         closeLabel={t('shared.close')}
         footer={
           <>
-            <Button
-              size="sm"
-              palette="gray"
-              onClick={() => setConfirming(false)}
-            >
+            <Button size="sm" palette="gray" onClick={close}>
               {t('localities.edit.discardKeep')}
             </Button>
             <Button
@@ -585,7 +618,7 @@ const EditExits = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               variant="primary"
               palette="red"
               onClick={() => {
-                setConfirming(false);
+                close();
                 void ws.cancelEdit();
               }}
             >
@@ -595,15 +628,49 @@ const EditExits = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         }
       >
         <p className={rowStyles.discardBody}>
-          {/* `Intl.ListFormat` rather than a joined string with an "og" in
-              it: the conjunction is the one bit of this sentence the three
-              locale files should not have to spell, and it is in the
-              platform. */}
-          {t('localities.edit.discardBody', {
-            what: new Intl.ListFormat(i18n.language, {
-              type: 'conjunction',
-            }).format(parts),
-          })}
+          {t('localities.edit.discardBody', { what })}
+        </p>
+      </Dialog>
+
+      {/* …and the same question on the way out, with the answer an author
+          usually means. `Lagre og avslutt` is the primary; the destructive arm
+          is spelled out rather than being what the dialog does by default. */}
+      <Dialog
+        open={confirming === 'exit'}
+        onOpenChange={(open) => {
+          if (!open) close();
+        }}
+        title={t('localities.edit.exitTitle')}
+        closeLabel={t('shared.close')}
+        footer={
+          <>
+            <Button size="sm" palette="gray" onClick={close}>
+              {t('localities.edit.exitStay')}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              palette="red"
+              onClick={() => {
+                close();
+                void ws.exitEdit();
+              }}
+            >
+              {t('localities.edit.exitDiscard')}
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={ws.saving}
+              onClick={() => void saveAndExit()}
+            >
+              {t('localities.edit.exitSave')}
+            </Button>
+          </>
+        }
+      >
+        <p className={rowStyles.discardBody}>
+          {t('localities.edit.exitBody', { what })}
         </p>
       </Dialog>
     </>

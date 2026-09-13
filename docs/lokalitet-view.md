@@ -114,9 +114,10 @@ what makes show mode safe to be generous with.
 
 The second half of the invariant, and it is what the row's right zone is for.
 Entering edit opens a **draft**; `Lagre` commits it; `Avbryt` throws it away
-and returns you to show with the record exactly as it was. §5.3 draws the
-exits and §5.6 itemises what the transaction costs, including the one place it
-genuinely cannot hold.
+and leaves the record exactly as it was. Neither ends the session — `Avslutt`
+does, and it is the only thing that returns you to show (§3). §5.3 draws the
+exits and §5.6 itemises what the transaction costs, including the two places
+it genuinely cannot hold.
 
 ---
 
@@ -132,9 +133,17 @@ genuinely cannot hold.
 - **The way in is one button in one slot**: `Rediger` for an owner,
   `Lag min kopi` for a reader. Honest labels beat one label with two
   behaviours.
-- **The way out is two buttons**, because edit is a transaction: `Lagre`
-  commits, `Avbryt` discards. There is no `Ferdig` — a stance you can leave
-  without answering "keep this?" is not a transaction.
+- **The way out is three buttons on two axes**, and this is the one thing in
+  this section the build revised. Edit is a transaction, so `Lagre` commits and
+  `Avbryt` discards — but neither *leaves*, because committing the buffer and
+  ending the session are two decisions and folding them together meant an
+  author who wanted the last hour on the server was thrown back into show for
+  saying so. `Avslutt` is the stance's own verb. `Avbryt` is on the row only
+  while there is something to discard, and `Avslutt` over a dirty buffer asks
+  the question the old design got for free — *Bli værende* / *Forkast og
+  avslutt* / *Lagre og avslutt*. There is still no `Ferdig`: a stance you can
+  leave without answering "keep this?" is not a transaction, and the three
+  answers are that question, asked once.
 - **Stance is per session, not stored on the record.** It is a stance, not a
   property of the site. (When sharing lands, a link must pin `show`
   regardless — noted in §10.)
@@ -252,6 +261,13 @@ This app's product is evidence. So:
 > commit is fast, the pixels are pinned within seconds of the author deciding
 > they were worth keeping, and a failed upload is retryable because the spec
 > is still there.
+
+More precisely, as built: **pin on the record existing**, which for everything
+but the starter set means on commit. A spec that is still in the buffer has no
+id to PATCH, so the queue cannot touch it — which is exactly why the starter
+set is written through instead of buffered (§5.6, consequence 6), and why the
+pinned record is handed back through a callback rather than left to a realtime
+event that is being held back for the duration of the session.
 
 Pinning is also forced, regardless of the queue, at the two moments bytes
 must exist and be *these* bytes: **Rapportpakke** (§9) and **Last ned**. And
@@ -465,6 +481,12 @@ Three changes from today's `Hent grunnpakke`:
 `starterPack.ts` therefore loses its `flyfoto` and `terrain` steps and becomes
 three calls to `starterExtract` with three styles. `STARTER_VIS` and the
 `terrainFigure` import go with them.
+
+A fourth change the build added: **the three specs are written straight to
+PocketBase, not into the draft** — the one View in the app that skips the
+transaction (§5.6, consequence 6). They are the tail of `Opprett` rather than
+an edit made after it, and buffering them left the new lokalitet showing three
+frames the pin queue was not allowed to fill.
 
 #### `Behold`: keep the ground you are looking at
 
@@ -711,7 +733,7 @@ let you try.
 |---|---|---|
 | 0 | show, owner or admin | `[Rediger]` `[Del]` `[Lukk]` `[⋮]` |
 | 0 | show, reader | `[Lag min kopi]` `[Del]` `[Lukk]` `[⋮]` |
-| 1 | edit, idle | `[Lagre]` `[Avbryt]` `[⋮]` |
+| 1 | edit, idle | `[Lagre]` `[Avbryt]` (dirty only) `[Avslutt]` `[⋮]` |
 | 2 | edit + funn draft | `[Ferdig med funn]` `[Forkast funn]` |
 | 2 | edit + Juster området | `[Bruk]` `[Angre]` |
 | 2 | edit + a picker run | owned by the picker in the bottom slot (§4.3) |
@@ -726,6 +748,11 @@ Three things this table is saying on purpose:
   committing the session are different acts a keystroke apart, so they get
   different words. `Ferdig med funn` closes the funn *into the draft*; the
   funn is not in PocketBase until you press `Lagre` one level up.
+- **Depth 1 is three verbs on two axes** (§3). `Lagre` and `Avbryt` are about
+  the buffer and leave you where you are; `Avslutt` is about the stance. The
+  zone is therefore two or three buttons wide depending on whether there is
+  anything to discard — a button offering to undo nothing still has to be read
+  before it can be ignored.
 - **`⋮` survives both stances**, holding what is not part of any loop: Zoom
   til lokaliteten, Detaljer, Juster området, Last opp, Rapportpakke, Slett.
   `Slett` stays hidden for readers.
@@ -789,8 +816,10 @@ Lokalitet: Storevike [K7M2QX] [offentlig] · Delt av Ola Nordmann
 ```
 Lokalitet: Storevike [K7M2QX] [privat] · ⛨Funn 3|👁 · Bilder ▾
   · Nytt funn · Behold · Hent ▾ · Skjermbilde
-                    ┊ Terreng · Sammenlign ┊ [Lagre] [Avbryt] [⋮]
+                    ┊ Terreng · Sammenlign ┊ [Lagre] [Avbryt] [Avslutt] [⋮]
 ```
+
+With a clean buffer that is `[Lagre] [Avslutt] [⋮]`, `Lagre` greyed.
 
 **Edit, drawing a funn:** the write verbs stay (you may still want a
 screenshot of what you are drawing), the exits collapse to depth 2.
@@ -837,7 +866,8 @@ is only true because of §4.1.2, and it is the main thing §4.1.2 buys:
 | funn: title, note, status, geometry | buffered — today's autosave is **suspended** in edit | dropped |
 | curation: `sort`, `hidden` | buffered | dropped |
 | `bbox` (Juster området) | buffered | dropped |
-| **Views** (`Behold`, the starter three, both pickers) | buffered as **specs** — a few hundred bytes each | dropped, nothing to undo |
+| **Views** (`Behold`, both pickers, flyfoto) | buffered as **specs** — a few hundred bytes each | dropped, nothing to undo |
+| the **starter three** | written **through**, at `Opprett` (see consequence 6) | kept — `Avbryt` no more un-fetches them than it un-creates the lokalitet |
 | **Files** (screenshot, upload) | written **eagerly**, id tracked in the draft | **deleted** |
 | **deletions** of funn | deferred — a tombstone in the draft, row greyed | dropped, the record comes back |
 | **deletions** of a bilde | written through on confirm (see consequence 2) | nothing left to drop |
@@ -856,7 +886,8 @@ deliberate act, neither of which anybody produces twelve of in a session.
 **Edit is a buffered transaction with a compensating edge**, and the edge is
 narrow enough to be honest about.
 
-Five consequences, each of which needs building rather than assuming:
+Six consequences, each of which needs building rather than assuming — the
+sixth added by the build, which found one View that must not buffer:
 
 1. **`Avbryt` is cheap in the ordinary case and only sometimes not.** Discard a
    session of kept renders and nothing goes over the network at all. It still
@@ -873,16 +904,21 @@ Five consequences, each of which needs building rather than assuming:
    The confirm on `Slett bildet` says the action cannot be undone — so the
    greyed card offering `Angre sletting` was contradicting the sentence the
    user had just agreed to. And the deletion only *happened* on `Lagre`, which
-   also ends the session: pruning an exhibit of twelve working renders down to
-   the three worth showing meant twelve rounds of leaving edit and pressing
-   `Rediger` again. So a confirmed `Slett bildet` writes through and the buffer
+   at the time also ended the session: pruning an exhibit of twelve working
+   renders down to the three worth showing meant twelve rounds of leaving edit
+   and pressing `Rediger` again. (`Lagre` has since stopped ending the session
+   — §3 — so only the first reason still stands. It is enough: a confirm that
+   says "cannot be undone" has to be telling the truth.) So a confirmed
+   `Slett bildet` writes through and the buffer
    forgets the record; a failed DELETE falls back to the tombstone, which is
    the only path that still greys a frame. A funn keeps the deferral because a
    funn is geometry that took ten minutes to draw, deleted from a list where
    the next row is one keystroke away.
 3. **`Lagre` returns before the pixels exist**, and the interface has to be
    truthful about that without being alarming. The commit writes rows and
-   closes the transaction; the pin queue then runs. A View that is not pinned
+   closes the transaction; the pin queue then runs — *in the same session*,
+   since `Lagre` hands the stance straight back (§3), so the cards fill in
+   under the author rather than after they have been put back into show. A View that is not pinned
    yet is not broken — it renders on demand (§4.2) — so the right treatment is
    a quiet per-card state, not a blocking spinner, and a retry when the queue
    fails. The one place it must *not* be quiet is Rapportpakke and `Last ned`,
@@ -902,6 +938,26 @@ Five consequences, each of which needs building rather than assuming:
    (*"Lokaliteten er endret et annet sted"*) rather than merging. Last write
    wins is acceptable here — only owners and admins can edit, so the realistic
    conflict is you in two tabs — but a *silent* overwrite is not.
+
+   The build had to sharpen "an event arrives for something the draft touches"
+   into "an event arrives that this client did not cause", because consequence
+   6 means events now arrive from *inside* the session: the starter set's three
+   creates and the pin queue's three updates would otherwise have told every
+   new lokalitet's author that somebody else had been at their images. The test
+   is a comparison of the event's `updated` against the one the client already
+   holds, made at read time rather than on arrival — which also means it does
+   not matter whether an event or its own POST response gets back first.
+6. **One View writes through, and it is the starter three.** Buffered, they
+   are `draft:` rows the pin queue will not touch — it only renders records
+   that exist — so a brand-new lokalitet opened on three blank frames whose
+   only way to fill was a `Lagre` pressed before the author had typed the name.
+   Written through at `Opprett` they reach the queue at once and the rail fills
+   with pixels while the name is still being typed. The justification is that
+   `Opprett` wrote the lokalitet straight through as well: the starter set is
+   the rest of that one act of creation, not an edit made inside it, which is
+   why `Avbryt` leaving it alone is the right answer and not a leak. The three
+   records are appended to the list by hand and each pin calls back to swap
+   itself in, because realtime is standing down (consequence 5).
 
 The reader's side is unaffected: realtime keeps working in show mode, so a
 reader watching an owner work still sees committed funn appear (§6). What they
