@@ -773,11 +773,21 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
    * session on the way past rather than merely hiding the exit. Closing or
    * switching lokalitet is the workspace's own cleanup, since that is what
    * unmounts this row.
+   *
+   * The row going away on its own is the third case and it is the one with no
+   * way back: the `ErrorBoundary` around this row can take it off the screen
+   * while the workspace above it lives on, and that leaves the surface over a
+   * frozen map with every exit gone. So it also goes up when this unmounts —
+   * through a ref, because `putPenDown` is rebound when a funn draft arms and
+   * a cleanup keyed on it would put the pen down mid-stroke.
    */
   const { putPenDown } = ws;
   useEffect(() => {
     if (!canAdd) putPenDown();
   }, [canAdd, putPenDown]);
+  const penDown = useRef(putPenDown);
+  penDown.current = putPenDown;
+  useEffect(() => () => penDown.current(), []);
 
   return (
     <div
