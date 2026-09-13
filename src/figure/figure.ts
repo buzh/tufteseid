@@ -99,6 +99,61 @@ export type FigureSpec = {
  */
 const MIN_FIGURE_WIDTH = 560;
 
+/*
+ * What the store will take — and therefore what a producer may hand it.
+ *
+ * `attachments.file` caps a figure at 50 MB
+ * (`pocketbase/pb_migrations/1700000600_attachment_file_size.js`), and a figure
+ * that does not fit is not a degraded image: it is *no* image. PocketBase
+ * answers 400, the pin queue marks the record failed, and the retry button
+ * fails the same way forever — which is exactly what a 1.7 km rectangle over a
+ * 10 pkt LiDAR project did, at 66 Mpx and some 63 MB.
+ *
+ * So the fit lives here rather than in each of the four producers, for the same
+ * reason the caption does: a downscale that happens behind the caption's back
+ * puts "0.25 m/px" and a scale bar drawn to it on an image that is no longer at
+ * that resolution, and a figure whose own numbers are wrong is the one failure
+ * this module exists to prevent. `renderFigureBlob` therefore reports the
+ * resolution it actually wrote, and every caller records *that* in `meta`.
+ *
+ * The pixel budget is the rule; the byte budget is the backstop. Kartverket's
+ * 10 pkt relief encodes to about a byte per pixel, so 40 Mpx lands near 40 MB —
+ * but that average hides a 250× spread (a no-data tile is 16 KB where a wooded
+ * slope is 4 MB at the same 2048²), so the bytes are measured rather than
+ * predicted and a figure still over the line is scaled again and re-encoded.
+ */
+const MAX_STORED_PIXELS = 40_000_000;
+const MAX_STORED_BYTES = 50_000_000;
+
+/**
+ * How many times it is worth re-encoding to find out. Each pass is seconds on
+ * a canvas this size, and the geometric step converges in one from any
+ * plausible starting point; the cap is there so a pathological encoder cannot
+ * spin the queue.
+ */
+const MAX_FIT_PASSES = 3;
+
+/**
+ * The image at a fraction of its size, smoothly. Used only to fit the store —
+ * everything else about a figure keeps the pixels it was handed.
+ */
+const scaleCanvas = (
+  src: HTMLCanvasElement,
+  factor: number,
+): HTMLCanvasElement => {
+  const out = document.createElement('canvas');
+  out.width = Math.max(1, Math.round(src.width * factor));
+  out.height = Math.max(1, Math.round(src.height * factor));
+  const ctx = out.getContext('2d');
+  // The unscaled canvas back: too large to store beats gone, and the byte
+  // check below will report honestly on whatever it is given.
+  if (!ctx) return src;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(src, 0, 0, out.width, out.height);
+  return out;
+};
+
 /** Where the image sits inside the figure. Recorded in the attachment meta. */
 export type ImageRect = { x: number; y: number; width: number; height: number };
 
@@ -248,14 +303,46 @@ export const figureBlob = (
 ): Promise<Blob | null> =>
   new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 
-/** The whole path, for the callers that only want bytes. */
+/**
+ * The whole path, for the callers that only want bytes — and the one place a
+ * figure is made to fit the store (see MAX_STORED_PIXELS above).
+ *
+ * `metresPerPx` comes back because it may not be the one that went in: it is
+ * the resolution of the pixels in the blob, which is what the caption says and
+ * therefore what `meta` has to record.
+ */
 export const renderFigureBlob = async (
   image: HTMLCanvasElement,
   spec: FigureSpec,
   type: 'image/png' | 'image/jpeg' = 'image/png',
   quality?: number,
-): Promise<{ blob: Blob; imageRect: ImageRect } | null> => {
-  const figure = await renderFigure(image, spec);
-  const blob = await figureBlob(figure.canvas, type, quality);
-  return blob ? { blob, imageRect: figure.imageRect } : null;
+): Promise<{
+  blob: Blob;
+  imageRect: ImageRect;
+  metresPerPx: number;
+} | null> => {
+  const pixels = image.width * image.height;
+  let source =
+    pixels > MAX_STORED_PIXELS
+      ? scaleCanvas(image, Math.sqrt(MAX_STORED_PIXELS / pixels))
+      : image;
+
+  for (let pass = 0; ; pass++) {
+    // Ratio of widths rather than the scale factor applied, so the rounding
+    // scaleCanvas did is included instead of being asserted away.
+    const metresPerPx = (spec.metresPerPx * image.width) / source.width;
+    const figure = await renderFigure(source, { ...spec, metresPerPx });
+    const blob = await figureBlob(figure.canvas, type, quality);
+    if (!blob) return null;
+    if (blob.size <= MAX_STORED_BYTES || pass === MAX_FIT_PASSES) {
+      return { blob, imageRect: figure.imageRect, metresPerPx };
+    }
+    // Bytes do not fall quite as fast as pixels — a downscale averages detail
+    // together rather than removing it — so the geometric step is taken with a
+    // margin instead of exactly.
+    source = scaleCanvas(
+      source,
+      Math.sqrt(MAX_STORED_BYTES / blob.size) * 0.95,
+    );
+  }
 };

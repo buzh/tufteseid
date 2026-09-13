@@ -1425,7 +1425,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           caption: `${t('localities.tools.screenshotCaption')} ${new Date().toLocaleDateString(i18n.language)}`,
           meta: {
             bbox25833: shot.bbox25833,
-            metresPerPx: shot.metresPerPx,
+            metresPerPx: figure.metresPerPx,
             imageRect: figure.imageRect,
             // What was on the map when the shutter went. The figure caption
             // already prints this, but only into the pixels — and a caption

@@ -2987,6 +2987,40 @@ Load-bearing:
 - **`renderFigure` never throws and never returns a smaller image than it was
   given.** If a 2D context cannot be obtained the source canvas comes straight
   back: losing the picture to save the caption is the wrong trade every time.
+- **`renderFigureBlob` fits the image to the store *before* the caption is
+  drawn, and hands back the resolution it actually wrote.** A figure has a
+  ceiling — `attachments.file` is 50 MB (`1700000600`) — and the client keeps
+  itself under it with a pixel budget as the rule (`MAX_STORED_PIXELS`,
+  40 Mpx) and a byte budget as the backstop (`MAX_STORED_BYTES`, 50 MB,
+  re-encoded at most `MAX_FIT_PASSES` = 3 times, each pass scaling by
+  `√(budget / size) × 0.95`). Pixels are the rule because bytes are not
+  predictable from them: Kartverket's relief encodes near a byte per pixel
+  while a flat-sea flyfoto is a couple of hundredths of one, a spread of some
+  250×, so sizing on bytes alone would shrink a picture that was never the
+  problem.
+
+  The part that is load-bearing is *where* the fit happens. Downscaling the
+  blob afterwards, or anywhere else the caption cannot see, prints a caption
+  that disagrees with its own pixels — the image row's `px` count, the m/px
+  figure and the length of the scale bar all come off `spec.metresPerPx`. So
+  the fit scales the source canvas, recomputes `metresPerPx` from the ratio,
+  and renders the caption from that; the return value carries the effective
+  `metresPerPx` and **every caller writes that into `meta`**, not the number
+  it asked the producer for (`starterPack.ts`, `pinQueue.ts` for terrain and
+  flyfoto, `useLocalityWorkspace.ts` for the screenshot). A stored figure
+  whose `meta` says 0.25 m/px and whose pixels are 0.4 is unfalsifiable in
+  exactly the way §8.10 exists to prevent.
+
+  This was paid for: Kartverket's 2025 reflights took a rectangle from 5 pkt
+  to 10 pkt coverage, `nativeResolutionMetersPerPx` stepped from 0.3 to
+  0.2 m/px, and 1658 × 1585 m stitched to 66 Mpx ≈ 63 MB. PocketBase answered
+  400 `validation_file_size_limit`, and since a pin failure is only a spinner
+  turning into a retry, the starter set of every new lokalitet in that
+  project simply never arrived. The same fix capped the *ask* as well: the
+  10 and 20 pkt tiers now resolve to **0.25 m/px**, which is the data's own
+  floor rather than a budget — Kartverket publishes the per-project models on
+  a 0.25 m grid and 10 pkt/m² is a 0.32 m mean point spacing — so the finer
+  asks were buying no detail that was ever in the laser.
 - **`figure/` reads `t` / `i18n` from `'i18next'` directly**, not through
   `useTranslation` — it is called from five places, three of them outside
   React. Precedent: `search/infobox/InfoBoxSections.tsx`,

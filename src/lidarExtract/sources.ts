@@ -110,14 +110,20 @@ export async function enumerateLidarSources(
 // Best-guess native ground resolution per source, used to pick a
 // sensible default when the user hasn't overridden it. Higher point
 // density → finer native resolution. National mosaic is 1 m.
+//
+// 0.25 m is the floor, and it is the *data's* floor rather than a budget:
+// Kartverket publishes the per-project models on a 0.25 m grid, and 10 pkt/m²
+// is a 0.32 m mean point spacing to begin with. Asking the WMS for 0.2 or
+// 0.15 m/px — which this did for the 10 and 20 pkt tiers — bought no detail
+// that was ever in the laser and cost 1.6× and 2.8× the pixels for it. The two
+// tiers are one line now because above 10 pkt they answer the same number.
 export function nativeResolutionMetersPerPx(source: LidarSource): number {
   if (source.kind === 'national') return 1;
   const d = source.pointDensity;
   if (!d) return 0.5;
   const m = d.match(/^(\d+)/);
   const pts = m ? parseInt(m[1], 10) : 0;
-  if (pts >= 20) return 0.15;
-  if (pts >= 10) return 0.2;
+  if (pts >= 10) return 0.25;
   if (pts >= 5) return 0.3;
   if (pts >= 2) return 0.5;
   return 1;

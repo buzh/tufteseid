@@ -195,7 +195,7 @@ has a name.
 | Kinds | terrain render, LiDAR extract, flyfoto | screenshot, upload |
 | What it fundamentally is | a row of parameters | bytes |
 | Can be produced from the record alone | ✔ | ✘ |
-| Costs | a few hundred bytes | up to 20 MB |
+| Costs | a few hundred bytes | up to 50 MB |
 | `Gjenskap` (§4.2) | the point of it | meaningless |
 
 **The category is derivable from `kind`**, so it needs no field and no
@@ -222,7 +222,7 @@ between them without the user thinking about it:
 | State | Has | Costs | What it is for |
 |---|---|---|---|
 | **spec** | `meta` only, no file | ~300 bytes | working state — kept, ordered, discarded, copied |
-| **pinned** | spec + the figure PNG | up to 20 MB | the citable artifact: exactly the pixels the author saw |
+| **pinned** | spec + the figure PNG | up to 50 MB | the citable artifact: exactly the pixels the author saw |
 | **stale** | spec + a file whose spec has moved on | — | after `Gjenskap` edits the parameters |
 
 **The record is the spec. The file is a pin on it.** That inversion is the
@@ -230,7 +230,7 @@ whole idea, and three things fall out of it that are each worth more than the
 storage saving:
 
 - **Keeping an image becomes free.** `Behold` writes a few hundred bytes, not
-  a 20 MB upload. Triage in the carousel and the picker stops having a cost
+  a 50 MB upload. Triage in the carousel and the picker stops having a cost
   per keep, which is what triage wants.
 - **Discarding becomes genuinely free**, which is what dissolves the
   compensating transaction (§5.6).
@@ -1081,7 +1081,7 @@ was what handled small screens and it is going away.
 - `derivedFrom` → the original
 
 The line lands exactly where the cost is. Copying a View costs a row; copying
-a File means duplicating up to 20 MB through the client, which turns a fork of
+a File means duplicating up to 50 MB through the client, which turns a fork of
 a worked-up lokalitet into a multi-minute upload. Before §4.1.2 that argument
 applied to all bilder and the copy carried none of them, on the grounds that
 extracts and renders are re-derivable and the starter three (§4.3) arrive on

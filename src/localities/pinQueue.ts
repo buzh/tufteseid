@@ -79,6 +79,22 @@ export type PinJob = {
 const sanitizeFilename = (s: string) =>
   s.replace(/[^\p{L}\p{N}._-]+/gu, '_').slice(0, 80) || 'bilde';
 
+/*
+ * Why a pin failed, and not merely that it did.
+ *
+ * PocketBase's ClientResponseError says "400: Failed to update record." and
+ * keeps the part that names the offending field in `response.data`, which
+ * logging the error alone does not print. The difference is one line in a
+ * console versus an afternoon of bisecting: the 20 MB file-size cap that
+ * stopped the starter set cost the second.
+ */
+const failureDetail = (e: unknown): string => {
+  const data = (e as { response?: { data?: unknown } })?.response?.data;
+  if (!data || typeof data !== 'object') return '';
+  const keys = Object.keys(data as object);
+  return keys.length ? JSON.stringify(data) : '';
+};
+
 const queue: PinJob[] = [];
 const states = new Map<string, PinState>();
 const attempted = new Set<string>();
@@ -236,7 +252,10 @@ export const renderSpec = async (
         blob: figure.blob,
         filename: `terreng_${spec.vis}_${spec.model}.png`,
         meta: {
-          metresPerPx: render.dem.metresPerPx,
+          // The figure's rather than the DEM's: the grid it was computed on is
+          // a processing fact and the caption prints it as one, while this
+          // describes the pixels on the file.
+          metresPerPx: figure.metresPerPx,
           bbox25833: render.dem.bbox25833,
           imageRect: figure.imageRect,
           // Written back because the grid may have clamped it. A spec that
@@ -277,7 +296,7 @@ export const renderSpec = async (
         blob: figure.blob,
         filename: 'flyfoto.jpg',
         meta: {
-          metresPerPx: result.metresPerPx,
+          metresPerPx: figure.metresPerPx,
           bbox25833: result.bbox25833,
           imageRect: figure.imageRect,
         },
@@ -329,7 +348,7 @@ const drain = async () => {
       try {
         await runJob(job);
       } catch (e) {
-        console.warn('[pinQueue] pin failed', job.rec.id, e);
+        console.warn('[pinQueue] pin failed', job.rec.id, failureDetail(e), e);
         states.set(job.rec.id, 'failed');
       }
       publish();
@@ -375,7 +394,12 @@ export const pinNow = async (job: PinJob): Promise<AttachmentRecord | null> => {
   try {
     return await runJob(job);
   } catch (e) {
-    console.warn('[pinQueue] forced pin failed', job.rec.id, e);
+    console.warn(
+      '[pinQueue] forced pin failed',
+      job.rec.id,
+      failureDetail(e),
+      e,
+    );
     states.set(job.rec.id, 'failed');
     return null;
   } finally {

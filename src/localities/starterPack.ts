@@ -61,6 +61,7 @@ export type ExtractRaster = {
   style: string;
   /** DTM or DOM. Implicit in the extract path today; recorded anyway. */
   model: string;
+  /** Of the pixels that were actually written — see `renderFigureBlob`. */
   metresPerPx: number;
   bbox25833: [number, number, number, number];
   /** Where the image sits inside the figure — the caption is below it. */
@@ -152,7 +153,10 @@ export const extractLidarFigure = async (
     sourceLabel: source.label,
     style,
     model: source.model,
-    metresPerPx: result.metresPerPx,
+    // The figure's, not the stitch's: a rectangle large enough to bust the
+    // store is written at whatever resolution did fit, and the caption already
+    // says so.
+    metresPerPx: figure.metresPerPx,
     bbox25833: result.bbox25833,
   };
 };

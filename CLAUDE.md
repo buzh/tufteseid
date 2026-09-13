@@ -430,7 +430,8 @@ Key files (data side):
   `localities.place` / `.municipality` / `.matrikkel`, `1700000500` adds
   everything the lokalitet view needs at once (`localities.code` +
   backfill, `.derivedFrom`, `.derivedFromLabel`, `attachments.sort`,
-  `.hidden`, and `attachments.file` relaxed to optional). **Leave the
+  `.hidden`, and `attachments.file` relaxed to optional), `1700000600`
+  raises `attachments.file` to 50 MB. **Leave the
   filenames alone** — they're recorded in `_migrations`, so renaming one
   makes PB re-run it. Collection ids must not equal any collection name
   (0.23+ rejects that), hence `pbc_localities` / `finds2` /
@@ -451,7 +452,7 @@ Data model:
   avkreftet | rapportert), `geometry` (json GeoJSON FeatureCollection,
   EPSG:4326 — Circles round-trip as 64-gons).
 - **`attachments`** — `locality`, `owner`, `kind` (extract | screenshot |
-  upload | flyfoto), `file` (protected, ≤20 MB, png/jpeg/webp, thumbs, and
+  upload | flyfoto), `file` (protected, ≤50 MB, png/jpeg/webp, thumbs, and
   **optional** — a View is a spec before it is pixels), `caption`, `meta`
   (json: source key/label, style, model, metresPerPx, bbox, `imageRect`,
   `renderedAt`), `sort` and `hidden` for exhibit order and concealment.
@@ -529,6 +530,11 @@ over the second kind.
   `meta.imageRect` for where the image sits inside it.
 - Producers therefore hand back a **canvas**, not a blob (`fetchFlyfoto`,
   `captureLocalityScreenshot`, `renderTerrain`, `extractCanvas`).
+- `renderFigureBlob` **fits the image to the store before captioning it** —
+  40 Mpx, with 50 MB (the field's ceiling) as a re-encode backstop — and
+  returns the resolution it actually wrote. Callers record *that* in
+  `meta.metresPerPx`; scaling anywhere the caption cannot see it puts a m/px
+  and a scale bar on the figure that its own pixels contradict.
 - Strings live under `figure.*`; `src/figure/` reads `t` / `i18n` from
   `'i18next'` directly, since three of its five call sites are outside React.
 
