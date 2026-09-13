@@ -3,8 +3,9 @@
 // Interactions used to be located by scanning `map.getInteractions()` for
 // an `instanceof` match, which turned that collection into one global
 // namespace shared by every tool. Several of them add the same classes: the
-// draw tool (Draw/Select/Translate/Modify/Snap), measure (Draw) and
-// "Juster området" (Translate/Modify). So "remove every Draw" in one tool
+// draw tool (Draw/Select/Translate/Modify/Snap), measure (Draw) and — until it
+// grew a Pointer interaction of its own — "Juster området"
+// (Translate/Modify). So "remove every Draw" in one tool
 // silently detached another tool's, and `getDrawInteraction()` returned
 // whichever Draw happened to be first in the collection.
 //

@@ -37,10 +37,11 @@ export type LocalityPlacementApi = {
  * second set of map interactions over the same rectangle.
  *
  * The authoritative rectangle is the one in `localityPlacementAtom`, written on
- * every finished gesture. The one this hook publishes is the *live* one, which
- * during a corner drag is the deformed ring's extent — so the readout keeps up
- * with the hand, while nothing downstream ever reads a rectangle that has not
- * been through the clamp.
+ * every finished gesture. The one this hook publishes is the *live* one, a
+ * frame at a time, so the readout keeps up with the hand — both are clamped
+ * (`useBboxHandles` clamps per frame), and the split is only about how often
+ * the atom is written: at pointer rate it would re-render the ribbon on every
+ * move.
  */
 export const useLocalityPlacement = (
   placement: LocalityPlacement,
@@ -80,9 +81,9 @@ export const useLocalityPlacement = (
   /*
    * `Opprett` — the one write in the whole session.
    *
-   * The rectangle it writes is the atom's, not the live one: a commit that
-   * lands mid-gesture must use the last rectangle that went through the clamp
-   * rather than whatever shape the ring is in.
+   * The rectangle it writes is the atom's, not the live one: `Enter` pressed
+   * mid-drag commits the last finished gesture rather than the frame the hand
+   * happens to be on.
    *
    * The stedsnavn lookup still runs *before* the record is written (§8.3) — it
    * just runs on a rectangle somebody chose. On failure the session stays up,

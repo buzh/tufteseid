@@ -944,11 +944,23 @@ The pieces:
   `Enter` = Opprett, on a capture-phase listener with `useWorkspaceKeys`'
   guards (§8.4).
 - `useBboxHandles` (`src/localities/useBboxHandles.ts`) is the gesture itself —
-  a `Translate` for the body, a `Modify` on the corners, `CORNER_GRAB_PX` to
-  keep the two apart, and the rebuild-from-the-opposite-corner that keeps the
-  result axis-aligned. Lifted out of `useLocalityAdjust`, which is now a thin
-  wrapper over it, so placing and "Juster området" are one gesture with two
-  entrances.
+  drag the interior to move it, a corner to take two sides with you, an edge to
+  take one. Lifted out of `useLocalityAdjust`, which is now a thin wrapper over
+  it, so placing and "Juster området" are one gesture with two entrances.
+
+  One `Pointer` interaction of our own, not OL's `Translate` + `Modify` pair it
+  started as. `Modify` moves the single vertex under the hand, so a corner drag
+  was a trapezoid until release and the rectangle was rebuilt in `modifyend`
+  from the dragged corner plus the opposite one — and its fixed set of vertex
+  handles is why there was nothing to grab along an edge. Here a grab names
+  *which sides move* (two for a corner, one for an edge, all four for a move),
+  and every frame rebuilds the extent from the pointer plus the sides that did
+  not move, through `clampBboxSize`. So the corners stay square throughout, the
+  drag *stops* at the size band rather than overshooting it and being pulled
+  back, and the body and the handles cannot disagree about what the hand is on
+  the way two interactions separated by a `CORNER_GRAB_PX` condition could. The
+  eight handles are drawn (`rectangleStyle`) and the cursor names the axis —
+  otherwise nothing on screen says an edge can be taken hold of.
 
 **The seed.** `viewportBbox` insets the visible map, then
 `clampBboxSize(seed, 'centre')` brings it into the band. Each of the four edges
@@ -4022,7 +4034,8 @@ distance and area, with live on-map tooltips; clear the measurement.
 
 **Own an area**
 sign in (OAuth or password); propose a lokalitet's rectangle from the visible
-map, move and resize it against the terrain with the readout tracking the hand,
+map, move it and resize it by any corner or edge against the terrain with the
+readout tracking the hand,
 and create it — or cancel with nothing written — and have it named after the
 nearest stedsnavn; be stopped at 1500 m and 50 m per side, and told which limit
 and what it is; rename it; describe it; read and edit its
