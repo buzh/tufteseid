@@ -142,7 +142,10 @@ export const renderScene = async (
         viewBackgroundColor: options.background ?? 'transparent',
         exportWithDarkMode: false,
       },
-      getDimensions: (width, height) => ({
+      // Annotated rather than inferred: the package types this callback
+      // loosely enough that it hands its parameters no contextual type, and
+      // `noImplicitAny` rejects the arrow that results.
+      getDimensions: (width: number, height: number) => ({
         width: Math.max(1, Math.round(width * scale)),
         height: Math.max(1, Math.round(height * scale)),
         scale,
