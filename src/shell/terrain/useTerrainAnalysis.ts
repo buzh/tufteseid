@@ -10,9 +10,9 @@
 // The render goes on the **map**, never in a row: map/groundOverlay.ts puts
 // the canvas down as a georeferenced image layer over the background, so
 // scrubbing the light re-lights the ground in place, under the Kulturminner
-// layers and the lokalitet's own drawing. That slot holds one image and a
-// pinned bilde wants it too, so taking it here is also what unpins a bilde —
-// the arbiter is in that module.
+// layers and the lokalitet's own drawing. That group is a stack and this is
+// its bottom member, so a kept bilde laid over the render is a comparison
+// rather than a contest (docs/lokalitet-view.md §13.1).
 //
 // One rectangle, and it is always a lokalitet's. There used to be a second
 // entrance — a free-floating rectangle framed from row 1, with a `Lagre` that
@@ -36,9 +36,8 @@ import {
 import type { BeholdKey, BeholdSpec } from '../../localities/behold';
 import { ribbonToolAtom } from '../../localities/toolAtoms';
 import {
-  hideGroundOverlay,
+  setGroundOverlay,
   setGroundOverlayOpacity,
-  showGroundOverlay,
 } from '../../map/groundOverlay';
 import type { CycleKey } from '../../map/useBackgroundCyclingKeys';
 import { fetchDem, type Dem, type DemModel } from '../../terrain/dem';
@@ -219,15 +218,13 @@ export const useTerrainAnalysis = () => {
     [dem, vis, azimuth, altitude, zFactor, staticField],
   );
 
-  // Paint, then hand the canvas to the map. Taking the overlay slot here is
-  // also what stands a pinned bilde down (src/map/groundOverlay.ts): both are
-  // an image of the same rectangle, and the render is the live one.
+  // Paint, then hand the canvas to the map, as this group's bottom member.
   useEffect(() => {
     if (!dem || !field) {
       // Covers loading, the no-coverage case, a failed fetch and leaving the
       // tool alike: an earlier render must not stay on the map describing
       // ground nothing is analysing any more.
-      hideGroundOverlay('terrain');
+      setGroundOverlay('terrain', null);
       return;
     }
     // Reused rather than recreated: this exact element is what the map's
@@ -235,24 +232,25 @@ export const useTerrainAnalysis = () => {
     // rebuilding the layer's image too.
     const canvas = (canvasRef.current ??= document.createElement('canvas'));
     if (!paintTerrainField(field, dem, vis, canvas)) return;
-    showGroundOverlay({
-      owner: 'terrain',
+    setGroundOverlay('terrain', {
       source: canvas,
       crop: { x: 0, y: 0, width: canvas.width, height: canvas.height },
       extent25833: demImageExtent(dem),
     });
   }, [dem, field, vis]);
 
-  // After the paint effect on purpose: on the commit that first builds the
-  // layer, this is what gives it the slider's own position rather than
-  // whatever a previous session of the tool left behind.
+  // Order against the paint effect no longer matters: the stack reads each
+  // member's alpha at draw time rather than holding it on the layer, so a
+  // first frame drawn at whatever a previous session of the tool left behind
+  // is corrected by the redraw this triggers. It still has to run, because
+  // that module-level number outlives this hook.
   useEffect(() => {
     setGroundOverlayOpacity('terrain', opacity / 100);
   }, [opacity]);
 
-  // Unmounting the ribbon takes the layer with it — unless a bilde has taken
-  // the slot in the meantime, which `hideGroundOverlay` checks for us.
-  useEffect(() => () => hideGroundOverlay('terrain'), []);
+  // Unmounting the ribbon takes the render with it. Only the render: a bilde
+  // is a member of its own and is not this hook's to withdraw.
+  useEffect(() => () => setGroundOverlay('terrain', null), []);
 
   /*
    * The render as a keepable thing — and since §4.1.2 that means *the row of

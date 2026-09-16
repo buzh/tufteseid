@@ -1,6 +1,6 @@
 # The lokalitet view
 
-**Status: §1–§12 built, §13 designed and unbuilt.** §12's build order is
+**Status: §1–§12 built, §13 designed and one step in.** §12's build order is
 complete through step 15; what is left of it is step 16 — sharing (§10) and the
 Rapportpakke (§9) — plus the two builds that landed outside the numbered list
 and are recorded at the end of §12 (placing the rectangle, sketches as
@@ -12,9 +12,10 @@ about what exists, it wins and this one is the argument that got there — kept
 because the reasoning is not recoverable from the result, not because it
 describes the app.
 
-§13 is the exception and reads the other way round: a later thread, nothing of
-it built, and it deletes several things `docs/ui-architecture.md` and CLAUDE.md
-still state as load-bearing.
+§13 is the exception and reads the other way round: a later thread whose build
+order is §13.10 and whose first step has landed, and which deletes several
+things `docs/ui-architecture.md` and CLAUDE.md stated as load-bearing until it
+came for them.
 
 Today "a lokalitet is open" is a context strip plus a dock column, and the rest
 of the app carries on unchanged — Terreng and Sammenlign sit in row 1 whether
@@ -1577,8 +1578,9 @@ Docs to update: `docs/ui-architecture.md` §3.1 (the shell loses a slot), §5.1
 
 ## 13. The layer row — the stack becomes the control
 
-**Status: designed, nothing built.** It supersedes the verbs in §4.2 and
-deletes the one-slot arbiter that section introduced. §4.1, §4.1.1 and §4.1.2
+**Status: designed; step 1 of §13.10 built, the rest not.** It supersedes the
+verbs in §4.2 and deletes the one-slot arbiter that section introduced — that
+deletion is the part that has landed. §4.1, §4.1.1 and §4.1.2
 survive unchanged: a View is still a spec, a File is still bytes, and the pin
 is still a pin. What changes is who decides what is on the map.
 
@@ -1830,13 +1832,20 @@ Three sequencing rules, and as in §12 they are worth more than the list.
   Land the component on an easy group if that ships sooner — but do not
   discover Visning's requirements after its props are fixed.
 
-1. **The stack** — `map/groundOverlay.ts` from one slot with an owner to a
-   declared set, the shape `sketchOverlay.ts` already has: `setGroundOverlays`
-   takes the whole list, diffs it by id, and each member carries its own
-   opacity. Out go `GroundOverlayOwner`, `groundOverlayOwner`,
-   `subscribeGroundOverlay`, `hideGroundOverlay`'s hold check, and the
-   displaced-side wiring in `usePinnedBilde`, `useTerrainAnalysis` and
-   `useLocalityWorkspace`'s restore.
+1. **The stack** — ✅ **built.** `map/groundOverlay.ts` from one slot with an
+   owner to a declared set. Out went `GroundOverlayOwner`,
+   `groundOverlayOwner`, `subscribeGroundOverlay`, `hideGroundOverlay`'s hold
+   check, and the displaced-side wiring in `usePinnedBilde`,
+   `useTerrainAnalysis` and `useLocalityWorkspace`'s fold/unfold restore.
+
+   **Contributors declare themselves by key, not one caller by array** —
+   `setGroundOverlay('terrain' | 'bilde', member | null)`, painted in a fixed
+   bottom-to-top `ORDER`. That is the one place this step does *not* copy
+   `sketchOverlay.ts`, and the reason is that the two contributors are in
+   different trees: Terrenganalyse's state is mounted once from
+   `RibbonGlobalRow`, a bilde's from the lokalitet workspace, and giving them a
+   shared owner now would be building the layer row's state before the row.
+   Step 5 makes the row that owner, and the key gives way to its order.
 
    **It ships visible on its own**, which is the reason it is first rather than
    merely the reason it is possible: both callers keep the controls they have,
@@ -1922,16 +1931,18 @@ Three sequencing rules, and as in §12 they are worth more than the list.
 
 #### Three traps worth writing down
 
-**The curtain sits above the stack.** `COMPARE_Z = 1.5` was chosen when
-`zIndex: 1` held exactly one image (`map/compare/curtainLayers.ts`). An
-N-member Visning stack is entirely below it, so Sammenlign's B half would cover
-the whole stack rather than the background it was drawn against. Three
-answers — move the curtain under the stack and accept that a compared render is
-not comparable, clip the stack in halves the way the background is, or hide
-Visning's non-preset members while the curtain is up — and step 1 has to pick
-one, because doing nothing means the B half silently eats a composition
-somebody built. This is also §14's "does the stack make Sammenlign redundant"
-arriving as a mechanical fact before anyone has to answer it as a design one.
+**The curtain sits above the stack** — and step 1 decided to leave it there.
+`COMPARE_Z = 1.5` was chosen when `zIndex: 1` held exactly one image
+(`map/compare/curtainLayers.ts`), so an N-member Visning stack is entirely
+below it and Sammenlign's B half covers all of it. The alternatives were to
+move the curtain under the stack, or to clip the stack in halves the way the
+background is, and both are wrong for the same reason: **the B half is another
+*full* ground**, which is what the curtain has always been, and what it is
+dragged over is whatever the A side has composed. Comparing a composition
+against a plain acquisition is the useful version of that. It is unchanged
+behaviour, but it is unchanged by decision — this is also §14's "does the stack
+make Sammenlign redundant" arriving as a mechanical fact, and the answer it
+gives is that the two compose rather than compete.
 
 **One output canvas per group, not per member.** `groundOverlay` and
 `sketchOverlay` each keep one viewport-sized canvas alive for the layer's whole
@@ -1939,12 +1950,13 @@ life — 30 MB on a 4K display at `devicePixelRatio` 2, which is why both reuse
 it rather than allocating per frame. One per member multiplies that by however
 many are switched on, and eight is a quarter of a gigabyte of canvases before a
 single source pixel. The members are an *ordered composite with per-member
-alpha*, which is exactly what one canvas and a draw loop is, so a group should
-almost certainly be one `ol/layer/Image` that paints its members in order — the
-row's order becomes the z-order for free and the layer count stops growing with
-the content. The thing that argues the other way is Skisse, whose members each
-re-export asynchronously at their own scale; that is a reason for its entries to
-keep separate *renders*, not separate layers.
+alpha*, which is exactly what one canvas and a draw loop is, so a group is one
+`ol/layer/Image` painting its members in order with `globalAlpha` — the row's
+order becomes the z-order for free and the layer count stops growing with the
+content. Step 1 built the ground group that way. The thing that argues the
+other way is Skisse, whose members each re-export asynchronously at their own
+scale; that is a reason for its entries to keep separate *renders*, not
+separate layers.
 
 **None of this is persisted, and that is a decision.** Which members are on is
 view state, not curation — §13.8 is firm that `hidden` and "switched off" are

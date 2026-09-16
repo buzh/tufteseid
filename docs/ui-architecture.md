@@ -2492,8 +2492,8 @@ both the ground and the caption field, which deselecting would take away
 together.
 
 - **The pixels.** `src/localities/usePinnedBilde.ts` decodes the **original**
-  file — never a thumbnail — and hands it to `showGroundOverlay` with
-  `meta.bbox25833` as the extent and `meta.imageRect` as the crop. It has to be
+  file — never a thumbnail — and hands it to `setGroundOverlay('bilde', …)`
+  with `meta.bbox25833` as the extent and `meta.imageRect` as the crop. It has to be
   the original: `imageRect` is in the original file's own pixels and nothing
   records the figure's overall size, so a thumb cannot be scaled back to the
   ground without a guess, and a guess a pixel out is half a metre out on the
@@ -2509,10 +2509,11 @@ together.
   differ: an upload has no extent, so it can be the active frame without being
   on the ground. Folding the toggle into `pin` made "select this record" mean
   "unpin" whenever the two had drifted apart.
-- **The shared slot.** It paints into the same `zIndex: 1` overlay as a terrain
-  render, and `src/map/groundOverlay.ts` is the arbiter: pinning stands the
-  render down, entering Terreng unpins the image, and the displaced side hears
-  about it through `subscribeGroundOverlay` (§10).
+- **The shared group.** It paints into the same `zIndex: 1` overlay as a
+  terrain render, and since `docs/lokalitet-view.md` §13 that overlay is a
+  **stack**: the render is its bottom member and the pinned bilde its upper
+  one, so a 1937 ortofoto faded over today's relief is the ordinary case. The
+  arbiter that used to make the two take turns is gone (§10, §15).
 - **The fade is imperative.** Percent in `useState`, mirrored onto the layer
   directly, exactly like Terrenganalyse's — routing a dragged slider
   through jotai would re-render the shell at 60 Hz to change a number
@@ -2674,12 +2675,11 @@ edge, and neither surface has a stylesheet of its own.
   the funn eye and the ground peek — and a glance that costs you your place is
   a glance you stop taking. The ref dies with the hook, which is
   remount-per-record, so a remembered id is always this lokalitet's; one
-  deleted meanwhile is cleared by the sweep and by `usePinnedBilde`'s own.
-  **The restore yields the ground slot**: if `groundOverlayOwner()` is not
-  free — Terreng is the other contender — the card comes back and the image
-  does not, because pinning is a press and unfolding the rail is not a press
-  on this image. `Vis i ruta` is then the press that takes the slot, which is
-  the escalation the arbiter asks of every caller.
+  deleted meanwhile is cleared by the sweep and by `usePinnedBilde`'s own. The
+  restore used to yield to a live terrain render, because the two shared one
+  slot and unfolding a rail is not a press on this image; they are members of
+  a stack now, so there is nothing to yield to and the image comes back
+  exactly as it left.
 - **The row's `Bilder` is lit when a bilde is on the ground, not when the rail
   is open.** The rail starts open, so the old reading put an engaged-looking
   button on the row of every lokalitet you walked into while the map
@@ -3969,17 +3969,33 @@ layer. Scrubbing the light therefore re-lights the terrain in place, at full
 size, against everything else on screen. What is left on the ribbon is knobs
 and a resolution readout.
 
-**That slot is shared, and the module is the arbiter.** A bilde pinned with
-"Vis i ruta" (§8.7.1) wants the same `zIndex: 1`, and nothing else in the app is
-near it, so the collision is exactly two-way. `groundOverlay.ts` therefore
-carries an `owner` tag (`'terrain' | 'bilde'`) on the single placement:
-`showGroundOverlay({ owner })` takes the slot, `hideGroundOverlay(owner)`
-no-ops unless you still hold it, and `subscribeGroundOverlay` publishes owner
-changes so the displaced side can drop its own UI state. The rule that falls
-out is one sentence in one place: **pinning an image stands the terrain render
-down, and entering Terreng unpins the image.** Two layers racing, or a
-"take it from them" verb the callers could disagree about, is what this
-replaces.
+**That level is shared, and it is a stack.** A bilde pinned with "Vis i ruta"
+(§8.7.1) wants the same `zIndex: 1`, and for a while the two took turns: the
+module carried an `owner` tag, pinning stood the render down, entering Terreng
+unpinned the image, and the displaced side was told so through a subscription.
+That arbiter is **deleted** (§15, and `docs/lokalitet-view.md` §13), because it
+forbade the one comparison the overlay exists for — a 1937 ortofoto faded over
+today's relief is two images of one rectangle, in register.
+
+What replaces it is a declared set. Contributors name themselves by key —
+`setGroundOverlay('terrain' | 'bilde', member | null)` — and the module paints
+them in a fixed bottom-to-top order (terrain, then bilde) into **one layer and
+one canvas**, each with its own `globalAlpha`. One layer rather than one per
+member because the members are an ordered composite with per-member opacity,
+which is what a draw loop is, and because the reused output canvas is ~30 MB;
+one per member would multiply that by the size of the composition. Withdrawing
+is unconditional, since a contributor owns its own key and nothing else's.
+
+Keys rather than one caller handing over the whole array — which is what
+`sketchOverlay.ts` does — because the two contributors live in different
+trees: Terrenganalyse's state is mounted once from `RibbonGlobalRow`, a bilde's
+from the lokalitet workspace. When the layer row lands (`lokalitet-view.md`
+§13) it becomes the single caller and the key gives way to the row's own order.
+
+The compare curtain's B half is at `COMPARE_Z = 1.5` and therefore covers this
+whole group, unchanged from when the group was one image and still what the
+curtain is for: the B half is another *full* ground, and what it is dragged
+over is everything the A side has composed.
 
 That is also the argument for the sliders being **on the strip** rather than in
 a popover anchored to it, which is what §5.1's one-line contract would
@@ -4015,12 +4031,10 @@ Consequences worth knowing:
   an atom plus a hook. The pixels change on every slider frame and the opacity
   on every drag of its own; pushing either through jotai would re-render the
   whole shell dozens of times a second for a change no component needs to see.
-  `showGroundOverlay` / `setGroundOverlayOpacity` / `hideGroundOverlay` is the
-  surface, plus `groundOverlayOwner` / `subscribeGroundOverlay` for the arbiter
-  that decides which of the two features holds the slot (see below).
-- `showGroundOverlay` is show, move *and* repaint in one call, because
-  `ImageCanvasSource` caches one image and `changed()` is the only way to
-  invalidate it — the canvas element identity never changes, since the hook
+  `setGroundOverlay` / `setGroundOverlayOpacity` is the whole surface.
+- `setGroundOverlay` is put up, move, repaint *and* take down in one call,
+  because `ImageCanvasSource` caches one image and `changed()` is the only way
+  to invalidate it — the canvas element identity never changes, since the hook
   repaints in place.
 - The source's output canvas is **reused** across frames rather than allocated
   per call (which is what OL's own docs bless `changed()` for): a viewport-sized
@@ -4634,3 +4648,15 @@ plausible-sounding reason to bring one back is exactly what the entry is for.
   creates one (§5.3, §10). Do not reintroduce a free-floating analysis
   rectangle "just for signed-out visitors": the price of that convenience was
   two owners of one surface, which is what §1's first invariant is about.
+- **The ground-overlay arbiter** (`docs/lokalitet-view.md` §13, build step 1) —
+  `GroundOverlayOwner`, the `owner` tag on the placement, `showGroundOverlay`'s
+  take-from-whoever-has-it, `hideGroundOverlay`'s no-op-unless-you-hold-it,
+  `groundOverlayOwner`, `subscribeGroundOverlay`, and the
+  displaced-side-drops-its-selection effects in `usePinnedBilde` and
+  `useLocalityWorkspace`'s fold/unfold restore. It existed because two features
+  wanted one `zIndex: 1`, and the rule it enforced — *pinning an image stands
+  the terrain render down, and entering Terreng unpins the image* — forbade the
+  comparison the overlay was built for: an old ortofoto faded over today's
+  relief, in register. `zIndex: 1` is a **stack** now (§10). Do not re-add an
+  arbiter to "stop two images fighting"; two images at one extent with two
+  opacities is the feature.

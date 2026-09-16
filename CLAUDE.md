@@ -86,13 +86,14 @@ all of them.
   and the takeout bundle, and moving Terreng and Sammenlign off row 1 onto
   the lokalitet row. Read it before building any of that; each step folds into
   `docs/ui-architecture.md` §8 as it lands. **§13 is a separate thread and
-  nothing of it is built**: the *layer row* — four `[thing ▾]` groups
+  only its first step is built**: the *layer row* — four `[thing ▾]` groups
   (Visning / Bilde / Skisse / Funn) matching the map's z-stack bottom-to-top,
   each member switchable with its own opacity — which deletes `Gjenskap`, `Vis
-  i ruta` and the one-slot ground arbiter both this file and
-  `docs/ui-architecture.md` currently state as load-bearing, makes a funn a
-  container for images as well as a sublocation, and gives an arrangement a
-  record of its own (`kind: 'scene'`, membership on the existing `over`).
+  i ruta` and the one-slot ground arbiter, makes a funn a container for images
+  as well as a sublocation, and gives an arrangement a record of its own
+  (`kind: 'scene'`, membership on the existing `over`). §13.10 is its build
+  order; step 1, the ground overlay becoming a stack, has landed and the
+  arbiter is gone.
 - `README.md` — third-party-facing install and admin guide (docker compose
   install, first-run PocketBase superuser, OAuth redirect URL, granting the
   app admin role, licence). Keep it accurate when any of that changes.
@@ -357,16 +358,17 @@ the reason the seed can't step on "Gjenskap": `docs/ui-architecture.md` §10.
   the relief has to be the ground. Imperative and module-level like
   `swapBackgroundLayers` — the pixels change every slider frame and no React
   component needs to see that.
-- **That slot holds exactly one image, and two features want it**: a live
-  terrain render and a bilde pinned with "Vis i ruta"
-  (`src/localities/usePinnedBilde.ts`). The arbiter is the module, not the two
-  callers — `showGroundOverlay({ owner })` takes the slot from whoever has it
-  and `hideGroundOverlay(owner)` no-ops unless you still hold it, so **pinning
-  an image stands the terrain render down, and entering Terreng unpins the
-  image**. The displaced side hears about it through `subscribeGroundOverlay`
-  and drops its own selection. There is deliberately no "take it away from
-  them" verb: an arbiter with two verbs is an arbiter two callers can disagree
-  with.
+- **That level is a stack, and two features are in it**: a live terrain render
+  at the bottom and a bilde pinned with "Vis i ruta" over it
+  (`src/localities/usePinnedBilde.ts`). It used to be one slot with an arbiter
+  making the two take turns; that is deleted (`docs/lokalitet-view.md` §13),
+  because it forbade the one comparison the overlay exists for. Contributors
+  now declare themselves by key — `setGroundOverlay('terrain' | 'bilde', member
+  | null)` — and the module paints them bottom-to-top into **one layer and one
+  canvas**, each with its own `globalAlpha`. One layer rather than one per
+  member: the members are an ordered composite with per-member opacity, and the
+  reused output canvas is ~30 MB. The compare curtain (`COMPARE_Z = 1.5`)
+  covers the whole group, which is what it is for.
 
 Load-bearing:
 

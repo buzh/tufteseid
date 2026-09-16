@@ -13,21 +13,19 @@
 // it away to see the map is the most likely thing to do right after pinning
 // something.
 //
-// The slot it paints into is shared with Terrenganalyse and there is exactly
-// one; `map/groundOverlay.ts` owns that rule. Here it means two things:
-// entering Terreng takes the slot away, which we hear about through
-// `subscribeGroundOverlay` and answer by dropping the selection, and pinning
-// stands a live terrain render down without asking it to.
+// The group it paints into is shared with Terrenganalyse, and since §13 it is
+// a **stack** rather than a slot: this is its upper member, so a pinned
+// ortofoto fading over a live terrain render is the ordinary case and neither
+// side has to stand the other down. What used to be here — entering Terreng
+// taking the slot away, heard through `subscribeGroundOverlay` and answered by
+// dropping the selection — went with the arbiter.
 
 import { useAtom } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
 import { getAttachmentUrl, type AttachmentRecord } from '../api/attachments';
 import {
-  groundOverlayOwner,
-  hideGroundOverlay,
+  setGroundOverlay,
   setGroundOverlayOpacity,
-  showGroundOverlay,
-  subscribeGroundOverlay,
 } from '../map/groundOverlay';
 import { pinnedAttachmentIdAtom } from './atoms';
 
@@ -115,8 +113,7 @@ export const usePinnedBilde = (attachments: AttachmentRecord[] | null) => {
       })
       .then((img) => {
         if (cancelled) return;
-        showGroundOverlay({
-          owner: 'bilde',
+        setGroundOverlay('bilde', {
           source: img,
           crop: cropOf(meta, img),
           extent25833,
@@ -126,17 +123,14 @@ export const usePinnedBilde = (attachments: AttachmentRecord[] | null) => {
       .catch(() => {
         if (cancelled) return;
         setFailed(true);
-        hideGroundOverlay('bilde');
+        setGroundOverlay('bilde', null);
       });
 
-    // Note what this cleanup does *not* do: it does not put the slot down.
-    // Swapping from one bilde to another runs it, and a hide there would
-    // publish an owner change that the subscription below reads as "Terreng
-    // took the slot" — unpinning the image that was just picked. Taking the
-    // slot down is the job of the effect after this one, which does it when
-    // there is no pinned record at all, and of the unmount cleanup. Leaving
-    // the old image up while the new one decodes is also the better swap:
-    // nothing flashes.
+    // Note what this cleanup does *not* do: it does not take the member down.
+    // Swapping from one bilde to another runs it, and withdrawing here would
+    // blank the map for as long as the next image takes to decode. Taking it
+    // down is the job of the effect after this one, which does it when there
+    // is no pinned record at all, and of the unmount cleanup.
     return () => {
       cancelled = true;
     };
@@ -145,13 +139,12 @@ export const usePinnedBilde = (attachments: AttachmentRecord[] | null) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinned?.id, metaKey]);
 
-  // Nothing pinned: put the slot down if we are still holding it.
-  // `hideGroundOverlay` no-ops when somebody else has taken it.
+  // Nothing pinned: take the member down.
   useEffect(() => {
-    if (!pinned) hideGroundOverlay('bilde');
+    if (!pinned) setGroundOverlay('bilde', null);
   }, [pinned]);
 
-  useEffect(() => () => hideGroundOverlay('bilde'), []);
+  useEffect(() => () => setGroundOverlay('bilde', null), []);
 
   // The record went away under us — deleted here or by another session. Only
   // once the list has actually arrived: `null` is "still loading", and
@@ -164,16 +157,6 @@ export const usePinnedBilde = (attachments: AttachmentRecord[] | null) => {
   // hook (the workspace is remounted per record), so closing or swapping has
   // to put it down or the next lokalitet opens with a stale id in it.
   useEffect(() => () => setPinnedId(null), [setPinnedId]);
-
-  // Terreng took the slot. Nothing is on the map any more, so the selection
-  // bar must stop claiming there is; the arbiter publishes owner changes
-  // precisely so the displaced side can say so itself.
-  useEffect(() => {
-    if (!pinnedId) return;
-    return subscribeGroundOverlay(() => {
-      if (groundOverlayOwner() !== 'bilde') setPinnedId(null);
-    });
-  }, [pinnedId, setPinnedId]);
 
   const setOpacity = useCallback((value: number) => {
     setOpacityState(value);

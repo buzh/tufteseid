@@ -44,7 +44,6 @@ import { renderFigureBlob } from '../figure/figure';
 import { describeHeritageRender, screenshotFigure } from '../figure/specs';
 import type { LidarSource } from '../lidarExtract/sources';
 import { mapAtom } from '../map/atoms';
-import { groundOverlayOwner } from '../map/groundOverlay';
 import { shownThemeLayersAtom } from '../map/layers/atoms';
 import {
   heritageDetailsAtom,
@@ -594,13 +593,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * lokalitet's; one deleted in the meantime is cleared by the sweep above
    * and by `usePinnedBilde`'s own, so neither half needs to re-validate.
    *
-   * **The restore yields the ground slot.** There is one (map/groundOverlay.ts)
-   * and Terreng is the other contender, so a rail unfolded while a terrain
-   * render is up must not knock it down: pinning is a press, and unfolding is
-   * not a press on this image. The card comes back either way — the selection
-   * is the rail's own business — and `Vis i ruta` in the detail panel is then
-   * the press that takes the slot, which is the same escalation the arbiter
-   * asks of every other caller.
+   * The restore used to yield to a live terrain render, because the two shared
+   * one slot and unfolding a rail is not a press on this image. Since §13 they
+   * are two members of a stack (map/groundOverlay.ts), so there is nothing to
+   * yield to and the image comes back exactly as it left.
    *
    * Only an explicit fold, which is why this reads `stripOpen` rather than
    * whether the strip is mounted: the pen and a picker borrow the bottom slot
@@ -626,7 +622,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     const { active, pinned: wasPinned } = foldedRef.current;
     foldedRef.current = { active: null, pinned: null };
     if (active) setActiveBildeId(active);
-    if (wasPinned && groundOverlayOwner() == null) pin(wasPinned);
+    if (wasPinned) pin(wasPinned);
   }, [stripOpen, activeBildeId, pinnedId, pin]);
 
   /*
@@ -635,15 +631,13 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * mean "nothing", and the images that cannot be placed are exactly the ones
    * with nothing to place.
    *
-   * It was show-only, and the asymmetry was a fear about the wrong caller. The
-   * ground overlay is one slot with two contenders (map/groundOverlay.ts) and
-   * the other is a live terrain render, so the worry was that a rail laying
-   * every card it walked past onto the map would knock the render down the
-   * instant a `Behold` result landed and moved the cursor onto it. `Behold`
-   * does not move the cursor; nothing that adds a record does. The only thing
-   * that selects a card for you is the auto-select in `BilderCarousel`, and
-   * that goes through `focusBilde`, which does not pin. What was left of the
-   * rule was two identical rails (§8.7.2) answering a click differently.
+   * It was show-only, and the asymmetry was a fear about the wrong caller: that
+   * a rail laying every card it walked past onto the map would knock a live
+   * terrain render down the instant a `Behold` result landed and moved the
+   * cursor onto it. Nothing that adds a record moves the cursor, so it was
+   * already two identical rails (§8.7.2) answering a click differently — and
+   * since §13 the two are members of a stack, so there is no knocking down
+   * left to fear.
    *
    * Two records it refuses. One with no file or no extent cannot be laid down
    * at all — `canPinBilde`. A borrowed one (§7) is the *original's* file and is
