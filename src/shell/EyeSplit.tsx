@@ -4,14 +4,22 @@ import styles from './EyeSplit.module.css';
 
 /*
  * The ribbon's split control: whatever you pass as children on the left, an
- * eye welded to its right edge. Two of them now — `Funn` and `Kulturminner`
- * — and they are the same idiom rather than two lookalikes, which is why the
- * geometry and the polarity live here instead of in each row's stylesheet.
+ * eye welded to its right edge.
  *
- * The left half is passed in rather than described by props because the two
- * differ in what they open (a list, a settings panel) and agree on nothing
- * except the seam. Give that half `joinedRight` on its `ModeButton` — that is
- * what squares the shared edge off and pulls the count badge back inside it.
+ * **One caller, and that is the state it settled in.** `Funn` was the other
+ * until §13.10 step 4, which made the lokalitet row four layer groups
+ * (`LayerGroup`) and took it with them — there the *label* is the switch and
+ * the right-hand segment opens the list, which is this control's duties
+ * swapped. So the two idioms are now one per row: `EyeSplit` is row 1's, on
+ * `Kulturminner`, where the thing being hidden is a global overlay rather than
+ * a member of the open lokalitet's stack. Kept as a component rather than
+ * folded back into `HeritageControl` because the geometry and the polarity
+ * below are the parts that were hard to get right, and they read as rules here
+ * and as styling there.
+ *
+ * The left half is passed in rather than described by props. Give it
+ * `joinedRight` on its `ModeButton` — that is what squares the shared edge off
+ * and pulls the count badge back inside it.
  *
  * Two segments and not an item inside the panel, deliberately. Taking a layer
  * off is something you do *while* dragging the Sammenlign curtain or reading

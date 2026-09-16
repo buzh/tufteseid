@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LocalityRecord } from '../api/localities';
-import { funnHiddenAtom } from '../localities/atoms';
+import { funnHiddenAtom, funnSwitchedOffAtom } from '../localities/atoms';
 import { FunnList } from '../localities/FunnList';
 import {
   bilderStripOpenAtom,
@@ -19,14 +19,12 @@ import {
   IconButton,
   Input,
   Menu,
-  Popover,
   toast,
   Tooltip,
 } from '../ui';
 import { CompareControl } from './compare/CompareControl';
-import { EyeSplit } from './EyeSplit';
 import { groundHandleAtom } from './groundHandle';
-import { LayerGroup } from './LayerGroup';
+import { LayerGroup, LayerMembers } from './LayerGroup';
 import { ModeButton } from './ModeButton';
 import styles from './Ribbon.module.css';
 import rowStyles from './RibbonLocalityRow.module.css';
@@ -309,85 +307,98 @@ const HentMenu = ({
 };
 
 /*
- * `Funn` — docs/lokalitet-view.md §5.5, §6. One control, two hit targets:
- * press the labelled half to open the index, press the eye to take the funn
- * off the map.
+ * `[Funn ▾]` — docs/lokalitet-view.md §5.5, §6, and §13.10 step 4, which is
+ * what re-clothed it. The top of the map's z-stack (`funnLayer`, zIndex 5) and
+ * therefore the rightmost of the row's layer groups.
  *
- * The index is the list that used to be the top half of the dock, in a
- * popover on the row: a line per funn, with the verbs that act on one. The
- * content — the note you wrote about the mound — is beside the mound, in
- * `FunnCallout`, which is why closing this on select is right rather than
- * rude: you asked for a funn, so the map has flown to it and the note is up.
+ * It was an `EyeSplit`: the labelled half opened the index and an eye welded
+ * to it took the funn off the map. It is now a `LayerGroup`, which is the same
+ * two hit targets with the duties **swapped** — the label is the switch (`H`
+ * unchanged) and a caret opens the index. That is a real cost paid once: the
+ * press this control has taught for a while now does something else. What it
+ * buys is the row reading left to right as the stack reads bottom to top,
+ * every group answering its label press the same way, and this button no
+ * longer being the one exception to a rule the other three state.
  *
- * A popover and not a dock is the whole bet of §6: this is a thing you consult
- * a few times a session, and it was costing 360 px of terrain permanently for
- * the privilege. The badge is what makes that safe — the count is on the row
- * whether the list is open or not, so "does this rectangle have anything in
- * it" never needs a click.
+ * The index itself is untouched, and that is step 4's other half. A funn is
+ * not only a layer — it is a record you rename, restage, redraw and delete —
+ * so `[Funn]` brings `FunnList` as its pulldown body rather than pretending
+ * its rows are the generic member rows beside a sketch's. What it gained is
+ * the one thing that *is* generic: a switch per row.
  *
- * The eye is "Skjul merker", which spent its life on row 1 three rows away
- * from the count of what it hid, grouped with a Sammenlign that then moved
- * here without it. It belongs on this button because this button is what
- * lists exactly the things it hides — the funn layer only ever holds the open
- * lokalitet's funn — and because the two questions are one question: how many
- * are there, and are they in my way right now.
+ * Closing on select is right rather than rude: you asked for a funn, so the
+ * map has flown to it and the note is up beside the shape in `FunnCallout`.
+ * A popover and not a dock is the whole bet of §6 — this is a thing you
+ * consult a few times a session, and it was costing 360 px of terrain
+ * permanently for the privilege.
  *
- * The seam itself — the geometry, the polarity of the light, why it is two
- * segments rather than an item inside the list — is `EyeSplit`, shared with
- * `Kulturminner` on row 1.
+ * **No opacity, per member or per group, and that is decided rather than
+ * deferred.** Per-funn opacity does not fall out of one vector layer: it is N
+ * layers or a style function, for a knob that would be aimed at the wrong
+ * thing anyway. The funn style is *already* built not to cover the ground it
+ * marks — a cased outline with a 0.12 fill, because the relief under a funn is
+ * the evidence for it (`funnLayer.ts`) — so what fading elsewhere buys, this
+ * layer bought at the style. What is left is on and off, and that has a
+ * switch, a group label and a key.
  *
- * Both stances. Reading your own index is not writing to it; `editable` is
- * what decides whether the rows offer the verbs (§2).
+ * Both stances, and the switches are not gated either: reading your own index
+ * is not writing to it and neither is taking a mark off the relief. `editable`
+ * still decides whether the rows offer the verbs (§2).
  */
 const FunnControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useAtom(funnHiddenAtom);
+  const [switchedOff, setSwitchedOff] = useAtom(funnSwitchedOffAtom);
+
+  const toggleShown = (id: string) =>
+    setSwitchedOff((cur) => {
+      const next = new Set(cur);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+
+  // What is on the map: the index minus this session's tombstones, which are
+  // already off it (`removeFunn`), minus the ones switched off by hand.
+  const shownCount = (ws.findItems ?? []).filter(
+    (f) => !ws.deletedIds.has(f.id) && !switchedOff.has(f.id),
+  ).length;
 
   return (
-    <EyeSplit
-      shown={!hidden}
-      label={t(hidden ? 'localities.funn.show' : 'localities.funn.hide')}
+    <LayerGroup
+      icon="bookmark"
+      label={t('localities.funn.heading')}
+      toggleLabel={t(hidden ? 'localities.funn.show' : 'localities.funn.hide')}
+      membersLabel={t('localities.funn.listHint')}
       hint="H"
+      shown={!hidden}
+      shownCount={shownCount}
+      width={360}
+      padded
       onToggle={() => setHidden(!hidden)}
     >
-      <Popover
-        open={open}
-        onOpenChange={setOpen}
-        width={360}
-        label={t('localities.funn.heading')}
-        trigger={
-          <ModeButton
-            icon="bookmark"
-            label={t('localities.funn.heading')}
-            tooltip={t('localities.funn.listHint')}
-            active={open}
-            badge={ws.funnCount || undefined}
-            joinedRight
-            onClick={() => setOpen(!open)}
-          />
-        }
-      >
+      {(close) => (
         <FunnList
           items={ws.findItems}
           editable={ws.canEdit}
           selectedId={ws.selectedFunnId}
           deletedIds={ws.deletedIds}
+          switchedOffIds={switchedOff}
+          onToggleShown={toggleShown}
           onSelect={(f) => {
-            setOpen(false);
+            close();
             ws.selectFunn(f);
           }}
           onStatus={ws.changeStatus}
           onSaveMeta={ws.saveFunnMeta}
           onEditGeometry={(f) => {
-            setOpen(false);
+            close();
             ws.startGeometryEdit(f);
           }}
           onDelete={ws.removeFunn}
           onRestore={ws.restoreDeleted}
         />
-      </Popover>
-    </EyeSplit>
+      )}
+    </LayerGroup>
   );
 };
 
@@ -407,9 +418,9 @@ const FunnControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
  * row's one teaching claim (§13.1) and it is cheap to keep.
  *
  * Absent rather than disabled on a lokalitet with no sketches. A group control
- * over nothing is a button that cannot answer the only question it is asked;
- * the uniform four-across row arrives at step 4, when the group that is always
- * there is in it.
+ * over nothing is a button that cannot answer the only question it is asked —
+ * and `[Funn ▾]` beside it is the group that is always there, so the row is
+ * never empty of one.
  *
  * The card's own eye (`SketchToggleButton`) is untouched and still correct —
  * both press the same set, so the rail and the row cannot disagree.
@@ -440,11 +451,17 @@ const SkisseControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
       )}
       membersLabel={t('localities.layers.skisseMembers')}
       shown={ws.sketchGroupShown}
-      members={members}
+      shownCount={members.filter((m) => m.shown).length}
       onToggle={ws.toggleSketchGroup}
-      onToggleMember={ws.toggleSketch}
-      onSetOpacity={ws.setSketchOpacity}
-    />
+    >
+      {() => (
+        <LayerMembers
+          members={members}
+          onToggleMember={ws.toggleSketch}
+          onSetOpacity={ws.setSketchOpacity}
+        />
+      )}
+    </LayerGroup>
   );
 };
 

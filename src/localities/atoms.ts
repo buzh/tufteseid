@@ -90,6 +90,23 @@ export const selectedFunnIdAtom = atom<string | null>(null);
 // shared to show someone a funn must not arrive with the funn hidden.
 export const funnHiddenAtom = atom(false);
 
+// And one funn at a time — the per-member switches in `[Funn]`'s pulldown
+// (docs/lokalitet-view.md §13.10 step 4). Ids that are *off*, so the default
+// is every funn on the map and an id nobody has touched needs no entry.
+//
+// Separate from the flag above rather than derived from it, for the reason
+// `sketchGroupShownAtom` is separate from `sketchShownAtom`: taking the group
+// off and putting it back has to restore the reading that was up, and the
+// members' own switches are what remember it.
+//
+// Keyed by record id, so it belongs to the open lokalitet and the workspace
+// empties it on the way out. Not persisted anywhere, like the flag: this is
+// what I am looking at now, which §13.8 is firm is not the same statement as
+// `hidden`, which is curation.
+export const funnSwitchedOffAtom = atom<ReadonlySet<string>>(
+  new Set<string>(),
+);
+
 // Which bilde is pinned to the map ("Vis i ruta"), if any. Outside the
 // filmstrip because the strip is collapsible and unmounts when it is folded
 // away — and folding it away to look at the map is exactly what you do after

@@ -422,8 +422,14 @@ subsume.
   read by the OL render handlers through
   `setCurtainSplit`, so `compareLayerAtomEffect` deliberately does *not* depend
   on it — dragging the divider must not rebuild a tile stack.
-- **The funn eye** — `funnHiddenAtom` (`src/localities/atoms.ts`), read by
-  `useFunnVisibility` (§8.6). Not persisted to the URL.
+- **The funn switches** — `funnHiddenAtom` for the whole group and
+  `funnSwitchedOffAtom` (a `Set` of the ids that are *off*) for one member at a
+  time, both in `src/localities/atoms.ts` and both read by `useFunnVisibility`
+  (§8.6). Two atoms rather than one for the reason `sketchGroupShownAtom` is
+  not `sketchShownAtom`: the group flag and the members are different
+  statements, and switching the group back on has to restore the composition
+  that was up. Neither is persisted to the URL; the member set is cleared when
+  the lokalitet closes or swaps.
 - **Theme layers** — `activeThemeLayersAtom` (a `Set<ThemeLayerName>`), plus
   `heritageDetailsAtom` / `heritageRenderAtom` / `heritageOpacityAtom` in
   `src/map/layers/heritage.ts` for how the Kulturminner overlay is drawn.
@@ -765,7 +771,8 @@ re-attaching the listener continuously.
 - **Hold X** — peek at the ground you were on before, snapping back on release.
   Reading relief against a photograph means flipping dozens of times, and a
   hold-to-compare is the cheapest form of that.
-- **H** — hide/show the funn, the same switch as the eye on `Funn` (§8.6). The
+- **H** — hide/show the funn, the same switch as the `Funn` label on the
+  lokalitet row (§8.6). The
   one key here written straight against an atom rather than through a
   registered handler: there is a single boolean and no mode owns it, so there
   is nothing for a component to contribute. It is a press rather than a hold
@@ -1295,8 +1302,8 @@ correctly over it.
 ### 5.9 Kulturminner — one control with a seam in it
 
 **Kulturminner** (`castle`) in row 1, with an eye welded to its right edge
-(`src/shell/heritage/HeritageControl.tsx`, split by the shared `EyeSplit` —
-§8.6 for the other one). The labelled half opens the settings `Popover` and
+(`src/shell/heritage/HeritageControl.tsx`, split by `EyeSplit`, whose one
+caller it now is — §8.6 for where the other went). The labelled half opens the settings `Popover` and
 carries a `CountBadge` of how many sources are on; the eye puts the overlay on
 the map or takes it off.
 
@@ -1790,7 +1797,7 @@ rows, the bottom edge of the map, a popover, a map callout and the dialogs:
 | Region | Component | Contents |
 |---|---|---|
 | Identity, the work, the exits | `RibbonLocalityRow` (the lokalitet row) | four zones — see below |
-| What the rectangle holds | `FunnList`, in a popover on that row | the funn index |
+| What the rectangle holds | `FunnList`, in the `[Funn ▾]` pulldown on that row | the funn index |
 | The funn being drawn | `RibbonFunnDraftRow` (row 4); the pen is `FunnSurface` over the map | title, save state, *Utvid området* — §8.5, §9 |
 | The selected funn's note | `FunnCallout` (an `ol/Overlay` on the map) | title, status, note, beside the shape — §8.6 |
 | The images | `BilderStrip` / `BilderCarousel` / `BilderPicker` (bottom slot) | the same rail in both stances — read-only in show, the write verbs and drag-to-reorder in edit; a picker run borrows the slot — §8.7.2, §8.9.3 |
@@ -1802,7 +1809,7 @@ question (`docs/lokalitet-view.md` §5.1–5.5):
 | Cell | Zone | Question | Present when | Contents |
 |---|---|---|---|---|
 | left | identity | *what am I looking at* | always | the literal word `Lokalitet:`, the name (click to rename in edit, click to zoom in show), the short code chip (click to copy), the visibility badge, the banner slot |
-| left | the contents | *what did someone put here* | always | `Skisse ▾` (only when there are sketches) · `Funn` + its eye · `Bilder ▾`, all with a count badge |
+| left | the contents | *what did someone put here* | always | `Skisse ▾` (only when there are sketches) · `Funn ▾` · `Bilder ▾`, all with a count badge |
 | left | the work | *what can I do to it* | **edit only** | Nytt funn · Behold · `Hent ▾` · Skjermbilde |
 | centre | the ground tools | *what does this ground look like* | always | Terreng · Sammenlign |
 | right | the exits | *how do I get out of here* | always | deepest-first — see the depth table below |
@@ -1832,23 +1839,42 @@ growing would now push the two zones after it out to the cell's far edge.
 **The contents zone is turning into the layer row** (`docs/lokalitet-view.md`
 §13.1). The end state is four `[thing ▾]` groups — Visning · Bilde · Skisse ·
 Funn — left to right in the map's own z-order, so the row teaches the stack.
-`src/shell/LayerGroup.tsx` is that control and the first of the four,
-`[Skisse ▾]`, is wearing it (§9.3): the label takes the group off the map, the
-caret opens a pulldown, and every member has a switch and a transparency
-slider. It sits left of `Funn` because sketches are `zIndex: 2` and the funn
-layer is 5.
+`src/shell/LayerGroup.tsx` is that control and **two of the four wear it**:
+`[Skisse ▾]` (§9.3) and `[Funn ▾]` (§8.6). The label takes the group off the
+map, the caret opens a pulldown, and every member has a switch. Skisse sits
+left of Funn because sketches are `zIndex: 2` and the funn layer is 5.
 
-Two properties of it that are not obvious from the screen. **The label toggles
-and the caret opens**, which is the opposite polarity to `Funn`'s `EyeSplit` —
-on the index the everyday press is "show me the list", on a layer group it is
-"take this off so I can see what is under it" — and the seam CSS is duplicated
-rather than shared until step 4 re-clothes `Funn` and there are two real cases
-to decide from. And **nothing in the group writes** (`docs/lokalitet-view.md`
+Three properties of it that are not obvious from the screen. **The label
+toggles and the caret opens.** That is the opposite polarity to `EyeSplit`, and
+re-clothing `Funn` is what settled it: on an index the everyday press is "show
+me the list", on a layer group it is "take this off so I can see what is under
+it", and the lokalitet row is a row of layer groups. `EyeSplit` stayed for its
+one remaining caller, `Kulturminner` on row 1 (§5.9), and the seam CSS stayed
+duplicated rather than shared — with the two idioms one per row and pointing
+opposite ways, a shared frame would couple two things whose only remaining
+likeness is that they are both a button with a chip welded to it.
+
+**Opacity is a raster idea, so it is per group rather than per member of every
+group.** Skisse's members each carry a transparency slider; Funn's do not, and
+the reason is not expedience — the funn are one vector source drawn as a cased
+outline over a 0.12 fill, i.e. marks on the ground rather than a covering of
+it, so the verb for "this one is in my way" is its switch
+(`docs/lokalitet-view.md` §13.10 step 4).
+
+And **nothing in the group writes** (`docs/lokalitet-view.md`
 §13.8): a switch is *what I am looking at now*, which is not the same statement
 as `hidden`, which is curation. So there is no stance gate anywhere in
 `LayerGroup` and a reader gets it at full function. A group with no members is
-**absent**, not disabled — the uniform four-across row arrives with step 4, and
-until then a permanently dead button teaches nothing.
+**absent**, not disabled — `[Skisse ▾]` is not on the row in a lokalitet with
+no sketches, and a permanently dead button teaches nothing.
+
+**The component is the button and the frame; the body is the caller's.**
+`children` is a render prop taking `close`, and the ordered member list with
+its switches and sliders is a second export, `LayerMembers`, which is what
+[Skisse] passes. That split is what let [Funn] keep `FunnList` — inline rename,
+a status menu, a row menu, tombstones with `Angre` — instead of flattening it
+into a generic member row, while still dismissing the pulldown when you pick
+one. Nothing in `LayerGroup` knows what is in the group.
 
 The ground tools and the contents are present in **both** stances, because
 reading is not writing — the same argument that makes show mode absolute about
@@ -2050,14 +2076,17 @@ So each one went to a surface priced like the use:
 | Was a dock section | Is now | Because |
 |---|---|---|
 | the live tool band | `RibbonFunnDraftRow` (§8.5), and since §9 the tools themselves are Excalidraw's own, on the canvas | it *is* watched, continuously, while you draw — so it belongs where the hand is, and the hand is on the map |
-| Funn | `FunnList` in a popover behind the `Funn` control on the row, with a count badge | consulted; the count is the part you want at a glance, and a badge carries that without the list |
+| Funn | `FunnList` in the `[Funn ▾]` pulldown on the row, with a count badge | consulted; the count is the part you want at a glance, and a badge carries that without the list |
 | Kulturminner | nothing — deleted outright (§15) | the register it listed is already the map's headline overlay, clickable; a second, text-only copy of it inside a lokalitet was a duplicate wearing the same word |
 | Detaljer | a `Dialog` off the `[⋮]` menu | set once and stopped looking at; the one surface here you want *modal*, because you are typing prose into it |
 | a funn's note | `FunnCallout`, an `ol/Overlay` beside its shape (§8.6) | it is about a place, and a list row is not a place |
 
 The count badge is load-bearing, not decoration — see §8.1. *How many funn
 are in this rectangle* was legible in the dock without opening anything, and a
-popover that hid the number would have been a straight regression.
+popover that hid the number would have been a straight regression. Since
+`[Funn ▾]` became a layer group the badge counts what is *on the map* rather
+than what exists (§8.6), which is the same number in every case but the one
+where you have just switched something off.
 
 `LocalityDetails` opens with the location group: **Sted**, **Kommune** and
 **Matrikkel** as ordinary text fields, then **Koordinater** and **Areal** as
@@ -2332,12 +2361,20 @@ wrote about a mound is not editing it.
   and an overlay that survived the flag would be the loudest thing left on
   screen.
 
-**The eye on `Funn`.** Restraint in the styling only goes so far: a cased
-outline sitting exactly on the bump you are judging is still on it, and the
-point of the curtain and the digit keys is to look at the *ground* in two
-acquisitions. `funnHiddenAtom` — the eye segment of the `Funn` control on the
-lokalitet row, or key **H** — takes the funn layer and the selection halo off
-through `useFunnVisibility` (`src/localities/funnVisibility.ts`).
+**`[Funn ▾]` is a layer group, and its label is the switch.** Restraint in the
+styling only goes so far: a cased outline sitting exactly on the bump you are
+judging is still on it, and the point of the curtain and the digit keys is to
+look at the *ground* in two acquisitions. `funnHiddenAtom` — pressing the word
+`Funn` on the lokalitet row, or key **H** — takes the funn layer and the
+selection halo off through `useFunnVisibility`
+(`src/localities/funnVisibility.ts`). The caret beside it opens the index.
+
+That is the duties of the two halves **swapped**: until `docs/lokalitet-view.md`
+§13.10 step 4 the label opened the list and an eye welded to its right edge did
+the hiding. Nothing about what either press *does* changed — what changed is
+which half does it, so that the four groups the contents zone is becoming
+(§8.1) all speak one polarity. `EyeSplit` and its polarity survive on row 1's
+`Kulturminner` (§5.9).
 
 - **`setVisible(false)`, never removal.** Everything the glance must leave
   alone hangs off those layers: the hydrated features, two realtime
@@ -2346,31 +2383,58 @@ through `useFunnVisibility` (`src/localities/funnVisibility.ts`).
 - It re-applies on the layer collection's `add` as well as on the flag, because
   each layer is created by its own hook and one arriving while the funn are
   hidden would default to visible.
-- **`startDraft` lifts the flag.** Drawing with the existing funn invisible is
-  how you end up drawing the one you already have. The shape being drawn is
+- **`startDraft` lifts the flag** — the group flag, and not the per-member
+  switches. Drawing with the existing funn invisible is
+  how you end up drawing the one you already have, and the group flag is the
+  one a keystroke can set over everything at once; switching off one named row
+  is a deliberate statement about a funn you have just looked at, so the pen
+  does not undo it. The shape being drawn is
   never in the set to begin with: it is Excalidraw's, on a canvas above the map
   rather than on a layer in it.
 - Not persisted to the URL, on the same grounds as the compare curtain: a link
   shared to show someone a funn must not arrive with the funn hidden.
-- **The segment is lit while the funn are *on the map*.** It lit while they
+- **The button is lit while the funn are *on the map*.** The eye lit while they
   were hidden at first, on the argument that the unusual state is the one
   worth a colour. That argument is right about which state needs marking and
   wrong about which colour marks it: on this ribbon accent means *engaged* —
   a tool armed, a ground selected, a popover open — so an accent-filled eye
   read as "the eye is on", the exact opposite of what it meant. Polarity beats
-  emphasis. Hidden is now said the way every layer switch says it, by the
-  tint going out and `visibility_off` replacing `visibility`, and the lit
-  state is a tint (`--c-accent-subtle`) rather than the full fill, because
-  "shown" is the normal state and a second saturated chip glued to `Funn`
-  would read as a second engaged control. No `aria-pressed`: the accessible
-  name is the verb and changes with the state, and saying both announces
-  "Vis merker, pressed".
-- **The seam is a shared component**, `src/shell/EyeSplit.tsx`: the geometry,
-  the hairline, the polarity above and the `joinedRight` contract with
-  `ModeButton`, with the labelled half passed in as children. Two controls use
-  it — `Funn` here and `Kulturminner` on row 1 (§5.9) — and they are the same
-  idiom rather than two lookalikes that drift apart the first time one of them
-  is restyled.
+  emphasis, and the polarity survived the swap: hidden is the `Funn` button
+  going dark, which is what every other layer switch on the row does.
+- **The tooltip is the verb; the accessible name is the noun.** `ModeButton`
+  sets `aria-pressed`, so naming the button after what a press *does* would
+  announce "Skjul funn på kartet, pressed" — the failure the eye avoided by
+  carrying no `aria-pressed` at all. A toggle whose tooltip flips therefore
+  passes its stable noun as `ariaLabel` and lets the pressed state say the
+  rest. That prop exists for `LayerGroup` and has no other caller.
+
+**Switching one funn off is a style, not a layer.** The funn are a single
+vector source, so `funnLayer.ts` keeps `switchedOffFunnIds` beside the pen's
+`hiddenFunnId` and resolves both in one `styleFor(id)` — the invisible style
+for either reason. Three things follow, and they are the reason the two are
+separate states rather than one:
+
+- **A resumed draft cannot clear your switches, and a switch cannot outlive the
+  pen.** `hideFunnOnLayer(id)` still owns exactly one id and still means "the
+  pen is on this one" (§8.5); `funnSwitchedOffAtom` owns the rest and is
+  cleared when the lokalitet closes or swaps.
+- **The halo is gated on the same predicate.** `funnHighlightLayer` clones
+  geometry rather than reading the funn layer's styles, so a switched-off funn
+  that happened to be selected would otherwise keep its halo — the one thing
+  left on screen pointing at the shape you just took off it. It asks
+  `isFunnOnMap(id)` and re-runs when the set changes.
+- **The badge counts what is on the map** — the index, minus tombstones, minus
+  whatever is switched off, and nothing at all while the group is off. That is
+  a change of meaning with almost no change of number, since every funn is on
+  unless you switched it off, so "is there anything in this rectangle" is still
+  answered at a glance (§8.2).
+
+`EyeSplit` remains a shared component in name only: `src/shell/EyeSplit.tsx`
+holds the geometry, the hairline and the `joinedRight` contract with
+`ModeButton` for its one caller, `Kulturminner` (§5.9). It was not folded back
+into `HeritageControl` because the geometry and the polarity are the parts that
+were hard to get right, and they read as rules in a component and as styling in
+a call site.
 
 **This used to be `Skjul merker`, on row 1, and it also hid the lokalitet
 rectangles.** Two things were wrong with that. It was grouped beside
@@ -2380,12 +2444,18 @@ what it hid. And it was global by an argument that had stopped being true: the
 funn layer only ever holds the *open* lokalitet's funn, and a signed-out
 visitor loads no rectangles at all, so for half the app it was a dead button.
 
-The two halves went separate ways. The funn half is a segment of the button
-that lists them — one visual object, two hit targets, and the count stays
-legible while they are hidden, so hiding never costs you the answer to "is
-there anything in this rectangle". It is a segment rather than an item inside
-the list because hiding the funn is what you do *while* dragging the compare
-curtain, and that has to stay one press.
+The two halves went separate ways. The funn half became part of the button that
+lists them — one visual object, two hit targets — and it is that rather than an
+item inside the list because hiding the funn is what you do *while* dragging the
+compare curtain, and that has to stay one press. Which half is which has since
+reversed (above); what did not change is that it is one press from the row.
+
+One property of the original arrangement *was* dropped, deliberately: the count
+used to stay legible while the funn were hidden. It now goes out with them,
+because the badge on a layer group answers "how much of this am I looking at"
+rather than "is there anything here" — the second question belongs to `Bilder
+▾` and to the rail. Opening the pulldown still answers both, and the state that
+loses the number is one the user just pressed for.
 
 The rectangles have no switch at all now. A lokalitet that is not the open one
 draws faint instead — dashed, half-alpha casing and frame, its name chip at
@@ -3782,8 +3852,9 @@ ones. A sketch is **not** offered `Vis i ruta`: that verb lays a figure into the
 ground level, and `canPinBilde` refuses a sketch outright rather than putting a
 white figure with a caption panel over the image it annotates.
 
-**And the whole set has one button, `[Skisse ▾]`** — the first of the layer
-row's four groups (§8.1, `docs/lokalitet-view.md` §13.10 step 3). The label
+**And the whole set has one button, `[Skisse ▾]`** — the first built of the
+layer row's four groups (§8.1, `docs/lokalitet-view.md` §13.10 step 3;
+`[Funn ▾]` joined it at step 4). The label
 takes every sketch off the map at once and the caret opens the members, each
 with its switch and its own fade. Two facts about it belong here rather than
 with the row:
@@ -4433,7 +4504,7 @@ switching between
 them with the A|B control or C, so one acquisition can be compared against
 another of the same ground; drag the seam with the pointer or nudge it with
 the arrow keys once it has focus, and leave to take the second stack back down;
-hide the funn with H or the eye on `Funn` so they do not cover the ground you
+hide the funn with H or the `Funn` button so they do not cover the ground you
 are judging, and bring them back the same way.
 
 **Overlay the heritage record**
@@ -4486,8 +4557,9 @@ arrow or freehand, with every change written back on its own; undo/redo; rename
 a funn; note it; set its status (mulig / sannsynlig / avkreftet / rapportert);
 re-edit an existing funn's drawing; zoom to it; walk the funn list with
 ↑/↓/Enter; click or hover a funn on the map to select it in the list, and the
-reverse; grow the lokalitet when a funn escapes it, unless that would take it
-past the size band.
+reverse; take the whole set off the map (`H`) or one funn at a time, in either
+stance, without that being a change to the record; grow the lokalitet when a
+funn escapes it, unless that would take it past the size band.
 
 **Draw over what you are reading**
 put a hand-drawn overlay on the ground with the full Excalidraw tool set and

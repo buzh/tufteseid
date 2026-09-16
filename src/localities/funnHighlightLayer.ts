@@ -6,8 +6,12 @@ import VectorSource from 'ol/source/Vector';
 import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
 import { useEffect } from 'react';
 import { mapAtom } from '../map/atoms';
-import { hoveredFunnIdAtom, selectedFunnIdAtom } from './atoms';
-import { FUNN_ID_PROPERTY, getFunnLayer } from './funnLayer';
+import {
+  funnSwitchedOffAtom,
+  hoveredFunnIdAtom,
+  selectedFunnIdAtom,
+} from './atoms';
+import { FUNN_ID_PROPERTY, getFunnLayer, isFunnOnMap } from './funnLayer';
 
 // Halo under the funn the list is pointing at. A separate layer rather
 // than a style swap on funnLayer: those features carry the per-feature
@@ -48,6 +52,11 @@ export const useFunnHighlightLayer = () => {
   const map = useAtomValue(mapAtom);
   const hovered = useAtomValue(hoveredFunnIdAtom);
   const selected = useAtomValue(selectedFunnIdAtom);
+  // Not read, only depended on: `isFunnOnMap` answers off module state, and
+  // this is what re-runs the effect when a switch in [Funn]'s pulldown moves.
+  // A halo is a pointer at a shape, so it has to go when the shape does — and
+  // come back when it does, since the selection survives being switched off.
+  const switchedOff = useAtomValue(funnSwitchedOffAtom);
 
   useEffect(() => {
     let layer = getHighlightLayer(map);
@@ -74,7 +83,7 @@ export const useFunnHighlightLayer = () => {
     ];
 
     for (const [id, style] of targets) {
-      if (!id) continue;
+      if (!id || !isFunnOnMap(id)) continue;
       for (const f of funnSource.getFeatures()) {
         if (f.get(FUNN_ID_PROPERTY) !== id) continue;
         const geometry = f.getGeometry();
@@ -88,5 +97,5 @@ export const useFunnHighlightLayer = () => {
     return () => {
       source.clear();
     };
-  }, [map, hovered, selected]);
+  }, [map, hovered, selected, switchedOff]);
 };

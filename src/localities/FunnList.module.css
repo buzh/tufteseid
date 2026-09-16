@@ -91,6 +91,35 @@
   gap: var(--sp-1);
 }
 
+/* The member switch (§13.10 step 4). No chrome of its own — the glyph is the
+   affordance, the way the status badge is — and nudged up a little so it sits
+   on the title's line rather than on the block's top edge, since `.head` is
+   `align-items: flex-start` for the sake of a two-line note. */
+.switch {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin-top: 1px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+.switchOn {
+  color: var(--c-accent);
+}
+
+.switchOff {
+  color: var(--c-fg-subtle);
+}
+
 .editor {
   display: flex;
   flex-direction: column;

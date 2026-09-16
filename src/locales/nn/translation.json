@@ -301,6 +301,8 @@
       "listHint": "Funna i denne lokaliteten",
       "hide": "Skjul funna på kartet",
       "show": "Vis funna på kartet igjen",
+      "hideOne": "Skjul dette funnet på kartet",
+      "showOne": "Vis dette funnet på kartet igjen",
       "new": "Nytt funn",
       "loading": "Hentar funn…",
       "empty": "Ingen funn enno. Teikn det du ser i terrenget.",

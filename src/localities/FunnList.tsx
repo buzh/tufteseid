@@ -155,11 +155,60 @@ const RowMenu = ({
   );
 };
 
+/*
+ * The member switch — `[Funn ▾]` is a layer group since §13.10 step 4, and
+ * this is what makes its rows members rather than merely an index.
+ *
+ * Same glyphs as `LayerGroup`'s own member rows, because it is the same
+ * statement: this row is on the map, that one is not. It is first in the row
+ * and outside `.actions` for the same reason it is first in a pulldown —
+ * everything to the right of it acts on the *record*, and this is the one
+ * control on the card that does not.
+ *
+ * In both stances, and not gated on `editable`: switching a layer off writes
+ * nothing (§13.8), and a reader looking at somebody's twenty funn needs to be
+ * able to clear one off the relief exactly as much as its owner does.
+ */
+const VisibilitySwitch = ({
+  shown,
+  onToggle,
+}: {
+  shown: boolean;
+  onToggle: () => void;
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={shown}
+      className={styles.switch}
+      title={t(shown ? 'localities.funn.hideOne' : 'localities.funn.showOne')}
+      aria-label={t(
+        shown ? 'localities.funn.hideOne' : 'localities.funn.showOne',
+      )}
+      onClick={(e: MouseEvent) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+    >
+      <Icon
+        icon={shown ? 'check_box' : 'check_box_outline_blank'}
+        size={18}
+        className={shown ? styles.switchOn : styles.switchOff}
+      />
+    </button>
+  );
+};
+
 const FunnRow = ({
   funn,
   editable,
   selected,
   deleted,
+  shown,
+  onToggleShown,
   onSelect,
   onStatus,
   onSaveMeta,
@@ -173,6 +222,9 @@ const FunnRow = ({
   /** Tombstoned by this edit session — greyed, and one press from coming
    *  back (§5.6, consequence 2). */
   deleted: boolean;
+  /** On the map right now. Nothing to do with `deleted` or `hidden`. */
+  shown: boolean;
+  onToggleShown: (id: string) => void;
   onSelect: (f: LocalityFindRecord) => void;
   onStatus: (f: LocalityFindRecord, s: LocalityFindStatus) => void;
   onSaveMeta: (f: LocalityFindRecord, title: string, note: string) => void;
@@ -233,6 +285,15 @@ const FunnRow = ({
       title={editing || deleted ? undefined : t('localities.funn.actions.zoom')}
     >
       <div className={styles.head}>
+        {/* A tombstoned funn is already off the map, so there is nothing for a
+            switch to say about it — and a switch that looked live would be
+            offering to put back something the transaction has taken away. */}
+        {!deleted && (
+          <VisibilitySwitch
+            shown={shown}
+            onToggle={() => onToggleShown(funn.id)}
+          />
+        )}
         <div className={styles.main}>
           {editing ? (
             <div className={styles.editor}>
@@ -311,6 +372,8 @@ export const FunnList = ({
   editable,
   selectedId,
   deletedIds,
+  switchedOffIds,
+  onToggleShown,
   onSelect,
   onStatus,
   onSaveMeta,
@@ -322,6 +385,9 @@ export const FunnList = ({
   editable: boolean;
   selectedId: string | null;
   deletedIds: ReadonlySet<string>;
+  /** Switched off in this session — view state, never stored (§13.8). */
+  switchedOffIds: ReadonlySet<string>;
+  onToggleShown: (id: string) => void;
   onSelect: (f: LocalityFindRecord) => void;
   onStatus: (f: LocalityFindRecord, s: LocalityFindStatus) => void;
   onSaveMeta: (f: LocalityFindRecord, title: string, note: string) => void;
@@ -357,6 +423,8 @@ export const FunnList = ({
           editable={editable}
           selected={f.id === selectedId}
           deleted={deletedIds.has(f.id)}
+          shown={!switchedOffIds.has(f.id)}
+          onToggleShown={onToggleShown}
           onSelect={onSelect}
           onStatus={onStatus}
           onSaveMeta={onSaveMeta}

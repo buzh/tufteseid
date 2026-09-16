@@ -301,6 +301,8 @@
       "listHint": "The finds in this locality",
       "hide": "Hide the finds on the map",
       "show": "Show the finds on the map again",
+      "hideOne": "Hide this find on the map",
+      "showOne": "Show this find on the map again",
       "new": "New find",
       "loading": "Loading finds…",
       "empty": "No finds yet. Draw what you see in the terrain.",

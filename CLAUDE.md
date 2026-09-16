@@ -86,19 +86,26 @@ all of them.
   and the takeout bundle, and moving Terreng and Sammenlign off row 1 onto
   the lokalitet row. Read it before building any of that; each step folds into
   `docs/ui-architecture.md` §8 as it lands. **§13 is a separate thread and
-  only its first three steps are built**: the *layer row* — four `[thing ▾]` groups
+  only its first four steps are built**: the *layer row* — four `[thing ▾]` groups
   (Visning / Bilde / Skisse / Funn) matching the map's z-stack bottom-to-top,
   each member switchable with its own opacity — which deletes `Gjenskap`, `Vis
   i ruta` and the one-slot ground arbiter, makes a funn a container for images
   as well as a sublocation, and gives an arrangement a record of its own
   (`kind: 'scene'`, membership on the existing `over`). §13.10 is its build
-  order and three steps have landed: the ground overlay is a stack and the
+  order and four steps have landed: the ground overlay is a stack and the
   arbiter is gone; `src/localities/groundView.ts` can put a View on the map
   as its own pixels over its own rectangle — rendering it live when there is no
-  pinned figure to lay down; and `src/shell/LayerGroup.tsx` is the `[thing ▾]`
-  control itself, worn so far by `[Skisse ▾]` alone. Its props are the
-  abstraction — an ordered member list and three callbacks — so the next three
-  steps re-clothe Funn, Visning and Bilde in it rather than writing more of it.
+  pinned figure to lay down; `src/shell/LayerGroup.tsx` is the `[thing ▾]`
+  control itself; and `[Skisse ▾]` and `[Funn ▾]` both wear it. The component
+  is the *button and the pulldown frame* — a label that toggles the group, a
+  caret that opens it, a badge counting what is on the map — with the body a
+  render prop, so a group brings either the default `LayerMembers` (a switch
+  and a fade each) or a surface of its own, as `[Funn ▾]` brings `FunnList`.
+  Steps 5 and 6 re-clothe Visning and Bilde in it rather than writing more of
+  it. Two rules that came out of step 4 and hold for those: **opacity is a
+  raster idea** — vector members get a switch and nothing else — and the funn
+  row's `EyeSplit` polarity (label opens, eye hides) is now row 1's alone, on
+  `Kulturminner`.
 - `README.md` — third-party-facing install and admin guide (docker compose
   install, first-run PocketBase superuser, OAuth redirect URL, granting the
   app admin role, licence). Keep it accurate when any of that changes.

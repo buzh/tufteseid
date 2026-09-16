@@ -305,7 +305,9 @@ export const RibbonGlobalRow = () => {
             rectangles load at all — so for half the app it was a dead button,
             and for the other half it was a switch sitting three rows away
             from the count of what it hid. The two halves went separate ways:
-            the funn half is the eye on `Funn` (H still works), and the
+            the funn half is the `Funn` button on the lokalitet row, which
+            since §13.10 step 4 is a layer group whose label is the switch
+            (H still works), and the
             rectangles no longer need hiding because they draw faint unless
             they are the one you have open (localityLayer.ts). */}
 

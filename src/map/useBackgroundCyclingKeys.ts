@@ -68,8 +68,11 @@ const GROUND_KEYS: readonly string[] = ['1', '2', '3', '4', '5'];
 // Not the backtick: on the Norwegian layout it is a dead key and arrives as
 // `key: "Dead"`, which is unusable for hold-and-release.
 const PEEK_KEY = 'x';
-// Hide/show the funn and their halo — the eye on `Funn`. Not the lokalitet
-// rectangles any more: those draw faint when they are not the open one.
+// Hide/show the funn and their halo — the `Funn` label on the lokalitet row.
+// That is the group toggle of a layer group, not the per-funn switches in its
+// pulldown; those are a separate state (funnSwitchedOffAtom) and no key owns
+// them. Not the lokalitet rectangles any more either: those draw faint when
+// they are not the open one.
 const FUNN_KEY = 'h';
 // Arm/disarm Stedsinfo, the click-the-map-for-a-readout tool.
 const INFO_KEY = 'i';

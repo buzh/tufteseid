@@ -1,5 +1,5 @@
-// The eye on the `Funn` control: take the funn off the map without unloading
-// any of them.
+// Taking the funn off the map without unloading any of them — the whole group
+// at once (the `Funn` label, key `H`) and one member at a time (its pulldown).
 //
 // `setVisible(false)` rather than removing the layers, because everything the
 // glance is meant to leave alone hangs off them — the hydrated features, two
@@ -11,9 +11,9 @@
 import { useAtomValue } from 'jotai';
 import { useEffect } from 'react';
 import { mapAtom } from '../map/atoms';
-import { funnHiddenAtom } from './atoms';
+import { funnHiddenAtom, funnSwitchedOffAtom } from './atoms';
 import { HIGHLIGHT_LAYER_ID } from './funnHighlightLayer';
-import { FUNN_LAYER_ID } from './funnLayer';
+import { FUNN_LAYER_ID, setSwitchedOffFunn } from './funnLayer';
 
 // The funn and their halo, and nothing else. The lokalitet rectangles used to
 // be in here too, back when this was one global "Skjul merker"; they came out
@@ -30,6 +30,15 @@ const FUNN_LAYER_IDS: readonly string[] = [FUNN_LAYER_ID, HIGHLIGHT_LAYER_ID];
 export const useFunnVisibility = () => {
   const map = useAtomValue(mapAtom);
   const hidden = useAtomValue(funnHiddenAtom);
+  const switchedOff = useAtomValue(funnSwitchedOffAtom);
+
+  // One funn at a time is a *style*, not a layer: the funn are one vector
+  // source, so there is nothing per-member to set `visible` on. Which is also
+  // why the two halves of this file do not look alike — the group's switch
+  // hides two layers, a member's empties one feature's style.
+  useEffect(() => {
+    setSwitchedOffFunn(switchedOff);
+  }, [switchedOff]);
 
   useEffect(() => {
     const apply = () => {

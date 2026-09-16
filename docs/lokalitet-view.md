@@ -1,6 +1,6 @@
 # The lokalitet view
 
-**Status: §1–§12 built, §13 designed and three steps in.** §12's build order is
+**Status: §1–§12 built, §13 designed and four steps in.** §12's build order is
 complete through step 15; what is left of it is step 16 — sharing (§10) and the
 Rapportpakke (§9) — plus the two builds that landed outside the numbered list
 and are recorded at the end of §12 (placing the rectangle, sketches as
@@ -13,7 +13,7 @@ because the reasoning is not recoverable from the result, not because it
 describes the app.
 
 §13 is the exception and reads the other way round: a later thread whose build
-order is §13.10 and whose first three steps have landed, and which deletes
+order is §13.10 and whose first four steps have landed, and which deletes
 several things `docs/ui-architecture.md` and CLAUDE.md stated as load-bearing
 until it came for them.
 
@@ -1578,12 +1578,13 @@ Docs to update: `docs/ui-architecture.md` §3.1 (the shell loses a slot), §5.1
 
 ## 13. The layer row — the stack becomes the control
 
-**Status: designed; steps 1–3 of §13.10 built, the rest not.** It supersedes the
+**Status: designed; steps 1–4 of §13.10 built, the rest not.** It supersedes the
 verbs in §4.2 and deletes the one-slot arbiter that section introduced — that
 deletion has landed, and so has the mechanism the replacement needs: a View can
-now be put on the map as its own pixels over its own rectangle. The row itself
-has its first button: `src/shell/LayerGroup.tsx` is the `[thing ▾]` control and
-[Skisse] is wearing it. §4.1, §4.1.1 and §4.1.2
+now be put on the map as its own pixels over its own rectangle. The row has two
+of its four buttons: `src/shell/LayerGroup.tsx` is the `[thing ▾]` control, and
+[Skisse] and [Funn] are both wearing it — the second by swapping the duties of
+the halves it already had. §4.1, §4.1.1 and §4.1.2
 survive unchanged: a View is still a spec, a File is still bytes, and the pin
 is still a pin. What changes is who decides what is on the map.
 
@@ -1915,18 +1916,25 @@ Three sequencing rules, and as in §12 they are worth more than the list.
 
 3. **The group control** — ✅ **built** (`src/shell/LayerGroup.tsx`). One
    `[thing ▾]`: the label toggles the group, the caret opens a pulldown, each
-   member has a switch and an opacity slider. Its props are the abstraction —
-   an ordered `LayerMember[]` and three callbacks — so nothing in the component
-   knows what a sketch is, and a prop that ever needs to is the signal that the
-   row has stopped being one control. Landed on **[Skisse]**, the only group
-   whose data was already this shape.
+   member has a switch and an opacity slider. Landed on **[Skisse]**, the only
+   group whose data was already this shape.
+
+   Its props were the abstraction — an ordered `LayerMember[]` and three
+   callbacks — so nothing in the component knew what a sketch was. **Step 4
+   moved that line one notch out**: the component is the *button and the
+   pulldown frame*, `children` is a render prop for the body, and the ordered
+   member list went to a second export, `LayerMembers`, which is what [Skisse]
+   passes. The rule the original prop shape was protecting still holds and is
+   easier to state in the new one — nothing in `LayerGroup` knows what is in
+   the group — and step 4's finding is that the shared thing was never the
+   rows, it was the seam.
 
    **The label toggles and the caret opens, which is the opposite polarity to
-   `EyeSplit`.** On `Funn` the everyday press is "show me the index" and the
+   `EyeSplit`.** On an index the everyday press is "show me the list" and the
    eye is the afterthought; here it is "take this layer off so I can see what
    is under it". The seam geometry is duplicated from `EyeSplit.module.css`
-   rather than shared, deliberately: step 4 is the step with two real cases in
-   front of it and the standing to decide whether one frame serves both.
+   rather than shared — see step 4, which had the two real cases and decided
+   to keep the copy.
 
    **The group toggle is layer visibility, not a teardown and not "all members
    off".** Switching a group back on has to bring back exactly the composition
@@ -1953,15 +1961,54 @@ Three sequencing rules, and as in §12 they are worth more than the list.
    stays; both surfaces press `sketchShownAtom`, so the rail and the row cannot
    disagree.
 
-4. **[Funn]** — `FunnControl` re-clothed. The `EyeSplit` becomes the group's
-   label toggle (`H` unchanged), the funn list becomes the pulldown's members,
-   and `funnLayer` learns per-member visibility. Cheapest of the four, and it
-   is what makes the row uniform enough for §13.1's claim — that the row
-   teaches the stack — to be true rather than merely intended. **Per-funn
-   opacity is the one thing that does not fall out**: the funn are one vector
-   layer, so it is N layers or a style function, and the honest third answer is
-   that a group opacity is enough for marks and per-member opacity is a raster
-   idea. Decide it here, do not carry it.
+4. **[Funn]** — ✅ **built.** `FunnControl` re-clothed: the two halves swapped
+   duties, so the **label** is now what takes the funn off the map (`H`
+   unchanged, `funnHiddenAtom` untouched) and the **caret** opens the index,
+   which used to be the label's job. The lokalitet row speaks one polarity from
+   here on; `EyeSplit` has one caller left, `Kulturminner` on row 1, where the
+   thing being hidden is a global overlay rather than a member of this
+   lokalitet's stack.
+
+   **The pulldown's body is `FunnList`, unchanged.** A funn row is inline
+   rename, a status menu, a row menu, a tombstone with `Angre`, zoom-to and
+   hover→halo; pouring that into a generic `MemberRow` would have been a
+   regression dressed as consistency. So `LayerGroup` was split instead (step
+   3 above) and [Funn] passes its own body through the render prop, taking
+   `close` from it so selecting a funn still dismisses the pulldown. A React
+   context for `close` was considered and rejected: one argument, one consumer.
+
+   **Per-member visibility is a style, not a layer.** The funn are one vector
+   source, so `funnLayer.ts` grew `switchedOffFunnIds` beside the pen's
+   existing `hiddenFunnId` and one `styleFor(id)` that ORs them — every place
+   that used to compare against the pen's id now asks `styleFor`, and
+   `isFunnOnMap(id)` is the predicate both the layer and
+   `funnHighlightLayer` read. The two states stay **separate** on purpose:
+   resuming a draft must not clear somebody's switches, and a switch must not
+   outlive the pen. The highlight layer clones geometry regardless of style, so
+   it is gated on `isFunnOnMap` too — otherwise a switched-off funn that
+   happened to be selected would still wear its halo.
+
+   `funnSwitchedOffAtom` holds the ids that are **off** (`src/localities/atoms.ts`),
+   for the same reason `sketchGroupShownAtom` is not `sketchShownAtom`: the
+   group flag and the members are different statements. Never persisted, reset
+   when the lokalitet closes or swaps. Nothing here writes — §13.8 — so the
+   switch is in both stances and a reader gets it in full.
+
+   **The badge now counts what is on the map**: the index minus tombstones
+   minus switched-off, and nothing while the group is off. §6's question —
+   *is there anything in this rectangle* — is still answered in the ordinary
+   case, and when it is not, the difference is a thing the user just did.
+
+   **No opacity on [Funn], per member or per group** — decided here, as the
+   step asked. Per-funn opacity is N layers or a style function over one
+   vector source, and the reason not to pay either is that it would buy
+   nothing: a fade is for reading *through* a layer at the ground beneath it,
+   and the funn are already a 0.12 fill and a cased outline — marks on the
+   ground rather than a covering of it (§8.6 of `docs/ui-architecture.md`).
+   The verb for "this one is in my way" is its switch. So `LayerMember.opacity`
+   stays a raster idea, and the row is uniform in the four things that matter
+   — a label that toggles, a caret that opens, a badge that counts, members
+   that switch — without pretending vectors are pixels.
 
 5. **[Visning]** — the group that holds the content and deletes the most. The
    bottom member is the ground preset off `groundHandleAtom`; above it, every

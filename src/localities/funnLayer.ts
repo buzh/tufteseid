@@ -53,7 +53,8 @@ const defaultFunnStyle = [
 ];
 
 // A style with nothing in it draws nothing — how a funn is kept off the map
-// while the pen is holding its shapes.
+// while the pen is holding its shapes, and how [Funn]'s per-member switches
+// take one off without taking anything else with it.
 const INVISIBLE = new Style(undefined);
 
 // The funn currently being drawn, if any. It has to stay hidden across
@@ -61,6 +62,44 @@ const INVISIBLE = new Style(undefined);
 // realtime update, which rebuilds the record's features from scratch and would
 // otherwise put the persisted copy back underneath the one under the pen.
 let hiddenFunnId: string | null = null;
+
+// The funn switched off by hand in [Funn]'s pulldown (§13.10 step 4). Module
+// level beside `hiddenFunnId` and for its reason — a realtime update rebuilds
+// the features, and a switch the rebuild forgot would put a funn back on the
+// map that somebody had just taken off it.
+//
+// Two states, not one set: the pen's is a fact about a session and this is a
+// choice about a reading, and merging them would mean a resumed draft could
+// clear a switch, or a switch could out-live the pen. They are ORed here and
+// nowhere else.
+let switchedOffFunnIds: ReadonlySet<string> = new Set<string>();
+
+const styleFor = (funnId: string) =>
+  funnId === hiddenFunnId || switchedOffFunnIds.has(funnId)
+    ? INVISIBLE
+    : defaultFunnStyle;
+
+/** Whether this funn is on the map — for the halo, which clones its shape. */
+export const isFunnOnMap = (funnId: string) =>
+  funnId !== hiddenFunnId && !switchedOffFunnIds.has(funnId);
+
+/**
+ * Declare the whole switched-off set — `useFunnVisibility` is the only caller.
+ *
+ * Restyling in place rather than reloading: the features, the two realtime
+ * subscriptions and the selection are all things a switch is meant to leave
+ * exactly as they were, which is the same argument the group's own eye makes
+ * one level up.
+ */
+export const setSwitchedOffFunn = (ids: ReadonlySet<string>) => {
+  switchedOffFunnIds = ids;
+  const source = getFunnLayer()?.getSource();
+  if (!source) return;
+  for (const f of source.getFeatures()) {
+    const id = f.get(FUNN_ID_PROPERTY) as string | undefined;
+    if (id) f.setStyle(styleFor(id));
+  }
+};
 
 const geoJson = new GeoJSON();
 
@@ -100,11 +139,7 @@ const hydrateFeatures = (
   }
   for (const f of features) {
     f.set(FUNN_ID_PROPERTY, rec.id);
-    if (rec.id === hiddenFunnId) {
-      f.setStyle(INVISIBLE);
-      continue;
-    }
-    f.setStyle(defaultFunnStyle);
+    f.setStyle(styleFor(rec.id));
   }
   return features;
 };
@@ -147,7 +182,7 @@ export const hideFunnOnLayer = (id: string | null) => {
   const source = getFunnLayer()?.getSource();
   if (!source || id == null) return;
   for (const f of source.getFeatures()) {
-    if (f.get(FUNN_ID_PROPERTY) === id) f.setStyle(INVISIBLE);
+    if (f.get(FUNN_ID_PROPERTY) === id) f.setStyle(styleFor(id));
   }
 };
 

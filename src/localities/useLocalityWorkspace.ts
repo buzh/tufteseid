@@ -68,6 +68,7 @@ import {
   editingLocalityIdAtom,
   funnDraftActiveAtom,
   funnHiddenAtom,
+  funnSwitchedOffAtom,
   pendingStarterLocalityIdAtom,
   selectedFunnIdAtom,
 } from './atoms';
@@ -266,6 +267,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [adjusting, setAdjusting] = useAtom(adjustingLocalityAtom);
   const [selectedFunnId, setSelectedFunnId] = useAtom(selectedFunnIdAtom);
   const setFunnHidden = useSetAtom(funnHiddenAtom);
+  const setFunnSwitchedOff = useSetAtom(funnSwitchedOffAtom);
   const [tool, setTool] = useAtom(ribbonToolAtom);
   const mode = useAtomValue(workspaceModeAtom);
   const stripOpen = useAtomValue(bilderStripOpenAtom);
@@ -878,6 +880,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setSelectedFunnId(null);
       setFunnOutside(false);
       hideFunnOnLayer(null);
+      // Keyed by find id, so the next lokalitet's funn are not in it — but a
+      // set left standing would come back with *this* lokalitet and open it
+      // with funn missing that its owner never switched off in this session.
+      setFunnSwitchedOff(new Set());
       // The overlays belong to this lokalitet's bilder, and the next one's
       // ids are not these. Both halves: the layers come off the map and the
       // set that decides which are up is emptied.
@@ -902,6 +908,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setTool,
     setSelectedFunnId,
     setFunnOutside,
+    setFunnSwitchedOff,
     setSketchShown,
     setSketchOpacityMap,
     setSketchGroupShown,
@@ -1237,9 +1244,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     if (!canAdd || draftActive) return;
     clearForPen();
     hideFunnOnLayer(null);
-    // The eye on `Funn` is a way of looking at the ground, not a way of
+    // The `Funn` switch is a way of looking at the ground, not a way of
     // working on it: drawing with the existing funn invisible is how you end
     // up drawing the one you already have.
+    //
+    // The group flag only, not the per-member switches (§13.10 step 4). This
+    // one can be set by a keystroke and takes *everything* away, which is the
+    // hazard; switching off one named row is a deliberate statement about a
+    // funn you have therefore just looked at, and clearing it here would be
+    // the pen undoing a reading it was not asked about.
     setFunnHidden(false);
     setDraftFunnId(null);
     setDraftIsEdit(false);
@@ -2723,7 +2736,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     },
   });
 
-  const funnCount = findItems?.length ?? 0;
   // What the badge on `Bilder ▾` counts: the strip's own list, so a reader is
   // told how many images the exhibit has rather than how many exist. In edit
   // the hidden ones are on the rail, so they are in the count too — the number
@@ -2930,7 +2942,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     takingBildeId: takingId,
     coverBildeId,
     pinned,
-    funnCount,
     bilderCount,
     hasBilder,
 

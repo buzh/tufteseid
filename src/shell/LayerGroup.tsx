@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx, Icon, type MaterialSymbol, Popover, Tooltip } from '../ui';
 import styles from './LayerGroup.module.css';
@@ -6,23 +6,29 @@ import { ModeButton } from './ModeButton';
 
 /*
  * One `[thing ▾]` on the lokalitet row — docs/lokalitet-view.md §13.1, §13.10
- * step 3.
+ * steps 3 and 4.
  *
  * The row is four of these, left to right in the map's own z-order: Visning,
  * Bilde, Skisse, Funn. So this component is the whole layer row, used four
- * times, and its props are the abstraction: an ordered list of members, and
- * the three things that can be done to them. Nothing here knows what a sketch
- * is. If a prop ever needs to, that is the signal that the row has stopped
- * being one control.
+ * times, and what it is is a *button*: a labelled half that takes the group
+ * off the map, a caret that opens what is in it, and a badge saying how much
+ * of it is up. Nothing here knows what a sketch or a funn is.
+ *
+ * **What goes in the pulldown is the caller's.** `LayerMembers` below is the
+ * default body and does the job for a group whose members are nothing but
+ * layers — a switch and a fade each. `[Funn]` is the one group whose members
+ * are also *records you act on* (rename, restage, redraw, delete), so it
+ * brings `FunnList` instead, switches and all. Splitting it that way is step
+ * 4's finding: the shared thing was never the rows, it was the seam.
  *
  * **The label toggles, the caret opens.** That is the opposite polarity to
- * `EyeSplit`, whose labelled half opens a list and whose eye hides it, and the
- * difference is which of the two is the everyday press: on `Funn` it is "show
- * me the index", here it is "take this layer off so I can see what is under
- * it". The seam geometry is duplicated from `EyeSplit.module.css` rather than
- * shared, deliberately and temporarily — step 4 re-clothes `Funn` as one of
- * these, and *that* is the step with two real cases in front of it and the
- * standing to decide whether one frame serves both.
+ * `EyeSplit`, whose labelled half opens a list and whose eye hides it. Having
+ * both idioms on one screen was tolerable while `Funn` was the odd one out;
+ * with `Funn` re-clothed the lokalitet row speaks this one throughout and
+ * `EyeSplit` is row 1's, on `Kulturminner`. The seam geometry stays duplicated
+ * between the two: what they share is ten lines of flex and a border radius,
+ * and what they differ in — width, glyph, and which state is lit — is
+ * everything that gives either one its meaning.
  *
  * Nothing in here writes (§13.8), so there is no stance gate anywhere in the
  * component: a reader gets the row at full function.
@@ -49,11 +55,13 @@ export const LayerGroup = ({
   label,
   toggleLabel,
   membersLabel,
+  hint,
   shown,
-  members,
+  shownCount,
+  width = 320,
+  padded = false,
+  children,
   onToggle,
-  onToggleMember,
-  onSetOpacity,
 }: {
   icon: MaterialSymbol;
   /** The group's name, on the button. */
@@ -62,36 +70,54 @@ export const LayerGroup = ({
   toggleLabel: string;
   /** Accessible name for the caret and its panel. */
   membersLabel: string;
+  /** Keyboard shortcut for the toggle, appended to its tooltip. */
+  hint?: string;
   shown: boolean;
-  members: readonly LayerMember[];
+  /** How many members are on the map. See the badge note below. */
+  shownCount: number;
+  /** The pulldown's geometry, for a body that is not `LayerMembers`. */
+  width?: number;
+  padded?: boolean;
+  /**
+   * The pulldown's contents, given a way to dismiss it.
+   *
+   * A function rather than a node because `FunnList`'s rows fly the map to a
+   * funn, and a pulldown left standing over the place it just flew to is the
+   * one outcome that gesture cannot want. The alternative — the caller owning
+   * `open` and passing it down — is what this component exists to stop four
+   * rows from each doing.
+   */
+  children: (close: () => void) => ReactNode;
   onToggle: () => void;
-  onToggleMember: (id: string) => void;
-  onSetOpacity: (id: string, opacity: number) => void;
 }) => {
   const [open, setOpen] = useState(false);
 
   return (
     <div className={styles.group}>
-      {/* The badge counts what is *on*, not what exists. The other two counted
-          buttons on this row answer "is there anything here" — that is what a
-          rail and an index are for — and this one answers "how much of it am I
-          looking at", which is the only question a layer switch is asked. */}
+      {/* The badge counts what is *on*, not what exists, and goes away with
+          the group. The other counted button on this row, `Bilder ▾`, answers
+          "is there anything here" — that is what a rail is for — and a layer
+          switch is only ever asked "how much of it am I looking at".
+
+          For `Funn` that is a change of meaning with almost no change of
+          number: every funn is on unless you switched it off, so the badge
+          still answers "does this rectangle have anything in it" in the
+          ordinary case, which is the property §6 wanted from it. */}
       <ModeButton
         icon={icon}
         label={label}
-        tooltip={toggleLabel}
+        tooltip={hint ? `${toggleLabel} (${hint})` : toggleLabel}
+        ariaLabel={label}
         active={shown}
-        badge={
-          shown ? members.filter((m) => m.shown).length || undefined : undefined
-        }
+        badge={shown ? shownCount || undefined : undefined}
         joinedRight
         onClick={onToggle}
       />
       <Popover
         open={open}
         onOpenChange={setOpen}
-        width={320}
-        padded={false}
+        width={width}
+        padded={padded}
         label={membersLabel}
         trigger={
           <Tooltip label={membersLabel}>
@@ -107,20 +133,38 @@ export const LayerGroup = ({
           </Tooltip>
         }
       >
-        <div className={styles.members}>
-          {members.map((member) => (
-            <MemberRow
-              key={member.id}
-              member={member}
-              onToggle={() => onToggleMember(member.id)}
-              onSetOpacity={(value) => onSetOpacity(member.id, value)}
-            />
-          ))}
-        </div>
+        {children(() => setOpen(false))}
       </Popover>
     </div>
   );
 };
+
+/**
+ * The default pulldown body: a switch and a fade per member.
+ *
+ * Exported separately from `LayerGroup` so that a group with a body of its own
+ * does not have to pretend its records are plain layers — see the note above.
+ */
+export const LayerMembers = ({
+  members,
+  onToggleMember,
+  onSetOpacity,
+}: {
+  members: readonly LayerMember[];
+  onToggleMember: (id: string) => void;
+  onSetOpacity: (id: string, opacity: number) => void;
+}) => (
+  <div className={styles.members}>
+    {members.map((member) => (
+      <MemberRow
+        key={member.id}
+        member={member}
+        onToggle={() => onToggleMember(member.id)}
+        onSetOpacity={(value) => onSetOpacity(member.id, value)}
+      />
+    ))}
+  </div>
+);
 
 /*
  * A switch and a fade, per member.

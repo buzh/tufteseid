@@ -43,9 +43,13 @@ const RESHAPEABLE: ThemeLayerName = 'heritageSites';
  * lived on the second. Turn on three sources from the panel and the button
  * labelled `Kulturminner` was a switch for one of them; press it and two
  * stayed behind. Now the noun names the whole overlay, the badge is on the
- * noun, and on/off is the eye — which is `Funn`'s arrangement three rows down
- * (`EyeSplit`), for the same reason: the button that lists what it hides is
- * the button the switch belongs on.
+ * noun, and on/off is the eye — for the reason `Funn` three rows down reaches
+ * the same way round by the other route: the button that lists what it hides
+ * is the button the switch belongs on. The two have since diverged on *which
+ * half* is which — `Funn` is a `LayerGroup` now, where the label switches and
+ * a caret opens (§13.10 step 4) — and this is the last `EyeSplit`. It stays
+ * one because what it hides is a global overlay rather than a member of the
+ * open lokalitet's stack, so the layer row's polarity has nothing to say here.
  *
  * The panel replaces the "Temakart" card, which was upstream's generic
  * theme-layer tree: expandable categories, subthemes, a count warning at

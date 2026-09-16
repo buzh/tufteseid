@@ -5,6 +5,7 @@ export const ModeButton = ({
   icon,
   label,
   tooltip,
+  ariaLabel,
   active,
   badge,
   disabled,
@@ -14,12 +15,19 @@ export const ModeButton = ({
   icon: MaterialSymbol;
   label: string;
   tooltip?: string;
+  /**
+   * The accessible name, when the tooltip is a *verb* that changes with
+   * `active`. Saying both the verb and the state announces "Hide the finds,
+   * pressed", so a toggle whose tooltip flips passes its stable noun here and
+   * lets `aria-pressed` carry the rest. `LayerGroup` is why this exists.
+   */
+  ariaLabel?: string;
   active?: boolean;
   badge?: number | string;
   disabled?: boolean;
   /** This button is the left half of a split control and something is butted
-   *  against it — square that edge off and pull the badge in off it. The only
-   *  one is `Funn` and its eye (RibbonLocalityRow). */
+   *  against it — square that edge off and pull the badge in off it. The two
+   *  are `LayerGroup` and `EyeSplit`. */
   joinedRight?: boolean;
   onClick: () => void;
 }) => (
@@ -29,7 +37,7 @@ export const ModeButton = ({
         type="button"
         className={cx(styles.button, active && styles.active)}
         aria-pressed={active}
-        aria-label={tooltip ?? label}
+        aria-label={ariaLabel ?? tooltip ?? label}
         disabled={disabled}
         onClick={onClick}
       >
