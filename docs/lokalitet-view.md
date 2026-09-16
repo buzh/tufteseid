@@ -1715,10 +1715,12 @@ failing.
 
 ### 13.5 Files on the map, and the upload opt-in
 
-`screenshot` has `bbox25833` and `imageRect` and lays down like anything else;
-that half landed at step 6. `upload` has no `meta` at all, which is why
-`canPinBilde` refused it and why `fileItems` still lists `screenshot` alone —
-[Bilde] would otherwise carry a member it cannot put on the ground.
+**Both halves are built** — the screenshots at step 6, the uploads at step 7.
+
+`screenshot` has `bbox25833` and `imageRect` and lays down like anything else.
+`upload` had no `meta` at all, which is why `canPinBilde` refused it and why
+`fileItems` listed `screenshot` alone after step 6 — [Bilde] would otherwise
+have carried a member it cannot put on the ground.
 
 Correct for a field photo, wrong for a scanned old map or a georeferenced
 export out of QGIS. So: **an opt-in, per upload.** It writes `meta.bbox25833`
@@ -1744,7 +1746,19 @@ hiding:
   when it leaves the surface that made it is worse than no assumption.
 
 It is a write, so: edit stance only, buffered into the transaction, committed
-by `Lagre` like everything else (§5.6).
+by `Lagre` like everything else (§5.6). Which settles where it goes. §13.8 says
+nothing in the layer row writes and the row therefore needs no stance gate
+anywhere in it, so the verb cannot live in [Bilde]'s pulldown; it lives on the
+card, with the caption and the concealment, and `Plasser i ruta` is a curation
+verb with a geometry in it rather than a map verb coming back.
+
+**As built** (step 7): `src/localities/uploadPlacement.ts` — `imageAspectOf`
+off the 800 px thumbnail, `assumedExtentOf` for the fit — with `placeUpload` /
+`unplaceUpload` on the workspace writing the whole `meta` object into the
+buffer, `PlaceUploadButton` in `bilderCommon.tsx`, `LayerMember.note` for the
+mark on the row and a gray badge for the mark on the card. `Ta med` (§7)
+already carries the whole `meta`, so the flag reaches a copy unaided; the
+takeout is §12 step 16 and has to carry it when it is built.
 
 ### 13.6 A funn is a sublocation *and* a container
 
@@ -2106,11 +2120,14 @@ Three sequencing rules, and as in §12 they are worth more than the list.
 6. **[Bilde]** — the Files. **Built.** `src/shell/BildeControl.tsx` is
    [Visning] minus the ground preset and minus the action: a `screenshot` lays
    down at its extent, with a switch and a fade each and several down at once.
-   `upload` is absent from the group until step 7, so `ws.fileItems` gates on
-   `kind === 'screenshot'`, and on two things only a File needs — bytes, and a
-   `bbox25833` — because a switch that cannot do anything is the one thing a
-   list of switches must not contain. A View is exempt from both: it can be
-   produced from its spec, over the spec's own rectangle.
+   `ws.fileItems` gates on the kind and on two things only a File needs —
+   bytes, and a `bbox25833` — because a switch that cannot do anything is the
+   one thing a list of switches must not contain. A View is exempt from both:
+   it can be produced from its spec, over the spec's own rectangle. `upload`
+   was absent from the group at this step, so the kind test read
+   `kind === 'screenshot'`; step 7 widened it to either File and left the
+   `bbox25833` test to keep the unplaced uploads out, which it turned out to
+   do already.
 
    **The mechanism grew a second caller, not a second layer.** Both groups
    paint into `zIndex: 1`, and they are siblings on the row with no component
@@ -2166,9 +2183,51 @@ Three sequencing rules, and as in §12 they are worth more than the list.
    with it. What outlives it is an id in a set nothing lists, which the
    close/swap cleanup empties along with the other six switches.
 
-7. **The upload opt-in** (§13.5) — `meta.bbox25833` at the image's own aspect,
-   `meta.bboxAssumed` and its mark, and the flag carried into a copy and a
-   takeout. A write, so edit only and buffered into the transaction.
+7. **The upload opt-in** (§13.5). **Built.** `src/localities/uploadPlacement.ts`
+   is the whole primitive: `imageAspectOf` reads the file's width ÷ height off
+   its 800 px thumbnail, and `assumedExtentOf` returns the largest rectangle of
+   that aspect centred in the lokalitet's and contained in it. `placeUpload` on
+   the workspace writes `{...meta, bbox25833, bboxAssumed: true}` into the edit
+   buffer; `unplaceUpload` writes the same object with both keys gone. Then
+   `fileItems` widened from `kind === 'screenshot'` to either File, and nothing
+   else changed: the `bbox25833` test that was already there — "a switch must
+   be able to do something" — turned out to be the upload gate as well. An
+   upload is not a second case in [Bilde]; it is the same case arriving later.
+
+   **The verb is on the card, and that does not reopen step 6's rule.** *Do not
+   add a map verb back to a card* survives because this is not one: pressing
+   `Plasser i ruta` shows nothing and hides nothing, it gives a record an
+   extent — an edit of the same kind as a caption or a concealment, which is
+   why it sits with those in the carousel's detail row and is buffered like
+   those. What it produces is a *switch*, and the switch is [Bilde]'s. Putting
+   it in the pulldown instead would have broken §13.8, which is the load-
+   bearing half of the same idea: nothing in the layer row writes, so the row
+   needs no stance gate anywhere in it. `canEdit` rather than `canAdd` — it is
+   an update, so an admin may place one.
+
+   **Two commitments from §13.5, kept literally.** The stored rectangle carries
+   the *image's* aspect, so a 4:3 scan over a 1:2 lokalitet is centred and
+   letterboxed rather than squashed: approximate in position and scale, never
+   wrong in shape, and the right kind of value for a drag-the-corners
+   georeferencer to edit later. And the assumption is marked wherever the
+   placement appears — a gray badge on the card, `LayerMember.note` on the
+   [Bilde] row (`warning`'s quiet sibling: same line, `info` glyph, subtle
+   colour, because a qualification printed in red reads as a fault). `Ta med`
+   already copies the whole `meta`, so the flag travels into a copy with no
+   code at all, and a copy inherits the original's rectangle so the extent
+   still means the same thing there. The takeout does not exist yet (§12 step
+   16); when it does, this is one of the fields it has to carry.
+
+   **One thing the write broke on the way in.** `useLocalityDraft.commit` fed
+   *every* buffered `meta` patch to the pin queue, which was right while a
+   re-drawn sketch was the only writer of that field. An upload's placement is
+   a `meta` patch too and a File has nothing to render from, so the queue would
+   have taken the job only to mark it `empty` and light a failure face on a
+   record that is perfectly fine. The test is now `body.meta && viewSpecOf(rec)`
+   — "are new pixels owed", which is the question that was always being asked.
+   `DraftAttachment.meta`'s doc comment used to say "and nothing else ever";
+   it now says what the field's actual rule is, which is that a writer must
+   spread the whole object because PocketBase replaces JSON wholesale.
 
 8. **`kind: 'scene'`** (§13.7) — membership on `over`, order and per-member
    opacity in `meta`, and the pin queue taught to flatten one. Last of the

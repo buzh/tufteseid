@@ -139,6 +139,7 @@ import {
   ribbonToolAtom,
   workspaceModeAtom,
 } from './toolAtoms';
+import { assumedExtentOf, imageAspectOf } from './uploadPlacement';
 import { useFunnAutosave } from './useFunnAutosave';
 import { useInheritedBilder } from './useInheritedBilder';
 import { useLocalityAdjust } from './useLocalityAdjust';
@@ -727,6 +728,61 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const setBildeHidden = useCallback(
     (rec: AttachmentRecord, hidden: boolean) => patchBilde(rec, { hidden }),
     [patchBilde],
+  );
+
+  /*
+   * `Plasser i ruta` and its undo — the upload opt-in (§13.5, §13.10 step 7).
+   *
+   * The only write in the whole layer-row thread, and it is deliberately not
+   * *on* the layer row: §13.8 says nothing in the row writes, and the switch
+   * that lays a File down has to stay a switch. Giving an upload an extent is
+   * a record edit of the same kind as a caption or a concealment, so it lives
+   * where those live — on the card, in edit, buffered until `Lagre`.
+   *
+   * The whole `meta` goes in the patch, not the one key, and that is
+   * `DraftAttachment.meta`'s rule rather than a choice here: PocketBase
+   * replaces a JSON field wholesale, so a partial patch is a deletion of
+   * everything it left out. `rec` is the overlaid record, so a second press in
+   * the same session reads what the first one buffered.
+   *
+   * Not `patchBilde`: that one is the three curation columns, and keeping
+   * `meta` out of its signature is what stops a caption edit from ever
+   * carrying a spec.
+   */
+  const placeUpload = useCallback(
+    async (rec: AttachmentRecord) => {
+      if (!canEdit) return;
+      try {
+        const aspect = await imageAspectOf(rec);
+        const meta: Record<string, unknown> = {
+          ...(rec.meta ?? {}),
+          bbox25833: assumedExtentOf(locality.bbox, aspect),
+          bboxAssumed: true,
+        };
+        mutateDraft((d) =>
+          withAttachment(d, rec.id, attachmentBaseOf(rec), { meta }),
+        );
+      } catch (e) {
+        // The aspect is the whole input, so there is no half-placement to
+        // leave behind: a file whose pixels will not decode gets no rectangle.
+        console.warn('[locality] place upload failed', rec.id, e);
+        toast.error({ title: t('localities.bilder.placeFailed') });
+      }
+    },
+    [canEdit, locality.bbox, mutateDraft, t],
+  );
+
+  const unplaceUpload = useCallback(
+    (rec: AttachmentRecord) => {
+      if (!canEdit) return;
+      const meta: Record<string, unknown> = { ...(rec.meta ?? {}) };
+      delete meta.bbox25833;
+      delete meta.bboxAssumed;
+      mutateDraft((d) =>
+        withAttachment(d, rec.id, attachmentBaseOf(rec), { meta }),
+      );
+    },
+    [canEdit, mutateDraft],
   );
 
   /*
@@ -1493,12 +1549,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   );
 
   /*
-   * What [Bilde] lists (§13.1, §13.10 step 6) — the same two filters again,
-   * and two more that only a File needs.
-   *
-   * `screenshot` alone, not every File: an `upload` has no georeference at
-   * all, so where it goes is a question before it is a switch, and that
-   * question is step 7's.
+   * What [Bilde] lists (§13.1, §13.10 steps 6 and 7) — the same two filters
+   * again, and two more that only a File needs.
    *
    * A File is bytes, so unlike a View it has nothing to render from — no file
    * means no member, and a `bbox25833` is what says where the bytes go. Both
@@ -1506,12 +1558,19 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * thing a list of switches must not contain is a switch that cannot do
    * anything. (A View is exempt from both: it can be produced from its spec,
    * over the spec's own rectangle.)
+   *
+   * Which is also the whole of step 7's change to this list. A screenshot has
+   * always carried the extent it was taken of; an upload carries one only once
+   * somebody has pressed `Plasser i ruta` on it (§13.5). So the kind test
+   * widened to both Files and the `bbox25833` test — already here, already
+   * doing this job — is what keeps the unplaced ones out. An upload is not a
+   * second case; it is the same case arriving later.
    */
   const fileItems = useMemo(
     () =>
       (attachmentItems ?? []).filter(
         (it) =>
-          it.kind === 'screenshot' &&
+          (it.kind === 'screenshot' || it.kind === 'upload') &&
           it.file !== '' &&
           !deletedIds.has(it.id) &&
           (canEdit || !it.hidden) &&
@@ -1972,6 +2031,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * blob cannot live in `localStorage`, so the record lands now and `Avbryt`
    * owes it a DELETE. `meta.takenFrom` is what keeps the card from coming
    * back on the borrowed tail afterwards.
+   *
+   * The whole `meta` comes across, which is how §13.5's "the flag travels into
+   * a copy" is already satisfied: an upload the original had placed arrives
+   * here placed, and still marked as assumed. The extent means the same thing
+   * on this side because a copy inherits the original's rectangle (§7).
    */
   const takeBilde = useCallback(
     async (rec: AttachmentRecord) => {
@@ -2996,6 +3060,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     removeBilde,
     setBildeCaption,
     setBildeHidden,
+    placeUpload,
+    unplaceUpload,
     reorderBilde,
 
     // funn list

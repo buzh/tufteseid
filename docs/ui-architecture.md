@@ -2565,7 +2565,10 @@ So the detail panel under the rail is now the record and nothing about the map:
 badges and provenance line, the caption field (`readOnly` unless `canEdit`,
 commits on blur), the sketch's own eye (§9.3 — it presses the same set [Skisse]
 does, so the card and the row cannot disagree), `Åpne originalen`, and in edit
-the curation verbs and `PinRetryButton` (§8.7.4).
+the curation verbs and `PinRetryButton` (§8.7.4). Step 7 added one more verb to
+that panel and it does not reopen the question: `Plasser i ruta` (§8.7.2)
+writes a rectangle onto the record, which is a curation verb with a geometry in
+it, and what it produces is a row in [Bilde] rather than a layer on the map.
 
 Three consequences of the separation, each of which had been paid for
 elsewhere:
@@ -2608,11 +2611,13 @@ is on over a layer that never came has to say so.
   means: a View whose upstream has nothing over this rectangle, or a File whose
   bytes will not decode.
 - **Eligibility is checked in the list, not on the map.** `ws.viewItems` is
-  `extract` or `flyfoto`; `ws.fileItems` is `screenshot`, with bytes and a
-  `bbox25833`. A File needs both because it has nothing to produce from, and a
-  View needs neither because it has. The one thing a list of switches must not
-  contain is a switch that cannot do anything. `upload` is in neither list
-  until `docs/lokalitet-view.md` §13.10 step 7 gives it an extent.
+  `extract` or `flyfoto`; `ws.fileItems` is either File — `screenshot` or
+  `upload` — with bytes and a `bbox25833`. A File needs both because it has
+  nothing to produce from, and a View needs neither because it has. The one
+  thing a list of switches must not contain is a switch that cannot do
+  anything. An upload has no georeference of its own, so it is in `fileItems`
+  only once `Plasser i ruta` (§8.7.2) has given it one — which the
+  `bbox25833` test was already enforcing before the kind test widened.
 - **There is no resolution ladder, and that is measured rather than assumed.**
   `docs/lokalitet-view.md` §13.2 argues for live rendering from sharpness — a
   pasted figure is a fixed number of pixels, so zooming stops helping. It does
@@ -2690,6 +2695,7 @@ transient by construction:
 | the map | nothing — picking a frame moves the cursor (§13.10 step 6) | the same |
 | order | none | drag a frame along the rail, or `arrow_back` / `arrow_forward` in the detail row |
 | conceal, delete | absent | in the detail row |
+| place an upload (§13.5) | absent | in the detail row, uploads only |
 | both | Åpne originalen, ← / →, `bottom_panel_close` | |
 
 **Edit used to be one large card at a time**, on the argument that judging a
@@ -2714,6 +2720,18 @@ Three things that read as arbitrary until you try the alternative:
   did in both until `docs/lokalitet-view.md` §13.10 step 6, and the two verbs
   it carried are [Bilde]'s pulldown now. `focusBilde` and `selectBilde` are
   what is left, and they differ only in that a press toggles.
+- **`Plasser i ruta` is on the card, and it is not a map verb.** The rule step
+  6 left behind is *do not add a map verb back to a card*, and the upload
+  opt-in (`docs/lokalitet-view.md` §13.5, §13.10 step 7) does not break it:
+  pressing it shows nothing and hides nothing, it writes `meta.bbox25833` —
+  an edit of the same kind as a caption or a concealment, which is why it sits
+  with those and is buffered into the transaction like those. What it buys is a
+  *switch*, and the switch is [Bilde]'s (§10.1). The undo,
+  `Fjern plasseringen`, deletes the key and the member with it. `canEdit`
+  rather than `canAdd`: it is an update, so an admin may place one.
+  `PlaceUploadButton` in `bilderCommon.tsx` is absent on every other kind —
+  they all already know where they are, and offering to invent a rectangle for
+  an extract that was cut to one is offering to make it worse.
 - **Only edit passes `onReorder`.** `BilderRail` takes it as an optional prop
   and `BilderStrip` omits it, so drag is not a thing show has and suppresses —
   the hook is never armed there at all.
@@ -2753,8 +2771,9 @@ edge, and neither surface has a stylesheet of its own.
   A sketch is transparent (§9.3) and lives in its own group at `zIndex: 2`, so
   any number can be up at once; pressing the eye adds or removes the id from
   `sketchShownAtom`, which is the same set [Skisse] presses. It used to be the
-  one card that did not pin, and is now simply the one card that still has a
-  map verb on it — the other kinds' verbs went to the row.
+  one card that did not pin, and is now the only card with a map verb on it at
+  all — the other kinds' verbs went to the row, and the one that arrived after
+  them, `Plasser i ruta`, is a record edit rather than a map verb.
 - **Edit selects for you, without pinning.** Show is legible with nothing
   active; edit is entered in order to change something, and a surface that
   opens with no subject makes you pick one before you can. So `BilderCarousel`
@@ -3332,6 +3351,15 @@ else's report), `Behold` on any ground, the flyfoto grab, "Ta skjermbilde" and
 all three steps of the starter set. An upload's provenance is unknown to the app,
 so inventing a caption for it would be worse than none.
 
+That is also why the one thing the app *does* let itself invent about an upload
+says so on its face. `Plasser i ruta` (§8.7.2) writes an extent nobody measured,
+so it writes `meta.bboxAssumed: true` beside it and every surface that shows the
+placement shows the mark — a badge on the card, a `note` on the [Bilde] row
+(§10.1), and the flag itself travels with the record into a copy (`Ta med`
+carries the whole `meta`, §8.12) and into the takeout when that is built. An
+assumption lost on the way out of the surface that made it is worse than no
+assumption.
+
 Load-bearing:
 
 - **The caption is a panel *below* the image, never an overlay.** No pixel of
@@ -3509,6 +3537,16 @@ Load-bearing, in the order the mistakes would be made:
   failure leaves a buffer describing exactly what is left and lets `Lagre`
   retry precisely that — and `saveEdit` returns that verdict as a boolean,
   because `Lagre og avslutt` must not walk out of a commit that half-failed.
+- **A `meta` patch is always the whole object, and only sometimes a re-pin.**
+  `DraftAttachment.meta` is the one buffered field that is not a curation
+  column, and it has two writers: a re-drawn sketch's new scene (§9.3) and a
+  placed upload's extent (§8.7.2). PocketBase replaces a JSON field wholesale,
+  so both spread the existing `meta` and neither may send a fragment. What
+  decides whether the commit also owes the record new pixels is `viewSpecOf`,
+  not the presence of the patch: a sketch's figure is now a picture of the old
+  drawing and goes back on the queue, while a File has nothing to render from
+  and the queue would only mark it `empty` (§8.7.4) and light a failure face on
+  a record that is perfectly fine.
 - **A successful commit reloads both lists.** Realtime is still held back — the
   stance did not end — so the funn and specs the commit just created would be
   nowhere: the buffer the overlay was reading them out of is empty now, and no
@@ -4386,12 +4424,21 @@ is no ground preset, because there is only one ground and [Visning] holds it;
 and there is no `Gjenskap`, because a File has no spec to re-run. What is left
 is exactly a `LayerMembers` list — a switch and a fade each — over `fileItems`.
 
-What it lists is `kind: 'screenshot'` with a `meta.bbox25833`, filtered for
-`hidden` the same way. **`upload` is deliberately out until step 7**: an
-uploaded image carries no georeference at all, so putting it on the ground is a
-question about *where* before it is a switch, and that question needs a
-rectangle to be authored, not a checkbox. A screenshot has an extent because
-the app took it, over a rectangle it chose.
+What it lists is either File — `screenshot` or `upload` — with bytes and a
+`meta.bbox25833`, filtered for `hidden` the same way. A screenshot has that
+extent because the app took it, over a rectangle it chose; an upload has one
+only once somebody has pressed `Plasser i ruta` on its card (§8.7.2, step 7).
+So the `bbox25833` test, which was already here doing the job of "a switch must
+be able to do something", is also the whole of the upload gate. An upload is
+not a second case in this list; it is the same case arriving later.
+
+**A placed upload's row is marked.** `LayerMember.note` is `warning`'s quiet
+sibling — the same line under the label, an `info` glyph, the subtle colour
+rather than the danger one — and it carries *Antatt utstrekning*. The two are
+separate because they are read at different volumes: a warning says the row is
+lying about being on the map, a note qualifies what being on the map means for
+this member. An extent the app invented must not sit unmarked beside an
+extract's measured one (`docs/lokalitet-view.md` §13.5).
 
 **The group is absent on a lokalitet with no Files**, the call `SkisseControl`
 already makes: a group control over nothing cannot answer the only question it
@@ -4732,6 +4779,9 @@ switch an extract, terrain render or flyfoto onto the ground from
 **[Visning ▾]**, and a screenshot from **[Bilde ▾]**, one or several at once,
 each with its own fade, over or instead of the live ground — and press a
 View's **Gjenskap** there to set the map back to the view it was made from;
+give an uploaded image an extent with **Plasser i ruta** on its card so it can
+join that list — fitted to the image's own aspect inside the lokalitet's
+rectangle, marked as assumed wherever it appears, and removable again;
 see a member say so on its own switch when the layer could not be shown;
 take the ground away entirely and read a sketch and its funn on white;
 see a card that is still a set of parameters say so, and retry it if its render

@@ -82,6 +82,17 @@ export type LayerMember = {
    * onto the switch that is claiming the layer is up.
    */
   warning?: string;
+  /**
+   * Something true of this layer even when it is working perfectly.
+   *
+   * `warning`'s quiet sibling, and separate from it because the two are read
+   * at different volumes: one says the row is lying about being on the map,
+   * this one qualifies what being on the map *means* here. There is one so
+   * far — a placed upload's extent is assumed rather than measured (§13.5),
+   * and a rectangle the app invented must not sit unmarked beside an
+   * extract's.
+   */
+  note?: string;
 };
 
 export const LayerGroup = ({
@@ -259,6 +270,12 @@ const MemberRow = ({
             {member.label}
             {member.meta && (
               <span className={styles.memberMeta}>{member.meta}</span>
+            )}
+            {member.note && (
+              <span className={styles.memberNote}>
+                <Icon icon="info" size={14} />
+                {member.note}
+              </span>
             )}
             {member.warning && (
               <span className={styles.memberWarning}>

@@ -373,7 +373,8 @@
       "skisseShow": "Vis skissene på kartet igjen",
       "skisseMembers": "Velg hvilke skisser som vises",
       "transparency": "Transparens",
-      "unavailable": "Kunne ikke vise dette laget"
+      "unavailable": "Kunne ikke vise dette laget",
+      "assumed": "Antatt utstrekning"
     },
     "bilder": {
       "heading": "Bilder",
@@ -411,7 +412,13 @@
       "pinEmpty": "Ingen dekning for dette utsnittet.",
       "pinRetry": "Prøv igjen",
       "pinNow": "Hent bildet",
-      "pinBuffered": "Hentes når du lagrer."
+      "pinBuffered": "Hentes når du lagrer.",
+      "assumed": "Antatt utstrekning",
+      "place": "Plasser i ruta",
+      "placeHint": "Gir bildet en antatt utstrekning inne i lokalitetens rute, slik at det kan legges på kartet fra «Bilde». Utstrekningen beholder bildets eget forhold mellom bredde og høyde, men den er et anslag — ikke en måling.",
+      "placeFailed": "Kunne ikke lese størrelsen på bildet.",
+      "unplace": "Fjern plasseringen",
+      "unplaceHint": "Tar bildet ut av «Bilde» igjen. Selve bildet blir liggende."
     },
     "picker": {
       "headingLidar": "Forslag · LiDAR-uttrekk",

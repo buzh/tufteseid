@@ -8,6 +8,7 @@ import {
   MetaLine,
   OpenOriginalButton,
   PinRetryButton,
+  PlaceUploadButton,
   SketchEditButton,
   SketchToggleButton,
 } from './bilderCommon';
@@ -27,21 +28,21 @@ import type { LocalityWorkspaceApi } from './useLocalityWorkspace';
  * judging one image and false of arranging a set: curating an exhibit is
  * mostly deciding what follows what, and a reorder you cannot watch happen is
  * a reorder you have to verify afterwards. So the rail is the shape in both
- * stances, and the big look at one picture is `Åpne originalen` or
- * `Vis i ruta` — which put it on the ground the render was made from, at full
- * size, which is better than a 180 px letterbox ever was.
+ * stances, and the big look at one picture is `Åpne originalen` or the
+ * member's own switch in `[Bilde ▾]` — which puts it on the ground the render
+ * was made from, at full size, which is better than a 180 px letterbox ever
+ * was.
  *
  * Three things about it that are easy to miss:
  *
  * - The concealed images are here, marked. Concealment is one of the things
  *   you came to change, and a curation control whose effect you cannot see is
  *   not a control. That is `bilderItems` doing it, not this component.
- * - **Picking a frame lays it on the map**, the same as in show. It did not,
- *   on the argument that the overlay slot is shared with the live terrain
- *   render — but nothing that adds a record moves the cursor, and the one
- *   thing that selects for you goes through `focusBilde`, which does not pin.
- *   `Vis i ruta` survives as a toggle for taking it off again without giving
- *   up the selection.
+ * - **Picking a frame does not lay it on the map.** It did once, back when the
+ *   ground was one slot and walking the rail moved what was in it; step 6
+ *   turned that level into a stack with a switch per member, and the rail
+ *   stopped being a map control in either stance (§13.2). The cursor moves and
+ *   nothing else does.
  * - **Order is dragged or stepped.** The frames drag along the rail
  *   (`useRailReorder`); the ←/→ buttons in this row do the same move for the
  *   keyboard and for touch, where the drag gesture belongs to scrolling.
@@ -151,6 +152,10 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                     the same set. */}
                 <SketchToggleButton ws={ws} rec={active} />
                 <SketchEditButton ws={ws} rec={active} />
+                {/* Not a map verb, which is why it is here and not in the
+                    pulldown: it gives the record an extent (§13.5). The
+                    switch that uses that extent is [Bilde]'s. */}
+                <PlaceUploadButton ws={ws} rec={active} />
                 <PinRetryButton ws={ws} rec={active} />
                 <OpenOriginalButton ws={ws} rec={active} />
 

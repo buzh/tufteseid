@@ -373,7 +373,8 @@
       "skisseShow": "Show the sketches on the map again",
       "skisseMembers": "Choose which sketches are shown",
       "transparency": "Transparency",
-      "unavailable": "Could not show this layer"
+      "unavailable": "Could not show this layer",
+      "assumed": "Assumed extent"
     },
     "bilder": {
       "heading": "Images",
@@ -411,7 +412,13 @@
       "pinEmpty": "No coverage for this rectangle.",
       "pinRetry": "Try again",
       "pinNow": "Render the image",
-      "pinBuffered": "Rendered when you save."
+      "pinBuffered": "Rendered when you save.",
+      "assumed": "Assumed extent",
+      "place": "Place in the rectangle",
+      "placeHint": "Gives the image an assumed extent inside the locality's rectangle, so it can be laid on the map from “Image”. The extent keeps the image's own width-to-height ratio, but it is an estimate, not a measurement.",
+      "placeFailed": "Could not read the image's dimensions.",
+      "unplace": "Remove the placement",
+      "unplaceHint": "Takes the image out of “Image” again. The image itself stays."
     },
     "picker": {
       "headingLidar": "Proposals · LiDAR extract",

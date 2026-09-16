@@ -23,6 +23,7 @@ import {
   newDraft,
   saveDraft,
 } from './draft';
+import { viewSpecOf } from './viewSpec';
 
 export type CommitResult = {
   /** Everything got through. False leaves the remainder in the buffer. */
@@ -236,7 +237,12 @@ export const useLocalityDraft = ({
         // is now a picture of the previous drawing. Onto the queue with the
         // new specs: the caller does not need to know which of the two a
         // record got there by, only that its pixels are owed.
-        if (body.meta) created.push(rec);
+        //
+        // `viewSpecOf` rather than `body.meta` alone, since step 7: placing an
+        // upload (§13.5) is a `meta` patch too, and a File has nothing behind
+        // it to render — the queue would take the job only to mark it `empty`
+        // and light a failure face on a record that is perfectly fine.
+        if (body.meta && viewSpecOf(rec)) created.push(rec);
         delete rest.attachments[id];
       } catch (e) {
         console.warn('[localityDraft] bilde update failed', e);

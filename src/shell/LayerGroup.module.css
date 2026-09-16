@@ -132,6 +132,18 @@
   color: var(--c-fg-subtle);
 }
 
+/* The same line as the warning below, in the subtle colour rather than the
+   danger one: an assumed extent is a qualification, not a fault, and printing
+   it in red would tell the reader something is wrong with an image that is
+   doing exactly what they asked. */
+.memberNote {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
 /* Under the label like the meta line, and wrapping rather than truncating: a
    switch that is on over a layer that is not there is the row's one piece of
    bad news and the sentence is short. */

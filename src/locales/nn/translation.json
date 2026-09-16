@@ -373,7 +373,8 @@
       "skisseShow": "Vis skissene på kartet igjen",
       "skisseMembers": "Vel kva for skisser som blir viste",
       "transparency": "Transparens",
-      "unavailable": "Kunne ikkje vise dette laget"
+      "unavailable": "Kunne ikkje vise dette laget",
+      "assumed": "Antatt utstrekning"
     },
     "bilder": {
       "heading": "Bilete",
@@ -411,7 +412,13 @@
       "pinEmpty": "Inga dekning for dette utsnittet.",
       "pinRetry": "Prøv igjen",
       "pinNow": "Hent biletet",
-      "pinBuffered": "Blir henta når du lagrar."
+      "pinBuffered": "Blir henta når du lagrar.",
+      "assumed": "Antatt utstrekning",
+      "place": "Plasser i ruta",
+      "placeHint": "Gjev biletet ei antatt utstrekning inne i ruta til lokaliteten, slik at det kan leggjast på kartet frå «Bilete». Utstrekninga held på biletet sitt eige forhold mellom breidd og høgd, men ho er eit anslag — ikkje ei måling.",
+      "placeFailed": "Kunne ikkje lese storleiken på biletet.",
+      "unplace": "Fjern plasseringa",
+      "unplaceHint": "Tek biletet ut av «Bilete» igjen. Sjølve biletet blir verande."
     },
     "picker": {
       "headingLidar": "Framlegg · LiDAR-uttrekk",

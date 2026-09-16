@@ -56,13 +56,19 @@ export type DraftAttachment = {
   sort: number;
   hidden: boolean;
   /**
-   * A re-drawn sketch's new scene (§9.3), and nothing else ever.
+   * A re-drawn sketch's new scene (§9.3), or an upload's placement (§13.5).
    *
-   * Absent on every other patch, which is what keeps it honest: PocketBase
-   * replaces a JSON field wholesale, so a patch that carried a partial `meta`
-   * would quietly delete the rest of the spec. Present means "this whole spec
-   * is the new one", and the commit re-pins the record because the pixels on
-   * it are now a picture of the old drawing.
+   * **Always the whole object, never a patch of it.** PocketBase replaces a
+   * JSON field wholesale, so a partial `meta` here would quietly delete the
+   * rest of the record's — which is why the two writers both spread the
+   * existing one and why this is absent from every other edit. Nothing else
+   * may put a key in `meta`, and anything that wants to must read this line
+   * first.
+   *
+   * The commit tells the two apart by asking `viewSpecOf`, not by asking
+   * whether this is set: a re-drawn sketch's pixels are now a picture of the
+   * old drawing and are owed again, while a File has nothing behind it to
+   * render and never goes on the pin queue at all.
    */
   meta?: Record<string, unknown>;
 };

@@ -45,8 +45,10 @@ import {
 } from '../ui';
 import styles from './bilderCommon.module.css';
 import { isDraftId } from './draft';
+import { groundExtentOf } from './groundView';
 import { type PinState, pinStateOf, subscribePinQueue } from './pinQueue';
 import { bilderStripOpenAtom } from './toolAtoms';
+import { isBboxAssumed } from './uploadPlacement';
 import type { LocalityWorkspaceApi } from './useLocalityWorkspace';
 import { type RailReorder, useRailReorder } from './useRailReorder';
 import { isPinned } from './viewSpec';
@@ -528,9 +530,77 @@ export const BildeBadges = ({
           {rec.hidden && (
             <Badge palette="yellow">{t('localities.bilder.hidden')}</Badge>
           )}
+          {/* Said in both stances and on both surfaces, because §13.5's rule
+              is that the assumption must not be lost when it leaves the
+              surface that made it. The [Bilde] row carries the same sentence
+              as a `note`; this is the card's copy of it. */}
+          {isBboxAssumed(rec) && (
+            <Badge palette="gray">{t('localities.bilder.assumed')}</Badge>
+          )}
         </>
       )}
     </>
+  );
+};
+
+/*
+ * `Plasser i ruta` — the upload opt-in (§13.5, §13.10 step 7).
+ *
+ * The one verb on a card that is about the map, and it survives the rule that
+ * deleted the others because it is not a map verb. `Vis i ruta` *showed* an
+ * image; this one gives a record an extent, which is an edit of the same kind
+ * as a caption or a concealment and stays where those are. The switch that
+ * actually lays it down is [Bilde]'s, where every other File's is, and it
+ * appears there the moment this has been pressed.
+ *
+ * Uploads only: every other kind already knows where it is, and offering to
+ * invent a rectangle for an extract that was cut to one would be offering to
+ * make it worse. Edit only, and `canEdit` rather than `canAdd` — this is an
+ * update, so an admin over somebody else's lokalitet may do it.
+ *
+ * Nothing about the press is optimistic: reading the file's aspect is a fetch
+ * and a decode, so the button spins until the buffer has the rectangle.
+ */
+export const PlaceUploadButton = ({
+  ws,
+  rec,
+}: {
+  ws: LocalityWorkspaceApi;
+  rec: AttachmentRecord;
+}) => {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  if (rec.kind !== 'upload' || !ws.canEdit) return null;
+
+  // The placement is exactly `meta.bbox25833`, so this is the same question
+  // [Bilde] asks to decide whether the record is a member at all.
+  if (groundExtentOf(rec.meta ?? {}) != null) {
+    return (
+      <Button
+        size="sm"
+        palette="gray"
+        leftIcon="wrong_location"
+        title={t('localities.bilder.unplaceHint')}
+        onClick={() => ws.unplaceUpload(rec)}
+      >
+        {t('localities.bilder.unplace')}
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      size="sm"
+      leftIcon="pin_drop"
+      disabled={busy}
+      title={t('localities.bilder.placeHint')}
+      onClick={() => {
+        setBusy(true);
+        void ws.placeUpload(rec).finally(() => setBusy(false));
+      }}
+    >
+      {t('localities.bilder.place')}
+    </Button>
   );
 };
 

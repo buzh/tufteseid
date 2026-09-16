@@ -2,6 +2,7 @@ import { useAtom } from 'jotai';
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { metaLineOf } from '../localities/bilderCommon';
+import { isBboxAssumed } from '../localities/uploadPlacement';
 import type { LocalityWorkspaceApi } from '../localities/useLocalityWorkspace';
 import {
   bildeGroupShownAtom,
@@ -33,11 +34,15 @@ import { LayerGroup, type LayerMember, LayerMembers } from './LayerGroup';
  * switch, several can be down at once, each carries its own fade, and the rail
  * has stopped being a map control (§13.2).
  *
- * `upload` is deliberately absent from the list until step 7: an uploaded
- * image has no georeference at all, so putting it on the ground is a question
- * about *where* before it is a switch, and that question is step 7's.
+ * Step 7 added the uploads, and added nothing to this file but a mark. An
+ * upload has no georeference of its own, so `Plasser i ruta` on its card gives
+ * it one (§13.5) and `fileItems` lists it from then on like any other File —
+ * the *question* was where it goes, and once a record answers it there is
+ * nothing here that needs to know it was ever open. What the row does have to
+ * say is that the answer was assumed rather than measured, which is `note`.
  *
- * **Nothing here writes** (§13.8): a reader gets the group at full function.
+ * **Nothing here writes** (§13.8): a reader gets the group at full function,
+ * and the one verb in this thread that writes is on the card, in edit.
  */
 export const BildeControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
@@ -106,6 +111,7 @@ export const BildeControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
     meta: rec.caption.trim() ? (metaLineOf(rec) ?? undefined) : undefined,
     shown: shown.has(rec.id),
     opacity: opacity.get(rec.id) ?? 100,
+    note: isBboxAssumed(rec) ? t('localities.layers.assumed') : undefined,
     warning: failedIds.has(rec.id)
       ? t('localities.layers.unavailable')
       : undefined,

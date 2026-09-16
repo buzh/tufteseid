@@ -86,15 +86,15 @@ all of them.
   and the takeout bundle, and moving Terreng and Sammenlign off row 1 onto
   the lokalitet row. Read it before building any of that; each step folds into
   `docs/ui-architecture.md` §8 as it lands. **§13 is a separate thread and
-  the row itself is built, through step 6**: the *layer row* — four `[thing ▾]`
+  the row itself is built, through step 7**: the *layer row* — four `[thing ▾]`
   groups
   (Visning / Bilde / Skisse / Funn) matching the map's z-stack bottom-to-top,
   each member switchable with its own opacity — which deletes `Gjenskap`, `Vis
   i ruta` and the one-slot ground arbiter, makes a funn a container for images
   as well as a sublocation, and gives an arrangement a record of its own
   (`kind: 'scene'`, membership on the existing `over`). §13.10 is its build
-  order and six of its nine steps have landed: the ground overlay is a stack and
-  the
+  order and seven of its nine steps have landed: the ground overlay is a stack
+  and the
   arbiter is gone; `src/localities/groundView.ts` can put a View on the map
   as its own pixels over its own rectangle — rendering it live when there is no
   pinned figure to lay down; `src/shell/LayerGroup.tsx` is the `[thing ▾]`
@@ -116,8 +116,17 @@ all of them.
   restore, and the `Bilder` button's light, which four group labels answer
   better than one. The rail is no longer a map control at all; picking a frame
   moves the cursor and nothing else. **Do not add a map verb back to a card.**
-  What remains is steps 7–9: `upload` on the ground (it has no
-  georeference, so it needs a placed rectangle first), `kind: 'scene'`, and the
+  Step 7 put the uploads in `[Bilde ▾]` without breaking that rule: an upload
+  has no georeference, so `Plasser i ruta` on its card
+  (`src/localities/uploadPlacement.ts`) gives the *record* an extent — the
+  largest rectangle of the image's own aspect centred in the lokalitet's,
+  written as `meta.bbox25833` with `meta.bboxAssumed: true` beside it and
+  marked as assumed on every surface that shows it. That is a curation verb
+  with a geometry in it, buffered into the edit transaction like a caption; the
+  switch it earns is the row's. It is the only write in the whole thread, and
+  it is deliberately not *in* the row — §13.8's rule is that nothing in the
+  layer row writes, which is why no group has a stance gate anywhere in it.
+  What remains is steps 8–9: `kind: 'scene'`, and the
   funn relation editor. Three rules from steps 4–6 that hold for them:
   **opacity is a raster idea** — vector members get a switch and nothing else,
   and so does the ground preset, whose fade would be three fades and lives on
@@ -536,8 +545,9 @@ Data model:
   upload | flyfoto | sketch), `file` (protected, ≤50 MB, png/jpeg/webp,
   thumbs, and
   **optional** — a View is a spec before it is pixels), `caption`, `meta`
-  (json, ≤2 MB: source key/label, style, model, metresPerPx, bbox,
-  `imageRect`, `renderedAt`, and for a sketch the Excalidraw scene itself),
+  (json, ≤2 MB: source key/label, style, model, metresPerPx, `bbox25833`,
+  `imageRect`, `renderedAt`, `bboxAssumed` on a placed upload, and for a
+  sketch the Excalidraw scene itself),
   `funn` and `over` (uncascaded relations → finds and → attachments: what a
   sketch is about, and which bilder it is a layer on), `sort` and `hidden`
   for exhibit order and concealment.
