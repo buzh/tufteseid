@@ -62,16 +62,15 @@ all of them.
   GIS tool survey with verdicts and licences, and what's worth building next.
   **Read it before proposing a new analysis feature** — it records what was
   already rejected and why, so those don't get re-litigated.
-- `docs/lokalitet-view.md` — **partly built**: §12's build order is through
-  step 16's first half, so the two axes, the View/File split, the row's zones,
-  the bottom
+- `docs/lokalitet-view.md` — **built**: §12's build order is complete, so the
+  two axes, the View/File split, the row's zones, the bottom
   filmstrip/carousel, curation, the picker carousels, **removing the dock**,
-  **the edit transaction**, **the copy**, **Terreng/Sammenlign on the row** and
-  **sharing** (`?lok=CODE`, `/l/CODE`, `Del`)
-  are live and are documented in `docs/ui-architecture.md`; the takeout bundle
-  is the one thing left in the list. Two builds landed *outside* the numbered
-  list and so are not in it at all: placing the rectangle before creating it,
-  and sketches as overlays. The whole design of making
+  **the edit transaction**, **the copy**, **Terreng/Sammenlign on the row**,
+  **sharing** (`?lok=CODE`, `/l/CODE`, `Del`) and **the Rapportpakke** (the
+  takeout zip) are all live and are documented in `docs/ui-architecture.md`,
+  which is the record where the two disagree. Two builds landed *outside* the
+  numbered list and so are not in it at all: placing the rectangle before
+  creating it, and sketches as overlays. The whole design of making
   "a lokalitet is open" a view of its own is here — the two axes (owner/reader ×
   show/edit), **show writes nothing and edit is a transaction** (`Lagre` /
   `Avbryt` over a client-side draft), the lokalitet row as three zones
@@ -240,6 +239,16 @@ that owns them.
   load exactly as it was. Following a link signs you in first (the read
   rules require auth even for `public`) and always lands in `show` —
   `docs/ui-architecture.md` §8.13.
+- **And handed over whole.** `Rapportpakke`, in the same `⋮`, zips the
+  lokalitet into `<slug>-YYYY-MM-DD.zip`: an `index.html` and a `README.txt`
+  carrying the register facts, the images inline in curated order and the funn
+  as a table, then `bilder/NN-*`, `funn/funn.geojson` and `funn/funn.csv`. It
+  forces a pin on every unpinned View first, because a bundle of parameter rows
+  is not a report — and where it cannot (a reader may not write, a source
+  retired an acquisition) it **names the missing bilder on the front page**
+  rather than refusing the bundle. The zip writer is ours
+  (`src/shared/utils/zip.ts`, stored not deflated) for the `dem.ts` reason: no
+  new dependency — `docs/ui-architecture.md` §8.14.
 - **A View is a spec before it is pixels.** An extract, terrain render,
   flyfoto grab or sketch is stored as a row of parameters and rendered into a
   figure PNG afterwards by a background queue (`src/localities/pinQueue.ts`); a

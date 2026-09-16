@@ -143,6 +143,7 @@ import {
 } from './sceneSpec';
 import { captureLocalityScreenshot } from './screenshot';
 import { planStarterPack } from './starterPack';
+import { buildTakeout, type TakeoutProgress } from './takeout';
 import {
   bilderStripOpenAtom,
   funnOutsideAtom,
@@ -345,6 +346,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // `Lag min kopi`: whether the dialog is up, and how far the fork has got.
   const [copyPrompt, setCopyPrompt] = useState(false);
   const [copyProgress, setCopyProgress] = useState<CopyProgress | null>(null);
+  // `Rapportpakke`: how far the bundle has got (§9). Same shape and the same
+  // banner rank as the copy's, because it is the same kind of wait — a long
+  // one with a countable middle.
+  const [takeoutProgress, setTakeoutProgress] =
+    useState<TakeoutProgress | null>(null);
   // Whether the licensing notice is up, and what accepting it does. Two
   // routes reach NiB now — the acquisition picker and `Behold` over the
   // flyfoto ground — and consent is owed on both, so the notice grew a
@@ -3242,6 +3248,72 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     }
   }, [canAdd, attachmentItems, deletedIds, pinJob]);
 
+  /*
+   * `Rapportpakke` — the whole lokalitet as a zip (§9).
+   *
+   * The exhibit it packs is `attachmentItems` minus the three things that are
+   * not in the record: the concealed (curation is what `hidden` is for, and a
+   * bundle that ignored it would ignore the author's own edit), the
+   * tombstoned, and the buffered. A draft spec has no server row to pin a
+   * figure onto, so `Lagre` is what puts this session's images in the report
+   * — the same sentence `Last ned` already makes on a card (§5.6).
+   *
+   * `forcePin` goes in only for `canAdd`. A pin is an `update` and nothing in
+   * show writes (§2), so a reader's bundle carries what is already pinned and
+   * the front page names the rest. That is the version of "refuses to produce
+   * a partial zip silently" that does not also refuse a reader a report.
+   */
+  const runTakeout = useCallback(async () => {
+    if (takeoutProgress) return;
+    setTakeoutProgress({ stage: 'pinning', done: 0, total: 0 });
+    try {
+      const exhibit = (attachmentItems ?? []).filter(
+        (rec) => !rec.hidden && !deletedIds.has(rec.id) && !isDraftId(rec.id),
+      );
+      const result = await buildTakeout({
+        locality,
+        finds: (findItems ?? []).filter((f) => !deletedIds.has(f.id)),
+        bilder: exhibit,
+        forcePin: canAdd ? forcePin : null,
+        onProgress: setTakeoutProgress,
+      });
+      // An anchor rather than `window.open`: a blob URL opened in a tab
+      // minutes after the click that asked for it is a popup and gets
+      // blocked, while a download attribute is a download. The URL is
+      // revoked on a timer because revoking it in the same tick cancels the
+      // transfer in some browsers.
+      const url = URL.createObjectURL(result.blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = result.filename;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      if (result.missing > 0) {
+        toast.warning({
+          title: t('localities.takeout.missing', { count: result.missing }),
+          description: t('localities.takeout.missingHint'),
+          duration: 8000,
+        });
+      } else {
+        toast.success({ title: t('localities.takeout.ready') });
+      }
+    } catch (e) {
+      console.warn('[localityWorkspace] takeout failed', e);
+      toast.error({ title: t('localities.takeout.failed') });
+    } finally {
+      setTakeoutProgress(null);
+    }
+  }, [
+    takeoutProgress,
+    attachmentItems,
+    deletedIds,
+    findItems,
+    locality,
+    canAdd,
+    forcePin,
+    t,
+  ]);
+
   return {
     // identity / permissions
     locality,
@@ -3461,6 +3533,14 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // the only caller that waits.
     retryPin,
     forcePin,
+
+    /*
+     * The Rapportpakke (§9): the verb, and how far it has got. Both stances
+     * and every access level — a bundle is a read, and the one thing in it
+     * that writes (the forced pin) is gated inside `runTakeout`.
+     */
+    runTakeout,
+    takeoutProgress,
 
     // Behold
     behold,

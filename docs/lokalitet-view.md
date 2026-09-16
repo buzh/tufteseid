@@ -1,10 +1,10 @@
 # The lokalitet view
 
-**Status: §1–§13 built.** §12's build order is complete through step 16's
-first half — sharing (§10) landed on 2026-09-16 — so the one thing left in the
-whole list is the Rapportpakke (§9). Add the two builds that happened outside
-the numbered list and are recorded at the end of §12 (placing the rectangle,
-sketches as overlays), both of which shipped.
+**Status: §1–§13 built, and §12's build order is complete** — step 16, its two
+halves being sharing (§10) and the Rapportpakke (§9), landed on 2026-09-16 and
+was the last of it. Add the two builds that happened outside the numbered list
+and are recorded at the end of §12 (placing the rectangle, sketches as
+overlays), both of which shipped.
 
 Everything built folded into `docs/ui-architecture.md` §8–§10 with the
 deletions in §15, and **that file is now the record**. Where the two disagree
@@ -1269,10 +1269,16 @@ budget. Follows the existing "entered and left, not persistent" rule.
 
 ---
 
-## 9. The takeout — a sketch
+## 9. The takeout — the Rapportpakke
 
-Not to be built yet, but show mode is shaped by where it is going, so the
-target belongs on the record.
+**Status: built** (2026-09-16, step 16's second half, and the last item in
+§12). `src/localities/takeout.ts` over a hand-rolled `src/shared/utils/zip.ts`,
+with `runTakeout` in `useLocalityWorkspace` holding the progress and the
+download; no migration and no new field — the bundle reads what is already
+there, which was the claim this section was making all along. The write-up that
+supersedes this one is `docs/ui-architecture.md` §8.14; what follows is the
+design it was built from, then the three places the build had to decide
+something this sketch left open.
 
 **The bundle is nearly free already**, and that is the argument for doing the
 curation work first. Every image is a figure with its provenance baked into the
@@ -1309,6 +1315,32 @@ built.
 The `index.html` matters more than it looks: a bundle whose front page is a
 plain-language summary with the images inline is a thing a
 kulturminneforvaltning can open, and a folder of PNGs is not.
+
+The shape above survived intact — the filename, the two front pages, the two
+funn files, `bilder/NN-*` in curated order. Three things it did not decide:
+
+**"Refuses to produce a partial zip silently" became *say what is missing*, not
+*refuse*.** A blocking dialog reads well until you notice who hits it: a reader
+over somebody else's lokalitet, who may not pin at all (a pin is an `update`,
+and §2 holds), and anyone whose source has retired an acquisition. Refusing
+them a report to protect them from an incomplete one is the worse failure. So
+the bundle names every absent bilde, with its reason, under its own heading on
+both front pages, and the count comes back on a `toast.warning` that points at
+that heading. Nothing about the zip is quiet; it simply is not a wall.
+
+**The zip writer is ours.** ~150 lines of the format's stored-entry path, for
+the reason `src/terrain/dem.ts` reads float TIFFs itself rather than adding
+geotiff.js — a dependency means regenerating `package-lock.json`, which the
+workstation cannot do. Stored rather than deflated because nearly every byte is
+an already-compressed PNG or JPEG.
+
+**The page is localised and the data files are not.** `index.html` and
+`README.txt` are in the UI language like everything else; `funn.geojson`'s
+property names and `funn.csv`'s column heads are fixed Norwegian, because a
+column name that changes with the reader's language is not a schema. The CSV is
+RFC 4180 with a BOM rather than the Norwegian semicolon dialect: a
+locale-dependent separator is a guess about the recipient's spreadsheet, and
+the wrong guess is unreadable where this one is a dialog box.
 
 ---
 
@@ -1540,8 +1572,12 @@ worth more than the list:
     and read, the `/l/CODE` redirect on our own Caddy, the sign-in wall, and
     `Del` in the row's `⋮`. No migration and no new field; the deep-link fit
     needed no code either, since the workspace already frames the rectangle
-    when it mounts. Then the Rapportpakke (§9), which is what is left of this
-    list.
+    when it mounts. Then **the Rapportpakke** (§9) — **built** the same day,
+    and the last item in this list: a hand-rolled STORE-only zip, a forced pin
+    over every unpinned View before it writes, `index.html` and `README.txt`
+    from one `Page`, the funn as GeoJSON and CSV, the absent bilder named
+    rather than the bundle refused, an `⋮` item in both stances and rank 3 of
+    the banner slot while it runs. No migration and no new field.
 
 **Placing the rectangle** (2026-09-13) is not a step in this list and is not a
 depth in the row's exits. It happens *before* there is a record, so it is a

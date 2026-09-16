@@ -3869,6 +3869,83 @@ actually do.
 
 ---
 
+### 8.14 The Rapportpakke — everything, in one zip
+
+`src/localities/takeout.ts` over `src/shared/utils/zip.ts`, driven by
+`runTakeout` in `useLocalityWorkspace`. Design: `docs/lokalitet-view.md` §9.
+
+**`index.html` is the deliverable; the PNGs are its illustrations.** A folder
+of images is not a report — it is a folder. The front page carries the register
+facts as a definition list (code, sted, kommune, matrikkel, the EPSG:4326
+extent, centre, span, area, owner, updated, packed), the images inline **in the
+exhibit's own order** with their number, caption, kind, funn and an
+`Antatt utstrekning` mark where the extent was invented (§13.10 step 7), the
+funn as a table, and every rights holder involved. `README.txt` says the same
+in plain text with a file manifest, for the archive that does not keep HTML.
+Both are generated from one `Page` object, so the two cannot drift.
+
+**It pins what is missing first.** A View is a spec until the queue renders it
+(§8.7.4), and a bundle of parameter rows is not a report, so pass one calls
+`forcePin` — the queue's jump-the-line path, sequential, because two tile
+bursts at Kartverket's edge finish no sooner — on every unpinned View. Pass two
+fetches each pinned file through `fetchWithin` on a 120 s deadline. **The
+progress is counted in two acts** (`stage: 'pinning' | 'files' | 'writing'`)
+because naming which act it is in is the difference between "this is slow" and
+"this is stuck".
+
+**`forcePin` is null for a reader.** A pin is an `update`, so `runTakeout`
+passes it only when `canAdd`; a reader still gets a bundle of everything
+already pinned, and the unpinned rows are named as missing with the reason that
+they have not been rendered rather than that they failed.
+
+**It never hands over a bundle that quietly has fewer images than the
+lokalitet.** Anything that could not be rendered or could not be fetched is
+listed by name, with its reason, under its own heading on both front pages, and
+the count comes back on a `toast.warning` pointing at that heading. This is
+`§9`'s "refuses to produce a partial zip silently" read as *say what is
+missing*, not as a blocking dialog — refusing a reader a report because a
+source retired an acquisition would be the worse failure. Figure numbers are
+handed back when a fetch fails, so the images that did land are 1..n with no
+holes.
+
+**Two audiences, two spellings.** The page and the README are in the UI
+language. `funn/funn.geojson`'s property names (`funn`, `tittel`, `notat`,
+`status`) and `funn/funn.csv`'s column heads are fixed Norwegian, because a
+column name that changes with the reader's language is not a schema. The
+GeoJSON is *flattened* — every funn's features in one FeatureCollection, each
+carrying its funn's fields — because a FeatureCollection of FeatureCollections
+is not GeoJSON. The CSV is RFC 4180 (comma, dot decimal) with a UTF-8 BOM and
+CRLF rather than the Norwegian semicolon dialect: a locale-dependent separator
+is a guess about the recipient's spreadsheet, and the wrong guess is unreadable
+where this one is a dialog box. Both files are written even with no funn — a
+header-only CSV is an answer, a missing path is a broken script.
+
+**The zip is hand-rolled and stores rather than deflates.** `zipStore` is
+~150 lines of the format's stored-entry path, written for the reason
+`src/terrain/dem.ts` reads float TIFFs itself: a dependency means regenerating
+`package-lock.json`, which the workstation cannot do. Deflate would spend
+seconds of main thread re-compressing PNGs and JPEGs to save nothing;
+`CompressionStream('deflate-raw')` is the dependency-free upgrade path if the
+text ever dominates. Not Zip64, so 4 GB and 65535 entries, and it throws rather
+than writing something silently wrong at either ceiling. Each body is read once
+to CRC it and then the **Blob** goes into the output, not the `ArrayBuffer`, so
+forty figures stay off the JS heap.
+
+**Where it appears.** An `OverflowMenu` item on the lokalitet row beside `Del`,
+in both stances and at every access level, disabled while one is running; and
+**rank 3 of the banner slot** (§5.7), between the copy's progress and the
+ownership lines, because it is the same kind of wait — a long one with a
+countable middle. The file is `<slug>-YYYY-MM-DD.zip`, downloaded through an
+object URL revoked a minute later.
+
+**Credits are coarse on purpose.** `CREDIT_BY_KIND` is exhaustive over
+`AttachmentKind`, so a kind added later is a build error rather than an image
+nobody is credited for; a scene unions its members' credits, resolved against
+the exhibit. The exact acquisition is already printed on each figure's own
+caption (§8.10), and the page says so — this list is the summary.
+
+---
+
 ## 9. Drawing
 
 `src/funn/` — Excalidraw on a transparent canvas over a frozen map. One pen,

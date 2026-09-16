@@ -250,6 +250,24 @@ const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             disabled: !ws.locality.code,
             onSelect: () => copyShareLink(ws.locality),
           },
+          /* `Rapportpakke` — the whole lokalitet as a zip
+             (docs/lokalitet-view.md §9). Both stances and every access level,
+             like `Del` and for the same reason: handing somebody a report of
+             a site you were shown is the ordinary case, and a bundle is a
+             read. The one write inside it — forcing a pin on a View that has
+             no pixels yet — is gated on `canAdd` in `runTakeout`, so a
+             reader's bundle carries what exists and its front page names
+             what does not.
+
+             Named `Rapportpakke` rather than `pakke`: "grunnpakke" is
+             already the starter set's word, and two unrelated pakker in one
+             menu is a collision that costs nothing to avoid. */
+          {
+            icon: 'folder_zip',
+            label: t('localities.takeout.action'),
+            disabled: ws.takeoutProgress != null,
+            onSelect: () => void ws.runTakeout(),
+          },
           /* The two that write are `canEdit`, not merely `mayEdit`: the menu
              is on the row in show as well now — Detaljer above has to be
              reachable by a reader — and nothing in show writes (§2). */
@@ -509,10 +527,11 @@ const SkisseControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
  * summary used to, holds at most one sentence, and answers exactly one
  * question: whose is this and what state is it in.
  *
- * Ranked, and only one shows. Ranks 1 and 2 are the two that are *news* — a
- * draft came back off disk, a fork is being written right now — and both
- * outrank the ownership lines, which describe a standing fact the reader
- * already knows and can go on knowing a few seconds longer.
+ * Ranked, and only one shows. Ranks 1 to 3 are the ones that are *news* — a
+ * draft came back off disk, a fork is being written right now, a Rapportpakke
+ * is being built — and all three outrank the ownership lines, which describe a
+ * standing fact the reader already knows and can go on knowing a few seconds
+ * longer.
  *
  * The `admin` line is keyed on the *stance* rather than on access alone — the
  * doc's table says "admin, not owner" unqualified, but "Du redigerer …"
@@ -564,6 +583,32 @@ const Banner = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               ? 'localities.copy.progressFunn'
               : 'localities.copy.progressBilder',
             { done: progress.done, total: progress.total },
+          );
+    return (
+      <span className={cx(rowStyles.banner, rowStyles.bannerAlert)}>
+        {text}
+      </span>
+    );
+  }
+
+  // Rank 3: the Rapportpakke being built (§9). Below the fork because a fork
+  // is writing records and this is only reading them, and above the ownership
+  // lines for the same reason rank 2 is — it is news, and it ends.
+  //
+  // Counted in two acts, because the first one can be much the longer: pinning
+  // the Views that have no pixels yet is a tile burst per image, where
+  // fetching the files that do is a download. Naming which act it is in is the
+  // difference between "this is slow" and "this is stuck".
+  const takeout = ws.takeoutProgress;
+  if (takeout) {
+    const text =
+      takeout.stage === 'writing' || takeout.total === 0
+        ? t('localities.takeout.progressZip')
+        : t(
+            takeout.stage === 'pinning'
+              ? 'localities.takeout.progressPin'
+              : 'localities.takeout.progressFiles',
+            { done: takeout.done, total: takeout.total },
           );
     return (
       <span className={cx(rowStyles.banner, rowStyles.bannerAlert)}>
