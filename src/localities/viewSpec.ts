@@ -18,13 +18,18 @@
 //
 // Applying a spec is `useRecreateView`; this module only reads.
 
-import type { AttachmentRecord } from '../api/attachments';
+import type {
+  AttachmentKind,
+  AttachmentMeta,
+  AttachmentRecord,
+} from '../api/attachments';
 import { sketchSceneOf, type SketchScene } from '../funn/scene';
 import type { LidarModel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { VISUALIZATIONS } from '../shell/terrain/useTerrainAnalysis';
 import type { DemModel } from '../terrain/dem';
 import { DEFAULT_AZIMUTH } from '../terrain/render';
 import type { Visualization } from '../terrain/shade';
+import { sceneCompositionOf, type SceneLayer } from './sceneSpec';
 
 export type ViewSpec =
   | {
@@ -67,10 +72,40 @@ export type ViewSpec =
        * fork intact (`copyLocality.ts`), and Gjenskap has somewhere to go.
        */
       scene: SketchScene;
+    }
+  | {
+      /*
+       * An arrangement of the others (§13.7, `sceneSpec.ts`).
+       *
+       * A View of Views, and a View by the same test as the rest: which
+       * layers were on, in what order, over which ground is enough to make
+       * the picture again. What it does *not* hold is the members' own
+       * parameters — a member is an attachment id, and the record it names is
+       * the spec. So a scene is reproducible exactly as far as its members
+       * are, which is the honest depth for something whose whole content is a
+       * statement about other records.
+       */
+      kind: 'scene';
+      /** Bottom of the stack, or null for white paper — see `sceneSpec.ts`. */
+      ground: GroundSpec | null;
+      layers: readonly SceneLayer[];
     };
 
 /** The terrain arm on its own — what §4.6's seeding hands the terrain hook. */
 export type TerrainSpec = Extract<ViewSpec, { kind: 'terrain' }>;
+
+/**
+ * What may sit under a scene: the three specs that produce *ground*.
+ *
+ * A sketch is out because it is a transparent layer over the ground rather
+ * than an image of it, and a scene is out because a scene of scenes is a
+ * recursion nobody asked for. `sceneSpec.ts` enforces the same list on the
+ * way in, on the raw `kind`, so this narrowing can never fail at runtime.
+ */
+export type GroundSpec = Extract<
+  ViewSpec,
+  { kind: 'lidar' | 'terrain' | 'flyfoto' }
+>;
 
 /*
  * Whether this record's pixels exist yet (docs/lokalitet-view.md §4.1.2).
@@ -103,10 +138,33 @@ const isVisualization = (v: unknown): v is Visualization =>
  * column that has been written by five producers over several schema
  * revisions, and a half-applied view — the right visualization at somebody
  * else's azimuth — is worse than no button, because it looks like it worked.
+ *
+ * Takes the two columns it reads rather than the whole record, because a
+ * scene's ground is a `{kind, meta}` pair that no record was ever written for
+ * (§13.7). Every `AttachmentRecord` satisfies it, so no caller had to change.
  */
-export const viewSpecOf = (rec: AttachmentRecord): ViewSpec | null => {
+export const viewSpecOf = (rec: {
+  kind: AttachmentKind;
+  meta: AttachmentMeta | null;
+}): ViewSpec | null => {
   const meta = rec.meta;
   if (!meta) return null;
+
+  if (rec.kind === 'scene') {
+    const composition = sceneCompositionOf(meta);
+    if (!composition) return null;
+    // One level, and only one: `GROUND_KINDS` in `sceneSpec.ts` excludes
+    // 'scene', so this call cannot come back here.
+    const ground = composition.ground ? viewSpecOf(composition.ground) : null;
+    return {
+      kind: 'scene',
+      ground:
+        ground && ground.kind !== 'scene' && ground.kind !== 'sketch'
+          ? ground
+          : null,
+      layers: composition.layers,
+    };
+  }
 
   if (rec.kind === 'sketch') {
     const scene = sketchSceneOf(meta);

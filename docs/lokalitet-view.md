@@ -1,6 +1,6 @@
 # The lokalitet view
 
-**Status: §1–§12 built, §13 designed and four steps in.** §12's build order is
+**Status: §1–§12 built, §13 designed and eight steps in.** §12's build order is
 complete through step 15; what is left of it is step 16 — sharing (§10) and the
 Rapportpakke (§9) — plus the two builds that landed outside the numbered list
 and are recorded at the end of §12 (placing the rectangle, sketches as
@@ -13,7 +13,7 @@ because the reasoning is not recoverable from the result, not because it
 describes the app.
 
 §13 is the exception and reads the other way round: a later thread whose build
-order is §13.10 and whose first six steps have landed, and which deletes
+order is §13.10 and whose first eight steps have landed, and which deletes
 several things `docs/ui-architecture.md` and CLAUDE.md stated as load-bearing
 until it came for them.
 
@@ -1578,7 +1578,8 @@ Docs to update: `docs/ui-architecture.md` §3.1 (the shell loses a slot), §5.1
 
 ## 13. The layer row — the stack becomes the control
 
-**Status: designed; steps 1–6 of §13.10 built, the rest not.** It supersedes the
+**Status: designed; steps 1–8 of §13.10 built, only the funn relation editor
+(step 9) is not.** It supersedes the
 verbs in §4.2 and deletes the one-slot arbiter that section introduced — that
 deletion has landed, and so has the mechanism the replacement needs: a View can
 now be put on the map as its own pixels over its own rectangle. **The row is
@@ -1790,6 +1791,13 @@ Three things that only bite once it is a container:
   funn this image belongs to" is not a guess anyone can make for you.
 
 ### 13.7 The arrangement is a record — `kind: 'scene'`
+
+> **Built at §13.10 step 8** — `src/localities/sceneSpec.ts`, migration
+> `1700000800`, and the flatten in `pinQueue.ts`. What the build added to this
+> section: the scene is in **no** group (§13.1's eligibility rule answers `kind`
+> and nothing answers `'scene'`), so it has no switch and cannot contain
+> another scene; and it has two verbs, `Oppsett` on the row and `Legg ut igjen`
+> on the card, for §13.8's reason. The step's entry has the rest.
 
 Which items are on, in what order, at what opacity, over which ground: that is
 the composition, and today it has nowhere to live. The row is what makes it
@@ -2230,9 +2238,74 @@ Three sequencing rules, and as in §12 they are worth more than the list.
    spread the whole object because PocketBase replaces JSON wholesale.
 
 8. **`kind: 'scene'`** (§13.7) — membership on `over`, order and per-member
-   opacity in `meta`, and the pin queue taught to flatten one. Last of the
-   substantial steps for §12's reason: it is a record *of* the row, so every
-   step above it changes what a scene can contain.
+   opacity in `meta`, and the pin queue taught to flatten one. **Built.** Last
+   of the substantial steps for §12's reason: it is a record *of* the row, so
+   every step above it changes what a scene can contain.
+
+   `src/localities/sceneSpec.ts` is the shape and `1700000800` is the whole
+   schema change: `kind` gains `'scene'` and **no field is added**, because
+   §13.7's two carriers were already there. `meta` holds `{bbox25833, ground,
+   layers:[{id, opacity}]}` bottom-to-top and `over` holds the same ids as a
+   relation; neither is derivable from the other, since a relation cannot hold
+   an order or a number and JSON is not a relation. Readers take the order and
+   the fades from `meta` and treat a member that has gone as one fewer layer —
+   which is what the uncascaded relation was chosen for.
+
+   **A scene is in no group, and that is enforced by the eligibility rule
+   rather than by a new flag.** §13.1's test is `kind`, and `viewItems` asks
+   for `extract` or `flyfoto`, so a scene is not a Visning; it is not a File
+   and not a sketch either. It therefore has no switch anywhere, `groundView`
+   answers `null` for it, and `GROUND_KINDS` in `sceneSpec.ts` excludes it from
+   the ground slot as well — so a scene inside a scene is unrepresentable in
+   the record, not merely unreachable in the UI.
+
+   **Two verbs, and neither is in the row.** `Oppsett` on the lokalitet row
+   keeps the stack that is up — beside `Behold`, which keeps its bottom layer —
+   and `Legg ut igjen` on the card puts one back: it replaces the three shown
+   sets, merges the three fade maps, switches the three groups on, and sends
+   the ground through `recreateViewAtom`, the same path [Visning]'s per-row
+   apply takes. Keeping is a write and buffered like every other (`canAdd`);
+   restoring writes nothing and is offered in both stances, to a reader, in
+   full. §13.8 is why they are on the row and on the card rather than in the
+   pulldown: the row is where an arrangement is *made*.
+
+   **What restoring deliberately does not do is blank the ground.** A scene
+   over Standard and a scene with the preset switched off record the same
+   nothing — neither is keepable as a spec — and the map always has a ground,
+   so switching it off would be inventing a decision the record does not
+   contain. The flatten is the one that answers on white paper.
+
+   **The flatten is the queue's, and it is the first producer that renders
+   other records.** It does not composite the members' figures — a caption
+   panel inside a composite is a picture of a card — it asks `groundRasterOf`
+   for each member's ground pixels, which is the pin where there is one and a
+   live render where there is not, exactly as the map does one level up. A
+   sketch is the exception in both directions: its pin is drawn on white paper,
+   so `groundRasterOf` refuses it and the arm re-renders the scene transparent
+   at the sheet's resolution. Resolution is decided once, before anything is
+   drawn — the sharpest member's own `metresPerPx`, floored at 1500 m /
+   6000 px — and members are drawn one at a time, so peak memory is the
+   composite plus one member rather than the whole stack. A layer that does not
+   arrive is left out of the caption as well as out of the picture, and a scene
+   where nothing arrives pins `empty` rather than `failed`.
+
+   **Two id traps, both the same trap.** A scene names its members in `over`
+   *and* in `meta.layers`, so every place that re-mints ids has to translate
+   both halves: `useLocalityDraft.commit`, where a scene kept in the same
+   session as the extract under it holds a `draft:` id, and `copyLocality`'s
+   relation pass, where every id belongs to somebody else's lokalitet.
+   `remapSceneMeta` is the JSON half of what `resolve` already did for the
+   relation, and both drop what they cannot translate — a layer pointing at a
+   record that was never written is not a layer.
+
+   **`ViewSpec` gained a fifth arm, which made one existing `switch`
+   non-exhaustive in a way TypeScript could not see.** `useRecreateView`
+   switches on `spec.kind` with no default; a scene arriving would have left
+   `recreateViewAtom` set forever and blocked the next `Gjenskap`. It now has
+   an explicit arm that spends the command and says why a scene never reaches
+   it. `viewSpecOf` also widened from `AttachmentRecord` to the two columns it
+   reads, because a scene's ground is a `{kind, meta}` pair no record was ever
+   written for.
 
 9. **The funn relation editor** (§13.6) — widening `attachments.funn` to "which
    funn this bilde belongs to" and grouping the pulldowns by it. No migration.

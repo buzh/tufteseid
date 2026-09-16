@@ -120,6 +120,65 @@ export type BeholdKey = {
 /** The seamless best-available mosaic, as against one acquisition. */
 export const NIB_MOSAIC_KEY = 'mosaic';
 
+/*
+ * The two grounds whose spec *is* a dataset name, written out.
+ *
+ * Here rather than at the producer because there are now two callers each:
+ * `useLocalityWorkspace` keeping the ground as a bilde, and `sceneSpec.ts`
+ * recording it as the bottom of an arrangement (§13.7). The same ground kept
+ * two ways has to be the same row of parameters — `viewSpecOf` reads both
+ * back, `attachmentMatchesKey` compares against both — and two copies of a
+ * key list is how that stops being true.
+ *
+ * Terrain has no builder here: its parameters are state inside
+ * `useTerrainAnalysis`, which is why that arm of the offer carries
+ * `describe()` instead.
+ */
+export const lidarSpecMeta = (
+  source: LidarSource,
+  style: string,
+  bbox25833: [number, number, number, number],
+): AttachmentMeta => ({
+  sourceKey: source.key,
+  sourceLabel: source.label,
+  style,
+  model: source.model,
+  bbox25833,
+});
+
+export const flyfotoSpecMeta = (
+  project: FlyfotoProject | undefined,
+  bbox25833: [number, number, number, number],
+): AttachmentMeta => ({
+  sourceLabel: 'Norge i bilder',
+  // The rectangle, but not the resolution: which acquisition over which
+  // ground is the spec, and what NiB actually serves for it is a fact about
+  // pixels that do not exist yet.
+  bbox25833,
+  // Which NiB source this is, said in a way a machine can act on: the
+  // seamless mosaic and one acquisition are different requests, and "no
+  // projectName key" is a poor way to tell them apart once a reader has to
+  // re-lay this image on the map.
+  ...(project
+    ? {
+        nibSource: 'project',
+        // The ImageServer's own selector (prosjektnavn), which is the same
+        // string as projectName today — kept as its own key because the
+        // display name is free to stop being the selector, and matching an
+        // acquisition by its year label breaks the day two projects share a
+        // year.
+        projectId: project.id,
+        projectName: project.projectName,
+        // The acquisition's native resolution. `fetchFlyfoto` needs it to
+        // plan the tile grid, and unlike the stitch's own it is knowable
+        // before the stitch happens.
+        projectMetresPerPx: project.metresPerPx,
+        year: project.year,
+        photoDate: project.photoDate,
+      }
+    : { nibSource: 'mosaic' }),
+});
+
 // Metres. The three producers all derive their extent from the same
 // `transformExtent(locality.bbox)`, so this only has to absorb a JSON round
 // trip — but a rectangle nudged by less than a metre by "Juster området" is

@@ -1,23 +1,29 @@
 import { pb } from './pocketbase';
 
 // Bilder attached to a lokalitet: kept LiDAR extracts, map screenshots,
-// plain uploads, and sketches. Visibility follows the parent lokalitet via
-// the collection rules, and the file field is *protected* — image bytes are
-// only served with a short-lived file token (see getAttachmentUrl).
+// plain uploads, sketches, and scenes — a scene being an arrangement of the
+// others rather than an image (localities/sceneSpec.ts). Visibility follows
+// the parent lokalitet via the collection rules, and the file field is
+// *protected* — image bytes are only served with a short-lived file token
+// (see getAttachmentUrl).
 // Keep in sync with the attachments.kind select values in the PocketBase
-// migrations (1700000300 adds 'flyfoto', 1700000700 adds 'sketch').
+// migrations (1700000300 adds 'flyfoto', 1700000700 adds 'sketch',
+// 1700000800 adds 'scene').
 export type AttachmentKind =
   | 'extract'
   | 'screenshot'
   | 'upload'
   | 'flyfoto'
-  | 'sketch';
+  | 'sketch'
+  | 'scene';
 
 // Free-form; extracts store sourceKey/sourceLabel/style/metresPerPx/
 // bbox25833 so the strip can say what an image shows. Flyfoto stores
 // source label + metresPerPx + bbox25833. A sketch stores {frame, scene} —
 // the Excalidraw elements and the rectangle they were drawn over — which is
-// why the field's server-side ceiling is 2 MB rather than 10 kB.
+// why the field's server-side ceiling is 2 MB rather than 10 kB. A scene
+// stores its layer order, their fades and the ground under them
+// (localities/sceneSpec.ts).
 export type AttachmentMeta = Record<string, unknown>;
 
 export type AttachmentRecord = {
@@ -39,13 +45,16 @@ export type AttachmentRecord = {
   sort: number;
   hidden: boolean;
   /*
-   * Two relations, only ever set on a sketch, neither cascading (1700000700).
+   * Two relations, neither cascading (1700000700).
    *
-   * `funn` is what the drawing is *about* and `over` is which bilder it is a
-   * layer *on*. Both are seeded at creation from what was on screen — the
-   * selected funn, the pinned bilde — and neither has an editor yet: the
-   * field exists so the answer has somewhere to live, and the day a sketch
-   * needs re-pointing is the day it gets a control.
+   * `funn` is what a drawing is *about* and `over` is which bilder it is a
+   * layer *on* — both seeded at creation from what was on screen. A scene
+   * (§13.7) uses `over` for the other sense the word already carried: the
+   * bilder it is an arrangement of. Neither field has an editor yet; the day
+   * a sketch needs re-pointing is the day it gets a control.
+   *
+   * Uncascaded is load-bearing for the scene: deleting a member leaves the
+   * arrangement standing with one fewer layer rather than taking it down.
    *
    * PocketBase returns `[]` for an unset multiple relation, so these are not
    * optional, but records written before the migration have no key at all —
@@ -117,6 +126,33 @@ export const listLocalityAttachments = async (
     // regularly in flight at once. The SDK's auto-cancellation would abort
     // the older one and reject its promise; the caller sequences results
     // itself (useLocalityContent), so let both finish.
+    requestKey: null,
+  });
+};
+
+/**
+ * A handful of attachments by id, for a caller that holds ids and no list.
+ *
+ * One caller: the pin queue flattening a scene (§13.7). It runs outside React
+ * and minutes after the arrangement was kept, so the member records it needs
+ * are neither in its hand nor safe to have been handed — a member may have
+ * been re-captioned, pinned, or deleted in between, and the flatten should be
+ * of the records as they are when the pixels are made.
+ *
+ * One request rather than one per id, and `requestKey: null` because two
+ * scenes in the same drain would otherwise auto-cancel each other.
+ */
+export const listAttachmentsByIds = async (
+  ids: readonly string[],
+): Promise<AttachmentRecord[]> => {
+  if (ids.length === 0) return [];
+  const params: Record<string, string> = {};
+  const clauses = ids.map((id, i) => {
+    params[`id${i}`] = id;
+    return `id = {:id${i}}`;
+  });
+  return pb.collection(COLLECTION).getFullList<AttachmentRecord>({
+    filter: pb.filter(clauses.join(' || '), params),
     requestKey: null,
   });
 };
@@ -232,13 +268,15 @@ export const updateAttachment = async (
     /**
      * The spec itself, replaced wholesale — PocketBase has no JSON merge.
      *
-     * One writer: a sketch that has been drawn on again (§9.3). Every other
-     * View's parameters are fixed at the moment it is kept, and the pin is the
-     * only thing that ever adds to them, which `pinAttachment` above does with
-     * the file in the same request.
+     * Three writers: a sketch that has been drawn on again (§9.3), an upload
+     * being given an extent (§13.5), and the copy re-pointing a scene's
+     * members at the fork's own records (§13.7). Every other View's parameters
+     * are fixed at the moment it is kept, and the pin is the only thing that
+     * ever adds to them, which `pinAttachment` above does with the file in the
+     * same request.
      */
     meta?: AttachmentMeta;
-    /** A sketch's two relations; see `AttachmentRecord`. */
+    /** The two relations; see `AttachmentRecord`. */
     funn?: string[];
     over?: string[];
   },

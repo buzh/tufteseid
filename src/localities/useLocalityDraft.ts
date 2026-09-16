@@ -23,6 +23,7 @@ import {
   newDraft,
   saveDraft,
 } from './draft';
+import { remapSceneMeta } from './sceneSpec';
 import { viewSpecOf } from './viewSpec';
 
 export type CommitResult = {
@@ -265,8 +266,24 @@ export const useLocalityDraft = ({
           {
             locality: localityId,
             kind: body.kind,
-            caption: body.caption,
-            meta: body.meta,
+            /*
+             * A scene names its members twice — in `over` and in `meta.layers`
+             * — so both halves need the same translation (§13.7). The
+             * relation's is `resolve` below; this is the one in JSON, and
+             * without it a scene kept in the same session as the extract under
+             * it would point at a `draft:` id nothing will ever answer for.
+             *
+             * Insertion order is what makes one pass enough: `newSpecs` is
+             * written in the order the specs were kept, a scene can only name
+             * members that already existed when it was kept, so every id it
+             * holds is already in `realSpecId` by the time it comes round.
+             */
+            meta:
+              body.kind === 'scene'
+                ? remapSceneMeta(body.meta, (id) =>
+                    isDraftId(id) ? (realSpecId.get(id) ?? null) : id,
+                  )
+                : body.meta,
             funn: resolve(body.funn, realFindId),
             over: resolve(body.over, realSpecId),
           },

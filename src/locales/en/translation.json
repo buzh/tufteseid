@@ -355,6 +355,19 @@
       "edit": "Edit the sketch",
       "editHint": "Open the strokes under the pen again."
     },
+    "scene": {
+      "keep": "Arrangement",
+      "keepHint": "Keep the layers now on the map, in the order and at the fades they have, as one image. It is written when you save the lokalitet.",
+      "keepEmpty": "Nothing is on the map to keep yet. Switch on a layer under Ground, Image or Sketch first.",
+      "caption": "Arrangement {{n}}",
+      "kept": "Arrangement added. It is saved along with the lokalitet.",
+      "restore": "Lay out again",
+      "restoreHint": "Put this arrangement's layers back on the map, in the same order and at the same fades.",
+      "restored": "The arrangement is back on the map.",
+      "missing_one": "One layer no longer exists and has been left out.",
+      "missing_other": "{{count}} layers no longer exist and have been left out.",
+      "unreadable": "This arrangement cannot be read back."
+    },
     "layers": {
       "visning": "Ground",
       "visningHide": "Hide the ground and its layers on the map",
@@ -404,7 +417,8 @@
         "screenshot": "Screenshot",
         "upload": "Uploaded",
         "flyfoto": "Aerial photo",
-        "sketch": "Sketch"
+        "sketch": "Sketch",
+        "scene": "Arrangement"
       },
       "pinPending": "Rendering the image …",
       "pinAbsent": "The image has not been rendered yet.",
@@ -688,7 +702,8 @@
       "terrain": "Terrain analysis",
       "flyfoto": "Aerial photo",
       "screenshot": "Map view",
-      "sketch": "Sketch"
+      "sketch": "Sketch",
+      "scene": "Arrangement"
     },
     "source": {
       "lidarWms": "Kartverket elevation data (WMS, pre-shaded)",
@@ -697,7 +712,8 @@
       "nibMosaic": "Norge i bilder, seamless mosaic",
       "map": "Map view",
       "compareGrounds": "{{left}} on the left, {{right}} on the right",
-      "sketch": "Hand-drawn interpretation"
+      "sketch": "Hand-drawn interpretation",
+      "scene": "Composite of the lokalitet's own images"
     },
     "acq": {
       "year": "flown {{year}}",
@@ -731,7 +747,9 @@
       "heritageTransparency": "heritage at {{percent}} % transparency",
       "heritageNone": "no sublayers",
       "sketchElements_one": "1 element",
-      "sketchElements_other": "{{count}} elements"
+      "sketchElements_other": "{{count}} elements",
+      "sceneGround": "background: {{label}}",
+      "sceneLayer": "layer: {{label}} ({{percent}} %)"
     },
     "blend": {
       "normal": "normal",

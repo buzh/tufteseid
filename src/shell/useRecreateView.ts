@@ -186,6 +186,17 @@ export const useRecreateView = (
         done();
         break;
       }
+
+      case 'scene':
+        // A scene is put back by `restoreScene` in the workspace, not here:
+        // the ground is only its bottom layer, and the rest of the answer is
+        // which members are switched on at which fade — atoms this hook has
+        // no business writing. It reaches *this* module for the ground alone,
+        // as an ordinary `GroundSpec`, so a whole scene arriving is a caller
+        // bug. Spend it anyway rather than leaving the command atom set, or
+        // the next Gjenskap would find the slot occupied.
+        done();
+        break;
     }
 
     return () => {

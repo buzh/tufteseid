@@ -9,6 +9,7 @@ import {
   OpenOriginalButton,
   PinRetryButton,
   PlaceUploadButton,
+  SceneRestoreButton,
   SketchEditButton,
   SketchToggleButton,
 } from './bilderCommon';
@@ -156,6 +157,11 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                     pulldown: it gives the record an extent (§13.5). The
                     switch that uses that extent is [Bilde]'s. */}
                 <PlaceUploadButton ws={ws} rec={active} />
+                {/* Also not a map verb, and the exception that proves the
+                    rule: it does not put *this* record on the ground — a
+                    scene is not a layer — it puts the whole row back the way
+                    the record says it was (§13.7). */}
+                <SceneRestoreButton ws={ws} rec={active} />
                 <PinRetryButton ws={ws} rec={active} />
                 <OpenOriginalButton ws={ws} rec={active} />
 

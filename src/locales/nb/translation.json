@@ -355,6 +355,19 @@
       "edit": "Rediger skissen",
       "editHint": "Åpne strekene under pennen igjen."
     },
+    "scene": {
+      "keep": "Oppsett",
+      "keepHint": "Behold lagene som ligger på kartet nå, i den rekkefølgen og med den gjennomsiktigheten de har, som ett bilde. Det skrives når du lagrer lokaliteten.",
+      "keepEmpty": "Ingenting ligger på kartet å beholde ennå. Slå på et lag i Visning, Bilde eller Skisse først.",
+      "caption": "Oppsett {{n}}",
+      "kept": "Oppsettet er lagt til. Det lagres sammen med lokaliteten.",
+      "restore": "Legg ut igjen",
+      "restoreHint": "Legg lagene i dette oppsettet ut på kartet igjen, i samme rekkefølge og med samme gjennomsiktighet.",
+      "restored": "Oppsettet ligger på kartet igjen.",
+      "missing_one": "Ett lag finnes ikke lenger og er utelatt.",
+      "missing_other": "{{count}} lag finnes ikke lenger og er utelatt.",
+      "unreadable": "Dette oppsettet kan ikke leses tilbake."
+    },
     "layers": {
       "visning": "Visning",
       "visningHide": "Skjul bakken og visningene på kartet",
@@ -404,7 +417,8 @@
         "screenshot": "Skjermbilde",
         "upload": "Opplastet",
         "flyfoto": "Flyfoto",
-        "sketch": "Skisse"
+        "sketch": "Skisse",
+        "scene": "Oppsett"
       },
       "pinPending": "Henter bildet …",
       "pinAbsent": "Bildet er ikke hentet ennå.",
@@ -688,7 +702,8 @@
       "terrain": "Terrenganalyse",
       "flyfoto": "Flyfoto",
       "screenshot": "Kartutsnitt",
-      "sketch": "Skisse"
+      "sketch": "Skisse",
+      "scene": "Oppsett"
     },
     "source": {
       "lidarWms": "Kartverket høydedata (WMS, ferdigskygget)",
@@ -697,7 +712,8 @@
       "nibMosaic": "Norge i bilder, sømløs mosaikk",
       "map": "Kartvisning",
       "compareGrounds": "{{left}} til venstre, {{right}} til høyre",
-      "sketch": "Håndtegnet tolkning"
+      "sketch": "Håndtegnet tolkning",
+      "scene": "Sammenstilling av lokalitetens egne bilder"
     },
     "acq": {
       "year": "opptaksår {{year}}",
@@ -731,7 +747,9 @@
       "heritageTransparency": "kulturminner {{percent}} % transparens",
       "heritageNone": "ingen dellag",
       "sketchElements_one": "1 element",
-      "sketchElements_other": "{{count}} elementer"
+      "sketchElements_other": "{{count}} elementer",
+      "sceneGround": "bakgrunn: {{label}}",
+      "sceneLayer": "lag: {{label}} ({{percent}} %)"
     },
     "blend": {
       "normal": "normal",

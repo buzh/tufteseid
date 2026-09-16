@@ -40,6 +40,7 @@ import {
   type LocalityFindRecord,
 } from '../api/localityFinds';
 import { upsertLocalityOnLayer } from './localityLayer';
+import { remapSceneMeta } from './sceneSpec';
 import { viewSpecOf } from './viewSpec';
 
 /** Rank 2 of the banner slot (§5.7), while this is running. */
@@ -199,13 +200,22 @@ export const copyLocality = async ({
    *
    * They cannot go on the create: a sketch may be a layer on a bilde further
    * down the same list, and the copy of that bilde does not exist yet. By here
-   * every record that is going to exist does, so one PATCH per sketch wires
-   * the whole graph at once. A failure is not counted — the sketch itself
+   * every record that is going to exist does, so one PATCH per record wires
+   * the whole graph at once. A failure is not counted — the record itself
    * arrived, and a fork whose overlay lost track of which photograph it was
    * traced off is a smaller loss than one that did not copy.
+   *
+   * Two kinds carry relations (§13.7): a sketch says what it is drawn over and
+   * about, and a scene says what it is made of. The scene needs one thing more
+   * — its membership is in `meta.layers` as well as in `over`, and both halves
+   * have to name the copy's records or the flatten would be of the original's.
+   * A layer that cannot be translated is dropped by both, which is the same
+   * sentence in two places: the original's Files stayed with the original
+   * (§8.12), so a scene built over one arrives with that layer missing until
+   * `Ta med` brings the File across.
    */
   for (const v of views) {
-    if (v.kind !== 'sketch') continue;
+    if (v.kind !== 'sketch' && v.kind !== 'scene') continue;
     const id = copiedId.get(v.id);
     if (!id) continue;
     const translate = (ids: string[] | undefined) =>
@@ -214,11 +224,15 @@ export const copyLocality = async ({
         .filter((x): x is string => x != null);
     const funn = translate(v.funn);
     const over = translate(v.over);
-    if (funn.length === 0 && over.length === 0) continue;
+    const meta =
+      v.kind === 'scene' && v.meta
+        ? remapSceneMeta(specMetaOf(v.meta), (x) => copiedId.get(x) ?? null)
+        : null;
+    if (funn.length === 0 && over.length === 0 && !meta) continue;
     try {
-      await updateAttachment(id, { funn, over });
+      await updateAttachment(id, { funn, over, ...(meta ? { meta } : {}) });
     } catch (e) {
-      console.warn('[copyLocality] sketch relations failed', v.id, e);
+      console.warn('[copyLocality] relations failed', v.id, e);
     }
   }
 

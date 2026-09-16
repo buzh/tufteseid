@@ -62,6 +62,9 @@ export const KIND_ICON: Record<AttachmentKind, MaterialSymbol> = {
   upload: 'image',
   flyfoto: 'satellite_alt',
   sketch: 'draw',
+  // The same mark the layer row's own button would wear: a scene is the row,
+  // kept (§13.7).
+  scene: 'layers',
 };
 
 // Tokened URLs are async (the file field is protected), so every image
@@ -600,6 +603,42 @@ export const PlaceUploadButton = ({
       }}
     >
       {t('localities.bilder.place')}
+    </Button>
+  );
+};
+
+/*
+ * `Legg ut igjen` — put a kept arrangement back on the map (§13.7).
+ *
+ * The other half of `Oppsett` on the row, and on the card rather than in the
+ * layer row for the mirror of that button's reason: the row is where an
+ * arrangement is *made*, and a record that replaces the whole row's state is a
+ * thing you pick out of the exhibit, not a member of it. A scene has no switch
+ * anywhere — it is not a layer (`groundView.ts` refuses to put one on the
+ * ground) — so this is its one verb.
+ *
+ * A read, so both stances and every access level get it. That is the same rule
+ * `Gjenskap` follows one level down (§13.8): applying somebody's arrangement to
+ * your own screen writes nothing anywhere.
+ */
+export const SceneRestoreButton = ({
+  ws,
+  rec,
+}: {
+  ws: LocalityWorkspaceApi;
+  rec: AttachmentRecord;
+}) => {
+  const { t } = useTranslation();
+  if (rec.kind !== 'scene') return null;
+  return (
+    <Button
+      size="sm"
+      palette="gray"
+      leftIcon="settings_backup_restore"
+      title={t('localities.scene.restoreHint')}
+      onClick={() => ws.restoreScene(rec)}
+    >
+      {t('localities.scene.restore')}
     </Button>
   );
 };

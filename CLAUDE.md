@@ -86,14 +86,14 @@ all of them.
   and the takeout bundle, and moving Terreng and Sammenlign off row 1 onto
   the lokalitet row. Read it before building any of that; each step folds into
   `docs/ui-architecture.md` §8 as it lands. **§13 is a separate thread and
-  the row itself is built, through step 7**: the *layer row* — four `[thing ▾]`
+  the row itself is built, through step 8**: the *layer row* — four `[thing ▾]`
   groups
   (Visning / Bilde / Skisse / Funn) matching the map's z-stack bottom-to-top,
   each member switchable with its own opacity — which deletes `Gjenskap`, `Vis
   i ruta` and the one-slot ground arbiter, makes a funn a container for images
   as well as a sublocation, and gives an arrangement a record of its own
   (`kind: 'scene'`, membership on the existing `over`). §13.10 is its build
-  order and seven of its nine steps have landed: the ground overlay is a stack
+  order and eight of its nine steps have landed: the ground overlay is a stack
   and the
   arbiter is gone; `src/localities/groundView.ts` can put a View on the map
   as its own pixels over its own rectangle — rendering it live when there is no
@@ -123,11 +123,23 @@ all of them.
   written as `meta.bbox25833` with `meta.bboxAssumed: true` beside it and
   marked as assumed on every surface that shows it. That is a curation verb
   with a geometry in it, buffered into the edit transaction like a caption; the
-  switch it earns is the row's. It is the only write in the whole thread, and
-  it is deliberately not *in* the row — §13.8's rule is that nothing in the
-  layer row writes, which is why no group has a stance gate anywhere in it.
-  What remains is steps 8–9: `kind: 'scene'`, and the
-  funn relation editor. Three rules from steps 4–6 that hold for them:
+  switch it earns is the row's. It is deliberately not *in* the row — §13.8's
+  rule is that nothing in the layer row writes, which is why no group has a
+  stance gate anywhere in it.
+  Step 8 landed the arrangement as a record (`kind: 'scene'`,
+  `src/localities/sceneSpec.ts`, migration `1700000800`, **no new field**):
+  `over` is the membership and `meta` the order, the per-member fade and the
+  ground under them. A scene is a member of *no* group — eligibility is `kind`
+  and nothing claims `'scene'` — so it has no switch, cannot be put on the
+  ground, and cannot contain another scene. Its two verbs are `Oppsett` on the
+  row beside `Behold` (a write, buffered) and `Legg ut igjen` on its card (a
+  read, both stances), and its pin is a flatten the queue composites out of the
+  members' own ground pixels, captioned with the stack bottom to top. **A
+  scene names its members twice**, in `over` and in `meta.layers`, so every
+  place that re-mints ids — the commit, the copy — must translate both halves
+  (`remapSceneMeta`).
+  What remains is step 9, the
+  funn relation editor. Three rules from steps 4–6 that hold for it:
   **opacity is a raster idea** — vector members get a switch and nothing else,
   and so does the ground preset, whose fade would be three fades and lives on
   the settings strip instead; **held is not withdrawn** — a group or preset
@@ -190,7 +202,8 @@ that owns them.
   list — `docs/terrain-analysis.md` and below.
 - **Lokaliteter**: an authored rectangle holding named *funn* drawn in
   Excalidraw over the frozen map, and *bilder* (extracts, terrain renders,
-  screenshots, flyfoto, uploads, sketches), behind sign-in — below, and
+  screenshots, flyfoto, uploads, sketches, and arrangements of those),
+  behind sign-in — below, and
   `docs/ui-architecture.md` §8, §9.
 - **Sketches — drawing *on* the ground rather than of it.** The same
   Excalidraw surface that makes a funn also makes a *tegning*: a transparent
@@ -472,7 +485,8 @@ hierarchy. A lokalitet is an authored rectangle — proposed from the visible ma
 then moved and sized by hand before anything is written, and resizable
 afterwards — holding *funn* (individually named and addressable drawn features)
 and *bilder* (kept LiDAR extracts, terrain renders, map screenshots, flyfoto,
-uploads, sketches). It is bounded to **50–1500 m per side**, a band read off what the
+uploads, sketches, and *oppsett* — an arrangement of the others, kept as a
+record of itself). It is bounded to **50–1500 m per side**, a band read off what the
 producers can actually render (`src/localities/bboxLimits.ts`,
 `docs/ui-architecture.md` §5.6).
 
@@ -520,7 +534,9 @@ Key files (data side):
   raises `attachments.file` to 50 MB, `1700000700` adds the `sketch`
   attachment kind together with `attachments.funn` and `.over` (both
   uncascaded relations) and raises `attachments.meta` to 2 MB so a sketch
-  can carry its scene. **Leave the
+  can carry its scene, `1700000800` adds the `scene` attachment kind and
+  **nothing else** — an arrangement reuses the `over` relation and the 2 MB
+  `meta` that one added. **Leave the
   filenames alone** — they're recorded in `_migrations`, so renaming one
   makes PB re-run it. Collection ids must not equal any collection name
   (0.23+ rejects that), hence `pbc_localities` / `finds2` /
@@ -542,18 +558,20 @@ Data model:
   EPSG:4326 — curves are sampled on the way in, so an ellipse is stored as a
   64-gon and stays one; the record never knew it had been a curve).
 - **`attachments`** — `locality`, `owner`, `kind` (extract | screenshot |
-  upload | flyfoto | sketch), `file` (protected, ≤50 MB, png/jpeg/webp,
+  upload | flyfoto | sketch | scene), `file` (protected, ≤50 MB, png/jpeg/webp,
   thumbs, and
   **optional** — a View is a spec before it is pixels), `caption`, `meta`
   (json, ≤2 MB: source key/label, style, model, metresPerPx, `bbox25833`,
-  `imageRect`, `renderedAt`, `bboxAssumed` on a placed upload, and for a
-  sketch the Excalidraw scene itself),
+  `imageRect`, `renderedAt`, `bboxAssumed` on a placed upload, for a
+  sketch the Excalidraw scene itself, and for a scene its layer order, their
+  fades and the ground under them),
   `funn` and `over` (uncascaded relations → finds and → attachments: what a
-  sketch is about, and which bilder it is a layer on), `sort` and `hidden`
+  sketch is about, and which bilder it is a layer on — on a scene, which
+  bilder it is an arrangement *of*), `sort` and `hidden`
   for exhibit order and concealment.
 
-**Views and Files.** `kind` decides which: `extract`, `flyfoto` and `sketch`
-are **Views** — producible from the record's own parameters, so they are written as
+**Views and Files.** `kind` decides which: `extract`, `flyfoto`, `sketch` and
+`scene` are **Views** — producible from the record's own parameters, so they are written as
 a spec (`createAttachmentSpec`, `meta` only) and the figure PNG is pinned onto
 them afterwards by `src/localities/pinQueue.ts`. `screenshot` and `upload` are
 **Files**: bytes, with nothing behind them that could make the bytes again.

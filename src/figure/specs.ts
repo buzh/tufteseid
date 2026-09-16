@@ -356,6 +356,89 @@ export const sketchFigure = ({
 });
 
 // ---------------------------------------------------------------------------
+// Oppsett — a kept arrangement of the layer row, flattened
+// ---------------------------------------------------------------------------
+
+/**
+ * Where one layer of a scene came from, as far as the credits line cares.
+ *
+ * Named by register rather than by attachment kind because that is the
+ * question being asked — a LiDAR extract and a terrain render are two
+ * products of hoydedata.no and one line on the figure.
+ */
+export type SceneLayerCredit = 'hoydedata' | 'nib' | 'kartverket' | 'none';
+
+export type SceneFigureLayer = {
+  /** The member's caption, or what kind of thing it is when it has none. */
+  label: string;
+  /** Percent, as the row's slider holds it. Omitted for the ground. */
+  opacity?: number;
+  credit: SceneLayerCredit;
+};
+
+export type SceneFigureInput = {
+  subject?: string;
+  /** The ground preset, where the scene was built over one. */
+  ground?: SceneFigureLayer;
+  /** The members, **bottom-to-top** — the order they were painted in. */
+  layers: SceneFigureLayer[];
+  metresPerPx: number;
+  bbox25833: Bbox25833;
+};
+
+const SCENE_CREDITS: Record<SceneLayerCredit, Credit | null> = {
+  hoydedata: CREDITS.hoydedata,
+  nib: CREDITS.nib,
+  kartverket: CREDITS.kartverket,
+  none: null,
+};
+
+/**
+ * The figure for a composition (docs/lokalitet-view.md §13.7).
+ *
+ * Its settings line is the stack itself, bottom to top, each layer with the
+ * fade it was seen through — which is the whole reproducibility contract here.
+ * Every other figure in this file names a service and the parameters it was
+ * asked with; this one names *the pictures it is made of*, because that is
+ * what was decided. A flatten whose caption did not say "1937 ortofoto at
+ * 40 % over sky-view factor" would be a picture of an overlap nobody could
+ * check, which is the one thing `src/figure/` exists to prevent.
+ *
+ * The credits are the union of its layers' — a scene over ortofoto owes NiB
+ * exactly as a flyfoto grab does, and a scene of nothing but sketches owes
+ * nobody, so the row goes out (`captionLayout` skips empty ones).
+ */
+export const sceneFigure = ({
+  subject,
+  ground,
+  layers,
+  metresPerPx,
+  bbox25833,
+}: SceneFigureInput): FigureSpec => {
+  const all = [...(ground ? [ground] : []), ...layers];
+  return {
+    title: titleOf(subject, t('figure.title.scene')),
+    source: t('figure.source.scene'),
+    settings: [
+      ...(ground ? [t('figure.set.sceneGround', { label: ground.label })] : []),
+      ...layers.map((layer) =>
+        t('figure.set.sceneLayer', {
+          label: layer.label,
+          percent: Math.round(layer.opacity ?? 100),
+        }),
+      ),
+    ],
+    metresPerPx,
+    bbox25833,
+    credits: dedupeCredits(
+      all
+        .map((layer) => SCENE_CREDITS[layer.credit])
+        .filter((c): c is Credit => c != null),
+    ),
+  };
+};
+
+// ---------------------------------------------------------------------------
 // Screenshot — whatever was on the map, composited
 // ---------------------------------------------------------------------------
 

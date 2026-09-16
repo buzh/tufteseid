@@ -5,6 +5,7 @@ import {
   CaptionField,
   MetaLine,
   OpenOriginalButton,
+  SceneRestoreButton,
   SketchToggleButton,
 } from './bilderCommon';
 import styles from './bilderCommon.module.css';
@@ -49,6 +50,9 @@ const Detail = ({
             can be held up against it and taken away again. `Rediger skissen`
             is the carousel's — that one writes. */}
         <SketchToggleButton ws={ws} rec={rec} />
+        {/* Here too, for the same reason: restoring an arrangement is a read,
+            and a reader is exactly who a shared scene is for. */}
+        <SceneRestoreButton ws={ws} rec={rec} />
         {/* No retry here, and none is reachable: a pin is a write, so
             `PinRetryButton` is the carousel's. This surface is only ever
             mounted where `canAdd` is false. */}

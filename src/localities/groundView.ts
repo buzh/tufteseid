@@ -92,7 +92,7 @@ const cropOf = (meta: Record<string, unknown>, img: HTMLImageElement) => {
 };
 
 /** Ground edge to edge — no caption panel, so no crop to carry. */
-type ViewRaster = {
+export type ViewRaster = {
   canvas: HTMLCanvasElement;
   extent25833: [number, number, number, number];
 };
@@ -108,7 +108,7 @@ type ViewRaster = {
  * `null` is "the source has nothing over this rectangle", which is a fact
  * about the ground rather than a failure; anything that throws is one.
  */
-const renderViewRaster = async (
+export const renderViewRaster = async (
   spec: ViewSpec,
   extent25833: [number, number, number, number],
   signal: AbortSignal,
@@ -179,7 +179,78 @@ const renderViewRaster = async (
       // [Visning]. Answering here would put a second copy of it on the map one
       // level down, on white paper, with a caption panel.
       return null;
+
+    case 'scene':
+      // Neither is a scene a ground layer. It is a statement *about* the
+      // stack — the thing the stack is read off, not a thing in it — and the
+      // one place it becomes pixels is its own flatten, which is the pin
+      // queue's (§13.7). A scene switched onto the ground under the members
+      // it is a record of would be the arrangement showing through itself.
+      return null;
   }
+};
+
+/**
+ * One record's ground pixels, outside React: the pin where there is one, a
+ * live render where there is not.
+ *
+ * The hook below does not call it, and that is deliberate rather than an
+ * oversight. On the map a pinned figure goes to `setGroundOverlay` as the
+ * `<img>` itself with a crop beside it, because the overlay draws from the
+ * source directly and a 36 Mpx intermediate canvas per member is ~140 MB of
+ * nothing. A flatten has to *composite*, so it needs the pixels in hand.
+ * Everything downstream of that difference — which file, which crop, which
+ * producer when there is no file — is the same, and is here.
+ *
+ * **Not for a sketch.** A sketch's pin is its figure, which is drawn on white
+ * paper (`pinQueue`), so laying one over a ground would erase the ground. Its
+ * caller renders the scene transparent instead; this returns null rather than
+ * the file, so the trap cannot be fallen into by accident.
+ */
+export const groundRasterOf = async (
+  rec: AttachmentRecord,
+  signal: AbortSignal,
+): Promise<ViewRaster | null> => {
+  const meta = rec.meta;
+  if (!meta || rec.kind === 'sketch') return null;
+  const extent25833 = groundExtentOf(meta);
+  if (!extent25833) return null;
+
+  if (isPinned(rec)) {
+    try {
+      const url = await getAttachmentUrl(rec);
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      const crop = cropOf(meta, img);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(crop.width));
+      canvas.height = Math.max(1, Math.round(crop.height));
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(
+          img,
+          crop.x,
+          crop.y,
+          crop.width,
+          crop.height,
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+        );
+        return { canvas, extent25833 };
+      }
+    } catch (e) {
+      // Same fallback the hook makes, for the same reason: a View is
+      // reproducible by definition, so a file that will not load is a reason
+      // to make the pixels again rather than a reason to give up.
+      console.warn('[groundView] pinned figure unusable', rec.id, e);
+    }
+  }
+
+  const spec = viewSpecOf(rec);
+  return spec ? renderViewRaster(spec, extent25833, signal) : null;
 };
 
 /**

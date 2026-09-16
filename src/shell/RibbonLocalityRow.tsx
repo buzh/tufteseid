@@ -1012,6 +1012,26 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               disabled={!ws.beholdReady || ws.beholdDone}
               onClick={ws.behold}
             />
+            {/* …and the same verb one level up: `Behold` keeps the ground,
+                this keeps the stack over it (§13.7). Beside it rather than in
+                the layer row because §13.8's rule is that nothing in the row
+                writes — the row is where an arrangement is made, and keeping
+                one is authorship.
+
+                Disabled when there is nothing on the map to keep, which is
+                the honest state rather than a hidden button: an empty stack
+                over an unkeepable ground is a blank sheet with a caption. */}
+            <ModeButton
+              icon="stacks"
+              label={t('localities.scene.keep')}
+              tooltip={
+                ws.canKeepScene
+                  ? t('localities.scene.keepHint')
+                  : t('localities.scene.keepEmpty')
+              }
+              disabled={!ws.canKeepScene}
+              onClick={ws.keepScene}
+            />
             <HentMenu ws={ws} active={mode === 'lidar'} />
             <ModeButton
               icon="photo_camera"

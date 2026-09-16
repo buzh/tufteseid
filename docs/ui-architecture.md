@@ -2496,12 +2496,13 @@ preserving. Since the View/File split (§8.7.4) they converge in **two** places,
 and which one a route takes is decided by its `kind`:
 
 ```
-Views (extract | flyfoto | sketch) — a row of parameters, stored as one:
+Views (extract | flyfoto | sketch | scene) — a row of parameters, stored as one:
 
   starterPack.ts           ─┐
   row 2 "Behold" (§8.9.2)   │
   the flyfoto grab          ┼─→ createAttachmentSpec()   — meta, no file
-  "Behold skissen" (§9.3)  ─┘             │
+  "Behold skissen" (§9.3)   │             │
+  "Oppsett" (§10.2)        ─┘             │
                                           │  afterwards, in the background:
                                           └─→ pinQueue.ts → renderSpec()
                                               → renderFigureBlob() (§8.10)
@@ -2521,14 +2522,16 @@ somewhere to draw a caption; only "Last opp" bypasses it (§8.10). The pin queue
 is a producer like any other and goes through the same stage — a pinned View
 and a File are the same kind of artifact once they exist.
 
-`kind` is one of `extract | screenshot | upload | flyfoto | sketch`; terrain
+`kind` is one of `extract | screenshot | upload | flyfoto | sketch | scene`;
+terrain
 renders reuse `extract` with the visualization recorded in `meta.style`, which
 is why adding terrain analysis needed no migration. `meta` also carries source
 key/label, `metresPerPx`, bbox, `imageRect` (§8.10), `renderedAt` (§8.7.4),
 for flyfoto the `projectName` / `year` / `photoDate` that the strip captions
-from ("Flyfoto 1937"), and for a sketch the `frame` and the Excalidraw `scene`
+from ("Flyfoto 1937"), for a sketch the `frame` and the Excalidraw `scene`
 itself — which is why `meta` is sized at 2 MB rather than the 10 kB the other
-kinds need. Files are `protected` in PocketBase, so the strip fetches
+kinds need — and for a scene its layer order, their fades and the ground under
+them (§10.2). Files are `protected` in PocketBase, so the strip fetches
 short-lived file tokens for thumbnails — a new UI must keep doing that or every
 thumbnail 403s.
 
@@ -2536,7 +2539,8 @@ Four more fields sit on the record and belong to the exhibit or to the
 sketch rather than to the image: `sort` (int) and `hidden` (bool), which are
 §8.7.3, and the two uncascaded relations `funn` (→ finds: what a sketch is
 about) and `over` (→ attachments: which bilder it is a layer on), which are
-§9.3.
+§9.3 — and on a scene `over` carries the other sense the word already had, the
+bilder it is an arrangement *of* (§10.2).
 
 #### 8.7.1 The image on the map — and why it is not the rail's
 
@@ -2569,6 +2573,10 @@ the curation verbs and `PinRetryButton` (§8.7.4). Step 7 added one more verb to
 that panel and it does not reopen the question: `Plasser i ruta` (§8.7.2)
 writes a rectangle onto the record, which is a curation verb with a geometry in
 it, and what it produces is a row in [Bilde] rather than a layer on the map.
+Step 8 added the other exception that proves the rule: `Legg ut igjen` on a
+scene's card (§10.2) does not put *that* record on the ground — a scene is not
+a layer and has no switch anywhere — it puts the whole row back the way the
+record says it was. It is a read, so it is on the card in both stances.
 
 Three consequences of the separation, each of which had been paid for
 elsewhere:
@@ -2922,9 +2930,9 @@ dataset, style, model, knobs, rectangle — and the pixels are what you get when
 you hand those parameters to a service. A screenshot and an upload are the
 opposite: bytes, with nothing behind them that could make the bytes again.
 That is the whole split, and it is **derivable from `kind`**: `extract`,
-`flyfoto` and `sketch` are Views, `screenshot` and `upload` are Files. There is
-no `spec` field and no `isView` field, deliberately — a flag that can disagree
-with `kind` is a flag that eventually will.
+`flyfoto`, `sketch` and `scene` are Views, `screenshot` and `upload` are Files.
+There is no `spec` field and no `isView` field, deliberately — a flag that can
+disagree with `kind` is a flag that eventually will.
 
 A sketch (§9.3) is the odd one and belongs on the View side anyway. Its
 parameters are not a dataset and a set of knobs — they are a frame and the
@@ -2934,6 +2942,13 @@ carried by a fork; the pixels are made afterwards by the same queue; and asking
 for them again gives back the same drawing at today's resolution instead of the
 one it was saved at. What it does not get is `Gjenskap`: there is no view of the
 map to go back to, because the figure holds no ground.
+
+A scene (§10.2) stretches the same argument one step further: its parameters
+are *other records*, so it is reproducible exactly as far as its members are,
+and its pin is a flatten of them rather than a render of a service. That is
+the honest depth for something whose whole content is a statement about other
+records — and it is what §13.2's rule buys, since a member is a spec or a
+File and never "this View, but as its pixels".
 
 A View therefore has three states, and `attachments.file` being optional
 (migration `1700000500`) is what allows the first of them:
@@ -3130,6 +3145,12 @@ none of them is on the bottom edge (§8.7.2).
 | `Behold` | whatever ground is on screen, kept at the source's own resolution |
 | the two pickers | LiDAR-uttrekk and Flyfoto, behind `Hent ▾` — propose a batch of *different* datasets and keep or discard each one (§8.9.3) |
 | Skjermbilde and Last opp | pixels, with no view behind them |
+
+**`Oppsett` (§10.2) is deliberately not a fifth row.** It keeps the
+*arrangement* of what these four produced rather than another reading of the
+ground, and its pixels are a flatten of records that are already here — so it
+brings nothing in. It sits beside `Behold` on the row because that is where the
+write verbs are, not because it is one of these.
 
 #### 8.9.1 The starter set (grunnpakke)
 
@@ -3343,13 +3364,20 @@ the second kind.
 |---|---|
 | `figure/draw.ts` | canvas primitives: `layoutCaption`, `drawScaleBar`, `drawNorthArrow`, number formatting |
 | `figure/figure.ts` | `FigureSpec`, `CREDITS`, `renderFigure` / `renderFigureBlob`, the seven caption rows |
-| `figure/specs.ts` | one spec builder per producer: `lidarExtractFigure`, `terrainFigure`, `flyfotoFigure`, `screenshotFigure` |
+| `figure/specs.ts` | one spec builder per producer: `lidarExtractFigure`, `terrainFigure`, `flyfotoFigure`, `sketchFigure`, `sceneFigure`, `screenshotFigure` |
 
 **Scope: everything but "Last opp".** Both LiDAR extract exits ("Behold" *and*
 the PNG download — the download is precisely the copy that ends up in someone
 else's report), `Behold` on any ground, the flyfoto grab, "Ta skjermbilde" and
 all three steps of the starter set. An upload's provenance is unknown to the app,
 so inventing a caption for it would be worse than none.
+
+A scene's figure (§10.2) is the one whose settings line is not a service and
+its parameters but *the pictures it is made of*, bottom to top, each with the
+fade it was seen through — because that is what was decided. A flatten whose
+caption did not say "1937 ortofoto at 40 % over sky-view factor" would be a
+picture of an overlap nobody could check. Its credits are the union of its
+layers'.
 
 That is also why the one thing the app *does* let itself invent about an upload
 says so on its face. `Plasser i ruta` (§8.7.2) writes an extent nobody measured,
@@ -3547,6 +3575,15 @@ Load-bearing, in the order the mistakes would be made:
   drawing and goes back on the queue, while a File has nothing to render from
   and the queue would only mark it `empty` (§8.7.4) and light a failure face on
   a record that is perfectly fine.
+- **A `draft:` id is translated in both halves of a scene.** The commit already
+  mapped temp ids in the two *relations* — a sketch about a funn invented in the
+  same session — and a scene names its members in `over` **and** in
+  `meta.layers` (§10.2), so `remapSceneMeta` does the same job on the half that
+  lives in JSON. One pass is enough because `newSpecs` is in the order the
+  specs were kept and a scene can only name members that already existed when
+  it was kept. `copyLocality` (§8.12) needed the identical fix for the same
+  reason, one id space over. Both drop what they cannot translate: a layer
+  pointing at a record that was never written is not a layer.
 - **A successful commit reloads both lists.** Realtime is still held back — the
   stance did not end — so the funn and specs the commit just created would be
   nowhere: the buffer the overlay was reading them out of is empty now, and no
@@ -3690,6 +3727,15 @@ Load-bearing details:
   queue renders the spec's own rectangle rather than the copy's current one.
 - **`sort` and `hidden` carry**, which is why `NewAttachmentInput` takes them
   at all. The original's arrangement is part of what was being shared.
+- **Relations are wired in a second pass**, after every record that is going to
+  exist does — a sketch may be a layer on a bilde further down the same list.
+  Two kinds have them: a sketch says what it is drawn over and about, and a
+  scene says what it is made of (§10.2). The scene needs one thing more, since
+  its membership is in `meta.layers` as well as in `over` and both halves have
+  to name the copy's records or the flatten would be of the original's.
+  Untranslatable layers are dropped by both, which is the same sentence twice:
+  the Files stayed with the original, so a scene built over one arrives with
+  that layer missing until `Ta med` brings the File across.
 
 **The Files that stayed behind are still shown.** `useInheritedBilder` lists
 the original's Files and appends them to the copy's carousel as borrowed
@@ -3923,6 +3969,13 @@ layers a screenshot catches the whole reading — the ground preset, every
 sketches are switched on, the heritage layers, the funn — as one File cropped to
 the lokalitet's rectangle. That is the answer to "keep what I am looking at",
 and it is why the sketch itself never needed to be composited.
+
+Since §10.2 there are two flattens and they do different jobs. A screenshot
+catches the *screen*, including everything that is not lokalitet content — the
+heritage layers, the measure line, search markers — as bytes with no components
+left in them. A scene keeps the *arrangement*, so it can be taken apart, put
+back, re-read at another zoom and forked. Press the first to show somebody what
+you were looking at; press the second to keep the reading.
 
 ### 9.4 What the surface deliberately does not offer
 
@@ -4462,6 +4515,68 @@ View falls through to a live render before it is allowed to fail at all
 (§8.7.1), so in practice the warning means the upstream has nothing over this
 rectangle, or a File's bytes will not decode.
 
+### 10.2 `kind: 'scene'` — the arrangement itself, kept
+
+Four groups and a fade each mean a composition can be built by hand: a 1937
+ortofoto at 40 % over a sky-view render with a sketch on top. A **scene** is
+that composition stored as *what it is made of* rather than flattened to bytes
+— `docs/lokalitet-view.md` §13.7, §13.10 step 8, and `src/localities/
+sceneSpec.ts` for the shape.
+
+It is an `attachments` row, so it inherits `sort`, `hidden`, `caption`, the
+copy and the pin queue, and migration `1700000800` adds **no field**: `over`
+holds the membership as a relation and `meta` holds `{bbox25833, ground,
+layers: [{id, opacity}]}` bottom-to-top. Both halves name the same ids and
+neither is derivable from the other — a relation cannot carry an order or a
+percentage, and JSON is not a relation, so a member deleted from under a scene
+leaves it standing with one fewer layer. The ground is the one member that is
+not a record ("Flyfoto" is the live ortofoto ground), so it is stored as the
+`{kind, meta}` pair a `Behold` of it would have written and read back by
+`viewSpecOf` with no special case; Standard and Hybrid store no ground at all,
+for the reason `Behold` refuses them, and a scene built over one flattens onto
+white paper.
+
+**A scene is not a layer.** Group membership is decided by `kind` and nothing
+claims `'scene'`, so it has no switch in any pulldown, `groundView` answers
+`null` for it, and the closed ground list in `sceneSpec.ts` excludes it — a
+scene inside a scene is unrepresentable in the record rather than merely
+unreachable.
+
+**Its two verbs, and where they are.**
+
+- **`Oppsett`** on the lokalitet row, beside `Behold` (§8.9.2): `Behold` keeps
+  the bottom layer, this keeps the stack over it. A write, so `canAdd`, and
+  buffered into the edit transaction like every other keep. Disabled rather
+  than hidden when there is nothing on the map to keep.
+- **`Legg ut igjen`** on the bilde card, in both surfaces: it replaces the
+  three shown sets, merges the three fade maps (`opacityByKey` is never
+  pruned), switches the three groups on, and sends the ground through
+  `recreateViewAtom` — the same path [Visning]'s per-row apply takes. A read,
+  so both stances and a reader get it in full, which is what a shared scene is
+  for. Members that have since been deleted are simply missing and the toast
+  says how many.
+
+Neither is in the layer row, and that is §13.8 rather than an accident: nothing
+in the row writes, and the row is where an arrangement is *made*. Restoring
+also deliberately never blanks the ground — a scene over Standard and a scene
+with the preset switched off record the same nothing, and the map always has a
+ground.
+
+**Its pin is the flatten**, and it is the first producer in `pinQueue.ts` that
+renders *other records*. It does not composite the members' figures — a caption
+panel inside a composite is a picture of a card — it asks `groundRasterOf` for
+each member's ground pixels, which is the pin where there is one and a live
+render where there is not, exactly as the map does one level up. A sketch is
+the exception: its figure is on white paper, so it is re-rendered transparent
+at the sheet's resolution instead. Resolution is settled once before anything
+is drawn (the sharpest member's own `metresPerPx`, floored at 1500 m / 6000 px)
+and members are composited one at a time, so peak memory is the sheet plus one
+member. The figure's settings line is the stack itself, bottom to top, each
+layer with the fade it was seen through, and its credits are the union of its
+layers' — a layer whose pixels did not arrive is left out of both the caption
+and the picture, and a scene where nothing arrives pins `empty` rather than
+`failed`.
+
 ---
 
 ## 11. Icons, and the build gotcha
@@ -4784,6 +4899,11 @@ join that list — fitted to the image's own aspect inside the lokalitet's
 rectangle, marked as assumed wherever it appears, and removable again;
 see a member say so on its own switch when the layer could not be shown;
 take the ground away entirely and read a sketch and its funn on white;
+keep the whole arrangement — which layers are on, in what order, at what fade,
+over which ground — with **Oppsett** on the row, as a bilde of its own that
+pins to a flatten captioned with its layers; and put a kept one back on the map
+with **Legg ut igjen** on its card, in either stance, with what has since been
+deleted reported rather than silently missing;
 see a card that is still a set of parameters say so, and retry it if its render
 failed; open the original in a tab, fetching it first where it does not exist
 yet; caption an attachment; delete one and have it gone on confirm, without

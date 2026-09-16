@@ -1,5 +1,5 @@
 import type { FeatureCollection } from 'geojson';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom, useStore } from 'jotai';
 import { transformExtent } from 'ol/proj';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -69,6 +69,7 @@ import {
   hybridOverlayHalves,
 } from '../map/layers/config/backgroundLayers/atoms';
 import { fitPadding, FUNN_MARGIN_PX } from '../shell/chromeInsets';
+import { recreateViewAtom } from '../shell/useRecreateView';
 import { toast } from '../ui';
 import {
   activeLocalityAtom,
@@ -86,6 +87,8 @@ import {
   attachmentMatchesKey,
   type BeholdKey,
   beholdOfferAtom,
+  flyfotoSpecMeta,
+  lidarSpecMeta,
   NIB_MOSAIC_KEY,
 } from './behold';
 import { copyLocality, type CopyProgress } from './copyLocality';
@@ -131,6 +134,12 @@ import {
   upsertLocalityOnLayer,
 } from './localityLayer';
 import { enqueuePin, pinAttempted, pinNow, type Produced } from './pinQueue';
+import {
+  sceneCompositionOf,
+  sceneGroundOf,
+  type SceneLayer,
+  sceneMetaOf,
+} from './sceneSpec';
 import { captureLocalityScreenshot } from './screenshot';
 import { planStarterPack } from './starterPack';
 import {
@@ -258,6 +267,10 @@ const bboxUnion = (a: LocalityBbox, b: LocalityBbox): LocalityBbox => [
 export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const { t, i18n } = useTranslation();
   const map = useAtomValue(mapAtom);
+  // For the handful of values that are only wanted at the instant of a click —
+  // see the layer-row fades below. Reading them through the store is what
+  // keeps a slider drag from re-rendering everything this hook feeds.
+  const store = useStore();
   const user = useAtomValue(currentUserAtom);
   const isAdmin = useAtomValue(isAdminAtom);
   const setActiveLocality = useSetAtom(activeLocalityAtom);
@@ -274,17 +287,29 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [sketchShown, setSketchShown] = useAtom(sketchShownAtom);
   const [sketchOpacity, setSketchOpacityMap] = useAtom(sketchOpacityAtom);
   const [sketchGroupShown, setSketchGroupShown] = useAtom(sketchGroupShownAtom);
-  // The two ground groups' switches. Their controls own them (see `viewItems`
-  // and `fileItems` below) and this hook's business with them is mostly
-  // emptying them on the way out — except for the two `shown` sets, which a
-  // new sketch reads to record what it was drawn over (`over`, §13.6).
-  const setGroundShown = useSetAtom(groundShownAtom);
+  /*
+   * The two ground groups' switches. Their controls own them (see `viewItems`
+   * and `fileItems` below) and this hook's business with them is mostly
+   * emptying them on the way out — except for what step 8 reads back off the
+   * row: a new sketch records what it was drawn over (`over`, §13.6), and
+   * `keepScene` records the whole arrangement (§13.7).
+   *
+   * Which is why the group switches are read and the *fades* are not. A group
+   * being off means its members are not on the map, so it changes what a keep
+   * would contain and the button's own enabled state with it; a fade changes
+   * neither, and subscribing to it here would re-render the whole workspace
+   * once per slider frame. `keepScene` reads those off the store at the
+   * instant of the press instead.
+   */
+  const [groundShown, setGroundShown] = useAtom(groundShownAtom);
   const [visningShown, setVisningShown] = useAtom(visningShownAtom);
   const setVisningOpacity = useSetAtom(visningOpacityAtom);
-  const setVisningGroupShown = useSetAtom(visningGroupShownAtom);
+  const [visningGroupShown, setVisningGroupShown] = useAtom(
+    visningGroupShownAtom,
+  );
   const [bildeShown, setBildeShown] = useAtom(bildeShownAtom);
   const setBildeOpacity = useSetAtom(bildeOpacityAtom);
-  const setBildeGroupShown = useSetAtom(bildeGroupShownAtom);
+  const [bildeGroupShown, setBildeGroupShown] = useAtom(bildeGroupShownAtom);
   const [adjusting, setAdjusting] = useAtom(adjustingLocalityAtom);
   const [selectedFunnId, setSelectedFunnId] = useAtom(selectedFunnIdAtom);
   const setFunnHidden = useSetAtom(funnHiddenAtom);
@@ -2138,35 +2163,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         sort: born,
         bornSort: born,
         hidden: false,
-        meta: {
-          sourceLabel: 'Norge i bilder',
-          // The rectangle, but not the resolution: which acquisition over
-          // which ground is the spec, and what NiB actually serves for it
-          // is a fact about pixels that do not exist yet.
-          bbox25833: beholdBbox,
-          // Which NiB source this is, said in a way a machine can act on:
-          // the seamless mosaic and one acquisition are different
-          // requests, and "no projectName key" is a poor way to tell them
-          // apart once a reader has to re-lay this image on the map.
-          ...(project
-            ? {
-                nibSource: 'project',
-                // The ImageServer's own selector (prosjektnavn), which is
-                // the same string as projectName today — kept as its own
-                // key because the display name is free to stop being the
-                // selector and matching an acquisition by its year label
-                // breaks the day two projects share a year.
-                projectId: project.id,
-                projectName: project.projectName,
-                // The acquisition's native resolution. `fetchFlyfoto`
-                // needs it to plan the tile grid, and unlike the stitch's
-                // own it is knowable before the stitch happens.
-                projectMetresPerPx: project.metresPerPx,
-                year: project.year,
-                photoDate: project.photoDate,
-              }
-            : { nibSource: 'mosaic' }),
-        },
+        // The shared builder, since a scene's ground records the same
+        // acquisition the same way (`behold.ts`, §13.7).
+        meta: flyfotoSpecMeta(project, beholdBbox),
       };
       mutateDraft((d) => withNewSpec(d, mintDraftId(), spec));
       return true;
@@ -2216,13 +2215,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         sort: born,
         bornSort: born,
         hidden: false,
-        meta: {
-          sourceKey: source.key,
-          sourceLabel: source.label,
-          style,
-          model: source.model,
-          bbox25833: beholdBbox,
-        },
+        meta: lidarSpecMeta(source, style, beholdBbox),
       };
       mutateDraft((d) => withNewSpec(d, mintDraftId(), spec));
     },
@@ -2630,6 +2623,255 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       toast.success({ title: t('localities.tools.beholdSaved') });
     }
   }, [user, canAdd, offer, saveExtractSpec, mutateDraft, t]);
+
+  /*
+   * `Oppsett` — the arrangement itself, kept as a record
+   * (docs/lokalitet-view.md §13.7, §13.10 step 8).
+   *
+   * `Behold` keeps *a ground*; this keeps *the stack over it*. Until now the
+   * only way to preserve a composition was `Ta skjermbilde`, which flattens it
+   * to bytes and throws away every component, every fade and every parameter —
+   * so a reader could see that a 1937 ortofoto had been laid over a sky-view
+   * render at 40 % but could not take it apart, re-read it at a different
+   * zoom, or check either half.
+   *
+   * It sits beside `Behold` on the lokalitet row and **not in the layer row**,
+   * which is §13.8 again: nothing in the row writes. The row is where the
+   * arrangement is made; keeping one is an act of authorship and belongs with
+   * the other write verbs, behind the same `canAdd`.
+   *
+   * No duplicate guard, unlike `Behold`. The guard exists because scrubbing a
+   * slider can leave forty near-identical renders; there is no gesture here
+   * that produces a scene as a side effect, and two keeps of the same stack
+   * are two decisions a minute apart rather than an accident.
+   */
+  const sceneCount = useMemo(
+    () => (attachmentItems ?? []).filter((it) => it.kind === 'scene').length,
+    [attachmentItems],
+  );
+
+  /*
+   * The ground under the arrangement, or null where there is none to name.
+   *
+   * Both switches gate it, for the same reason they gate the pixels: the
+   * preset's, because that is what the preset is, and the group's, because a
+   * group that is off is not on the map. Standard and Hybrid answer null even
+   * when both are on — there is no rectangle-fetch path for the topo WMS, so
+   * the honest record of a stack built over one is a stack over nothing
+   * (`sceneSpec.ts`).
+   */
+  const sceneGround = useMemo(
+    () =>
+      visningGroupShown && groundShown
+        ? sceneGroundOf(offer, beholdBbox)
+        : null,
+    [visningGroupShown, groundShown, offer, beholdBbox],
+  );
+
+  const sceneShownCount =
+    (visningGroupShown
+      ? viewItems.filter((it) => visningShown.has(it.id)).length
+      : 0) +
+    (bildeGroupShown
+      ? fileItems.filter((it) => bildeShown.has(it.id)).length
+      : 0) +
+    (sketchGroupShown
+      ? sketchItems.filter((it) => sketchShown.has(it.id)).length
+      : 0);
+
+  const canKeepScene = canAdd && (sceneGround != null || sceneShownCount > 0);
+
+  const keepScene = useCallback(() => {
+    if (!user || !canKeepScene) return;
+
+    /*
+     * The stack, bottom to top — the row's own left-to-right (§13.1).
+     *
+     * Read off the three group lists rather than off the overlay module,
+     * because the order a group paints in is the order its control declared
+     * (`setGroundOverlayStack`) and that is this list filtered, not a separate
+     * fact. [Skisse] is last because a sketch is over both ground groups
+     * (`sketchOverlay.ts`, zIndex 2).
+     */
+    const layers: SceneLayer[] = [];
+    const take = (
+      recs: readonly AttachmentRecord[],
+      shown: ReadonlySet<string>,
+      fades: ReadonlyMap<string, number>,
+    ) => {
+      for (const rec of recs) {
+        if (shown.has(rec.id)) {
+          layers.push({ id: rec.id, opacity: fades.get(rec.id) ?? 100 });
+        }
+      }
+    };
+    if (visningGroupShown) {
+      take(viewItems, visningShown, store.get(visningOpacityAtom));
+    }
+    if (bildeGroupShown) {
+      take(fileItems, bildeShown, store.get(bildeOpacityAtom));
+    }
+    if (sketchGroupShown) {
+      take(sketchItems, sketchShown, store.get(sketchOpacityAtom));
+    }
+
+    const born = Date.now();
+    mutateDraft((d) =>
+      withNewSpec(d, mintDraftId(), {
+        kind: 'scene',
+        caption: t('localities.scene.caption', { n: sceneCount + 1 }),
+        sort: born,
+        bornSort: born,
+        hidden: false,
+        meta: sceneMetaOf({
+          bbox25833: beholdBbox,
+          ground: sceneGround,
+          layers,
+        }),
+        // The same set, said as a relation. Neither half is derivable from the
+        // other and both are load-bearing — `sceneSpec.ts` has the argument.
+        over: layers.map((l) => l.id),
+      }),
+    );
+    toast.success({ title: t('localities.scene.kept') });
+  }, [
+    user,
+    canKeepScene,
+    store,
+    viewItems,
+    fileItems,
+    sketchItems,
+    visningShown,
+    bildeShown,
+    sketchShown,
+    visningGroupShown,
+    bildeGroupShown,
+    sketchGroupShown,
+    sceneGround,
+    sceneCount,
+    beholdBbox,
+    mutateDraft,
+    t,
+  ]);
+
+  const recreate = useSetAtom(recreateViewAtom);
+
+  /*
+   * …and back: put a kept arrangement on the map again (§13.7).
+   *
+   * A read, so it is offered in both stances and to a reader, like every other
+   * layer-row gesture. It is `Gjenskap` for a stack — and for the ground under
+   * it that is literally true: the bottom of a scene is a `GroundSpec`, so the
+   * preset goes back through `recreateViewAtom`, the same path the View row's
+   * apply takes.
+   *
+   * What it does **not** do is blank the ground when the scene has none. A
+   * scene over Standard and a scene with the preset switched off record the
+   * same nothing — neither is keepable as a spec — and the map always has a
+   * ground, so switching it off here would be inventing a decision the record
+   * does not contain. The flatten is the one that answers on white paper,
+   * where there is no live ground to show through.
+   *
+   * Members that have since been deleted are simply missing, which is what the
+   * uncascaded relation was chosen for; the toast says how many, because a
+   * restore that silently comes back smaller is a restore nobody can trust.
+   */
+  const restoreScene = useCallback(
+    (rec: AttachmentRecord) => {
+      const composition = sceneCompositionOf(rec.meta);
+      if (!composition) {
+        toast.error({ title: t('localities.scene.unreadable') });
+        return;
+      }
+      const byId = new Map((attachmentItems ?? []).map((it) => [it.id, it]));
+
+      const visning = new Set<string>();
+      const bilde = new Set<string>();
+      const skisse = new Set<string>();
+      const fades = new Map<string, number>();
+      let missing = 0;
+      for (const layer of composition.layers) {
+        const member = byId.get(layer.id);
+        if (!member || deletedIds.has(member.id)) {
+          missing++;
+          continue;
+        }
+        fades.set(member.id, layer.opacity);
+        switch (member.kind) {
+          case 'extract':
+          case 'flyfoto':
+            visning.add(member.id);
+            break;
+          case 'screenshot':
+          case 'upload':
+            bilde.add(member.id);
+            break;
+          case 'sketch':
+            skisse.add(member.id);
+            break;
+          default:
+            missing++;
+        }
+      }
+
+      // Replaced, not merged: restoring an arrangement means the map shows
+      // *that* arrangement, and a member left over from what was up before it
+      // is a layer the scene does not contain.
+      setVisningShown(visning);
+      setBildeShown(bilde);
+      setSketchShown(skisse);
+      // The fades are merged, because `opacityByKey` is never pruned (§13.4):
+      // a member's fade outlives its member, and a scene has no opinion about
+      // the ones it does not include.
+      const merge = (cur: ReadonlyMap<string, number>, ids: Set<string>) => {
+        const next = new Map(cur);
+        for (const id of ids) next.set(id, fades.get(id) ?? 100);
+        return next;
+      };
+      setVisningOpacity((cur) => merge(cur, visning));
+      setBildeOpacity((cur) => merge(cur, bilde));
+      setSketchOpacityMap((cur) => merge(cur, skisse));
+
+      // Every group on: a scene's members are on the map by definition, and a
+      // held-down group would show none of them.
+      setVisningGroupShown(true);
+      setBildeGroupShown(true);
+      setSketchGroupShown(true);
+
+      const groundSpec = composition.ground
+        ? viewSpecOf(composition.ground)
+        : null;
+      if (groundSpec && groundSpec.kind !== 'scene') {
+        setGroundShown(true);
+        recreate(groundSpec);
+      }
+
+      if (missing > 0) {
+        toast.warning({
+          title: t('localities.scene.restored'),
+          description: t('localities.scene.missing', { count: missing }),
+        });
+      } else {
+        toast.success({ title: t('localities.scene.restored') });
+      }
+    },
+    [
+      attachmentItems,
+      deletedIds,
+      setVisningShown,
+      setBildeShown,
+      setSketchShown,
+      setVisningOpacity,
+      setBildeOpacity,
+      setSketchOpacityMap,
+      setVisningGroupShown,
+      setBildeGroupShown,
+      setSketchGroupShown,
+      setGroundShown,
+      recreate,
+      t,
+    ],
+  );
 
   // The NiB licensing notice. The starter set no longer goes through it: it
   // stopped fetching ortofoto, so consent to NiB's terms is no longer being
@@ -3063,6 +3305,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     placeUpload,
     unplaceUpload,
     reorderBilde,
+    // the arrangement, kept and put back (§13.7)
+    keepScene,
+    canKeepScene,
+    restoreScene,
 
     // funn list
     selectedFunnId,
