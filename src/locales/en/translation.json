@@ -353,6 +353,13 @@
       "edit": "Edit the sketch",
       "editHint": "Open the strokes under the pen again."
     },
+    "layers": {
+      "skisse": "Sketch",
+      "skisseHide": "Hide the sketches on the map",
+      "skisseShow": "Show the sketches on the map again",
+      "skisseMembers": "Choose which sketches are shown",
+      "transparency": "Transparency"
+    },
     "bilder": {
       "heading": "Images",
       "upload": "Upload",

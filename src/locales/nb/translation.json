@@ -353,6 +353,13 @@
       "edit": "Rediger skissen",
       "editHint": "Åpne strekene under pennen igjen."
     },
+    "layers": {
+      "skisse": "Skisse",
+      "skisseHide": "Skjul skissene på kartet",
+      "skisseShow": "Vis skissene på kartet igjen",
+      "skisseMembers": "Velg hvilke skisser som vises",
+      "transparency": "Transparens"
+    },
     "bilder": {
       "heading": "Bilder",
       "upload": "Last opp",

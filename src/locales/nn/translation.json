@@ -353,6 +353,13 @@
       "edit": "Rediger skissa",
       "editHint": "Opne strekane under pennen igjen."
     },
+    "layers": {
+      "skisse": "Skisse",
+      "skisseHide": "Skjul skissene på kartet",
+      "skisseShow": "Vis skissene på kartet igjen",
+      "skisseMembers": "Vel kva for skisser som blir viste",
+      "transparency": "Transparens"
+    },
     "bilder": {
       "heading": "Bilete",
       "upload": "Last opp",

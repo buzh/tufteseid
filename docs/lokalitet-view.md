@@ -1,6 +1,6 @@
 # The lokalitet view
 
-**Status: §1–§12 built, §13 designed and two steps in.** §12's build order is
+**Status: §1–§12 built, §13 designed and three steps in.** §12's build order is
 complete through step 15; what is left of it is step 16 — sharing (§10) and the
 Rapportpakke (§9) — plus the two builds that landed outside the numbered list
 and are recorded at the end of §12 (placing the rectangle, sketches as
@@ -13,7 +13,7 @@ because the reasoning is not recoverable from the result, not because it
 describes the app.
 
 §13 is the exception and reads the other way round: a later thread whose build
-order is §13.10 and whose first two steps have landed, and which deletes
+order is §13.10 and whose first three steps have landed, and which deletes
 several things `docs/ui-architecture.md` and CLAUDE.md stated as load-bearing
 until it came for them.
 
@@ -1578,11 +1578,12 @@ Docs to update: `docs/ui-architecture.md` §3.1 (the shell loses a slot), §5.1
 
 ## 13. The layer row — the stack becomes the control
 
-**Status: designed; steps 1–2 of §13.10 built, the rest not.** It supersedes the
+**Status: designed; steps 1–3 of §13.10 built, the rest not.** It supersedes the
 verbs in §4.2 and deletes the one-slot arbiter that section introduced — that
 deletion has landed, and so has the mechanism the replacement needs: a View can
-now be put on the map as its own pixels over its own rectangle, with no figure
-and no control yet. §4.1, §4.1.1 and §4.1.2
+now be put on the map as its own pixels over its own rectangle. The row itself
+has its first button: `src/shell/LayerGroup.tsx` is the `[thing ▾]` control and
+[Skisse] is wearing it. §4.1, §4.1.1 and §4.1.2
 survive unchanged: a View is still a spec, a File is still bytes, and the pin
 is still a pin. What changes is who decides what is on the map.
 
@@ -1912,14 +1913,45 @@ Three sequencing rules, and as in §12 they are worth more than the list.
    is the one thing that must not go on the map. The duplication is two source
    lookups.
 
-3. **The group control** — one `[thing ▾]`: the label toggles the group, the
-   caret opens a pulldown, each member has a switch and an opacity slider. Its
-   props are the abstraction, so they are an ordered member list and two
-   setters, nothing kind-specific. Land it on **[Skisse]**, the only group
-   whose data is already exactly this shape — `sketchShownAtom` is the set and
-   `setSketchOverlays` is the declaration — so the step is the control and
-   per-member opacity, which `sketchOverlay` does not have yet, and nothing
-   else.
+3. **The group control** — ✅ **built** (`src/shell/LayerGroup.tsx`). One
+   `[thing ▾]`: the label toggles the group, the caret opens a pulldown, each
+   member has a switch and an opacity slider. Its props are the abstraction —
+   an ordered `LayerMember[]` and three callbacks — so nothing in the component
+   knows what a sketch is, and a prop that ever needs to is the signal that the
+   row has stopped being one control. Landed on **[Skisse]**, the only group
+   whose data was already this shape.
+
+   **The label toggles and the caret opens, which is the opposite polarity to
+   `EyeSplit`.** On `Funn` the everyday press is "show me the index" and the
+   eye is the afterthought; here it is "take this layer off so I can see what
+   is under it". The seam geometry is duplicated from `EyeSplit.module.css`
+   rather than shared, deliberately: step 4 is the step with two real cases in
+   front of it and the standing to decide whether one frame serves both.
+
+   **The group toggle is layer visibility, not a teardown and not "all members
+   off".** Switching a group back on has to bring back exactly the composition
+   that was up, so the members' own switches have to stay untouched — and an
+   entry that keeps its layer keeps its export, so the group comes back without
+   re-rendering every scene in it. `sketchGroupShownAtom` is that flag and
+   `setSketchOverlays(next, shown)` applies it.
+
+   **Per-member opacity is the layer's opacity, applied outside `generation`.**
+   It is held in percent (`sketchOpacityAtom`), because every surface that
+   prints a fade prints a percentage, and converted to OpenLayers' 0–1 at the
+   `setSketchOverlays` boundary. Both it and visibility are set *before* the
+   scene-identity check, so fading a sketch or hiding the group can never
+   invalidate an export and re-run it. On the pulldown the word is
+   *gjennomsiktighet* and the number is `100 - opacity`, the same flip
+   `BildeTransparency` and the terrain strip make.
+
+   Two calls the control forced. **[Skisse] is absent rather than disabled when
+   the lokalitet has no sketches** — a four-across row that is uniform arrives
+   at step 4, and until then a permanently dead button teaches nothing. And the
+   sketch under the pen is **out of the member list**, because the overlay
+   effect already skips it: its strokes are on the drawing surface, so a switch
+   for it would be a switch that does nothing. The card's own eye in the rail
+   stays; both surfaces press `sketchShownAtom`, so the rail and the row cannot
+   disagree.
 
 4. **[Funn]** — `FunnControl` re-clothed. The `EyeSplit` becomes the group's
    label toggle (`H` unchanged), the funn list becomes the pulldown's members,

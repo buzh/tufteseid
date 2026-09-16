@@ -26,6 +26,7 @@ import {
 import { CompareControl } from './compare/CompareControl';
 import { EyeSplit } from './EyeSplit';
 import { groundHandleAtom } from './groundHandle';
+import { LayerGroup } from './LayerGroup';
 import { ModeButton } from './ModeButton';
 import styles from './Ribbon.module.css';
 import rowStyles from './RibbonLocalityRow.module.css';
@@ -387,6 +388,63 @@ const FunnControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         />
       </Popover>
     </EyeSplit>
+  );
+};
+
+/*
+ * `[Skisse ▾]` — the first of the layer row's four groups
+ * (docs/lokalitet-view.md §13.1, §13.10 step 3).
+ *
+ * Skisse first because its data is already exactly the shape the row assumes:
+ * a *set* of members, declared as a whole (`setSketchOverlays`), each its own
+ * layer. The other three have to be reshaped before they can be listed, so
+ * landing the control here made the step the control and per-member opacity
+ * and nothing else.
+ *
+ * Its place in the row is its place in the stack — sketches are at `zIndex: 2`
+ * and the funn layer at 5, so [Skisse] goes to the left of `Funn`, and
+ * [Visning] and [Bilde] will arrive to the left of it. That ordering is the
+ * row's one teaching claim (§13.1) and it is cheap to keep.
+ *
+ * Absent rather than disabled on a lokalitet with no sketches. A group control
+ * over nothing is a button that cannot answer the only question it is asked;
+ * the uniform four-across row arrives at step 4, when the group that is always
+ * there is in it.
+ *
+ * The card's own eye (`SketchToggleButton`) is untouched and still correct —
+ * both press the same set, so the rail and the row cannot disagree.
+ */
+const SkisseControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
+  const { t } = useTranslation();
+  const members = ws.sketchItems.map((rec, i) => ({
+    id: rec.id,
+    // The caption is the author's own name for the drawing and is seeded
+    // "Skisse n" at `Behold skissen`, so it is nearly always there. The
+    // fallback counts this list rather than the record, because a numbering
+    // that skips is worse than one that does not match a caption nobody wrote.
+    label: rec.caption.trim() || t('localities.sketch.caption', { n: i + 1 }),
+    shown: ws.sketchShown.has(rec.id),
+    opacity: ws.sketchOpacity.get(rec.id) ?? 100,
+  }));
+
+  if (members.length === 0) return null;
+
+  return (
+    <LayerGroup
+      icon="gesture"
+      label={t('localities.layers.skisse')}
+      toggleLabel={t(
+        ws.sketchGroupShown
+          ? 'localities.layers.skisseHide'
+          : 'localities.layers.skisseShow',
+      )}
+      membersLabel={t('localities.layers.skisseMembers')}
+      shown={ws.sketchGroupShown}
+      members={members}
+      onToggle={ws.toggleSketchGroup}
+      onToggleMember={ws.toggleSketch}
+      onSetOpacity={ws.setSketchOpacity}
+    />
   );
 };
 
@@ -837,6 +895,7 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             place when `.tools` appears and disappears with the stance: pressing
             `Rediger` must not move `Funn` out from under the pointer. */}
         <div className={rowStyles.contents}>
+          <SkisseControl ws={ws} />
           <FunnControl ws={ws} />
           {/* Lit when a bilde is **on the ground**, not when the rail is
               open. The rail is open by default (toolAtoms.ts), so the old

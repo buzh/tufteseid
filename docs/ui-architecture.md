@@ -455,9 +455,14 @@ subsume.
   open on when a sketch is), `funnSessionAtom` (the map is frozen and the
   surface is live, holding the frame and the request that opened it), and
   `funnSceneAtom` (what is currently drawn).
-  A fourth sits with the overlays rather than the session: `sketchShownAtom`
-  (`src/map/sketchOverlay.ts`), the set of sketch ids currently on the map,
-  which is a set rather than an id because several may be shown at once (§9.3).
+  Three more sit with the overlays rather than the session, all in
+  `src/map/sketchOverlay.ts` and all view state that is never stored:
+  `sketchShownAtom`, the set of sketch ids currently on the map — a set rather
+  than an id because several may be shown at once (§9.3) — plus
+  `sketchOpacityAtom` (per-sketch fade in percent, missing meaning "as drawn")
+  and `sketchGroupShownAtom`, `[Skisse ▾]`'s own label toggle, which is a flag
+  of its own precisely because it is not the same statement as every member
+  being off.
   The asymmetry between the first two is load-bearing and §9.1 explains it;
   only the second may be used to decide that something else is inop. This used
   to be the largest cluster in the app — `src/settings/draw/atoms.ts`, 375 lines
@@ -1797,7 +1802,7 @@ question (`docs/lokalitet-view.md` §5.1–5.5):
 | Cell | Zone | Question | Present when | Contents |
 |---|---|---|---|---|
 | left | identity | *what am I looking at* | always | the literal word `Lokalitet:`, the name (click to rename in edit, click to zoom in show), the short code chip (click to copy), the visibility badge, the banner slot |
-| left | the contents | *what did someone put here* | always | `Funn` + its eye · `Bilder ▾`, both with a count badge |
+| left | the contents | *what did someone put here* | always | `Skisse ▾` (only when there are sketches) · `Funn` + its eye · `Bilder ▾`, all with a count badge |
 | left | the work | *what can I do to it* | **edit only** | Nytt funn · Behold · `Hent ▾` · Skjermbilde |
 | centre | the ground tools | *what does this ground look like* | always | Terreng · Sammenlign |
 | right | the exits | *how do I get out of here* | always | deepest-first — see the depth table below |
@@ -1823,6 +1828,27 @@ keeps its place when the verbs appear and disappear with the stance: pressing
 `Rediger` must not move `Funn` out from under the pointer. `.identity` is
 `flex: 0 1 auto` for the same reason — it used to take the row's slack, and
 growing would now push the two zones after it out to the cell's far edge.
+
+**The contents zone is turning into the layer row** (`docs/lokalitet-view.md`
+§13.1). The end state is four `[thing ▾]` groups — Visning · Bilde · Skisse ·
+Funn — left to right in the map's own z-order, so the row teaches the stack.
+`src/shell/LayerGroup.tsx` is that control and the first of the four,
+`[Skisse ▾]`, is wearing it (§9.3): the label takes the group off the map, the
+caret opens a pulldown, and every member has a switch and a transparency
+slider. It sits left of `Funn` because sketches are `zIndex: 2` and the funn
+layer is 5.
+
+Two properties of it that are not obvious from the screen. **The label toggles
+and the caret opens**, which is the opposite polarity to `Funn`'s `EyeSplit` —
+on the index the everyday press is "show me the list", on a layer group it is
+"take this off so I can see what is under it" — and the seam CSS is duplicated
+rather than shared until step 4 re-clothes `Funn` and there are two real cases
+to decide from. And **nothing in the group writes** (`docs/lokalitet-view.md`
+§13.8): a switch is *what I am looking at now*, which is not the same statement
+as `hidden`, which is curation. So there is no stance gate anywhere in
+`LayerGroup` and a reader gets it at full function. A group with no members is
+**absent**, not disabled — the uniform four-across row arrives with step 4, and
+until then a permanently dead button teaches nothing.
 
 The ground tools and the contents are present in **both** stances, because
 reading is not writing — the same argument that makes show mode absolute about
@@ -3702,9 +3728,10 @@ the terrain it was drawn over, and three things follow from that:
   (§8.9.2). A sketch has no such refusal to inherit: one drawn over the
   topographic map is exactly as good a record as one drawn over a LiDAR
   hillshade, because neither contains a ground.
-- **It does not compete for the ground slot.** `map/groundOverlay.ts` holds
-  exactly one image and arbitrates between two callers (§8.7.1). Sketches are
-  transparent, so they take nothing from anybody: `map/sketchOverlay.ts` holds
+- **It does not compete for the ground level.** That level is a stack of
+  composited members in one layer and one canvas (§8.7.1). Sketches are
+  transparent, so they are not members of it and take nothing from anybody:
+  `map/sketchOverlay.ts` holds
   a *set* of them, each on its own `ImageCanvasSource` at `zIndex: 2` — the
   slot `drawLayer` vacated, over the ground and the pinned bilde and *under*
   the funn, the measure line and the heritage layers, because a sketch is a
@@ -3751,9 +3778,30 @@ on writes nothing and holding a reading up against the image it was made over
 is the whole reason the two are stored apart; and `Rediger skissen` in edit,
 which is `resumeSketch` — the scene back under the pen, the stored copy taken
 off the map while it is there so the old strokes do not show through the new
-ones. A sketch is **not** offered `Vis i ruta`: that verb is the one-image
-ground slot, and `canPinBilde` refuses a sketch outright rather than laying a
+ones. A sketch is **not** offered `Vis i ruta`: that verb lays a figure into the
+ground level, and `canPinBilde` refuses a sketch outright rather than putting a
 white figure with a caption panel over the image it annotates.
+
+**And the whole set has one button, `[Skisse ▾]`** — the first of the layer
+row's four groups (§8.1, `docs/lokalitet-view.md` §13.10 step 3). The label
+takes every sketch off the map at once and the caret opens the members, each
+with its switch and its own fade. Two facts about it belong here rather than
+with the row:
+
+- **The group toggle is layer visibility.** `sketchGroupShownAtom` reaches
+  `setSketchOverlays(next, shown)`, which calls `setVisible` on the entries
+  rather than shortening the list — so the group comes back holding exactly the
+  composition that was up, and holding its exports, instead of re-running an
+  Excalidraw render per member.
+- **A fade never invalidates an export.** Per-member opacity lives in
+  `sketchOpacityAtom` in percent, converts to OpenLayers' 0–1 at the same
+  boundary, and both it and visibility are applied *before* the scene-identity
+  check in `setSketchOverlays` — so neither can bump `generation` and throw a
+  render away.
+
+The card's eye in the rail stays exactly as it was: both surfaces press
+`sketchShownAtom`, so the rail and the row cannot disagree about what is up.
+The one under the pen is in neither list, because the overlay effect skips it.
 
 **Flattening a composition is `Ta skjermbilde`, and it already works.**
 `compositeMapCanvases` walks every `.ol-layer` canvas in layer order honouring

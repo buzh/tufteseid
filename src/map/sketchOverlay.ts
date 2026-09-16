@@ -59,11 +59,42 @@ const RESCALE_TOLERANCE = 1.4;
  */
 export const sketchShownAtom = atom<ReadonlySet<string>>(new Set<string>());
 
+/**
+ * How far each shown sketch is faded, 0–100, by attachment id. Missing is
+ * 100, i.e. as drawn.
+ *
+ * Percent rather than OpenLayers' 0–1 because every surface that prints a
+ * fade prints a percentage, and the one conversion belongs at the boundary
+ * (`setSketchOverlays`) rather than in each control. Same reason the ground
+ * overlay's two callers hold percent.
+ *
+ * Beside `sketchShownAtom` for its reason: the layer row reads it to draw the
+ * slider, the workspace reads it to declare the set, and neither owns it.
+ */
+export const sketchOpacityAtom = atom<ReadonlyMap<string, number>>(
+  new Map<string, number>(),
+);
+
+/**
+ * Whether the group is on the map at all — §13.1's label toggle, one level
+ * above the per-member switches.
+ *
+ * Not the same statement as every member being off, which is why it is a flag
+ * of its own: switching the group off and on again has to bring back exactly
+ * the composition that was up, and the members' own switches are what
+ * remember it. It is layer visibility rather than a teardown for the same
+ * reason — an entry keeps its export, so the group comes back without
+ * re-rendering every scene in it.
+ */
+export const sketchGroupShownAtom = atom(true);
+
 export type SketchOverlay = {
   /** The attachment the scene came off. Identity for the diff below. */
   id: string;
   frame: FunnFrame;
   elements: readonly SceneElement[];
+  /** 0–1, as OpenLayers wants it. */
+  opacity: number;
 };
 
 type Entry = {
@@ -173,7 +204,7 @@ const drawEntry =
     return out;
   };
 
-const addEntry = (spec: SketchOverlay): Entry => {
+const addEntry = (spec: SketchOverlay, shown: boolean): Entry => {
   const entry: Entry = {
     spec,
     // Assigned below; the source needs the entry and the entry needs the
@@ -193,6 +224,8 @@ const addEntry = (spec: SketchOverlay): Entry => {
       canvasFunction: drawEntry(entry),
     }),
     zIndex: Z_INDEX,
+    opacity: spec.opacity,
+    visible: shown,
     properties: { id: `sketch.overlay.${spec.id}` },
   });
   getDefaultStore().get(mapAtom).addLayer(entry.layer);
@@ -210,8 +243,16 @@ const addEntry = (spec: SketchOverlay): Entry => {
  * An entry whose scene is unchanged keeps its export; a resumed sketch that
  * has just been saved arrives with new elements and re-exports at the
  * resolution it is already being shown at.
+ *
+ * `shown` is the group, not the set: it hides the layers the list declares
+ * rather than shortening the list, so [Skisse]'s label toggle costs nothing
+ * on the way back. Defaulted, because taking everything down (`[]`) has no
+ * opinion about it.
  */
-export const setSketchOverlays = (next: readonly SketchOverlay[]) => {
+export const setSketchOverlays = (
+  next: readonly SketchOverlay[],
+  shown = true,
+) => {
   const map = getDefaultStore().get(mapAtom);
   const wanted = new Set(next.map((spec) => spec.id));
   for (const [id, entry] of entries) {
@@ -223,9 +264,14 @@ export const setSketchOverlays = (next: readonly SketchOverlay[]) => {
     if (spec.elements.length === 0) continue;
     const existing = entries.get(spec.id);
     if (!existing) {
-      entries.set(spec.id, addEntry(spec));
+      entries.set(spec.id, addEntry(spec, shown));
       continue;
     }
+    // Both are properties of the *layer*, so they are applied before the scene
+    // comparison below and never touch `generation`: fading a sketch or
+    // hiding the group must not throw away an export and re-run it.
+    existing.layer.setOpacity(spec.opacity);
+    existing.layer.setVisible(shown);
     if (
       existing.spec.elements === spec.elements &&
       existing.spec.frame === spec.frame

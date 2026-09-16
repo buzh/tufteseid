@@ -37,6 +37,8 @@ import {
 } from '../funn/session';
 import {
   setSketchOverlays,
+  sketchGroupShownAtom,
+  sketchOpacityAtom,
   sketchShownAtom,
   type SketchOverlay,
 } from '../map/sketchOverlay';
@@ -259,6 +261,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const draftActive = useAtomValue(funnDraftActiveAtom);
   const sketchActive = drawSession?.mode === 'sketch';
   const [sketchShown, setSketchShown] = useAtom(sketchShownAtom);
+  const [sketchOpacity, setSketchOpacityMap] = useAtom(sketchOpacityAtom);
+  const [sketchGroupShown, setSketchGroupShown] = useAtom(sketchGroupShownAtom);
   const [adjusting, setAdjusting] = useAtom(adjustingLocalityAtom);
   const [selectedFunnId, setSelectedFunnId] = useAtom(selectedFunnIdAtom);
   const setFunnHidden = useSetAtom(funnHiddenAtom);
@@ -879,6 +883,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       // set that decides which are up is emptied.
       setSketchOverlays([]);
       setSketchShown(new Set());
+      // The fades are keyed by attachment id and the group's switch is view
+      // state like the stance is — neither belongs to the next lokalitet, and
+      // a group left off would open it with the sketches mysteriously absent.
+      setSketchOpacityMap(new Map());
+      setSketchGroupShown(true);
       // And the curtain comes down with the row that raised it
       // (docs/lokalitet-view.md §8). Sammenlign's only control moved onto the
       // lokalitet row, so leaving the lokalitet with it up would strand a
@@ -894,6 +903,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setSelectedFunnId,
     setFunnOutside,
     setSketchShown,
+    setSketchOpacityMap,
+    setSketchGroupShown,
     leaveCompare,
   ]);
 
@@ -1401,7 +1412,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     t,
   ]);
 
-  /** The eye on a sketch card: put this overlay up, or take it down. */
+  /**
+   * The switch on one sketch — the card's eye, and [Skisse]'s member row.
+   *
+   * Two surfaces on one set rather than two states, so the rail and the row
+   * can never disagree about what is on the map (§13.10 step 3).
+   */
   const toggleSketch = useCallback(
     (id: string) =>
       setSketchShown((cur) => {
@@ -1410,6 +1426,41 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         return next;
       }),
     [setSketchShown],
+  );
+
+  /** One member's fade, 0–100 (§13.1: each member has its own opacity). */
+  const setSketchOpacity = useCallback(
+    (id: string, value: number) =>
+      setSketchOpacityMap((cur) => new Map(cur).set(id, value)),
+    [setSketchOpacityMap],
+  );
+
+  /** The group's label toggle: the whole of [Skisse] on or off the map. */
+  const toggleSketchGroup = useCallback(
+    () => setSketchGroupShown((cur) => !cur),
+    [setSketchGroupShown],
+  );
+
+  /*
+   * What [Skisse] lists. Deletions are out — a bilde awaiting `Lagre`'s
+   * compensating delete is not something to offer the map — but `hidden` ones
+   * stay in, per §13.8: concealment is curation and the switch is what you are
+   * looking at right now, so losing an image from the row because it is out of
+   * the exhibit would make curation a way to lose your own work.
+   *
+   * The one under the pen is out for the same reason the overlay effect skips
+   * it: its strokes are on the drawing surface, so a switch for it would be a
+   * switch that does nothing.
+   */
+  const sketchItems = useMemo(
+    () =>
+      (attachmentItems ?? []).filter(
+        (it) =>
+          it.kind === 'sketch' &&
+          !deletedIds.has(it.id) &&
+          drawSession?.resume?.id !== it.id,
+      ),
+    [attachmentItems, deletedIds, drawSession],
   );
 
   /*
@@ -1446,10 +1497,19 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         id: rec.id,
         frame: stored.frame,
         elements: stored.elements,
+        // Percent on this side of the boundary, 0–1 on the other.
+        opacity: (sketchOpacity.get(rec.id) ?? 100) / 100,
       });
     }
-    setSketchOverlays(overlays);
-  }, [attachmentItems, sketchShown, deletedIds, drawSession]);
+    setSketchOverlays(overlays, sketchGroupShown);
+  }, [
+    attachmentItems,
+    sketchShown,
+    sketchOpacity,
+    sketchGroupShown,
+    deletedIds,
+    drawSession,
+  ]);
 
   /*
    * `Hent → LiDAR-uttrekk`: open the source-and-style dialog.
@@ -2920,6 +2980,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
      * `sketchShown` is a set, not a slot: two readings of the same mound,
      * traced off two different grounds, shown together over either, is the
      * analysis the whole feature is for.
+     *
+     * The last four are [Skisse] on the layer row (§13.10 step 3): what the
+     * group lists, how far each member is faded, and the group's own switch.
+     * None of them writes — the whole row is a read, in both stances (§13.8).
      */
     sketchActive,
     startSketch,
@@ -2928,6 +2992,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     resumeSketch,
     sketchShown,
     toggleSketch,
+    sketchItems,
+    sketchOpacity,
+    setSketchOpacity,
+    sketchGroupShown,
+    toggleSketchGroup,
 
     // tools
     tool,

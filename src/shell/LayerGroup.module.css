@@ -1,0 +1,142 @@
+/*
+ * A layer group on the lokalitet row: a labelled half that takes the group off
+ * the map, and a caret welded to its right edge that opens the members.
+ *
+ * The seam is `EyeSplit`'s — no gap, a hairline between the halves, the right
+ * half stretching to whatever height the ModeButton decides on — and it is
+ * copied rather than imported because the two differ in polarity and in what
+ * the right half is for. See the note in LayerGroup.tsx: step 4 is where that
+ * duplication is either justified or removed.
+ */
+
+.group {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-left: 1px solid var(--c-border);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: transparent;
+  color: var(--c-fg-muted);
+  cursor: pointer;
+}
+
+.caret:hover {
+  background: var(--c-bg-hover);
+  color: var(--c-fg);
+}
+
+.caret:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 1px;
+}
+
+/* Open is engaged, which is the ribbon's one colour for it — the same reading
+   a ModeButton's `active` gets. Unlike the eye beside `Funn`, this segment
+   says nothing about the map, so there is no polarity to protect here. */
+.caretOpen {
+  background: var(--c-accent-subtle);
+  color: var(--c-accent);
+}
+
+.caretOpen:hover {
+  background: var(--c-green-100);
+}
+
+.members {
+  max-height: min(50vh, 360px);
+  overflow-y: auto;
+}
+
+/* A member is two rows that belong together, so the block gets the hover
+   rather than the switch inside it: reaching for the slider must not make the
+   thing above it look like what you are about to press. */
+.member {
+  padding-bottom: var(--sp-1);
+}
+
+.member:hover {
+  background: var(--c-bg-hover);
+}
+
+/* Pulldown.module.css's `.item` geometry, so a member row lines up with every
+   other list in the ribbon. */
+.switch {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  width: 100%;
+  padding: var(--sp-3) var(--sp-4);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+
+.checkOn {
+  color: var(--c-accent);
+}
+
+.checkOff {
+  color: var(--c-fg-subtle);
+}
+
+.memberLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-sm);
+  color: var(--c-fg);
+}
+
+/* Its own line rather than beside the label: this is the provenance (§13.4)
+   and it is a sentence's worth of dataset, acquisition and knobs, which
+   `nowrap` beside a truncating label would hide exactly when it matters. */
+.memberMeta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+/* Indented to under the label, so the fade reads as belonging to the row above
+   it rather than as a fifth member of the list. */
+.fade {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 0 var(--sp-4) var(--sp-2) calc(var(--sp-4) + 18px + var(--sp-4));
+  font-size: var(--font-xs);
+  color: var(--c-fg-subtle);
+}
+
+.fadeLabel {
+  flex: none;
+}
+
+.fade input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 64px;
+  margin: 0;
+}
+
+.fadeValue {
+  flex: none;
+  min-width: 4.5ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
