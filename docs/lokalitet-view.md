@@ -1811,6 +1811,149 @@ an editor), §10 (Terreng becomes a Visning member), §15 (the deletions); and
 CLAUDE.md's Terrenganalyse and Lokaliteter paragraphs, both of which state the
 one-slot rule as load-bearing.
 
+### 13.10 Build order
+
+Three sequencing rules, and as in §12 they are worth more than the list.
+
+- **The mechanism before the control.** The row is a control over a thing that
+  does not exist. Today the map has *one slot with an arbiter* at `zIndex: 1`
+  and *one set* at 2, and three of the four groups have no per-member anything
+  — so a row built first would be a control over a slot pretending to be a
+  stack, and every step after it would be discovering that.
+- **Nothing is deleted until its replacement is on screen.** `Gjenskap` and
+  `Vis i ruta` are the only ways a stored image reaches the map today. §13.9
+  is a list of what this thread removes, not an early step.
+- **The four groups are one component used four times, so the hardest one
+  decides its shape.** That is **[Visning]**: the only group whose bottom
+  member is a preset rather than a record, the only one that can be switched
+  off to nothing, and the only one whose members render three different ways.
+  Land the component on an easy group if that ships sooner — but do not
+  discover Visning's requirements after its props are fixed.
+
+1. **The stack** — `map/groundOverlay.ts` from one slot with an owner to a
+   declared set, the shape `sketchOverlay.ts` already has: `setGroundOverlays`
+   takes the whole list, diffs it by id, and each member carries its own
+   opacity. Out go `GroundOverlayOwner`, `groundOverlayOwner`,
+   `subscribeGroundOverlay`, `hideGroundOverlay`'s hold check, and the
+   displaced-side wiring in `usePinnedBilde`, `useTerrainAnalysis` and
+   `useLocalityWorkspace`'s restore.
+
+   **It ships visible on its own**, which is the reason it is first rather than
+   merely the reason it is possible: both callers keep the controls they have,
+   and each already owns an opacity slider, so the step where the contest goes
+   away is also the step that first puts a 1937 ortofoto over a live hillshade
+   with both fades under the hand. That is the comparison §4.2 opened by
+   promising and the one §13 exists to deliver. Verifying it is three gestures:
+   pin the flyfoto, press Terreng, drag both sliders.
+
+2. **A View as a layer over its own rectangle** — the piece §13.2 assumes and
+   the app does not have, and the step that is the whole job. A View reaches
+   the map two ways today and neither is this one: as a *pinned figure* pasted
+   at `bbox25833` (`usePinnedBilde`), or as an *application of its spec to the
+   whole map* (`useRecreateView`). What a Visning member needs is the third —
+   the spec's own pixels over the spec's own rectangle at the resolution the
+   view currently wants — for all four spec kinds, off producers that all
+   already exist: `extractCanvas`, `renderTerrain`, `fetchFlyfoto`,
+   `renderScene`.
+
+   **Load-bearing, and a refinement of §13.2: paint the pin first, render live
+   on demand.** §13.2 says a View's figure never goes on the map and the
+   argument is right — but it is an argument about the *choice*, not about the
+   first frame. A lidar extract rendered live is a WMS tile stitch: seconds of
+   latency and a burst against a shared rate limit, so a member that shows
+   nothing for four seconds after you switch it on is a worse thing than the
+   model it was sparing the user from learning. So paint the pinned figure at
+   once where there is one, and re-render live when the view asks for pixels
+   finer than the figure holds. That is `sketchOverlay.ts`'s
+   `RESCALE_TOLERANCE` generalised from scenes to specs, it keeps §13.2's claim
+   exactly — nobody chooses, and zooming in still sharpens — and it pays the
+   upstream cost only where zoom demands it. A spec with no pin renders
+   immediately, as §13.2 says.
+
+   Small side effect worth noticing rather than claiming: when a figure has
+   drifted from its source, the swap from pin to live render is visible as a
+   change under the cursor. That is not the observability §14 asks for, but it
+   is not nothing either.
+
+3. **The group control** — one `[thing ▾]`: the label toggles the group, the
+   caret opens a pulldown, each member has a switch and an opacity slider. Its
+   props are the abstraction, so they are an ordered member list and two
+   setters, nothing kind-specific. Land it on **[Skisse]**, the only group
+   whose data is already exactly this shape — `sketchShownAtom` is the set and
+   `setSketchOverlays` is the declaration — so the step is the control and
+   per-member opacity, which `sketchOverlay` does not have yet, and nothing
+   else.
+
+4. **[Funn]** — `FunnControl` re-clothed. The `EyeSplit` becomes the group's
+   label toggle (`H` unchanged), the funn list becomes the pulldown's members,
+   and `funnLayer` learns per-member visibility. Cheapest of the four, and it
+   is what makes the row uniform enough for §13.1's claim — that the row
+   teaches the stack — to be true rather than merely intended. **Per-funn
+   opacity is the one thing that does not fall out**: the funn are one vector
+   layer, so it is N layers or a style function, and the honest third answer is
+   that a group opacity is enough for marks and per-member opacity is a raster
+   idea. Decide it here, do not carry it.
+
+5. **[Visning]** — the group that holds the content and deletes the most. The
+   bottom member is the ground preset off `groundHandleAtom`; above it, every
+   View in the lokalitet as a step-2 layer. `Gjenskap` goes and
+   `useRecreateView` survives as the preset member's apply (§13.2), `Vis i
+   ruta` goes for Views, and the switch-it-all-off case arrives with it.
+
+6. **[Bilde]** — the Files. A `screenshot` lays down at its extent; `upload` is
+   absent from the group until step 7. This is where `usePinnedBilde`,
+   `canPinBilde`, `pinnedAttachmentIdAtom` and `BildeTransparency` are deleted,
+   because it is the step that replaces the last thing each of them does — and
+   where the `Bilder` button stops lighting for "a bilde is on the ground",
+   since four group labels now answer that better than one.
+
+7. **The upload opt-in** (§13.5) — `meta.bbox25833` at the image's own aspect,
+   `meta.bboxAssumed` and its mark, and the flag carried into a copy and a
+   takeout. A write, so edit only and buffered into the transaction.
+
+8. **`kind: 'scene'`** (§13.7) — membership on `over`, order and per-member
+   opacity in `meta`, and the pin queue taught to flatten one. Last of the
+   substantial steps for §12's reason: it is a record *of* the row, so every
+   step above it changes what a scene can contain.
+
+9. **The funn relation editor** (§13.6) — widening `attachments.funn` to "which
+   funn this bilde belongs to" and grouping the pulldowns by it. No migration.
+   After the groups exist, because it is a grouping of them.
+
+#### Three traps worth writing down
+
+**The curtain sits above the stack.** `COMPARE_Z = 1.5` was chosen when
+`zIndex: 1` held exactly one image (`map/compare/curtainLayers.ts`). An
+N-member Visning stack is entirely below it, so Sammenlign's B half would cover
+the whole stack rather than the background it was drawn against. Three
+answers — move the curtain under the stack and accept that a compared render is
+not comparable, clip the stack in halves the way the background is, or hide
+Visning's non-preset members while the curtain is up — and step 1 has to pick
+one, because doing nothing means the B half silently eats a composition
+somebody built. This is also §14's "does the stack make Sammenlign redundant"
+arriving as a mechanical fact before anyone has to answer it as a design one.
+
+**One output canvas per group, not per member.** `groundOverlay` and
+`sketchOverlay` each keep one viewport-sized canvas alive for the layer's whole
+life — 30 MB on a 4K display at `devicePixelRatio` 2, which is why both reuse
+it rather than allocating per frame. One per member multiplies that by however
+many are switched on, and eight is a quarter of a gigabyte of canvases before a
+single source pixel. The members are an *ordered composite with per-member
+alpha*, which is exactly what one canvas and a draw loop is, so a group should
+almost certainly be one `ol/layer/Image` that paints its members in order — the
+row's order becomes the z-order for free and the layer count stops growing with
+the content. The thing that argues the other way is Skisse, whose members each
+re-export asynchronously at their own scale; that is a reason for its entries to
+keep separate *renders*, not separate layers.
+
+**None of this is persisted, and that is a decision.** Which members are on is
+view state, not curation — §13.8 is firm that `hidden` and "switched off" are
+different things — and the app persists ribbon state in the URL
+(`docs/ui-architecture.md` §4.3). A stack references record ids, so putting it
+in the URL is putting a lokalitet's contents in a query string and inventing
+half of §13.7 badly. Keep it per session, like stance, and let `kind: 'scene'`
+be the only way an arrangement outlives the tab.
+
 ---
 
 ## 14. Open, deliberately
