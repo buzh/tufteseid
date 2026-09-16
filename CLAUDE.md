@@ -85,7 +85,14 @@ all of them.
   keep/discard picker carousels behind LiDAR-uttrekk and Flyfoto), curation
   and the takeout bundle, and moving Terreng and Sammenlign off row 1 onto
   the lokalitet row. Read it before building any of that; each step folds into
-  `docs/ui-architecture.md` §8 as it lands.
+  `docs/ui-architecture.md` §8 as it lands. **§13 is a separate thread and
+  nothing of it is built**: the *layer row* — four `[thing ▾]` groups
+  (Visning / Bilde / Skisse / Funn) matching the map's z-stack bottom-to-top,
+  each member switchable with its own opacity — which deletes `Gjenskap`, `Vis
+  i ruta` and the one-slot ground arbiter both this file and
+  `docs/ui-architecture.md` currently state as load-bearing, makes a funn a
+  container for images as well as a sublocation, and gives an arrangement a
+  record of its own (`kind: 'scene'`, membership on the existing `over`).
 - `README.md` — third-party-facing install and admin guide (docker compose
   install, first-run PocketBase superuser, OAuth redirect URL, granting the
   app admin role, licence). Keep it accurate when any of that changes.

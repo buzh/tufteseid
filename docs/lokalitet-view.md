@@ -1,8 +1,20 @@
-# The lokalitet view — a draft
+# The lokalitet view
 
-**Status: design draft, nothing built.** When it is built this folds into
-`docs/ui-architecture.md` §8 and the deletions land in §15; until then this
-file is the argument, not the record.
+**Status: §1–§12 built, §13 designed and unbuilt.** §12's build order is
+complete through step 15; what is left of it is step 16 — sharing (§10) and the
+Rapportpakke (§9) — plus the two builds that landed outside the numbered list
+and are recorded at the end of §12 (placing the rectangle, sketches as
+overlays), both of which shipped.
+
+Everything built folded into `docs/ui-architecture.md` §8–§10 with the
+deletions in §15, and **that file is now the record**. Where the two disagree
+about what exists, it wins and this one is the argument that got there — kept
+because the reasoning is not recoverable from the result, not because it
+describes the app.
+
+§13 is the exception and reads the other way round: a later thread, nothing of
+it built, and it deletes several things `docs/ui-architecture.md` and CLAUDE.md
+still state as load-bearing.
 
 Today "a lokalitet is open" is a context strip plus a dock column, and the rest
 of the app carries on unchanged — Terreng and Sammenlign sit in row 1 whether
@@ -1563,7 +1575,245 @@ Docs to update: `docs/ui-architecture.md` §3.1 (the shell loses a slot), §5.1
 
 ---
 
-## 13. Open, deliberately
+## 13. The layer row — the stack becomes the control
+
+**Status: designed, nothing built.** It supersedes the verbs in §4.2 and
+deletes the one-slot arbiter that section introduced. §4.1, §4.1.1 and §4.1.2
+survive unchanged: a View is still a spec, a File is still bytes, and the pin
+is still a pin. What changes is who decides what is on the map.
+
+Today an image gets onto the map by *being selected in the strip*, and the map
+holds one at a time — `map/groundOverlay.ts` is a single slot arbitrated
+between a live terrain render and a pinned bilde. That was the right shape
+while the question was "which picture am I looking at". It is the wrong shape
+for the question the app exists for — *hold two readings of this hillside
+against each other* — and it leaves a deliberate composition with nowhere to
+live: no way to build one, and no record if you did.
+
+So the lokalitet row grows a set of layer buttons, each `[thing ▾]`: the label
+toggles the group on and off, the caret opens a pulldown of its members, and
+each member has its own switch and its own opacity slider.
+
+### 13.1 The buttons are z-order rows, not kinds
+
+That is the framing the whole thing falls out of, because the stack is already
+there and already in this order:
+
+| zIndex | layer | button |
+|---|---|---|
+| 0 | background stack | **Visning** |
+| 1 | `groundOverlay` — terrain render *or* pinned bilde | **Visning** / **Bilde** |
+| 2 | `sketchOverlay` — a set, one layer per shown sketch | **Skisse** |
+| 3 | measure line | — |
+| 4 | the lokalitet's own rectangle | — |
+| 5 | `funnLayer` | **Funn** |
+| 10 | Kulturminner theme layers | — (global, not lokalitet content) |
+
+So **[Visning ▾] [Bilde ▾] [Skisse ▾] [Funn ▾], left to right, is bottom to top
+of the stack.** The row teaches the stack for free, and that property is worth
+protecting if a fifth group is ever added.
+
+Four groups, not three, because the funn layer is one of these rows whether or
+not it is drawn as one. The funn list is already a popover on this row (§6);
+folding it into the same idiom costs nothing and makes the row uniform.
+
+**Eligibility is `kind`, and needs no new field:**
+
+| | Visning | Bilde | Skisse |
+|---|---|---|---|
+| ground preset — kart / lidar / hybrid / flyfoto / terreng | ✔ | — | — |
+| `extract`, `flyfoto` — a View | ✔ *live* | — | — |
+| `screenshot` — a File | — | ✔ | — |
+| `upload` — a File | — | ✔, opt-in (§13.5) | — |
+| `sketch` | — | — | ✔ |
+
+Two consequences of that table:
+
+- **[Visning] holds more than one thing at once, with opacity.** A ground and
+  a stored extract, or two extracts, blended. This is not Sammenlign and does
+  not replace it: the curtain is two *full* grounds in register, dragged; this
+  is a blend. Both are worth having and they answer different questions.
+- **[Visning] can be switched off entirely**, leaving no ground at all. That
+  is the one reading where "off" means something for this group, and it is a
+  real one: a sketch and its funn on white, with nothing underneath arguing.
+
+### 13.2 A View is a Visning, and its figure is not a layer
+
+**`Gjenskap` and `Vis i ruta` are deleted.** Not merged, not renamed —
+deleted. A View appears in [Visning]'s pulldown and is rendered live, at the
+resolution the screen currently wants. Its pinned figure never goes on the map.
+
+§4.2 argued those two verbs were the same mechanism seen from two sides, and
+that was true. The decision here is that **the identity stops being something
+the interface has to express.** A live render and its figure being the same
+reading is a fact about the data model; making the user choose between them per
+image was making them learn the model in order to predict which one stays sharp
+when they zoom. You can still make a picture of what is on screen — that is
+`Ta skjermbilde`, and it is unchanged.
+
+What that deletes:
+
+- `canPinBilde` and `usePinnedBilde`'s slot-taking.
+- **The arbiter in full**: `showGroundOverlay({ owner })`'s take-from-whoever-
+  has-it, `hideGroundOverlay`'s no-op-unless-you-hold-it, the `owner` token,
+  `subscribeGroundOverlay`, and the displaced-side-drops-its-selection wiring
+  on both callers. It existed because two features wanted one slot. Under rows
+  they have a row each and there is no contest, which also ends the rule that
+  pinning an image stands the terrain render down — the rule that stopped a
+  1937 ortofoto from fading over today's hillshade, which is the comparison
+  §4.2 opened by promising.
+- **The "not fetched yet" state, as a thing shown to a user.** An unpinned View
+  is fully usable: switch it on and look at it. `isPinned` stops gating
+  anything on screen and becomes an export-readiness question only. §4.1.2's
+  three states stay true of the data and leave the interface.
+
+What survives: `useRecreateView` — it stops being a button and becomes the
+pulldown's apply, unchanged. And `cropOf` / `meta.imageRect`, but only for
+Files (§13.5); no View's figure is laid on the ground any more.
+
+### 13.3 What a pin is still for, and why it stays eager
+
+Three reasons, down from four: the carousel thumbnail, export and takeout, and
+**durability against upstream drift** — §4.1.2's argument, which is the one
+that matters and the one now easiest to talk yourself out of. Once no figure is
+ever needed for display, pinning on demand looks like a free simplification. It
+is not: a takeout assembled in 2029 from specs alone contains different pictures
+than the lokalitet was written about, said in the same words. Pin on commit,
+as §4.1.2 says, for the reason §4.1.2 gives.
+
+**And the drift is now invisible.** `Gjenskap` beside `Vis i ruta` was the one
+place a live render and its archived figure could be put side by side, which
+means it was the one place a person could notice they had diverged. Nothing
+replaces that. Probably acceptable — nobody was doing the comparison on purpose
+— but it should be a decision, and it is in §14 as one.
+
+### 13.4 The pulldown row is now the only on-screen provenance
+
+The caption panel is the evidentiary artifact and it is only ever exported, so
+under this design a user never sees one while working. That is consistent with
+§8.10's rationale, which is about *handing over* rather than about reading. But
+it moves a job: the [Visning] row's label is now the entire answer to "what am
+I looking at", so it has to carry dataset · acquisition · model · knobs, not a
+nickname. A pulldown of four rows all reading "Terrengmodell" is this design
+failing.
+
+### 13.5 Files on the map, and the upload opt-in
+
+`screenshot` has `bbox25833` and `imageRect` and lays down like anything else.
+`upload` has no `meta` at all, which is why `canPinBilde` refuses it today —
+so [Bilde] would otherwise ship with a member it cannot put on the ground.
+
+Correct for a field photo, wrong for a scanned old map or a georeferenced
+export out of QGIS. So: **an opt-in, per upload.** It writes `meta.bbox25833`
+and nothing else — `cropOf` already falls back to the whole image when there is
+no `imageRect`, so one key is the entire mechanism and deleting it is the undo.
+
+Two details decide whether it reads as honest rather than as a guess the app is
+hiding:
+
+- **Write the image's aspect, not the rectangle's.** Every placeable raster
+  until now was produced *at* the lokalitet rectangle's aspect, so painting it
+  at the extent was safe. A 4:3 scan over a 1:2 rectangle squashes. Store the
+  largest rectangle with the image's own aspect, centred on the lokalitet's and
+  contained in it. The extent is then approximate but never wrong in shape, and
+  the day a drag-the-corners georeferencer gets built it is editing a value of
+  the right kind.
+- **Mark it as assumed.** An upload's provenance is unknown to the app —
+  §4.1's table, and the reason it is the one producer that bypasses the figure
+  stage. Placing one makes the app assert an extent it invented, and in a
+  pulldown beside an extract it will read as equally measured. So the placement
+  carries `meta.bboxAssumed: true` and a mark on its row, and the flag travels:
+  into a scene (§13.7), into a copy, into a takeout. An assumption that is lost
+  when it leaves the surface that made it is worse than no assumption.
+
+It is a write, so: edit stance only, buffered into the transaction, committed
+by `Lagre` like everything else (§5.6).
+
+### 13.6 A funn is a sublocation *and* a container
+
+`attachments.funn` already exists — multiple relation → `finds`, uncascaded,
+already remapped by the copy (§7). Today it means "what this sketch is *about*"
+and is written only on sketches, seeded at creation, with no editor
+deliberately. Widening it to "which funn this bilde belongs to", on every kind,
+is a change of meaning plus that deferred editor. **No migration.**
+
+A funn then has two roles at once, and they are orthogonal: the sublocation —
+named, statused, addressable, in the ↑/↓/Enter list, clickable on the map,
+able to grow the lokalitet when it escapes — is untouched by also holding
+images. [Bilde] and [Skisse]'s pulldowns group by funn; the lokalitet's own
+images are the group with no funn.
+
+Three things that only bite once it is a container:
+
+- **Uncascaded now means something different.** A sketch about a deleted funn
+  is still a sketch; a collection whose owner was deleted is an orphan. The
+  uncascaded relation actually gives the right behaviour for free — the images
+  fall back to the lokalitet — but only if readers treat a dangling id as
+  "none". Nothing checks that today.
+- **A funn has geometry, not a bbox.** Views need a rectangle, and a funn's
+  extent can be three metres across: under the 50 m floor in `bboxLimits.ts`
+  and under what the extract producers will render. So a funn-scoped View needs
+  a pad-and-clamp rule, or funn-scoped images stay crops and Files.
+- **The relation wants an editor at last.** §9.3 deferred it on the grounds
+  that seeding guesses well enough for "what this sketch is about". "Which
+  funn this image belongs to" is not a guess anyone can make for you.
+
+### 13.7 The arrangement is a record — `kind: 'scene'`
+
+Which items are on, in what order, at what opacity, over which ground: that is
+the composition, and today it has nowhere to live. The row is what makes it
+worth keeping — once you have built one by hand, *keep this* is the obvious
+next press, and the only answer currently available is `Ta skjermbilde`, which
+flattens it to a File and loses every component and every parameter.
+
+A scene is **a View of Views**, so it goes in `attachments` and inherits
+everything: `sort`, `hidden`, `caption`, the copy's translation, and the pin
+queue. Two fields carry it and both exist:
+
+- **`over`** — membership. Multiple relation → attachments, uncascaded,
+  already remapped by `copyLocality` (§7), which is exactly the semantics a
+  scene's member list wants.
+- **`meta`** — the order, the per-member opacity, and the ground spec for the
+  members that are presets rather than records.
+
+Its pinned figure is the flatten, produced by the queue instead of by hand.
+`Ta skjermbilde` survives for the job that is genuinely different: catching
+what is on screen *including* the things that are not lokalitet content — the
+Kulturminner layers, the measure line, search markers.
+
+And §13.2 makes the scene simpler before it is written: a member is a spec or a
+File, never "this View, but as its pixels". One variant gone.
+
+### 13.8 Two distinctions not to collapse
+
+- **`hidden` is not "switched off".** `hidden` is stored curation — not part
+  of the exhibit (§4.4). The toggle is what I am looking at right now. A hidden
+  bilde must still be reachable from the pulldown in edit, or curation becomes
+  a way to lose your own images.
+- **Nothing in this row writes.** Toggling and dragging opacity are reads, so
+  the whole thing works in show, for a reader, at full function — §2's
+  invariant, and the *reading is not writing* principle the Terreng move was
+  made on. Only saving a scene escalates, and only the upload opt-in writes
+  outside it.
+
+### 13.9 What this deletes
+
+`Gjenskap`, `Vis i ruta`, `canPinBilde`, the `owner` arbitration in
+`map/groundOverlay.ts` with both callers' halves of it, the "not fetched yet"
+card state, and the single-image rule that §4.2 pinned down as a detail. §4.2's
+prose stays as the argument for *why* an image belongs on the map at its own
+rectangle — that part was right and this builds on it — but its list of four
+verbs is superseded by this section.
+
+Docs to update when it lands: `docs/ui-architecture.md` §8.7 (the strip's
+verbs), §8.7.1 (the arbiter, deleted), §8.7.4, §9.3 (the sketch relations get
+an editor), §10 (Terreng becomes a Visning member), §15 (the deletions); and
+CLAUDE.md's Terrenganalyse and Lokaliteter paragraphs, both of which state the
+one-slot rule as load-bearing.
+
+---
+
+## 14. Open, deliberately
 
 - **Whether a picker run inside an aborted session should really be undone.**
   Consistent with §5.6, and it is also throwing away eight images somebody
@@ -1580,9 +1830,25 @@ Docs to update: `docs/ui-architecture.md` §3.1 (the shell loses a slot), §5.1
   or re-processed years later. Re-rendering to compare is cheap and would let
   the app *say* the source has moved — which is real provenance value and also
   a background job asking to be built, per lokalitet, forever. The floor is
-  showing `renderedAt` and letting a person press `Gjenskap`. Anything above
-  that floor is a maintenance commitment, and it should be entered
-  deliberately or not at all.
+  showing `renderedAt` and letting a person switch the View on and look at it
+  live (§13.2). Anything above that floor is a maintenance commitment, and it
+  should be entered deliberately or not at all.
+- **That the drift is now unobservable.** §13.3. Removing `Gjenskap` and `Vis
+  i ruta` removes the only place a live render and its archived figure could be
+  seen together, so a source that has moved under a pinned figure will never
+  announce itself. The cheap partial answer is a `renderedAt` older than some
+  threshold marking the row; the honest one is the background re-render above,
+  with its maintenance bill.
+- **Whether [Visning]'s stacking makes Sammenlign redundant.** §13.1 says no —
+  a blend and a dragged curtain answer different questions — but two controls
+  for one surface is the failure §1 is about, and this is the nearest the app
+  comes to it. Worth re-asking once the row exists and someone has used both.
+- **What a scene does when a member changes under it.** A sketch redrawn, an
+  upload's assumed extent corrected, a member deleted outright. `over` is
+  uncascaded, so a deleted member leaves a dangling id and the scene quietly
+  renders with one fewer layer than it was composed with. Naming it in the
+  scene's own caption is the floor; refusing the delete is wrong, and
+  versioning the scene is version control again (below).
 - **Whether `Rediger` should be sticky per lokalitet.** Someone doing a long
   survey opens the same site nine times and presses Rediger nine times. Against
   it: §3 says stance is per session precisely so that opening a site is always
@@ -1619,10 +1885,11 @@ Docs to update: `docs/ui-architecture.md` §3.1 (the shell loses a slot), §5.1
   the upstream either.
 - **What happens to the starter three when "Juster området" moves the
   rectangle.** Every image in a lokalitet covers the lokalitet's rectangle
-  (§6), so after a resize none of them do. `Gjenskap` (§4.2) is the manual
-  answer and the invariant is really "covers the rectangle it was made
-  against" — but the carousel should at least *say* which cards are stale, and
-  the honest fix might be re-running the starter three on resize.
+  (§6), so after a resize none of them do. Switching the View on renders it
+  over its *own* stored rectangle (§13.2), which is the manual answer and also
+  makes the mismatch visible; the invariant is really "covers the rectangle it
+  was made against" — but the carousel should at least *say* which cards are
+  stale, and the honest fix might be re-running the starter three on resize.
 - **Whether a picker should be able to run in the background.** A ten-image
   flyfoto stack is a minute of sequential fetching, and holding the bottom
   slot hostage for it means you cannot do anything else meanwhile. Against:
