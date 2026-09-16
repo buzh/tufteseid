@@ -3263,18 +3263,30 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * the front page names the rest. That is the version of "refuses to produce
    * a partial zip silently" that does not also refuse a reader a report.
    */
+  const takeoutRunning = useRef(false);
   const runTakeout = useCallback(async () => {
-    if (takeoutProgress) return;
+    /*
+     * A ref rather than `takeoutProgress`: the state is what the banner reads,
+     * but a second click in the same tick as the first sees the stale `false`
+     * captured by this callback and packs the lokalitet twice. The ref is
+     * written synchronously, so the guard holds before React has re-rendered.
+     */
+    if (takeoutRunning.current) return;
+    // Both lists are null while they load, and `?? []` would quietly pack an
+    // empty exhibit and an empty funn table as though that were the record.
+    if (!attachmentItems || !findItems) return;
+    takeoutRunning.current = true;
     setTakeoutProgress({ stage: 'pinning', done: 0, total: 0 });
     try {
-      const exhibit = (attachmentItems ?? []).filter(
+      const exhibit = attachmentItems.filter(
         (rec) => !rec.hidden && !deletedIds.has(rec.id) && !isDraftId(rec.id),
       );
       const result = await buildTakeout({
         locality,
-        finds: (findItems ?? []).filter((f) => !deletedIds.has(f.id)),
+        finds: findItems.filter((f) => !deletedIds.has(f.id)),
         bilder: exhibit,
         forcePin: canAdd ? forcePin : null,
+        pinnableInEdit: mayAdd && !canAdd,
         onProgress: setTakeoutProgress,
       });
       // An anchor rather than `window.open`: a blob URL opened in a tab
@@ -3286,7 +3298,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = result.filename;
+      // Firefox ignores a click on an anchor that is not in the document.
+      document.body.append(anchor);
       anchor.click();
+      anchor.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
       if (result.missing > 0) {
         toast.warning({
@@ -3301,15 +3316,16 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       console.warn('[localityWorkspace] takeout failed', e);
       toast.error({ title: t('localities.takeout.failed') });
     } finally {
+      takeoutRunning.current = false;
       setTakeoutProgress(null);
     }
   }, [
-    takeoutProgress,
     attachmentItems,
     deletedIds,
     findItems,
     locality,
     canAdd,
+    mayAdd,
     forcePin,
     t,
   ]);

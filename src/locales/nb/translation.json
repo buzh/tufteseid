@@ -325,6 +325,7 @@
       "missingHeading": "Bilder som mangler",
       "missingRender": "bildet kunne ikke lages",
       "missingReader": "bildet er ikke laget ennå, og bare eieren kan lage det",
+      "missingOwner": "bildet er ikke laget ennå — åpne Rediger og lag pakken på nytt",
       "missingFile": "filen kunne ikke hentes",
       "funnHeading": "Funn",
       "funnEmpty": "Ingen funn er registrert.",

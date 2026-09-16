@@ -325,6 +325,7 @@
       "missingHeading": "Missing images",
       "missingRender": "the image could not be rendered",
       "missingReader": "the image has not been rendered yet, and only the owner can render it",
+      "missingOwner": "the image has not been rendered yet — open Edit and build the bundle again",
       "missingFile": "the file could not be fetched",
       "funnHeading": "Finds",
       "funnEmpty": "No finds recorded.",

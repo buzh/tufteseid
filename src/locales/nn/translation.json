@@ -325,6 +325,7 @@
       "missingHeading": "Bilete som manglar",
       "missingRender": "biletet kunne ikkje lagast",
       "missingReader": "biletet er ikkje laga enno, og berre eigaren kan lage det",
+      "missingOwner": "biletet er ikkje laga enno — opne Rediger og lag pakken på nytt",
       "missingFile": "fila kunne ikkje hentast",
       "funnHeading": "Funn",
       "funnEmpty": "Ingen funn er registrerte.",

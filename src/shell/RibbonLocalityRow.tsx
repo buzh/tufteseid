@@ -265,7 +265,12 @@ const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           {
             icon: 'folder_zip',
             label: t('localities.takeout.action'),
-            disabled: ws.takeoutProgress != null,
+            // Also while the lists load: `runTakeout` refuses to pack a
+            // half-loaded lokalitet, so the menu must not look willing.
+            disabled:
+              ws.takeoutProgress != null ||
+              ws.bilderItems == null ||
+              ws.findItems == null,
             onSelect: () => void ws.runTakeout(),
           },
           /* The two that write are `canEdit`, not merely `mayEdit`: the menu

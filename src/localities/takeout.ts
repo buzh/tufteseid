@@ -59,14 +59,21 @@ import {
 } from './format';
 import { funnIdOf } from './funnGroups';
 import { isBboxAssumed } from './uploadPlacement';
-import { isPinned, viewSpecOf } from './viewSpec';
+import { type GroundSpec, isPinned, viewSpecOf } from './viewSpec';
 
 /*
  * One file, not the whole bundle: forty figures over a slow link is a long
- * time and legitimately so, but a single PB file that has gone quiet for two
- * minutes is not coming, and the bundle should say so rather than park.
+ * time and legitimately so, but a single PB file that has gone quiet is not
+ * coming, and the bundle should say so rather than park.
+ *
+ * `fetchWithin` is a *total* budget rather than an idle one, so this has to
+ * cover the transfer and not merely the silence: `attachments.file` tops out
+ * at 50 MB, and two minutes would abort a perfectly healthy figure on any link
+ * below ~400 kB/s and then print it as missing. Five minutes is the same
+ * number the queue gives the upload of the same file (`UPLOAD_DEADLINE_MS`),
+ * for the same reason.
  */
-const FILE_DEADLINE_MS = 120_000;
+const FILE_DEADLINE_MS = 300_000;
 
 /** Rank 3 of the banner slot (§5.7) while the bundle is being built. */
 export type TakeoutProgress = {
@@ -116,6 +123,22 @@ const esc = (s: string): string =>
 // RFC 4180: quote anything with a comma, a quote or a newline in it.
 const csvField = (s: string): string =>
   /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+
+/*
+ * The same, for a column the author typed.
+ *
+ * `funn.csv` is written to be opened in a spreadsheet by double-click — that
+ * is what the BOM and the CRLF are for — and a spreadsheet reads a cell
+ * beginning with `=`, `+`, `-` or `@` as a *formula*, not as text. The person
+ * opening it is by construction not the person who wrote it, so a funn titled
+ * `=cmd|…` is a bundle that runs something on the recipient's machine. A
+ * leading apostrophe is the conventional defusing and is what a spreadsheet
+ * itself writes when it means "this is text"; it is only ever added to a value
+ * that would otherwise be evaluated, so an ordinary title leaves here byte for
+ * byte. The generated columns (`status`, `lat`, `lon`) do not need it.
+ */
+const csvText = (s: string): string =>
+  csvField(/^[=+\-@\t\r]/.test(s) ? `'${s}` : s);
 
 const captionOf = (rec: AttachmentRecord): string =>
   rec.caption.trim() || t(`localities.bilder.kind.${rec.kind}`);
@@ -212,6 +235,21 @@ const CREDIT_BY_KIND: Record<AttachmentKind, Credit | null> = {
   scene: null,
 };
 
+/*
+ * …and the same question for a scene's *ground*, which is the one layer that
+ * is not a record (`sceneSpec.ts`): the live ortofoto or LiDAR ground is
+ * stored as a `{kind, meta}` pair in the scene's own `meta`, not as a member
+ * in `over`, so walking the membership alone never sees it. A scene flattened
+ * over Flyfoto has NiB pixels in it, and NiB is the one source here that is
+ * not open data — missing it off the page is the failure this list exists to
+ * prevent.
+ */
+const CREDIT_BY_GROUND: Record<GroundSpec['kind'], Credit> = {
+  lidar: CREDITS.hoydedata,
+  terrain: CREDITS.hoydedata,
+  flyfoto: CREDITS.nib,
+};
+
 const creditsOf = (bilder: readonly AttachmentRecord[]): Credit[] => {
   const byId = new Map(bilder.map((rec) => [rec.id, rec] as const));
   const out: Credit[] = [];
@@ -229,6 +267,10 @@ const creditsOf = (bilder: readonly AttachmentRecord[]): Credit[] => {
       for (const id of rec.over ?? []) {
         const member = byId.get(id);
         if (member) add(CREDIT_BY_KIND[member.kind]);
+      }
+      const spec = viewSpecOf(rec);
+      if (spec?.kind === 'scene' && spec.ground) {
+        add(CREDIT_BY_GROUND[spec.ground.kind]);
       }
     }
   }
@@ -272,6 +314,23 @@ const centreOf = (find: LocalityFindRecord): [number, number] | null => {
   return [(minLon + maxLon) / 2, (minLat + maxLat) / 2];
 };
 
+/**
+ * A funn with its centre already worked out.
+ *
+ * Three surfaces want it — the CSV's two columns, the table on `index.html`,
+ * the line in `README.txt` — and walking a FeatureCollection three times to
+ * get the same pair of numbers is three chances for them to disagree as well
+ * as two walks nobody asked for.
+ */
+type FindRow = { find: LocalityFindRecord; centre: [number, number] | null };
+
+const findRowsOf = (finds: readonly LocalityFindRecord[]): FindRow[] =>
+  finds.map((find) => ({ find, centre: centreOf(find) }));
+
+/** A funn's name as every surface says it — see `funnSectionsOf`. */
+const titleOf = (find: LocalityFindRecord): string =>
+  find.title.trim() || t('localities.funn.untitled');
+
 /*
  * Every funn's features in one FeatureCollection, each carrying the record's
  * own fields.
@@ -287,7 +346,7 @@ const geojsonOf = (finds: readonly LocalityFindRecord[]): string => {
       properties: {
         ...(feature.properties ?? {}),
         funn: find.id,
-        tittel: find.title,
+        tittel: titleOf(find),
         notat: find.note,
         status: find.status,
       },
@@ -307,20 +366,20 @@ const geojsonOf = (finds: readonly LocalityFindRecord[]): string => {
  * spreadsheet the recipient uses, and the wrong guess is unreadable where
  * this one is merely a dialog box.
  */
-const csvOf = (finds: readonly LocalityFindRecord[]): string => {
-  const rows = [['tittel', 'status', 'notat', 'lat', 'lon']];
-  for (const find of finds) {
-    const centre = centreOf(find);
-    rows.push([
-      find.title,
-      find.status,
-      find.note,
-      centre ? centre[1].toFixed(6) : '',
-      centre ? centre[0].toFixed(6) : '',
-    ]);
+const csvOf = (rows: readonly FindRow[]): string => {
+  const lines = [['tittel', 'status', 'notat', 'lat', 'lon'].join(',')];
+  for (const { find, centre } of rows) {
+    lines.push(
+      [
+        csvText(titleOf(find)),
+        csvField(find.status),
+        csvText(find.note),
+        centre ? centre[1].toFixed(6) : '',
+        centre ? centre[0].toFixed(6) : '',
+      ].join(','),
+    );
   }
-  const body = rows.map((r) => r.map(csvField).join(',')).join('\r\n');
-  return `\ufeff${body}\r\n`;
+  return `\ufeff${lines.join('\r\n')}\r\n`;
 };
 
 // ---------------------------------------------------------------------------
@@ -342,7 +401,7 @@ type Page = {
   facts: Fact[];
   images: PageImage[];
   missing: PageMissing[];
-  finds: readonly LocalityFindRecord[];
+  finds: readonly FindRow[];
   credits: Credit[];
   packedAt: Date;
   locale: string;
@@ -354,6 +413,9 @@ const STYLE = [
   'h1{margin:0 0 .2rem;font-size:1.9rem}',
   'h2{margin:2.5rem 0 1rem;font-size:1.2rem}',
   '.sub{margin:0 0 1.5rem;color:#5a5a5a}',
+  // The description is one field holding whatever the author typed into a
+  // textarea, so its line breaks are content rather than formatting.
+  '.desc{white-space:pre-line}',
   'dl{display:grid;grid-template-columns:max-content 1fr;gap:.35rem 1.25rem}',
   'dt{color:#5a5a5a}dd{margin:0}',
   'figure{margin:0 0 2rem}',
@@ -395,7 +457,7 @@ const indexHtml = (page: Page): string => {
     `<p class="sub">${esc(t('localities.takeout.subtitle'))}</p>`,
   ];
   if (locality.description.trim()) {
-    out.push(`<p>${esc(locality.description.trim())}</p>`);
+    out.push(`<p class="desc">${esc(locality.description.trim())}</p>`);
   }
   out.push('<dl>');
   for (const fact of page.facts) {
@@ -437,13 +499,12 @@ const indexHtml = (page: Page): string => {
       `<th>${esc(t('localities.workspace.coordinates'))}</th>`,
       '</tr></thead><tbody>',
     );
-    for (const find of page.finds) {
-      const centre = centreOf(find);
+    for (const { find, centre } of page.finds) {
       out.push(
         '<tr>',
-        `<td>${esc(find.title || t('localities.funn.untitled'))}</td>`,
+        `<td>${esc(titleOf(find))}</td>`,
         `<td>${esc(t(`localities.funn.status.${find.status}`))}</td>`,
-        `<td>${esc(find.note)}</td>`,
+        `<td class="desc">${esc(find.note)}</td>`,
         `<td>${centre ? esc(`${deg(centre[1])}, ${deg(centre[0])}`) : ''}</td>`,
         '</tr>',
       );
@@ -501,13 +562,10 @@ const readmeText = (page: Page): string => {
   if (page.finds.length === 0) {
     out.push(`  ${t('localities.takeout.funnEmpty')}`);
   }
-  for (const find of page.finds) {
-    const centre = centreOf(find);
+  for (const { find, centre } of page.finds) {
     const where = centre ? ` (${deg(centre[1])}, ${deg(centre[0])})` : '';
     const status = t(`localities.funn.status.${find.status}`);
-    out.push(
-      `  ${find.title || t('localities.funn.untitled')} — ${status}${where}`,
-    );
+    out.push(`  ${titleOf(find)} — ${status}${where}`);
     if (find.note.trim()) out.push(`    ${find.note.trim()}`);
   }
   out.push('', t('localities.takeout.sourcesHeading'), '');
@@ -536,6 +594,7 @@ export const buildTakeout = async ({
   finds,
   bilder,
   forcePin,
+  pinnableInEdit = false,
   onProgress,
 }: {
   locality: LocalityRecord;
@@ -549,16 +608,20 @@ export const buildTakeout = async ({
    * already pinned and names the rest as missing.
    */
   forcePin: ForcePin | null;
+  /**
+   * `forcePin` is null only because the stance is `show`, not because the
+   * caller lacks the right — an owner packing from show. The missing list
+   * then says so, since "open Rediger and pack again" is a fix and "ask the
+   * owner" is not.
+   */
+  pinnableInEdit?: boolean;
   onProgress: (progress: TakeoutProgress) => void;
 }): Promise<TakeoutResult> => {
   const packedAt = new Date();
   const locale = i18n.language;
   const knownFunn = new Set(finds.map((f) => f.id));
-  const titleOfFunn = new Map(
-    finds.map(
-      (f) => [f.id, f.title || t('localities.funn.untitled')] as const,
-    ),
-  );
+  const titleOfFunn = new Map(finds.map((f) => [f.id, titleOf(f)] as const));
+  const findRows = findRowsOf(finds);
 
   /*
    * Pass one: the pixels that do not exist yet.
@@ -589,6 +652,9 @@ export const buildTakeout = async ({
   const images: PageImage[] = [];
   const missing: PageMissing[] = [];
   const files: ZipEntry[] = [];
+  // Wide enough for the whole exhibit, so `bilder/` sorts in curated order in
+  // a file manager: ten figures is `01`, a hundred is `001`.
+  const pad = Math.max(2, String(bilder.length).length);
   let index = 0;
   let fileDone = 0;
   onProgress({ stage: 'files', done: 0, total: bilder.length });
@@ -600,11 +666,13 @@ export const buildTakeout = async ({
         label,
         reason: forcePin
           ? t('localities.takeout.missingRender')
-          : t('localities.takeout.missingReader'),
+          : pinnableInEdit
+            ? t('localities.takeout.missingOwner')
+            : t('localities.takeout.missingReader'),
       });
     } else {
       index += 1;
-      const name = `${String(index).padStart(2, '0')}-${slug(
+      const name = `${String(index).padStart(pad, '0')}-${slug(
         label,
         rec.kind,
       )}.${extensionOf(rec)}`;
@@ -644,7 +712,7 @@ export const buildTakeout = async ({
     facts: factsOf(locality, locale, packedAt),
     images,
     missing,
-    finds,
+    finds: findRows,
     credits: creditsOf(bilder),
     packedAt,
     locale,
@@ -659,7 +727,7 @@ export const buildTakeout = async ({
       { path: 'README.txt', body: readmeText(page) },
       ...files,
       { path: 'funn/funn.geojson', body: geojsonOf(finds) },
-      { path: 'funn/funn.csv', body: csvOf(finds) },
+      { path: 'funn/funn.csv', body: csvOf(findRows) },
     ],
     packedAt,
   );
