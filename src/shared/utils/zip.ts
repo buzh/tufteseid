@@ -84,8 +84,14 @@ export const zipStore = async (
   const encoder = new TextEncoder();
   const time = dosTime(modifiedAt);
   const date = dosDate(modifiedAt);
+  // Both are `BlobPart[]` rather than `Uint8Array[]`: since TS 5.7 the array
+  // is generic in its buffer, and a plain `Uint8Array[]` widens to
+  // `ArrayBufferLike` — which includes `SharedArrayBuffer` and so is not a
+  // `BlobPart`. The central directory's running size is counted here for the
+  // same reason: a `BlobPart` has no `.length` to reduce over.
   const parts: BlobPart[] = [];
-  const central: Uint8Array[] = [];
+  const central: BlobPart[] = [];
+  let centralSize = 0;
   let offset = 0;
 
   for (const entry of entries) {
@@ -136,13 +142,13 @@ export const zipStore = async (
 
     parts.push(local, body);
     central.push(cd);
+    centralSize += cd.length;
     offset += local.length + size;
     if (offset > MAX_32) {
       throw new Error('zip: archive exceeds 4 GB, which needs Zip64');
     }
   }
 
-  const centralSize = central.reduce((sum, cd) => sum + cd.length, 0);
   const end = new Uint8Array(22);
   const ev = new DataView(end.buffer);
   ev.setUint32(0, END_OF_CENTRAL, true);
