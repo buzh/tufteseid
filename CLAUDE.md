@@ -110,7 +110,15 @@ all of them.
   switching an extract or a 1937 ortofoto onto the ground — several at once,
   each faded — is now one pulldown; `Gjenskap` moved there as the View row's
   apply, and switching the whole group off leaves a sketch and its funn on
-  white. `[Bilde ▾]` (`src/shell/BildeControl.tsx`) is the same control minus
+  white. Two later corrections to how that group *arrives*, both §10.1: a
+  lokalitet opens with its **cover** on the ground when the cover is a View
+  that has already been pinned (nothing else, and never a live render — the
+  old empty-on-open rule left a place whose point is three readings of one
+  rectangle showing none of them), and **W/S walk that group** rather than the
+  ground's dataset ring wherever there is a View to walk
+  (`src/shell/visningRing.ts`, §5.3 — which is also why the four dataset
+  pulldowns compose their `· W/S` heading instead of translating it).
+  `[Bilde ▾]` (`src/shell/BildeControl.tsx`) is the same control minus
   the ground preset and minus the action, over the Files — and step 6, which
   built it, is where the whole pin mechanism went: `Vis i ruta`,
   `usePinnedBilde`, `BildeTransparency` on the rectangle, the fold/unfold

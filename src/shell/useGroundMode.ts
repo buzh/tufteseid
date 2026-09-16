@@ -1,4 +1,4 @@
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useRef } from 'react';
 import { activeLocalityAtom } from '../localities/atoms';
 import { ribbonToolAtom } from '../localities/toolAtoms';
@@ -8,6 +8,7 @@ import type { FlyfotoControls } from './flyfoto/useFlyfotoControls';
 import type { LidarControls } from './lidar/useLidarControls';
 import type { StandardControls } from './standard/useStandardControls';
 import type { TerrainAnalysis } from './terrain/useTerrainAnalysis';
+import { cycleVisningAtom } from './visningRing';
 
 /**
  * The five grounds, as one control surface.
@@ -109,6 +110,9 @@ export const useGroundMode = (
   // which half everything below sets and reports. Always 'a' with the curtain
   // down, so nothing here changes for the ordinary single-ground case.
   const half = useAtomValue(focusedHalfAtom);
+  // The lokalitet's own ring, which takes W/S ahead of the ground's — see
+  // `cycle` below.
+  const cycleVisning = useSetAtom(cycleVisningAtom);
 
   // One entrance. Terreng is a reading *of a rectangle*, and the only
   // rectangle in the app is a lokalitet's.
@@ -205,7 +209,8 @@ export const useGroundMode = (
     if (modifiers !== 'terrain') terrainStandDown();
   }, [modifiers, lidarStandDown, flyfotoStandDown, terrainStandDown]);
 
-  // A/D/W/S/E go to the ring of the ground on screen, and nowhere else. The
+  // A/D/W/S/E go to the ring of the ground on screen — after the lokalitet's
+  // own, which takes W/S where there is one to take (see below). The
   // four control hooks each know *how* to walk their own ring but cannot see
   // which ground is up from where they sit, so whether they are asked at all
   // is decided here — otherwise W/S in Terreng would walk an invisible
@@ -219,6 +224,23 @@ export const useGroundMode = (
   // not a dataset in the sense the other three mean: same elevation grid,
   // eight ways of drawing it.
   const cycle = (key: CycleKey): boolean => {
+    /*
+     * Inside a lokalitet, W/S belongs to the lokalitet's own kept renders
+     * (`visningRing.ts`). An extract, a VAT and a 1937 ortofoto of one
+     * rectangle are what somebody opened the place to compare, and the group
+     * holding them was the one pulldown in the app without a ring.
+     *
+     * Before the modifier switch, not after: this is a reassignment of the
+     * keys rather than a fallback, so with a lokalitet open and one View in it
+     * the ground's dataset ring is the pulldown's and the strip's. The two
+     * cases where it declines and the ground answers as before — an empty ring
+     * and the curtain's B half — are `visningRingHasKeysAtom`, which is also
+     * what the four dataset headings read, so no heading can promise a ring
+     * the keys have left.
+     */
+    if (key === 'w' || key === 's') {
+      if (cycleVisning(key === 's' ? 1 : -1)) return true;
+    }
     switch (modifiers) {
       case 'standard':
         return standard.cycle(key);

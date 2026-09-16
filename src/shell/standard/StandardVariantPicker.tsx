@@ -4,6 +4,7 @@ import { STANDARD_VARIANTS } from '../../map/layers/config/backgroundLayers/stan
 import { cx, Icon, Popover, Tooltip } from '../../ui';
 import { PulldownItem } from '../Pulldown';
 import pulldown from '../Pulldown.module.css';
+import { useGroundRingHint } from '../visningRing';
 import styles from './StandardVariantPicker.module.css';
 import type { StandardControls } from './useStandardControls';
 
@@ -54,10 +55,16 @@ export const StandardVariantPicker = ({
   onPickGround: () => void;
 }) => {
   const { t } = useTranslation();
+  const hint = useGroundRingHint();
 
-  const tip = t('ribbon.standard.triggerTip', {
-    name: t(`ribbon.standard.${standard.active}`),
-  });
+  // Two strings rather than a composed one: this tooltip ends in the shortcut
+  // in parentheses, so dropping it takes the parentheses with it. Which of
+  // them is right is the same question `hint` answers below — inside a
+  // lokalitet with kept Views, W/S is theirs (docs/ui-architecture.md §5.3).
+  const tip = t(
+    hint ? 'ribbon.standard.triggerTip' : 'ribbon.standard.triggerTipPlain',
+    { name: t(`ribbon.standard.${standard.active}`) },
+  );
 
   return (
     <Popover
@@ -84,7 +91,10 @@ export const StandardVariantPicker = ({
       }
     >
       <div className={pulldown.head}>
-        <span>{t('ribbon.standard.datasetHead')}</span>
+        <span>
+          {t('ribbon.standard.datasetHead')}
+          {hint}
+        </span>
       </div>
 
       {STANDARD_VARIANTS.map((variant) => (

@@ -2196,6 +2196,15 @@ Three sequencing rules, and as in §12 they are worth more than the list.
    put every extract up on open would spend a minute of Kartverket's rate
    limit answering a question nobody asked.
 
+   *Amended 2026-09-16, and the amendment is in `docs/ui-architecture.md`
+   §10.1:* off by default turned out to mean a lokalitet whose point is three
+   readings of one rectangle opening on bare ground, with the images reachable
+   only from a pulldown nobody had been shown. The stitch argument is about
+   *unpinned* Views — a pinned one is a file fetch — so **the cover goes down
+   on open when it is a View and already pinned**, once per lokalitet, and
+   nothing else does. W/S walk the group as a ring in the same change (§5.3
+   there, `src/shell/visningRing.ts`).
+
    **`Gjenskap` moved rather than went.** `RecreateButton` is deleted from the
    two bilde surfaces and each View row in the pulldown carries a trailing
    `restart_alt` instead, setting the same `recreateViewAtom` — so

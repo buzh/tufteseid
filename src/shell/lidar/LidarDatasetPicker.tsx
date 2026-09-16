@@ -4,6 +4,7 @@ import type { LidarViewportEntry } from '../../map/layers/config/backgroundLayer
 import { Button, CountBadge, IconButton, Popover, Spinner } from '../../ui';
 import { PulldownDisclosure, PulldownItem } from '../Pulldown';
 import styles from '../Pulldown.module.css';
+import { useGroundRingHint } from '../visningRing';
 import { LidarFilters } from './LidarFilters';
 import type { LidarControls } from './useLidarControls';
 
@@ -39,6 +40,9 @@ const AUTO_ICON = 'bolt';
  */
 export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
   const { t } = useTranslation();
+  // Blank inside a lokalitet whose Views have taken W/S — the heading must
+  // not promise a ring it no longer has (docs/ui-architecture.md §5.3).
+  const hint = useGroundRingHint();
   const [filterOpen, setFilterOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -117,7 +121,10 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
       }
     >
       <div className={styles.head}>
-        <span>{t('ribbon.lidar.datasetHead')}</span>
+        <span>
+          {t('ribbon.lidar.datasetHead')}
+          {hint}
+        </span>
         <IconButton
           icon="tune"
           size="xs"

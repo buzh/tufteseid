@@ -545,7 +545,7 @@
     },
     "terrain": {
       "visualization": "Visualization",
-      "visHead": "Visualization · W/S",
+      "visHead": "Visualization",
       "vis": {
         "hillshade": "Hillshade",
         "multiHillshade": "Multidirectional",
@@ -663,7 +663,7 @@
     },
     "flyfoto": {
       "datasetLabel": "Aerial acquisition",
-      "datasetHead": "Aerial photo · W/S",
+      "datasetHead": "Aerial photo",
       "eraLabel": "Period",
       "eraAll": "All",
       "mosaic": "Best mosaic",
@@ -680,8 +680,9 @@
     },
     "standard": {
       "datasetLabel": "Map type",
-      "datasetHead": "Map type · W/S",
+      "datasetHead": "Map type",
       "triggerTip": "Map type: {{name}} — pick another (W/S)",
+      "triggerTipPlain": "Map type: {{name}} — pick another",
       "historicHint": "Older surveys, drawn before the twentieth century rearranged the landscape.",
       "topo": "Topographic",
       "topoMeta": "the ordinary map",
@@ -696,7 +697,7 @@
     },
     "lidar": {
       "datasetLabel": "LiDAR dataset",
-      "datasetHead": "LiDAR dataset · W/S",
+      "datasetHead": "LiDAR dataset",
       "auto": "Automatic",
       "autoMeta": "follows the view",
       "autoMark": "chosen automatically",

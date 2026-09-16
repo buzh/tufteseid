@@ -3,6 +3,7 @@ import type { FlyfotoProject } from '../../localities/flyfotoProjects';
 import { Button, CountBadge, Popover, Spinner } from '../../ui';
 import { PulldownItem } from '../Pulldown';
 import styles from '../Pulldown.module.css';
+import { useGroundRingHint } from '../visningRing';
 import type { FlyfotoControls } from './useFlyfotoControls';
 
 // The exact date where the archive has one — the project name usually
@@ -36,6 +37,9 @@ export const FlyfotoDatasetPicker = ({
   flyfoto: FlyfotoControls;
 }) => {
   const { t } = useTranslation();
+  // Blank inside a lokalitet whose Views have taken W/S — the heading must
+  // not promise a ring it no longer has (docs/ui-architecture.md §5.3).
+  const hint = useGroundRingHint();
   const { viewport } = flyfoto;
 
   const chipLabel =
@@ -75,7 +79,10 @@ export const FlyfotoDatasetPicker = ({
       }
     >
       <div className={styles.head}>
-        <span>{t('ribbon.flyfoto.datasetHead')}</span>
+        <span>
+          {t('ribbon.flyfoto.datasetHead')}
+          {hint}
+        </span>
       </div>
 
       <PulldownItem

@@ -20,6 +20,7 @@ import { groundHandleAtom } from './groundHandle';
 import { GroundMember, useLayerFailures } from './groundMembers';
 import { LayerGroup, type LayerMember, LayerMembers } from './LayerGroup';
 import { recreateViewAtom } from './useRecreateView';
+import { useVisningRingHint, visningRingAtom } from './visningRing';
 
 /*
  * `[Visning ▾]` — the layer row's bottom group, and the one that holds the
@@ -59,10 +60,37 @@ export const VisningControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const [opacity, setOpacity] = useAtom(visningOpacityAtom);
   const [groupShown, setGroupShown] = useAtom(visningGroupShownAtom);
   const recreate = useSetAtom(recreateViewAtom);
+  const setRing = useSetAtom(visningRingAtom);
+  const ringHint = useVisningRingHint();
   const { failedIds, report } = useLayerFailures();
 
   const views = ws.viewItems;
   const shownViews = views.filter((rec) => shown.has(rec.id));
+
+  /*
+   * The same list, handed to the keyboard (`visningRing.ts`).
+   *
+   * Every View, not the shown ones: W/S walks the pulldown, and a ring made of
+   * what is already up would have one stop. Keyed on the ids for the reason
+   * the stack below is, and emptied on the way out — row 1 registers the keys
+   * and cannot see whether this group is on screen.
+   */
+  const ringKey = views.map((rec) => rec.id).join(' ');
+  const ringIds = useMemo(
+    () => views.map((rec) => rec.id),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ringKey],
+  );
+
+  useEffect(() => {
+    setRing(ringIds);
+    return () => setRing([]);
+  }, [ringIds, setRing]);
+
+  // The caret's tooltip is where the ring is announced, the pulldown being
+  // what it walks — and only once there is something in it, which is the same
+  // condition the keys themselves use.
+  const membersLabel = t('localities.layers.visningMembers') + ringHint;
 
   /*
    * The arrangement, said to the map.
@@ -187,7 +215,7 @@ export const VisningControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             ? 'localities.layers.visningHide'
             : 'localities.layers.visningShow',
         )}
-        membersLabel={t('localities.layers.visningMembers')}
+        membersLabel={membersLabel}
         shown={groupShown}
         shownCount={members.filter((m) => m.shown).length}
         onToggle={() => setGroupShown(!groupShown)}

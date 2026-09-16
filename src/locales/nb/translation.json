@@ -545,7 +545,7 @@
     },
     "terrain": {
       "visualization": "Visualisering",
-      "visHead": "Visualisering · W/S",
+      "visHead": "Visualisering",
       "vis": {
         "hillshade": "Skyggerelieff",
         "multiHillshade": "Flerretning",
@@ -663,7 +663,7 @@
     },
     "flyfoto": {
       "datasetLabel": "Flyfotoprosjekt",
-      "datasetHead": "Flyfoto · W/S",
+      "datasetHead": "Flyfoto",
       "eraLabel": "Periode",
       "eraAll": "Alle",
       "mosaic": "Beste mosaikk",
@@ -680,8 +680,9 @@
     },
     "standard": {
       "datasetLabel": "Karttype",
-      "datasetHead": "Karttype · W/S",
+      "datasetHead": "Karttype",
       "triggerTip": "Karttype: {{name}} — velg en annen (W/S)",
+      "triggerTipPlain": "Karttype: {{name}} — velg en annen",
       "historicHint": "Eldre kartverk, tegnet før 1900-tallet endret landskapet.",
       "topo": "Topografisk",
       "topoMeta": "det vanlige kartet",
@@ -696,7 +697,7 @@
     },
     "lidar": {
       "datasetLabel": "LiDAR-datasett",
-      "datasetHead": "LiDAR-datasett · W/S",
+      "datasetHead": "LiDAR-datasett",
       "auto": "Automatisk",
       "autoMeta": "følger utsnittet",
       "autoMark": "valgt automatisk",

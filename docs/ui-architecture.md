@@ -437,8 +437,11 @@ subsume.
   `visningOpacityAtom` (per-View fade in percent, missing meaning opaque) and
   `visningGroupShownAtom` (`[Visning ▾]`'s label toggle). The same group/member
   split as the funn and sketch switches, for the same reason, and all four are
-  reset by `useLocalityWorkspace` when the lokalitet closes or swaps. They live
-  with the stack rather than in `src/localities/atoms.ts` because what they
+  reset by `useLocalityWorkspace` when the lokalitet closes or swaps — which is
+  also the hook that seeds the member set with the cover on the way *in*
+  (§10.1). `visningShownAtom` has a second author besides the pulldown, and no
+  cursor beside it: the W/S ring (§5.3) reads its own position out of it.
+  They live with the stack rather than in `src/localities/atoms.ts` because what they
   describe is the map's `zIndex: 1` composite, which outlives any one lokalitet
   surface (§10.1).
 - **Theme layers** — `activeThemeLayersAtom` (a `Set<ThemeLayerName>`), plus
@@ -834,6 +837,22 @@ thing to peek back to.
   a press also pins the dataset (§5.7) — walking the ring is the user choosing,
   and otherwise the auto resolver would take the background back on the next
   pan and W/S would feel broken.
+- **W / S inside a lokalitet that has Views** — the same two keys, walking
+  `[Visning ▾]` instead (§10.1, `src/shell/visningRing.ts`). An extract, a VAT
+  and a 1937 ortofoto of one rectangle are what somebody opened the place to
+  compare, and until this the group holding them was the only pulldown in the
+  app without a ring. Its stops are **no View** — the bare ground, where a
+  lokalitet opens unless its cover is pinned — and then each View in pulldown
+  order, exactly one up at a time; walking switches the group's label back on,
+  and never touches the ground preset's own switch, so a stop means "no View"
+  rather than "ground". It is a **reassignment, not a fallback**: with a
+  lokalitet open and one View kept, the ground's dataset ring is reachable
+  from its pulldown and the settings strip and not from the keyboard. Two
+  places it declines and the ground's ring answers as before — a lokalitet
+  with nothing kept yet (a one-stop ring is no ring), and the compare
+  curtain's B half, since `C W W C` is the whole argument for walking the
+  *focused* half's datasets and the group belongs to A. A/D and E are
+  untouched, so DTM/DOM and the LiDAR style stay on the keyboard throughout.
 - **E** — toggle DTM / DOM. In Terreng too: it has the same pair on its strip,
   and it is the same question about the same laser data.
 
@@ -875,10 +894,15 @@ The listener itself is **not** in the ribbon. It lives in
 (a collapsing ribbon row) would re-register and flip its position in the
 capture chain relative to the other keyboard layers. Row 1 publishes only the
 behaviour, via `useRegisterBackgroundCycle` and `useRegisterGroundKeys`, and
-what it publishes for cycling is `ground.cycle` — `useGroundMode` dispatches to
-the ring named by `groundModifiers(mode)` (§5.1), a switch with a case per
-modifier family and no `default`, so adding a fifth would fail the build rather
-than silently swallow the keys. The rings are *routed*, not chained past each
+what it publishes for cycling is `ground.cycle` — `useGroundMode` offers W/S to
+the lokalitet's ring first (`cycleVisningAtom`, which declines when there is
+nothing in it) and otherwise dispatches to the ring named by
+`groundModifiers(mode)` (§5.1), a switch with a case per modifier family and
+no `default`, so adding a fifth would fail the build rather
+than silently swallow the keys. The lokalitet's ring is published *into* an
+atom by `VisningControl` rather than read here, for the reason
+`groundHandleAtom` exists: the keys are registered once, in row 1, and the
+group is on the lokalitet row. The rings are *routed*, not chained past each
 other: neither hook
 tests the mode any more, because neither can see Terreng, and W/S falling
 through to a LiDAR background under a terrain render spends a screenful of tile
@@ -4625,9 +4649,8 @@ about left-to-right carried inside the group.
 
 **What each switch does.** A View's switch mounts or unmounts a `<GroundMember>`
 child, so switching off withdraws the member and stops the work — the point
-being that switching one on can start a WMS stitch, which is also why
-`visningShownAtom` starts empty and a lokalitet never opens N of them. The
-group label and the ground preset instead *hold* what they cannot withdraw
+being that switching one on can start a WMS stitch, which is also why a
+lokalitet never opens N of them. The group label and the ground preset instead *hold* what they cannot withdraw
 (§10, above), and the preset additionally takes the background stack down
 through `setBackgroundHidden` in
 `map/layers/config/backgroundLayers/utils.ts` — `visible: false` on every
@@ -4639,6 +4662,31 @@ So **the map can have no ground at all** — a sketch and its funn on white, wit
 nothing underneath arguing. That is the one reading where "off" means something
 for this group, and it is why the preset is a member rather than a sixth ground
 mode.
+
+**It opens on its cover.** `visningShownAtom` used to start empty on every
+arrival, and a lokalitet whose whole point was three kept readings of one
+rectangle opened on bare ground with the images reachable only from a
+pulldown. The stitch argument above is what that was built on, and it is an
+argument about *unpinned* Views: a spec renders itself live, a pinned one is a
+file fetch and a decode. So `useLocalityWorkspace` lays down the narrowest
+thing the cost allows — **the cover, if the cover is a View and is already
+pinned** — once per lokalitet, latched on the record id. Not all of them,
+because N stacked images is a pile nobody composed; the cover because it is
+the first non-hidden image in exhibit order (§8.7.3), i.e. the one its author
+dragged to the front. A lokalitet whose first image is a screenshot, or whose
+extracts are still in the pin queue, still opens on bare ground. The latch
+makes it an *arrival*: neither a later pin nor a drag that moves the cover
+reaches over the user's hand afterwards.
+
+**And it has a ring.** W/S walk `[Visning ▾]` whenever a lokalitet is open with
+at least one View in it — §5.3 for the stops and the two cases where the
+ground's dataset ring keeps the keys. `src/shell/visningRing.ts` holds both
+halves: `visningRingAtom`, the ordered ids this control publishes, and
+`cycleVisningAtom`, the step, which reads where the ring is standing off
+`visningShownAtom` rather than keeping a cursor of its own — a second copy of
+"what is on the ground" would disagree with the switches the first time
+somebody used them. A hand-composed stack therefore collapses to one member on
+the next press, from the topmost of them.
 
 **The preset has no fade.** `LayerMember.opacity` is optional and the preset
 omits it: the background is a stack of tile layers, so a slider here is three

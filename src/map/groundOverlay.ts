@@ -334,10 +334,15 @@ export const setGroundOverlayStack = (
 export const groundShownAtom = atom(true);
 
 /**
- * Which Views are on the ground, by attachment id. **Empty by default**, and
- * that is load-bearing: switching one on can start a WMS stitch, so a
- * lokalitet that put every extract up on open would spend a minute of
- * Kartverket's rate limit answering a question nobody asked.
+ * Which Views are on the ground, by attachment id.
+ *
+ * **Never more than the cover on open**, and that is load-bearing: switching
+ * a View on can start a WMS stitch, so a lokalitet that put every extract up
+ * would spend a minute of Kartverket's rate limit answering a question nobody
+ * asked. What `useLocalityWorkspace` seeds it with is the one case that costs
+ * a file fetch instead — the cover, when the cover is a View that has already
+ * been pinned. Everything else waits to be asked, in the pulldown or on the
+ * ring (`shell/visningRing.ts`).
  */
 export const visningShownAtom = atom<ReadonlySet<string>>(new Set<string>());
 

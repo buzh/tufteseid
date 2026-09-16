@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Popover } from '../../ui';
 import { PulldownItem } from '../Pulldown';
 import styles from '../Pulldown.module.css';
+import { useGroundRingHint } from '../visningRing';
 import { VISUALIZATIONS, type TerrainAnalysis } from './useTerrainAnalysis';
 
 /**
@@ -32,6 +33,9 @@ import { VISUALIZATIONS, type TerrainAnalysis } from './useTerrainAnalysis';
  */
 export const TerrainVisPicker = ({ terrain }: { terrain: TerrainAnalysis }) => {
   const { t } = useTranslation();
+  // Blank inside a lokalitet whose Views have taken W/S — the heading must
+  // not promise a ring it no longer has (docs/ui-architecture.md §5.3).
+  const hint = useGroundRingHint();
 
   return (
     <Popover
@@ -57,7 +61,10 @@ export const TerrainVisPicker = ({ terrain }: { terrain: TerrainAnalysis }) => {
       }
     >
       <div className={styles.head}>
-        <span>{t('localities.terrain.visHead')}</span>
+        <span>
+          {t('localities.terrain.visHead')}
+          {hint}
+        </span>
       </div>
 
       {VISUALIZATIONS.map((vis) => (

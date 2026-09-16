@@ -3167,6 +3167,51 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [attachmentItems, deletedIds],
   );
 
+  /*
+   * And the cover, on the ground, once — the answer to "I opened a lokalitet
+   * and its images were nowhere" (§13.10 step 5 left the map bare on arrival).
+   *
+   * The argument for opening with `visningShownAtom` empty was that switching
+   * a View on can start a WMS stitch, and that is true of an *unpinned* one:
+   * a spec renders itself live. A pinned one is a single file fetch and a
+   * decode. So the rule is the narrow one the cost allows — the cover, and
+   * only if it is a View and only if it already has its figure — and a
+   * lokalitet whose first image is a screenshot, or whose extracts are still
+   * in the pin queue, still opens on bare ground.
+   *
+   * The cover rather than all of them: it is the first non-hidden image in
+   * exhibit order, i.e. the one its author dragged to the front, and N
+   * stacked images is a pile nobody composed.
+   *
+   * Once per lokalitet, latched on the id, so it is an *arrival* and never
+   * something that reaches over the user's hand afterwards — neither when the
+   * pin queue lands a figure nor when curation moves the cover.
+   *
+   * Two refs rather than one, and the second is not optional: `useCollection`
+   * empties `items` from an effect of its own, so the first effect pass after
+   * a swap still holds the *previous* lokalitet's list. Latching there would
+   * read A's cover for B, or — where A had no images — spend B's one shot on
+   * an empty list. So the null is what arms the latch: a list is this
+   * lokalitet's only once we have seen it not be the last one's.
+   */
+  const coverLaidRef = useRef<string | null>(null);
+  const listArmedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (attachmentItems == null) {
+      listArmedRef.current = locality.id;
+      return;
+    }
+    if (listArmedRef.current !== locality.id) return;
+    if (coverLaidRef.current === locality.id) return;
+    coverLaidRef.current = locality.id;
+    const cover = attachmentItems.find(
+      (a) => !a.hidden && !deletedIds.has(a.id),
+    );
+    if (!cover || !isPinned(cover)) return;
+    if (cover.kind !== 'extract' && cover.kind !== 'flyfoto') return;
+    setVisningShown(new Set([cover.id]));
+  }, [locality.id, attachmentItems, deletedIds, setVisningShown]);
+
   // The site's own terrain render, for §4.6 — entering Terreng over a
   // lokalitet starts from what its owner was looking at rather than from a
   // default hillshade at 315°/35°.
