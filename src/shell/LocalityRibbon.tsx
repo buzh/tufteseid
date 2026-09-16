@@ -5,7 +5,6 @@ import type { LocalityRecord } from '../api/localities';
 import { BilderCarousel } from '../localities/BilderCarousel';
 import { BilderPicker } from '../localities/BilderPicker';
 import { BilderStrip } from '../localities/BilderStrip';
-import { BildeTransparency } from '../localities/BildeTransparency';
 import { FunnCallout } from '../localities/FunnCallout';
 import { LocalityDialogs } from '../localities/LocalityDialogs';
 import { bilderStripOpenAtom } from '../localities/toolAtoms';
@@ -105,12 +104,6 @@ export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
           so it stays on the mound while you pan (§6). */}
       <ErrorBoundary name="FunnCallout">
         <FunnCallout items={ws.findItems} />
-      </ErrorBoundary>
-      {/* The same idiom, anchored to the rectangle's other top corner: the
-          transparency of whatever bilde is on the ground, beside the ground
-          rather than down in the strip that used to carry it (§8.9.3). */}
-      <ErrorBoundary name="BildeTransparency">
-        <BildeTransparency ws={ws} />
       </ErrorBoundary>
       <ErrorBoundary name="LocalityDialogs">
         <LocalityDialogs ws={ws} />

@@ -1,28 +1,30 @@
-import { useTranslation } from 'react-i18next';
 import type { AttachmentRecord } from '../api/attachments';
-import { Button } from '../ui';
 import {
   BildeBadges,
   BilderRail,
   CaptionField,
   MetaLine,
-  Note,
   OpenOriginalButton,
   SketchToggleButton,
 } from './bilderCommon';
 import styles from './bilderCommon.module.css';
 import type { LocalityWorkspaceApi } from './useLocalityWorkspace';
-import { canPinBilde } from './usePinnedBilde';
 
 /*
  * What you can do with the image the rail is pointing at, and it is all
- * reading: Vis i ruta / Ta av ruta (the first of which picking the frame
- * already did), Gjenskap and the original. Transparens is not here — it is on
- * the rectangle's own corner (BildeTransparency), because it belongs to the
- * image that is on the ground rather than to the card you have selected, and
- * those two drift apart the moment you walk the rail. The caption is here too,
- * `readOnly` rather than absent, because a caption is the record's content and
- * hiding what the exhibit says would be a strange way to show it (§8.1).
+ * reading: the sketch's own eye and the original.
+ *
+ * **The ground verbs are gone from here** (§13.10 step 6). `Vis i ruta` /
+ * `Ta av ruta` put one File on the map and `Transparens` faded it from the
+ * rectangle's corner; both are [Bilde]'s pulldown now, with a switch and a
+ * fade per File and several down at once. What that removes from this surface
+ * is a set of controls that were about the *map* on a rail that is about the
+ * *exhibit* — and with them the failure note, which moved onto the switch
+ * that is claiming the layer is up (`LayerMember.warning`).
+ *
+ * The caption stays, `readOnly` rather than absent, because a caption is the
+ * record's content and hiding what the exhibit says would be a strange way to
+ * show it (§8.1).
  */
 const Detail = ({
   ws,
@@ -31,10 +33,6 @@ const Detail = ({
   ws: LocalityWorkspaceApi;
   rec: AttachmentRecord;
 }) => {
-  const { t } = useTranslation();
-  const { pinned } = ws;
-  const isPinned = pinned.pinnedId === rec.id;
-
   return (
     <div className={styles.detail}>
       <div className={styles.detailMain}>
@@ -43,35 +41,9 @@ const Detail = ({
           <MetaLine rec={rec} />
         </div>
         <CaptionField ws={ws} rec={rec} />
-        {pinned.pinnedFailed && isPinned && (
-          <Note>{t('localities.bilder.loadFailed')}</Note>
-        )}
       </div>
 
       <div className={styles.actions}>
-        {/* A toggle, as in edit. It was the way *back* on only, on the
-            argument that picking the frame had already laid the image down
-            and picking it again would take it off — true, and useless as the
-            answer to "how do I stop looking at this": it spends the selection
-            to do it, so the caption and the meta line of the thing you were
-            reading go with the image. Taking a picture off the map is not a
-            write, and show is short of verbs, not entitled to fewer.
-
-            Unpinned Views are still not offered here — `canPinBilde` refuses
-            them. Not because there is nothing to lay down any more (§13.10
-            step 2 renders one live), but because this rail is read by walking
-            it, and a toggle here would start a WMS stitch per card. */}
-        {canPinBilde(rec) && (
-          <Button
-            size="sm"
-            leftIcon={isPinned ? 'visibility_off' : 'visibility'}
-            onClick={() => pinned.pin(isPinned ? null : rec.id)}
-          >
-            {isPinned
-              ? t('localities.bilder.hideFromMap')
-              : t('localities.bilder.showOnMap')}
-          </Button>
-        )}
         {/* And here in show as well, because turning a layer on is reading:
             a sketch is only worth storing separately from its ground if it
             can be held up against it and taken away again. `Rediger skissen`

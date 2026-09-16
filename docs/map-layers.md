@@ -73,10 +73,13 @@ outgoing layers (context the fading dataset should keep covering), 3–4 go
 Above the whole stack, and below the lokalitet rectangles, the funn and the
 Kulturminner theme layers, sits the **ground overlay** —
 `src/map/groundOverlay.ts`, a georeferenced `ol/layer/Image` at `zIndex: 1`.
-Two things paint into it and only one at a time: a live terrain render, and a
-kept bilde pinned to its own rectangle with "Vis i ruta". The module carries
-the `owner` tag and the arbiter (pinning stands the render down, entering
-Terreng unpins the image); the callers carry neither. The full ordering is
+It is a **stack**, not a slot: the live terrain render, every View switched on
+in `[Visning ▾]` and every File switched on in `[Bilde ▾]`, each over its own
+rectangle and with its own alpha, composited bottom-to-top into one canvas.
+Contributors name themselves by key and the layer row says what order the keys
+paint in; there is no arbiter, and there was one until `lokalitet-view.md`
+§13.10 deleted it — it made the terrain render and a kept bilde take turns,
+which forbade the comparison the overlay exists for. The full ordering is
 `ui-architecture.md` §10; why the render is a map layer rather than a thumbnail
 is CLAUDE.md's Terrenganalyse section, and the visualizations themselves are
 `terrain-analysis.md`.

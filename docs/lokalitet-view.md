@@ -13,7 +13,7 @@ because the reasoning is not recoverable from the result, not because it
 describes the app.
 
 §13 is the exception and reads the other way round: a later thread whose build
-order is §13.10 and whose first five steps have landed, and which deletes
+order is §13.10 and whose first six steps have landed, and which deletes
 several things `docs/ui-architecture.md` and CLAUDE.md stated as load-bearing
 until it came for them.
 
@@ -1578,24 +1578,24 @@ Docs to update: `docs/ui-architecture.md` §3.1 (the shell loses a slot), §5.1
 
 ## 13. The layer row — the stack becomes the control
 
-**Status: designed; steps 1–5 of §13.10 built, the rest not.** It supersedes the
+**Status: designed; steps 1–6 of §13.10 built, the rest not.** It supersedes the
 verbs in §4.2 and deletes the one-slot arbiter that section introduced — that
 deletion has landed, and so has the mechanism the replacement needs: a View can
-now be put on the map as its own pixels over its own rectangle. The row has
-three of its four buttons: `src/shell/LayerGroup.tsx` is the `[thing ▾]`
-control, and [Visning], [Skisse] and [Funn] are all wearing it — the last by
-swapping the duties of the halves it already had. With [Visning] the ground
-itself became a member, `Gjenskap` left the bilde cards for its pulldown, and
-`Vis i ruta` narrowed to Files. §4.1, §4.1.1 and §4.1.2
+now be put on the map as its own pixels over its own rectangle. **The row is
+complete**: `src/shell/LayerGroup.tsx` is the `[thing ▾]` control and all four
+of [Visning], [Bilde], [Skisse] and [Funn] wear it, left to right in the map's
+own z-order. With [Visning] the ground itself became a member and `Gjenskap`
+left the bilde cards for its pulldown; with [Bilde] `Vis i ruta` went entirely,
+and selecting a thumbnail stopped being a map gesture. §4.1, §4.1.1 and §4.1.2
 survive unchanged: a View is still a spec, a File is still bytes, and the pin
 is still a pin. What changes is who decides what is on the map.
 
-Today an image gets onto the map by *being selected in the strip*, and the map
-holds one at a time — `map/groundOverlay.ts` is a single slot arbitrated
+An image used to get onto the map by *being selected in the strip*, and the map
+held one at a time — `map/groundOverlay.ts` was a single slot arbitrated
 between a live terrain render and a pinned bilde. That was the right shape
 while the question was "which picture am I looking at". It is the wrong shape
 for the question the app exists for — *hold two readings of this hillside
-against each other* — and it leaves a deliberate composition with nowhere to
+against each other* — and it left a deliberate composition with nowhere to
 live: no way to build one, and no record if you did.
 
 So the lokalitet row grows a set of layer buttons, each `[thing ▾]`: the label
@@ -1715,9 +1715,10 @@ failing.
 
 ### 13.5 Files on the map, and the upload opt-in
 
-`screenshot` has `bbox25833` and `imageRect` and lays down like anything else.
-`upload` has no `meta` at all, which is why `canPinBilde` refuses it today —
-so [Bilde] would otherwise ship with a member it cannot put on the ground.
+`screenshot` has `bbox25833` and `imageRect` and lays down like anything else;
+that half landed at step 6. `upload` has no `meta` at all, which is why
+`canPinBilde` refused it and why `fileItems` still lists `screenshot` alone —
+[Bilde] would otherwise carry a member it cannot put on the ground.
 
 Correct for a field photo, wrong for a scanned old map or a georeferenced
 export out of QGIS. So: **an opt-in, per upload.** It writes `meta.bbox25833`
@@ -1818,21 +1819,24 @@ File, never "this View, but as its pixels". One variant gone.
 `map/groundOverlay.ts` with both callers' halves of it, the "not fetched yet"
 card state, and the single-image rule that §4.2 pinned down as a detail.
 
-Three of those are done: the arbiter went at step 1, `Gjenskap` at step 5
-(moved, not dropped — it is [Visning]'s per-row apply), and `Vis i ruta` is
-Files-only from step 5 and goes entirely at step 6, taking `canPinBilde` with
-it. The "not fetched yet" state is still on the rail and still correct there:
-what step 5 removed was the *pin toggle* on a card that has no pixels, not the
-face that says so. §4.2's
+All of them are done. The arbiter went at step 1, `Gjenskap` at step 5 (moved,
+not dropped — it is [Visning]'s per-row apply), and `Vis i ruta` at step 6,
+taking `canPinBilde`, `usePinnedBilde`, `pinnedAttachmentIdAtom` and
+`BildeTransparency` with it. The single-image rule went with the arbiter.
+
+The "not fetched yet" state is still on the rail and still correct there: what
+step 5 removed was the *pin toggle* on a card that has no pixels, not the face
+that says so. §4.2's
 prose stays as the argument for *why* an image belongs on the map at its own
 rectangle — that part was right and this builds on it — but its list of four
 verbs is superseded by this section.
 
-Docs to update when it lands: `docs/ui-architecture.md` §8.7 (the strip's
-verbs), §8.7.1 (the arbiter, deleted), §8.7.4, §9.3 (the sketch relations get
-an editor), §10 (Terreng becomes a Visning member), §15 (the deletions); and
-CLAUDE.md's Terrenganalyse and Lokaliteter paragraphs, both of which state the
-one-slot rule as load-bearing.
+Docs updated as it landed: `docs/ui-architecture.md` §8.7 (the strip's verbs),
+§8.7.1 (the arbiter, then the whole section), §8.7.4, §10 (Terreng as a Visning
+member), §10.1 (the two ground groups), §15 (the deletions); and CLAUDE.md's
+Terrenganalyse and Lokaliteter paragraphs, both of which stated the one-slot
+rule as load-bearing. Still outstanding: §9.3, whose sketch relations get an
+editor at step 9.
 
 ### 13.10 Build order
 
@@ -2099,12 +2103,68 @@ Three sequencing rules, and as in §12 they are worth more than the list.
    background back on unmount, so no route out leaves a white screen with no
    control that could undo it.
 
-6. **[Bilde]** — the Files. A `screenshot` lays down at its extent; `upload` is
-   absent from the group until step 7. This is where `usePinnedBilde`,
-   `canPinBilde`, `pinnedAttachmentIdAtom` and `BildeTransparency` are deleted,
-   because it is the step that replaces the last thing each of them does — and
-   where the `Bilder` button stops lighting for "a bilde is on the ground",
-   since four group labels now answer that better than one.
+6. **[Bilde]** — the Files. **Built.** `src/shell/BildeControl.tsx` is
+   [Visning] minus the ground preset and minus the action: a `screenshot` lays
+   down at its extent, with a switch and a fade each and several down at once.
+   `upload` is absent from the group until step 7, so `ws.fileItems` gates on
+   `kind === 'screenshot'`, and on two things only a File needs — bytes, and a
+   `bbox25833` — because a switch that cannot do anything is the one thing a
+   list of switches must not contain. A View is exempt from both: it can be
+   produced from its spec, over the spec's own rectangle.
+
+   **The mechanism grew a second caller, not a second layer.** Both groups
+   paint into `zIndex: 1`, and they are siblings on the row with no component
+   above them (the gap `groundHandle` also crosses), so the *relative* order of
+   the two is the one fact about the stack with no runtime owner — and it is
+   not a runtime fact. `setGroundOverlayStack(group, keys, held)` is now keyed
+   by group and `GROUP_ORDER = ['visning', 'bilde']` is a constant, which is
+   the row read left to right. Unnamed keys still paint above everything named;
+   nothing relies on that any more, and what it covers is the frame between a
+   producer declaring and its control mounting.
+
+   **Deleted, as promised:** `usePinnedBilde`, `canPinBilde`,
+   `pinnedAttachmentIdAtom`, `BildeTransparency` and its stylesheet, the ground
+   verb on both bilde surfaces, and `Note` in `bilderCommon.tsx` once its last
+   caller went. The `Bilder` button stopped lighting for "a bilde is on the
+   ground" — four group labels answer that about layers they actually own — so
+   it is back to being the drawer it looks like, with no `active` at all.
+
+   **Three things the deletion pulled out that were not on the list.**
+
+   - **Selecting a thumbnail no longer touches the map.** `pinOnWalk` is gone
+     and `selectBilde` only moves the cursor. That ends a class of surprise the
+     old rule could not avoid: the ground changed as a side effect of reading a
+     caption, refused silently on the cards it could not place, and could hold
+     one image.
+   - **The fold/unfold restore went with it.** `Bilder` pressed shut used to
+     put the pinned image down and remember it, because an overlay whose only
+     control has been folded away is stranded. [Bilde] is on the row and stays
+     on the row, so there is nothing to drop, nothing to remember and nothing
+     to give back — the cursor simply stays where it was.
+   - **`over` on a new sketch stopped being "the pinned File".** It is now
+     every layer that was under the pen, in row order: [Visning]'s shown
+     members, then [Bilde]'s. The ground preset is not in it and cannot be —
+     `over` is a relation to attachments and "the hillshade as it was today" is
+     not a record. That gap is what step 8 is for.
+
+   **The failure surface moved rather than went.** Deleting the card's
+   `pinnedFailed` note would have made "switched on, nothing arrived" unsayable
+   — the one state a row of switches cannot say by itself, and a reachable one
+   (a File whose bytes will not decode, a View whose upstream has nothing over
+   this rectangle). So `LayerMember.warning` prints it on the switch that is
+   claiming the layer is up, and `src/shell/groundMembers.tsx` holds the two
+   halves both groups need identically: `GroundMember`, one mounted component
+   per member on the map, and `useLayerFailures`. Shared because the *rules*
+   are what is shared — two copies would be two chances for the groups to
+   answer one question differently, which is the failure the row exists to
+   stop. [Visning] gained the affordance in the same step [Bilde] would have
+   lost it.
+
+   **No sweep for a member whose record leaves.** `viewItems` and `fileItems`
+   apply the same two filters as `bilderItems`, so a deleted or concealed
+   record leaves the pulldown, its `GroundMember` unmounts, and the pixels go
+   with it. What outlives it is an id in a set nothing lists, which the
+   close/swap cleanup empties along with the other six switches.
 
 7. **The upload opt-in** (§13.5) — `meta.bbox25833` at the image's own aspect,
    `meta.bboxAssumed` and its mark, and the flag carried into a copy and a

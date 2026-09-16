@@ -22,6 +22,7 @@ import {
   toast,
   Tooltip,
 } from '../ui';
+import { BildeControl } from './BildeControl';
 import { CompareControl } from './compare/CompareControl';
 import { groundHandleAtom } from './groundHandle';
 import { LayerGroup, LayerMembers } from './LayerGroup';
@@ -415,8 +416,8 @@ const FunnControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
  *
  * Its place in the row is its place in the stack — sketches are at `zIndex: 2`
  * and the funn layer at 5, so [Skisse] goes to the left of `Funn`, and
- * [Visning] and [Bilde] will arrive to the left of it. That ordering is the
- * row's one teaching claim (§13.1) and it is cheap to keep.
+ * [Visning] and [Bilde] are to the left of it. That ordering is the row's one
+ * teaching claim (§13.1) and it is cheap to keep.
  *
  * Absent rather than disabled on a lokalitet with no sketches. A group control
  * over nothing is a button that cannot answer the only question it is asked —
@@ -915,35 +916,31 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         <div className={rowStyles.contents}>
           {/* Left to right is bottom to top of the map's z-stack
               (docs/lokalitet-view.md §13.1): the ground and the Views over it,
-              then the sketches at zIndex 2, then the funn at 5. [Bilde]
-              arrives between the first two at step 6. */}
+              the Files over those, then the sketches at zIndex 2 and the funn
+              at 5. All four groups are here as of §13.10 step 6. */}
           <VisningControl ws={ws} />
+          <BildeControl ws={ws} />
           <SkisseControl ws={ws} />
           <FunnControl ws={ws} />
-          {/* Lit when a bilde is **on the ground**, not when the rail is
-              open. The rail is open by default (toolAtoms.ts), so the old
-              reading put an engaged-looking button on the row of every
-              lokalitet you walked into while the map underneath it was
-              untouched — a control announcing a state the map flatly
-              contradicted. What it lights for now is the one thing about
-              `Bilder` that changes what you are looking at.
+          {/* The drawer, and only the drawer. It used to light for "a bilde
+              is on the ground" and press shut to take that bilde off — the
+              one thing about `Bilder` that changed what you were looking at,
+              on a button whose other half is a bar across the bottom of the
+              screen.
 
-              Folding the rail puts that image down (useLocalityWorkspace), so
-              `lit` implies `open` and the press does the two together: the
-              rail goes away and the ground comes back. Whether the rail is
-              open needs no light of its own — it is a bar across the bottom
-              of the screen. */}
+              Step 6 gave that reading to four group labels that each answer
+              it about a layer they actually own, so this button is back to
+              the question a rail is for: is there anything here, and do I
+              want to see it. Nothing it does touches the map, so nothing it
+              shows needs to be lit — the bar's own presence is the state. */}
           <ModeButton
             icon="photo_library"
             label={t('localities.bilder.heading')}
-            tooltip={
-              ws.pinned.pinnedId != null
-                ? t('localities.bilder.hideStripAndMap')
-                : stripOpen
-                  ? t('localities.bilder.hideStrip')
-                  : t('localities.bilder.showStrip')
-            }
-            active={ws.pinned.pinnedId != null}
+            tooltip={t(
+              stripOpen
+                ? 'localities.bilder.hideStrip'
+                : 'localities.bilder.showStrip',
+            )}
             badge={ws.bilderCount || undefined}
             // Nothing to show and no way to put anything there: a reader on an
             // empty lokalitet. The button would open an empty bar.

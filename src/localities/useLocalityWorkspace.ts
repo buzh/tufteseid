@@ -47,6 +47,9 @@ import { describeHeritageRender, screenshotFigure } from '../figure/specs';
 import type { LidarSource } from '../lidarExtract/sources';
 import { mapAtom } from '../map/atoms';
 import {
+  bildeGroupShownAtom,
+  bildeOpacityAtom,
+  bildeShownAtom,
   groundShownAtom,
   visningGroupShownAtom,
   visningOpacityAtom,
@@ -121,6 +124,7 @@ import {
   removeFunnFromLayer,
   upsertFunnOnLayer,
 } from './funnLayer';
+import { groundExtentOf } from './groundView';
 import {
   removeLocalityFromLayer,
   setLocalityHighlight,
@@ -144,7 +148,6 @@ import {
 } from './useLocalityContent';
 import { useLocalityDraft } from './useLocalityDraft';
 import { type PickerCandidate, usePickerRun } from './usePickerRun';
-import { canPinBilde, usePinnedBilde } from './usePinnedBilde';
 import { useWorkspaceKeys } from './useWorkspaceKeys';
 import { isPinned, viewSpecOf } from './viewSpec';
 
@@ -270,13 +273,17 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [sketchShown, setSketchShown] = useAtom(sketchShownAtom);
   const [sketchOpacity, setSketchOpacityMap] = useAtom(sketchOpacityAtom);
   const [sketchGroupShown, setSketchGroupShown] = useAtom(sketchGroupShownAtom);
-  // Write-only here: [Visning]'s own control reads them (see `viewItems`
-  // below), and this hook's business with them is emptying them on the way
-  // out.
+  // The two ground groups' switches. Their controls own them (see `viewItems`
+  // and `fileItems` below) and this hook's business with them is mostly
+  // emptying them on the way out — except for the two `shown` sets, which a
+  // new sketch reads to record what it was drawn over (`over`, §13.6).
   const setGroundShown = useSetAtom(groundShownAtom);
-  const setVisningShown = useSetAtom(visningShownAtom);
+  const [visningShown, setVisningShown] = useAtom(visningShownAtom);
   const setVisningOpacity = useSetAtom(visningOpacityAtom);
   const setVisningGroupShown = useSetAtom(visningGroupShownAtom);
+  const [bildeShown, setBildeShown] = useAtom(bildeShownAtom);
+  const setBildeOpacity = useSetAtom(bildeOpacityAtom);
+  const setBildeGroupShown = useSetAtom(bildeGroupShownAtom);
   const [adjusting, setAdjusting] = useAtom(adjustingLocalityAtom);
   const [selectedFunnId, setSelectedFunnId] = useAtom(selectedFunnIdAtom);
   const setFunnHidden = useSetAtom(funnHiddenAtom);
@@ -512,12 +519,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [mutateDraft, findItems],
   );
 
-  // "Vis i ruta". Mounted here rather than in the strip because the strip is
-  // collapsible and unmounts when it is folded away — and folding it away to
-  // look at the map is exactly what you do after putting an image on it.
-  const pinned = usePinnedBilde(attachmentItems);
-  const { pin, pinnedId } = pinned;
-
   /*
    * The exhibit (docs/lokalitet-view.md §4.4).
    *
@@ -560,21 +561,21 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    *
    * Up here rather than in BilderStrip for two reasons: the strip unmounts
    * when it is folded away, and ←/→ walk it from `useWorkspaceKeys`, which is
-   * mounted here. It is deliberately *not* the same value as `pinned.pinnedId`
-   * — an upload carries no extent and so can be the active card without being
-   * on the ground, and Terreng taking the overlay slot drops the pin while
-   * leaving the card where it was.
+   * mounted here. Since step 6 it says nothing at all about the map: what is
+   * on the ground is `bildeShownAtom`, pressed in [Bilde]'s pulldown, and this
+   * is only where the rail is pointing.
    */
   const [activeBildeId, setActiveBildeId] = useState<string | null>(null);
 
   // The record is no longer on the rail — deleted here or by another session,
   // or concealed and then left behind when `Ferdig` drops the stance.
   //
-  // The pin goes down with it. `usePinnedBilde` only unpins records that have
-  // left the *unfiltered* list, which is the right rule for a deletion and the
-  // wrong one for a concealment: hiding an image and pressing Ferdig would
-  // otherwise leave it lying on the map in show, which is precisely what
-  // `hidden` was asked to prevent.
+  // Only the cursor needs sweeping. A layer member goes with its record for
+  // free: `viewItems` and `fileItems` apply the same two filters, so a record
+  // that has left the rail has left the pulldown, and the `<GroundMember>`
+  // under it unmounts and takes its pixels with it. The switch that outlives
+  // it is an id in a set that nothing lists, which the close/swap cleanup
+  // empties.
   useEffect(() => {
     if (
       activeBildeId &&
@@ -582,110 +583,49 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       !bilderItems.some((a) => a.id === activeBildeId)
     ) {
       setActiveBildeId(null);
-      pin(null);
     }
-  }, [activeBildeId, bilderItems, pin]);
+  }, [activeBildeId, bilderItems]);
 
   /*
-   * Folding the rail away puts the ground back; unfolding it puts the image
-   * back. `Bilder` is one gesture with two halves, not a switch that discards.
+   * Folding the rail away used to put the ground back, and unfolding it put
+   * the image back — `Bilder` as one gesture with two halves, with the card
+   * under the cursor and the pin both remembered in a ref across the fold.
    *
-   * The fold half first. `Bilder` could be pressed shut while a 1937 ortofoto
-   * stayed over the hillshade with nothing left on screen that named it or
-   * could take it off — an overlay whose only controls have been folded away
-   * is stranded, and you are looking at a map that is not the map. So the pin
-   * goes down, and the *cursor* goes down with it: reopening onto a
-   * still-selected card that is no longer on the ground makes the obvious next
-   * press — click the frame to get it back — mean *deselect*, because that is
-   * what `selectBilde` does to the active id.
-   *
-   * Which is exactly why what went down is remembered. Folding the edge away
-   * is how you look at the ground under an image — a glance, like the funn eye
-   * and the ground peek — and a glance that costs you your place is a glance
-   * you stop taking. Unfolding puts the same card back under the cursor and
-   * the same image back on the map.
-   *
-   * In the ref rather than in state: nothing renders it, it is read exactly
-   * once, and putting it in state would re-render the whole workspace to
-   * record something that has just left the screen. It dies with the hook,
-   * which is remount-per-record, so a remembered id is always this
-   * lokalitet's; one deleted in the meantime is cleared by the sweep above
-   * and by `usePinnedBilde`'s own, so neither half needs to re-validate.
-   *
-   * The restore used to yield to a live terrain render, because the two shared
-   * one slot and unfolding a rail is not a press on this image. Since §13 they
-   * are two members of a stack (map/groundOverlay.ts), so there is nothing to
-   * yield to and the image comes back exactly as it left.
-   *
-   * Only an explicit fold, which is why this reads `stripOpen` rather than
-   * whether the strip is mounted: the pen and a picker borrow the bottom slot
-   * (LocalityRibbon), and drawing a funn over a pinned ortofoto is a use of
-   * this feature, not a lapse in it.
+   * Step 6 deleted the whole of it, because the whole of it was undoing
+   * something this hook was doing to itself. Selecting a thumbnail no longer
+   * touches the map, so folding the edge away cannot strand an overlay whose
+   * only control has gone with it: what is on the ground is [Bilde]'s
+   * pulldown, which is on the row and stays on the row. With nothing to drop,
+   * there is nothing to remember and nothing to give back — the cursor simply
+   * stays where it was, and unfolding shows the same card selected.
    */
-  const foldedRef = useRef<{ active: string | null; pinned: string | null }>({
-    active: null,
-    pinned: null,
-  });
-  const stripWasOpen = useRef(stripOpen);
-  useEffect(() => {
-    if (stripOpen === stripWasOpen.current) return;
-    stripWasOpen.current = stripOpen;
-
-    if (!stripOpen) {
-      foldedRef.current = { active: activeBildeId, pinned: pinnedId };
-      setActiveBildeId(null);
-      pin(null);
-      return;
-    }
-
-    const { active, pinned: wasPinned } = foldedRef.current;
-    foldedRef.current = { active: null, pinned: null };
-    if (active) setActiveBildeId(active);
-    if (wasPinned) pin(wasPinned);
-  }, [stripOpen, activeBildeId, pinnedId, pin]);
 
   /*
-   * Picking a thumbnail *is* "Vis i ruta" (§4.2), in both stances. Pressing
-   * the active one again puts it down, which is the only way the rail has to
-   * mean "nothing", and the images that cannot be placed are exactly the ones
-   * with nothing to place.
+   * Picking a thumbnail used to *be* "Vis i ruta" (§4.2): the press moved the
+   * cursor and laid that image on the ground, and walking off it took the
+   * image away again. Step 6 separated the two, and the separation is the
+   * point of the step — the rail is where the images are looked at and
+   * [Bilde] is where they are put on the map, so a press here moves the
+   * cursor and nothing else.
    *
-   * It was show-only, and the asymmetry was a fear about the wrong caller: that
-   * a rail laying every card it walked past onto the map would knock a live
-   * terrain render down the instant a `Behold` result landed and moved the
-   * cursor onto it. Nothing that adds a record moves the cursor, so it was
-   * already two identical rails (§8.7.2) answering a click differently — and
-   * since §13 the two are members of a stack, so there is no knocking down
-   * left to fear.
+   * What that ends is a class of surprise the old rule could not avoid.
+   * Selecting-is-pinning meant the ground changed as a side effect of reading
+   * a caption, refused silently on the cards it could not place (no extent, no
+   * file, borrowed from the original), and could hold exactly one image — so
+   * the gesture was at once too eager and unable to do the thing the row now
+   * does with four switches.
    *
-   * Two records it refuses. One with no extent cannot be laid down at all, and
-   * one with no file is refused here although §13.10 step 2 could now render
-   * it — walking the rail must not start a stitch per card. Both are
-   * `canPinBilde`. A borrowed one (§7) is the *original's* file and is
-   * not in `attachmentItems`, so `usePinnedBilde` has nothing to resolve it
-   * against; reading one is `Åpne originalen`, and `Ta med` is what makes it
-   * this lokalitet's.
-   *
-   * Walking away from a card still puts its image down: a pin that outlived
-   * the card it belongs to points at something the surface is no longer
-   * showing.
+   * Pressing the active card again still deselects, which is the only way the
+   * rail has to mean "nothing".
    */
-  const pinOnWalk = useCallback(
-    (rec: AttachmentRecord | null | undefined) => {
-      pin(rec && canPinBilde(rec) && !inheritedIds.has(rec.id) ? rec.id : null);
-    },
-    [inheritedIds, pin],
-  );
 
   /**
-   * Point the rail at a record without touching the map — for the surface
-   * selecting *for* you, as against `selectBilde`, which is a press.
+   * Point the rail at a record — for the surface selecting *for* you, as
+   * against `selectBilde`, which is a press and therefore toggles.
    *
    * `BilderCarousel` lands on the first image when edit opens, because a
    * surface entered in order to change something should not make you pick a
-   * subject before you can. That is a good default for the cursor and a bad
-   * one for the ground: the terrain render you were reading when you pressed
-   * `Rediger` is not something the rail gets to replace on its own.
+   * subject before you can.
    */
   const focusBilde = useCallback((id: string | null) => {
     setActiveBildeId(id);
@@ -693,11 +633,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
   const selectBilde = useCallback(
     (id: string | null) => {
-      const next = id === activeBildeId ? null : id;
-      setActiveBildeId(next);
-      pinOnWalk(next ? bilderItems?.find((a) => a.id === next) : null);
+      setActiveBildeId((cur) => (id === cur ? null : id));
     },
-    [activeBildeId, bilderItems, pinOnWalk],
+    [],
   );
 
   // ←/→. Wraps, and never lands on nothing: walking a rail past its end and
@@ -713,11 +651,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
             ? 0
             : items.length - 1
           : (at + delta + items.length) % items.length;
-      const rec = items[next];
-      setActiveBildeId(rec.id);
-      pinOnWalk(rec);
+      setActiveBildeId(items[next].id);
     },
-    [bilderItems, activeBildeId, pinOnWalk],
+    [bilderItems, activeBildeId],
   );
 
   /*
@@ -750,7 +686,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     async (rec: AttachmentRecord) => {
       mutateDraft((d) => dropAttachment(d, rec.id));
       setActiveBildeId((cur) => (cur === rec.id ? null : cur));
-      if (pinnedId === rec.id) pin(null);
       if (isDraftId(rec.id)) return;
       try {
         await deleteAttachment(rec.id);
@@ -764,7 +699,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         prev ? prev.filter((it) => it.id !== rec.id) : prev,
       );
     },
-    [mutateDraft, pin, pinnedId, setAttachmentItems, t],
+    [mutateDraft, setAttachmentItems, t],
   );
 
   // Into the buffer, which is also what makes the drag not snap back: there
@@ -917,6 +852,13 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setVisningShown(new Set());
       setVisningOpacity(new Map());
       setVisningGroupShown(true);
+      // [Bilde]'s three, on the first of those grounds alone: its members are
+      // attachment ids and the next lokalitet's are not these. This is also
+      // the sweep that used to be `usePinnedBilde`'s — one image on the ground
+      // became a set, so clearing it became emptying one.
+      setBildeShown(new Set());
+      setBildeOpacity(new Map());
+      setBildeGroupShown(true);
       // And the curtain comes down with the row that raised it
       // (docs/lokalitet-view.md §8). Sammenlign's only control moved onto the
       // lokalitet row, so leaving the lokalitet with it up would strand a
@@ -939,6 +881,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setVisningShown,
     setVisningOpacity,
     setVisningGroupShown,
+    setBildeShown,
+    setBildeOpacity,
+    setBildeGroupShown,
     leaveCompare,
   ]);
 
@@ -1417,6 +1362,25 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     } else {
       const born = Date.now();
       const id = mintDraftId();
+      /*
+       * What this drawing is *on* — the `over` relation (§13.6).
+       *
+       * It used to be the pinned File, because one image on the ground was
+       * all there could be. The ground is a stack now, so the honest answer
+       * is every layer that was under the pen, and in the order they were in:
+       * [Visning]'s members first because they are underneath, then
+       * [Bilde]'s. The two sets are disjoint by `kind`, so filtering the one
+       * exhibit list twice is the row's own bottom-to-top.
+       *
+       * The ground preset is not in it and cannot be: `over` is a relation to
+       * attachments, and "the LiDAR hillshade as it was today" is not a
+       * record. That gap is what `kind: 'scene'` is for, in step 8.
+       */
+      const items = attachmentItems ?? [];
+      const over = [
+        ...items.filter((it) => visningShown.has(it.id)),
+        ...items.filter((it) => bildeShown.has(it.id)),
+      ].map((it) => it.id);
       mutateDraft((d) =>
         withNewSpec(d, id, {
           kind: 'sketch',
@@ -1426,7 +1390,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           hidden: false,
           meta,
           funn: selectedFunnId ? [selectedFunnId] : [],
-          over: pinnedId ? [pinnedId] : [],
+          over,
         }),
       );
       // Shown straight away. Everything else about keeping an image leaves it
@@ -1445,7 +1409,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     attachmentItems,
     sketchCount,
     selectedFunnId,
-    pinnedId,
+    visningShown,
+    bildeShown,
     mutateDraft,
     setSketchShown,
     setDrawRequested,
@@ -1523,6 +1488,34 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           (it.kind === 'extract' || it.kind === 'flyfoto') &&
           !deletedIds.has(it.id) &&
           (canEdit || !it.hidden),
+      ),
+    [attachmentItems, deletedIds, canEdit],
+  );
+
+  /*
+   * What [Bilde] lists (§13.1, §13.10 step 6) — the same two filters again,
+   * and two more that only a File needs.
+   *
+   * `screenshot` alone, not every File: an `upload` has no georeference at
+   * all, so where it goes is a question before it is a switch, and that
+   * question is step 7's.
+   *
+   * A File is bytes, so unlike a View it has nothing to render from — no file
+   * means no member, and a `bbox25833` is what says where the bytes go. Both
+   * are checked here rather than left to fail on the map, because the one
+   * thing a list of switches must not contain is a switch that cannot do
+   * anything. (A View is exempt from both: it can be produced from its spec,
+   * over the spec's own rectangle.)
+   */
+  const fileItems = useMemo(
+    () =>
+      (attachmentItems ?? []).filter(
+        (it) =>
+          it.kind === 'screenshot' &&
+          it.file !== '' &&
+          !deletedIds.has(it.id) &&
+          (canEdit || !it.hidden) &&
+          groundExtentOf(it.meta ?? {}) != null,
       ),
     [attachmentItems, deletedIds, canEdit],
   );
@@ -2992,7 +2985,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     takeBilde,
     takingBildeId: takingId,
     coverBildeId,
-    pinned,
     bilderCount,
     hasBilder,
 
@@ -3068,6 +3060,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
      * well — nothing outside the pulldown touches them.
      */
     viewItems,
+    /**
+     * What [Bilde] lists (§13.10 step 6) — the Files that can lie on the
+     * ground. Published for the same reason `viewItems` is and gated the same
+     * way; the group's three switches are atoms beside the mechanism.
+     */
+    fileItems,
 
     // tools
     tool,

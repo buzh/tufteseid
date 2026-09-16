@@ -71,6 +71,17 @@ export type LayerMember = {
    * leaves it out, which is the same "absent, not disabled" the card made.
    */
   action?: { icon: MaterialSymbol; label: string; onClick: () => void };
+  /**
+   * Switched on, and nothing arrived.
+   *
+   * A layer that is on but invisible is the one state a row of switches cannot
+   * say by itself, and it is reachable: a File whose bytes will not decode, a
+   * View whose upstream has nothing over this rectangle (`useGroundView`
+   * returns exactly that as `failed`). This is where the note that used to sit
+   * under the selected card went when step 6 took the card's ground verbs —
+   * onto the switch that is claiming the layer is up.
+   */
+  warning?: string;
 };
 
 export const LayerGroup = ({
@@ -211,8 +222,10 @@ export const LayerMembers = ({
  *
  * **0 % is opaque.** The word on screen is transparency, so the number counts
  * what the word names; the map holds opacity and the flip is here, at the
- * surface that prints the word. `BildeTransparency` and the terrain strip say
- * the same thing the same way.
+ * surface that prints the word. The terrain strip says the same thing the same
+ * way; `BildeTransparency`, which was the third, is what step 6 deleted — a
+ * fade for the one image on the ground, anchored to the rectangle's corner,
+ * replaced by a fade per member where the member's switch is.
  */
 const MemberRow = ({
   member,
@@ -246,6 +259,12 @@ const MemberRow = ({
             {member.label}
             {member.meta && (
               <span className={styles.memberMeta}>{member.meta}</span>
+            )}
+            {member.warning && (
+              <span className={styles.memberWarning}>
+                <Icon icon="error" size={14} />
+                {member.warning}
+              </span>
             )}
           </span>
         </button>

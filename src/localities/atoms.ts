@@ -106,10 +106,3 @@ export const funnHiddenAtom = atom(false);
 export const funnSwitchedOffAtom = atom<ReadonlySet<string>>(
   new Set<string>(),
 );
-
-// Which bilde is pinned to the map ("Vis i ruta"), if any. Outside the
-// filmstrip because the strip is collapsible and unmounts when it is folded
-// away — and folding it away to look at the map is exactly what you do after
-// pinning something. usePinnedBilde, mounted from the workspace, is what
-// turns this into pixels.
-export const pinnedAttachmentIdAtom = atom<string | null>(null);

@@ -11,15 +11,14 @@
  * keeping it in two components is what stops a write verb from being one
  * boolean away from show.
  *
- * The token dance that fetches an image, the line naming the dataset, the
- * caption field and the fade slider are shared for the older reason: two
- * copies of `useAttachmentUrl` would be two chances to get the protected-file
- * fallback wrong.
+ * The token dance that fetches an image, the line naming the dataset and the
+ * caption field are shared for the older reason: two copies of
+ * `useAttachmentUrl` would be two chances to get the protected-file fallback
+ * wrong.
  */
 
 import { useSetAtom } from 'jotai';
 import {
-  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -476,11 +475,6 @@ export const BilderRail = ({
   );
 };
 
-/** A subtle one-liner: the meta line's twin, for anything else that small. */
-export const Note = ({ children }: { children: ReactNode }) => (
-  <p className={styles.metaLine}>{children}</p>
-);
-
 /**
  * Dataset · style · resolution, as one line — the record's provenance in the
  * smallest space it fits in.
@@ -585,15 +579,15 @@ export const CaptionField = ({
 };
 
 /*
- * A sketch's own eye, and it is deliberately not `Vis i ruta`.
+ * A sketch's own eye — the last card verb that is about the map.
  *
- * That verb is the ground-overlay stack's upper member (`usePinnedBilde`),
- * which holds one image at a time, and a sketch is not a ground: it is a
- * transparent layer over one, so the answer to "show it" is a *set* — two
- * readings of the same mound can both be up, and either can come off without
- * disturbing the other (§9.3).
- * `canPinBilde` refuses a sketch for the same reason, so the two never both
- * appear on one card.
+ * It outlived `Vis i ruta`, which was the same idea done worse: that one held
+ * a single image on a ground that could only hold one, while a sketch has
+ * always been a *set* — two readings of the same mound can both be up, and
+ * either can come off without disturbing the other (§9.3). Step 6 made the
+ * Files work the way the sketches already did, and moved their switch to the
+ * row; this one stays on the card because it presses the same set [Skisse]
+ * does, so the two surfaces cannot disagree.
  *
  * Present in show as well as edit: turning a layer on writes nothing, and
  * comparing the drawings against the image they were made over is the whole

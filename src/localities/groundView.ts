@@ -5,12 +5,14 @@
 // A stored image reached the map exactly two ways before this, and neither is
 // the one a [Visning] member needs. `useRecreateView` applies a spec to the
 // *whole map*, which answers "put the map back the way it was" and throws the
-// rectangle away. `usePinnedBilde` could only paste the *pinned figure* at its
+// rectangle away. `Vis i ruta` could only paste the *pinned figure* at its
 // `bbox25833`, which needs the file to exist — so a View that the pin queue
 // has not reached yet, or a fork whose Views all arrived as bare specs, had
 // nothing to show. This module is the third path: the spec's own pixels over
 // the spec's own rectangle, produced on demand from the same four producers
-// the pin queue uses.
+// the pin queue uses. Step 6 deleted the second path and put both groups on
+// this one (`shell/groundMembers.tsx`), so a File is now the same call with
+// nothing to produce.
 //
 // **Paint the pin where there is one; render live where there is not.** §13.2
 // says a View's figure never goes on the map and argues it from sharpness —

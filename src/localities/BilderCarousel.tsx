@@ -6,7 +6,6 @@ import {
   BilderRail,
   CaptionField,
   MetaLine,
-  Note,
   OpenOriginalButton,
   PinRetryButton,
   SketchEditButton,
@@ -14,7 +13,6 @@ import {
 } from './bilderCommon';
 import styles from './bilderCommon.module.css';
 import type { LocalityWorkspaceApi } from './useLocalityWorkspace';
-import { canPinBilde } from './usePinnedBilde';
 
 /**
  * Edit mode's bottom edge: the carousel (docs/lokalitet-view.md §4.3).
@@ -53,7 +51,6 @@ import { canPinBilde } from './usePinnedBilde';
  */
 export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
-  const { pinned } = ws;
   const items = ws.bilderItems;
   // The exhibit is the *own* records; the borrowed tail (§7) is a suffix of
   // the rail that has no position in it. `reorderBilde` clamps to that
@@ -78,7 +75,6 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
     focusBilde(items[0].id);
   }, [items, activeBildeId, focusBilde]);
 
-  const isPinned = active != null && pinned.pinnedId === active.id;
   // Tombstoned: a `Slett bildet` whose DELETE did not get through, which is
   // the only way an attachment stays on the rail after the confirm now that
   // the deletion is written straight away (§5.6, consequence 2). The frame
@@ -105,9 +101,6 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               <MetaLine rec={active} />
             </div>
             <CaptionField ws={ws} rec={active} readOnly={borrowed} />
-            {pinned.pinnedFailed && isPinned && (
-              <Note>{t('localities.bilder.loadFailed')}</Note>
-            )}
           </div>
 
           <div className={styles.actions}>
@@ -144,26 +137,18 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               </Button>
             ) : (
               <>
-                {/* Picking the frame already laid it down, here as in show.
-                    This stays, and stays a *toggle* rather than show's
-                    way-back-on only, because edit is the stance with something
-                    else to do with a selected record: captioning it against
-                    the ground it covers needs the ground, and deselecting to
-                    get it would take away the caption field too. */}
-                {canPinBilde(active) && (
-                  <Button
-                    size="sm"
-                    leftIcon={isPinned ? 'visibility_off' : 'visibility'}
-                    onClick={() => pinned.pin(isPinned ? null : active.id)}
-                  >
-                    {isPinned
-                      ? t('localities.bilder.hideFromMap')
-                      : t('localities.bilder.showOnMap')}
-                  </Button>
-                )}
-                {/* The sketch's pair, in the slot the ground verb leaves
-                    empty on it: the eye that puts the layer up, and the way
-                    back under the pen. */}
+                {/* The ground verb was here, and is [Bilde]'s pulldown now
+                    (§13.10 step 6) — the same deletion the strip took, for the
+                    same reason, and the argument that kept it a toggle in edit
+                    survives it unchanged: captioning an image against the
+                    ground it covers needs the ground, and now nothing about
+                    the caption field depends on what is laid down.
+
+                    The sketch's pair stays: the eye that puts the layer up,
+                    and the way back under the pen. A sketch is not a [Bilde]
+                    member — it is [Skisse]'s — so this is still the card's own
+                    switch and still agrees with the row, because both press
+                    the same set. */}
                 <SketchToggleButton ws={ws} rec={active} />
                 <SketchEditButton ws={ws} rec={active} />
                 <PinRetryButton ws={ws} rec={active} />

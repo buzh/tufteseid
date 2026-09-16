@@ -30,12 +30,14 @@
 // **Producers declare, the row orders.** A contributor puts its pixels up
 // under a key of its own choosing and knows nothing about the rest of the
 // stack; `setGroundOverlayStack` is where the bottom-to-top order and the
-// row's own switches arrive, from one caller. That split is not a preference
-// either — the producers live in different trees (Terrenganalyse's state is
-// mounted once from RibbonGlobalRow, a View's from the lokalitet workspace),
-// so there is no component above all of them to declare the array the way
-// `sketchOverlay.ts` does. Step 5 is where the row became that caller and the
-// fixed two-value key gave way to its order, as step 1 said it would.
+// row's own switches arrive, one call per group. That split is not a
+// preference either — the producers live in different trees (Terrenganalyse's
+// state is mounted once from RibbonGlobalRow, a View's from the lokalitet
+// workspace), so there is no component above all of them to declare the array
+// the way `sketchOverlay.ts` does. Step 5 is where the row became that caller
+// and the fixed two-value key gave way to its order, as step 1 said it would;
+// step 6 added the second group, so the layer now holds [Visning]'s members
+// and then [Bilde]'s, which is the row read left to right.
 //
 // Imperative and module-level, like `swapBackgroundLayers`, rather than an
 // atom plus a hook. The two things that change here — the pixels on every
@@ -43,7 +45,7 @@
 // a second and no React component needs to see either. Routing them through
 // jotai would re-render the whole shell at that rate for nothing. The *control*
 // state below is the other half of that sentence and is atoms, because it is
-// pressed a handful of times a session and four surfaces read it.
+// pressed a handful of times a session and several surfaces read it.
 
 import { atom, getDefaultStore } from 'jotai';
 import type { Extent } from 'ol/extent';
@@ -79,6 +81,23 @@ export const TERRAIN_KEY = 'terrain';
 /** One View in [Visning]'s pulldown, by attachment id. */
 export const viewKeyOf = (attachmentId: string) => `view:${attachmentId}`;
 
+/** One File in [Bilde]'s pulldown, by attachment id. */
+export const bildeKeyOf = (attachmentId: string) => `bilde:${attachmentId}`;
+
+/**
+ * The two layer-row groups that paint into this one layer, bottom to top.
+ *
+ * `zIndex: 1` is one OpenLayers layer and one canvas (see the header), and the
+ * row above it is two buttons: [Visning] is the ground and the Views over it,
+ * [Bilde] is the Files over those. Each declares its own members and neither
+ * can see the other's, so the *relative* order of the two is the one fact
+ * about the stack that has no owner — and it is not a runtime fact at all. It
+ * is the row's left-to-right, so it is a constant here.
+ */
+export type GroundGroup = 'visning' | 'bilde';
+
+const GROUP_ORDER: readonly GroundGroup[] = ['visning', 'bilde'];
+
 export type GroundOverlayMember = {
   /**
    * What to paint. Terrain hands over *the same canvas* it paints into and
@@ -109,25 +128,36 @@ const members = new Map<string, GroundOverlayMember>();
 // costs one number, and forgetting it is the bug above with a longer fuse.
 const opacityByKey = new Map<string, number>();
 
-// The row's half of the arrangement: which keys are its members, bottom to
-// top, and which of those it is holding down.
+// The row's half of the arrangement, one entry per group: which keys are that
+// group's members, bottom to top, and which of those it is holding down.
 //
 // Held is not the same as withdrawn, and only the row needs the difference.
 // A member's own switch withdraws it — the producer unmounts and the pixels
-// go — but the group label and the ground preset have to take down members
-// that somebody else declared, and have to give them back unchanged. So they
-// are skipped in the draw loop and nothing else about them moves.
+// go — but a group label, and [Visning]'s ground preset, have to take down
+// members that somebody else declared, and have to give them back unchanged.
+// So they are skipped in the draw loop and nothing else about them moves.
 //
-// Keys the row has not named paint *above* everything it has, in the order
-// they were declared. That is where `usePinnedBilde` sits until step 6 gives
-// [Bilde] a declaration of its own, and it is the right place for it: a File
-// on the ground is the group above this one.
-let order: readonly string[] = [];
+// Keys nobody has named paint *above* everything that was named. Nothing
+// relies on that since step 6 gave the Files a group of their own; what it
+// still covers is the gap between a producer declaring and the control that
+// ordered it mounting, which is a frame rather than a design.
+const groups = new Map<
+  GroundGroup,
+  { keys: readonly string[]; held: ReadonlySet<string> }
+>();
+
+// The union of the groups' held sets, kept rather than recomputed per frame:
+// `drawFrame` asks per member and runs on every slider tick.
 let held: ReadonlySet<string> = new Set<string>();
 
 const stack = (): string[] => {
-  const named = order.filter((key) => members.has(key));
-  const rest = [...members.keys()].filter((key) => !order.includes(key));
+  const named: string[] = [];
+  for (const group of GROUP_ORDER) {
+    for (const key of groups.get(group)?.keys ?? []) {
+      if (members.has(key)) named.push(key);
+    }
+  }
+  const rest = [...members.keys()].filter((key) => !named.includes(key));
   return [...named, ...rest];
 };
 
@@ -251,33 +281,44 @@ const sameHeld = (a: ReadonlySet<string>, b: ReadonlySet<string>) =>
   a.size === b.size && [...a].every((key) => b.has(key));
 
 /**
- * The layer row's statement about this group: its members bottom to top, and
+ * One layer-row group's statement about itself: its members bottom to top, and
  * which of them it is holding down.
  *
- * One caller — `VisningControl` — and it re-declares the whole thing on every
- * change rather than adding and removing, for the reason `setSketchOverlays`
- * does: switching a member, switching the group, reordering the exhibit and
- * closing the lokalitet are four routes to the same map and only one of them
- * is a removal. Cheap to call redundantly; the compare below is what makes
- * that true.
+ * One caller per group — `VisningControl` and `BildeControl` — and each
+ * re-declares its whole list on every change rather than adding and removing,
+ * for the reason `setSketchOverlays` does: switching a member, switching the
+ * group, reordering the exhibit and closing the lokalitet are four routes to
+ * the same map and only one of them is a removal. Cheap to call redundantly;
+ * the compare below is what makes that true.
+ *
+ * Two groups rather than one caller for the whole layer: they are siblings in
+ * the row with no component above them, which is the same gap `groundHandle`
+ * crosses, and inventing a shared owner for two fixed lists would be building
+ * a fifth state holder to express a constant (`GROUP_ORDER`).
  */
 export const setGroundOverlayStack = (
+  group: GroundGroup,
   keys: readonly string[],
   hidden: ReadonlySet<string>,
 ) => {
-  if (sameOrder(order, keys) && sameHeld(held, hidden)) return;
-  order = keys;
-  held = hidden;
+  const cur = groups.get(group);
+  if (cur && sameOrder(cur.keys, keys) && sameHeld(cur.held, hidden)) return;
+  groups.set(group, { keys, held: hidden });
+
+  const union = new Set<string>();
+  for (const g of groups.values()) for (const key of g.held) union.add(key);
+  held = union;
+
   redraw();
 };
 
 /*
- * [Visning]'s control state — the row's, not the map's.
+ * The two groups' control state — the row's, not the map's.
  *
  * Here rather than in `localities/atoms.ts` for the reason the sketch group's
  * three live in `map/sketchOverlay.ts`: an atom that only makes sense against
  * one mechanism belongs beside it. Nothing here is persisted (§13.10's third
- * trap) and `useLocalityWorkspace` empties all four when the lokalitet closes
+ * trap) and `useLocalityWorkspace` empties all seven when the lokalitet closes
  * or swaps.
  */
 
@@ -307,3 +348,25 @@ export const visningOpacityAtom = atom<ReadonlyMap<string, number>>(
 
 /** The group label's flag — see `sketchGroupShownAtom` for why it is its own. */
 export const visningGroupShownAtom = atom(true);
+
+/**
+ * Which Files are on the ground, by attachment id. Empty by default like
+ * [Visning]'s, and for a weaker version of the same reason: laying one down is
+ * a decode rather than a stitch, but a lokalitet that put every screenshot it
+ * owns on the ground at once would open on a pile nobody stacked.
+ *
+ * This is what replaced `pinnedAttachmentIdAtom`, and the shape is the
+ * difference: a set, not an id. "Selecting is pinning" held the map to one
+ * image because the map could hold one image; the ground is a stack now and
+ * what is on it is a decision of its own, made in the pulldown rather than as
+ * a side effect of walking the rail.
+ */
+export const bildeShownAtom = atom<ReadonlySet<string>>(new Set<string>());
+
+/** How far each shown File is faded, 0–100 by attachment id. Missing is 100. */
+export const bildeOpacityAtom = atom<ReadonlyMap<string, number>>(
+  new Map<string, number>(),
+);
+
+/** [Bilde]'s label toggle. */
+export const bildeGroupShownAtom = atom(true);
