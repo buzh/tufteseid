@@ -337,6 +337,11 @@
       "confirmDeleteShort": "Delete the find?",
       "growConfirmAction": "Grow the area",
       "autoName": "Find {{n}}",
+      "belongsTo": "Belongs to",
+      "belongsHint": "Choose which find this image belongs to. It is listed under that find in [Image] and [Sketch], and travels with it through the exhibit. Saved when you save.",
+      "none": "The locality",
+      "untitled": "Untitled",
+      "badge": "Find: {{title}}",
       "growHint": "The drawing extends beyond the locality's area.",
       "growTooLarge": "The area would end up larger than {{max}} m on a side. Move the drawing closer, or make it a locality of its own."
     },

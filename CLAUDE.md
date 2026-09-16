@@ -86,14 +86,14 @@ all of them.
   and the takeout bundle, and moving Terreng and Sammenlign off row 1 onto
   the lokalitet row. Read it before building any of that; each step folds into
   `docs/ui-architecture.md` §8 as it lands. **§13 is a separate thread and
-  the row itself is built, through step 8**: the *layer row* — four `[thing ▾]`
+  the row itself is built, all nine steps**: the *layer row* — four `[thing ▾]`
   groups
   (Visning / Bilde / Skisse / Funn) matching the map's z-stack bottom-to-top,
   each member switchable with its own opacity — which deletes `Gjenskap`, `Vis
   i ruta` and the one-slot ground arbiter, makes a funn a container for images
   as well as a sublocation, and gives an arrangement a record of its own
   (`kind: 'scene'`, membership on the existing `over`). §13.10 is its build
-  order and eight of its nine steps have landed: the ground overlay is a stack
+  order and all nine steps have landed: the ground overlay is a stack
   and the
   arbiter is gone; `src/localities/groundView.ts` can put a View on the map
   as its own pixels over its own rectangle — rendering it live when there is no
@@ -138,8 +138,16 @@ all of them.
   scene names its members twice**, in `over` and in `meta.layers`, so every
   place that re-mints ids — the commit, the copy — must translate both halves
   (`remapSceneMeta`).
-  What remains is step 9, the
-  funn relation editor. Three rules from steps 4–6 that hold for it:
+  Step 9 finished the thread by widening `attachments.funn` — same column, no
+  migration — from "what a sketch is about" to **which funn this bilde belongs
+  to**, on every kind: `src/localities/funnGroups.ts` is the only reader
+  (`funnIdOf` is also the single place a dangling id becomes "none", since the
+  relation does not cascade), `BildeFunnPicker` on the bilde card is the
+  editor, and `[Bilde ▾]` and `[Skisse ▾]` group their members under funn
+  headings. The grouping is a **paint order**, not a sort — the grouped
+  sequence reaches `setGroundOverlayStack` and `setSketchOverlays` — because
+  position in a pulldown means depth. Three rules from steps 4–6 that hold
+  across all of it:
   **opacity is a raster idea** — vector members get a switch and nothing else,
   and so does the ground preset, whose fade would be three fades and lives on
   the settings strip instead; **held is not withdrawn** — a group or preset
@@ -565,10 +573,13 @@ Data model:
   `imageRect`, `renderedAt`, `bboxAssumed` on a placed upload, for a
   sketch the Excalidraw scene itself, and for a scene its layer order, their
   fades and the ground under them),
-  `funn` and `over` (uncascaded relations → finds and → attachments: what a
-  sketch is about, and which bilder it is a layer on — on a scene, which
+  `funn` and `over` (uncascaded relations → finds and → attachments: which
+  funn this bilde belongs to, on every kind and editable since §13.10 step 9,
+  and which bilder a sketch is a layer on — on a scene, which
   bilder it is an arrangement *of*), `sort` and `hidden`
-  for exhibit order and concealment.
+  for exhibit order and concealment. `funn` is read only through
+  `src/localities/funnGroups.ts`, because the relation does not cascade and an
+  id that no longer names a funn has to read as "none" everywhere at once.
 
 **Views and Files.** `kind` decides which: `extract`, `flyfoto`, `sketch` and
 `scene` are **Views** — producible from the record's own parameters, so they are written as

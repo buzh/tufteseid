@@ -32,6 +32,7 @@ import {
   type AttachmentRecord,
   getAttachmentUrl,
 } from '../api/attachments';
+import type { LocalityFindRecord } from '../api/localityFinds';
 import {
   Badge,
   Button,
@@ -40,11 +41,13 @@ import {
   IconButton,
   Input,
   type MaterialSymbol,
+  Menu,
   Spinner,
   Tooltip,
 } from '../ui';
 import styles from './bilderCommon.module.css';
 import { isDraftId } from './draft';
+import { funnIdOf } from './funnGroups';
 import { groundExtentOf } from './groundView';
 import { type PinState, pinStateOf, subscribePinQueue } from './pinQueue';
 import { bilderStripOpenAtom } from './toolAtoms';
@@ -505,6 +508,101 @@ export const MetaLine = ({ rec }: { rec: AttachmentRecord }) => {
   return <p className={styles.metaLine}>{line}</p>;
 };
 
+/**
+ * The funn a bilde belongs to, as a record — null for the lokalitet's own
+ * images and for one whose funn has since been deleted (§13.6).
+ *
+ * The lookup is here rather than in `funnGroups.ts` because the card holds one
+ * record and no list: it wants the funn itself, not a partition of a set.
+ */
+const funnOf = (
+  ws: LocalityWorkspaceApi,
+  rec: AttachmentRecord,
+): LocalityFindRecord | null => {
+  const finds = ws.findItems ?? [];
+  const id = funnIdOf(rec, new Set(finds.map((f) => f.id)));
+  return id ? (finds.find((f) => f.id === id) ?? null) : null;
+};
+
+/*
+ * `Hører til` — which funn this bilde belongs to (§13.6, §13.10 step 9).
+ *
+ * The editor §9.3 deferred, and the reason it could be deferred then is the
+ * reason it cannot be now: seeding guesses well enough for "what this drawing
+ * is about", because the drawing was made over a funn that was selected at the
+ * time. "Which funn this photograph belongs to" is not a guess anyone can make
+ * for you — the image existed before you decided what it was of.
+ *
+ * A menu of one answer rather than a set of checkboxes, because belonging is
+ * one answer; the column stays a multiple relation and this writes an array of
+ * at most one (`setBildeFunn`). The lokalitet itself is the first item rather
+ * than a `Fjern`, since "belongs to the lokalitet" is a position in the
+ * hierarchy and not the absence of one.
+ *
+ * Edit only, and absent on a lokalitet with no funn — a picker whose only
+ * option is the one you already have answers nothing. Buffered like the
+ * caption, so filing a batch of images and changing your mind costs `Avbryt`
+ * and no writes. A funn invented in the same session is offered here with its
+ * temp id and translated at the commit (`useLocalityDraft`).
+ */
+export const BildeFunnPicker = ({
+  ws,
+  rec,
+}: {
+  ws: LocalityWorkspaceApi;
+  rec: AttachmentRecord;
+}) => {
+  const { t } = useTranslation();
+  const finds = ws.findItems ?? [];
+  if (!ws.canEdit || finds.length === 0) return null;
+  const current = funnOf(ws, rec);
+  const titleOf = (f: LocalityFindRecord) =>
+    f.title.trim() || t('localities.funn.untitled');
+
+  return (
+    <Menu
+      align="end"
+      width={230}
+      label={t('localities.funn.belongsTo')}
+      title={t('localities.funn.belongsTo')}
+      trigger={(p) => (
+        <Button
+          size="sm"
+          palette="gray"
+          leftIcon="bookmark"
+          rightIcon="keyboard_arrow_down"
+          title={t('localities.funn.belongsHint')}
+          aria-expanded={p.open}
+          onClick={p.onClick}
+        >
+          {current ? titleOf(current) : t('localities.funn.none')}
+        </Button>
+      )}
+      items={[
+        {
+          label: t('localities.funn.none'),
+          active: current == null,
+          onSelect: () => {
+            if (current) ws.setBildeFunn(rec, null);
+          },
+        },
+        // The tombstoned ones are out: filing an image under a funn this
+        // session has already deleted would be a relation the commit drops
+        // on the way out, which is a choice that silently does nothing.
+        ...finds
+          .filter((f) => !ws.deletedIds.has(f.id))
+          .map((f) => ({
+            label: titleOf(f),
+            active: current?.id === f.id,
+            onSelect: () => {
+              if (current?.id !== f.id) ws.setBildeFunn(rec, f.id);
+            },
+          })),
+      ]}
+    />
+  );
+};
+
 /** Kind, cover and concealment, said as chips. */
 export const BildeBadges = ({
   ws,
@@ -517,6 +615,12 @@ export const BildeBadges = ({
   borrowed?: boolean;
 }) => {
   const { t } = useTranslation();
+  const funn = funnOf(ws, rec);
+  const funnLabel = funn
+    ? t('localities.funn.badge', {
+        title: funn.title.trim() || t('localities.funn.untitled'),
+      })
+    : null;
   return (
     <>
       <Badge>{t(`localities.bilder.kind.${rec.kind}`)}</Badge>
@@ -540,6 +644,13 @@ export const BildeBadges = ({
           {isBboxAssumed(rec) && (
             <Badge palette="gray">{t('localities.bilder.assumed')}</Badge>
           )}
+          {/* Which funn it belongs to (§13.6), in both stances: the picker
+              beside it is edit's, and a reader who cannot see the filing
+              cannot read the exhibit the way its author arranged it. A funn
+              that has since been deleted shows nothing at all — `funnIdOf`
+              answers null for a dangling id, which is the same fallback the
+              pulldowns make. */}
+          {funnLabel && <Badge palette="gray">{funnLabel}</Badge>}
         </>
       )}
     </>

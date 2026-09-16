@@ -2537,10 +2537,14 @@ thumbnail 403s.
 
 Four more fields sit on the record and belong to the exhibit or to the
 sketch rather than to the image: `sort` (int) and `hidden` (bool), which are
-§8.7.3, and the two uncascaded relations `funn` (→ finds: what a sketch is
-about) and `over` (→ attachments: which bilder it is a layer on), which are
-§9.3 — and on a scene `over` carries the other sense the word already had, the
-bilder it is an arrangement *of* (§10.2).
+§8.7.3, and the two uncascaded relations `funn` (→ finds) and `over`
+(→ attachments), neither of which means quite what it did. `funn` was "what a
+sketch is about", seeded and uneditable (§9.3); since §13.10 step 9 it is
+**which funn this bilde belongs to**, on every kind, with an editor on the card
+and the pulldowns grouped by it (§10.3) — a widening that cost no migration,
+because the column is the same. `over` is still which bilder a sketch is a
+layer on, and on a scene the other sense the word already had: the bilder it is
+an arrangement *of* (§10.2).
 
 #### 8.7.1 The image on the map — and why it is not the rail's
 
@@ -2576,7 +2580,11 @@ it, and what it produces is a row in [Bilde] rather than a layer on the map.
 Step 8 added the other exception that proves the rule: `Legg ut igjen` on a
 scene's card (§10.2) does not put *that* record on the ground — a scene is not
 a layer and has no switch anywhere — it puts the whole row back the way the
-record says it was. It is a read, so it is on the card in both stances.
+record says it was. It is a read, so it is on the card in both stances. Step 9
+added `Hører til`, the funn picker (§10.3), which is the same kind of verb as
+`Plasser i ruta`: it writes a relation, shows and hides nothing, and what it
+changes on the map is only the *order* the member is painted in, because the
+pulldown it appears in is grouped by the answer.
 
 Three consequences of the separation, each of which had been paid for
 elsewhere:
@@ -2704,6 +2712,7 @@ transient by construction:
 | order | none | drag a frame along the rail, or `arrow_back` / `arrow_forward` in the detail row |
 | conceal, delete | absent | in the detail row |
 | place an upload (§13.5) | absent | in the detail row, uploads only |
+| which funn it belongs to (§13.6) | a badge on the detail line | the badge, plus `Hører til ▾` in the detail row |
 | both | Åpne originalen, ← / →, `bottom_panel_close` | |
 
 **Edit used to be one large card at a time**, on the argument that judging a
@@ -2740,6 +2749,13 @@ Three things that read as arbitrary until you try the alternative:
   `PlaceUploadButton` in `bilderCommon.tsx` is absent on every other kind —
   they all already know where they are, and offering to invent a rectangle for
   an extract that was cut to one is offering to make it worse.
+- **`Hører til ▾` is on the card for the same reason, and it is the first verb
+  in the row.** Filing an image under a funn (§10.3) is what decides where the
+  card *sits* — a chip on its badges line, and a heading in [Bilde] or
+  [Skisse] — so it leads the verbs rather than sitting among the curation
+  arrows. `BildeFunnPicker` is absent on a lokalitet with no funn, because
+  "belongs to the lokalitet" is then the only answer there is. In show the
+  answer is still visible, as the badge: it is part of what the exhibit says.
 - **Only edit passes `onReorder`.** `BilderRail` takes it as an optional prop
   and `BilderStrip` omits it, so drag is not a thing show has and suppresses —
   the hook is never armed there at all.
@@ -3584,6 +3600,14 @@ Load-bearing, in the order the mistakes would be made:
   it was kept. `copyLocality` (§8.12) needed the identical fix for the same
   reason, one id space over. Both drop what they cannot translate: a layer
   pointing at a record that was never written is not a layer.
+- **And in an existing bilde's `funn`.** `DraftAttachment` gained the relation
+  at §13.10 step 9 (§10.3), so it is a buffered column like `caption` and
+  `hidden` — and it is the one buffered *relation* on a record that already
+  exists, which means the attachment patch loop needs the same `resolve` the
+  specs get: filing a photograph under a funn drawn in this session is exactly
+  the case where the id is still `draft:`. The buffer's `version` is not bumped
+  for it; the field is additive and `attachmentBaseOf` supplies it, so a buffer
+  written before step 9 merges unchanged.
 - **A successful commit reloads both lists.** Realtime is still held back — the
   stance did not end — so the funn and specs the commit just created would be
   nowhere: the buffer the overlay was reading them out of is empty now, and no
@@ -3729,13 +3753,17 @@ Load-bearing details:
   at all. The original's arrangement is part of what was being shared.
 - **Relations are wired in a second pass**, after every record that is going to
   exist does — a sketch may be a layer on a bilde further down the same list.
-  Two kinds have them: a sketch says what it is drawn over and about, and a
-  scene says what it is made of (§10.2). The scene needs one thing more, since
+  Since §13.10 step 9 the pass runs for **every** carried View, not just the two
+  kinds that carry `over`: `funn` means "which funn this bilde belongs to" now
+  (§10.3), so a fork that carried the funn and lost which images were filed
+  under them would arrive with its exhibit unsorted. The scene needs one thing
+  more, since
   its membership is in `meta.layers` as well as in `over` and both halves have
   to name the copy's records or the flatten would be of the original's.
   Untranslatable layers are dropped by both, which is the same sentence twice:
   the Files stayed with the original, so a scene built over one arrives with
-  that layer missing until `Ta med` brings the File across.
+  that layer missing until `Ta med` brings the File across — and a File brought
+  across later arrives filed under nothing, because by then the id map is gone.
 
 **The Files that stayed behind are still shown.** `useInheritedBilder` lists
 the original's Files and appends them to the copy's carousel as borrowed
@@ -3900,7 +3928,7 @@ the terrain it was drawn over, and three things follow from that:
 | field | → | means | set from |
 |---|---|---|---|
 | `over` | `attachments` | the bilder this drawing is a layer on | every member switched on in [Visning] and [Bilde], in row order, at the moment it is kept |
-| `funn` | `finds` | what the drawing is *about* | the selected funn at that moment |
+| `funn` | `finds` | which funn the drawing belongs to | the selected funn at that moment — and editable since §13.10 step 9 (§10.3) |
 
 `over` used to be a single id — the one pinned bilde, because the ground held
 one image — and since §13.10 step 6 it is the whole ground as it stood: the
@@ -3909,11 +3937,18 @@ better record of what was drawn over and it is the same reading the map already
 has, so nothing had to be invented to take it. A sketch tied to nothing is
 simply one you switch on yourself, from the rail or from [Skisse].
 
-Both relations are seeded automatically and **there is no editor for them yet**
-— deliberately deferred (§13.10 step 9), and the first thing to build if the
-seeding turns out to guess wrong often. Nothing reads `over` back yet either:
-the old claim that selecting a bilde brings its sketches up with it went with
-the rail's ground verbs, since selecting no longer touches the map at all.
+Both are seeded automatically, and **one of them now has an editor**. `funn`
+got it at §13.10 step 9, together with a wider meaning: the seed answers "what
+was selected while you drew", which is a fair guess at what a sketch is about
+and no guess at all at where an image belongs, so the answer became editable on
+every kind's card and the pulldowns group by it (§10.3). A sketch is where the
+two readings meet, and they were never in conflict — the funn you drew over is
+the funn the drawing files under.
+
+`over` is still seeded and still uneditable, and nothing reads it back: the old
+claim that selecting a bilde brings its sketches up with it went with the
+rail's ground verbs, since selecting no longer touches the map at all. Its one
+reader is the copy, which translates it (§8.12).
 
 **Where the verbs are.** `Tegn` on the lokalitet row puts the pen down in
 sketch mode and is its own toggle; while the surface is up the row's exits zone
@@ -4499,6 +4534,9 @@ is asked. Its hooks still run first, so the empty stack is declared before the
 `null` return — a group that renders nothing still has to say it is holding
 nothing.
 
+**Its list is grouped by funn, and so is [Skisse]'s** — §10.3, and the grouping
+is a paint order as well as a heading.
+
 **The two share their member machinery**, in `src/shell/groundMembers.tsx`:
 `GroundMember`, the child whose mount *is* the member (it calls `useGroundView`
 and takes the pixels down on unmount), and `useLayerFailures`, the small
@@ -4576,6 +4614,65 @@ layer with the fade it was seen through, and its credits are the union of its
 layers' — a layer whose pixels did not arrive is left out of both the caption
 and the picture, and a scene where nothing arrives pins `empty` rather than
 `failed`.
+
+### 10.3 Which funn a bilde belongs to — the relation, and the grouping
+
+A funn is a sublocation *and* a container (`docs/lokalitet-view.md` §13.6,
+§13.10 step 9). `attachments.funn` carried half of that already — the sketch's
+"what this drawing is about", seeded and uneditable (§9.3) — and step 9 widened
+it to **which funn this bilde belongs to**, on every kind, with **no
+migration**: same column, same uncascaded multiple relation, a different
+question asked of it. The two roles stay orthogonal. A funn is named, statused,
+addressable, in the ↑/↓/Enter list and on the map whether or not anything hangs
+off it.
+
+**`src/localities/funnGroups.ts` is the whole reader side**, and it is one file
+because three call sites must not disagree:
+
+- `funnIdOf(rec, known)` — the answer, or `null`, **including when the record
+  names a funn that no longer exists**. The relation does not cascade on
+  purpose: deleting a funn must not delete the photographs of it, and the
+  images falling back to the lokalitet is the right behaviour — but only if
+  every reader treats a dangling id as no answer. That rule is this function
+  and nowhere else.
+- `funnGroupsOf(items, finds)` — the lokalitet's own images first, then one
+  group per funn in the funn list's own order (creation order, so a rename or a
+  restatus does not reshuffle the map), empty groups dropped.
+- `orderedByFunn` — the same order flattened, for a caller that paints rather
+  than lists — and `funnSectionsOf`, the headings by record id, `null` where
+  there is only one group because a single heading over the whole list names
+  nothing.
+
+**One answer, in a multi-valued column.** The editor writes at most one id and
+every reader takes the first one it recognises. The field stays a multiple
+relation because that is what it already is and because nothing has ever
+written more than one, so no stored record is being reinterpreted — and because
+"about these funn" is a plural idea that may yet want the room.
+
+**The editor is on the card, not in the row.** `BildeFunnPicker` in
+`bilderCommon.tsx` is a `Menu` over *Lokaliteten* plus every funn, leading the
+verb row in `BilderCarousel` (§8.7.2) and absent for a reader, in show, and on a
+lokalitet with no funn. It writes through `ws.setBildeFunn`, which is
+`patchBilde` with a fourth column, so it is buffered into the edit transaction
+like a caption and translated at commit like a spec's (§8.11). Funn tombstoned
+in this session are left out of the options, since the commit's `resolve` would
+drop the relation anyway. The answer is readable in both stances as a badge on
+the detail line: where an image belongs is part of what the exhibit says.
+
+**The grouping is a paint order, not a sort.** §13.1's one teaching claim is
+that position in a pulldown is depth on the map, so a group that re-ordered its
+list for display alone would contradict the row on the same screen it makes its
+claim. `BildeControl` therefore derives `keys` for `setGroundOverlayStack` from
+the grouped list, and the sketch overlay effect in `useLocalityWorkspace` walks
+`orderedByFunn` before calling `setSketchOverlays`. Bottom to top it reads as
+*the lokalitet's own layers, then each funn's over them*.
+
+**`LayerMember.section` is how a heading gets into a list of switches.**
+`LayerMembers` emits a sticky heading whenever a member's section differs from
+the one above it — no nesting, no collapsible group inside a pulldown that is
+already a popover. [Visning] is deliberately ungrouped: its bottom member is
+the live ground preset, which belongs to no funn, and a single *Lokaliteten*
+heading over the rest would be a heading that says nothing.
 
 ---
 
@@ -4897,6 +4994,10 @@ View's **Gjenskap** there to set the map back to the view it was made from;
 give an uploaded image an extent with **Plasser i ruta** on its card so it can
 join that list — fitted to the image's own aspect inside the lokalitet's
 rectangle, marked as assumed wherever it appears, and removable again;
+file an image under a funn with **Hører til** on its card, so that the
+photographs and sketches of one feature sit together under its name in
+[Bilde ▾] and [Skisse ▾] — in that order on the map as well as in the list —
+and read which funn an image belongs to from its badge in either stance;
 see a member say so on its own switch when the layer could not be shown;
 take the ground away entirely and read a sketch and its funn on white;
 keep the whole arrangement — which layers are on, in what order, at what fade,

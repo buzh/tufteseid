@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   cx,
@@ -93,6 +93,19 @@ export type LayerMember = {
    * extract's.
    */
   note?: string;
+  /**
+   * The heading this member sits under, printed when it differs from the one
+   * above it — which is why the caller hands the members in group order rather
+   * than handing groups.
+   *
+   * There is one grouping so far and it is by funn (§13.6, §13.10 step 9):
+   * `[Bilde]` and `[Skisse]` put the lokalitet's own images first and each
+   * funn's above them. That order is also the paint order, so the caller
+   * cannot sort for display alone — see `funnGroups.ts`. Absent on every
+   * member means no headings at all, which is what a lokalitet that has never
+   * filed an image under a funn should look like.
+   */
+  section?: string;
 };
 
 export const LayerGroup = ({
@@ -200,13 +213,17 @@ export const LayerMembers = ({
   onSetOpacity: (id: string, opacity: number) => void;
 }) => (
   <div className={styles.members}>
-    {members.map((member) => (
-      <MemberRow
-        key={member.id}
-        member={member}
-        onToggle={() => onToggleMember(member.id)}
-        onSetOpacity={(value) => onSetOpacity(member.id, value)}
-      />
+    {members.map((member, i) => (
+      <Fragment key={member.id}>
+        {member.section && member.section !== members[i - 1]?.section && (
+          <p className={styles.section}>{member.section}</p>
+        )}
+        <MemberRow
+          member={member}
+          onToggle={() => onToggleMember(member.id)}
+          onSetOpacity={(value) => onSetOpacity(member.id, value)}
+        />
+      </Fragment>
     ))}
   </div>
 );

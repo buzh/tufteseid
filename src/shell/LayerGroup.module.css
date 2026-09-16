@@ -55,6 +55,22 @@
   overflow-y: auto;
 }
 
+/* The funn a run of members belongs to (§13.6). Sticky, because the list
+   scrolls and a heading that has left the top of the panel takes the answer to
+   "whose layer is this" with it. Not a `Menu` title: that one names the panel,
+   and there is at most one of those. */
+.section {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--c-bg-subtle);
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--c-fg-muted);
+}
+
 /* A member is two rows that belong together, so the block gets the hover
    rather than the switch inside it: reaching for the slider must not make the
    thing above it look like what you are about to press. */

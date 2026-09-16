@@ -2,6 +2,7 @@ import { useAtom } from 'jotai';
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { metaLineOf } from '../localities/bilderCommon';
+import { funnGroupsOf, funnSectionsOf } from '../localities/funnGroups';
 import { isBboxAssumed } from '../localities/uploadPlacement';
 import type { LocalityWorkspaceApi } from '../localities/useLocalityWorkspace';
 import {
@@ -41,8 +42,17 @@ import { LayerGroup, type LayerMember, LayerMembers } from './LayerGroup';
  * nothing here that needs to know it was ever open. What the row does have to
  * say is that the answer was assumed rather than measured, which is `note`.
  *
+ * Step 9 grouped the list by funn (§13.6). It is the same members in a
+ * different order, and the order is the point: a funn is a container for
+ * images as well as a sublocation, so the photographs of the pit sit together
+ * and above the lokalitet's own. The grouping decides the paint order too —
+ * `keys` below is read off the grouped list, because a pulldown that sorted
+ * for display alone would contradict the row's one teaching claim (§13.1) on
+ * the same screen it makes it.
+ *
  * **Nothing here writes** (§13.8): a reader gets the group at full function,
- * and the one verb in this thread that writes is on the card, in edit.
+ * and the one verb in this thread that writes is on the card, in edit — the
+ * funn a File belongs to is set there too, beside its caption.
  */
 export const BildeControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
@@ -51,8 +61,13 @@ export const BildeControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const [groupShown, setGroupShown] = useAtom(bildeGroupShownAtom);
   const { failedIds, report } = useLayerFailures();
 
-  const files = ws.fileItems;
+  const groups = funnGroupsOf(ws.fileItems, ws.findItems);
+  const files = groups.flatMap((g) => g.items);
   const shownFiles = files.filter((rec) => shown.has(rec.id));
+  const sections = funnSectionsOf(groups, {
+    none: t('localities.funn.none'),
+    untitled: t('localities.funn.untitled'),
+  });
 
   // Keyed on the ids rather than the array, for the reason `VisningControl`
   // gives: the item list is rebuilt on every realtime event and every
@@ -83,14 +98,19 @@ export const BildeControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
 
   // Pushed for every File and not only the shown ones: `opacityByKey` outlives
   // the member, so switching one back on has to find the fade it was left at.
+  //
+  // Off `ws.fileItems` rather than the grouped list, which is two facts at
+  // once: a fade does not care what order its layer paints in, and the grouped
+  // list is a fresh array every render while the hook's is memoised.
+  const items = ws.fileItems;
   useEffect(() => {
-    for (const rec of files) {
+    for (const rec of items) {
       setGroundOverlayOpacity(
         bildeKeyOf(rec.id),
         (opacity.get(rec.id) ?? 100) / 100,
       );
     }
-  }, [files, opacity]);
+  }, [items, opacity]);
 
   const toggleFile = (id: string) =>
     setShown((cur) => {
@@ -115,6 +135,7 @@ export const BildeControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
     warning: failedIds.has(rec.id)
       ? t('localities.layers.unavailable')
       : undefined,
+    section: sections?.get(rec.id),
   }));
 
   // Absent rather than disabled on a lokalitet with no Files, the same call

@@ -71,6 +71,20 @@ export type DraftAttachment = {
    * render and never goes on the pin queue at all.
    */
   meta?: Record<string, unknown>;
+  /**
+   * Which funn this bilde belongs to (§13.6, §13.10 step 9).
+   *
+   * Buffered like a caption, because that is what it now is: a statement the
+   * author makes about the record rather than something a producer knew. It
+   * may hold a temp id — filing an image under a funn invented in the same
+   * session is the ordinary case — and the commit maps it once the funn has
+   * been written, the same pass `DraftSpec.funn` already goes through.
+   *
+   * Optional rather than `[]`, so a buffer written before step 9 still merges:
+   * `attachmentBaseOf` fills it from the record, and an older stored patch
+   * that does not mention it leaves the record's own relation alone.
+   */
+  funn?: string[];
 };
 
 /** A View kept during the session: a spec, with no pixels behind it yet. */
@@ -78,21 +92,21 @@ export type DraftSpec = DraftAttachment & {
   kind: AttachmentKind;
   meta: Record<string, unknown>;
   /**
-   * A sketch's two relations, seeded when it is kept (§9.3). Buffered with the
-   * rest of the spec because they are part of what the record *is* — a layer
-   * on that bilde, about those funn — and a commit that wrote the row first
-   * and the relations afterwards would leave a sketch attached to nothing if
-   * the second write failed. Empty for every other kind.
+   * What this is a layer *on*: a sketch's tracing (§9.3), a scene's membership
+   * (§13.7). Buffered with the rest of the spec because it is part of what the
+   * record *is*, and a commit that wrote the row first and the relation
+   * afterwards would leave a sketch attached to nothing if the second write
+   * failed. Empty for every other kind.
    *
-   * A `funn` id here may be a temp one: sketching over a funn invented in the
-   * same session is the ordinary case, and the commit maps it to the real id
-   * once that funn has been written.
+   * An id here may be a temp one — keeping an arrangement of images kept in
+   * the same session is the ordinary case — and the commit maps it once the
+   * record it names has been written. `DraftAttachment.funn` above is the
+   * other relation and goes through the same pass.
    *
    * Optional rather than `[]` at every producer, for the same reason
-   * `NewAttachmentInput.sort` is: the other four kinds have no opinion about
-   * these, and asking each of them to say so is four chances to disagree.
+   * `NewAttachmentInput.sort` is: the other kinds have no opinion about it,
+   * and asking each of them to say so is four chances to disagree.
    */
-  funn?: string[];
   over?: string[];
   /**
    * The exhibit position it was minted with, so the commit can tell an
@@ -217,6 +231,10 @@ export const attachmentBaseOf = (rec: AttachmentRecord): DraftAttachment => ({
   caption: rec.caption,
   sort: rec.sort,
   hidden: rec.hidden,
+  // `?? []` because records written before 1700000700 have no key at all, and
+  // a base that left it undefined would make the first caption edit of the
+  // session look like a patch that never mentions the relation.
+  funn: rec.funn ?? [],
 });
 
 const isNew = (d: LocalityDraft, id: string) => id in d.newFinds;

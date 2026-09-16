@@ -1578,8 +1578,7 @@ Docs to update: `docs/ui-architecture.md` §3.1 (the shell loses a slot), §5.1
 
 ## 13. The layer row — the stack becomes the control
 
-**Status: designed; steps 1–8 of §13.10 built, only the funn relation editor
-(step 9) is not.** It supersedes the
+**Status: built — all nine steps of §13.10 have landed.** It supersedes the
 verbs in §4.2 and deletes the one-slot arbiter that section introduced — that
 deletion has landed, and so has the mechanism the replacement needs: a View can
 now be put on the map as its own pixels over its own rectangle. **The row is
@@ -1762,6 +1761,15 @@ already carries the whole `meta`, so the flag reaches a copy unaided; the
 takeout is §12 step 16 and has to carry it when it is built.
 
 ### 13.6 A funn is a sublocation *and* a container
+
+> **Built at §13.10 step 9** — `src/localities/funnGroups.ts` is the reader
+> side, `BildeFunnPicker` on the bilde card is the editor, and no migration was
+> needed. Of the three consequences below, the first is answered (`funnIdOf`
+> is the single place a dangling id becomes "none"), the third is the build
+> itself, and the second is still open: nothing is funn-scoped yet, so the
+> pad-and-clamp rule is still unwritten and funn-scoped images are still crops
+> and Files. One thing the build added: "belongs to" is **one** answer, so the
+> editor writes at most one id into a column that stays a multiple relation.
 
 `attachments.funn` already exists — multiple relation → `finds`, uncascaded,
 already remapped by the copy (§7). Today it means "what this sketch is *about*"
@@ -2309,7 +2317,47 @@ Three sequencing rules, and as in §12 they are worth more than the list.
 
 9. **The funn relation editor** (§13.6) — widening `attachments.funn` to "which
    funn this bilde belongs to" and grouping the pulldowns by it. No migration.
-   After the groups exist, because it is a grouping of them.
+   **Built.** Last because it is a grouping of the groups, and it needed all
+   four of them to exist before it could be one.
+
+   `src/localities/funnGroups.ts` is the reader side and deliberately the only
+   one: `funnIdOf` answers which funn a record belongs to *and* treats an id
+   that no longer names a funn as no answer, which is §13.6's first consequence
+   discharged in one function rather than repeated in the card, the badge and
+   two pulldowns. `funnGroupsOf` splits a list into the loose images and one
+   group per funn — loose first, funn in the funn list's own creation order,
+   empty groups dropped — with `orderedByFunn` for the callers that paint and
+   `funnSectionsOf` for the ones that head.
+
+   **The editor writes one id, into a column that stays plural.** Nothing has
+   ever written more than one, so widening the *meaning* reinterprets no stored
+   record; keeping the column multiple costs nothing and leaves room for the
+   sketch's older plural sense. `BildeFunnPicker` is a `Menu` over
+   *Lokaliteten* plus every funn, first in the card's verb row because the
+   answer decides where the card sits, absent where there are no funn, and
+   buffered into the edit transaction like a caption. Funn tombstoned in this
+   session are not offered, since the commit would drop the relation anyway.
+
+   **The grouping had to reach the map, not just the list.** §13.1's claim is
+   that position in a pulldown is depth, so `BildeControl` reads the keys it
+   hands `setGroundOverlayStack` off the grouped list, and the sketch-overlay
+   effect in `useLocalityWorkspace` walks `orderedByFunn` before
+   `setSketchOverlays`. A display-only sort would have contradicted the row's
+   one teaching claim on the screen that makes it. `LayerMember.section` is the
+   whole UI of it — a sticky heading in `LayerMembers` wherever the section
+   changes, no nesting inside a popover. [Visning] stays ungrouped: its bottom
+   member is the live ground preset, which belongs to no funn.
+
+   **Three small consequences elsewhere.** `DraftAttachment` gained `funn`, so
+   the commit's attachment patch loop needs the same `resolve` the specs get —
+   filing a photograph under a funn drawn this session is exactly the `draft:`
+   case; the buffer's `version` is *not* bumped, because the field is additive
+   and `attachmentBaseOf` supplies it. `copyLocality`'s relation pass now runs
+   for every View rather than only sketches and scenes, or a fork would arrive
+   with its funn intact and its exhibit unsorted — a File taken across later by
+   `Ta med` still arrives filed under nothing, because by then there is no id
+   map. And `over` keeps the old arrangement: seeded, uneditable, read only by
+   the copy.
 
 #### Three traps worth writing down
 

@@ -230,9 +230,26 @@ export const useLocalityDraft = ({
         failed++;
       }
     }
+    // A relation to something the buffer invented and could not write is
+    // dropped rather than sent: a sketch about a funn whose create just failed
+    // is still a sketch, and refusing to save it would lose the drawing over
+    // the label on it.
+    const resolve = (
+      ids: string[] | undefined,
+      map: Map<string, string>,
+    ): string[] =>
+      (ids ?? []).map((id) => map.get(id) ?? id).filter((id) => !isDraftId(id));
     for (const [id, body] of Object.entries(d.attachments)) {
       try {
-        const rec = await updateAttachment(id, body);
+        // Filing an existing bilde under a funn invented in the same session
+        // is the ordinary case for step 9's editor, so this patch needs the
+        // same translation the specs below get. `funn` is always in the body
+        // (`attachmentBaseOf`), so this is a round trip for every other edit
+        // rather than a write only the editor triggers.
+        const rec = await updateAttachment(id, {
+          ...body,
+          funn: resolve(body.funn, realFindId),
+        });
         // A sketch that has been drawn on again is the one patch that changes
         // what the record *is* rather than how it is displayed, so its figure
         // is now a picture of the previous drawing. Onto the queue with the
@@ -251,15 +268,6 @@ export const useLocalityDraft = ({
       }
     }
     const realSpecId = new Map<string, string>();
-    // A relation to something the buffer invented and could not write is
-    // dropped rather than sent: a sketch about a funn whose create just failed
-    // is still a sketch, and refusing to save it would lose the drawing over
-    // the label on it.
-    const resolve = (
-      ids: string[] | undefined,
-      map: Map<string, string>,
-    ): string[] =>
-      (ids ?? []).map((id) => map.get(id) ?? id).filter((id) => !isDraftId(id));
     for (const [tmp, body] of Object.entries(d.newSpecs)) {
       try {
         const rec = await createAttachmentSpec(

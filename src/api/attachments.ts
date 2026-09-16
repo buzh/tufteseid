@@ -47,14 +47,22 @@ export type AttachmentRecord = {
   /*
    * Two relations, neither cascading (1700000700).
    *
-   * `funn` is what a drawing is *about* and `over` is which bilder it is a
-   * layer *on* — both seeded at creation from what was on screen. A scene
-   * (§13.7) uses `over` for the other sense the word already carried: the
-   * bilder it is an arrangement of. Neither field has an editor yet; the day
-   * a sketch needs re-pointing is the day it gets a control.
+   * `funn` is **which funn this bilde belongs to** (§13.6, §13.10 step 9) —
+   * on every kind, not only on the sketches it was introduced for, and edited
+   * on the card in edit. It was "what a drawing is about", seeded at creation
+   * and never changeable; widening the meaning cost no migration, and no
+   * record is being reinterpreted, since nothing has ever written more than
+   * one id. `localities/funnGroups.ts` is the only reader: the answer is the
+   * first id that still names an existing funn, because the relation does not
+   * cascade and a dangling one has to read as "none".
    *
-   * Uncascaded is load-bearing for the scene: deleting a member leaves the
-   * arrangement standing with one fewer layer rather than taking it down.
+   * `over` is which bilder something is a layer *on*, seeded at creation from
+   * what was on screen. A scene (§13.7) uses it for the other sense the word
+   * already carried: the bilder it is an arrangement of.
+   *
+   * Uncascaded is load-bearing for both: deleting a member leaves the
+   * arrangement standing with one fewer layer rather than taking it down, and
+   * deleting a funn leaves its images in the lokalitet rather than with it.
    *
    * PocketBase returns `[]` for an unset multiple relation, so these are not
    * optional, but records written before the migration have no key at all —
@@ -82,7 +90,8 @@ export type NewAttachmentInput = {
   // being shared.
   sort?: number;
   hidden?: boolean;
-  // Sketches only, and set once at creation — see AttachmentRecord above.
+  // Seeded at creation — see AttachmentRecord above. `funn` is a sketch's
+  // only producer-set one; every other kind gets its funn from the card.
   funn?: string[];
   over?: string[];
 };

@@ -134,10 +134,11 @@ export const copyLocality = async ({
   let failed = 0;
 
   /*
-   * The original's ids → the copy's, for a sketch's two relations.
+   * The original's ids → the copy's, for the relations.
    *
-   * A sketch says which bilde it is a layer on and which funn it is about, and
-   * those ids mean nothing in a lokalitet that has just minted its own. Left
+   * A bilde says which funn it belongs to and a sketch or a scene says which
+   * bilder it sits over, and those ids mean nothing in a lokalitet that has
+   * just minted its own. Left
    * alone they would be relations to somebody else's records — which the
    * create rules refuse anyway — so they are translated, and whatever cannot
    * be translated is dropped: a File stayed with the original (§8.12) and is
@@ -205,17 +206,22 @@ export const copyLocality = async ({
    * arrived, and a fork whose overlay lost track of which photograph it was
    * traced off is a smaller loss than one that did not copy.
    *
-   * Two kinds carry relations (§13.7): a sketch says what it is drawn over and
-   * about, and a scene says what it is made of. The scene needs one thing more
-   * — its membership is in `meta.layers` as well as in `over`, and both halves
-   * have to name the copy's records or the flatten would be of the original's.
-   * A layer that cannot be translated is dropped by both, which is the same
-   * sentence in two places: the original's Files stayed with the original
-   * (§8.12), so a scene built over one arrives with that layer missing until
-   * `Ta med` brings the File across.
+   * Every View goes through it since step 9, not just the two that carry
+   * `over`: `funn` means "which funn this bilde belongs to" now (§13.6), on
+   * every kind, and a fork that carried the funn and lost which images were
+   * filed under them would arrive with its exhibit unsorted. `over` is still
+   * a sketch's and a scene's — what it is drawn on, what it is made of — and
+   * the scene needs one thing more, since its membership is in `meta.layers`
+   * as well as in `over` and both halves have to name the copy's records or
+   * the flatten would be of the original's. A relation that cannot be
+   * translated is dropped everywhere, which is the same sentence in three
+   * places: the original's Files stayed with the original (§8.12), so a scene
+   * built over one arrives with that layer missing until `Ta med` brings the
+   * File across — and a File taken across afterwards arrives filed under
+   * nothing, because by then there is no map from the original's ids to this
+   * fork's.
    */
   for (const v of views) {
-    if (v.kind !== 'sketch' && v.kind !== 'scene') continue;
     const id = copiedId.get(v.id);
     if (!id) continue;
     const translate = (ids: string[] | undefined) =>

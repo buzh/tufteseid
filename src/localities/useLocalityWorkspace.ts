@@ -120,6 +120,7 @@ import {
   fetchFlyfotoProjectsForBbox,
   type FlyfotoProject,
 } from './flyfotoProjects';
+import { orderedByFunn } from './funnGroups';
 import {
   getFunnExtentOnLayer,
   hideFunnOnLayer,
@@ -730,10 +731,20 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
   // Into the buffer, which is also what makes the drag not snap back: there
   // is no round trip to wait out any more.
+  //
+  // Four columns since step 9, not three: `funn` joined the curation set when
+  // it stopped being something a producer knew and became something the author
+  // says (§13.6). `meta` is still out of the signature, for the reason
+  // `placeUpload` gives — a caption edit must never be able to carry a spec.
   const patchBilde = useCallback(
     (
       rec: AttachmentRecord,
-      patch: { caption?: string; sort?: number; hidden?: boolean },
+      patch: {
+        caption?: string;
+        sort?: number;
+        hidden?: boolean;
+        funn?: string[];
+      },
     ) => {
       mutateDraft((d) =>
         withAttachment(d, rec.id, attachmentBaseOf(rec), patch),
@@ -744,6 +755,24 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
   const setBildeCaption = useCallback(
     (rec: AttachmentRecord, caption: string) => patchBilde(rec, { caption }),
+    [patchBilde],
+  );
+
+  /*
+   * Which funn this bilde belongs to (§13.6, §13.10 step 9).
+   *
+   * One id or none, written as the whole array — "belongs to" is a single
+   * answer, and `funnGroups.ts` reads it back as one. The array is what the
+   * column is, so the editor writes the column rather than a convention on top
+   * of it; a record that somehow held two would be corrected by the first edit
+   * rather than quietly half-read.
+   *
+   * `canEdit` rather than `canAdd`, like the caption beside it: this is an
+   * update, so an admin over somebody else's lokalitet may file their images.
+   */
+  const setBildeFunn = useCallback(
+    (rec: AttachmentRecord, funnId: string | null) =>
+      patchBilde(rec, { funn: funnId ? [funnId] : [] }),
     [patchBilde],
   );
 
@@ -1617,12 +1646,18 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * each call, and the overlay module decides whether to re-render by
    * comparing element arrays by reference — so an uncached parse would look
    * like a new drawing on every keystroke in the name field.
+   *
+   * **In the order [Skisse] lists them** (§13.10 step 9), which since the
+   * pulldown groups by funn is no longer exhibit order. The row's one teaching
+   * claim is that position means depth (§13.1), so a grouping that reordered
+   * the list without reordering the paint would make the pulldown lie about
+   * the map two pixels from where it says it.
    */
   const sceneCache = useRef(new WeakMap<object, SketchScene | null>());
   useEffect(() => {
     const cache = sceneCache.current;
     const overlays: SketchOverlay[] = [];
-    for (const rec of attachmentItems ?? []) {
+    for (const rec of orderedByFunn(attachmentItems ?? [], findItems)) {
       if (rec.kind !== 'sketch' || !rec.meta) continue;
       if (!sketchShown.has(rec.id) || deletedIds.has(rec.id)) continue;
       // The one under the pen is on the surface already; a second copy of it
@@ -1645,6 +1680,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setSketchOverlays(overlays, sketchGroupShown);
   }, [
     attachmentItems,
+    findItems,
     sketchShown,
     sketchOpacity,
     sketchGroupShown,
@@ -3302,6 +3338,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     removeBilde,
     setBildeCaption,
     setBildeHidden,
+    /** Which funn it belongs to (§13.6) — the relation's editor, at last. */
+    setBildeFunn,
     placeUpload,
     unplaceUpload,
     reorderBilde,

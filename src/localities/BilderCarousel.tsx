@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, ConfirmPopover, IconButton, Tooltip } from '../ui';
 import {
   BildeBadges,
+  BildeFunnPicker,
   BilderRail,
   CaptionField,
   MetaLine,
@@ -151,6 +152,13 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                     member — it is [Skisse]'s — so this is still the card's own
                     switch and still agrees with the row, because both press
                     the same set. */}
+                {/* Which funn this image belongs to (§13.6, step 9). First
+                    among the verbs because it is the one that decides where
+                    the card *sits* — in the exhibit it is a chip on the
+                    badges line, and in [Bilde] and [Skisse] it is the heading
+                    the layer appears under. Not a map verb either: filing an
+                    image changes nothing on the ground. */}
+                <BildeFunnPicker ws={ws} rec={active} />
                 <SketchToggleButton ws={ws} rec={active} />
                 <SketchEditButton ws={ws} rec={active} />
                 {/* Not a map verb, which is why it is here and not in the

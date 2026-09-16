@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LocalityRecord } from '../api/localities';
 import { funnHiddenAtom, funnSwitchedOffAtom } from '../localities/atoms';
+import { funnGroupsOf, funnSectionsOf } from '../localities/funnGroups';
 import { FunnList } from '../localities/FunnList';
 import {
   bilderStripOpenAtom,
@@ -426,19 +427,35 @@ const FunnControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
  *
  * The card's own eye (`SketchToggleButton`) is untouched and still correct —
  * both press the same set, so the rail and the row cannot disagree.
+ *
+ * Step 9 grouped it by funn (§13.6), which this group had the most claim to:
+ * `funn` has meant "what this drawing is about" since 1700000700 and was
+ * already seeded from the selected funn, so the tracings of a pit have been
+ * filed under it all along with nothing showing that. The paint order follows
+ * the same list — `useLocalityWorkspace`'s overlay effect walks
+ * `orderedByFunn` for exactly that reason (§13.1).
  */
 const SkisseControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
-  const members = ws.sketchItems.map((rec, i) => ({
-    id: rec.id,
-    // The caption is the author's own name for the drawing and is seeded
-    // "Skisse n" at `Behold skissen`, so it is nearly always there. The
-    // fallback counts this list rather than the record, because a numbering
-    // that skips is worse than one that does not match a caption nobody wrote.
-    label: rec.caption.trim() || t('localities.sketch.caption', { n: i + 1 }),
-    shown: ws.sketchShown.has(rec.id),
-    opacity: ws.sketchOpacity.get(rec.id) ?? 100,
-  }));
+  const groups = funnGroupsOf(ws.sketchItems, ws.findItems);
+  const sections = funnSectionsOf(groups, {
+    none: t('localities.funn.none'),
+    untitled: t('localities.funn.untitled'),
+  });
+  const members = groups
+    .flatMap((g) => g.items)
+    .map((rec, i) => ({
+      id: rec.id,
+      // The caption is the author's own name for the drawing and is seeded
+      // "Skisse n" at `Behold skissen`, so it is nearly always there. The
+      // fallback counts this list rather than the record, because a numbering
+      // that skips is worse than one that does not match a caption nobody
+      // wrote.
+      label: rec.caption.trim() || t('localities.sketch.caption', { n: i + 1 }),
+      shown: ws.sketchShown.has(rec.id),
+      opacity: ws.sketchOpacity.get(rec.id) ?? 100,
+      section: sections?.get(rec.id),
+    }));
 
   if (members.length === 0) return null;
 

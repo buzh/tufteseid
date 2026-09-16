@@ -337,6 +337,11 @@
       "confirmDeleteShort": "Slette funnet?",
       "growConfirmAction": "Utvid området",
       "autoName": "Funn {{n}}",
+      "belongsTo": "Høyrer til",
+      "belongsHint": "Vel kva funn biletet høyrer til. Biletet legg seg under overskrifta til funnet i «Bilde» og «Skisse», og følgjer funnet i utstillinga. Blir lagra når du lagrar.",
+      "none": "Lokaliteten",
+      "untitled": "Utan namn",
+      "badge": "Funn: {{title}}",
       "growHint": "Teikninga går utanfor området til lokaliteten.",
       "growTooLarge": "Området ville blitt større enn {{max}} m på ei side. Flytt teikninga nærare, eller lag ein eigen lokalitet."
     },
