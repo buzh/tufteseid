@@ -596,9 +596,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    *
    * Up here rather than in BilderStrip for two reasons: the strip unmounts
    * when it is folded away, and ←/→ walk it from `useWorkspaceKeys`, which is
-   * mounted here. Since step 6 it says nothing at all about the map: what is
-   * on the ground is `bildeShownAtom`, pressed in [Bilde]'s pulldown, and this
-   * is only where the rail is pointing.
+   * mounted here.
+   *
+   * Since step 6 this said nothing about the map, and **that is reversed** —
+   * see `selectBilde`, defined with the map verbs it now needs.
    */
   const [activeBildeId, setActiveBildeId] = useState<string | null>(null);
 
@@ -627,69 +628,56 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * under the cursor and the pin both remembered in a ref across the fold.
    *
    * Step 6 deleted the whole of it, because the whole of it was undoing
-   * something this hook was doing to itself. Selecting a thumbnail no longer
-   * touches the map, so folding the edge away cannot strand an overlay whose
-   * only control has gone with it: what is on the ground is [Bilde]'s
-   * pulldown, which is on the row and stays on the row. With nothing to drop,
-   * there is nothing to remember and nothing to give back — the cursor simply
-   * stays where it was, and unfolding shows the same card selected.
-   */
-
-  /*
-   * Picking a thumbnail used to *be* "Vis i ruta" (§4.2): the press moved the
-   * cursor and laid that image on the ground, and walking off it took the
-   * image away again. Step 6 separated the two, and the separation is the
-   * point of the step — the rail is where the images are looked at and
-   * [Bilde] is where they are put on the map, so a press here moves the
-   * cursor and nothing else.
-   *
-   * What that ends is a class of surprise the old rule could not avoid.
-   * Selecting-is-pinning meant the ground changed as a side effect of reading
-   * a caption, refused silently on the cards it could not place (no extent, no
-   * file, borrowed from the original), and could hold exactly one image — so
-   * the gesture was at once too eager and unable to do the thing the row now
-   * does with four switches.
-   *
-   * Pressing the active card again still deselects, which is the only way the
-   * rail has to mean "nothing".
+   * something this hook was doing to itself, and it stays deleted now that
+   * selecting a thumbnail shows it again. What made the fold destructive was
+   * that the rail was the image's *only* control, so folding it away hid the
+   * switch that was holding the image up. It is not: what is on the ground is
+   * the layer row's four pulldowns, which are on the row and stay on the row
+   * whatever the bottom edge is doing. So there is still nothing to drop,
+   * nothing to remember and nothing to give back — the cursor stays where it
+   * was, the image stays up, and unfolding shows the same card selected.
    */
 
   /**
-   * Point the rail at a record — for the surface selecting *for* you, as
-   * against `selectBilde`, which is a press and therefore toggles.
+   * Point the rail at a record, and nothing else.
    *
-   * `BilderCarousel` lands on the first image when edit opens, because a
-   * surface entered in order to change something should not make you pick a
-   * subject before you can.
+   * For the surface selecting *for* you, as against `selectBilde`, which is a
+   * press and therefore also changes the map. `BilderCarousel` lands on the
+   * first image when edit opens, because a surface entered in order to change
+   * something should not make you pick a subject before you can — and landing
+   * there must not rearrange the ground on the way in.
    */
   const focusBilde = useCallback((id: string | null) => {
     setActiveBildeId(id);
   }, []);
 
-  const selectBilde = useCallback(
-    (id: string | null) => {
-      setActiveBildeId((cur) => (id === cur ? null : id));
-    },
-    [],
-  );
-
-  // ←/→. Wraps, and never lands on nothing: walking a rail past its end and
-  // getting an empty strip would be a worse answer than starting over.
-  const stepBilde = useCallback(
-    (delta: 1 | -1) => {
-      const items = bilderItems;
-      if (!items || items.length === 0) return;
-      const at = items.findIndex((a) => a.id === activeBildeId);
-      const next =
-        at < 0
-          ? delta > 0
-            ? 0
-            : items.length - 1
-          : (at + delta + items.length) % items.length;
-      setActiveBildeId(items[next].id);
-    },
-    [bilderItems, activeBildeId],
-  );
+  /*
+   * …and the other direction: the cursor follows the map.
+   *
+   * Whenever exactly one bilde is on the map, the rail points at it. That
+   * covers three gestures with one rule — W/S walking `[Visning ▾]`'s ring
+   * (§5.3), a switch pressed in any of the three pulldowns, and the arrival
+   * cover — none of which knows the rail exists, and all of which would
+   * otherwise leave the strip pointing at some other card while the ground
+   * shows this one.
+   *
+   * Exactly one, because that is the only arrangement a single cursor can
+   * describe honestly. Two members up is a comparison and the rail stays
+   * where it is; none up is the empty ground, and blanking the cursor there
+   * would close the detail panel every time someone switched a group off.
+   *
+   * No loop with `selectBilde`: it sets the shown set to the id it just
+   * pointed at, so this fires and finds the cursor already there.
+   */
+  useEffect(() => {
+    const shown = [...visningShown, ...bildeShown, ...sketchShown];
+    if (shown.length !== 1) return;
+    const id = shown[0];
+    // A set is never pruned (§13.4), so it can still name a record that has
+    // left the rail — and the sweep above would only have to undo this.
+    if (!bilderItems?.some((a) => a.id === id)) return;
+    setActiveBildeId((cur) => (cur === id ? cur : id));
+  }, [visningShown, bildeShown, sketchShown, bilderItems]);
 
   /*
    * `Slett bildet` — **not** deferred, unlike every other write in edit.
@@ -2929,6 +2917,115 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     ],
   );
 
+  /*
+   * Pressing a card on the rail: point at it, **and put it on the map**
+   * (docs/lokalitet-view.md §13.2, §13.8).
+   *
+   * That reverses step 6's rule, which was "picking a frame moves the cursor
+   * and nothing else", and the reversal is the whole of this change. Step 6
+   * was right that the rail must not be the *only* way to put an image up —
+   * one image at a time, silently refusing on the cards it could not place,
+   * was too weak for a surface whose point is comparison, and the four
+   * pulldowns are what fixed it. But it left the bottom edge with no map verb
+   * at all, and the bottom edge is where a visitor lands and what they press
+   * first: a row of thumbnails that a reader can click and watch nothing
+   * happen reads as broken, whatever the row above it can do. The author
+   * ordered these images for someone to walk through, and walking through
+   * them has to be the first thing that works.
+   *
+   * Reversed, not undone. Step 6's real content survives it: the pulldowns
+   * are still where several images at once, the fades and the depth order
+   * live, this defers to them by *speaking* their atoms rather than keeping a
+   * pin of its own, and nothing here writes to PocketBase. What comes back is
+   * one line of it — a press is a map gesture again.
+   *
+   * **One slide at a time.** All three sets are replaced, not merged, for
+   * `restoreScene`'s reason: walking a strip means each stop shows what that
+   * stop is, and a screenshot left switched on from two cards ago would be
+   * painting over the extract you just asked for. Building an arrangement is
+   * what the pulldowns and `Oppsett` are for — and a scene, pressed here,
+   * hands straight to `restoreScene`, since a scene *is* a set of layers.
+   *
+   * A card with nothing to show — an unpinned spec is fine, but a File with
+   * no extent, or one borrowed from the original (§7) — moves the cursor and
+   * leaves the map alone. Not blanks it: the reader asked to look at a card,
+   * not to clear the ground, and the card says on its own face why it cannot
+   * be placed.
+   *
+   * No toggle. Pressing the selected card again used to mean "nothing", back
+   * when nothing was cheap; now it would take the image off the ground, and
+   * the card most likely to be pressed twice is the cover the lokalitet opens
+   * on. "Nothing on the map" is the group switches' job, one row up.
+   */
+  const selectBilde = useCallback(
+    (id: string | null) => {
+      setActiveBildeId(id);
+      if (!id) return;
+      const rec = (bilderItems ?? []).find((a) => a.id === id);
+      if (!rec) return;
+      if (rec.kind === 'scene') {
+        restoreScene(rec);
+        return;
+      }
+      // Eligibility is the pulldowns' own — `viewItems` and `fileItems` are
+      // the lists `[Visning ▾]` and `[Bilde ▾]` switch, so a card that can be
+      // shown here is exactly a card with a switch up there.
+      // (`[Skisse ▾]` builds its own list inline from `attachmentItems`, so
+      // the sketch arm spells out the same two conditions: a drawing to show,
+      // and not one that is on its way out.)
+      const visning = viewItems.some((it) => it.id === id);
+      const bilde = fileItems.some((it) => it.id === id);
+      const skisse =
+        rec.kind === 'sketch' && !!rec.meta && !deletedIds.has(id);
+      if (!visning && !bilde && !skisse) return;
+      setVisningShown(visning ? new Set([id]) : new Set<string>());
+      setBildeShown(bilde ? new Set([id]) : new Set<string>());
+      setSketchShown(skisse ? new Set([id]) : new Set<string>());
+      setVisningGroupShown(true);
+      setBildeGroupShown(true);
+      setSketchGroupShown(true);
+      // Asking for an image by name is the user's statement about the stack,
+      // so the arrival guess is spent and the next ground press no longer
+      // reaches in to withdraw it (§10.1).
+      setProvisionalView(null);
+    },
+    [
+      bilderItems,
+      viewItems,
+      fileItems,
+      deletedIds,
+      restoreScene,
+      setVisningShown,
+      setBildeShown,
+      setSketchShown,
+      setVisningGroupShown,
+      setBildeGroupShown,
+      setSketchGroupShown,
+      setProvisionalView,
+    ],
+  );
+
+  // ←/→. Wraps, and never lands on nothing: walking a rail past its end and
+  // getting an empty strip would be a worse answer than starting over. Through
+  // `selectBilde`, so the arrow keys and the pointer are the same gesture —
+  // two ways of walking a sequence that disagreed about whether the map comes
+  // with you would be worse than either.
+  const stepBilde = useCallback(
+    (delta: 1 | -1) => {
+      const items = bilderItems;
+      if (!items || items.length === 0) return;
+      const at = items.findIndex((a) => a.id === activeBildeId);
+      const next =
+        at < 0
+          ? delta > 0
+            ? 0
+            : items.length - 1
+          : (at + delta + items.length) % items.length;
+      selectBilde(items[next].id);
+    },
+    [bilderItems, activeBildeId, selectBilde],
+  );
+
   // The NiB licensing notice. The starter set no longer goes through it: it
   // stopped fetching ortofoto, so consent to NiB's terms is no longer being
   // asked of someone who never asked for a photograph
@@ -3221,7 +3318,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     const cover = attachmentItems.find(
       (a) => !a.hidden && !deletedIds.has(a.id),
     );
-    if (!cover || !isPinned(cover)) return;
+    if (!cover) return;
+    // The rail starts on it too, and starts there whatever the cover turns
+    // out to be: a strip with no cursor has no detail line under it, so a
+    // lokalitet whose first image is a screenshot would open with its bottom
+    // edge saying nothing about the image it is showing you first. Where the
+    // cover *does* reach the ground, the sync effect above would land the
+    // cursor here anyway — this is the case it cannot cover.
+    setActiveBildeId(cover.id);
+    if (!isPinned(cover)) return;
     if (cover.kind !== 'extract' && cover.kind !== 'flyfoto') return;
     setVisningShown(new Set([cover.id]));
     // And it is only a guess until the user has said otherwise: the first

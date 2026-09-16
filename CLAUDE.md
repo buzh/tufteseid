@@ -126,8 +126,16 @@ all of them.
   built it, is where the whole pin mechanism went: `Vis i ruta`,
   `usePinnedBilde`, `BildeTransparency` on the rectangle, the fold/unfold
   restore, and the `Bilder` button's light, which four group labels answer
-  better than one. The rail is no longer a map control at all; picking a frame
-  moves the cursor and nothing else. **Do not add a map verb back to a card.**
+  better than one. Step 6 also made the rail stop being a map control at all —
+  picking a frame moved the cursor and nothing else — and **that half is
+  reversed**: pressing a card shows that card, by standing its own group on it
+  (`selectBilde` in `useLocalityWorkspace`), and the cursor follows the map
+  back whenever exactly one bilde is up, so W/S and the pulldowns keep the
+  strip pointing at what is on the ground. The rule that survives is the one
+  step 6 was actually for: the rail speaks the row's atoms and owns no pin, no
+  fade and no depth order of its own, so several images at once is still the
+  pulldowns' job — and nothing on the rail writes in `show`. A card still may
+  not grow a *verb*; what it has is a press that means "show me this one".
   Step 7 put the uploads in `[Bilde ▾]` without breaking that rule: an upload
   has no georeference, so `Plasser i ruta` on its card
   (`src/localities/uploadPlacement.ts`) gives the *record* an extent — the

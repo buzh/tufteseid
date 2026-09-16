@@ -2,7 +2,6 @@ import { getDefaultStore, useAtomValue, useSetAtom } from 'jotai';
 import { Feature, MapBrowserEvent } from 'ol';
 import BaseEvent from 'ol/events/Event';
 import type { FeatureLike } from 'ol/Feature';
-import MultiLineString from 'ol/geom/MultiLineString';
 import Point from 'ol/geom/Point';
 import { fromExtent as polygonFromExtent } from 'ol/geom/Polygon';
 import VectorLayer from 'ol/layer/Vector';
@@ -34,78 +33,33 @@ let highlightedLocalityId: string | null = null;
  *
  * The rectangle is a frame around the ground, never a tint over it: relief
  * shading is the thing being read, and an interior fill — even at 4 % — is
- * the loudest object on a grey hillshade. So: no fill at all, a thin line
- * cased in white so it survives both dark relief and bright ortofoto, corner
- * brackets to say "this one is open", and the name in a chip pinned to the
- * top-left corner instead of a haloed word across the middle of the view.
+ * the loudest object on a grey hillshade. So: no visible fill, a thin dashed
+ * line cased in white so it survives both dark relief and bright ortofoto,
+ * and the name in a chip pinned to the top-left corner instead of a haloed
+ * word across the middle of the view.
  *
- * Two strengths, and the gap between them is wide on purpose. The open
- * lokalitet is the boundary of what you are working in and draws at full
- * weight. Every *other* one draws faint — dashed, half-alpha, its name chip
- * barely there — because the only question it has to answer is "somebody has
- * framed this ground", and answering it at full weight over the site you are
- * actually reading is what "Skjul merker" used to exist to undo. Fading is
- * the better answer than a switch: it leaves the rectangle clickable, so the
- * way to open a neighbour is still to press it.
+ * It draws faint because the only question it has to answer is "somebody has
+ * framed this ground, and it is called Storevike", and answering *that* at
+ * full weight over the site you are actually reading is what "Skjul merker"
+ * used to exist to undo. Fading is the better answer than a switch: it leaves
+ * the rectangle clickable, so the way to open one is still to press it.
+ *
+ * And the open one draws no line at all — see `styleFor`.
  */
-const FRAME = '#FF6A00';
-const CASING = 'rgba(255, 255, 255, 0.9)';
 const FRAME_FAINT = 'rgba(255, 106, 0, 0.45)';
 const CASING_FAINT = 'rgba(255, 255, 255, 0.4)';
-// Bracket arms are a constant length on screen, not on the ground.
-const BRACKET_PX = 18;
 
-const cornerBrackets = (
-  extent: number[],
-  resolution: number,
-): MultiLineString => {
-  const [minX, minY, maxX, maxY] = extent;
-  // Never longer than a third of a side, or a small rectangle turns into a
-  // solid frame with a gap in the middle of each edge.
-  const a = Math.min(
-    BRACKET_PX * resolution,
-    (maxX - minX) / 3,
-    (maxY - minY) / 3,
-  );
-  return new MultiLineString([
-    [
-      [minX, minY + a],
-      [minX, minY],
-      [minX + a, minY],
-    ],
-    [
-      [maxX - a, minY],
-      [maxX, minY],
-      [maxX, minY + a],
-    ],
-    [
-      [maxX, maxY - a],
-      [maxX, maxY],
-      [maxX - a, maxY],
-    ],
-    [
-      [minX + a, maxY],
-      [minX, maxY],
-      [minX, maxY - a],
-    ],
-  ]);
-};
-
-const nameChip = (name: string, corner: number[], highlighted: boolean) =>
+const nameChip = (name: string, corner: number[]) =>
   new Style({
     geometry: new Point(corner),
     text: new Text({
       text: name,
-      font: `${highlighted ? 600 : 500} 12px sans-serif`,
+      font: '500 12px sans-serif',
       // Faint, but not so faint it stops being readable over a bright
       // ortofoto — the chip is the only thing that says *which* lokalitet
       // the rectangle you are about to click is.
-      fill: new Fill({
-        color: highlighted ? '#ffffff' : 'rgba(58, 24, 0, 0.65)',
-      }),
-      backgroundFill: new Fill({
-        color: highlighted ? FRAME : 'rgba(255, 255, 255, 0.45)',
-      }),
+      fill: new Fill({ color: 'rgba(58, 24, 0, 0.65)' }),
+      backgroundFill: new Fill({ color: 'rgba(255, 255, 255, 0.45)' }),
       padding: [2, 5, 2, 5],
       textAlign: 'left',
       textBaseline: 'bottom',
@@ -115,52 +69,65 @@ const nameChip = (name: string, corner: number[], highlighted: boolean) =>
     }),
   });
 
-const styleFor = (feature: FeatureLike, resolution: number): Style[] => {
+/*
+ * Not decoration: OL hit-detects a polygon's interior by re-executing its
+ * fill and testing the alpha byte, so dropping the fill entirely would make a
+ * rectangle clickable only within a few pixels of its edge — and clicking one
+ * is how you open it. 1 % white is invisible over both hillshade and ortofoto
+ * and still rounds to alpha > 0.
+ */
+const hitFill = new Style({
+  fill: new Fill({ color: 'rgba(255, 255, 255, 0.01)' }),
+});
+
+const styleFor = (feature: FeatureLike): Style[] => {
   const extent = feature.getGeometry()?.getExtent();
   if (!extent) return [];
   const name = (feature.get('name') as string) ?? '';
-  const highlighted =
-    feature.get(LOCALITY_ID_PROPERTY) === highlightedLocalityId;
+
+  /*
+   * **The open lokalitet draws nothing at all** — no frame, no casing, no
+   * corner brackets, no name chip.
+   *
+   * It used to draw at full weight, on the argument that it is the boundary
+   * of what you are working in. But a `?lok=` view is already about one
+   * rectangle and says so everywhere: the row carries its name and code, the
+   * map is sitting on its extent, and every ground, View and sketch is
+   * clipped to it. Nothing is left for the line to disambiguate — while it
+   * *is* a bright orange border laid across the relief the lokalitet exists
+   * to let you read, at the one moment the reading matters most, and worst
+   * exactly at the edges, where a mound running out of the rectangle has to
+   * be seen running out of it.
+   *
+   * Only the paint goes. The feature, the hit fill and everything built on
+   * them stay, so clicking the ground still resolves to this lokalitet and
+   * "Juster området" still hides a rectangle and hands it back
+   * (`hideLocalityOnLayer`, which suppresses the fill too, so the handles get
+   * the clicks).
+   */
+  if (feature.get(LOCALITY_ID_PROPERTY) === highlightedLocalityId) {
+    return [hitFill];
+  }
 
   const styles = [
-    new Style({
-      // Not decoration: OL hit-detects a polygon's interior by re-executing
-      // its fill and testing the alpha byte, so dropping the fill entirely
-      // would make a rectangle clickable only within a few pixels of its
-      // edge — and clicking one is how you open it. 1 % white is invisible
-      // over both hillshade and ortofoto and still rounds to alpha > 0.
-      fill: new Fill({ color: 'rgba(255, 255, 255, 0.01)' }),
-    }),
+    hitFill,
     new Style({
       stroke: new Stroke({
-        color: highlighted ? CASING : CASING_FAINT,
-        width: highlighted ? 4 : 2,
-        lineDash: highlighted ? undefined : [7, 7],
+        color: CASING_FAINT,
+        width: 2,
+        lineDash: [7, 7],
       }),
     }),
     new Style({
       stroke: new Stroke({
-        color: highlighted ? FRAME : FRAME_FAINT,
-        width: highlighted ? 2 : 1,
-        lineDash: highlighted ? undefined : [7, 7],
+        color: FRAME_FAINT,
+        width: 1,
+        lineDash: [7, 7],
       }),
     }),
   ];
 
-  if (highlighted) {
-    styles.push(
-      new Style({
-        geometry: cornerBrackets(extent, resolution),
-        stroke: new Stroke({ color: CASING, width: 6 }),
-      }),
-      new Style({
-        geometry: cornerBrackets(extent, resolution),
-        stroke: new Stroke({ color: FRAME, width: 3 }),
-      }),
-    );
-  }
-
-  if (name) styles.push(nameChip(name, [extent[0], extent[3]], highlighted));
+  if (name) styles.push(nameChip(name, [extent[0], extent[3]]));
   return styles;
 };
 

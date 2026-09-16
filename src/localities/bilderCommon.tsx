@@ -16,6 +16,12 @@
  * `useAttachmentUrl` would be two chances to get the fallback wrong.
  */
 
+// `t` from the module, not from the hook, for the two label helpers below:
+// they are plain functions called from outside a component as often as from
+// inside one (the layer row's pulldowns, an `alt` attribute), and that is the
+// same reason `src/figure/` reads i18next directly. Everything that renders
+// here still uses `useTranslation`, so a language switch still redraws it.
+import { t } from 'i18next';
 import { useSetAtom } from 'jotai';
 import {
   useCallback,
@@ -28,10 +34,12 @@ import {
 import { useTranslation } from 'react-i18next';
 import {
   type AttachmentKind,
+  type AttachmentMeta,
   type AttachmentRecord,
   getAttachmentUrl,
 } from '../api/attachments';
 import type { LocalityFindRecord } from '../api/localityFinds';
+import { dec } from '../figure/draw';
 import {
   Badge,
   Button,
@@ -286,7 +294,7 @@ const Frame = ({
             face.label
           : error
             ? t('localities.bilder.loadFailed')
-            : rec.caption || rec.kind
+            : bildeLabelOf(rec)
       }
       onPointerDown={drag ? (e) => drag.onPointerDown(e, rec.id) : undefined}
       onPointerMove={drag?.onPointerMove}
@@ -304,7 +312,7 @@ const Frame = ({
       ) : url ? (
         <img
           src={url}
-          alt={rec.caption || rec.kind}
+          alt={bildeLabelOf(rec)}
           onError={onError}
           className={styles.frameImage}
         />
@@ -472,29 +480,138 @@ export const BilderRail = ({
   );
 };
 
+const num = (v: unknown): number | null =>
+  typeof v === 'number' && Number.isFinite(v) ? v : null;
+
+/*
+ * The knobs, per visualization — the same switch `terrainSettings` in
+ * `src/figure/specs.ts` makes, reading the stored `meta` where that one reads
+ * the live state.
+ *
+ * Per visualization rather than "print whatever is in `meta`", because
+ * `describe()` records `altitude` and `zFactor` unconditionally to keep the
+ * shape predictable, and they mean nothing on a sky-view factor — a card
+ * reading "Himmelsyn · solhøyde 35°" would be naming a sun that is not in the
+ * picture. The parameters each view actually used are the figure caption's
+ * list, and this is the same list said in one line.
+ *
+ * What is deliberately not here: the constants. VAT's stack, the
+ * multidirectional azimuths and the SVF direction count are the same on every
+ * render ever made, so they distinguish nothing and the figure is where
+ * somebody who needs to rebuild the composite reads them off.
+ */
+const lightParts = (style: string | null, meta: AttachmentMeta): string[] => {
+  const azimuth = num(meta.azimuth);
+  const altitude = num(meta.altitude);
+  const zFactor = num(meta.zFactor);
+  const radius = num(meta.radius);
+  const sun = [
+    altitude != null ? t('figure.set.altitude', { deg: altitude }) : null,
+    zFactor != null ? t('figure.set.zFactor', { z: zFactor }) : null,
+  ].filter((s): s is string => !!s);
+
+  switch (style) {
+    case 'hillshade':
+      return [
+        azimuth != null ? t('figure.set.azimuth', { deg: azimuth }) : null,
+        ...sun,
+      ].filter((s): s is string => !!s);
+    case 'multiHillshade':
+      return sun;
+    case 'slope':
+      return zFactor != null ? [t('figure.set.zFactor', { z: zFactor })] : [];
+    case 'lrm':
+      return radius != null ? [t('figure.set.lrmRadius', { m: radius })] : [];
+    case 'svf':
+      return radius != null ? [t('figure.set.svfRadius', { m: radius })] : [];
+    case 'openPos':
+    case 'openNeg':
+      return radius != null
+        ? [t('figure.set.opennessRadius', { m: radius })]
+        : [];
+    // VAT's sun is frozen and its stretch is absolute — that is what makes two
+    // VAT renders comparable — so it has no knobs to name. Everything else
+    // reaching this line is a WMS style with no knobs either.
+    default:
+      return [];
+  }
+};
+
 /**
- * Dataset · style · resolution, as one line — the record's provenance in the
- * smallest space it fits in.
+ * Dataset · style · model · light · resolution, as one line — the record's
+ * provenance in the smallest space it fits in.
  *
  * A function rather than only a component because [Visning]'s pulldown prints
  * the same line under the same record (§13.4, where the row's label *is* the
  * provenance), and a second reading of `meta` would be a second chance for the
  * card and the layer row to disagree about what an image is.
+ *
+ * **The light belongs here, and leaving it out was the bug.** Eight terrain
+ * renders of one rectangle differ in nothing but azimuth, sun altitude and
+ * z-factor — that is the whole reason somebody keeps eight — so a line that
+ * stopped at "dataset · style" printed the same sentence under all of them and
+ * the rail was eight identical cards. It is the argument §8.10 makes for the
+ * figure caption, one surface earlier: a render without its own azimuth on it
+ * cannot be checked by anyone, and that has to be true of the card as well as
+ * of the PNG, because the card is what a reader walks.
+ *
+ * The parameter strings are `figure.*`, borrowed rather than re-translated,
+ * for exactly that reason — this line and the caption burned into the figure
+ * are two readings of one record and must not word it differently.
  */
 export const metaLineOf = (rec: AttachmentRecord): string | null => {
-  const meta = rec.meta ?? {};
+  const meta: AttachmentMeta = rec.meta ?? {};
+  const style = typeof meta.style === 'string' ? meta.style : null;
+  const metresPerPx = num(meta.metresPerPx);
+
   const parts = [
     typeof meta.sourceLabel === 'string' ? meta.sourceLabel : null,
-    typeof meta.style === 'string' ? meta.style : null,
-    typeof meta.metresPerPx === 'number' ? `${meta.metresPerPx} m/px` : null,
+    // A terrain render's style is a visualization key and has a name in three
+    // languages; a LiDAR extract's is the WMS layer's own (`skyggerelieff`),
+    // which is already the clearest thing anyone could print. One lookup with
+    // a default covers both, since the two vocabularies do not collide.
+    style
+      ? t(`localities.terrain.vis.${style}`, { defaultValue: style })
+      : null,
+    typeof meta.model === 'string'
+      ? t('figure.set.model', { model: meta.model.toUpperCase() })
+      : null,
+    ...lightParts(style, meta),
+    // `dec`, not the raw number: `metresPerPx` is a division and prints as
+    // 0.5001568426393691 if you let it — the resolution of a half-metre grid
+    // stated to the nearest ångström.
+    metresPerPx != null
+      ? t('localities.bilder.mpp', { m: dec(metresPerPx, 2) })
+      : null,
   ].filter((s): s is string => !!s);
   return parts.length > 0 ? parts.join(' · ') : null;
 };
 
+/**
+ * What to call a bilde in one line, wherever one is needed.
+ *
+ * The author's own caption wins; underneath it the provenance line, which for
+ * a kept render says more than any caption would; and only then the kind.
+ * That last step is the whole point of having this: the fallback used to be
+ * the bare `rec.kind`, so a record whose caption never survived its commit
+ * showed up on the rail, in its tooltip and in its alt text as the literal
+ * string `extract`.
+ */
+export const bildeLabelOf = (rec: AttachmentRecord): string =>
+  rec.caption.trim() ||
+  metaLineOf(rec) ||
+  t(`localities.bilder.kind.${rec.kind}`);
+
 export const MetaLine = ({ rec }: { rec: AttachmentRecord }) => {
   const line = metaLineOf(rec);
   if (!line) return null;
-  return <p className={styles.metaLine}>{line}</p>;
+  // `title` because the line truncates: a card's width is not a reason for
+  // the azimuth to be the part that falls off the end.
+  return (
+    <p className={styles.metaLine} title={line}>
+      {line}
+    </p>
+  );
 };
 
 /**

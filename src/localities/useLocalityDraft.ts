@@ -274,6 +274,14 @@ export const useLocalityDraft = ({
           {
             locality: localityId,
             kind: body.kind,
+            // The buffer has carried a caption since `behold()` started
+            // copying one in, and the pending card has been printing it all
+            // along — it just never reached the create payload, so every
+            // View kept in an edit session arrived at PocketBase with
+            // `caption: ''` and fell back to its bare `kind` on every surface
+            // that names it. The update branch above spreads `...body`, which
+            // is why editing an existing record never showed this.
+            caption: body.caption,
             /*
              * A scene names its members twice — in `over` and in `meta.layers`
              * — so both halves need the same translation (§13.7). The

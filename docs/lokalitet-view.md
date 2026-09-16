@@ -637,6 +637,30 @@ to keep: the **record's caption** is what the author says, the **record's
 meta** is what the machine can act on, and the **baked figure caption** is what
 survives the file leaving the app.
 
+**Two ways that broke, both fixed, and worth writing down because the shape
+above is what made them invisible.**
+
+The caption never reached the server. `useLocalityDraft`'s commit built the
+`createAttachmentSpec` payload field by field and had no `caption` in it, so
+every View kept inside an edit session — the whole of `Behold`, the terrain
+tool's keep, the flyfoto grab — arrived with `caption: ''`. Nothing looked
+wrong while you were authoring: the buffer carried the caption and the pending
+card printed it, so the loss only appeared after `Lagre`, and only to whoever
+read the lokalitet next. (The *update* branch spreads `...body`, which is why
+re-captioning an existing record always worked and why this survived so long.)
+
+And `metaLineOf` was not carrying the third copy's weight. With the caption
+gone, the provenance line is the only thing left that can tell two renders of
+one rectangle apart — and it printed source, style and a raw
+`0.5001568426393691 m/px`, omitting exactly the parameters that differ:
+azimuth, sun altitude, z-factor, the horizon radius. Eight hillshades of one
+hillside became eight identical cards labelled `extract`. It now prints the
+same per-visualization parameter list the figure caption does (`terrainSettings`
+in `src/figure/specs.ts`), through the same `figure.set.*` strings, so the card
+and the burned-in caption cannot word it differently — which is §8.10's
+argument applied one surface earlier: *a render without its own azimuth on it
+cannot be checked by anyone*, and the card is what a reader actually walks.
+
 ### 4.6 Terreng in show mode seeds from the site's own render
 
 Small, cheap, and it makes show mode mean something for the live tools too:
@@ -882,7 +906,11 @@ at all now. A rectangle that is not the one you have open draws faint
 (`localityLayer.ts`): dashed, half-alpha, its name chip barely there. That
 answers the same complaint the switch existed for, without a control to find,
 and it leaves the rectangle clickable, so opening a neighbour is still a
-press on it.
+press on it. The one you *do* have open draws no line at all — the view is
+already about that rectangle in every other way, so the frame had nothing left
+to say and a bright border across the relief is the last thing this view
+wants. It keeps its invisible hit fill, so it is still clickable and still
+adjustable (`docs/ui-architecture.md` §8.6).
 
 ### 5.6 What the transaction actually costs
 
@@ -1676,7 +1704,9 @@ complete**: `src/shell/LayerGroup.tsx` is the `[thing ▾]` control and all four
 of [Visning], [Bilde], [Skisse] and [Funn] wear it, left to right in the map's
 own z-order. With [Visning] the ground itself became a member and `Gjenskap`
 left the bilde cards for its pulldown; with [Bilde] `Vis i ruta` went entirely,
-and selecting a thumbnail stopped being a map gesture. §4.1, §4.1.1 and §4.1.2
+and selecting a thumbnail stopped carrying a pin of its own — it presses the
+row's switches instead, which is the correction in §13.10 step 6's postscript.
+§4.1, §4.1.1 and §4.1.2
 survive unchanged: a View is still a spec, a File is still bytes, and the pin
 is still a pin. What changes is who decides what is on the map.
 
@@ -2274,12 +2304,16 @@ Three sequencing rules, and as in §12 they are worth more than the list.
      and `selectBilde` only moves the cursor. That ends a class of surprise the
      old rule could not avoid: the ground changed as a side effect of reading a
      caption, refused silently on the cards it could not place, and could hold
-     one image.
+     one image. (**Half of this was later reversed** — a press shows the card
+     again, through the row's own switches. The postscript below is the whole
+     of the change.)
    - **The fold/unfold restore went with it.** `Bilder` pressed shut used to
      put the pinned image down and remember it, because an overlay whose only
      control has been folded away is stranded. [Bilde] is on the row and stays
      on the row, so there is nothing to drop, nothing to remember and nothing
-     to give back — the cursor simply stays where it was.
+     to give back — the cursor simply stays where it was. (Still true after the
+     reversal, and for the same reason: the switch holding the image up is the
+     row's, not the rail's, so folding the rail away cannot strand it.)
    - **`over` on a new sketch stopped being "the pinned File".** It is now
      every layer that was under the pen, in row order: [Visning]'s shown
      members, then [Bilde]'s. The ground preset is not in it and cannot be —
@@ -2305,6 +2339,52 @@ Three sequencing rules, and as in §12 they are worth more than the list.
    with it. What outlives it is an id in a set nothing lists, which the
    close/swap cleanup empties along with the other six switches.
 
+   ---
+
+   **Postscript: the press comes back.** Step 6 ended with *the rail is no
+   longer a map control at all; picking a frame moves the cursor and nothing
+   else*, and that sentence went one clause too far. It was reported from the
+   other end, by someone opening a shared lokalitet as a reader: the filmstrip
+   is the first thing at the bottom of the screen, its frames look like
+   buttons, and pressing one did nothing a visitor could see. The images an
+   author kept and *ordered* are the content of a shared lokalitet, and walking
+   them has to be the first interaction that works — a reader should not have
+   to find a pulldown on a row above the map to see the second reading of a
+   rectangle.
+
+   So `selectBilde` shows the card again. What matters is *how*, because step 6
+   was right about everything it deleted and none of it comes back:
+
+   - It **presses the row's atoms** — `visningShownAtom`, `bildeShownAtom`,
+     `sketchShownAtom` — rather than holding a pin. There is still exactly one
+     mechanism putting images on the ground, and the rail is a second caller of
+     it, the way [Visning] and [Bilde] are two callers of
+     `setGroundOverlayStack`.
+   - **Eligibility is the pulldowns' own.** A card is showable here iff it has
+     a switch up there (`viewItems`, `fileItems`, and [Skisse]'s two conditions
+     for a sketch); a `scene` hands to `restoreScene`, since a scene *is* an
+     arrangement. Anything else — an unplaced upload, a File borrowed from the
+     original — moves the cursor and leaves the map alone, which is the honest
+     answer and not the silent refusal step 6 objected to, because the card
+     says on its own face why it cannot be placed.
+   - **One member at a time**, all three sets replaced. Walking a strip means
+     each stop shows that stop. Several at once, the fades and the depth order
+     are still the pulldowns', and that is still the division of labour: the
+     rail walks a sequence, the row composes a stack.
+   - **And the cursor follows the map back.** Whenever exactly one bilde is
+     shown, the rail points at it — so W/S on [Visning]'s ring (§5.3), a switch
+     pressed in a pulldown and the arrival cover all keep the strip honest
+     without knowing it exists. Exactly one, because one cursor cannot describe
+     a comparison, and blanking it on zero would close the detail panel every
+     time a group was switched off.
+   - **No toggle.** A press re-asserts rather than clearing, because the card
+     most likely to be pressed twice is the cover the lokalitet opens on
+     (§10.1). "Nothing on the map" is a group switch, one row up.
+
+   The rule that survives, and should be quoted instead of the old one: **a
+   card may press the row, but may not own map machinery.** No pin, no fade, no
+   depth order, no arbiter, and nothing on the rail writes in `show`.
+
 7. **The upload opt-in** (§13.5). **Built.** `src/localities/uploadPlacement.ts`
    is the whole primitive: `imageAspectOf` reads the file's width ÷ height off
    its 800 px thumbnail, and `assumedExtentOf` returns the largest rectangle of
@@ -2316,8 +2396,9 @@ Three sequencing rules, and as in §12 they are worth more than the list.
    be able to do something" — turned out to be the upload gate as well. An
    upload is not a second case in [Bilde]; it is the same case arriving later.
 
-   **The verb is on the card, and that does not reopen step 6's rule.** *Do not
-   add a map verb back to a card* survives because this is not one: pressing
+   **The verb is on the card, and that does not reopen step 6's rule.** *A card
+   may press the row, but may not own map machinery* survives because this is
+   neither: pressing
    `Plasser i ruta` shows nothing and hides nothing, it gives a record an
    extent — an edit of the same kind as a caption or a concealment, which is
    why it sits with those in the carousel's detail row and is buffered like

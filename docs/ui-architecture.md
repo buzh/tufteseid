@@ -2382,16 +2382,32 @@ fit a shape since moved back inside.
 
 **A frame around the ground, never a tint over it.** Relief shading is the thing
 being read, and an interior fill — even at 4 % — is the loudest object on a grey
-hillshade. So `localityLayer.ts` draws no fill, a thin line cased in white so it
-survives both dark relief and bright ortofoto, corner brackets to say "this one
-is open", and the name in a chip pinned to the top-left corner instead of a
-haloed word across the middle of the view. `funnLayer.ts`'s default is the same
-treatment: white casing under an orange stroke, fill at 0.12.
+hillshade. So `localityLayer.ts` draws no visible fill, a thin dashed line cased
+in white so it survives both dark relief and bright ortofoto, and the name in a
+chip pinned to the top-left corner instead of a haloed word across the middle of
+the view. `funnLayer.ts`'s default is the same treatment: white casing under an
+orange stroke, fill at 0.12.
 
-One catch worth not rediscovering: the rectangle keeps a **1 % white fill**.
+**And the open lokalitet draws nothing at all.** No frame, no casing, no corner
+brackets, no name chip — `styleFor` returns the hit fill alone as soon as the
+feature is the highlighted one. It used to draw at *full* weight, on the
+argument that it is the boundary of what you are working in; the argument does
+not survive contact with a `?lok=` view, where nothing is left for the line to
+disambiguate. The row already carries the name and the code, the map is sitting
+on the rectangle's extent, and every ground, View and sketch is clipped to it.
+What the line still does is lay a bright orange border across the relief the
+lokalitet exists to let you read, at the one moment the reading matters most,
+and worst exactly at the edges — which is where a mound running out of the
+rectangle has to be seen running out of it.
+
+One catch worth not rediscovering, and the reason "draws nothing" is not
+literal: the rectangle keeps a **1 % white fill**, in both states.
 OpenLayers hit-detects a polygon's interior by re-executing its fill and testing
 the alpha byte, so dropping the fill entirely would make a rectangle clickable
-only within a few pixels of its edge — and clicking one is how you open it.
+only within a few pixels of its edge — and clicking one is how you open it. So
+the feature, the hit detection and everything built on them are unchanged; only
+the paint is gone. ("Juster området" is separate again: `hideLocalityOnLayer`
+suppresses the fill too while the handles are up, so they get the clicks.)
 
 `useFunnPointer` (mounted in `useMapSideEffects`) completes the link the list
 already had in one direction: hovering or clicking a funn *on the map* writes
@@ -2524,9 +2540,8 @@ The rectangles have no switch at all now. A lokalitet that is not the open one
 draws faint instead — dashed, half-alpha casing and frame, its name chip at
 45 % (`styleFor` in `localityLayer.ts`) — which answers the same complaint
 without a control to find, and leaves the rectangle clickable, so opening a
-neighbour is still a press on it. The open one keeps its full-strength frame
-and corner brackets: it is the boundary of what you are working in, and it is
-a frame rather than a fill, so it is not the thing in your way.
+neighbour is still a press on it. The open one draws no line at all, which is
+the same answer taken to its end: see §8.6.
 
 ### 8.7 The attachment pipeline
 
@@ -2602,11 +2617,12 @@ is the whole reason this section exists.
 used to *be* the gesture — **selecting was pinning** — and the map held one
 image at a time, arbitrated against the live terrain render. The layer row
 (`docs/lokalitet-view.md` §13) replaced all of that in two steps, and as of
-§13.10 step 6 the rail has no ground verbs left at all:
+§13.10 step 6 the rail owns no ground machinery at all — it presses the row's
+switches and keeps nothing (see "the rail shows what it points at", §8.7.2):
 
 | was, on the card | is, on the lokalitet row |
 | --- | --- |
-| picking a frame laid it down | picking a frame moves the cursor, and nothing else |
+| picking a frame laid it down, as its own pin | picking a frame presses the member's switch in the group that owns it |
 | `Vis i ruta` / `Ta av ruta`, one image | a switch per member in [Visning] and [Bilde] (§10.1), several down at once |
 | `Transparens` on the rectangle's corner (§8.7.5) | a fade under each member's switch |
 | `Gjenskap` on the card | the trailing verb on each View row (§10.1) |
@@ -2751,7 +2767,7 @@ transient by construction:
 | shape | a rail of 88×64 frames, a detail line under it | the same |
 | hidden records | absent | present, dashed and marked |
 | caption | `readOnly` (§8.1) | editable, committed on blur |
-| the map | nothing — picking a frame moves the cursor (§13.10 step 6) | the same |
+| the map | picking a frame shows that bilde, by pressing its member switch on the row | the same |
 | order | none | drag a frame along the rail, or `arrow_back` / `arrow_forward` in the detail row |
 | conceal, delete | absent | in the detail row |
 | place an upload (§13.5) | absent | in the detail row, uploads only |
@@ -2776,13 +2792,47 @@ Three things that read as arbitrary until you try the alternative:
   `canEdit &&` scattered through it is how a greyed-out delete button ends up
   on a stranger's lokalitet — and the shared geometry does not weaken that,
   because what the two files hold is the verb row, not the layout.
-- **Walking the rail does not touch the map, in either stance** (§8.7.1). It
-  did in both until `docs/lokalitet-view.md` §13.10 step 6, and the two verbs
-  it carried are [Bilde]'s pulldown now. `focusBilde` and `selectBilde` are
-  what is left, and they differ only in that a press toggles.
+- **The rail shows what it points at, in either stance** — and it does so by
+  *pressing the row*, never by keeping a pin of its own. `selectBilde` in
+  `useLocalityWorkspace` puts the record's id into `visningShownAtom`,
+  `bildeShownAtom` or `sketchShownAtom` — whichever group lists it, using the
+  group's own eligibility (`viewItems` / `fileItems`) — switches all three
+  groups on, spends the arrival latch (§10.1), and hands a `scene` straight to
+  `restoreScene`. One member at a time: all three sets are replaced, so each
+  stop on the strip shows that stop and not the leftovers of the last two.
+  `stepBilde` (← / →, and the chevrons at each end of the rail) goes through
+  the same call, so the keyboard and the pointer are one gesture. A card with
+  nothing to place — a File with no extent, one borrowed from the original
+  (§8.12) — moves the cursor and leaves the map alone.
+
+  And the cursor follows back: whenever exactly one bilde is on the map, the
+  rail points at it. That is what keeps W/S (§5.3), a switch pressed in a
+  pulldown, and the arrival cover from leaving the strip pointing somewhere
+  else. Exactly one, because two members up is a comparison that one cursor
+  cannot describe, and none up would blank the detail panel every time a group
+  was switched off.
+
+  `focusBilde` is the quiet half — move the cursor, touch nothing — for a
+  surface selecting on your behalf, which is how `BilderCarousel` lands on the
+  first image without rearranging the ground on the way in. Neither toggles:
+  pressing the selected card again re-asserts it, because the card most likely
+  to be pressed twice is the cover a lokalitet opens on, and "nothing on the
+  map" is the group switches' job one row up.
+
+  **This reverses step 6's "picking a frame moves the cursor and nothing
+  else"**, deliberately and only that far. Step 6's argument was sound about
+  what it deleted — a rail that could hold exactly one image, arbitrated
+  against the live terrain render, refusing in silence on the cards it could
+  not place — and none of that comes back: the pin mechanism, the fade and the
+  depth order stay the row's. What came back is one press. The bottom edge is
+  where a visitor lands and the first thing they try, and a row of thumbnails
+  that a reader clicks to no effect reads as broken however capable the row
+  above it is — which is exactly how it was reported.
 - **`Plasser i ruta` is on the card, and it is not a map verb.** The rule step
-  6 left behind is *do not add a map verb back to a card*, and the upload
-  opt-in (`docs/lokalitet-view.md` §13.5, §13.10 step 7) does not break it:
+  6 left behind is that a card may not grow map *machinery* of its own — a
+  press that speaks the row's atoms is the whole of what it may do — and the
+  upload opt-in (`docs/lokalitet-view.md` §13.5, §13.10 step 7) is not even
+  that:
   pressing it shows nothing and hides nothing, it writes `meta.bbox25833` —
   an edit of the same kind as a caption or a concealment, which is why it sits
   with those and is buffered into the transaction like those. What it buys is a
@@ -2803,11 +2853,12 @@ Three things that read as arbitrary until you try the alternative:
   and `BilderStrip` omits it, so drag is not a thing show has and suppresses —
   the hook is never armed there at all.
 
-The shared vocabulary — the image URL and its thumb fallback, the meta line,
-the caption
+The shared vocabulary — the image URL and its thumb fallback, the caption
 field, the pin face (§8.7.4), the provenance line
 (`metaLineOf`, which [Visning]'s rows read too, so the card and the pulldown
-cannot disagree about what an image is) and Åpne originalen —
+cannot disagree about what an image is), the one-line label built on it
+(`bildeLabelOf` — caption, else the provenance line, else the kind's name, and
+*never* the raw enum) and Åpne originalen —
 is `src/localities/bilderCommon.tsx`, and since the two stances are one shape
 the geometry is shared too: `bilderCommon.module.css` owns the whole bottom
 edge, and neither surface has a stylesheet of its own.
@@ -4189,13 +4240,14 @@ on writes nothing and holding a reading up against the image it was made over
 is the whole reason the two are stored apart; and `Rediger skissen` in edit,
 which is `resumeSketch` — the scene back under the pen, the stored copy taken
 off the map while it is there so the old strokes do not show through the new
-ones. The eye is the *only* map verb left on the rail: `Vis i ruta` was deleted
-in step 6 and a sketch never had it anyway, since laying a figure into the
-ground level would have put a white image with a caption panel over the very
-thing it annotates. That refusal is now structural rather than a check — a
+ones. The eye is the only map *verb* left on the rail — `Vis i ruta` was
+deleted in step 6 and a sketch never had it anyway, since laying a figure into
+the ground level would have put a white image with a caption panel over the
+very thing it annotates. That refusal is structural rather than a check: a
 sketch is not in `fileItems` or `viewItems`, so there is no row in [Bilde] or
-[Visning] for it to be refused on, and the eye it does have presses the same
-`sketchShownAtom` that [Skisse] presses.
+[Visning] for it to be refused on, and both the eye and a press on the card
+itself (§8.7.2) go to the same `sketchShownAtom` that [Skisse] presses — the
+drawing, never a figure of it.
 
 **And the whole set has one button, `[Skisse ▾]`** — the first built of the
 layer row's four groups (§8.1, `docs/lokalitet-view.md` §13.10 step 3;
@@ -5259,8 +5311,8 @@ they render.
 **Keep it**
 walk the images along the bottom of the map, with ← / → or the chevrons — a
 rail of small frames in both stances, with the write verbs under it while you
-are editing, and nothing there touching the map — picking a frame moves the
-cursor and that is all;
+are editing — and each frame you land on goes up on the ground, so walking the
+rail is walking the readings their author ordered for you;
 switch an extract, terrain render or flyfoto onto the ground from
 **[Visning ▾]**, and a screenshot from **[Bilde ▾]**, one or several at once,
 each with its own fade, over or instead of the live ground — and press a
