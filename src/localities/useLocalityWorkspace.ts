@@ -92,6 +92,7 @@ import {
   lidarSpecMeta,
   NIB_MOSAIC_KEY,
 } from './behold';
+import { bilderRingAtom } from './bilderRing';
 import { copyLocality, type CopyProgress } from './copyLocality';
 import {
   attachmentBaseOf,
@@ -3046,6 +3047,46 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [bilderItems, activeBildeId, selectBilde],
   );
 
+  /*
+   * Who may walk the rail: a strip that is open, not covered by the pen, and
+   * holding more than one frame. Both spellings are gated on it — ←/→ below,
+   * and A/D from row 1, through `railWalkable` — so the two cannot disagree
+   * about whose the strip is, which is also what lets the LiDAR style heading
+   * say which ring it is advertising (`bilderRing.ts`).
+   */
+  const stripNavigable =
+    stripOpen && !draftActive && (bilderItems?.length ?? 0) > 1;
+
+  /*
+   * …and not while a picker run is up. `useWorkspaceKeys` already stands ←/→
+   * down for the run by handling them itself first (§8.4), but A/D arrive
+   * through the *other* listener, which knows nothing about pickers — so the
+   * run's claim on the keyboard has to be made here, where the rail says
+   * whether it is walkable at all. Walking the collection behind a surface
+   * whose whole job is one decision at a time is the case that rule is for.
+   */
+  const railWalkable = stripNavigable && picker.run == null;
+
+  // A/D reach the rail across the sibling gap, so what crosses is the
+  // primitive plus a delegate that stays the same object while `stepBilde`
+  // underneath it is rebuilt on every cursor move. The ref is written in an
+  // effect rather than in the render body: a ref assignment during render is
+  // exactly the thing `react(refs)` is about, and the keyboard only ever reads
+  // it after a commit anyway.
+  const stepRef = useRef(stepBilde);
+  useEffect(() => {
+    stepRef.current = stepBilde;
+  }, [stepBilde]);
+  const stepDelegate = useCallback(
+    (delta: 1 | -1) => stepRef.current(delta),
+    [],
+  );
+  const setBilderRing = useSetAtom(bilderRingAtom);
+  useEffect(() => {
+    setBilderRing({ walkable: railWalkable, step: stepDelegate });
+    return () => setBilderRing(null);
+  }, [railWalkable, stepDelegate, setBilderRing]);
+
   // The NiB licensing notice. The starter set no longer goes through it: it
   // stopped fetching ortofoto, so consent to NiB's terms is no longer being
   // asked of someone who never asked for a photograph
@@ -3224,10 +3265,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // ←/→ walk the filmstrip (§4.3), and only while there is a strip to walk:
     // OpenLayers' KeyboardPan has these keys otherwise, and taking panning
     // away from a map with no images on the edge of it would be a straight
-    // loss. The ground deliberately does not move as you step, which is the
-    // whole trick — each press is another reading of the same rectangle, in
+    // loss. A/D do the same thing on the same gate, published for row 1 above;
+    // stepping either way goes through `selectBilde`, so the ground follows
+    // the cursor and each press is another reading of the same rectangle, in
     // register.
-    stripNavigable: stripOpen && !draftActive && (bilderItems?.length ?? 0) > 1,
+    stripNavigable,
     onStepBilde: stepBilde,
 
     // The picker layer (§4.3). It stands every binding above down while a run

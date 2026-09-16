@@ -16,8 +16,12 @@ import { infoToolAtom } from './featureInfo/infoTool';
  *
  * A/D (style), W/S (dataset), E (DTM/DOM) then move *within* a mode. W/S
  * walks whichever ring the active mode has: LiDAR acquisitions in LiDAR mode,
- * ortofoto acquisitions in flyfoto mode. A/D and E are LiDAR-only.
- * docs/ui-architecture.md §5.3.
+ * ortofoto acquisitions in flyfoto mode. E is LiDAR-only, and so is A/D as
+ * long as the ground owns it — inside a lokalitet both pairs are reassigned,
+ * W/S to `[Visning ▾]` (src/shell/visningRing.ts) and A/D to the bilder rail
+ * (src/localities/bilderRing.ts). The routing is `useGroundMode.cycle`, not
+ * this listener: one handler answers, and which ring it walks is its own
+ * decision. docs/ui-architecture.md §5.3.
  *
  * H takes the funn off the map and puts them back, I arms Stedsinfo so
  * a click asks the registers about a point, and C flips which half of the

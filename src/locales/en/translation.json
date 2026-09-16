@@ -721,7 +721,7 @@
       "filterMinArea": "Minimum share of the view: {{percent}}%",
       "filterReset": "Reset filter",
       "styleLabel": "Visualization",
-      "styleHead": "Visualization · A/D",
+      "styleHead": "Visualization",
       "moreStyles": "{{count}} more styles",
       "modelLabel": "Elevation model",
       "modelTip": "DTM = terrain (vegetation removed), DOM = surface (buildings and trees). Switch with E"

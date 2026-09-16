@@ -1,6 +1,7 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useRef } from 'react';
 import { activeLocalityAtom } from '../localities/atoms';
+import { cycleBilderAtom } from '../localities/bilderRing';
 import { ribbonToolAtom } from '../localities/toolAtoms';
 import { focusedHalfAtom } from '../map/compare/halves';
 import { spendProvisionalViewAtom } from '../map/groundOverlay';
@@ -111,9 +112,10 @@ export const useGroundMode = (
   // which half everything below sets and reports. Always 'a' with the curtain
   // down, so nothing here changes for the ordinary single-ground case.
   const half = useAtomValue(focusedHalfAtom);
-  // The lokalitet's own ring, which takes W/S ahead of the ground's — see
-  // `cycle` below.
+  // The lokalitet's own two rings, which take W/S and A/D ahead of the
+  // ground's — see `cycle` below.
   const cycleVisning = useSetAtom(cycleVisningAtom);
+  const cycleBilder = useSetAtom(cycleBilderAtom);
   // The arrival cover's latch — see `select` below.
   const spendProvisional = useSetAtom(spendProvisionalViewAtom);
 
@@ -236,7 +238,8 @@ export const useGroundMode = (
   }, [modifiers, lidarStandDown, flyfotoStandDown, terrainStandDown]);
 
   // A/D/W/S/E go to the ring of the ground on screen — after the lokalitet's
-  // own, which takes W/S where there is one to take (see below). The
+  // own two, which take W/S and A/D where there is a ring to take them (see
+  // below). The
   // four control hooks each know *how* to walk their own ring but cannot see
   // which ground is up from where they sit, so whether they are asked at all
   // is decided here — otherwise W/S in Terreng would walk an invisible
@@ -266,6 +269,16 @@ export const useGroundMode = (
      */
     if (key === 'w' || key === 's') {
       if (cycleVisning(key === 's' ? 1 : -1)) return true;
+    }
+    /*
+     * And A/D belong to the bilder rail on the same terms (`bilderRing.ts`):
+     * one pair of keys for choosing what is on the ground, another for walking
+     * the exhibit, both of them the lokalitet's while there is a lokalitet to
+     * walk. What declines here is the LiDAR style ring, which is a pulldown
+     * away and says so in its heading.
+     */
+    if (key === 'a' || key === 'd') {
+      if (cycleBilder(key === 'd' ? 1 : -1)) return true;
     }
     switch (modifiers) {
       case 'standard':

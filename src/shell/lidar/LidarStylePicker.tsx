@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLidarStyleRingHint } from '../../localities/bilderRing';
 import { Button, CountBadge, Popover } from '../../ui';
 import { PulldownDisclosure, PulldownItem } from '../Pulldown';
 import styles from '../Pulldown.module.css';
@@ -8,7 +9,9 @@ import type { LidarControls } from './useLidarControls';
 /**
  * Which styled variant of the active dataset to render — hillshade, slope,
  * and whatever else the WMS publishes for it. Rarer ones sit behind "flere
- * stiler"; the short list above is the same ring A/D walks.
+ * stiler"; the short list above is the same ring A/D walks — when it has A/D,
+ * which inside a lokalitet with a bilder rail it does not
+ * (`src/localities/bilderRing.ts`). Hence the composed heading.
  *
  * Rendered only when the dataset publishes more than one. The national
  * mosaic and everything in DOM mode publish exactly one, and a pulldown with
@@ -17,6 +20,7 @@ import type { LidarControls } from './useLidarControls';
 export const LidarStylePicker = ({ lidar }: { lidar: LidarControls }) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const hint = useLidarStyleRingHint();
 
   const pick = (style: string) => {
     lidar.setActiveLidarStyle(style);
@@ -51,7 +55,10 @@ export const LidarStylePicker = ({ lidar }: { lidar: LidarControls }) => {
       }
     >
       <div className={styles.head}>
-        <span>{t('ribbon.lidar.styleHead')}</span>
+        <span>
+          {t('ribbon.lidar.styleHead')}
+          {hint}
+        </span>
       </div>
       {lidar.tierAStyles.map((style) => (
         <PulldownItem

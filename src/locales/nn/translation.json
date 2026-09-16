@@ -721,7 +721,7 @@
       "filterMinArea": "Minste del av synsfeltet: {{percent}}%",
       "filterReset": "Tilbakestill filter",
       "styleLabel": "Visingsstil",
-      "styleHead": "Visingsstil · A/D",
+      "styleHead": "Visingsstil",
       "moreStyles": "{{count}} fleire stilar",
       "modelLabel": "Høgdemodell",
       "modelTip": "DTM = terreng (vegetasjon fjerna), DOM = overflate (bygg og tre). Byt med E"

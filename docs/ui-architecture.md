@@ -860,10 +860,23 @@ thing to peek back to.
   places it declines and the ground's ring answers as before — a lokalitet
   with nothing kept yet (a one-stop ring is no ring), and the compare
   curtain's B half, since `C W W C` is the whole argument for walking the
-  *focused* half's datasets and the group belongs to A. A/D and E are
-  untouched, so DTM/DOM and the LiDAR style stay on the keyboard throughout.
-- **E** — toggle DTM / DOM. In Terreng too: it has the same pair on its strip,
-  and it is the same question about the same laser data.
+  *focused* half's datasets and the group belongs to A.
+- **A / D inside a lokalitet with a bilder rail** — the same two keys, walking
+  the filmstrip instead (§8.7.2, `src/localities/bilderRing.ts`). ←/→ have
+  always done this, but those keys are OpenLayers' horizontal pan on loan and
+  they are also what a hand already on the map is using; A/D are what the rest
+  of the app reserves for stepping a list. Same gate as the arrows
+  (`stripNavigable`: a strip open, the pen up, more than one frame) and the
+  same path, `selectBilde` — so the cursor, the pointer and the ground agree,
+  and a press is another reading of the same rectangle in register. The same
+  **reassignment, not fallback** rule as W/S, with the same two declines (no
+  rail worth walking, and the curtain's B half), and the same cost: inside a
+  lokalitet the **LiDAR style ring is the pulldown's**, which is why its
+  heading composes `· A/D` rather than translating it. So the two pairs read
+  together — W/S chooses what is on the ground, A/D walks the exhibit.
+- **E** — toggle DTM / DOM, untouched by either reassignment, so the model
+  pair stays on the keyboard throughout. In Terreng too: it has the same pair
+  on its strip, and it is the same question about the same laser data.
 
 Terreng was the exception here until 2026-09-11 — "a client-side render has no
 dataset ring", which was true of five visualizations on a segmented control and
@@ -2251,6 +2264,7 @@ the overlay actually took focus.
 |---|---|
 | ↑ / ↓ | Move funn selection (only when `navigable`); in **show**, zoom to each as you land on it |
 | ← / → | Walk the filmstrip (only when `stripNavigable`) |
+| A / D | The same walk, from row 1's cycling listener (§5.3) |
 | Enter | Zoom to selected funn (only when `navigable`) |
 | N | Arm drawing / put the pen down — the same toggle as the lokalitet-row button the key is advertised on |
 | U | Toggle the LiDAR-uttrekk dialog |
@@ -2296,9 +2310,22 @@ thing you are about to act on and moving the map under a pen is hostile.
 `stripNavigable` is narrower — the strip has to be unfolded, no draft open, and
 more than one image in it. Anything less and ← / → fall through to
 OpenLayers' `KeyboardPan`, which is what they mean when there is no strip to
-walk. They move the rail and nothing else — selecting a frame stopped touching
-the map at `docs/lokalitet-view.md` §13.10 step 6 (§8.7.1) — and the selected
-frame scrolls itself into view.
+walk. A step goes through `selectBilde`, so it stands the frame's own group on
+it and the ground follows the cursor (§8.7.1 — step 6's "the rail is not a map
+control" held for one release and was reversed); the selected frame scrolls
+itself into view.
+
+**A / D are the same walk on the same gate**, published for row 1's cycling
+listener rather than handled here (`src/localities/bilderRing.ts`, §5.3). The
+arrows are borrowed from `KeyboardPan` and are also what a hand on the map is
+already using; A/D are what every other list in this app is walked with. They
+are the one binding of the lokalitet's that lives in the *other* listener,
+because that is where the ring they displace — the LiDAR style ring — is
+routed, and two listeners racing for one key by registration order is exactly
+what `useGroundMode.cycle` exists to avoid. The price of living over there is
+that the picker run's claim on the keyboard has to be made explicitly: the run
+swallows ← / → by handling them first, which A/D never reach, so the rail
+reports itself unwalkable for the duration instead.
 
 That Escape carve-out is deliberate: Excalidraw binds Escape to abort the
 shape currently being drawn and to drop a selection, and stealing it would
@@ -2307,7 +2334,8 @@ no longer the data-loss risk it was — everything already drawn is a buffered
 record by then.
 
 Row 1's map keys (1–5, hold X, A/D/W/S/E) are a separate listener and keep
-working throughout; see §5.3.
+working throughout; see §5.3 — though inside a lokalitet two of those pairs
+are the lokalitet's own, W/S walking `[Visning ▾]` and A/D the rail.
 
 ### 8.5 Funn autosave
 
@@ -5300,7 +5328,8 @@ historical acquisition covering the viewport; narrow those acquisitions to one
 period of the archive so both the list and the keyboard ring walk only it;
 cycle styles with A/D, the active
 mode's datasets with W/S, model with E, without opening any pulldown or
-occluding the map; put a second ground on the right of a draggable curtain
+occluding the map — with the first two pairs handed to the lokalitet's own
+rings while one is open; put a second ground on the right of a draggable curtain
 (Sammenlign) and then describe *either* half with the whole of row 1 and its
 strip — ground, cartography, dataset, style, DTM/DOM, hybrid, contours,
 A/D/W/S/E —
@@ -5401,7 +5430,8 @@ bottom edge without asking, before you have saved anything, and filling in as
 they render.
 
 **Keep it**
-walk the images along the bottom of the map, with ← / → or the chevrons — a
+walk the images along the bottom of the map, with ← / →, A / D or the
+chevrons — a
 rail of small frames in both stances, with the write verbs under it while you
 are editing — and each frame you land on goes up on the ground, so walking the
 rail is walking the readings their author ordered for you;

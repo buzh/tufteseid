@@ -143,7 +143,14 @@ all of them.
   step 6 was actually for: the rail speaks the row's atoms and owns no pin, no
   fade and no depth order of its own, so several images at once is still the
   pulldowns' job — and nothing on the rail writes in `show`. A card still may
-  not grow a *verb*; what it has is a press that means "show me this one".
+  not grow a *verb*; what it has is a press that means "show me this one" —
+  which is also what **A/D** mean now (`src/localities/bilderRing.ts`, §5.3):
+  the rail's ←/→ were borrowed from OpenLayers' pan, so it gets the letter keys
+  every other list in the app is walked with, on the same `stripNavigable`
+  gate and through the same `selectBilde`. That is the second ring the
+  lokalitet takes off the ground, after W/S: inside a lokalitet the LiDAR style
+  ring is the pulldown's, and its heading composes `· A/D` for the same reason
+  the four dataset headings compose `· W/S`. E is untouched by both.
   Step 7 put the uploads in `[Bilde ▾]` without breaking that rule: an upload
   has no georeference, so `Plasser i ruta` on its card
   (`src/localities/uploadPlacement.ts`) gives the *record* an extent — the
