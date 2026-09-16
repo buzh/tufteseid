@@ -639,8 +639,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * since §13 the two are members of a stack, so there is no knocking down
    * left to fear.
    *
-   * Two records it refuses. One with no file or no extent cannot be laid down
-   * at all — `canPinBilde`. A borrowed one (§7) is the *original's* file and is
+   * Two records it refuses. One with no extent cannot be laid down at all, and
+   * one with no file is refused here although §13.10 step 2 could now render
+   * it — walking the rail must not start a stitch per card. Both are
+   * `canPinBilde`. A borrowed one (§7) is the *original's* file and is
    * not in `attachmentItems`, so `usePinnedBilde` has nothing to resolve it
    * against; reading one is `Åpne originalen`, and `Ta med` is what makes it
    * this lokalitet's.

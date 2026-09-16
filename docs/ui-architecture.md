@@ -2491,14 +2491,37 @@ selected record, and captioning an image against the ground it covers needs
 both the ground and the caption field, which deselecting would take away
 together.
 
-- **The pixels.** `src/localities/usePinnedBilde.ts` decodes the **original**
-  file — never a thumbnail — and hands it to `setGroundOverlay('bilde', …)`
-  with `meta.bbox25833` as the extent and `meta.imageRect` as the crop. It has to be
-  the original: `imageRect` is in the original file's own pixels and nothing
-  records the figure's overall size, so a thumb cannot be scaled back to the
-  ground without a guess, and a guess a pixel out is half a metre out on the
-  map. Records with no `bbox25833` (uploads) can still be selected — captioned,
-  opened, deleted — but the pin button is absent.
+- **The pixels.** `usePinnedBilde` holds only the *selection*; getting a record
+  onto the ground is `src/localities/groundView.ts` and its one hook,
+  `useGroundView(key, rec)`. It decodes the **original** file — never a
+  thumbnail — and hands it to `setGroundOverlay(key, …)` with `meta.bbox25833`
+  as the extent and `meta.imageRect` as the crop. It has to be the original:
+  `imageRect` is in the original file's own pixels and nothing records the
+  figure's overall size, so a thumb cannot be scaled back to the ground without
+  a guess, and a guess a pixel out is half a metre out on the map. Records with
+  no `bbox25833` (uploads) can still be selected — captioned, opened, deleted —
+  but the pin button is absent.
+- **A View with no file is rendered instead** (`docs/lokalitet-view.md` §13.10
+  step 2). `groundView.ts` dispatches a `ViewSpec` over the same four producers
+  the pin queue uses and puts the raw canvas down at the spec's own rectangle —
+  no figure, so no caption panel on the map. It is `renderSpec`'s sibling
+  rather than `renderSpec` itself, precisely because that one makes the
+  captioned artifact. Nothing on the rail offers it yet: `canPinBilde` still
+  requires a file, for the reason two bullets down, so the path reachable today
+  is the fallback — a *pinned* View whose file will not load renders live
+  instead of reporting a failure, because a View is reproducible by definition.
+  [Visning]'s pulldown is where an unpinned View becomes switchable on purpose.
+- **There is no resolution ladder, and that is measured rather than assumed.**
+  `docs/lokalitet-view.md` §13.2 argues for live rendering from sharpness — a
+  pasted figure is a fixed number of pixels, so zooming stops helping. It does
+  not hold here: `renderFigureBlob` fits a figure to 40 Mpx (§8.10) and a
+  lokalitet is 50–1500 m per side (§5.6), so 1500 m of LiDAR at its native
+  0.25 m/px is 36 Mpx and a terrain render is capped at 3000 px per side long
+  before that. **A pinned figure is already the source's own pixels.** The one
+  exception is a flyfoto over the largest rectangles — 1500 m at NiB's 0.2 m
+  target is 56 Mpx, fitted to 0.237 — and re-stitching a whole acquisition to
+  recover 18 % is not a trade worth making on a zoom notch. Adding one later
+  means measuring again, not citing §13.2.
 - **Where it is mounted.** From `useLocalityWorkspace`, not from `BilderStrip`,
   and `pinnedAttachmentIdAtom` lives in `src/localities/atoms.ts` for the same
   reason: the strip is collapsible and genuinely unmounts when it is folded
@@ -2534,8 +2557,11 @@ together.
   frame does lay its image down (§8.7.1), but laying down a *file* is a decode
   and recreating a spec is a Kartverket fetch and a render — one is a click,
   the other is a click that costs seconds and rate limit. So it does not:
-  `canPinBilde` already requires a file, an unpinned View simply shows what it
-  is waiting for (§8.7.4), and `Gjenskap` stays the verb it was.
+  `canPinBilde` still requires a file, an unpinned View simply shows what it
+  is waiting for (§8.7.4), and `Gjenskap` stays the verb it was. Note the
+  reason moved: the machinery to render one now exists (the bullet above), so
+  what keeps it off this rail is the cost of walking the rail, not the absence
+  of a path.
 - **Absent, not disabled.** A screenshot or an upload yields `null` from
   `viewSpecOf` and gets no Gjenskap button at all. There is no view to go back
   to, which is a different statement from "you may not go back to it". When a

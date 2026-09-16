@@ -13,6 +13,12 @@
 // it away to see the map is the most likely thing to do right after pinning
 // something.
 //
+// What is left here is the *selection* — which record is up, and how far it is
+// faded. Getting that record onto the ground is `groundView.ts` (§13.10 step
+// 2), which paints a pinned figure and renders a View live when there is no
+// figure to paint. This hook is its first caller; the layer row will be the
+// other, and then this one goes (§13.10 step 6).
+//
 // The group it paints into is shared with Terrenganalyse, and since §13 it is
 // a **stack** rather than a slot: this is its upper member, so a pinned
 // ortofoto fading over a live terrain render is the ordinary case and neither
@@ -22,129 +28,52 @@
 
 import { useAtom } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
-import { getAttachmentUrl, type AttachmentRecord } from '../api/attachments';
-import {
-  setGroundOverlay,
-  setGroundOverlayOpacity,
-} from '../map/groundOverlay';
+import type { AttachmentRecord } from '../api/attachments';
+import { setGroundOverlayOpacity } from '../map/groundOverlay';
 import { pinnedAttachmentIdAtom } from './atoms';
-
-/** `[minX, minY, maxX, maxY]` in EPSG:25833, as every producer writes it. */
-const extentOf = (meta: Record<string, unknown>) => {
-  const b = meta.bbox25833;
-  return Array.isArray(b) &&
-    b.length === 4 &&
-    b.every((n) => typeof n === 'number' && Number.isFinite(n))
-    ? (b as [number, number, number, number])
-    : null;
-};
-
-/**
- * Where the ground sits inside the figure PNG, in that file's own pixels.
- *
- * Not optional in practice but treated as such: the caption panel is drawn
- * *below* the image (src/figure/), so a figure is taller than the rectangle it
- * shows and painting the whole file at the extent would squash the ground and
- * hang a caption off the bottom of it. Anything without an imageRect predates
- * the figure work and is pixel-registered already.
- */
-const cropOf = (meta: Record<string, unknown>, img: HTMLImageElement) => {
-  const r = meta.imageRect as Record<string, unknown> | undefined;
-  const n = (v: unknown) =>
-    typeof v === 'number' && Number.isFinite(v) ? v : null;
-  const x = n(r?.x);
-  const y = n(r?.y);
-  const width = n(r?.width);
-  const height = n(r?.height);
-  return x != null && y != null && width != null && height != null
-    ? { x, y, width, height }
-    : { x: 0, y: 0, width: img.naturalWidth, height: img.naturalHeight };
-};
+import { groundExtentOf, useGroundView } from './groundView';
 
 /**
  * Whether this record has enough recorded about it to be placed on the map.
  *
  * A sketch is refused although a pinned one has both a file and an extent, and
- * that is about the slot rather than the record: this one holds a *ground*,
- * one at a time, and a sketch is a transparent layer over one. It has its own
- * way onto the map — `sketchOverlay.ts`, a set rather than a slot (§9.3) — and
- * laying its figure down here would put a white sheet with a caption panel on
- * it over the very image it was drawn to annotate.
+ * that is about the group rather than the record: this one holds a *ground*,
+ * and a sketch is a transparent layer over one. It has its own way onto the
+ * map — `sketchOverlay.ts`, a set rather than a slot (§9.3) — and laying its
+ * figure down here would put a white sheet with a caption panel on it over the
+ * very image it was drawn to annotate.
+ *
+ * The `file` requirement is now this surface's rule rather than the ground's.
+ * `useGroundView` renders an unpinned View from its spec, so the map no longer
+ * needs the figure — but the rail is where "ikke hentet ennå" is shown, and
+ * putting a pin toggle on that card would make browsing captions start WMS
+ * stitches. [Visning]'s pulldown is where switching one on is a deliberate act
+ * and where the requirement drops (§13.2, §13.10 step 5).
  */
 export const canPinBilde = (rec: AttachmentRecord): boolean =>
   rec.kind !== 'sketch' &&
   rec.file !== '' &&
   rec.meta != null &&
-  extentOf(rec.meta) != null;
+  groundExtentOf(rec.meta) != null;
 
 export const usePinnedBilde = (attachments: AttachmentRecord[] | null) => {
   const [pinnedId, setPinnedId] = useAtom(pinnedAttachmentIdAtom);
   // Percent, like Terrenganalyse's, and for the same reason: this slider is
   // dragged, and routing every frame through jotai would re-render the shell
   // at 60 Hz to change a number OpenLayers reads imperatively anyway.
-  const [opacity, setOpacityState] = useState(100);
-  const [failed, setFailed] = useState(false);
+  const [opacity, setOpacity] = useState(100);
 
   const pinned = attachments?.find((a) => a.id === pinnedId) ?? null;
 
-  // Deliberately keyed on the record's identity and its meta, not on the whole
-  // list: the list is rebuilt on every realtime event, and re-decoding a
-  // several-megabyte PNG because somebody's caption changed would flash the
-  // map.
-  const metaKey = pinned?.meta ? JSON.stringify(pinned.meta) : null;
+  const { failed } = useGroundView('bilde', pinned);
+
+  // The stack keeps each member's alpha at module level and reads it at draw
+  // time, so it outlives this hook — and the slider's own state does not.
+  // Pushing it down on mount is what stops the next lokalitet from opening at
+  // the last one's fade.
   useEffect(() => {
-    if (!pinned || !pinned.meta) return;
-    const extent25833 = extentOf(pinned.meta);
-    if (!extent25833) return;
-    const meta = pinned.meta;
-
-    let cancelled = false;
-    setFailed(false);
-    // The original, never a thumbnail. `meta.imageRect` is in the original
-    // file's pixels and nothing records the figure's own width, so a thumb
-    // cannot be scaled back to the ground without guessing — and a guess that
-    // is a pixel out is half a metre out on the map, which defeats the point
-    // of registering it at all.
-    getAttachmentUrl(pinned)
-      .then((url) => {
-        const img = new Image();
-        img.src = url;
-        return img.decode().then(() => img);
-      })
-      .then((img) => {
-        if (cancelled) return;
-        setGroundOverlay('bilde', {
-          source: img,
-          crop: cropOf(meta, img),
-          extent25833,
-        });
-        setGroundOverlayOpacity('bilde', opacity / 100);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setFailed(true);
-        setGroundOverlay('bilde', null);
-      });
-
-    // Note what this cleanup does *not* do: it does not take the member down.
-    // Swapping from one bilde to another runs it, and withdrawing here would
-    // blank the map for as long as the next image takes to decode. Taking it
-    // down is the job of the effect after this one, which does it when there
-    // is no pinned record at all, and of the unmount cleanup.
-    return () => {
-      cancelled = true;
-    };
-    // `opacity` is read once to seed the layer and must not retrigger a
-    // decode; the slider path below sets it directly.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pinned?.id, metaKey]);
-
-  // Nothing pinned: take the member down.
-  useEffect(() => {
-    if (!pinned) setGroundOverlay('bilde', null);
-  }, [pinned]);
-
-  useEffect(() => () => setGroundOverlay('bilde', null), []);
+    setGroundOverlayOpacity('bilde', opacity / 100);
+  }, [opacity]);
 
   // The record went away under us — deleted here or by another session. Only
   // once the list has actually arrived: `null` is "still loading", and
@@ -157,11 +86,6 @@ export const usePinnedBilde = (attachments: AttachmentRecord[] | null) => {
   // hook (the workspace is remounted per record), so closing or swapping has
   // to put it down or the next lokalitet opens with a stale id in it.
   useEffect(() => () => setPinnedId(null), [setPinnedId]);
-
-  const setOpacity = useCallback((value: number) => {
-    setOpacityState(value);
-    setGroundOverlayOpacity('bilde', value / 100);
-  }, []);
 
   // A plain setter, not a toggle. The strip's own selection is what toggles
   // (`selectBilde` in useLocalityWorkspace), and the two ids are not the same

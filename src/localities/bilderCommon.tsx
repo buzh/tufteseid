@@ -574,10 +574,11 @@ export const CaptionField = ({
 /*
  * A sketch's own eye, and it is deliberately not `Vis i ruta`.
  *
- * That verb is the ground-overlay slot (`usePinnedBilde`), which holds exactly
- * one image, and a sketch is not a ground: it is a transparent layer over one,
- * so the answer to "show it" is a *set* — two readings of the same mound can
- * both be up, and either can come off without disturbing the other (§9.3).
+ * That verb is the ground-overlay stack's upper member (`usePinnedBilde`),
+ * which holds one image at a time, and a sketch is not a ground: it is a
+ * transparent layer over one, so the answer to "show it" is a *set* — two
+ * readings of the same mound can both be up, and either can come off without
+ * disturbing the other (§9.3).
  * `canPinBilde` refuses a sketch for the same reason, so the two never both
  * appear on one card.
  *

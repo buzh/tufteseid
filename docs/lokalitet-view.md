@@ -1,6 +1,6 @@
 # The lokalitet view
 
-**Status: §1–§12 built, §13 designed and one step in.** §12's build order is
+**Status: §1–§12 built, §13 designed and two steps in.** §12's build order is
 complete through step 15; what is left of it is step 16 — sharing (§10) and the
 Rapportpakke (§9) — plus the two builds that landed outside the numbered list
 and are recorded at the end of §12 (placing the rectangle, sketches as
@@ -13,9 +13,9 @@ because the reasoning is not recoverable from the result, not because it
 describes the app.
 
 §13 is the exception and reads the other way round: a later thread whose build
-order is §13.10 and whose first step has landed, and which deletes several
-things `docs/ui-architecture.md` and CLAUDE.md stated as load-bearing until it
-came for them.
+order is §13.10 and whose first two steps have landed, and which deletes
+several things `docs/ui-architecture.md` and CLAUDE.md stated as load-bearing
+until it came for them.
 
 Today "a lokalitet is open" is a context strip plus a dock column, and the rest
 of the app carries on unchanged — Terreng and Sammenlign sit in row 1 whether
@@ -1578,9 +1578,11 @@ Docs to update: `docs/ui-architecture.md` §3.1 (the shell loses a slot), §5.1
 
 ## 13. The layer row — the stack becomes the control
 
-**Status: designed; step 1 of §13.10 built, the rest not.** It supersedes the
+**Status: designed; steps 1–2 of §13.10 built, the rest not.** It supersedes the
 verbs in §4.2 and deletes the one-slot arbiter that section introduced — that
-deletion is the part that has landed. §4.1, §4.1.1 and §4.1.2
+deletion has landed, and so has the mechanism the replacement needs: a View can
+now be put on the map as its own pixels over its own rectangle, with no figure
+and no control yet. §4.1, §4.1.1 and §4.1.2
 survive unchanged: a View is still a spec, a File is still bytes, and the pin
 is still a pin. What changes is who decides what is on the map.
 
@@ -1644,6 +1646,14 @@ Two consequences of that table:
 **`Gjenskap` and `Vis i ruta` are deleted.** Not merged, not renamed —
 deleted. A View appears in [Visning]'s pulldown and is rendered live, at the
 resolution the screen currently wants. Its pinned figure never goes on the map.
+
+> **Struck at build, §13.10 step 2.** The second sentence's *reason* does not
+> survive measurement: `renderFigureBlob` fits a figure to 40 Mpx, which is
+> above what any producer makes over a 50–1500 m rectangle, so a pinned figure
+> already *is* the source's own pixels and there is nothing to be sharper than.
+> What the section is right about — nobody chooses between a View and its
+> figure, and an unpinned View is fully usable — is what got built. The rule is
+> paint the pin, render live when there is no pin.
 
 §4.2 argued those two verbs were the same mechanism seen from two sides, and
 that was true. The decision here is that **the identity stops being something
@@ -1855,34 +1865,52 @@ Three sequencing rules, and as in §12 they are worth more than the list.
    promising and the one §13 exists to deliver. Verifying it is three gestures:
    pin the flyfoto, press Terreng, drag both sliders.
 
-2. **A View as a layer over its own rectangle** — the piece §13.2 assumes and
-   the app does not have, and the step that is the whole job. A View reaches
-   the map two ways today and neither is this one: as a *pinned figure* pasted
-   at `bbox25833` (`usePinnedBilde`), or as an *application of its spec to the
-   whole map* (`useRecreateView`). What a Visning member needs is the third —
-   the spec's own pixels over the spec's own rectangle at the resolution the
-   view currently wants — for all four spec kinds, off producers that all
-   already exist: `extractCanvas`, `renderTerrain`, `fetchFlyfoto`,
-   `renderScene`.
+2. **A View as a layer over its own rectangle** — ✅ **built**
+   (`src/localities/groundView.ts`). The piece §13.2 assumes and the app did
+   not have. A View reached the map two ways and neither was this one: as a
+   *pinned figure* pasted at `bbox25833` (`usePinnedBilde`), or as an
+   *application of its spec to the whole map* (`useRecreateView`). The third is
+   the spec's own pixels over the spec's own rectangle, off producers that all
+   already existed — `extractCanvas`, `renderTerrain`, `fetchFlyfoto` — and
+   `useGroundView(key, rec)` is the whole surface. `usePinnedBilde` keeps the
+   selection and nothing else; [Visning] becomes the second caller at step 5.
 
-   **Load-bearing, and a refinement of §13.2: paint the pin first, render live
-   on demand.** §13.2 says a View's figure never goes on the map and the
-   argument is right — but it is an argument about the *choice*, not about the
-   first frame. A lidar extract rendered live is a WMS tile stitch: seconds of
-   latency and a burst against a shared rate limit, so a member that shows
-   nothing for four seconds after you switch it on is a worse thing than the
-   model it was sparing the user from learning. So paint the pinned figure at
-   once where there is one, and re-render live when the view asks for pixels
-   finer than the figure holds. That is `sketchOverlay.ts`'s
-   `RESCALE_TOLERANCE` generalised from scenes to specs, it keeps §13.2's claim
-   exactly — nobody chooses, and zooming in still sharpens — and it pays the
-   upstream cost only where zoom demands it. A spec with no pin renders
-   immediately, as §13.2 says.
+   **The refinement this step was written expecting did not survive building
+   it, and the measurement is the useful part.** The plan was: paint the pin,
+   re-render live when the view asks for pixels finer than the figure holds —
+   `sketchOverlay.ts`'s `RESCALE_TOLERANCE` generalised from scenes to specs.
+   It rests on the figure being coarser than the source, and it is not.
+   `renderFigureBlob` fits a figure to 40 Mpx, a lokalitet is 50–1500 m per
+   side, and every producer's native resolution fits under that cap: 1500 m of
+   LiDAR at 0.25 m/px is 36 Mpx, a terrain render is capped at 3000 px per side
+   long before it. **A pinned figure is already the source's own pixels**,
+   cropped past the caption panel by `imageRect`. The single exception is a
+   flyfoto over the largest rectangles — 1500 m at NiB's 0.2 m target is
+   56 Mpx, fitted to 0.237 — and re-stitching an acquisition to recover 18 % on
+   a zoom notch is not a trade worth making.
 
-   Small side effect worth noticing rather than claiming: when a figure has
-   drifted from its source, the swap from pin to live render is visible as a
-   change under the cursor. That is not the observability §14 asks for, but it
-   is not nothing either.
+   So the rule is **paint the pin; render live when there is no pin** — which
+   is what §13.2 actually needs, since what it deletes is the *"not fetched
+   yet" state as a thing shown to a user*, not a blurry one. §13.2's sharpness
+   argument is struck (see the note there): it was reasoning from an assumption
+   that holds for `sketchOverlay`, whose scenes have no native resolution, and
+   not here.
+
+   **What is reachable today is the fallback, and that is deliberate.**
+   `canPinBilde` still requires a file, so the rail never offers an unpinned
+   View — not because there is nothing to lay down any more, but because the
+   rail is read by *walking* it and a toggle there would start a WMS stitch per
+   card. What the step does change on screen: a pinned View whose file will not
+   load now renders itself instead of reporting a failure. The rest is
+   mechanism waiting for step 5's control, which is the build order's first
+   rule working as intended rather than an admission.
+
+   Two things the step added that the row will need. Renders are **cancelled on
+   switching records**, so a surface somebody is clicking through has at most
+   one stitch in flight. And `renderViewRaster` is `pinQueue.renderSpec`'s
+   *sibling*, not a reuse of it: that one produces the captioned figure, which
+   is the one thing that must not go on the map. The duplication is two source
+   lookups.
 
 3. **The group control** — one `[thing ▾]`: the label toggles the group, the
    caret opens a pulldown, each member has a switch and an opacity slider. Its

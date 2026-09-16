@@ -86,14 +86,16 @@ all of them.
   and the takeout bundle, and moving Terreng and Sammenlign off row 1 onto
   the lokalitet row. Read it before building any of that; each step folds into
   `docs/ui-architecture.md` §8 as it lands. **§13 is a separate thread and
-  only its first step is built**: the *layer row* — four `[thing ▾]` groups
+  only its first two steps are built**: the *layer row* — four `[thing ▾]` groups
   (Visning / Bilde / Skisse / Funn) matching the map's z-stack bottom-to-top,
   each member switchable with its own opacity — which deletes `Gjenskap`, `Vis
   i ruta` and the one-slot ground arbiter, makes a funn a container for images
   as well as a sublocation, and gives an arrangement a record of its own
   (`kind: 'scene'`, membership on the existing `over`). §13.10 is its build
-  order; step 1, the ground overlay becoming a stack, has landed and the
-  arbiter is gone.
+  order and two steps have landed: the ground overlay is a stack and the
+  arbiter is gone, and `src/localities/groundView.ts` can put a View on the map
+  as its own pixels over its own rectangle — rendering it live when there is no
+  pinned figure to lay down.
 - `README.md` — third-party-facing install and admin guide (docker compose
   install, first-run PocketBase superuser, OAuth redirect URL, granting the
   app admin role, licence). Keep it accurate when any of that changes.

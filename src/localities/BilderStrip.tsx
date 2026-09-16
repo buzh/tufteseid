@@ -58,8 +58,10 @@ const Detail = ({
             reading go with the image. Taking a picture off the map is not a
             write, and show is short of verbs, not entitled to fewer.
 
-            Unpinned Views are not offerable to the map — `canPinBilde`
-            already refuses one, because there is nothing to lay down. */}
+            Unpinned Views are still not offered here — `canPinBilde` refuses
+            them. Not because there is nothing to lay down any more (§13.10
+            step 2 renders one live), but because this rail is read by walking
+            it, and a toggle here would start a WMS stitch per card. */}
         {canPinBilde(rec) && (
           <Button
             size="sm"
