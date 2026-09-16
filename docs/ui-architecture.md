@@ -430,19 +430,22 @@ subsume.
   statements, and switching the group back on has to restore the composition
   that was up. Neither is persisted to the URL; the member set is cleared when
   the lokalitet closes or swaps.
-- **The ground group** — five in `src/map/groundOverlay.ts`, all read by
-  `VisningControl` and none persisted: `groundShownAtom` (the ground preset's
-  own switch), `visningShownAtom` (the ids of the Views currently on the
-  ground — a set, like `sketchShownAtom`, because several may be up at once),
-  `visningOpacityAtom` (per-View fade in percent, missing meaning opaque),
-  `visningGroupShownAtom` (`[Visning ▾]`'s label toggle) and
-  `provisionalViewAtom` (the arrival cover, until somebody says what they want
-  the ground to be). The same group/member
-  split as the funn and sketch switches, for the same reason, and all five are
+- **The ground group** — four in `src/map/groundOverlay.ts`, all read by
+  `VisningControl` and none persisted: `visningShownAtom` (the View currently
+  on the ground — **at most one**, since §10.1 made the group a selection, but
+  still a `ReadonlySet<string>`, because that is the shape
+  `setGroundOverlayStack` and `bildeShownAtom` beside it speak and an empty set
+  is the "no View" stop), `visningOpacityAtom` (per-View fade in percent,
+  missing meaning opaque), `visningGroupShownAtom` (`[Visning ▾]`'s label
+  toggle) and `provisionalViewAtom` (the arrival cover, until somebody says
+  what they want the ground to be). The same group/member
+  split as the funn and sketch switches, for the same reason, and all four are
   reset by `useLocalityWorkspace` when the lokalitet closes or swaps — which is
   also the hook that seeds the member set with the cover on the way *in*
-  (§10.1). `visningShownAtom` has a second author besides the pulldown, and no
-  cursor beside it: the W/S ring (§5.3) reads its own position out of it.
+  (§10.1). The ground preset has no switch of its own: it is a row in the
+  selection, and "no ground at all" is the group label's. `visningShownAtom` is
+  written in one place — `selectVisningAtom` (§10.1) — which is what lets the
+  W/S ring (§5.3) read its own position out of it instead of keeping a cursor.
   They live with the stack rather than in `src/localities/atoms.ts` because what they
   describe is the map's `zIndex: 1` composite, which outlives any one lokalitet
   surface (§10.1).
@@ -846,8 +849,12 @@ thing to peek back to.
   app without a ring. Its stops are **no View** — the bare ground, where a
   lokalitet opens unless its cover is pinned — and then each View in pulldown
   order, exactly one up at a time; walking switches the group's label back on,
-  and never touches the ground preset's own switch, so a stop means "no View"
-  rather than "ground". It is a **reassignment, not a fallback**: with a
+  and never touches the group's hold on the background, so a stop means "no
+  View" rather than "no ground". **A step also enters the View it lands on** —
+  the ground it was rendered on, its dataset and its knobs — which is the same
+  `selectVisningAtom` the pulldown's own press goes through, so the ribbon
+  never describes a ground other than the one on screen. It is a
+  **reassignment, not a fallback**: with a
   lokalitet open and one View kept, the ground's dataset ring is reachable
   from its pulldown and the settings strip and not from the keyboard. Two
   places it declines and the ground's ring answers as before — a lokalitet
@@ -1912,10 +1919,23 @@ still has no slider here, because the background is a *stack* of tile layers
 and the grounds that can be faded are faded from the settings strip, where all
 their other modifiers are.
 
-**A member row can carry one verb.** `LayerMember.action` puts an icon button
-at the row's right edge, outside the switch's hit area because a `<button>`
-cannot nest one and because the verb moves the map. It has exactly one user:
-`Gjenskap` on each View in [Visning] (§10.1).
+**A member row carries no verb.** It briefly could — `LayerMember.action` put
+an icon button at the row's right edge, and its one user was `Gjenskap` on each
+View in [Visning]. Both are deleted: pressing the row *is* the recreate now
+(§10.1), and a second control for what the press already does is the failure §1
+is about. The row is the switch and nothing else, which is also what lets
+`.head` stay a plain flex line whose only job is making the label truncate.
+
+**A group's members are either a set or a selection.** `LayerMembers` takes a
+`select` flag, and one group wears it: [Visning], where exactly one View is up
+at a time and the row marks itself with `Pulldown.module.css`'s accent left bar
+instead of a checkbox (§10.1). [Bilde], [Skisse] and [Funn] are sets and keep
+the glyph, for the reason `PulldownCheck` exists — several rows on at once, and
+a bar saying "this is the one" says the wrong thing about the other three. The
+two modes share the component rather than forking it because what differs is
+those two lines: everything a member row is *for* — the provenance under the
+label, the note, the warning, the fade — is the same question asked of the same
+record.
 
 And **nothing in the group writes** (`docs/lokalitet-view.md`
 §13.8): a switch is *what I am looking at now*, which is not the same statement
@@ -2062,7 +2082,8 @@ read-only, and the bottom edge is a rail with
 no delete, no reordering, no hide-from-exhibit and a read-only caption rather
 than the same
 rail carrying all four; funn are not editable, and N / U / B do nothing. Reading, putting an image on the map and taking it off again,
-the whole layer row, `Gjenskap` in [Visning]'s pulldown and downloading a
+the whole layer row, including the recreate a [Visning] row performs when you
+press it, and downloading a
 figure all stay, because none of them leaves a trace. The one way to write is
 to press `Rediger` first, which costs nothing: no fetch, no write, the map
 does not move.
@@ -2623,9 +2644,9 @@ switches and keeps nothing (see "the rail shows what it points at", §8.7.2):
 | was, on the card | is, on the lokalitet row |
 | --- | --- |
 | picking a frame laid it down, as its own pin | picking a frame presses the member's switch in the group that owns it |
-| `Vis i ruta` / `Ta av ruta`, one image | a switch per member in [Visning] and [Bilde] (§10.1), several down at once |
-| `Transparens` on the rectangle's corner (§8.7.5) | a fade under each member's switch |
-| `Gjenskap` on the card | the trailing verb on each View row (§10.1) |
+| `Vis i ruta` / `Ta av ruta`, one image | a row per member in [Visning] and [Bilde] (§10.1) — a selection in the first, switches in the second, several Files down at once |
+| `Transparens` on the rectangle's corner (§8.7.5) | a fade under each member's row |
+| `Gjenskap` on the card | pressing the View's row in [Visning] (§10.1) |
 | a note under the selected card when the pin would not load | `LayerMember.warning`, on the switch that is claiming the layer is up |
 
 So the detail panel under the rail is now the record and nothing about the map:
@@ -2723,23 +2744,30 @@ the primitive `docs/lokalitet-view.md` §4.2 asks for rather than a button:
 `useRecreateView` — mounted in `RibbonGlobalRow`, the one place the four
 control hooks live — applies it. Two later builds are written on that split:
 a View is stored as a spec before it is pixels (§8.7.4), and a forked lokalitet
-carries its original's views without its files (§8.12).
+carries its original's views without its files (§8.12), and since §10.1 made
+[Visning] a selection there is no `Gjenskap` control left at all — it is what
+pressing a View's row *does*.
 
-- **`Gjenskap` does not render.** It moves the map, and that is all it has ever
-  done — which matters more now that a View may have no pixels at all.
+- **The recreate itself still does not render.** It moves the map, and that is
+  all it has ever done — which matters more now that a View may have no pixels
+  at all. What renders is the other half of the same press: `selectVisning`
+  mounts the row's `<GroundMember>`, and that is a Kartverket fetch for an
+  unpinned spec. The two travel together now because a row that laid down a
+  pinned PNG and left the ribbon describing some other ground was a surface
+  lying about what is on screen; they are still two mechanisms, which is why an
+  unreadable `meta` selects and shows without moving the map.
   `docs/lokalitet-view.md` §4.2 reads as though `Vis i ruta` on an unpinned View
-  *is* `Gjenskap`, i.e. that walking onto a spec should recreate it. The
-  machinery to render one now exists, so what kept the two apart was never
-  capability: it is that switching a View on is a Kartverket fetch and a render,
-  which is a deliberate press in a pulldown and not something a rail should do
-  per card as you walk it. Since step 5 the rail does not list Views at all, so
-  the question is [Visning]'s.
+  *is* `Gjenskap`, and that turns out to have been right about the gesture and
+  wrong about the surface: it is a deliberate press in a pulldown, not
+  something a rail does per card as you walk it. Since step 5 the rail does not
+  list Views at all, so the question is [Visning]'s.
 - **Absent, not disabled** — the rule `Gjenskap` was built on, and it survives
-  its move: a screenshot or an upload yields `null` from `viewSpecOf`, and
-  rather than a dead button it simply has no row in [Visning] to hang one on.
-  When a spec exists but the dataset behind it does not any more — a LiDAR
-  project withdrawn from the WMS catalogue, an acquisition no longer listed for
-  the bbox — the attempt toasts and leaves the map alone.
+  the button: a screenshot or an upload yields `null` from `viewSpecOf` and has
+  no row in [Visning] at all, and a View whose `meta` no longer parses yields
+  `null` too and simply selects without moving the map. When a spec exists but
+  the dataset behind it does not any more — a LiDAR project withdrawn from the
+  WMS catalogue, an acquisition no longer listed for the bbox — the attempt
+  toasts and leaves the map alone.
 - **Restoring a terrain view is a method on the hook**
   (`useTerrainAnalysis.restoreView`), not six setter calls from outside,
   because the radius setter routes to one of two stored radii according to the
@@ -2798,7 +2826,11 @@ Three things that read as arbitrary until you try the alternative:
   `bildeShownAtom` or `sketchShownAtom` — whichever group lists it, using the
   group's own eligibility (`viewItems` / `fileItems`) — switches all three
   groups on, spends the arrival latch (§10.1), and hands a `scene` straight to
-  `restoreScene`. One member at a time: all three sets are replaced, so each
+  `restoreScene`. A View goes through `selectVisningAtom` rather than writing
+  the atom directly, so landing on an extract in the strip enters it exactly as
+  pressing its row or stepping W/S onto it would; that is the whole reason
+  §10.1 made that atom the group's one entrance. One member at a time: all
+  three sets are replaced, so each
   stop on the strip shows that stop and not the leftovers of the last two.
   `stepBilde` (← / →, and the chevrons at each end of the rail) goes through
   the same call, so the keyboard and the pointer are one gesture. A card with
@@ -4450,7 +4482,7 @@ with the dock it lived in — did not.
 **Entering Terreng over a lokalitet seeds the knobs from its cover render.**
 The workspace publishes the first terrain-kind attachment's spec on
 `coverTerrainSpecAtom` (`src/localities/atoms.ts`) and the hook, on becoming
-the active tool, feeds it to the same `restoreView` that "Gjenskap" uses. The
+the active tool, feeds it to the same `restoreView` the recreate uses. The
 argument is that the second visit to a lokalitet is nearly always the same
 reading as the first: someone dialled 315°/35° at a 6 m radius because that is
 what showed the feature, kept the render, and comes back to look again. Opening
@@ -4471,10 +4503,12 @@ a fresh object for the same lokalitet. Re-seeding on every entrance would
 silently undo an
 adjustment as soon as the user glanced at another ground and came back, which
 is the same complaint the unconditional mount answers. `restoreView` sets that
-ref itself, which is what keeps the seed from stepping on Gjenskap: the
-recreate path calls `restoreView(spec)` and `ground.select('terreng')` in one
-tick, so the tool-change effect would otherwise fire *after* the explicit
-restore and overwrite the render the user actually asked for.
+ref itself, which is what keeps the seed from stepping on a recreate: that path
+calls `restoreView(spec)` and `ground.select('terreng')` in one tick, so the
+tool-change effect would otherwise fire *after* the explicit restore and
+overwrite the render the user actually asked for. Since §10.1, a W/S step in
+[Visning] can be that recreate, so the ordering is walked rather than clicked
+now — the same guard, hit far more often.
 
 Only the sliders the current visualization uses are rendered: two for sky-view
 factor and for VAT, four for a plain hillshade. Absent rather than disabled,
@@ -4735,26 +4769,43 @@ the leftmost of the lokalitet row's layer groups (§8.1,
   already the one thing row 1 publishes about the live ground.
 - **every View in the lokalitet** — `kind` of `extract` (which includes terrain
   renders) or `flyfoto`, each put up by `useGroundView` over its own rectangle,
-  each with a switch, a fade and a `Gjenskap`.
+  each with a fade.
 
 Reading down the list is reading *up* the stack, which is the row's own claim
 about left-to-right carried inside the group.
 
-**What each switch does.** A View's switch mounts or unmounts a `<GroundMember>`
-child, so switching off withdraws the member and stops the work — the point
-being that switching one on can start a WMS stitch, which is also why a
-lokalitet never opens N of them. The group label and the ground preset instead *hold* what they cannot withdraw
-(§10, above), and the preset additionally takes the background stack down
-through `setBackgroundHidden` in
-`map/layers/config/backgroundLayers/utils.ts` — `visible: false` on every
-`bg.` layer, which stops tile loading while keeping the tiles already
-fetched, so switching back is free. Scoped to `bg.` and deliberately not
-`cmp.`: the curtain's B half is another full ground.
+**One member at a time, and it is a selection.** The rows are not checkboxes:
+pressing one *replaces* whatever was up, and the row marks itself the way every
+dataset pulldown in the ribbon does — `Pulldown.module.css`'s accent left bar,
+no glyph (`LayerMembers`' `select` mode). The preset's row is the group's other
+stop and means "no View over the rectangle"; it is where a reader who has
+walked into an image walks back out. The whole argument is in
+`src/shell/visningRing.ts`, and the short version is that W/S had walked this
+group as a ring since the ring landed, so the checkboxes were the only surface
+in the app saying the group held a set. Composing two images over one another
+is still worth doing and is still possible — it is `[Bilde ▾]` and `Oppsett`
+that do it.
+
+That makes the fade the better half of the group rather than a casualty of it:
+the one View up, faded, is how you read it *against* the ground that selecting
+it has just put underneath.
+
+**What a press does.** Selecting a View mounts its `<GroundMember>` child and
+unmounts the one before it, so the old member is withdrawn and its work stops —
+the point being that putting one up can start a WMS stitch, which is also why a
+lokalitet never opens N of them. The group *label* is the other polarity: it
+**holds** what it cannot withdraw (§10, above) — the live terrain render
+through `setGroundOverlayStack`'s held set, and the background stack through
+`setBackgroundHidden` in `map/layers/config/backgroundLayers/utils.ts`, i.e.
+`visible: false` on every `bg.` layer, which stops tile loading while keeping
+the tiles already fetched, so switching back is free. Scoped to `bg.` and
+deliberately not `cmp.`: the curtain's B half is another full ground.
 
 So **the map can have no ground at all** — a sketch and its funn on white, with
-nothing underneath arguing. That is the one reading where "off" means something
-for this group, and it is why the preset is a member rather than a sixth ground
-mode.
+nothing underneath arguing. That reading is the group label's alone. It used to
+be the preset row's, which had a switch of its own; once the members became a
+selection the preset's row means "no View", not "no ground", and one hold with
+one control is what it should have been.
 
 **It opens on its cover.** `visningShownAtom` used to start empty on every
 arrival, and a lokalitet whose whole point was three kept readings of one
@@ -4771,6 +4822,13 @@ extracts are still in the pin queue, still opens on bare ground. The latch
 makes it an *arrival*: neither a later pin nor a drag that moves the cover
 reaches over the user's hand afterwards.
 
+The lay-down writes `visningShownAtom` directly and is the one place that does
+not go through `selectVisningAtom` — deliberately, because that entrance also
+*enters* the View. An arrival that moved the ribbon onto a ground nobody asked
+for would be the app making a guess it then has to be talked out of, on top of
+the guess it is already making about the image. So it lays the pixels down and
+leaves every control alone.
+
 **And it steps aside for the first ground you ask for.** The lay-down puts an
 opaque image over the whole rectangle — which is the thing all five grounds are
 about — so pressing Terreng fetched a DEM, rendered relief and showed none of
@@ -4778,11 +4836,11 @@ it, and pressing Flyfoto repainted everything except the part being looked at.
 A ground button that does nothing visible is worse than an arrival on bare
 ground. So the cover is **provisional** (`provisionalViewAtom`): the id is
 remembered, and `useGroundMode.select` — the single entrance for the five
-buttons, the digit keys and `Gjenskap` — withdraws it on the way through.
+buttons, the digit keys and the recreate — withdraws it on the way through.
 Once and one member only, the one nobody asked for.
 
 Anything the user does to the group themselves spends the latch *without*
-withdrawing: a switch or a fade in the pulldown, a step of the W/S ring, a
+withdrawing: a selection or a fade in the pulldown, a step of the W/S ring, a
 scene put back with `Legg ut igjen`. From then on nothing is ever taken off the
 ground automatically, which is what keeps the composition this stack exists for
 — a 1937 ortofoto faded over today's hillshade — stable under a ground change.
@@ -4796,27 +4854,46 @@ release and there would be nothing to restore.
 
 **And it has a ring.** W/S walk `[Visning ▾]` whenever a lokalitet is open with
 at least one View in it — §5.3 for the stops and the two cases where the
-ground's dataset ring keeps the keys. `src/shell/visningRing.ts` holds both
-halves: `visningRingAtom`, the ordered ids this control publishes, and
-`cycleVisningAtom`, the step, which reads where the ring is standing off
-`visningShownAtom` rather than keeping a cursor of its own — a second copy of
-"what is on the ground" would disagree with the switches the first time
-somebody used them. A hand-composed stack therefore collapses to one member on
-the next press, from the topmost of them.
+ground's dataset ring keeps the keys. `src/shell/visningRing.ts` holds all
+three parts: `visningRingAtom`, the ordered stops this control publishes (an id
+and the `ViewSpec` selecting it applies, carried rather than looked up, because
+the keys are registered in row 1 where the attachments are not);
+`selectVisningAtom`, **the one entrance** — the pulldown's press and the keys
+both go through it; and `cycleVisningAtom`, the step, which reads where the
+ring is standing off `visningShownAtom` rather than keeping a cursor of its own
+— a second copy of "what is on the ground" would disagree with the pulldown the
+first time somebody used it. It reads the *topmost* match, which costs nothing
+now that the set holds one and is what keeps the reading total: the atom's type
+is still a set, because that is the shape `setGroundOverlayStack` and
+`[Bilde ▾]`'s sibling atom speak.
 
 **The preset has no fade.** `LayerMember.opacity` is optional and the preset
 omits it: the background is a stack of tile layers, so a slider here is three
 fades and not one, and the grounds that can be faded are faded from the
 settings strip where all their other modifiers live.
 
-**`Gjenskap` lives here now.** It left the bilde cards (§8.7.1) and became each
-View row's trailing `restart_alt`, setting the same `recreateViewAtom` — so
-`useRecreateView` is untouched. Every row in this list has a view behind it by
-construction, so the "absent where there is nothing to go back to" case the
-button needed is gone with the button.
+**`Gjenskap` lives here now — as the press itself.** It left the bilde cards
+(§8.7.1) and became each View row's trailing `restart_alt` for one release,
+then stopped being a control at all: `selectVisningAtom` sets the same
+`recreateViewAtom`, so choosing a row puts the map back the way that image was
+taken — the ground it was rendered on, the dataset it named, the knobs it was
+made with — and `useRecreateView` is untouched. A separate button beside a
+press that already does it is the failure §1 is about, and the state it
+prevented is worse than the duplication: a row that showed a pinned PNG and
+left the ribbon saying "Standard" had the settings strip describing knobs
+nobody was looking at and `Behold` offering to keep a ground that was not
+visible. Every row has a view behind it by construction, so the "absent where
+there is nothing to go back to" case the button needed is gone with it; a row
+whose `meta` no longer parses still selects, and leaves the ground where it
+was.
+
+The one cost, stated because it is real: a W/S step can now enter Terreng and
+start a DEM fetch. Everything under `useRecreateView` is cached per rectangle
+and `useTerrainAnalysis`'s memo split keeps the sun knobs on the cheap side, so
+it is the first step that pays.
 
 The control atoms are in `map/groundOverlay.ts`, beside the mechanism they
-drive: `groundShownAtom`, `visningShownAtom`, `visningOpacityAtom`,
+drive: `visningShownAtom`, `visningOpacityAtom`,
 `visningGroupShownAtom` for this group and `bildeShownAtom`,
 `bildeOpacityAtom`, `bildeGroupShownAtom` for the next. None is persisted —
 which members are on is view state, not curation — and `useLocalityWorkspace`
@@ -4831,8 +4908,13 @@ show, which is §13.8's rule and the same one `bilderItems` applies.
 `src/shell/BildeControl.tsx` (`docs/lokalitet-view.md` §13.10 step 6) is the
 same control minus two things, and the subtraction is the whole design: there
 is no ground preset, because there is only one ground and [Visning] holds it;
-and there is no `Gjenskap`, because a File has no spec to re-run. What is left
-is exactly a `LayerMembers` list — a switch and a fade each — over `fileItems`.
+and there is no recreate, because a File has no spec to re-run. That second
+subtraction is also why this group keeps its checkboxes while [Visning] became
+a selection: with nothing to enter, a press here means only "show me this too",
+and several screenshots layered over one another is the composition [Visning]
+handed over when it went one-at-a-time. What is left is exactly a
+`LayerMembers` list in its default mode — a switch and a fade each — over
+`fileItems`.
 
 What it lists is either File — `screenshot` or `upload` — with bytes and a
 `meta.bbox25833`, filtered for `hidden` the same way. A screenshot has that
@@ -4911,10 +4993,20 @@ unreachable.
 - **`Legg ut igjen`** on the bilde card, in both surfaces: it replaces the
   three shown sets, merges the three fade maps (`opacityByKey` is never
   pruned), switches the three groups on, and sends the ground through
-  `recreateViewAtom` — the same path [Visning]'s per-row apply takes. A read,
+  `recreateViewAtom` — the same path pressing a [Visning] row takes. A read,
   so both stances and a reader get it in full, which is what a shared scene is
   for. Members that have since been deleted are simply missing and the toast
   says how many.
+
+  **A scene kept before §10.1 can name two Views, and only the topmost comes
+  back.** [Visning] holds one member now, and the exception was not worth
+  keeping: a restore that could put the group into a state no press can reach
+  would give the ring a position the following keystroke had to resolve by
+  throwing a layer away anyway. `restoreScene` keeps the last of them —
+  `composition.layers` is bottom-to-top, so that is the one on top — and
+  **says so**, `localities.scene.oneView` alongside the missing-members count
+  in the same toast. Naming it is the point: a restore that silently comes back
+  smaller is a restore nobody can trust.
 
 Neither is in the layer row, and that is §13.8 rather than an accident: nothing
 in the row writes, and the row is where an arrangement is *made*. Restoring
@@ -5313,10 +5405,11 @@ walk the images along the bottom of the map, with ← / → or the chevrons — 
 rail of small frames in both stances, with the write verbs under it while you
 are editing — and each frame you land on goes up on the ground, so walking the
 rail is walking the readings their author ordered for you;
-switch an extract, terrain render or flyfoto onto the ground from
-**[Visning ▾]**, and a screenshot from **[Bilde ▾]**, one or several at once,
-each with its own fade, over or instead of the live ground — and press a
-View's **Gjenskap** there to set the map back to the view it was made from;
+pick an extract, terrain render or flyfoto onto the ground from
+**[Visning ▾]** — one at a time, with W/S or the pointer, and picking one puts
+the map back the way that image was taken, so the ribbon under it describes
+what you are looking at — and switch screenshots on from **[Bilde ▾]**, one or
+several at once, each with its own fade, over or instead of the live ground;
 give an uploaded image an extent with **Plasser i ruta** on its card so it can
 join that list — fitted to the image's own aspect inside the lokalitet's
 rectangle, marked as assumed wherever it appears, and removable again;
@@ -5540,11 +5633,20 @@ plausible-sounding reason to bring one back is exactly what the entry is for.
   `bilderCommon.tsx` with its `localities.bilder.recreate` / `recreateHint`
   strings, off both the filmstrip card and the carousel; and `canPinBilde`'s
   `extract` / `flyfoto` arms. Neither verb went away: an extract, terrain
-  render or flyfoto is switched onto the ground from `[Visning ▾]` now, where
-  the row names what it is, and `Gjenskap` is that row's apply
+  render or flyfoto is selected onto the ground from `[Visning ▾]` now, where
+  the row names what it is, and the recreate is what the press *does*
   (`useRecreateView` is untouched underneath). Do not put either back on a
   card — two controls for one layer, one of which cannot see the stack the
   other is ordering, is the failure §1 is about.
+- **The apply button inside `[Visning ▾]`, and its checkboxes** (§10.1) —
+  `LayerMember.action`, `MemberRow`'s trailing `IconButton`, the `.action` rule
+  in `LayerGroup.module.css` and `localities.layers.apply`, all of which the
+  row's own press replaced; and with them `groundShownAtom`, the ground
+  preset's separate switch, since the preset is a stop in the selection and
+  hiding the background is the group label's. The `action` slot lasted one
+  release and had exactly one user. Do not give a member row a verb again: a
+  press on the row is the verb, and a group whose rows can mean two things
+  needs the user to aim.
 - **`Vis i ruta` / `Ta av ruta`, and the whole pin mechanism behind them**
   (`docs/lokalitet-view.md` §13, build step 6) — `src/localities/usePinnedBilde.ts`
   with `canPinBilde`, `pinnedAttachmentIdAtom`, the workspace's `pinned` /

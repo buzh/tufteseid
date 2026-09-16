@@ -415,6 +415,8 @@
       "restored": "Oppsettet ligg på kartet att.",
       "missing_one": "Eitt lag finst ikkje lenger og er utelate.",
       "missing_other": "{{count}} lag finst ikkje lenger og er utelatne.",
+      "oneView_one": "Vising-gruppa viser éi om gongen, så det nedste laget er utelate.",
+      "oneView_other": "Vising-gruppa viser éi om gongen, så dei {{count}} nedste laga er utelatne.",
       "unreadable": "Dette oppsettet kan ikkje lesast tilbake."
     },
     "layers": {
@@ -424,7 +426,6 @@
       "visningMembers": "Vel kva som ligg i bakken",
       "ground": "Bakgrunn",
       "view": "Vising {{n}}",
-      "apply": "Gjenskap — still kartet tilbake til denne visinga",
       "bilde": "Bilete",
       "bildeHide": "Skjul bileta på kartet",
       "bildeShow": "Vis bileta på kartet igjen",

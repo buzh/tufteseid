@@ -323,21 +323,18 @@ export const setGroundOverlayStack = (
  */
 
 /**
- * The bottom member: whether there is a ground at all.
+ * Which View is on the ground, by attachment id.
  *
- * Not a fifth ground mode and not a background of its own — it takes the
- * background stack down (`setBackgroundHidden`) and holds `TERRAIN_KEY` when
- * Terreng is what is up. §13.1's second consequence, and the one reading where
- * "off" means something for this group: a sketch and its funn on white, with
- * nothing underneath arguing.
- */
-export const groundShownAtom = atom(true);
-
-/**
- * Which Views are on the ground, by attachment id.
+ * A set holding at most one, rather than a `string | null`, and that is
+ * deliberate: it is the shape `setGroundOverlayStack` and `[Bilde ▾]`'s
+ * sibling atom speak, `restoreScene` can still arrive with a scene kept while
+ * this group was multi-select, and a group that may one day compose again
+ * should not have to be re-plumbed to do it. What enforces the one is
+ * `selectVisningAtom`, which is the only thing the pulldown and the keys
+ * write through.
  *
- * **Never more than the cover on open**, and that is load-bearing: switching
- * a View on can start a WMS stitch, so a lokalitet that put every extract up
+ * **Never more than the cover on open**, and that is load-bearing: putting a
+ * View up can start a WMS stitch, so a lokalitet that laid down every extract
  * would spend a minute of Kartverket's rate limit answering a question nobody
  * asked. What `useLocalityWorkspace` seeds it with is the one case that costs
  * a file fetch instead — the cover, when the cover is a View that has already

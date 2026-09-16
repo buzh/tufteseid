@@ -82,9 +82,31 @@
   background: var(--c-bg-hover);
 }
 
-/* The switch and its one action, side by side: a `<button>` cannot nest a
-   `<button>`, so the row's top line is a flex container and the switch is the
-   part of it that stretches. */
+/* `[Visning ▾]`: one member at a time, so the row marks itself the way every
+   dataset pulldown in the ribbon does — Pulldown.module.css's `.itemActive`,
+   copied for the same reason the seam geometry above is. The gutter is on
+   every row of the group, selected or not, or choosing one would shunt the
+   list sideways by three pixels. */
+.selectable {
+  border-left: 3px solid transparent;
+}
+
+.memberSelected {
+  border-left-color: var(--c-accent);
+  background: var(--c-accent-subtle);
+}
+
+.memberSelected:hover {
+  background: var(--c-green-100);
+}
+
+.memberSelected .memberLabel {
+  font-weight: 600;
+}
+
+/* The row's top line. A flex container rather than the button alone because
+   the label has to truncate against the row's own right edge — which is what
+   `min-width: 0` on `.switch` below is for. */
 .head {
   display: flex;
   align-items: center;
@@ -112,13 +134,6 @@
 .switch:focus-visible {
   outline: 2px solid var(--c-focus);
   outline-offset: -2px;
-}
-
-/* Inside the row's padding rather than after it, so the label still truncates
-   against the same right edge whether or not the row carries a verb. */
-.action {
-  flex: none;
-  margin-right: var(--sp-2);
 }
 
 .checkOn {
@@ -180,6 +195,12 @@
   padding: 0 var(--sp-4) var(--sp-2) calc(var(--sp-4) + 18px + var(--sp-4));
   font-size: var(--font-xs);
   color: var(--c-fg-subtle);
+}
+
+/* No checkbox to clear in `select` mode, so the indent is the row's padding
+   alone — the slider still starts under the label. */
+.selectable .fade {
+  padding-left: var(--sp-4);
 }
 
 .fadeLabel {

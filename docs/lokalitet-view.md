@@ -1703,7 +1703,9 @@ now be put on the map as its own pixels over its own rectangle. **The row is
 complete**: `src/shell/LayerGroup.tsx` is the `[thing ▾]` control and all four
 of [Visning], [Bilde], [Skisse] and [Funn] wear it, left to right in the map's
 own z-order. With [Visning] the ground itself became a member and `Gjenskap`
-left the bilde cards for its pulldown; with [Bilde] `Vis i ruta` went entirely,
+left the bilde cards for its pulldown — and then for the pulldown row's own
+press, when that group went one-member-at-a-time (§13.1's postscript); with
+[Bilde] `Vis i ruta` went entirely,
 and selecting a thumbnail stopped carrying a pin of its own — it presses the
 row's switches instead, which is the correction in §13.10 step 6's postscript.
 §4.1, §4.1.1 and §4.1.2
@@ -1765,6 +1767,28 @@ Two consequences of that table:
   is the one reading where "off" means something for this group, and it is a
   real one: a sketch and its funn on white, with nothing underneath arguing.
 
+> **Reversed after build, on the first bullet only** (`docs/ui-architecture.md`
+> §10.1). **[Visning] holds one View at a time and picking one enters it.** Two
+> findings, both from using it. The ground and a stored extract blended is
+> still right and is still what the group does — the ground is the row *under*
+> the selected View, and its fade is how you read one against the other. Two
+> *extracts* blended is the part that went, and the reason is that it was never
+> the ordinary case: a reader stepping through eight readings of one mound had
+> to switch the last one off before the next one meant anything, while W/S —
+> which walked this same group from the day it got a ring — had always shown
+> exactly one. The checkboxes were the only surface in the app saying
+> otherwise. Composing two images over one another is `[Bilde ▾]` and
+> `Oppsett`, which is where a composition worth keeping belonged anyway.
+>
+> And picking a row now *applies the View's spec* as well as putting its pixels
+> up, which is where the `Gjenskap` this design moved into the pulldown ended
+> up: a row that laid down a pinned PNG and left the ribbon saying "Standard"
+> had the settings strip describing knobs nobody was looking at.
+>
+> The second bullet survives with one correction: "off" is the group *label's*
+> reading. The ground preset's own switch is deleted — its row is a stop in the
+> selection and means "no View", not "no ground".
+
 ### 13.2 A View is a Visning, and its figure is not a layer
 
 **`Gjenskap` and `Vis i ruta` are deleted.** Not merged, not renamed —
@@ -1804,7 +1828,8 @@ What that deletes:
   three states stay true of the data and leave the interface.
 
 What survives: `useRecreateView` — it stops being a button and becomes the
-pulldown's apply, unchanged. And `cropOf` / `meta.imageRect`, but only for
+pulldown's apply, unchanged, and then (§13.1's postscript) the pulldown row's
+own press. And `cropOf` / `meta.imageRect`, but only for
 Files (§13.5); no View's figure is laid on the ground any more.
 
 ### 13.3 What a pin is still for, and why it stays eager
@@ -2250,6 +2275,17 @@ Three sequencing rules, and as in §12 they are worth more than the list.
    `<button>` cannot contain a `<button>`; keeping the verb out of the switch's
    hit area is the other half of that, since `Gjenskap` moves the map.
 
+   > **Superseded one release later** (§13.1's postscript,
+   > `docs/ui-architecture.md` §10.1). The group became a *selection* — one
+   > View at a time, the row wearing the accent bar every dataset pulldown
+   > wears — and pressing a row applies its spec, so the trailing button was a
+   > second control for what the press already did. `LayerMember.action`,
+   > `MemberRow`'s `IconButton`, the `.action` rule and
+   > `localities.layers.apply` are all deleted; `.head` stays a flex line
+   > because that is what makes the label truncate against the row's edge.
+   > `groundShownAtom` went with them: the preset's row is a stop meaning "no
+   > View", and hiding the background is the group label's job.
+
    **`Vis i ruta` is now Files-only.** `canPinBilde` gates on `kind` being
    `screenshot` or `upload`: the rail's toggle knows nothing about the stack
    the pulldown orders, and two controls for one layer would disagree the
@@ -2262,16 +2298,19 @@ Three sequencing rules, and as in §12 they are worth more than the list.
    both stances, where §13.8 says *in edit* — `viewItems` was written to the
    corrected rule and `sketchItems` moved to it, matching `bilderItems`.
 
-   The four control atoms live in `map/groundOverlay.ts`, beside the mechanism
+   The control atoms live in `map/groundOverlay.ts`, beside the mechanism
    they drive, for the reason the sketch group's three live in
    `map/sketchOverlay.ts`; none is persisted and `useLocalityWorkspace` empties
-   all four when the lokalitet closes or swaps. `VisningControl` puts the
+   them when the lokalitet closes or swaps. `VisningControl` puts the
    background back on unmount, so no route out leaves a white screen with no
    control that could undo it.
 
 6. **[Bilde]** — the Files. **Built.** `src/shell/BildeControl.tsx` is
    [Visning] minus the ground preset and minus the action: a `screenshot` lays
    down at its extent, with a switch and a fade each and several down at once.
+   (When [Visning] later became a selection, this group kept its checkboxes —
+   it is the one with nothing to enter, so a press here means only "show me
+   this too", and several at once is what it inherited.)
    `ws.fileItems` gates on the kind and on two things only a File needs —
    bytes, and a `bbox25833` — because a switch that cannot do anything is the
    one thing a list of switches must not contain. A View is exempt from both:
@@ -2611,10 +2650,14 @@ be the only way an arrangement outlives the tab.
   announce itself. The cheap partial answer is a `renderedAt` older than some
   threshold marking the row; the honest one is the background re-render above,
   with its maintenance bill.
-- **Whether [Visning]'s stacking makes Sammenlign redundant.** §13.1 says no —
-  a blend and a dragged curtain answer different questions — but two controls
-  for one surface is the failure §1 is about, and this is the nearest the app
-  comes to it. Worth re-asking once the row exists and someone has used both.
+- ~~**Whether [Visning]'s stacking makes Sammenlign redundant.**~~ **Closed
+  from the other end.** §13.1 said no — a blend and a dragged curtain answer
+  different questions — and the worry was that two controls for one surface is
+  the failure §1 is about. What happened instead is that [Visning] stopped
+  stacking (§13.1's postscript): it holds one View over the ground, which is a
+  blend of two and nothing more, and the compositions of three are `[Bilde ▾]`
+  and `Oppsett`. Sammenlign is untouched and the overlap is smaller than the
+  question assumed.
 - **What a scene does when a member changes under it.** A sketch redrawn, an
   upload's assumed extent corrected, a member deleted outright. `over` is
   uncascaded, so a deleted member leaves a dangling id and the scene quietly

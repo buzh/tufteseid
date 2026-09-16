@@ -415,6 +415,8 @@
       "restored": "The arrangement is back on the map.",
       "missing_one": "One layer no longer exists and has been left out.",
       "missing_other": "{{count}} layers no longer exist and have been left out.",
+      "oneView_one": "The Ground group shows one at a time, so the bottom layer has been left out.",
+      "oneView_other": "The Ground group shows one at a time, so the bottom {{count}} layers have been left out.",
       "unreadable": "This arrangement cannot be read back."
     },
     "layers": {
@@ -424,7 +426,6 @@
       "visningMembers": "Choose what lies in the ground",
       "ground": "Background",
       "view": "View {{n}}",
-      "apply": "Recreate — put the map back the way this view was made",
       "bilde": "Image",
       "bildeHide": "Hide the images on the map",
       "bildeShow": "Show the images on the map again",

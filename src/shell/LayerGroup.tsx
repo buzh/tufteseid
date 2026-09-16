@@ -1,13 +1,6 @@
 import { Fragment, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  cx,
-  Icon,
-  IconButton,
-  type MaterialSymbol,
-  Popover,
-  Tooltip,
-} from '../ui';
+import { cx, Icon, type MaterialSymbol, Popover, Tooltip } from '../ui';
 import styles from './LayerGroup.module.css';
 import { ModeButton } from './ModeButton';
 
@@ -62,15 +55,6 @@ export type LayerMember = {
    * their other modifiers are, on the settings strip.
    */
   opacity?: number;
-  /**
-   * One verb the row carries, at its right edge.
-   *
-   * There is exactly one so far and it is `Gjenskap` (§13.2): the button left
-   * the bilde card when [Visning] arrived and became this, the pulldown's
-   * apply. A member that has no view behind it — a File, the ground preset —
-   * leaves it out, which is the same "absent, not disabled" the card made.
-   */
-  action?: { icon: MaterialSymbol; label: string; onClick: () => void };
   /**
    * Switched on, and nothing arrived.
    *
@@ -202,14 +186,25 @@ export const LayerGroup = ({
  *
  * Exported separately from `LayerGroup` so that a group with a body of its own
  * does not have to pretend its records are plain layers — see the note above.
+ *
+ * `select` is the other polarity, and `[Visning ▾]` is the one group that
+ * wears it: exactly one member at a time, so a press *replaces* rather than
+ * toggles and the row marks itself the way every dataset pulldown in the
+ * ribbon does — a left bar, no glyph. The two modes share this component
+ * rather than forking it because what differs is those two lines; everything
+ * a member row is *for* — the provenance under the label, the note, the
+ * warning, the fade — is the same question asked of the same record.
  */
 export const LayerMembers = ({
   members,
-  onToggleMember,
+  select = false,
+  onPressMember,
   onSetOpacity,
 }: {
   members: readonly LayerMember[];
-  onToggleMember: (id: string) => void;
+  /** One member at a time: press to select, not to toggle. */
+  select?: boolean;
+  onPressMember: (id: string) => void;
   onSetOpacity: (id: string, opacity: number) => void;
 }) => (
   <div className={styles.members}>
@@ -220,7 +215,8 @@ export const LayerMembers = ({
         )}
         <MemberRow
           member={member}
-          onToggle={() => onToggleMember(member.id)}
+          select={select}
+          onPress={() => onPressMember(member.id)}
           onSetOpacity={(value) => onSetOpacity(member.id, value)}
         />
       </Fragment>
@@ -231,22 +227,30 @@ export const LayerMembers = ({
 /*
  * A switch and a fade, per member.
  *
- * The switch is a checkbox rather than a `PulldownItem`'s left bar for the
- * reason `PulldownCheck` gives: several rows are on at once, and a bar that
- * says "this is the one" says the wrong thing about the other three. It is not
- * `PulldownCheck` itself because that row is a single line and this one grows
- * a slider under it.
+ * In toggle mode the switch is a checkbox rather than a `PulldownItem`'s left
+ * bar for the reason `PulldownCheck` gives: several rows are on at once, and a
+ * bar that says "this is the one" says the wrong thing about the other three.
+ * In `select` mode exactly one row *is* the one, so the bar is what the row
+ * wears and the glyph goes — which is also what makes `[Visning ▾]` read as
+ * the sibling of the four dataset pulldowns it has always behaved like under
+ * W/S. Neither is `PulldownCheck` or `PulldownItem` itself, because those rows
+ * are a single line and this one grows a slider under it.
  *
  * The slider is absent rather than disabled while the member is off — a fade
  * that cannot be seen is indistinguishable from a fade that does nothing, the
  * same call `TerrainSliders` makes — and it streams, because what is being
  * watched is the layer underneath coming through and a fade that only lands on
  * release cannot be aimed. A member with no `opacity` at all never grows one.
+ * It survives the move to one-at-a-time and is the better half of it: fading
+ * the one View that is up is now how you read it *against* the ground it was
+ * rendered on, which selecting it has just put underneath.
  *
- * The switch fills the row, and an action sits beside it rather than in it: a
- * `<button>` cannot contain a `<button>`, so `.head` is the flex line the two
- * share. That is also why the action is not part of the switch's hit area —
- * `Gjenskap` moves the map, and a press meant for a checkbox must not.
+ * The switch fills `.head` on its own. It used to share that line with one
+ * verb — `Gjenskap`, at the right edge of a [Visning] row — and that verb is
+ * gone because pressing the row performs it: a second control for "put the map
+ * back the way this image was taken" beside a press that does exactly that is
+ * the failure docs/ui-architecture.md §1 is about. `.head` stays a flex line:
+ * the seam is what made the label truncate correctly.
  *
  * **0 % is opaque.** The word on screen is transparency, so the number counts
  * what the word names; the map holds opacity and the flip is here, at the
@@ -257,32 +261,41 @@ export const LayerMembers = ({
  */
 const MemberRow = ({
   member,
-  onToggle,
+  select,
+  onPress,
   onSetOpacity,
 }: {
   member: LayerMember;
-  onToggle: () => void;
+  select: boolean;
+  onPress: () => void;
   onSetOpacity: (opacity: number) => void;
 }) => {
   const { t } = useTranslation();
-  const { action } = member;
   const transparency = member.opacity == null ? null : 100 - member.opacity;
 
   return (
-    <div className={styles.member}>
+    <div
+      className={cx(
+        styles.member,
+        select && styles.selectable,
+        select && member.shown && styles.memberSelected,
+      )}
+    >
       <div className={styles.head}>
         <button
           type="button"
-          role="menuitemcheckbox"
+          role={select ? 'menuitemradio' : 'menuitemcheckbox'}
           aria-checked={member.shown}
           className={styles.switch}
-          onClick={onToggle}
+          onClick={onPress}
         >
-          <Icon
-            icon={member.shown ? 'check_box' : 'check_box_outline_blank'}
-            size={18}
-            className={member.shown ? styles.checkOn : styles.checkOff}
-          />
+          {!select && (
+            <Icon
+              icon={member.shown ? 'check_box' : 'check_box_outline_blank'}
+              size={18}
+              className={member.shown ? styles.checkOn : styles.checkOff}
+            />
+          )}
           <span className={styles.memberLabel}>
             {member.label}
             {member.meta && (
@@ -302,18 +315,6 @@ const MemberRow = ({
             )}
           </span>
         </button>
-        {action && (
-          <Tooltip label={action.label}>
-            <IconButton
-              icon={action.icon}
-              size="sm"
-              palette="gray"
-              className={styles.action}
-              aria-label={action.label}
-              onClick={action.onClick}
-            />
-          </Tooltip>
-        )}
       </div>
       {member.shown && transparency != null && (
         <label className={styles.fade}>

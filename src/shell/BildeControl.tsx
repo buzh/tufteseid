@@ -165,7 +165,7 @@ export const BildeControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         {() => (
           <LayerMembers
             members={members}
-            onToggleMember={toggleFile}
+            onPressMember={toggleFile}
             onSetOpacity={(id, value) =>
               setOpacity((cur) => new Map(cur).set(id, value))
             }

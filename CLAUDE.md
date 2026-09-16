@@ -107,10 +107,17 @@ all of them.
   and a fade each) or a surface of its own, as `[Funn ▾]` brings `FunnList`.
   `[Visning ▾]` (`src/shell/VisningControl.tsx`, §10.1 of the UI doc) holds the
   ground preset at the bottom and every View in the lokalitet above it, so
-  switching an extract or a 1937 ortofoto onto the ground — several at once,
-  each faded — is now one pulldown; `Gjenskap` moved there as the View row's
-  apply, and switching the whole group off leaves a sketch and its funn on
-  white. Two later corrections to how that group *arrives*, both §10.1: a
+  switching an extract or a 1937 ortofoto onto the ground is now one pulldown,
+  and switching the whole group off leaves a sketch and its funn on white.
+  That group is a **selection, not a set of checkboxes**: one View at a time
+  over the ground, faded to read one against the other, and **pressing a row
+  enters the View** — the ground it was rendered on, its dataset, its knobs —
+  which is where `Gjenskap` finally went, from a button on the card, to a
+  button in the row, to the press itself. `src/shell/visningRing.ts` is the one
+  entrance (`selectVisningAtom`) and W/S go through it too, so the keys, the
+  pointer and the rail cannot disagree about what is up; stacking two Views is
+  gone on purpose and composing images is `[Bilde ▾]` and `Oppsett`. Two
+  earlier corrections to how that group *arrives*, both §10.1: a
   lokalitet opens with its **cover** on the ground when the cover is a View
   that has already been pinned (nothing else, and never a live render — the
   old empty-on-open rule left a place whose point is three readings of one
@@ -122,7 +129,8 @@ all of them.
   (`src/shell/visningRing.ts`, §5.3 — which is also why the four dataset
   pulldowns compose their `· W/S` heading instead of translating it).
   `[Bilde ▾]` (`src/shell/BildeControl.tsx`) is the same control minus
-  the ground preset and minus the action, over the Files — and step 6, which
+  the ground preset and minus the recreate, over the Files — checkboxes, since
+  a File has no spec to enter and several at once is the point — and step 6, which
   built it, is where the whole pin mechanism went: `Vis i ruta`,
   `usePinnedBilde`, `BildeTransparency` on the rectangle, the fold/unfold
   restore, and the `Bilder` button's light, which four group labels answer
@@ -404,7 +412,8 @@ pixels are made later by the pin queue (see below).
 Entering it over a lokalitet **seeds the knobs from that lokalitet's cover
 terrain render**, once per lokalitet, so coming back to a place opens on the
 light that showed the feature rather than on the module defaults. Details and
-the reason the seed can't step on "Gjenskap": `docs/ui-architecture.md` §10.
+the reason the seed can't step on a recreate — which a W/S step in `[Visning ▾]`
+can now be: `docs/ui-architecture.md` §10.
 
 - Source is hoydedata.no's ArcGIS ImageServers via `exportImage` with
   `renderingRule={"rasterFunction":"None"}` — the service's *other* raster

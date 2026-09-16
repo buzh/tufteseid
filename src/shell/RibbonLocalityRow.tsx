@@ -519,7 +519,7 @@ const SkisseControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
       {() => (
         <LayerMembers
           members={members}
-          onToggleMember={ws.toggleSketch}
+          onPressMember={ws.toggleSketch}
           onSetOpacity={ws.setSketchOpacity}
         />
       )}

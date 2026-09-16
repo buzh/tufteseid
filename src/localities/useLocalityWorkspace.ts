@@ -50,7 +50,6 @@ import {
   bildeGroupShownAtom,
   bildeOpacityAtom,
   bildeShownAtom,
-  groundShownAtom,
   provisionalViewAtom,
   visningGroupShownAtom,
   visningOpacityAtom,
@@ -71,6 +70,7 @@ import {
 } from '../map/layers/config/backgroundLayers/atoms';
 import { fitPadding, FUNN_MARGIN_PX } from '../shell/chromeInsets';
 import { recreateViewAtom } from '../shell/useRecreateView';
+import { selectVisningAtom } from '../shell/visningRing';
 import { toast } from '../ui';
 import {
   activeLocalityAtom,
@@ -304,7 +304,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
    * once per slider frame. `keepScene` reads those off the store at the
    * instant of the press instead.
    */
-  const [groundShown, setGroundShown] = useAtom(groundShownAtom);
   const [visningShown, setVisningShown] = useAtom(visningShownAtom);
   const setVisningOpacity = useSetAtom(visningOpacityAtom);
   const [visningGroupShown, setVisningGroupShown] = useAtom(
@@ -948,13 +947,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       // a group left off would open it with the sketches mysteriously absent.
       setSketchOpacityMap(new Map());
       setSketchGroupShown(true);
-      // [Visning]'s four, on the same grounds and with one extra: the ground
-      // preset's switch can leave the map with *no background at all*
-      // (§13.1), so a lokalitet closed with it off would hand the next one a
-      // white screen. `VisningControl` puts the tile layers back on unmount;
-      // this is what stops a swap — which does not unmount it — from carrying
-      // the arrangement across.
-      setGroundShown(true);
+      // [Visning]'s three, on the same grounds. The group's own switch can
+      // leave the map with *no background at all* (§13.1), so a lokalitet
+      // closed with it off would hand the next one a white screen.
+      // `VisningControl` puts the tile layers back on unmount; this is what
+      // stops a swap — which does not unmount it — from carrying the
+      // arrangement across.
       setVisningShown(new Set());
       setVisningOpacity(new Map());
       setVisningGroupShown(true);
@@ -988,7 +986,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setSketchShown,
     setSketchOpacityMap,
     setSketchGroupShown,
-    setGroundShown,
     setVisningShown,
     setVisningOpacity,
     setVisningGroupShown,
@@ -2691,19 +2688,18 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   /*
    * The ground under the arrangement, or null where there is none to name.
    *
-   * Both switches gate it, for the same reason they gate the pixels: the
-   * preset's, because that is what the preset is, and the group's, because a
-   * group that is off is not on the map. Standard and Hybrid answer null even
-   * when both are on — there is no rectangle-fetch path for the topo WMS, so
-   * the honest record of a stack built over one is a stack over nothing
+   * The group's switch gates it, for the same reason it gates the pixels: a
+   * group that is off is not on the map. (The preset's own switch used to gate
+   * it too; it is gone — the preset's row is the group's "no View" stop now,
+   * and a ground that is showing is a ground worth naming whether or not a
+   * View sits over part of it.) Standard and Hybrid answer null even when the
+   * group is on — there is no rectangle-fetch path for the topo WMS, so the
+   * honest record of a stack built over one is a stack over nothing
    * (`sceneSpec.ts`).
    */
   const sceneGround = useMemo(
-    () =>
-      visningGroupShown && groundShown
-        ? sceneGroundOf(offer, beholdBbox)
-        : null,
-    [visningGroupShown, groundShown, offer, beholdBbox],
+    () => (visningGroupShown ? sceneGroundOf(offer, beholdBbox) : null),
+    [visningGroupShown, offer, beholdBbox],
   );
 
   const sceneShownCount =
@@ -2793,6 +2789,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   ]);
 
   const recreate = useSetAtom(recreateViewAtom);
+  const selectVisning = useSetAtom(selectVisningAtom);
 
   /*
    * …and back: put a kept arrangement on the map again (§13.7).
@@ -2828,6 +2825,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       const skisse = new Set<string>();
       const fades = new Map<string, number>();
       let missing = 0;
+      // Scenes kept while `[Visning ▾]` was multi-select can name two Views,
+      // and the group shows one. `composition.layers` is bottom-to-top, so
+      // the last one wins and the ones under it are dropped — said out loud
+      // below, because a restore that silently comes back smaller is a
+      // restore nobody can trust.
+      let dropped = 0;
       for (const layer of composition.layers) {
         const member = byId.get(layer.id);
         if (!member || deletedIds.has(member.id)) {
@@ -2838,6 +2841,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         switch (member.kind) {
           case 'extract':
           case 'flyfoto':
+            dropped += visning.size;
+            visning.clear();
             visning.add(member.id);
             break;
           case 'screenshot':
@@ -2884,15 +2889,21 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       const groundSpec = composition.ground
         ? viewSpecOf(composition.ground)
         : null;
-      if (groundSpec && groundSpec.kind !== 'scene') {
-        setGroundShown(true);
-        recreate(groundSpec);
-      }
+      // The scene's own ground, not the surviving View's: a scene records what
+      // was underneath its layers, and that is the answer even where the top
+      // layer is a render of some other ground. So the members go on the map
+      // by hand here rather than through `selectVisningAtom`, whose whole
+      // point is that choosing a View also enters it.
+      if (groundSpec && groundSpec.kind !== 'scene') recreate(groundSpec);
 
-      if (missing > 0) {
+      const notes = [
+        missing > 0 ? t('localities.scene.missing', { count: missing }) : null,
+        dropped > 0 ? t('localities.scene.oneView', { count: dropped }) : null,
+      ].filter((n): n is string => !!n);
+      if (notes.length > 0) {
         toast.warning({
           title: t('localities.scene.restored'),
-          description: t('localities.scene.missing', { count: missing }),
+          description: notes.join(' '),
         });
       } else {
         toast.success({ title: t('localities.scene.restored') });
@@ -2911,7 +2922,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setVisningGroupShown,
       setBildeGroupShown,
       setSketchGroupShown,
-      setGroundShown,
       recreate,
       t,
     ],
@@ -2978,7 +2988,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       const skisse =
         rec.kind === 'sketch' && !!rec.meta && !deletedIds.has(id);
       if (!visning && !bilde && !skisse) return;
-      setVisningShown(visning ? new Set([id]) : new Set<string>());
+      // A View goes through `[Visning ▾]`'s own entrance rather than straight
+      // at the atom, which is what makes a card and a pulldown row the same
+      // gesture: the ground the render was made on comes back with it, and the
+      // ribbon describes the image the reader is looking at. The rail is still
+      // speaking the row's atoms and owning no map machinery of its own — that
+      // is the rule step 6 left standing; the entrance is just where the rule
+      // now lives.
+      if (visning) selectVisning(id);
+      else setVisningShown(new Set<string>());
       setBildeShown(bilde ? new Set([id]) : new Set<string>());
       setSketchShown(skisse ? new Set([id]) : new Set<string>());
       setVisningGroupShown(true);
@@ -2986,7 +3004,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setSketchGroupShown(true);
       // Asking for an image by name is the user's statement about the stack,
       // so the arrival guess is spent and the next ground press no longer
-      // reaches in to withdraw it (§10.1).
+      // reaches in to withdraw it (§10.1). `selectVisning` has already said so
+      // on its own arm; this is the other two.
       setProvisionalView(null);
     },
     [
@@ -2995,6 +3014,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       fileItems,
       deletedIds,
       restoreScene,
+      selectVisning,
       setVisningShown,
       setBildeShown,
       setSketchShown,
@@ -3328,6 +3348,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setActiveBildeId(cover.id);
     if (!isPinned(cover)) return;
     if (cover.kind !== 'extract' && cover.kind !== 'flyfoto') return;
+    // Written directly rather than through `selectVisningAtom`, and this is
+    // the one place that is right: the group's entrance also *enters* the View
+    // (§10.1), and an arrival that moved the ribbon onto a ground nobody asked
+    // for would be the app making a guess it then has to be talked out of.
+    // Lay the pixels down, leave the controls alone.
     setVisningShown(new Set([cover.id]));
     // And it is only a guess until the user has said otherwise: the first
     // ground they ask for takes it back down, because an opaque image over the
