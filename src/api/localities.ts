@@ -92,6 +92,33 @@ export const getLocality = async (id: string): Promise<LocalityRecord> => {
     .getOne<LocalityRecord>(id, { expand: 'owner' });
 };
 
+/*
+ * The share link's resolver (docs/lokalitet-view.md §10): a code, not an id.
+ *
+ * Uppercased on the way in because the code is *displayed* uppercase and
+ * matched case-insensitively — people type it off a note, and SQLite's `=`
+ * on a plain text column is not case-folding. The stored value is always
+ * uppercase (`newLocalityCode` draws from an uppercase alphabet), so folding
+ * the input is the whole of it.
+ *
+ * A miss and a record the reader may not see are the same 404 here: PB
+ * applies the list rule before it counts rows, so `getFirstListItem` on a
+ * private lokalitet somebody else owns throws exactly as it does on a code
+ * that was never minted. That is the correct answer to give the caller too —
+ * telling a stranger that a code exists but is not theirs is a leak, not a
+ * better error message.
+ */
+export const getLocalityByCode = async (
+  code: string,
+): Promise<LocalityRecord> => {
+  return pb
+    .collection(COLLECTION)
+    .getFirstListItem<LocalityRecord>(
+      pb.filter('code = {:code}', { code: code.toUpperCase() }),
+      { expand: 'owner' },
+    );
+};
+
 // Crockford base32: the digits and the consonants, minus I, L, O and U, so
 // a code can be read aloud without being spelled out. Exactly 32 symbols,
 // and a byte is exactly eight of those, so `% 32` is uniform — no rejection

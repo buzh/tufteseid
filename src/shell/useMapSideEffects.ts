@@ -5,6 +5,7 @@ import {
   useLocalityClick,
 } from '../localities/localityLayer';
 import { useFunnVisibility } from '../localities/funnVisibility';
+import { useLocalityShareLink } from '../localities/shareLink';
 import { useFeatureInfoClick } from '../map/featureInfo/useFeatureInfo';
 import { useLidarFootprintsLayer } from '../map/lidarFootprintsLayer';
 import { useBackgroundCyclingKeys } from '../map/useBackgroundCyclingKeys';
@@ -43,6 +44,12 @@ export const useMapSideEffects = () => {
   useFunnHighlightLayer();
   useFunnPointer();
   useLocalityClick();
+  // `?lok=CODE`, both directions: the open lokalitet written into the URL,
+  // and a shared link resolved on a cold load. Here rather than in the
+  // ribbon because it has to run while *nothing* is open — that is the whole
+  // case it exists for — and because it must be mounted exactly once, like
+  // the subscriptions above it.
+  useLocalityShareLink();
   // After the three layers it hides, so the first pass finds them.
   useFunnVisibility();
   useLidarFootprintsLayer();

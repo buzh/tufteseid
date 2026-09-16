@@ -6,6 +6,7 @@ import type { LocalityRecord } from '../api/localities';
 import { funnHiddenAtom, funnSwitchedOffAtom } from '../localities/atoms';
 import { funnGroupsOf, funnSectionsOf } from '../localities/funnGroups';
 import { FunnList } from '../localities/FunnList';
+import { copyShareLink } from '../localities/shareLink';
 import {
   bilderStripOpenAtom,
   localityDetailsOpenAtom,
@@ -229,6 +230,25 @@ const OverflowMenu = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             icon: 'info',
             label: t('localities.workspace.details'),
             onSelect: () => setDetailsOpen(true),
+          },
+          /* `Del` — the link to this lokalitet (docs/lokalitet-view.md §10).
+             Both stances and every access level: a reader sharing on a
+             lokalitet they were shown is the ordinary case, and the link
+             grants nothing the recipient does not already have. It is a menu
+             item rather than a surface of its own because it is one
+             clipboard write, and it sits beside the short code it is made
+             of — `LocalityCode` copies the six characters for a phone call,
+             this copies the URL for a message.
+
+             The toast names the visibility consequence rather than the menu
+             hiding the verb on a private record: "nobody else can open this"
+             is a fact about the lokalitet worth being told, and a `Del` that
+             silently is not there teaches nothing. */
+          {
+            icon: 'share',
+            label: t('localities.share.copyLink'),
+            disabled: !ws.locality.code,
+            onSelect: () => copyShareLink(ws.locality),
           },
           /* The two that write are `canEdit`, not merely `mayEdit`: the menu
              is on the row in show as well now — Detaljer above has to be

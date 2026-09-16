@@ -296,6 +296,14 @@
       "taking": "Hentar…",
       "takeFailed": "Biletet kunne ikkje hentast."
     },
+    "share": {
+      "copyLink": "Del",
+      "copied": "Lenkja er kopiert",
+      "copiedPublic": "Alle som er logga inn kan opne lokaliteten med lenkja.",
+      "copiedPrivate": "Lokaliteten er privat, så berre du kan opne lenkja. Endre synlegheita under Detaljar.",
+      "notFound": "Fann ingen lokalitet med koden {{code}}",
+      "notFoundHint": "Lokaliteten kan vere sletta, eller privat."
+    },
     "funn": {
       "heading": "Funn",
       "listHint": "Funna i denne lokaliteten",

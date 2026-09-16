@@ -512,7 +512,7 @@ for the legacy Norgeskart `#!?` hash format.
 Live parameters: `lat`, `lon`, `zoom` (written on every map `moveend`),
 `backgroundLayer`, `hybrid`, `contours`, `lidarModel`, `themeLayers`,
 `heritageDetails`, `heritageRender`, `heritageOpacity`, `sok`, `markerLat`,
-`markerLon`, `showSelection`.
+`markerLon`, `showSelection`, `lok`.
 
 `backgroundLayer` carries the Standard cartography as well, because a variant
 *is* a layer name (§5.10) — so there is no second parameter, and
@@ -527,13 +527,20 @@ rather than with `getListUrlParameter`, because that helper cannot tell an
 absent parameter from an empty one and "no sublayers" is a state the picker can
 reach.
 
+`lok` is the odd one out and the only one that can *fail*: every other
+parameter names a setting, and this one names a record. It carries the
+lokalitet's six-character code rather than its PB id, and
+`src/localities/shareLink.ts` owns both directions of it — see §8.13, which is
+where the reason each half is shaped the way it is lives. The one thing worth
+repeating here: the boot code is read at **module import**, not during the
+first render, because the writer deletes `lok` whenever nothing is open and on
+a cold load nothing is.
+
 Dead entries still in the union: `rotation`, `drawing`, `printTool` have no live
 writers, and `projection` is read but never written. Not persisted at all,
-though arguably they should be: the active LiDAR **style** and **project**, and
-the open lokalitet. Sharing a link to "this terrain, styled this way, on this
-lokalitet" is not currently possible, and for a tool whose whole point is
-showing someone else a suspicious bump in the ground, that is a real gap worth
-closing in the rewrite.
+though arguably they should be: the active LiDAR **style** and **project**.
+Sharing a link to "this terrain, styled this way" is still not possible — the
+lokalitet half of that gap closed with `lok`, the styling half did not.
 
 ---
 
@@ -1943,7 +1950,9 @@ riding on `Avbryt`, whose grain is the whole session.
 There is no `[←]` back arrow: leaving is an exit, exits are on the right, and
 one lokalitet should not have two ways out at opposite ends of the same row.
 Edit tints the row (`.rowEdit`) — the zones already differ, so the tint is the
-confirmation rather than the signal. `Del` is absent until `?lok=CODE` exists.
+confirmation rather than the signal. `Del` waited for `?lok=CODE`, which now
+exists, and landed in the `⋮` menu rather than on the row itself (§8.13) — it
+is one clipboard write, and the exits zone is for exits.
 
 The two depth-0 rows are **one slot, filled two ways**: `mayEdit` decides which
 verb a lokalitet offers, and a reader gets `Lag min kopi` (§8.12) rather than a
@@ -1952,10 +1961,13 @@ other, and it needs somewhere to put the new record.
 
 The `[⋮]` menu is on the row in **both** stances, and it is how a reader opens
 Detaljer. Its two writing items (`Juster området`, `Slett`) are gated on
-`canEdit` inside it, so in show it holds two entries: `Zoom til lokaliteten`
-and Detaljer. Zoom is there unconditionally because the name — the fast way to
-it — means *rename* in edit, and a verb that changes homes with the stance is
-a verb you have to hunt for.
+`canEdit` inside it, so in show it holds three entries: `Zoom til
+lokaliteten`, Detaljer and `Del` (§8.13). Zoom is there unconditionally
+because the name — the fast way to it — means *rename* in edit, and a verb
+that changes homes with the stance is a verb you have to hunt for. `Del` is
+unconditional for a different reason: a reader sharing on a lokalitet they
+were shown is the ordinary case, and a link grants nothing the recipient did
+not already have.
 
 The **banner slot** takes the space the old summary line (`3 funn · 12 ha`)
 occupied, holds at most one sentence, and answers only *whose is this and what
@@ -2018,7 +2030,8 @@ opening anything else.
 
 **Nothing in show writes.** Not disabled verbs — *absent* ones: the write-verb
 zone does not render, the name renames nobody (it zooms to the rectangle
-instead), the `⋮` menu holds only zoom and Detaljer and its fields are
+instead), the `⋮` menu holds only zoom, Detaljer and `Del` — none of which write —
+and its fields are
 read-only, and the bottom edge is a rail with
 no delete, no reordering, no hide-from-exhibit and a read-only caption rather
 than the same
@@ -3786,6 +3799,74 @@ paid for by whoever asked. Four things about that tail:
   which says it once and withdraws `Åpne originalen` rather than offering a
   link known to be dead.
 
+### 8.13 The share link — `Del`, `?lok=` and `/l/CODE`
+
+`src/localities/shareLink.ts`, plus six lines in the `Caddyfile`. Design:
+`docs/lokalitet-view.md` §10.
+
+**The code is the link.** `?lok=K7M2QX` is the parameter and
+`/l/K7M2QX` the short URL, and neither needs a redirect table, because the
+six-character code already addresses the record (§8.1's row shows it; the
+migration that added it says why). So the "short URL" is a `redir` on our own
+Caddy — one `path_regexp` on `^/l/([0-9A-Za-z]+)$` into `/?lok=…` — rather than
+a service, and the app only ever writes the long spelling, so there is exactly
+one form to keep parsing. Deliberately **not** an SPA fallback over
+`file_server`: a catch-all rewrite to `index.html` would change what every
+wrong path in the app does, and a 404 for a URL nobody minted is the right
+answer.
+
+**Both directions live in one module**, because the writer and the reader have
+to agree about spelling, case and — the part that actually bites — *when* the
+parameter may be removed:
+
+- **The writer** puts the open lokalitet's code in the URL and takes it out
+  when the lokalitet closes. Keyed on the code, not the record, so re-fetching
+  the same lokalitet does not rewrite the URL.
+- **The reader** resolves `?lok=` once, on a cold load, through
+  `getLocalityByCode` — a `getFirstListItem` on the uppercased code, since the
+  code is displayed uppercase and typed off a note in whatever case.
+- **The boot code is captured at module import**, not during the first render.
+  On a cold load nothing is open yet, so a writer that ran first would delete
+  the parameter before the reader ever saw it. Reading it before React starts
+  is what makes the race impossible rather than unlikely.
+- **The writer holds off until the reader has settled.** A guest at the
+  sign-in wall still has the link in their address bar, so reloading during
+  sign-in is not what loses it.
+
+**The sign-in wall is the read rules, not a policy decision here.** All
+lokalitet content requires auth, including `public` ones, so a guest following
+a link gets `isAuthDialogOpenAtom` raised and the code waits in the module
+until `currentUserAtom` fills in — asking PocketBase first would answer 404 for
+the wrong reason. **A miss and a lokalitet the reader may not see are one
+message**, because the API cannot tell them apart and telling a stranger that a
+code exists but is not theirs is a leak rather than a better error.
+
+**A link opens in `show`, whoever follows it** (§8.1, §2). Nothing in this
+module writes `editingLocalityIdAtom`, and that is the whole of the
+enforcement — stance is keyed on a record id that starts null, so the rule
+holds by construction rather than by this module remembering it.
+
+**The link carries no viewport.** No `lat`/`lon`/`zoom` of the sender's: the
+workspace fits the map to the rectangle when it mounts (`zoomToLocality`, keyed
+on the record id), so a shared link frames the lokalitet for free — and a
+pinned viewport would be a link that opens somewhere else the day somebody
+uses `Juster området`.
+
+**`Del` is an item in the `⋮` menu** (`OverflowMenu`), in both stances and for
+every access level. A reader sharing a lokalitet they were shown is the
+ordinary case, and the link grants nothing the recipient did not already have.
+It sits beside the short code it is made of: `LocalityCode` copies six
+characters for a phone call, `Del` copies the URL for a message.
+
+**The toast names the visibility consequence.** Visibility is set in Detaljer,
+once, months before anybody shares anything, and a link to a `private`
+lokalitet answers "finner ikke" for everyone but its owner. So a public record
+gets a `success` and everything else a `warning` that says only you can open
+it and where to change that — rather than the menu hiding `Del`, which would
+teach nothing. `limited` gets the private wording, because `limited` behaves as
+`private` until groups exist and the toast has to describe what the server will
+actually do.
+
 ---
 
 ## 9. Drawing
@@ -4933,7 +5014,11 @@ three ways past the question; delete it; frame the map
 back on it by clicking its name or from the row's `⋮`; browse "Mine
 lokaliteter"; click a rectangle on the map to open it; see which known
 kulturminner already fall inside it; read its details in a dialog off the
-row's `⋮`; on somebody else's, press **Lag min kopi** and get the rectangle,
+row's `⋮`; copy a link to it with **Del** from the same menu, in either
+stance and whoever you are, and be told at that moment whether anybody else
+can open it; follow one and land on the lokalitet, framed on its rectangle and
+in show, after signing in if you were not; on somebody else's, press **Lag min
+kopi** and get the rectangle,
 the details, every funn and every image the app can make again as a private
 lokalitet of your own, with the original named in the banner and one press away
 — and the screenshots and uploads that stayed behind still shown at the end of

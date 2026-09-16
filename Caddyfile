@@ -30,6 +30,26 @@ route {
         "
         header Permissions-Policy "geolocation=(self), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), accelerometer=(), camera=()"
 
+        # /l/K7M2QX — the short URL for a lokalitet (docs/lokalitet-view.md
+        # §10). A redirect to /?lok=K7M2QX and nothing more: the six-character
+        # code *is* the key, so there is no table to look anything up in and
+        # no reason for this to be a service. The SPA only ever writes the
+        # long spelling, so the short one has exactly one job — surviving
+        # being pasted into a message — and the app has one form to parse.
+        #
+        # Deliberately a `redir` on one narrow pattern rather than an SPA
+        # fallback over `file_server`: a catch-all rewrite to /index.html
+        # would change what every wrong path in the app does, and a 404 for a
+        # URL nobody minted is the right answer.
+        #
+        # One alphanumeric segment, not exactly six characters. A `{6}`
+        # quantifier in a Caddyfile is a brace in a config format that reads
+        # braces as structure, and the length check buys nothing anyway: the
+        # app has to answer "no such lokalitet" for a well-formed code that
+        # names nothing, which is the same message a malformed one gets.
+        @shortLink path_regexp shortLink ^/l/([0-9A-Za-z]+)$
+        redir @shortLink /?lok={re.shortLink.1}
+
         # Proxies to wmscache. One handler per upstream host — the second
         # path segment picks the host, the rest is passed through to that
         # host's WMS namespace. Layer configs use these same-origin paths

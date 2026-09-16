@@ -296,6 +296,14 @@
       "taking": "Henter…",
       "takeFailed": "Bildet kunne ikke hentes."
     },
+    "share": {
+      "copyLink": "Del",
+      "copied": "Lenken er kopiert",
+      "copiedPublic": "Alle som er logget inn kan åpne lokaliteten med lenken.",
+      "copiedPrivate": "Lokaliteten er privat, så bare du kan åpne lenken. Endre synligheten under Detaljer.",
+      "notFound": "Fant ingen lokalitet med koden {{code}}",
+      "notFoundHint": "Lokaliteten kan være slettet, eller privat."
+    },
     "funn": {
       "heading": "Funn",
       "listHint": "Funnene i denne lokaliteten",

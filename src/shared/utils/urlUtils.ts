@@ -131,4 +131,9 @@ export type NKUrlParameter =
   | 'drawing'
   | 'sok'
   | 'showSelection'
-  | 'printTool';
+  | 'printTool'
+  // The open lokalitet, as its six-character code rather than its PB id —
+  // `src/localities/shareLink.ts` owns both directions of it. The only
+  // parameter here that names a *record* instead of a view setting, which
+  // is why it is the only one that can fail to resolve.
+  | 'lok';

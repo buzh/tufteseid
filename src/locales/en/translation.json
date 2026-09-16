@@ -296,6 +296,14 @@
       "taking": "Fetching…",
       "takeFailed": "The image could not be fetched."
     },
+    "share": {
+      "copyLink": "Share",
+      "copied": "Link copied",
+      "copiedPublic": "Anyone signed in can open the locality with this link.",
+      "copiedPrivate": "This locality is private, so only you can open the link. Change its visibility under Details.",
+      "notFound": "No locality found with the code {{code}}",
+      "notFoundHint": "It may have been deleted, or it may be private."
+    },
     "funn": {
       "heading": "Finds",
       "listHint": "The finds in this locality",

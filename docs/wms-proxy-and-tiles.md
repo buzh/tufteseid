@@ -58,6 +58,14 @@ go through `/nib-wms/` and `/nib-arcgis/`, and hoydedata through
 `/hoydedata-arcgis/` — same reason, since both ArcGIS upstreams would
 otherwise want the same `/arcgis/` path inside nginx.
 
+**One route in the `Caddyfile` is not a proxy at all**: `/l/<code>` is a
+`redir` to `/?lok=<code>`, the short URL for a lokalitet
+(`docs/lokalitet-view.md` §10). It touches no upstream and needs no cache rule;
+it is here because this file is what you read before editing that file. Note
+that `file_server` still has **no SPA fallback**, deliberately — the redirect
+is one narrow pattern rather than a catch-all rewrite to `index.html`, so every
+other unknown path still 404s.
+
 Cache config at `nginx/wms-cache.conf` (per-upstream `location` blocks)
 + `nginx/wms-proxy-common.conf` (shared cache/timeout/header defaults).
 Cache lives on the `wmscache` docker volume with a 25 GB LRU cap. Not

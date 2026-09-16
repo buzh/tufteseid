@@ -1,10 +1,10 @@
 # The lokalitet view
 
-**Status: §1–§12 built, §13 designed and eight steps in.** §12's build order is
-complete through step 15; what is left of it is step 16 — sharing (§10) and the
-Rapportpakke (§9) — plus the two builds that landed outside the numbered list
-and are recorded at the end of §12 (placing the rectangle, sketches as
-overlays), both of which shipped.
+**Status: §1–§13 built.** §12's build order is complete through step 16's
+first half — sharing (§10) landed on 2026-09-16 — so the one thing left in the
+whole list is the Rapportpakke (§9). Add the two builds that happened outside
+the numbered list and are recorded at the end of §12 (placing the rectangle,
+sketches as overlays), both of which shipped.
 
 Everything built folded into `docs/ui-architecture.md` §8–§10 with the
 deletions in §15, and **that file is now the record**. Where the two disagree
@@ -13,7 +13,7 @@ because the reasoning is not recoverable from the result, not because it
 describes the app.
 
 §13 is the exception and reads the other way round: a later thread whose build
-order is §13.10 and whose first eight steps have landed, and which deletes
+order is §13.10 and all nine of whose steps have landed, and which deletes
 several things `docs/ui-architecture.md` and CLAUDE.md stated as load-bearing
 until it came for them.
 
@@ -78,8 +78,8 @@ the live relief — none of it touches the record. Show is a lens.
 
 That is worth having as a hard rule rather than a tendency for three reasons:
 
-- It makes show mode **safe to hand to someone**. When sharing lands, a link
-  opens in show, and the guarantee that a visitor cannot disturb what you sent
+- It makes show mode **safe to hand to someone**. A link opens in show (§10,
+  built), and the guarantee that a visitor cannot disturb what you sent
   them is the guarantee that makes sending it comfortable.
 - It re-instates, at the right level, the principle that moving Terreng off
   row 1 costs us (§8): *reading the ground is not an act of ownership.* It
@@ -158,12 +158,21 @@ it genuinely cannot hold.
   leave without answering "keep this?" is not a transaction, and the three
   answers are that question, asked once.
 - **Stance is per session, not stored on the record.** It is a stance, not a
-  property of the site. (When sharing lands, a link must pin `show`
-  regardless — noted in §10.)
+  property of the site. (A link pins `show` regardless of who follows it —
+  §10, and it cost no code to honour, since the id this atom holds starts
+  null.)
 - **An uncommitted draft blocks the exits.** `Lukk` and `Del` are absent while
   editing: you cannot close or hand out a record whose current state exists
   only in your browser. This is the modality made visible rather than
   enforced with a dialog.
+
+  > **Built (2026-09-16): half of this holds.** `Lukk` is still absent in
+  > edit. `Del` is not, and the reason is that it stopped being an exit: it
+  > copies the URL, and since the open lokalitet now *is* the URL (§10), the
+  > link is already in the address bar of the browser you are editing in.
+  > Hiding the button would hide the button and nothing else. The argument
+  > underneath is intact and lands elsewhere — what you hand out is the last
+  > saved state, which is what `Lagre` is for.
 - Edit mode tints its ribbon row. Which stance you are in should be legible
   without reading a label, and the row's contents already differ; the tint is
   the confirmation, not the signal.
@@ -770,8 +779,8 @@ Three things this table is saying on purpose:
   anything to discard — a button offering to undo nothing still has to be read
   before it can be ignored.
 - **`⋮` survives both stances**, holding what is not part of any loop: Zoom
-  til lokaliteten, Detaljer, Juster området, Last opp, Rapportpakke, Slett.
-  `Slett` stays hidden for readers.
+  til lokaliteten, Detaljer, Del, Juster området, Last opp, Rapportpakke,
+  Slett. `Slett` stays hidden for readers.
 
 **`Del` is buildable before sharing is designed.** Its first version is a
 popover with the visibility control (which exists) and *Kopier lenke*, which
@@ -780,6 +789,14 @@ the deep-link boot (§10). Everything else sharing eventually grows goes in
 the same popover later. Until that parameter exists the button is absent
 rather than disabled; a share button that shares nothing is worse than no
 share button.
+
+> **Built (2026-09-16), and smaller than this.** Not a popover and not on the
+> row: `Del` is an item in the `⋮` menu that copies the link and raises a
+> toast, and the visibility control stayed in Detaljer where it already was.
+> The popover was sized for a verb with several settings in it, and the verb
+> turned out to have none — what it needed was not a second place to set
+> visibility but a sentence saying what the current setting *means for this
+> link*, which is what the toast says. `docs/ui-architecture.md` §8.13.
 
 ### 5.4 The write verbs
 
@@ -1295,28 +1312,60 @@ kulturminneforvaltning can open, and a folder of PNGs is not.
 
 ---
 
-## 10. Sharing — deferred, but one fact to carry
+## 10. Sharing — `Del`, `?lok=` and `/l/CODE`
 
-Being fleshed out later. The one fact the rest of this depends on: **the open
-lokalitet is not in the URL at all** (`ui-architecture.md` §4.3 flags it). So
-today "shared" only means "appears in your Lokaliteter list", and nothing here
-can be linked to.
+**Status: built** (2026-09-16, step 16's first half). `src/localities/shareLink.ts`
+plus six lines in the `Caddyfile`; no migration and no new field — the code
+from §11 was the whole schema cost, paid two steps early on purpose. The write-up
+that supersedes this section is `docs/ui-architecture.md` §8.13; what follows is
+the design it was built from, kept because three of its four claims are
+reasons rather than descriptions.
 
-Whenever it lands it will need a `lok` URL parameter, a deep-link boot that
-fits the map to the bbox, and a sign-in wall (the read rules require auth even
-for `public`). **A link must open in `show`, regardless of who follows it** —
-that is the whole reason §2's invariant is a rule rather than a habit.
+This section used to open on the fact the rest of it depended on: **the open
+lokalitet was not in the URL at all**, so "shared" meant only "appears in your
+Lokaliteter list" and nothing here could be linked to. That is what closed.
 
-**The short code (§11) is most of that work already done.** `?lok=K7M2QX` is
+Four requirements, and all four landed unchanged:
+
+- **A `lok` URL parameter.** Carrying the *code*, not the PB id. The code
+  already addresses the record, survives a rename and a `Juster området`, and
+  is what a report to Riksantikvaren cites — so the link and the citation are
+  the same string.
+- **A deep-link boot that fits the map to the bbox.** It turned out to need no
+  code at all: the workspace already fits the rectangle when it mounts, keyed
+  on the record id, so setting the active lokalitet is the whole of it. The
+  link therefore carries **no viewport of the sender's**, which is the better
+  behaviour anyway — a pinned `lat`/`lon`/`zoom` is a link that opens somewhere
+  else the day the rectangle is adjusted.
+- **A sign-in wall**, because the read rules require auth even for `public`. A
+  guest following a link gets the auth dialog and the code waits until they are
+  through it.
+- **A link must open in `show`, regardless of who follows it** — that is the
+  whole reason §2's invariant is a rule rather than a habit. It cost nothing to
+  honour: stance is keyed on a record id that starts null, so a module that
+  never writes `editingLocalityIdAtom` cannot open anything in edit.
+
+**The short code (§11) was most of that work already done.** `?lok=K7M2QX` is
 the parameter, `/l/K7M2QX` is the short URL, and neither needs a redirect
 table: the code *is* the key, so the "short URL" is a route on the app's own
-Caddy rather than a service. That is why the code is worth a migration now,
-before sharing is designed — it is the piece the rest hangs off, and
+Caddy rather than a service. That is why the code was worth a migration then,
+before sharing was designed — it is the piece the rest hangs off, and
 retrofitting it onto records people have already cited is worse than adding
 it early.
 
-Until then `limited` stays a placeholder behaving as `private`, and the copy is
-the collaboration story: share read-only, and a collaborator forks.
+Two things the build decided that this section had not:
+
+- **`Del` is an item in the `⋮` menu, not a surface**, and it is there in both
+  stances for every access level. It is one clipboard write, and it belongs
+  beside the short code it is made of.
+- **The toast says whether anybody else can open the link.** A `private`
+  lokalitet's link answers "finner ikke" for everyone but its owner, and the
+  moment of copying is the only moment that fact is worth stating. A record
+  whose visibility is not `public` gets a warning rather than a hidden verb —
+  including `limited`, which still behaves as `private`.
+
+`limited` stays a placeholder behaving as `private`, and the copy is still the
+collaboration story: share read-only, and a collaborator forks.
 
 ---
 
@@ -1487,7 +1536,12 @@ worth more than the list:
 14. **The copy** — `derivedFrom`, the copy dialog, `Lag min kopi`, the View
     specs carried and the Files linked back with `Ta med` (§7).
 15. **Move Terreng and Sammenlign**, delete the standalone terrain entrance.
-16. Later: sharing and `Del` (§10), then the Rapportpakke (§9).
+16. **Sharing and `Del`** (§10) — **built**, 2026-09-16: `?lok=CODE` written
+    and read, the `/l/CODE` redirect on our own Caddy, the sign-in wall, and
+    `Del` in the row's `⋮`. No migration and no new field; the deep-link fit
+    needed no code either, since the workspace already frames the rectangle
+    when it mounts. Then the Rapportpakke (§9), which is what is left of this
+    list.
 
 **Placing the rectangle** (2026-09-13) is not a step in this list and is not a
 depth in the row's exits. It happens *before* there is a record, so it is a

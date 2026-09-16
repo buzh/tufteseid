@@ -63,11 +63,13 @@ all of them.
   **Read it before proposing a new analysis feature** — it records what was
   already rejected and why, so those don't get re-litigated.
 - `docs/lokalitet-view.md` — **partly built**: §12's build order is through
-  step 15, so the two axes, the View/File split, the row's zones, the bottom
+  step 16's first half, so the two axes, the View/File split, the row's zones,
+  the bottom
   filmstrip/carousel, curation, the picker carousels, **removing the dock**,
-  **the edit transaction**, **the copy** and **Terreng/Sammenlign on the row**
+  **the edit transaction**, **the copy**, **Terreng/Sammenlign on the row** and
+  **sharing** (`?lok=CODE`, `/l/CODE`, `Del`)
   are live and are documented in `docs/ui-architecture.md`; the takeout bundle
-  and sharing (`?lok=CODE`) are not. Two builds landed *outside* the numbered
+  is the one thing left in the list. Two builds landed *outside* the numbered
   list and so are not in it at all: placing the rectangle before creating it,
   and sketches as overlays. The whole design of making
   "a lokalitet is open" a view of its own is here — the two axes (owner/reader ×
@@ -229,6 +231,15 @@ that owns them.
   `derivedFrom` pointing back; the Files stay with the original and are shown
   at the end of the copy's carousel with one `Ta med` each —
   `docs/ui-architecture.md` §8.12.
+- **And a lokalitet can be linked to.** `Del` in the row's `⋮` copies
+  `/l/K7M2QX`; the open lokalitet rides along in the URL as `?lok=K7M2QX`,
+  both directions owned by `src/localities/shareLink.ts`. The code is the key,
+  so the short URL is a `redir` in our own `Caddyfile` rather than a service,
+  and there is still **no SPA fallback** — the redirect is one narrow pattern,
+  not a catch-all rewrite to `index.html`, so `/hjelp` is still 404 on a cold
+  load exactly as it was. Following a link signs you in first (the read
+  rules require auth even for `public`) and always lands in `show` —
+  `docs/ui-architecture.md` §8.13.
 - **A View is a spec before it is pixels.** An extract, terrain render,
   flyfoto grab or sketch is stored as a row of parameters and rendered into a
   figure PNG afterwards by a background queue (`src/localities/pinQueue.ts`); a
