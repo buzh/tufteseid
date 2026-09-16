@@ -13,7 +13,7 @@ because the reasoning is not recoverable from the result, not because it
 describes the app.
 
 §13 is the exception and reads the other way round: a later thread whose build
-order is §13.10 and whose first four steps have landed, and which deletes
+order is §13.10 and whose first five steps have landed, and which deletes
 several things `docs/ui-architecture.md` and CLAUDE.md stated as load-bearing
 until it came for them.
 
@@ -1578,13 +1578,15 @@ Docs to update: `docs/ui-architecture.md` §3.1 (the shell loses a slot), §5.1
 
 ## 13. The layer row — the stack becomes the control
 
-**Status: designed; steps 1–4 of §13.10 built, the rest not.** It supersedes the
+**Status: designed; steps 1–5 of §13.10 built, the rest not.** It supersedes the
 verbs in §4.2 and deletes the one-slot arbiter that section introduced — that
 deletion has landed, and so has the mechanism the replacement needs: a View can
-now be put on the map as its own pixels over its own rectangle. The row has two
-of its four buttons: `src/shell/LayerGroup.tsx` is the `[thing ▾]` control, and
-[Skisse] and [Funn] are both wearing it — the second by swapping the duties of
-the halves it already had. §4.1, §4.1.1 and §4.1.2
+now be put on the map as its own pixels over its own rectangle. The row has
+three of its four buttons: `src/shell/LayerGroup.tsx` is the `[thing ▾]`
+control, and [Visning], [Skisse] and [Funn] are all wearing it — the last by
+swapping the duties of the halves it already had. With [Visning] the ground
+itself became a member, `Gjenskap` left the bilde cards for its pulldown, and
+`Vis i ruta` narrowed to Files. §4.1, §4.1.1 and §4.1.2
 survive unchanged: a View is still a spec, a File is still bytes, and the pin
 is still a pin. What changes is who decides what is on the map.
 
@@ -1814,7 +1816,14 @@ File, never "this View, but as its pixels". One variant gone.
 
 `Gjenskap`, `Vis i ruta`, `canPinBilde`, the `owner` arbitration in
 `map/groundOverlay.ts` with both callers' halves of it, the "not fetched yet"
-card state, and the single-image rule that §4.2 pinned down as a detail. §4.2's
+card state, and the single-image rule that §4.2 pinned down as a detail.
+
+Three of those are done: the arbiter went at step 1, `Gjenskap` at step 5
+(moved, not dropped — it is [Visning]'s per-row apply), and `Vis i ruta` is
+Files-only from step 5 and goes entirely at step 6, taking `canPinBilde` with
+it. The "not fetched yet" state is still on the rail and still correct there:
+what step 5 removed was the *pin toggle* on a card that has no pixels, not the
+face that says so. §4.2's
 prose stays as the argument for *why* an image belongs on the map at its own
 rectangle — that part was right and this builds on it — but its list of four
 verbs is superseded by this section.
@@ -2010,11 +2019,85 @@ Three sequencing rules, and as in §12 they are worth more than the list.
    — a label that toggles, a caret that opens, a badge that counts, members
    that switch — without pretending vectors are pixels.
 
-5. **[Visning]** — the group that holds the content and deletes the most. The
-   bottom member is the ground preset off `groundHandleAtom`; above it, every
-   View in the lokalitet as a step-2 layer. `Gjenskap` goes and
-   `useRecreateView` survives as the preset member's apply (§13.2), `Vis i
-   ruta` goes for Views, and the switch-it-all-off case arrives with it.
+5. **[Visning]** — ✅ **built.** `src/shell/VisningControl.tsx`, its own file
+   because it carries effects and a child component and `RibbonLocalityRow.tsx`
+   was already 1156 lines. The bottom member is the ground preset off
+   `groundHandleAtom`, labelled with the preset's own name and carrying what
+   `beholdOfferAtom` says is under it — the LiDAR dataset and style, the NiB
+   acquisition, the terrain visualization's caption. Above it every View in the
+   lokalitet (`kind` is `extract` or `flyfoto`, §13.1's rule and no new field),
+   each a step-2 `useGroundView` layer with its own switch and fade.
+
+   **The order problem, and the split that answers it.** Two fixed keys had to
+   become N, and the producers cannot be asked to agree on an order — a
+   terrain render is declared from `useTerrainAnalysis` in row 1 and a View
+   from this control, which are siblings with no component above them. So:
+   **producers declare, the row orders.** `setGroundOverlay(key, member)` is
+   unchanged except that `key` is now any string (`TERRAIN_KEY`, `view:<id>`),
+   and `setGroundOverlayStack(keys, held)` is the row's one statement about
+   the arrangement, re-declared whole on every change the way
+   `setSketchOverlays` is. Keys the row has not named paint *above* everything
+   it has — which is exactly where `usePinnedBilde`'s `'bilde'` belongs until
+   step 6, since [Bilde] is the group above this one.
+
+   **Held is not withdrawn**, and the difference is the group toggle's whole
+   mechanism. A member's own switch unmounts its `<VisningLayer>` and
+   `useGroundView`'s cleanup takes the pixels off the map — which is what
+   keeps a lokalitet's worth of unwatched WMS stitches from being kept warm.
+   The group label and the ground preset have to take down layers *somebody
+   else* declared and give them back unchanged, so they name them in `held`
+   and the draw loop skips them. Step 3's rule survives intact: the group
+   toggle is layer visibility, not a teardown and not "all members off".
+
+   **Switching it all off**, §13.1's second consequence, needed a mechanism of
+   its own, because the background is not in this stack at all — it is the
+   tile layers under it. `setBackgroundHidden` in
+   `map/layers/config/backgroundLayers/utils.ts` sets `visible` on every `bg.`
+   layer and is re-applied to the incoming stack inside `swapBackgroundLayers`.
+   `visible` rather than opacity for two reasons: that module already owns
+   background opacity (`OUTGOING_OPACITY` during a swap), and an invisible
+   layer stops loading tiles while keeping the ones it has, so switching back
+   is free. Scoped to `bg.` and deliberately not `cmp.` — the curtain's B half
+   is another full ground, per the first trap below.
+
+   **The preset member has no fade.** The background is a *stack* of tile
+   layers, so one slider here is three fades and not one; and the two grounds
+   that can be faded have that control where all their other modifiers are, on
+   the settings strip. So `LayerMember.opacity` became optional and absent
+   means no slider at all — step 4's "opacity is a raster idea" said from the
+   other end, for a raster whose fade lives elsewhere.
+
+   **Views default off.** `visningShownAtom` starts empty and that is
+   load-bearing: switching one on can start a WMS stitch, so a lokalitet that
+   put every extract up on open would spend a minute of Kartverket's rate
+   limit answering a question nobody asked.
+
+   **`Gjenskap` moved rather than went.** `RecreateButton` is deleted from the
+   two bilde surfaces and each View row in the pulldown carries a trailing
+   `restart_alt` instead, setting the same `recreateViewAtom` — so
+   `useRecreateView` is untouched, as §13.2 said it would be. That needed
+   `LayerMember.action` and a `.head` flex line in `MemberRow`, because a
+   `<button>` cannot contain a `<button>`; keeping the verb out of the switch's
+   hit area is the other half of that, since `Gjenskap` moves the map.
+
+   **`Vis i ruta` is now Files-only.** `canPinBilde` gates on `kind` being
+   `screenshot` or `upload`: the rail's toggle knows nothing about the stack
+   the pulldown orders, and two controls for one layer would disagree the
+   moment both were used. It goes entirely at step 6.
+
+   Two smaller things landed with it. The pulldown's label is the provenance
+   (§13.4), so `metaLineOf` was extracted from `MetaLine` in
+   `bilderCommon.tsx` and the card and the row now read `meta` once. And
+   `sketchItems`' **hidden leak** was fixed: it listed concealed sketches in
+   both stances, where §13.8 says *in edit* — `viewItems` was written to the
+   corrected rule and `sketchItems` moved to it, matching `bilderItems`.
+
+   The four control atoms live in `map/groundOverlay.ts`, beside the mechanism
+   they drive, for the reason the sketch group's three live in
+   `map/sketchOverlay.ts`; none is persisted and `useLocalityWorkspace` empties
+   all four when the lokalitet closes or swaps. `VisningControl` puts the
+   background back on unmount, so no route out leaves a white screen with no
+   control that could undo it.
 
 6. **[Bilde]** — the Files. A `screenshot` lays down at its extent; `upload` is
    absent from the group until step 7. This is where `usePinnedBilde`,

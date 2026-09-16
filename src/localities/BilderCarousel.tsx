@@ -9,7 +9,6 @@ import {
   Note,
   OpenOriginalButton,
   PinRetryButton,
-  RecreateButton,
   SketchEditButton,
   SketchToggleButton,
 } from './bilderCommon';
@@ -167,7 +166,6 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                     back under the pen. */}
                 <SketchToggleButton ws={ws} rec={active} />
                 <SketchEditButton ws={ws} rec={active} />
-                <RecreateButton rec={active} />
                 <PinRetryButton ws={ws} rec={active} />
                 <OpenOriginalButton ws={ws} rec={active} />
 

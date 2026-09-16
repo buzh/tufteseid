@@ -40,7 +40,7 @@ import { getAttachmentUrl, type AttachmentRecord } from '../api/attachments';
 import type { LocalityBbox } from '../api/localities';
 import { extractCanvas } from '../lidarExtract/run';
 import { enumerateLidarSources } from '../lidarExtract/sources';
-import { setGroundOverlay, type GroundOverlayKey } from '../map/groundOverlay';
+import { setGroundOverlay } from '../map/groundOverlay';
 import { withDeadline } from '../shared/utils/deadline';
 import { renderTerrain } from '../terrain/render';
 import { fetchFlyfoto } from './flyfoto';
@@ -191,7 +191,7 @@ const renderViewRaster = async (
  * View whose upstream has nothing over the rectangle, ends up `failed`.
  */
 export const useGroundView = (
-  key: GroundOverlayKey,
+  key: string,
   rec: AttachmentRecord | null,
 ): { failed: boolean } => {
   const [failed, setFailed] = useState(false);

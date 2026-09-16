@@ -202,6 +202,40 @@ export type LayerNamespace = 'bg' | 'cmp';
 const isBackgroundLayer = (layer: BaseLayer): boolean =>
   String(layer.get('id') ?? '').startsWith('bg.');
 
+/*
+ * Whether the ground is switched off — [Visning]'s bottom member, taken down
+ * (docs/lokalitet-view.md §13.1, §13.10 step 5).
+ *
+ * `visible`, not opacity and not a teardown. The background is a *stack* — a
+ * topo base, the featured dataset, a hybrid overlay — so fading each of three
+ * layers to nothing is three fades rather than one, and this module already
+ * owns background opacity for the swap (`OUTGOING_OPACITY`). Visibility is
+ * also what makes switching back free: OpenLayers stops drawing and stops
+ * loading, and the tiles it has are still there when the ground comes back.
+ *
+ * Module-level and imperative like the swap itself, and applied to the
+ * incoming layers inside it, because a dataset change while the ground is off
+ * would otherwise put a fresh stack up at full strength.
+ *
+ * Scoped to `bg.` and so deliberately not the compare curtain's `cmp.` half:
+ * the B side is another *full* ground, which is what the curtain has always
+ * been, and taking [Visning] down is a statement about what the A side has
+ * composed (§13.10's first trap).
+ */
+let backgroundHidden = false;
+
+const applyBackgroundHidden = (layer: BaseLayer) =>
+  layer.setVisible(!backgroundHidden);
+
+export const setBackgroundHidden = (hidden: boolean) => {
+  if (backgroundHidden === hidden) return;
+  backgroundHidden = hidden;
+  const map = getDefaultStore().get(mapAtom);
+  for (const layer of map.getLayers().getArray()) {
+    if (isBackgroundLayer(layer)) applyBackgroundHidden(layer);
+  }
+};
+
 // Identity of what a background layer is showing: equal signatures mean
 // equal pixels. Cycling styles or datasets rebuilds the whole stack on
 // every keypress, but the topo base and the faded LiDAR fallback under
@@ -317,6 +351,9 @@ export const swapBackgroundLayers = (under: TileLayer[], over: TileLayer[]) => {
   }
 
   for (const layer of outgoing) layer.setOpacity(OUTGOING_OPACITY);
+  // The incoming ones only: the outgoing stack is already on the map and was
+  // set when the ground was switched off.
+  for (const layer of layers) applyBackgroundHidden(layer);
 
   const retire = () => {
     cancelPendingRetire?.();

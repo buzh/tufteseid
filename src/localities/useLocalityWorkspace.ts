@@ -46,6 +46,12 @@ import { renderFigureBlob } from '../figure/figure';
 import { describeHeritageRender, screenshotFigure } from '../figure/specs';
 import type { LidarSource } from '../lidarExtract/sources';
 import { mapAtom } from '../map/atoms';
+import {
+  groundShownAtom,
+  visningGroupShownAtom,
+  visningOpacityAtom,
+  visningShownAtom,
+} from '../map/groundOverlay';
 import { shownThemeLayersAtom } from '../map/layers/atoms';
 import {
   heritageDetailsAtom,
@@ -264,6 +270,13 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [sketchShown, setSketchShown] = useAtom(sketchShownAtom);
   const [sketchOpacity, setSketchOpacityMap] = useAtom(sketchOpacityAtom);
   const [sketchGroupShown, setSketchGroupShown] = useAtom(sketchGroupShownAtom);
+  // Write-only here: [Visning]'s own control reads them (see `viewItems`
+  // below), and this hook's business with them is emptying them on the way
+  // out.
+  const setGroundShown = useSetAtom(groundShownAtom);
+  const setVisningShown = useSetAtom(visningShownAtom);
+  const setVisningOpacity = useSetAtom(visningOpacityAtom);
+  const setVisningGroupShown = useSetAtom(visningGroupShownAtom);
   const [adjusting, setAdjusting] = useAtom(adjustingLocalityAtom);
   const [selectedFunnId, setSelectedFunnId] = useAtom(selectedFunnIdAtom);
   const setFunnHidden = useSetAtom(funnHiddenAtom);
@@ -894,6 +907,16 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       // a group left off would open it with the sketches mysteriously absent.
       setSketchOpacityMap(new Map());
       setSketchGroupShown(true);
+      // [Visning]'s four, on the same grounds and with one extra: the ground
+      // preset's switch can leave the map with *no background at all*
+      // (§13.1), so a lokalitet closed with it off would hand the next one a
+      // white screen. `VisningControl` puts the tile layers back on unmount;
+      // this is what stops a swap — which does not unmount it — from carrying
+      // the arrangement across.
+      setGroundShown(true);
+      setVisningShown(new Set());
+      setVisningOpacity(new Map());
+      setVisningGroupShown(true);
       // And the curtain comes down with the row that raised it
       // (docs/lokalitet-view.md §8). Sammenlign's only control moved onto the
       // lokalitet row, so leaving the lokalitet with it up would strand a
@@ -912,6 +935,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setSketchShown,
     setSketchOpacityMap,
     setSketchGroupShown,
+    setGroundShown,
+    setVisningShown,
+    setVisningOpacity,
+    setVisningGroupShown,
     leaveCompare,
   ]);
 
@@ -1456,10 +1483,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
   /*
    * What [Skisse] lists. Deletions are out — a bilde awaiting `Lagre`'s
-   * compensating delete is not something to offer the map — but `hidden` ones
-   * stay in, per §13.8: concealment is curation and the switch is what you are
-   * looking at right now, so losing an image from the row because it is out of
-   * the exhibit would make curation a way to lose your own work.
+   * compensating delete is not something to offer the map — and `hidden` ones
+   * are in **in edit and only there**, which is §13.8 said exactly: a hidden
+   * bilde has to stay reachable from the pulldown in edit, or curation becomes
+   * a way to lose your own images. In show it is out of the exhibit, and that
+   * is the same rule `bilderItems` applies two hundred lines up; a row that
+   * kept it would let a reader switch on an image its author put away.
    *
    * The one under the pen is out for the same reason the overlay effect skips
    * it: its strokes are on the drawing surface, so a switch for it would be a
@@ -1471,9 +1500,31 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         (it) =>
           it.kind === 'sketch' &&
           !deletedIds.has(it.id) &&
+          (canEdit || !it.hidden) &&
           drawSession?.resume?.id !== it.id,
       ),
-    [attachmentItems, deletedIds, drawSession],
+    [attachmentItems, deletedIds, canEdit, drawSession],
+  );
+
+  /*
+   * What [Visning] lists, on the same rule and by the same reading of `kind`
+   * (§13.1): an extract, a terrain render and a flyfoto grab are Views over
+   * the lokalitet's own rectangle and belong under the ground preset. A
+   * terrain render is stored as an `extract` — it has been since the kind list
+   * was fixed — so two kinds cover three producers.
+   *
+   * Borrowed Files are not here and cannot be: `inheritedItems` is the
+   * original's bytes (§7), and a File is [Bilde]'s from step 6 anyway.
+   */
+  const viewItems = useMemo(
+    () =>
+      (attachmentItems ?? []).filter(
+        (it) =>
+          (it.kind === 'extract' || it.kind === 'flyfoto') &&
+          !deletedIds.has(it.id) &&
+          (canEdit || !it.hidden),
+      ),
+    [attachmentItems, deletedIds, canEdit],
   );
 
   /*
@@ -3008,6 +3059,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setSketchOpacity,
     sketchGroupShown,
     toggleSketchGroup,
+
+    /**
+     * What [Visning] lists (§13.10 step 5). Only the list: the group's four
+     * switches are atoms beside the mechanism they drive
+     * (`map/groundOverlay.ts`) and `VisningControl` reads them directly,
+     * because unlike [Skisse] — whose set is pressed from the card's eye as
+     * well — nothing outside the pulldown touches them.
+     */
+    viewItems,
 
     // tools
     tool,

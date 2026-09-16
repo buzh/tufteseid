@@ -430,6 +430,17 @@ subsume.
   statements, and switching the group back on has to restore the composition
   that was up. Neither is persisted to the URL; the member set is cleared when
   the lokalitet closes or swaps.
+- **The ground group** — four in `src/map/groundOverlay.ts`, all read by
+  `VisningControl` and none persisted: `groundShownAtom` (the ground preset's
+  own switch), `visningShownAtom` (the ids of the Views currently on the
+  ground — a set, like `sketchShownAtom`, because several may be up at once),
+  `visningOpacityAtom` (per-View fade in percent, missing meaning opaque) and
+  `visningGroupShownAtom` (`[Visning ▾]`'s label toggle). The same group/member
+  split as the funn and sketch switches, for the same reason, and all four are
+  reset by `useLocalityWorkspace` when the lokalitet closes or swaps. They live
+  with the stack rather than in `src/localities/atoms.ts` because what they
+  describe is the map's `zIndex: 1` composite, which outlives any one lokalitet
+  surface (§10.1).
 - **Theme layers** — `activeThemeLayersAtom` (a `Set<ThemeLayerName>`), plus
   `heritageDetailsAtom` / `heritageRenderAtom` / `heritageOpacityAtom` in
   `src/map/layers/heritage.ts` for how the Kulturminner overlay is drawn.
@@ -1839,10 +1850,12 @@ growing would now push the two zones after it out to the cell's far edge.
 **The contents zone is turning into the layer row** (`docs/lokalitet-view.md`
 §13.1). The end state is four `[thing ▾]` groups — Visning · Bilde · Skisse ·
 Funn — left to right in the map's own z-order, so the row teaches the stack.
-`src/shell/LayerGroup.tsx` is that control and **two of the four wear it**:
-`[Skisse ▾]` (§9.3) and `[Funn ▾]` (§8.6). The label takes the group off the
-map, the caret opens a pulldown, and every member has a switch. Skisse sits
-left of Funn because sketches are `zIndex: 2` and the funn layer is 5.
+`src/shell/LayerGroup.tsx` is that control and **three of the four wear it**:
+`[Visning ▾]` (§10.1), `[Skisse ▾]` (§9.3) and `[Funn ▾]` (§8.6). The label
+takes the group off the map, the caret opens a pulldown, and every member has a
+switch. Visning is leftmost because it is the ground and everything else is
+over it; Skisse sits left of Funn because sketches are `zIndex: 2` and the funn
+layer is 5. `[Bilde ▾]` lands between Visning and Skisse.
 
 Three properties of it that are not obvious from the screen. **The label
 toggles and the caret opens.** That is the opposite polarity to `EyeSplit`, and
@@ -1859,7 +1872,16 @@ group.** Skisse's members each carry a transparency slider; Funn's do not, and
 the reason is not expedience — the funn are one vector source drawn as a cased
 outline over a 0.12 fill, i.e. marks on the ground rather than a covering of
 it, so the verb for "this one is in my way" is its switch
-(`docs/lokalitet-view.md` §13.10 step 4).
+(`docs/lokalitet-view.md` §13.10 step 4). `LayerMember.opacity` is optional for
+the same reason read the other way: [Visning]'s ground preset is a raster and
+still has no slider here, because the background is a *stack* of tile layers
+and the grounds that can be faded are faded from the settings strip, where all
+their other modifiers are.
+
+**A member row can carry one verb.** `LayerMember.action` puts an icon button
+at the row's right edge, outside the switch's hit area because a `<button>`
+cannot nest one and because the verb moves the map. It has exactly one user:
+`Gjenskap` on each View in [Visning] (§10.1).
 
 And **nothing in the group writes** (`docs/lokalitet-view.md`
 §13.8): a switch is *what I am looking at now*, which is not the same statement
@@ -2000,7 +2022,8 @@ read-only, and the bottom edge is a rail with
 no delete, no reordering, no hide-from-exhibit and a read-only caption rather
 than the same
 rail carrying all four; funn are not editable, and N / U / B do nothing. Reading, putting an image on the map and taking it off again,
-`Gjenskap` and downloading a figure all stay, because none of them leaves a trace. The one way to write is
+the whole layer row, `Gjenskap` in [Visning]'s pulldown and downloading a
+figure all stay, because none of them leaves a trace. The one way to write is
 to press `Rediger` first, which costs nothing: no fetch, no write, the map
 does not move.
 
@@ -2514,7 +2537,7 @@ sketch rather than to the image: `sort` (int) and `hidden` (bool), which are
 about) and `over` (→ attachments: which bilder it is a layer on), which are
 §9.3.
 
-#### 8.7.1 The image on the map — Vis i ruta and Gjenskap
+#### 8.7.1 The image on the map — Vis i ruta
 
 **There is no lightbox.** Picking a frame in the filmstrip (§8.7.2) selects it,
 opens a detail panel *under the rail*, and — where the record has an extent —
@@ -2526,10 +2549,19 @@ over today's hillshade with the funn drawn on top; in a lightbox it is a
 picture of somewhere you are no longer looking.
 
 The detail panel carries: the kind badge and provenance line, the caption field
-(`readOnly` unless `canEdit`, commits on blur), then **Gjenskap** and **Åpne
-originalen**. Beside them, in **both** stances, one button that is a **toggle**:
-**Vis i ruta** when the record is pinnable and not up, **Ta av ruta** when it
-is.
+(`readOnly` unless `canEdit`, commits on blur), then **Åpne originalen**.
+Beside it, in **both** stances, one button that is a **toggle**: **Vis i ruta**
+when the record is pinnable and not up, **Ta av ruta** when it is.
+
+**Both of those narrowed when the layer row arrived.** `Gjenskap` left this
+panel at §13.10 step 5 and is now the trailing verb on each View row in
+[Visning]'s pulldown (§10.1) — the same `recreateViewAtom`, a different place
+to press it. And `canPinBilde` narrowed to **Files**: an extract or a flyfoto
+grab is a View and is switched on in the pulldown, where the rows say what each
+one is and the group orders them. Two controls for one layer would disagree the
+moment both were used, and the rail's toggle knows nothing about the stack. So
+what this panel still pins is a screenshot over its rectangle, until [Bilde]
+takes that too.
 
 **Transparens is not in the panel** — it is on the rectangle's top-right
 corner, opposite the name chip (§8.7.5). It lived here, beside the caption, and
@@ -2572,7 +2604,8 @@ What the reversal needs to hold:
   *original's* file and is not in `attachmentItems`, so `usePinnedBilde` has
   nothing to resolve it against; reading one is `Åpne originalen`, and `Ta med`
   is what makes it this lokalitet's. It refuses unpinnable records for the
-  older reason — `canPinBilde`, no file or no extent, nothing to lay down.
+  older reason — `canPinBilde`: not a File, or no bytes, or no extent, so
+  nothing to lay down.
 - **Deleting takes the pin down with it**, explicitly, in `removeBilde` rather
   than by waiting for the sweep that unpins a record which has left
   `bilderItems`. The DELETE is a round trip and a failed one leaves a tombstone
@@ -2602,11 +2635,11 @@ together.
   the pin queue uses and puts the raw canvas down at the spec's own rectangle —
   no figure, so no caption panel on the map. It is `renderSpec`'s sibling
   rather than `renderSpec` itself, precisely because that one makes the
-  captioned artifact. Nothing on the rail offers it yet: `canPinBilde` still
-  requires a file, for the reason two bullets down, so the path reachable today
-  is the fallback — a *pinned* View whose file will not load renders live
-  instead of reporting a failure, because a View is reproducible by definition.
-  [Visning]'s pulldown is where an unpinned View becomes switchable on purpose.
+  captioned artifact. The rail never offers this and now never can — Views are
+  [Visning]'s (§10.1), which is where switching an unpinned one on is a
+  deliberate press. What this panel still uses it for is the fallback: a
+  *pinned* File whose bytes will not load fails, while a View in the pulldown
+  renders live instead, because a View is reproducible by definition.
 - **There is no resolution ladder, and that is measured rather than assumed.**
   `docs/lokalitet-view.md` §13.2 argues for live rendering from sharpness — a
   pasted figure is a fixed number of pixels, so zooming stops helping. It does
@@ -2655,15 +2688,17 @@ together.
   the other is a click that costs seconds and rate limit. So it does not:
   `canPinBilde` still requires a file, an unpinned View simply shows what it
   is waiting for (§8.7.4), and `Gjenskap` stays the verb it was. Note the
-  reason moved: the machinery to render one now exists (the bullet above), so
-  what keeps it off this rail is the cost of walking the rail, not the absence
-  of a path.
-- **Absent, not disabled.** A screenshot or an upload yields `null` from
-  `viewSpecOf` and gets no Gjenskap button at all. There is no view to go back
-  to, which is a different statement from "you may not go back to it". When a
-  spec exists but the dataset behind it does not any more — a LiDAR project
-  withdrawn from the WMS catalogue, an acquisition no longer listed for the
-  bbox — the attempt toasts and leaves the map alone.
+  reason moved twice: the machinery to render one now exists (the bullet
+  above), so what kept it off this rail was the cost of walking the rail — and
+  since step 5 the rail does not offer Views at all, so the question is
+  [Visning]'s, where switching one on is a deliberate press rather than a
+  side effect of reading a caption.
+- **Absent, not disabled** — the rule `Gjenskap` was built on, and it survives
+  its move: a screenshot or an upload yields `null` from `viewSpecOf`, and
+  rather than a dead button it simply has no row in [Visning] to hang one on.
+  When a spec exists but the dataset behind it does not any more — a LiDAR
+  project withdrawn from the WMS catalogue, an acquisition no longer listed for
+  the bbox — the attempt toasts and leaves the map alone.
 - **Restoring a terrain view is a method on the hook**
   (`useTerrainAnalysis.restoreView`), not six setter calls from outside,
   because the radius setter routes to one of two stored radii according to the
@@ -2691,10 +2726,10 @@ transient by construction:
 | shape | a rail of 88×64 frames, a detail line under it | the same |
 | hidden records | absent | present, dashed and marked |
 | caption | `readOnly` (§8.1) | editable, committed on blur |
-| the map | picking a frame pins it | the same, plus `Vis i ruta` as a toggle |
+| the map | picking a frame pins it, where it is a File with an extent | the same, plus `Vis i ruta` as a toggle |
 | order | none | drag a frame along the rail, or `arrow_back` / `arrow_forward` in the detail row |
 | conceal, delete | absent | in the detail row |
-| both | Gjenskap, Åpne originalen, ← / →, `bottom_panel_close` | |
+| both | Åpne originalen, ← / →, `bottom_panel_close` | |
 
 **Edit used to be one large card at a time**, on the argument that judging a
 caption off an 88×64 thumbnail is judging it blind. That is true of looking at
@@ -2703,7 +2738,8 @@ what follows what, and a reorder you cannot watch happen is a reorder you have
 to go and verify. So both stances are the rail, `BilderRail` in
 `bilderCommon.tsx` renders it for both, and the big look at one picture is
 `Vis i ruta` — the image on the ground it is of, at full size, which the
-180 px letterbox never was — or `Åpne originalen`.
+180 px letterbox never was — or, for a View, its switch in [Visning] (§10.1);
+failing both, `Åpne originalen`.
 
 Three things that read as arbitrary until you try the alternative:
 
@@ -2723,7 +2759,9 @@ Three things that read as arbitrary until you try the alternative:
   the hook is never armed there at all.
 
 The shared vocabulary — the tokened-URL dance, the meta line, the caption
-field, the fade slider, the pin face (§8.7.4), Gjenskap and Åpne originalen —
+field, the fade slider, the pin face (§8.7.4), the provenance line
+(`metaLineOf`, which [Visning]'s rows read too, so the card and the pulldown
+cannot disagree about what an image is) and Åpne originalen —
 is `src/localities/bilderCommon.tsx`, and since the two stances are one shape
 the geometry is shared too: `bilderCommon.module.css` owns the whole bottom
 edge, and neither surface has a stylesheet of its own.
@@ -3850,11 +3888,13 @@ which is `resumeSketch` — the scene back under the pen, the stored copy taken
 off the map while it is there so the old strokes do not show through the new
 ones. A sketch is **not** offered `Vis i ruta`: that verb lays a figure into the
 ground level, and `canPinBilde` refuses a sketch outright rather than putting a
-white figure with a caption panel over the image it annotates.
+white figure with a caption panel over the image it annotates. It is the only
+kind that was refused for a reason of its own; since step 5 the verb is Files
+only, so `extract` and `flyfoto` are out too — those are [Visning]'s (§10.1).
 
 **And the whole set has one button, `[Skisse ▾]`** — the first built of the
 layer row's four groups (§8.1, `docs/lokalitet-view.md` §13.10 step 3;
-`[Funn ▾]` joined it at step 4). The label
+`[Funn ▾]` joined it at step 4 and `[Visning ▾]` at step 5). The label
 takes every sketch off the map at once and the caret opens the members, each
 with its switch and its own fade. Two facts about it belong here rather than
 with the row:
@@ -4122,20 +4162,35 @@ That arbiter is **deleted** (§15, and `docs/lokalitet-view.md` §13), because i
 forbade the one comparison the overlay exists for — a 1937 ortofoto faded over
 today's relief is two images of one rectangle, in register.
 
-What replaces it is a declared set. Contributors name themselves by key —
-`setGroundOverlay('terrain' | 'bilde', member | null)` — and the module paints
-them in a fixed bottom-to-top order (terrain, then bilde) into **one layer and
-one canvas**, each with its own `globalAlpha`. One layer rather than one per
-member because the members are an ordered composite with per-member opacity,
-which is what a draw loop is, and because the reused output canvas is ~30 MB;
-one per member would multiply that by the size of the composition. Withdrawing
-is unconditional, since a contributor owns its own key and nothing else's.
+What replaces it is a declared set, **ordered by the row**. Contributors name
+themselves by key — `setGroundOverlay(key, member | null)`, where `key` is
+`TERRAIN_KEY` for the live render and `view:<attachment id>` for a View — and
+the module paints them bottom-to-top into **one layer and one canvas**, each
+with its own `globalAlpha`. One layer rather than one per member because the
+members are an ordered composite with per-member opacity, which is what a draw
+loop is, and because the reused output canvas is ~30 MB; one per member would
+multiply that by the size of the composition. Withdrawing is unconditional,
+since a contributor owns its own key and nothing else's.
 
-Keys rather than one caller handing over the whole array — which is what
-`sketchOverlay.ts` does — because the two contributors live in different
-trees: Terrenganalyse's state is mounted once from `RibbonGlobalRow`, a bilde's
-from the lokalitet workspace. When the layer row lands (`lokalitet-view.md`
-§13) it becomes the single caller and the key gives way to the row's own order.
+**Producers declare, the row orders**, and the split is forced rather than
+chosen: the contributors live in different trees — Terrenganalyse's state is
+mounted once from `RibbonGlobalRow`, a View's from the lokalitet row — so
+there is no component above all of them to hand over the whole array the way
+`sketchOverlay.ts`'s single caller does. `setGroundOverlayStack(keys, held)` is
+the row's half, called only by `VisningControl` (§10.1): the members bottom to
+top, and which of them the row is holding down. Keys the row has not named
+paint *above* everything it has, in declaration order — which is where
+`usePinnedBilde`'s `'bilde'` sits until [Bilde] lands, and the right place for
+it, since a File on the ground is the group above this one.
+
+**Held is not withdrawn.** A member's own switch withdraws it: the producer
+unmounts and the pixels go. The group label and the ground preset have to take
+down members *somebody else* declared — the terrain render is row 1's — and
+give them back unchanged, so those are named in `held` and skipped in the draw
+loop instead. Per-member alpha is remembered in `opacityByKey` and deliberately
+never pruned: switching DTM→DOM withdraws the terrain image and declares a new
+one, and losing the fade you had just dialled in on the way through would be a
+bug.
 
 The compare curtain's B half is at `COMPARE_Z = 1.5` and therefore covers this
 whole group, unchanged from when the group was one image and still what the
@@ -4283,6 +4338,64 @@ can be its title.
 
 The algorithmic side of all this is `docs/terrain-analysis.md`; the ribbon rows
 are only the control surface.
+
+### 10.1 `[Visning ▾]` — the ground as a layer group
+
+The terrain render is no longer a thing that happens to be on the map; it is a
+*member*, and the member list has a control. `src/shell/VisningControl.tsx` is
+the leftmost of the lokalitet row's layer groups (§8.1,
+`docs/lokalitet-view.md` §13.10 step 5) and its pulldown lists, bottom to top:
+
+- **the ground preset** — whichever of the five is on screen, named with its
+  own label (`ribbon.mode.*`, or `ribbon.terrain.label` for Terreng) and
+  carrying what `beholdOfferAtom` says is under it: the LiDAR dataset and
+  style, the NiB acquisition, the terrain visualization's caption. §13.4 asks
+  the row's label to be the whole on-screen provenance, and that atom is
+  already the one thing row 1 publishes about the live ground.
+- **every View in the lokalitet** — `kind` of `extract` (which includes terrain
+  renders) or `flyfoto`, each put up by `useGroundView` over its own rectangle,
+  each with a switch, a fade and a `Gjenskap`.
+
+Reading down the list is reading *up* the stack, which is the row's own claim
+about left-to-right carried inside the group.
+
+**What each switch does.** A View's switch mounts or unmounts a `<VisningLayer>`
+child, so switching off withdraws the member and stops the work — the point
+being that switching one on can start a WMS stitch, which is also why
+`visningShownAtom` starts empty and a lokalitet never opens N of them. The
+group label and the ground preset instead *hold* what they cannot withdraw
+(§10, above), and the preset additionally takes the background stack down
+through `setBackgroundHidden` in
+`map/layers/config/backgroundLayers/utils.ts` — `visible: false` on every
+`bg.` layer, which stops tile loading while keeping the tiles already
+fetched, so switching back is free. Scoped to `bg.` and deliberately not
+`cmp.`: the curtain's B half is another full ground.
+
+So **the map can have no ground at all** — a sketch and its funn on white, with
+nothing underneath arguing. That is the one reading where "off" means something
+for this group, and it is why the preset is a member rather than a sixth ground
+mode.
+
+**The preset has no fade.** `LayerMember.opacity` is optional and the preset
+omits it: the background is a stack of tile layers, so a slider here is three
+fades and not one, and the grounds that can be faded are faded from the
+settings strip where all their other modifiers live.
+
+**`Gjenskap` lives here now.** It left the bilde cards (§8.7.1) and became each
+View row's trailing `restart_alt`, setting the same `recreateViewAtom` — so
+`useRecreateView` is untouched. Every row in this list has a view behind it by
+construction, so the "absent where there is nothing to go back to" case the
+button needed is gone with the button.
+
+The four control atoms are in `map/groundOverlay.ts`, beside the mechanism they
+drive: `groundShownAtom`, `visningShownAtom`, `visningOpacityAtom`,
+`visningGroupShownAtom`. None is persisted — which members are on is view
+state, not curation — and `useLocalityWorkspace` empties all four when the
+lokalitet closes or swaps, while the control puts the background back on
+unmount. Nothing here writes, so there is no stance gate: a reader gets the
+group in full. What it *lists* is stance-sensitive for one reason only —
+`hidden` records are in the list in edit and out of it in show, which is
+§13.8's rule and the same one `bilderItems` applies.
 
 ---
 
@@ -4598,9 +4711,12 @@ rail of small frames in both stances, with the write verbs under it while you
 are editing; picking a frame puts that image back on the map at its own
 rectangle and fades it over what is there now, either stance, with
 **Vis i ruta** / **Ta av ruta** to toggle it without giving up the selection,
-in either stance;
-press **Gjenskap** on an extract,
-terrain render or flyfoto to set the map back to the view it was made from;
+in either stance, for a screenshot;
+switch an extract, terrain render or flyfoto onto the ground from
+**[Visning ▾]** instead, one or several at once, each with its own fade, over
+or instead of the live ground — and press its **Gjenskap** there to set the map
+back to the view it was made from;
+take the ground away entirely and read a sketch and its funn on white;
 see a card that is still a set of parameters say so, and retry it if its render
 failed; open the original in a tab, fetching it first where it does not exist
 yet; caption an attachment; delete one and have it gone on confirm, without
@@ -4806,3 +4922,14 @@ plausible-sounding reason to bring one back is exactly what the entry is for.
   relief, in register. `zIndex: 1` is a **stack** now (§10). Do not re-add an
   arbiter to "stop two images fighting"; two images at one extent with two
   opacities is the feature.
+- **`Gjenskap` as a button, and `Vis i ruta` on a View**
+  (`docs/lokalitet-view.md` §13, build step 5) — `RecreateButton` in
+  `bilderCommon.tsx` with its `localities.bilder.recreate` / `recreateHint`
+  strings, off both the filmstrip card and the carousel; and `canPinBilde`'s
+  `extract` / `flyfoto` arms. Neither verb went away: an extract, terrain
+  render or flyfoto is switched onto the ground from `[Visning ▾]` now, where
+  the row names what it is, and `Gjenskap` is that row's apply
+  (`useRecreateView` is untouched underneath). Do not put either back on a
+  card — two controls for one layer, one of which cannot see the stack the
+  other is ordering, is the failure §1 is about. `Vis i ruta` is still the
+  screenshot's own way onto the map until step 6 gives the Files a group.

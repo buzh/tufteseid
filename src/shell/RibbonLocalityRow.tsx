@@ -28,6 +28,7 @@ import { LayerGroup, LayerMembers } from './LayerGroup';
 import { ModeButton } from './ModeButton';
 import styles from './Ribbon.module.css';
 import rowStyles from './RibbonLocalityRow.module.css';
+import { VisningControl } from './VisningControl';
 
 const VISIBILITY_PALETTE: Record<
   LocalityRecord['visibility'],
@@ -912,6 +913,11 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             place when `.tools` appears and disappears with the stance: pressing
             `Rediger` must not move `Funn` out from under the pointer. */}
         <div className={rowStyles.contents}>
+          {/* Left to right is bottom to top of the map's z-stack
+              (docs/lokalitet-view.md §13.1): the ground and the Views over it,
+              then the sketches at zIndex 2, then the funn at 5. [Bilde]
+              arrives between the first two at step 6. */}
+          <VisningControl ws={ws} />
           <SkisseControl ws={ws} />
           <FunnControl ws={ws} />
           {/* Lit when a bilde is **on the ground**, not when the rail is

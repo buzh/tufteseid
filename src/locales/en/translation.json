@@ -356,6 +356,13 @@
       "editHint": "Open the strokes under the pen again."
     },
     "layers": {
+      "visning": "Ground",
+      "visningHide": "Hide the ground and its layers on the map",
+      "visningShow": "Show the ground and its layers on the map again",
+      "visningMembers": "Choose what lies in the ground",
+      "ground": "Background",
+      "view": "View {{n}}",
+      "apply": "Recreate — put the map back the way this view was made",
       "skisse": "Sketch",
       "skisseHide": "Hide the sketches on the map",
       "skisseShow": "Show the sketches on the map again",
@@ -388,8 +395,6 @@
       "unhide": "Show in the exhibit",
       "moveEarlier": "Move earlier",
       "moveLater": "Move later",
-      "recreate": "Recreate",
-      "recreateHint": "Put the map back to the view this image was made from.",
       "recreateFailed": "Could not find the dataset this image was made from.",
       "kind": {
         "extract": "LiDAR extract",

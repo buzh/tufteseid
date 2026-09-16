@@ -16,8 +16,13 @@
 // What is left here is the *selection* — which record is up, and how far it is
 // faded. Getting that record onto the ground is `groundView.ts` (§13.10 step
 // 2), which paints a pinned figure and renders a View live when there is no
-// figure to paint. This hook is its first caller; the layer row will be the
-// other, and then this one goes (§13.10 step 6).
+// figure to paint. This hook was its first caller; [Visning] is the second,
+// and step 5 took the Views with it, so what this still pins is a File over a
+// rectangle. Step 6 gives those a group of their own and then this hook goes.
+//
+// Until it does, its member is one the layer row has not named, which the
+// stack paints above everything the row has ordered — the right place for it,
+// since [Bilde] is the group above [Visning].
 //
 // The group it paints into is shared with Terrenganalyse, and since §13 it is
 // a **stack** rather than a slot: this is its upper member, so a pinned
@@ -36,22 +41,27 @@ import { groundExtentOf, useGroundView } from './groundView';
 /**
  * Whether this record has enough recorded about it to be placed on the map.
  *
- * A sketch is refused although a pinned one has both a file and an extent, and
- * that is about the group rather than the record: this one holds a *ground*,
- * and a sketch is a transparent layer over one. It has its own way onto the
- * map — `sketchOverlay.ts`, a set rather than a slot (§9.3) — and laying its
- * figure down here would put a white sheet with a caption panel on it over the
- * very image it was drawn to annotate.
+ * **Files only, since step 5.** `kind` is the whole eligibility rule of the
+ * layer row (§13.1) and the row now owns the other two kinds: an extract or a
+ * flyfoto is a View and is switched on in [Visning], where the rows say what
+ * each one *is* and switching one on is a deliberate act. Leaving `Vis i ruta`
+ * on those cards as well would be two controls for one layer, disagreeing —
+ * the rail's toggle knows nothing about the stack the pulldown is ordering.
  *
- * The `file` requirement is now this surface's rule rather than the ground's.
- * `useGroundView` renders an unpinned View from its spec, so the map no longer
- * needs the figure — but the rail is where "ikke hentet ennå" is shown, and
- * putting a pin toggle on that card would make browsing captions start WMS
- * stitches. [Visning]'s pulldown is where switching one on is a deliberate act
- * and where the requirement drops (§13.2, §13.10 step 5).
+ * A sketch was already refused, and for a reason that is about the group
+ * rather than the record: this one holds a *ground*, and a sketch is a
+ * transparent layer over one. It has its own way onto the map —
+ * `sketchOverlay.ts`, a set rather than a slot (§9.3) — and laying its figure
+ * down here would put a white sheet with a caption panel on it over the very
+ * image it was drawn to annotate.
+ *
+ * So what is left is the two kinds that are bytes and nothing else, and the
+ * `file` requirement is theirs by definition rather than the ground's: a File
+ * has nothing behind it that could make the pixels again. An upload carries no
+ * extent and is refused by the last clause, as it always was.
  */
 export const canPinBilde = (rec: AttachmentRecord): boolean =>
-  rec.kind !== 'sketch' &&
+  (rec.kind === 'screenshot' || rec.kind === 'upload') &&
   rec.file !== '' &&
   rec.meta != null &&
   groundExtentOf(rec.meta) != null;

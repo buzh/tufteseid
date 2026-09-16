@@ -38,6 +38,7 @@ import { ribbonToolAtom } from '../../localities/toolAtoms';
 import {
   setGroundOverlay,
   setGroundOverlayOpacity,
+  TERRAIN_KEY,
 } from '../../map/groundOverlay';
 import type { CycleKey } from '../../map/useBackgroundCyclingKeys';
 import { fetchDem, type Dem, type DemModel } from '../../terrain/dem';
@@ -224,7 +225,7 @@ export const useTerrainAnalysis = () => {
       // Covers loading, the no-coverage case, a failed fetch and leaving the
       // tool alike: an earlier render must not stay on the map describing
       // ground nothing is analysing any more.
-      setGroundOverlay('terrain', null);
+      setGroundOverlay(TERRAIN_KEY, null);
       return;
     }
     // Reused rather than recreated: this exact element is what the map's
@@ -232,7 +233,7 @@ export const useTerrainAnalysis = () => {
     // rebuilding the layer's image too.
     const canvas = (canvasRef.current ??= document.createElement('canvas'));
     if (!paintTerrainField(field, dem, vis, canvas)) return;
-    setGroundOverlay('terrain', {
+    setGroundOverlay(TERRAIN_KEY, {
       source: canvas,
       crop: { x: 0, y: 0, width: canvas.width, height: canvas.height },
       extent25833: demImageExtent(dem),
@@ -245,12 +246,12 @@ export const useTerrainAnalysis = () => {
   // is corrected by the redraw this triggers. It still has to run, because
   // that module-level number outlives this hook.
   useEffect(() => {
-    setGroundOverlayOpacity('terrain', opacity / 100);
+    setGroundOverlayOpacity(TERRAIN_KEY, opacity / 100);
   }, [opacity]);
 
   // Unmounting the ribbon takes the render with it. Only the render: a bilde
   // is a member of its own and is not this hook's to withdraw.
-  useEffect(() => () => setGroundOverlay('terrain', null), []);
+  useEffect(() => () => setGroundOverlay(TERRAIN_KEY, null), []);
 
   /*
    * The render as a keepable thing — and since §4.1.2 that means *the row of

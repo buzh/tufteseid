@@ -8,7 +8,6 @@ import {
   MetaLine,
   Note,
   OpenOriginalButton,
-  RecreateButton,
   SketchToggleButton,
 } from './bilderCommon';
 import styles from './bilderCommon.module.css';
@@ -78,7 +77,6 @@ const Detail = ({
             can be held up against it and taken away again. `Rediger skissen`
             is the carousel's — that one writes. */}
         <SketchToggleButton ws={ws} rec={rec} />
-        <RecreateButton rec={rec} />
         {/* No retry here, and none is reachable: a pin is a write, so
             `PinRetryButton` is the carousel's. This surface is only ever
             mounted where `canAdd` is false. */}

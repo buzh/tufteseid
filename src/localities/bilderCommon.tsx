@@ -33,7 +33,6 @@ import {
   type AttachmentRecord,
   getAttachmentUrl,
 } from '../api/attachments';
-import { recreateViewAtom } from '../shell/useRecreateView';
 import {
   Badge,
   Button,
@@ -51,7 +50,7 @@ import { type PinState, pinStateOf, subscribePinQueue } from './pinQueue';
 import { bilderStripOpenAtom } from './toolAtoms';
 import type { LocalityWorkspaceApi } from './useLocalityWorkspace';
 import { type RailReorder, useRailReorder } from './useRailReorder';
-import { isPinned, viewSpecOf } from './viewSpec';
+import { isPinned } from './viewSpec';
 
 // `landscape` is what the ribbon already uses for LiDAR mode, so an
 // extract carries the same mark here. (Material Symbols' `terrain` isn't
@@ -482,15 +481,29 @@ export const Note = ({ children }: { children: ReactNode }) => (
   <p className={styles.metaLine}>{children}</p>
 );
 
-export const MetaLine = ({ rec }: { rec: AttachmentRecord }) => {
+/**
+ * Dataset · style · resolution, as one line — the record's provenance in the
+ * smallest space it fits in.
+ *
+ * A function rather than only a component because [Visning]'s pulldown prints
+ * the same line under the same record (§13.4, where the row's label *is* the
+ * provenance), and a second reading of `meta` would be a second chance for the
+ * card and the layer row to disagree about what an image is.
+ */
+export const metaLineOf = (rec: AttachmentRecord): string | null => {
   const meta = rec.meta ?? {};
   const parts = [
     typeof meta.sourceLabel === 'string' ? meta.sourceLabel : null,
     typeof meta.style === 'string' ? meta.style : null,
     typeof meta.metresPerPx === 'number' ? `${meta.metresPerPx} m/px` : null,
   ].filter((s): s is string => !!s);
-  if (parts.length === 0) return null;
-  return <p className={styles.metaLine}>{parts.join(' · ')}</p>;
+  return parts.length > 0 ? parts.join(' · ') : null;
+};
+
+export const MetaLine = ({ rec }: { rec: AttachmentRecord }) => {
+  const line = metaLineOf(rec);
+  if (!line) return null;
+  return <p className={styles.metaLine}>{line}</p>;
 };
 
 /** Kind, cover and concealment, said as chips. */
@@ -636,30 +649,6 @@ export const SketchEditButton = ({
       onClick={() => ws.resumeSketch(rec)}
     >
       {t('localities.sketch.edit')}
-    </Button>
-  );
-};
-
-/**
- * Put the map back the way it was when this image was taken.
- *
- * Absent rather than disabled where there is no view behind the record
- * (§4.2): a screenshot has nothing to go back to, which is a different
- * statement from "you may not go back to it".
- */
-export const RecreateButton = ({ rec }: { rec: AttachmentRecord }) => {
-  const { t } = useTranslation();
-  const recreate = useSetAtom(recreateViewAtom);
-  const spec = viewSpecOf(rec);
-  if (!spec) return null;
-  return (
-    <Button
-      size="sm"
-      leftIcon="restart_alt"
-      title={t('localities.bilder.recreateHint')}
-      onClick={() => recreate(spec)}
-    >
-      {t('localities.bilder.recreate')}
     </Button>
   );
 };

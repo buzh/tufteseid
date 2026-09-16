@@ -66,6 +66,14 @@
   background: var(--c-bg-hover);
 }
 
+/* The switch and its one action, side by side: a `<button>` cannot nest a
+   `<button>`, so the row's top line is a flex container and the switch is the
+   part of it that stretches. */
+.head {
+  display: flex;
+  align-items: center;
+}
+
 /* Pulldown.module.css's `.item` geometry, so a member row lines up with every
    other list in the ribbon. */
 .switch {
@@ -73,6 +81,10 @@
   align-items: center;
   gap: var(--sp-4);
   width: 100%;
+  /* So it can give way to the action beside it in `.head` — without this the
+     switch's content width is its floor and a long label pushes the verb off
+     the row. */
+  min-width: 0;
   padding: var(--sp-3) var(--sp-4);
   border: 0;
   background: transparent;
@@ -84,6 +96,13 @@
 .switch:focus-visible {
   outline: 2px solid var(--c-focus);
   outline-offset: -2px;
+}
+
+/* Inside the row's padding rather than after it, so the label still truncates
+   against the same right edge whether or not the row carries a verb. */
+.action {
+  flex: none;
+  margin-right: var(--sp-2);
 }
 
 .checkOn {

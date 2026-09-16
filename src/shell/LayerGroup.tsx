@@ -1,6 +1,13 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { cx, Icon, type MaterialSymbol, Popover, Tooltip } from '../ui';
+import {
+  cx,
+  Icon,
+  IconButton,
+  type MaterialSymbol,
+  Popover,
+  Tooltip,
+} from '../ui';
 import styles from './LayerGroup.module.css';
 import { ModeButton } from './ModeButton';
 
@@ -46,8 +53,24 @@ export type LayerMember = {
   /** The second line, when the label cannot carry all of it. */
   meta?: string;
   shown: boolean;
-  /** 0–100. Printed as transparency, which is `100 -` this. */
-  opacity: number;
+  /**
+   * 0–100, printed as transparency (`100 -` this). **Optional, and absent
+   * means no fade at all** — step 4's rule that opacity is a raster idea, said
+   * once more for a raster that happens not to have one knob: [Visning]'s
+   * ground preset is a *stack* of tile layers, so fading it is three fades and
+   * not one, and the grounds that do fade already have that control where all
+   * their other modifiers are, on the settings strip.
+   */
+  opacity?: number;
+  /**
+   * One verb the row carries, at its right edge.
+   *
+   * There is exactly one so far and it is `Gjenskap` (§13.2): the button left
+   * the bilde card when [Visning] arrived and became this, the pulldown's
+   * apply. A member that has no view behind it — a File, the ground preset —
+   * leaves it out, which is the same "absent, not disabled" the card made.
+   */
+  action?: { icon: MaterialSymbol; label: string; onClick: () => void };
 };
 
 export const LayerGroup = ({
@@ -179,7 +202,12 @@ export const LayerMembers = ({
  * that cannot be seen is indistinguishable from a fade that does nothing, the
  * same call `TerrainSliders` makes — and it streams, because what is being
  * watched is the layer underneath coming through and a fade that only lands on
- * release cannot be aimed.
+ * release cannot be aimed. A member with no `opacity` at all never grows one.
+ *
+ * The switch fills the row, and an action sits beside it rather than in it: a
+ * `<button>` cannot contain a `<button>`, so `.head` is the flex line the two
+ * share. That is also why the action is not part of the switch's hit area —
+ * `Gjenskap` moves the map, and a press meant for a checkbox must not.
  *
  * **0 % is opaque.** The word on screen is transparency, so the number counts
  * what the word names; the map holds opacity and the flip is here, at the
@@ -196,30 +224,45 @@ const MemberRow = ({
   onSetOpacity: (opacity: number) => void;
 }) => {
   const { t } = useTranslation();
-  const transparency = 100 - member.opacity;
+  const { action } = member;
+  const transparency = member.opacity == null ? null : 100 - member.opacity;
 
   return (
     <div className={styles.member}>
-      <button
-        type="button"
-        role="menuitemcheckbox"
-        aria-checked={member.shown}
-        className={styles.switch}
-        onClick={onToggle}
-      >
-        <Icon
-          icon={member.shown ? 'check_box' : 'check_box_outline_blank'}
-          size={18}
-          className={member.shown ? styles.checkOn : styles.checkOff}
-        />
-        <span className={styles.memberLabel}>
-          {member.label}
-          {member.meta && (
-            <span className={styles.memberMeta}>{member.meta}</span>
-          )}
-        </span>
-      </button>
-      {member.shown && (
+      <div className={styles.head}>
+        <button
+          type="button"
+          role="menuitemcheckbox"
+          aria-checked={member.shown}
+          className={styles.switch}
+          onClick={onToggle}
+        >
+          <Icon
+            icon={member.shown ? 'check_box' : 'check_box_outline_blank'}
+            size={18}
+            className={member.shown ? styles.checkOn : styles.checkOff}
+          />
+          <span className={styles.memberLabel}>
+            {member.label}
+            {member.meta && (
+              <span className={styles.memberMeta}>{member.meta}</span>
+            )}
+          </span>
+        </button>
+        {action && (
+          <Tooltip label={action.label}>
+            <IconButton
+              icon={action.icon}
+              size="sm"
+              palette="gray"
+              className={styles.action}
+              aria-label={action.label}
+              onClick={action.onClick}
+            />
+          </Tooltip>
+        )}
+      </div>
+      {member.shown && transparency != null && (
         <label className={styles.fade}>
           <span className={styles.fadeLabel}>
             {t('localities.layers.transparency')}

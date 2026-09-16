@@ -14,8 +14,9 @@
 // comparison the sentence above promises: a 1937 ortofoto *over* today's
 // hillshade is two images of one rectangle, and the arbiter's whole job was
 // making sure there was never more than one. §13 is the correction, and this
-// module is the mechanism half of it: the members are **declared**, they
-// stack bottom-to-top in `ORDER`, and each carries its own opacity.
+// module is the mechanism half of it: the members are **declared**, they stack
+// bottom-to-top in whatever order the layer row gives them, and each carries
+// its own opacity.
 //
 // **One layer and one canvas for the whole group**, not one per member. The
 // members are an ordered composite with per-member alpha, which is precisely
@@ -26,21 +27,25 @@
 // z-order the list's order for free, with no fractional zIndex ladder to
 // maintain.
 //
-// Contributors declare themselves by key rather than one caller declaring the
-// whole array, which is the difference between this and `sketchOverlay.ts`.
-// That is not a preference: the two live in different trees — Terrenganalyse's
-// state is mounted once from RibbonGlobalRow, a bilde's from the lokalitet
-// workspace — and inventing a shared owner for them now would be building the
-// layer row's state before the layer row. When that row lands it becomes the
-// single caller and the key gives way to the row's own order.
+// **Producers declare, the row orders.** A contributor puts its pixels up
+// under a key of its own choosing and knows nothing about the rest of the
+// stack; `setGroundOverlayStack` is where the bottom-to-top order and the
+// row's own switches arrive, from one caller. That split is not a preference
+// either — the producers live in different trees (Terrenganalyse's state is
+// mounted once from RibbonGlobalRow, a View's from the lokalitet workspace),
+// so there is no component above all of them to declare the array the way
+// `sketchOverlay.ts` does. Step 5 is where the row became that caller and the
+// fixed two-value key gave way to its order, as step 1 said it would.
 //
 // Imperative and module-level, like `swapBackgroundLayers`, rather than an
 // atom plus a hook. The two things that change here — the pixels on every
 // slider frame, the opacity on every drag of its own — change dozens of times
 // a second and no React component needs to see either. Routing them through
-// jotai would re-render the whole shell at that rate for nothing.
+// jotai would re-render the whole shell at that rate for nothing. The *control*
+// state below is the other half of that sentence and is atoms, because it is
+// pressed a handful of times a session and four surfaces read it.
 
-import { getDefaultStore } from 'jotai';
+import { atom, getDefaultStore } from 'jotai';
 import type { Extent } from 'ol/extent';
 import ImageLayer from 'ol/layer/Image';
 import type { Size } from 'ol/size';
@@ -61,13 +66,18 @@ const LAYER_ID = 'ground.overlay';
 const Z_INDEX = 1;
 
 /**
- * Who is contributing an image, and — read as an array — in what order they
- * stack. Terrenganalyse's live render is a reading of the ground itself, so
- * it sits at the bottom; a kept bilde is laid over it.
+ * The live terrain render — Terrenganalyse's own key, and [Visning]'s bottom
+ * member when Terreng is the ground on screen (docs/lokalitet-view.md §13.1).
+ *
+ * Named here rather than spelled at both ends because the row has to hold this
+ * one down without being able to withdraw it: the render is declared by
+ * `useTerrainAnalysis` in row 1, and the switch for it is [Visning]'s preset
+ * member, three components away.
  */
-export type GroundOverlayKey = 'terrain' | 'bilde';
+export const TERRAIN_KEY = 'terrain';
 
-const ORDER: readonly GroundOverlayKey[] = ['terrain', 'bilde'];
+/** One View in [Visning]'s pulldown, by attachment id. */
+export const viewKeyOf = (attachmentId: string) => `view:${attachmentId}`;
 
 export type GroundOverlayMember = {
   /**
@@ -90,14 +100,35 @@ export type GroundOverlayMember = {
 
 let layer: ImageLayer<ImageCanvasSource> | null = null;
 
-const members = new Map<GroundOverlayKey, GroundOverlayMember>();
+const members = new Map<string, GroundOverlayMember>();
 
 // Remembered per contributor and deliberately outliving the member: switching
 // DTM→DOM withdraws the terrain image and declares a new one, and losing the
-// fade you had just dialled in on the way through would be a bug.
-const opacityByKey: Record<GroundOverlayKey, number> = {
-  terrain: 1,
-  bilde: 1,
+// fade you had just dialled in on the way through would be a bug. Never
+// pruned, and that is the same decision said once more — a key that is gone
+// costs one number, and forgetting it is the bug above with a longer fuse.
+const opacityByKey = new Map<string, number>();
+
+// The row's half of the arrangement: which keys are its members, bottom to
+// top, and which of those it is holding down.
+//
+// Held is not the same as withdrawn, and only the row needs the difference.
+// A member's own switch withdraws it — the producer unmounts and the pixels
+// go — but the group label and the ground preset have to take down members
+// that somebody else declared, and have to give them back unchanged. So they
+// are skipped in the draw loop and nothing else about them moves.
+//
+// Keys the row has not named paint *above* everything it has, in the order
+// they were declared. That is where `usePinnedBilde` sits until step 6 gives
+// [Bilde] a declaration of its own, and it is the right place for it: a File
+// on the ground is the group above this one.
+let order: readonly string[] = [];
+let held: ReadonlySet<string> = new Set<string>();
+
+const stack = (): string[] => {
+  const named = order.filter((key) => members.has(key));
+  const rest = [...members.keys()].filter((key) => !order.includes(key));
+  return [...named, ...rest];
 };
 
 // One output canvas for the group's whole life rather than one per call.
@@ -125,10 +156,11 @@ const drawFrame = (
 
   // Ground metres → canvas pixels.
   const scale = pixelRatio / resolution;
-  for (const key of ORDER) {
+  for (const key of stack()) {
+    if (held.has(key)) continue;
     const member = members.get(key);
     if (!member) continue;
-    const alpha = opacityByKey[key];
+    const alpha = opacityByKey.get(key) ?? 1;
     if (!(alpha > 0)) continue;
     const [minX, minY, maxX, maxY] = member.extent25833;
     const w = (maxX - minX) * scale;
@@ -197,7 +229,7 @@ const redraw = () => {
  * displaced side to drop its selection, are what §13 deleted.
  */
 export const setGroundOverlay = (
-  key: GroundOverlayKey,
+  key: string,
   member: GroundOverlayMember | null,
 ) => {
   if (member) members.set(key, member);
@@ -206,11 +238,72 @@ export const setGroundOverlay = (
 };
 
 /** 0..1. Fades this member towards whatever is under it in the stack. */
-export const setGroundOverlayOpacity = (
-  key: GroundOverlayKey,
-  value: number,
-) => {
-  if (opacityByKey[key] === value) return;
-  opacityByKey[key] = value;
+export const setGroundOverlayOpacity = (key: string, value: number) => {
+  if (opacityByKey.get(key) === value) return;
+  opacityByKey.set(key, value);
   if (members.has(key)) redraw();
 };
+
+const sameOrder = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((key, i) => key === b[i]);
+
+const sameHeld = (a: ReadonlySet<string>, b: ReadonlySet<string>) =>
+  a.size === b.size && [...a].every((key) => b.has(key));
+
+/**
+ * The layer row's statement about this group: its members bottom to top, and
+ * which of them it is holding down.
+ *
+ * One caller — `VisningControl` — and it re-declares the whole thing on every
+ * change rather than adding and removing, for the reason `setSketchOverlays`
+ * does: switching a member, switching the group, reordering the exhibit and
+ * closing the lokalitet are four routes to the same map and only one of them
+ * is a removal. Cheap to call redundantly; the compare below is what makes
+ * that true.
+ */
+export const setGroundOverlayStack = (
+  keys: readonly string[],
+  hidden: ReadonlySet<string>,
+) => {
+  if (sameOrder(order, keys) && sameHeld(held, hidden)) return;
+  order = keys;
+  held = hidden;
+  redraw();
+};
+
+/*
+ * [Visning]'s control state — the row's, not the map's.
+ *
+ * Here rather than in `localities/atoms.ts` for the reason the sketch group's
+ * three live in `map/sketchOverlay.ts`: an atom that only makes sense against
+ * one mechanism belongs beside it. Nothing here is persisted (§13.10's third
+ * trap) and `useLocalityWorkspace` empties all four when the lokalitet closes
+ * or swaps.
+ */
+
+/**
+ * The bottom member: whether there is a ground at all.
+ *
+ * Not a fifth ground mode and not a background of its own — it takes the
+ * background stack down (`setBackgroundHidden`) and holds `TERRAIN_KEY` when
+ * Terreng is what is up. §13.1's second consequence, and the one reading where
+ * "off" means something for this group: a sketch and its funn on white, with
+ * nothing underneath arguing.
+ */
+export const groundShownAtom = atom(true);
+
+/**
+ * Which Views are on the ground, by attachment id. **Empty by default**, and
+ * that is load-bearing: switching one on can start a WMS stitch, so a
+ * lokalitet that put every extract up on open would spend a minute of
+ * Kartverket's rate limit answering a question nobody asked.
+ */
+export const visningShownAtom = atom<ReadonlySet<string>>(new Set<string>());
+
+/** How far each shown View is faded, 0–100 by attachment id. Missing is 100. */
+export const visningOpacityAtom = atom<ReadonlyMap<string, number>>(
+  new Map<string, number>(),
+);
+
+/** The group label's flag — see `sketchGroupShownAtom` for why it is its own. */
+export const visningGroupShownAtom = atom(true);

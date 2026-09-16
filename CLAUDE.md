@@ -86,24 +86,34 @@ all of them.
   and the takeout bundle, and moving Terreng and Sammenlign off row 1 onto
   the lokalitet row. Read it before building any of that; each step folds into
   `docs/ui-architecture.md` §8 as it lands. **§13 is a separate thread and
-  only its first four steps are built**: the *layer row* — four `[thing ▾]` groups
+  only its first five steps are built**: the *layer row* — four `[thing ▾]` groups
   (Visning / Bilde / Skisse / Funn) matching the map's z-stack bottom-to-top,
   each member switchable with its own opacity — which deletes `Gjenskap`, `Vis
   i ruta` and the one-slot ground arbiter, makes a funn a container for images
   as well as a sublocation, and gives an arrangement a record of its own
   (`kind: 'scene'`, membership on the existing `over`). §13.10 is its build
-  order and four steps have landed: the ground overlay is a stack and the
+  order and five steps have landed: the ground overlay is a stack and the
   arbiter is gone; `src/localities/groundView.ts` can put a View on the map
   as its own pixels over its own rectangle — rendering it live when there is no
   pinned figure to lay down; `src/shell/LayerGroup.tsx` is the `[thing ▾]`
-  control itself; and `[Skisse ▾]` and `[Funn ▾]` both wear it. The component
+  control itself; and `[Visning ▾]`, `[Skisse ▾]` and `[Funn ▾]` all wear it.
+  The component
   is the *button and the pulldown frame* — a label that toggles the group, a
   caret that opens it, a badge counting what is on the map — with the body a
   render prop, so a group brings either the default `LayerMembers` (a switch
   and a fade each) or a surface of its own, as `[Funn ▾]` brings `FunnList`.
-  Steps 5 and 6 re-clothe Visning and Bilde in it rather than writing more of
-  it. Two rules that came out of step 4 and hold for those: **opacity is a
-  raster idea** — vector members get a switch and nothing else — and the funn
+  `[Visning ▾]` (`src/shell/VisningControl.tsx`, §10.1 of the UI doc) holds the
+  ground preset at the bottom and every View in the lokalitet above it, so
+  switching an extract or a 1937 ortofoto onto the ground — several at once,
+  each faded — is now one pulldown; `Gjenskap` moved there as the View row's
+  apply, `Vis i ruta` narrowed to Files, and switching the whole group off
+  leaves a sketch and its funn on white. Step 6 re-clothes Bilde in it rather
+  than writing more of it. Three rules from steps 4–5 that hold for it:
+  **opacity is a raster idea** — vector members get a switch and nothing else,
+  and so does the ground preset, whose fade would be three fades and lives on
+  the settings strip instead; **held is not withdrawn** — a group or preset
+  switch that takes down a layer somebody else declared must hand it back
+  unchanged, never reach for its producer; and the funn
   row's `EyeSplit` polarity (label opens, eye hides) is now row 1's alone, on
   `Kulturminner`.
 - `README.md` — third-party-facing install and admin guide (docker compose
@@ -370,17 +380,26 @@ the reason the seed can't step on "Gjenskap": `docs/ui-architecture.md` §10.
   the relief has to be the ground. Imperative and module-level like
   `swapBackgroundLayers` — the pixels change every slider frame and no React
   component needs to see that.
-- **That level is a stack, and two features are in it**: a live terrain render
-  at the bottom and a bilde pinned with "Vis i ruta" over it
-  (`src/localities/usePinnedBilde.ts`). It used to be one slot with an arbiter
-  making the two take turns; that is deleted (`docs/lokalitet-view.md` §13),
-  because it forbade the one comparison the overlay exists for. Contributors
-  now declare themselves by key — `setGroundOverlay('terrain' | 'bilde', member
-  | null)` — and the module paints them bottom-to-top into **one layer and one
-  canvas**, each with its own `globalAlpha`. One layer rather than one per
-  member: the members are an ordered composite with per-member opacity, and the
-  reused output canvas is ~30 MB. The compare curtain (`COMPARE_Z = 1.5`)
-  covers the whole group, which is what it is for.
+- **That level is a stack, and anyone may be in it**: the live terrain render
+  at the bottom, every View switched on in `[Visning ▾]`
+  (`src/shell/VisningControl.tsx`) above it, and a File pinned with "Vis i
+  ruta" (`src/localities/usePinnedBilde.ts`) above those. It used to be one
+  slot with an arbiter making two features take turns; that is deleted
+  (`docs/lokalitet-view.md` §13), because it forbade the one comparison the
+  overlay exists for. **Producers declare, the layer row orders**:
+  `setGroundOverlay(key, member | null)` takes any string key, and
+  `setGroundOverlayStack(keys, held)` — called from `VisningControl` alone —
+  says what order those keys paint in and which of them are held down. A key
+  nobody ordered paints above everything that was ordered, which is where the
+  pinned File sits until §13.10 step 6. The module paints them bottom-to-top
+  into **one layer and one canvas**, each with its own `globalAlpha`. One layer
+  rather than one per member: the members are an ordered composite with
+  per-member opacity, and the reused output canvas is ~30 MB. The compare
+  curtain (`COMPARE_Z = 1.5`) covers the whole group, which is what it is for.
+  Two rules the row rests on: **held is not withdrawn** — holding a member
+  down never touches the producer that declared it, so switching the group
+  back on gives it back unchanged — and `opacityByKey` is **never pruned**,
+  because a member's fade has to outlive its member.
 
 Load-bearing:
 

@@ -356,6 +356,13 @@
       "editHint": "Åpne strekene under pennen igjen."
     },
     "layers": {
+      "visning": "Visning",
+      "visningHide": "Skjul bakken og visningene på kartet",
+      "visningShow": "Vis bakken og visningene på kartet igjen",
+      "visningMembers": "Velg hva som ligger i bakken",
+      "ground": "Bakgrunn",
+      "view": "Visning {{n}}",
+      "apply": "Gjenskap — still kartet tilbake til denne visningen",
       "skisse": "Skisse",
       "skisseHide": "Skjul skissene på kartet",
       "skisseShow": "Vis skissene på kartet igjen",
@@ -388,8 +395,6 @@
       "unhide": "Vis i utstillingen",
       "moveEarlier": "Flytt fram",
       "moveLater": "Flytt bak",
-      "recreate": "Gjenskap",
-      "recreateHint": "Still kartet tilbake til visningen bildet ble laget fra.",
       "recreateFailed": "Fant ikke datasettet bildet ble laget fra.",
       "kind": {
         "extract": "LiDAR-uttrekk",
