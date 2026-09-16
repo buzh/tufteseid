@@ -9,6 +9,7 @@ import {
   groundShownAtom,
   setGroundOverlayOpacity,
   setGroundOverlayStack,
+  spendProvisionalViewAtom,
   TERRAIN_KEY,
   viewKeyOf,
   visningGroupShownAtom,
@@ -60,6 +61,7 @@ export const VisningControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const [opacity, setOpacity] = useAtom(visningOpacityAtom);
   const [groupShown, setGroupShown] = useAtom(visningGroupShownAtom);
   const recreate = useSetAtom(recreateViewAtom);
+  const spendProvisional = useSetAtom(spendProvisionalViewAtom);
   const setRing = useSetAtom(visningRingAtom);
   const ringHint = useVisningRingHint();
   const { failedIds, report } = useLayerFailures();
@@ -154,8 +156,13 @@ export const VisningControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
       return next;
     });
 
-  const setViewOpacity = (id: string, value: number) =>
+  // Dialling a member's fade is composing the stack as much as switching one
+  // is, and somebody who has faded the cover to read through it has said what
+  // they want it to do.
+  const setViewOpacity = (id: string, value: number) => {
+    spendProvisional('keep');
     setOpacity((cur) => new Map(cur).set(id, value));
+  };
 
   const members: LayerMember[] = [
     {
@@ -223,9 +230,16 @@ export const VisningControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         {() => (
           <LayerMembers
             members={members}
-            onToggleMember={(id) =>
-              id === 'ground' ? setGroundShown(!groundShown) : toggleView(id)
-            }
+            // Either switch is the user taking this group in hand, so the
+            // arrival cover stops being the app's guess and is never withdrawn
+            // from under them again (`provisionalViewAtom`). `keep`: the
+            // switches say what is on the ground, and this is only about who
+            // said it.
+            onToggleMember={(id) => {
+              spendProvisional('keep');
+              if (id === 'ground') setGroundShown(!groundShown);
+              else toggleView(id);
+            }}
             onSetOpacity={setViewOpacity}
           />
         )}

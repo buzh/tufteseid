@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { activeLocalityAtom } from '../localities/atoms';
 import { ribbonToolAtom } from '../localities/toolAtoms';
 import { focusedHalfAtom } from '../map/compare/halves';
+import { spendProvisionalViewAtom } from '../map/groundOverlay';
 import type { CycleKey } from '../map/useBackgroundCyclingKeys';
 import type { FlyfotoControls } from './flyfoto/useFlyfotoControls';
 import type { LidarControls } from './lidar/useLidarControls';
@@ -113,6 +114,8 @@ export const useGroundMode = (
   // The lokalitet's own ring, which takes W/S ahead of the ground's — see
   // `cycle` below.
   const cycleVisning = useSetAtom(cycleVisningAtom);
+  // The arrival cover's latch — see `select` below.
+  const spendProvisional = useSetAtom(spendProvisionalViewAtom);
 
   // One entrance. Terreng is a reading *of a rectangle*, and the only
   // rectangle in the app is a lokalitet's.
@@ -146,7 +149,7 @@ export const useGroundMode = (
   // Deliberately not memoized: every branch closes over control objects that
   // are rebuilt each render anyway, and the only consumers are event handlers
   // and a registration that re-publishes on every render by design.
-  const select = (next: GroundMode) => {
+  const enter = (next: GroundMode) => {
     // On the B half the ring is four buttons, not five, and it must not
     // disturb the A half's terrain render either way: that render is very
     // often the left-hand term of the comparison being set up.
@@ -189,6 +192,29 @@ export const useGroundMode = (
         else placeForTerrain();
         break;
     }
+  };
+
+  /**
+   * Asking for a ground, which is `enter` plus the one thing a peek must not
+   * do (§10.1).
+   *
+   * A lokalitet opens with its cover on the ground, laid there by the app
+   * rather than chosen — and it is an opaque image over the whole rectangle,
+   * i.e. over everything any of the five grounds has to say. So the first
+   * *ask* takes the guess back down: press Terreng and you see relief, press
+   * Flyfoto and you see the photograph. The withdrawal is one member, once,
+   * and only ever the one nobody asked for — `provisionalViewAtom` for why
+   * that is not the arbiter §13 deleted, and for the switches that spend the
+   * latch without withdrawing anything.
+   *
+   * Hold-to-compare goes to `enter` instead. A peek returns you to exactly
+   * where you were on key release, so it is not an ask about the stack, and
+   * withdrawing on the way out with nothing to restore on the way back would
+   * make X quietly destructive.
+   */
+  const select = (next: GroundMode) => {
+    spendProvisional('withdraw');
+    enter(next);
   };
 
   // The other half of `modifiers`: controls that leave the bar have to be
@@ -274,7 +300,7 @@ export const useGroundMode = (
     if (peekFromRef.current) return;
     const previous = previousRef.current;
     if (!previous || previous === mode) return;
-    // A peek is not an act of authorship, and `select('terreng')` with nothing
+    // A peek is not an act of authorship, and `enter('terreng')` with nothing
     // open starts *placing* a lokalitet. Closing one leaves 'terreng' as the
     // mode before this one, so delegating blindly would have a held X put a
     // rectangle and a row on the screen and then snap straight back out of the
@@ -282,7 +308,7 @@ export const useGroundMode = (
     // sign-in dialog, signed out.
     if (previous === 'terreng' && !locality) return;
     peekFromRef.current = mode;
-    select(previous);
+    enter(previous);
   };
 
   const peekEnd = () => {
@@ -291,7 +317,7 @@ export const useGroundMode = (
     // Cleared first: the effect above has to see the snap-back as a real
     // mode change, so the peeked-at mode becomes the next peek target.
     peekFromRef.current = null;
-    select(back);
+    enter(back);
   };
 
   // A getter rather than the value: it lives in a ref precisely so that

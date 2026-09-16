@@ -341,10 +341,59 @@ export const groundShownAtom = atom(true);
  * would spend a minute of Kartverket's rate limit answering a question nobody
  * asked. What `useLocalityWorkspace` seeds it with is the one case that costs
  * a file fetch instead — the cover, when the cover is a View that has already
- * been pinned. Everything else waits to be asked, in the pulldown or on the
- * ring (`shell/visningRing.ts`).
+ * been pinned — and that one is provisional, see below. Everything else waits
+ * to be asked, in the pulldown or on the ring (`shell/visningRing.ts`).
  */
 export const visningShownAtom = atom<ReadonlySet<string>>(new Set<string>());
+
+/**
+ * The cover, for as long as it is still the app's guess rather than a choice.
+ *
+ * The lay-down above answers "I opened a lokalitet and its images were
+ * nowhere", but it puts an opaque image over the whole rectangle without being
+ * asked — and the rectangle is what every ground in this app is about. Pressing
+ * Terreng under it fetches a DEM, renders relief and shows none of it; pressing
+ * Flyfoto repaints everything except the part you are looking at. A ground
+ * button that does nothing visible is worse than an arrival on bare ground.
+ *
+ * So the cover is **provisional**: it holds the id the workspace laid down, and
+ * the first time the user says which ground they want it steps aside
+ * (`spendProvisionalViewAtom` from `useGroundMode.select`). Once they have
+ * touched the group themselves — a switch in the pulldown, W/S on the ring, a
+ * scene put back — the latch is spent without withdrawing anything and nothing
+ * is ever taken off the ground again. That is what keeps the composition this
+ * whole stack exists for (a 1937 ortofoto faded over today's hillshade) stable
+ * under a ground change: one click makes it yours, and the app has no second
+ * guess to make.
+ *
+ * Deliberately not the arbiter §13 deleted. That one withdrew whatever held the
+ * slot, forever and from both sides; this withdraws exactly one member, exactly
+ * once, and only the one nobody asked for.
+ */
+export const provisionalViewAtom = atom<string | null>(null);
+
+/**
+ * Spend the latch — `'withdraw'` when the user asked for a ground the cover is
+ * covering, `'keep'` when they have taken the group in hand themselves.
+ *
+ * A write atom rather than the two setters at each call site, because the pair
+ * is the rule: clearing without withdrawing is the "it is theirs now" half and
+ * withdrawing without clearing would arm it again on the next ground change.
+ */
+export const spendProvisionalViewAtom = atom(
+  null,
+  (get, set, how: 'withdraw' | 'keep') => {
+    const id = get(provisionalViewAtom);
+    if (id == null) return;
+    set(provisionalViewAtom, null);
+    if (how === 'keep') return;
+    const shown = get(visningShownAtom);
+    if (!shown.has(id)) return;
+    const next = new Set(shown);
+    next.delete(id);
+    set(visningShownAtom, next);
+  },
+);
 
 /** How far each shown View is faded, 0–100 by attachment id. Missing is 100. */
 export const visningOpacityAtom = atom<ReadonlyMap<string, number>>(

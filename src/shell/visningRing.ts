@@ -1,6 +1,10 @@
 import { atom, useAtomValue } from 'jotai';
 import { focusedHalfAtom } from '../map/compare/halves';
-import { visningGroupShownAtom, visningShownAtom } from '../map/groundOverlay';
+import {
+  provisionalViewAtom,
+  visningGroupShownAtom,
+  visningShownAtom,
+} from '../map/groundOverlay';
 
 /*
  * W/S over `[Visning ▾]` — the lokalitet's own kept renders as a ring.
@@ -104,6 +108,11 @@ export const cycleVisningAtom = atom(
       next === 0 ? new Set<string>() : new Set([ring[next - 1]]),
     );
     set(visningGroupShownAtom, true);
+    // Walking the ring is the group taken in hand, so the arrival cover is no
+    // longer the app's guess — including the stop that walked *off* it. Set
+    // directly rather than through `spendProvisionalViewAtom`: the shown set
+    // has just been replaced wholesale, so there is nothing left to withdraw.
+    set(provisionalViewAtom, null);
     return true;
   },
 );

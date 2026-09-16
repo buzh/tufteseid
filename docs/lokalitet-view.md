@@ -2205,6 +2205,13 @@ Three sequencing rules, and as in §12 they are worth more than the list.
    nothing else does. W/S walk the group as a ring in the same change (§5.3
    there, `src/shell/visningRing.ts`).
 
+   *Amended again the same day, same section:* the cover goes down **and
+   comes back up on the first ground the user asks for** — an opaque image
+   over the whole rectangle is over everything Terreng or Flyfoto has to say,
+   and a ground button that does nothing visible is worse than bare ground.
+   `provisionalViewAtom` is the latch; touching the group by hand spends it
+   without withdrawing, so a composed stack is never reached into.
+
    **`Gjenskap` moved rather than went.** `RecreateButton` is deleted from the
    two bilde surfaces and each View row in the pulldown carries a trailing
    `restart_alt` instead, setting the same `recreateViewAtom` — so

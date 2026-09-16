@@ -51,6 +51,7 @@ import {
   bildeOpacityAtom,
   bildeShownAtom,
   groundShownAtom,
+  provisionalViewAtom,
   visningGroupShownAtom,
   visningOpacityAtom,
   visningShownAtom,
@@ -309,6 +310,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [visningGroupShown, setVisningGroupShown] = useAtom(
     visningGroupShownAtom,
   );
+  const setProvisionalView = useSetAtom(provisionalViewAtom);
   const [bildeShown, setBildeShown] = useAtom(bildeShownAtom);
   const setBildeOpacity = useSetAtom(bildeOpacityAtom);
   const [bildeGroupShown, setBildeGroupShown] = useAtom(bildeGroupShownAtom);
@@ -968,6 +970,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setVisningShown(new Set());
       setVisningOpacity(new Map());
       setVisningGroupShown(true);
+      // The latch is keyed to an id in the set just emptied, so leaving it
+      // standing would arm the next lokalitet's first ground change against a
+      // member that is not on the map — harmless today, and the kind of
+      // harmless that stops being so the moment ids repeat.
+      setProvisionalView(null);
       // [Bilde]'s three, on the first of those grounds alone: its members are
       // attachment ids and the next lokalitet's are not these. This is also
       // the sweep that used to be `usePinnedBilde`'s — one image on the ground
@@ -997,6 +1004,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setVisningShown,
     setVisningOpacity,
     setVisningGroupShown,
+    setProvisionalView,
     setBildeShown,
     setBildeOpacity,
     setBildeGroupShown,
@@ -2862,6 +2870,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setVisningShown(visning);
       setBildeShown(bilde);
       setSketchShown(skisse);
+      // An arrangement put back by hand is the user's statement about the
+      // stack, so the arrival guess is spent — whether or not the cover
+      // survived into it, a later ground change must not reach in and remove a
+      // layer the scene names.
+      setProvisionalView(null);
       // The fades are merged, because `opacityByKey` is never pruned (§13.4):
       // a member's fade outlives its member, and a scene has no opinion about
       // the ones it does not include.
@@ -2903,6 +2916,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setVisningShown,
       setBildeShown,
       setSketchShown,
+      setProvisionalView,
       setVisningOpacity,
       setBildeOpacity,
       setSketchOpacityMap,
@@ -3210,7 +3224,18 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     if (!cover || !isPinned(cover)) return;
     if (cover.kind !== 'extract' && cover.kind !== 'flyfoto') return;
     setVisningShown(new Set([cover.id]));
-  }, [locality.id, attachmentItems, deletedIds, setVisningShown]);
+    // And it is only a guess until the user has said otherwise: the first
+    // ground they ask for takes it back down, because an opaque image over the
+    // whole rectangle is exactly what a ground button has to be able to change
+    // (`provisionalViewAtom`).
+    setProvisionalView(cover.id);
+  }, [
+    locality.id,
+    attachmentItems,
+    deletedIds,
+    setVisningShown,
+    setProvisionalView,
+  ]);
 
   // The site's own terrain render, for §4.6 — entering Terreng over a
   // lokalitet starts from what its owner was looking at rather than from a

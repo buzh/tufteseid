@@ -114,7 +114,10 @@ all of them.
   lokalitet opens with its **cover** on the ground when the cover is a View
   that has already been pinned (nothing else, and never a live render — the
   old empty-on-open rule left a place whose point is three readings of one
-  rectangle showing none of them), and **W/S walk that group** rather than the
+  rectangle showing none of them) — **provisionally**, since that image covers
+  the rectangle every ground speaks about, so the first ground the user asks
+  for withdraws it (`provisionalViewAtom`, and touching the group by hand
+  spends the latch instead) — and **W/S walk that group** rather than the
   ground's dataset ring wherever there is a View to walk
   (`src/shell/visningRing.ts`, §5.3 — which is also why the four dataset
   pulldowns compose their `· W/S` heading instead of translating it).

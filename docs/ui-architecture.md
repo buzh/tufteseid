@@ -430,13 +430,15 @@ subsume.
   statements, and switching the group back on has to restore the composition
   that was up. Neither is persisted to the URL; the member set is cleared when
   the lokalitet closes or swaps.
-- **The ground group** — four in `src/map/groundOverlay.ts`, all read by
+- **The ground group** — five in `src/map/groundOverlay.ts`, all read by
   `VisningControl` and none persisted: `groundShownAtom` (the ground preset's
   own switch), `visningShownAtom` (the ids of the Views currently on the
   ground — a set, like `sketchShownAtom`, because several may be up at once),
-  `visningOpacityAtom` (per-View fade in percent, missing meaning opaque) and
-  `visningGroupShownAtom` (`[Visning ▾]`'s label toggle). The same group/member
-  split as the funn and sketch switches, for the same reason, and all four are
+  `visningOpacityAtom` (per-View fade in percent, missing meaning opaque),
+  `visningGroupShownAtom` (`[Visning ▾]`'s label toggle) and
+  `provisionalViewAtom` (the arrival cover, until somebody says what they want
+  the ground to be). The same group/member
+  split as the funn and sketch switches, for the same reason, and all five are
   reset by `useLocalityWorkspace` when the lokalitet closes or swaps — which is
   also the hook that seeds the member set with the cover on the way *in*
   (§10.1). `visningShownAtom` has a second author besides the pulldown, and no
@@ -4677,6 +4679,29 @@ dragged to the front. A lokalitet whose first image is a screenshot, or whose
 extracts are still in the pin queue, still opens on bare ground. The latch
 makes it an *arrival*: neither a later pin nor a drag that moves the cover
 reaches over the user's hand afterwards.
+
+**And it steps aside for the first ground you ask for.** The lay-down puts an
+opaque image over the whole rectangle — which is the thing all five grounds are
+about — so pressing Terreng fetched a DEM, rendered relief and showed none of
+it, and pressing Flyfoto repainted everything except the part being looked at.
+A ground button that does nothing visible is worse than an arrival on bare
+ground. So the cover is **provisional** (`provisionalViewAtom`): the id is
+remembered, and `useGroundMode.select` — the single entrance for the five
+buttons, the digit keys and `Gjenskap` — withdraws it on the way through.
+Once and one member only, the one nobody asked for.
+
+Anything the user does to the group themselves spends the latch *without*
+withdrawing: a switch or a fade in the pulldown, a step of the W/S ring, a
+scene put back with `Legg ut igjen`. From then on nothing is ever taken off the
+ground automatically, which is what keeps the composition this stack exists for
+— a 1937 ortofoto faded over today's hillshade — stable under a ground change.
+One click makes it yours and the app has no second guess to make.
+
+Two things it is deliberately not. It is not the one-slot arbiter §13 deleted:
+that one withdrew whatever held the slot, from both sides and forever. And it
+is not reachable from hold-to-compare — `peekStart` / `peekEnd` call `enter`
+rather than `select`, because a peek puts you back where you were on key
+release and there would be nothing to restore.
 
 **And it has a ring.** W/S walk `[Visning ▾]` whenever a lokalitet is open with
 at least one View in it — §5.3 for the stops and the two cases where the
