@@ -2117,7 +2117,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       if (!user || !canAdd || takingId) return;
       setTakingId(rec.id);
       try {
-        const url = await getAttachmentUrl(rec);
+        const url = getAttachmentUrl(rec);
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const blob = await res.blob();

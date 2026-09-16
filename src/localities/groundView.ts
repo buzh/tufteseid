@@ -218,9 +218,8 @@ export const groundRasterOf = async (
 
   if (isPinned(rec)) {
     try {
-      const url = await getAttachmentUrl(rec);
       const img = new Image();
-      img.src = url;
+      img.src = getAttachmentUrl(rec);
       await img.decode();
       const crop = cropOf(meta, img);
       const canvas = document.createElement('canvas');
@@ -343,13 +342,11 @@ export const useGroundView = (
       // cannot be scaled back to the ground without guessing — and a guess
       // that is a pixel out is half a metre out on the map, which defeats the
       // point of registering it at all.
-      getAttachmentUrl(rec)
-        .then((url) => {
-          const img = new Image();
-          img.src = url;
-          return img.decode().then(() => img);
-        })
-        .then((img) => {
+      const img = new Image();
+      img.src = getAttachmentUrl(rec);
+      img
+        .decode()
+        .then(() => {
           if (cancelled) return;
           setGroundOverlay(key, {
             source: img,

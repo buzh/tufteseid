@@ -192,7 +192,8 @@
       "private": "Private",
       "limited": "Limited",
       "public": "Public",
-      "limitedHint": "Limited sharing arrives when user groups do. Until then it behaves as private."
+      "limitedHint": "Limited sharing arrives when user groups do. Until then it behaves as private.",
+      "publicHint": "Public means anyone with the link can see the locality and its images, without signing in."
     },
     "topbar": {
       "myLocalities": "My localities",
@@ -299,10 +300,11 @@
     "share": {
       "copyLink": "Share",
       "copied": "Link copied",
-      "copiedPublic": "Anyone signed in can open the locality with this link.",
+      "copiedPublic": "Anyone with this link can open the locality, without signing in.",
       "copiedPrivate": "This locality is private, so only you can open the link. Change its visibility under Details.",
       "notFound": "No locality found with the code {{code}}",
-      "notFoundHint": "It may have been deleted, or it may be private."
+      "notFoundHint": "It may have been deleted, or it may be private.",
+      "notFoundSignIn": "It may be private. If it is yours, sign in to open it."
     },
     "takeout": {
       "action": "Report bundle",

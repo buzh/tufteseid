@@ -11,10 +11,9 @@
  * keeping it in two components is what stops a write verb from being one
  * boolean away from show.
  *
- * The token dance that fetches an image, the line naming the dataset and the
+ * The image URL and its thumb fallback, the line naming the dataset and the
  * caption field are shared for the older reason: two copies of
- * `useAttachmentUrl` would be two chances to get the protected-file fallback
- * wrong.
+ * `useAttachmentUrl` would be two chances to get the fallback wrong.
  */
 
 import { useSetAtom } from 'jotai';
@@ -70,50 +69,40 @@ export const KIND_ICON: Record<AttachmentKind, MaterialSymbol> = {
   scene: 'layers',
 };
 
-// Tokened URLs are async (the file field is protected), so every image
-// needs a small fetch-then-render dance. `thumb` falls back to the
-// original when PB can't generate one — it regularly can't for the huge
-// stitched extract PNGs.
+// Where an attachment's pixels are, and what to do when they don't arrive.
+//
+// The URL itself is a string built on the spot — the file field stopped
+// being `protected` in 1700000900, so there is no token to fetch first and
+// no fetch-then-render dance left. What still needs a state is the
+// *fallback*: `thumb` is only a request, and PB regularly cannot generate
+// one for the huge stitched extract PNGs.
+//
+// So failures are counted rather than flagged. The first one is ordinary and
+// is answered by asking for the original instead; a second one means the
+// bytes are not coming, and the frame says so. Counting is what stops the
+// old behaviour where an image that failed both ways kept its spinner up
+// forever, which reads as "still loading" for something that will never
+// arrive.
 export const useAttachmentUrl = (
   rec: AttachmentRecord | null,
   thumb?: '200x200' | '800x0',
 ) => {
-  const [url, setUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [error, setError] = useState(false);
+  const [failures, setFailures] = useState(0);
 
   useEffect(() => {
-    setUrl(null);
-    setFailed(false);
-    setError(false);
+    setFailures(0);
   }, [rec?.id]);
 
-  useEffect(() => {
-    // An unpinned View has no file to ask for a token for, and asking anyway
-    // is a 404 that would light the error state on a record that is perfectly
-    // fine (§4.1.2). The surfaces show the pin face instead — `usePinFace`.
-    if (!rec || !isPinned(rec)) return;
-    let cancelled = false;
-    getAttachmentUrl(rec, failed ? undefined : thumb)
-      .then((u) => {
-        if (!cancelled) setUrl(u);
-      })
-      .catch((e) => {
-        console.warn('[bilder] url failed', e);
-        // Say so. Left to itself the tile keeps its spinner up forever,
-        // which reads as "still loading" for something that will never
-        // arrive.
-        if (!cancelled) setError(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // `rec` is read, not depended on: the list reloads on every realtime
-    // event and a fresh object identity would refetch every token.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rec?.id, rec?.file, thumb, failed]);
+  const error = failures > 1;
+  // An unpinned View has no file to point at, and pointing anyway is a 404
+  // that would light the error state on a record that is perfectly fine
+  // (§4.1.2). The surfaces show the pin face instead — `usePinFace`.
+  const url =
+    rec && isPinned(rec) && !error
+      ? getAttachmentUrl(rec, failures === 0 ? thumb : undefined)
+      : null;
 
-  return { url, error, onError: () => setFailed(true) };
+  return { url, error, onError: () => setFailures((n) => n + 1) };
 };
 
 /** What the pin queue is doing about this record right now. */
@@ -930,9 +919,7 @@ export const OpenOriginalButton = ({
       size="sm"
       leftIcon="open_in_new"
       onClick={() => {
-        getAttachmentUrl(target)
-          .then((u) => window.open(u, '_blank', 'noopener'))
-          .catch((e) => console.warn('[bilder] open failed', e));
+        window.open(getAttachmentUrl(target), '_blank', 'noopener');
       }}
     >
       {t('localities.bilder.openOriginal')}

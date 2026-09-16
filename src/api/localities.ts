@@ -115,7 +115,12 @@ export const getLocalityByCode = async (
     .collection(COLLECTION)
     .getFirstListItem<LocalityRecord>(
       pb.filter('code = {:code}', { code: code.toUpperCase() }),
-      { expand: 'owner' },
+      // `requestKey: null` because the deep link can ask twice for the same
+      // code: a guest's attempt that missed, then the retry after they sign
+      // in (shareLink.ts). Auto-cancellation would abort the first, and an
+      // abort arrives in the same `catch` as a genuine miss — a spurious
+      // "finner ikke" for a lokalitet that is about to open.
+      { expand: 'owner', requestKey: null },
     );
 };
 

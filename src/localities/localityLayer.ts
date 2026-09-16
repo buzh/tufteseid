@@ -251,11 +251,20 @@ export const hideLocalityOnLayer = (id: string) => {
   }
 };
 
-// Mount from useMapSideEffects. Everything is behind sign-in: signed out,
-// the layer stays empty and we never hit PB.
+// Mount from useMapSideEffects. The *register* is behind sign-in: signed
+// out, we never list, so the map is not an index of everybody's public
+// rectangles. The one exception is the lokalitet a guest was actually sent
+// to — a shared link opens for anybody now (shareLink.ts), and the rectangle
+// is the lokalitet, so arriving at one and seeing no rectangle would be
+// arriving nowhere.
 export const useLocalitiesLayer = () => {
   const map = useAtomValue(mapAtom);
   const user = useAtomValue(currentUserAtom);
+  const active = useAtomValue(activeLocalityAtom);
+  // Signed in, the list and the subscription already carry whatever is open,
+  // so re-running on every open would refetch the register for nothing.
+  // Signed out it is the entire content of the layer.
+  const guestLocality = user ? null : active;
 
   useEffect(() => {
     let layer = map
@@ -277,9 +286,22 @@ export const useLocalitiesLayer = () => {
 
     const source = layer.getSource()!;
     source.clear();
-    if (!user) return;
 
     const projection = map.getView().getProjection().getCode();
+
+    if (!user) {
+      // Just the one, straight off the record the deep link already
+      // resolved — no list, and no realtime either: a guest is reading a
+      // rectangle, not watching a register.
+      if (guestLocality) {
+        const feature = hydrateFeature(guestLocality, projection);
+        if (feature) source.addFeature(feature);
+      }
+      return () => {
+        source.clear();
+      };
+    }
+
     let cancelled = false;
 
     listLocalities()
@@ -309,7 +331,7 @@ export const useLocalitiesLayer = () => {
       unsub();
       source.clear();
     };
-  }, [map, user?.id]);
+  }, [map, user?.id, guestLocality]);
 };
 
 // Click a rectangle (outside any workspace/tool) → open its workspace.

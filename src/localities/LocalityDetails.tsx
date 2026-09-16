@@ -240,6 +240,17 @@ export const LocalityDetails = ({
             {t('localities.visibility.limitedHint')}
           </span>
         )}
+        {/*
+          Public stopped meaning "any signed-in user" in migration 1700000900
+          and now means the open web, images included. That is a bigger thing
+          to hand over than the word implies, and the segmented control is
+          the last place it can be said before it is true.
+        */}
+        {locality.visibility === 'public' && (
+          <span className={styles.hint}>
+            {t('localities.visibility.publicHint')}
+          </span>
+        )}
       </div>
 
       <div className={styles.group}>

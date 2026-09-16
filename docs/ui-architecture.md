@@ -2570,9 +2570,13 @@ for flyfoto the `projectName` / `year` / `photoDate` that the strip captions
 from ("Flyfoto 1937"), for a sketch the `frame` and the Excalidraw `scene`
 itself — which is why `meta` is sized at 2 MB rather than the 10 kB the other
 kinds need — and for a scene its layer order, their fades and the ground under
-them (§10.2). Files are `protected` in PocketBase, so the strip fetches
-short-lived file tokens for thumbnails — a new UI must keep doing that or every
-thumbnail 403s.
+them (§10.2). Files used to be `protected` in PocketBase, so every thumbnail
+began by fetching a short-lived file token; since `1700000900` they are served
+by the same rules as the record (§8.13), `getAttachmentUrl` is a plain string
+build, and what the strip still has to get right is the *thumb fallback* —
+PocketBase regularly cannot generate one for the huge stitched extract PNGs,
+so `useAttachmentUrl` counts failures and asks for the original after the
+first.
 
 Four more fields sit on the record and belong to the exhibit or to the
 sketch rather than to the image: `sort` (int) and `hidden` (bool), which are
@@ -2799,7 +2803,8 @@ Three things that read as arbitrary until you try the alternative:
   and `BilderStrip` omits it, so drag is not a thing show has and suppresses —
   the hook is never armed there at all.
 
-The shared vocabulary — the tokened-URL dance, the meta line, the caption
+The shared vocabulary — the image URL and its thumb fallback, the meta line,
+the caption
 field, the pin face (§8.7.4), the provenance line
 (`metaLineOf`, which [Visning]'s rows read too, so the card and the pulldown
 cannot disagree about what an image is) and Åpne originalen —
@@ -3855,17 +3860,47 @@ parameter may be removed:
   On a cold load nothing is open yet, so a writer that ran first would delete
   the parameter before the reader ever saw it. Reading it before React starts
   is what makes the race impossible rather than unlikely.
-- **The writer holds off until the reader has settled.** A guest at the
-  sign-in wall still has the link in their address bar, so reloading during
+- **The writer holds off until the reader has settled.** A guest who has been
+  offered sign-in still has the link in their address bar, so reloading during
   sign-in is not what loses it.
 
-**The sign-in wall is the read rules, not a policy decision here.** All
-lokalitet content requires auth, including `public` ones, so a guest following
-a link gets `isAuthDialogOpenAtom` raised and the code waits in the module
-until `currentUserAtom` fills in — asking PocketBase first would answer 404 for
-the wrong reason. **A miss and a lokalitet the reader may not see are one
-message**, because the API cannot tell them apart and telling a stranger that a
-code exists but is not theirs is a leak rather than a better error.
+**A link opens. It does not ask first.** Migration `1700000900` dropped the
+auth requirement from the `public` branch of the three read rules, so a guest
+following `/l/CODE` resolves the record on the first request and lands in the
+lokalitet. Before it, `public` meant "any signed-in user" and this module
+raised `isAuthDialogOpenAtom` instead: the one surface whose entire job is
+receiving a stranger answered a stranger by demanding an account before saying
+what for, over a map of the whole country. Sign-in is now offered in exactly
+one place, where it can change the answer — see the miss path below. Three
+consequences worth stating, because each is a rule somewhere else:
+
+- **Reading is still not writing.** Only list and view moved; create, update
+  and delete are unchanged, so a guest is a `reader` in `show`
+  (`useLocalityWorkspace` already returns `'reader'` for a null user, and
+  `mayEdit`/`mayAdd` are false), and every write verb is *absent* rather than
+  disabled, exactly as §8.1 has it for any other reader.
+- **The file field is no longer `protected`.** A protected file is served only
+  against a short-lived token from `pb.files.getToken()`, and that endpoint is
+  itself authenticated — so without this the records would arrive and every
+  bilde would be a blank card. It also makes `getAttachmentUrl` a synchronous
+  string build rather than a fetch (§8.7.2). The price: files under *private*
+  lokaliteter are no longer covered by a rule. The record stays unreadable, so
+  an outsider cannot learn the URL, but a URL that leaks is a URL that works.
+- **The map is not an index.** `useLocalitiesLayer` still refuses to list for
+  a signed-out visitor — a guest is not shown everybody's public rectangles.
+  It draws exactly one feature, the lokalitet the deep link resolved, because
+  the rectangle *is* the lokalitet and arriving at one with no rectangle is
+  arriving nowhere.
+
+**A miss and a lokalitet the reader may not see are one message**, because the
+API cannot tell them apart and telling a stranger that a code exists but is not
+theirs is a leak rather than a better error. **For a guest that message carries
+`Logg inn`**, and is the only sign-in prompt left on this path: the ambiguity is
+sharper for them than for anybody else, since the person most likely to follow
+a link to a private lokalitet is its owner on a machine they are not signed in
+on. That branch deliberately does **not** settle and does not remove the
+parameter, so signing in re-runs the reader over the same code. A signed-in
+reader's miss settles and clears it — for them the answer will not change.
 
 **A link opens in `show`, whoever follows it** (§8.1, §2). Nothing in this
 module writes `editingLocalityIdAtom`, and that is the whole of the
@@ -3889,7 +3924,11 @@ once, months before anybody shares anything, and a link to a `private`
 lokalitet answers "finner ikke" for everyone but its owner. So a public record
 gets a `success` and everything else a `warning` that says only you can open
 it and where to change that — rather than the menu hiding `Del`, which would
-teach nothing. `limited` gets the private wording, because `limited` behaves as
+teach nothing. The public wording says *"alle som har lenken … også uten å
+logge inn"* since `1700000900`, and Detaljer carries the same sentence as a
+hint under the visibility control whenever `public` is the selected value: the
+word got materially bigger, and the segmented control is the last place that
+can be said before it is true. `limited` gets the private wording, because `limited` behaves as
 `private` until groups exist and the toast has to describe what the server will
 actually do.
 

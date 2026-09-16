@@ -24,6 +24,13 @@
  *   `editingLocalityIdAtom`, and that is the whole of the enforcement: stance
  *   is keyed on a record id that starts null, so "opens in show" holds by
  *   construction rather than by this module remembering to say so (§2).
+ * - **And it opens. It does not ask first.** A guest following `/l/CODE`
+ *   lands in the lokalitet, because since migration 1700000900 a `public`
+ *   one is readable without an account. This used to raise the sign-in
+ *   dialog over a map of the whole country: the visitor was asked to make an
+ *   account before being told what for, and the one surface whose entire job
+ *   is receiving a stranger answered a stranger with a wall. Sign-in is now
+ *   offered only where it can change the answer — the miss path below.
  */
 
 import { t } from 'i18next';
@@ -101,38 +108,64 @@ export const useLocalityShareLink = () => {
   const openAuthDialog = useSetAtom(isAuthDialogOpenAtom);
 
   /*
-   * Has the deep link finished — resolved, failed, or never existed?
+   * Has the deep link finished — resolved, failed for good, or never existed?
    *
-   * Until it has, the writer holds off rather than clearing the parameter,
-   * so a reader stuck at the sign-in wall still has the link in their address
-   * bar. Reloading the page during sign-in must not be what loses it.
+   * Until it has, the writer holds off rather than clearing the parameter, so
+   * a visitor who has been offered sign-in still has the link in their
+   * address bar. Reloading the page during sign-in must not be what loses it.
+   *
+   * A miss answered to a *guest* deliberately does not settle: they may be
+   * the owner of a private lokalitet on a machine they are not signed in on,
+   * and signing in re-runs this effect over the same code.
    */
   const settled = useRef(bootCode == null);
   const activeCode = active?.code ?? null;
 
-  // The reader. Runs again when the user arrives, which is how the sign-in
-  // wall works: a guest gets the dialog and the code waits in `bootCode`
-  // until `currentUserAtom` fills in.
+  // The reader. Tries immediately, whoever is asking — `pb.authStore`
+  // rehydrates from localStorage at import, so a signed-in visitor's very
+  // first request already carries their token and there is nothing to wait
+  // for. Runs again if the user changes, which is what makes the sign-in
+  // offer on the miss path lead anywhere.
   useEffect(() => {
     if (!bootCode || settled.current) return;
-    if (!user) {
-      // The read rules require auth even for a `public` lokalitet, so there
-      // is nothing to try yet — and asking PB first would answer 404 for the
-      // wrong reason. Not settled: the code is still owed to whoever signs in.
-      openAuthDialog(true);
-      return;
-    }
-    settled.current = true;
     const code = bootCode;
     getLocalityByCode(code)
-      .then((rec) => setActive(rec))
+      .then((rec) => {
+        settled.current = true;
+        setActive(rec);
+      })
       .catch((err) => {
+        // A later attempt got there first — sign in fast enough and the
+        // guest's own lookup is still out when the signed-in one lands. Its
+        // failure is not news about a lokalitet that is already open.
+        if (settled.current) return;
         console.warn('[shareLink] deep link failed', code, err);
         // Deliberately one message for both a code that names nothing and a
         // lokalitet this reader may not see: the API cannot tell them apart
         // (getLocalityByCode) and neither should the interface.
+        const title = t('localities.share.notFound', {
+          code: code.toUpperCase(),
+        });
+        if (!user) {
+          // For a guest the miss is ambiguous in a way it is not for anybody
+          // else — a private lokalitet reads exactly like a dead code, and
+          // the person most likely to follow a link to a private lokalitet is
+          // its owner. Offer the one thing that can tell the two apart, and
+          // keep both the code and `settled` so signing in retries it.
+          toast.warning({
+            title,
+            description: t('localities.share.notFoundSignIn'),
+            action: {
+              label: t('auth.signIn'),
+              onClick: () => openAuthDialog(true),
+            },
+            duration: 10000,
+          });
+          return;
+        }
+        settled.current = true;
         toast.warning({
-          title: t('localities.share.notFound', { code: code.toUpperCase() }),
+          title,
           description: t('localities.share.notFoundHint'),
         });
         removeUrlParameter('lok');

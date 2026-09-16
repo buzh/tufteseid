@@ -192,7 +192,8 @@
       "private": "Privat",
       "limited": "Avgrensa",
       "public": "Offentleg",
-      "limitedHint": "Avgrensa deling kjem når brukargrupper er på plass. Fram til då oppfører den seg som privat."
+      "limitedHint": "Avgrensa deling kjem når brukargrupper er på plass. Fram til då oppfører den seg som privat.",
+      "publicHint": "Offentleg tyder at alle som har lenkja kan sjå lokaliteten og bileta, utan å logge inn."
     },
     "topbar": {
       "myLocalities": "Mine lokalitetar",
@@ -299,10 +300,11 @@
     "share": {
       "copyLink": "Del",
       "copied": "Lenkja er kopiert",
-      "copiedPublic": "Alle som er logga inn kan opne lokaliteten med lenkja.",
+      "copiedPublic": "Alle som har lenkja kan opne lokaliteten, òg utan å logge inn.",
       "copiedPrivate": "Lokaliteten er privat, så berre du kan opne lenkja. Endre synlegheita under Detaljar.",
       "notFound": "Fann ingen lokalitet med koden {{code}}",
-      "notFoundHint": "Lokaliteten kan vere sletta, eller privat."
+      "notFoundHint": "Lokaliteten kan vere sletta, eller privat.",
+      "notFoundSignIn": "Lokaliteten kan vere privat. Er ho di, kan du logge inn for å opne henne."
     },
     "takeout": {
       "action": "Rapportpakke",

@@ -192,7 +192,8 @@
       "private": "Privat",
       "limited": "Begrenset",
       "public": "Offentlig",
-      "limitedHint": "Begrenset deling kommer når brukergrupper er på plass. Frem til da oppfører den seg som privat."
+      "limitedHint": "Begrenset deling kommer når brukergrupper er på plass. Frem til da oppfører den seg som privat.",
+      "publicHint": "Offentlig betyr at alle som har lenken kan se lokaliteten og bildene, uten å logge inn."
     },
     "topbar": {
       "myLocalities": "Mine lokaliteter",
@@ -299,10 +300,11 @@
     "share": {
       "copyLink": "Del",
       "copied": "Lenken er kopiert",
-      "copiedPublic": "Alle som er logget inn kan åpne lokaliteten med lenken.",
+      "copiedPublic": "Alle som har lenken kan åpne lokaliteten, også uten å logge inn.",
       "copiedPrivate": "Lokaliteten er privat, så bare du kan åpne lenken. Endre synligheten under Detaljer.",
       "notFound": "Fant ingen lokalitet med koden {{code}}",
-      "notFoundHint": "Lokaliteten kan være slettet, eller privat."
+      "notFoundHint": "Lokaliteten kan være slettet, eller privat.",
+      "notFoundSignIn": "Lokaliteten kan være privat. Er den din, kan du logge inn for å åpne den."
     },
     "takeout": {
       "action": "Rapportpakke",

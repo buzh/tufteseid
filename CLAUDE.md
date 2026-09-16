@@ -222,8 +222,8 @@ that owns them.
   list — `docs/terrain-analysis.md` and below.
 - **Lokaliteter**: an authored rectangle holding named *funn* drawn in
   Excalidraw over the frozen map, and *bilder* (extracts, terrain renders,
-  screenshots, flyfoto, uploads, sketches, and arrangements of those),
-  behind sign-in — below, and
+  screenshots, flyfoto, uploads, sketches, and arrangements of those).
+  Making one needs an account; reading a `public` one does not — below, and
   `docs/ui-architecture.md` §8, §9.
 - **Sketches — drawing *on* the ground rather than of it.** The same
   Excalidraw surface that makes a funn also makes a *tegning*: a transparent
@@ -247,8 +247,11 @@ that owns them.
   so the short URL is a `redir` in our own `Caddyfile` rather than a service,
   and there is still **no SPA fallback** — the redirect is one narrow pattern,
   not a catch-all rewrite to `index.html`, so `/hjelp` is still 404 on a cold
-  load exactly as it was. Following a link signs you in first (the read
-  rules require auth even for `public`) and always lands in `show` —
+  load exactly as it was. Following a link **opens the lokalitet, without
+  asking for an account** — a `public` one is readable by a guest since
+  migration `1700000900` — and always lands in `show`. Sign-in is offered in
+  one place only, on the miss, where the visitor may be the owner of a private
+  lokalitet signed out; that branch keeps the code so signing in retries it —
   `docs/ui-architecture.md` §8.13.
 - **And handed over whole.** `Rapportpakke`, in the same `⋮`, zips the
   lokalitet into `<slug>-YYYY-MM-DD.zip`: an `index.html` and a `README.txt`
@@ -531,9 +534,16 @@ producers can actually render (`src/localities/bboxLimits.ts`,
 
 Two rules that hold regardless of what the interface looks like:
 
-- All lokalitet content is behind sign-in, including `public` ones — the read
-  rules require `@request.auth.id != ""`. The map itself stays publicly
-  browsable.
+- **Authorship is behind sign-in; reading a `public` lokalitet is not.** The
+  create, update and delete rules all require `@request.auth.id != ""` and
+  ownership, and nothing about that has moved. The *read* rules opened up in
+  `1700000900` so a shared link resolves for a guest (`docs/ui-architecture.md`
+  §8.13), which also means `attachments.file` is no longer `protected` — a
+  private lokalitet's images are unreachable because nobody can read the
+  record that names them, not because a rule guards the bytes. Anything
+  `private` or `limited` still requires being its owner. The map itself stays
+  publicly browsable, and a signed-out visitor is shown no register: the
+  rectangle layer draws the one lokalitet a link resolved and never lists.
 - `limited` visibility is a placeholder that behaves as `private` until
   groups exist.
 
@@ -550,8 +560,9 @@ Key files (data side):
 - `src/api/pocketbase.ts` — singleton PB client (`pocketbaseUrl` from env,
   defaults `/pb`).
 - `src/api/localities.ts`, `localityFinds.ts`, `attachments.ts` — CRUD +
-  realtime per collection. Attachment files are `protected`, so the client
-  fetches short-lived file tokens for thumbnails. `createAttachmentSpec` writes
+  realtime per collection. Attachment files are served by the collection's
+  own rules since `1700000900`, so `getAttachmentUrl` is a synchronous string
+  build with no file token behind it. `createAttachmentSpec` writes
   a fileless View row and `pinAttachment` puts the figure on it later.
 - `src/localities/pinQueue.ts` — the pinner: turns a stored spec into a
   provenance figure and PATCHes it onto the record. Module-level and
@@ -575,7 +586,10 @@ Key files (data side):
   uncascaded relations) and raises `attachments.meta` to 2 MB so a sketch
   can carry its scene, `1700000800` adds the `scene` attachment kind and
   **nothing else** — an arrangement reuses the `over` relation and the 2 MB
-  `meta` that one added. **Leave the
+  `meta` that one added — and `1700000900` opens `public` to guests: the
+  list/view rules on all three collections drop their auth requirement for
+  the public branch, and `attachments.file` stops being `protected` so the
+  images come with it. **Leave the
   filenames alone** — they're recorded in `_migrations`, so renaming one
   makes PB re-run it. Collection ids must not equal any collection name
   (0.23+ rejects that), hence `pbc_localities` / `finds2` /
@@ -597,7 +611,7 @@ Data model:
   EPSG:4326 — curves are sampled on the way in, so an ellipse is stored as a
   64-gon and stays one; the record never knew it had been a curve).
 - **`attachments`** — `locality`, `owner`, `kind` (extract | screenshot |
-  upload | flyfoto | sketch | scene), `file` (protected, ≤50 MB, png/jpeg/webp,
+  upload | flyfoto | sketch | scene), `file` (≤50 MB, png/jpeg/webp,
   thumbs, and
   **optional** — a View is a spec before it is pixels), `caption`, `meta`
   (json, ≤2 MB: source key/label, style, model, metresPerPx, `bbox25833`,
@@ -627,8 +641,8 @@ and nothing in show writes. Rationale, states and the two forced-pin call sites:
 
 Rules (server-enforced by PB), same shape on all three:
 
-- read: signed in **and** (own it, or its lokalitet is public, or
-  `@request.auth.role = "admin"`)
+- read: it (or its lokalitet) is public — **no account needed** — or else
+  signed in and (own it, or `@request.auth.role = "admin"`)
 - create: signed in, owns the record, and owns the parent lokalitet
 - update/delete: owner or admin
 

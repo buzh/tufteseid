@@ -48,9 +48,8 @@ export type Extent25833 = [number, number, number, number];
  * is a guess to begin with.
  */
 export const imageAspectOf = async (rec: AttachmentRecord): Promise<number> => {
-  const url = await getAttachmentUrl(rec, '800x0');
   const img = new Image();
-  img.src = url;
+  img.src = getAttachmentUrl(rec, '800x0');
   await img.decode();
   const { naturalWidth: w, naturalHeight: h } = img;
   if (!w || !h) throw new Error('image has no dimensions');

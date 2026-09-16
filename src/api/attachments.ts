@@ -3,9 +3,10 @@ import { pb } from './pocketbase';
 // Bilder attached to a lokalitet: kept LiDAR extracts, map screenshots,
 // plain uploads, sketches, and scenes — a scene being an arrangement of the
 // others rather than an image (localities/sceneSpec.ts). Visibility follows
-// the parent lokalitet via the collection rules, and the file field is
-// *protected* — image bytes are only served with a short-lived file token
-// (see getAttachmentUrl).
+// the parent lokalitet via the collection rules, including for the file
+// itself: since 1700000900 the field is no longer `protected`, so the bytes
+// of a public lokalitet's bilde are served to anyone with the URL and a
+// guest following a shared link can see them (see getAttachmentUrl).
 // Keep in sync with the attachments.kind select values in the PocketBase
 // migrations (1700000300 adds 'flyfoto', 1700000700 adds 'sketch',
 // 1700000800 adds 'scene').
@@ -297,47 +298,20 @@ export const deleteAttachment = async (id: string): Promise<void> => {
   await pb.collection(COLLECTION).delete(id);
 };
 
-// PB file tokens are valid ~2 minutes; cache one and refresh early so a
-// gallery of thumbnails costs a single token request, not one each.
+// The URL of an attachment's file. `thumb` takes the sizes declared in the
+// migration ('200x200' grid thumb, '800x0' preview); omit it for the
+// original.
 //
-// The cache holds the *promise*, not the resolved token, and that is
-// load-bearing: a grid mounts all its thumbnails in the same tick, so
-// caching only the result still lets N requests leave before the first one
-// answers — and the SDK auto-cancels same-key requests, so N-1 of them
-// reject and those thumbnails spin forever. `requestKey: null` covers the
-// remaining window, where an entry expires while its request is still out.
-let fileToken: { token: Promise<string>; fetchedAt: number } | null = null;
-const FILE_TOKEN_MAX_AGE_MS = 100000;
-
-const getFileToken = (): Promise<string> => {
-  const now = Date.now();
-  if (fileToken && now - fileToken.fetchedAt <= FILE_TOKEN_MAX_AGE_MS) {
-    return fileToken.token;
-  }
-  // Annotated because the catch handler refers back to `pending`, which
-  // would otherwise be a circular type inference.
-  const pending: Promise<string> = pb.files
-    .getToken({ requestKey: null })
-    .catch((e) => {
-      // A failure must not sit in the cache for the next 100 seconds of
-      // thumbnails — drop it so the next caller retries.
-      if (fileToken?.token === pending) fileToken = null;
-      throw e;
-    });
-  fileToken = { token: pending, fetchedAt: now };
-  return pending;
-};
-
-// Tokened URL for a protected attachment file. `thumb` takes the sizes
-// declared in the migration ('200x200' grid thumb, '800x0' preview);
-// omit it for the original.
-export const getAttachmentUrl = async (
+// Synchronous, and that is the whole of what 1700000900 bought on this side.
+// The field used to be `protected`, so every thumbnail began with a
+// short-lived token from `pb.files.getToken()` — an authenticated call, and
+// therefore one a guest following a shared link could never make. Serving
+// the bytes by rule instead of by token turns a fetch-then-render dance into
+// a string.
+export const getAttachmentUrl = (
   rec: AttachmentRecord,
   thumb?: '200x200' | '800x0',
-): Promise<string> => {
-  const token = await getFileToken();
-  return pb.files.getURL(rec, rec.file, { token, thumb });
-};
+): string => pb.files.getURL(rec, rec.file, { thumb });
 
 export const subscribeAttachments = (
   handler: (

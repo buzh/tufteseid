@@ -678,7 +678,7 @@ export const buildTakeout = async ({
       )}.${extensionOf(rec)}`;
       const path = `bilder/${name}`;
       try {
-        const url = await getAttachmentUrl(rec);
+        const url = getAttachmentUrl(rec);
         const blob = await fetchWithin(
           url,
           { ms: FILE_DEADLINE_MS, what: 'takeout file' },
