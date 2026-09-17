@@ -40,6 +40,18 @@ Sign in through the app once so PocketBase creates your user record.
 Then in the admin UI: **Collections → users → your record → `role` =
 `admin`**.
 
+## Check that it works
+
+```sh
+scripts/live-check.sh https://<your-host> <a-public-lokalitet-code>
+```
+
+One request per thing the app depends on — the SPA, PocketBase, each
+proxied map service and each service the browser calls directly — with
+the exit status as the verdict. curl is all it needs, it writes
+nothing, and it is safe to run against a live install. The manual pass
+that goes with it is [`docs/live-site-test.md`](docs/live-site-test.md).
+
 ## Licence
 
 MIT — see [`LICENCE`](LICENCE). Upstream copyright by Statens Kartverk

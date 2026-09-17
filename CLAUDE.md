@@ -29,6 +29,7 @@ Each owns its subject; this file keeps only what is true across all of them.
 | `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
 | `docs/analysis-roadmap.md` | Where lokalitet analysis stands, the GIS tool survey and its verdicts | proposing a new analysis feature |
+| `docs/live-site-test.md` | Verifying a running deployment: the fixture lokalitet, `scripts/live-check.sh`, the eye pass, what to do around a deploy | claiming something works in production |
 | `docs/open-questions.md` | Decisions deliberately not taken | closing one |
 | `README.md` | Third-party install and admin guide | any change to install, first-run or licensing |
 
@@ -71,7 +72,12 @@ git pull
 docker compose build --pull tufteseid
 docker compose up -d
 docker compose logs -f tufteseid wmscache
+scripts/live-check.sh https://<host> <lokalitet-code>
 ```
+
+- `scripts/live-check.sh` runs from the workstation too — the live origin is
+  public. It is the machine half of `docs/live-site-test.md`; read that for the
+  eye pass and for what a red line means.
 
 - Changed anything under `nginx/`? Also `docker compose restart wmscache`. The
   configs are bind-mounted but nginx only reads them at startup, and
