@@ -221,15 +221,26 @@ const stackOf = (
 // ---------------------------------------------------------------------------
 
 /**
- * The legend for one stored attachment, or null where there is none to state.
- * The extent and the resolution are required rather than defaulted: a plate
- * whose scale bar is a guess is worse than no plate.
- *
- * Takes the two columns rather than the record, like `viewSpecOf`: a picker
- * proposal is a kind and a `meta` with no row behind it yet, and it still has
- * to download with the same plate the kept one would carry.
+ * The map's own rectangle inside the stored file, for the records pinned while
+ * the caption panel was still burned in below it. Nothing writes `imageRect`
+ * any more, so a missing one is the normal case and means the file is all map.
  */
-export const figureSpecOf = (
+const cropOf = (meta: Record<string, unknown>): FigureSpec['crop'] => {
+  const r = meta.imageRect as Record<string, unknown> | undefined;
+  if (!r || typeof r !== 'object') return undefined;
+  const x = num(r.x);
+  const y = num(r.y);
+  const width = num(r.width);
+  const height = num(r.height);
+  return x != null && y != null && width != null && height != null
+    ? { x, y, width, height }
+    : undefined;
+};
+
+// The legend itself. Everything that reads `meta` for the plate's *text* is
+// below; the crop is bolted on by the caller, because it describes the file
+// rather than the figure.
+const describe = (
   rec: { kind: AttachmentKind; meta: AttachmentMeta | null },
   ctx: StampContext,
 ): FigureSpec | null => {
@@ -331,4 +342,23 @@ export const figureSpecOf = (
     case 'scene':
       return null;
   }
+};
+
+/**
+ * The legend for one stored attachment, or null where there is none to state.
+ * The extent and the resolution are required rather than defaulted: a plate
+ * whose scale bar is a guess is worse than no plate.
+ *
+ * Takes the two columns rather than the record, like `viewSpecOf`: a picker
+ * proposal is a kind and a `meta` with no row behind it yet, and it still has
+ * to download with the same plate the kept one would carry.
+ */
+export const figureSpecOf = (
+  rec: { kind: AttachmentKind; meta: AttachmentMeta | null },
+  ctx: StampContext,
+): FigureSpec | null => {
+  const spec = describe(rec, ctx);
+  if (!spec) return null;
+  const crop = cropOf((rec.meta ?? {}) as Record<string, unknown>);
+  return crop ? { ...spec, crop } : spec;
 };

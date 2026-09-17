@@ -92,6 +92,15 @@ export type FigureSpec = {
   authored?: AuthoredCredit;
   /** See NorthArrowOptions. Zero for everything but a rotated screenshot. */
   rotation?: number;
+  /**
+   * Where the map sits inside the stored file, in that file's own pixels.
+   * Present only on a record pinned while the caption panel was still burned
+   * in below the map: the stamp trims to this first, or the plate lands on top
+   * of the old panel and the file goes out saying everything twice. Absent
+   * means the whole file is map, which is what every producer writes now.
+   * `groundView.cropOf` reads the same field to place those pixels on the map.
+   */
+  crop?: { x: number; y: number; width: number; height: number };
 };
 
 // What the store will take. `attachments.file` caps a raster at 50 MB and one
@@ -285,6 +294,30 @@ const decodeToCanvas = async (
   }
 };
 
+// The map out of a file that has something else below it. Clamped to the
+// source, and a rect that is the whole image or degenerate is no crop at all:
+// the canvas comes back as it went in.
+const cropCanvas = (
+  src: HTMLCanvasElement,
+  crop: { x: number; y: number; width: number; height: number },
+): HTMLCanvasElement => {
+  const x = Math.max(0, Math.round(crop.x));
+  const y = Math.max(0, Math.round(crop.y));
+  const width = Math.min(Math.round(crop.width), src.width - x);
+  const height = Math.min(Math.round(crop.height), src.height - y);
+  if (width < 1 || height < 1) return src;
+  if (x === 0 && y === 0 && width === src.width && height === src.height) {
+    return src;
+  }
+  const out = document.createElement('canvas');
+  out.width = width;
+  out.height = height;
+  const ctx = out.getContext('2d');
+  if (!ctx) return src;
+  ctx.drawImage(src, x, y, width, height, 0, 0, width, height);
+  return out;
+};
+
 /**
  * Stored bytes → the bytes that leave the app. The whole of the "legend on the
  * way out" arrangement lands here: every download, every takeout entry and
@@ -302,8 +335,9 @@ export const stampBlob = async (
 ): Promise<Blob> => {
   if (!spec) return blob;
   try {
-    const canvas = await decodeToCanvas(blob);
-    if (!canvas) return blob;
+    const decoded = await decodeToCanvas(blob);
+    if (!decoded) return blob;
+    const canvas = spec.crop ? cropCanvas(decoded, spec.crop) : decoded;
     await stampOnto(canvas, spec);
     const jpeg = blob.type === 'image/jpeg';
     const out = await canvasBlob(

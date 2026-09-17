@@ -649,8 +649,10 @@ image downloaded alone and inside a bundle is the same file.
 - `Åpne originalen` deliberately does not stamp: that verb is the unretouched
   raster, and the distinction is worth keeping. `Last ned` sits beside it.
 - Legacy: records pinned while the caption was still a panel burned in below the
-  image carry `meta.imageRect`, and `groundView.cropOf` still reads it so they
-  land on the map in the right place.
+  image carry `meta.imageRect`. `groundView.cropOf` reads it so they land on the
+  map in the right place, and `figureSpecOf` puts it on the spec as `crop` so
+  `stampBlob` trims the panel off before drawing — otherwise the new plate lands
+  on top of the old one and the file says everything twice.
 - Text wrapping splits on `/ +/`, so U+00A0 thousands separators survive.
 - Strings are under `figure.*`, and `src/figure/` reads `t` / `i18n` from
   `'i18next'` directly, since most of its call sites are outside React.
