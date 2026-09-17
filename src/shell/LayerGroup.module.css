@@ -42,8 +42,12 @@
   background: var(--c-green-100);
 }
 
+/* The starter set plus the grounds it was read against is seven two-line rows,
+   about 375px, and the old 360px cap sliced the last one through its subtitle
+   for the sake of thirteen pixels. 50vh stays the real guard: on a short screen
+   the panel must not reach past the map. */
 .members {
-  max-height: min(50vh, 360px);
+  max-height: min(50vh, 420px);
   overflow-y: auto;
 }
 
