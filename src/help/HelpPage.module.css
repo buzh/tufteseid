@@ -63,12 +63,6 @@
   line-height: 1.5;
 }
 
-.build {
-  margin: var(--sp-6) 0 0;
-  font-size: var(--font-xs);
-  color: var(--c-fg-muted);
-}
-
 /* auto-fit rather than a breakpoint list: the cards are the same shape at
    every width, so the only question is how many fit. */
 .grid {

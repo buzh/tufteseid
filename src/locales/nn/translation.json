@@ -142,13 +142,6 @@
     "enkeltminneNumber": "Enkeltminne #{{id}}",
     "kulturminnesokMangler": "Kulturminnesøk har inga oppføring for dette kulturminnet – lenkja opnar ei tom side."
   },
-  "about": {
-    "heading": "Om oss",
-    "textone": "Tufteseid er eit kartverktøy for lenestolsarkeologi: les skyggerelieff frå LiDAR mot kulturminneregisteret til Riksantikvaren, og finn tufter, gravhaugar og andre spor i terrenget heimanfrå.",
-    "texttwo": "Tufteseid er ikkje Norgeskart og blir ikkje drive av Kartverket. Det er eit uavhengig, ikkje-kommersielt hobbyprosjekt, bygd vidare på kjeldekoden til Norgeskart frå Kartverket.",
-    "textthree": "Kartdata og høgdedata kjem frå Kartverket og Geonorge, kulturminnedata frå Riksantikvaren. Dataa er deira, og er underlagde deira eigne bruksvilkår. Det du finn her er ikkje kvalitetssikra av nokon av dei.",
-    "buildDate": "Bygd"
-  },
   "measure": {
     "label": "Måleverktøy",
     "length": "Lengd",

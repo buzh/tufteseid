@@ -808,7 +808,6 @@ Keep it
 
 Housekeeping
 
-- Switch language (nb / nn / en).
 - Sign out.
 
 ## 15. Removed upstream machinery — don't re-add
@@ -935,7 +934,10 @@ Fix-list; none of these are load-bearing.
 - `trackPositionAtom` and its effect have no UI entry point.
 - `HelpPage` is unreachable: nothing navigates to `/hjelp`, and typing it is a
   cold load, which 404s. It is off the functionality contract until it has an
-  entrance; the "Om oss" attribution prose lives in it meanwhile.
+  entrance. What it still holds — tips and tricks, the only `LanguageSwitcher`
+  in the app, and the "finner du det ikke?" source list — is unreachable with
+  it, so the language choice a user gets is whatever the browser detector
+  picked.
 - Search has no keyboard support: no arrow-key walk of the result list.
 - The OL z-index ladder contains a `4.5` and a `1.5`.
 - The compare seam clamps at a flat 5–95% rather than against `chromeInsets`, so

@@ -5,10 +5,6 @@ import path from 'path';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
-// No commit hash beside it: the build stage is a plain node image with no git
-// and no `.git` in the context, so every deployed build read 'unknown'.
-const buildDate = new Date().toISOString();
-
 /*
  * Serve Excalidraw's fonts from this origin.
  *
@@ -75,9 +71,6 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] }),
     excalidrawFonts(),
   ],
-  define: {
-    __BUILD_DATE__: JSON.stringify(buildDate),
-  },
   build: {
     sourcemap: true,
   },

@@ -168,17 +168,6 @@ export const HelpPage = () => {
             </div>
           </section>
 
-          <section className={styles.block}>
-            <h2 className={styles.blockTitle}>{t('about.heading')}</h2>
-            <p className={styles.blockText}>{t('about.textone')}</p>
-            <p className={styles.blockText}>{t('about.texttwo')}</p>
-            <p className={styles.blockText}>{t('about.textthree')}</p>
-            <p className={styles.build}>
-              {t('about.buildDate')}:{' '}
-              {new Date(__BUILD_DATE__).toLocaleDateString()}
-            </p>
-          </section>
-
           {/* Unconditional: the ribbon carries no language control, so
               gating this leaves desktop with no way to change language. */}
           <section className={styles.block}>

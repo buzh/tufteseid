@@ -16,7 +16,7 @@ re-adding an upstream Norgeskart feature, ask whether this use case needs it —
 Not affiliated with Kartverket or Riksantikvaren. The app is de-branded on
 purpose: no Norgeskart naming or Kartverket visual identity in user-visible
 strings, page titles, export filenames or assets. Attribution belongs in prose
-(the "Om oss" text, README, LICENCE), not in the chrome.
+(README, LICENCE), not in the app.
 
 ## Docs
 

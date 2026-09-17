@@ -54,6 +54,12 @@ that goes with it is [`docs/live-site-test.md`](docs/live-site-test.md).
 
 ## Licence
 
+Tufteseid is not Norgeskart and is not operated by Kartverket. It is an
+independent, non-commercial hobby project built on the source code of
+Kartverket's Norgeskart. Map and elevation data come from Kartverket and
+Geonorge, heritage data from Riksantikvaren; nothing you find here has
+been vetted by any of them.
+
 MIT — see [`LICENCE`](LICENCE). Upstream copyright by Statens Kartverk
 (The Norwegian Mapping Authority) is preserved as required. Web
 services from Kartverket and Riksantikvaren are subject to their own
