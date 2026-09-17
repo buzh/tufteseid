@@ -809,7 +809,6 @@ Keep it
 Housekeeping
 
 - Switch language (nb / nn / en).
-- Open the help page at `/hjelp`.
 - Sign out.
 
 ## 15. Removed upstream machinery — don't re-add
@@ -934,6 +933,9 @@ Fix-list; none of these are load-bearing.
 - The active LiDAR style and project, the active flyfoto acquisition and the
   open lokalitet's viewport are not in the URL.
 - `trackPositionAtom` and its effect have no UI entry point.
+- `HelpPage` is unreachable: nothing navigates to `/hjelp`, and typing it is a
+  cold load, which 404s. It is off the functionality contract until it has an
+  entrance; the "Om oss" attribution prose lives in it meanwhile.
 - Search has no keyboard support: no arrow-key walk of the result list.
 - The OL z-index ladder contains a `4.5` and a `1.5`.
 - The compare seam clamps at a flat 5–95% rather than against `chromeInsets`, so
