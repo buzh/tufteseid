@@ -310,6 +310,7 @@ const FunnControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         <FunnList
           items={ws.findItems}
           editable={ws.canEdit}
+          drawable={ws.canAdd}
           selectedId={ws.selectedFunnId}
           deletedIds={ws.deletedIds}
           switchedOffIds={switchedOff}

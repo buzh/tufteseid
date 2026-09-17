@@ -338,6 +338,7 @@ const FunnRow = ({
 export const FunnList = ({
   items,
   editable,
+  drawable,
   selectedId,
   deletedIds,
   switchedOffIds,
@@ -351,6 +352,11 @@ export const FunnList = ({
 }: {
   items: LocalityFindRecord[] | null;
   editable: boolean;
+  /**
+   * `canAdd`, not `canEdit`: the empty state invites the reader to draw, and an
+   * admin in edit may reshape somebody's funn but never add one.
+   */
+  drawable: boolean;
   selectedId: string | null;
   deletedIds: ReadonlySet<string>;
   /** Switched off in this session: view state, never stored. */
@@ -379,7 +385,11 @@ export const FunnList = ({
   }
 
   if (items.length === 0) {
-    return <p className={styles.empty}>{t('localities.funn.empty')}</p>;
+    return (
+      <p className={styles.empty}>
+        {t(drawable ? 'localities.funn.empty' : 'localities.funn.emptyRead')}
+      </p>
+    );
   }
 
   return (

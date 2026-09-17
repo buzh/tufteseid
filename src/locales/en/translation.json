@@ -342,6 +342,7 @@
       "new": "New find",
       "loading": "Loading finds…",
       "empty": "No finds yet. Draw what you see in the terrain.",
+      "emptyRead": "No finds have been recorded in this locality.",
       "draft": {
         "titlePlaceholder": "E.g. burial mound?",
         "notePlaceholder": "Why do you think something is here?",

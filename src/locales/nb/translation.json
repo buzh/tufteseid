@@ -342,6 +342,7 @@
       "new": "Nytt funn",
       "loading": "Henter funn…",
       "empty": "Ingen funn enda. Tegn det du ser i terrenget.",
+      "emptyRead": "Ingen funn er registrert i denne lokaliteten.",
       "draft": {
         "titlePlaceholder": "F.eks. gravhaug?",
         "notePlaceholder": "Hvorfor tror du det er noe her?",
