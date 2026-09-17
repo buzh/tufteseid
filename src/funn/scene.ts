@@ -35,8 +35,11 @@ export const storableScene = (
 // write (`draft.ts`), leaving a recovery copy that silently is not one.
 export const SCENE_BUDGET_BYTES = 1000000;
 
+// UTF-8 bytes, not `String.length`: both ceilings are measured in bytes, and
+// this is a Norwegian app, so æ/ø/å in a caption inside a scene is ordinary and
+// costs two bytes to the code unit's one.
 export const sceneBytes = (elements: readonly SceneElement[]): number =>
-  JSON.stringify(elements).length;
+  new TextEncoder().encode(JSON.stringify(elements)).length;
 
 /**
  * A sketch's `meta`, re-checked field by field: it is a free-form JSON column,
