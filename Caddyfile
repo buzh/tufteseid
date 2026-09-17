@@ -90,12 +90,6 @@ route {
                 reverse_proxy http://wmscache
         }
 
-        # testapi.norgeskart.no/v1/* — matrikkel (cadastral) WMS.
-        handle_path /wms/testapi/* {
-                rewrite * /v1{http.request.uri.path}
-                reverse_proxy http://wmscache
-        }
-
         # Norge i bilder ortofoto — same-origin via wmscache, which proxies
         # to the nib-proxy sidecar that injects NiB's anonymous access
         # token (see nginx/wms-cache.conf location /nib-wms/). No CSP entry

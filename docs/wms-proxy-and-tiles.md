@@ -24,7 +24,6 @@ request time (Docker DNS `127.0.0.11`), since a compose service's IP changes.
 | `/wfs/geonorge/wfs.foo` | `/wfs-skwms1/` | `wfs.geonorge.no/skwms1/wfs.foo` |
 | `/wms/ra/kulturminner2` | `/wms/` | `kart.ra.no/wms/kulturminner2` |
 | `/kms/api/v2/search/123` | `/kms-api/` | `kms-api.kulturminnesok.no/api/v2/search/123` |
-| `/wms/testapi/matrikkel` | `/v1/` | `testapi.norgeskart.no/v1/matrikkel` |
 | `/wms/nib/ortofoto` | `/nib-wms/` | nib-proxy → `services.norgeibilder.no/wms/ortofoto` |
 | `/arcgis/nib/*` | `/nib-arcgis/` | nib-proxy → `services.norgeibilder.no/arcgis/rest/services/*` |
 | `/arcgis/hoydedata/*` | `/hoydedata-arcgis/` | `hoydedata.no/arcgis/rest/services/*` |
@@ -48,7 +47,6 @@ the host-independent half and is `include`d from each location.
 | `/wfs-skwms1/` (rest of WFS) | not cached | 8s | register data should be fresh |
 | `/wms/` (Riksantikvaren) | 180d | 30s (shared) | slowest origin in the stack |
 | `/kms-api/` | 7d | 8s | a missing record is one RA reindex from existing |
-| `/v1/` (matrikkel) | 180d | 30s (shared) | shared include |
 | `/hoydedata-arcgis/` | 180d | 30s (shared) | DEM for a fixed bbox never changes |
 | `/nib-arcgis/prosjekter/` | 7d | 15s | the acquisition catalogue *grows* |
 | `/nib-arcgis/` | 180d | 30s (shared) | a completed acquisition's pixels do not |
