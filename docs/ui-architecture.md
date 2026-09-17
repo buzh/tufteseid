@@ -938,5 +938,3 @@ Fix-list; none of these are load-bearing.
 - The OL z-index ladder contains a `4.5` and a `1.5`.
 - The compare seam clamps at a flat 5–95% rather than against `chromeInsets`, so
   it can be dragged under a card.
-- `tsconfig.test.json` is not in `tsconfig.json`'s references, so `tsc -b` never
-  typechecks anything under `test/`.

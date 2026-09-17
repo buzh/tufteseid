@@ -11,7 +11,7 @@
     "lint-fix": "oxlint --fix",
     "test": "vitest run",
     "format": "prettier --write \"./**/*.{js,jsx,ts,tsx,css,json}\" --list-different",
-    "format-check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,css,json}\"",
+    "format-check": "prettier --check \"{src,test}/**/*.{js,jsx,ts,tsx,css,json}\"",
     "format-specific": "prettier --write ",
     "preview": "vite preview",
     "aword": "node scripts/addWord.js",
