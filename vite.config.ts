@@ -1,22 +1,12 @@
 import babel from '@rolldown/plugin-babel';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
-import { execSync } from 'child_process';
 import { cpSync, createReadStream, existsSync } from 'fs';
 import path from 'path';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
-// Falls back to 'unknown' when building outside a git checkout (e.g. a Docker
-// build stage that doesn't COPY .git) so the build doesn't crash over a label.
-function getCommitHash(): string {
-  try {
-    return execSync('git rev-parse --short HEAD').toString().trim();
-  } catch {
-    return 'unknown';
-  }
-}
-
-const commitHash = getCommitHash();
+// No commit hash beside it: the build stage is a plain node image with no git
+// and no `.git` in the context, so every deployed build read 'unknown'.
 const buildDate = new Date().toISOString();
 
 /*
@@ -86,7 +76,6 @@ export default defineConfig({
     excalidrawFonts(),
   ],
   define: {
-    __COMMIT_HASH__: JSON.stringify(commitHash),
     __BUILD_DATE__: JSON.stringify(buildDate),
   },
   build: {

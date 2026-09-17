@@ -174,7 +174,7 @@ export const HelpPage = () => {
             <p className={styles.blockText}>{t('about.texttwo')}</p>
             <p className={styles.blockText}>{t('about.textthree')}</p>
             <p className={styles.build}>
-              {t('about.version')}: {__COMMIT_HASH__} | {t('about.buildDate')}:{' '}
+              {t('about.buildDate')}:{' '}
               {new Date(__BUILD_DATE__).toLocaleDateString()}
             </p>
           </section>
