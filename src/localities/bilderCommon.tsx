@@ -833,11 +833,21 @@ export const OpenOriginalButton = ({
   rec: AttachmentRecord;
 }) => {
   const { t } = useTranslation();
-  const [busy, setBusy] = useState(false);
+  // Both of these belong to one record, and the rail walks under this
+  // component without remounting it — the call sites pass `rec={active}` with
+  // no key. So they carry the id they were set for and are read back only
+  // against a matching `rec`, rather than being cleared on the change: a pin
+  // still in flight when A/D moved on resolves onto this instance afterwards,
+  // and `open original` must not hand the previous card's file to
+  // `window.open`.
+  const [busyId, setBusyId] = useState<string | null>(null);
   // The record the pin handed back, so the label flips on the response rather
   // than on the realtime event bringing the list round again.
   const [pinnedRec, setPinnedRec] = useState<AttachmentRecord | null>(null);
-  const target = isPinned(rec) ? rec : pinnedRec;
+
+  const busy = busyId === rec.id;
+  const held = pinnedRec?.id === rec.id ? pinnedRec : null;
+  const target = isPinned(rec) ? rec : held;
 
   if (!target) {
     // Nothing to force a pin against while the spec is only in the draft:
@@ -850,13 +860,15 @@ export const OpenOriginalButton = ({
         leftIcon="photo_library"
         disabled={busy}
         onClick={() => {
-          setBusy(true);
+          setBusyId(rec.id);
           ws.forcePin(rec)
             .then((pinned) => {
               if (pinned) setPinnedRec(pinned);
             })
             .catch((e) => console.warn('[bilder] force pin failed', e))
-            .finally(() => setBusy(false));
+            // Only this record's: the rail may have moved on and started
+            // another pin while this one was in flight.
+            .finally(() => setBusyId((id) => (id === rec.id ? null : id)));
         }}
       >
         {busy
