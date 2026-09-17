@@ -119,10 +119,12 @@ field classes), **not** the 0.22 `Dao` API.
 - **`localities`** — `owner` (→ users, cascade), `code` (six characters of
   Crockford base32, unique, generated client-side and retried on the
   unique-index 400), `name`, `description`, `place`, `municipality`,
-  `matrikkel`, `visibility` (private | limited | public), `bbox` (json,
-  `[minLon, minLat, maxLon, maxLat]` EPSG:4326), `derivedFrom` (→ localities,
-  **no** cascade — a fork outlives its original) + `derivedFromLabel`. The
-  centre coordinate is deliberately not a field: it is derived per render.
+  `matrikkel`, `credit` (the author's name, denormalized off the account
+  because `users` is closed to guests), `visibility` (private | limited |
+  public), `bbox` (json, `[minLon, minLat, maxLon, maxLat]` EPSG:4326),
+  `derivedFrom` (→ localities, **no** cascade — a fork outlives its original) +
+  `derivedFromLabel`. The centre coordinate is deliberately not a field: it is
+  derived per render.
 - **`finds`** — `locality` (cascade), `owner` (denormalized so rules stay
   cheap), `title`, `note`, `status` (mulig | sannsynlig | avkreftet |
   rapportert), `geometry` (json GeoJSON FeatureCollection, EPSG:4326).

@@ -2,7 +2,7 @@ import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import type { ChangeEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { LocalityRecord } from '../api/localities';
+import { creditOf, type LocalityRecord } from '../api/localities';
 import { funnHiddenAtom, funnSwitchedOffAtom } from '../localities/atoms';
 import { funnGroupsOf, funnSectionsOf } from '../localities/funnGroups';
 import { FunnList } from '../localities/FunnList';
@@ -387,7 +387,7 @@ const SkisseControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
 // standing ones.
 const Banner = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t, i18n } = useTranslation();
-  const owner = ws.locality.expand?.owner?.name;
+  const owner = creditOf(ws.locality);
 
   if (ws.restoredAt != null) {
     // At most one buffer per lokalitet, so the question is how long ago.

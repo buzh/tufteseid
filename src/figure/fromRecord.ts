@@ -12,7 +12,7 @@
 
 import { t } from 'i18next';
 import type { AttachmentKind, AttachmentMeta } from '../api/attachments';
-import type { LocalityRecord } from '../api/localities';
+import { creditOf, type LocalityRecord } from '../api/localities';
 import { viewSpecOf } from '../localities/viewSpec';
 import type { BackgroundLayerName } from '../map/layers/backgroundLayers';
 import {
@@ -60,7 +60,7 @@ const bboxOf = (v: unknown): [number, number, number, number] | null => {
  * still say so.
  */
 export const authorOf = (loc: LocalityRecord): string =>
-  loc.expand?.owner?.name?.trim() || t('localities.takeout.ownerUnknown');
+  creditOf(loc) ?? t('localities.takeout.ownerUnknown');
 
 export type StampContext = {
   /** The lokalitet's name, in front of the product on the title line. */

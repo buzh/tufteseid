@@ -1,4 +1,4 @@
-import { pb } from './pocketbase';
+import { type NkUser, pb } from './pocketbase';
 
 // Match the PB select options; localise via `localities.visibility.*`.
 export type LocalityVisibility = 'private' | 'limited' | 'public';
@@ -25,6 +25,8 @@ export type LocalityRecord = {
   matrikkel?: string;
   visibility: LocalityVisibility;
   bbox: LocalityBbox;
+  // Whose reading this is, denormalized off the account. See `creditOf`.
+  credit?: string;
   // Forked from. Uncascaded, so a fork outlives its original, and the label
   // denormalizes name and owner so the attribution survives its deletion.
   derivedFrom?: string;
@@ -42,11 +44,24 @@ export type NewLocalityInput = {
   place?: string;
   municipality?: string;
   matrikkel?: string;
+  credit?: string;
   visibility: LocalityVisibility;
   bbox: LocalityBbox;
   derivedFrom?: string;
   derivedFromLabel?: string;
 };
+
+/**
+ * Who to name as the lokalitet's author, or null where the record declines to
+ * say and the reader cannot look it up.
+ *
+ * `users` is closed to guests on purpose, so `expand.owner` is empty for
+ * exactly the reader a share link exists for. `credit` is the owner's own
+ * answer to that, stored on the record and published with it; the expansion is
+ * the fallback for anything written before migration 1700001000.
+ */
+export const creditOf = (loc: LocalityRecord): string | null =>
+  loc.credit?.trim() || loc.expand?.owner?.name?.trim() || null;
 
 const COLLECTION = 'localities';
 
@@ -105,6 +120,9 @@ const isCodeTaken = (err: unknown): boolean =>
   (err as { response?: { data?: Record<string, { code?: string }> } })?.response
     ?.data?.code?.code === 'validation_not_unique';
 
+const accountName = (): string =>
+  (pb.authStore.record as NkUser | null)?.name?.trim() ?? '';
+
 // 32^6 ≈ 1.07 billion; one redraw is more than enough at this scale.
 const CODE_ATTEMPTS = 2;
 
@@ -119,6 +137,11 @@ export const createLocality = async (
     place: input.place ?? '',
     municipality: input.municipality ?? '',
     matrikkel: input.matrikkel ?? '',
+    // Starts as the account's display name; the owner may rewrite it, and an
+    // account with no name leaves it empty rather than inventing one. Read off
+    // the session rather than `ownerId`, because `users` is the one collection
+    // the app cannot look a name up in.
+    credit: input.credit ?? accountName(),
     visibility: input.visibility,
     bbox: input.bbox,
     ...(input.derivedFrom
@@ -149,6 +172,7 @@ export type LocalityPatch = Partial<{
   place: string;
   municipality: string;
   matrikkel: string;
+  credit: string;
   visibility: LocalityVisibility;
   bbox: LocalityBbox;
 }>;

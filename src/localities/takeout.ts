@@ -136,7 +136,7 @@ const factsOf = (
     },
     {
       label: t('localities.workspace.owner'),
-      value: loc.expand?.owner?.name || t('localities.takeout.ownerUnknown'),
+      value: authorOf(loc),
     },
     {
       label: t('localities.workspace.updated'),

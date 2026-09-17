@@ -9,7 +9,7 @@ import {
   type AttachmentRecord,
   listLocalityAttachments,
 } from '../api/attachments';
-import { getLocality, type LocalityRecord } from '../api/localities';
+import { creditOf, getLocality, type LocalityRecord } from '../api/localities';
 import { isPinned, viewSpecOf } from './viewSpec';
 
 /** Which parent File a copied one came from; in `meta`, no schema change. */
@@ -55,7 +55,7 @@ export const useInheritedBilder = (
       try {
         const parent = await getLocality(parentId);
         if (seq.current !== mine) return;
-        setOwner(parent.expand?.owner?.name?.trim() || null);
+        setOwner(creditOf(parent));
       } catch (e) {
         if (seq.current !== mine) return;
         console.warn('[inheritedBilder] original unreadable', e);

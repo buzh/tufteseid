@@ -351,8 +351,9 @@ both stances; Juster området and Slett are gated on `canEdit`. The banner slot
 ranks: recovered buffer, copy progress, Rapportpakke progress, *Delt av X*,
 admin-in-edit, *Kopiert fra X*. Detaljer is a dialog: Sted / Kommune / Matrikkel
 editable, Koordinater (`formatBboxCentre`) and Areal read-only, plus "Hent
-stedsdata på nytt" under `canEdit`. The centre coordinate is derived per render,
-never stored. In show the dialog holds only what the record says: an unfilled
+stedsdata på nytt" under `canEdit`. Kreditering is there too, under `canEdit`:
+the name that goes on the plates and the bundle. The centre coordinate is
+derived per render, never stored. In show the dialog holds only what the record says: an unfilled
 Sted / Kommune / Matrikkel row is absent rather than a blank line, Beskrivelse
 appears only when there is one, and Synlighet — a write verb whose state the
 row's badge already carries — is absent rather than a disabled segmented.
@@ -474,7 +475,8 @@ the pin sweep, the pin face, `Åpne originalen`.
 `Lag min kopi` (`copyLocality.ts`) carries the bbox, name, description, place,
 municipality, matrikkel, every funn, and every View's meta/caption/sort/hidden as
 unpinned specs (`imageRect` and `renderedAt` stripped, `bbox25833` kept). Left
-behind: the owner, the visibility (a copy starts `private`) and every File.
+behind: the owner, the credit (a copy is the copier's own reading), the
+visibility (a copy starts `private`) and every File.
 `derivedFrom` points back and does not cascade; `derivedFromLabel` names it;
 relations are wired in a second pass. The Files that stayed behind appear at the
 end of the copy's carousel through `useInheritedBilder`, each with one `Ta med`
@@ -487,7 +489,9 @@ as `?lok=CODE`. The short URL is six lines of `Caddyfile` — a `redir` behind
 import; `getLocalityByCode` uppercases. A link always lands in `show`, framed on
 the rectangle (`zoomToLocality`); there is no viewport in it. Migration
 `1700000900` opened public reads and unprotected `attachments.file`, so a guest
-can follow one. A miss keeps the parameter and offers `Logg inn`, because the
+can follow one; `users` stayed closed, so the name behind `owner` is not a
+guest's to read and `credit` (migration `1700001000`) carries it on the record
+instead — see §11. A miss keeps the parameter and offers `Logg inn`, because the
 visitor may be the signed-out owner of a private lokalitet.
 
 `Rapportpakke` (`takeout.ts` over `src/shared/utils/zip.ts`) zips the lokalitet
@@ -638,7 +642,12 @@ image downloaded alone and inside a bundle is the same file.
   statement about who did the visualising. Where the app made the picture rather
   than fetching it whole — a terrain render, a skisse, an Oppsett, a kartutsnitt
   with something drawn over it — the lokalitet's owner and Tufteseid are named
-  as co-authors. The terms are not negotiable: everything the tool makes for you
+  as co-authors. `authorOf` takes that name from `creditOf(locality)`: the
+  record's own `credit` field, prefilled from the account at creation and the
+  owner's to rewrite, falling back to `expand.owner.name` where the reader can
+  see it and to *Ukjent* where neither is there. It is a field rather than a
+  lookup because `users` is closed to guests, and a takeout handed to a third
+  party must still say whose reading it is. The terms are not negotiable: everything the tool makes for you
   is CC BY 4.0, which is what lets a reading be quoted and argued with. NiB
   ortofoto keeps its own notice.
 - Fitting the store is a separate job and happens at pin time, not at stamp

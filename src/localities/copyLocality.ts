@@ -13,6 +13,7 @@ import {
 } from '../api/attachments';
 import {
   createLocality,
+  creditOf,
   type LocalityRecord,
   type NewLocalityInput,
 } from '../api/localities';
@@ -39,7 +40,7 @@ export type CopyResult = {
 // Denormalized rather than read through `derivedFrom`, which does not cascade:
 // a deleted original still has to leave the copy able to say where it came from.
 const derivedLabel = (source: LocalityRecord): string => {
-  const owner = source.expand?.owner?.name;
+  const owner = creditOf(source);
   const name = source.name || source.code;
   return owner ? `${name} (${owner})` : name;
 };

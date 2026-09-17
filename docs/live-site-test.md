@@ -71,10 +71,11 @@ Five checks assert an absence, and each is a rule rather than a screen:
   create rule.
 - `owner-not-expanded` — migration `1700000900` opened `localities`, `finds` and
   `attachments` to guests, and deliberately not `users`. So `expand=owner` comes
-  back empty for a signed-out reader, and every surface that names an owner —
-  the *Delt av* banner, Detaljer's owner row, the report package's credit — has
-  no name to print. A non-empty expand means somebody opened the users
-  collection, which is a privacy decision and not a bug fix.
+  back empty for a signed-out reader. A non-empty expand means somebody opened
+  the users collection, which is a privacy decision and not a bug fix. The
+  surfaces that name an author read `credit` off the lokalitet instead
+  (migration `1700001000`); a record created before that field, or one whose
+  owner cleared it, still has no name to print.
 - `unknown-path` — `file_server` still has no SPA fallback.
 - `help-route-404` — `/hjelp` is a client-side route and a cold load of it 404s
   (`docs/ui-architecture.md` §8). A 200 means somebody added a catch-all.
@@ -94,8 +95,9 @@ run this; it needs no account and touches nothing.
 
 1. **Landing.** The URL becomes `/?lok=JYBNQC`, the map frames the rectangle,
    and the lokalitet row reads *Løkstad* with its code chip and a `public`
-   badge. No *Delt av* banner: the owner is a `users` record, which a guest may
-   not read, so there is no name to put in it.
+   badge, and a *Delt av* banner naming whatever the owner put in `credit` —
+   absent where they cleared it, since the `users` record behind it is not a
+   guest's to read.
 2. **Stance.** The exits are `[Lukk] [⋮]` and nothing else — no `Rediger`
    (not the owner), no `Lag min kopi` (not signed in). `Nytt funn`, `Behold`,
    `Hent ▾` and `Skjermbilde` are absent, not greyed. `⋮` offers Zoom til
@@ -132,8 +134,8 @@ run this; it needs no account and touches nothing.
    rail's order and `funn/funn.geojson` + `funn.csv` beside them. A reader
    cannot pin, so any unpinned View is named on the front page instead of
    silently missing. Every image in the zip carries the same plate `Last ned`
-   stamps. The owner credit reads *Ukjent*, on the front page and in the plate's
-   authored half both, for the same reason the banner is absent.
+   stamps. The front page and the plate's authored half both name the
+   lokalitet's `credit`, and read *Ukjent* only where that field is empty.
 10. **Del.** `⋮ → Del` copies `/l/JYBNQC` and says that anybody can open it.
 11. **Housekeeping.** Switch language nb → nn → en: no raw translation keys
     anywhere, and no `Norgeskart` or `Kartverket` in the chrome in any of the

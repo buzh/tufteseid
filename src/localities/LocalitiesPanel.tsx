@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { countAttachmentsByLocality } from '../api/attachments';
 import {
+  creditOf,
   listLocalities,
   listMyLocalities,
   LocalityRecord,
@@ -60,6 +61,8 @@ const LocalityRow = ({
     formatDate(locality.updated, i18n.language),
   ].filter((s): s is string => !!s);
 
+  const author = isOwner ? null : creditOf(locality);
+
   return (
     <div
       className={styles.row}
@@ -80,9 +83,7 @@ const LocalityRow = ({
       )}
       <div className={styles.meta}>
         {meta.join(' · ')}
-        {!isOwner && locality.expand?.owner
-          ? ` · ${t('localities.byOwner', { name: locality.expand.owner.name })}`
-          : ''}
+        {author ? ` · ${t('localities.byOwner', { name: author })}` : ''}
       </div>
     </div>
   );

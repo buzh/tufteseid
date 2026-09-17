@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  creditOf,
   LocalityPatch,
   LocalityRecord,
   LocalityVisibility,
@@ -25,6 +26,7 @@ const TextRow = ({
   label,
   value,
   placeholder,
+  hint,
   maxLength,
   readOnly,
   onCommit,
@@ -32,6 +34,8 @@ const TextRow = ({
   label: string;
   value: string;
   placeholder: string;
+  /** Under the box, for a field whose label cannot say what it is for. */
+  hint?: string;
   maxLength: number;
   // Read-only rather than disabled: in show this is every field, the owner's
   // included. See `.control:read-only` in Field.module.css.
@@ -71,6 +75,7 @@ const TextRow = ({
           if (e.key === 'Escape') setDraft(value);
         }}
       />
+      {hint && <span className={styles.hint}>{hint}</span>}
     </div>
   );
 };
@@ -179,6 +184,7 @@ export const LocalityDetails = ({
 }) => {
   const { t, i18n } = useTranslation();
   const [description, setDescription] = useState(locality.description ?? '');
+  const credit = creditOf(locality);
 
   useEffect(() => {
     setDescription(locality.description ?? '');
@@ -244,12 +250,26 @@ export const LocalityDetails = ({
         </div>
       )}
 
+      {/* The other half of publishing, so it sits under Synlighet: this is
+          the name the plate stamps on every image and the Rapportpakke prints
+          on its front page. It is a field on the lokalitet rather than a read
+          of the account because `users` stays closed to guests — the reader a
+          share link exists for cannot look anybody up. */}
+      {canEdit && (
+        <TextRow
+          label={t('localities.workspace.credit')}
+          value={locality.credit ?? ''}
+          placeholder={t('localities.workspace.creditPlaceholder')}
+          hint={t('localities.workspace.creditHint')}
+          maxLength={200}
+          readOnly={false}
+          onCommit={(credit) => onPatch({ credit })}
+        />
+      )}
+
       <div className={styles.group}>
-        {locality.expand?.owner && (
-          <Fact
-            label={t('localities.workspace.owner')}
-            value={locality.expand.owner.name || locality.expand.owner.id}
-          />
+        {!canEdit && credit && (
+          <Fact label={t('localities.workspace.owner')} value={credit} />
         )}
         <Fact
           label={t('localities.workspace.created')}

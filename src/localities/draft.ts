@@ -23,7 +23,7 @@ import type {
 export type DraftLocality = Required<
   Pick<LocalityPatch, 'name' | 'description' | 'visibility' | 'bbox'>
 > &
-  Pick<LocalityPatch, 'place' | 'municipality' | 'matrikkel'>;
+  Pick<LocalityPatch, 'place' | 'municipality' | 'matrikkel' | 'credit'>;
 
 /** What a funn's row in the buffer holds — the four editable columns. */
 export type DraftFind = {
@@ -104,6 +104,7 @@ export const localityFieldsOf = (rec: LocalityRecord): DraftLocality => ({
   place: rec.place,
   municipality: rec.municipality,
   matrikkel: rec.matrikkel,
+  credit: rec.credit,
   visibility: rec.visibility,
   bbox: rec.bbox,
 });
@@ -340,6 +341,7 @@ const sameLocality = (a: DraftLocality, b: DraftLocality): boolean =>
   (a.place ?? '') === (b.place ?? '') &&
   (a.municipality ?? '') === (b.municipality ?? '') &&
   (a.matrikkel ?? '') === (b.matrikkel ?? '') &&
+  (a.credit ?? '') === (b.credit ?? '') &&
   a.visibility === b.visibility &&
   a.bbox.join(',') === b.bbox.join(',');
 
@@ -376,6 +378,9 @@ export const localityPatchOf = (d: LocalityDraft): LocalityPatch | null => {
   }
   if ((now.matrikkel ?? '') !== (base.matrikkel ?? '')) {
     patch.matrikkel = now.matrikkel ?? '';
+  }
+  if ((now.credit ?? '') !== (base.credit ?? '')) {
+    patch.credit = now.credit ?? '';
   }
   if (now.visibility !== base.visibility) patch.visibility = now.visibility;
   if (now.bbox.join(',') !== base.bbox.join(',')) patch.bbox = now.bbox;
