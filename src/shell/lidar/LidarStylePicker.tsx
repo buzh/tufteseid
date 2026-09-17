@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLidarStyleRingHint } from '../../localities/bilderRing';
+import { lidarStyleLabel } from '../../map/layers/config/backgroundLayers/lidarProjects';
 import { Button, CountBadge, Popover } from '../../ui';
 import { PulldownDisclosure, PulldownItem } from '../Pulldown';
 import styles from '../Pulldown.module.css';
@@ -36,7 +37,9 @@ export const LidarStylePicker = ({ lidar }: { lidar: LidarControls }) => {
             onClick={() => setOpen(!open)}
             aria-expanded={open}
           >
-            <span className={styles.triggerLabel}>{lidar.shownStyle}</span>
+            <span className={styles.triggerLabel}>
+            {lidarStyleLabel(lidar.shownStyle)}
+          </span>
           </Button>
           <CountBadge
             count={lidar.datasetStyles.length}
@@ -55,7 +58,7 @@ export const LidarStylePicker = ({ lidar }: { lidar: LidarControls }) => {
       {lidar.tierAStyles.map((style) => (
         <PulldownItem
           key={style}
-          label={style}
+          label={lidarStyleLabel(style)}
           active={lidar.shownStyle === style}
           onActivate={() => pick(style)}
         />
@@ -89,7 +92,7 @@ const StyleOverflow = ({
         lidar.tierBStyles.map((style) => (
           <PulldownItem
             key={style}
-            label={style}
+            label={lidarStyleLabel(style)}
             active={lidar.shownStyle === style}
             onActivate={() => onPick(style)}
           />

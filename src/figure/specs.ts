@@ -16,6 +16,7 @@ import {
   type HeritageDetail,
   type HeritageRender,
 } from '../map/layers/heritage';
+import { lidarStyleLabel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { themeLayerName } from '../map/layers/themeLayerConfigApi';
 import type { DemModel } from '../terrain/dem';
 import { defaultRadius, usesHorizon, type TerrainLight } from '../terrain/render';
@@ -113,7 +114,12 @@ export type LidarExtractFigureInput = Common & {
 export const lidarExtractFigure = (
   input: LidarExtractFigureInput,
 ): FigureSpec => ({
-  title: titleOf(input.subject, `${t('figure.title.extract')} — ${input.style}`),
+  // The title says what the picture is, the settings row says how to ask for
+  // it again: prose here, the raw suffix there.
+  title: titleOf(
+    input.subject,
+    `${t('figure.title.extract')} — ${lidarStyleLabel(input.style)}`,
+  ),
   source: joinDot([t('figure.source.lidarWms'), input.sourceLabel]),
   acquisition:
     joinDot([

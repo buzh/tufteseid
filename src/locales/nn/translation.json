@@ -717,6 +717,13 @@
       "filterReset": "Tilbakestill filter",
       "styleLabel": "Visingsstil",
       "styleHead": "Visingsstil",
+      "style": {
+        "skyggerelieff": "Skyggerelieff",
+        "multiskyggerelieff": "Multiskyggerelieff",
+        "helning_prosent": "Helling i prosent",
+        "helning_grader": "Helling i grader",
+        "dynamisk_farget_hoyde": "Dynamisk fargelagd høgd"
+      },
       "moreStyles": "{{count}} fleire stilar",
       "modelLabel": "Høgdemodell",
       "modelTip": "DTM = terreng (vegetasjon fjerna), DOM = overflate (bygg og tre). Byt med E"

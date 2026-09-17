@@ -717,6 +717,13 @@
       "filterReset": "Reset filter",
       "styleLabel": "Visualization",
       "styleHead": "Visualization",
+      "style": {
+        "skyggerelieff": "Hillshade",
+        "multiskyggerelieff": "Multi-directional hillshade",
+        "helning_prosent": "Slope in percent",
+        "helning_grader": "Slope in degrees",
+        "dynamisk_farget_hoyde": "Dynamic colour ramp"
+      },
       "moreStyles": "{{count}} more styles",
       "modelLabel": "Elevation model",
       "modelTip": "DTM = terrain (vegetation removed), DOM = surface (buildings and trees). Switch with E"

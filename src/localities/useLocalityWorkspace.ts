@@ -63,6 +63,7 @@ import {
   backgroundLayerHalves,
   hybridOverlayHalves,
 } from '../map/layers/config/backgroundLayers/atoms';
+import { lidarStyleLabel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { saveBlob } from '../shared/utils/download';
 import { fitPadding, FUNN_MARGIN_PX } from '../shell/chromeInsets';
 import { recreateViewAtom } from '../shell/useRecreateView';
@@ -1594,7 +1595,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       const born = Date.now();
       const spec: DraftSpec = {
         kind: 'extract',
-        caption: `${source.label} · ${style}`,
+        caption: `${source.label} · ${lidarStyleLabel(style)}`,
         sort: born,
         bornSort: born,
         hidden: false,
@@ -1682,9 +1683,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           candidates.push({
             id: `${source.key}::${style}`,
             title: source.label,
-            subtitle: style,
+            subtitle: lidarStyleLabel(style),
             kind: 'extract',
-            caption: `${source.label} · ${style}`,
+            caption: `${source.label} · ${lidarStyleLabel(style)}`,
             meta: lidarSpecMeta(source, style, beholdBbox),
             spec: projectName
               ? { kind: 'lidar', source: { projectName }, style, model }
@@ -1761,7 +1762,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
               {
                 locality: locality.id,
                 kind: 'extract',
-                caption: `${plan.source.label} · ${style}`,
+                caption: `${plan.source.label} · ${lidarStyleLabel(style)}`,
                 meta: lidarSpecMeta(plan.source, style, beholdBbox),
               },
               user.id,

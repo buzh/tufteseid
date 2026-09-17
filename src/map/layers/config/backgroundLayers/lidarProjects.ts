@@ -1,6 +1,7 @@
 // Kartverket's per-project LiDAR GetCapabilities, parsed into one entry per
 // acquisition; long-cached in wmscache plus a week of localStorage here.
 
+import { t } from 'i18next';
 import { fetchWithin } from '../../../../shared/utils/deadline';
 import { getUrlParameter } from '../../../../shared/utils/urlUtils';
 import { halved } from '../../../compare/halves';
@@ -92,6 +93,23 @@ export const resolveLidarStyle = (
 // Advertised but unusable: `None` renders near-uniform, and
 // `dynamisk_farget_hoyde` ramps per tile, so neighbouring tiles disagree.
 const EXCLUDED_STYLES = new Set<string>(['None', 'dynamisk_farget_hoyde']);
+
+/**
+ * The suffix in Norwegian prose, for the places a reader is being told what
+ * they are looking at: the style pulldown, a bilde's caption, a plate's title.
+ * The raw suffix stays the reproducibility contract and `figure.set.wmsStyle`
+ * still prints it verbatim, so this never replaces it — it sits beside it.
+ *
+ * The list comes from GetCapabilities rather than from here, so an unadvertised
+ * suffix is prettified instead of dropped: five is what the two services
+ * publish today, not a closed set.
+ */
+export const lidarStyleLabel = (style: string): string => {
+  const known = t(`ribbon.lidar.style.${style}`, { defaultValue: '' });
+  if (known) return known;
+  const spaced = style.replace(/_/g, ' ');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+};
 
 type CachedEntry = { ts: number; projects: LidarProject[] };
 
