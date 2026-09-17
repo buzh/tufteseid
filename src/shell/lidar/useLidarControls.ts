@@ -120,8 +120,7 @@ export const useLidarControls = () => {
       const extent = map.getView().calculateExtent(size);
       const projection = map.getView().getProjection().getCode();
       const extentLonLat = transformExtent(extent, projection, 'EPSG:4326') as
-        | [number, number, number, number]
-        | undefined;
+        [number, number, number, number] | undefined;
       if (!extentLonLat) return;
       setEnvelopeCount(
         allProjects.filter((p) => bboxIntersects(p.bboxLonLat, extentLonLat))
@@ -320,7 +319,9 @@ export const useLidarControls = () => {
     // order.
     const entries = viewport.primary;
     const ring = entries.length + 1;
-    const at = entries.findIndex((e) => e.project.id === activeLidarProject?.id);
+    const at = entries.findIndex(
+      (e) => e.project.id === activeLidarProject?.id,
+    );
     const from = isNationalMosaic ? 0 : at >= 0 ? at + 1 : step > 0 ? -1 : 0;
     const next = (from + step + ring) % ring;
     // Walking pins, or the resolver takes the background back on the next pan.

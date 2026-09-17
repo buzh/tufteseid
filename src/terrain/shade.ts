@@ -58,10 +58,7 @@ export const horizonDecimation = (
 ): number =>
   Math.min(
     maxDecimation(metresPerPx),
-    Math.max(
-      1,
-      Math.ceil(radiusMetres / (metresPerPx * SVF_MAX_RADIUS_PX)),
-    ),
+    Math.max(1, Math.ceil(radiusMetres / (metresPerPx * SVF_MAX_RADIUS_PX))),
   );
 
 /**
@@ -183,7 +180,14 @@ function shadeFromGradients(
     if (Number.isNaN(gx)) continue;
     const gy = dzdy[i];
     const slope = Math.atan(zFactor * Math.hypot(gx, gy));
-    const aspect = gx !== 0 ? Math.atan2(gy, -gx) : gy > 0 ? Math.PI / 2 : gy < 0 ? -Math.PI / 2 : 0;
+    const aspect =
+      gx !== 0
+        ? Math.atan2(gy, -gx)
+        : gy > 0
+          ? Math.PI / 2
+          : gy < 0
+            ? -Math.PI / 2
+            : 0;
     const v =
       cosZenith * Math.cos(slope) +
       sinZenith * Math.sin(slope) * Math.cos(azMath - aspect);
@@ -438,8 +442,9 @@ function scanHorizon(grid: Grid, radiusMetres: number): HorizonFields {
   );
 
   // Precompute the ray offsets once rather than per pixel.
-  const rays: Array<Array<{ off: number; dx: number; dy: number; dist: number }>> =
-    [];
+  const rays: Array<
+    Array<{ off: number; dx: number; dy: number; dist: number }>
+  > = [];
   for (let d = 0; d < SVF_DIRECTIONS; d++) {
     const angle = (2 * Math.PI * d) / SVF_DIRECTIONS;
     const ux = Math.cos(angle);
@@ -611,7 +616,12 @@ export function percentileRange(
   if (finite.length === 0) return [0, 1];
   finite.sort((a, b) => a - b);
   const at = (p: number) =>
-    finite[Math.min(finite.length - 1, Math.max(0, Math.round(p * (finite.length - 1))))];
+    finite[
+      Math.min(
+        finite.length - 1,
+        Math.max(0, Math.round(p * (finite.length - 1))),
+      )
+    ];
   const lo = at(lowPct);
   const hi = at(highPct);
   return hi > lo ? [lo, hi] : [lo, lo + 1];

@@ -59,7 +59,6 @@
   padding-left: var(--sp-1);
 }
 
-
 @media (prefers-reduced-motion: reduce) {
   .chevron {
     transition: none;

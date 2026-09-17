@@ -48,8 +48,8 @@ const probe = (id: string): Promise<KulturminnesokStatus> => {
  * slow or broken probe costs the mark and never the link. */
 export const useKulturminnesokStatus = (link: string): KulturminnesokStatus => {
   const id = kulturminnesokId(link);
-  const [status, setStatus] = useState<KulturminnesokStatus>(
-    () => (id ? (answers.get(id) ?? 'unknown') : 'unknown'),
+  const [status, setStatus] = useState<KulturminnesokStatus>(() =>
+    id ? (answers.get(id) ?? 'unknown') : 'unknown',
   );
 
   useEffect(() => {

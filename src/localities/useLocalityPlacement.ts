@@ -112,7 +112,8 @@ export const useLocalityPlacement = (
   // inert while something is being typed into or an overlay is up.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey)
+        return;
       if (event.key !== 'Escape' && event.key !== 'Enter') return;
       const target = event.target;
       if (
@@ -140,11 +141,12 @@ export const useLocalityPlacement = (
   // The clamp lands on the limit through two reprojections, so an exact
   // comparison lights up on some rectangles and not on identical ones.
   const near = (value: number, limit: number) => Math.abs(value - limit) < 1;
-  const atLimit = near(width, MAX_SIDE_M) || near(height, MAX_SIDE_M)
-    ? 'max'
-    : near(width, MIN_SIDE_M) || near(height, MIN_SIDE_M)
-      ? 'min'
-      : null;
+  const atLimit =
+    near(width, MAX_SIDE_M) || near(height, MAX_SIDE_M)
+      ? 'max'
+      : near(width, MIN_SIDE_M) || near(height, MIN_SIDE_M)
+        ? 'min'
+        : null;
 
   return {
     bbox,

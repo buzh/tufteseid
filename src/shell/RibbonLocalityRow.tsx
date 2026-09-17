@@ -33,10 +33,7 @@ import styles from './Ribbon.module.css';
 import rowStyles from './RibbonLocalityRow.module.css';
 import { VisningControl } from './VisningControl';
 
-const VISIBILITY_PALETTE: Record<
-  LocalityRecord['visibility'],
-  BadgePalette
-> = {
+const VISIBILITY_PALETTE: Record<LocalityRecord['visibility'], BadgePalette> = {
   private: 'gray',
   limited: 'yellow',
   public: 'green',
@@ -770,7 +767,9 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
               label={t('localities.funn.new')}
               tooltip={`${t('localities.funn.new')} (N)`}
               active={mode === 'draft'}
-              onClick={() => (ws.draftActive ? ws.stopDraft() : ws.startDraft())}
+              onClick={() =>
+                ws.draftActive ? ws.stopDraft() : ws.startDraft()
+              }
             />
             {/* The other thing the same pen makes: a transparent overlay,
                 kept as its strokes rather than converted to geometry. */}
@@ -884,11 +883,7 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
           /* The rectangle moves in the buffer, so `Angre` puts a value back
              rather than issuing a second PATCH. */
           <>
-            <Button
-              variant="primary"
-              leftIcon="check"
-              onClick={ws.applyAdjust}
-            >
+            <Button variant="primary" leftIcon="check" onClick={ws.applyAdjust}>
               {t('localities.workspace.adjustApply')}
             </Button>
             <Button variant="ghost" leftIcon="undo" onClick={ws.undoAdjust}>

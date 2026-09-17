@@ -28,10 +28,7 @@ import { formatBboxArea, formatDate } from './format';
 import styles from './LocalitiesPanel.module.css';
 import { setLocalityHighlight } from './localityLayer';
 
-const VISIBILITY_PALETTE: Record<
-  LocalityRecord['visibility'],
-  BadgePalette
-> = {
+const VISIBILITY_PALETTE: Record<LocalityRecord['visibility'], BadgePalette> = {
   private: 'gray',
   limited: 'yellow',
   public: 'green',
@@ -102,7 +99,9 @@ export const LocalitiesPanel = () => {
   const [items, setItems] = useState<LocalityRecord[] | null>(null);
   const [scope, setScope] = useState<Scope>('mine');
   const [query, setQuery] = useState('');
-  const [funnCounts, setFunnCounts] = useState<Map<string, number> | null>(null);
+  const [funnCounts, setFunnCounts] = useState<Map<string, number> | null>(
+    null,
+  );
   const [bilderCounts, setBilderCounts] = useState<Map<string, number> | null>(
     null,
   );
@@ -173,7 +172,9 @@ export const LocalitiesPanel = () => {
 
   if (!user) {
     return (
-      <p className={styles.signInPrompt}>{t('localities.panel.signInPrompt')}</p>
+      <p className={styles.signInPrompt}>
+        {t('localities.panel.signInPrompt')}
+      </p>
     );
   }
 

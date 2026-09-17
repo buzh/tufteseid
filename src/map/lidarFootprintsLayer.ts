@@ -91,8 +91,7 @@ const getOrCreateLayer = (map: OlMap): VectorLayer => {
     .getLayers()
     .getArray()
     .find((l) => l.get('id') === LIDAR_FOOTPRINTS_LAYER_ID) as
-    | VectorLayer
-    | undefined;
+    VectorLayer | undefined;
   if (existing) return existing;
   const layer = new VectorLayer({
     source: new VectorSource(),
@@ -155,8 +154,7 @@ export const useLidarFootprintsLayer = () => {
       ];
       const projection = map.getView().getProjection().getCode();
       const extentLonLat = transformExtent(extent, projection, 'EPSG:4326') as
-        | [number, number, number, number]
-        | undefined;
+        [number, number, number, number] | undefined;
       if (!extentLonLat) return;
 
       // Claimed before the two scale guards, so a fetch started while zoomed

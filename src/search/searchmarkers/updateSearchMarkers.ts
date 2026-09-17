@@ -84,8 +84,7 @@ const registerMarkerClickHandler = (map: Map) => {
       evt.pixel,
       (feature) => {
         const featuresAtPixel = feature.get('features') as
-          | Feature[]
-          | undefined;
+          Feature[] | undefined;
         if (!featuresAtPixel?.length) {
           return false;
         }

@@ -17,10 +17,7 @@ import {
   LocalityPatch,
   LocalityRecord,
 } from '../api/localities';
-import {
-  LocalityFindRecord,
-  LocalityFindStatus,
-} from '../api/localityFinds';
+import { LocalityFindRecord, LocalityFindStatus } from '../api/localityFinds';
 import { currentUserAtom, isAdminAtom } from '../auth/atoms';
 import {
   SCENE_BUDGET_BYTES,
@@ -156,10 +153,7 @@ import { assumedExtentOf, imageAspectOf } from './uploadPlacement';
 import { useFunnAutosave } from './useFunnAutosave';
 import { useInheritedBilder } from './useInheritedBilder';
 import { useLocalityAdjust } from './useLocalityAdjust';
-import {
-  useLocalityAttachments,
-  useLocalityFinds,
-} from './useLocalityContent';
+import { useLocalityAttachments, useLocalityFinds } from './useLocalityContent';
 import { useLocalityDraft } from './useLocalityDraft';
 import { type PickerCandidate, usePickerRun } from './usePickerRun';
 import { useWorkspaceKeys } from './useWorkspaceKeys';
@@ -419,10 +413,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   );
 
   const dirty = isDirty(draft);
-  const counts = useMemo(
-    () => (draft ? draftCounts(draft) : null),
-    [draft],
-  );
+  const counts = useMemo(() => (draft ? draftCounts(draft) : null), [draft]);
 
   const restoreDeleted = useCallback(
     (id: string) => {
@@ -726,10 +717,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [applyLocality, mutateDraft],
   );
 
-  const close = useCallback(
-    () => setActiveLocality(null),
-    [setActiveLocality],
-  );
+  const close = useCallback(() => setActiveLocality(null), [setActiveLocality]);
 
   // `Rediger` only sets the stance; the buffer follows it, above.
   const enterEdit = useCallback(() => {
@@ -1008,7 +996,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         return;
       }
       clearForPen();
-      setDrawRequested({ mode: 'sketch', resume: { id: rec.id, scene: stored } });
+      setDrawRequested({
+        mode: 'sketch',
+        resume: { id: rec.id, scene: stored },
+      });
     },
     [canAdd, clearForPen, setDrawRequested, t],
   );
@@ -1503,15 +1494,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         setUploading(false);
       }
     },
-    [
-      user,
-      canAdd,
-      uploading,
-      locality.id,
-      setAttachmentItems,
-      mutateDraft,
-      t,
-    ],
+    [user, canAdd, uploading, locality.id, setAttachmentItems, mutateDraft, t],
   );
 
   // `Ta med`: pull one of the original's Files into this copy, bytes down and
@@ -2183,8 +2166,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       // exactly a card with a switch up there.
       const visning = viewItems.some((it) => it.id === id);
       const bilde = fileItems.some((it) => it.id === id);
-      const skisse =
-        rec.kind === 'sketch' && !!rec.meta && !deletedIds.has(id);
+      const skisse = rec.kind === 'sketch' && !!rec.meta && !deletedIds.has(id);
       if (!visning && !bilde && !skisse) return;
       // A View goes through `[Visning ▾]`'s entrance rather than straight at
       // the atom, so the ground the render was made on comes back with it.

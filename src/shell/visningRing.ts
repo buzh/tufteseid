@@ -42,19 +42,16 @@ export const useVisningRingHint = () =>
  * `useLocalityWorkspace` write `visningShownAtom` directly instead, because
  * they must not move the ribbon: the arrival cover, and a scene's own ground.
  */
-export const selectVisningAtom = atom(
-  null,
-  (get, set, id: string | null) => {
-    set(visningShownAtom, id == null ? new Set<string>() : new Set([id]));
-    set(visningGroupShownAtom, true);
-    // Spends the arrival cover: the shown set was replaced wholesale.
-    set(provisionalViewAtom, null);
-    if (id == null) return;
-    // No readable spec still selects: the figure goes up, the ground stays.
-    const spec = get(visningRingAtom).find((stop) => stop.id === id)?.spec;
-    if (spec) set(recreateViewAtom, spec);
-  },
-);
+export const selectVisningAtom = atom(null, (get, set, id: string | null) => {
+  set(visningShownAtom, id == null ? new Set<string>() : new Set([id]));
+  set(visningGroupShownAtom, true);
+  // Spends the arrival cover: the shown set was replaced wholesale.
+  set(provisionalViewAtom, null);
+  if (id == null) return;
+  // No readable spec still selects: the figure goes up, the ground stays.
+  const spec = get(visningRingAtom).find((stop) => stop.id === id)?.spec;
+  if (spec) set(recreateViewAtom, spec);
+});
 
 /**
  * Step the ring over `ring.length + 1` stops, `null` first. Returns whether it

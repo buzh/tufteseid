@@ -54,7 +54,9 @@ const linearPoints = (el: SceneElement): Point[] => {
   const pts = (el as { points?: readonly (readonly number[])[] }).points;
   if (!Array.isArray(pts)) return [];
   return pts
-    .filter((p) => p.length >= 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]))
+    .filter(
+      (p) => p.length >= 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]),
+    )
     .map((p) => [el.x + p[0], el.y + p[1]] as Point);
 };
 
@@ -212,7 +214,9 @@ const lineElement = (points: Point[]): SceneElement | null => {
 };
 
 /** Every position in a FeatureCollection, whatever its geometry types. */
-const positionsOf = function* (geometry: FeatureCollection): Generator<Position> {
+const positionsOf = function* (
+  geometry: FeatureCollection,
+): Generator<Position> {
   for (const feature of geometry.features ?? []) {
     const g = feature.geometry;
     if (!g || g.type === 'GeometryCollection') continue;
@@ -259,11 +263,10 @@ export const geometryToScene = (
     const ground =
       frame.projection === 'EPSG:4326'
         ? ([pos[0], pos[1]] as [number, number])
-        : (transform(
-            [pos[0], pos[1]],
-            'EPSG:4326',
-            frame.projection,
-          ) as [number, number]);
+        : (transform([pos[0], pos[1]], 'EPSG:4326', frame.projection) as [
+            number,
+            number,
+          ]);
     return coordToScene(frame, ground);
   };
 

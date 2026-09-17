@@ -52,7 +52,9 @@ function excalidrawFonts(): Plugin {
       server.middlewares.use((req, res, next) => {
         const url = req.url?.split('?')[0];
         if (!url?.startsWith('/fonts/')) return next();
-        const rel = path.normalize(decodeURIComponent(url.slice('/fonts/'.length)));
+        const rel = path.normalize(
+          decodeURIComponent(url.slice('/fonts/'.length)),
+        );
         // path.normalize collapses '..', so a leading one is the only way out
         // of the font directory and the only thing left to reject.
         if (rel.startsWith('..')) return next();

@@ -45,7 +45,7 @@
     "babel-plugin-react-compiler": "^1.0.0",
     "jsdom": "^30.0.1",
     "oxlint": "^1.81.0",
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.7",
     "prettier-plugin-organize-imports": "^4.3.0",
     "typescript": "~7.0.2",
     "vite": "^8.2.2",

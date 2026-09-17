@@ -5,10 +5,7 @@ import type Interaction from 'ol/interaction/Interaction';
 import type Map from 'ol/Map';
 
 export type InteractionOwner =
-  | 'draw'
-  | 'measure'
-  | 'localityAdjust'
-  | 'localityPlace';
+  'draw' | 'measure' | 'localityAdjust' | 'localityPlace';
 
 const OWNER_KEY = 'tufteseidOwner';
 

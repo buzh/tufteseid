@@ -126,7 +126,10 @@ const KIND_ICONS: Partial<Record<FeatureKind, MaterialSymbol>> = {
   brukerminne: 'person_pin_circle',
 };
 
-const getParentId = (feature: HeritageFeature, fallbackIndex: number): string => {
+const getParentId = (
+  feature: HeritageFeature,
+  fallbackIndex: number,
+): string => {
   const p = feature.properties;
   if (feature.kind === 'enkeltminne') {
     const lokalitetid = stringify(p['lokalitetid']);
@@ -146,14 +149,17 @@ const getParentId = (feature: HeritageFeature, fallbackIndex: number): string =>
   }
   if (feature.kind === 'sikringssone') {
     // Sikringssoner have their own id space; keep them as their own group.
-    return 'sz-' + (stringify(p['lokalid']) || stringify(p['kulturminneid']) || fallbackIndex);
+    return (
+      'sz-' +
+      (stringify(p['lokalid']) ||
+        stringify(p['kulturminneid']) ||
+        fallbackIndex)
+    );
   }
   return identityOf(p) || stringify(p['objid']) || `other-${fallbackIndex}`;
 };
 
-const toHeritageFeatures = (
-  layers: LayerFeatureInfo[],
-): HeritageFeature[] => {
+const toHeritageFeatures = (layers: LayerFeatureInfo[]): HeritageFeature[] => {
   const out: HeritageFeature[] = [];
   for (const layer of layers) {
     const baseKind = classifyLayerId(layer.layerId);
@@ -183,7 +189,10 @@ const groupFeatures = (layers: LayerFeatureInfo[]): HeritageGroup[] => {
   for (const f of features) {
     const k = dedupeKey(f);
     const prev = seen.get(k);
-    if (!prev || Object.keys(f.properties).length > Object.keys(prev.properties).length) {
+    if (
+      !prev ||
+      Object.keys(f.properties).length > Object.keys(prev.properties).length
+    ) {
       seen.set(k, f);
     }
   }
@@ -226,17 +235,16 @@ const groupFeatures = (layers: LayerFeatureInfo[]): HeritageGroup[] => {
   // A sikringssone is metadata for a lokalitet, not a result of its own.
   const hasReal = all.some((g) => g.lokalitet || g.enkeltminner.length > 0);
   if (hasReal) {
-    return all.filter((g) => g.lokalitet || g.enkeltminner.length > 0 || g.others.length > 0);
+    return all.filter(
+      (g) => g.lokalitet || g.enkeltminner.length > 0 || g.others.length > 0,
+    );
   }
   return all;
 };
 
 // Roll a field up across a lokalitet and its enkeltminner: the shared value if
 // they agree, a "Flere/Ulike …" label if they do not.
-const rollup = (
-  values: string[],
-  aggregateLabel: string,
-): string => {
+const rollup = (values: string[], aggregateLabel: string): string => {
   const unique = Array.from(new Set(values.filter((v) => v.length > 0)));
   if (unique.length === 0) return '';
   if (unique.length === 1) return unique[0];
@@ -344,10 +352,7 @@ const NestedEnkeltminner = ({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <Icon
-          icon={open ? 'keyboard_arrow_down' : 'chevron_right'}
-          size={16}
-        />
+        <Icon icon={open ? 'keyboard_arrow_down' : 'chevron_right'} size={16} />
         {t('kulturminner.enkeltminner', { count: features.length })}
       </button>
       {open && (
@@ -419,7 +424,11 @@ const HeritageCard = ({
   withText: boolean;
 }) => {
   const { t } = useTranslation();
-  const primary = group.lokalitet ?? group.enkeltminner[0] ?? group.sikringssoner[0] ?? group.others[0];
+  const primary =
+    group.lokalitet ??
+    group.enkeltminner[0] ??
+    group.sikringssoner[0] ??
+    group.others[0];
   const props = primary?.properties ?? {};
 
   // `art` (159 values) is the subtitle; `kategori` is the 12-value bucket.
@@ -457,7 +466,8 @@ const HeritageCard = ({
       ? Array.from(uniqueVerneDato)[0]
       : '';
   const antall =
-    group.lokalitet && stringify(group.lokalitet.properties['antallenkeltminner']);
+    group.lokalitet &&
+    stringify(group.lokalitet.properties['antallenkeltminner']);
   const informasjon = firstOf(props, DESCRIPTION_FIELDS);
   // Only the synthesized askeladden URL needs the guard: sikringssoner have
   // their own id space, and a kid= from one 404s.
@@ -754,4 +764,3 @@ export const KulturminnerPopup = () => {
     containerRef.current,
   );
 };
-

@@ -58,9 +58,8 @@ const crsUrn = (projection: string): string | undefined => {
 // The legacy `crs` member this ArcGIS-backed WFS sets when output is not WGS84,
 // whether or not SRSNAME was honoured.
 const epsgFromCrsMember = (doc: unknown): string | undefined => {
-  const name = (
-    doc as { crs?: { properties?: { name?: string } } }
-  )?.crs?.properties?.name;
+  const name = (doc as { crs?: { properties?: { name?: string } } })?.crs
+    ?.properties?.name;
   if (!name) return undefined;
   const m = name.match(/EPSG[:.]{1,2}(\d+)/i);
   return m ? `EPSG:${m[1]}` : undefined;

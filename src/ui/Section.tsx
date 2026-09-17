@@ -51,10 +51,7 @@ export const Section = ({
         {action}
       </div>
       {open && (
-        <div
-          id={bodyId}
-          className={cx(styles.body, bodyClassName)}
-        >
+        <div id={bodyId} className={cx(styles.body, bodyClassName)}>
           {children}
         </div>
       )}

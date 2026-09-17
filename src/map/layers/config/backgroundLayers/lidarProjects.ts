@@ -128,9 +128,7 @@ function parseCapabilities(xmlText: string): LidarProject[] {
   >();
 
   for (const layer of Array.from(doc.getElementsByTagName('Layer'))) {
-    const name = layer
-      .getElementsByTagName('Name')[0]
-      ?.textContent?.trim();
+    const name = layer.getElementsByTagName('Name')[0]?.textContent?.trim();
     if (!name || !name.includes(':')) continue;
     const colon = name.indexOf(':');
     const projectName = name.slice(0, colon);
@@ -281,23 +279,20 @@ export const bboxOverlapRatio = (
 
 // One service per model, styled variants under a single fixed layer prefix;
 // only the DTM one carries bathymetry.
-export const NATIONAL_WMS: Record<
-  LidarModel,
-  { url: string; prefix: string }
-> = {
-  dtm: {
-    url: '/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833',
-    prefix: 'NHM_DTM_TOPOBATHY_25833',
-  },
-  dom: {
-    url: '/wms/geonorge/wms.hoyde-dom-nhm-25833',
-    prefix: 'NHM_DOM_25833',
-  },
-};
+export const NATIONAL_WMS: Record<LidarModel, { url: string; prefix: string }> =
+  {
+    dtm: {
+      url: '/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833',
+      prefix: 'NHM_DTM_TOPOBATHY_25833',
+    },
+    dom: {
+      url: '/wms/geonorge/wms.hoyde-dom-nhm-25833',
+      prefix: 'NHM_DOM_25833',
+    },
+  };
 
 // Only the DTM mosaic's styles are discovered at runtime; DOM is DOM_STYLES.
-const NATIONAL_CAPS_URL =
-  `${NATIONAL_WMS.dtm.url}?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0`;
+const NATIONAL_CAPS_URL = `${NATIONAL_WMS.dtm.url}?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0`;
 // Bump when the parser filter changes.
 const NATIONAL_STORAGE_KEY = 'lidarProjects.nationalStyles.v1';
 const NATIONAL_TTL_MS = 7 * 24 * 60 * 60 * 1000;

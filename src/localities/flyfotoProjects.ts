@@ -63,7 +63,12 @@ function toProject(attrs: QueryAttributes): FlyfotoProject | null {
   const minLat = toNumber(attrs.y_min);
   const maxLon = toNumber(attrs.x_max);
   const maxLat = toNumber(attrs.y_max);
-  if (minLon === null || minLat === null || maxLon === null || maxLat === null) {
+  if (
+    minLon === null ||
+    minLat === null ||
+    maxLon === null ||
+    maxLat === null
+  ) {
     return null;
   }
 
@@ -113,10 +118,13 @@ export async function fetchFlyfotoProjectsForBbox(
   );
   // ArcGIS reports failures as a 200 with an error envelope.
   if (body?.error) {
-    throw new Error(`flyfoto projects: ${body.error.message ?? 'query failed'}`);
+    throw new Error(
+      `flyfoto projects: ${body.error.message ?? 'query failed'}`,
+    );
   }
 
-  const features: Array<{ attributes?: QueryAttributes }> = body?.features ?? [];
+  const features: Array<{ attributes?: QueryAttributes }> =
+    body?.features ?? [];
   const seen = new Set<string>();
   const projects: FlyfotoProject[] = [];
   for (const feature of features) {

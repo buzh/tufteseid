@@ -216,10 +216,7 @@ export const withNewSpec = (
   body: DraftSpec,
 ): LocalityDraft => ({ ...d, newSpecs: { ...d.newSpecs, [id]: body } });
 
-export const dropAttachment = (
-  d: LocalityDraft,
-  id: string,
-): LocalityDraft => {
+export const dropAttachment = (d: LocalityDraft, id: string): LocalityDraft => {
   if (id in d.newSpecs) {
     const newSpecs = { ...d.newSpecs };
     delete newSpecs[id];

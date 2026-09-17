@@ -28,12 +28,7 @@ export type PickerCandidate = {
 };
 
 export type PickerCardState =
-  | 'waiting'
-  | 'fetching'
-  | 'ready'
-  | 'empty'
-  | 'failed'
-  | 'kept';
+  'waiting' | 'fetching' | 'ready' | 'empty' | 'failed' | 'kept';
 
 export type PickerCard = {
   candidate: PickerCandidate;

@@ -168,10 +168,13 @@ const captionRows = (
     },
     {
       label: t('figure.label.produced'),
-      text: `${t('figure.app')} · ${new Intl.DateTimeFormat(i18n.language || 'nb', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }).format(produced)}`,
+      text: `${t('figure.app')} · ${new Intl.DateTimeFormat(
+        i18n.language || 'nb',
+        {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        },
+      ).format(produced)}`,
     },
   ];
 };

@@ -114,10 +114,7 @@ const num = (v: unknown): number | null =>
 const str = (v: unknown): string | null =>
   typeof v === 'string' && v !== '' ? v : null;
 
-const sameBbox = (
-  a: [number, number, number, number],
-  b: unknown,
-): boolean =>
+const sameBbox = (a: [number, number, number, number], b: unknown): boolean =>
   Array.isArray(b) &&
   b.length === 4 &&
   a.every((v, i) => {

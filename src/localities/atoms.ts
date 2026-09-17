@@ -37,6 +37,4 @@ export const funnHiddenAtom = atom(false);
 
 // The `[Funn ▾]` switches, as the ids that are *off*. Separate from the flag
 // above, so putting the group back restores the members that were on.
-export const funnSwitchedOffAtom = atom<ReadonlySet<string>>(
-  new Set<string>(),
-);
+export const funnSwitchedOffAtom = atom<ReadonlySet<string>>(new Set<string>());

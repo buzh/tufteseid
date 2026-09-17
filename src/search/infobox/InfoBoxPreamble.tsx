@@ -64,13 +64,10 @@ const InfoBoxElevationContent = ({ result }: { result: SearchResult }) => {
   return (
     <div className={styles.elevation}>
       <p>
-        {t('infoBox.heightEstimatedByInterpolation')}{' '}
-        {numericValue.toFixed(1)} {t('infoBox.metersAboveSeaLevel')}
+        {t('infoBox.heightEstimatedByInterpolation')} {numericValue.toFixed(1)}{' '}
+        {t('infoBox.metersAboveSeaLevel')}
       </p>
-      <Tooltip
-        label={t('infoBox.metersAboveSeaLevelTooltip')}
-        placement="top"
-      >
+      <Tooltip label={t('infoBox.metersAboveSeaLevelTooltip')} placement="top">
         <Icon icon="info" size={16} />
       </Tooltip>
     </div>

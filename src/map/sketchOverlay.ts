@@ -63,7 +63,11 @@ const entries = new Map<string, Entry>();
 const ensureRender = (entry: Entry, scale: number) => {
   if (entry.pendingScale !== null) return;
   const have = entry.renderedScale;
-  if (have !== null && scale < have * RESCALE_TOLERANCE && scale * RESCALE_TOLERANCE > have) {
+  if (
+    have !== null &&
+    scale < have * RESCALE_TOLERANCE &&
+    scale * RESCALE_TOLERANCE > have
+  ) {
     return;
   }
   entry.pendingScale = scale;

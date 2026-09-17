@@ -13,7 +13,10 @@ import CircleStyle from 'ol/style/Circle';
 import { useEffect, useRef } from 'react';
 import { LocalityBbox } from '../api/localities';
 import { mapAtom } from '../map/atoms';
-import { addOwnedInteraction, type InteractionOwner } from '../map/interactions';
+import {
+  addOwnedInteraction,
+  type InteractionOwner,
+} from '../map/interactions';
 import { clampBboxSize } from './bboxLimits';
 
 /*

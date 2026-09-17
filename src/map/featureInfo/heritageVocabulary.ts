@@ -21,7 +21,7 @@ const KATEGORI_ICONS: Record<string, MaterialSymbol> = {
   'kulturminne under vann': 'scuba_diving',
   'teknisk/industrielt minne': 'factory',
   bergkunst: 'brush',
-  'fartøy': 'sailing',
+  fartøy: 'sailing',
   'ruin (middelalder)': 'foundation',
   // Register spellings, as aliases.
   'arkeologisk lokalitet': 'history_edu',

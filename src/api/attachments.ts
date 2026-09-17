@@ -2,12 +2,7 @@ import { pb } from './pocketbase';
 
 // Must match the attachments.kind select values in the PB migrations.
 export type AttachmentKind =
-  | 'extract'
-  | 'screenshot'
-  | 'upload'
-  | 'flyfoto'
-  | 'sketch'
-  | 'scene';
+  'extract' | 'screenshot' | 'upload' | 'flyfoto' | 'sketch' | 'scene';
 
 // Free-form per kind; server-side ceiling is 2 MB.
 export type AttachmentMeta = Record<string, unknown>;
@@ -183,11 +178,9 @@ export const subscribeAttachments = (
     rec: AttachmentRecord,
   ) => void,
 ): (() => void) => {
-  const p = pb
-    .collection(COLLECTION)
-    .subscribe<AttachmentRecord>('*', (e) => {
-      handler(e.action as 'create' | 'update' | 'delete', e.record);
-    });
+  const p = pb.collection(COLLECTION).subscribe<AttachmentRecord>('*', (e) => {
+    handler(e.action as 'create' | 'update' | 'delete', e.record);
+  });
   return () => {
     p.then((unsub) => unsub()).catch(() => {
       /* ignore — connection may already be down */

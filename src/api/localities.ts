@@ -80,14 +80,12 @@ export const getLocality = async (id: string): Promise<LocalityRecord> => {
 export const getLocalityByCode = async (
   code: string,
 ): Promise<LocalityRecord> => {
-  return pb
-    .collection(COLLECTION)
-    .getFirstListItem<LocalityRecord>(
-      pb.filter('code = {:code}', { code: code.toUpperCase() }),
-      // A deep link asks twice (guest miss, then the retry after sign-in) and
-      // an auto-cancelled first lands in the same catch as a genuine miss.
-      { expand: 'owner', requestKey: null },
-    );
+  return pb.collection(COLLECTION).getFirstListItem<LocalityRecord>(
+    pb.filter('code = {:code}', { code: code.toUpperCase() }),
+    // A deep link asks twice (guest miss, then the retry after sign-in) and
+    // an auto-cancelled first lands in the same catch as a genuine miss.
+    { expand: 'owner', requestKey: null },
+  );
 };
 
 // Crockford base32, so a code can be read aloud; 32 divides 256, so `% 32`
@@ -174,11 +172,9 @@ export const subscribeLocalities = (
     rec: LocalityRecord,
   ) => void,
 ): (() => void) => {
-  const p = pb
-    .collection(COLLECTION)
-    .subscribe<LocalityRecord>('*', (e) => {
-      handler(e.action as 'create' | 'update' | 'delete', e.record);
-    });
+  const p = pb.collection(COLLECTION).subscribe<LocalityRecord>('*', (e) => {
+    handler(e.action as 'create' | 'update' | 'delete', e.record);
+  });
   return () => {
     p.then((unsub) => unsub()).catch(() => {
       /* ignore — connection may already be down */

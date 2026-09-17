@@ -211,7 +211,11 @@ export const paintTerrainField = (
     const m = Math.max(Math.abs(lo), Math.abs(hi)) || 1;
     range = [-m, m];
   }
-  ctx.putImageData(toImageData(field, dem.width, dem.height, ramp, range), 0, 0);
+  ctx.putImageData(
+    toImageData(field, dem.width, dem.height, ramp, range),
+    0,
+    0,
+  );
   return canvas;
 };
 

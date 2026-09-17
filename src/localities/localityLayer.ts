@@ -185,8 +185,7 @@ export const useLocalitiesLayer = () => {
       .getLayers()
       .getArray()
       .find((l) => l.get('id') === LOCALITIES_LAYER_ID) as
-      | VectorLayer
-      | undefined;
+      VectorLayer | undefined;
 
     if (!layer) {
       layer = new VectorLayer({

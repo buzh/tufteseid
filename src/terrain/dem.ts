@@ -389,10 +389,7 @@ function readIfd(
   return entries;
 }
 
-function requireEntry(
-  entries: Map<number, IfdEntry>,
-  tag: number,
-): IfdEntry {
+function requireEntry(entries: Map<number, IfdEntry>, tag: number): IfdEntry {
   const e = entries.get(tag);
   // Only reachable if the service switches to a strip layout.
   if (!e) throw new Error(`TIFF missing tag ${tag} (expected a tiled image)`);
@@ -411,7 +408,9 @@ function readValues(dv: DataView, le: boolean, e: IfdEntry): number[] {
   const out: number[] = new Array(e.count);
   for (let i = 0; i < e.count; i++) {
     out[i] =
-      size === 2 ? dv.getUint16(base + i * 2, le) : dv.getUint32(base + i * 4, le);
+      size === 2
+        ? dv.getUint16(base + i * 2, le)
+        : dv.getUint32(base + i * 4, le);
   }
   return out;
 }

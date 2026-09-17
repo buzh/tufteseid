@@ -42,7 +42,8 @@ export const chromeInsets = (map: Map): ChromeInsets => {
             ? r.right - view.left
             : view.right - r.left;
 
-    const limit = edge === 'top' || edge === 'bottom' ? view.height : view.width;
+    const limit =
+      edge === 'top' || edge === 'bottom' ? view.height : view.width;
     const i = EDGES.indexOf(edge);
     insets[i] = Math.max(insets[i], Math.min(depth, limit));
   }

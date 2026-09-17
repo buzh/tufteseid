@@ -16,11 +16,7 @@ import { countByEra, filterByEra, type FlyfotoEra } from './eras';
 const MIN_FLYFOTO_ZOOM = 8;
 
 export type FlyfotoViewportStatus =
-  | 'idle'
-  | 'loading'
-  | 'ready'
-  | 'zoomedOut'
-  | 'error';
+  'idle' | 'loading' | 'ready' | 'zoomedOut' | 'error';
 
 export type FlyfotoViewport = {
   status: FlyfotoViewportStatus;
@@ -66,8 +62,7 @@ export const useFlyfotoControls = () => {
       const extent = map.getView().calculateExtent(size);
       const projection = map.getView().getProjection().getCode();
       const extentLonLat = transformExtent(extent, projection, 'EPSG:4326') as
-        | [number, number, number, number]
-        | undefined;
+        [number, number, number, number] | undefined;
       if (!extentLonLat) return;
 
       // Claimed before the zoom check too, so a fetch started while zoomed in

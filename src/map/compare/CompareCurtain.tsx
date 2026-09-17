@@ -64,7 +64,9 @@ export const CompareCurtain = () => {
           // Stop the map's own arrow-key panning.
           e.preventDefault();
           e.stopPropagation();
-          setSplit((s) => clamp(s + (e.key === 'ArrowLeft' ? -1 : 1) * KEY_STEP));
+          setSplit((s) =>
+            clamp(s + (e.key === 'ArrowLeft' ? -1 : 1) * KEY_STEP),
+          );
         }}
       >
         <span className={styles.line} />

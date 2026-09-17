@@ -72,7 +72,11 @@ export const sceneExtentToBbox4326 = (
     Math.max(aY, bY),
   ];
   if (frame.projection === 'EPSG:4326') return inFrame;
-  return transformExtent(inFrame, frame.projection, 'EPSG:4326') as LocalityBbox;
+  return transformExtent(
+    inFrame,
+    frame.projection,
+    'EPSG:4326',
+  ) as LocalityBbox;
 };
 
 /** The frame's own extent, for placing a rendered funn on a live map. */

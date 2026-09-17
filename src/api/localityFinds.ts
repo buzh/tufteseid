@@ -4,10 +4,7 @@ import { pb } from './pocketbase';
 // Match the PB select options. Visibility is inherited from the parent
 // lokalitet through the collection rules; there is no field for it.
 export type LocalityFindStatus =
-  | 'mulig'
-  | 'sannsynlig'
-  | 'avkreftet'
-  | 'rapportert';
+  'mulig' | 'sannsynlig' | 'avkreftet' | 'rapportert';
 
 export type LocalityFindRecord = {
   id: string;

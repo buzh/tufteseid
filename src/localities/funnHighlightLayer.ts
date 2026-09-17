@@ -39,8 +39,7 @@ const getHighlightLayer = (map: Map): VectorLayer | null =>
     .getLayers()
     .getArray()
     .find((l) => l.get('id') === HIGHLIGHT_LAYER_ID) as
-    | VectorLayer
-    | undefined) ?? null;
+    VectorLayer | undefined) ?? null;
 
 // Mount from useMapSideEffects, next to useFunnLayer.
 export const useFunnHighlightLayer = () => {

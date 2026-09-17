@@ -1,9 +1,4 @@
-import type {
-  InputHTMLAttributes,
-  KeyboardEvent,
-  ReactNode,
-  Ref,
-} from 'react';
+import type { InputHTMLAttributes, KeyboardEvent, ReactNode, Ref } from 'react';
 import { useId, useLayoutEffect, useRef } from 'react';
 import type { ControlSize } from './Button';
 import { cx } from './cx';
