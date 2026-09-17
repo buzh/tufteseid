@@ -1,12 +1,5 @@
-/*
- * The ribbon: one white bar across the top of the map, one row per level of
- * context. Row 1 is always there; the settings strip appears when the ground
- * on screen has something to adjust, the lokalitet row with an open lokalitet.
- *
- * Rows wrap rather than scroll horizontally. The old top bar set
- * `overflowX: auto` below md, which put the account button and the lokalitet
- * actions off-screen on a phone with nothing to say they were there.
- */
+/* One white bar, one row per level of context. Rows wrap rather than scroll:
+ * a scroller puts controls off-screen on a phone with nothing to say so. */
 
 .bar {
   background: var(--c-bg);
@@ -22,34 +15,27 @@
   min-height: 48px;
 }
 
-/* Row 1 while a funn is being drawn: still there, visibly not available.
-   `inert` does the disabling (Ribbon.tsx); this only says so. Opacity sits on
-   the wrapper inside the bar, so `.bar`'s own white stays opaque behind it and
-   the map does not show through the chrome. */
+/* Row 1 while a funn is being drawn. `inert` does the disabling (Ribbon.tsx);
+   this only says so. Opacity is on the wrapper inside the bar, so `.bar`'s
+   white stays opaque and the map does not show through. */
 .standDown {
   opacity: 0.4;
   filter: grayscale(1);
 }
 
-/* Rows below the first read as subordinate: tinted, and separated by a rule
-   rather than by whitespace the bar does not have to spare. */
 .rowSub {
   background: var(--c-bg-subtle);
   border-top: 1px solid var(--c-border);
 }
 
-/* The settings strip. Shorter than a full row: it carries chips and toggles
-   rather than the mode buttons row 1 is sized for, and every pixel here is
-   map the user is not reading. Capped at one line by contract, not by CSS —
-   see RibbonSettingsRow. */
+/* The settings strip: shorter than a full row, since it carries chips rather
+   than mode buttons. Capped at one line by contract, not by CSS. */
 .rowSettings {
   min-height: 40px;
   padding-top: var(--sp-2);
   padding-bottom: var(--sp-2);
 }
 
-/* Names what the controls belong to. Without it the strip is a row of
-   unlabelled chips whose meaning changes under you when you press 2 or 4. */
 .settingsSubject {
   flex: none;
   font-size: var(--font-xs);
@@ -59,15 +45,12 @@
   color: var(--c-fg-subtle);
 }
 
-/* A control with a seam down it — the `Kart` button and its cartography
-   caret. Same geometry as EyeSplit: one object, two hit targets, stretched so
-   the narrow half matches whatever height the labelled half decides on. */
+/* One object, two hit targets, stretched to the labelled half's height. */
 .split {
   display: inline-flex;
   align-items: stretch;
 }
 
-/* Keeps a set of controls together when the row wraps. */
 .group {
   display: flex;
   align-items: center;
@@ -82,16 +65,14 @@
   background: var(--c-border);
 }
 
-/* Pushes what follows to the right edge — but only while the row is on one
-   line. Once it wraps, `flex-basis: 0` lets it collapse instead of forcing
-   a line of its own. */
+/* Pushes what follows right while the row is on one line; `flex-basis: 0`
+   lets it collapse rather than force a line of its own once it wraps. */
 .spacer {
   flex: 1 1 0;
   min-width: 0;
 }
 
-/* The divider is the wrong idiom once the row has wrapped: it ends up
-   floating at the start of a line separating nothing. */
+/* A wrapped row's divider floats at the start of a line separating nothing. */
 @media (max-width: 47.999rem) {
   .divider {
     display: none;

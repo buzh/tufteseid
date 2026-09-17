@@ -37,9 +37,7 @@ export const PlacesResult = ({
     return null;
   }
 
-  // Place names are the only result set the API pages; everything else
-  // arrives whole. Prev/next over numbered pages, because the count runs to
-  // hundreds and the panel is 450 px wide.
+  // Place names are the only result set the API pages.
   const pageCount = Math.ceil(
     placesMetadata.totaltAntallTreff / placesMetadata.treffPerSide,
   );

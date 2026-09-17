@@ -15,12 +15,8 @@ const TONE_ICON: Record<AlertTone, MaterialSymbol> = {
   warning: 'warning',
 };
 
-/*
- * A standing remark about the surface it sits in — the theme-layer count is
- * near the point where the map starts dropping tiles, the coordinate you
- * typed is outside Norway. Not a toast: these do not appear in response to an
- * action and do not go away, so they belong in the flow rather than over it.
- */
+// A standing remark about the surface it sits in. Not a toast: it does not
+// follow an action and does not go away, so it sits in the flow.
 export const Alert = ({
   tone = 'info',
   className,

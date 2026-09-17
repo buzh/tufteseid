@@ -1,8 +1,4 @@
-/*
- * Rows inside the dataset and style pulldowns. Single-line and borderless
- * because a viewport can turn up RENDER_CAP entries and the list still has
- * to fit on screen.
- */
+/* Single-line and borderless: a viewport can turn up RENDER_CAP entries. */
 
 .item {
   display: flex;
@@ -57,22 +53,14 @@
   color: var(--c-fg-subtle);
 }
 
-/*
- * "Automatisk landed here." Accent-coloured so it reads as a system
- * statement rather than more of the row's grey metadata, but a glyph rather
- * than the active row's left bar — it is pointing at a consequence of the
- * selection, not at the selection.
- *
- * Colour only — Icon's own rule sets `flex: 0 0 auto` at doubled
- * specificity, so repeating the layout here would lose anyway.
- */
+/* "Automatisk landed here": a glyph rather than the active row's left bar.
+ * Colour only — Icon sets the layout at doubled specificity. */
 .itemMark {
   color: var(--c-accent);
 }
 
-/* Checkbox rows. The glyph carries the state, so the row keeps the plain
-   background an active PulldownItem gives up — several of these are on at
-   once and highlighting them all would highlight nothing. */
+/* Checkbox rows: the glyph carries the state and the row keeps a plain
+   background, since several are on at once. */
 .checkOn {
   color: var(--c-accent);
 }
@@ -81,13 +69,12 @@
   color: var(--c-fg-subtle);
 }
 
-/* A source's own sublayers, one level in. The indent lands under the parent
-   row's label rather than its checkbox, so the two columns read as a tree. */
+/* A source's own sublayers: indented under the parent's label rather than its
+   checkbox, so the two columns read as a tree. */
 .itemIndent {
   padding-left: var(--sp-8);
 }
 
-/* Overflow group trigger — chevron first, otherwise an item's geometry. */
 .disclosure {
   display: flex;
   align-items: center;
@@ -115,11 +102,8 @@
   transform: rotate(90deg);
 }
 
-/*
- * Pulldown trigger. `position: relative` so the count badge can overhang the
- * top-right corner, and a max-width so a sixty-character project name
- * truncates instead of shoving the rest of the row onto a second line.
- */
+/* Pulldown trigger. `position: relative` so the count badge can overhang the
+ * corner. */
 .trigger {
   position: relative;
   display: inline-flex;
@@ -129,8 +113,8 @@
   max-width: 240px;
 }
 
-/* A project name can run to sixty characters. Truncate inside the chip
-   rather than letting it set the width of the whole row. */
+/* A project name can run to sixty characters: truncate inside the chip rather
+   than let it set the row's width. */
 .triggerLabel {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -145,7 +129,6 @@
   border: 2px solid var(--c-bg);
 }
 
-/* Panel scaffolding shared by both pulldowns. */
 .head {
   display: flex;
   align-items: center;
@@ -177,11 +160,8 @@
   color: var(--c-fg-subtle);
 }
 
-/*
- * Only the list scrolls. The header, the filter panel and the national
- * mosaic row stay put — they are the parts you reach for after scrolling
- * to the bottom of a long list and deciding against all of it.
- */
+/* Only the list scrolls; the header, the filter panel and the national mosaic
+ * row stay reachable from the bottom of a long list. */
 .list {
   max-height: min(45vh, 300px);
   overflow-y: auto;

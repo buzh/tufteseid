@@ -4,14 +4,8 @@ import { createPortal } from 'react-dom';
 import { cx } from './cx';
 import styles from './Tooltip.module.css';
 
-/*
- * Hover/focus label. Not an overlay in the Popover sense — it never takes
- * focus and never traps keys, so it does not touch overlayOpenCountAtom and
- * carries no data-scope.
- *
- * Below the anchor by default because almost every tooltip in this app hangs
- * off a control in the top ribbon, where there is nothing above to point at.
- */
+// Hover/focus label. Not an overlay in the Popover sense: it never takes
+// focus and never traps keys, so no overlayOpenCountAtom and no data-scope.
 
 const MARGIN = 8;
 const GAP = 6;
@@ -62,7 +56,6 @@ export const Tooltip = ({
         onPointerLeave={() => setOpen(false)}
         onFocusCapture={() => setOpen(true)}
         onBlurCapture={() => setOpen(false)}
-        // A tooltip that survives the click it describes is just noise.
         onPointerDown={() => setOpen(false)}
       >
         {children}

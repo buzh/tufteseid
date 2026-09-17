@@ -3,59 +3,28 @@ import type { LocalityBbox } from '../api/localities';
 import { getEnv } from '../env';
 import type { PlaceNamePoint } from '../types/searchTypes';
 
-/*
- * What the public registers already know about a rectangle, before the user
- * has typed anything: the nearest real placename, which kommune it is in,
- * and which matrikkel units it covers.
- *
- * Three independent anonymous lookups against ws.geonorge.no — the same host
- * `src/search/searchApi.ts` uses, already in the Caddyfile CSP, and small
- * enough (a few kB each) not to be worth routing through wmscache.
- *
- * Every one of them is optional. A lokalitet over open sea, over Sweden, or
- * created while GeoNorge is down is a perfectly valid lokalitet; nothing in
- * here may stop one being made. The three run in parallel and each failure
- * degrades to an empty string.
- *
- * The result pre-fills *editable* fields. It is a starting point, not a
- * derived truth: the register cannot know that the user means "the terrace
- * above Storevike", and once they have said so nothing re-derives it behind
- * their back. The one genuinely derived fact — the centre coordinate — is
- * not stored at all (`formatBboxCentre` in format.ts).
- */
+// Nearest placename, kommune and matrikkel for a rectangle, from three
+// anonymous ws.geonorge.no lookups in parallel. Never fatal and never slow:
+// each failure degrades to '' and TIMEOUT_MS bounds the lot. Pre-fill only —
+// nothing re-derives the fields afterwards.
 
 const env = getEnv();
 
-// Both the stedsnavn and the eiendom endpoints want a point and a radius,
-// so a rectangle is queried as its centre plus enough reach to cover the
-// corners. Floors keep a tiny lokalitet from finding nothing at all; ceilings
-// keep a 25 km one from dragging in half a valley.
+// The point endpoints take a radius: centre plus reach enough for the corners.
 const PLACE_RADIUS_MIN_M = 250;
 const PLACE_RADIUS_MAX_M = 1500;
 const MATRIKKEL_RADIUS_MIN_M = 50;
 const MATRIKKEL_RADIUS_MAX_M = 500;
 
-// Nobody waits ten seconds to find out what their rectangle is called — the
-// create button is disabled for the whole fetch, so this is the worst case a
-// user can be made to sit through before falling back to "Uten navn".
+// The create button is disabled for the whole fetch.
 const TIMEOUT_MS = 6000;
 
-// A rectangle crossing more than this many properties is bigger than a
-// matrikkel list usefully describes; the field stays editable either way.
+// Past this a matrikkel list stops describing anything.
 const MAX_MATRIKKEL = 8;
 
-/*
- * Stedsnavnregisteret classifies every name by `navneobjekttype`, and the
- * type — not the distance — is what separates a name worth putting on a
- * lokalitet from one that merely happens to be close. The three sets below
- * are drawn from the register's own published vocabulary
- * (ws.geonorge.no/stedsnavn/v1/navneobjekttyper, 291 types); everything not
- * listed forms the neutral middle tier, which is almost exactly the natural
- * landscape and settlement vocabulary — Vik, Haug, Ås, Tjern, Grend, Nes.
- *
- * Denied outright: administrative and statistical geography. A rectangle is
- * not a kommune, and "Innlandet fylke" tells you nothing the map didn't.
- */
+// A name is ranked by `navneobjekttype` first and distance second; the three
+// sets are drawn from the register's own 291-type vocabulary and anything
+// unlisted is the neutral middle. Denied: administrative geography.
 const NAME_TYPE_DENY = new Set([
   'Administrativ bydel',
   'Annen administrativ inndeling',
@@ -78,12 +47,7 @@ const NAME_TYPE_DENY = new Set([
   'Valgkrets',
 ]);
 
-/*
- * Promoted: the types this app exists for. A farm name or a recorded
- * settlement site is the anchor an archaeologist would reach for anyway, so
- * it outranks a nearer stream or knoll — but only by a few hundred metres'
- * worth of preference, not unconditionally.
- */
+// Promoted by PROMOTE_BONUS_M's worth, not unconditionally.
 const NAME_TYPE_PROMOTE = new Set([
   'Bruk',
   'Gammel bosettingsplass',
@@ -101,14 +65,7 @@ const NAME_TYPE_PROMOTE = new Set([
   'Varde',
 ]);
 
-/*
- * Demoted, not denied: the built layer — buildings, roads, service points,
- * navigation marks. Downtown these are often the *only* names within reach,
- * and "Skolegata" beats "Uten navn", so they stay eligible. But a farm, a
- * hill or a bay several hundred metres away is a better anchor for an area
- * to explore than the street you would park in, so anything in this set
- * loses to anything outside it regardless of distance.
- */
+// Demoted, not denied: downtown it may be all there is.
 const NAME_TYPE_DEMOTE = new Set([
   'Adressenavn',
   'Adressetilleggsnavn',
@@ -225,20 +182,16 @@ const NAME_TYPE_DEMOTE = new Set([
   'Vegsving',
 ]);
 
-// Bigger than any reachable meterFraPunkt, so the demoted tier sorts
-// strictly after the other two instead of merely being penalised.
+// Bigger than any reachable meterFraPunkt: the demoted tier sorts strictly last.
 const DEMOTE_PENALTY_M = 1_000_000;
 
-// A name whose point falls inside the rectangle is describing ground the
-// user is actually looking at, so it beats a slightly closer one outside.
+// A name inside the rectangle beats a slightly closer one outside.
 const INSIDE_BBOX_BONUS_M = 250;
 
 // How much nearer a neutral name has to be to beat a promoted one.
 const PROMOTE_BONUS_M = 400;
 
-// Spellings the register has settled on. Used only to break ties on the
-// places that have no `hovednavn` at all, where the raw first entry is
-// often a rejected proposal.
+// Ties on places with no `hovednavn`, where the first entry is often rejected.
 const SETTLED_SPELLING = new Set([
   'godkjent',
   'godkjent og prioritert',
@@ -247,11 +200,10 @@ const SETTLED_SPELLING = new Set([
 ]);
 
 export type LocalityContext = {
-  /** Nearest significant placename, or '' if the register has none. */
   place: string;
-  /** "Vang (3454), Innlandet", or ''. */
+  /** "Vang (3454), Innlandet". */
   municipality: string;
-  /** "12/6, 12/5, 10/1-2", or ''. */
+  /** "12/6, 12/5, 10/1-2". */
   matrikkel: string;
 };
 
@@ -272,11 +224,8 @@ const bboxCentre = (bbox: LocalityBbox): { lon: number; lat: number } => ({
 const bboxHalfDiagonalM = (bbox: LocalityBbox): number =>
   getDistance([bbox[0], bbox[1]], [bbox[2], bbox[3]]) / 2;
 
-/*
- * Every failure mode of these endpoints collapses to "no answer": a network
- * error, an abort, a 404 — kommuneinfo answers a point outside Norway with a
- * 404 *HTML* page, so a non-ok response must never reach res.json().
- */
+// kommuneinfo answers a point outside Norway with a 404 HTML page, so a non-ok
+// response must never reach json().
 const getJson = async <T>(url: URL, signal: AbortSignal): Promise<T | null> => {
   try {
     const res = await fetch(url.toString(), { signal });
@@ -287,11 +236,7 @@ const getJson = async <T>(url: URL, signal: AbortSignal): Promise<T | null> => {
   }
 };
 
-/*
- * EPSG:4326 lon/lat passed as koordsys=4258. The two differ by well under a
- * metre in Norway and GeoNorge's own services treat them interchangeably;
- * `getPropetyInfoByCoordinates` in searchApi.ts does the same.
- */
+// EPSG:4326 lon/lat passed as koordsys=4258: under a metre apart in Norway.
 const geonorgeUrl = (
   path: string,
   centre: { lon: number; lat: number },
@@ -313,18 +258,13 @@ const pickPlaceName = (
   let bestScore = Number.POSITIVE_INFINITY;
 
   for (const point of points) {
-    // 'relikt' and 'uaktuell' names are historic. Tempting for archaeology,
-    // but they are also where the register keeps abolished counties, and a
-    // wrong auto-name is worse than none — the field is right there to type
-    // one into.
+    // 'relikt' and 'uaktuell' are historic names and abolished counties.
     if (point.stedstatus !== 'aktiv') continue;
     // A few of the register's type labels carry trailing spaces ("Båe  ").
     const type = point.navneobjekttype.trim();
     if (NAME_TYPE_DENY.has(type)) continue;
 
-    // Most places have a `hovednavn`; the ones that don't list several
-    // spellings of equal standing, where the first is often a proposal that
-    // was never adopted.
+    // Places without a `hovednavn` list several spellings of equal standing.
     const entry =
       point.stedsnavn.find((n) => n.navnestatus === 'hovednavn') ??
       point.stedsnavn.find((n) => SETTLED_SPELLING.has(n.skrivemåtestatus)) ??
@@ -380,10 +320,7 @@ const fetchPlaceName = async (
   );
   if (near || radius >= PLACE_RADIUS_MAX_M) return near;
 
-  // Nothing at all nearby happens on the høgfjell and out on the vidde,
-  // which is precisely where a lokalitet is hardest to tell apart from the
-  // next one. One wider sweep usually turns "Uten navn" into "Gråhøgda";
-  // it only ever runs when the first pass came back empty-handed.
+  // One wider sweep, only when the first pass found nothing.
   return pickPlaceName(
     await placeNamesWithin(centre, PLACE_RADIUS_MAX_M, signal),
     bbox,
@@ -431,8 +368,7 @@ const fetchTeiger = async (
     MATRIKKEL_RADIUS_MIN_M,
     MATRIKKEL_RADIUS_MAX_M,
   );
-  // `/punkt` rather than `/punkt/omrader`: the same list, minus the teig
-  // polygons, which are two orders of magnitude larger and drawn nowhere.
+  // `/punkt` rather than `/punkt/omrader`: same list, no teig polygons.
   const url = geonorgeUrl('/eiendom/v1/punkt', centre, {
     radius: radius.toString(),
     treffPerSide: '30',
@@ -442,12 +378,8 @@ const fetchTeiger = async (
   return data?.eiendom ?? [];
 };
 
-/*
- * Nearest first, water and infrastructure parcels dropped, capped. Split
- * from the fetch because it needs the kommunenummer the *other* lookup
- * returns, and making it wait for that would serialise two calls that have
- * no reason not to overlap.
- */
+// Split from the fetch so it can take the other lookup's kommunenummer without
+// serialising the two.
 const formatMatrikkel = (
   teiger: Teig[],
   municipalityNumber: string,
@@ -457,16 +389,12 @@ const formatMatrikkel = (
   for (const teig of [...teiger].sort(
     (a, b) => (a.meterFraPunkt ?? 0) - (b.meterFraPunkt ?? 0),
   )) {
-    // Water surfaces come back as "Mnr vann mangler" with a null gårdsnummer,
-    // and gnr ≥ 9000 is the reserved range for road, rail and watercourse
-    // parcels. Neither is land anybody holds, and both crowd out the real
-    // properties in a short list.
+    // Null gårdsnummer is water; gnr ≥ 9000 is road, rail and watercourse.
     const gnr = teig.gardsnummer;
     if (gnr == null || gnr <= 0 || gnr >= 9000) continue;
     if (!teig.matrikkelnummertekst) continue;
 
-    // The kommune is already its own field, so only spell it out on the
-    // parcels that fall outside it — a rectangle can straddle a border.
+    // A rectangle can straddle a border: name the kommune only on the outsiders.
     const kommune = teig.kommunenummer ?? '';
     const label =
       kommune && kommune !== municipalityNumber
@@ -481,10 +409,7 @@ const formatMatrikkel = (
   return parts.join(', ');
 };
 
-/**
- * Look up everything the registers know about `bbox`. Never rejects and
- * never takes longer than TIMEOUT_MS; missing answers come back as ''.
- */
+/** Never rejects, never exceeds TIMEOUT_MS; missing answers come back as ''. */
 export const fetchLocalityContext = async (
   bbox: LocalityBbox,
 ): Promise<LocalityContext> => {
@@ -503,8 +428,7 @@ export const fetchLocalityContext = async (
       matrikkel: formatMatrikkel(teiger, municipality.number),
     };
   } catch (e) {
-    // The three helpers swallow their own failures, so reaching here means
-    // something structural. Still not fatal: an unnamed lokalitet is fine.
+    // The helpers swallow their own failures, so this is structural.
     console.warn('[localityContext] lookup failed', e);
     return EMPTY_LOCALITY_CONTEXT;
   } finally {

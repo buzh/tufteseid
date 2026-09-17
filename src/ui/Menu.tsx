@@ -6,25 +6,10 @@ import { Icon, type MaterialSymbol } from './Icon';
 import styles from './Menu.module.css';
 import { Popover } from './Popover';
 
-/*
- * A popover holding a list of verbs — "the rest of what you can do to this
- * thing". Sits on Popover, so it inherits the portal, the outside-press
- * dismissal, the focus handling and the `data-scope="popover"` the keyboard
- * layers walk for (see Popover.tsx).
- *
- * Items are data rather than children, so the menu can own the three things
- * every call site was otherwise copying: holding `open`, closing itself
- * before the verb runs, and swapping its own body for a confirm question.
- *
- * That last one is why this exists alongside `ConfirmPopover` rather than
- * using it: a destructive *item* that opened a second popover would stack two
- * overlays over the thing being deleted. `confirm` replaces the list in place
- * instead — the same shape the funn row menu and the lokalitet overflow menu
- * had each hand-rolled.
- *
- * Labels are props, not t() calls: src/ui/ stays free of i18next so the kit
- * can be lifted somewhere else unchanged.
- */
+// On Popover, so it inherits the portal, the outside-press dismissal, the
+// focus handling and `data-scope="popover"`. `confirm` replaces the list in
+// place: a second overlay would stack over the thing being deleted.
+// Labels are props, not t() calls — src/ui/ stays free of i18next.
 
 export type MenuConfirm = {
   title: string;
@@ -36,9 +21,7 @@ export type MenuItemSpec = {
   /** Leading glyph. Omit where the label is already a graphic (a Badge). */
   icon?: MaterialSymbol;
   label: ReactNode;
-  /** Reads as selected — the status a funn already has, the tool already on. */
   active?: boolean;
-  /** Destructive: red label. */
   danger?: boolean;
   disabled?: boolean;
   /** Ask first. Replaces the menu body with the question until answered. */
@@ -47,18 +30,9 @@ export type MenuItemSpec = {
 };
 
 export type MenuTriggerProps = {
-  /*
-   * For `aria-expanded`, and for triggers that light up while their menu is
-   * down (ModeButton's `active`) — which is why this is `open` and not
-   * `'aria-expanded'`: one name for one fact, read rather than spread.
-   */
+  /** For `aria-expanded`, and for triggers that light up while open. */
   open: boolean;
-  /*
-   * Toggles the menu. Typed to take an optional event rather than none so
-   * both kinds of trigger fit: a plain <button> hands its click over — and a
-   * menu anchored inside a clickable row needs that click stopped, or the row
-   * fires too — while ModeButton's `onClick: () => void` declares none.
-   */
+  /** Optional event so a menu inside a clickable row can stop it. */
   onClick: (e?: { stopPropagation: () => void }) => void;
 };
 
@@ -70,19 +44,13 @@ export const Menu = ({
   width,
   label,
 }: {
-  /** Called with the state the trigger control has to reflect. */
   trigger: (props: MenuTriggerProps) => ReactNode;
-  /*
-   * Falsy entries are dropped, so a conditional item is
-   * `cond && { … }` inline. Their slots stay put, which is what makes the
-   * index a stable key.
-   */
+  /** Falsy entries are dropped but keep their slot, so the index is a key. */
   items: (MenuItemSpec | false | null | undefined)[];
   /** Heading above the list, where the items need naming as a set. */
   title?: string;
   align?: 'start' | 'center' | 'end';
   width?: number;
-  /** Accessible name for the panel. */
   label: string;
 }) => {
   const [open, setOpen] = useState(false);

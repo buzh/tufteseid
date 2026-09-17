@@ -53,15 +53,8 @@ export const useFeatureInfoClick = () => {
   const handleMapClick = useCallback(
     async (e: Event | BaseEvent) => {
       const store = getDefaultStore();
-      // Two gates, not one, because this handler produces two things.
-      //
-      // The Kulturminner popup answers whenever the overlay is on the map:
-      // switching the register on is already the act of asking for it, and a
-      // second tool between a visible mark and what it is would be two
-      // controls for one surface. The rest — the coordinate marker, the
-      // elevation readout, the InfoBox — is Stedsinfo's, and Stedsinfo is off
-      // until someone arms it, because the map's primary gesture is looking,
-      // not asking. src/map/featureInfo/infoTool.ts.
+      // Two gates: the Kulturminner popup answers whenever the overlay is on
+      // the map, the rest needs Stedsinfo armed. See `infoTool.ts`.
       const armed = store.get(infoClickArmedAtom);
       if (!armed && !store.get(heritageClickArmedAtom)) {
         return;
@@ -87,8 +80,7 @@ export const useFeatureInfoClick = () => {
         CULTURAL_HERITAGE_LAYER_IDS,
       );
 
-      // Unarmed, the overlay is the only thing that can have been asked. With
-      // no heritage on the map there is no question, so the click is a click.
+      // Unarmed, the overlay is the only thing that can have been asked.
       if (!armed && !heritageLayerVisible) {
         return;
       }
@@ -118,18 +110,13 @@ export const useFeatureInfoClick = () => {
         );
 
         if (heritageLayers.length > 0) {
-          // Kulturminner click: show the floating compact popup instead of
-          // the coordinate InfoBox. "Vis mer" in the popup opens the InfoBox
-          // for the full accordion.
+          // The compact popup; "Vis mer" opens the InfoBox behind it.
           setKulturminnerPopup({ coordinate, layers: heritageLayers });
           setSelectedResult(null);
           setFeatureInfoPanelOpen(false);
         } else {
-          // Kulturminner layer was visible so useMapClickSearch skipped its
-          // usual setSelectedResult; do it here now that we know no heritage
-          // POI was actually hit. Only while armed — a miss on the overlay is
-          // not a request for the coordinate readout, and unarmed it is not a
-          // request for anything at all.
+          // `useMapClickSearch` skips its own `setSelectedResult` while a
+          // heritage layer is visible, so do it here on a miss.
           if (armed && heritageLayerVisible) {
             setSelectedResult(buildCoordinateResult(coordinate, projection));
           }
@@ -163,8 +150,7 @@ export const useFeatureInfoClick = () => {
     };
   }, [handleMapClick]);
 
-  // A mode with no cursor of its own is a mode you forget you left on, and
-  // this one only answers when it is clicked — so the pointer says so.
+  // A mode with no cursor of its own is a mode you forget you left on.
   useEffect(() => {
     if (!armed) return;
     const viewport = getDefaultStore().get(mapAtom).getViewport();

@@ -7,7 +7,7 @@
 // field forgotten here cannot be added by editing this file later — and the
 // symptom of a missing field is a silent 404 on the API call, not an error
 // in the logs. The later build steps consume these one at a time; all of
-// them exist from today. See docs/lokalitet-view.md §11.
+// them exist from today.
 //
 // 1. `localities.code` — six characters of Crockford base32, unique and
 //    required. The short code on the lokalitet row: the thing you read down
@@ -17,12 +17,12 @@
 //    the unique-index 400 (src/api/localities.ts) — no Go hook, nothing
 //    added to the pinned image.
 //
-// 2. `attachments.sort` / `.hidden` — exhibit order and concealment (§4.4).
+// 2. `attachments.sort` / `.hidden` — exhibit order and concealment.
 //    A working render stays in the lokalitet without being part of what the
 //    lokalitet shows.
 //
 // 3. `attachments.file` → not required. The entire schema cost of the
-//    View/File split (§4.1.2): an extract, terrain render or flyfoto is a
+//    View/File split: an extract, terrain render or flyfoto is a
 //    row of parameters that exists as a spec before a background queue pins
 //    it to pixels, while a screenshot or an upload is only ever bytes. No
 //    `spec` field and no `isView` field — `meta` already holds every

@@ -36,8 +36,8 @@ export const SearchResults = ({
   const { t } = useTranslation();
   const displaySearchResults = useAtomValue(displaySearchResultsAtom);
 
-  // The sections are independent disclosures, all open to begin with, so the
-  // container holds the set and each section is a controlled `Section`.
+  // Independent disclosures, all open to begin with, so the container holds
+  // the set and each section is a controlled `Section`.
   const [openTabs, setOpenTabs] = useState<ResultTab[]>([
     'places',
     'roads',

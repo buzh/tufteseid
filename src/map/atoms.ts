@@ -34,13 +34,10 @@ const getInitialMapView = () => {
     const parsedLon = parseFloat(lon);
     const parsedLat = parseFloat(lat);
     if (!Number.isNaN(parsedLon) && !Number.isNaN(parsedLat)) {
-      // If the values are in the WGS84 degree range they are geographic
-      // coordinates and must be transformed to the current projection.
-      // Current URLs always store the raw projected center (large UTM-range numbers),
-      // so this branch only fires for legacy / externally-generated links.
+      // We write the raw projected centre, so a degree-range value is a legacy
+      // or external link and has to be transformed.
       if (Math.abs(parsedLat) <= 90 && Math.abs(parsedLon) <= 180) {
         let centerResolved = false;
-        // Prefer the 'sok' parameter when it encodes a valid coordinate
         const sokParam = getUrlParameter('sok');
         if (sokParam) {
           const parsedCoord = parseCoordinateInput(sokParam, projectionId);
@@ -91,23 +88,15 @@ export const mapAtom = atom<Map>(() => {
     controls: defaultControls({ zoom: false, rotate: false }).extend([
       new ScaleLine({ minWidth: 100 }),
     ]),
-    // There is no rotation UI (compass rose / reset button), so lock the
-    // map north-up — otherwise a stray gesture leaves the user with a
-    // rotation they have no way to clear.
+    // No rotation UI, so a stray gesture would leave a rotation nothing clears.
     interactions: defaultInteractions({
       altShiftDragRotate: false,
       pinchRotate: false,
     }),
     keyboardEventTarget: document,
-    // OpenLayers runs ONE tile queue for the whole map and will not
-    // start a new tile while `maxTilesLoading` are already in flight —
-    // the default 16 assumes tile servers answer in milliseconds. Ours
-    // do not: a cold LiDAR WMS tile is 3-12 s at Kartverket's origin, so
-    // a screenful of them pins every slot and the topo base — which
-    // answers in ~130 ms and is the whole reason there is always
-    // supposed to be *something* on screen — never gets scheduled at
-    // all. A wider window lets the fast base layer slip past the slow
-    // hillshade instead of queueing behind it.
+    // One queue for the whole map. The default 16 assumes millisecond
+    // responses; a cold LiDAR tile is 3-12 s, so a screenful of them pins every
+    // slot and the ~130 ms topo base never gets scheduled.
     maxTilesLoading: 48,
   });
 

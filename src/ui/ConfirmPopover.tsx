@@ -4,14 +4,9 @@ import { Button } from './Button';
 import styles from './ConfirmPopover.module.css';
 import { Popover } from './Popover';
 
-/*
- * Destructive confirm anchored to the control that triggers it. Preferred
- * over a modal for "slett funn" / "slett lokalitet" because the thing being
- * deleted stays visible behind it.
- *
- * Labels are props rather than t() calls in here: src/ui/ stays free of
- * i18next so the kit can be lifted somewhere else unchanged.
- */
+// Destructive confirm anchored to its trigger, so the thing being deleted
+// stays visible behind it. Labels are props, not t() calls — src/ui/ stays
+// free of i18next.
 export const ConfirmPopover = ({
   trigger,
   title,

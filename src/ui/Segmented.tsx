@@ -16,24 +16,12 @@ export type SegmentedOption<T extends string> = {
   icon?: MaterialSymbol;
   palette?: ButtonPalette;
   disabled?: boolean;
-  /**
-   * Native tooltip on this option alone. For sets where the label names a
-   * thing the reader may not know yet — the five terrain visualizations — and
-   * the hint therefore belongs to the option being *considered*, not to the
-   * group or to the one already selected.
-   */
+  /** Native tooltip on this option alone, not on the group. */
   title?: string;
 };
 
-/*
- * One click per value. Beats a <select> for the small closed sets in this
- * app (synlighet, funn status, DTM/DOM, terrain visualization) because the
- * options stay readable without opening anything — which matters when the
- * thing behind the control is the terrain you are reading.
- *
- * Rendered as a radiogroup rather than a row of toggle buttons so arrow keys
- * move between options the way a keyboard user expects.
- */
+// One click per value, for small closed sets. A radiogroup rather than a row
+// of toggle buttons, so arrow keys move between the options.
 export const Segmented = <T extends string>({
   value,
   options,

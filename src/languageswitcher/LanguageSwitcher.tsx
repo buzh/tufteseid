@@ -7,16 +7,12 @@ const LANGUAGES = [
   { value: 'en', label: 'English' },
 ];
 
-/*
- * A native <select>. Three options, chosen once and then forgotten about —
- * nothing here is worth a custom listbox, and the native one already knows
- * about touch, keyboard and the platform's own idea of a picker.
- */
+// A native <select>: three options, chosen once, not worth a custom listbox.
 export const LanguageSwitcher = () => {
   const { i18n, t } = useTranslation();
 
-  // i18next hands back region-tagged codes ('nb-NO') when the browser
-  // supplies one; the options are language-only.
+  // i18next hands back region-tagged codes ('nb-NO'); the options are
+  // language-only.
   const current = (i18n.language || 'nb').split('-')[0];
 
   return (

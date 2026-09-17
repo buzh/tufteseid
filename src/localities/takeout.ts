@@ -1,44 +1,14 @@
-/*
- * The Rapportpakke — everything a lokalitet knows, in one zip
- * (docs/lokalitet-view.md §9).
- *
- * The bundle is nearly free, and that is the whole argument for it: every
- * image is already a figure with its provenance baked into the pixels, every
- * funn is already a GeoJSON FeatureCollection in EPSG:4326, and every register
- * fact is already a field. So this module is mostly a manifest and a zip.
- *
- * ## `index.html` is the point, not the PNGs
- *
- * A folder of images is not a report. A front page with the register facts,
- * the images inline in the order the author arranged them, the funn as a
- * table, and the rights holder for every source is a thing a
- * kulturminneforvaltning can open and read without installing anything —
- * which is the only form in which an amateur's reading of the ground has a
- * chance of being looked at. `README.txt` says the same in plain text, for
- * the archive that does not keep HTML.
- *
- * ## It pins what is missing, and it never lies about what is in it
- *
- * A View is a row of parameters until the queue renders it (§4.1.2), and a
- * Rapportpakke of parameter rows is not a report. This is the last honest
- * moment, so it forces a pin on every unpinned View first, with the count on
- * the row's banner while it runs.
- *
- * What it will not do is hand over a bundle that quietly has fewer images
- * than the lokalitet does. Anything that could not be rendered — a reader has
- * no right to pin, a source has retired the acquisition, the file would not
- * come down — is listed by name on the front page under its own heading, and
- * the caller is told the count. The failure this prevents is somebody
- * forwarding the zip believing it is the site.
- *
- * ## Two audiences, two spellings
- *
- * The page and the README are in the UI language, like every other string in
- * the app. The *data* files are not: `funn.geojson`'s property names and
- * `funn.csv`'s column heads are fixed Norwegian, because a column name that
- * changes with the reader's language is not a schema — the same export opened
- * by two people should be the same table.
- */
+// The Rapportpakke: a lokalitet as one zip — `index.html` and `README.txt`
+// carrying the register facts, the images inline in curated order and the funn
+// as a table, then `bilder/`, `funn/funn.geojson` and `funn/funn.csv`.
+//
+// It forces a pin on every unpinned View first, and anything it still could
+// not render is named on the front page rather than silently absent.
+//
+// The page and the README are in the UI language; the data files are not.
+// `funn.geojson`'s property names and `funn.csv`'s column heads are fixed
+// Norwegian, because a column name that changes with the reader is not a
+// schema.
 
 import i18n, { t } from 'i18next';
 import {
@@ -61,21 +31,12 @@ import { funnIdOf } from './funnGroups';
 import { isBboxAssumed } from './uploadPlacement';
 import { type GroundSpec, isPinned, viewSpecOf } from './viewSpec';
 
-/*
- * One file, not the whole bundle: forty figures over a slow link is a long
- * time and legitimately so, but a single PB file that has gone quiet is not
- * coming, and the bundle should say so rather than park.
- *
- * `fetchWithin` is a *total* budget rather than an idle one, so this has to
- * cover the transfer and not merely the silence: `attachments.file` tops out
- * at 50 MB, and two minutes would abort a perfectly healthy figure on any link
- * below ~400 kB/s and then print it as missing. Five minutes is the same
- * number the queue gives the upload of the same file (`UPLOAD_DEADLINE_MS`),
- * for the same reason.
- */
+// Per file, not per bundle. `fetchWithin` is a total budget rather than an
+// idle one, so it must cover the transfer: `attachments.file` tops out at
+// 50 MB, and a shorter clock aborts healthy figures on a slow link and then
+// prints them as missing.
 const FILE_DEADLINE_MS = 300_000;
 
-/** Rank 3 of the banner slot (§5.7) while the bundle is being built. */
 export type TakeoutProgress = {
   stage: 'pinning' | 'files' | 'writing';
   done: number;
@@ -92,9 +53,7 @@ export type TakeoutResult = {
   missing: number;
 };
 
-// ---------------------------------------------------------------------------
-// Small formatters
-// ---------------------------------------------------------------------------
+// ---- Small formatters ----
 
 const slug = (s: string, fallback: string): string => {
   const out = s
@@ -124,19 +83,10 @@ const esc = (s: string): string =>
 const csvField = (s: string): string =>
   /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 
-/*
- * The same, for a column the author typed.
- *
- * `funn.csv` is written to be opened in a spreadsheet by double-click — that
- * is what the BOM and the CRLF are for — and a spreadsheet reads a cell
- * beginning with `=`, `+`, `-` or `@` as a *formula*, not as text. The person
- * opening it is by construction not the person who wrote it, so a funn titled
- * `=cmd|…` is a bundle that runs something on the recipient's machine. A
- * leading apostrophe is the conventional defusing and is what a spreadsheet
- * itself writes when it means "this is text"; it is only ever added to a value
- * that would otherwise be evaluated, so an ordinary title leaves here byte for
- * byte. The generated columns (`status`, `lat`, `lon`) do not need it.
- */
+// Author-typed columns only. A spreadsheet reads a cell beginning with `=`,
+// `+`, `-` or `@` as a formula, and the person opening this is not the person
+// who wrote it, so those get the conventional leading apostrophe. The
+// generated columns (`status`, `lat`, `lon`) do not need it.
 const csvText = (s: string): string =>
   csvField(/^[=+\-@\t\r]/.test(s) ? `'${s}` : s);
 
@@ -152,9 +102,7 @@ const dateStamp = (d: Date): string =>
     String(d.getDate()).padStart(2, '0'),
   ].join('-');
 
-// ---------------------------------------------------------------------------
-// What the bundle says about itself
-// ---------------------------------------------------------------------------
+// ---- What the bundle says about itself ----
 
 type Fact = { label: string; value: string };
 
@@ -212,16 +160,9 @@ const factsOf = (
   return rows.filter((row): row is Fact => row != null);
 };
 
-/*
- * Who to credit, by the kind of record — the same coarse map the pin queue
- * uses for a scene's layers (`SCENE_CREDIT_BY_KIND`), and coarse for the same
- * reason: a terrain render and a LiDAR extract both come from hoydedata.no,
- * and the exact acquisition is already printed on each figure's own caption.
- * This list is the summary, and the page says so.
- *
- * Exhaustive over `AttachmentKind` on purpose, so a kind added later is a
- * build error here rather than an image nobody is credited for.
- */
+// The page's summary credit list; each figure's own caption names the exact
+// acquisition. Exhaustive over `AttachmentKind` on purpose, so a kind added
+// later is a build error rather than an image nobody is credited for.
 const CREDIT_BY_KIND: Record<AttachmentKind, Credit | null> = {
   extract: CREDITS.hoydedata,
   flyfoto: CREDITS.nib,
@@ -235,15 +176,9 @@ const CREDIT_BY_KIND: Record<AttachmentKind, Credit | null> = {
   scene: null,
 };
 
-/*
- * …and the same question for a scene's *ground*, which is the one layer that
- * is not a record (`sceneSpec.ts`): the live ortofoto or LiDAR ground is
- * stored as a `{kind, meta}` pair in the scene's own `meta`, not as a member
- * in `over`, so walking the membership alone never sees it. A scene flattened
- * over Flyfoto has NiB pixels in it, and NiB is the one source here that is
- * not open data — missing it off the page is the failure this list exists to
- * prevent.
- */
+// A scene's ground is a `{kind, meta}` pair in its own `meta`, not a member in
+// `over`, so walking the membership never sees it. It must be credited
+// separately: NiB is the one source here that is not open data.
 const CREDIT_BY_GROUND: Record<GroundSpec['kind'], Credit> = {
   lidar: CREDITS.hoydedata,
   terrain: CREDITS.hoydedata,
@@ -260,9 +195,8 @@ const creditsOf = (bilder: readonly AttachmentRecord[]): Credit[] => {
   };
   for (const rec of bilder) {
     add(CREDIT_BY_KIND[rec.kind]);
-    // A scene owes what its members owe. Resolved against the exhibit rather
-    // than the server: a member kept out of the bundle is a member whose
-    // pixels are not in the bundle either.
+    // A scene owes what its members owe, resolved against the exhibit rather
+    // than the server: a member out of the bundle has no pixels in it either.
     if (rec.kind === 'scene') {
       for (const id of rec.over ?? []) {
         const member = byId.get(id);
@@ -277,19 +211,10 @@ const creditsOf = (bilder: readonly AttachmentRecord[]): Credit[] => {
   return out;
 };
 
-// ---------------------------------------------------------------------------
-// The funn, as data
-// ---------------------------------------------------------------------------
+// ---- The funn, as data ----
 
-/*
- * A funn's centre, for the CSV's two columns.
- *
- * Walked rather than taken from a library: the geometry is a
- * FeatureCollection of whatever the drawing tools made, and the only thing
- * needed is the midpoint of everything in it. A GeometryCollection has no
- * `coordinates` and simply contributes nothing — nothing in `src/funn/` has
- * ever written one.
- */
+// The midpoint of everything in the FeatureCollection. A GeometryCollection
+// has no `coordinates` and contributes nothing; `src/funn/` writes none.
 const centreOf = (find: LocalityFindRecord): [number, number] | null => {
   let minLon = Infinity;
   let minLat = Infinity;
@@ -314,14 +239,7 @@ const centreOf = (find: LocalityFindRecord): [number, number] | null => {
   return [(minLon + maxLon) / 2, (minLat + maxLat) / 2];
 };
 
-/**
- * A funn with its centre already worked out.
- *
- * Three surfaces want it — the CSV's two columns, the table on `index.html`,
- * the line in `README.txt` — and walking a FeatureCollection three times to
- * get the same pair of numbers is three chances for them to disagree as well
- * as two walks nobody asked for.
- */
+/** A funn with its centre worked out once, for the CSV, the page and the README. */
 type FindRow = { find: LocalityFindRecord; centre: [number, number] | null };
 
 const findRowsOf = (finds: readonly LocalityFindRecord[]): FindRow[] =>
@@ -331,14 +249,8 @@ const findRowsOf = (finds: readonly LocalityFindRecord[]): FindRow[] =>
 const titleOf = (find: LocalityFindRecord): string =>
   find.title.trim() || t('localities.funn.untitled');
 
-/*
- * Every funn's features in one FeatureCollection, each carrying the record's
- * own fields.
- *
- * Flattened rather than nested because a FeatureCollection of
- * FeatureCollections is not GeoJSON: a funn that is an outline plus a text
- * label is two features that both say which funn they belong to.
- */
+// Flattened, because a FeatureCollection of FeatureCollections is not GeoJSON:
+// every feature carries its funn's fields instead.
 const geojsonOf = (finds: readonly LocalityFindRecord[]): string => {
   const features = finds.flatMap((find) =>
     (find.geometry?.features ?? []).map((feature) => ({
@@ -356,16 +268,10 @@ const geojsonOf = (finds: readonly LocalityFindRecord[]): string => {
   return `${JSON.stringify(collection, null, 2)}\n`;
 };
 
-/*
- * The same table for people who do not do GIS.
- *
- * A BOM and CRLF, which is what makes a UTF-8 CSV with æøå in it open
- * correctly in Excel by double-click rather than through the import wizard.
- * Comma-separated with a dot decimal, i.e. RFC 4180 rather than the Norwegian
- * list separator: a locale-dependent separator is a guess about which
- * spreadsheet the recipient uses, and the wrong guess is unreadable where
- * this one is merely a dialog box.
- */
+// BOM and CRLF, which is what makes a UTF-8 CSV with æøå open correctly in
+// Excel by double-click. RFC 4180 comma and dot decimal rather than the
+// Norwegian list separator, which would be a guess about the recipient's
+// spreadsheet.
 const csvOf = (rows: readonly FindRow[]): string => {
   const lines = [['tittel', 'status', 'notat', 'lat', 'lon'].join(',')];
   for (const { find, centre } of rows) {
@@ -382,15 +288,13 @@ const csvOf = (rows: readonly FindRow[]): string => {
   return `\ufeff${lines.join('\r\n')}\r\n`;
 };
 
-// ---------------------------------------------------------------------------
-// The front page
-// ---------------------------------------------------------------------------
+// ---- The front page ----
 
 type PageImage = {
   rec: AttachmentRecord;
   path: string;
   index: number;
-  /** The funn it belongs to, where it belongs to one (§13.6). */
+  /** The funn it belongs to, where it belongs to one. */
   funn: string | null;
 };
 
@@ -413,8 +317,7 @@ const STYLE = [
   'h1{margin:0 0 .2rem;font-size:1.9rem}',
   'h2{margin:2.5rem 0 1rem;font-size:1.2rem}',
   '.sub{margin:0 0 1.5rem;color:#5a5a5a}',
-  // The description is one field holding whatever the author typed into a
-  // textarea, so its line breaks are content rather than formatting.
+  // The description comes from a textarea, so its line breaks are content.
   '.desc{white-space:pre-line}',
   'dl{display:grid;grid-template-columns:max-content 1fr;gap:.35rem 1.25rem}',
   'dt{color:#5a5a5a}dd{margin:0}',
@@ -585,9 +488,7 @@ const readmeText = (page: Page): string => {
   return out.join('\r\n');
 };
 
-// ---------------------------------------------------------------------------
-// The build
-// ---------------------------------------------------------------------------
+// ---- The build ----
 
 export const buildTakeout = async ({
   locality,
@@ -602,17 +503,13 @@ export const buildTakeout = async ({
   /** The exhibit: the lokalitet's own, non-hidden, in curated order. */
   bilder: readonly AttachmentRecord[];
   /**
-   * Render an unpinned View, now and awaited — `useLocalityWorkspace`'s
-   * `forcePin`. Null where the caller has no right to write, which is a
-   * reader over somebody else's lokalitet: the bundle then carries what is
-   * already pinned and names the rest as missing.
+   * Render an unpinned View, now and awaited. Null where the caller may not
+   * write; the bundle then carries what is pinned and names the rest missing.
    */
   forcePin: ForcePin | null;
   /**
    * `forcePin` is null only because the stance is `show`, not because the
-   * caller lacks the right — an owner packing from show. The missing list
-   * then says so, since "open Rediger and pack again" is a fix and "ask the
-   * owner" is not.
+   * caller lacks the right. Changes what the missing list advises.
    */
   pinnableInEdit?: boolean;
   onProgress: (progress: TakeoutProgress) => void;
@@ -623,14 +520,10 @@ export const buildTakeout = async ({
   const titleOfFunn = new Map(finds.map((f) => [f.id, titleOf(f)] as const));
   const findRows = findRowsOf(finds);
 
-  /*
-   * Pass one: the pixels that do not exist yet.
-   *
-   * Sequential because `forcePin` is the queue's own producer path and two
-   * tile bursts at once against Kartverket's edge finish no sooner (§4.1.2).
-   * A pin that fails is not fatal here — the record simply has no file and
-   * falls through to the missing list below.
-   */
+  // Pass one: the pixels that do not exist yet. Sequential, because `forcePin`
+  // is the queue's own producer path and two tile bursts at once against
+  // Kartverket's edge finish no sooner. A failed pin falls through to the
+  // missing list below.
   const unpinned = bilder.filter((rec) => !isPinned(rec));
   const repinned = new Map<string, AttachmentRecord>();
   onProgress({ stage: 'pinning', done: 0, total: unpinned.length });
@@ -653,7 +546,7 @@ export const buildTakeout = async ({
   const missing: PageMissing[] = [];
   const files: ZipEntry[] = [];
   // Wide enough for the whole exhibit, so `bilder/` sorts in curated order in
-  // a file manager: ten figures is `01`, a hundred is `001`.
+  // a file manager.
   const pad = Math.max(2, String(bilder.length).length);
   let index = 0;
   let fileDone = 0;
@@ -693,8 +586,8 @@ export const buildTakeout = async ({
         });
       } catch (e) {
         console.warn('[takeout] file unavailable', rec.id, e);
-        // Give the number back, so the ones that did land are 1..n with no
-        // holes — a gap in a figure list reads as a page that lost something.
+        // Give the number back, so the figures that landed are 1..n with no
+        // holes.
         index -= 1;
         missing.push({
           label,
@@ -719,8 +612,7 @@ export const buildTakeout = async ({
   };
 
   // The two funn files are written even when there are no funn: a header-only
-  // CSV and an empty FeatureCollection are answers, where a missing path is a
-  // broken script at the other end.
+  // CSV and an empty FeatureCollection are answers; a missing path is not.
   const blob = await zipStore(
     [
       { path: 'index.html', body: indexHtml(page) },

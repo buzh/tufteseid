@@ -59,12 +59,9 @@ const handleClusterClick = (
   }
 };
 
-// The clustered source, built once and reused. updateSearchMarkers runs
-// on every hover over a result row, and a fresh VectorSource + Cluster
-// each time threw away the computed clusters and made OL re-cluster and
-// re-render the whole set — for a change that only recolours one marker.
-// Read back off the layer rather than held in a module variable, so it
-// heals if the layer is ever re-sourced from elsewhere.
+// Built once: this runs on every hover over a result row, and a fresh Cluster
+// re-clusters the whole set. Read back off the layer rather than held in a
+// module variable, so it heals if the layer is re-sourced elsewhere.
 const getMarkerSource = (markerLayer: VectorLayer): VectorSource => {
   const existing = markerLayer.getSource();
   if (existing instanceof Cluster) {
@@ -75,13 +72,8 @@ const getMarkerSource = (markerLayer: VectorLayer): VectorSource => {
   return source;
 };
 
-// What a click on a marker does. The handler below is registered once
-// and lives as long as the map, while this callback comes out of a React
-// render and changes identity — so the handler reads it at click time
-// rather than closing over whichever one was current at registration.
-// That capture was a bug: the callback is optional (useMapClickSearch
-// drops a coordinate marker without one), so whoever called first owned
-// every marker click thereafter.
+// The handler is registered once and outlives any render, so it reads this at
+// click time rather than closing over the callback current at registration.
 let onMarkerResultClick: (res: SearchResult) => void = () => {};
 
 const registerMarkerClickHandler = (map: Map) => {
@@ -103,14 +95,10 @@ const registerMarkerClickHandler = (map: Map) => {
         } else {
           handleClusterClick(featuresAtPixel, map, onMarkerResultClick);
         }
-        // Truthy stops the iteration. Overlapping cluster circles put
-        // more than one hit under the same pixel, and without this both
-        // would fire — two onResultClick calls, or a view.fit racing a
-        // popup.
+        // Truthy stops the iteration; overlapping circles would both fire.
         return true;
       },
-      // Only the marker layer has cluster features; hit-testing the draw
-      // and lokalitet layers as well was work thrown away every click.
+      // Only the marker layer has cluster features.
       { layerFilter: (layer) => layer.get('id') === 'markerLayer' },
     );
   });
@@ -120,9 +108,7 @@ export const updateSearchMarkers = (
   searchResults: SearchResult[],
   hoveredResult: { lon: number; lat: number } | null,
   selectedResult: SearchResult | null,
-  // Optional: callers that only place a marker (a map click dropping a
-  // coordinate pin) leave whatever the results list last registered in
-  // place instead of clobbering it with a no-op.
+  // Optional, so a caller that only places a marker leaves the last handler.
   onResultClick?: (res: SearchResult) => void,
 ) => {
   const map = getDefaultStore().get(mapAtom);
@@ -134,8 +120,7 @@ export const updateSearchMarkers = (
   }
   registerMarkerClickHandler(map);
 
-  // Re-set every call: the style function closes over hoveredResult, and
-  // handing the layer a new one is what makes it redraw with it.
+  // The style function closes over hoveredResult; a new one forces the redraw.
   markerLayer.setStyle((feature) => clusterStyle(feature, hoveredResult));
 
   const markers: Feature[] = [];
@@ -148,15 +133,14 @@ export const updateSearchMarkers = (
     markers.push(createMarker(selectedResult, 'red', map));
   }
 
-  // A selected place/address/property is the only thing on the map; a
-  // selected coordinate still shows the result list alongside it.
+  // A selected place/address/property is alone on the map; a selected
+  // coordinate still shows the result list alongside it.
   const selectedOnly =
     selectedResult != null && selectedResult.type !== 'Coordinate';
 
   if (!selectedOnly) {
     searchResults.forEach((res) => {
       if (!isFinite(res.lon) || !isFinite(res.lat)) return;
-      // Skip if this result is the same as the selected result to avoid duplicate markers
       if (
         selectedResult &&
         res.lon === selectedResult.lon &&
@@ -178,9 +162,7 @@ export const updateSearchMarkers = (
     });
   }
 
-  // One clear + one addFeatures rather than a call per marker: Cluster
-  // re-clusters on every 'change' its source fires, and addFeature fires
-  // one each.
+  // One addFeatures: Cluster re-clusters on every 'change', one per addFeature.
   markerSource.clear();
   markerSource.addFeatures(markers);
 };

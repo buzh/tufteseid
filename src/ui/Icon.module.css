@@ -1,9 +1,6 @@
-/*
- * Selectors are doubled to outrank `.material-symbols-rounded` from
- * material-symbols/rounded.css, which sets font-variation-settings on the
- * same element at equal specificity — whichever stylesheet Vite happens to
- * emit last would otherwise win.
- */
+/* Selectors are doubled to outrank `.material-symbols-rounded` from
+   material-symbols/rounded.css, which sets font-variation-settings on the same
+   element at equal specificity. */
 .icon.icon {
   display: inline-flex;
   align-items: center;

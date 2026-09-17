@@ -1,51 +1,30 @@
-// Enumerates the Norge i bilder ortofoto acquisitions ("prosjekter") that
-// cover a lokalitet, so the same ground can be kept as a temporal stack —
-// 1937, 1963, 2011, 2024 — rather than only the single seamless mosaic
-// that fetchFlyfoto() grabs by default.
-//
-// Source is NiB's own project index, layer 4 ("Prosjektomriss prosessert")
-// of the prosjekter MapServer: one row per acquisition with its name,
-// year, photo date and lon/lat bounds. Requests go same-origin through
-// /arcgis/nib/* → wmscache → nib-proxy (which injects the token), same as
-// the imagery itself.
-//
-// Deliberately NOT Kartverket's wms.georef_nib, which the layer name makes
-// look like the obvious index: that service is a *planning* layer. Its
-// features carry prosjektfase P/U and start years in the future, with the
-// project-name fields empty — it describes photography that has not been
-// flown yet, not the archive.
+// The NiB ortofoto acquisitions ("prosjekter") over a lokalitet, from NiB's own
+// project index. Not Kartverket's wms.georef_nib, which looks like the obvious
+// index but is a planning layer: prosjektfase P/U, start years in the future,
+// empty project names.
 
 import { transformExtent } from 'ol/proj';
 import type { LocalityBbox } from '../api/localities';
 import { fetchWithin } from '../shared/utils/deadline';
 
-// One attribute query, a few kilobytes of JSON. The ceiling is on a stalled
-// connection, not on the query (src/shared/utils/deadline.ts) — and it matters
-// here because the pin queue waits on this before a flyfoto spec renders.
+// A ceiling on a stalled connection, not on the query.
 const PROJECTS_TIMEOUT_MS = 20_000;
 
-// Layer 4 of the prosjekter MapServer. Layer 1 ("Prosjektomriss original")
-// holds the same rows but the unprocessed outlines; 2 and 3 are seam lines
-// and per-photo frames, both far too granular for a picker.
+// Layer 4, "Prosjektomriss prosessert": one row per acquisition. 1 is the same
+// rows unprocessed; 2 and 3 are seam lines and per-photo frames.
 const PROJECTS_URL = '/arcgis/nib/prosjekter/MapServer/4/query';
 
-// ortofototype is a coded domain on that layer. 6 = "Satellittbilde",
-// which is how the nationwide 10 m Sentinel-2 mosaics get in; they cover
-// everywhere, so without this every lokalitet in the country lists them,
-// and at 10 m/px they are useless next to 0.1 m aerial photography.
+// ortofototype 6 = "Satellittbilde": the nationwide 10 m Sentinel-2 mosaics,
+// which cover everywhere and would list under every lokalitet.
 const SATELLITE_ORTOFOTOTYPE = 6;
 
 export type FlyfotoProject = {
-  // prosjektnavn — also the imagery selector, see flyfoto.ts. The two
-  // come from the same table in the same database, so there is no name
-  // matching to get wrong between index and renderer.
+  // prosjektnavn, which is also the imagery selector in flyfoto.ts.
   id: string;
   projectName: string;
   year: number | null;
-  // ISO yyyy-mm-dd, from fotodato_date. More precise than the year and
-  // occasionally disagrees with the year in the project's own name.
+  // ISO from fotodato_date; sometimes disagrees with the year in the name.
   photoDate: string | null;
-  // Native ground resolution in metres, when published.
   metresPerPx: number | null;
   bboxLonLat: [number, number, number, number];
 };
@@ -67,8 +46,8 @@ function toNumber(value: unknown): number | null {
   return typeof n === 'number' && Number.isFinite(n) ? n : null;
 }
 
-// fotodato_date arrives as epoch milliseconds. Format in UTC: these are
-// dates, not instants, and local formatting can shift them a day.
+// Epoch milliseconds, formatted in UTC: these are dates, not instants, and
+// local formatting can shift them a day.
 function toIsoDate(epochMs: number | null | undefined): string | null {
   if (typeof epochMs !== 'number' || !Number.isFinite(epochMs)) return null;
   const d = new Date(epochMs);
@@ -98,8 +77,7 @@ function toProject(attrs: QueryAttributes): FlyfotoProject | null {
   };
 }
 
-// Newest first — the ordering the picker shows. Falls back to the year
-// when a row has no photo date, and to the name so the list is stable.
+// Newest first, then the year, then the name, so the list is stable.
 function byNewest(a: FlyfotoProject, b: FlyfotoProject): number {
   const da = a.photoDate ?? (a.year !== null ? `${a.year}-00-00` : '');
   const db = b.photoDate ?? (b.year !== null ? `${b.year}-00-00` : '');
@@ -107,16 +85,12 @@ function byNewest(a: FlyfotoProject, b: FlyfotoProject): number {
   return a.projectName.localeCompare(b.projectName, 'nb');
 }
 
-// Every acquisition whose footprint intersects the lokalitet, newest
-// first. The spatial filter runs against the real project outlines
-// server-side, not their bounding boxes, so a project that only clips a
-// neighbouring valley is already excluded here.
+// The server filters against the real outlines, not their bounding boxes.
 export async function fetchFlyfotoProjectsForBbox(
   bbox4326: LocalityBbox,
   signal?: AbortSignal,
 ): Promise<FlyfotoProject[]> {
-  // The service takes the query envelope in a projected CRS; 25833 is
-  // what the rest of the flyfoto path already works in.
+  // The service wants a projected CRS, and 25833 is the flyfoto path's.
   const bbox25833 = transformExtent(bbox4326, 'EPSG:4326', 'EPSG:25833');
 
   const params = new URLSearchParams({
@@ -128,8 +102,7 @@ export async function fetchFlyfotoProjectsForBbox(
     spatialRel: 'esriSpatialRelIntersects',
     outFields:
       'prosjektnavn,aar,fotodato_date,ortofototype,pixelstorrelse,x_min,y_min,x_max,y_max',
-    // Footprint geometry would dominate the response and we only need the
-    // published lon/lat bounds, which come along as plain attributes.
+    // The bounds come as plain attributes; the footprints would dominate.
     returnGeometry: 'false',
   });
 
@@ -148,8 +121,8 @@ export async function fetchFlyfotoProjectsForBbox(
   const projects: FlyfotoProject[] = [];
   for (const feature of features) {
     const project = toProject(feature.attributes ?? {});
-    // A project occasionally has more than one outline row; the imagery
-    // selector is the name, so extras would just be duplicate buttons.
+    // More than one outline row happens; the selector is the name, so extras
+    // would only be duplicate buttons.
     if (!project || seen.has(project.id)) continue;
     seen.add(project.id);
     projects.push(project);

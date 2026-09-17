@@ -24,29 +24,18 @@ import { createThemeLayerFromConfig, ThemeLayerName } from './themeWMS';
 
 export const activeThemeLayersAtom = atom<Set<ThemeLayerName>>(new Set([]));
 
-/** Module-level so the derived atom below returns a stable identity while the
- *  overlay is hidden — a fresh `new Set()` per read re-runs every effect that
- *  depends on it. */
+// Module-level for a stable identity: a fresh `new Set()` per read re-runs
+// every effect below.
 const NO_THEME_LAYERS: ReadonlySet<ThemeLayerName> = new Set();
 
-/**
- * Which sources are *on the map*, as opposed to which are ticked. The eye
- * (`heritageHiddenAtom`) is the difference.
- *
- * Anything describing what a reader can see reads this one: the figure caption
- * on a screenshot names the layers in the pixels, and a hidden overlay put no
- * pixels there. The picker reads `activeThemeLayersAtom` instead, because a
- * checkbox is about the selection and the selection is what the eye preserves.
- */
+/** Which sources are on the map, as opposed to which are ticked; the eye
+ *  (`heritageHiddenAtom`) is the difference. */
 export const shownThemeLayersAtom = atom<ReadonlySet<ThemeLayerName>>((get) =>
   get(heritageHiddenAtom) ? NO_THEME_LAYERS : get(activeThemeLayersAtom),
 );
 
-/**
- * The one theme layer whose WMS request the user can reshape. The other four
- * RA services publish a single style each, so there is nothing to say about
- * them beyond on/off and how strongly to draw them.
- */
+// The one theme layer whose WMS request can be reshaped; the other four RA
+// services publish a single style each.
 const RESHAPEABLE: ThemeLayerName = 'heritageSites';
 
 const paramsFor = (
@@ -57,8 +46,7 @@ const paramsFor = (
 
 export const themeLayerEffect = atomEffect((get) => {
   const themeLayers = get(activeThemeLayersAtom);
-  // Read, so changing any of them re-runs the effect and reshapes the layers
-  // already on the map. The add/remove diff below is a no-op on those runs.
+  // Read so a change re-runs this effect and reshapes the layers on the map.
   const heritageDetails = get(heritageDetailsAtom);
   const heritageRender = get(heritageRenderAtom);
   const heritageOpacity = get(heritageOpacityAtom);
@@ -148,9 +136,7 @@ export const themeLayerEffect = atomEffect((get) => {
     removeFromUrlListParameter('themeLayers', layerName);
   });
 
-  // Reshape whatever is on the map now — including the layers just added, so
-  // one pass covers both "the settings changed" and "a source was switched
-  // on while they were already off default".
+  // Reshape whatever is on the map now, including the layers just added.
   map
     .getLayers()
     .getArray()
@@ -161,29 +147,18 @@ export const themeLayerEffect = atomEffect((get) => {
 
       const layerName = id.substring(6) as ThemeLayerName;
       const params = paramsFor(layerName, heritageDetails, heritageRender);
-      // Two reasons a theme layer draws nothing, and they are independent.
-      // The eye takes the whole overlay off while the selection stands; and
-      // kulturminner2 with none of its three registers ticked renders nothing
-      // anyway, so say so by hiding it rather than by sending a request whose
-      // only possible answer is a transparent tile.
-      //
-      // Visible rather than removed, in both cases: the layer stays on the
-      // map, so the URL still describes what is selected, the tile cache
-      // survives, and `isRendering` in featureInfoService — which is
-      // `Layer#isVisible` — stops a click asking RA about a register the
-      // reader cannot see.
+      // kulturminner2 with no register ticked can only answer with a
+      // transparent tile, so hide rather than request one. Hidden, not removed:
+      // the tile cache survives and featureInfoService's `isRendering`
+      // (`Layer#isVisible`) stops a click asking RA about an unseen register.
       const empty = layerName === RESHAPEABLE && params === null;
       layer.setVisible(!heritageHidden && !empty);
-      // `paramsFor` is null for the other four sources as well as for an
-      // empty kulturminner2, and neither has anything left to reshape.
       if (!params) return;
 
       const source = (layer as { getSource?: () => unknown }).getSource?.();
       if (!isWmsSource(source)) return;
       const current = source.getParams();
-      // updateParams invalidates the tile cache and re-requests the whole
-      // screen, so only when something actually moved: this effect also runs
-      // for unrelated theme-layer adds and removes.
+      // updateParams invalidates the tile cache and re-requests the screen.
       if (current.LAYERS === params.LAYERS && current.STYLES === params.STYLES)
         return;
       source.updateParams(params);

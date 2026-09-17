@@ -10,9 +10,8 @@ import { AppShell } from './shell/AppShell.tsx';
 export const App = () => {
   const { setMapFullScreen } = useMapSettings();
 
-  // PocketBase authStore → currentUserAtom. Mounted above the router: the
-  // shell is only on "/", and signing in must not depend on which route
-  // happens to be showing.
+  // Mounted above the router: the shell is only on "/", and signing in must
+  // not depend on the route.
   useAtom(pbAuthSyncEffect);
 
   const fullscreenClickHandler = (event: KeyboardEvent) => {

@@ -1,30 +1,12 @@
 import Map from 'ol/Map';
 import { unByKey } from 'ol/Observable';
 
-/*
- * Flattening the map's layer canvases into one.
- *
- * `localities/screenshot.ts` composites at CSS resolution and crops to the
- * lokalitet's rectangle. It is the only caller today — the drawing surface
- * briefly wanted a device-resolution still of the whole viewport to freeze
- * under itself, and does not any more, since what is under a stroke is the
- * real map (`funn/session.ts`). The recipe is the standard OpenLayers
- * canvas-export dance and keeps its own file regardless: it is about the map,
- * not about screenshots, and the next thing that wants a picture of the map
- * should not have to find it at the bottom of one.
- *
- * What this catches is every `.ol-layer` canvas — which is to say the map.
- * What it does *not* catch is `ol/Overlay`, which is DOM: the funn callout,
- * the Kulturminner popup, the search marker popup. Those are transient
- * things you would not want baked into either output anyway, but it is the
- * reason a drawn point icon rendered as a DOM overlay never once appeared in
- * a saved figure.
- */
+// Flattening the map's layer canvases into one. It catches every `.ol-layer`
+// canvas and nothing served by `ol/Overlay`, which is DOM, so the funn callout,
+// the Kulturminner popup and the search marker cannot reach a saved figure.
 
-// 'rendercomplete' only fires once every source has finished loading, so a
-// single tile that never settles means it never fires. Waiting is normal (a
-// cold LiDAR tile is 3-12 s at Kartverket's origin), so the budget is the
-// same generous one the background swap uses as its retirement backstop.
+// 'rendercomplete' waits for every source, so one tile that never settles means
+// it never fires. A cold LiDAR tile is 3-12 s, so waiting is normal.
 export const RENDER_TIMEOUT_MS = 15000;
 
 /**
@@ -52,15 +34,10 @@ export const whenRendered = (
   });
 
 /**
- * Every layer canvas drawn into one, in layer order, honouring each one's CSS
- * transform, opacity and background colour.
- *
- * `scale` multiplies the output resolution: 1 gives CSS pixels, and
- * `devicePixelRatio` gives the pixels the screen is actually showing — which
- * is what a freeze has to match to look like nothing happened.
- *
- * Safe from canvas taint because every tile source is same-origin through the
- * /wms/* proxies. Returns null if the map has no size yet.
+ * Every layer canvas drawn into one, honouring each one's CSS transform,
+ * opacity and background colour. `scale` multiplies the output resolution: 1 is
+ * CSS pixels. Null if the map has no size yet; never tainted, since every tile
+ * source is same-origin through the /wms/* proxies.
  */
 export const compositeMapCanvases = (
   map: Map,
@@ -101,10 +78,7 @@ export const compositeMapCanvases = (
         0,
       ];
     }
-    // The layer's own matrix takes its device pixels into CSS pixels; `scale`
-    // then takes CSS pixels into output pixels. Composed in that order rather
-    // than multiplied by hand, so scale === 1 is bit-for-bit what this code
-    // did before it moved here.
+    // Device pixels → CSS pixels → output pixels, composed in that order.
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     ctx.transform(
       matrix[0],

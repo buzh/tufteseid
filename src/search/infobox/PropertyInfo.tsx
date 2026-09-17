@@ -107,7 +107,6 @@ export const PropertyInfo = ({
           const containingExtent = getContainingExtent(features);
 
           if (containingExtent) {
-            // Expand extent by 20%
             const [minX, minY, maxX, maxY] = containingExtent;
             const width = maxX - minX;
             const height = maxY - minY;

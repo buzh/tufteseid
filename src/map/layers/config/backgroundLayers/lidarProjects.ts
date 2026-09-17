@@ -1,28 +1,15 @@
-// Fetches and parses the per-project LiDAR WMS GetCapabilities from
-// Kartverket, exposing one entry per acquisition (project) with its
-// bounding box, year, point density, and available styled variants.
-//
-// The XML is proxied + long-cached through wmscache; we additionally
-// keep a week-long localStorage cache to avoid re-parsing on every load.
+// Kartverket's per-project LiDAR GetCapabilities, parsed into one entry per
+// acquisition; long-cached in wmscache plus a week of localStorage here.
 
 import { fetchWithin } from '../../../../shared/utils/deadline';
 import { getUrlParameter } from '../../../../shared/utils/urlUtils';
 import { halved } from '../../../compare/halves';
 
-// The per-project document is some 8 MB of XML over a proxy that may be
-// fetching it cold from Kartverket, so the ceiling is roomy; it is there so a
-// stalled connection cannot hold an in-flight promise — and with it every
-// caller sharing that promise, including a pin queue job — open forever
-// (src/shared/utils/deadline.ts).
+// Roomy: the document is some 8 MB of XML the proxy may be fetching cold.
 const CAPS_TIMEOUT_MS = 60_000;
 
-// Terrengmodell vs overflatemodell: the same acquisitions with
-// vegetation and buildings stripped away (DTM) or left standing (DOM).
-// Kartverket publishes them as parallel services whose project sets are
-// *identical* — 1936 names on each side, no difference either way — so a
-// model is nothing but a different URL and layer prefix for the same
-// dataset identity. Catalogue, footprints, relevance tiering and the
-// picker are all model-independent as a result.
+// The two services publish identical project sets, so a model is only another
+// URL and layer prefix.
 export type LidarModel = 'dtm' | 'dom';
 
 export type LidarProject = {
@@ -37,28 +24,16 @@ export type LidarProject = {
 
 const CAPS_URL =
   '/wms/geonorge/wms.hoyde-dtm-prosjekt?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0';
-// Bump when the parser output shape or filtering changes so cached
-// entries from an older schema are ignored.
+// Bump when the parser output shape or filtering changes.
 const STORAGE_KEY = 'lidarProjects.v4';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-// The project the picker most recently activated as the background source.
-// Read by the background-layer effect when backgroundLayerAtom is
-// 'lidarProject' to build the actual WMS request.
-//
-// Halved like every other piece of ground state (src/map/compare/halves.ts):
-// "this acquisition against that one" is the comparison the curtain exists
-// for, and it needs two of these.
+// What the background effect builds a WMS request from under 'lidarProject'.
 export const activeLidarProjectHalves = halved<LidarProject | null>(null);
 export const activeLidarProjectAtom = activeLidarProjectHalves.focused;
 
-// The styled variant (skyggerelieff, multiskyggerelieff, ...) currently
-// shown for whichever dataset is active (national mosaic or a project).
-// Read by the background-layer effect alongside activeLidarProjectAtom.
-//
-// This holds what the user *picked*, which is a DTM style: DOM has only
-// the one style, so it overrides rather than overwrites (see
-// effectiveLidarStyle) and a DTM choice survives a trip through DOM.
+// Holds the picked DTM style: DOM has one, so effectiveLidarStyle overrides
+// rather than overwrites and the DTM choice survives the trip.
 export const activeLidarStyleHalves = halved<string>('skyggerelieff');
 export const activeLidarStyleAtom = activeLidarStyleHalves.focused;
 
@@ -72,68 +47,38 @@ export const LIDAR_PROJECT_WMS_URL: Record<LidarModel, string> = {
   dom: '/wms/geonorge/wms.hoyde-dom-prosjekt',
 };
 
-// The extent the LiDAR services actually cover, straight out of their
-// GetCapabilities `<BoundingBox CRS="EPSG:25833">`. Norway plus a
-// margin; nothing outside it will ever be anything but a no-data tile.
-//
-// This has to be handed to the layer explicitly. A TileWMS with no
-// tileGrid of its own falls back to a grid spanning the whole *
-// projection* extent, and EPSG:25833 is a UTM zone stretching far
-// beyond Norway — so at low zoom OpenLayers cheerfully asks for tiles
-// over the Atlantic, Denmark and western Russia. Every one of those is
-// a full on-the-fly render at the origin that comes back 479 bytes
-// (worse: some of them time out and 504), and none of them can ever
-// draw a pixel. Setting `extent` on the layer makes OL cull them before
-// a request is made.
+// The services' own `<BoundingBox CRS="EPSG:25833">`, handed to the layer as
+// `extent`: a TileWMS without one tiles the whole UTM zone.
 export const LIDAR_COVERAGE_EXTENT_25833: [number, number, number, number] = [
   -100275, 6399725, 1150255, 8000275,
 ];
 export const DEFAULT_LIDAR_PROJECT_STYLE = 'skyggerelieff';
 
-// Every DOM layer, national and per-project alike, publishes
-// skyggerelieff and dynamisk_farget_hoyde — and the latter is excluded
-// everywhere (see EXCLUDED_STYLES). Verified across all 1936 entries in
-// both capabilities documents, so this is a constant rather than
-// something worth a second 4 MB GetCapabilities fetch to discover.
+// Every DOM layer publishes skyggerelieff and the excluded
+// dynamisk_farget_hoyde, so a constant rather than a second caps fetch.
 const DOM_STYLES = [DEFAULT_LIDAR_PROJECT_STYLE];
 
-// What the style pulldown may offer for a dataset under a given model.
 export const stylesForModel = (
   styles: string[],
   model: LidarModel,
 ): string[] => (model === 'dom' ? DOM_STYLES : styles);
 
-// The style actually requested from the WMS. Asking a DOM layer for
-// multiskyggerelieff doesn't fail loudly — see resolveLidarStyle below
-// for that failure mode — so the model gets the final say.
+// The style actually requested: asking a DOM layer for one it does not publish
+// fails silently (see resolveLidarStyle), so the model wins.
 export const effectiveLidarStyle = (
   style: string,
   model: LidarModel,
 ): string => (model === 'dom' ? DOM_STYLES[0] : style);
 
-// The three most diagnostic variants for reading archaeology in terrain —
-// shown first, in this order, in the style pulldown. Anything else
-// (helning_grader and whatever else a dataset happens to publish) sits
-// behind that pulldown's "flere lag" overflow.
+// Shown first in the style pulldown; anything else sits behind its overflow.
 export const TIER_A_STYLES = [
   'skyggerelieff',
   'multiskyggerelieff',
   'helning_prosent',
 ];
 
-// Picks the style to show for a dataset the user just activated: keep
-// the one they were already looking at if this dataset publishes it
-// (a style choice should survive a dataset switch), otherwise the most
-// diagnostic style it does publish.
-//
-// Every entry point that changes the active dataset must go through
-// this. The national mosaic publishes *only* `skyggerelieff`, while
-// every per-project dataset publishes four — and asking the national
-// WMS for a per-project style doesn't fail loudly: it answers HTTP 200,
-// Content-Type image/png, with a ~100 byte JSON error body. The browser
-// decodes that as a broken image and the background just silently goes
-// empty — nothing in the console, nothing in the network tab that looks
-// wrong. (wmscache refuses to cache it; see $skip_cache.)
+// The national mosaic publishes only skyggerelieff; asking it for a per-project
+// style answers HTTP 200 image/png with a ~100 byte JSON error body.
 export const resolveLidarStyle = (
   published: string[],
   preferred: string,
@@ -144,11 +89,8 @@ export const resolveLidarStyle = (
       published[0] ??
       DEFAULT_LIDAR_PROJECT_STYLE);
 
-// Styles that are advertised but not useful to show anywhere:
-//   - `None`: the "no style" placeholder (renders a near-uniform PNG).
-//   - `dynamisk_farget_hoyde`: Kartverket picks a per-tile colour ramp
-//     from the local elevation range, so adjacent tiles get incompatible
-//     palettes — looks broken as a background layer.
+// Advertised but unusable: `None` renders near-uniform, and
+// `dynamisk_farget_hoyde` ramps per tile, so neighbouring tiles disagree.
 const EXCLUDED_STYLES = new Set<string>(['None', 'dynamisk_farget_hoyde']);
 
 type CachedEntry = { ts: number; projects: LidarProject[] };
@@ -207,10 +149,7 @@ function parseCapabilities(xmlText: string): LidarProject[] {
   for (const [projectName, { styles, bboxes }] of grouped) {
     const bboxLonLat = unionBbox(bboxes);
     if (!bboxLonLat) continue;
-    // Skip photogrammetry-derived DTMs. They advertise the same styles as
-    // the real lidar projects (skyggerelieff etc.) but render blank tiles
-    // in this WMS. The "Bilde" ("image") prefix is Kartverket's naming
-    // convention that distinguishes them from actual lidar acquisitions.
+    // Photogrammetry DTMs: a lidar project's styles advertised, blank tiles.
     if (/^Bilde\b/i.test(projectName)) continue;
     out.push({
       id: projectName,
@@ -229,8 +168,7 @@ function parseCapabilities(xmlText: string): LidarProject[] {
 function readBboxFromLayerOrAncestor(
   layer: Element,
 ): [number, number, number, number] | null {
-  // WMS 1.3.0 lets a child <Layer> inherit EX_GeographicBoundingBox from
-  // its parent. Walk up the ancestor chain of <Layer> elements.
+  // WMS 1.3.0 lets a child <Layer> inherit EX_GeographicBoundingBox.
   let el: Element | null = layer;
   while (el && el.tagName === 'Layer') {
     const direct = Array.from(el.children).find(
@@ -300,17 +238,14 @@ function writeCache(projects: LidarProject[]) {
   }
 }
 
-// pointDensity is a string like "10pkt" — parse the leading digits so we
-// can sort/compare densest first. Shared by the ribbon picker and the
-// footprint-layer relevance classification.
+// pointDensity is a string like "10pkt"; the leading digits order it.
 export const densityOrder = (d: string | null): number => {
   if (!d) return 0;
   const m = d.match(/^(\d+)/);
   return m ? parseInt(m[1], 10) : 0;
 };
 
-// Newest first, then densest, then alphabetical — the display order for
-// every LiDAR project list in the app.
+// The display order for every LiDAR project list in the app.
 export const sortProjectsByRelevance = (
   a: LidarProject,
   b: LidarProject,
@@ -329,14 +264,8 @@ export const bboxIntersects = (
   b: [number, number, number, number],
 ): boolean => a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
 
-// Fraction of `viewport` covered by `bbox`, both lon/lat. An *upper
-// bound* on the project's real on-screen coverage — the catalogue only
-// knows envelopes, and a project's polygon is always a subset of its
-// envelope. That makes it the right key for deciding which candidates
-// are worth fetching a real footprint for: the ones dropped are the ones
-// that could not have scored well even if their polygon filled their
-// bbox. Degrees, not metres, but every candidate shares the viewport's
-// latitude band so the distortion cancels out of the ordering.
+// Fraction of `viewport` covered by `bbox`, both lon/lat; an upper bound, since
+// the catalogue knows only envelopes.
 export const bboxOverlapRatio = (
   bbox: [number, number, number, number],
   viewport: [number, number, number, number],
@@ -348,16 +277,10 @@ export const bboxOverlapRatio = (
   return area > 0 ? (w * h) / area : 0;
 };
 
-// --- National mosaic styles ---
-//
-// wms.hoyde-dtm-nhm-topobathy-25833 publishes the same kind of styled
-// variants as the per-project WMS, under one fixed layer prefix instead
-// of one per acquisition. Moved here (from lidarExtract/sources.ts, which
-// re-exports it) so the ribbon style pulldown and the LiDAR-uttrekk tool
-// share one fetch/cache instead of hitting GetCapabilities twice.
+// ---- National mosaic styles ----
 
-// One service per model, each with its own layer prefix. The DOM mosaic
-// is plain terrain — no bathymetry counterpart is published.
+// One service per model, styled variants under a single fixed layer prefix;
+// only the DTM one carries bathymetry.
 export const NATIONAL_WMS: Record<
   LidarModel,
   { url: string; prefix: string }
@@ -372,16 +295,14 @@ export const NATIONAL_WMS: Record<
   },
 };
 
-// Only the DTM mosaic's styles are discovered at runtime; the DOM side
-// is the DOM_STYLES constant above.
+// Only the DTM mosaic's styles are discovered at runtime; DOM is DOM_STYLES.
 const NATIONAL_CAPS_URL =
   `${NATIONAL_WMS.dtm.url}?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0`;
-// Bump when the parser filter changes so stale cached lists (e.g. still
-// including the `None` pseudo-style) get discarded on next load.
+// Bump when the parser filter changes.
 const NATIONAL_STORAGE_KEY = 'lidarProjects.nationalStyles.v1';
 const NATIONAL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-// Kept as a floor so the UI still has something to offer when caps is down.
+// A floor, so the UI still has something to offer when caps is down.
 const NATIONAL_FALLBACK_STYLES = [DEFAULT_LIDAR_PROJECT_STYLE];
 
 let nationalInflight: Promise<string[]> | null = null;

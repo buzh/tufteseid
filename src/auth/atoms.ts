@@ -2,16 +2,14 @@ import { atom } from 'jotai';
 import { atomEffect } from 'jotai-effect';
 import { NkUser, pb, Role } from '../api/pocketbase';
 
-// Source of truth: the PB SDK's authStore. This atom mirrors it so
-// components can subscribe via jotai instead of onChange handlers.
-// Initial value comes from LocalAuthStore (rehydrated at pb import).
+// Mirrors the PB SDK's authStore, which is the source of truth, so
+// components can subscribe through jotai instead of onChange.
 export const currentUserAtom = atom<NkUser | null>(
   (pb.authStore.record as NkUser | null) ?? null,
 );
 
-// Kept in sync by pbAuthSyncEffect below. Consumers should NOT set the
-// user atom directly — go through pb.collection('users').authWithOAuth2
-// (or signOut) which fires authStore events that this effect catches.
+// Do not set the user atom directly: go through the SDK's auth calls, whose
+// authStore events pbAuthSyncEffect below catches.
 export const pbAuthSyncEffect = atomEffect((_get, set) => {
   const unsubscribe = pb.authStore.onChange(() => {
     set(currentUserAtom, (pb.authStore.record as NkUser | null) ?? null);
@@ -19,8 +17,7 @@ export const pbAuthSyncEffect = atomEffect((_get, set) => {
   return unsubscribe;
 });
 
-// Derived selectors so a component can subscribe only to what it needs
-// without re-rendering on unrelated user field changes.
+// Derived so a component does not re-render on unrelated user fields.
 export const isSignedInAtom = atom((get) => get(currentUserAtom) != null);
 
 export const roleAtom = atom<Role>((get) => {

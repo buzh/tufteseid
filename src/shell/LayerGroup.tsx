@@ -5,90 +5,27 @@ import styles from './LayerGroup.module.css';
 import { ModeButton } from './ModeButton';
 
 /*
- * One `[thing ▾]` on the lokalitet row — docs/lokalitet-view.md §13.1, §13.10
- * steps 3 and 4.
- *
- * The row is four of these, left to right in the map's own z-order: Visning,
- * Bilde, Skisse, Funn. So this component is the whole layer row, used four
- * times, and what it is is a *button*: a labelled half that takes the group
- * off the map, a caret that opens what is in it, and a badge saying how much
- * of it is up. Nothing here knows what a sketch or a funn is.
- *
- * **What goes in the pulldown is the caller's.** `LayerMembers` below is the
- * default body and does the job for a group whose members are nothing but
- * layers — a switch and a fade each. `[Funn]` is the one group whose members
- * are also *records you act on* (rename, restage, redraw, delete), so it
- * brings `FunnList` instead, switches and all. Splitting it that way is step
- * 4's finding: the shared thing was never the rows, it was the seam.
- *
- * **The label toggles, the caret opens.** That is the opposite polarity to
- * `EyeSplit`, whose labelled half opens a list and whose eye hides it. Having
- * both idioms on one screen was tolerable while `Funn` was the odd one out;
- * with `Funn` re-clothed the lokalitet row speaks this one throughout and
- * `EyeSplit` is row 1's, on `Kulturminner`. The seam geometry stays duplicated
- * between the two: what they share is ten lines of flex and a border radius,
- * and what they differ in — width, glyph, and which state is lit — is
- * everything that gives either one its meaning.
- *
- * Nothing in here writes (§13.8), so there is no stance gate anywhere in the
- * component: a reader gets the row at full function.
+ * One `[thing ▾]` on the lokalitet row, used four times over: Visning, Bilde,
+ * Skisse, Funn, left to right in the map's z-order. Nothing here writes, so
+ * there is no stance gate. The label toggles and the caret opens, the opposite
+ * polarity to `EyeSplit`.
  */
 
 export type LayerMember = {
   /** Record id, or a stable key for a member that is not a record. */
   id: string;
-  /**
-   * What this layer *is*. Under §13.4 this is the only provenance on screen —
-   * dataset, acquisition, knobs — so a group whose rows all read the same word
-   * is this design failing. Callers own it for that reason.
-   */
   label: string;
-  /** The second line, when the label cannot carry all of it. */
   meta?: string;
   shown: boolean;
-  /**
-   * 0–100, printed as transparency (`100 -` this). **Optional, and absent
-   * means no fade at all** — step 4's rule that opacity is a raster idea, said
-   * once more for a raster that happens not to have one knob: [Visning]'s
-   * ground preset is a *stack* of tile layers, so fading it is three fades and
-   * not one, and the grounds that do fade already have that control where all
-   * their other modifiers are, on the settings strip.
-   */
+  /** 0–100, printed as transparency (`100 -` this). Absent means no fade at
+   * all: opacity is a raster idea. */
   opacity?: number;
-  /**
-   * Switched on, and nothing arrived.
-   *
-   * A layer that is on but invisible is the one state a row of switches cannot
-   * say by itself, and it is reachable: a File whose bytes will not decode, a
-   * View whose upstream has nothing over this rectangle (`useGroundView`
-   * returns exactly that as `failed`). This is where the note that used to sit
-   * under the selected card went when step 6 took the card's ground verbs —
-   * onto the switch that is claiming the layer is up.
-   */
+  /** Switched on and nothing arrived. */
   warning?: string;
-  /**
-   * Something true of this layer even when it is working perfectly.
-   *
-   * `warning`'s quiet sibling, and separate from it because the two are read
-   * at different volumes: one says the row is lying about being on the map,
-   * this one qualifies what being on the map *means* here. There is one so
-   * far — a placed upload's extent is assumed rather than measured (§13.5),
-   * and a rectangle the app invented must not sit unmarked beside an
-   * extract's.
-   */
+  /** True of the layer even when it is working. */
   note?: string;
-  /**
-   * The heading this member sits under, printed when it differs from the one
-   * above it — which is why the caller hands the members in group order rather
-   * than handing groups.
-   *
-   * There is one grouping so far and it is by funn (§13.6, §13.10 step 9):
-   * `[Bilde]` and `[Skisse]` put the lokalitet's own images first and each
-   * funn's above them. That order is also the paint order, so the caller
-   * cannot sort for display alone — see `funnGroups.ts`. Absent on every
-   * member means no headings at all, which is what a lokalitet that has never
-   * filed an image under a funn should look like.
-   */
+  /** Printed when it differs from the member above, so members must arrive in
+   * group order, which is also the paint order (`funnGroups.ts`). */
   section?: string;
 };
 
@@ -106,29 +43,20 @@ export const LayerGroup = ({
   onToggle,
 }: {
   icon: MaterialSymbol;
-  /** The group's name, on the button. */
   label: string;
-  /** The verb a press on that button performs, and its accessible name. */
+  /** The verb a press on the button performs, and its accessible name. */
   toggleLabel: string;
   /** Accessible name for the caret and its panel. */
   membersLabel: string;
   /** Keyboard shortcut for the toggle, appended to its tooltip. */
   hint?: string;
   shown: boolean;
-  /** How many members are on the map. See the badge note below. */
+  /** How many members are on the map — what is on, not what exists. */
   shownCount: number;
-  /** The pulldown's geometry, for a body that is not `LayerMembers`. */
   width?: number;
   padded?: boolean;
-  /**
-   * The pulldown's contents, given a way to dismiss it.
-   *
-   * A function rather than a node because `FunnList`'s rows fly the map to a
-   * funn, and a pulldown left standing over the place it just flew to is the
-   * one outcome that gesture cannot want. The alternative — the caller owning
-   * `open` and passing it down — is what this component exists to stop four
-   * rows from each doing.
-   */
+  /** A function rather than a node because `FunnList`'s rows fly the map and
+   * must close over the dismiss. */
   children: (close: () => void) => ReactNode;
   onToggle: () => void;
 }) => {
@@ -136,15 +64,6 @@ export const LayerGroup = ({
 
   return (
     <div className={styles.group}>
-      {/* The badge counts what is *on*, not what exists, and goes away with
-          the group. The other counted button on this row, `Bilder ▾`, answers
-          "is there anything here" — that is what a rail is for — and a layer
-          switch is only ever asked "how much of it am I looking at".
-
-          For `Funn` that is a change of meaning with almost no change of
-          number: every funn is on unless you switched it off, so the badge
-          still answers "does this rectangle have anything in it" in the
-          ordinary case, which is the property §6 wanted from it. */}
       <ModeButton
         icon={icon}
         label={label}
@@ -181,20 +100,7 @@ export const LayerGroup = ({
   );
 };
 
-/**
- * The default pulldown body: a switch and a fade per member.
- *
- * Exported separately from `LayerGroup` so that a group with a body of its own
- * does not have to pretend its records are plain layers — see the note above.
- *
- * `select` is the other polarity, and `[Visning ▾]` is the one group that
- * wears it: exactly one member at a time, so a press *replaces* rather than
- * toggles and the row marks itself the way every dataset pulldown in the
- * ribbon does — a left bar, no glyph. The two modes share this component
- * rather than forking it because what differs is those two lines; everything
- * a member row is *for* — the provenance under the label, the note, the
- * warning, the fade — is the same question asked of the same record.
- */
+/** The default pulldown body, exported so `FunnList` can bring its own. */
 export const LayerMembers = ({
   members,
   select = false,
@@ -225,39 +131,9 @@ export const LayerMembers = ({
 );
 
 /*
- * A switch and a fade, per member.
- *
- * In toggle mode the switch is a checkbox rather than a `PulldownItem`'s left
- * bar for the reason `PulldownCheck` gives: several rows are on at once, and a
- * bar that says "this is the one" says the wrong thing about the other three.
- * In `select` mode exactly one row *is* the one, so the bar is what the row
- * wears and the glyph goes — which is also what makes `[Visning ▾]` read as
- * the sibling of the four dataset pulldowns it has always behaved like under
- * W/S. Neither is `PulldownCheck` or `PulldownItem` itself, because those rows
- * are a single line and this one grows a slider under it.
- *
- * The slider is absent rather than disabled while the member is off — a fade
- * that cannot be seen is indistinguishable from a fade that does nothing, the
- * same call `TerrainSliders` makes — and it streams, because what is being
- * watched is the layer underneath coming through and a fade that only lands on
- * release cannot be aimed. A member with no `opacity` at all never grows one.
- * It survives the move to one-at-a-time and is the better half of it: fading
- * the one View that is up is now how you read it *against* the ground it was
- * rendered on, which selecting it has just put underneath.
- *
- * The switch fills `.head` on its own. It used to share that line with one
- * verb — `Gjenskap`, at the right edge of a [Visning] row — and that verb is
- * gone because pressing the row performs it: a second control for "put the map
- * back the way this image was taken" beside a press that does exactly that is
- * the failure docs/ui-architecture.md §1 is about. `.head` stays a flex line:
- * the seam is what made the label truncate correctly.
- *
- * **0 % is opaque.** The word on screen is transparency, so the number counts
- * what the word names; the map holds opacity and the flip is here, at the
- * surface that prints the word. The terrain strip says the same thing the same
- * way; `BildeTransparency`, which was the third, is what step 6 deleted — a
- * fade for the one image on the ground, anchored to the rectangle's corner,
- * replaced by a fade per member where the member's switch is.
+ * Not `PulldownCheck` / `PulldownItem`: those rows are a single line and this
+ * one grows a slider. The map holds opacity and the screen says transparency;
+ * the flip is here.
  */
 const MemberRow = ({
   member,

@@ -1,40 +1,7 @@
-// A kept bilde as a layer over its own rectangle — and for a View, its own
-// pixels when there is no figure to lay down (docs/lokalitet-view.md §13.10,
-// step 2).
-//
-// A stored image reached the map exactly two ways before this, and neither is
-// the one a [Visning] member needs. `useRecreateView` applies a spec to the
-// *whole map*, which answers "put the map back the way it was" and throws the
-// rectangle away. `Vis i ruta` could only paste the *pinned figure* at its
-// `bbox25833`, which needs the file to exist — so a View that the pin queue
-// has not reached yet, or a fork whose Views all arrived as bare specs, had
-// nothing to show. This module is the third path: the spec's own pixels over
-// the spec's own rectangle, produced on demand from the same four producers
-// the pin queue uses. Step 6 deleted the second path and put both groups on
-// this one (`shell/groundMembers.tsx`), so a File is now the same call with
-// nothing to produce.
-//
-// **Paint the pin where there is one; render live where there is not.** §13.2
-// says a View's figure never goes on the map and argues it from sharpness —
-// stretch a PNG and zooming stops helping. Building it says otherwise, and the
-// measurement is worth keeping: `renderFigureBlob` fits a figure to 40 Mpx,
-// and a lokalitet is 50–1500 m per side (`bboxLimits.ts`), so every producer's
-// native resolution already fits inside that cap. 1500 m of LiDAR at 0.25 m/px
-// is 36 Mpx; a terrain render is capped at 3000 px per side long before it.
-// **A pinned figure is the source's own pixels**, cropped past the caption
-// panel by `imageRect`, and there is nothing finer to upgrade it to. The one
-// exception is a flyfoto over the largest rectangles — 1500 m at NiB's 0.2 m
-// target is 56 Mpx, so the store fits it to 0.237 — and re-stitching the whole
-// acquisition to recover 18 % is not a trade worth making on a zoom notch.
-//
-// So §13.2's rule survives where it does work (nobody has to choose, and an
-// unpinned View is fully usable) and is dropped where it was reasoning from an
-// assumption that does not hold here. What that costs is written down: there
-// is no resolution ladder in this module, and adding one later means measuring
-// again rather than reading it off §13.2.
-//
-// The figure is still the citable artifact and still pinned eagerly; none of
-// this is a cache (§13.3, `pinQueue.ts`).
+// A kept bilde as a layer over its own rectangle: paint the pinned figure
+// where there is one, render the spec live where there is not. A pinned figure
+// is the source's own pixels cropped past the caption panel, so there is no
+// resolution ladder here; adding one means measuring the producers again.
 
 import { transformExtent } from 'ol/proj';
 import { useEffect, useState } from 'react';
@@ -49,17 +16,12 @@ import { fetchFlyfoto } from './flyfoto';
 import { fetchFlyfotoProjectsForBbox } from './flyfotoProjects';
 import { isPinned, viewSpecOf, type ViewSpec } from './viewSpec';
 
-/*
- * The same ceiling the pin queue puts on a render, and the same number
- * deliberately: it is the same producer doing the same work over the same
- * rectangle, so a second figure for "this stitch has stopped making progress"
- * would only be a second way to be wrong about it. What keeps this one from
- * being felt as a five-minute wait is the abort on switching records, not a
- * shorter clock.
- */
+// Same ceiling as the pin queue, deliberately: same producer, same work. What
+// keeps it from being felt is the abort on switching records, not a shorter
+// clock.
 const LIVE_RENDER_DEADLINE_MS = 300_000;
 
-/** `[minX, minY, maxX, maxY]` in EPSG:25833, as every producer writes it. */
+/** `[minX, minY, maxX, maxY]` in EPSG:25833. */
 export const groundExtentOf = (meta: Record<string, unknown>) => {
   const b = meta.bbox25833;
   return Array.isArray(b) &&
@@ -69,15 +31,9 @@ export const groundExtentOf = (meta: Record<string, unknown>) => {
     : null;
 };
 
-/**
- * Where the ground sits inside the figure PNG, in that file's own pixels.
- *
- * Not optional in practice but treated as such: the caption panel is drawn
- * *below* the image (src/figure/), so a figure is taller than the rectangle it
- * shows and painting the whole file at the extent would squash the ground and
- * hang a caption off the bottom of it. Anything without an imageRect predates
- * the figure work and is pixel-registered already.
- */
+// Where the ground sits inside the figure PNG, in that file's own pixels: the
+// caption panel is drawn below the image, so a figure is taller than the
+// rectangle it shows. Records with no imageRect are pixel-registered already.
 const cropOf = (meta: Record<string, unknown>, img: HTMLImageElement) => {
   const r = meta.imageRect as Record<string, unknown> | undefined;
   const n = (v: unknown) =>
@@ -97,17 +53,9 @@ export type ViewRaster = {
   extent25833: [number, number, number, number];
 };
 
-/*
- * Spec → ground pixels. The sibling of `pinQueue.renderSpec`, and deliberately
- * not the same function: that one produces the *figure* — scale bar, north
- * arrow, caption panel below the image — which is the one thing that must not
- * go on the map. The source lookups are all the two duplicate, and three lines
- * each is cheaper than entangling the citable artifact's path with the
- * screen's.
- *
- * `null` is "the source has nothing over this rectangle", which is a fact
- * about the ground rather than a failure; anything that throws is one.
- */
+// Spec → ground pixels. Sibling of `pinQueue.renderSpec`, which produces the
+// captioned figure instead — that must not go on the map. `null` means the
+// source has nothing over this rectangle; a throw is a failure.
 export const renderViewRaster = async (
   spec: ViewSpec,
   extent25833: [number, number, number, number],
@@ -173,39 +121,25 @@ export const renderViewRaster = async (
     }
 
     case 'sketch':
-      // `map/sketchOverlay.ts` owns this one, and has to: a sketch is a
-      // transparent layer over the ground rather than an image of it, so it
-      // belongs at zIndex 2 in a set of its own — the [Skisse] group, not
-      // [Visning]. Answering here would put a second copy of it on the map one
-      // level down, on white paper, with a caption panel.
+      // `map/sketchOverlay.ts` owns this one: a sketch is a transparent layer
+      // at zIndex 2, not a ground.
       return null;
 
     case 'scene':
-      // Neither is a scene a ground layer. It is a statement *about* the
-      // stack — the thing the stack is read off, not a thing in it — and the
-      // one place it becomes pixels is its own flatten, which is the pin
-      // queue's (§13.7). A scene switched onto the ground under the members
-      // it is a record of would be the arrangement showing through itself.
+      // A scene is a statement about the stack, not a layer in it; the one
+      // place it becomes pixels is its own flatten, in the pin queue.
       return null;
   }
 };
 
 /**
- * One record's ground pixels, outside React: the pin where there is one, a
- * live render where there is not.
+ * One record's ground pixels, outside React, for callers that must composite.
+ * The hook below deliberately does not use it: on the map a pinned figure goes
+ * to `setGroundOverlay` as the `<img>` itself, since a 36 Mpx intermediate
+ * canvas per member is ~140 MB of nothing.
  *
- * The hook below does not call it, and that is deliberate rather than an
- * oversight. On the map a pinned figure goes to `setGroundOverlay` as the
- * `<img>` itself with a crop beside it, because the overlay draws from the
- * source directly and a 36 Mpx intermediate canvas per member is ~140 MB of
- * nothing. A flatten has to *composite*, so it needs the pixels in hand.
- * Everything downstream of that difference — which file, which crop, which
- * producer when there is no file — is the same, and is here.
- *
- * **Not for a sketch.** A sketch's pin is its figure, which is drawn on white
- * paper (`pinQueue`), so laying one over a ground would erase the ground. Its
- * caller renders the scene transparent instead; this returns null rather than
- * the file, so the trap cannot be fallen into by accident.
+ * Returns null for a sketch: its pin is drawn on white paper, so laying it
+ * over a ground would erase the ground.
  */
 export const groundRasterOf = async (
   rec: AttachmentRecord,
@@ -241,9 +175,8 @@ export const groundRasterOf = async (
         return { canvas, extent25833 };
       }
     } catch (e) {
-      // Same fallback the hook makes, for the same reason: a View is
-      // reproducible by definition, so a file that will not load is a reason
-      // to make the pixels again rather than a reason to give up.
+      // A View is reproducible, so an unloadable file falls through to a live
+      // render rather than failing.
       console.warn('[groundView] pinned figure unusable', rec.id, e);
     }
   }
@@ -253,14 +186,10 @@ export const groundRasterOf = async (
 };
 
 /**
- * Put one attachment on the ground under `key`, and take it down again.
- * `null` is "nothing here".
- *
- * Returns whether the record could not be shown at all — a narrower claim than
- * it looks, because for a View a figure that will not load is not one: the
- * pixels can be made again, so a missing or broken file falls through to the
- * live render rather than to an error. Only a File with no usable bytes, or a
- * View whose upstream has nothing over the rectangle, ends up `failed`.
+ * Put one attachment on the ground under `key`, and take it down again; `null`
+ * is "nothing here". `failed` means only a File with no usable bytes or a View
+ * whose upstream has nothing over the rectangle — a View's broken figure falls
+ * through to a live render instead.
  */
 export const useGroundView = (
   key: string,
@@ -268,10 +197,9 @@ export const useGroundView = (
 ): { failed: boolean } => {
   const [failed, setFailed] = useState(false);
 
-  // Deliberately keyed on the record's identity and its meta, not on the whole
-  // record: the attachment list is rebuilt on every realtime event, and
-  // re-decoding a several-megabyte PNG because somebody's caption changed
-  // would flash the map.
+  // Keyed on identity and meta, not the whole record: the attachment list is
+  // rebuilt on every realtime event, and re-decoding a several-megabyte PNG
+  // because a caption changed would flash the map.
   const id = rec?.id ?? null;
   const metaKey = rec?.meta ? JSON.stringify(rec.meta) : null;
 
@@ -290,10 +218,8 @@ export const useGroundView = (
     const spec = viewSpecOf(rec);
 
     let cancelled = false;
-    // Cancellation is what makes a live render affordable on a surface a
-    // person is clicking through: walking the rail starts at most one stitch,
-    // because switching records aborts the one before it rather than leaving
-    // it to finish into a member nobody is looking at.
+    // Switching records aborts the render before it, so walking the rail
+    // leaves at most one stitch in flight.
     const ac = new AbortController();
 
     const goLive = () => {
@@ -305,9 +231,7 @@ export const useGroundView = (
         LIVE_RENDER_DEADLINE_MS,
         `${spec.kind} live render`,
         (deadline) => {
-          // Folded into the one controller rather than combined at the call
-          // site: the producers take a single signal, and this way whichever
-          // of the two fires stops the same requests.
+          // Producers take a single signal, so fold the deadline into `ac`.
           deadline.addEventListener('abort', () => ac.abort(deadline.reason));
           return renderViewRaster(spec, extent25833, ac.signal);
         },
@@ -337,11 +261,9 @@ export const useGroundView = (
     };
 
     if (isPinned(rec)) {
-      // The original, never a thumbnail. `meta.imageRect` is in the original
+      // The original, never a thumbnail: `meta.imageRect` is in the original
       // file's pixels and nothing records the figure's own width, so a thumb
-      // cannot be scaled back to the ground without guessing — and a guess
-      // that is a pixel out is half a metre out on the map, which defeats the
-      // point of registering it at all.
+      // cannot be scaled back to the ground without guessing.
       const img = new Image();
       img.src = getAttachmentUrl(rec);
       img
@@ -356,19 +278,15 @@ export const useGroundView = (
         })
         .catch(() => {
           if (cancelled) return;
-          // A View is reproducible by definition, so a file that will not load
-          // is a reason to make the pixels again rather than a reason to give
-          // up. A File has nothing behind it and this is as far as it goes.
           goLive();
         });
     } else {
       goLive();
     }
 
-    // Note what this cleanup does *not* do: it does not take the member down.
-    // Swapping from one bilde to another runs it, and withdrawing here would
-    // blank the map for as long as the next image takes to arrive. Taking it
-    // down is the `rec == null` branch above and the unmount cleanup below.
+    // Must not take the member down: swapping bilder runs this, and
+    // withdrawing here would blank the map until the next image arrives.
+    // Taking it down is the `rec == null` branch and the unmount cleanup.
     return () => {
       cancelled = true;
       ac.abort();

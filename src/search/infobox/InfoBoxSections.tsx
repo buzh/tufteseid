@@ -11,13 +11,8 @@ import styles from './InfoBox.module.css';
 import { PlaceInfo } from './PlaceInfo';
 import { PropertyInfo } from './PropertyInfo';
 
-/*
- * The stack of disclosures under the preamble. All independent, all closed to
- * begin with, so the open set lives here and each section is a controlled
- * `Section` — the same shape as the search results panel. `FeatureInfoSection`
- * opens itself when there is exactly one hit, which the controlled pair
- * already allows; it used to reach into the accordion's context for that.
- */
+// The stack of disclosures under the preamble: independent, closed to begin
+// with, so the open set lives here and each is a controlled `Section`.
 export const InfoBoxSections = () => {
   const placesNearby = useAtomValue(placesNearbyAtom);
   const selectedResult = useAtomValue(selectedResultAtom);

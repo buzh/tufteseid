@@ -1,18 +1,7 @@
-// Stitch Norge i bilder (NiB) ortofoto over a lokalitet's bbox into a
-// single JPEG, so a user can keep aerial imagery of an area as a Bilde
-// without hand-shooting screenshots.
-//
-// Two sources, one stitcher: the seamless best-available mosaic (default)
-// and any single acquisition from the archive (pass a FlyfotoProject —
-// see flyfotoProjects.ts), which is what makes the same ground readable
-// across decades.
-//
-// Requests go same-origin through /wms/nib/* (the mosaic) and
-// /arcgis/nib/* (one acquisition): Caddy → wmscache (cache) → the
-// nib-proxy sidecar (which injects NiB's anonymous access token) →
-// services.norgeibilder.no. See nib-proxy/server.mjs and the "Flyfoto"
-// section of docs/map-layers.md. The tiling/paint/concurrency machinery is
-// shared with the LiDAR extract (src/lidarExtract/stitch.ts).
+// Norge i bilder ortofoto over a lokalitet's bbox: the seamless mosaic or one
+// acquisition, one stitcher. Same-origin through /wms/nib/* and /arcgis/nib/*
+// → Caddy → wmscache → nib-proxy (which injects the anonymous token). Tiling
+// and concurrency are src/lidarExtract/stitch.ts.
 
 import { transformExtent } from 'ol/proj';
 import type { LocalityBbox } from '../api/localities';
@@ -23,55 +12,39 @@ import {
 } from '../lidarExtract/stitch';
 import type { FlyfotoProject } from './flyfotoProjects';
 
-// Same-origin NiB ortofoto WMS. The published layer name is verified
-// against GetCapabilities on deploy — change it here if it differs (see
-// the docker rebuild notes / README).
 export const FLYFOTO_WMS_URL = '/wms/nib/ortofoto';
 export const FLYFOTO_LAYER = 'ortofoto';
 
-// Rendering *one* acquisition instead of the seamless mosaic is not a WMS
-// operation: /wms/ortofoto publishes only the merged `ortofoto` layer, and
-// the per-project service has no WMS endpoint at all. It is an ArcGIS
-// ImageServer whose mosaic catalogue carries a prosjektnavn column, so a
-// single project is selected with a mosaicRule `where` clause.
-//
-// The service root, without the operation: the background layer built on
-// the same service in map/layers/config/backgroundLayers/flyfotoBackground.ts
-// hands this to OpenLayers, which appends /exportImage itself.
+// One acquisition is not a WMS operation: /wms/ortofoto publishes only the
+// merged layer. It is an ArcGIS ImageServer whose catalogue carries a
+// prosjektnavn column, picked with a mosaicRule `where`. Exported without the
+// operation: the background layer hands the root to OL, which appends it.
 export const FLYFOTO_PROJECT_IMAGESERVER =
   '/arcgis/nib/ortofoto_prosjekter/ImageServer';
 const FLYFOTO_PROJECT_URL = `${FLYFOTO_PROJECT_IMAGESERVER}/exportImage`;
 
-// Selects exactly one acquisition out of the ImageServer's mosaic
-// catalogue. Doubling is SQL's apostrophe escape; a few project names have
-// one. Shared with the background layer so the two paths can never disagree
-// about how a name is quoted.
+// SQL apostrophe escape; a few project names have one. Shared with the
+// background layer so the two cannot disagree about quoting.
 export const flyfotoProjectWhere = (projectId: string): string =>
   `prosjektnavn='${projectId.replace(/'/g, "''")}'`;
 
-// Draw exactly the rasters the where clause selects, in catalogue order,
-// with none of the service's default by-date/by-quality preference mixing
-// other projects back in.
+// `esriMosaicNone`: exactly what the where clause selects, with no by-date
+// preference mixing other projects back in.
 export const flyfotoMosaicRule = (projectId: string): string =>
   JSON.stringify({
     mosaicMethod: 'esriMosaicNone',
     where: flyfotoProjectWhere(projectId),
   });
 
-// Ortofoto nationally is ~0.10–0.25 m/px; 0.20 keeps a lokalitet-sized
-// grab sharp. planTiles scales both axes down together past its canvas
-// cap, so on a large bbox the effective resolution is coarser than this —
-// hence it's a target, not a floor, and we report the actual value back.
+// A target, not a floor: planTiles scales down past its canvas cap and the
+// actual value is what gets reported.
 const TARGET_M_PER_PX = 0.2;
-// NiB sits behind the same shed-and-retry public edge as Kartverket, so
-// keep concurrency modest and let wmscache absorb repeats.
+// NiB is behind the same shed-and-retry public edge as Kartverket.
 const MAX_CONCURRENT = 4;
 const TILE_RETRIES = 3;
 
 export type FlyfotoResult = {
-  // The stitched pixels, not bytes: everything that keeps one of these runs
-  // it through the provenance figure first (src/figure), which needs a
-  // canvas to draw a caption under.
+  // Pixels, not bytes: src/figure needs a canvas to draw a caption under.
   canvas: HTMLCanvasElement;
   widthPx: number;
   heightPx: number;
@@ -91,9 +64,8 @@ function buildProjectUrl(
     bboxSR: '25833',
     imageSR: '25833',
     size: `${widthPx},${heightPx}`,
-    // Plain jpg, not the jpgpng the background layer asks for: a stitch
-    // flattens onto an opaque white canvas anyway, and fetchAndPaint's
-    // uniform-image check is what drops the no-coverage tiles.
+    // Plain jpg, not jpgpng: the stitch flattens onto opaque white and
+    // fetchAndPaint's uniform check drops the empty tiles.
     format: 'jpg',
     mosaicRule: flyfotoMosaicRule(project.id),
   });
@@ -115,23 +87,18 @@ function buildUrl(
     BBOX: bbox25833.join(','),
     WIDTH: String(widthPx),
     HEIGHT: String(heightPx),
-    // Ortofoto is opaque photography — JPEG is far smaller than PNG here
-    // and there's no transparency to preserve.
     FORMAT: 'image/jpeg',
   });
   return `${FLYFOTO_WMS_URL}?${params.toString()}`;
 }
 
 export type FlyfotoOptions = {
-  // Omit for the seamless best-available mosaic; pass one to grab that
-  // single acquisition instead.
   project?: FlyfotoProject;
   signal?: AbortSignal;
 };
 
-// Returns null when nothing painted and nothing failed — the bbox is entirely
-// outside NiB coverage, or outside this project's. A grab where every tile
-// errored or timed out throws instead.
+// Null when nothing painted and nothing failed: outside coverage. A grab where
+// every tile errored throws instead.
 export async function fetchFlyfoto(
   bbox4326: LocalityBbox,
   { project, signal }: FlyfotoOptions = {},
@@ -143,10 +110,8 @@ export async function fetchFlyfoto(
     number,
   ];
 
-  // Never ask for finer than the acquisition actually holds: a 1937 flight
-  // at 0.5 m upsampled to 0.2 m is four times the tiles for the same
-  // detail. The mosaic has no single native resolution, so it keeps the
-  // target.
+  // Never finer than the acquisition holds — a 1937 flight upsampled is four
+  // times the tiles for the same detail. The mosaic keeps the target.
   const metresPerPx = Math.max(TARGET_M_PER_PX, project?.metresPerPx ?? 0);
   const plan = planTiles(bbox25833, metresPerPx);
   const canvas = document.createElement('canvas');
@@ -154,8 +119,7 @@ export async function fetchFlyfoto(
   canvas.height = plan.heightPx;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
-  // Ortofoto is opaque; paint a white base so any no-coverage gap reads
-  // as neutral rather than transparent-black once flattened to JPEG.
+  // White base: a no-coverage gap would flatten to black in JPEG.
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, plan.widthPx, plan.heightPx);
 
@@ -190,11 +154,8 @@ export async function fetchFlyfoto(
   });
 
   if (signal?.aborted) throw new Error('flyfoto grab cancelled');
-  // "Nothing came back" is not "nothing is there" — a tile can now also be
-  // given up on for taking too long. Reported as null this would reach the pin
-  // queue as `empty`, which is the state that says the acquisition does not
-  // reach this valley and offers no retry. Same rule as `fetchDem` and
-  // `extractCanvas`.
+  // "Nothing came back" is not "nothing is there": null reaches the pin queue
+  // as `empty`, which offers no retry. Same rule as `fetchDem`.
   if (painted === 0 && failed > 0) {
     throw new Error('every flyfoto tile request failed');
   }

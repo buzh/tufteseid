@@ -1,439 +1,212 @@
-# Terrain analysis — float DEMs, and what to build on them
+# Terrain analysis — float DEMs from hoydedata.no
 
-Notes for the analysis work that goes beyond re-styling Kartverket's
-pre-rendered hillshade. Three parts: the elevation-data access this rests on
-(verified, don't re-derive), the two bigger builds that are still designs
-(server-side visualization, QGIS handoff), and the Norwegian data sources
-we're not pulling yet.
+Kartverket's WMS only publishes relief pre-shaded (`skyggerelieff`,
+`helning_prosent`), and a single-azimuth hillshade hides every feature running
+parallel to the sun. The visualizations that work for earthworks are
+illumination-independent and need elevation values, so this module fetches the
+raw float grid and computes relief in the browser. Reference: Kokalj & Hesse,
+*Airborne laser scanning raster data visualization* (ZRC SAZU, open access);
+RVT's `blend.py` / `blend_func.py` is the specification `composeVat` follows.
 
-Read `wms-proxy-and-tiles.md` first if you're touching how any of this is
-proxied — the routing rules there apply unchanged. `analysis-roadmap.md` is
-the shorter overview of the same thread, including the tool survey and what
-was rejected.
+Where it lives: `src/terrain/dem.ts` (fetch + TIFF reader), `shade.ts`
+(operators), `render.ts` (field → canvas, headless-capable),
+`src/shell/terrain/` (the control surface, described in
+`docs/ui-architecture.md`), `src/figure/specs.ts` (`terrainFigure`). The
+rectangle analysed is always an open lokalitet's bbox, read off the record
+rather than copied, so resizing the lokalitet refetches the DEM; Terreng is a
+read tool, available in full to a guest who followed a share link into a
+`public` lokalitet, and pressing it with nothing open places a lokalitet first.
 
-**One thing about scope, because it changed and the code no longer shows the
-seam.** The rectangle a DEM is fetched for is always an open lokalitet's bbox.
-There used to be a second, free-floating rectangle framed from the ribbon over
-the bare map, with a `Lagre` of its own that turned it into a lokalitet on the
-way out; it is gone, and pressing Terreng with nothing open now creates the
-lokalitet first (`docs/ui-architecture.md` §5.3, §10). The consequence to know
-before designing anything here: **computing relief requires an account.** A
-signed-out visitor can browse the map and read Kartverket's pre-baked
-hillshade, but not this. The tier-1 and tier-2 designs below assume a lokalitet
-exists, which they always did — what changed is that this is now true by
-construction rather than by convention.
-
-## Why bother: hillshade is the weak visualization
-
-Everything the app renders today is Kartverket's *pre-baked* raster: the WMS
-publishes `skyggerelieff`, `helning_prosent` and friends as named layers and
-we pick one. That's a single-azimuth hillshade, and its defining flaw is that
-it hides every feature running parallel to the sun. A ditch lit end-on is
-invisible.
-
-The archaeological-prospection literature settled this a while ago — the
-reference is Kokalj & Hesse, *Airborne laser scanning raster data
-visualization* (ZRC SAZU, open access). The visualizations that actually work
-for earthworks are illumination-independent: sky-view factor, positive and
-negative openness, local relief models, and blends of those (VAT). None of
-them can be computed from a shaded PNG. They all need the elevation values.
-
-So the unlock is getting float elevation into our hands.
-
-## Elevation data access (verified 2026-09-09)
-
-`hoydedata.no` runs an ArcGIS Server whose ImageServers will hand over the raw
-elevation grid, anonymously, no token:
+## The endpoint
 
 ```
-GET https://hoydedata.no/arcgis/rest/services/Prosjekt_DTM/ImageServer/exportImage
-    ?bbox=262000,6649000,262300,6649300
-    &bboxSR=25833&imageSR=25833
-    &size=1200,1200
-    &format=tiff&pixelType=F32
+GET /arcgis/hoydedata/Prosjekt_DTM/ImageServer/exportImage
+    ?bbox=…&bboxSR=25833&imageSR=25833
+    &size=1200,1200&format=tiff&pixelType=F32
+    &interpolation=RSP_BilinearInterpolation
     &renderingRule={"rasterFunction":"None"}
     &mosaicRule={"mosaicMethod":"esriMosaicAttribute","sortField":"lowps","sortValue":0}
     &f=image
-→ 200 image/tiff, 6.4 MB, 1200×1200, 32-bit float, 0.25 m/px
 ```
 
-`renderingRule` matters: the service's other raster function is `skyggerelieff`,
-i.e. the same shaded product the WMS serves. `None` is what gets you values.
+- `renderingRule` is load-bearing: the service's other raster function is
+  `skyggerelieff`, the shaded product the WMS already serves. `None` returns
+  values.
+- Same-origin `/arcgis/hoydedata/*` → Caddy → wmscache →
+  `hoydedata.no/arcgis/rest/services/*`. Anonymous, no token sidecar unlike
+  NiB. Proxy rules and cache lifetime: `docs/wms-proxy-and-tiles.md`.
+- `Prosjekt_DOM` defaults to a `Northwest` mosaic method where `Prosjekt_DTM`
+  defaults to `ByAttribute` / `lowps`, so `dem.ts` states `esriMosaicAttribute`
+  / `lowps` explicitly to make the two models resolve overlaps alike.
+  `allowedMosaicMethods` is `ByAttribute,NorthWest,LockRaster` — no
+  `esriMosaicNone`, so the NiB flyfoto `mosaicRule` does not transfer.
+- `Prosjekt_DTM` carries `LAS_PROJECT_NAME`, so per-acquisition selection is
+  available the way per-project ortofoto is. `maxImageWidth/Height` is 15000
+  per-project and 4096 national, but `planTiles`' own `MAX_TILE_PX` (2048) is
+  what actually bounds a request.
+- `returnDistinctValues=true` works here (unlike NiB's ImageServer) but ignores
+  `returnGeometry=false` and ships full footprint rings. Use `outStatistics`.
+- Untested standards-based alternative, if the ArcGIS dependency ever bites:
+  `wcs.geonorge.no/skwms1/wcs.hoyde-dtm-nhm-25833` answers GetCapabilities.
 
-Facts worth not re-deriving:
+### The TIFF
 
-- **The services we care about** are `Prosjekt_DTM` / `Prosjekt_DOM`
-  (per-acquisition, 0.25 m — what `src/terrain/dem.ts` fetches) and the
-  national `NHM_DTM_TOPOBATHY_25833` / `NHM_DOM_25833` (1 m — what the app's
-  LiDAR background and `searchApi.ts` use). `25832` and `25835` variants exist
-  for the other UTM zones; we're 25833 throughout. Why the per-project pair
-  won: the coverage probe below.
-- **Request-size caps differ.** The national mosaics declare
-  `maxImageWidth/Height: 4096`; `Prosjekt_DTM` declares **15000**. A
-  lokalitet-sized bbox is one request either way, and `planTiles`' own
-  `MAX_TILE_PX` (2048) is what actually bounds a single request — but tile
-  against 4096 if the national path is ever used again.
-- **The output TIFF is a very narrow subset of the format.** Always
-  little-endian, `Compression: 1` (none), `BitsPerSample: 32`,
-  `SampleFormat: 3` (IEEE float), `SamplesPerPixel: 1`, `PlanarConfig: 1`,
-  and always **tiled at 128×128** — never striped. That's why
-  `src/terrain/dem.ts` carries its own ~120-line reader instead of pulling in
-  `geotiff.js`: the dependency is ~500 KB to handle a hundred variants this
-  endpoint never emits, and adding it would mean regenerating
-  `package-lock.json`, which the workstation can't do (`npm ci` in the
-  Dockerfile).
-- **No-coverage is signalled by sparse tiles, not by a nodata value.** Ask for
-  a bbox outside the LiDAR footprint and you still get a structurally valid
-  TIFF — 1135 bytes for a 100×100 request — with `TileOffsets: [0]` and
-  `TileByteCounts: [0]`. Absent tile, not an error. The `noData` query
-  parameter has no observable effect on this endpoint; don't bother passing
-  it.
-- **Water inside a covered tile reads as exactly `0.0`**, in bulk — a flat
-  zero plane rather than bathymetry, even on the mosaic named TOPOBATHY.
-  (Open water past the laser's reach is not covered at all: at 1 m/px a bbox
-  out in Skagerrak comes back fully sparse from national and per-project
-  alike, so the bathymetry rows must sit behind a `MINPS` of their own.)
-  Harmless for a land lokalitet, but it will flatten the histogram of any
-  bbox with a fjord in it, so relief stretches should be computed on
-  percentiles rather than min/max.
-- **Georeferencing is exactly what you asked for.** `ModelPixelScale` is the
-  requested resolution and `ModelTiepoint` maps raster (0,0) to the bbox's
-  north-west corner. There's no need to parse the GeoTIFF geo-tags at all —
-  the requested bbox *is* the georeferencing.
-- **`Prosjekt_DTM` carries `LAS_PROJECT_NAME`**, so per-acquisition selection
-  is available the same way per-project ortofoto works. One difference from
-  the NiB recipe: its `allowedMosaicMethods` are `ByAttribute,NorthWest,
-  LockRaster` — **`esriMosaicNone` is not in the list**, so the `mosaicRule`
-  used for flyfoto won't transfer verbatim.
-- **A standards-based alternative exists** if the ArcGIS dependency ever
-  bothers us: `wcs.geonorge.no/skwms1/wcs.hoyde-dtm-nhm-25833` answers
-  GetCapabilities. Untested beyond that.
+One shape, always: little-endian, uncompressed (`Compression: 1`), single band,
+32-bit IEEE float (`BitsPerSample: 32`, `SampleFormat: 3`), `PlanarConfig: 1`,
+tiled 128×128, never striped — which is why `dem.ts` carries its own ~120-line
+reader rather than `geotiff.js`.
 
-### Which mosaic: the coverage-edge probe (measured 2026-09-10)
+- No coverage arrives as sparse tiles, not as a nodata value or an error: a
+  bbox outside the footprint returns a valid TIFF with `TileOffsets: 0` /
+  `TileByteCounts: 0`. Those pixels become NaN and every operator is NaN-aware.
+  The `noData` query parameter has no observable effect.
+- Georeferencing is exactly what was requested (`ModelTiepoint` is the bbox's
+  north-west corner at the requested pixel size), so the geo-tags go unparsed.
+- Water inside a covered tile reads as exactly `0.0` in bulk, even on the mosaic
+  named TOPOBATHY. Harmless on land, but it flattens the histogram of any bbox
+  with a fjord in it — stretch on percentiles, not min/max.
 
-The analysis originally pinned the **national** 1 m mosaic. It now uses the
-**per-project** 0.25 m one, and the switch turned out to cost nothing. What
-the measurements said:
+### Which mosaic, and why there is no fallback
 
-- **The national mosaic is not a 1 m LiDAR product — it is a blend.** Its
-  catalogue holds NHM laser tiles (`33-158-182`, LOWPS 1, ZORDER −300), DTM10
-  tiles (`7607_1_10m_z33`, LOWPS 10, ZORDER −200) and DTM50, and the DTM10
-  rows carry **`MINPS: 0`**. There is no lower cell size at which they stop
-  participating, so wherever NHM never flew, `exportImage` serves 10 m
-  contour-derived elevation resampled up to whatever you asked for. HTTP 200,
-  correct georeferencing, no flag anywhere in the response. This is the real
-  cause of "the analysis looks softer than the pre-rendered hillshade".
-- **The per-project mosaic is honest about the same gaps.** Its DTM10 rows
-  carry **`MINPS: 27`**, so below 27 m/px they drop out and an uncovered pixel
-  comes back as an absent tile → NaN, which `fetchDem` already handles.
-- **Coverage is identical where it matters.** 120 random land points, 128 m
-  window at 1 m/px, comparing three fetches per point — national default,
-  national restricted to `LOWPS>=10`, and per-project:
+The app fetches the per-project `Prosjekt_DTM` / `Prosjekt_DOM` (0.25 m), never
+the national `NHM_DTM_TOPOBATHY_25833` / `NHM_DOM_25833` (1 m, which the LiDAR
+background and `searchApi.ts` do use).
 
-  | | per-project has data | per-project empty |
-  |---|---|---|
-  | **national serves real 1 m** | 99 | **0** |
-  | **national serves DTM10** (pixel-identical to its own `LOWPS>=10` mosaic) | 0 | 21 |
+The national mosaic is a blend, not a 1 m laser product: its DTM10 rows carry
+`MINPS: 0`, so wherever NHM never flew it serves 10 m contour-derived elevation
+resampled up to whatever cell size was asked for — HTTP 200, correct
+georeferencing, nothing in the response saying so. The per-project catalogue
+gives those rows `MINPS: 27`, so below 27 m/px they drop out and an uncovered
+pixel comes back as an absent tile. Measured over 120 random land points: 99
+had real laser in both, 21 in neither, and none had laser data nationally but
+not per-project. So there is no fallback to the national mosaic and there
+should not be — the only thing it could add back is the 10 m data. Corollary:
+don't trust the catalogue for coverage, trust the pixels; a point can intersect
+a LOWPS 1 footprint and still be served DTM10.
 
-  Not one point had laser data nationally and not per-project. So the switch
-  loses no LiDAR anywhere; in the ~18 % of land where the national mosaic was
-  answering with DTM10, the tool now says "ingen laserdata" instead of drawing
-  a smooth lie. **Don't add a fallback to the national mosaic** — the only
-  thing it could contribute is exactly that 10 m data.
-- **Do not trust the catalogue for coverage; trust the pixels.** A point can
-  intersect a LOWPS 1 tile's footprint and still be served DTM10 — those tiles
-  are large and internally sparse. The `LOWPS>=10` comparison fetch is the
-  reliable detector.
-- **`Prosjekt_DOM` defaults to `Northwest`** (`sortField` empty), unlike
-  `Prosjekt_DTM`'s `ByAttribute` / `lowps`. `dem.ts` therefore sends an
-  explicit `mosaicRule` — `{"mosaicMethod":"esriMosaicAttribute",
-  "sortField":"lowps","sortValue":0}` — so both models resolve overlaps to the
-  finest raster.
-- **Resolution is probed, not assumed.** Acquisitions are 0.25, 0.5 or 1 m;
-  requesting 0.25 m over a 0.5 m project is 4× the pixels and 4× the sky-view
-  factor for pure interpolation. One catalogue query answers it:
+### The resolution probe
 
-  ```
-  GET .../Prosjekt_DTM/ImageServer/query
-      ?geometry={envelope}&geometryType=esriGeometryEnvelope&inSR=25833
-      &spatialRel=esriSpatialRelIntersects
-      &where=OPPLOSNING IS NOT NULL
-      &outStatistics=[{"statisticType":"min","onStatisticField":"OPPLOSNING",
-                       "outStatisticFieldName":"best"}]
-      &returnGeometry=false&f=json
-  → {"features":[{"attributes":{"BEST":0.25}}]}
-  ```
+Before any pixels, one ~200-byte catalogue query against
+`.../ImageServer/query`: the envelope, `spatialRel=esriSpatialRelIntersects`,
+`where=OPPLOSNING IS NOT NULL`, and `outStatistics` asking for
+`min(OPPLOSNING)`. Acquisitions are 0.25, 0.5 or 1 m and asking for 0.25 m over
+a 0.5 m project is 4× the pixels for pure interpolation; the same query also
+answers "is there any laser data here" before a megabyte moves. Two reply
+quirks: the service upper-cases `outStatisticFieldName`, and no-coverage
+arrives as one feature with `"BEST": null`, not as an empty `features` array.
+The response is under wmscache's 1000-byte store threshold, so `dem.ts`
+memoises it in-tab instead.
 
-  Sampled over 45 land points: 0.25 m at 19, 0.5 m at 18, no coverage at 8.
-  Two quirks: the reply **upper-cases** `outStatisticFieldName`, and
-  no-coverage arrives as one feature with `"BEST": null`, *not* as an empty
-  `features` array. The same query doubles as the cheap "is there anything
-  here" check, before any megabytes move. It is ~200 bytes, which is under
-  wmscache's 1000-byte store threshold, so `dem.ts` memoises it in-tab
-  instead.
-- **The cost of the switch is pixels.** `MAX_DEM_PX_PER_SIDE` is unchanged at
-  3000, so nothing comes back coarser than before — but a small rectangle that
-  used to be 300² at 1 m is now 1200² at 0.25 m, i.e. 16× the download and 16×
-  the neighbourhood work. That is the trade being bought, and it is why the
-  panel prints both the effective and the source resolution.
-- **`returnDistinctValues=true` does work here** — unlike on NiB's ImageServer,
-  where it silently returns zero features — but it **ignores
-  `returnGeometry=false`** and ships full footprint rings with every distinct
-  value, which is kilobytes to megabytes for the same one number.
-  `outStatistics` is the one to use.
+`MAX_DEM_PX_PER_SIDE` (3000) caps the assembled grid; `planTiles` scales
+resolution down to fit, and `Dem.nativeMetresPerPx` records what the
+acquisition actually publishes so a caption can say the render was resampled.
 
-### Proxying
+## The visualizations, and what each caption records
 
-Routed like every other external source — `/arcgis/hoydedata/*` → Caddy →
-wmscache → `hoydedata.no/arcgis/rest/services/*`, using the shared cache
-include. A DEM for a fixed bbox never changes, so the 180-day lifetime is
-right.
-
-`hoydedata.no` is already in the Caddyfile CSP `connect-src` (the ArcGIS
-identify call in `searchApi.ts` still goes direct), but the DEM path
-deliberately does not rely on that: same-origin gets us the 25 GB disk cache,
-and a 4 MB float TIFF is exactly the kind of response that should only be
-fetched from the origin once.
-
-### Every saved render carries its own parameters
-
-A render is only as useful as the settings behind it: a hillshade at 315°/35°
-and one at 135°/20° disagree about whether there is a mound in the same field,
-and a slope map stretched 2–98 % is a different picture from one stretched to
-its true range. So nothing leaves the app bare — `src/figure/` draws a caption
-panel under every kept or downloaded raster, and `terrainFigure`
-(`src/figure/specs.ts`) is the builder that turns the current knob positions
-into that caption:
+`src/figure/` puts a caption panel under every kept or downloaded raster and
+`terrainFigure` builds it — a hillshade at 315°/35° and one at 135°/20°
+disagree about whether there is a mound in the same field.
 
 | Visualization | Recorded |
 |---|---|
 | hillshade | azimuth, altitude, z-factor |
-| multidirectional | all six azimuths *and* their weights, altitude, z-factor |
-| slope | z-factor, 2–98 % stretch |
+| multidirectional | all six `MULTI_AZIMUTHS` *and* their weights, altitude, z-factor |
+| VAT | the whole `VAT_LAYERS` stack (vis, blend mode, opacity, absolute bounds), frozen sun 315°/35°, z-factor 1, horizon radius, `SVF_DIRECTIONS`, absolute stretch |
+| sky-view factor | horizon radius, `SVF_DIRECTIONS`, stretch |
+| positive openness | horizon radius, `SVF_DIRECTIONS`, stretch |
+| negative openness | horizon radius, `SVF_DIRECTIONS`, inverted ramp, stretch |
 | local relief model | smoothing radius, diverging ramp symmetric about zero, stretch |
-| sky-view factor | search radius, `SVF_DIRECTIONS`, stretch |
-| positive openness | search radius, `SVF_DIRECTIONS`, stretch |
-| negative openness | search radius, `SVF_DIRECTIONS`, reversed grey ramp, stretch |
-| VAT | the whole layer stack from `VAT_LAYERS` (visualization, blend mode, opacity, absolute stretch bounds), the frozen sun, search radius, `SVF_DIRECTIONS` |
+| slope | z-factor, inverted ramp, stretch |
 
-Plus, always: the model (DTM/DOM), the source mosaic, the EPSG:25833 extent,
-the geodetic centre, the grid resolution — and, when the rectangle was too
-large for `MAX_DEM_PX_PER_SIDE`, the `nativeMetresPerPx` it was resampled
-*from*. That last one is the difference between "this is all the detail there
-is" and "there is more, ask for a smaller area", and two renders of
-different-sized areas are not comparable without it.
+Always, additionally: model (DTM/DOM), source mosaic, EPSG:25833 extent,
+geodetic centre, grid resolution; `figure.set.horizonGrid` when the horizon
+scan decimated; `figure.set.resampled` with `nativeMetresPerPx` when the
+rectangle exceeded `MAX_DEM_PX_PER_SIDE`.
 
-Practical consequence for this module: **`MULTI_AZIMUTHS`, `SVF_DIRECTIONS`
-and `VAT_LAYERS` are exported and printed on figures.** Changing one silently
-changes what old and new renders mean relative to each other; the caption is
-what keeps that honest, so keep them exported. The VAT line is *assembled*
-from `VAT_LAYERS` rather than written out, so the caption cannot drift from
-the blend. The figure machinery itself is `docs/ui-architecture.md` §8.10.
+- `MULTI_AZIMUTHS`, `SVF_DIRECTIONS` and `VAT_LAYERS` are exported because they
+  are printed; changing one changes what old and new renders mean relative to
+  each other. The VAT line is assembled from `VAT_LAYERS`, so caption and blend
+  cannot drift.
+- Slope and negative openness are drawn on a reversed grey ramp and both say
+  so — negative openness is high in a depression, so painted straight it would
+  put ditches in white while sky-view beside it puts them in black (RVT inverts
+  the same two in `normalize_image`).
+- VAT's stretches are absolute where every other view's are 2–98 % percentiles,
+  and its sun is frozen: two VAT renders are comparable and two sky-view renders
+  are not. Wiring the azimuth slider to VAT would break that silently.
 
-Slope and negative openness are the two views drawn on a **reversed** grey
-ramp, and both say so on the caption. Negative openness is *high* in a
-depression — it is positive openness of the flipped surface — so painted
-straight it would put ditches in white while sky-view factor beside it puts
-them in black. RVT inverts exactly these two in `normalize_image` for the same
-reason. "These dark lines are ditches" and "these dark lines are ridges" are
-different claims, and the caption is where the difference is recorded.
+## The horizon radius: reach is bought by decimating
 
-VAT is the one view whose caption says its stretches are **absolute**. Every
-other view here is stretched 2–98 % to get a legible picture out of whatever
-range this particular hillside happens to have; VAT's four layers are mixed on
-fixed bounds, because the blend assumes 0.7 sky-view means the same thing
-everywhere. Two VAT renders are therefore comparable and two sky-view renders
-are not, and only the caption says which kind you are holding.
+The ray walk costs width × height × directions × steps, so `SVF_MAX_RADIUS_PX`
+(24) is a fixed budget on steps — which taken one DEM cell at a time is also a
+limit in metres: 24 steps of 0.25 m is 6 m, shorter than a burial mound. So
+`horizonDecimation` averages the grid down to no coarser than
+`HORIZON_MIN_M_PER_PX` (1 m), `computeHorizonFields` scans that and bilinearly
+interpolates sky-view and both opennesses back onto the full grid, masked
+against the original NaNs. Reach on a 0.25 m DEM goes 6 m → 24 m and the pass
+gets factor² cheaper. 1 m is the floor both ways: below it a 0.25 m grid is
+largely interpolation (4–5 points/m² acquisitions), above it the surface stops
+resolving the features whose horizon is being measured.
 
-The two radii are the user's now — a slider on the terrain strip, defaulting to
-`DEFAULT_LRM_RADIUS` / `DEFAULT_SVF_RADIUS` — so the caption prints the value
-that was used rather than the constant. Two, not five: the split is by
-*quantity*, so LRM's smoothing radius is one number and the horizon search
-radius shared by sky-view, both opennesses and VAT is the other
-(`usesHorizon` in `render.ts`). Getting that right needed one more thing than
-passing the number through: what the horizon scan can reach is not what it is
-asked for.
+- The horizon views are read off a coarser surface than the hillshade beside
+  them, which `figure.set.horizonGrid` prints when the factor exceeds 1.
+- A requested radius and an effective one can differ: the ceiling is
+  `horizonMaxRadiusMetres` — 24 m on any grid at 1 m or finer, 24 × the cell
+  size on a coarser one — and a saved spec can be replayed over another
+  rectangle. `clampRadius(vis, dem, metres)` in `render.ts` is the single answer
+  both the render and the caption go through, and `radiusRange` takes the
+  slider's ceiling from it. Skipping it puts "SVF-radius 40 m" on a 24 m render.
+- The four views off the scan are one ray walk read four ways (`usesHorizon`),
+  the radius clamped through `'svf'` so all four resolve to the same number,
+  which is what lets the control surface cache it (`docs/ui-architecture.md`).
 
-### The horizon radius is a distance, and that costs a decimation
+## Tier 1 — server-side visualization sidecar (designed, not built)
 
-The ray walk costs width × height × directions × steps, and `SVF_MAX_RADIUS_PX`
-(24) is the budget on the last of those — the thing that keeps the pass a pass.
-For a long time the walk stepped one DEM cell at a time, which quietly turned
-that budget into a limit in metres as well: 24 steps of 0.25 m is **6 m**, and
-6 m is shorter than a burial mound. The per-project DTM being the *finest*
-source available therefore bought the horizon views the *shortest* search, and
-there was no way to trade the resolution back.
+A container on the `nib-proxy` pattern (`ghcr.io/osgeo/gdal:ubuntu-small` plus
+`rvt-py` and `rasterio`, optionally `whitebox-tools` — MIT core only, its
+Extension toolsets are proprietary), reachable only from wmscache, one POST
+`{bbox, model, visualization}` → PNG, results landing as attachments under a
+new `analyse` kind. Verdict: mostly overtaken, since VAT, sky-view and both
+opennesses turned out to be one ray walk plus a few lines of arithmetic and
+shipped client-side. What is left is the multiscale family (e3MSTP, multiscale
+topographic position), which needs DEMs at several resolutions — one always-on
+Python service for one visualization family is a thin case.
 
-The fix is to separate the two. `horizonDecimation(metresPerPx, radiusMetres)`
-returns how far the grid has to be averaged down for the requested radius to
-fit in 24 steps, capped at `HORIZON_MIN_M_PER_PX` (1 m per pixel);
-`computeHorizonFields` block-averages the DEM by that factor, scans the coarse
-copy, and bilinearly interpolates sky-view, positive and negative openness back
-onto the full grid, masked against the original NaNs so the fields cannot bleed
-into cells with no elevation. Reach on a 0.25 m DEM goes 6 m → 24 m, and the
-pass gets *cheaper* by factor² on the way — a wider horizon over a sixteenth of
-the cells is less work, not more (≈20 s → ≈1.3 s on a 3000² grid).
+## Tier 2 — QGIS handoff (designed, not built)
 
-Why 1 m is the floor, in both directions. Below it there is little to lose: the
-acquisitions behind the 0.25 m mosaic are mostly 4–5 points/m², i.e. a mean
-point spacing of 0.45–0.50 m, so a 0.25 m grid is around three-quarters
-interpolation and averaging four of its cells throws away very little that was
-ever measured — Kartverket's own national product is 1 m, and the prospection
-literature computes sky-view factor on 0.5–1 m DEMs. Above it there is: past a
-metre the surface stops resolving the features whose horizon is being measured,
-and a ditch two cells wide has no horizon worth finding.
+An "Åpne i QGIS" zip: a `.qgs` project at the lokalitet's extent in EPSG:25833
+(plain XML, writable by hand; a `.qlr` is the 80/20), the app's proxy WMS/WFS
+layers pre-wired, a GeoPackage of the rectangle, its funn and the kulturminner
+readout, the bbox DTM as a GeoTIFF, optionally a `.model3` Processing model
+running an RVT chain on it. Verdict: cheapest of the tiers and the only one
+that scales past what we think to implement. Plugins worth naming to users:
+Relief Visualization Toolbox, Whitebox for QGIS, Čučković's Terrain Shading and
+Visibility Analysis, and the SAGA/GRASS providers QGIS bundles
+(`r.local.relief` is Hesse's LRM, `r.geomorphon` classifies landform elements).
 
-Coarsening is not free of *meaning*, though, only of cost — the same radius
-over a 1 m surface and over a 0.25 m one are two different measurements of the
-same ground. So when the factor is above 1 the caption says so, on a line of
-its own (`figure.set.horizonGrid`, "horisontsøk i 1 m rutenett"), because the
-resolution line below it is describing the DEM and no longer describes what
-these four views were computed from.
-
-The requested radius and the effective one can still differ — the ceiling is
-`horizonMaxRadiusMetres`, 24 m on any grid at 1 m or finer and 24 × the cell
-size on a coarser one, and a spec saved over one rectangle can be replayed over
-another. `clampRadius(vis, dem, metres)` in `render.ts` is the single answer
-both the render and the caption go through, and `radiusRange` derives the
-slider's ceiling from the same rule so the control cannot offer a position that
-renders identically to the one before it. A caption reading "SVF-radius 40 m"
-over a 24 m render is exactly the failure the figure machinery exists to
-prevent.
-
-## Tier 1 — server-side visualization sidecar (design, not built, mostly moot)
-
-**Read the premise before the design.** This section used to say the client
-could not reasonably do the composite blends, because VAT needs several layers
-combined with specific opacity/blend stacks and the reference implementation is
-Python. That did not survive contact with the code (2026-09-11):
-
-- The whole cost of sky-view factor is the horizon ray walk, and positive and
-  negative openness are the *same walk* read differently — one extra extremum
-  per direction. `computeHorizonFields` returns all three.
-- RVT's blend modes collapse on single-band data. `blend_func.lum()` returns a
-  greyscale image unchanged, so a luminosity blend is the active layer outright,
-  and `apply_opacity` is a linear mix. VAT is then about three lines of
-  per-pixel arithmetic over fields we already have (`composeVat`).
-
-So four of the six visualizations this tier was going to serve — VAT, sky-view,
-positive openness, negative openness — are in the browser as of 2026-09-11, for
-roughly one horizon pass. What is genuinely left for a sidecar is the
-*multiscale* family: e3MSTP and multiscale topographic position compute several
-DEMs at different resolutions, which is a different shape of work rather than
-more of the same. Weigh that against the cost below before building anything —
-one always-on Python service for one visualization family is a much thinner
-case than the one this section was originally written to make.
-
-Shape, following the `nib-proxy` precedent:
-
-- A small container — `ghcr.io/osgeo/gdal:ubuntu-small` base, plus `rvt-py`
-  (Apache-2.0, ZRC SAZU) and `rasterio`. Add `whitebox-tools` (MIT for the
-  open core — its "Extension" toolsets are proprietary and must stay out) if
-  multiscale topographic position is wanted.
-- One endpoint: POST `{ bbox, model, visualization }` → fetch the float DEM
-  from the same upstream → compute → return PNG.
-- Only reachable from wmscache on the compose network, like nib-proxy. Caddy
-  exposes it under a same-origin prefix.
-- Results land as attachments with a new `kind` (`analyse`), which needs a
-  migration extending the `attachments.kind` enum, `AttachmentKind` in
-  `src/api/attachments.ts`, `KIND_ICON` in `src/localities/bilderCommon.tsx`,
-  and a `localities.bilder.kind.analyse` string in all three locale files —
-  the same four places `flyfoto` and `sketch` touched.
-
-Visualizations that would still be new here: multiscale topographic position,
-e3MSTP. The rest of the original list — VAT, sky-view factor, negative openness
-(ditches), positive openness (banks), local relief model — is Tier 0 now.
-
-The cost to weigh before building: it's a new always-on service and a new
-Python dependency chain, for output that is a static image per bbox. The
-client-side versions did turn out to be good enough in practice, which is what
-emptied most of this tier out; decide on the multiscale remainder on its own
-merits rather than on the momentum of this section.
-
-## Tier 2 — QGIS handoff (design, not built)
-
-The point is to stop being the last stop. A user who has found something wants
-to run their own processing chain, and QGIS is where that happens.
-
-Deliverable: an "Åpne i QGIS" workspace action producing a zip containing
-
-- a `.qgs` project with the lokalitet's extent and CRS EPSG:25833 preset;
-- the app's proxy WMS/WFS layers pre-wired (Kulturminner, topo, LiDAR) — QGIS
-  can consume our same-origin proxy paths directly, given the deployment's
-  public base URL;
-- a GeoPackage of the lokalitet rectangle, its funn, and the kulturminner
-  readout;
-- the bbox DTM as a GeoTIFF — we already have the bytes.
-
-A `.qgs` is plain XML and writable by hand; a `.qlr` layer-definition file is
-the much smaller 80/20 if the full project turns out fiddly. Optionally ship a
-`.model3` Processing model that runs an RVT chain on the bundled DTM.
-
-Worth naming in the user-facing docs, since the handoff is only useful if
-people know what to install: **Relief Visualization Toolbox** (the one that
-matters), **Whitebox for QGIS**, Zoran Čučković's **Terrain Shading** (fast
-SVF/openness) and **Visibility Analysis** (viewsheds — intervisibility of
-burial mounds is a real question, not a gimmick), and the SAGA/GRASS
-providers already bundled with QGIS (`r.local.relief` is Hesse's local relief
-model, written for archaeology; `r.geomorphon` is excellent for classifying
-landform elements).
-
-Licensing note for the bundle: Kartverket elevation and Riksantikvaren data
-are open (NLOD/CC BY). NiB imagery is **not** — it's free for private
-non-commercial use only, so ortofoto must not be baked into an exported
-bundle without the same notice the Flyfoto action shows.
+Licensing constraint on any bundle: Kartverket elevation and Riksantikvaren
+data are open (NLOD/CC BY), NiB imagery is not — free for private
+non-commercial use only — so ortofoto must not be baked into an export without
+the notice the Flyfoto action shows.
 
 ## Data we're not pulling yet
 
-Ordered by what would most change what a user can conclude.
+- **NGU marine limit + shoreline displacement** — isostatic rebound puts the
+  contemporary shoreline at a computable elevation per location and millennium.
+- **NGU Løsmasser** (`geo.ngu.no/mapserver/LosmasserWMS3`, verified live,
+  `Losmasser_temakart_sammenstilt`) — Quaternary deposits; a plain theme-layer
+  addition, recipe in `docs/map-layers.md`.
+- **Kartverket historiske kart, the ØK sheets** — fornminne symbols surveyed
+  before 20th-century ploughing; Amtskartserien already ships as a Standard
+  variant, ØK does not.
+- **SSR toponyms as indicators** — the *haug / borg / hov / ve / vang / ring /
+  offer / tingst-* families, off the place-name search that already exists.
+- **`kart.ra.no/arcgis/rest/services`** — unprobed; the REST root returns
+  folders `Andretjenester` and `MABYGIS` with an empty top-level `services[]`.
+  An ArcGIS `/query` would give attribute tables where GetFeatureInfo gives
+  scraps, on an origin we already proxy.
+- **Point clouds via PDAL** — re-deriving ground from raw LAZ recovers low
+  earthworks the DTM smooths away under canopy; needs the async order API and
+  server-side processing.
 
-**NGU marine limit + shoreline displacement.** The standout, and the most
-distinctively Norwegian analysis available to us. Coastal Stone Age sites sit
-at the contemporary shoreline, and post-glacial isostatic rebound means that
-shoreline is now a specific elevation that varies by location. Combine an
-isobase-corrected sea level for a target millennium with the DEM we can now
-read, and "show me the terraces in this bbox that were beach at 6000 BP"
-becomes a computation rather than a guess. This is a genuine predictive
-model, and it's the single strongest argument for having float elevation.
-
-**NGU Løsmasser** (`geo.ngu.no/mapserver/LosmasserWMS3`, verified live —
-`Losmasser_temakart_sammenstilt` and a stack of sub-layers). Quaternary
-deposits. Tells you whether a bump is an anthropogenic mound or a kame, and
-whether ground is diggable. Straightforward theme-layer addition — follow the
-"Adding another theme layer" recipe in `map-layers.md`.
-
-**Kartverket historiske kart — the ØK sheets.** Amtskartserien is already a
-Standard variant (`map-layers.md`); rectified Økonomisk kartverk is not. ØK in
-particular carries fornminne symbols surveyed before a lot of 20th-century
-ploughing, plus pre-consolidation farm boundaries. Complements the flyfoto
-time series directly.
-
-**SSR toponyms as indicators.** Nearly free given the place-name search
-already exists: filtering for the *haug / borg / hov / ve / vang / ring /
-offer / tingst-* families surfaces candidate areas with no new data source at
-all. High signal per unit of effort.
-
-**`kart.ra.no/arcgis/rest/services`.** The REST root returns folders
-`Andretjenester` and `MABYGIS` with an empty top-level `services[]` — not
-probed further. Worth doing: an ArcGIS `/query` would give real attribute
-tables where GetFeatureInfo currently gives us scraps, and it's the same
-origin we already proxy for the Kulturminner WMS.
-
-**Point clouds, via PDAL.** The one that could reveal genuinely new features
-rather than presenting known ones better: under forest canopy the official
-DTM's ground classification smooths away low earthworks, and re-deriving
-ground from LAZ with a tuned CSF/SMRF filter recovers some of them. But it
-needs the async order API on hoydedata, gigabytes of storage per project, and
-server-side processing — a much larger build than anything else here.
-
-### Ruled out
-
-- **Automated detection** (`samgeo`/SAM over a local relief model, CNN mound
-  detectors). Tempting and mostly MIT-licensed, but without fine-tuning on
-  Norwegian material the false-positive rate makes it noise, and a tool that
-  cries wolf is worse than no tool for this audience.
-- **Potree / COPC in-browser point clouds.** Impressive, unrelated to reading
-  terrain against the heritage register.
-- **PostGIS.** The "right" answer for spatial queries in general, but a
-  lokalitet-scale workspace needs buffers and intersections over a handful of
-  features, which Turf.js does client-side without a second database.
+What has been ruled out, and why, is in `docs/analysis-roadmap.md`.

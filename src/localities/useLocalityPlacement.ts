@@ -19,7 +19,7 @@ import { useBboxHandles } from './useBboxHandles';
 const PLACE_LAYER_ID = 'localityPlaceLayer';
 
 export type LocalityPlacementApi = {
-  /** What the rectangle spans right now, following the hand mid-drag. */
+  /** What the rectangle spans right now, following the hand. */
   bbox: LocalityBbox;
   /** Sitting on a limit, so the readout can say which and why. */
   atLimit: 'min' | 'max' | null;
@@ -29,19 +29,10 @@ export type LocalityPlacementApi = {
 };
 
 /**
- * One placement session: the rectangle before there is a record under it.
- *
- * Mounted once, by `RibbonPlaceLocalityRow`, which is the only thing on screen
- * while it lasts — the same arrangement `LocalityRibbon` has with
- * `useLocalityWorkspace`, and for the same reason: a second mount would be a
- * second set of map interactions over the same rectangle.
- *
- * The authoritative rectangle is the one in `localityPlacementAtom`, written on
- * every finished gesture. The one this hook publishes is the *live* one, a
- * frame at a time, so the readout keeps up with the hand — both are clamped
- * (`useBboxHandles` clamps per frame), and the split is only about how often
- * the atom is written: at pointer rate it would re-render the ribbon on every
- * move.
+ * The rectangle before there is a record under it. Mounted once, by
+ * `RibbonPlaceLocalityRow`. `localityPlacementAtom` holds the authoritative
+ * rectangle, written per finished gesture; what is published here is the live
+ * one, because writing the atom at pointer rate re-renders the ribbon.
  */
 export const useLocalityPlacement = (
   placement: LocalityPlacement,
@@ -78,17 +69,8 @@ export const useLocalityPlacement = (
 
   const cancel = useCallback(() => setPlacement(null), [setPlacement]);
 
-  /*
-   * `Opprett` — the one write in the whole session.
-   *
-   * The rectangle it writes is the atom's, not the live one: `Enter` pressed
-   * mid-drag commits the last finished gesture rather than the frame the hand
-   * happens to be on.
-   *
-   * The stedsnavn lookup still runs *before* the record is written (§8.3) — it
-   * just runs on a rectangle somebody chose. On failure the session stays up,
-   * because the alternative is throwing away the placing that was just done.
-   */
+  // Commits the atom's rectangle, not the live one, so `Enter` mid-drag takes
+  // the last finished gesture. Failure leaves the session up.
   const commit = useCallback(async () => {
     if (!user || creating) return;
     setCreating(true);
@@ -102,18 +84,12 @@ export const useLocalityPlacement = (
         toast.error({ title: t('localities.createFailed') });
         return;
       }
-      // The one exception to "every lokalitet opens in show"
-      // (docs/lokalitet-view.md §3): a rectangle placed thirty seconds ago has
-      // nothing to show. Set in the same batch as the active record, so the row
-      // never renders it in show first. The starter set follows it in, unasked
-      // (§4.3) — and now over ground the author framed deliberately.
+      // The one exception to "every lokalitet opens in show", batched with the
+      // active record so the row never renders it in show first.
       setActiveLocality(rec);
       setEditingLocalityId(rec.id);
       setPendingStarter(rec.id);
-      // What "press Terreng with nothing open" turns into: the rectangle first,
-      // the tool after it, and still only on a create that worked — a failed
-      // one must not leave 'terrain' armed for whichever lokalitet is opened
-      // next.
+      // Only on a create that worked, or the next lokalitet opens armed.
       if (placement.then === 'terrain') setRibbonTool('terrain');
       setPlacement(null);
     } finally {
@@ -132,12 +108,8 @@ export const useLocalityPlacement = (
     setPlacement,
   ]);
 
-  /*
-   * Escape and Enter, on the same terms as every other keyboard layer in the
-   * app (src/localities/useWorkspaceKeys.ts): capture phase so OpenLayers'
-   * KeyboardPan does not also act on them, and inert while something is being
-   * typed into or an overlay is up.
-   */
+  // Capture phase so OpenLayers' KeyboardPan does not also act on them, and
+  // inert while something is being typed into or an overlay is up.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -165,9 +137,8 @@ export const useLocalityPlacement = (
   }, [store, cancel, commit]);
 
   const [width, height] = bboxSpanMetres(bbox);
-  // A tolerance, because the clamp lands on the limit through two
-  // reprojections: an exact comparison would light up on some rectangles and
-  // not on others that look identical.
+  // The clamp lands on the limit through two reprojections, so an exact
+  // comparison lights up on some rectangles and not on identical ones.
   const near = (value: number, limit: number) => Math.abs(value - limit) < 1;
   const atLimit = near(width, MAX_SIDE_M) || near(height, MAX_SIDE_M)
     ? 'max'

@@ -62,10 +62,8 @@ const classifyLayerId = (layerId: string): FeatureKind => {
   return 'other';
 };
 
-// The Kulturminner WMS returns each feature under a sublayer element name
-// (Lokaliteter_layer / Enkeltminner_layer / Sikringssoner_layer, plus their
-// *ikoner duplicates). parseXmlFeatureInfo loses that element name, so we
-// re-derive the sublayer kind from the property fingerprint.
+// `parseXmlFeatureInfo` loses the sublayer element name the WMS returns each
+// feature under, so re-derive it from the property fingerprint.
 const refineHeritageSitesKind = (
   properties: Record<string, unknown>,
 ): FeatureKind => {
@@ -73,8 +71,7 @@ const refineHeritageSitesKind = (
     return 'enkeltminne';
   if ('lokalitetsart' in properties || 'antallenkeltminner' in properties)
     return 'lokalitet';
-  // Sikringssoner have very few fields — a kulturminneid but no navn,
-  // no vernetype, no lokalitetsart, no enkeltminneart.
+  // Sikringssoner carry a kulturminneid and almost nothing else.
   if (
     'kulturminneid' in properties &&
     !('navn' in properties) &&
@@ -101,20 +98,10 @@ const firstOf = (
   return '';
 };
 
-/*
- * The five registers agree on what a card says and disagree on what to call
- * every field of it. kulturminner2 and freda_bygninger share one vocabulary
- * (`navn` / `informasjon` / `datering` / `lokalid`); the other three each
- * brought their own, and reading only the first is what used to leave a
- * brukerminne showing the word "Brukerminner" and a kommune chip — its title,
- * its whole description and its one link all sit under names nothing looked up.
- *
- * Verified against live GetFeatureInfo on all five, not guessed:
- *   kulturmiljoer  navn · informasjon · kulturmiljokategori · lokalid
- *   sefrak         objektnavn · — · bygningstypetekst · tidsangivelsetekst ·
- *                  askeladdenid
- *   brukerminner   tittel · beskrivelse · opprettet_av · opprettet · (no id)
- */
+// The five registers say the same things under different field names, read off
+// live GetFeatureInfo: sefrak objektnavn/bygningstypetekst/tidsangivelsetekst/
+// askeladdenid, brukerminner tittel/beskrivelse/opprettet_av/opprettet with no
+// id at all, the rest navn/informasjon/datering.
 const NAME_FIELDS = ['navn', 'objektnavn', 'tittel'] as const;
 const DESCRIPTION_FIELDS = ['informasjon', 'beskrivelse'] as const;
 const ART_FIELDS = [
@@ -128,13 +115,8 @@ const DATERING_FIELDS = ['datering', 'tidsangivelsetekst'] as const;
 /** Ids the register owns and a user can quote back at it. */
 const ID_FIELDS = ['lokalid', 'kulturminneid', 'askeladdenid'] as const;
 
-/*
- * A stable handle on one record, for grouping and for killing the `*ikoner`
- * twins. Brukerminner serve no id at all — their kulturminnesøk link ends in
- * the record's uuid, and that is the only thing on the wire that separates two
- * of them. Without it every brukerminne in a click deduped against every
- * other, so a spot with three showed one.
- */
+// Brukerminner serve no id, so the kulturminnesøk link is the only thing on the
+// wire separating two of them.
 const identityOf = (properties: Record<string, unknown>): string =>
   firstOf(properties, ID_FIELDS) || stringify(properties['linkkulturminnesok']);
 
@@ -147,16 +129,14 @@ const KIND_ICONS: Partial<Record<FeatureKind, MaterialSymbol>> = {
 const getParentId = (feature: HeritageFeature, fallbackIndex: number): string => {
   const p = feature.properties;
   if (feature.kind === 'enkeltminne') {
-    // lokalitetid preferred; fallback to lokalid split on "-"
     const lokalitetid = stringify(p['lokalitetid']);
     if (lokalitetid) return lokalitetid;
     const lokalid = stringify(p['lokalid']);
     if (lokalid) return lokalid.split('-')[0];
   }
   if (feature.kind === 'lokalitet') {
-    // Some records have a suffixed id like "300651-0"; the parent lokalitetid
-    // used by enkeltminner is the numeric prefix. Strip it so the enkeltminner
-    // land in the same group.
+    // Some ids are suffixed ("300651-0") and the lokalitetid enkeltminner name
+    // is the numeric prefix.
     const raw =
       stringify(p['kulturminneid']) ||
       stringify(p['lokalid']) ||
@@ -195,10 +175,7 @@ const toHeritageFeatures = (
 const groupFeatures = (layers: LayerFeatureInfo[]): HeritageGroup[] => {
   const features = toHeritageFeatures(layers);
 
-  // Dedupe *ikoner duplicates: same kind + same identifying id. A record with
-  // no identity at all (SEFRAK serves none the icons share, brukerminner serve
-  // none full stop) is never a duplicate of another one, so it gets a key of
-  // its own rather than colliding with every sibling of its kind.
+  // Dedupe *ikoner twins. A record with no identity gets a key of its own.
   let anonymous = 0;
   const dedupeKey = (f: HeritageFeature) =>
     `${f.kind}::${identityOf(f.properties) || `#${anonymous++}`}`;
@@ -233,11 +210,7 @@ const groupFeatures = (layers: LayerFeatureInfo[]): HeritageGroup[] => {
     else g.others.push(f);
   }
 
-  // Fill navn: lokalitet.navn → first enkeltminne.navn → the layer's own
-  // title for the four registers that aren't kulturminner2. Left **empty**
-  // when the record is genuinely unnamed — a great many are — so the card can
-  // fall back to its `art`, which is both more informative and not the word
-  // "Kulturminne" repeated down the popup.
+  // Left empty when genuinely unnamed, so the card falls back to its `art`.
   for (const g of groups.values()) {
     const fromLokalitet = stringify(g.lokalitet?.properties['navn']);
     const fromEnkeltminne = stringify(g.enkeltminner[0]?.properties['navn']);
@@ -250,10 +223,7 @@ const groupFeatures = (layers: LayerFeatureInfo[]): HeritageGroup[] => {
 
   const all = Array.from(groups.values());
 
-  // Kulturminnesøk doesn't surface sikringssoner as first-class results —
-  // they're implicit protection metadata for a lokalitet. Drop pure
-  // sikringssone groups when there's any real POI in the click; otherwise
-  // keep them so a lone sikringssone click still shows something.
+  // A sikringssone is metadata for a lokalitet, not a result of its own.
   const hasReal = all.some((g) => g.lokalitet || g.enkeltminner.length > 0);
   if (hasReal) {
     return all.filter((g) => g.lokalitet || g.enkeltminner.length > 0 || g.others.length > 0);
@@ -261,9 +231,8 @@ const groupFeatures = (layers: LayerFeatureInfo[]): HeritageGroup[] => {
   return all;
 };
 
-// Roll up a field across a lokalitet + its enkeltminner, following the
-// Kulturminnesøk pattern: if the values agree, show the shared value;
-// if they disagree, show a "Flere/Ulike …" aggregate label.
+// Roll a field up across a lokalitet and its enkeltminner: the shared value if
+// they agree, a "Flere/Ulike …" label if they do not.
 const rollup = (
   values: string[],
   aggregateLabel: string,
@@ -282,18 +251,8 @@ const formatDate = (v: unknown): string => {
   return m ? m[0] : s;
 };
 
-/*
- * One fact, as a glyph. The label:value list this replaced spent a line and a
- * 100 px label column on each of five fields — for values that are mostly one
- * word out of a closed vocabulary ("Tønsberg", "Automatisk fredet") — which
- * left a three-hit click needing a scroll before the first `informasjon` was
- * in view.
- *
- * Hover or focus names the field and spells the value out. On a device with
- * no hover there is nothing to hover *with*, so the chip carries its text
- * instead: `(hover: none)` is the one case where the density is not worth it.
- * The value is in the DOM either way, for a screen reader.
- */
+// One fact as a glyph, with hover or focus naming the field. `withText` is for
+// pointerless input; the value is in the DOM either way.
 const MetaChip = ({
   icon,
   label,
@@ -307,14 +266,10 @@ const MetaChip = ({
   tone?: VernBucket;
   withText: boolean;
 }) => (
-  // The tooltip stays on even when the text is showing: the chip's *value* is
-  // then visible but its field name never is, and "Tønsberg" alone does not
-  // say kommune.
+  // On even when the text shows: "Tønsberg" alone does not say kommune.
   <Tooltip label={`${label}: ${value}`}>
     <span
       className={cx(styles.chip, tone && styles[tone])}
-      // Icon-only, focus is the only keyboard route to the value, so it needs
-      // a tab stop. With the text out it would only be a tab stop.
       tabIndex={withText ? undefined : 0}
     >
       <Icon icon={icon} size={16} />
@@ -327,21 +282,9 @@ const MetaChip = ({
   </Tooltip>
 );
 
-/*
- * `informasjon` runs from empty to several paragraphs and is the field most
- * worth reading, so it is open by default and clamped rather than hidden
- * behind a button. The toggle appears only when the clamp actually bit, which
- * has to be measured: a character count and a line clamp disagree at the
- * popup's narrow width, and a "Mer" that expands nothing is worse than none.
- *
- * Two reasons that measurement is an observer rather than one layout effect.
- * The overlay's element is `display: none` until the OL `Overlay` is given a
- * position, which happens in an effect of the *parent* — i.e. after this
- * one — so a single measurement at mount reads 0 for both heights and the
- * toggle never appears. And the popup can be resized under an open card.
- * Nothing observes while expanded: with the clamp off the two heights agree by
- * construction, and measuring then would retract the button that undoes it.
- */
+// An observer rather than a layout effect: the overlay element is
+// `display: none` until the parent positions the OL `Overlay`, after this
+// effect, so a single measurement at mount reads 0 and the toggle never shows.
 const Description = ({ text }: { text: string }) => {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
@@ -479,28 +422,18 @@ const HeritageCard = ({
   const primary = group.lokalitet ?? group.enkeltminner[0] ?? group.sikringssoner[0] ?? group.others[0];
   const props = primary?.properties ?? {};
 
-  // `art` is the informative one — 159 values, from "Gravfelt" to
-  // "Tjærebrenningsanlegg" — so it stays text and becomes the card's subtitle,
-  // or its title when the record is unnamed. `kategori` is the 12-value bucket
-  // above it and is the leading glyph; printing both was printing the second
-  // one twice.
+  // `art` (159 values) is the subtitle; `kategori` is the 12-value bucket.
   const art = firstOf(props, ART_FIELDS);
   const kategori =
     stringify(props['lokaliteteskategori']) ||
     stringify(props['enkeltminnekategori']);
 
-  // kulturminner2 serves no `fylke` — there, beliggenhet is the kommune and
-  // nothing else. Brukerminner serve both, and a kommune name alone is
-  // ambiguous across the country, so the chip takes the fylke when it is there.
+  // kulturminner2 serves no `fylke` and brukerminner do; a kommune name alone
+  // is ambiguous nationally.
   const kommune = [stringify(props['kommune']), stringify(props['fylke'])]
     .filter(Boolean)
     .join(', ');
 
-  // Roll up vernetype + datering across the lokalitet's own field AND all
-  // its nested enkeltminner. If they agree, show the value; if not, show
-  // the "Ulike vernestatus" / "Flere dateringer" aggregate label the way
-  // Kulturminnesøk does. A register with no lokalitet/enkeltminne hierarchy
-  // rolls up over the one record it has.
   const members = [
     ...(group.lokalitet ? [group.lokalitet.properties] : []),
     ...group.enkeltminner.map((em) => em.properties),
@@ -512,9 +445,7 @@ const HeritageCard = ({
     memberProps.map((p) => firstOf(p, DATERING_FIELDS)),
     t('kulturminner.flereDateringer'),
   );
-  // vernedato only if there's a single shared vernetype AND a single shared
-  // date across all members; otherwise a single date next to "Ulike
-  // vernestatus" would misrepresent when the mixed statuses were assigned.
+  // One shared vernetype and date only, or the date would misdate the rest.
   const uniqueVerne = new Set(
     memberProps.map((p) => stringify(p['vernetype'])).filter(Boolean),
   );
@@ -528,10 +459,8 @@ const HeritageCard = ({
   const antall =
     group.lokalitet && stringify(group.lokalitet.properties['antallenkeltminner']);
   const informasjon = firstOf(props, DESCRIPTION_FIELDS);
-  // A link the register *served* is always good, whatever the kind — that is
-  // how a brukerminne gets back to its kulturminnesøk page, and it is the only
-  // exit it has. Only the **synthesized** askeladden URL needs the guard:
-  // sikringssoner have their own id space, so a kid= built from one 404s.
+  // Only the synthesized askeladden URL needs the guard: sikringssoner have
+  // their own id space, and a kid= from one 404s.
   const hasReal = !!group.lokalitet || group.enkeltminner.length > 0;
   const askeladden =
     stringify(props['linkaskeladden']) ||
@@ -539,36 +468,27 @@ const HeritageCard = ({
       ? `https://askeladden.ra.no/askeladden/?kid=${stringify(props['lokalid'])}`
       : '');
   const kulturminnesok = stringify(props['linkkulturminnesok']);
-  // Riksantikvaren links every record to Kulturminnesøk; Kulturminnesøk does
-  // not have every record, and says so with a 200 and a blank page. See
-  // `kulturminnesok.ts`. The answer arrives after this first render, so the
-  // link is never withheld — only marked.
+  // Kulturminnesøk does not have every record Riksantikvaren links to it. The
+  // answer arrives after this render, so the link is marked, not withheld.
   const kulturminnesokMissing =
     useKulturminnesokStatus(kulturminnesok) === 'missing';
 
-  // Who reported it and when. Brukerminner are the one register where that is
-  // the record's standing, so it takes the place vernestatus holds elsewhere.
+  // For brukerminner, who reported it takes vernestatus' place.
   const opprettetAv = stringify(props['opprettet_av']);
   const opprettet = formatDate(props['opprettet']);
 
-  // Colour the vernestatus chip by bucket even when the labels disagreed: two
-  // members reading "Automatisk fredet" and "Vedtaksfredet" are both fredet,
-  // so "Ulike vernestatus" in red is the true statement. Only a genuine
-  // disagreement about *how protected* it is falls back to neutral.
+  // Colour by bucket even when the labels disagreed; mixed buckets go neutral.
   const vernBuckets = new Set(vernetypes.filter(Boolean).map(vernBucket));
   const vernTone: VernBucket =
     vernBuckets.size === 1 ? [...vernBuckets][0] : 'ukjent';
 
-  // If we have a lokalitet, all enkeltminner nest below it. Otherwise the
-  // first enkeltminne IS the primary card, so nest the remaining.
+  // With no lokalitet the first enkeltminne is the primary card itself.
   const nested = group.lokalitet
     ? group.enkeltminner
     : group.enkeltminner.slice(1);
   const isSikringssone = !group.lokalitet && group.sikringssoner.length > 0;
 
-  // What the card is *of*. The first four are kulturminner2's own hierarchy;
-  // the rest name their register, because "Enkeltminne" over a SEFRAK building
-  // or a user's report is the wrong noun.
+  // The rest name their register: "Enkeltminne" over SEFRAK is the wrong noun.
   const kind: FeatureKind = group.lokalitet
     ? 'lokalitet'
     : isSikringssone
@@ -582,10 +502,7 @@ const HeritageCard = ({
   const kindIcon =
     KIND_ICONS[kind] ?? (kategori ? kategoriIcon(kategori) : 'castle');
 
-  // Ids the register owns, only. The synthetic grouping keys — `other-3`, and
-  // the kulturminnesøk URL a brukerminne is keyed on for want of anything
-  // better — are ours, and printing one in the corner of a card would invite
-  // someone to quote it back at Riksantikvaren.
+  // Ids the register owns, only: the synthetic grouping keys are ours.
   const cardId =
     hasReal || isSikringssone
       ? group.parentId.replace(/^sz-/, '')
@@ -699,9 +616,7 @@ const HeritageCard = ({
                   >
                     Kulturminnesøk ↗
                     <Icon icon="info" size={14} />
-                    {/* The glyph says nothing to a screen reader, and the
-                        tooltip only exists while it is open. Below, the note
-                        is on the page already. */}
+                    {/* The glyph says nothing to a screen reader. */}
                     {!withText && (
                       <span className={styles.srOnly}>
                         {t('kulturminner.kulturminnesokMangler')}
@@ -720,8 +635,7 @@ const HeritageCard = ({
                 </a>
               ))}
           </div>
-          {/* Nothing to hover with, so the warning has to be written out —
-              the same trade MetaChip makes. */}
+          {/* Nothing to hover with, so the warning is written out. */}
           {kulturminnesokMissing && withText && (
             <div className={styles.linkNote}>
               {t('kulturminner.kulturminnesokMangler')}
@@ -743,8 +657,7 @@ const PopupContent = ({
   onShowMore: () => void;
 }) => {
   const { t } = useTranslation();
-  // A glyph nobody can hover over is a blank. Coarse pointers get the value
-  // spelled out on the chip instead — see MetaChip.
+  // A glyph nobody can hover over is a blank, so the chips carry their text.
   const withText = useMediaQuery('(hover: none)');
 
   return (

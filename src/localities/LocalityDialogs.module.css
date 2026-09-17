@@ -24,8 +24,7 @@
   gap: var(--sp-5);
 }
 
-/* The seamless mosaic sits apart from the acquisition list: it is the
-   "just give me the best picture" answer, and it is not one of the years. */
+/* The seamless mosaic sits apart from the list: it is not one of the years. */
 .mosaic {
   display: flex;
   align-items: center;
@@ -35,8 +34,7 @@
   border-radius: var(--radius-md);
 }
 
-/* Every row is a checkbox now, so the whole row is the label and the click
-   target is the row rather than a 13 px box at the start of it. */
+/* The whole row is the label, so the click target is the row. */
 .row {
   cursor: pointer;
 }

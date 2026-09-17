@@ -1,8 +1,5 @@
-/*
- * Place/property search. Grows to fill whatever the rest of row 1 leaves,
- * within reason — wide enough for an address, never so wide it pushes the
- * map controls onto a second line before it has to.
- */
+/* Place/property search: wide enough for an address, never so wide it wraps
+ * the map controls before it has to. */
 .root {
   position: relative;
   display: flex;
@@ -20,10 +17,8 @@
 }
 
 /*
- * Doubled up on .root for specificity. src/ui/Field.module.css sets the
- * input's padding with a shorthand, and which of two single-class rules
- * wins depends on the order Vite happens to concatenate the CSS modules in
- * — not something to leave to chance for a control this visible.
+ * Doubled on .root for specificity: Field.module.css sets the padding with a
+ * shorthand, and which single-class rule wins is a bundle-order accident.
  */
 .root .input {
   padding: 0 32px 0 34px;

@@ -1,16 +1,5 @@
-// Stitches one (source × style) into a canvas at that source's native ground
-// resolution — the national mosaic at 1 m/px, per-project layers at whatever
-// their point density supports. Tiles that come back as blank PNGs (see
-// BLANK_RESPONSE_THRESHOLD_BYTES) don't get painted; a canvas that ends with
-// zero painted tiles is `null`, i.e. the rectangle is outside this source's
-// coverage.
-//
-// There used to be a second, atom-driven entrance that ran every source ×
-// style of a multi-source Hent at once and reported per-tile progress into
-// `lidarExtractRunAtom` for the extract viewer to draw. The picker carousel
-// (docs/lokalitet-view.md §4.3) fetches one card ahead of where you are
-// standing instead, so the shared tile budget, the progress counters and the
-// run atom all went with it — there is only ever one canvas in flight now.
+// One (source × style) stitched at that source's native ground resolution.
+// Zero painted tiles means the rectangle is outside its coverage.
 
 import { LidarSource, nativeResolutionMetersPerPx } from './sources';
 import {
@@ -20,13 +9,10 @@ import {
   runWithConcurrency,
 } from './stitch';
 
-// Kept modest so a Hent doesn't drown the wmscache→Kartverket keepalive
-// pool while regular map tiles are also flowing. Bumping this past ~4
-// tends to trigger 502s from wmscache under real map-browsing load.
+// Past ~4, wmscache starts answering 502 under normal map-browsing load.
 const MAX_CONCURRENT_TILES = 4;
 
-// Transient 5xx from wmscache / Kartverket during bursts is common; a
-// small retry with backoff turns the flakiness into eventual success.
+// Transient 5xx during bursts is common upstream.
 const TILE_MAX_RETRIES = 3;
 const TILE_RETRY_BASE_MS = 500;
 
@@ -39,12 +25,9 @@ type TileJob = {
   ctx: CanvasRenderingContext2D;
 };
 
-// 'aborted' is not an outcome the caller records — the run it belonged to is
-// gone, and counting it would finish a canvas nobody is watching.
+// 'aborted' is not counted: the run it belonged to is gone.
 type TileOutcomeKind = 'painted' | 'blank' | 'failed' | 'aborted';
 
-// The retry loop. Reporting is deliberately not in here: the caller only
-// cares how many tiles painted.
 async function paintTile(
   item: TileJob,
   signal: AbortSignal,
@@ -86,14 +69,9 @@ export type ExtractedCanvas = {
 };
 
 /**
- * One source × one style, stitched. What "Hent grunnpakke", the pin queue and
- * every picker card run.
- *
- * `null` when nothing painted *and* nothing failed, i.e. the rectangle is
- * outside this source's coverage. A run where every tile errored or timed out
- * throws instead. There is no module-level abort controller:
- * cancellation is the caller's `signal`, so a background grab can never
- * cancel the extract somebody is watching.
+ * `null` when nothing painted and nothing failed — no coverage; a run where
+ * every tile errored throws instead. Cancellation is the caller's `signal`,
+ * never a module-level one, so a background grab cannot cancel a foreground.
  */
 export async function extractCanvas(
   bbox25833: [number, number, number, number],
@@ -137,27 +115,18 @@ export async function extractCanvas(
     signal?.removeEventListener('abort', abort);
   }
 
-  // A cancelled run has no answer, and whoever cancelled it is not waiting for
-  // one. Throwing rather than returning null keeps it out of the null case,
-  // which means something specific — see below.
+  // Throwing, not null: null means "no coverage" and is acted on below.
   if (signal?.aborted) throw new Error('extract cancelled');
 
-  // Nothing painted, and *requests* are the reason. That is a fault, not a
-  // fact about the ground, and the difference is load-bearing now that a tile
-  // can also be given up on for taking too long (`TILE_TIMEOUT_MS` in
-  // stitch.ts): `null` here reaches the pin queue as `empty`, the one state
-  // whose card offers no retry. A network blip would have silently retired
-  // three starter images. Same distinction `fetchDem` draws, for the same
-  // reason.
+  // `null` reaches the pin queue as `empty`, the one state whose card offers
+  // no retry, so a network blip must not produce it.
   if (painted === 0 && failed > 0) {
     throw new Error(`every tile failed: ${source.label} / ${style}`);
   }
   if (painted === 0) return null;
   return {
     canvas,
-    // What the stitch actually produced: planTiles scales both axes down
-    // together past its canvas cap, so on a large rectangle this is coarser
-    // than the source's native resolution.
+    // What the stitch produced: planTiles scales down past its canvas cap.
     metresPerPx: (bbox25833[2] - bbox25833[0]) / plan.widthPx,
     widthPx: plan.widthPx,
     heightPx: plan.heightPx,
@@ -165,8 +134,7 @@ export async function extractCanvas(
   };
 }
 
-// Abortable sleep. Rejects immediately if the signal aborts; otherwise
-// resolves after `ms`. Wrapped so the retry loop can bail on Cancel.
+// Abortable sleep, so the retry loop can bail on cancel.
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) return reject(new Error('aborted'));

@@ -6,17 +6,9 @@ import { cx } from './cx';
 import styles from './Dialog.module.css';
 import { overlayOpenCountAtom } from './overlayAtoms';
 
-/*
- * Modal built on the native <dialog> element.
- *
- * showModal() gives us the focus trap, Escape-to-close, inert background and
- * top-layer stacking for free — which is most of what a hand-rolled modal
- * gets wrong, and the reason this is ~60 lines instead of ~300. Being in the
- * top layer also means no z-index: it paints above the ribbon, the popovers
- * and the 1000-level fixed bars regardless of the ladder in tokens.css.
- *
- * `data-scope="dialog"` is required, not decorative — see Popover.tsx.
- */
+// Native <dialog>: showModal() brings the focus trap, Escape, the inert
+// background and top-layer stacking, so no z-index applies here.
+// `data-scope="dialog"` is required, not decorative — see Popover.tsx.
 
 export const Dialog = ({
   open,
@@ -57,16 +49,13 @@ export const Dialog = ({
       ref={ref}
       data-scope="dialog"
       className={cx(styles.dialog, className)}
-      // Escape and the browser's own dismissal both land here; the element
-      // has already decided to close, so mirror that into React state rather
-      // than trying to prevent it.
+      // The browser's own dismissal closes the element behind React's back.
       onCancel={(e) => {
         e.preventDefault();
         onOpenChange(false);
       }}
       onClose={() => onOpenChange(false)}
-      // Backdrop press: <dialog>'s own box fills the viewport when modal, so
-      // a pointer outside the inner panel's rect is a click on the backdrop.
+      // The box fills the viewport, so outside the panel's rect is backdrop.
       onPointerDown={(e) => {
         if (e.target !== e.currentTarget) return;
         const r = e.currentTarget.getBoundingClientRect();

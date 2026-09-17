@@ -3,7 +3,7 @@
 // A sketch is a bilde you drew.
 //
 // Three changes, all on `attachments`, all for the same feature (see
-// docs/ui-architecture.md §9.3):
+// docs/ui-architecture.md, "Drawing"):
 //
 // 1. `kind` gains 'sketch' — a transparent Excalidraw overlay registered to a
 //    rectangle, stored as a View: the scene is the spec and the figure PNG is

@@ -1,15 +1,6 @@
 import { pb } from './pocketbase';
 
-// Bilder attached to a lokalitet: kept LiDAR extracts, map screenshots,
-// plain uploads, sketches, and scenes — a scene being an arrangement of the
-// others rather than an image (localities/sceneSpec.ts). Visibility follows
-// the parent lokalitet via the collection rules, including for the file
-// itself: since 1700000900 the field is no longer `protected`, so the bytes
-// of a public lokalitet's bilde are served to anyone with the URL and a
-// guest following a shared link can see them (see getAttachmentUrl).
-// Keep in sync with the attachments.kind select values in the PocketBase
-// migrations (1700000300 adds 'flyfoto', 1700000700 adds 'sketch',
-// 1700000800 adds 'scene').
+// Must match the attachments.kind select values in the PB migrations.
 export type AttachmentKind =
   | 'extract'
   | 'screenshot'
@@ -18,13 +9,7 @@ export type AttachmentKind =
   | 'sketch'
   | 'scene';
 
-// Free-form; extracts store sourceKey/sourceLabel/style/metresPerPx/
-// bbox25833 so the strip can say what an image shows. Flyfoto stores
-// source label + metresPerPx + bbox25833. A sketch stores {frame, scene} —
-// the Excalidraw elements and the rectangle they were drawn over — which is
-// why the field's server-side ceiling is 2 MB rather than 10 kB. A scene
-// stores its layer order, their fades and the ground under them
-// (localities/sceneSpec.ts).
+// Free-form per kind; server-side ceiling is 2 MB.
 export type AttachmentMeta = Record<string, unknown>;
 
 export type AttachmentRecord = {
@@ -32,43 +17,16 @@ export type AttachmentRecord = {
   locality: string;
   owner: string;
   kind: AttachmentKind;
-  // Server-side filename within the record's storage dir, and **empty until
-  // the pixels exist** (docs/lokalitet-view.md §4.1.2). A View — an extract, a
-  // terrain render, a flyfoto — is kept as its `meta` first and materialised
-  // by the pin queue afterwards, so an empty string here is a normal state
-  // rather than a broken record. `isPinned` in localities/viewSpec.ts is the
-  // predicate; nothing should compare this to '' by hand.
+  // Empty until the pixels exist: a View is its `meta` first and is pinned
+  // later. Test with `isPinned` (localities/viewSpec.ts), not against ''.
   file: string;
   caption: string;
   meta: AttachmentMeta | null;
-  // Exhibit order and concealment — docs/lokalitet-view.md §4.4. `sort` is an
-  // opaque ordering key, not an index: see `nextAttachmentSort` below.
+  // Opaque ordering key, not an index — see `nextAttachmentSort` below.
   sort: number;
   hidden: boolean;
-  /*
-   * Two relations, neither cascading (1700000700).
-   *
-   * `funn` is **which funn this bilde belongs to** (§13.6, §13.10 step 9) —
-   * on every kind, not only on the sketches it was introduced for, and edited
-   * on the card in edit. It was "what a drawing is about", seeded at creation
-   * and never changeable; widening the meaning cost no migration, and no
-   * record is being reinterpreted, since nothing has ever written more than
-   * one id. `localities/funnGroups.ts` is the only reader: the answer is the
-   * first id that still names an existing funn, because the relation does not
-   * cascade and a dangling one has to read as "none".
-   *
-   * `over` is which bilder something is a layer *on*, seeded at creation from
-   * what was on screen. A scene (§13.7) uses it for the other sense the word
-   * already carried: the bilder it is an arrangement of.
-   *
-   * Uncascaded is load-bearing for both: deleting a member leaves the
-   * arrangement standing with one fewer layer rather than taking it down, and
-   * deleting a funn leaves its images in the lokalitet rather than with it.
-   *
-   * PocketBase returns `[]` for an unset multiple relation, so these are not
-   * optional, but records written before the migration have no key at all —
-   * read them through `?? []` rather than trusting the type on a cached row.
-   */
+  // Neither relation cascades, so a dangling id must read as "none" — read
+  // them through funnGroups.ts, and through `?? []` for pre-1700000700 rows.
   funn: string[];
   over: string[];
   created: string;
@@ -83,41 +41,17 @@ export type NewAttachmentInput = {
   kind: AttachmentKind;
   caption?: string;
   meta?: AttachmentMeta;
-  // Only the copy (docs/lokalitet-view.md §7) passes these. Every other
-  // producer wants the defaults below — last in the exhibit, and shown — and
-  // saying so at each call site would be five chances to disagree about what
-  // "new image" means. A copy is the one case where the position and the
-  // concealment are *carried*: the original's arrangement is part of what was
-  // being shared.
+  // Only the copy passes these; every other producer takes the defaults.
   sort?: number;
   hidden?: boolean;
-  // Seeded at creation — see AttachmentRecord above. `funn` is a sketch's
-  // only producer-set one; every other kind gets its funn from the card.
   funn?: string[];
   over?: string[];
 };
 
 const COLLECTION = 'attachments';
 
-/*
- * The sort key a newly created bilde gets: epoch milliseconds.
- *
- * An opaque ordering key rather than a 0..n index, and that is what lets the
- * producers that do *not* hold the attachment list — terrain `Lagre`, the
- * extract's `Behold` — land their image at the end of the exhibit without
- * asking anybody what the end currently is. It is minted here rather than by
- * the caller for exactly that reason: "later than everything that already
- * exists" is a fact a clock knows and a caller would have to look up.
- *
- * Reordering rewrites the moved record to a value *between* its new
- * neighbours (`useLocalityWorkspace.reorderBilde`), so a drag costs one PATCH
- * rather than one per card. Those values are small — a renumbering pass uses
- * multiples of 1000 — which keeps them below any future clock reading, so an
- * image created after a reorder still arrives last.
- *
- * Records written before this field existed carry 0 and sort first, in
- * creation order, which is the order they were displayed in anyway.
- */
+// Epoch milliseconds, so a producer that does not hold the list still lands
+// last. Reordering writes values between neighbours; legacy records carry 0.
 const nextAttachmentSort = () => Date.now();
 
 export const listLocalityAttachments = async (
@@ -125,33 +59,15 @@ export const listLocalityAttachments = async (
 ): Promise<AttachmentRecord[]> => {
   return pb.collection(COLLECTION).getFullList<AttachmentRecord>({
     filter: pb.filter('locality = {:lid}', { lid: localityId }),
-    // Exhibit order, oldest first — the sequence the author arranged, not the
-    // newest-first inventory this was before §4.4. `created` breaks the ties
-    // that legacy zeroes and same-millisecond batches leave behind, and it is
-    // what makes the order total: without it PocketBase is free to return two
-    // equal-`sort` rows in either order, and a rail that reshuffles itself on
-    // every realtime event is worse than no order at all.
+    // `created` makes the order total, so equal-`sort` rows cannot reshuffle.
     sort: 'sort,created',
-    // The list reloads on every realtime event, so two of these are
-    // regularly in flight at once. The SDK's auto-cancellation would abort
-    // the older one and reject its promise; the caller sequences results
-    // itself (useLocalityContent), so let both finish.
+    // Two of these fly at once on a realtime reload; the SDK would cancel one.
     requestKey: null,
   });
 };
 
-/**
- * A handful of attachments by id, for a caller that holds ids and no list.
- *
- * One caller: the pin queue flattening a scene (§13.7). It runs outside React
- * and minutes after the arrangement was kept, so the member records it needs
- * are neither in its hand nor safe to have been handed — a member may have
- * been re-captioned, pinned, or deleted in between, and the flatten should be
- * of the records as they are when the pixels are made.
- *
- * One request rather than one per id, and `requestKey: null` because two
- * scenes in the same drain would otherwise auto-cancel each other.
- */
+// By id, in one request; `requestKey: null` so two callers do not cancel each
+// other.
 export const listAttachmentsByIds = async (
   ids: readonly string[],
 ): Promise<AttachmentRecord[]> => {
@@ -167,8 +83,6 @@ export const listAttachmentsByIds = async (
   });
 };
 
-// Bilder per lokalitet for the "Mine lokaliteter" list — see
-// countFindsByLocality; same `fields` trick, same reason.
 export const countAttachmentsByLocality = async (): Promise<
   Map<string, number>
 > => {
@@ -182,17 +96,8 @@ export const countAttachmentsByLocality = async (): Promise<
   return counts;
 };
 
-/*
- * A row that arrives with its pixels already in hand.
- *
- * That is every File — a screenshot or an upload is bytes and was never
- * anything else (§4.1.1) — and one View case: a picker candidate (§4.3) was
- * rendered in order to be *looked at*, so keeping it writes the figure it
- * showed rather than a spec for the queue to render a second time. The record
- * lands pinned, `renderedAt` and all, in one request.
- *
- * Every other View goes through `createAttachmentSpec` below.
- */
+// A row that arrives with its pixels in hand; a View goes through
+// `createAttachmentSpec` instead.
 export const createAttachment = async (
   input: NewAttachmentInput,
   ownerId: string,
@@ -207,27 +112,14 @@ export const createAttachment = async (
   if (input.meta) form.append('meta', JSON.stringify(input.meta));
   form.append('sort', String(input.sort ?? nextAttachmentSort()));
   if (input.hidden) form.append('hidden', 'true');
-  // Multiple relations go up one value per key in multipart; an empty list is
-  // simply no keys, which is what PocketBase stores anyway.
+  // Multiple relations go up one value per key in multipart.
   for (const id of input.funn ?? []) form.append('funn', id);
   for (const id of input.over ?? []) form.append('over', id);
   form.append('file', blob, filename);
   return pb.collection(COLLECTION).create<AttachmentRecord>(form);
 };
 
-/*
- * A View: the row of parameters, with no pixels yet (§4.1.2).
- *
- * This is how `Behold`, the starter set and the terrain tool's own `Lagre`
- * write. A few hundred bytes of JSON instead of up to twenty megabytes of
- * PNG, which is what makes keeping an image free — and free keeps are what a
- * carousel you triage in, and a picker you throw eight of twelve away in, both
- * need in order to be reasonable things to put in front of someone.
- *
- * Plain JSON rather than the FormData above, deliberately: a multipart create
- * with no file part is the same request said in a way that invites somebody to
- * add one later.
- */
+// A View: the parameters, with no pixels yet — the pin queue renders them.
 export const createAttachmentSpec = async (
   input: NewAttachmentInput,
   ownerId: string,
@@ -244,18 +136,9 @@ export const createAttachmentSpec = async (
     over: input.over ?? [],
   });
 
-/*
- * …and the pin: the pixels for a spec that already exists.
- *
- * `meta` goes up with the file because materialising a View is what learns the
- * three things the spec could not know — where the image sits inside the
- * figure (`imageRect`), what resolution the source actually gave
- * (`metresPerPx`) and when the pixels were made (`renderedAt`). One request,
- * so a record can never hold a file the meta does not describe.
- *
- * The caller passes the *whole* meta, not a patch: PocketBase replaces a JSON
- * field wholesale.
- */
+// The pixels for an existing spec. `meta` goes up in the same request so a
+// record can never hold a file its meta does not describe; pass the whole of
+// it, since PocketBase replaces a JSON field wholesale.
 export const pinAttachment = async (
   id: string,
   blob: Blob,
@@ -268,25 +151,14 @@ export const pinAttachment = async (
   return pb.collection(COLLECTION).update<AttachmentRecord>(id, form);
 };
 
-/** Caption, exhibit position or concealment — everything an author edits. */
 export const updateAttachment = async (
   id: string,
   patch: {
     caption?: string;
     sort?: number;
     hidden?: boolean;
-    /**
-     * The spec itself, replaced wholesale — PocketBase has no JSON merge.
-     *
-     * Three writers: a sketch that has been drawn on again (§9.3), an upload
-     * being given an extent (§13.5), and the copy re-pointing a scene's
-     * members at the fork's own records (§13.7). Every other View's parameters
-     * are fixed at the moment it is kept, and the pin is the only thing that
-     * ever adds to them, which `pinAttachment` above does with the file in the
-     * same request.
-     */
+    // Replaced wholesale — PocketBase has no JSON merge.
     meta?: AttachmentMeta;
-    /** The two relations; see `AttachmentRecord`. */
     funn?: string[];
     over?: string[];
   },
@@ -298,16 +170,8 @@ export const deleteAttachment = async (id: string): Promise<void> => {
   await pb.collection(COLLECTION).delete(id);
 };
 
-// The URL of an attachment's file. `thumb` takes the sizes declared in the
-// migration ('200x200' grid thumb, '800x0' preview); omit it for the
-// original.
-//
-// Synchronous, and that is the whole of what 1700000900 bought on this side.
-// The field used to be `protected`, so every thumbnail began with a
-// short-lived token from `pb.files.getToken()` — an authenticated call, and
-// therefore one a guest following a shared link could never make. Serving
-// the bytes by rule instead of by token turns a fetch-then-render dance into
-// a string.
+// `thumb` takes the sizes declared in the migration; omit it for the original.
+// Synchronous: the file field is not `protected`, so there is no file token.
 export const getAttachmentUrl = (
   rec: AttachmentRecord,
   thumb?: '200x200' | '800x0',

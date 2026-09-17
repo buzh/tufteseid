@@ -1,8 +1,5 @@
-/*
- * Funn rows. The whole card is the zoom target; the status badge and the
- * overflow menu are separate targets sitting inside it, which is why both
- * stop propagation rather than relying on layout to keep them apart.
- */
+/* Funn rows. The whole card is the zoom target, with the badge and the menu
+   as separate targets inside it — hence the stopPropagation in FunnList.tsx. */
 
 .list {
   display: flex;
@@ -38,9 +35,8 @@
   background: transparent;
 }
 
-/* Tombstoned by this edit session (§5.6). Faded and struck through rather
-   than gone: the deletion has not happened yet, and a row that vanished
-   would be claiming it had. */
+/* Tombstoned by this edit session: faded and struck through rather than gone,
+   because the deletion has not happened yet. */
 .rowDeleted,
 .rowDeleted:hover {
   cursor: default;
@@ -91,10 +87,8 @@
   gap: var(--sp-1);
 }
 
-/* The member switch (§13.10 step 4). No chrome of its own — the glyph is the
-   affordance, the way the status badge is — and nudged up a little so it sits
-   on the title's line rather than on the block's top edge, since `.head` is
-   `align-items: flex-start` for the sake of a two-line note. */
+/* The member switch. No chrome of its own, and nudged up so it sits on the
+   title's line: `.head` is `align-items: flex-start` for a two-line note. */
 .switch {
   display: flex;
   flex: none;
@@ -131,8 +125,7 @@
   justify-content: flex-end;
 }
 
-/* Badge plus a chevron, with no button chrome of its own — the badge is
-   the affordance and a bordered box around it reads as a second control. */
+/* Badge plus a chevron, with no button chrome of its own. */
 .statusTrigger {
   display: flex;
   align-items: center;
@@ -150,8 +143,8 @@
   outline-offset: 2px;
 }
 
-/* The status list and the row menu are both `Menu` — body styling is
-   src/ui/Menu.module.css. */
+/* The status list and the row menu are both `Menu`; their bodies are styled
+   in src/ui/Menu.module.css. */
 
 .busy {
   display: flex;

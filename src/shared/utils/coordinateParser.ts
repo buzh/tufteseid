@@ -26,18 +26,12 @@ const assignLatLon = (
   return { lon: applyDirection(val1, dir1), lat: applyDirection(val2, dir2) };
 };
 
-/** Norway UTM rough bounding box (easting -100 000–1 200 000, northing 5 000 000–9 000 000) */
+/** Norway UTM rough bounding box. */
 const isValidUTMRange = (east: number, north: number): boolean =>
   east >= -100000 && east <= 1200000 && north >= 5000000 && north <= 9000000;
 
-/**
- * Typed lookup of every EPSG code the parser accepts.
- * TypeScript validates each literal against the ProjectionIdentifier union, so
- * adding an unsupported code here is a compile-time error.
- * Note: EPSG:4258 (ETRS89) is intentionally absent — the parser normalises it
- * to EPSG:4326 before calling this lookup (the two datums are identical for
- * display purposes at the precision the parser uses).
- */
+// EPSG:4258 (ETRS89) is absent on purpose: the parser normalises it to
+// EPSG:4326 first, the two being identical at display precision.
 const SUPPORTED_PROJECTIONS = new Set<ProjectionIdentifier>([
   'EPSG:4326',
   'EPSG:3857',
@@ -63,11 +57,6 @@ const SUPPORTED_PROJECTIONS = new Set<ProjectionIdentifier>([
   'EPSG:27398',
 ]);
 
-/**
- * Converts a numeric EPSG code to a typed ProjectionIdentifier.
- * Returns null for codes not supported by the parser.
- * Eliminates the need for `as ProjectionIdentifier` casts elsewhere.
- */
 const toProjectionIdentifier = (code: number): ProjectionIdentifier | null => {
   const key = `EPSG:${code}` as ProjectionIdentifier;
   return SUPPORTED_PROJECTIONS.has(key) ? key : null;
@@ -132,15 +121,9 @@ const normalizeDirections = (input: string): string =>
     .replace(/Vest|VEST|West|WEST/g, 'W');
 
 const normalizeDecimalSeparators = (input: string): string => {
-  // Convert European decimal commas to dots, e.g. "60,135106" → "60.135106"
-  // but leave commas that act as coordinate separators intact.
-  //
-  // Examples that must convert:  "60,135106, 10,618917" → "60.135106, 10.618917"
-  //                               "60,13,10,61"         → "60.13,10.61"
-  // Examples that must NOT convert: "500000,7000000", "60,10" (two coords)
-
-  // Pre-scan: count occurrences of "digit,1-2-digits" at a separator boundary.
-  // Two or more such patterns strongly implies European decimal notation.
+  // A decimal comma becomes a dot, but a comma separating two coordinates
+  // ("500000,7000000") must survive. Two or more "digit,1-2-digits" at a
+  // separator boundary implies European decimal notation.
   const shortPatterns = input.match(/\d,\d{1,2}(?=,|;|\s|@|$)/g) ?? [];
   const hasMultipleShortPatterns = shortPatterns.length >= 2;
 
@@ -154,32 +137,26 @@ const normalizeDecimalSeparators = (input: string): string => {
     const textBefore = str.slice(0, offset + 1);
     const numberBeforeComma = textBefore.match(/[\d.]+$/);
 
-    // Number before the comma already contains a dot → this comma separates
-    // two coordinates, not a decimal separator (e.g. "60.5,10.5").
+    // A dot already before the comma → the comma separates two coordinates.
     if (numberBeforeComma?.[0].includes('.')) return match;
 
-    // Both sides of the comma are large integers (≥ 1 000) → coordinate pair
-    // such as a UTM easting/northing (e.g. "500000,6000000").
+    // Large integers both sides → a UTM easting/northing pair.
     if (numberBeforeComma) {
       const fullBefore = parseInt(numberBeforeComma[0], 10);
       const fullAfter = parseInt(after, 10);
       if (fullBefore >= 1000 && fullAfter >= 1000) return match;
     }
 
-    // 3+ digits after the comma → unambiguously a European decimal fraction
-    // (e.g. "60,135106").
+    // 3+ digits after the comma → unambiguously a decimal fraction.
     if (after.length >= 3) return `${before}.${after}`;
 
-    // 1–2 digits after the comma: ambiguous on its own.
-    // Convert when context provides enough evidence:
-    //   a) two or more such patterns in the whole string ("60,13,10,61")
-    //   b) another coordinate follows immediately after ("60,13 10,61")
+    // 1–2 digits is ambiguous; convert only with corroborating context —
+    // another such pattern in the string, or a coordinate following.
     if (hasMultipleShortPatterns) return `${before}.${after}`;
 
     const rest = str.slice(offset + match.length);
     if (/^[,;]\s*\d|^\s+\d|^@/.test(rest)) return `${before}.${after}`;
 
-    // Cannot determine intent — leave as-is (treat as coordinate separator).
     return match;
   };
 
@@ -187,16 +164,14 @@ const normalizeDecimalSeparators = (input: string): string => {
 };
 
 /**
- * Parses coordinate input from search query and detects format.
- * Supports:
+ * Accepted formats:
  * - Decimal degrees: "59.91273, 10.74609", "lat: 59.91273, lon: 10.74609"
  * - DMS / DM: "59°54'45.8\"N 10°44'45.9\"E", "60° 50.466' N, 04° 52.535' E"
  * - UTM: "598515, 6643994", "east: 598515, north: 6643994", "33W 598515 6643994"
  * - Explicit EPSG: "425917 7730314@25833", "59.91273, 10.74609@4326"
  * - Norwegian direction words: "60 Nord, 10 Øst"
  *
- * @param input - The coordinate string to parse
- * @param fallbackProjection - Projection to use as tie-breaker for ambiguous projected coords
+ * `fallbackProjection` is the tie-breaker for ambiguous projected pairs.
  */
 export const parseCoordinateInput = (
   input: string,
@@ -207,7 +182,7 @@ export const parseCoordinateInput = (
   const trimmedInput = input.trim();
 
   if (trimmedInput.includes('@')) {
-    // Explicit EPSG — return result or null, never fall through to other parsers
+    // Explicit EPSG never falls through to the other parsers.
     return parseWithEPSG(
       normalizeDecimalSeparators(normalizeDirections(trimmedInput)),
     );
@@ -224,10 +199,7 @@ export const parseCoordinateInput = (
   );
 };
 
-/**
- * Parse coordinates with explicit EPSG code.
- * Examples: "425917 7730314@25834", "59.91273, 10.74609@4326", "163834.01,6663030.01@EPSG:25833"
- */
+// "425917 7730314@25834", "59.91273, 10.74609@4326", "163834.01,6663030.01@EPSG:25833"
 const parseWithEPSG = (input: string): ParsedCoordinate | null => {
   const atIndex = input.indexOf('@');
   if (atIndex === -1) return null;
@@ -239,17 +211,14 @@ const parseWithEPSG = (input: string): ParsedCoordinate | null => {
   if (!epsgMatch) return null;
 
   const rawCode = parseInt(epsgMatch[1], 10);
-  // EPSG:4258 (ETRS89) is geographically equivalent to WGS84 at display precision.
+  // ETRS89 equals WGS84 at display precision.
   const epsgCode = rawCode === 4258 ? 4326 : rawCode;
 
   const projection = toProjectionIdentifier(epsgCode);
   if (!projection) return null;
 
-  // Upstream looked up a per-projection display name here; no locale in this
-  // fork ever carried those keys, so it always fell through to the EPSG code.
   const formatName = projection;
 
-  // Strip common label prefixes, then split into two numbers
   const coordsCleaned = coordsPart
     .replace(
       /\b(lat|latitude|lon|lng|longitude|north|northing|nord|east|easting|øst|ost)\b[\s:=]*/gi,
@@ -266,7 +235,7 @@ const parseWithEPSG = (input: string): ParsedCoordinate | null => {
   if (isNaN(coord1) || isNaN(coord2)) return null;
 
   if (projection === 'EPSG:4326') {
-    // Geographic: coord1 = lat, coord2 = lon
+    // Geographic: lat, lon.
     if (coord1 < -90 || coord1 > 90 || coord2 < -180 || coord2 > 180)
       return null;
     return {
@@ -278,7 +247,7 @@ const parseWithEPSG = (input: string): ParsedCoordinate | null => {
     };
   }
 
-  // Projected: coord1 = easting, coord2 = northing
+  // Projected: easting, northing.
   if (!isValidUTMRange(coord1, coord2)) return null;
   return {
     lat: coord2,
@@ -289,15 +258,9 @@ const parseWithEPSG = (input: string): ParsedCoordinate | null => {
   };
 };
 
-/**
- * Parse decimal degrees format.
- * Examples: "59.91273, 10.74609", "lat: 59.91273, lon: 10.74609",
- *           "59.9494° N, 10.7564° E", "60° N, 10° E"
- */
+// "59.91273, 10.74609", "lat: 59.91273, lon: 10.74609", "59.9494° N, 10.7564° E"
 const parseDecimalDegrees = (input: string): ParsedCoordinate | null => {
-  // Match decimal degrees with optional degree symbol and direction
-  // e.g. "59.9494° N, 10.7564° E" or "N 60°, E 10°"
-  // Skip if input has minute markers — that's DMS, not decimal degrees
+  // Minute markers mean DMS, not decimal degrees.
   if (!/['\u2032]/.test(input)) {
     const degreePattern =
       /([NSEW])?\s*(\d+(?:\.\d+)?)\s*°\s*([NSEW])?[\s,;]+([NSEW])?\s*(\d+(?:\.\d+)?)\s*°\s*([NSEW])?/i;
@@ -328,12 +291,10 @@ const parseDecimalDegrees = (input: string): ParsedCoordinate | null => {
     }
   }
 
-  // If input has both ° and minute/second markers, let parseDMS handle it
+  // Both ° and minute/second markers, or "°digit" ("66°45.005 N"), is DM/DMS.
   if (/°/.test(input) && /['\u2032"\u2033]/.test(input)) return null;
-  // "°digit" (e.g. "66°45.005 N") is DM/DMS format
   if (/°\d/.test(input)) return null;
 
-  // Strip common label prefixes
   const cleaned = input
     .toLowerCase()
     .replace(/\b(lat|latitude|nord|north|n)[\s:=]*/gi, '')
@@ -358,12 +319,8 @@ const parseDecimalDegrees = (input: string): ParsedCoordinate | null => {
   };
 };
 
-/**
- * Parse DMS (Degrees, Minutes, Seconds) and DM (Degrees, decimal Minutes) formats.
- * Handles direction before or after, with or without direction letters.
- * Examples: "59°54'45.8\"N 10°44'45.9\"E", "60° 50.466' N, 04° 52.535' E",
- *           "N 60° 5' 38'', E 10° 50' 10''", "N 60° 44.077 E 011° 15.943"
- */
+// Degrees/minutes/seconds and degrees/decimal-minutes, with the direction
+// before, after or absent.
 const parseDMS = (input: string): ParsedCoordinate | null => {
   // Pattern 1: Direction BEFORE, DMS — "N 60° 5' 38'', E 10° 50' 10''"
   const dirBeforeDMSPattern =
@@ -453,9 +410,8 @@ const parseDMS = (input: string): ParsedCoordinate | null => {
     return tryDMSWithDirections(d1, deg1, min1, d2, deg2, min2);
   }
 
-  // Pattern 5d: DM without degree symbol and without direction — "67 24.5536 015 34.7826"
-  // Must be careful not to match decimal degrees or UTM coordinates.
-  // Heuristic: treat 4-number input as DM when minute values are < 60 (3+ decimal places helps disambiguate).
+  // Pattern 5d: DM without degree symbol and without direction — "67 24.5536 015 34.7826".
+  // Requires 3+ decimals on the minutes so decimal degrees and UTM don't match.
   const dmNoDegreeSymbolNoDirectionPattern =
     /^(\d{1,3})\s+(\d{1,2}(?:\.\d{3,})?)[\s,;]+(\d{1,3})\s+(\d{1,2}(?:\.\d{3,})?)$/;
   const m5d = input.match(dmNoDegreeSymbolNoDirectionPattern);
@@ -466,7 +422,6 @@ const parseDMS = (input: string): ParsedCoordinate | null => {
     const mm1 = parseFloat(min1);
     const mm2 = parseFloat(min2);
 
-    // Validate degrees are within lat/lon range and minutes are < 60
     if (deg1Val <= 90 && deg2Val <= 180 && mm1 < 60 && mm2 < 60)
       return validateAndReturnDMS(
         dmsToDecimal(deg1Val, mm1),
@@ -479,10 +434,8 @@ const parseDMS = (input: string): ParsedCoordinate | null => {
     /(\d+)[°\s]+(\d+)['\u2032'\s]+(\d+(?:\.\d+)?)["\u2033"']{0,2}\s*([NSEW])/gi;
   let matches = Array.from(input.matchAll(dmsAfterPattern));
 
-  // isDMS tracks whether Pattern 6 (DMS, 4 capture groups) or
-  // Pattern 7 (DM, 3 capture groups) produced the matches.
-  // Setting it here — rather than deriving it from match array length — makes
-  // the intent explicit and immune to regex group count changes.
+  // Which of the two patterns below produced the matches, and therefore
+  // whether the capture groups hold seconds.
   const isDMS = matches.length === 2;
 
   // Pattern 7: DM with direction AFTER — "60° 50.466' N, 04° 52.535' E"
@@ -527,25 +480,18 @@ const parseDMS = (input: string): ParsedCoordinate | null => {
   return createDMSResult(lat, lon);
 };
 
-/**
- * Parse projected coordinates (UTM or Web Mercator).
- * Examples: "598515, 6643994", "east: 598515, north: 6643994", "33W 598515 6643994"
- * Assumes UTM zone 33N (EPSG:25833) for Norway unless a zone or fallback is specified.
- *
- * @param input - The coordinate string to parse
- * @param fallbackProjection - Projection to prefer when coordinates are ambiguous
- */
+// Projected coordinates, UTM or Web Mercator. Defaults to UTM 33N
+// (EPSG:25833) unless a zone or a fallback projection says otherwise.
 const parseUTM = (
   input: string,
   fallbackProjection?: ProjectionIdentifier,
 ): ParsedCoordinate | null => {
-  // Detect "Northing N, Easting E" order from explicit direction letters
+  // "Northing N, Easting E" order, when the direction letters say so.
   const directionPattern =
     /(\d+(?:\.\d+)?)\s*([NE])\s*[,;]\s*(\d+(?:\.\d+)?)\s*([NE])/i;
   const dirMatch = input.match(directionPattern);
   const firstIsNorthing = dirMatch?.[2]?.toUpperCase() === 'N';
 
-  // Strip common label prefixes
   const cleaned = input
     .toLowerCase()
     .replace(/(^|[\s,;:=])(east|easting|øst|ost|e)[\s:=]*/gi, '$1')
@@ -557,16 +503,16 @@ const parseUTM = (
   const parts = cleaned.split(/[,;\s]+/).filter(Boolean);
   if (parts.length < 2) return null;
 
-  // Extract explicit zone from first or last token
+  // An explicit zone may be the first or the last token.
   let zone: number | null = null;
   let numStartIdx = 0;
   let explicitZone = false;
 
   const tryExtractZone = (token: string): number | null => {
-    // Short zone format: "33", "33N", "33W", "W33"
+    // "33", "33N", "33W", "W33".
     const zoneMatch = token.match(/^([A-Z]?)(\d{1,2})([A-Z]?)$/i);
     if (zoneMatch) return parseInt(zoneMatch[2], 10);
-    // 5-digit EPSG: 32633 or 25833
+    // Or a 5-digit EPSG code: 32633, 25833.
     const epsgMatch = token.match(/^(\d{5})$/);
     if (epsgMatch) {
       const code = parseInt(epsgMatch[1], 10);
@@ -595,13 +541,12 @@ const parseUTM = (
   const coord2 = parseFloat(parts[numStartIdx + 1]);
   if (isNaN(coord1) || isNaN(coord2)) return null;
 
-  // Resolve east/north from coordinate order
   let east: number, north: number;
   if (firstIsNorthing) {
     north = coord1;
     east = coord2;
   } else if (coord1 > 1000000 && coord2 < 1000000) {
-    // First number is clearly northing (> 1 M), second is easting
+    // Over a million can only be the northing.
     north = coord1;
     east = coord2;
   } else {
@@ -609,7 +554,6 @@ const parseUTM = (
     north = coord2;
   }
 
-  // Resolve projection
   let projection: ProjectionIdentifier;
   let projectionName: string;
 
@@ -644,7 +588,6 @@ const parseUTM = (
     projection = 'EPSG:3857';
     projectionName = 'Web Mercator';
   } else {
-    // Default: UTM 33N
     if (!isValidUTMRange(east, north)) return null;
     projection = 'EPSG:25833';
     projectionName = 'UTM 33N';
@@ -659,17 +602,8 @@ const parseUTM = (
   };
 };
 
-/**
- * Heuristic: returns true when a WGS84 coordinate pair looks like the user
- * entered (longitude, latitude) instead of the expected (latitude, longitude).
- *
- * The bounding box (lat 0–45, lon 50–90) covers Central and South Asia
- * (e.g. Afghanistan, Iran, Kazakhstan, Pakistan) — a region where GIS tools
- * often produce coordinates in lon/lat order and where swapped input would still
- * pass basic range checks. If the parsed "lat" falls in the northern part of
- * this box and the parsed "lon" is in the eastern part, the values are more
- * likely to be a swapped (lon, lat) pair than genuine WGS84 (lat, lon).
- */
+// Heuristic: a WGS84 pair landing in Central/South Asia (lat 0–45, lon 50–90)
+// is more likely a Norwegian coordinate entered lon/lat than a real one.
 export const isLikelyLonLatSwap = (parsed: ParsedCoordinate): boolean => {
   if (parsed.projection !== 'EPSG:4326') return false;
   const { lat, lon } = parsed;

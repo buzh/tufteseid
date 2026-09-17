@@ -4,8 +4,8 @@ import { SearchResult } from '../types/searchTypes.ts';
 import { SearchResults } from './results/SearchResults.tsx';
 import styles from './SearchComponent.module.css';
 
-// Search *input* now lives in the ribbon. This component renders only
-// the results panel that floats under the bar, in the shell's left slot.
+// The search input is in the ribbon; this renders only the results panel
+// that floats under it, in the shell's left slot.
 export const SearchComponent = () => {
   const [hoveredResult, setHoveredResult] = useState<SearchResult | null>(null);
 

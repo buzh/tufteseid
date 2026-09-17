@@ -32,13 +32,9 @@ const STATUS_PALETTE: Record<LocalityFindStatus, BadgePalette> = {
   rapportert: 'blue',
 };
 
-/*
- * Every control in here calls stopPropagation on its click. The row itself
- * is clickable (it zooms the map to the funn), and React events bubble
- * through the component tree — so even the portalled popover bodies would
- * otherwise fire the row's handler. `Menu` does that for its own trigger and
- * body; the controls written out longhand below have to do it themselves.
- */
+// Every control stops its click propagating: the row zooms the map to the funn,
+// and React events bubble through the tree, so even a portalled popover body
+// would fire the row's handler. `Menu` does it for its own trigger and body.
 
 const StatusPicker = ({
   value,
@@ -78,8 +74,7 @@ const StatusPicker = ({
         </button>
       )}
       items={STATUS_ORDER.map((s) => ({
-        // The same badge the row shows, so picking is recognition rather
-        // than reading a word list.
+        // The same badge the row shows.
         label: (
           <Badge palette={STATUS_PALETTE[s]}>
             {t(`localities.funn.status.${s}`)}
@@ -94,14 +89,7 @@ const StatusPicker = ({
   );
 };
 
-/*
- * Delete confirms in place rather than nesting a second popover.
- *
- * It confirms at all because the *card* is the reversible half: since §5.6
- * the deletion is deferred until `Lagre`, and the row keeps offering `Angre
- * sletting` for the rest of the session. That is the safety net, and this
- * question is the one that stops a mis-click putting a funn in it.
- */
+// Delete confirms in place rather than nesting a second popover.
 const RowMenu = ({
   onEditText,
   onEditGeometry,
@@ -155,20 +143,8 @@ const RowMenu = ({
   );
 };
 
-/*
- * The member switch — `[Funn ▾]` is a layer group since §13.10 step 4, and
- * this is what makes its rows members rather than merely an index.
- *
- * Same glyphs as `LayerGroup`'s own member rows, because it is the same
- * statement: this row is on the map, that one is not. It is first in the row
- * and outside `.actions` for the same reason it is first in a pulldown —
- * everything to the right of it acts on the *record*, and this is the one
- * control on the card that does not.
- *
- * In both stances, and not gated on `editable`: switching a layer off writes
- * nothing (§13.8), and a reader looking at somebody's twenty funn needs to be
- * able to clear one off the relief exactly as much as its owner does.
- */
+// Outside `.actions` and not gated on `editable`: everything to its right acts
+// on the record, and switching a layer off writes nothing.
 const VisibilitySwitch = ({
   shown,
   onToggle,
@@ -219,8 +195,7 @@ const FunnRow = ({
   funn: LocalityFindRecord;
   editable: boolean;
   selected: boolean;
-  /** Tombstoned by this edit session — greyed, and one press from coming
-   *  back (§5.6, consequence 2). */
+  /** Tombstoned by this session: one press from coming back. */
   deleted: boolean;
   /** On the map right now. Nothing to do with `deleted` or `hidden`. */
   shown: boolean;
@@ -239,16 +214,15 @@ const FunnRow = ({
   const [note, setNote] = useState(funn.note ?? '');
   const rowRef = useRef<HTMLDivElement | null>(null);
 
-  // Keyboard navigation moves the selection; the row it lands on has to
-  // come into view on its own.
+  // Keyboard navigation moves the selection; the row has to follow.
   useEffect(() => {
     if (selected) {
       rowRef.current?.scrollIntoView({ block: 'nearest' });
     }
   }, [selected]);
 
-  // A realtime update to the record while the row sits open would
-  // otherwise be overwritten by the stale draft on the next blur.
+  // Or a realtime update arriving while the row sits open is overwritten by
+  // the stale draft on the next blur.
   useEffect(() => {
     if (!editing) {
       setTitle(funn.title);
@@ -256,9 +230,7 @@ const FunnRow = ({
     }
   }, [funn.title, funn.note, editing]);
 
-  // Existing records save on blur — no Lagre/Avbryt pair for a field you
-  // are editing in place. Drafts (new funn) are still forms; see
-  // FunnDraft.
+  // Existing records save on blur; drafts are still forms (see FunnDraft).
   const commit = () => {
     const nextTitle = title.trim();
     const nextNote = note.trim();
@@ -285,9 +257,7 @@ const FunnRow = ({
       title={editing || deleted ? undefined : t('localities.funn.actions.zoom')}
     >
       <div className={styles.head}>
-        {/* A tombstoned funn is already off the map, so there is nothing for a
-            switch to say about it — and a switch that looked live would be
-            offering to put back something the transaction has taken away. */}
+        {/* A tombstoned funn is already off the map. */}
         {!deleted && (
           <VisibilitySwitch
             shown={shown}
@@ -332,9 +302,7 @@ const FunnRow = ({
         </div>
         {!editing && (
           <div className={styles.actions}>
-            {/* A tombstoned row keeps its badge but loses every verb that
-                would change it: the only decision left on it is whether it
-                goes. */}
+            {/* A tombstoned row keeps its badge but loses every verb. */}
             <StatusPicker
               value={funn.status}
               editable={editable && !deleted}
@@ -385,7 +353,7 @@ export const FunnList = ({
   editable: boolean;
   selectedId: string | null;
   deletedIds: ReadonlySet<string>;
-  /** Switched off in this session — view state, never stored (§13.8). */
+  /** Switched off in this session: view state, never stored. */
   switchedOffIds: ReadonlySet<string>;
   onToggleShown: (id: string) => void;
   onSelect: (f: LocalityFindRecord) => void;
@@ -398,7 +366,7 @@ export const FunnList = ({
   const { t } = useTranslation();
   const setHovered = useSetAtom(hoveredFunnIdAtom);
 
-  // The halo has no business outliving the list it belongs to.
+  // The halo must not outlive the list.
   useEffect(() => () => setHovered(null), [setHovered]);
 
   if (items == null) {

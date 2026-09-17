@@ -1,17 +1,8 @@
 @import './ui/tokens.css';
 @import './map/map.css';
 
-/*
- * The reset. `<KvibProvider>` supplied Chakra's preflight; this took over when
- * kvib went. Deliberately the small version: every ported surface
- * sets its own margins, sizes and list styling in its own module, so what is
- * left here is what those modules assume rather than a full normalize.
- *
- * The element rules that look redundant against the modules are parity with
- * preflight, not belt and braces — an element the modules do not reach (an
- * unclassed <a>, a heading added later) should keep looking the way it did
- * while Chakra was resetting it.
- */
+/* A small reset: each surface sets its own margins, sizes and list styling in
+   its own module, so what is here is what those assume. */
 
 *,
 *::before,
@@ -45,9 +36,8 @@ dd {
   margin: 0;
 }
 
-/* Headings drop the UA's size and weight along with the margin: every
-   heading in the app is classed and sets both itself, which is what it had
-   to do under preflight too. */
+/* Headings drop the UA's size and weight with the margin: every heading in
+   the app is classed and sets both itself. */
 h1,
 h2,
 h3,

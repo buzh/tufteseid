@@ -6,17 +6,9 @@ import { PulldownDisclosure, PulldownItem } from '../Pulldown';
 import styles from '../Pulldown.module.css';
 import type { LidarControls } from './useLidarControls';
 
-/**
- * Which styled variant of the active dataset to render — hillshade, slope,
- * and whatever else the WMS publishes for it. Rarer ones sit behind "flere
- * stiler"; the short list above is the same ring A/D walks — when it has A/D,
- * which inside a lokalitet with a bilder rail it does not
- * (`src/localities/bilderRing.ts`). Hence the composed heading.
- *
- * Rendered only when the dataset publishes more than one. The national
- * mosaic and everything in DOM mode publish exactly one, and a pulldown with
- * a single entry is a label wearing a chevron.
- */
+// The styled variants the WMS publishes for the active dataset; the tier-A
+// list is the ring A/D walks, when a bilder rail has not taken A/D. Rendered
+// only when there is more than one style.
 export const LidarStylePicker = ({ lidar }: { lidar: LidarControls }) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);

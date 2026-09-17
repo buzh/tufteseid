@@ -5,19 +5,9 @@ import { cx } from './cx';
 import { Icon } from './Icon';
 import styles from './Section.module.css';
 
-/*
- * Collapsible block with a heading, a count and an optional action on the
- * header row.
- *
- * Controlled: the open state is the caller's, not this component's. The
- * lokalitet dock that once kept its sections in a shared atom is gone, and
- * the callers left — the search panels and the help page — each have their
- * own idea of what "open" means and when it survives a remount.
- *
- * Content is unmounted while collapsed. That is a change from the kvib
- * Collapsible, and the point of it: the Bilder gallery fetches short-lived
- * file tokens for its thumbnails, and a collapsed section should not.
- */
+// Collapsible block with a heading, a count and an optional header action.
+// Controlled — the open state is the caller's — and the content is unmounted
+// while collapsed, so a collapsed section costs nothing.
 export const Section = ({
   title,
   open,

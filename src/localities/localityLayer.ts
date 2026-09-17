@@ -24,28 +24,11 @@ import { localityPlacementAtom } from './placement';
 export const LOCALITY_ID_PROPERTY = '__localityId';
 export const LOCALITIES_LAYER_ID = 'localitiesLayer';
 
-// The open lokalitet gets a heavier frame. Module-level because the
-// style function can't reach jotai hooks; the workspace keeps it synced.
+// Module level: the style function cannot reach jotai hooks.
 let highlightedLocalityId: string | null = null;
 
-/*
- * How a lokalitet rectangle draws.
- *
- * The rectangle is a frame around the ground, never a tint over it: relief
- * shading is the thing being read, and an interior fill — even at 4 % — is
- * the loudest object on a grey hillshade. So: no visible fill, a thin dashed
- * line cased in white so it survives both dark relief and bright ortofoto,
- * and the name in a chip pinned to the top-left corner instead of a haloed
- * word across the middle of the view.
- *
- * It draws faint because the only question it has to answer is "somebody has
- * framed this ground, and it is called Storevike", and answering *that* at
- * full weight over the site you are actually reading is what "Skjul merker"
- * used to exist to undo. Fading is the better answer than a switch: it leaves
- * the rectangle clickable, so the way to open one is still to press it.
- *
- * And the open one draws no line at all — see `styleFor`.
- */
+// A frame around the ground, never a tint over it: a dashed line cased in
+// white so it survives dark relief and bright ortofoto, plus a corner chip.
 const FRAME_FAINT = 'rgba(255, 106, 0, 0.45)';
 const CASING_FAINT = 'rgba(255, 255, 255, 0.4)';
 
@@ -55,9 +38,6 @@ const nameChip = (name: string, corner: number[]) =>
     text: new Text({
       text: name,
       font: '500 12px sans-serif',
-      // Faint, but not so faint it stops being readable over a bright
-      // ortofoto — the chip is the only thing that says *which* lokalitet
-      // the rectangle you are about to click is.
       fill: new Fill({ color: 'rgba(58, 24, 0, 0.65)' }),
       backgroundFill: new Fill({ color: 'rgba(255, 255, 255, 0.45)' }),
       padding: [2, 5, 2, 5],
@@ -69,13 +49,8 @@ const nameChip = (name: string, corner: number[]) =>
     }),
   });
 
-/*
- * Not decoration: OL hit-detects a polygon's interior by re-executing its
- * fill and testing the alpha byte, so dropping the fill entirely would make a
- * rectangle clickable only within a few pixels of its edge — and clicking one
- * is how you open it. 1 % white is invisible over both hillshade and ortofoto
- * and still rounds to alpha > 0.
- */
+// Required: OL hit-detects an interior by re-running the fill and testing the
+// alpha byte, so with no fill only the edge is clickable. 1 % rounds to >0.
 const hitFill = new Style({
   fill: new Fill({ color: 'rgba(255, 255, 255, 0.01)' }),
 });
@@ -85,26 +60,8 @@ const styleFor = (feature: FeatureLike): Style[] => {
   if (!extent) return [];
   const name = (feature.get('name') as string) ?? '';
 
-  /*
-   * **The open lokalitet draws nothing at all** — no frame, no casing, no
-   * corner brackets, no name chip.
-   *
-   * It used to draw at full weight, on the argument that it is the boundary
-   * of what you are working in. But a `?lok=` view is already about one
-   * rectangle and says so everywhere: the row carries its name and code, the
-   * map is sitting on its extent, and every ground, View and sketch is
-   * clipped to it. Nothing is left for the line to disambiguate — while it
-   * *is* a bright orange border laid across the relief the lokalitet exists
-   * to let you read, at the one moment the reading matters most, and worst
-   * exactly at the edges, where a mound running out of the rectangle has to
-   * be seen running out of it.
-   *
-   * Only the paint goes. The feature, the hit fill and everything built on
-   * them stay, so clicking the ground still resolves to this lokalitet and
-   * "Juster området" still hides a rectangle and hands it back
-   * (`hideLocalityOnLayer`, which suppresses the fill too, so the handles get
-   * the clicks).
-   */
+  // The open lokalitet draws no paint: its own edges are where a mound running
+  // out of the rectangle has to stay readable. The hit fill stays.
   if (feature.get(LOCALITY_ID_PROPERTY) === highlightedLocalityId) {
     return [hitFill];
   }
@@ -131,8 +88,7 @@ const styleFor = (feature: FeatureLike): Style[] => {
   return styles;
 };
 
-// PB json fields arrive parsed in REST responses but have shipped as
-// strings over realtime SSE — cope with both.
+// PB json fields arrive parsed over REST but as strings over realtime SSE.
 const asBbox = (raw: unknown): LocalityBbox | null => {
   const value = typeof raw === 'string' ? safeParse(raw) : raw;
   if (
@@ -185,8 +141,7 @@ const removeById = (source: VectorSource, id: string) => {
   for (const f of doomed) source.removeFeature(f);
 };
 
-// Push a record straight onto the layer after create/update — realtime
-// is best-effort and we already hold the record.
+// Realtime is best-effort and the caller already holds the record.
 export const upsertLocalityOnLayer = (rec: LocalityRecord) => {
   const layer = getLocalitiesLayer();
   const source = layer?.getSource();
@@ -208,8 +163,7 @@ export const setLocalityHighlight = (id: string | null) => {
   getLocalitiesLayer()?.changed();
 };
 
-// Hide a rectangle while the adjust interaction shows its own editable
-// copy on a temp layer. Restore by re-upserting the record.
+// Hide while adjust shows an editable copy; restore by re-upserting.
 export const hideLocalityOnLayer = (id: string) => {
   const source = getLocalitiesLayer()?.getSource();
   if (!source) return;
@@ -218,19 +172,12 @@ export const hideLocalityOnLayer = (id: string) => {
   }
 };
 
-// Mount from useMapSideEffects. The *register* is behind sign-in: signed
-// out, we never list, so the map is not an index of everybody's public
-// rectangles. The one exception is the lokalitet a guest was actually sent
-// to — a shared link opens for anybody now (shareLink.ts), and the rectangle
-// is the lokalitet, so arriving at one and seeing no rectangle would be
-// arriving nowhere.
+// Mount from useMapSideEffects. Signed out we never list, so the map is not an
+// index of everybody's public rectangles — only what a shared link resolved.
 export const useLocalitiesLayer = () => {
   const map = useAtomValue(mapAtom);
   const user = useAtomValue(currentUserAtom);
   const active = useAtomValue(activeLocalityAtom);
-  // Signed in, the list and the subscription already carry whatever is open,
-  // so re-running on every open would refetch the register for nothing.
-  // Signed out it is the entire content of the layer.
   const guestLocality = user ? null : active;
 
   useEffect(() => {
@@ -257,9 +204,7 @@ export const useLocalitiesLayer = () => {
     const projection = map.getView().getProjection().getCode();
 
     if (!user) {
-      // Just the one, straight off the record the deep link already
-      // resolved — no list, and no realtime either: a guest is reading a
-      // rectangle, not watching a register.
+      // No list and no realtime: a guest reads a rectangle, not a register.
       if (guestLocality) {
         const feature = hydrateFeature(guestLocality, projection);
         if (feature) source.addFeature(feature);
@@ -301,7 +246,6 @@ export const useLocalitiesLayer = () => {
   }, [map, user?.id, guestLocality]);
 };
 
-// Click a rectangle (outside any workspace/tool) → open its workspace.
 export const useLocalityClick = () => {
   const map = useAtomValue(mapAtom);
   const user = useAtomValue(currentUserAtom);
@@ -313,13 +257,8 @@ export const useLocalityClick = () => {
 
     const onClick = (e: Event | BaseEvent) => {
       if (!(e instanceof MapBrowserEvent)) return;
-      // Deaf while a rectangle is being placed. The placement covers the same
-      // ground these rectangles are drawn on, so a drag that ends over a
-      // neighbouring lokalitet would otherwise open it out from under the
-      // session — and opening one closes the placement, taking the rectangle
-      // with it. Read from the store rather than through the hook: this
-      // listener is registered once and must see the flag as it is at click
-      // time, not as it was when the effect last ran.
+      // Deaf while a rectangle is being placed. Read from the store, not the
+      // hook: this listener is registered once and must see the flag live.
       if (getDefaultStore().get(localityPlacementAtom)) return;
       let hitId: string | null = null;
       map.forEachFeatureAtPixel(

@@ -21,9 +21,7 @@
   color: var(--c-fg-subtle);
 }
 
-/* Fact rows: label left, value right, value truncating rather than
-   wrapping — these are dates and names, and none of them repay a
-   second line. */
+/* Label left, value right, truncating rather than wrapping. */
 .fact {
   display: flex;
   justify-content: space-between;
@@ -36,8 +34,7 @@
   color: var(--c-fg-subtle);
 }
 
-/* Sized to its own label rather than stretched across the column, so it
-   reads as an action on the facts above it and not as another field. */
+/* Sized to its own label, so it reads as an action rather than a field. */
 .refresh {
   align-self: flex-start;
   margin-top: var(--sp-2);

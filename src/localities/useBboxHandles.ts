@@ -17,37 +17,12 @@ import { addOwnedInteraction, type InteractionOwner } from '../map/interactions'
 import { clampBboxSize } from './bboxLimits';
 
 /*
- * A rectangle you can move and resize on the map, and nothing else.
- *
- * Both surfaces that author a bbox run on this: placing a new lokalitet
- * (`useLocalityPlacement`) and reshaping an existing one (`useLocalityAdjust`,
- * "Juster området"). They differ in what they do with the result — one is
- * holding a rectangle that has no record yet, the other is writing into an edit
- * buffer — and in nothing else, which is why the gesture lives here rather than
- * twice.
- *
- * **The rectangle is a rectangle at every frame of the gesture**, which is what
- * one interaction of our own buys over the `Translate` + `Modify` pair this
- * replaced. `Modify` moves the one vertex under the hand, so a corner drag made
- * a trapezoid and the axis-aligned shape only came back on release, rebuilt
- * from the dragged corner and the opposite one. Here a grab names *which sides
- * move* — two of them for a corner, one for an edge — and every frame rebuilds
- * the extent from the pointer plus the sides that did not move. Nothing snaps
- * back afterwards because nothing was ever out of shape, and the same frame
- * goes through `clampBboxSize`, so the drag stops at the size band instead of
- * overshooting it and being pulled in on release.
- *
- * Edges are grabbable for the same reason corners are: one side is very often
- * the only thing wrong with the frame, and moving a corner to fix it costs the
- * other axis. Corners win where the two bands cross, and the interior is the
- * move.
- *
- * Two callbacks, because the two questions have different answers mid-gesture:
- * `onChange` fires on a finished gesture and is what anything downstream should
- * read, while `onLive` fires on every frame, for a readout that has to keep up
- * with the hand. Both are clamped; the difference is only how often, and
- * writing the authoritative rectangle per frame would re-render the ribbon at
- * pointer rate.
+ * A rectangle you can move and resize; both `useLocalityPlacement` and
+ * `useLocalityAdjust` run on it. A grab names which sides move, and each frame
+ * rebuilds the extent from the pointer plus the sides that did not, through
+ * `clampBboxSize`, so the drag stops at the band rather than snapping back on
+ * release. `onChange` is the finished gesture; `onLive` is every frame of one,
+ * because writing the record per frame re-renders the ribbon at pointer rate.
  */
 
 const CORNER_GRAB_PX = 12;
@@ -65,20 +40,12 @@ const handleImage = (radius: number) =>
     stroke: new Stroke({ color: '#FF6A00', width: 2 }),
   });
 
-// Mutated per render pass by `rectangleStyle` below — the standard OL idiom for
-// drawing a geometry's own vertices, and safe here because the style is read
-// back synchronously by the renderer and only one of these layers is ever
-// mounted (placing closes the open lokalitet, so adjust cannot also be live).
+// Mutated per render pass by `rectangleStyle`, the OL idiom for drawing a
+// geometry's own vertices; the renderer reads it back synchronously.
 const cornerStyle = new Style({ image: handleImage(6) });
 const edgeStyle = new Style({ image: handleImage(4.5) });
 
-/**
- * The rectangle, its four corner handles and its four edge handles.
- *
- * The handles are drawn rather than merely hit-tested because they are the only
- * thing that says an edge can be taken hold of; `Modify` used to put a vertex
- * dot under the hand on hover, and nothing would have replaced it.
- */
+// Drawn, not merely hit-tested: the handles are what say an edge is grabbable.
 const rectangleStyle = (feature: FeatureLike): Style[] => {
   const geometry = feature.getGeometry();
   if (!(geometry instanceof Polygon)) return [boxStyle];
@@ -114,11 +81,7 @@ type Sides = {
 
 type Grab = { kind: 'resize'; sides: Sides } | { kind: 'move' };
 
-/**
- * Which of two parallel edges a pixel is on, or `null` if it is near neither.
- * Nearest rather than first, so that a rectangle dragged down to a few pixels
- * across still resizes from the side the hand is actually on.
- */
+// Nearest, not first: a rectangle a few pixels across still resizes correctly.
 const nearestSide = (
   value: number,
   low: number,
@@ -142,19 +105,10 @@ const cursorFor = (grab: Grab | null, dragging: boolean): string => {
 };
 
 export type BboxHandlesOptions = {
-  /** Mount the layer and the interaction while this is true. */
   active: boolean;
-  /**
-   * Where the rectangle starts. Read **once**, when the session begins: the
-   * gesture owns the geometry from then on, and re-seeding from a prop would
-   * fight the hand that is dragging it.
-   */
+  /** Read once, when the session begins: re-seeding would fight the hand. */
   seed: LocalityBbox;
-  /**
-   * Restarts the session when it changes — the open lokalitet's id for adjust,
-   * a placement's id for a new one. Keyed rather than deep-compared so that
-   * "this is a different rectangle now" is something the caller states.
-   */
+  /** Restarts the session when it changes; the caller states the identity. */
   sessionKey: string;
   owner: InteractionOwner;
   layerId: string;
@@ -162,7 +116,7 @@ export type BboxHandlesOptions = {
   onChange: (bbox: LocalityBbox) => void;
   /** Every frame of one. */
   onLive?: (bbox: LocalityBbox) => void;
-  /** Runs on mount and its return value on unmount — see useLocalityAdjust. */
+  /** Runs on mount, its return value on unmount. */
   onMount?: () => () => void;
 };
 
@@ -223,11 +177,7 @@ export const useBboxHandles = ({
       geometry.setCoordinates(polygonFromExtent(next).getCoordinates());
     };
 
-    /**
-     * What is under the pointer. Corners are tested first and with a wider
-     * band than edges: a corner is where two edge bands cross, and grabbing it
-     * has to mean both axes rather than whichever edge is asked about first.
-     */
+    // Corners are tested first and wider, so a crossing band means both axes.
     const grabAt = (pixel: number[]): Grab | null => {
       const box = currentExtent();
       if (!box) return null;
@@ -235,9 +185,8 @@ export const useBboxHandles = ({
       const [right, top] = map.getPixelFromCoordinate([box[2], box[3]]);
       const [x, y] = pixel;
 
-      // Pixel y grows downwards, so the north edge is the smaller of the two.
-      // Rotation is locked off app-wide, which is what lets the rectangle be
-      // hit-tested as four numbers.
+      // Pixel y grows downwards, so north is the smaller. Rotation is off
+      // app-wide, which is what lets this be four numbers.
       const corner = {
         x: nearestSide(x, left, right, CORNER_GRAB_PX),
         y: nearestSide(y, top, bottom, CORNER_GRAB_PX),
@@ -283,9 +232,7 @@ export const useBboxHandles = ({
       return insideX && insideY ? { kind: 'move' } : null;
     };
 
-    // The cursor is the only thing that says an edge is grabbable, so this
-    // interaction owns it while it is mounted — and hands it back to whatever
-    // had it when the session began rather than to nothing, because Stedsinfo
+    // Owns the cursor while mounted and hands back whatever had it — Stedsinfo
     // keeps a `crosshair` on the same element for as long as it is armed.
     const viewport = map.getViewport();
     const restCursor = viewport.style.cursor;
@@ -297,10 +244,8 @@ export const useBboxHandles = ({
       viewport.style.cursor = value;
     };
 
-    // `sides: null` is a body move. `before` is the rectangle as it stood when
-    // the hand went down, and every frame is computed from it rather than from
-    // the previous frame: absolute, so nothing accumulates drift, and it is
-    // also the ceiling the clamp ratchets against.
+    // `sides: null` is a body move. Every frame is computed from `before`, the
+    // rectangle as the hand found it, which is also the clamp's ratchet ceiling.
     let drag: {
       sides: Sides | null;
       from: number[];
@@ -310,16 +255,12 @@ export const useBboxHandles = ({
     const resize = (sides: Sides, to: number[], before: Extent) => {
       const [minX, minY, maxX, maxY] = before;
       const [x, y] = to;
-      // Each held side follows the pointer, bounded by the one opposite it;
-      // every other side stays exactly where the gesture found it. That is the
-      // whole of "the corners stay square".
+      // Each held side follows the pointer, bounded by the one opposite.
       const west = sides.west ? Math.min(x, maxX) : minX;
       const east = sides.east ? Math.max(x, minX) : maxX;
       const south = sides.south ? Math.min(y, maxY) : minY;
       const north = sides.north ? Math.max(y, minY) : maxY;
-      // The point that does not move: the opposite corner for a corner drag,
-      // and for an edge drag the opposite edge, whose other axis is unchanged
-      // and therefore answers the same either way.
+      // The point that does not move: the opposite corner or edge.
       const anchor = transform(
         [sides.west ? east : west, sides.south ? north : south],
         projection,
@@ -330,8 +271,7 @@ export const useBboxHandles = ({
           clampBboxSize(
             toBbox([west, south, east, north]),
             anchor,
-            // The ratchet: a record already over the band may be shrunk, never
-            // snapped (see clampBboxSize).
+            // The ratchet: a record over the band may shrink, never snap.
             toBbox(before),
           ),
           'EPSG:4326',
@@ -340,11 +280,7 @@ export const useBboxHandles = ({
       );
     };
 
-    // Both gestures in one interaction of our own, rather than a `Translate`
-    // for the body beside something else for the handles: the two have to
-    // agree about what the hand is on — a body drag that starts on an edge is
-    // the bug the old `CORNER_GRAB_PX` condition existed to paper over — and
-    // the cursor can only name the grab if one of them decides what it is.
+    // Both gestures in one interaction: only one of them can name the cursor.
     const handles = new PointerInteraction({
       handleDownEvent: (event) => {
         const original = event.originalEvent;
@@ -379,8 +315,7 @@ export const useBboxHandles = ({
         drag = null;
         setCursor(cursorFor(grabAt(event.pixel), false));
         const box = currentExtent();
-        // Only a gesture that moved something is a change. A click on a handle
-        // that goes nowhere would otherwise dirty an edit buffer.
+        // A click that goes nowhere must not dirty the edit buffer.
         if (!finished || !box) return false;
         if (box.every((value, i) => value === finished.before[i])) return false;
         if (box[2] - box[0] <= 0 || box[3] - box[1] <= 0) return false;

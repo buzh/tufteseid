@@ -26,8 +26,7 @@ export const Badge = ({
   </span>
 );
 
-// Nothing to say when the count is zero or unknown, so render nothing —
-// call sites used to repeat this `count != null && count !== 0` guard.
+// Nothing to say when the count is zero or unknown.
 export const CountBadge = ({
   count,
   palette = 'gray',

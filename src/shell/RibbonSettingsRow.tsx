@@ -19,15 +19,7 @@ import { TerrainStrip } from './terrain/TerrainStrip';
 import type { TerrainAnalysis } from './terrain/useTerrainAnalysis';
 import type { GroundControls, GroundMode } from './useGroundMode';
 
-/**
- * What to call the thing being adjusted. Keyed on the ground *mode* rather
- * than on which family of controls is below it: in Hybrid the controls are
- * the LiDAR stack's, but the person reading the map is reading Hybrid, and
- * labelling the strip "LiDAR" there would describe the plumbing instead.
- *
- * Exhaustive over GroundMode, so adding a sixth ground is a type error here
- * rather than an unlabelled bar.
- */
+/** Exhaustive over GroundMode: a sixth ground is a type error here. */
 const SUBJECT_KEY: Record<GroundMode, string> = {
   standard: 'ribbon.mode.standard',
   lidar: 'ribbon.mode.lidar',
@@ -37,61 +29,12 @@ const SUBJECT_KEY: Record<GroundMode, string> = {
 };
 
 /**
- * The settings strip — one line under row 1, holding the controls that belong
- * to whatever row 1 currently has selected.
- *
- * A *strip*, not a tray. The four-row collapse deleted a 380 px panel and a
- * pair of tool rows that between them grew the bar to five hundred pixels,
- * over the very terrain they were describing; the rule that came out of that
- * forbids **bodies, not rows**. So the contract here is one line. Anything
- * needing more goes in a popover anchored to a control on this line, the way
- * the dataset pickers already do — a subject whose controls stop fitting is
- * the signal to move something into a popover, never to let the strip grow.
- *
- * Two different questions decide what it shows, and keeping them apart is the
- * whole point of the split introduced in fb4104c:
- *
- * - `ground.modifiers` picks the **controls**, because they act on a stack,
- *   and Hybrid is a modifier on the LiDAR stack rather than a stack of its
- *   own.
- * - `ground.mode` picks the **label**, because that is the ground actually on
- *   screen.
- *
- * **Absent under Standard**, and present under the other four. The strip was
- * a fixture for a while, on the argument that a line of chrome coming and
- * going as you walk the ring changes the bar's height under the pointer and
- * moves everything below row 1. That argument is right about the cost and
- * wrong about the size of it: the height only changes on 1↔2, a deliberate
- * press, never on W/S inside a ground — and what it was buying under Standard
- * was a 40 px row carrying one pulldown and a subject label that repeated the
- * lit button above it. So Standard's pulldown moved onto the `Kart` button
- * (StandardVariantPicker) and the row went with it. The other four bring two
- * to six controls each and earn the line.
- *
- * The exception is the compare curtain: the A|B switch lives here, so with the
- * curtain up the strip stays even under Standard — otherwise there would be no
- * way to aim the ribbon at the other half. It carries the switch and the
- * subject and nothing else there, which is exactly the phrase that is wanted:
- * "Høyre — Kart".
- *
- * Terreng is the one subject that can *wrap* this line, because it is the one
- * that puts sliders on it (`TerrainSliders`, inline: label · track · readout).
- * That is within the contract, which forbids a *body* — the 380 px panel, the
- * 360 px dock column — rather than a second line of the same thin row; and
- * the knobs had a dedicated second row until they were flattened, so wrapping
- * on a narrow window costs exactly what that row cost on every window. If a
- * ninth visualization ever needs a fifth slider, the answer is fewer knobs on
- * the line, not a taller strip.
- *
- * With the compare curtain up the strip also carries the A|B switch, and both
- * questions above are then asked of the *focused* half — the controls on this
- * line and the five buttons on the row above act on whichever side of the
- * curtain the switch names (docs/ui-architecture.md §5.8).
- *
- * Deliberately *not* registered with `anyOverlayOpenAtom`. The strip is
- * ordinary chrome, not an overlay, and counting it as one would disable 1–5
- * and W/S/A/D exactly while someone is using the controls that those keys are
- * the shortcut for.
+ * The settings strip — one line under row 1, holding whatever row 1 selected;
+ * anything needing more room goes in a popover anchored to a control on it.
+ * `ground.modifiers` picks the controls (Hybrid is a modifier on LiDAR's),
+ * `ground.mode` picks the label, both off the focused half under the curtain.
+ * Not registered with `anyOverlayOpenAtom`: counting the strip as an overlay
+ * would disable 1–5 and W/S/A/D exactly while its controls are in use.
  */
 export const RibbonSettingsRow = ({
   ground,
@@ -126,8 +69,6 @@ export const RibbonSettingsRow = ({
       role="group"
       aria-label={compareOn ? `${halfLabel} — ${subject}` : subject}
     >
-      {/* First, ahead of the subject, because it governs what the subject
-          even names: "Høyre — Flyfoto" is one phrase read left to right. */}
       {compareOn && (
         <Segmented
           value={focus}
@@ -139,15 +80,9 @@ export const RibbonSettingsRow = ({
 
       <span className={styles.settingsSubject}>{subject}</span>
 
-      {/* No `standard` arm. Under Standard this row only ever renders with
-          the curtain up, and then it is the A|B switch and the subject —
-          the cartography pulldown is on the `Kart` button above. */}
-
       {ground.modifiers === 'flyfoto' && (
         <div className={styles.group}>
           <FlyfotoDatasetPicker flyfoto={flyfoto} />
-          {/* Narrows the pulldown beside it and the W/S ring together, so
-              the chips are next to the chip whose count they change. */}
           <FlyfotoEraPicker flyfoto={flyfoto} />
         </div>
       )}
@@ -157,17 +92,14 @@ export const RibbonSettingsRow = ({
           <LidarDatasetPicker lidar={lidar} />
           {/* Only when the dataset publishes more than one styled variant. */}
           {lidar.datasetStyles.length > 1 && <LidarStylePicker lidar={lidar} />}
-          {/* Outside that guard on purpose: DOM publishes a single style, so
-              the style chip disappears in DOM mode and this toggle would take
-              the way back out with it. */}
+          {/* Outside that guard: DOM publishes one style, so the style chip
+              disappears in DOM mode and would take this with it. */}
           <LidarModelToggle
             model={lidar.lidarModel}
             onSelect={lidar.setLidarModel}
           />
-          {/* Keyed on the *mode*, not the modifiers, and the only control on
-              this strip that is: contours are two more groups in the hybrid
-              overlay's own request, so in plain LiDAR there is no overlay for
-              them to ride on and the switch would toggle nothing. */}
+          {/* Keyed on the mode, not the modifiers: contours ride in the hybrid
+              overlay's request, absent in plain LiDAR. */}
           {ground.mode === 'hybrid' && (
             <HybridContoursToggle
               contours={lidar.hybridContours}
@@ -177,11 +109,9 @@ export const RibbonSettingsRow = ({
         </div>
       )}
 
-      {/* Not wrapped in a `group` like the two above: Terreng brings the most
-          controls of any subject — five long Norwegian visualization names,
-          a model toggle, a readout and two verbs — and holding them together
-          on one unbreakable line is what would push the strip off a laptop.
-          It supplies its own grouping for the pairs that must not split. */}
+      {/* Not wrapped in a `group`: Terreng brings the most controls, and one
+          unbreakable line would push the strip off a laptop. It groups the
+          pairs that must not split itself. */}
       {ground.modifiers === 'terrain' && <TerrainStrip terrain={terrain} />}
     </div>
   );

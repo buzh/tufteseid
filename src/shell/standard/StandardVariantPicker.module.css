@@ -1,16 +1,5 @@
-/*
- * The caret welded to the right edge of the `Kart` button — the whole of
- * Standard's control surface, now that it no longer has a settings strip to
- * live on.
- *
- * Same seam as EyeSplit's eye and deliberately so: no gap, a hairline, a
- * square inner corner, and no fixed height, so it stretches to whatever the
- * ModeButton beside it decides on and the pair stays one object when the
- * ribbon shrinks its buttons on a phone. Narrower than the eye (24 px against
- * 28) because a caret is a glyph you aim at rather than a switch you hit
- * repeatedly, and every pixel on row 1 is width the search field wants.
- */
-
+/* The caret welded to the right edge of the `Kart` button: EyeSplit's seam, and
+   no fixed height, so it stretches to whatever the ModeButton beside it is. */
 .caret {
   display: inline-flex;
   align-items: center;
@@ -35,10 +24,8 @@
   outline-offset: 1px;
 }
 
-/* Held down while the list is up. Not the accent fill: on this row accent
-   means "this is the ground you are on", which is the half to the left's job
-   to say — and a lit caret beside a lit Kart button would read as two
-   selections rather than one control with a list open. */
+/* Held down while the list is up, but not the accent fill: on this row accent
+   means "this is the ground you are on", which the half to the left says. */
 .caretOpen,
 .caretOpen:hover {
   background: var(--c-bg-active);

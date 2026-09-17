@@ -327,8 +327,7 @@ const LayerFeatureInfoSection = ({
 }) => {
   const featureCount = layerInfo.features.length;
 
-  // The badge carries the count, or the word Feil when the layer failed —
-  // `Section` takes either, so the two cases differ only in what goes in it.
+  // The badge carries the count, or Feil when the layer failed.
   if (layerInfo.error) {
     return (
       <Section
@@ -382,9 +381,7 @@ export const FeatureInfoSection = ({
   const { t } = useTranslation();
   const result = useAtomValue(featureInfoResultAtom);
   const loading = useAtomValue(featureInfoLoadingAtom);
-  // Which layer within the section is expanded. One at a time, and the first
-  // one whenever a new click brings a new set — with several layers under the
-  // cursor the list is a menu, not a report to read straight through.
+  // One layer expanded at a time, and the first one on every new click.
   const [openLayer, setOpenLayer] = useState<string | null>(null);
 
   const totalFeatures = result
@@ -393,8 +390,7 @@ export const FeatureInfoSection = ({
 
   useEffect(() => {
     setOpenLayer(result?.layers[0]?.layerId ?? null);
-    // A single hit is unambiguous, so show it rather than making the user
-    // open a section to find out what they clicked.
+    // A single hit is unambiguous, so open it.
     if (totalFeatures === 1) {
       onOpenChange(true);
     }

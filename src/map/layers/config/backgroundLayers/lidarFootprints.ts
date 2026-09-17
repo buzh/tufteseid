@@ -1,15 +1,5 @@
-// Real per-project LiDAR coverage footprints — Kartverket's
-// "Prosjektavgrensning" (project boundary) WFS, the same service that
-// backs høydedata.no's project map. It is the sole source of truth for
-// "does this project actually cover the viewport": real polygon-vs-
-// viewport intersection, not the catalogue's envelope.
-//
-// Routed same-origin through wmscache (/wfs/geonorge/ →
-// wfs.geonorge.no/skwms1/); it is the only user of that prefix.
-//
-// Footprints are fetched ONE PROJECT AT A TIME, by name, and never by
-// BBOX. See "Why not a BBOX query" below — that is the whole point of
-// this module's shape.
+// Real coverage polygons from Kartverket's "Prosjektavgrensning" WFS, rather
+// than the catalogue's envelope. Same-origin via /wfs/geonorge/, only user.
 
 import GeoJSON from 'ol/format/GeoJSON';
 import { Geometry } from 'ol/geom';
@@ -20,56 +10,16 @@ const TYPE_NAME = 'metadata_prosjekt:Prosjektavgrensning';
 
 export type LidarFootprint = {
   project: LidarProject;
-  // A project can appear as several disjoint WFS features (sub-areas);
-  // keep every part rather than merging geometry.
+  // A project can appear as several disjoint WFS features; keep every part.
   geometries: Geometry[];
 };
 
-// --- Why not a BBOX query ---
-//
-// This used to ask the WFS for every boundary intersecting the viewport
-// and join the answer against the catalogue by name. That is the obvious
-// shape, and it is wrong: the service is ArcGIS Server, and its spatial
-// filter is approximate in both directions — it over-returns for wide
-// boxes (features tens of km outside them) and, fatally, *under*-returns
-// for narrow ones. Measured against the origin directly, with this proxy
-// out of the path, at Skien (188562, 6569064 in EPSG:25833), where three
-// projects genuinely contain the point:
-//
-//     query box   projects returned that contain the point
-//       2 km      1  (Skien 2008)
-//       3 km      2
-//       4 km      3  ← complete
-//      33 km      3
-//
-// The same probe in Trondheim and Oslo needed a 33 km box before the
-// answer was complete, and what it dropped below that was consistently
-// the newest, densest acquisition — NDH Trondheim 30pkt 2022, Oslo 10pkt
-// 2024 — i.e. exactly the datasets worth opening. Nested boxes are not
-// even monotonic: a 6 km box returned features a 16 km box did not.
-// (This is what "the projects only show up if I zoom out to z13" was.)
-//
-// So a BBOX query is only trustworthy zoomed way out, which is where it
-// is also unaffordable: the responses are uncompressed GeoJSON growing
-// with area — 1.3 MB across 4 km, 4.4 MB across 33 km, 7 MB across
-// 65 km, and a 504 past that.
-//
-// A name filter has neither problem. The catalogue prefilter in
-// map/lidarFootprintsLayer.ts already yields a *complete* candidate set
-// — GetCapabilities bounding boxes are true envelopes, so it can only
-// over-include — and asking for one named project returns one project:
-// 0.1–0.3 s, 10–600 KB, correct at any zoom. 110 catalogue names sampled
-// across the country, including every one containing æøå or punctuation,
-// matched a case-insensitive name filter on the first try.
-//
-// It is also cacheable in a way a viewport query never was: a project's
-// boundary is immutable, so a response is good forever. Hence the
-// unbounded-TTL memo below and the cached nginx location fronting this
-// one WFS in nginx/wms-cache.conf.
+// By name, never by BBOX: the ArcGIS spatial filter silently under-returns for
+// narrow boxes, dropping the newest and densest acquisitions, and wide ones are
+// uncompressed GeoJSON (4.4 MB at 33 km, a 504 past 65 km).
 
-// The fes 2.0 predicate for one project. Only the three XML-significant
-// characters need escaping; the whole thing is URL-encoded on the way
-// out by URLSearchParams.
+// The fes 2.0 predicate for one project; URLSearchParams encodes it, so only
+// the three XML-significant characters need escaping here.
 const buildNameFilter = (projectName: string): string => {
   const literal = projectName
     .replace(/&/g, '&amp;')
@@ -84,12 +34,9 @@ const buildNameFilter = (projectName: string): string => {
   );
 };
 
-// A handful of catalogue names differ from the WFS spelling only by the
-// point-density token, so a miss is retried without it. Kept as a
-// fallback rather than the primary key because 81 name groups in the WMS
-// catalogue (169 of 1938 projects) differ by *nothing* else — Selbu 2pkt
-// / 024pkt / 5pkt 2007, Gjerdrum 5pkt / 50pkt 2021 — and matching on the
-// stripped name would collapse all their footprints onto one.
+// A few catalogue names differ from the WFS spelling only by the density token,
+// so a miss retries without it — never as the primary key: 81 name groups
+// differ by nothing else and would collapse onto one footprint.
 const stripDensity = (name: string): string =>
   name
     .replace(/\b\d+\s*(pkt|pnt)\b/gi, '')
@@ -108,10 +55,8 @@ const crsUrn = (projection: string): string | undefined => {
   return m ? `urn:ogc:def:crs:EPSG::${m[1]}` : undefined;
 };
 
-// A GeoJSON FeatureCollection's optional legacy `crs` member — ArcGIS-
-// backed WFS servers (this one included) set it when the output isn't
-// plain WGS84, which lets us interpret coordinates correctly regardless
-// of whether the server actually honored our SRSNAME request.
+// The legacy `crs` member this ArcGIS-backed WFS sets when output is not WGS84,
+// whether or not SRSNAME was honoured.
 const epsgFromCrsMember = (doc: unknown): string | undefined => {
   const name = (
     doc as { crs?: { properties?: { name?: string } } }
@@ -121,19 +66,12 @@ const epsgFromCrsMember = (doc: unknown): string | undefined => {
   return m ? `EPSG:${m[1]}` : undefined;
 };
 
-// Keyed by projection + project id, never expired: a project boundary is
-// static for the lifetime of the tab (and, thanks to the cached nginx
-// location, well beyond it). Negative results are cached too — a
-// project with no WFS row must not be re-asked on every pan.
-//
-// Bounded by count rather than TTL. An entry is one project's parsed
-// geometry, tens to hundreds of KB; a few hundred is a session's worth of
-// browsing one region without letting a long session grow without limit.
+// Keyed by projection + project id, never expired since a boundary is static;
+// negative results too. Bounded by count: an entry is 10s-100s kB.
 const MAX_CACHE_ENTRIES = 400;
 const cache = new Map<string, Promise<LidarFootprint | null>>();
 
-// Map iterates in insertion order, so re-inserting on read is what makes
-// the eviction below least-*recently*-used rather than oldest-first.
+// Map iterates in insertion order, so re-inserting on read makes eviction LRU.
 const readCache = (key: string): Promise<LidarFootprint | null> | undefined => {
   const hit = cache.get(key);
   if (!hit) return undefined;
@@ -151,8 +89,7 @@ const writeCache = (key: string, value: Promise<LidarFootprint | null>) => {
   }
 };
 
-// One WFS name query, reduced to the geometry parts that belong to this
-// catalogue entry. Null means "no rows for that name".
+// One WFS name query; null means no rows for that name.
 const requestByName = async (
   project: LidarProject,
   projectName: string,
@@ -184,10 +121,7 @@ const requestByName = async (
   const geometries: Geometry[] = [];
   for (const feature of features) {
     const props = feature.getProperties() as WfsProperties;
-    // Same name, different acquisition: the catalogue and the WFS agree
-    // on the year to within a rounding of when the flying happened, so
-    // anything further out is a different project that happens to share
-    // a name.
+    // Further out than a rounding of the flying date is a different project.
     const wfsYear = props.AARSTALL != null ? Number(props.AARSTALL) : null;
     if (
       project.year != null &&
@@ -202,8 +136,7 @@ const requestByName = async (
   return geometries.length > 0 ? geometries : null;
 };
 
-// One project's boundary, in the map's projection. Resolves to null when
-// the WFS has no row for it.
+// One project's boundary in the map's projection, or null if the WFS has none.
 const fetchOne = (
   project: LidarProject,
   projection: string,
@@ -231,16 +164,11 @@ const fetchOne = (
   return promise;
 };
 
-// How many name queries may be in flight at once. The WFS answers one in
-// ~0.2 s but hangs outright on roughly one request in five (see the
-// retry note in nginx/wms-cache.conf), so a wide fan-out mostly buys
-// more simultaneous hangs.
+// ~0.2 s per answer, but roughly one request in five hangs outright.
 const CONCURRENCY = 6;
 
-// Footprints for `projects`, keyed by LidarProject.id. Projects the WFS
-// has no boundary for are simply absent from the result. Order of
-// `projects` is the fetch order, so callers that cap the list should
-// pass the most relevant candidates first.
+// Keyed by LidarProject.id; projects with no boundary are absent. `projects`
+// order is the fetch order, so pass the best candidates first.
 export async function fetchLidarFootprints(
   projects: LidarProject[],
   projection: string,
@@ -266,17 +194,8 @@ export async function fetchLidarFootprints(
   return out;
 }
 
-// How much of the viewport a project's footprint actually paints, 0..1.
-//
-// Sampled on a grid rather than clipped analytically: OL has no polygon
-// intersection, and a topology library is a lot of bytes for a number
-// that only orders a list. A 24×24 grid resolves under 0.2% of the
-// screen — far finer than either the ordering or the "minste andel av
-// synsfeltet" filter can act on.
-//
-// `extent` and `geometries` must be in the same (projected, metric)
-// coordinate system, which they are: readFeatures reprojects to the
-// view's projection.
+// How much of the viewport a footprint paints, 0..1. Grid-sampled, since OL has
+// no polygon intersection; `extent` and `geometries` share a metric CRS.
 const COVERAGE_GRID = 24;
 
 export const viewportCoverage = (
@@ -288,9 +207,7 @@ export const viewportCoverage = (
   const cellH = (extent[3] - extent[1]) / COVERAGE_GRID;
   if (cellW <= 0 || cellH <= 0) return 0;
 
-  // Boundary polygons run to thousands of vertices, and the sample can't
-  // see detail finer than a cell anyway. getSimplifiedGeometry takes a
-  // *squared* tolerance.
+  // The sample sees no finer than a cell; the argument is a squared tolerance.
   const tolerance = Math.min(cellW, cellH);
   const simplified = geometries.map((g) =>
     g.getSimplifiedGeometry(tolerance * tolerance),
@@ -307,10 +224,8 @@ export const viewportCoverage = (
   return hits / (COVERAGE_GRID * COVERAGE_GRID);
 };
 
-// Whether any part of the footprint falls inside the viewport at all.
-// Cheaper and stricter than the coverage sample: a project that clips a
-// corner still belongs in the list (bottom of it), but one whose only
-// overlap with the viewport is its envelope's does not.
+// Stricter than the coverage sample: a project overlapping only by its envelope
+// does not belong in the list.
 export const touchesExtent = (
   geometries: Geometry[],
   extent: [number, number, number, number],

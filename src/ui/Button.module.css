@@ -30,8 +30,6 @@
   cursor: not-allowed;
 }
 
-/* Sizes ------------------------------------------------------------------ */
-
 .xs {
   height: var(--ctl-h-sm);
   padding: 0 var(--sp-4);
@@ -50,8 +48,8 @@
   font-size: var(--font-md);
 }
 
-/* Variants. `accent` is set per palette below and is what each variant
-   colours itself from, so adding a palette does not touch the variants. */
+/* Variants colour themselves from `accent`, which the palettes below set, so
+   a new palette does not touch them. */
 
 .primary {
   background: var(--accent);
@@ -83,8 +81,6 @@
   background: var(--c-bg-hover);
 }
 
-/* Palettes --------------------------------------------------------------- */
-
 .paletteGreen {
   --accent: var(--c-green-500);
   --accent-hover: var(--c-green-600);
@@ -112,8 +108,6 @@
   --accent-fg: var(--c-gray-0);
   --accent-text: var(--c-blue-600);
 }
-
-/* Modifiers -------------------------------------------------------------- */
 
 .full {
   width: 100%;

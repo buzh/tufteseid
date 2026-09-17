@@ -15,7 +15,6 @@ import {
   WMS_Z_DIRECTION,
 } from './wmsTileGrid';
 
-// Fork keeps only Kulturminner theme layers.
 export type ThemeLayerName =
   | 'heritageSites'
   | 'culturalEnvironments'
@@ -23,13 +22,9 @@ export type ThemeLayerName =
   | 'protectedBuildings'
   | 'userReportedHeritage';
 
-/**
- * `overrides` lets a caller pin LAYERS/STYLES at construction time. Only
- * Kulturminner uses it, and only because the sublayer and render settings can
- * already differ from the config's defaults on the first frame: building the
- * layer from the config and correcting it afterwards would spend a screenful
- * of GetMap requests, at RA's MapServer, on a picture nobody asked for.
- */
+/** `overrides` pins LAYERS/STYLES at construction: kulturminner2's settings can
+ *  differ from the config defaults on the first frame, and correcting
+ *  afterwards costs a screenful of GetMap at RA's MapServer. */
 export const createThemeLayerFromConfig = (
   config: ThemeLayerConfig,
   layerDef: ThemeLayerDefinition,
@@ -76,9 +71,7 @@ export const createThemeLayerFromConfig = (
   const minZoom =
     layerDef.minZoom ?? category?.minZoom ?? parentCategory?.minZoom;
 
-  // No SRS/CRS: OL writes it from the source projection on every request
-  // (ol/source/wms.js). Setting it here just adds a parameter the server
-  // ignores.
+  // No SRS/CRS: OL writes it from the source projection on every request.
   const wmsParams = {
     LAYERS: layerDef.layers,
     TRANSPARENT: true,
@@ -92,21 +85,15 @@ export const createThemeLayerFromConfig = (
       url: wmsUrl,
       params: { ...wmsParams, TILED: true },
       projection: projection,
-      // 512 px, same grid the WMS background layers use — see
-      // src/map/layers/wmsTileGrid.ts. RA's MapServer is the slowest
-      // origin in the stack, so quartering the request count per
-      // screenful helps most here; it also halves the number of tile
-      // seams a point symbol or label can be clipped by.
+      // The same 512 px grid as the WMS backgrounds: RA's MapServer is the
+      // slowest origin, and there are half as many seams to clip a label.
       tileGrid: getWMSTileGrid(projection),
       zDirection: WMS_Z_DIRECTION,
     }),
     properties: layerProperties,
     cacheSize: WMS_TILE_CACHE_SIZE,
-    // preload 0 for the same reason as the WMS background layers: these
-    // are on-the-fly renders (RA's MapServer especially) sharing the
-    // map's one tile queue with the base map, and coarse levels nobody
-    // asked for are not worth a slot. See "One tile queue per Map" in
-    // docs/wms-proxy-and-tiles.md.
+    // preload 0 as on the WMS backgrounds: on-the-fly renders sharing the one
+    // tile queue, so coarse levels are not worth a slot.
     preload: 0,
     ...(minZoom !== undefined ? { minZoom } : {}),
   });

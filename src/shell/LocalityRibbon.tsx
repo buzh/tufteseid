@@ -15,61 +15,31 @@ import { RibbonFunnDraftRow } from './RibbonFunnDraftRow';
 import { RibbonLocalityRow } from './RibbonLocalityRow';
 
 /**
- * Everything the shell grows when a lokalitet is open.
+ * Everything the shell grows when a lokalitet is open, and the one place
+ * `useLocalityWorkspace` is mounted: it opens two PocketBase realtime
+ * subscriptions that reload the whole list on every event, so a second call
+ * site would double both.
  *
- * This is the one place `useLocalityWorkspace` is mounted. The rows, the
- * bottom edge, the map callout and the dialogs all need it, and the hook opens
- * two PocketBase realtime subscriptions that reload the whole list on every
- * event — a second call site would double both.
- *
- * The bottom edge renders through a portal because it belongs to the shell's
- * slot, on the far side of the tree from the ribbon row that mounts the
- * controller. Reasoning in `bottomSlot.ts`.
- *
- * The rows are outside the boundary that wraps the bottom edge: if the
- * carousel throws, you still need the exits to get out of the lokalitet.
+ * The bottom edge portals into the shell's slot, on the far side of the tree.
+ * The rows sit outside that boundary: if the carousel throws you still need
+ * the exits.
  */
 export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
   const ws = useLocalityWorkspace(locality);
   const bottomSlot = useAtomValue(bottomSlotAtom);
   const [stripOpen, setStripOpen] = useAtom(bilderStripOpenAtom);
 
-  // Nobody presses anything to start a grunnpakke any more — it comes with a
-  // lokalitet you just made. Unfold the edge, or the first moments of a new
-  // lokalitet are a shell that looks like it did nothing. It is a second
-  // rather than the old several minutes since the set writes specs (§4.1.2),
-  // but the three cards that land are what has to be seen arriving.
+  // The starter set is not asked for, it comes with a new lokalitet, so the
+  // edge unfolds itself or the three cards land unseen.
   const starterRunning = ws.starterBusy;
   useEffect(() => {
     if (starterRunning) setStripOpen(true);
   }, [starterRunning, setStripOpen]);
 
-  /*
-   * The one-occupant rule (§4.3). Three surfaces want the bottom edge — the
-   * filmstrip, the edit carousel and a picker run — and none of them may
-   * stack, because all of them are over the map. The pen takes it from all
-   * three without being a fourth: while a drawing session is up the Excalidraw
-   * surface covers the map and carries its own tools, so there is nothing for
-   * this edge to hold and nothing to curate. (There used to be a fourth, the
-   * `FunnDrawBar` that drove the OpenLayers pen; it went with src/draw/.)
-   *
-   * A picker **borrows** the slot rather than being a third occupant of it:
-   * while a run is live it is what the slot holds, and closing the run gives
-   * the collection back. That is why it is a branch here and not a third
-   * flag — "the kept ones join the collection when you close the picker" is
-   * literally true because the collection is not on screen until then.
-   *
-   * The order of the branches is the priority: the pen outranks a picker,
-   * which outranks the collection. It is deepest-first, the same rule the
-   * right zone sorts its exits by (§5.3), for the same reason — the thing you
-   * are in the middle of is the thing the edge should be serving.
-   *
-   * Which of the last two takes it is the stance, and it is decided here
-   * rather than inside one component with branches through it: the rail and
-   * the card share their vocabulary (localities/bilderCommon.tsx) but not
-   * their geometry, and a component that is a rail on Tuesday is how the
-   * write verbs end up merely disabled in show instead of absent (§2).
-   */
+  // One occupant of the bottom edge at a time, in branch order, deepest
+  // first: the pen outranks a picker, which outranks the collection. Stance
+  // picks between the last two here rather than inside one component, so the
+  // write verbs stay absent in show rather than merely disabled.
   const drawing = ws.draftActive || ws.sketchActive;
   const picking = !drawing && ws.picker.run != null;
   const showStrip = !drawing && !picking && stripOpen && ws.hasBilder;
@@ -100,8 +70,8 @@ export const LocalityRibbon = ({ locality }: { locality: LocalityRecord }) => {
           </ErrorBoundary>,
           bottomSlot,
         )}
-      {/* Not in a slot at all: an `ol/Overlay` anchored to the funn itself,
-          so it stays on the mound while you pan (§6). */}
+      {/* Not in a slot: an `ol/Overlay` anchored to the funn, so it stays on
+          the mound while you pan. */}
       <ErrorBoundary name="FunnCallout">
         <FunnCallout items={ws.findItems} />
       </ErrorBoundary>

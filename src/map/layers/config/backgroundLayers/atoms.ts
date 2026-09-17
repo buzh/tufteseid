@@ -18,14 +18,11 @@ import {
 import { buildStack, LIDAR_LAYERS, resolveStack } from './stack';
 import { clearBackgroundLayer, swapBackgroundLayers } from './utils';
 
-// Startup values the URL param may name directly. `lidarProject` and
-// `flyfotoProject` are excluded because their concrete acquisition lives in
-// an atom that starts null on a fresh visit — leaving the app on either one
-// with nothing selected renders nothing.
+// Startup values the URL parameter may name. Not `lidarProject` or
+// `flyfotoProject`: their acquisition atom starts null, so a cold load into
+// either renders nothing.
 const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'topo',
-  // The other four Standard variants qualify for the same reason `topo`
-  // does: each is one fixed layer, so a cold load into one renders it.
   'topograatone',
   'toporaster',
   'sjokartraster',
@@ -45,68 +42,46 @@ const getDefaultBackgroundLayer = (): BackgroundLayerName => {
   return 'topo';
 };
 
-// Fetched WMTS capabilities documents, keyed by the URL they came from
-// rather than by layer name: Kartverket's cache publishes all four Standard
-// variants in one 35 kB document, and keying it per layer would refetch the
-// same bytes on the way to each of them.
+// Fetched WMTS capabilities, keyed by URL rather than layer name: Kartverket's
+// cache publishes all four Standard variants in one 35 kB document.
 export const backgroundLayerCapabilitiesCacheAtom = atom<
   Record<string, string>
 >({});
 
-// Two halves and a facade — see src/map/compare/halves.ts. `.a` is the
-// ordinary background, i.e. the whole map whenever the compare curtain is
-// down; `.b` is the curtain's right side. Everything that adjusts the
-// background goes on writing `backgroundLayerAtom` and lands in whichever
-// half has focus.
+// Two halves and a facade (src/map/compare/halves.ts): `.a` is the ordinary
+// background, `.b` the curtain's right side, and the facade the focused one.
 export const backgroundLayerHalves = halved<BackgroundLayerName>(
   getDefaultBackgroundLayer(),
 );
 export const backgroundLayerAtom = backgroundLayerHalves.focused;
 
-// Hybrid mode: the LiDAR relief with Kartverket's transparent
-// roads/railways/place-names overlay on top, so you can tell what
-// you're looking at without leaving the terrain. A modifier on the
-// background rather than a background of its own — it only has meaning
-// over a LiDAR layer, and toggling it doesn't disturb which dataset or
-// style is selected underneath.
+// Kartverket's transparent roads/railways/place-names overlay over the relief.
+// A modifier, not a background, so toggling leaves the dataset underneath.
 export const hybridOverlayHalves = halved<boolean>(
   getUrlParameter('hybrid') === 'true',
 );
 export const hybridOverlayAtom = hybridOverlayHalves.focused;
 
-// Contour lines on that overlay. A modifier on a modifier, and deliberately
-// so: they are two more group layers in the overlay's own GetMap, they only
-// mean anything where the overlay is, and they answer a different question —
-// the roads and names say *where* you are, the contours say what the relief
-// under the hillshade measures. Off by default, because a hillshade covered
-// in brown lines is a worse hillshade and the point of Hybrid is the terrain.
+// Contours are two more group layers in that overlay's own GetMap.
 export const hybridContoursHalves = halved<boolean>(
   getUrlParameter('contours') === 'true',
 );
 export const hybridContoursAtom = hybridContoursHalves.focused;
 
-// Which run of the effect below is the current one. The effect builds
-// its stack asynchronously — a WMTS base still needs its capabilities
-// fetched the first time — while W/S and A/D fire the effect faster than
-// that round trip. Without this an earlier run could resolve last and
-// install a stack the user has already cycled past, along with its URL
-// parameters. Bumped before any of the early returns so switching to the
-// empty background invalidates an in-flight build too.
+// Which run of the effect below is current: the build awaits and key-repeat
+// outruns it, so a stale run must not install a stack already cycled past.
 let swapGeneration = 0;
 
 export const backgroundLayerAtomEffect = atomEffect((get) => {
   const generation = ++swapGeneration;
-  // The A half throughout, never the focused facade: this effect owns the
-  // whole map when the curtain is down and the left side when it is up, and
-  // pointing the ribbon at B must not rebuild it.
+  // The A half throughout, never the facade: the ribbon pointing at the
+  // curtain's B half must not rebuild the map's own background.
   const layerName = get(backgroundLayerHalves.a);
-  // Depend on the active lidar project + style so switching either while
-  // a LiDAR layer is the background rebuilds the WMS layer.
+  // Read so switching project, style or model rebuilds the LiDAR WMS layer.
   const activeLidarProject = get(activeLidarProjectHalves.a);
   const activeLidarStyle = get(activeLidarStyleHalves.a);
   const activeLidarModel = get(activeLidarModelHalves.a);
-  // Same for the flyfoto acquisition: picking another year while
-  // 'flyfotoProject' is the background rebuilds its mosaicRule.
+  // Same for the flyfoto acquisition: another year rebuilds its mosaicRule.
   const activeFlyfotoProject = get(activeFlyfotoProjectHalves.a);
   const hybridOverlay = get(hybridOverlayHalves.a);
   const hybridContours = get(hybridContoursHalves.a);
@@ -119,8 +94,7 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
 
   const stack = resolveStack(layerName, {
     lidarProject: activeLidarProject,
-    // DOM publishes one style, so the model has the last word — and the
-    // user's DTM pick stays in the atom, waiting for them to switch back.
+    // DOM publishes one style, so the model has the last word.
     lidarStyle: effectiveLidarStyle(activeLidarStyle, activeLidarModel),
     lidarModel: activeLidarModel,
     flyfotoProject: activeFlyfotoProject,
@@ -130,8 +104,7 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
 
   if (!stack) {
     if (layerName === 'lidarProject' || layerName === 'flyfotoProject') {
-      // Nothing picked out of the archive yet — nothing to render, and
-      // nothing wrong either, so no warning.
+      // Nothing picked out of the archive yet: not an error.
       return;
     }
     console.warn(`No layer config found for layer name: ${layerName}`);
@@ -146,14 +119,11 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
 
       const built = await buildStack(stack, projection);
 
-      // A newer run started while this one was building. Everything from
-      // here on mutates shared state — the layer collection, the URL —
-      // so it has to be the last word or not happen at all.
+      // Everything below mutates the shared layer collection and the URL.
       if (generation !== swapGeneration) return;
       if (!built) return;
 
-      // Always set opacity explicitly: any of these may be a reused
-      // layer still carrying the fade from an earlier swap.
+      // Always explicit: a reused layer still carries an earlier swap's fade.
       for (const { layer, opacity } of [...built.under, ...built.over]) {
         layer.setOpacity(opacity);
       }
@@ -163,8 +133,7 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
         built.over.map((e) => e.layer),
       );
       setUrlParameter('backgroundLayer', layerName);
-      // Keyed on what's actually in the stack, not on the atoms: a
-      // shared URL should reproduce what's on screen.
+      // Keyed on the stack, not the atoms, so a shared URL reproduces the view.
       if (stack.hybrid) setUrlParameter('hybrid', true);
       else removeUrlParameter('hybrid');
       if (stack.contours) setUrlParameter('contours', true);

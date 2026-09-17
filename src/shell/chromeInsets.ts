@@ -1,34 +1,18 @@
 import type Map from 'ol/Map';
 
 /*
- * How much of the map the floating chrome is covering, right now.
- *
- * The shell puts every surface *over* the map rather than beside it, so the
- * map's own size says nothing about how much of it you can actually see. Any
- * code that frames something — fitting a lokalitet's rectangle, seeding a new
- * one from the viewport, zooming to a funn — has to work in the free area, or
- * it centres its subject underneath the ribbon or behind the filmstrip.
- *
- * This replaced a lone `ribbonHeight()` that measured `[data-ribbon]` and knew
- * about no other edge. Surfaces opt in by carrying `data-chrome="<edge>"`,
- * which is deliberately generic: a new panel becomes part of the calculation
- * by declaring which edge it hugs, with nothing to register anywhere.
- *
- * Measured on demand, never observed. Nothing here reacts to the chrome
- * changing size — the values are read at the moment a fit is computed, so
- * there is no ResizeObserver, no layout state, and no re-render (and, since
- * the OL canvas never resizes, no new GetMap requests either).
+ * How much of the map the floating chrome is covering: the map's own size says
+ * nothing about it, so anything that frames something has to work in the free
+ * area. Surfaces opt in by carrying `data-chrome="<edge>"`. Measured on
+ * demand, never observed.
  */
 
 /** [top, right, bottom, left] — the order `View#fit` wants for padding. */
 export type ChromeInsets = [number, number, number, number];
 
-// Breathing room between the chrome and whatever is being framed, so the
-// subject reads as being inside the free area rather than tucked under a bar.
 export const CHROME_MARGIN_PX = 24;
 
-// Padding beyond this leaves View#fit resolving a rectangle bigger than the
-// space it has, which it answers by zooming out to nothing useful.
+// Beyond this View#fit resolves a rectangle bigger than its space.
 const MAX_PADDING_FRACTION = 0.7;
 
 const EDGES = ['top', 'right', 'bottom', 'left'] as const;
@@ -46,12 +30,9 @@ export const chromeInsets = (map: Map): ChromeInsets => {
     const edge = el.dataset.chrome;
     if (!isEdge(edge)) continue;
     const r = el.getBoundingClientRect();
-    // A collapsed or display:none surface covers nothing.
     if (r.width === 0 || r.height === 0) continue;
 
-    // How far into the map the surface reaches from the edge it hugs. A
-    // surface that has scrolled clear of the map gives a negative depth,
-    // which the max against 0 discards.
+    // Depth into the map from the edge it hugs; negative once scrolled clear.
     const depth =
       edge === 'top'
         ? r.bottom - view.top
@@ -69,8 +50,7 @@ export const chromeInsets = (map: Map): ChromeInsets => {
   return insets;
 };
 
-// Two opposing paddings that together exceed the viewport cannot both be
-// honoured; scale them down together rather than letting one win.
+// Opposing paddings that exceed the viewport scale down together.
 const clampPair = (a: number, b: number, size: number): [number, number] => {
   const budget = size * MAX_PADDING_FRACTION;
   const total = a + b;
@@ -80,22 +60,12 @@ const clampPair = (a: number, b: number, size: number): [number, number] => {
 };
 
 /**
- * Extra room for a *funn*, on top of the chrome.
- *
- * A funn is small — metres across, not hundreds — so fitting one to the free
- * area alone puts it edge to edge with nothing around it to read it against.
- * Shared with `funn/FunnSurface.tsx`, which flies to the same rectangle before
- * opening it for editing: framing the same thing two different ways depending
- * on which verb you pressed is exactly the kind of small incoherence the
- * insets module exists to remove.
+ * Extra room for a funn on top of the chrome: metres across, so the free area
+ * alone puts it edge to edge. Shared with `funn/FunnSurface.tsx`.
  */
 export const FUNN_MARGIN_PX = 90;
 
-/**
- * `View#fit` padding that clears the chrome. Use this instead of a hard-coded
- * `[80, 80, 80, 80]`: the numbers those guessed at are exactly what the
- * floating shell made unknowable.
- */
+/** `View#fit` padding that clears the chrome. */
 export const fitPadding = (
   map: Map,
   margin = CHROME_MARGIN_PX,

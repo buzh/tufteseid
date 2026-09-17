@@ -36,8 +36,7 @@
   color: var(--c-blue-600);
 }
 
-/* Count pill riding on a button or a heading: circular, tabular digits so
-   9 → 10 does not shift the layout next to it. */
+/* Tabular digits, so 9 → 10 does not shift the layout beside it. */
 .count {
   min-width: 18px;
   justify-content: center;

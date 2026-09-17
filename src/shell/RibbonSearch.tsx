@@ -8,10 +8,7 @@ import {
 import { Icon, IconButton, Input } from '../ui';
 import styles from './RibbonSearch.module.css';
 
-/**
- * The query field only. Results render in the left slot below
- * (SearchComponent) — they are a list over the map, not part of the bar.
- */
+/** The query field only; results render in the left slot (SearchComponent). */
 export const RibbonSearch = () => {
   const { t } = useTranslation();
   const [query, setQuery] = useAtom(searchQueryAtom);
@@ -22,8 +19,7 @@ export const RibbonSearch = () => {
     <div className={styles.root}>
       <Icon icon="search" size={18} className={styles.icon} />
       <Input
-        // Not type="search": WebKit adds its own clear affordance and we
-        // would render two.
+        // Not type="search": WebKit adds its own clear affordance.
         type="text"
         size="md"
         className={styles.input}

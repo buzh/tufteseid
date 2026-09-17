@@ -3,69 +3,30 @@ import { metresPerScenePx, sceneToCoord } from './frame';
 import type { FunnFrame } from './frame';
 import type { SceneElement } from './scene';
 
-/*
- * A stored scene, turned back into pixels.
- *
- * Two callers, wanting the same picture at two resolutions and on two
- * backgrounds. `map/sketchOverlay.ts` asks for a transparent one at whatever
- * the view is showing, because a sketch on the map is a layer over the ground
- * and the ground is the map. `localities/pinQueue.ts` asks for one on paper,
- * at the scene's own resolution, because the pinned figure is the citable
- * artifact and a transparent PNG in a card, in a report or in a takeout bundle
- * is a picture of nothing.
- *
- * Both go through Excalidraw's own renderer rather than a reimplementation of
- * it, which is the only way a sketch and its re-export are the same drawing:
- * the hand-drawn stroke is roughjs seeded per element, and a second opinion
- * about what a wobbly line looks like would make every figure disagree with
- * the surface it was drawn on.
- *
- * ## Why the import is dynamic
- *
- * `@excalidraw/excalidraw` is megabytes, and the module that needs this most
- * is a *map* layer — which is to say it is reachable from the graph
- * `map/atoms.ts` builds the map out of, before any lokalitet is open and
- * whether or not the user will ever press the pen. `session.ts` makes the same
- * point about its own imports. A reader who opens a shared lokalitet to look
- * at it gets the editor only at the moment a sketch actually has to be drawn,
- * and the promise is cached so the second sketch costs nothing.
- *
- * ## Georeferencing
- *
- * `exportToCanvas` frames its output on the drawing, not on the viewport: the
- * canvas covers the elements' common bounds grown by `exportPadding`, at
- * whatever scale `getDimensions` asks for. That is the better rectangle — a
- * sketch is its strokes, not the empty screen around them — but it means the
- * placement has to be computed from the same bounds the exporter used, which
- * is why `getCommonBounds` is called here on the *restored* elements rather
- * than estimated from the raw ones. An estimate that is two pixels out is a
- * drawing two pixels off the terrain it traces, every time it is displayed.
- */
+// A stored scene, turned back into pixels: transparent at view resolution for
+// `map/sketchOverlay.ts`, on paper at the scene's own for `localities/pinQueue.ts`.
+// The import of `@excalidraw/excalidraw` is dynamic and its promise cached —
+// megabytes, and this module is reachable from the map graph before any
+// lokalitet is open. `exportToCanvas` frames on the drawing's common bounds
+// grown by `exportPadding`, not on the viewport, so the placement below is
+// computed from those same bounds: an estimate two pixels out is a drawing two
+// pixels off the terrain it traces, every time it is displayed.
 
-// Room for the stroke itself. Excalidraw's common bounds are the geometry's,
-// and a 4 px brush puts 2 px outside them on every side; the default export
-// padding exists for exactly this and this is that default.
+// Scene units. Common bounds are the geometry's, so a brush stroke sits partly
+// outside them; this is Excalidraw's own default padding for that.
 const EXPORT_PADDING = 10;
 
-/*
- * A ceiling on one export, in device pixels.
- *
- * The overlay re-exports on every zoom step, so this is a frame budget rather
- * than a storage one — 16 Mpx is a 4K viewport at devicePixelRatio 2 with room
- * over, and a canvas past it is a scene somebody has zoomed a long way into
- * rather than a drawing that needs the resolution. The stored figure has its
- * own, larger ceiling in `figure.ts`.
- */
+// A frame budget, not a storage one: the overlay re-exports on every zoom step.
+// The stored figure has its own, larger ceiling in `figure.ts`.
 const MAX_RENDER_PIXELS = 16000000;
 
 export type SceneRender = {
-  /** The drawing. Transparent unless a background was asked for. */
+  /** Transparent unless a background was asked for. */
   canvas: HTMLCanvasElement;
   /** Ground it covers, in `frame.projection`. */
   extent: [number, number, number, number];
-  /** Ground it covers, EPSG:25833 — what `meta.bbox25833` wants. */
   bbox25833: [number, number, number, number];
-  /** Metres per pixel of `canvas`, at the frame's centre. */
+  /** Of `canvas`, at the frame's centre. */
   metresPerPx: number;
 };
 
@@ -80,9 +41,8 @@ const excalidraw = (): Promise<ExcalidrawModule> => {
 
 export type RenderSceneOptions = {
   /**
-   * Device pixels per scene unit. 1 is the resolution the scene was drawn at;
-   * the overlay passes the ratio between the frame's metres-per-pixel and the
-   * view's, so a sketch drawn zoomed out stays sharp when you zoom into it.
+   * Device pixels per scene unit; 1 is the resolution the scene was drawn at.
+   * The overlay passes the ratio of the frame's metres-per-pixel to the view's.
    */
   scale: number;
   /** CSS colour behind the strokes. Omitted means transparent. */
@@ -90,11 +50,8 @@ export type RenderSceneOptions = {
 };
 
 /**
- * Scene → canvas, placed on the ground. Null when there is nothing to draw.
- *
- * Never throws: a sketch that will not render is one card without a picture,
- * and both callers are places where that is the correct outcome — the overlay
- * simply has no layer and the pin queue records a failure with a retry.
+ * Scene → canvas, placed on the ground. Never throws; null when there is
+ * nothing to draw or the export failed.
  */
 export const renderScene = async (
   frame: FunnFrame,
@@ -111,10 +68,9 @@ export const renderScene = async (
     return null;
   }
 
-  // Restored *before* the bounds are read, because `exportToCanvas` restores
-  // again on the way in and reads its own bounds off the result. Restoring
-  // twice is idempotent; restoring once, on the other side, would put the
-  // placement and the pixels on two different rectangles.
+  // Restored before the bounds are read: `exportToCanvas` restores again on the
+  // way in and reads its own bounds off that, and restoring only on its side
+  // would put the placement and the pixels on two different rectangles.
   const restored = mod
     .restoreElements(elements, null)
     .filter((el) => !el.isDeleted);
@@ -142,9 +98,8 @@ export const renderScene = async (
         viewBackgroundColor: options.background ?? 'transparent',
         exportWithDarkMode: false,
       },
-      // Annotated rather than inferred: the package types this callback
-      // loosely enough that it hands its parameters no contextual type, and
-      // `noImplicitAny` rejects the arrow that results.
+      // Annotated because the package gives this callback's parameters no
+      // contextual type, which `noImplicitAny` rejects.
       getDimensions: (width: number, height: number) => ({
         width: Math.max(1, Math.round(width * scale)),
         height: Math.max(1, Math.round(height * scale)),
@@ -156,10 +111,9 @@ export const renderScene = async (
     return null;
   }
 
-  // The exported rectangle, in scene units, then on the ground. Scene y runs
-  // down and projected y runs up, so the scene's top-left corner is the
-  // ground's north-west and the extent has to be assembled rather than mapped
-  // corner for corner.
+  // Scene y runs down and projected y runs up, so the scene's top-left corner
+  // is the ground's north-west: the extent is assembled, not mapped corner for
+  // corner.
   const [west, north] = sceneToCoord(
     frame,
     minX - EXPORT_PADDING,

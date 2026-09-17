@@ -28,48 +28,16 @@ import { GROUND_MODES, useGroundMode } from './useGroundMode';
 import { useRecreateView } from './useRecreateView';
 
 /**
- * Row 1 — always present, independent of any lokalitet: what the map shows
- * and how to find a place on it.
+ * Row 1 — what the map shows and how to find a place on it, with
+ * `RibbonSettingsRow` below it carrying the chosen ground's modifiers.
  *
- * Left to right, and the order is the argument: find a place, choose what the
- * ground looks like, overlay the heritage record on top of it, then the tools
- * that act on what you are looking at.
+ * The four control hooks and `useGroundMode` are mounted here and only here; a
+ * second mount means a second DEM. What the sibling lokalitet row needs
+ * crosses the gap on `groundHandleAtom` and `beholdOfferAtom`.
  *
- * The row renders with its settings strip below it (RibbonSettingsRow), which
- * is where the *modifiers* on the chosen ground now live. Row 1 answers "what
- * am I looking at", the strip answers "how"; keeping the second question off
- * this row is what stops it wrapping to two lines on a laptop as soon as
- * LiDAR is on. Terreng adds a third row under the strip for its sliders, and
- * is the only ground that does. All of them come from this component because
- * all of them run off the four control hooks below, which are mounted once
- * and only here.
- *
- * The ground buttons are one ring, in digit order, driven by useGroundMode.
- * Four of the five are drawn here; the fifth, Terreng, renders on the
- * lokalitet row (docs/lokalitet-view.md §8) because it reads a rectangle and
- * the only rectangle in the app is a lokalitet's. Digit 5 still selects it —
- * `GROUND_KEYS` is positional against GROUND_MODES, not against what this row
- * draws — and with nothing open it places the lokalitet's rectangle first.
- *
- * Hybrid is the odd one out and stays a mode here on purpose: it is a modifier
- * on the LiDAR stack (which is why picking it activates the national mosaic
- * when nothing LiDAR is on yet), but it is also one of the five things you
- * flip between, and splitting the ring to say so would cost more than it
- * explains. DTM/DOM and the style pick remain modifiers and stay on the
- * settings strip. docs/ui-architecture.md §5.2.
- *
- * Standard, LiDAR and Flyfoto each bring a dataset pulldown and a keyboard
- * ring, and only one of the three is ever on screen — this component is where
- * they are chained, because there is exactly one registered cycle handler.
- * LiDAR's and Flyfoto's pulldowns render on the strip; Standard's hangs off
- * the `Kart` button here, and is the reason that ground has no strip at all.
- *
- * Sammenlign has left this row too, for the same reason and to the same
- * place. It still needs the ring's current and previous mode to pick a
- * sensible other half, which is what `groundHandleAtom` below carries. Once it
- * is on, this whole row — buttons, digits, W/S — describes whichever half of
- * the curtain the strip's A|B switch names. Nothing here has to know that; the
- * ground atoms route themselves (src/map/compare/halves.ts).
+ * Four of the five ground buttons are drawn here — Terreng's is on the
+ * lokalitet row — but digit 5 still selects it: `GROUND_KEYS` is positional
+ * against `GROUND_MODES`, not against what this row draws.
  */
 export const RibbonGlobalRow = () => {
   const { t } = useTranslation();
@@ -79,69 +47,33 @@ export const RibbonGlobalRow = () => {
   const standard = useStandardControls();
   const lidar = useLidarControls();
   const flyfoto = useFlyfotoControls();
-  // "Ny lokalitet" seeds a rectangle from the visible map and hands it to the
-  // author to place — and so, now, does pressing Terreng with nothing open.
-  // Neither writes anything; `Opprett` on the placement row does
-  // (docs/ui-architecture.md §5.6). The hook raises the sign-in dialog for a
-  // guest, which is why there is no `isSignedIn` check at either call site.
+  // Nothing is written until `Opprett`, and it raises the sign-in dialog
+  // itself, hence no `isSignedIn` check at either call site.
   const startPlacement = useStartLocalityPlacement();
 
-  // The DEM, the render and every knob that shapes it. Mounted here with the
-  // other three control hooks, and for the same reason: its controls are
-  // spread over the two rows below, and the analysis behind them must not exist
-  // twice. Unconditional — the hook itself decides whether a rectangle is
-  // being analysed, and hiding it behind `ground.modifiers` would throw the
-  // DEM away every time someone glanced at another ground.
-  //
-  // Above useGroundMode, because that is where its visualization ring is
-  // chained with the other three. It reads the atoms it needs directly and
-  // takes nothing from `ground`, so the order is free.
+  // Unconditional: gating it on `ground.modifiers` would throw the DEM away
+  // every time someone glanced at another ground.
   const terrain = useTerrainAnalysis();
-  /*
-   * Terreng with no lokalitet open (docs/lokalitet-view.md §8): place the
-   * rectangle, and the tool is armed at the commit.
-   *
-   * There used to be a second entrance here — a free-floating rectangle in
-   * `terrainStandaloneBboxAtom`, framed on the press and turned into a
-   * lokalitet later by a `Lagre` of its own. It is gone, and this is what
-   * replaced it: the rectangle is made first, and everything downstream has
-   * exactly one answer to "what am I analysing".
-   *
-   * The bill, stated rather than hidden: relief needs an account. That was the
-   * price of the second entrance not existing, and the second entrance was two
-   * rectangles, two saves and a `Lagre` that could create a lokalitet nobody
-   * had asked for.
-   */
+  // Terreng with nothing open places a rectangle; the tool arms at the commit.
   const ground = useGroundMode(standard, lidar, flyfoto, terrain, () => {
     startPlacement('terrain');
   });
-  // Gjenskap. Mounted here because this is where the four control hooks are,
-  // and a saved view is applied by writing all four — see useRecreateView.
+  // Mounted here because applying a saved view writes all four control hooks.
   useRecreateView(ground, lidar, flyfoto, terrain);
 
-  // A/D/W/S/E. useGroundMode routes them to the ring of the ground on screen;
-  // there is exactly one registered handler, so the two halves compose there
-  // rather than each registering. The document listener lives at the shell
-  // root (useMapSideEffects).
+  // A/D/W/S/E. Exactly one registered handler: `useGroundMode.cycle` routes
+  // them rather than each ring registering and racing the others.
   useRegisterBackgroundCycle(ground.cycle);
-  // 1–5 and hold-X, positional against GROUND_MODES — which is the order the
-  // buttons render in, except that Terreng's is on the lokalitet row.
+  // 1–5 and hold-X, positional against GROUND_MODES.
   useRegisterGroundKeys({
     select: (position) => ground.select(GROUND_MODES[position - 1]),
     peekStart: ground.peekStart,
     peekEnd: ground.peekEnd,
   });
 
-  /*
-   * Terreng and Sammenlign render on the lokalitet row now (§8), which is
-   * this row's sibling — so what they need crosses the gap on an atom, the
-   * way `beholdOfferAtom` already does in the same direction.
-   *
-   * Through a ref so the atom is written only when `mode` or `half` actually
-   * changes: `select` and `previous` are fresh closures every render, and
-   * publishing those directly would re-render the lokalitet row on every
-   * keystroke in the search field above it.
-   */
+  // Through a ref so the atom is written only when `mode` or `half` changes:
+  // publishing the fresh closures would re-render the lokalitet row on every
+  // keystroke in the search field above it.
   const setGroundHandle = useSetAtom(groundHandleAtom);
   const groundRef = useRef(ground);
   groundRef.current = ground;
@@ -153,32 +85,15 @@ export const RibbonGlobalRow = () => {
       previous: () => groundRef.current.previous(),
       select: (next) => groundRef.current.select(next),
     });
-    // Cleared on unmount, which is how the `null` case gets to mean what
-    // `groundHandle.ts` says it means: if this row crashes into its own error
-    // boundary the two buttons on the sibling row go away, rather than staying
-    // clickable against controls that are no longer mounted.
+    // Cleared on unmount, so a crash into this row's boundary takes the
+    // sibling row's buttons with it rather than leaving them clickable.
     return () => setGroundHandle(null);
   }, [groundMode, groundHalf, setGroundHandle]);
 
-  /*
-   * What the ground on screen offers `Behold` (docs/lokalitet-view.md §4.3).
-   *
-   * Published rather than passed, because the button that reads it is on the
-   * lokalitet row and that row is this one's *sibling*, not its child — the
-   * same gap `coverTerrainSpecAtom` crosses in the other direction. The four
-   * control hooks are mounted here and only here, so this is the one place
-   * that can answer the question at all.
-   *
-   * A dataset name, everywhere except terrain: the workspace can turn a named
-   * LiDAR dataset or a named acquisition into a spec itself, and it is the
-   * side that holds the write and the gallery's optimistic update. Terrain's
-   * parameters are state this row owns — eight visualizations and three
-   * sliders, none of it readable off the map — so that arm carries a
-   * callback that says what is currently on screen.
-   */
+  // What the ground on screen offers `Behold`, published across the sibling
+  // gap. A dataset name except under terrain, which carries a callback.
   const setBeholdOffer = useSetAtom(beholdOfferAtom);
-  // Destructured, because `lidar`, `flyfoto` and `terrain` are fresh objects
-  // on every render and the effect below is keyed on what actually changed.
+  // Destructured: the control objects are fresh every render.
   const { activeLidarSource, shownStyle } = lidar;
   const { describe: terrainDescribe, beholdKey: terrainKey } = terrain;
   const flyfotoProject = flyfoto.activeProject;
@@ -203,14 +118,9 @@ export const RibbonGlobalRow = () => {
         };
         break;
       default:
-        // Standard and Hybrid. Hybrid *is* the LiDAR stack underneath, but its
-        // roads-and-names overlay is a separate layer the extract path cannot
-        // see — so keeping it would hand back a bare hillshade under the name
-        // of the view being read. Skjermbilde is the honest verb there.
-        //
-        // The two are carried separately rather than collapsed to one refusal
-        // because they are refused for different reasons, and the row is free
-        // to say which.
+        // Both unkeepable. Hybrid's roads-and-names overlay is a separate
+        // layer the extract path cannot see, so a keep would hand back a bare
+        // hillshade under the name of the view being read.
         offer = { ground: groundMode };
     }
     setBeholdOffer(offer);
@@ -223,8 +133,7 @@ export const RibbonGlobalRow = () => {
     terrainDescribe,
     setBeholdOffer,
   ]);
-  // Row 1 outlives every lokalitet, so nothing here clears the offer on
-  // unmount — the workspace is the shorter-lived side and stops reading it.
+  // Row 1 outlives every lokalitet, so nothing clears the offer on unmount.
 
   const toggleTool = (name: Exclude<MapTool, null>) =>
     setTool(tool === name ? null : name);
@@ -236,10 +145,8 @@ export const RibbonGlobalRow = () => {
 
         {/* The ring. Order is GROUND_MODES, which is also 1–5. */}
         <div className={styles.group}>
-          {/* The one ground whose dataset list hangs off its own button
-              rather than off the settings strip, which is why it is also the
-              one ground with no strip. Five cartographies were never enough
-              to earn a row — see StandardVariantPicker. */}
+          {/* The one ground whose dataset list hangs off its own button rather
+              than off the settings strip, which is why it has no strip. */}
           <div className={styles.split}>
             <ModeButton
               icon="map"
@@ -255,10 +162,8 @@ export const RibbonGlobalRow = () => {
             />
           </div>
 
-          {/* Activating LiDAR lands on whatever the dataset pulldown is set to
-              — the best acquisition for this view while it says Automatisk,
-              the national mosaic otherwise. Entering the mode is not itself a
-              dataset pick, so it leaves that setting alone. */}
+          {/* Lands on whatever the dataset pulldown is set to: entering the
+              ground is not itself a dataset pick. */}
           <ModeButton
             icon="landscape"
             label={t('ribbon.mode.lidar')}
@@ -267,8 +172,8 @@ export const RibbonGlobalRow = () => {
             onClick={() => ground.select('lidar')}
           />
 
-          {/* The LiDAR stack plus roads, rail and place names. Still LiDAR
-              mode, so dataset, style and cycling keep working underneath. */}
+          {/* The LiDAR stack plus roads, rail and place names — still LiDAR's
+              modifiers underneath. */}
           <ModeButton
             icon="signpost"
             label={t('ribbon.mode.hybrid')}
@@ -277,11 +182,10 @@ export const RibbonGlobalRow = () => {
             onClick={() => ground.select('hybrid')}
           />
 
-          {/* Ortofoto: the seamless best-available mosaic by default, with
-              every acquisition back to the 1930s in the pulldown. Hybrid is
-              deliberately left alone rather than cleared — it's a LiDAR
-              modifier, inert here, and switching back should return to the
-              stack you left. */}
+          {/* Ortofoto: the seamless mosaic by default, every acquisition back
+              to the 1930s in the pulldown. Hybrid is left set rather than
+              cleared — it is inert here, and switching back should return to
+              the stack you left. */}
           <ModeButton
             icon="satellite_alt"
             label={t('ribbon.mode.flyfoto')}
@@ -290,47 +194,23 @@ export const RibbonGlobalRow = () => {
             onClick={() => ground.select('flyfoto')}
           />
 
-          {/* Terreng is the fifth ground and digit 5 still selects it, but its
-              *button* is on the lokalitet row now (docs/lokalitet-view.md §8):
-              it reads a rectangle, and the only rectangle in the app belongs
-              to a lokalitet. The gap it leaves here is deliberate — four
-              buttons, five positions, and `GROUND_KEYS` is positional against
-              GROUND_MODES rather than against what this row draws. */}
+          {/* Terreng, the fifth ground, has its button on the lokalitet row.
+              Four buttons, five positions. */}
         </div>
-
-        {/* "Skjul merker" stood here, and it is gone rather than moved twice.
-            It was global by an argument that had stopped being true: it hid
-            the lokalitet rectangles *and* the funn, but the funn layer only
-            ever holds the open lokalitet's, and for a signed-out visitor no
-            rectangles load at all — so for half the app it was a dead button,
-            and for the other half it was a switch sitting three rows away
-            from the count of what it hid. The two halves went separate ways:
-            the funn half is the `Funn` button on the lokalitet row, which
-            since §13.10 step 4 is a layer group whose label is the switch
-            (H still works), and the
-            rectangles no longer need hiding because they draw faint unless
-            they are the one you have open (localityLayer.ts). */}
 
         <div className={styles.divider} />
 
         <div className={styles.group}>
-          {/* One control with a seam in it: the noun opens the panel — the
-              five services, kulturminner2's registers, the rendering, the
-              opacity — and the eye beside it puts the overlay on the map or
-              takes it off. It was two buttons, `Kulturminner` toggling one of
-              the five sources and `Oppsett` holding the rest; see
-              HeritageControl for why the split was in the wrong place. */}
+          {/* One control with a seam: the noun opens the panel, the eye puts
+              the overlay on the map or takes it off. */}
           <HeritageControl />
         </div>
 
         <div className={styles.divider} />
 
         <div className={styles.group}>
-          {/* Stedsinfo. Beside Mål because they are the same kind of thing —
-              a question you put to the map by clicking it, and a mode you
-              stay in while you do. It is off on arrival: clicking used to
-              interrogate every register unasked, which turned panning away
-              from a click into a panel to dismiss. */}
+          {/* Stedsinfo, beside Mål: both are questions put to the map by
+              clicking it. Off on arrival, so a click asks nothing unarmed. */}
           <ModeButton
             icon="info"
             label={t('ribbon.info.label')}
@@ -375,12 +255,8 @@ export const RibbonGlobalRow = () => {
       </div>
 
       {/* The settings strip for whatever the ring above has selected — absent
-          under Kart, which keeps its one pulldown on its own button. Rendered
-          from here rather than as a sibling in Ribbon.tsx because it runs off
-          the same control hooks, which are mounted once and only here —
-          hoisting them into a context to gain a second error boundary would
-          buy nothing, since a crash in either row comes from the same
-          hooks. */}
+          under Kart. Rendered from here rather than as a sibling in Ribbon.tsx
+          because it runs off the same control hooks. */}
       <RibbonSettingsRow
         ground={ground}
         lidar={lidar}

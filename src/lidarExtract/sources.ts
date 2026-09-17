@@ -1,10 +1,5 @@
-// Enumerates the LiDAR sources that overlap a chosen bbox: the national
-// mosaic (wms.hoyde-dtm-nhm-topobathy-25833) plus every per-project layer
-// from wms.hoyde-dtm-prosjekt whose declared bbox intersects the selection.
-//
-// Both WMS endpoints expose each style as its own named layer
-// (e.g. `<prefix>:skyggerelieff`), so "styles" here really means the set of
-// layer suffixes advertised in GetCapabilities under a given prefix.
+// Each style is its own named layer (`<prefix>:skyggerelieff`), so "styles"
+// here is the set of layer suffixes advertised under a prefix.
 
 import {
   bboxIntersects,
@@ -26,32 +21,16 @@ export type LidarSource = {
   label: string;
   year: number | null;
   pointDensity: string | null;
-  // DTM or DOM. Carried on the source rather than assumed by the caller
-  // because every kept extract records it (`meta.model`), and a record whose
-  // model is "whatever the code did that year" is one that cannot be redrawn.
+  // Every kept extract records this as `meta.model` and is redrawn from it.
   model: LidarModel;
   wmsUrl: string;
   layerPrefix: string; // 'NHM_DTM_TOPOBATHY_25833' or the project name
   styles: string[];
 };
 
-/*
- * The two constructors, and the reason the model is an argument rather than
- * a constant.
- *
- * The extract path used to be hard-wired to DTM. That was harmless while the
- * only way in was the LiDAR-uttrekk dialog, which never offered a choice —
- * and became a silent lie the moment `Behold` started keeping *the ground on
- * screen* (docs/lokalitet-view.md §4.3): the LiDAR background can be set to
- * DOM, so a DTM-only extract hands back bare terrain for a view the user was
- * reading as canopy, labelled with the canopy's settings.
- *
- * Both services publish the same style suffixes under one prefix each, so
- * teaching this the model really is one URL and one prefix. `stylesForModel`
- * is what keeps the second half honest: DOM publishes only `skyggerelieff`,
- * and asking it for `multiskyggerelieff` answers HTTP 200 with a JSON body
- * the browser decodes as a broken image.
- */
+// `stylesForModel` is not optional: DOM publishes only `skyggerelieff`, and
+// asking it for `multiskyggerelieff` answers HTTP 200 with a JSON body the
+// browser decodes as a broken image.
 export const nationalLidarSource = (
   nationalStyles: string[],
   model: LidarModel,
@@ -78,18 +57,12 @@ export const projectLidarSource = (
   pointDensity: p.pointDensity,
   model,
   wmsUrl: LIDAR_PROJECT_WMS_URL[model],
-  // The same string for both services: the DOM WMS publishes each project
-  // under its own name too.
+  // The same string for both services; the DOM WMS uses the project name too.
   layerPrefix: p.projectName,
   styles: stylesForModel(p.styles, model),
 });
 
-// Produce the sortable, filtered list of sources for a selection bbox given
-// in EPSG:4326 (lon/lat). National mosaic is always first. Projects are
-// filtered by bbox intersection and sorted newest / densest first.
-//
-// `model` is required rather than defaulted: a caller that does not say which
-// elevation model it wants is exactly the bug the parameter was added to fix.
+// bbox in EPSG:4326. National mosaic first, then every intersecting project.
 export async function enumerateLidarSources(
   bboxLonLat: [number, number, number, number],
   model: LidarModel,
@@ -107,16 +80,9 @@ export async function enumerateLidarSources(
   return [nationalLidarSource(nationalStyles, model), ...overlapping];
 }
 
-// Best-guess native ground resolution per source, used to pick a
-// sensible default when the user hasn't overridden it. Higher point
-// density → finer native resolution. National mosaic is 1 m.
-//
-// 0.25 m is the floor, and it is the *data's* floor rather than a budget:
-// Kartverket publishes the per-project models on a 0.25 m grid, and 10 pkt/m²
-// is a 0.32 m mean point spacing to begin with. Asking the WMS for 0.2 or
-// 0.15 m/px — which this did for the 10 and 20 pkt tiers — bought no detail
-// that was ever in the laser and cost 1.6× and 2.8× the pixels for it. The two
-// tiers are one line now because above 10 pkt they answer the same number.
+// 0.25 m is the data's floor, not a budget: the per-project models are
+// published on a 0.25 m grid and 10 pkt/m² is 0.32 m mean spacing, so asking
+// for finer buys pixels and no detail.
 export function nativeResolutionMetersPerPx(source: LidarSource): number {
   if (source.kind === 'national') return 1;
   const d = source.pointDensity;

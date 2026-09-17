@@ -1,27 +1,9 @@
 import type { FlyfotoProject } from '../../localities/flyfotoProjects';
 
-/*
- * Periods of Norwegian aerial photography, as a filter over the acquisition
- * list.
- *
- * The list the viewport query returns is complete, which is the problem: an
- * Oslo-sized bbox intersects on the order of a hundred acquisitions, and the
- * handful that answer "what did this field look like before the road" are
- * buried under twenty years of near-identical modern omløp. Ranking cannot
- * fix that the way it does for LiDAR — the index returns no geometry, so
- * there is no coverage ratio to rank by, and every row here is equally
- * relevant to the screen. What differs is *when*.
- *
- * Four periods rather than ten decades, and they are breaks in the archive
- * rather than round numbers: 2010 onwards is the digital omløp at 0.1–0.25 m,
- * 1990–2009 is colour at 0.25–0.5 m, 1960–1989 is the systematic national
- * coverage, and everything before that is the early flights — mostly black
- * and white, mostly the only picture of the ground before the post-war
- * rebuild, and the ones an armchair reading is usually after.
- *
- * The labels are the year ranges themselves, so they are not translated; only
- * "Alle" is a word.
- */
+// Breaks in the Norwegian aerial archive, not round numbers: digital omløp at
+// 0.1–0.25 m from 2010, colour at 0.25–0.5 m from 1990, the systematic national
+// coverage from 1960, and the early flights before that. The labels are year
+// ranges, so they are not translated.
 export const FLYFOTO_ERAS = [
   { id: 'e2010', from: 2010, to: null },
   { id: 'e1990', from: 1990, to: 2009 },
@@ -38,11 +20,8 @@ export const eraLabel = (era: (typeof FLYFOTO_ERAS)[number]): string =>
       ? `${era.from}–`
       : `${era.from}–${era.to}`;
 
-/**
- * When the flight was flown. `aar` is the project year and is what the
- * archive orders by, but a few rows carry only a photo date, so fall back to
- * that rather than dropping them out of every period.
- */
+// The project year the archive orders by, falling back to the photo date for
+// the rows that carry only that.
 const projectYear = (p: FlyfotoProject): number | null => {
   if (p.year != null) return p.year;
   const fromDate = p.photoDate ? Number(p.photoDate.slice(0, 4)) : NaN;
@@ -54,8 +33,7 @@ const inEra = (p: FlyfotoProject, era: FlyfotoEra): boolean => {
   const def = FLYFOTO_ERAS.find((e) => e.id === era);
   if (!def) return true;
   const year = projectYear(p);
-  // Undated rows appear only under "Alle". A period is a claim about when,
-  // and a row that cannot support the claim should not answer it.
+  // Undated rows appear only under "Alle".
   if (year == null) return false;
   return (
     (def.from == null || year >= def.from) && (def.to == null || year <= def.to)

@@ -1,24 +1,14 @@
-// Gjenskap: apply a `ViewSpec` to the live map.
+// Apply a `ViewSpec` to the live map: the other half of
+// `src/localities/viewSpec.ts`, which reads one out of an attachment.
 //
-// The other half of `src/localities/viewSpec.ts`. That module reads a stored
-// view out of an attachment; this one puts it back on screen — enter the
-// ground, pick the dataset, set the knobs — so that a render saved six months
-// ago can be reproduced at today's zoom, over today's theme layers, and
-// compared against them.
+// A command atom plus a hook rather than a function a caller invokes, because
+// some of the state it writes is `useState` inside `useTerrainAnalysis` and so
+// only reachable beside the control hooks in RibbonGlobalRow.
 //
-// It is a command atom plus a hook rather than a function the Bilder section
-// calls, because the state it has to write is not reachable from there. Two of
-// the four grounds keep their controls in hooks that are mounted exactly once,
-// from RibbonGlobalRow — Terrenganalyse's whole state is `useState` inside
-// `useTerrainAnalysis`, not atoms — so the only place that can apply a spec is
-// beside those hooks. The button therefore says what it wants and this hook
-// does it: one writer, one place, and the button stays a button.
-//
-// Resolving a dataset is asynchronous on purpose. A LiDAR project is a name in
-// a 1936-entry WMS catalogue and a flyfoto acquisition is a row in an ArcGIS
-// query, and either can be recreated before its list has ever been fetched —
-// pressing Gjenskap from a cold load is the normal case, not the edge one.
-// Both fetches are cached, so the second press is instant.
+// Resolving a dataset is asynchronous: a LiDAR project is a name in a
+// 1936-entry WMS catalogue and a flyfoto acquisition a row in an ArcGIS query,
+// and either can be asked for before its list has ever been fetched. Both
+// fetches are cached.
 
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { useEffect, useRef } from 'react';
@@ -40,10 +30,8 @@ import type { TerrainAnalysis } from './terrain/useTerrainAnalysis';
 import type { GroundControls } from './useGroundMode';
 
 /**
- * The view somebody asked to be taken back to, until it has been. Set it and
- * forget it — `useRecreateView` clears it once it has applied or given up, so
- * pressing Gjenskap twice on the same image is two commands rather than one
- * that never lands.
+ * The view asked for, until it has been applied. `useRecreateView` clears it
+ * on success or failure, so a second press is a second command.
  */
 export const recreateViewAtom = atom<ViewSpec | null>(null);
 
@@ -58,11 +46,9 @@ export const useRecreateView = (
   const locality = useAtomValue(activeLocalityAtom);
   const map = useAtomValue(mapAtom);
 
-  // The four control objects are rebuilt on every render, and this effect must
-  // run when a *spec* arrives and at no other time — a re-run would re-enter
-  // the ground under a user who has since moved on. Everything it writes is
-  // either an atom setter or a `useState` setter, so a closure one render
-  // stale is the same closure.
+  // This effect must run when a spec arrives and at no other time, or it
+  // re-enters the ground under a user who has moved on. Everything it writes
+  // is a setter, so a closure one render stale is the same closure.
   const latest = useRef({ ground, lidar, flyfoto, terrain, locality, map, t });
   latest.current = { ground, lidar, flyfoto, terrain, locality, map, t };
 
@@ -71,8 +57,7 @@ export const useRecreateView = (
     let cancelled = false;
     const { ground, lidar, flyfoto, terrain, locality, map, t } =
       latest.current;
-    // Applied or given up, either way it is spent. Clearing on failure too is
-    // what makes a second press a second attempt.
+    // Cleared on failure too, so a second press is a second attempt.
     const done = () => setSpec(null);
     const giveUp = (what: string) => {
       toast.warning({
@@ -84,8 +69,8 @@ export const useRecreateView = (
 
     switch (spec.kind) {
       case 'terrain':
-        // Knobs first, then the mode: entering Terreng is what starts the DEM
-        // fetch, and that fetch is keyed on the model this call sets.
+        // Knobs first: entering Terreng starts the DEM fetch, keyed on the
+        // model this call sets.
         terrain.restoreView(spec);
         ground.select('terreng');
         done();
@@ -95,12 +80,9 @@ export const useRecreateView = (
         ground.select('lidar');
         lidar.setLidarModel(spec.model);
         if (spec.source === 'national') {
-          // Set the wanted style *first* and let `activateNational` resolve
-          // it: that path reads the current style as its preference and clamps
-          // it to what the dataset actually publishes. Writing the style
-          // afterwards would skip the clamp, and asking a LiDAR WMS for a
-          // style it does not have answers HTTP 200 with a JSON error body —
-          // i.e. a blank map and nothing in the console.
+          // Style first, so `activateNational` clamps it to what the dataset
+          // publishes: asking a LiDAR WMS for a style it does not have answers
+          // HTTP 200 with a JSON error body, i.e. a blank map and no error.
           lidar.setActiveLidarStyle(spec.style);
           lidar.activateNational();
           done();
@@ -115,9 +97,8 @@ export const useRecreateView = (
               giveUp(wanted);
               return;
             }
-            // Clamped by the same rule the pulldown uses, and against the
-            // model as well: DOM publishes one style whatever the DTM
-            // catalogue lists for the project.
+            // Clamped against the model too: DOM publishes one style whatever
+            // the DTM catalogue lists.
             const published = stylesForModel(project.styles, spec.model);
             lidar.setActiveLidarStyle(
               published.includes(spec.style) ? spec.style : published[0],
@@ -138,11 +119,8 @@ export const useRecreateView = (
           break;
         }
         const wantedId = spec.source.projectId;
-        // Against the lokalitet's own rectangle rather than the viewport list
-        // the pulldown shows: that list is only fetched while ortofoto is
-        // already the background and is empty when zoomed out, and the
-        // acquisition we want is by definition one that covers this lokalitet.
-        // Same cached query either way.
+        // Against the lokalitet's rectangle, not the pulldown's viewport list:
+        // that list is empty when zoomed out. Same cached query.
         fetchFlyfotoProjectsForBbox(locality.bbox)
           .then((projects) => {
             if (cancelled) return;
@@ -161,15 +139,8 @@ export const useRecreateView = (
       }
 
       case 'sketch': {
-        /*
-         * A sketch names no ground, so there is none to enter: it is a layer
-         * over whatever the reader has up, and changing that would be this
-         * button deciding something it was not asked about. What it *can* do is
-         * the part that is actually lost — where the author was standing. The
-         * view goes back to the frame the strokes were drawn on, at the scale
-         * they were drawn at, and the sketch is then legible over today's
-         * ground rather than over a rectangle it has nothing to say about.
-         */
+        // A sketch names no ground, so there is none to enter — only the
+        // frame it was drawn on, at the scale it was drawn at.
         const view = map.getView();
         const size = map.getSize();
         if (size) {
@@ -188,13 +159,8 @@ export const useRecreateView = (
       }
 
       case 'scene':
-        // A scene is put back by `restoreScene` in the workspace, not here:
-        // the ground is only its bottom layer, and the rest of the answer is
-        // which members are switched on at which fade — atoms this hook has
-        // no business writing. It reaches *this* module for the ground alone,
-        // as an ordinary `GroundSpec`, so a whole scene arriving is a caller
-        // bug. Spend it anyway rather than leaving the command atom set, or
-        // the next Gjenskap would find the slot occupied.
+        // A scene is put back by `restoreScene`; this module only sees its
+        // ground. A whole scene arriving is a caller bug, spent anyway.
         done();
         break;
     }

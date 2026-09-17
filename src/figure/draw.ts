@@ -1,20 +1,10 @@
-/*
- * The drawing half of the provenance figure: the two map furnishings that go
- * *on* the image (scale bar, north arrow) and the caption block that goes
- * under it.
- *
- * Plain 2D canvas throughout, with every dimension derived from one
- * `fontSize` the caller computes from the image width — so a 600 px
- * screenshot and a 4000 px LiDAR extract come out looking like the same
- * figure rather than one with unreadable text and one with a caption you
- * could read across a room.
- *
- * The caption is *paper*: dark text on near-white, because these end up in
- * reports and next to excavation photographs, not in the app's chrome. The
- * furnishings are the opposite — white, cased on a translucent dark plate,
- * because they sit on ground that is black in one visualization and white in
- * the next.
- */
+// The drawing half of the provenance figure: the furnishings that go *on* the
+// image (scale bar, north arrow) and the caption block under it. Every
+// dimension derives from the one `fontSize` the caller computes from the image
+// width, so a 600 px screenshot and a 4000 px extract come out as the same
+// figure. The caption is paper, dark on near-white, because these end up in
+// reports; the furnishings are white on a translucent dark plate, because they
+// sit on ground that is black in one visualization and white in the next.
 
 import i18n from 'i18next';
 
@@ -48,9 +38,8 @@ export const dec = (value: number, digits: number): string =>
   );
 
 /**
- * Big enough to read, small enough not to shout. Linear in the image width
- * between the two clamps, which is what keeps the caption a roughly constant
- * fraction of the figure across three orders of magnitude of raster size.
+ * Linear in the image width between the two clamps, which keeps the caption a
+ * roughly constant fraction of the figure at any raster size.
  */
 export const figureFontSize = (width: number): number =>
   Math.round(Math.min(34, Math.max(13, width / 55)));
@@ -58,8 +47,7 @@ export const figureFontSize = (width: number): number =>
 /**
  * Canvas text does not wait for webfonts — it silently falls through to the
  * next family in the stack, which would make two figures saved a second apart
- * look different. Mulish is self-hosted and normally loaded long before
- * anyone saves anything; this only covers the cold case.
+ * look different. Covers the cold case only.
  */
 export const ensureFigureFont = async (size: number): Promise<void> => {
   const fonts = document.fonts;
@@ -138,10 +126,10 @@ export type CaptionLayout = {
 };
 
 /**
- * Measure first, paint later. The caption's height depends on how the text
- * wraps, and the output canvas has to be sized before anything can be drawn
- * on it — so this lays out against a throwaway context and hands back both
- * the height and a closure that repeats the same walk for real.
+ * Measure first, paint later: the caption's height depends on how the text
+ * wraps and the output canvas has to be sized before anything is drawn on it,
+ * so this lays out against a throwaway context and hands back the height plus a
+ * closure that repeats the same walk for real.
  */
 export const layoutCaption = (
   measure: CanvasRenderingContext2D,
@@ -257,12 +245,9 @@ export type ScaleBarOptions = {
 };
 
 /**
- * Four alternating segments with the ground distance above them.
- *
- * `niceMetres` rounds *down*, so the bar is always at or under the 22 %
- * target and can never run off the plate — the only case worth guarding is
- * the other end, where a thumbnail-sized image would get a bar too short to
- * measure anything against.
+ * Four alternating segments with the ground distance above them. `niceMetres`
+ * rounds *down*, so the bar stays under the 22 % target and can never run off
+ * the plate; the guard is for the other end, an image too small to carry one.
  */
 export const drawScaleBar = (
   ctx: CanvasRenderingContext2D,
@@ -317,11 +302,10 @@ export type NorthArrowOptions = {
   cy: number;
   radius: number;
   /**
-   * OpenLayers view rotation in radians, positive clockwise. Zero for every
-   * stitched raster — they are requested north-up in EPSG:25833 — and
-   * non-zero only for a screenshot of a rotated map. The content is drawn
-   * rotated by the *negative* of it, so that is how far the arrow has to
-   * turn to keep pointing at grid north.
+   * OpenLayers view rotation in radians, positive clockwise; zero for every
+   * stitched raster (north-up in EPSG:25833) and non-zero only for a screenshot
+   * of a rotated map. The content is drawn rotated by the *negative* of it, so
+   * that is how far the arrow turns to keep pointing at grid north.
    */
   rotation: number;
 };
@@ -345,8 +329,8 @@ export const drawNorthArrow = (
   ctx.textBaseline = 'middle';
   ctx.fillText('N', 0, -radius * 0.58);
 
-  // A kite, not a triangle: the waist is what tells you which end is the
-  // point when the whole thing is 30 px across.
+  // A kite, not a triangle: the waist is what tells you which end is the point
+  // when the whole thing is 30 px across.
   const tip = -radius * 0.2;
   const base = radius * 0.74;
   const half = radius * 0.34;

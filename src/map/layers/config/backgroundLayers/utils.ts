@@ -31,8 +31,7 @@ export const getWMTSLayer = async (
     const url = layerConfig.provider.capabilitiesUrl;
     const cache = store.get(backgroundLayerCapabilitiesCacheAtom);
     let capabilitiesText: string;
-    // Keyed by URL: one document describes every layer a provider publishes,
-    // so switching between the Standard variants costs one fetch in total.
+    // Keyed by URL: one document describes every layer a provider publishes.
     if (cache[url]) {
       capabilitiesText = cache[url]!;
     } else {
@@ -62,14 +61,10 @@ export const getWMTSLayer = async (
     }
 
     const layer = new TileLayer({
-      // crossOrigin keeps the map canvas untainted so the lokalitet
-      // skjermbilde can toBlob() it — cache.kartverket.no sends ACAO:*.
-      // Every other raster source is same-origin via the /wms/* proxies.
+      // Untainted canvas for skjermbilde; cache.kartverket.no sends ACAO:*.
       source: new WMTS({ ...layerOptions, crossOrigin: 'anonymous' }),
       properties: { id: `bg.${layerConfig.layerName}` },
-      // The WMTS base is pre-rendered and answers in ~130 ms, so
-      // preloading coarser levels is nearly free and it is the layer we
-      // most want ready when a zoom lands. Contrast the WMS layers below.
+      // Pre-rendered and ~130 ms a tile, so preloading coarser levels is cheap.
       preload: 2,
     });
 
@@ -83,10 +78,7 @@ export const getWMTSLayer = async (
   }
 };
 
-// 8 sampling stops per edge rather than the default corners-only:
-// reprojecting a Norway-sized box out of UTM33 bows its edges, and four
-// corners would clip the bulge — cutting real coverage off the map.
-// Sampling along the edges errs outward instead.
+// 8 stops per edge, not corners-only: a Norway-sized box out of UTM33 bows.
 const toViewExtent = (
   coverage: CoverageExtent | undefined,
   projection: string,
@@ -102,26 +94,17 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
   const projection = map.getView().getProjection().getCode();
   const properties = { id: `bg.${layerConfig.layerName}` };
 
-  // No SRS/CRS here: OL derives it from the source projection and writes
-  // it itself on every request (`params[v13 ? 'CRS' : 'SRS']` in
-  // ol/source/wms.js). A hand-set SRS is not overwritten, it is just
-  // carried along as a spare parameter the server ignores.
+  // No SRS/CRS here: OL derives it from the source projection on every request.
   const source = new TileWMS({
     url: layerConfig.url,
     params: { ...layerConfig.props },
-    // 512 px tiles, aligned to the view's resolution ladder. See
-    // src/map/layers/wmsTileGrid.ts — this is a request-count decision,
-    // not a bandwidth one.
+    // 512 px on the view's ladder, a request-count decision (wmsTileGrid.ts).
     tileGrid: getWMSTileGrid(projection),
     zDirection: WMS_Z_DIRECTION,
   });
   const extent = toViewExtent(layerConfig.coverageExtent, projection);
-  // preload 0, unlike the WMTS base. These are on-the-fly renders —
-  // measured 3-12 s for a cold LiDAR tile at the origin — and every
-  // preloaded coarse tile occupies one of the map's globally limited
-  // concurrent tile slots (see maxTilesLoading in src/map/atoms.ts) for
-  // that long. Spending them on levels the user may never look at is
-  // what starves the base map of slots.
+  // preload 0, unlike the WMTS base: these render on the fly (3-12 s cold) and
+  // each preloaded tile holds a tile slot for that long.
   return new TileLayer({
     source,
     properties,
@@ -131,10 +114,7 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
   });
 };
 
-// ArcGIS ImageServer / MapServer as a tiled background. Same tile grid,
-// same culling and the same preload policy as the WMS layers above — the
-// service renders on the fly exactly like they do, so every request-count
-// argument in docs/wms-proxy-and-tiles.md carries over unchanged.
+// ArcGIS ImageServer: same grid, culling and preload as the WMS layers.
 export const getArcGISImageLayer = (
   layerConfig: ArcGISImageBackgroundLayer,
 ): TileLayer => {
@@ -147,11 +127,8 @@ export const getArcGISImageLayer = (
     params: { ...layerConfig.params },
     tileGrid: getWMSTileGrid(projection),
     zDirection: WMS_Z_DIRECTION,
-    // Off, so a tile is 512×512 at DPI 90 whatever the display. Left on
-    // (the default) TileArcGISRest scales SIZE and DPI by the map's pixel
-    // ratio, which on a HiDPI screen quadruples the pixels the service has
-    // to resample *and* gives wmscache a second set of cache keys for the
-    // same ground — the tile grid's whole argument, undone.
+    // Off, so a tile is 512x512 at DPI 90 whatever the display; on, SIZE and
+    // DPI scale by pixel ratio and wmscache keys the same ground twice.
     hidpi: false,
   });
 
@@ -183,45 +160,17 @@ export const getLayerFromConfig = async (
 };
 
 /**
- * Which stack a raster layer belongs to.
- *
- * `bg.` is *the* background — the one stack `swapBackgroundLayers` owns and
- * sweeps. `cmp.` is the compare curtain's B side (src/map/compare/), which
- * has to be invisible to that sweep. It also namespaces the reuse signature:
- * A and B routinely resolve to the same config (both stacks carry a topo
- * base), and handing them one layer instance would put it in the map twice
- * and clip the wrong half.
+ * `bg.` is swept by `swapBackgroundLayers`; `cmp.`, the curtain's B side, must
+ * stay invisible to that sweep. It also namespaces the reuse signature: A and B
+ * often resolve to one config and cannot share an instance.
  */
 export type LayerNamespace = 'bg' | 'cmp';
 
-// Strictly the `bg.` prefix. This used to also count any layer without
-// an id, which no layer in the app has — every one is constructed with
-// `properties: { id }` — so the clause could only ever fire for a future
-// id-less layer, and its effect there would be to have the next
-// background swap quietly delete it.
 const isBackgroundLayer = (layer: BaseLayer): boolean =>
   String(layer.get('id') ?? '').startsWith('bg.');
 
-/*
- * Whether the ground is switched off — [Visning]'s bottom member, taken down
- * (docs/lokalitet-view.md §13.1, §13.10 step 5).
- *
- * `visible`, not opacity and not a teardown. The background is a *stack* — a
- * topo base, the featured dataset, a hybrid overlay — so fading each of three
- * layers to nothing is three fades rather than one, and this module already
- * owns background opacity for the swap (`OUTGOING_OPACITY`). Visibility is
- * also what makes switching back free: OpenLayers stops drawing and stops
- * loading, and the tiles it has are still there when the ground comes back.
- *
- * Module-level and imperative like the swap itself, and applied to the
- * incoming layers inside it, because a dataset change while the ground is off
- * would otherwise put a fresh stack up at full strength.
- *
- * Scoped to `bg.` and so deliberately not the compare curtain's `cmp.` half:
- * the B side is another *full* ground, which is what the curtain has always
- * been, and taking [Visning] down is a statement about what the A side has
- * composed (§13.10's first trap).
- */
+// Ground switched off, as `visible` rather than the opacity the swap spends.
+// Applied inside the swap too, and scoped to `bg.` only.
 let backgroundHidden = false;
 
 const applyBackgroundHidden = (layer: BaseLayer) =>
@@ -236,12 +185,8 @@ export const setBackgroundHidden = (hidden: boolean) => {
   }
 };
 
-// Identity of what a background layer is showing: equal signatures mean
-// equal pixels. Cycling styles or datasets rebuilds the whole stack on
-// every keypress, but the topo base and the faded LiDAR fallback under
-// the active dataset are nearly always unchanged between steps —
-// rebuilding those throws away a screenful of loaded tiles and refetches
-// them for no visible difference.
+// Equal signatures mean equal pixels, so cycling datasets keeps the loaded
+// tiles of the base and fallback under them.
 const layerSignature = (
   config: BackgroundLayer,
   projection: string,
@@ -257,10 +202,8 @@ const layerSignature = (
   return null;
 };
 
-// The layer for this config, reusing the one already on the map when it
-// would render identically. Callers must set opacity explicitly on what
-// comes back: a reused layer may still be carrying the fade from an
-// earlier swap.
+// Reuses the layer already on the map when it would render identically, so
+// callers must set opacity explicitly: it may carry an earlier swap's fade.
 export const buildOrReuseBackgroundLayer = async (
   config: BackgroundLayer,
   projection: string,
@@ -279,57 +222,32 @@ export const buildOrReuseBackgroundLayer = async (
   }
   const layer = await getLayerFromConfig(config, projection);
   if (layer) {
-    // The builders all stamp `bg.<name>`; anything else renames on the way
-    // out rather than threading the namespace through three constructors.
+    // The builders all stamp `bg.<name>`; anything else renames on the way out.
     if (ns !== 'bg') layer.set('id', `${ns}.${config.layerName}`);
     if (signature) layer.set('sig', signature);
   }
   return layer;
 };
 
-// How long the outgoing stack may hang around waiting for a render that
-// never comes — a tile stuck loading, a backgrounded tab. Generous,
-// because a cold LiDAR tile takes 3-12 s at the origin and a
-// slow-but-real swap should still be gapless; the only cost of waiting
-// is two background stacks in memory.
-//
-// Exported for the compare curtain, which retires its own B stack by the
-// same rules against the same map (src/map/compare/curtainLayers.ts).
+// How long the outgoing stack waits for a render that never comes; a cold LiDAR
+// tile takes 3-12 s. Also used by the compare curtain.
 export const SWAP_TIMEOUT_MS = 15000;
 
-// What a layer on its way out is dimmed to, immediately, for as long as
-// it hangs around. A per-project dataset usually covers only part of the
-// screen, and an outgoing full-screen layer at full opacity behind it is
-// indistinguishable from real coverage — the edge of what you just
-// selected has to be readable before its tiles are even in.
+// What an outgoing layer is dimmed to: at full opacity behind a part-screen
+// dataset it reads as real coverage.
 export const OUTGOING_OPACITY = 0.35;
 
 // Cancels the pending retirement of the previous swap, if any.
 let cancelPendingRetire: (() => void) | null = null;
 
-// Replace the background stack without ever showing a gap. Both lists
-// are bottom-first and describe where the incoming layers sit relative
-// to the outgoing ones that are still fading out: `under` goes below
-// them (the topo base, the faded national mosaic — context that the
-// outgoing dataset should keep covering until it goes away), `over`
-// above them (the dataset being featured, and the hybrid overlay on top
-// of that, which must not be buried by a layer on its way out).
-//
-// Removing the old layers first would leave the map nothing but the
-// topo base to draw while the new LiDAR tiles load, so cycling styles or
-// datasets would flash topo between every step. Instead the outgoing
-// layers stay put (faded, see above) and are removed only once the map
-// reports a complete render with the incoming ones in.
+// Both lists are bottom-first, over outgoing layers that go on rendercomplete.
 export const swapBackgroundLayers = (under: TileLayer[], over: TileLayer[]) => {
   const store = getDefaultStore();
   const map = store.get(mapAtom);
   const layers = [...under, ...over];
   if (layers.length === 0) return;
 
-  // A swap arriving while an earlier one is still retiring: cancel that
-  // retirement rather than running it. Its layers are part of this
-  // swap's outgoing set anyway, and dropping them now would open the
-  // very gap the deferral exists to avoid.
+  // Cancelled rather than run: those layers are in this swap's outgoing set.
   cancelPendingRetire?.();
 
   const collection = map.getLayers();
@@ -337,10 +255,7 @@ export const swapBackgroundLayers = (under: TileLayer[], over: TileLayer[]) => {
     .getArray()
     .filter((l) => isBackgroundLayer(l) && !layers.includes(l as TileLayer));
 
-  // Reposition rather than just add: `under` goes to the bottom of the
-  // collection in order, `over` on top of everything. Layers that were
-  // reused are already somewhere in the collection, and the outgoing
-  // ones have to end up *between* the two groups.
+  // Reposition rather than add: reused layers are already in the collection.
   under.forEach((layer, i) => {
     collection.remove(layer);
     collection.insertAt(i, layer);
@@ -351,8 +266,7 @@ export const swapBackgroundLayers = (under: TileLayer[], over: TileLayer[]) => {
   }
 
   for (const layer of outgoing) layer.setOpacity(OUTGOING_OPACITY);
-  // The incoming ones only: the outgoing stack is already on the map and was
-  // set when the ground was switched off.
+  // Incoming layers only: the outgoing stack was set when the ground went off.
   for (const layer of layers) applyBackgroundHidden(layer);
 
   const retire = () => {
@@ -371,11 +285,9 @@ export const swapBackgroundLayers = (under: TileLayer[], over: TileLayer[]) => {
 export const clearBackgroundLayer = () => {
   const store = getDefaultStore();
   const map = store.get(mapAtom);
-  // Nothing is coming in to hide behind, so any deferred removal should
-  // just happen now.
+  // Nothing is coming in to hide behind, so a deferred removal happens now.
   cancelPendingRetire?.();
-  // Snapshot: getArray() is the live collection array, and removing
-  // while iterating it skips every other entry.
+  // Snapshot: getArray() is live, and removing while iterating skips entries.
   const allLayers = [...map.getLayers().getArray()];
   allLayers.forEach((layer) => {
     try {

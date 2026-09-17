@@ -1,24 +1,16 @@
-// Relevance tiering for the LiDAR project picker and footprint overlay:
-// decides which viewport candidates surface immediately ("primary") vs
-// sit behind the "flere lag" overflow ("secondary"). Nothing is ever
-// excluded outright — these are priority rules the user can dial back
-// via lidarFilterSettingsAtom — and a render cap bounds cost regardless
-// of how many candidates a fully-zoomed-out viewport turns up.
+// Relevance tiering for the LiDAR picker and footprint overlay: primary shows
+// immediately, secondary behind the overflow. Nothing is excluded outright.
 
 import { atom } from 'jotai';
 import { Geometry } from 'ol/geom';
 import { LidarProject, sortProjectsByRelevance } from './lidarProjects';
 
 export type LidarFilterSettings = {
-  // Projects older than this are demoted, unless the density grandfather
-  // exception below applies.
+  // Projects older than this are demoted, unless grandfathered below.
   minYear: number;
-  // A project with pointDensity >= 5 pkt/m² counts as meeting the year
-  // bar even if it's a bit older than minYear.
+  // A project at >= 5 pkt/m² meets the year bar even when older than minYear.
   grandfatherDense: boolean;
-  // Projects painting less than this fraction of the viewport are
-  // demoted — a project clipping one corner of the screen is rarely the
-  // one you meant to open.
+  // Projects painting less than this fraction of the viewport are demoted.
   minAreaRatio: number;
 };
 
@@ -53,11 +45,8 @@ export const meetsSizeBar = (
   filters: LidarFilterSettings,
 ): boolean => areaRatio >= filters.minAreaRatio;
 
-// How many entries (primary + secondary combined) ever get a list row —
-// and, by extension, a hoverable footprint. Applied after the WFS
-// response is in, so it bounds list length only; download and parse cost
-// is bounded by the extent guard in map/lidarFootprintsLayer.ts. Not
-// user-adjustable: a performance bound, not a relevance preference.
+// How many entries ever get a list row. Applied after the WFS response, so
+// download cost is the extent guard's job.
 export const RENDER_CAP = 25;
 
 type RelevanceInput = {
@@ -65,9 +54,7 @@ type RelevanceInput = {
   areaRatio: number;
 };
 
-// `sorted` must already be in display-priority order (most on-screen
-// coverage first — see sortByOnScreenCoverage below); this only tiers
-// and caps, it doesn't re-sort.
+// `sorted` arrives in display order (sortByOnScreenCoverage); this only tiers.
 export const classifyRelevance = <T extends RelevanceInput>(
   sorted: T[],
   filters: LidarFilterSettings,
@@ -90,23 +77,18 @@ export const lidarFilterSettingsAtom = atom<LidarFilterSettings>(
   DEFAULT_LIDAR_FILTERS,
 );
 
-// One entry per viewport candidate, shared by the ribbon picker (list
-// rows) and the map footprint layer (drawn shapes) so both read off a
-// single fetch/classify pass instead of duplicating the WFS call.
+// One entry per viewport candidate; the picker and the footprint layer share
+// one fetch and classify pass.
 export type LidarViewportEntry = {
   project: LidarProject;
-  // Real WFS polygon parts, at least one of which touches the viewport —
-  // a project without a footprint on screen never becomes an entry.
+  // WFS polygon parts, at least one of which touches the viewport.
   geometries: Geometry[];
-  // Fraction of the viewport those polygons actually paint, 0..1 (see
-  // viewportCoverage). Both the size bar and the list order read this.
+  // Fraction of the viewport those polygons paint, 0..1 (viewportCoverage).
   areaRatio: number;
 };
 
-// Display order for the picker: whatever covers most of what the user is
-// looking at, first. Coverage is bucketed at 5% so that near-identical
-// candidates fall back to newest/densest instead of swapping places on
-// sampling noise as the map is panned.
+// Bucketed at 5% so near-identical candidates fall back to newest/densest
+// instead of swapping places on sampling noise while panning.
 const COVERAGE_BUCKET = 0.05;
 
 export const sortByOnScreenCoverage = (
@@ -121,12 +103,11 @@ export const sortByOnScreenCoverage = (
 };
 
 export type LidarViewportStatus =
-  // Not in LiDAR mode — nothing fetched, nothing drawn.
+  // Not in LiDAR mode: nothing fetched, nothing drawn.
   | 'idle'
   | 'loading'
   | 'ready'
-  // Viewport too wide to ask the WFS about; the user has to zoom in
-  // before coverage can be shown at all.
+  // Viewport too wide to ask the WFS about.
   | 'zoomedOut'
   | 'error';
 
@@ -144,25 +125,13 @@ export const lidarViewportAtom = atom<LidarViewportState>(
   emptyLidarViewport('idle'),
 );
 
-// Whether the ribbon's LiDAR dataset pulldown is open. The footprint
-// polygons are a picking aid, not a persistent overlay — they'd only
-// clutter the terrain the user came to read — so the drawn shapes hang
-// off this, and go away the moment the pulldown closes (selecting a
-// dataset closes it).
+// The footprint polygons are a picking aid, so they hang off the pulldown.
 export const lidarPickerOpenAtom = atom(false);
 
-// Set while the user is cycling datasets from the keyboard (W/S). That
-// walks the same viewport list the pulldown shows, so it needs the same
-// WFS fetch — but with no pulldown and no polygons on the map, which is
-// the whole point of cycling from the keyboard. Hence two atoms: this
-// one keeps the *data* current, lidarPickerOpenAtom decides whether
-// anything is *drawn*. useLidarControls clears it after an idle period, so
-// panning around long after the last keypress doesn't keep refetching.
+// Set while datasets are cycled from the keyboard: same WFS fetch, no polygons.
+// Cleared by useLidarControls after an idle period.
 export const lidarCyclingAtom = atom(false);
 
-// The pulldown row the pointer (or keyboard focus) is currently on. Only
-// that one project's footprint is drawn, alongside the active dataset's —
-// drawing all of them at once turned the map into an unreadable stack of
-// overlapping outlines, and the whole point of the overlay is answering
-// "where is *this* row" while the user runs down the list.
+// The focused pulldown row: only its footprint is drawn, alongside the active
+// dataset's, since all of them at once is an unreadable stack of outlines.
 export const hoveredLidarProjectIdAtom = atom<string | null>(null);

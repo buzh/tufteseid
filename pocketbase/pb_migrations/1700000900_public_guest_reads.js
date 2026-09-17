@@ -7,7 +7,7 @@
 // whose entire job is receiving a stranger — could only answer with a
 // sign-in dialog over a map of Norway. The visitor was asked to make an
 // account before being told what for. `?lok=CODE` now resolves for a guest
-// and lands them in the show stance (docs/ui-architecture.md §8.13).
+// and lands them in the show stance (docs/ui-architecture.md, "The copy, the link, the bundle").
 //
 // Three rules and one field:
 //

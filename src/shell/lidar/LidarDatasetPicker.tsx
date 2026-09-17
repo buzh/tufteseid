@@ -8,8 +8,8 @@ import { useGroundRingHint } from '../visningRing';
 import { LidarFilters } from './LidarFilters';
 import type { LidarControls } from './useLidarControls';
 
-// Worth a column of its own because it's what the list is ordered by: how
-// much of the current screen this project's footprint paints.
+// How much of the current screen this project's footprint paints, which is
+// what the list is ordered by.
 const coverageLabel = (ratio: number): string | null =>
   ratio <= 0 ? null : ratio < 0.01 ? '<1%' : `${Math.round(ratio * 100)}%`;
 
@@ -22,26 +22,17 @@ const projectMeta = (entry: LidarViewportEntry): string =>
     .filter((s): s is string => !!s && s.length > 0)
     .join(' · ');
 
-// The glyph on whichever row "Automatisk" has landed on. Also the chip's
-// left icon, so the same symbol means the same thing whether the pulldown
-// is open or shut.
+// The glyph on whichever row Automatisk has landed on, and the chip's left
+// icon, so the symbol means the same open or shut.
 const AUTO_ICON = 'bolt';
 
-/**
- * Which LiDAR dataset is painting the map: the seamless national mosaic, one
- * specific acquisition, or **Automatisk** — the mosaic when zoomed out, the
- * best-covering acquisition once close enough in for its finer grid to show
- * (see lidarAuto.ts). Coverage is confirmed against real WFS footprint
- * polygons rather than bounding boxes — see lidarFootprintsLayer.ts.
- *
- * Under auto the list marks the resolved row but does not make it *active*:
- * the active row is "Automatisk", because that is the choice the user made.
- * Two accented rows would leave it ambiguous which one a click would undo.
- */
+// The national mosaic, one acquisition, or Automatisk. Under auto the list
+// marks the resolved row but leaves Automatisk the active one: two accented
+// rows would not say which a click undoes.
 export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
   const { t } = useTranslation();
-  // Blank inside a lokalitet whose Views have taken W/S — the heading must
-  // not promise a ring it no longer has (docs/ui-architecture.md §5.3).
+  // Blank inside a lokalitet whose Views have taken W/S: the heading must not
+  // promise a ring it no longer has.
   const hint = useGroundRingHint();
   const [filterOpen, setFilterOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -92,9 +83,8 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
             variant="secondary"
             size="md"
             className={styles.triggerButton}
-            // The chip keeps naming the dataset actually on screen — that's
-            // the fact the user needs while reading terrain. Whether it got
-            // there by itself is the secondary fact, so it's the icon.
+            // The chip names the dataset on screen; whether auto put it there
+            // is the secondary fact, so it is the icon.
             leftIcon={autoDataset ? AUTO_ICON : undefined}
             title={
               autoDataset
@@ -106,12 +96,11 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
             aria-expanded={lidar.pickerOpen}
           >
             <span className={styles.triggerLabel}>{datasetLabel}</span>
-            {/* First W/S press after a pause only kicks off the footprint
+            {/* The first W/S press after a pause only starts the footprint
                 fetch; without this the key looks dead. */}
             {lidar.cyclingPending && <Spinner size={14} />}
           </Button>
-          {/* How many datasets cover the viewport — i.e. how much this
-              pulldown has to offer here. */}
+          {/* How many datasets cover the viewport. */}
           <CountBadge
             count={lidar.datasetCount}
             palette="yellow"
@@ -136,10 +125,7 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
 
       {filterOpen && <LidarFilters />}
 
-      {/* First, because it is the answer for most views and because the two
-          rows under it are what it chooses between. Its meta line names the
-          dataset it has currently settled on, so the row explains itself
-          without the user having to look at the chip. */}
+      {/* Its meta line names the dataset auto has settled on. */}
       <PulldownItem
         label={t('ribbon.lidar.auto')}
         meta={autoDataset ? datasetLabel : t('ribbon.lidar.autoMeta')}
@@ -161,8 +147,8 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
         className={styles.list}
         onMouseLeave={() => lidar.setHoveredProjectId(null)}
       >
-        {/* 'idle' is reachable here for the tick between the pulldown
-            opening and the fetch effect starting. */}
+        {/* 'idle' is the tick between the pulldown opening and the fetch
+            effect starting. */}
         {(allProjects === null ||
           viewport.status === 'loading' ||
           viewport.status === 'idle') && (
@@ -174,9 +160,8 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
           </div>
         )}
 
-        {/* Coverage can't be answered for a whole-country viewport — the
-            boundary WFS times out rather than replying, so say so instead of
-            spinning into an empty list. */}
+        {/* The boundary WFS times out on a whole-country viewport rather than
+            replying, so say so instead of spinning into an empty list. */}
         {viewport.status === 'zoomedOut' && (
           <p className={styles.hint}>{t('ribbon.lidar.zoomedOut')}</p>
         )}

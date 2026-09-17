@@ -48,10 +48,8 @@ export const InfoBox = () => {
           onClick={onClose}
         />
       </div>
-      {/* Hidden rather than unmounted while minimized. `PropertyInfo` draws
-          the property outline on the map and clears it on unmount, and
-          folding the panel away to look at that outline is the point of
-          folding it away. */}
+      {/* Hidden, not unmounted: `PropertyInfo` clears its map outline on
+          unmount, and seeing that outline is why the panel folds. */}
       <div className={cx(styles.folds, isMinimized && styles.hidden)}>
         {showHeading && (
           <h2 className={styles.heading}>{selectedResult.name}</h2>

@@ -19,15 +19,8 @@ const Fact = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
-/*
- * A labelled one-line field that saves on blur, like Beskrivelse saves on
- * blur — there is no Lagre button anywhere in the workspace, so every field
- * has to commit itself.
- *
- * Local draft state rather than writing straight through: `onCommit` round-
- * trips to PocketBase, and typing against a value that only updates when the
- * server answers loses characters.
- */
+// A labelled one-line field that commits on blur, over local draft state so
+// typing is not fighting the record's value.
 const TextRow = ({
   label,
   value,
@@ -40,16 +33,14 @@ const TextRow = ({
   value: string;
   placeholder: string;
   maxLength: number;
-  // Read-only, not disabled: in show mode this is every one of these fields,
-  // the owner's included, and dimming a record's own content to say "not
-  // now" is the wrong sentence. See `.control:read-only` in Field.module.css.
+  // Read-only rather than disabled: in show this is every field, the owner's
+  // included. See `.control:read-only` in Field.module.css.
   readOnly: boolean;
   onCommit: (next: string) => void;
 }) => {
   const [draft, setDraft] = useState(value);
 
-  // Follows the record: the refresh button below rewrites all three at once,
-  // and realtime can bring in an edit made in another tab.
+  // Follows the record: the refresh button below rewrites all three at once.
   useEffect(() => setDraft(value), [value]);
 
   const commit = () => {
@@ -69,9 +60,8 @@ const TextRow = ({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
-          // Enter commits via blur. Escape reverts *without* blurring — a
-          // synchronous blur() here would still see the old draft in this
-          // render's closure and save it anyway.
+          // Enter commits via blur. Escape reverts without blurring: a
+          // synchronous blur() would still see this render's stale draft.
           if (e.key === 'Enter') e.currentTarget.blur();
           if (e.key === 'Escape') setDraft(value);
         }}
@@ -80,16 +70,10 @@ const TextRow = ({
   );
 };
 
-/*
- * Where the lokalitet is. Sted / Kommune / Matrikkel are pre-filled from the
- * public registers when the rectangle is first framed and are the user's
- * afterwards; the refresh button re-asks for the rectangle as it now stands,
- * which is the only thing that overwrites them, and only on request.
- *
- * Koordinater is *not* among them. It is computed from the bbox on every
- * render, so it cannot fall out of step with a rectangle that "Juster
- * området" has moved — see formatBboxCentre.
- */
+// Sted / Kommune / Matrikkel are pre-filled from the public registers when the
+// rectangle is first framed and are the user's afterwards; only the refresh
+// button overwrites them. Koordinater is not a field — it is computed from the
+// bbox per render, so "Juster området" cannot leave it stale.
 const LocationGroup = ({
   locality,
   canEdit,
@@ -177,10 +161,8 @@ const LocationGroup = ({
   );
 };
 
-// Everything you set once and then stop looking at, folded away by
-// default. Saves on blur (description, the location fields) or on click
-// (synlighet); there is no dirty-state Lagre button anywhere in the
-// workspace.
+// Everything you set once and then stop looking at. Commits on blur (the text
+// fields) or on click (synlighet), into the edit transaction's buffer.
 export const LocalityDetails = ({
   locality,
   canEdit,
@@ -240,12 +222,8 @@ export const LocalityDetails = ({
             {t('localities.visibility.limitedHint')}
           </span>
         )}
-        {/*
-          Public stopped meaning "any signed-in user" in migration 1700000900
-          and now means the open web, images included. That is a bigger thing
-          to hand over than the word implies, and the segmented control is
-          the last place it can be said before it is true.
-        */}
+        {/* Public means the open web, images included — not just signed-in
+            users — so say so before it is true. */}
         {locality.visibility === 'public' && (
           <span className={styles.hint}>
             {t('localities.visibility.publicHint')}

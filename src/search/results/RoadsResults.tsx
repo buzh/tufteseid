@@ -105,9 +105,8 @@ export const RoadsResults = ({
               }
               onMouseLeave={() => setHoveredResult(null)}
             />
-            {/* Numbers as chips rather than a labelled row each: a long
-                street runs to a hundred of them, and the toggle that opened
-                the list already said "Husnr". */}
+            {/* Chips rather than a labelled row each: a long street runs to
+                a hundred of them. */}
             {openRoads.includes(road.ID) && road.HUSNUMMER && (
               <li className={styles.houseNumbers}>
                 {road.HUSNUMMER.map((houseNumber, j) => (

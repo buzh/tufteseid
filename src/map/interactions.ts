@@ -1,16 +1,5 @@
-// Who owns which OL interaction.
-//
-// Interactions used to be located by scanning `map.getInteractions()` for
-// an `instanceof` match, which turned that collection into one global
-// namespace shared by every tool. Several of them add the same classes: the
-// draw tool (Draw/Select/Translate/Modify/Snap), measure (Draw) and — until it
-// grew a Pointer interaction of its own — "Juster området"
-// (Translate/Modify). So "remove every Draw" in one tool
-// silently detached another tool's, and `getDrawInteraction()` returned
-// whichever Draw happened to be first in the collection.
-//
-// Tagging on the way in and filtering on the way out keeps each tool
-// looking only at its own.
+// Who owns which OL interaction: `map.getInteractions()` is one namespace and
+// several tools add the same classes, so `instanceof` finds another tool's.
 
 import type Interaction from 'ol/interaction/Interaction';
 import type Map from 'ol/Map';
@@ -33,10 +22,8 @@ export const addOwnedInteraction = <T extends Interaction>(
   return interaction;
 };
 
-// Returns a fresh array. That matters: `getArray()` hands back the live
-// array behind the Collection, and both it and `Collection#forEach` walk
-// it by index with the length read up front — removing while iterating
-// skips entries. Every caller here removes while iterating.
+// A fresh array, because `getArray()` hands back the Collection's live one and
+// every caller here removes while iterating, which skips entries.
 export const getOwnedInteractions = (
   map: Map,
   owner: InteractionOwner,

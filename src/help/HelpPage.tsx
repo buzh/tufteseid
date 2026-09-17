@@ -61,8 +61,7 @@ const TipsAndTricksContent = ({ content }: { content: ContentBlock[] }) => (
   </>
 );
 
-// One tip open at a time within a card — the tips are alternatives to each
-// other, and a card that expands to its full height pushes the grid around.
+// One tip open at a time per card: a card at full height pushes the grid.
 const TipsCard = ({
   categoryId,
   icon,
@@ -180,9 +179,8 @@ export const HelpPage = () => {
             </p>
           </section>
 
-          {/* Unconditional. The old TopBar carried a language button; the
-              ribbon does not, so gating this on `isMobile` left desktop with
-              no way to change language at all. */}
+          {/* Unconditional: the ribbon carries no language control, so
+              gating this leaves desktop with no way to change language. */}
           <section className={styles.block}>
             <h2 className={styles.blockTitle}>
               {t('languageSelector.chooseLanguage')}

@@ -36,37 +36,19 @@ export type CommitResult = {
    * queue: the specs this commit created, and any sketch it re-drew.
    */
   created: AttachmentRecord[];
-  /**
-   * Temp spec id → the real one, for callers holding an id the buffer minted.
-   * A shown sketch is remembered by id, and the id it went up under was a
-   * draft id this commit has just replaced.
-   */
+  /** Temp spec id → the real one, for callers holding an id the buffer minted. */
   renamedSpecs: Map<string, string>;
 };
 
 /**
- * The edit transaction's React half (docs/lokalitet-view.md §5.6).
+ * The edit transaction's React half: when the buffer opens and closes, when it
+ * reaches `localStorage`, and what `Lagre` and `Avbryt` do. `draft.ts` is the
+ * data half.
  *
- * `draft.ts` is the data — what a buffer is, how to read it back, how to put
- * it on disk. This is the part that has to live in a component: when the
- * buffer opens and closes, when it is written to `localStorage`, and what
- * `Lagre` and `Avbryt` actually do.
- *
- * Three properties are load-bearing:
- *
- * - **A recovered draft restores itself.** Finding one in `localStorage` is
- *   already the answer to "did this session end badly"; making the user press
- *   a second button to get their own work back would be asking them to
- *   confirm a fact. The banner (§5.7, rank 1) says it happened and offers
- *   `Forkast`, which is the only decision left to make.
- * - **The commit is resumable.** N writes with no transaction behind them can
- *   half-succeed, so each one is removed from the buffer as it lands. A second
- *   `Lagre` after a dropped connection retries exactly the remainder — never
- *   the funn that already exists.
- * - **`Avbryt` writes only to compensate.** The buffered edits were never
- *   sent, so rolling them back is local and instant; the only network traffic
- *   is deleting the Files this session wrote eagerly, which is the narrow edge
- *   §5.6 admits to.
+ * The commit must stay resumable: N writes with no transaction behind them can
+ * half-succeed, so each is removed from the buffer as it lands and a second
+ * `Lagre` retries exactly the remainder. `Avbryt` touches the network only to
+ * delete the Files this session wrote eagerly.
  */
 export const useLocalityDraft = ({
   locality,
@@ -85,8 +67,8 @@ export const useLocalityDraft = ({
   /** When a buffer was recovered from disk, for the banner. Null otherwise. */
   const [restoredAt, setRestoredAt] = useState<number | null>(null);
 
-  // The commit and the rollback read the buffer from a timer-free callback
-  // that must not re-identify on every keystroke in the name field.
+  // `commit` and `rollback` must not re-identify on every keystroke, so they
+  // read the buffer through a ref rather than closing over it.
   const draftRef = useRef<LocalityDraft | null>(draft);
   draftRef.current = draft;
   const applyRef = useRef(applyLocality);
@@ -94,20 +76,14 @@ export const useLocalityDraft = ({
 
   const localityId = locality.id;
 
-  /*
-   * Recovery, on arrival.
-   *
-   * Keyed on the id alone: re-running this when the record's own fields
-   * change would restore the buffer over the edits it just made. The stored
-   * copy is only read once per lokalitet, which is also what makes it safe to
-   * write on every mutation below.
-   */
+  // Recovery, on arrival. Must stay keyed on the id alone: re-running when the
+  // record's own fields change would restore the buffer over the edits it just
+  // made.
   useEffect(() => {
     setDraft(null);
     setRestoredAt(null);
-    // A reader's own browser can hold a buffer for a lokalitet they have
-    // since lost edit rights on. Leave it where it is rather than restoring
-    // a session that cannot be committed.
+    // A browser can hold a buffer for a lokalitet its owner has since lost
+    // edit rights on; leave it rather than restoring an uncommittable session.
     if (!recoverable) return;
     const stored = loadDraft(localityId);
     if (!stored) return;
@@ -116,9 +92,8 @@ export const useLocalityDraft = ({
     applyRef.current(stored.locality);
   }, [localityId, recoverable]);
 
-  // Persist on every change. No debounce: the two writes that could be
-  // frequent are already debounced upstream — the pen settles for 700 ms
-  // before it hands over geometry, and text fields commit on blur.
+  // No debounce: the two frequent writers are debounced upstream — the pen
+  // settles for 700 ms before handing over geometry, text fields commit on blur.
   useEffect(() => {
     if (!draft) return;
     if (isDirty(draft)) saveDraft(draft);
@@ -156,8 +131,8 @@ export const useLocalityDraft = ({
       attachments: { ...d.attachments },
       newSpecs: { ...d.newSpecs },
       attachmentDeletes: [...d.attachmentDeletes],
-      // Whatever happens, the Files are already on the server and are no
-      // longer this transaction's to compensate.
+      // The Files are already on the server, so they are no longer this
+      // transaction's to compensate.
       eagerIds: [],
     };
     let failed = 0;
@@ -175,9 +150,8 @@ export const useLocalityDraft = ({
       }
     }
 
-    // Deletions first: a session that deleted a funn and then drew a
-    // replacement should not have both on the list for the length of a
-    // round trip.
+    // Deletions first, so a deleted funn and its replacement are never both on
+    // the list for the length of a round trip.
     for (const id of d.findDeletes) {
       try {
         await deleteLocalityFind(id);
@@ -196,16 +170,8 @@ export const useLocalityDraft = ({
         failed++;
       }
     }
-    /*
-     * Temp id → the real one, for the sketches below.
-     *
-     * A sketch kept in the same session that invented the funn it is about
-     * holds that funn's *temp* id, and posting it verbatim would be a relation
-     * to a record that does not exist — which PocketBase rejects, so the whole
-     * sketch would fail over a field that is not what the author was doing.
-     * The funn are written first, so by the time the specs go out every id
-     * that was going to become real has.
-     */
+    // Temp funn id → the real one. PocketBase rejects a relation to a record
+    // that does not exist, so the funn are written before anything naming them.
     const realFindId = new Map<string, string>();
     for (const [tmp, body] of Object.entries(d.newFinds)) {
       try {
@@ -231,9 +197,7 @@ export const useLocalityDraft = ({
       }
     }
     // A relation to something the buffer invented and could not write is
-    // dropped rather than sent: a sketch about a funn whose create just failed
-    // is still a sketch, and refusing to save it would lose the drawing over
-    // the label on it.
+    // dropped rather than sent, so the record still saves without it.
     const resolve = (
       ids: string[] | undefined,
       map: Map<string, string>,
@@ -241,25 +205,16 @@ export const useLocalityDraft = ({
       (ids ?? []).map((id) => map.get(id) ?? id).filter((id) => !isDraftId(id));
     for (const [id, body] of Object.entries(d.attachments)) {
       try {
-        // Filing an existing bilde under a funn invented in the same session
-        // is the ordinary case for step 9's editor, so this patch needs the
-        // same translation the specs below get. `funn` is always in the body
-        // (`attachmentBaseOf`), so this is a round trip for every other edit
-        // rather than a write only the editor triggers.
+        // `funn` may name a funn invented in the same session, so it needs the
+        // same translation the specs below get.
         const rec = await updateAttachment(id, {
           ...body,
           funn: resolve(body.funn, realFindId),
         });
-        // A sketch that has been drawn on again is the one patch that changes
-        // what the record *is* rather than how it is displayed, so its figure
-        // is now a picture of the previous drawing. Onto the queue with the
-        // new specs: the caller does not need to know which of the two a
-        // record got there by, only that its pixels are owed.
-        //
-        // `viewSpecOf` rather than `body.meta` alone, since step 7: placing an
-        // upload (§13.5) is a `meta` patch too, and a File has nothing behind
-        // it to render — the queue would take the job only to mark it `empty`
-        // and light a failure face on a record that is perfectly fine.
+        // A `meta` patch means a re-drawn sketch, whose figure is now a picture
+        // of the previous drawing — but placing an upload is a `meta` patch
+        // too, and a File has nothing to render, so `viewSpecOf` must gate it
+        // or the queue lights a failure face on a record that is fine.
         if (body.meta && viewSpecOf(rec)) created.push(rec);
         delete rest.attachments[id];
       } catch (e) {
@@ -274,26 +229,11 @@ export const useLocalityDraft = ({
           {
             locality: localityId,
             kind: body.kind,
-            // The buffer has carried a caption since `behold()` started
-            // copying one in, and the pending card has been printing it all
-            // along — it just never reached the create payload, so every
-            // View kept in an edit session arrived at PocketBase with
-            // `caption: ''` and fell back to its bare `kind` on every surface
-            // that names it. The update branch above spreads `...body`, which
-            // is why editing an existing record never showed this.
             caption: body.caption,
-            /*
-             * A scene names its members twice — in `over` and in `meta.layers`
-             * — so both halves need the same translation (§13.7). The
-             * relation's is `resolve` below; this is the one in JSON, and
-             * without it a scene kept in the same session as the extract under
-             * it would point at a `draft:` id nothing will ever answer for.
-             *
-             * Insertion order is what makes one pass enough: `newSpecs` is
-             * written in the order the specs were kept, a scene can only name
-             * members that already existed when it was kept, so every id it
-             * holds is already in `realSpecId` by the time it comes round.
-             */
+            // A scene names its members twice, in `over` and in `meta.layers`,
+            // so both halves need the same translation. One pass suffices
+            // because `newSpecs` keeps insertion order and a scene can only
+            // name members that existed when it was kept.
             meta:
               body.kind === 'scene'
                 ? remapSceneMeta(body.meta, (id) =>
@@ -306,10 +246,9 @@ export const useLocalityDraft = ({
           userId,
         );
         realSpecId.set(tmp, rec.id);
-        // The exhibit position the buffer gave it, but only where the author
-        // put it there: `createAttachmentSpec` mints its own clock-derived
-        // `sort`, which is the right answer for a record created now and the
-        // wrong one for a card that has since been dragged or hidden.
+        // `createAttachmentSpec` mints its own clock-derived `sort`, which is
+        // right for a record created now; only override it where the author
+        // actually dragged or hid the card.
         const arranged = body.sort !== body.bornSort || body.hidden;
         const placed = arranged
           ? await updateAttachment(rec.id, {
@@ -336,12 +275,8 @@ export const useLocalityDraft = ({
   }, [localityId, userId]);
 
   /**
-   * `Avbryt`. Returns how many eager Files could not be taken back.
-   *
-   * The buffer goes first and the network second on purpose: the user has
-   * asked for their edits to be gone, and they are gone the moment the state
-   * clears. Whether the screenshot they took also went is a slower question
-   * and not one to hold the interface open for.
+   * `Avbryt`. Returns how many eager Files could not be taken back. Clears the
+   * buffer before touching the network, so the edits are gone immediately.
    */
   const rollback = useCallback(async (): Promise<number> => {
     const d = draftRef.current;

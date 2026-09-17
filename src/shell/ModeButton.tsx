@@ -16,18 +16,16 @@ export const ModeButton = ({
   label: string;
   tooltip?: string;
   /**
-   * The accessible name, when the tooltip is a *verb* that changes with
-   * `active`. Saying both the verb and the state announces "Hide the finds,
-   * pressed", so a toggle whose tooltip flips passes its stable noun here and
-   * lets `aria-pressed` carry the rest. `LayerGroup` is why this exists.
+   * The accessible name, for a toggle whose tooltip is a verb that flips with
+   * `active`: pass the stable noun here and let `aria-pressed` carry the rest,
+   * or it announces "Hide the finds, pressed".
    */
   ariaLabel?: string;
   active?: boolean;
   badge?: number | string;
   disabled?: boolean;
-  /** This button is the left half of a split control and something is butted
-   *  against it — square that edge off and pull the badge in off it. The two
-   *  are `LayerGroup` and `EyeSplit`. */
+  /** Left half of a split control (`LayerGroup`, `EyeSplit`): square that edge
+   *  off and pull the badge in off it. */
   joinedRight?: boolean;
   onClick: () => void;
 }) => (

@@ -18,13 +18,11 @@ export const culturalHeritageConfig: ThemeLayerConfig = {
         en: 'Cultural heritage',
       },
       infoFormat: 'application/vnd.ogc.gml',
-      // Kart.ra.no is MapServer; map_resolution acts as a DPI hint and
-      // scales symbol sizes / line widths on the server side. 192 = ~2x
-      // the default 96 dpi, doubling the "R" icon and related glyphs.
+      // kart.ra.no is MapServer: map_resolution is a DPI hint that scales
+      // symbols and line widths server-side, 192 being twice the default 96.
       extraWmsParams: { map_resolution: 192 },
-      // Norway has ~300k heritage records; below city-scale zoom the
-      // map turns into an unreadable wall of pins. Hide the whole
-      // category until the view zooms in past this level.
+      // Norway has ~300k heritage records, an unreadable wall of pins below
+      // city scale.
       minZoom: 8,
     },
   ],

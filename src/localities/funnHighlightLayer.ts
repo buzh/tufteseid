@@ -13,12 +13,9 @@ import {
 } from './atoms';
 import { FUNN_ID_PROPERTY, getFunnLayer, isFunnOnMap } from './funnLayer';
 
-// Halo under the funn the list is pointing at. A separate layer rather
-// than a style swap on funnLayer: those features carry the per-feature
-// style they were drawn with (round-tripped through the GeoJSON
-// properties), so overriding them to show emphasis would lose the
-// drawing and restoring it afterwards means reconstructing that style.
-// Cloning the geometry one layer down costs nothing and is reversible.
+// Halo under the funn the list is pointing at. A separate layer rather than a
+// style swap on funnLayer, whose features carry the per-feature style they
+// were drawn with; overriding that would lose the drawing.
 
 export const HIGHLIGHT_LAYER_ID = 'funnHighlightLayer';
 
@@ -33,8 +30,7 @@ const halo = (color: string, width: number) =>
     }),
   });
 
-// Selected reads louder than hovered — the pointer already tells you
-// where the hover is, the selection has to survive looking away.
+// Selected reads louder than hovered.
 const SELECTED_STYLE = halo('rgba(255, 106, 0, 0.9)', 10);
 const HOVERED_STYLE = halo('rgba(255, 106, 0, 0.45)', 8);
 
@@ -46,16 +42,13 @@ const getHighlightLayer = (map: Map): VectorLayer | null =>
     | VectorLayer
     | undefined) ?? null;
 
-// Mount from useMapSideEffects, next to useFunnLayer. Keeps the halo in
-// sync with the two pointer atoms; clears itself when neither is set.
+// Mount from useMapSideEffects, next to useFunnLayer.
 export const useFunnHighlightLayer = () => {
   const map = useAtomValue(mapAtom);
   const hovered = useAtomValue(hoveredFunnIdAtom);
   const selected = useAtomValue(selectedFunnIdAtom);
   // Not read, only depended on: `isFunnOnMap` answers off module state, and
   // this is what re-runs the effect when a switch in [Funn]'s pulldown moves.
-  // A halo is a pointer at a shape, so it has to go when the shape does — and
-  // come back when it does, since the selection survives being switched off.
   const switchedOff = useAtomValue(funnSwitchedOffAtom);
 
   useEffect(() => {

@@ -2,7 +2,7 @@
 //
 // A scene is the arrangement itself, kept as a bilde.
 //
-// One change: `kind` gains 'scene' (docs/lokalitet-view.md §13.7). Which
+// One change: `kind` gains 'scene'. Which
 // layers were on, in what order, at what opacity, over which ground — that is
 // a reading of the ground as much as any single extract is, and until now it
 // had nowhere to live: the only way to keep one was `Ta skjermbilde`, which

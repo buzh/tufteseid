@@ -9,17 +9,13 @@ import {
 import { IconButton, Segmented, type SegmentedOption, Tooltip } from '../ui';
 
 /**
- * Measure length or area. Inline in the ribbon rather than in a pulldown:
- * measuring is a mode you stay in while clicking around the map, and an
- * anchored panel would either close on the first click or sit on top of the
- * thing being measured. It also keeps the keyboard free — an open overlay
- * suspends the A/D/W/S/E cycling keys for as long as it is up.
+ * Measure length or area. Inline rather than in a pulldown: an anchored panel
+ * would close on the first map click, and an open overlay suspends the
+ * A/D/W/S/E cycling keys while it is up.
  *
- * measureEnabledEffect is mounted unconditionally. It already returns early
- * unless the measure tool is active, and leaving it mounted is what
- * guarantees the teardown branch runs at all: hosting it inside the panel
- * meant the effect could be unmounted before it observed the tool change,
- * leaving the OL interaction attached.
+ * `measureEnabledEffect` is mounted unconditionally so its teardown branch
+ * runs at all — unmounted with the panel, it never observes the tool change
+ * and leaves the OL interaction attached.
  */
 export const RibbonMeasure = () => {
   const { t } = useTranslation();

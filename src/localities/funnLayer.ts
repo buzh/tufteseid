@@ -21,22 +21,13 @@ import {
   selectedFunnIdAtom,
 } from './atoms';
 
-// Renders the funn of the OPEN lokalitet only, all of them in one style.
-//
-// Features used to carry their own colour, width and dash, round-tripped
-// through the geometry's properties by the OpenLayers pen. They do not any
-// more: a funn is geometry (§9.2) and the pen that makes it is the Excalidraw
-// surface, which keeps its own appearance in a sketch's scene rather than in
-// a find's coordinates. What a funn looks like on the map is therefore a
-// decision of this layer's, made once, which is also what makes twenty of
-// them read as one set.
+// The open lokalitet's funn, all in one style: a funn is geometry, and how it
+// looks is this layer's decision rather than the record's.
 export const FUNN_ID_PROPERTY = '__funnId';
 export const FUNN_LAYER_ID = 'funnLayer';
 
-// Cased, barely filled. The relief under a funn is the evidence for it, so
-// the shape marks the ground rather than covering it; the white underline is
-// what keeps an orange stroke readable on both dark hillshade and bright
-// ortofoto without having to shout.
+// Barely filled: the relief under a funn is the evidence for it. The white
+// casing keeps the orange readable on hillshade and ortofoto alike.
 const defaultFunnStyle = [
   new Style({
     stroke: new Stroke({ color: 'rgba(255, 255, 255, 0.9)', width: 5 }),
@@ -52,26 +43,14 @@ const defaultFunnStyle = [
   }),
 ];
 
-// A style with nothing in it draws nothing — how a funn is kept off the map
-// while the pen is holding its shapes, and how [Funn]'s per-member switches
-// take one off without taking anything else with it.
 const INVISIBLE = new Style(undefined);
 
-// The funn currently being drawn, if any. It has to stay hidden across
-// re-hydration, not just once: every autosaved geometry patch comes back as a
-// realtime update, which rebuilds the record's features from scratch and would
-// otherwise put the persisted copy back underneath the one under the pen.
+// The funn under the pen. Module level so it survives re-hydration: every
+// autosaved patch returns as a realtime update that rebuilds the features.
 let hiddenFunnId: string | null = null;
 
-// The funn switched off by hand in [Funn]'s pulldown (§13.10 step 4). Module
-// level beside `hiddenFunnId` and for its reason — a realtime update rebuilds
-// the features, and a switch the rebuild forgot would put a funn back on the
-// map that somebody had just taken off it.
-//
-// Two states, not one set: the pen's is a fact about a session and this is a
-// choice about a reading, and merging them would mean a resumed draft could
-// clear a switch, or a switch could out-live the pen. They are ORed here and
-// nowhere else.
+// Switched off by hand in `[Funn ▾]`. Kept separate from the pen's hide so a
+// resumed draft cannot clear a switch, nor a switch outlive the pen.
 let switchedOffFunnIds: ReadonlySet<string> = new Set<string>();
 
 const styleFor = (funnId: string) =>
@@ -79,18 +58,11 @@ const styleFor = (funnId: string) =>
     ? INVISIBLE
     : defaultFunnStyle;
 
-/** Whether this funn is on the map — for the halo, which clones its shape. */
+/** For the halo, which clones the shape. */
 export const isFunnOnMap = (funnId: string) =>
   funnId !== hiddenFunnId && !switchedOffFunnIds.has(funnId);
 
-/**
- * Declare the whole switched-off set — `useFunnVisibility` is the only caller.
- *
- * Restyling in place rather than reloading: the features, the two realtime
- * subscriptions and the selection are all things a switch is meant to leave
- * exactly as they were, which is the same argument the group's own eye makes
- * one level up.
- */
+/** Restyles in place, so features, subscriptions and selection survive. */
 export const setSwitchedOffFunn = (ids: ReadonlySet<string>) => {
   switchedOffFunnIds = ids;
   const source = getFunnLayer()?.getSource();
@@ -103,8 +75,7 @@ export const setSwitchedOffFunn = (ids: ReadonlySet<string>) => {
 
 const geoJson = new GeoJSON();
 
-// PB json fields arrive parsed in REST responses but have shipped as
-// strings over realtime SSE — cope with both.
+// PB json fields arrive parsed over REST but as strings over realtime SSE.
 const asFeatureCollection = (raw: unknown): FeatureCollection | null => {
   if (!raw) return null;
   if (typeof raw === 'string') {
@@ -174,9 +145,8 @@ export const removeFunnFromLayer = (id: string) => {
   if (source) removeById(source, id);
 };
 
-// Hide a funn while its geometry is being drawn on the draw layer, so the
-// persisted copy doesn't double-render underneath. Pass null to lift it, then
-// re-upsert the record to draw the version that was just saved.
+// Hide while the geometry is on the draw layer, so the persisted copy does not
+// double-render under it. Null lifts it; re-upsert to draw what was saved.
 export const hideFunnOnLayer = (id: string | null) => {
   hiddenFunnId = id;
   const source = getFunnLayer()?.getSource();
@@ -186,8 +156,7 @@ export const hideFunnOnLayer = (id: string | null) => {
   }
 };
 
-// Union extent of a funn's rendered features, in map coordinates — for
-// zoom-to-funn in the workspace. Null when nothing is on the layer.
+// Union extent in map coordinates, or null when nothing is on the layer.
 export const getFunnExtentOnLayer = (
   funnId: string,
 ): [number, number, number, number] | null => {
@@ -214,27 +183,13 @@ export const getFunnExtentOnLayer = (
   return extent as [number, number, number, number] | null;
 };
 
-/*
- * Re-hydrate the layer from the server, discarding whatever has been pushed
- * onto it by hand.
- *
- * The edit transaction (docs/lokalitet-view.md §5.6) is what needs this. The
- * layer follows the *server's* funn over realtime, and a buffered session
- * writes nothing — so the workspace pushes its buffered shapes on with
- * `upsertFunnOnLayer`, under temporary ids that will never match a record.
- * Committing turns them into real records with different ids, and cancelling
- * means the pushed shapes were never true; both end with a layer that has to
- * be told to forget what it is holding and ask again.
- *
- * A module-level hook rather than a returned callback, because the two
- * callers are inside `useLocalityWorkspace` and the layer is mounted from
- * `useMapSideEffects`, on the far side of the tree.
- */
+// Re-hydrate, discarding what was pushed on by hand: the edit transaction
+// buffers funn under temporary ids, and both committing and cancelling leave
+// shapes on the layer that are no longer true.
 let reloadFunnLayer: (() => void) | null = null;
 export const refreshFunnLayer = () => reloadFunnLayer?.();
 
-// Mount from useMapSideEffects. Follows the open lokalitet: hydrates its
-// funn, keeps them synced via realtime, empties when the workspace closes.
+// Mount from useMapSideEffects; follows the open lokalitet over realtime.
 export const useFunnLayer = () => {
   const map = useAtomValue(mapAtom);
   const activeLocality = useAtomValue(activeLocalityAtom);
@@ -262,9 +217,7 @@ export const useFunnLayer = () => {
     const projection = map.getView().getProjection().getCode();
     let cancelled = false;
 
-    // A sequence number rather than the `cancelled` flag alone: `refresh`
-    // can start a second load while the first is in flight, and the older
-    // response must not be allowed to add its features on top.
+    // `refresh` can start a second load while the first is still in flight.
     let seq = 0;
     const load = () => {
       const mine = ++seq;
@@ -315,19 +268,12 @@ const funnIdAtPixel = (map: Map, pixel: [number, number]): string | null => {
       }
       return undefined;
     },
-    // A drawn line is a couple of pixels wide; without slack the only way
-    // to hit one is to be exactly on it.
     { hitTolerance: 6 },
   );
   return hitId;
 };
 
-// The other half of the pointer link the list already had: hovering or
-// clicking a funn *on the map* selects it, so the map, the `Funn ▾` list and
-// the callout stay pointed at the same thing whichever one you touch.
-//
-// Mount from useMapSideEffects, next to useFunnLayer. Only the open
-// lokalitet's funn are on the layer, so this is inert without one.
+// Hover and click select, so the map, `[Funn ▾]` and the callout agree.
 export const useFunnPointer = () => {
   const map = useAtomValue(mapAtom);
   const activeLocality = useAtomValue(activeLocalityAtom);
@@ -341,15 +287,11 @@ export const useFunnPointer = () => {
     const onClick = (e: Event | BaseEvent) => {
       if (!(e instanceof MapBrowserEvent)) return;
       const id = funnIdAtPixel(map, e.pixel as [number, number]);
-      // Clicking past the funn is not "deselect": the click may well be
-      // aimed at the background, and losing the selection every time you
-      // pan-nudge the map would make the list's highlight useless.
+      // Clicking past a funn is not "deselect".
       if (id) setSelected(id);
     };
 
-    // Written through a local rather than read back off the store: this
-    // fires on every mouse move over the map, and only the transitions
-    // are worth a jotai write.
+    // A local rather than the store: only the transitions are worth a write.
     let last: string | null = null;
     const onMove = (e: Event | BaseEvent) => {
       if (!(e instanceof MapBrowserEvent) || e.dragging) return;

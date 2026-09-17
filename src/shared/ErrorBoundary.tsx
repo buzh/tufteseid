@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next';
 import styles from './ErrorBoundary.module.css';
 
 interface ErrorBoundaryProps {
-  // Omit for the default chip. Pass `null` for a subtree that should just
-  // disappear (a decoration whose absence says everything).
+  // Omit for the default chip; `null` for a subtree that should vanish.
   fallback?: React.ReactNode;
   children: React.ReactNode | React.ReactNode[];
   onError?: () => void;
@@ -15,11 +14,8 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// Small, in-flow, and dismissible. Every call site used to pass
-// `fallback={undefined}`, so a crash anywhere made that subtree vanish
-// silently and permanently — no message, and no way back short of a
-// reload. Retry is worth having because most of what these boundaries wrap
-// is a panel over a map that is still perfectly usable underneath.
+// Small, in-flow and dismissible, with a retry: what these boundaries wrap
+// is usually a panel over a map that is still usable underneath.
 const DefaultFallback = ({
   name,
   onRetry,

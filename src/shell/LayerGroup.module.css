@@ -1,13 +1,5 @@
-/*
- * A layer group on the lokalitet row: a labelled half that takes the group off
- * the map, and a caret welded to its right edge that opens the members.
- *
- * The seam is `EyeSplit`'s — no gap, a hairline between the halves, the right
- * half stretching to whatever height the ModeButton decides on — and it is
- * copied rather than imported because the two differ in polarity and in what
- * the right half is for. See the note in LayerGroup.tsx: step 4 is where that
- * duplication is either justified or removed.
- */
+/* Seam geometry copied from `EyeSplit` rather than imported: the two differ
+   in polarity. */
 
 .group {
   display: inline-flex;
@@ -38,9 +30,6 @@
   outline-offset: 1px;
 }
 
-/* Open is engaged, which is the ribbon's one colour for it — the same reading
-   a ModeButton's `active` gets. Unlike the eye beside `Funn`, this segment
-   says nothing about the map, so there is no polarity to protect here. */
 .caretOpen {
   background: var(--c-accent-subtle);
   color: var(--c-accent);
@@ -55,10 +44,7 @@
   overflow-y: auto;
 }
 
-/* The funn a run of members belongs to (§13.6). Sticky, because the list
-   scrolls and a heading that has left the top of the panel takes the answer to
-   "whose layer is this" with it. Not a `Menu` title: that one names the panel,
-   and there is at most one of those. */
+/* Sticky: the list scrolls and the heading answers "whose layer is this". */
 .section {
   position: sticky;
   top: 0;
@@ -71,9 +57,7 @@
   color: var(--c-fg-muted);
 }
 
-/* A member is two rows that belong together, so the block gets the hover
-   rather than the switch inside it: reaching for the slider must not make the
-   thing above it look like what you are about to press. */
+/* Hover on the block: a member is two rows that belong together. */
 .member {
   padding-bottom: var(--sp-1);
 }
@@ -82,10 +66,7 @@
   background: var(--c-bg-hover);
 }
 
-/* `[Visning ▾]`: one member at a time, so the row marks itself the way every
-   dataset pulldown in the ribbon does — Pulldown.module.css's `.itemActive`,
-   copied for the same reason the seam geometry above is. The gutter is on
-   every row of the group, selected or not, or choosing one would shunt the
+/* The gutter is on every row, selected or not, or choosing one shunts the
    list sideways by three pixels. */
 .selectable {
   border-left: 3px solid transparent;
@@ -104,24 +85,18 @@
   font-weight: 600;
 }
 
-/* The row's top line. A flex container rather than the button alone because
-   the label has to truncate against the row's own right edge — which is what
-   `min-width: 0` on `.switch` below is for. */
 .head {
   display: flex;
   align-items: center;
 }
 
-/* Pulldown.module.css's `.item` geometry, so a member row lines up with every
-   other list in the ribbon. */
+/* Pulldown.module.css's `.item` geometry, so the lists line up. */
 .switch {
   display: flex;
   align-items: center;
   gap: var(--sp-4);
   width: 100%;
-  /* So it can give way to the action beside it in `.head` — without this the
-     switch's content width is its floor and a long label pushes the verb off
-     the row. */
+  /* Or a long label widens the row instead of truncating. */
   min-width: 0;
   padding: var(--sp-3) var(--sp-4);
   border: 0;
@@ -151,9 +126,6 @@
   color: var(--c-fg);
 }
 
-/* Its own line rather than beside the label: this is the provenance (§13.4)
-   and it is a sentence's worth of dataset, acquisition and knobs, which
-   `nowrap` beside a truncating label would hide exactly when it matters. */
 .memberMeta {
   display: block;
   overflow: hidden;
@@ -163,10 +135,6 @@
   color: var(--c-fg-subtle);
 }
 
-/* The same line as the warning below, in the subtle colour rather than the
-   danger one: an assumed extent is a qualification, not a fault, and printing
-   it in red would tell the reader something is wrong with an image that is
-   doing exactly what they asked. */
 .memberNote {
   display: flex;
   align-items: center;
@@ -175,9 +143,6 @@
   color: var(--c-fg-subtle);
 }
 
-/* Under the label like the meta line, and wrapping rather than truncating: a
-   switch that is on over a layer that is not there is the row's one piece of
-   bad news and the sentence is short. */
 .memberWarning {
   display: flex;
   align-items: center;
@@ -186,8 +151,6 @@
   color: var(--c-danger);
 }
 
-/* Indented to under the label, so the fade reads as belonging to the row above
-   it rather than as a fifth member of the list. */
 .fade {
   display: flex;
   align-items: center;
@@ -197,8 +160,7 @@
   color: var(--c-fg-subtle);
 }
 
-/* No checkbox to clear in `select` mode, so the indent is the row's padding
-   alone — the slider still starts under the label. */
+/* No checkbox to clear in `select` mode. */
 .selectable .fade {
   padding-left: var(--sp-4);
 }

@@ -14,41 +14,20 @@ import {
 } from './useLocalityWorkspace';
 
 /**
- * The workspace's modals, kept out of the ribbon rows.
- *
- * None of them is anchored to a control, and all are driven by controller
- * state rather than by whoever pressed the button — the flyfoto notice hands
- * off to the acquisition list. Mounting them next to the trigger would tie
- * their lifetime to whichever row happens to be on screen.
- *
- * Two of them are the selection dialogs behind `Hent ▾` (§4.3). Both survived
- * the picker unchanged in what they *ask*; what changed is what happens after:
- * they hand a list of proposals to a picker run instead of saving anything.
- *
- * Detaljer is the newest and the odd one out — it *is* anchored to a control,
- * the `⋮` menu on the lokalitet row, and it is driven by an atom rather than
- * by the controller for exactly that reason. It is here anyway because a
- * dialog raised from inside a popover would die with the popover.
- *
- * The copy prompt is here for the Detaljer reason rather than the flyfoto
- * one: it is raised from the lokalitet row, and the row it is raised from is
- * about to be replaced by the copy's.
- *
- * Grow-to-fit used to be one of these, raised from inside the funn save path.
- * It is an inline warning on the draft row now: drawing past the edge of the
- * rectangle is worth remarking on, but not worth stopping the pen for.
+ * The workspace's modals, mounted here rather than next to their triggers so
+ * their lifetime is not tied to whichever row or popover is on screen. Detaljer
+ * is driven by an atom because its trigger is inside a popover; the rest run
+ * off controller state.
  */
 export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { t } = useTranslation();
   const [detailsOpen, setDetailsOpen] = useAtom(localityDetailsOpenAtom);
   // Which acquisitions are checked. `NIB_MOSAIC_KEY` stands for the seamless
-  // one, which is not a project and has no id of its own.
+  // mosaic, which is not a project and has no id of its own.
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const { flyfotoPicker, flyfotoProjects } = ws;
 
-  // A closed dialog remembers nothing: reopening it is a new question, and a
-  // list still checked from last time is how you grab eight photographs you
-  // meant to grab once.
+  // A closed dialog remembers nothing: reopening it is a new question.
   useEffect(() => {
     if (!flyfotoPicker) setPicked(new Set());
   }, [flyfotoPicker]);
@@ -65,9 +44,7 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const check = (key: string) => ({
     type: 'checkbox' as const,
     checked: picked.has(key),
-    // The cap is enforced on the way in rather than by silently truncating
-    // the run: a checkbox you ticked that turns out not to count is worse
-    // than one you could not tick.
+    // The cap is enforced on the way in rather than by truncating the run.
     disabled: atCap && !picked.has(key),
     onChange: () => toggle(key),
   });
@@ -81,8 +58,7 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   };
 
   const startRun = () => {
-    // The order the list is in — newest first, the mosaic ahead of it. The
-    // rail should walk the way the author read it.
+    // The order the list is in: newest first, the mosaic ahead of it.
     const chosen: (FlyfotoProject | null)[] = picked.has(NIB_MOSAIC_KEY)
       ? [null]
       : [];
@@ -96,18 +72,9 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
     <>
       <LidarExtractDialog ws={ws} />
 
-      {/* Beskrivelse, sted, kommune, matrikkel, synlighet — the lokalitet's
-          own fields, which used to be the section at the bottom of the dock
-          (§6). A dialog because it is the one part of a lokalitet you fill in
-          once and then stop looking at, and because the fields are a form:
-          they need width and a body, and neither fits on a ribbon row.
-
-          No footer, and since §5.6 that is load-bearing rather than merely
-          tidy: every field in it commits to the draft on blur, and the only
-          `Lagre` there is lives on the row behind this dialog. A second one
-          here would be a competing promise about when the change lands — and
-          the honest answer, "when you save the lokalitet", is not something a
-          button inside a sub-dialog can say. */}
+      {/* No footer, deliberately: every field commits to the draft on blur,
+          and the only `Lagre` is on the row behind this dialog. A second one
+          here would be a competing promise about when the change lands. */}
       <Dialog
         open={detailsOpen}
         onOpenChange={setDetailsOpen}
@@ -121,15 +88,9 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         />
       </Dialog>
 
-      {/* `Lag min kopi` (docs/lokalitet-view.md §7). One prompt, and its body
-          is the whole of §7's line about what does and does not come along:
-          the rectangle, the details, the funn and every image the app can
-          make again; not the screenshots and not the uploads.
-
-          Said before rather than reported after, because the split is not an
-          implementation detail the copier can be told about later — the one
-          photograph they wanted may be the one that stayed behind, and `Ta
-          med` on the copy's own carousel is the answer to that. */}
+      {/* `Lag min kopi`. The body says what comes along — the rectangle, the
+          details, the funn and every image the app can make again — and what
+          does not: the screenshots and the uploads. */}
       <Dialog
         open={ws.copyPrompt}
         onOpenChange={(next) => !next && ws.closeCopyPrompt()}
@@ -154,11 +115,9 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         <p className={styles.text}>{t('localities.copy.body')}</p>
       </Dialog>
 
-      {/* Licensing notice shown before every flyfoto grab: NiB imagery is
-          free for private use, but publishing or commercial use is the
-          user's own responsibility. Only the acquisition list waits behind
-          it — the starter set no longer fetches ortofoto, so nobody is asked
-          to accept NiB's terms who has not asked for a photograph. */}
+      {/* Licensing notice before every flyfoto grab: NiB imagery is free for
+          private use, publishing and commercial use are the user's own
+          responsibility. Only the acquisition list waits behind it. */}
       <Dialog
         open={ws.flyfotoNotice}
         onOpenChange={(next) => !next && ws.closeFlyfotoNotice()}
@@ -182,12 +141,9 @@ export const LocalityDialogs = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         <p className={styles.text}>{t('localities.tools.flyfotoNotice')}</p>
       </Dialog>
 
-      {/* The acquisition list. NiB keeps every ortofoto project flown over an
-          area back to the 1930s, so the same ground can be read as a temporal
-          stack rather than only as today's best mosaic — which is exactly the
-          "give me several of these at once so I can compare" question the
-          picker exists to answer. Checking is choosing what to be shown; only
-          `Behold` on a card writes anything. */}
+      {/* The acquisition list: every ortofoto project NiB has flown over this
+          area, back to the 1930s. Checking chooses what to be shown; only
+          `Behold` on a card writes. */}
       <Dialog
         open={ws.flyfotoPicker}
         onOpenChange={(next) => !next && ws.closeFlyfotoPicker()}

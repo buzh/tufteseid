@@ -1,35 +1,7 @@
-// The starter set — the images worth having before you start reading a
-// rectangle, produced without asking which.
-//
-// A lokalitet is made in one press from the visible map, and what you want
-// next is always the same thing: the laser, read three ways. Picking each of
-// those by hand is a dialog and half a dozen decisions the register can make
-// better than the user can — which LiDAR project covers here at the finest
-// point density, and which styled variants it actually publishes.
-//
-// Three styles, one service, one fetch path: `skyggerelieff` (the fixed
-// north-west hillshade every source advertises), `multiskyggerelieff` (every
-// direction at once, so nothing hides along the sun) and `helning_prosent`
-// (slope, which shows edges the light misses). They are Kartverket's own
-// pre-baked renders, so nothing here has settings a user did not choose and
-// cannot check — see docs/lokalitet-view.md §4.3 for why the terrain render
-// and the flyfoto left this set.
-//
-// Since the View/File split (docs/ui-architecture.md §8.7.4) the set itself
-// fetches nothing: `planStarterPack` resolves the dataset and the style list,
-// `saveExtractSpec` in useLocalityWorkspace writes one spec per style, and the
-// pin queue renders them afterwards. So the two halves of this module are now
-// at opposite ends of that: the plan, up front, and `extractLidarFigure`, the
-// renderer the queue calls.
-//
-// `extractLidarFigure` is the general one-styled-view-of-the-rectangle call
-// and is not the starter set's alone: a `Behold` over the LiDAR ground pins
-// through exactly the same function, so the provenance figure and the recorded
-// meta have one place to go wrong.
-//
-// Every image goes out as a provenance figure (src/figure), same as when it
-// is produced by hand: an image nobody chose the settings for is exactly the
-// one whose settings have to be written on it.
+// The starter set: the best LiDAR dataset over a new rectangle, read three
+// ways, without being asked. `planStarterPack` resolves dataset and styles up
+// front; `extractLidarFigure` is what the pin queue calls afterwards, and
+// `Behold` over the LiDAR ground goes through it too.
 
 import type { LocalityBbox } from '../api/localities';
 import { type ImageRect, renderFigureBlob } from '../figure/figure';
@@ -41,13 +13,7 @@ import {
 } from '../lidarExtract/sources';
 import { TIER_A_STYLES } from '../map/layers/config/backgroundLayers/lidarProjects';
 
-/**
- * The three styles, in the order they are fetched and shown.
- *
- * The same three the style pulldown puts first, and for the same reason:
- * they are the most diagnostic variants for reading archaeology in terrain.
- * One list, so the starter set and the ring can never drift apart.
- */
+// The same list the style pulldown puts first, so the two cannot drift apart.
 const STARTER_STYLES = TIER_A_STYLES;
 
 /** What a stitched view hands back, so every caller has one save path. */
@@ -57,19 +23,17 @@ export type ExtractRaster = {
   sourceKey: string;
   /** Names the service in the Bilde's meta line. */
   sourceLabel: string;
-  /** The styled variant, in the `meta.style` slot an extract already uses. */
+  /** In the `meta.style` slot an extract already uses. */
   style: string;
-  /** DTM or DOM. Implicit in the extract path today; recorded anyway. */
   model: string;
-  /** Of the pixels that were actually written — see `renderFigureBlob`. */
+  /** Of the pixels actually written, which may be fewer than asked for. */
   metresPerPx: number;
   bbox25833: [number, number, number, number];
-  /** Where the image sits inside the figure — the caption is below it. */
+  /** Where the image sits inside the figure; the caption is below it. */
   imageRect: ImageRect;
 };
 
 export type ExtractOptions = {
-  /** The lokalitet's name, for the figure's title line. */
   subject?: string;
   /** Threaded into the stitch, so a caller with a deadline can stop it. */
   signal?: AbortSignal;
@@ -78,46 +42,27 @@ export type ExtractOptions = {
 /** One dataset and the styles the set will actually ask it for. */
 export type StarterPlan = { source: LidarSource; styles: string[] };
 
-/**
- * The best LiDAR source over this rectangle: the densest, newest per-project
- * acquisition covering it, or the national 1 m mosaic when none does.
- *
- * `enumerateLidarSources` returns the national mosaic first and the projects
- * after it already sorted by relevance, so this is "the second one, if there
- * is one".
- */
+// `enumerateLidarSources` returns the national mosaic first and the projects
+// after it already sorted, so the densest one is "the second, if any".
 const bestLidarSource = (sources: LidarSource[]): LidarSource | null => {
   const project = sources.find((s) => s.kind === 'project');
   return project ?? sources[0] ?? null;
 };
 
 /**
- * Which dataset the set comes from, and how many images it will be.
- *
- * Resolved once and handed to every `extractLidarFigure` call, so three images
- * cost one catalogue lookup and are guaranteed to be three readings of the
- * *same* acquisition — which is the only way flipping between them means
- * anything.
- *
- * The styles are filtered against what the chosen source publishes, and that
- * filter is load-bearing rather than defensive: **the national mosaic
- * publishes only `skyggerelieff`**, and asking it for a per-project style
- * does not fail loudly — it answers HTTP 200, `Content-Type: image/png`,
- * with a ~100 byte JSON error body that the browser decodes as a broken
- * image. So where no project covers the rectangle the starter set is one
- * image, not three silent failures.
+ * Resolved once, so the three images are readings of the same acquisition.
+ * Filtering the styles against what the source publishes is required, not
+ * defensive: the national mosaic publishes only `skyggerelieff` and answers a
+ * per-project style with a 200 whose PNG is a JSON error body.
  */
 export const planStarterPack = async (
   bbox4326: LocalityBbox,
 ): Promise<StarterPlan | null> => {
-  // DTM, always. Two of the three styles are DTM-only, and the starter set is
-  // what a lokalitet gets before anybody has expressed a preference — reading
-  // the bare ground is the one that answers the archaeological question.
+  // DTM: two of the three styles are DTM-only.
   const source = bestLidarSource(await enumerateLidarSources(bbox4326, 'dtm'));
   if (!source) return null;
   const styles = STARTER_STYLES.filter((s) => source.styles.includes(s));
-  // A dataset that publishes none of the three is not one we have seen, but
-  // it would produce an empty pack rather than an honest one image.
+  // A source publishing none of the three would otherwise give an empty pack.
   if (styles.length === 0) {
     const fallback = source.styles[0];
     if (!fallback) return null;
@@ -157,9 +102,8 @@ export const extractLidarFigure = async (
     sourceLabel: source.label,
     style,
     model: source.model,
-    // The figure's, not the stitch's: a rectangle large enough to bust the
-    // store is written at whatever resolution did fit, and the caption already
-    // says so.
+    // The figure's, not the stitch's: an oversized rectangle is written at
+    // whatever resolution fit.
     metresPerPx: figure.metresPerPx,
     bbox25833: result.bbox25833,
   };

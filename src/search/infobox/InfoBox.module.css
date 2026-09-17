@@ -1,8 +1,4 @@
-/*
- * The infobox and everything in it — one module for the eight files under
- * infobox/, on the same reasoning as the results panel: it is a single
- * surface, and the property table has no life outside the panel it sits in.
- */
+/* One module for every file under infobox/: it is a single surface. */
 .panel {
   display: flex;
   flex-direction: column;

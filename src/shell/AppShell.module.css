@@ -1,12 +1,7 @@
 /*
- * The map is the window; the chrome floats over it.
- *
- * No ResizeObserver and no measured CSS variable for the ribbon's height:
- * .overlay is an ordinary flow column that *contains* the ribbon, so the
- * ribbon's natural height pushes the slots below it down with zero JS.
- * Growing a ribbon row therefore costs nothing and — because the OL canvas
- * never resizes — provokes no new GetMap requests, which matters against
- * Kartverket's per-IP rate limit (docs/wms-proxy-and-tiles.md).
+ * The map is the window; the chrome floats over it. `.overlay` is a flow
+ * column containing the ribbon, so a taller ribbon pushes the slots down
+ * without resizing the OL canvas — no new GetMap requests.
  */
 
 .shell {
@@ -17,23 +12,16 @@
   background: var(--c-gray-200);
 }
 
-/*
- * The OL target element's wrapper. Must stay a sibling of .overlay, never
- * its parent: F11 calls requestFullscreen() on the map target, and
- * parenting the chrome inside it would drag the chrome into fullscreen.
- */
+/* The OL target's wrapper. Must stay a sibling of .overlay, never its parent:
+ * F11 calls requestFullscreen() on the map target. */
 .map {
   position: absolute;
   inset: 0;
   z-index: var(--z-map);
 }
 
-/*
- * pointer-events is load-bearing all the way down this tree. Every element
- * here spans the whole viewport, so a single stray `auto` on a container
- * stops the map being panned anywhere at all. Only leaf surfaces — the
- * ribbon itself and the individual cards — turn it back on.
- */
+/* Every element here spans the viewport, so one stray `pointer-events: auto`
+ * on a container stops the map being panned. Only leaf surfaces turn it on. */
 .overlay {
   position: absolute;
   inset: 0;
@@ -50,12 +38,8 @@
   pointer-events: auto;
 }
 
-/*
- * Everything under the ribbon. The slots inside are absolutely positioned
- * rather than laid out as flex children so that they may overlap — on a
- * phone the left slot is full width and the infobox sits on top of it,
- * which two flex items competing for the same row cannot do.
- */
+/* The slots inside are absolute rather than flex children so they may
+ * overlap: on a phone the infobox sits on top of the left slot. */
 .row {
   position: relative;
   flex: 1;
@@ -63,12 +47,7 @@
   pointer-events: none;
 }
 
-/*
- * Left slot: the search box and the MapTool cards. top/bottom give it a
- * definite height, which is what replaced the old `calc(100vh - 65px)`
- * guesses at the header height inside the cards — they can now just say
- * 100%.
- */
+/* top/bottom give a definite height, so the cards inside can say 100%. */
 .left {
   position: absolute;
   top: 0;
@@ -93,22 +72,13 @@
   }
 }
 
-/*
- * Right slot: the search-result infobox, and only that.
- *
- * It was a dock column — infobox on top, whichever dock was live under it —
- * and both docks have since gone (docs/lokalitet-view.md §6). What is left is
- * a card that sizes itself (`max-height: 52vh`), so the slot no longer needs
- * `bottom: 0` to give it a height to resolve against, and no longer needs a
- * phone breakpoint: there is nothing here that ever became a bottom sheet.
- */
+/* The infobox sizes itself, so no `bottom: 0` and no phone breakpoint. */
 .right {
   position: absolute;
   top: 0;
   right: 0;
   display: flex;
   flex-direction: column;
-  /* The infobox keeps its own width and sits against the right edge. */
   align-items: flex-end;
   gap: var(--sp-4);
   width: 100%;
@@ -116,7 +86,6 @@
   pointer-events: none;
 }
 
-/* Phone: tighter gutters, like every other slot at this width. */
 @media (max-width: 47.999rem) {
   .right {
     padding: var(--sp-5) var(--sp-3) var(--sp-3);
@@ -135,19 +104,8 @@
   }
 }
 
-/*
- * Bottom slot: the lokalitet's bottom edge (docs/lokalitet-view.md §4.3).
- *
- * In flow, not absolutely positioned. As the last flex child of `.overlay` it
- * takes its height out of `.row`, the same way the ribbon takes its own out
- * of the top — so the left and right slots simply end where the strip begins,
- * and neither knows the other exists. Floating it over `.row` instead would
- * mean every card in those slots had to be told how tall this one is.
- *
- * Empty and zero-height until something portals in, so it costs nothing when
- * no lokalitet is open. `pointer-events` stays off here and is turned back on
- * by the occupant, per the rule at the top of this file.
- */
+/* The lokalitet's bottom edge. In flow, so it takes its height out of `.row`
+ * and the side slots end where it begins without being told how tall it is. */
 .bottom {
   position: relative;
   z-index: var(--z-ribbon);
@@ -155,18 +113,8 @@
   pointer-events: none;
 }
 
-/*
- * While a funn is being drawn, the two slots get out of the way.
- *
- * The drawing surface is the whole of `.row` and it is *registered to the
- * ground underneath it* (src/funn/frame.ts), so a search card floating over
- * it is both in the way of the pen and covering the terrain being traced.
- *
- * `visibility` rather than unmounting: it takes the slots out of hit-testing
- * too, so this is one property rather than two, and the components keep their
- * state — a search result you had open is still open when the pen comes back
- * up, which it would not be if the subtree had been thrown away and remade.
- */
+/* The side slots out of the way while a funn is drawn. `visibility` rather
+ * than unmounting, so hit-testing goes with it and the state survives. */
 .standDown {
   visibility: hidden;
 }

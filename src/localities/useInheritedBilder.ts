@@ -1,34 +1,8 @@
-/*
- * The Files a copy did not carry (docs/lokalitet-view.md §7).
- *
- * `copyLocality` brings the Views over as specs and leaves the screenshots and
- * uploads where they are, because a File is bytes and duplicating twenty
- * megabytes per image through the client turns a fork into a multi-minute
- * upload. The parent link is the answer instead: the copy *shows* the
- * original's Files, marked as borrowed, and `Ta med` copies one across when
- * somebody actually wants it. Elective, per image, paid for by whoever asked.
- *
- * Three decisions worth stating, because none of them is in the doc:
- *
- * - **The cards are owner-in-edit only** (`enabled` is the workspace's
- *   `canAdd`). The only verb a borrowed card has is `Ta med`, and `Ta med` is
- *   a write — so in show the whole tail would be cards you can look at and not
- *   act on, which is the opposite of what §2 means by the write verbs being
- *   *absent* rather than greyed. A reader has even less use for them. The
- *   *question* "is the original still there" is asked in both stances, though:
- *   the banner offers `Åpne originalen` in show too, and offering a link that
- *   is known to be dead is worse than not offering it.
- * - **Sourced live, not stubbed.** There is no per-file row in the copy, only
- *   the one `derivedFrom` relation, so a parent that has been deleted or
- *   turned private yields no cards at all rather than broken ones. §7 asks for
- *   a *"Bildet er ikke lenger tilgjengelig"* on the individual card; with
- *   nothing stored per file there is no card to put it on, so the sentence
- *   moves to the banner, said once about the lokalitet.
- * - **Unpinned parents are skipped.** A View whose figure was never rendered
- *   is not offered here — it is not a File, and the copy already has its spec.
- *   `isPinned` also keeps a genuinely fileless row out of a card whose only
- *   verb would be to download nothing.
- */
+// The original's Files, which `copyLocality` leaves behind. Read live off
+// `derivedFrom` — nothing per file is stored in the copy — so an unreadable
+// parent yields no cards and one banner. The cards are owner-in-edit only,
+// `Ta med` being their one verb, but the availability check runs in both
+// stances, because the banner's `Åpne originalen` does.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -38,11 +12,7 @@ import {
 import { getLocality, type LocalityRecord } from '../api/localities';
 import { isPinned, viewSpecOf } from './viewSpec';
 
-/**
- * Which parent File a copied one came from. Lives in `meta` rather than in a
- * column of its own for the same reason `renderedAt` does: provenance already
- * has a home there, and this needs no schema change.
- */
+/** Which parent File a copied one came from; in `meta`, no schema change. */
 const takenFromOf = (rec: AttachmentRecord): string | null => {
   const v = rec.meta?.takenFrom;
   return typeof v === 'string' && v !== '' ? v : null;
@@ -63,10 +33,7 @@ export const useInheritedBilder = (
   const parentId = locality.derivedFrom || null;
   const [parentFiles, setParentFiles] = useState<AttachmentRecord[]>([]);
   const [unavailable, setUnavailable] = useState(false);
-  // Same guard as `useLocalityContent`: a late response must not overwrite a
-  // newer one. Cheaper here — this list is fetched once per lokalitet rather
-  // than on every realtime event — but the parent can change under a swap
-  // between two copies without the component unmounting.
+  // The parent can change under a swap between two copies, without unmount.
   const seq = useRef(0);
 
   useEffect(() => {
@@ -75,12 +42,8 @@ export const useInheritedBilder = (
     setUnavailable(false);
     if (!parentId) return;
     void (async () => {
-      // Two requests rather than one, and the first is asked even in show:
-      // a parent that has been deleted or unshared does not make the
-      // attachment list *fail*, the read rule just filters every row out,
-      // which is indistinguishable from an original that had no Files.
-      // Whether the record itself still resolves is the question the banner
-      // has, so it is the one asked, and it is asked in both stances.
+      // Asked separately: an unreadable parent does not fail the attachment
+      // list, the read rule just filters every row out.
       try {
         await getLocality(parentId);
       } catch (e) {
@@ -93,6 +56,7 @@ export const useInheritedBilder = (
       try {
         const rows = await listLocalityAttachments(parentId);
         if (seq.current !== mine) return;
+        // Files only, and pinned: the copy already carries every spec.
         setParentFiles(
           rows.filter((rec) => viewSpecOf(rec) == null && isPinned(rec)),
         );

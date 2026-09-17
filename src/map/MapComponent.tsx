@@ -18,10 +18,9 @@ export const MapComponent = () => {
   useAtom(themeLayerEffect);
   useAtom(trackPostitionAtomEffect);
   useAtom(backgroundLayerAtomEffect);
-  // The compare curtain's B stack. Separate from the background effect
-  // above and deliberately so: it resolves through the same rules
-  // (resolveStack) but installs into its own `cmp.` namespace, which the
-  // background swap must never sweep.
+  // The compare curtain's B stack: same resolveStack rules as the background
+  // effect above, but into its own `cmp.` namespace, which the background
+  // swap does not sweep.
   useAtom(compareLayerAtomEffect);
 
   useEffect(() => {

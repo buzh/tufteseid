@@ -1,33 +1,7 @@
-/*
- * Drag a frame along the bilder rail to its place in the exhibit (§4.4).
- *
- * Hand-rolled pointer handling rather than a drag library, for the reason
- * everything else here is hand-rolled: the workstation cannot regenerate
- * `package-lock.json`, so a new dependency is not available at any price. It
- * is about eighty lines, which is cheaper than the argument would be.
- *
- * Four decisions worth knowing before changing it:
- *
- * - **Mouse and pen only.** A touch pointer is left alone so the rail keeps
- *   its native horizontal scroll — on a phone the whole rail is two frames
- *   wide, and stealing the scroll gesture to reorder would make a long
- *   exhibit unreachable. Touch reorders with the ←/→ buttons in the verb row,
- *   which are also the keyboard path and are not going away.
- * - **A drag starts at 4 px, not at pointerdown.** Clicking a frame selects
- *   it, and that has to keep working; below the threshold nothing has
- *   happened yet. Past it, the click that pointerup would otherwise produce
- *   is swallowed — `consumeClick` — because ending a drag on top of a frame
- *   is not a request to select that frame.
- * - **Pointer capture, so there are no window listeners.** The frame that
- *   went down keeps receiving the move and up events even when the pointer
- *   leaves it, which is the whole reason the handlers can live on the element
- *   in JSX instead of being attached and torn down against `window`.
- * - **Indices are in *rest* space.** `reorderBilde(id, to)` splices the
- *   dragged record into the list with itself already removed, so `to` counts
- *   gaps in that shorter list. Computing it against the frames still on
- *   screen — which is exactly the list without the dragged one — means the
- *   two agree without an off-by-one correction anywhere.
- */
+// Drag a frame along the rail to its place in the exhibit. Touch pointers are
+// left alone so the rail keeps its native scroll (touch reorders with ←/→);
+// pointer capture is what keeps the handlers off `window`; and the index handed
+// to `reorderBilde` is a gap in the list with the dragged record removed.
 
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -35,10 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 // Far enough that a click with a shaky hand is still a click.
 const THRESHOLD_PX = 4;
 
-// Dragging towards the end of a rail longer than the surface: how close to
-// the edge starts scrolling, and by how much per move event. Per *event*
-// rather than per frame, so there is no animation loop to cancel — hold still
-// at the edge and it stops, which is a fair reading of holding still.
+// Edge scrolling, per move event rather than per frame: no loop to cancel.
 const EDGE_PX = 44;
 const EDGE_STEP_PX = 24;
 
@@ -47,7 +18,7 @@ export type RailReorder = {
   dragId: string | null;
   /** Gap index in the list *without* `dragId`, or null while not dragging. */
   insertAt: number | null;
-  /** Every frame reports its element here, so the drop gap can be measured. */
+  /** Every frame reports its element, so the drop gap can be measured. */
   register: (id: string, el: HTMLElement | null) => void;
   onPointerDown: (e: ReactPointerEvent<HTMLElement>, id: string) => void;
   onPointerMove: (e: ReactPointerEvent<HTMLElement>) => void;
@@ -57,15 +28,8 @@ export type RailReorder = {
   consumeClick: () => boolean;
 };
 
-/**
- * @param ids   the reorderable frames, in display order. The borrowed tail is
- *              not among them (§7) — those records are not in this lokalitet,
- *              so there is no position in its exhibit to move them to.
- * @param railRef the scrolling container, for edge scrolling.
- * @param onReorder null in show, where nothing writes (§2). With no handler
- *              the hook still renders its no-op props, so the caller does not
- *              have to branch on the stance twice.
- */
+/** `ids` is the reorderable frames in display order, without the borrowed
+ * tail. `onReorder` is null in show, but the props come back either way. */
 export const useRailReorder = (
   ids: string[],
   railRef: RefObject<HTMLElement | null>,
@@ -80,9 +44,7 @@ export const useRailReorder = (
   );
   const blockClick = useRef(false);
 
-  // Read inside pointer handlers, which are recreated on every render anyway
-  // — but the *drag in progress* must see the current order, not the one that
-  // was current when the pointer went down.
+  // A drag in progress must see the current order, not the pointerdown one.
   const idsRef = useRef(ids);
   idsRef.current = ids;
   const insertRef = useRef<number | null>(null);
@@ -99,8 +61,7 @@ export const useRailReorder = (
     setInsertAt(null);
   }, []);
 
-  // Escape gets you out with the exhibit untouched, like every other
-  // in-progress gesture in the app.
+  // Escape leaves the exhibit untouched.
   useEffect(() => {
     if (!dragId) return;
     const onKey = (e: KeyboardEvent) => {
@@ -168,8 +129,6 @@ export const useRailReorder = (
       const at = insertRef.current;
       if (d.active) {
         blockClick.current = true;
-        // `reorderBilde` returns on a no-op move, so landing where it started
-        // costs nothing and needs no check here.
         if (at != null && onReorder) onReorder(d.id, at);
       }
       stop();

@@ -1,9 +1,4 @@
-/*
- * The results panel and everything in it. One module for the six components
- * under results/ rather than six files: they are a single visual surface,
- * and splitting the list row away from the list it lives in would only mean
- * reading two files to change one row.
- */
+/* One module for every component under results/: a single visual surface. */
 .panel {
   display: flex;
   flex-direction: column;
@@ -50,12 +45,9 @@
   border-top: 1px solid var(--c-border);
 }
 
-/*
- * The row's own hit target is a button rather than a click handler on the
- * <li>, so it is reachable by keyboard. The house-number control in the road
- * results is a sibling, not a child, which is also why it no longer needs to
- * stop propagation.
- */
+/* The row's hit target is a button, not a handler on the <li>, so it is
+   reachable by keyboard; the road results' house-number control is a
+   sibling of it rather than a child. */
 .lineMain {
   display: flex;
   flex-direction: column;

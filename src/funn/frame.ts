@@ -2,27 +2,12 @@ import Map from 'ol/Map';
 import { getPointResolution, transformExtent } from 'ol/proj';
 import type { LocalityBbox } from '../api/localities';
 
-/*
- * The one transform between an Excalidraw scene and the ground.
- *
- * Drawing a funn freezes the map: the view stops moving, and Excalidraw draws
- * over it on a transparent canvas in its own scene coordinates. A frame is
- * what makes those coordinates mean something — it is captured once when the
- * pen goes down and never changes while it is down, which is the whole reason
- * this can be four numbers and a size rather than a live projection.
- *
- * Scene units are the **CSS pixels of the frozen viewport**, origin top-left,
- * y downwards — so a scene coordinate is a pixel of the view the user was
- * looking at when they started, and the map element can be transformed to
- * follow the scene rather than the other way round (`session.ts`).
- *
- * The extent is stored in the **view projection at freeze**, not in EPSG:4326
- * like `localities.bbox`. That is deliberate: rotation is locked off
- * (`map/atoms.ts`), so in a projected CRS the scene↔ground mapping is exactly
- * linear, and storing degrees instead would make the y axis subtly non-linear
- * across a tall viewport for no gain. Degrees are derived at the edges, where
- * something actually wants them.
- */
+// The one transform between an Excalidraw scene and the ground. Drawing a funn
+// freezes the map, so a frame is captured once when the pen goes down and never
+// changes while it is down. Scene units are CSS pixels of the frozen viewport,
+// origin top-left, y downwards. The extent is in the view projection at freeze,
+// not EPSG:4326 like `localities.bbox`: rotation is locked off
+// (`map/atoms.ts`), so in a projected CRS the scene↔ground mapping is linear.
 export type FunnFrame = {
   /** The map's projection when the pen went down, e.g. 'EPSG:25833'. */
   projection: string;
@@ -33,7 +18,7 @@ export type FunnFrame = {
   heightPx: number;
 };
 
-/** The frame for the view as it stands. Null before the map has a size. */
+/** Null before the map has a size. */
 export const captureFunnFrame = (map: Map): FunnFrame | null => {
   const size = map.getSize();
   if (!size || size[0] < 1 || size[1] < 1) return null;
@@ -73,13 +58,7 @@ export const coordToScene = (
   ];
 };
 
-/**
- * A rectangle in scene units → the ground it covers, EPSG:4326.
- *
- * This is what grow-to-fit reads: `funnOutsideAtom` needs the drawing's
- * extent in the same coordinates as `locality.bbox` to answer whether the pen
- * has left the rectangle.
- */
+/** Scene rectangle → ground, EPSG:4326, to compare against `locality.bbox`. */
 export const sceneExtentToBbox4326 = (
   frame: FunnFrame,
   scene: [number, number, number, number],
@@ -111,13 +90,9 @@ export const frameExtentIn = (
 };
 
 /**
- * How many metres one scene unit covers, at the frame's centre.
- *
- * Via `getPointResolution` rather than `width / widthPx`, because the frame's
- * projection is whatever the user had selected — a UTM zone gives metres
- * directly, but EPSG:4326 would give degrees and EPSG:3857 would give metres
- * inflated by the latitude. This is the number a scale bar or a length
- * readout has to be measured off.
+ * Metres one scene unit covers, at the frame's centre. Via `getPointResolution`
+ * because the frame's projection is whatever the user had selected: EPSG:4326
+ * would give degrees, EPSG:3857 metres inflated by the latitude.
  */
 export const metresPerScenePx = (frame: FunnFrame): number => {
   const [minX, minY, maxX, maxY] = frame.extent;

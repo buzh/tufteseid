@@ -1,26 +1,10 @@
-/*
- * The parts the two bottom-edge surfaces share (docs/lokalitet-view.md §4.3).
- *
- * Both stances are a rail of the lokalitet's images with a line about the
- * active one under it — the same geometry, because arranging a set needs to
- * see the set, and that is as true of the stance that does the arranging as
- * of the one that only walks it. So the surface, the rail, the frames and the
- * detail layout are all here, and what the two surfaces still own is **the
- * row of verbs**: show's are all reading, edit's include everything that
- * writes. That is the only difference §2 ever asked to be visible, and
- * keeping it in two components is what stops a write verb from being one
- * boolean away from show.
- *
- * The image URL and its thumb fallback, the line naming the dataset and the
- * caption field are shared for the older reason: two copies of
- * `useAttachmentUrl` would be two chances to get the fallback wrong.
- */
+// What the two bottom-edge surfaces (show and edit) share: the rail, the
+// frames, the detail layout. What they keep to themselves is the row of verbs,
+// so no write verb is one boolean away from show.
 
-// `t` from the module, not from the hook, for the two label helpers below:
-// they are plain functions called from outside a component as often as from
-// inside one (the layer row's pulldowns, an `alt` attribute), and that is the
-// same reason `src/figure/` reads i18next directly. Everything that renders
-// here still uses `useTranslation`, so a language switch still redraws it.
+// Module `t` rather than the hook, because `metaLineOf` and `bildeLabelOf` are
+// plain functions and not components. Everything that renders here uses
+// `useTranslation`, so a language switch still redraws them.
 import { t } from 'i18next';
 import { useSetAtom } from 'jotai';
 import {
@@ -63,34 +47,23 @@ import type { LocalityWorkspaceApi } from './useLocalityWorkspace';
 import { type RailReorder, useRailReorder } from './useRailReorder';
 import { isPinned } from './viewSpec';
 
-// `landscape` is what the ribbon already uses for LiDAR mode, so an
-// extract carries the same mark here. (Material Symbols' `terrain` isn't
-// in the set material-symbols ships types for.)
+// `landscape` for an extract: the mark the ribbon uses for LiDAR mode, and
+// `terrain` is not in the set `material-symbols` ships types for.
 export const KIND_ICON: Record<AttachmentKind, MaterialSymbol> = {
   extract: 'landscape',
   screenshot: 'photo_camera',
   upload: 'image',
   flyfoto: 'satellite_alt',
   sketch: 'draw',
-  // The same mark the layer row's own button would wear: a scene is the row,
-  // kept (§13.7).
   scene: 'layers',
 };
 
-// Where an attachment's pixels are, and what to do when they don't arrive.
-//
-// The URL itself is a string built on the spot — the file field stopped
-// being `protected` in 1700000900, so there is no token to fetch first and
-// no fetch-then-render dance left. What still needs a state is the
-// *fallback*: `thumb` is only a request, and PB regularly cannot generate
-// one for the huge stitched extract PNGs.
-//
-// So failures are counted rather than flagged. The first one is ordinary and
-// is answered by asking for the original instead; a second one means the
-// bytes are not coming, and the frame says so. Counting is what stops the
-// old behaviour where an image that failed both ways kept its spinner up
-// forever, which reads as "still loading" for something that will never
-// arrive.
+// The URL is built on the spot; the file field is not `protected`, so there is
+// no token to fetch first. What needs state is the fallback: `thumb` is only a
+// request, and PB regularly cannot generate one for the huge stitched extract
+// PNGs. Failures are counted rather than flagged — the first is answered by
+// asking for the original, the second means the bytes are not coming and the
+// frame says so instead of spinning forever.
 export const useAttachmentUrl = (
   rec: AttachmentRecord | null,
   thumb?: '200x200' | '800x0',
@@ -103,8 +76,7 @@ export const useAttachmentUrl = (
 
   const error = failures > 1;
   // An unpinned View has no file to point at, and pointing anyway is a 404
-  // that would light the error state on a record that is perfectly fine
-  // (§4.1.2). The surfaces show the pin face instead — `usePinFace`.
+  // lighting the error state on a record that is fine. `usePinFace` instead.
   const url =
     rec && isPinned(rec) && !error
       ? getAttachmentUrl(rec, failures === 0 ? thumb : undefined)
@@ -122,15 +94,10 @@ export const usePinState = (id: string): PinState | undefined =>
   );
 
 /**
- * What to draw where the image would be, on a View whose pixels do not exist
- * yet — and null on a record that has them, which is the common case.
- *
- * A **quiet per-card state**, per §5.6: not a blocking spinner over the rail
- * and not a broken-image placeholder. An unpinned View is a normal record
- * that simply has not been rendered yet, and the five faces are five
- * different sentences — not written down yet, being made, not asked for,
- * nothing there, went wrong — because only one of them is worth pressing a
- * button about.
+ * What to draw where the image would be on a View whose pixels do not exist
+ * yet; null on a record that has them. Five faces — not written down yet,
+ * being made, not asked for, nothing there, went wrong — because only one of
+ * them is worth pressing a button about.
  */
 export const usePinFace = (
   rec: AttachmentRecord,
@@ -138,10 +105,8 @@ export const usePinFace = (
   const { t } = useTranslation();
   const state = usePinState(rec.id);
   if (isPinned(rec)) return null;
-  // A View buffered by the open transaction: the server has never heard of
-  // this record, so the queue cannot have an opinion about it and the face
-  // has to come from the draft instead. It says *when* rather than *what
-  // went wrong*, because nothing has yet gone anywhere.
+  // A View buffered by the open transaction: the server has never heard of it,
+  // so the queue can have no opinion and the face says *when*, not what failed.
   if (isDraftId(rec.id)) {
     return { icon: 'bookmark', label: t('localities.bilder.pinBuffered') };
   }
@@ -155,18 +120,15 @@ export const usePinFace = (
     case 'failed':
       return { icon: 'broken_image', label: t('localities.bilder.pinFailed') };
     default:
-      // Nobody has asked. A reader over somebody else's lokalitet, or an
-      // owner in show — §2 keeps the sweep on the edit side of the line.
+      // Nobody has asked: a reader, or an owner in show. The sweep is on the
+      // edit side of the line.
       return { icon: 'image', label: t('localities.bilder.pinAbsent') };
   }
 };
 
 /**
- * The face itself.
- *
- * `compact` for the strip's 88×64 frames, where the sentence does not fit and
- * the frame's `title` is carrying it anyway; the carousel's card has room to
- * say it out loud.
+ * The face itself. `compact` for the strip's 88×64 frames, where the sentence
+ * does not fit and the frame's `title` is carrying it anyway.
  */
 export const PinFace = ({
   rec,
@@ -191,12 +153,9 @@ export const PinFace = ({
 };
 
 /**
- * …and the one case worth a verb: a render that failed.
- *
- * Only failures get a button. `empty` means the source has nothing over this
- * rectangle, and offering to try again would be offering to re-learn the same
- * fact; `queued` is already happening. Owner-only, because a pin is an
- * `update` and nothing in show writes (§2).
+ * Only a failed render gets a button: `empty` means the source has nothing
+ * over this rectangle, so retrying would re-learn the same fact, and `queued`
+ * is already happening. Owner-only — a pin is an `update`.
  */
 export const PinRetryButton = ({
   ws,
@@ -215,18 +174,11 @@ export const PinRetryButton = ({
   );
 };
 
-/*
- * One frame of the rail.
- *
- * Scrolls itself into view when it becomes the active one, because ←/→ walk
- * the rail and the twelfth image is off the right-hand end of it — a keyboard
- * step that changes the surface but not the rail would leave you unable to see
- * what you are looking at.
- *
- * The three curation states are marked here rather than being filtered out,
- * and only edit ever sees them: a concealed image is not on the rail in show
- * at all, and a tombstoned one exists only inside an open transaction.
- */
+// One frame of the rail. Scrolls itself into view when it becomes the active
+// one, because the keys walk the rail past its right-hand end. The three
+// curation states are marked rather than filtered out, and only edit sees
+// them: a concealed image is off the rail in show, a tombstoned one exists
+// only inside an open transaction.
 const Frame = ({
   rec,
   selected,
@@ -240,9 +192,9 @@ const Frame = ({
   rec: AttachmentRecord;
   selected: boolean;
   isCover: boolean;
-  /** Tombstoned by this edit session (§5.6, consequence 2). */
+  /** Tombstoned by this edit session. */
   deleted: boolean;
-  /** One of the original's Files, on a copy that did not carry it (§7). */
+  /** One of the original's Files, on a copy that did not carry it. */
   borrowed: boolean;
   /** Null in show — nothing there reorders anything. */
   drag: RailReorder | null;
@@ -254,8 +206,8 @@ const Frame = ({
   const { t } = useTranslation();
   const el = useRef<HTMLButtonElement | null>(null);
 
-  // One callback ref for two jobs: keeping our own handle for scrollIntoView,
-  // and telling the reorder hook where this frame is on screen.
+  // One callback ref for two jobs: our own handle for scrollIntoView, and
+  // telling the reorder hook where this frame is on screen.
   const register = drag?.register;
   const setRef = useCallback(
     (node: HTMLButtonElement | null) => {
@@ -289,8 +241,8 @@ const Frame = ({
       aria-pressed={selected}
       title={
         face
-          ? // The pin state *is* the frame's sentence while there are no
-            // pixels: the caption describes an image nobody can see yet.
+          ? // While there are no pixels the pin state is the frame's sentence:
+            // the caption describes an image nobody can see yet.
             face.label
           : error
             ? t('localities.bilder.loadFailed')
@@ -301,8 +253,8 @@ const Frame = ({
       onPointerUp={drag?.onPointerUp}
       onPointerCancel={drag?.onPointerCancel}
       onClick={() => {
-        // The pointerup that ended a drag also produces a click, and landing
-        // a card in its new place is not a request to select it.
+        // The pointerup that ended a drag also produces a click, and landing a
+        // card in its new place is not a request to select it.
         if (drag?.consumeClick()) return;
         onClick();
       }}
@@ -328,8 +280,8 @@ const Frame = ({
       <span className={styles.kindMark}>
         <Icon icon={KIND_ICON[rec.kind]} size={14} />
       </span>
-      {/* The cover is derived, so this mark is the only place it is stated —
-          and it moves the moment something else is arranged in front of it. */}
+      {/* The cover is derived from the exhibit order, not stored, so this mark
+          moves the moment something else is arranged in front of it. */}
       {isCover && !borrowed && (
         <span className={cx(styles.mark, styles.coverMark)}>
           <Icon icon="star" size={13} filled />
@@ -349,15 +301,8 @@ const Frame = ({
 
 /**
  * The rail: every image this lokalitet holds, in exhibit order, with the
- * active one ringed. Both stances mount it, and the ground does not move as
- * you walk it — so stepping the rail is flipping between readings of one
- * rectangle in register, which is the curtain's trick and the flyfoto temporal
- * stack's trick applied to the images somebody already decided were worth
- * keeping.
- *
- * `onReorder` is the whole of the stance difference here: with it the frames
- * can be dragged into a new exhibit position, without it they cannot be
- * dragged at all (§2, `useRailReorder`).
+ * active one ringed. Both stances mount it; `onReorder` is the whole of the
+ * stance difference — without it the frames cannot be dragged at all.
  */
 export const BilderRail = ({
   ws,
@@ -373,8 +318,8 @@ export const BilderRail = ({
   const walkable = (items?.length ?? 0) > 1;
 
   // Only this lokalitet's own images have a position in its exhibit; the
-  // borrowed tail (§7) is a suffix that belongs to the original, so it is
-  // neither draggable nor a place to drop something.
+  // borrowed tail belongs to the original, so it is neither draggable nor a
+  // place to drop something.
   const { inheritedIds } = ws;
   const ownIds = useMemo(
     () =>
@@ -405,9 +350,9 @@ export const BilderRail = ({
 
   return (
     <>
-      {/* Above the rail, not a frame in it: the images the starter set has
-          already saved are in that rail, and a placeholder among them would
-          be read as one more that failed. */}
+      {/* Above the rail, not a frame in it: the starter set's finished images
+          are in the rail, and a placeholder among them reads as one more that
+          failed. */}
       {ws.starterBusy && (
         <div className={styles.busy}>
           <Spinner size={14} />
@@ -483,23 +428,14 @@ export const BilderRail = ({
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null;
 
-/*
- * The knobs, per visualization — the same switch `terrainSettings` in
- * `src/figure/specs.ts` makes, reading the stored `meta` where that one reads
- * the live state.
- *
- * Per visualization rather than "print whatever is in `meta`", because
- * `describe()` records `altitude` and `zFactor` unconditionally to keep the
- * shape predictable, and they mean nothing on a sky-view factor — a card
- * reading "Himmelsyn · solhøyde 35°" would be naming a sun that is not in the
- * picture. The parameters each view actually used are the figure caption's
- * list, and this is the same list said in one line.
- *
- * What is deliberately not here: the constants. VAT's stack, the
- * multidirectional azimuths and the SVF direction count are the same on every
- * render ever made, so they distinguish nothing and the figure is where
- * somebody who needs to rebuild the composite reads them off.
- */
+// The knobs, per visualization — the switch `terrainSettings` in
+// `src/figure/specs.ts` makes, over stored `meta` rather than live state.
+// Per visualization rather than "print whatever is in `meta`" because
+// `describe()` writes `altitude` and `zFactor` unconditionally, and they mean
+// nothing on a sky-view factor: the card would name a sun not in the picture.
+// The constants are deliberately absent — VAT's stack, the multidirectional
+// azimuths and the SVF direction count are the same on every render ever made,
+// so they distinguish nothing and the figure caption is where they are read.
 const lightParts = (style: string | null, meta: AttachmentMeta): string[] => {
   const azimuth = num(meta.azimuth);
   const altitude = num(meta.altitude);
@@ -529,35 +465,24 @@ const lightParts = (style: string | null, meta: AttachmentMeta): string[] => {
       return radius != null
         ? [t('figure.set.opennessRadius', { m: radius })]
         : [];
-    // VAT's sun is frozen and its stretch is absolute — that is what makes two
-    // VAT renders comparable — so it has no knobs to name. Everything else
-    // reaching this line is a WMS style with no knobs either.
+    // VAT's sun is frozen and its stretch absolute, so it has no knobs to
+    // name. Everything else here is a WMS style with none either.
     default:
       return [];
   }
 };
 
 /**
- * Dataset · style · model · light · resolution, as one line — the record's
- * provenance in the smallest space it fits in.
+ * Dataset · style · model · light · resolution, as one line.
  *
- * A function rather than only a component because [Visning]'s pulldown prints
- * the same line under the same record (§13.4, where the row's label *is* the
- * provenance), and a second reading of `meta` would be a second chance for the
- * card and the layer row to disagree about what an image is.
- *
- * **The light belongs here, and leaving it out was the bug.** Eight terrain
- * renders of one rectangle differ in nothing but azimuth, sun altitude and
- * z-factor — that is the whole reason somebody keeps eight — so a line that
- * stopped at "dataset · style" printed the same sentence under all of them and
- * the rail was eight identical cards. It is the argument §8.10 makes for the
- * figure caption, one surface earlier: a render without its own azimuth on it
- * cannot be checked by anyone, and that has to be true of the card as well as
- * of the PNG, because the card is what a reader walks.
- *
- * The parameter strings are `figure.*`, borrowed rather than re-translated,
- * for exactly that reason — this line and the caption burned into the figure
- * are two readings of one record and must not word it differently.
+ * A function rather than only a component because the layer row's pulldowns
+ * print the same line under the same record, and a second reading of `meta`
+ * would be a second chance for the two to disagree about what an image is.
+ * The light is part of it: eight terrain renders of one rectangle differ in
+ * nothing but azimuth, sun altitude and z-factor, so a line stopping at
+ * "dataset · style" makes the rail eight identical cards. The parameter
+ * strings are `figure.*` rather than re-translated, so this line and the
+ * caption burned into the figure cannot word the same record differently.
  */
 export const metaLineOf = (rec: AttachmentRecord): string | null => {
   const meta: AttachmentMeta = rec.meta ?? {};
@@ -566,10 +491,9 @@ export const metaLineOf = (rec: AttachmentRecord): string | null => {
 
   const parts = [
     typeof meta.sourceLabel === 'string' ? meta.sourceLabel : null,
-    // A terrain render's style is a visualization key and has a name in three
-    // languages; a LiDAR extract's is the WMS layer's own (`skyggerelieff`),
-    // which is already the clearest thing anyone could print. One lookup with
-    // a default covers both, since the two vocabularies do not collide.
+    // A terrain render's style is a visualization key with a name in three
+    // languages; a LiDAR extract's is the WMS layer's own (`skyggerelieff`).
+    // One lookup with a default covers both — the vocabularies do not collide.
     style
       ? t(`localities.terrain.vis.${style}`, { defaultValue: style })
       : null,
@@ -578,8 +502,7 @@ export const metaLineOf = (rec: AttachmentRecord): string | null => {
       : null,
     ...lightParts(style, meta),
     // `dec`, not the raw number: `metresPerPx` is a division and prints as
-    // 0.5001568426393691 if you let it — the resolution of a half-metre grid
-    // stated to the nearest ångström.
+    // 0.5001568426393691 if you let it.
     metresPerPx != null
       ? t('localities.bilder.mpp', { m: dec(metresPerPx, 2) })
       : null,
@@ -588,14 +511,8 @@ export const metaLineOf = (rec: AttachmentRecord): string | null => {
 };
 
 /**
- * What to call a bilde in one line, wherever one is needed.
- *
- * The author's own caption wins; underneath it the provenance line, which for
- * a kept render says more than any caption would; and only then the kind.
- * That last step is the whole point of having this: the fallback used to be
- * the bare `rec.kind`, so a record whose caption never survived its commit
- * showed up on the rail, in its tooltip and in its alt text as the literal
- * string `extract`.
+ * What to call a bilde in one line: the author's caption, else the provenance
+ * line, else the kind — translated, never the bare `rec.kind` string.
  */
 export const bildeLabelOf = (rec: AttachmentRecord): string =>
   rec.caption.trim() ||
@@ -605,8 +522,7 @@ export const bildeLabelOf = (rec: AttachmentRecord): string =>
 export const MetaLine = ({ rec }: { rec: AttachmentRecord }) => {
   const line = metaLineOf(rec);
   if (!line) return null;
-  // `title` because the line truncates: a card's width is not a reason for
-  // the azimuth to be the part that falls off the end.
+  // `title` because the line truncates, and the azimuth is at the far end.
   return (
     <p className={styles.metaLine} title={line}>
       {line}
@@ -614,13 +530,8 @@ export const MetaLine = ({ rec }: { rec: AttachmentRecord }) => {
   );
 };
 
-/**
- * The funn a bilde belongs to, as a record — null for the lokalitet's own
- * images and for one whose funn has since been deleted (§13.6).
- *
- * The lookup is here rather than in `funnGroups.ts` because the card holds one
- * record and no list: it wants the funn itself, not a partition of a set.
- */
+// The funn a bilde belongs to — null for the lokalitet's own images and for
+// one whose funn has since been deleted (the relation does not cascade).
 const funnOf = (
   ws: LocalityWorkspaceApi,
   rec: AttachmentRecord,
@@ -630,27 +541,12 @@ const funnOf = (
   return id ? (finds.find((f) => f.id === id) ?? null) : null;
 };
 
-/*
- * `Hører til` — which funn this bilde belongs to (§13.6, §13.10 step 9).
- *
- * The editor §9.3 deferred, and the reason it could be deferred then is the
- * reason it cannot be now: seeding guesses well enough for "what this drawing
- * is about", because the drawing was made over a funn that was selected at the
- * time. "Which funn this photograph belongs to" is not a guess anyone can make
- * for you — the image existed before you decided what it was of.
- *
- * A menu of one answer rather than a set of checkboxes, because belonging is
- * one answer; the column stays a multiple relation and this writes an array of
- * at most one (`setBildeFunn`). The lokalitet itself is the first item rather
- * than a `Fjern`, since "belongs to the lokalitet" is a position in the
- * hierarchy and not the absence of one.
- *
- * Edit only, and absent on a lokalitet with no funn — a picker whose only
- * option is the one you already have answers nothing. Buffered like the
- * caption, so filing a batch of images and changing your mind costs `Avbryt`
- * and no writes. A funn invented in the same session is offered here with its
- * temp id and translated at the commit (`useLocalityDraft`).
- */
+// `Hører til` — which funn this bilde belongs to. A menu of one answer, though
+// the column stays a multiple relation: `setBildeFunn` writes an array of at
+// most one. Edit only, and absent on a lokalitet with no funn. Buffered like
+// the caption, so a batch filed and regretted costs `Avbryt` and no writes; a
+// funn invented in the same session is offered with its temp id and translated
+// at the commit (`useLocalityDraft`).
 export const BildeFunnPicker = ({
   ws,
   rec,
@@ -692,9 +588,8 @@ export const BildeFunnPicker = ({
             if (current) ws.setBildeFunn(rec, null);
           },
         },
-        // The tombstoned ones are out: filing an image under a funn this
-        // session has already deleted would be a relation the commit drops
-        // on the way out, which is a choice that silently does nothing.
+        // The tombstoned ones are out: a relation to a funn this session has
+        // deleted is dropped at the commit, so offering it does nothing.
         ...finds
           .filter((f) => !ws.deletedIds.has(f.id))
           .map((f) => ({
@@ -717,7 +612,7 @@ export const BildeBadges = ({
 }: {
   ws: LocalityWorkspaceApi;
   rec: AttachmentRecord;
-  /** One of the original's Files, on a copy that did not carry it (§7). */
+  /** One of the original's Files, on a copy that did not carry it. */
   borrowed?: boolean;
 }) => {
   const { t } = useTranslation();
@@ -730,9 +625,8 @@ export const BildeBadges = ({
   return (
     <>
       <Badge>{t(`localities.bilder.kind.${rec.kind}`)}</Badge>
-      {/* Said first among the states, because it is the one that changes what
-          the card *is*: a borrowed image is not part of this exhibit yet, so
-          neither the cover nor the hidden mark would mean anything on it. */}
+      {/* A borrowed image is not part of this exhibit yet, so neither the
+          cover nor the hidden mark would mean anything on it. */}
       {borrowed ? (
         <Badge palette="blue">{t('localities.copy.borrowed')}</Badge>
       ) : (
@@ -743,19 +637,13 @@ export const BildeBadges = ({
           {rec.hidden && (
             <Badge palette="yellow">{t('localities.bilder.hidden')}</Badge>
           )}
-          {/* Said in both stances and on both surfaces, because §13.5's rule
-              is that the assumption must not be lost when it leaves the
-              surface that made it. The [Bilde] row carries the same sentence
-              as a `note`; this is the card's copy of it. */}
+          {/* An assumed extent is said in both stances and on both surfaces:
+              the [Bilde] row carries the same sentence as a `note`. */}
           {isBboxAssumed(rec) && (
             <Badge palette="gray">{t('localities.bilder.assumed')}</Badge>
           )}
-          {/* Which funn it belongs to (§13.6), in both stances: the picker
-              beside it is edit's, and a reader who cannot see the filing
-              cannot read the exhibit the way its author arranged it. A funn
-              that has since been deleted shows nothing at all — `funnIdOf`
-              answers null for a dangling id, which is the same fallback the
-              pulldowns make. */}
+          {/* The filing, in both stances — the picker beside it is edit's.
+              A dangling id shows nothing: `funnIdOf` answers null for it. */}
           {funnLabel && <Badge palette="gray">{funnLabel}</Badge>}
         </>
       )}
@@ -763,24 +651,13 @@ export const BildeBadges = ({
   );
 };
 
-/*
- * `Plasser i ruta` — the upload opt-in (§13.5, §13.10 step 7).
- *
- * The one verb on a card that is about the map, and it survives the rule that
- * deleted the others because it is not a map verb. `Vis i ruta` *showed* an
- * image; this one gives a record an extent, which is an edit of the same kind
- * as a caption or a concealment and stays where those are. The switch that
- * actually lays it down is [Bilde]'s, where every other File's is, and it
- * appears there the moment this has been pressed.
- *
- * Uploads only: every other kind already knows where it is, and offering to
- * invent a rectangle for an extract that was cut to one would be offering to
- * make it worse. Edit only, and `canEdit` rather than `canAdd` — this is an
- * update, so an admin over somebody else's lokalitet may do it.
- *
- * Nothing about the press is optimistic: reading the file's aspect is a fetch
- * and a decode, so the button spins until the buffer has the rectangle.
- */
+// `Plasser i ruta` — the upload opt-in. It gives a record an extent, which is
+// an edit like a caption; the switch that lays it on the map is [Bilde]'s, and
+// appears there once this has been pressed. Uploads only: every other kind
+// already knows where it is. `canEdit` rather than `canAdd`, because this is
+// an update and an admin may make it. Not optimistic — reading the file's
+// aspect is a fetch and a decode, so the button spins until the buffer has the
+// rectangle.
 export const PlaceUploadButton = ({
   ws,
   rec,
@@ -792,8 +669,8 @@ export const PlaceUploadButton = ({
   const [busy, setBusy] = useState(false);
   if (rec.kind !== 'upload' || !ws.canEdit) return null;
 
-  // The placement is exactly `meta.bbox25833`, so this is the same question
-  // [Bilde] asks to decide whether the record is a member at all.
+  // The placement is exactly `meta.bbox25833` — the same question [Bilde] asks
+  // to decide whether the record is a member at all.
   if (groundExtentOf(rec.meta ?? {}) != null) {
     return (
       <Button
@@ -824,20 +701,11 @@ export const PlaceUploadButton = ({
   );
 };
 
-/*
- * `Legg ut igjen` — put a kept arrangement back on the map (§13.7).
- *
- * The other half of `Oppsett` on the row, and on the card rather than in the
- * layer row for the mirror of that button's reason: the row is where an
- * arrangement is *made*, and a record that replaces the whole row's state is a
- * thing you pick out of the exhibit, not a member of it. A scene has no switch
- * anywhere — it is not a layer (`groundView.ts` refuses to put one on the
- * ground) — so this is its one verb.
- *
- * A read, so both stances and every access level get it. That is the same rule
- * `Gjenskap` follows one level down (§13.8): applying somebody's arrangement to
- * your own screen writes nothing anywhere.
- */
+// `Legg ut igjen` — put a kept arrangement back on the map. A scene has no
+// switch anywhere, because it is not a layer (`groundView.ts` refuses to put
+// one on the ground), so this is its one verb. A read, so both stances and
+// every access level get it: applying an arrangement to your own screen
+// writes nothing.
 export const SceneRestoreButton = ({
   ws,
   rec,
@@ -860,13 +728,10 @@ export const SceneRestoreButton = ({
   );
 };
 
-/*
- * The caption. `readOnly` rather than absent in show, per §8.1: a caption is
- * the record's content, and dimming what the exhibit says would hide it.
- *
- * Local state committed on blur, so a realtime reload mid-sentence cannot
- * rewrite the field under the cursor.
- */
+// The caption. `readOnly` rather than absent in show, because a caption is the
+// record's content and hiding it would hide what the exhibit says. Local state
+// committed on blur, so a realtime reload mid-sentence cannot rewrite the
+// field under the cursor.
 export const CaptionField = ({
   ws,
   rec,
@@ -875,10 +740,9 @@ export const CaptionField = ({
   ws: LocalityWorkspaceApi;
   rec: AttachmentRecord;
   /**
-   * Forced on for a borrowed card (§7). The record belongs to the original,
-   * so a caption typed here would either edit somebody else's lokalitet or —
-   * worse — go into this session's buffer under an id `Lagre` would then
-   * PATCH on their behalf. `Ta med` first; then it is yours to caption.
+   * Forced on for a borrowed card: the record belongs to the original, so a
+   * caption typed here would land in this session's buffer under an id
+   * `Lagre` would then PATCH on their behalf. `Ta med` first.
    */
   readOnly?: boolean;
 }) => {
@@ -904,21 +768,9 @@ export const CaptionField = ({
   );
 };
 
-/*
- * A sketch's own eye — the last card verb that is about the map.
- *
- * It outlived `Vis i ruta`, which was the same idea done worse: that one held
- * a single image on a ground that could only hold one, while a sketch has
- * always been a *set* — two readings of the same mound can both be up, and
- * either can come off without disturbing the other (§9.3). Step 6 made the
- * Files work the way the sketches already did, and moved their switch to the
- * row; this one stays on the card because it presses the same set [Skisse]
- * does, so the two surfaces cannot disagree.
- *
- * Present in show as well as edit: turning a layer on writes nothing, and
- * comparing the drawings against the image they were made over is the whole
- * reason they are stored as overlays rather than flattened into one.
- */
+// A sketch's own eye. Presses the same set [Skisse] does, so the card and the
+// layer row cannot disagree. Present in show as well as edit — turning a layer
+// on writes nothing.
 export const SketchToggleButton = ({
   ws,
   rec,
@@ -942,15 +794,10 @@ export const SketchToggleButton = ({
 };
 
 /**
- * …and the way back into it: the scene, under the pen again.
- *
- * The one entrance a sketch has that no other bilde does, and the mirror of
- * `Rediger tegningen` on a funn. Owner-gated, because `Behold skissen` at the
- * other end of it is an update; buffered until then, so a re-draw you abandon
- * with `Avbryt` costs the record nothing.
- *
- * Absent on a sketch whose spec cannot be read back — `resumeSketch` says so
- * rather than opening an empty canvas over the drawing it failed to load.
+ * The sketch's scene under the pen again. Owner-gated, because `Behold
+ * skissen` at the other end is an update; buffered until then, so a re-draw
+ * abandoned with `Avbryt` costs the record nothing. `resumeSketch` refuses a
+ * sketch whose spec cannot be read back rather than opening an empty canvas.
  */
 export const SketchEditButton = ({
   ws,
@@ -973,23 +820,11 @@ export const SketchEditButton = ({
   );
 };
 
-/*
- * The full-size file in a tab of its own — which is also how it is saved.
- *
- * One of the two places that **force a pin** (§4.1.2, §12): there is no such
- * thing as downloading a row of parameters, so an unpinned View has to be
- * rendered before this can do anything at all.
- *
- * Which makes it two presses, and that is a browser constraint rather than a
- * design preference: `window.open` several seconds after the click that
- * caused it is a popup, and gets blocked. So the button says `Hent bildet`
- * while there are no pixels, spins while it makes them, and becomes `Åpne
- * originalen` — the second press is inside a gesture and opens cleanly.
- *
- * Owner-gated in the same breath, for the same reason `PinRetryButton` is: a
- * pin writes. A reader over a spec sees no button, which is honest — there is
- * nothing there to open.
- */
+// The full-size file in a tab of its own, and one of the two places that force
+// a pin: there is nothing to open on an unpinned View. Two presses, because
+// `window.open` seconds after the click that caused it is a popup and gets
+// blocked — the button renders on the first press and opens inside the gesture
+// of the second. Owner-gated, because a pin writes.
 export const OpenOriginalButton = ({
   ws,
   rec,
@@ -1000,14 +835,14 @@ export const OpenOriginalButton = ({
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   // The record the pin handed back, so the label flips on the response rather
-  // than waiting for the realtime event to bring the list round again.
+  // than on the realtime event bringing the list round again.
   const [pinnedRec, setPinnedRec] = useState<AttachmentRecord | null>(null);
   const target = isPinned(rec) ? rec : pinnedRec;
 
   if (!target) {
-    // Nothing to force a pin against while the spec is still only in the
-    // draft: there is no record id the queue could PATCH. `Lagre` writes it
-    // and the queue picks it up a moment later (§5.6, consequence 3).
+    // Nothing to force a pin against while the spec is only in the draft:
+    // there is no record id the queue could PATCH. `Lagre` writes it and the
+    // queue picks it up.
     if (!ws.canAdd || isDraftId(rec.id)) return null;
     return (
       <Button

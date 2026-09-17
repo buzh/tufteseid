@@ -15,11 +15,9 @@ import { updateSearchMarkers } from './searchmarkers/updateSearchMarkers';
 export const useMapClickSearch = () => {
   const setSearchCoordinates = useSetAtom(searchCoordinatesAtom);
   const setSelectedResult = useSetAtom(selectedResultAtom);
-  //I hate this function
   const isClusterClick = useCallback((e: MapBrowserEvent): boolean => {
     const map = getDefaultStore().get(mapAtom);
     const features = map.getFeaturesAtPixel(e.pixel);
-    // Check if the click is on a cluster
     const isCluster =
       features &&
       features.length === 1 &&
@@ -74,10 +72,8 @@ export const useMapClickSearch = () => {
   const mapClickHandler = useCallback(
     (e: MapBrowserEvent) => {
       const store = getDefaultStore();
-      // The coordinate readout is half of Stedsinfo — the other half is
-      // useFeatureInfoClick — so it answers to the same arming flag, which
-      // also stands the two of them down while measure or drawing owns the
-      // click (src/map/featureInfo/infoTool.ts).
+      // Half of Stedsinfo: same arming flag as useFeatureInfoClick, which
+      // stands both down while measure or drawing owns the click.
       if (!store.get(infoClickArmedAtom)) {
         return;
       }
@@ -86,10 +82,8 @@ export const useMapClickSearch = () => {
         return;
       }
       const map = getDefaultStore().get(mapAtom);
-      // If a kulturminner layer is visible, useFeatureInfoClick owns the
-      // click result — it may open the compact popup and doesn't want the
-      // coordinate InfoBox flashing in first. It will fall back to setting
-      // selectedResult itself when the click misses every kulturminner.
+      // With a kulturminner layer visible, useFeatureInfoClick owns the
+      // result and sets selectedResult itself when the click misses.
       if (hasVisibleLayerWithIdIn(map, CULTURAL_HERITAGE_LAYER_IDS)) {
         return;
       }
@@ -97,12 +91,8 @@ export const useMapClickSearch = () => {
     },
     [handlePositionClick, isClusterClick],
   );
-  // 'singleclick', not 'click'. OL dispatches 'click' for *both* halves
-  // of a double-click and only then decides between 'dblclick' and
-  // 'singleclick' (MapBrowserEventHandler.emulateClick_), so on 'click'
-  // a double-click to zoom in also dropped a coordinate marker — twice.
-  // 'singleclick' is the 250 ms-deferred one that a double-click
-  // cancels, and it's what every other click handler in the app is on.
+  // 'singleclick', not 'click': OL dispatches 'click' for both halves of a
+  // double-click, so zooming in would also drop two coordinate markers.
   useEffect(() => {
     const map = getDefaultStore().get(mapAtom);
     map.on('singleclick', mapClickHandler);

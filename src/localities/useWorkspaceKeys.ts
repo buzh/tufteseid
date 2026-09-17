@@ -3,21 +3,10 @@ import { useEffect, useRef } from 'react';
 import { funnSessionAtom } from '../funn/session';
 import { anyOverlayOpenAtom } from '../ui/overlayAtoms';
 
-// Keyboard for the open lokalitet, same shape as the background cycling keys
-// in src/map/useBackgroundCyclingKeys.ts: one document listener, bail out on
-// modifiers, repeats, anything typed into a field, and anything with an
-// overlay open over it.
-//
-// Capture phase, and handled keys are stopped dead. OpenLayers'
-// KeyboardPan is attached to `document` too (see the map atom's
-// keyboardEventTarget) and does not look at defaultPrevented, so a
-// bubble-phase listener would move the funn selection *and* pan the map
-// out from under it.
-//
-// Escape is deliberately NOT bound while the pen is down — the Excalidraw
-// surface has the keyboard and binds it to abort the shape currently being
-// drawn, and stealing it there would throw away a drawing instead of a
-// keystroke.
+// One document listener, bailing out on modifiers, repeats, typing and
+// overlays. Capture phase, and handled keys are stopped dead: KeyboardPan is on
+// `document` too and ignores defaultPrevented. Escape stays unbound while the
+// pen is down, Excalidraw having bound it to abort the shape.
 
 export type WorkspaceKeyHandlers = {
   onNewFunn: () => void;
@@ -27,33 +16,24 @@ export type WorkspaceKeyHandlers = {
   onZoomSelected: () => void;
   onStepBilde: (delta: 1 | -1) => void;
   onEscape: () => void;
-  // A picker run is up (docs/lokalitet-view.md §4.3) — depth 2 in §5.3's
-  // table, and it owns the keyboard outright while it lasts.
+  // A picker run owns the keyboard outright while it lasts.
   pickerActive: boolean;
   onPickerStep: (delta: 1 | -1) => void;
   onPickerKeep: () => void;
   onPickerDiscard: () => void;
   onPickerFinish: () => void;
   draftActive: boolean;
-  // Arrows/Enter walk the funn — the list they are an index of is behind a
-  // popover now, but walking them is a way of reading the map rather than the
-  // list, so this stays on whether the popover is up or not, and while the
-  // extract and terrain panels are open. It is off only while drawing, where
-  // picking a different funn out from under the pen is never what the arrow
-  // meant.
+  // Arrows/Enter walk the funn whatever is open, except while drawing.
   navigable: boolean;
-  // ←/→ walk the filmstrip. Off unless there is a strip with something in it:
-  // OpenLayers' KeyboardPan owns these keys otherwise (↑/↓ it has already
-  // lost to the funn list), and taking horizontal panning away from a map
-  // whose bottom edge is folded away would be a straight loss.
+  // ←/→ walk the filmstrip, but only when there is one: KeyboardPan keeps
+  // horizontal panning otherwise.
   stripNavigable: boolean;
 };
 
 export const useWorkspaceKeys = (handlers: WorkspaceKeyHandlers) => {
   const ref = useRef(handlers);
   ref.current = handlers;
-  // Read through the store inside the listener: the value must be current
-  // at keypress time, and subscribing would re-register on every open.
+  // Read through the store: subscribing would re-register on every open.
   const store = useStore();
 
   useEffect(() => {
@@ -61,10 +41,7 @@ export const useWorkspaceKeys = (handlers: WorkspaceKeyHandlers) => {
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) {
         return;
       }
-      // While the pen is down the drawing surface owns the keyboard — see the
-      // same guard in map/useBackgroundCyclingKeys.ts. N, U and B would start
-      // a second thing over a frozen map, and Excalidraw needs Delete,
-      // Escape and the arrows for the shapes.
+      // While the pen is down the drawing surface owns the keyboard.
       if (store.get(funnSessionAtom)) return;
       const h = ref.current;
       const target = event.target;
@@ -72,30 +49,18 @@ export const useWorkspaceKeys = (handlers: WorkspaceKeyHandlers) => {
         target instanceof HTMLElement &&
         (target.isContentEditable ||
           ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
-          // An open popover/dialog/select drives its own list with the
-          // same keys; don't move the funn selection out from under it.
+          // An open popover drives its own list with the same keys.
           target.closest(
             '[data-scope="popover"], [data-scope="dialog"], [data-scope="select"]',
           ))
       ) {
         return;
       }
-      // Second, focus-independent check on the same question — see
-      // src/ui/overlayAtoms.ts.
+      // Second, focus-independent check on the same question.
       if (store.get(anyOverlayOpenAtom)) return;
 
-      /*
-       * A live picker run takes the whole keyboard.
-       *
-       * Not a layer *on top of* the others — a replacement for them. ←/→ are
-       * walking proposals rather than the filmstrip; `N`, `U` and `B` would
-       * start a second thing on a surface whose entire job is one decision at
-       * a time; and `Esc` ends the run rather than the stance behind it,
-       * which is what makes it the deepest thing in flight (§5.3).
-       *
-       * Enter/K keep and Delete/X discard, two spellings each, because one
-       * hand on the arrows should be able to finish the job.
-       */
+      // A run replaces the keyboard rather than layering on it: Esc ends the
+      // run and not the stance, and keep/discard have two spellings each.
       if (h.pickerActive) {
         switch (event.key) {
           case 'ArrowRight':

@@ -25,8 +25,7 @@
   pointer-events: none;
 }
 
-/* Doubled up for specificity against Field.module.css's padding shorthand —
-   same reason as RibbonSearch. */
+/* Doubled up for specificity against Field.module.css's padding shorthand. */
 .search .searchInput {
   padding: 0 30px 0 34px;
 }
@@ -76,8 +75,7 @@
   gap: var(--sp-4);
 }
 
-/* Every line in a row is one line: the list is for telling areas apart at a
-   glance, and a wrapping description would make the rows different heights. */
+/* One line each, so the rows keep a single height. */
 .name {
   flex: 1;
   min-width: 0;

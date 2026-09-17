@@ -1,25 +1,8 @@
-/*
- * A zip file, written by hand, with nothing compressed.
- *
- * Hand-rolled for the same reason `src/terrain/dem.ts` reads float TIFFs
- * itself rather than pulling in geotiff.js: adding a dependency means
- * regenerating `package-lock.json`, which the workstation cannot do. The
- * format's stored-entry path is about eighty lines, and one caller — the
- * Rapportpakke (docs/lokalitet-view.md §9) — needs exactly that path.
- *
- * **Stored, not deflated, and that is not a shortcut.** Nearly every byte in
- * the bundle is a PNG or a JPEG, i.e. already compressed; deflating those
- * again costs seconds of main thread to save nothing. What would compress is
- * the two text files, and those are kilobytes. If that ever changes,
- * `CompressionStream('deflate-raw')` would make it possible without a
- * dependency — the entry would need method 8 and the deflated length in its
- * headers.
- *
- * Not Zip64: sizes and offsets are 32-bit, so an archive is capped at 4 GB and
- * 65535 entries. A lokalitet's exhibit is tens of figures of tens of megabytes,
- * so the ceiling is two orders of magnitude away, and `zipStore` throws rather
- * than writing a file that is silently wrong if it is ever reached.
- */
+// Stored, not deflated: nearly every byte in the bundle is already-compressed
+// PNG or JPEG. Hand-rolled because a dependency would mean regenerating
+// `package-lock.json`, which the workstation cannot do.
+// Not Zip64, so 4 GB and 65535 entries are hard caps and `zipStore` throws at
+// either rather than write a silently wrong file.
 
 /** One file in the archive. Directories are implied by `/` in the path. */
 export type ZipEntry = {
@@ -47,8 +30,7 @@ const crc32 = (bytes: Uint8Array): number => {
   return (c ^ 0xffffffff) >>> 0;
 };
 
-// MS-DOS packed date and time, which is what the format stores. Local time
-// and two-second resolution, both by the spec rather than by choice.
+// MS-DOS packed date and time: local time, two-second resolution, per spec.
 const dosTime = (d: Date) =>
   ((d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)) &
   0xffff;
@@ -62,18 +44,12 @@ const dosDate = (d: Date) =>
 const LOCAL_HEADER = 0x04034b50;
 const CENTRAL_HEADER = 0x02014b50;
 const END_OF_CENTRAL = 0x06054b50;
-// Bit 11: the filename is UTF-8. Without it a name with æøå in it is read as
-// CP437 by anything that still believes the 1989 default.
+// Bit 11: the filename is UTF-8. Without it æøå is read as CP437.
 const FLAG_UTF8 = 0x0800;
 const MAX_32 = 0xffffffff;
 
-/**
- * The entries, in the order given, as one Blob.
- *
- * The bytes of each body are read once to checksum them and then dropped: the
- * *Blob* goes into the output, not the `ArrayBuffer`, so a bundle of forty
- * figures is held wherever the browser keeps blobs rather than on the JS heap.
- */
+// The Blob, not the ArrayBuffer, goes into the output, so a large bundle stays
+// off the JS heap.
 export const zipStore = async (
   entries: readonly ZipEntry[],
   modifiedAt: Date = new Date(),
@@ -84,11 +60,8 @@ export const zipStore = async (
   const encoder = new TextEncoder();
   const time = dosTime(modifiedAt);
   const date = dosDate(modifiedAt);
-  // Both are `BlobPart[]` rather than `Uint8Array[]`: since TS 5.7 the array
-  // is generic in its buffer, and a plain `Uint8Array[]` widens to
-  // `ArrayBufferLike` — which includes `SharedArrayBuffer` and so is not a
-  // `BlobPart`. The central directory's running size is counted here for the
-  // same reason: a `BlobPart` has no `.length` to reduce over.
+  // `BlobPart[]`: since TS 5.7 `Uint8Array[]` widens to `ArrayBufferLike`,
+  // which is not one. Hence `centralSize` too — a `BlobPart` has no `.length`.
   const parts: BlobPart[] = [];
   const central: BlobPart[] = [];
   let centralSize = 0;

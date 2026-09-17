@@ -1,48 +1,20 @@
-/*
- * The pin queue: turning kept specs into pixels, afterwards
- * (docs/lokalitet-view.md §4.1.2).
- *
- * A View — a LiDAR extract, a terrain render, a flyfoto grab — is *a row of
- * parameters*, and every surface that keeps one now writes only that row.
- * `Behold` returns in the time of one small POST instead of the time of a
- * tile burst, the starter set fills a rail in a second, and discarding costs
- * nothing at all. This module is the other half of that bargain: the thing
- * that goes and makes the image the record already fully describes.
- *
- * ## Why the pixels have to exist at all
- *
- * "Just store the parameters" is not the whole answer, and the limit is worth
- * being precise about. Reproducible is not the same as reproducible *forever*.
- * Kartverket re-flies LiDAR projects and retires the old ones, NiB reprocesses
- * its mosaics, hoydedata updates a DTM when new laser lands — so a spec
- * re-rendered in three years may honestly not be the image its author was
- * reading, and the caption would say the same words over different pixels.
- * That is the precise failure `src/figure/` exists to prevent, in a new place.
- * So the pin is not a cache. It is the citable artifact, and `meta.renderedAt`
- * is when it was made.
- *
- * ## Shape
- *
- * Module-level and imperative, like `map/groundOverlay.ts`, and for the same
- * kind of reason: it must outlive the surface that started it. Closing the
- * lokalitet — or pressing `Ferdig` — is not a reason to abandon pixels the
- * author already decided were worth keeping, and there is nothing half-written
- * to lose either way, since each pin is one atomic update. React reads it
- * through `usePinState` in `bilderCommon.tsx`.
- *
- * **One job at a time.** Every producer here is a burst of tile requests
- * against a shared public edge, or an 800 ms horizon scan on the main thread.
- * Two at once would not finish sooner; it would make both slower and invite
- * shed responses. Same argument the starter set and the flyfoto batch each
- * used to make for themselves — it lives in one place now, which is most of
- * why this is a queue rather than a function.
- *
- * The three states a job can end in are deliberately distinct. `failed` is a
- * fault and is worth retrying; `empty` means the source has nothing over this
- * rectangle and retrying is pointless — a 1962 acquisition that turns out not
- * to reach this valley is a fact about the ground, not an error, and the card
- * says so instead of spinning.
- */
+// The pin queue: a kept View is a row of parameters, and this is what turns
+// that row into the figure PNG and PATCHes it onto the record afterwards.
+//
+// Module-level and React-free so it outlives the surface that started it —
+// closing the lokalitet must not abandon pixels the author decided to keep,
+// and each pin is one atomic update. React reads it through `usePinState`.
+//
+// One job at a time: every producer is a burst of tile requests against a
+// shared public edge or an 800 ms horizon scan on the main thread, so two at
+// once finish no sooner and invite shed responses.
+//
+// A pin is not a cache. Upstreams re-fly and reprocess, so a spec re-rendered
+// in three years may not be the image its author read; the pin is the citable
+// artifact and `meta.renderedAt` says when it was made.
+//
+// `failed` is a fault and worth retrying; `empty` means the source has nothing
+// over this rectangle and retrying is pointless.
 
 import { t } from 'i18next';
 import { transformExtent } from 'ol/proj';
@@ -91,51 +63,24 @@ export type PinJob = {
   /** The lokalitet's name, for the figure's title line. */
   subject?: string;
   /**
-   * The pinned record, handed back to whoever is showing it.
-   *
-   * Realtime would carry the PATCH back by itself, except that it is held
-   * back for the length of an edit session — and edit is when pins happen.
-   * So the caller gets told directly. Optional, and the queue does not care
-   * whether anybody is still listening: a pin is worth landing either way.
+   * The pinned record, handed back to whoever is showing it. Needed because
+   * realtime is held back for the length of an edit session, which is when
+   * pins happen.
    */
   onPinned?: (rec: AttachmentRecord) => void;
 };
 
-/*
- * Nothing here may wait forever, and the reason is the queue rather than any
- * one image.
- *
- * One job at a time is what makes a stall expensive: a render that never
- * settles is not one card spinning, it is `drain` parked on an `await` with
- * every queued job behind it, and a spinner is exactly what the surface shows
- * while it waits. There is no upstream that guarantees an answer — the
- * requests underneath have their own per-request ceilings now
- * (src/shared/utils/deadline.ts), but "the producer ran out of ways to fail"
- * is not a property this module can check, so it puts a clock on the whole
- * thing and treats expiry as an ordinary failure: `failed`, with a retry
- * button, which is the honest state for "we do not know, ask again".
- *
- * Both numbers are ceilings on a stall, not budgets. A 40 Mpx stitch of
- * sixteen tiles at four at a time is well under a minute; five is where a
- * render has clearly stopped making progress rather than being slow. The
- * upload gets the same, which is 50 MB — the field's cap — at about
- * 1.5 Mbit/s up.
- */
+// Ceilings on a stall, not budgets. The queue is serial, so a render that
+// never settles parks `drain` with every job behind it; expiry is treated as
+// an ordinary `failed`, with a retry button. The upload gets the same, which
+// is 50 MB — the field's cap — at about 1.5 Mbit/s up.
 const RENDER_DEADLINE_MS = 300_000;
 const UPLOAD_DEADLINE_MS = 300_000;
 
-/*
- * The longest side of a flatten, in pixels (§13.7).
- *
- * A scene is the one producer here that composites *several* rasters, so it is
- * the one that has to say how big the sheet is before any of them arrives.
- * 6000 is the largest thing any single member can be — 1500 m, the bbox
- * ceiling, at LiDAR's 0.25 m/px — so a flatten never coarsens the sharpest
- * layer in it, and 36 Mpx is inside `renderFigureBlob`'s 40 Mpx store fit, so
- * nothing gets resampled twice. It is also the memory ceiling: 144 MB for the
- * composite, and members are rendered and drawn one at a time so only one of
- * them is alive beside it.
- */
+// The longest side of a scene's flatten. 6000 px is the largest a single
+// member can be (1500 m, the bbox ceiling, at LiDAR's 0.25 m/px), so a flatten
+// never coarsens its sharpest layer, and 36 Mpx stays inside
+// `renderFigureBlob`'s 40 Mpx store fit so nothing is resampled twice.
 const SCENE_MAX_SIDE_PX = 6000;
 
 // Filenames end up in a download dialog and in a takeout bundle, so keep them
@@ -143,15 +88,8 @@ const SCENE_MAX_SIDE_PX = 6000;
 const sanitizeFilename = (s: string) =>
   s.replace(/[^\p{L}\p{N}._-]+/gu, '_').slice(0, 80) || 'bilde';
 
-/*
- * Why a pin failed, and not merely that it did.
- *
- * PocketBase's ClientResponseError says "400: Failed to update record." and
- * keeps the part that names the offending field in `response.data`, which
- * logging the error alone does not print. The difference is one line in a
- * console versus an afternoon of bisecting: the 20 MB file-size cap that
- * stopped the starter set cost the second.
- */
+// PocketBase's ClientResponseError logs only "400: Failed to update record.";
+// the field that actually failed is in `response.data`.
 const failureDetail = (e: unknown): string => {
   const data = (e as { response?: { data?: unknown } })?.response?.data;
   if (!data || typeof data !== 'object') return '';
@@ -180,10 +118,8 @@ export const pinStateOf = (id: string): PinState | undefined => states.get(id);
 
 /**
  * Whether this record has already been offered to the queue in this session.
- *
- * What the workspace's retry sweep filters on. Without it, a record whose pin
- * failed would be re-enqueued by every realtime event — and the list reloads
- * wholesale on every one of those.
+ * The workspace's retry sweep filters on it; without it a failed pin would be
+ * re-enqueued by every realtime event.
  */
 export const pinAttempted = (id: string): boolean => attempted.has(id);
 
@@ -203,20 +139,11 @@ const to25833 = (bbox: LocalityBbox) =>
     number,
   ];
 
-/*
- * Which rectangle to render — the *spec's*, not the lokalitet's.
- *
- * Every producer works in lon/lat, and every spec records its extent in
- * EPSG:25833, so this goes back the way the writer came. It matters because a
- * pin can be minutes or a session behind the spec: "Juster området" moves the
- * lokalitet's rectangle, and a queued render that followed it would produce an
- * image of ground the author never asked to keep, under a caption that says
- * the extent they did ask for. The record is the spec; the rectangle is part
- * of it.
- *
- * The lokalitet's own bbox is the fallback, for records written before any of
- * this existed and for the one producer whose meta has no extent to read.
- */
+// Render the spec's rectangle, never the lokalitet's current one: a pin can be
+// a session behind the spec, and "Juster området" would otherwise produce
+// ground the author never kept under a caption naming the extent they did.
+// Producers work in lon/lat; specs store EPSG:25833. The lokalitet's bbox is
+// the fallback, for records whose meta has no extent.
 const rectangleOf = (rec: AttachmentRecord, fallback: LocalityBbox) => {
   const stored = rec.meta?.bbox25833;
   if (
@@ -236,14 +163,8 @@ const rectangleOf = (rec: AttachmentRecord, fallback: LocalityBbox) => {
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null;
 
-/*
- * What a scene's layer owes, by the kind of record it is (§13.7).
- *
- * Exhaustive over `AttachmentKind` on purpose: another kind added later is a
- * build error here rather than a figure that quietly credits nobody for it.
- * A terrain render and a LiDAR extract share `extract` and share hoydedata.no,
- * so the coarseness costs nothing.
- */
+// Exhaustive over `AttachmentKind` on purpose: a kind added later is a build
+// error here rather than a figure that quietly credits nobody.
 const SCENE_CREDIT_BY_KIND: Record<AttachmentKind, SceneLayerCredit> = {
   extract: 'hoydedata',
   flyfoto: 'nib',
@@ -255,15 +176,8 @@ const SCENE_CREDIT_BY_KIND: Record<AttachmentKind, SceneLayerCredit> = {
   scene: 'none',
 };
 
-/*
- * A scene's ground, named for the caption.
- *
- * Built from the parsed spec rather than borrowed from `metaLineOf`, which
- * says the same thing on a card: that one lives in `bilderCommon.tsx` and
- * importing a UI module into the queue would pull the whole kit behind a
- * module that has to run with no surface mounted. Two readings of the same
- * three specs is the cheaper of the two prices.
- */
+// Duplicates what `metaLineOf` says on a card, deliberately: importing a UI
+// module here would pull the kit into a module that runs with no surface.
 const groundLabelOf = (spec: GroundSpec): string => {
   switch (spec.kind) {
     case 'lidar':
@@ -289,22 +203,13 @@ const groundLabelOf = (spec: GroundSpec): string => {
 };
 
 /**
- * Spec → figure. The one place a View becomes pixels, whichever of the three it
- * is, and the mirror of `useRecreateView`: that one applies a spec to the live
- * map, this one applies it to a canvas nobody is watching.
+ * Spec → figure. The one place a View becomes pixels. `null` means the source
+ * has nothing here, which is not a failure; a throw is, including the deadline
+ * — applied here rather than in `runJob` so the picker gets it too.
  *
- * `null` is "the source has nothing here", which is not a failure. Anything
- * that throws is — including running out of time: the deadline is applied
- * here, not in the queue's `runJob`, so the picker gets it too. A card stuck
- * on `fetching` and a card stuck on a spinner are the same bug on two
- * surfaces.
- *
- * Exported for the picker (§4.3), which is the one caller that renders a spec
- * with no record behind it: a picker candidate is not an attachment until it is
- * kept, so it has nothing to pin onto and nothing to enqueue. Keeping one then
- * writes *these* bytes rather than asking the queue for a second render of the
- * same parameters — which spares Kartverket a duplicate tile burst and makes
- * the stored pin literally the pixels the author looked at when they decided.
+ * Exported for the picker, whose candidates have no record to pin onto; it
+ * keeps these bytes rather than asking for a second render of the same
+ * parameters.
  */
 export const renderSpec = (
   spec: ViewSpec,
@@ -323,18 +228,15 @@ const renderSpecWithin = async (
 ): Promise<Produced | null> => {
   switch (spec.kind) {
     case 'lidar': {
-      // The catalogue rather than the stored key alone: a project is a name in
-      // a 1936-entry GetCapabilities and what we need is its URL, prefix and
-      // published style list. Cached, so three specs off the same lokalitet
-      // cost one lookup.
+      // The catalogue rather than the stored key alone: the key is a name, and
+      // what the stitch needs is the URL, prefix and published style list.
       const wanted =
         spec.source === 'national'
           ? 'national'
           : `project:${spec.source.projectName}`;
       const sources = await enumerateLidarSources(bbox4326, spec.model);
       const source = sources.find((s) => s.key === wanted);
-      // The project no longer covers this rectangle, or has been retired
-      // upstream. Nothing to retry against, which is exactly `empty`.
+      // Retired upstream, or no longer covering this rectangle: `empty`.
       if (!source) return null;
       const raster = await extractLidarFigure(
         source,
@@ -385,34 +287,23 @@ const renderSpecWithin = async (
         blob: figure.blob,
         filename: `terreng_${spec.vis}_${spec.model}.png`,
         meta: {
-          // The figure's rather than the DEM's: the grid it was computed on is
-          // a processing fact and the caption prints it as one, while this
-          // describes the pixels on the file.
+          // The figure's, not the DEM's: this describes the pixels on the file.
           metresPerPx: figure.metresPerPx,
           bbox25833: render.dem.bbox25833,
           imageRect: figure.imageRect,
-          // Written back because the grid may have clamped it. A spec that
-          // asked for 20 m and got 6 m should say 6 m from now on, or the
-          // duplicate guard would offer to fetch it again forever.
+          // Write the clamped radius back, or the duplicate guard never
+          // matches and offers to fetch this again forever.
           ...(render.radius != null ? { radius: render.radius } : {}),
         },
       };
     }
 
     case 'sketch': {
-      /*
-       * The only producer here that asks nothing of the network, so the
-       * rectangle and the signal both go unused: the strokes are in the spec
-       * and the scene is its own extent. Rendered at scale 1 — the resolution
-       * the frozen viewport had when it was drawn — because that is the
-       * resolution the author was judging at, and inventing more of it would
-       * put a metres-per-pixel on the caption that no hand ever worked to.
-       *
-       * On **white paper**, unlike the same scene on the map. The overlay is
-       * transparent because it is a layer over the ground; this is the figure
-       * that goes in a card, a report and a takeout bundle, and a transparent
-       * PNG in any of the three is a picture of nothing.
-       */
+      // Asks nothing of the network, so the rectangle and the signal go
+      // unused: the strokes are in the spec and the scene is its own extent.
+      // Scale 1 is the resolution the author drew at. On white paper, unlike
+      // the transparent map overlay — a transparent PNG in a report is a
+      // picture of nothing.
       const render = await renderScene(spec.scene.frame, spec.scene.elements, {
         scale: 1,
         background: '#ffffff',
@@ -450,9 +341,8 @@ const renderSpecWithin = async (
       if (source !== 'mosaic' && !project) return null;
       const result = await fetchFlyfoto(bbox4326, { project, signal });
       if (!result) return null;
-      // JPEG all the way through, like the stitch itself: the caption is large
-      // flat type and survives it, and a lossless copy of a lossy-sourced
-      // photograph is several times the bytes for nothing.
+      // JPEG all the way through, like the stitch itself: a lossless copy of a
+      // lossy-sourced photograph is several times the bytes for nothing.
       const figure = await renderFigureBlob(
         result.canvas,
         flyfotoFigure({
@@ -477,28 +367,18 @@ const renderSpecWithin = async (
     }
 
     case 'scene': {
-      /*
-       * The flatten (§13.7): the arrangement, drawn once, bottom to top.
-       *
-       * The only producer here that renders *other records*, and the shape
-       * follows from that. It does not reuse the members' pinned figures as
-       * figures — a caption panel inside a composite is a picture of a card —
-       * it asks `groundRasterOf` for each member's ground pixels, which is the
-       * pin where there is one and a live render where there is not, exactly
-       * as the map does for the same member one level up.
-       *
-       * Sequential rather than parallel, and not only for the queue's usual
-       * rate-limit reason: each member is up to 36 Mpx, so rendering four at
-       * once is half a gigabyte of canvases waiting for each other.
-       */
+      // The flatten: the arrangement, drawn once, bottom to top. Members go
+      // through `groundRasterOf` rather than their pinned figures — a caption
+      // panel inside a composite is a picture of a card. Sequential: each
+      // member is up to 36 Mpx, so four at once is half a gigabyte of canvases.
       const extent25833 = to25833(bbox4326);
       const [minX, minY, maxX, maxY] = extent25833;
       const widthM = maxX - minX;
       const heightM = maxY - minY;
       if (!(widthM > 0) || !(heightM > 0)) return null;
 
-      // One query for the membership, in the order the scene records rather
-      // than the order the server answers in — the order *is* the content.
+      // One query for the membership, re-ordered by the scene: the server's
+      // order is not the scene's, and the order is the content.
       const byId = new Map(
         (await listAttachmentsByIds(spec.layers.map((l) => l.id))).map(
           (rec) => [rec.id, rec] as const,
@@ -506,9 +386,8 @@ const renderSpecWithin = async (
       );
       const ordered = spec.layers.flatMap((layer) => {
         const rec = byId.get(layer.id);
-        // Deleted since, or no longer readable. An uncascaded relation is what
-        // makes that a scene with one fewer layer rather than a broken record
-        // (`sceneSpec.ts`), and the caption below lists what actually landed.
+        // Deleted since, or no longer readable: a scene with one fewer layer,
+        // and the caption below lists what actually landed.
         return rec ? [{ layer, rec }] : [];
       });
 
@@ -517,15 +396,9 @@ const renderSpecWithin = async (
         : null;
       if (!ground && ordered.length === 0) return null;
 
-      /*
-       * How fine to draw, decided once and before anything is composited.
-       *
-       * The sharpest thing in the stack sets it — anything coarser would throw
-       * away detail the author was reading — with the sheet's own ceiling as
-       * the floor. The ground's resolution is measured off the raster it
-       * actually produced; a member's is the `metresPerPx` its pin recorded,
-       * which is absent on an unpinned spec and simply does not vote.
-       */
+      // The sharpest thing in the stack sets the resolution, with the sheet's
+      // ceiling as the floor. An unpinned member has no `metresPerPx` and
+      // simply does not vote.
       const floor = Math.max(widthM, heightM) / SCENE_MAX_SIDE_PX;
       const declared = [
         ...(ground
@@ -549,9 +422,8 @@ const renderSpecWithin = async (
       canvas.height = Math.max(1, Math.round(heightM / metresPerPx));
       const ctx = canvas.getContext('2d');
       if (!ctx) return null;
-      // White paper under everything, for the same reason a sketch's figure
-      // gets it: a scene built over Standard or Hybrid has no ground spec at
-      // all, and a transparent PNG in a report is a picture of nothing.
+      // White paper: a scene built over Standard or Hybrid has no ground spec
+      // at all, and a transparent PNG in a report is a picture of nothing.
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -571,8 +443,7 @@ const renderSpecWithin = async (
         ctx.save();
         ctx.globalAlpha = Math.min(1, Math.max(0, alpha));
         // Smooth on the way down, nearest on the way up — the same rule
-        // `map/groundOverlay.ts` applies, so the flatten looks like what was
-        // on screen when it was kept.
+        // `map/groundOverlay.ts` applies, so the flatten matches the screen.
         ctx.imageSmoothingEnabled = w < raster.canvas.width;
         ctx.drawImage(
           raster.canvas,
@@ -598,14 +469,9 @@ const renderSpecWithin = async (
         const memberSpec = viewSpecOf(rec);
         let raster: ViewRaster | null;
         if (memberSpec?.kind === 'sketch') {
-          /*
-           * A sketch is the one member that cannot come from its own pin:
-           * that figure is drawn on white paper, so laying it over the stack
-           * would erase everything under it (`groundRasterOf` refuses it for
-           * exactly this). Re-rendered transparent instead, at the sheet's
-           * resolution rather than the scene's own, so the strokes stay a
-           * hand's width whatever the ground beneath them is.
-           */
+          // A sketch cannot come from its own pin — that figure is on white
+          // paper and would erase the stack — so re-render it transparent, at
+          // the sheet's resolution so the strokes stay a hand's width.
           const render = await renderScene(
             memberSpec.scene.frame,
             memberSpec.scene.elements,
@@ -617,9 +483,8 @@ const renderSpecWithin = async (
         } else {
           raster = await groundRasterOf(rec, signal);
         }
-        // A layer that did not land is left out of the caption as well as out
-        // of the picture. A settings line naming a layer the pixels do not
-        // contain is the one failure `src/figure/` exists to prevent.
+        // A layer that did not land must leave the caption too: naming a layer
+        // the pixels do not contain is what `src/figure/` exists to prevent.
         if (!raster) continue;
         place(raster, layer.opacity / 100);
         captionLayers.push({
@@ -629,8 +494,7 @@ const renderSpecWithin = async (
         });
       }
 
-      // Everything the scene named is gone or empty. `empty` rather than
-      // `failed`: there is nothing here to retry against.
+      // Everything the scene named is gone or empty: nothing to retry against.
       if (!captionGround && captionLayers.length === 0) return null;
 
       const figure = await renderFigureBlob(
@@ -660,9 +524,8 @@ const renderSpecWithin = async (
 /** One job, start to finish. Resolves to the pinned record, or null. */
 const runJob = async (job: PinJob): Promise<AttachmentRecord | null> => {
   const spec = viewSpecOf(job.rec);
-  // A File, or a View whose meta no longer parses. Neither is the queue's to
-  // fix, and leaving it `failed` would put a retry button on a card that has
-  // nothing to retry.
+  // A File, or a View whose meta no longer parses: `failed` would put a retry
+  // button on a card with nothing to retry.
   if (!spec) {
     states.set(job.rec.id, 'empty');
     return null;
@@ -673,19 +536,13 @@ const runJob = async (job: PinJob): Promise<AttachmentRecord | null> => {
     states.set(job.rec.id, 'empty');
     return null;
   }
-  // The upload is the other half that can hang, and the SDK's own
-  // auto-cancellation is keyed on request identity rather than on time. No
-  // signal goes in: a multipart PATCH already on the wire cannot be taken back,
-  // so this is the rejection guarantee only — the queue moves on and the card
-  // offers a retry, while the browser finishes or drops the transfer in its
-  // own time.
+  // No signal: a multipart PATCH already on the wire cannot be taken back, so
+  // the deadline only guarantees rejection — the queue moves on while the
+  // browser finishes or drops the transfer in its own time.
   const pinned = await withDeadline(UPLOAD_DEADLINE_MS, 'pin upload', () =>
     pinAttachment(job.rec.id, produced.blob, produced.filename, {
       ...(job.rec.meta ?? {}),
       ...produced.meta,
-      // Provenance, so a pin and its spec can be compared later rather than
-      // merely trusted. It lives inside `meta` because provenance already has
-      // a home there and this needs no column of its own.
       renderedAt: new Date().toISOString(),
     }),
   );
@@ -716,12 +573,8 @@ const drain = async () => {
 
 /**
  * Ask for a spec's pixels. Returns immediately; the work happens behind.
- *
- * Idempotent while a job is in flight, so the workspace's retry sweep can run
- * on every list reload without piling up duplicates of the one already
- * running. A `failed` or `empty` record *can* be re-enqueued — that is the
- * retry button — which is why the guard is on the live states and not on
- * `attempted`.
+ * Idempotent while a job is in flight. The guard is on the live states rather
+ * than `attempted` so a `failed` or `empty` record can still be retried.
  */
 export const enqueuePin = (job: PinJob): void => {
   const state = states.get(job.rec.id);
@@ -734,14 +587,9 @@ export const enqueuePin = (job: PinJob): void => {
 };
 
 /**
- * The pixels, now, awaited — for the two callers whose whole purpose is the
- * bytes (§4.1.2): `Last ned` and, later, the Rapportpakke. There is no such
- * thing as downloading a parameter row.
- *
- * It jumps the queue rather than joining it, because it has somebody waiting
- * on it. A job already running for this record is left alone and this simply
- * does the work again — one wasted render is a better answer than a promise
- * that resolves when an unrelated batch ahead of it finishes.
+ * The pixels, now, awaited — for the callers that need the bytes themselves
+ * (`Last ned`, the Rapportpakke). Jumps the queue rather than joining it, and
+ * does the work again if a job is already running for this record.
  */
 export const pinNow = async (job: PinJob): Promise<AttachmentRecord | null> => {
   attempted.add(job.rec.id);

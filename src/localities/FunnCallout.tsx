@@ -18,26 +18,10 @@ const STATUS_PALETTE: Record<LocalityFindRecord['status'], BadgePalette> = {
 };
 
 /**
- * The selected funn's own words, beside it — docs/lokalitet-view.md §6.
- *
- * The funn list is an index now, in a popover on the row; this is the
- * content. A note about a mound belongs next to the mound, not in a column
- * 400 px to the right of it, and the popover the index lives in closes the
- * moment you touch the map — so the thing you actually wanted to read would
- * have gone with it.
- *
- * Deliberately read-only. Editing a note is a rare, deliberate act performed
- * from the list row that already knows how to do it; a textarea floating over
- * the terrain would be one more surface between you and the ground.
- *
- * It is an `ol/Overlay` rather than a card in a slot, which is what makes it
- * stay on the mound while you pan. `stopEvent` is on: the close button and
- * the link have to be clickable, and OpenLayers would otherwise read the
- * press as the start of a drag.
- *
- * `funnHidden` takes it down with the drawing it annotates — H is a way of
- * looking at the bare ground, and a label sitting exactly where the outline
- * was would defeat the whole gesture.
+ * The selected funn's title and note, read-only, beside the funn itself. An
+ * `ol/Overlay` rather than a card in a slot, so it stays on the mound while
+ * you pan; `stopEvent` is on so its buttons are clickable. Goes down with
+ * `funnHidden`, along with the drawing it annotates.
  */
 export const FunnCallout = ({
   items,
@@ -80,9 +64,8 @@ export const FunnCallout = ({
     };
   }, [map]);
 
-  // Re-read the extent off the layer rather than off the record: the layer is
-  // where the geometry has been reprojected into the view's coordinates, and
-  // it is also what an in-flight geometry edit updates first.
+  // Off the layer rather than the record: that is where the geometry is in the
+  // view's coordinates, and it is what an in-flight geometry edit updates.
   useEffect(() => {
     const visible = funn && !funnHidden;
     const extent = visible ? getFunnExtentOnLayer(funn.id) : null;

@@ -1,10 +1,7 @@
 /*
- * The placement row — the rectangle on the map, before there is a record
- * (docs/ui-architecture.md §5.6).
- *
- * Tinted like the funn draft row, and for the same reason: it is a session you
- * are inside rather than a strip beside the others, and the tint is what says
- * the bar is in a state you have to leave.
+ * The placement row — the rectangle on the map, before there is a record.
+ * Tinted like the funn draft row: it is a session you are inside, and the tint
+ * says the bar is in a state you have to leave.
  */
 
 .row {
@@ -12,7 +9,7 @@
   border-top-color: var(--c-border);
 }
 
-/* "NY LOKALITET" — the same quiet uppercase the lokalitet row's label uses. */
+/* The same quiet uppercase the lokalitet row's label uses. */
 .label {
   flex: none;
   font-size: var(--font-xs);
@@ -22,9 +19,8 @@
   color: var(--c-fg-subtle);
 }
 
-/* 620 × 480 m · 29,8 ha. Tabular figures so the numbers do not jitter sideways
-   while a corner is being dragged — the readout is being watched, which is the
-   one place proportional digits are actually distracting. */
+/* 620 × 480 m · 29,8 ha. Tabular figures so the numbers do not jitter while a
+   corner is being dragged. */
 .span {
   flex: none;
   font-size: var(--font-sm);
@@ -32,8 +28,7 @@
   color: var(--c-fg);
 }
 
-/* Sitting on the band's edge. Amber: the drag stopped where it had to, which
-   is a thing to notice rather than a thing that failed. */
+/* Sitting on the band's edge. Amber: a thing to notice, not a failure. */
 .limit {
   flex: none;
   display: flex;
@@ -58,7 +53,7 @@
   color: var(--c-fg-subtle);
 }
 
-/* The exits, last and right — the same place row 2 keeps its own. */
+/* The exits, last and right, where row 2 keeps its own. */
 .actions {
   flex: none;
   display: flex;

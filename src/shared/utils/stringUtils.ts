@@ -53,16 +53,14 @@ export const computeLevenshteinDistance = (
   if (s1 === s2) return 0;
   if (!s1.length || !s2.length) return s1.length + s2.length;
 
-  // Create matrix for dynamic programming
   const matrix = [];
   for (let i = 0; i <= s2.length; i++) {
-    matrix[i] = [i]; // Initialize the first column
+    matrix[i] = [i];
   }
   for (let j = 0; j <= s1.length; j++) {
-    matrix[0][j] = j; // Initialize the first row
+    matrix[0][j] = j;
   }
 
-  // Fill in the rest of the matrix
   for (let i = 1; i <= s2.length; i++) {
     for (let j = 1; j <= s1.length; j++) {
       const cost = s1[j - 1] === s2[i - 1] ? 0 : 1;
@@ -74,6 +72,5 @@ export const computeLevenshteinDistance = (
     }
   }
 
-  // The bottom-right cell contains the final distance
   return matrix[s2.length][s1.length];
 };

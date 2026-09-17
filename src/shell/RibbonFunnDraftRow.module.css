@@ -1,9 +1,6 @@
 /*
- * Row 3 — the funn draft's naming line (docs/lokalitet-view.md §6).
- *
- * Tinted like the lokalitet row above it in edit, because it is inside that
- * stance rather than beside it: the two read as one block that the ordinary
- * rows are not part of.
+ * The funn draft's naming line. Tinted like the lokalitet row above it in
+ * edit, because it is inside that stance rather than beside it.
  */
 
 .row {
@@ -11,8 +8,7 @@
   border-top-color: var(--c-green-200);
 }
 
-/* "Nytt funn" / "Rediger tegningen" — the same quiet uppercase the lokalitet
-   row's own label uses, saying what this row is scoped to. */
+/* The same quiet uppercase the lokalitet row's label uses. */
 .label {
   flex: none;
   font-size: var(--font-xs);
@@ -28,17 +24,14 @@
   max-width: 360px;
 }
 
-/* Saving / saved / pending. A word, not a spinner: the write is a hundred
-   milliseconds and a spinner that flashes is worse than a label that
-   changes. */
+/* Buffered / pending. A word, not a spinner: nothing here writes. */
 .state {
   flex: none;
   font-size: var(--font-xs);
   color: var(--c-fg-subtle);
 }
 
-/* The grow-to-fit warning, inline. Amber rather than red — drawing past the
-   edge of the rectangle is a thing to notice, not a thing that failed. */
+/* The grow-to-fit warning. Amber: a thing to notice, not a failure. */
 .outside {
   display: flex;
   align-items: center;

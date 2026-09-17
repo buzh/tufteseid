@@ -1,13 +1,6 @@
-// Shows where a LiDAR project actually lies while the ribbon's dataset
-// pulldown is open: the footprint of the row the pointer is on, plus the
-// dataset currently in use. Picking happens in the list, not here — this
-// is the "you are pointing at *that* valley" half of it, which is why it
-// lives and dies with the pulldown rather than staying up for the whole
-// LiDAR session.
-//
-// Fetching + relevance classification happens here and is written to
-// lidarViewportAtom, which the ribbon pulldown also reads — one WFS call
-// and one classification pass serve both the drawn shapes and the list.
+// Draws where a LiDAR project lies while the dataset pulldown is open. The
+// fetch and the relevance classification also happen here, into
+// lidarViewportAtom, so one WFS pass serves both the shapes and the list.
 
 import { useAtomValue, useSetAtom } from 'jotai';
 import { Feature } from 'ol';
@@ -50,40 +43,24 @@ import {
 
 export const LIDAR_FOOTPRINTS_LAYER_ID = 'lidarFootprintsLayer';
 
-// Furthest out the pulldown will try to answer "what covers this view".
-// Expressed as a zoom level rather than a viewport width because that's
-// what the cutoff feels like in use, and it doesn't move with the
-// browser window.
-//
-// Not a cost bound any more — FOOTPRINT_FETCH_CAP below bounds the work
-// at every zoom. It's that the answer stops being a picker: a
-// whole-country view intersects some 450 acquisitions, of which the list
-// can show 25, and "these 25 counties have LiDAR" is not a choice anyone
-// is trying to make. The honest response out here is "zoom in".
+// Furthest out the pulldown will answer "what covers this view". Not a cost
+// bound but a usefulness one: a whole-country view intersects some 450
+// acquisitions and the list shows 25.
 const MIN_FOOTPRINT_ZOOM = 7;
 
-// How many candidates get a real footprint fetched. Candidates are
-// ordered by bboxOverlapRatio first — an upper bound on real coverage —
-// so the ones this drops are the ones that could not have made the top
-// of the list anyway. Sized above RENDER_CAP (25) with room for the
-// envelope-vs-polygon slack, and it's also the request budget: 60 name
-// queries at 6 concurrent is ~2 s cold and free once cached.
+// How many candidates get a real footprint fetched. Ordered by bboxOverlapRatio
+// first, an upper bound on real coverage, so this only drops ones that could
+// not have reached the top of a 25-row list.
 const FOOTPRINT_FETCH_CAP = 60;
 
-// Auto (lidarAuto.ts) keeps this refreshing for a whole LiDAR session
-// rather than only while a pulldown is open, so a pan gesture that ends in
-// three quick moveends should cost one pass, not three. Short enough not to
-// be felt: the fetch behind it takes an order of magnitude longer cold, and
-// nothing longer once cached.
+// Auto keeps this refreshing for a whole LiDAR session, so a pan ending in
+// three quick moveends should cost one pass rather than three.
 const REFRESH_DEBOUNCE_MS = 250;
 
 type Tier = 'hover' | 'active';
 
-// At most two footprints are on screen at a time, so the styles can
-// afford to be loud. Both draw a white casing under a saturated core:
-// the base underneath is either green topo or grey-brown hillshade, and
-// a plain coloured outline disappears into one or the other — an earlier
-// green outline over green topo was effectively invisible.
+// A white casing under a saturated core: the base is either green topo or
+// grey-brown hillshade, and a plain coloured outline vanishes into one of them.
 const casing = (width: number) =>
   new Stroke({ color: 'rgba(255, 255, 255, 0.85)', width });
 
@@ -96,8 +73,8 @@ const HOVER_STYLE = [
   }),
 ];
 
-// No fill: the active dataset is usually the one being read, and tinting
-// the terrain it covers defeats the purpose.
+// No fill: the active dataset is the one being read, and tinting the terrain
+// it covers defeats the purpose.
 const ACTIVE_STYLE = [
   new Style({ stroke: casing(5), zIndex: 0 }),
   new Style({
@@ -127,8 +104,7 @@ const getOrCreateLayer = (map: OlMap): VectorLayer => {
   return layer;
 };
 
-// Mount once (src/shell/useMapSideEffects.ts) alongside the other
-// map-effect hooks.
+/** Mount once, from `src/shell/useMapSideEffects.ts`. */
 export const useLidarFootprintsLayer = () => {
   const map = useAtomValue(mapAtom);
   const backgroundLayer = useAtomValue(backgroundLayerAtom);
@@ -144,42 +120,27 @@ export const useLidarFootprintsLayer = () => {
 
   const isLidarBackground =
     backgroundLayer === 'lidarProject' || backgroundLayer === 'lidarHillshade';
-  // The pulldown is only on the bar while LiDAR is the ground on screen, but
-  // check both — the atom can be left true if the popover unmounts without
+  // Both, because the atom can be left true if the popover unmounts without
   // closing itself (which is why useGroundMode calls standDown).
   const picking = isLidarBackground && pickerOpen;
-  // Keyboard cycling walks the same list without opening anything, so it
-  // needs the fetch but not the drawing.
-  //
-  // Auto is the third consumer, and the only one that isn't a transient
-  // interaction: while it is on, the list *is* the dataset selection, so it
-  // has to stay current for as long as LiDAR mode is. That would be
-  // expensive at every zoom, which is why `refresh` below additionally
-  // declines to fetch on auto's behalf out where auto already knows the
-  // answer without asking.
+  // Cycling and auto both want the fetch and neither wants the drawing.
   const wantsViewport =
     picking || (isLidarBackground && (cycling || autoDataset));
 
-  // Layer lifecycle: created lazily, visibility follows the pulldown.
-  // Hover is cleared on the way out so a row the pointer happened to be
-  // over when the pulldown closed doesn't flash back on reopen.
+  // Hover is cleared on the way out, so it does not flash back on reopen.
   useEffect(() => {
     const layer = getOrCreateLayer(map);
     layer.setVisible(picking);
     if (!picking) setHoveredProjectId(null);
   }, [map, picking, setHoveredProjectId]);
 
-  // Fetch + classify on viewport change, while the pulldown is open, the
-  // keyboard is cycling datasets, or auto is resolving them.
   useEffect(() => {
     if (!wantsViewport) {
       setViewport(emptyLidarViewport('idle'));
       return;
     }
     let cancelled = false;
-    // Panning fires refreshes faster than the WFS answers them; only the
-    // newest one may write to the atom, or a slow early response can
-    // overwrite the coverage for where the user actually ended up.
+    // Panning outruns the WFS; only the newest request may write to the atom.
     let latestRequest = 0;
 
     const refresh = () => {
@@ -198,18 +159,13 @@ export const useLidarFootprintsLayer = () => {
         | undefined;
       if (!extentLonLat) return;
 
-      // Claimed before the two scale guards too, so a fetch started while
-      // zoomed in can't land afterwards and overwrite the guard state.
+      // Claimed before the two scale guards, so a fetch started while zoomed
+      // in cannot land afterwards and overwrite the guard state.
       const request = ++latestRequest;
       const isStale = () => cancelled || request !== latestRequest;
 
-      // Auto on its own doesn't need this list out where it would resolve
-      // to the national mosaic regardless — and that is most of the zoom
-      // range, including every view wide enough for the candidate set to be
-      // large. Skipping it there is what keeps always-on auto affordable.
-      // An open pulldown or an armed W/S ring still wants an answer at any
-      // zoom the WFS will give one, so this only applies when auto is the
-      // sole reason we're here.
+      // Out where auto would resolve to the national mosaic regardless it does
+      // not need the list, which is what keeps always-on auto affordable.
       const resolution = map.getView().getResolution();
       if (
         !picking &&
@@ -222,9 +178,8 @@ export const useLidarFootprintsLayer = () => {
         return;
       }
 
-      // getZoom() is a log2 of the resolution, so an integral zoom can
-      // come back a hair under itself — don't lock the user out of the
-      // threshold level they're standing on.
+      // getZoom() is a log2 of the resolution, so an integral zoom can come
+      // back a hair under itself — hence the epsilon.
       const zoom = map.getView().getZoom();
       if (zoom == null || zoom < MIN_FOOTPRINT_ZOOM - 0.001) {
         setViewport((prev) =>
@@ -237,13 +192,9 @@ export const useLidarFootprintsLayer = () => {
 
       fetchLidarProjects()
         .then((allProjects) => {
-          // The catalogue's GetCapabilities bounding boxes are true
-          // envelopes, so this prefilter is *complete* — it can only
-          // over-include. That completeness is what lets the footprint
-          // fetch be a per-name lookup instead of a spatial query the
-          // WFS answers wrong at small extents (see lidarFootprints.ts).
-          // What actually qualifies a project for the list is its real
-          // polygon touching the viewport, decided below.
+          // The catalogue's bounding boxes are true envelopes, so this can only
+          // over-include — which is what lets the footprint fetch be a per-name
+          // lookup rather than a spatial query (see lidarFootprints.ts).
           const candidates = allProjects
             .filter((p) => bboxIntersects(p.bboxLonLat, extentLonLat))
             .map((project) => ({
@@ -264,9 +215,8 @@ export const useLidarFootprintsLayer = () => {
               const entries: LidarViewportEntry[] = [];
               for (const project of candidates) {
                 const geometries = matches.get(project.id)?.geometries;
-                // No boundary in the WFS, or one whose only overlap with
-                // the viewport was its envelope's: the project has
-                // nothing on this screen, so it isn't in this list.
+                // No boundary in the WFS, or one whose only overlap with the
+                // viewport was its envelope's: nothing on this screen.
                 if (!geometries || !touchesExtent(geometries, extent)) continue;
                 entries.push({
                   project,
@@ -286,8 +236,6 @@ export const useLidarFootprintsLayer = () => {
         });
     };
 
-    // Immediate on mount — opening the pulldown should not sit on an empty
-    // list for a quarter second — and debounced thereafter.
     refresh();
     let debounce: number | undefined;
     const onMoveEnd = () => {
@@ -302,17 +250,12 @@ export const useLidarFootprintsLayer = () => {
     };
   }, [map, wantsViewport, picking, cycling, filters, setViewport]);
 
-  // Render: the hovered row's footprint plus the active dataset's, and
-  // nothing else. Both come out of the same viewport lists the pulldown
-  // renders, so a row can only light up terrain that's actually been
-  // fetched and classified.
+  // The hovered row's footprint and the active dataset's, off the same lists.
   useEffect(() => {
     const layer = getOrCreateLayer(map);
     const source = layer.getSource();
     if (!source) return;
     source.clear();
-    // Cycling keeps the viewport list current with the pulldown shut;
-    // building features it would never show is pure waste.
     if (!picking) return;
 
     const entries = [...viewport.primary, ...viewport.secondary];
@@ -328,8 +271,7 @@ export const useLidarFootprintsLayer = () => {
       }
     };
 
-    // Hovering the active dataset's own row should read as hover — it's
-    // the row the user is asking about.
+    // Hovering the active dataset's own row reads as hover, not active.
     const activeEntry = byId(activeLidarProject?.id);
     if (activeEntry && activeEntry.project.id !== hoveredProjectId) {
       draw(activeEntry, 'active');

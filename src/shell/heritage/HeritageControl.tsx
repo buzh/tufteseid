@@ -27,49 +27,13 @@ import styles from './HeritageControl.module.css';
 
 const SOURCES = themeLayerConfig.layers.map((l) => l.id as ThemeLayerName);
 
-/** The source whose sublayers and rendering the panel below can reshape, and
- *  the one the eye reaches for when nothing at all is on. */
+// The source whose sublayers and rendering the panel can reshape, and the one
+// the eye arms when nothing at all is on.
 const RESHAPEABLE: ThemeLayerName = 'heritageSites';
 
-/**
- * `Kulturminner` — one control with a seam in it. Press the labelled half for
- * what the heritage overlay draws and how hard; press the eye to take it off
- * the map and put it back.
- *
- * **It used to be two buttons**: a `castle` that toggled `heritageSites` and
- * an `Oppsett` (`tune`) beside it that opened this panel. Two controls for one
- * subject, and the split was in the wrong place — the first could only ever
- * say one of the five sources, while the count badge saying how many were on
- * lived on the second. Turn on three sources from the panel and the button
- * labelled `Kulturminner` was a switch for one of them; press it and two
- * stayed behind. Now the noun names the whole overlay, the badge is on the
- * noun, and on/off is the eye — for the reason `Funn` three rows down reaches
- * the same way round by the other route: the button that lists what it hides
- * is the button the switch belongs on. The two have since diverged on *which
- * half* is which — `Funn` is a `LayerGroup` now, where the label switches and
- * a caret opens (§13.10 step 4) — and this is the last `EyeSplit`. It stays
- * one because what it hides is a global overlay rather than a member of the
- * open lokalitet's stack, so the layer row's polarity has nothing to say here.
- *
- * The panel replaces the "Temakart" card, which was upstream's generic
- * theme-layer tree: expandable categories, subthemes, a count warning at
- * fifteen active layers. The fork has five layers in one category, all from
- * the same rights holder, so the tree was scaffolding around a list of five
- * checkboxes — and it spent a dock slot to say so, next to the map it was
- * covering.
- *
- * What is here instead is the four things the register can actually be asked:
- * which services, which of kulturminner2's three registers, how they are
- * drawn, and how strongly. All four are in `src/map/layers/heritage.ts`
- * together with the WMS tables they resolve against.
- *
- * A popover rather than a row on the settings strip. The strip belongs to the
- * ground, and the heritage overlay is not a ground — it is the thing you are
- * reading the ground *against*, and it stays on while you cycle LiDAR
- * datasets underneath it. Giving it the strip would mean the strip's subject
- * changed on its own, so the controls under your cursor would be for
- * something else by the time you reached them.
- */
+// Kulturminner: the labelled half opens what the overlay draws and how hard,
+// the eye takes the whole overlay off the map. The four axes and the WMS
+// tables they resolve against are `src/map/layers/heritage.ts`.
 export const HeritageControl = () => {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -86,10 +50,9 @@ export const HeritageControl = () => {
       else next.add(id);
       return next;
     });
-    // Ticking a source is a request to see it, and the eye is a blind over
-    // all of them: leaving it down would answer a checkbox with nothing on
-    // the map and no visible reason why. Outside the updater — a setter is
-    // not a place to put a side effect.
+    // The eye is a blind over every source, so ticking one has to raise it or
+    // the checkbox answers with nothing on the map. Outside the updater: a
+    // setter is not a place for a side effect.
     if (!active.has(id)) setHidden(false);
   };
 
@@ -102,21 +65,12 @@ export const HeritageControl = () => {
     });
 
   const showRender = active.has(RESHAPEABLE);
-  // On the map, as against ticked: hiding keeps the selection (heritage.ts),
-  // and nothing ticked draws nothing whatever the blind says.
+  // On the map, as against ticked: hiding keeps the selection (heritage.ts).
   const shown = !hidden && active.size > 0;
 
-  /*
-   * Three states, one press, and the third is the one worth stating: with no
-   * source ticked at all the eye *arms* the overlay rather than raising an
-   * empty blind, turning on heritageSites — the register most readings start
-   * from, and what the old `castle` button meant by one press.
-   *
-   * That is what keeps the merge from costing anything. A first visitor's
-   * route to the heritage record has to be one press on a control named after
-   * it; without this they would have to open the panel and know which of five
-   * Riksantikvaren services to tick.
-   */
+  // With nothing ticked the eye arms the overlay rather than raising an empty
+  // blind, so reaching the heritage record is one press on the control named
+  // after it.
   const toggleShown = () => {
     if (active.size === 0) {
       setActive(new Set([RESHAPEABLE]));
@@ -171,10 +125,8 @@ export const HeritageControl = () => {
               checked={active.has(id)}
               onToggle={() => toggleSource(id)}
             />
-            {/* The three registers inside kulturminner2, indented under it.
-                Only while it is on: they are its sublayers, and offering them
-                next to a source that is switched off invites the reasonable
-                guess that ticking one turns the source on. */}
+            {/* kulturminner2's three registers, shown only while it is on:
+                they are sublayers, and ticking one does not turn it on. */}
             {id === RESHAPEABLE &&
               active.has(id) &&
               HERITAGE_DETAILS.map((detail) => (
@@ -203,9 +155,8 @@ export const HeritageControl = () => {
             />
             <RenderItem render="flate" active={render} onPick={setRender} />
 
-            {/* The subsets. One axis with the two above, because STYLES is one
-                axis — see heritage.ts. Under its own heading so the list does
-                not read as five more ways of drawing the same thing. */}
+            {/* The vern subsets: one axis with the two renders above, because
+                the WMS STYLES parameter is one axis. */}
             <div className={pulldown.head}>
               <span>{t('ribbon.heritage.subsetHead')}</span>
             </div>
@@ -221,11 +172,9 @@ export const HeritageControl = () => {
         )}
 
         <div className={pulldown.rule} />
-        {/* Counted as transparency, so 0 % is the overlay at full strength.
-            The atom still holds opacity — it is what the WMS layers take and
-            what `?heritageOpacity` has always meant — so the flip lives here
-            and the floor becomes a ceiling: `MIN_HERITAGE_OPACITY` is why the
-            track stops at 80 % rather than letting the record vanish. */}
+        {/* Counted as transparency (0 % is full strength) while the atom holds
+            opacity, which is what the WMS layers and `?heritageOpacity` take,
+            so `MIN_HERITAGE_OPACITY` becomes the track's ceiling. */}
         <div className={styles.opacity}>
           <label className={styles.opacityLabel} htmlFor="heritage-opacity">
             {t('ribbon.heritage.transparency', {
@@ -248,11 +197,8 @@ export const HeritageControl = () => {
   );
 };
 
-/**
- * Kept as a component so the label lookup and the "is this the current one"
- * test happen in one place for all seven renders — they come from two
- * different lists and are easy to get subtly out of step.
- */
+// One component for all seven renders, which come from two different lists, so
+// the label lookup and the active test cannot drift apart.
 const RenderItem = ({
   render,
   active,

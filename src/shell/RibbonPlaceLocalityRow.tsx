@@ -8,18 +8,10 @@ import styles from './Ribbon.module.css';
 import rowStyles from './RibbonPlaceLocalityRow.module.css';
 
 /**
- * The placement row — a lokalitet's rectangle while it is being placed, and
- * before anything about it has been written (docs/ui-architecture.md §5.6).
- *
- * One line, no body, the same shape as the funn draft row: the rectangle is on
- * the map, which is where it has to be looked at, and a panel over the terrain
- * being framed would be the one surface guaranteed to cover the thing it is
- * about.
- *
- * Four things on it, left to right — what this row is scoped to, how big the
- * rectangle is, what to do with it, and the two ways it ends. `Opprett` is the
- * only write in the session; `Avbryt` has nothing to undo, which is the whole
- * argument for placing before creating.
+ * A lokalitet's rectangle while it is being placed, before anything has been
+ * written. One line, because the rectangle is on the map and a panel would
+ * cover the terrain being framed. `Opprett` is the session's only write;
+ * `Avbryt` has nothing to undo.
  */
 export const RibbonPlaceLocalityRow = ({
   placement,
@@ -39,9 +31,8 @@ export const RibbonPlaceLocalityRow = ({
         {formatBboxArea(place.bbox, i18n.language)}
       </span>
 
-      {/* Why the drag stopped. The band is not arbitrary — it is what the
-          producers can render (bboxLimits.ts) — so the row says the number
-          rather than just refusing to go past it. */}
+      {/* Why the drag stopped: the band is what the producers can render
+          (bboxLimits.ts), so the row says the number. */}
       {place.atLimit && (
         <span className={rowStyles.limit}>
           <Icon icon="crop_free" size={16} />

@@ -5,20 +5,15 @@ import {
 } from './lidarProjects';
 import { WMSBackgroundLayer } from './types';
 
-// The national mosaic can show any style the WMS publishes (see
-// lidarProjects.ts's fetchNationalLidarStyles) — the ribbon style
-// pulldown picks it via activeLidarStyleAtom. On the DOM side that's
-// skyggerelieff and nothing else.
+// The national mosaic shows any style the WMS publishes; on the DOM side that
+// is skyggerelieff and nothing else.
 export const buildNationalLidarConfig = (
   style: string,
   model: LidarModel,
 ): WMSBackgroundLayer => ({
   type: 'WMS',
   layerName: 'lidarHillshade',
-  // Same-origin via the /wms/geonorge/* Caddy handler → wmscache →
-  // wms.geonorge.no. Same-origin avoids CORS issues seen when calling
-  // wms.geonorge.no from fetch(), and wmscache holds a 25 GB LRU of
-  // successful, non-blank tile responses.
+  // Same-origin via /wms/geonorge/*: wms.geonorge.no direct fails CORS.
   url: NATIONAL_WMS[model].url,
   props: {
     LAYERS: `${NATIONAL_WMS[model].prefix}:${style}`,

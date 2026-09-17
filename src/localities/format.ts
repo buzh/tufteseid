@@ -3,9 +3,7 @@ import { getArea } from 'ol/sphere';
 import { LocalityBbox } from '../api/localities';
 import { bboxSpanMetres } from './bboxLimits';
 
-// How big is the area I'm looking at — the one number about a lokalitet
-// rectangle that isn't obvious from the map. Hectares up to a square
-// kilometre (the scale an amateur actually walks), km² above it.
+// Hectares up to a square kilometre, km² above it.
 export const formatBboxArea = (bbox: LocalityBbox, locale: string): string => {
   const m2 = getArea(polygonFromExtent(bbox), { projection: 'EPSG:4326' });
   const inHectares = m2 < 1_000_000;
@@ -16,17 +14,9 @@ export const formatBboxArea = (bbox: LocalityBbox, locale: string): string => {
   return `${formatted} ${inHectares ? 'ha' : 'km²'}`;
 };
 
-/*
- * The two sides on the ground — "620 × 480 m".
- *
- * Beside the area rather than instead of it, while a rectangle is being
- * placed: the area is what the site *is*, but the sides are what the size band
- * is written in (`bboxLimits.ts`), so a drag that stops has to be readable in
- * the same units as the rule that stopped it.
- *
- * Kilometres above 2 km, which only an old record can reach — the band tops
- * out at 1500 m.
- */
+// The two sides on the ground, "620 × 480 m" — the units the size band in
+// `bboxLimits.ts` is written in. Kilometres above 2 km, which only a record
+// predating the band can reach.
 export const formatBboxSpan = (bbox: LocalityBbox, locale: string): string => {
   const [width, height] = bboxSpanMetres(bbox);
   const inKm = Math.max(width, height) >= 2000;
@@ -37,18 +27,9 @@ export const formatBboxSpan = (bbox: LocalityBbox, locale: string): string => {
   return `${format(width)} × ${format(height)} ${inKm ? 'km' : 'm'}`;
 };
 
-/*
- * Centre of the rectangle, as decimal degrees with a hemisphere letter.
- *
- * Derived on every render rather than stored: "Juster området" moves the
- * rectangle, and a coordinate saved at creation would quietly start
- * describing somewhere the lokalitet no longer is. Five decimals is ~1 m,
- * which is finer than the rectangle is authored to anyway.
- *
- * Hemisphere letters are the Norwegian ones (N/S, Ø/V) in every locale —
- * they are read against Norwegian maps, and the app's other coordinate
- * readouts do the same.
- */
+// Derived per render rather than stored, so "Juster området" cannot leave a
+// stale coordinate behind. Five decimals is ~1 m. Hemisphere letters are the
+// Norwegian ones (N/S, Ø/V) in every locale.
 export const formatBboxCentre = (bbox: LocalityBbox): string => {
   const lon = (bbox[0] + bbox[2]) / 2;
   const lat = (bbox[1] + bbox[3]) / 2;
@@ -57,8 +38,8 @@ export const formatBboxCentre = (bbox: LocalityBbox): string => {
   return `${deg(lat, 'N', 'S')}, ${deg(lon, 'Ø', 'V')}`;
 };
 
-// PocketBase timestamps come back as "2026-09-04 08:12:33.123Z", which
-// Safari refuses to parse — the space has to become a T first.
+// PocketBase timestamps are "2026-09-04 08:12:33.123Z"; Safari refuses to
+// parse that until the space becomes a T.
 export const formatDate = (iso: string, locale: string): string => {
   const d = new Date(iso.replace(' ', 'T'));
   if (Number.isNaN(d.getTime())) return iso;

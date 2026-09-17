@@ -6,9 +6,8 @@ import styles from '../Pulldown.module.css';
 import { useGroundRingHint } from '../visningRing';
 import type { FlyfotoControls } from './useFlyfotoControls';
 
-// The exact date where the archive has one — the project name usually
-// carries only the year, and two flights over the same town in the same
-// year are otherwise indistinguishable in the list.
+// The exact date where the archive has one: the project name carries only the
+// year, so two flights over the same town in one year look identical without it.
 const projectMeta = (p: FlyfotoProject): string =>
   [
     p.photoDate ?? (p.year != null ? String(p.year) : null),
@@ -17,28 +16,16 @@ const projectMeta = (p: FlyfotoProject): string =>
     .filter((s): s is string => !!s)
     .join(' · ');
 
-/**
- * Which ortofoto is painting the map: Norge i bilder's seamless
- * best-available mosaic, or one specific acquisition out of the archive.
- * Listed newest first, so walking down the list walks back in time.
- *
- * No filter sub-panel and no hover-to-preview footprint, unlike the LiDAR
- * pulldown next to it: the index query returns no geometry, so there is
- * nothing to draw and no coverage ratio to rank by, and the list is already
- * scoped to acquisitions whose real outline touches this screen. The one
- * filter it has — the period — is on the strip beside this chip rather than
- * inside it (FlyfotoEraPicker), because with a hundred rows in a city the
- * period is the first thing you set and the last thing you should have to
- * open a pulldown to see.
- */
+// Norge i bilder's seamless mosaic, or one acquisition, newest first. No
+// hover-to-preview footprint as LiDAR has: the index query returns no geometry.
 export const FlyfotoDatasetPicker = ({
   flyfoto,
 }: {
   flyfoto: FlyfotoControls;
 }) => {
   const { t } = useTranslation();
-  // Blank inside a lokalitet whose Views have taken W/S — the heading must
-  // not promise a ring it no longer has (docs/ui-architecture.md §5.3).
+  // Blank inside a lokalitet whose Views have taken W/S: the heading must not
+  // promise a ring it no longer has.
   const hint = useGroundRingHint();
   const { viewport } = flyfoto;
 
@@ -67,9 +54,8 @@ export const FlyfotoDatasetPicker = ({
           >
             <span className={styles.triggerLabel}>{chipLabel}</span>
           </Button>
-          {/* How many acquisitions this pulldown has to offer here: covering
-              the viewport *and* inside the chosen period, because that is
-              the list a click or a W/S press will actually walk. */}
+          {/* Acquisitions covering the viewport and inside the chosen period,
+              which is the list a click or a W/S press walks. */}
           <CountBadge
             count={flyfoto.projects.length}
             palette="yellow"
@@ -95,8 +81,8 @@ export const FlyfotoDatasetPicker = ({
       <p className={styles.hint}>{t('ribbon.flyfoto.projectsHint')}</p>
 
       <div className={styles.list}>
-        {/* Rows from the previous view stay up while the next one loads, so
-            this sits above them rather than replacing them. */}
+        {/* Above the rows, not instead of them: the previous view's stay up
+            while the next one loads. */}
         {(viewport.status === 'loading' || viewport.status === 'idle') && (
           <div className={styles.busy}>
             <Spinner size={14} />
@@ -112,9 +98,8 @@ export const FlyfotoDatasetPicker = ({
         )}
         {viewport.status === 'ready' && flyfoto.projects.length === 0 && (
           <p className={styles.hint}>
-            {/* Two different nothings: the archive has never flown here, or
-                it has but not in the period the chips are set to. The second
-                is one click from being undone, so say which one it is. */}
+            {/* Never flown here, or not in the chosen period — the second is
+                one click from being undone, so say which. */}
             {viewport.projects.length === 0
               ? t('ribbon.flyfoto.empty')
               : t('ribbon.flyfoto.emptyEra')}

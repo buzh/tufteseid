@@ -12,9 +12,8 @@
   cursor: not-allowed;
 }
 
-/* The real checkbox stays in the DOM and keeps every native behaviour —
-   focus, space to toggle, form participation, screen-reader semantics —
-   it is only visually replaced by the track that follows it. */
+/* The real checkbox stays in the DOM for the native behaviour; the track
+   that follows it is only the visual replacement. */
 .input {
   position: absolute;
   width: 1px;

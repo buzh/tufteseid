@@ -21,14 +21,9 @@ import { DEFAULT_INFO_FORMAT } from './types';
 
 export type QueryableWMSLayer = TileLayer | ImageLayer<ImageWMS>;
 
-// `getVisible()` is only the checkbox — it says nothing about whether the
-// layer is actually drawing at the current zoom. The whole Kulturminner
-// category carries `minZoom: 8`, so below that these layers render
-// nothing while still reporting visible: clicking empty topo at zoom 3
-// fired five GetFeatureInfo requests at kart.ra.no and could open an
-// info panel about heritage the map wasn't showing. `Layer#isVisible`
-// folds in min/max zoom, min/max resolution and the layer extent
-// (ol/layer/Layer.js `inView`), which is what "on screen" means here.
+// Not `getVisible()`, which is only the checkbox: the Kulturminner category
+// carries `minZoom: 8` and draws nothing below it while still reporting
+// visible. `isVisible` folds in the zoom, resolution and extent limits.
 const isRendering = (layer: BaseLayer, map: Map): boolean =>
   layer instanceof Layer && layer.isVisible(map.getView());
 
@@ -506,7 +501,7 @@ export const getVectorFeaturesAtPixel = (
       }
     },
     {
-      hitTolerance: 5, // Allow clicking slightly off the feature, adjust later
+      hitTolerance: 5, // Allow clicking slightly off the feature
     },
   );
 

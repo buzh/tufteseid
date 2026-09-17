@@ -42,9 +42,8 @@
   transform: rotate(90deg);
 }
 
-/* Sections nest — a theme category holds subtheme sections — so the heading
-   size is a custom property the outer one can step down for its children,
-   rather than a `level` prop every call site would have to thread. */
+/* Sections nest, so the heading size is a custom property the outer one can
+   step down rather than a `level` prop threaded through every call site. */
 .title {
   font-size: var(--section-title-size, var(--font-sm));
   font-weight: 700;

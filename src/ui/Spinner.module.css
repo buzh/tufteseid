@@ -14,8 +14,7 @@
   }
 }
 
-/* Respect the OS setting: pulse instead of rotate, so the control still
-   reads as busy without motion. */
+/* Pulse instead of rotate, so it still reads as busy without motion. */
 @media (prefers-reduced-motion: reduce) {
   .spinner {
     animation: pulse 1.2s ease-in-out infinite;

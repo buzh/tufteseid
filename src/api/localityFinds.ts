@@ -1,12 +1,8 @@
 import type { FeatureCollection } from 'geojson';
 import { pb } from './pocketbase';
 
-// Child level of a lokalitet: one record per funn the user marks inside
-// the rectangle. Visibility is inherited from the parent lokalitet via
-// relation traversal in the collection rules — no visibility field here.
-//
-// Status values match the PB select options exactly; they double as the
-// lifecycle of a candidate: mulig → sannsynlig → avkreftet → rapportert.
+// Match the PB select options. Visibility is inherited from the parent
+// lokalitet through the collection rules; there is no field for it.
 export type LocalityFindStatus =
   | 'mulig'
   | 'sannsynlig'
@@ -20,9 +16,7 @@ export type LocalityFindRecord = {
   title: string;
   note: string;
   status: LocalityFindStatus;
-  // GeoJSON in EPSG:4326, always a FeatureCollection so the draw tools
-  // round-trip verbatim — usually one shape, but a funn may be several
-  // strokes (e.g. outline + text label).
+  // EPSG:4326, always a FeatureCollection: a funn may be several strokes.
   geometry: FeatureCollection;
   created: string;
   updated: string;
@@ -44,17 +38,12 @@ export const listLocalityFinds = async (
   return pb.collection(COLLECTION).getFullList<LocalityFindRecord>({
     filter: pb.filter('locality = {:lid}', { lid: localityId }),
     sort: 'created',
-    // See listLocalityAttachments: reload-on-realtime-event means two of
-    // these overlap routinely, and auto-cancellation would turn the older
-    // one into a rejected promise the caller then logs as a load failure.
+    // Realtime reloads overlap; a cancelled promise reads as a load failure.
     requestKey: null,
   });
 };
 
-// Funn per lokalitet for the "Mine lokaliteter" list. `fields` keeps the
-// GeoJSON blob — by far the biggest column here — out of the response;
-// without it this would pull every drawing in the account to render a
-// number.
+// `fields` keeps the GeoJSON out: without it a count pulls every drawing.
 export const countFindsByLocality = async (): Promise<Map<string, number>> => {
   const rows = await pb
     .collection(COLLECTION)
@@ -98,9 +87,8 @@ export const deleteLocalityFind = async (id: string): Promise<void> => {
   await pb.collection(COLLECTION).delete(id);
 };
 
-// Realtime over the whole collection — PB wildcard subscriptions can't
-// filter server-side on our SDK version, so consumers check
-// `rec.locality` against the open lokalitet themselves.
+// Wildcard subscriptions cannot filter server-side here, so consumers check
+// `rec.locality` themselves.
 export const subscribeLocalityFinds = (
   handler: (
     action: 'create' | 'update' | 'delete',

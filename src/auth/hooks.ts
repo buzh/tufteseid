@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { pb } from '../api/pocketbase';
 
-// Provider list is fetched from PB — whatever the superuser enabled in
-// the pb admin UI appears here (google, github, gitlab, oidc, …). We
-// cache it per session so the sign-in dialog opens instantly on re-open.
-// Structural subset of the SDK's AuthProviderInfo; only these two are
-// used, the rest belong to the manual OAuth2 flow we don't drive.
+// Whatever the superuser enabled in the PB admin UI, cached per session. A
+// structural subset of AuthProviderInfo; the rest is the manual OAuth2 flow.
 export type OAuthProvider = {
   name: string;
   displayName: string;
@@ -40,10 +37,7 @@ export const useOAuthProviders = () => {
   return { providers, error };
 };
 
-// Kicks off the OAuth2 flow via the PB SDK's popup helper. On success,
-// pb.authStore is updated and the currentUserAtom picks it up through
-// pbAuthSyncEffect. Returns whatever the caller needs to know about
-// the outcome; errors bubble.
+// On success pb.authStore updates and pbAuthSyncEffect carries it to the atom.
 export const useSignIn = () => {
   return useCallback(async (providerName: string) => {
     await pb.collection('users').authWithOAuth2({ provider: providerName });

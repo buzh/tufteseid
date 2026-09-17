@@ -1,8 +1,5 @@
-/*
- * The region is a `popover`, so most of what is here fights the UA stylesheet
- * for `[popover]` (fixed, inset 0, auto margins, a border, `overflow: auto`)
- * rather than styling from nothing.
- */
+/* The region is a `popover`, so most of this overrides the UA stylesheet for
+   `[popover]` rather than styling from nothing. */
 .region {
   position: fixed;
   inset: auto var(--sp-5) var(--sp-5) auto;
@@ -22,8 +19,7 @@
   pointer-events: none;
 }
 
-/* Narrow screens: full width, so a long message wraps to two lines instead
-   of a column of six words. */
+/* Narrow screens: full width, so a long message wraps to two lines. */
 @media (max-width: 30rem) {
   .region {
     inset: auto var(--sp-4) calc(env(safe-area-inset-bottom, 0px) + var(--sp-4))
@@ -83,9 +79,7 @@
   overflow-wrap: anywhere;
 }
 
-/* Sits between the message and the close button, and must not be squeezed by
-   a long title — the whole point of the action is that it stays hittable for
-   the few seconds the toast is up. */
+/* Must not be squeezed by a long title; it has to stay hittable. */
 .action {
   flex: none;
   align-self: center;

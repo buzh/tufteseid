@@ -1,8 +1,6 @@
 /*
- * Icon over label, for the controls that decide what the map *is* —
- * background modes and the one-click Kulturminner toggle. The label is
- * always visible rather than tooltip-only: these are the controls a first
- * visitor has to understand without hovering anything.
+ * Icon over label, for the controls that decide what the map is. The label is
+ * always visible rather than tooltip-only.
  */
 
 .wrap {
@@ -69,10 +67,8 @@
   pointer-events: none;
 }
 
-/* Left half of a split control. The right edge goes square so the seam reads
-   as one object, and the badge comes back inside it — overhanging by 4 px
-   would park the funn count on top of the eye beside it, which is the one
-   segment the count is not about. */
+/* Left half of a split control: square edge so the seam reads as one object,
+   and the badge pulled inside it rather than onto the segment beside. */
 .joinedRight .button {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
@@ -82,9 +78,8 @@
   right: 1px;
 }
 
-/* On a phone the labels are what makes the row wrap to three lines; the
-   glyphs alone are enough once the modes are familiar, and the accessible
-   name stays on the button either way. */
+/* On a phone the labels are what wraps the row to three lines; the accessible
+   name stays on the button. */
 @media (max-width: 29.999rem) {
   .button {
     min-width: 40px;

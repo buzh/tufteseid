@@ -37,14 +37,8 @@ export const Input = ({
   />
 );
 
-/*
- * Multi-line input that grows with its content up to `maxRows`, then
- * scrolls. Funn notes are usually one line and occasionally twenty; a fixed
- * two-row box makes the short case look broken and the long case unreadable.
- *
- * The height is measured rather than computed from line counts because the
- * box wraps: `\n` counting gets it wrong for a single long sentence.
- */
+// Grows with its content up to `maxRows`, then scrolls. The height is
+// measured rather than counted from newlines, because the box wraps.
 export const NoteInput = ({
   value,
   onChange,
@@ -106,8 +100,7 @@ export const NoteInput = ({
   );
 };
 
-// Label / hint / error wrapper. Optional — plenty of ribbon controls are
-// labelled by an adjacent icon button instead.
+// Label / hint / error wrapper. Optional.
 export const Field = ({
   label,
   hint,

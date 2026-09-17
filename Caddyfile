@@ -30,17 +30,13 @@ route {
         "
         header Permissions-Policy "geolocation=(self), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), accelerometer=(), camera=()"
 
-        # /l/K7M2QX — the short URL for a lokalitet (docs/lokalitet-view.md
-        # §10). A redirect to /?lok=K7M2QX and nothing more: the six-character
-        # code *is* the key, so there is no table to look anything up in and
-        # no reason for this to be a service. The SPA only ever writes the
-        # long spelling, so the short one has exactly one job — surviving
-        # being pasted into a message — and the app has one form to parse.
+        # /l/K7M2QX — the short URL for a lokalitet. A redirect to
+        # /?lok=K7M2QX and nothing more: the code is the key, so there is
+        # nothing to look up and no reason for this to be a service.
         #
-        # Deliberately a `redir` on one narrow pattern rather than an SPA
-        # fallback over `file_server`: a catch-all rewrite to /index.html
-        # would change what every wrong path in the app does, and a 404 for a
-        # URL nobody minted is the right answer.
+        # Must stay a `redir` on this one narrow pattern, not an SPA fallback
+        # over `file_server`: a catch-all rewrite to /index.html would turn
+        # every wrong path in the app into a 200.
         #
         # One alphanumeric segment, not exactly six characters. A `{6}`
         # quantifier in a Caddyfile is a brace in a config format that reads
@@ -65,11 +61,11 @@ route {
                 reverse_proxy http://wmscache
         }
 
-        # wfs.geonorge.no/skwms1/* — Kartverket WFS namespace. Used by the
-        # lokalitet workspace's "kjente kulturminner" readout
-        # (wfs.kulturminner GetFeature). Distinct internal prefix so it
-        # can't be confused with wms.geonorge.no's /skwms1/ in wmscache;
-        # nginx rewrites it back to /skwms1/ before forwarding.
+        # wfs.geonorge.no/skwms1/* — Kartverket WFS namespace. One live
+        # caller: the LiDAR project footprints (lidarFootprints.ts).
+        # Distinct internal prefix so it can't be confused with
+        # wms.geonorge.no's /skwms1/ in wmscache; nginx rewrites it back
+        # to /skwms1/ before forwarding.
         handle_path /wfs/geonorge/* {
                 rewrite * /wfs-skwms1{http.request.uri.path}
                 reverse_proxy http://wmscache

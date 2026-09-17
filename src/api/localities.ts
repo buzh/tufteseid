@@ -1,12 +1,9 @@
 import { pb } from './pocketbase';
 
-// Visibility mirrors the enum in the `localities` collection. String
-// values match the PB select options exactly — do not translate for
-// display (localise via i18n keys under `localities.visibility.*`).
+// Match the PB select options; localise via `localities.visibility.*`.
 export type LocalityVisibility = 'private' | 'limited' | 'public';
 
-// The authored rectangle in EPSG:4326 — created by a box drag, movable
-// and resizable afterwards. Not derived from the lokalitet's content.
+// EPSG:4326.
 export type LocalityBbox = [
   minLon: number,
   minLat: number,
@@ -17,35 +14,23 @@ export type LocalityBbox = [
 export type LocalityRecord = {
   id: string;
   owner: string;
-  // Six characters of Crockford base32, unique across the install. The
-  // short code on the lokalitet row: what you read down a phone or cite in
-  // a report. Generated at create (below) and never rewritten, so it
-  // survives a rename and a "Juster området" — which is the entire reason
-  // it is not derived from the id, the name or the bbox.
+  // The share link's key: six Crockford base32 characters, unique, write-once.
   code: string;
   name: string;
   description: string;
-  // Where it is, as three editable strings. Pre-filled at creation from
-  // GeoNorge (src/localities/localityContext.ts) and the user's afterwards
-  // — nothing downstream parses them, so a correction is always safe.
-  // Optional on the type because records created before the migration have
-  // no such keys until PocketBase next writes them.
+  // Pre-filled from GeoNorge at creation and freely editable after; optional
+  // because pre-migration records carry no such key.
   place?: string;
   municipality?: string;
   matrikkel?: string;
   visibility: LocalityVisibility;
   bbox: LocalityBbox;
-  // What this was forked from (docs/lokalitet-view.md §7), and **not**
-  // cascade-deleted: a fork outlives its original, which is the point of a
-  // fork. The label denormalizes the original's name and owner at copy time
-  // for the same reason `finds.owner` is denormalized — attribution that
-  // vanishes when the original does is not attribution. Both optional on the
-  // type because records written before the migration have no such keys.
+  // Forked from. Uncascaded, so a fork outlives its original, and the label
+  // denormalizes name and owner so the attribution survives its deletion.
   derivedFrom?: string;
   derivedFromLabel?: string;
   created: string;
   updated: string;
-  // PB's `expand` output when we ?expand=owner.
   expand?: {
     owner?: { id: string; name: string; avatar: string };
   };
@@ -65,9 +50,7 @@ export type NewLocalityInput = {
 
 const COLLECTION = 'localities';
 
-// Everything the current auth principal may see — PB enforces the list
-// rule server-side. Full list, not a single page: localities are small
-// rows (no geometry blob) and the map wants all rectangles anyway.
+// Everything the caller may see; PB enforces the list rule server-side.
 export const listLocalities = async (): Promise<LocalityRecord[]> => {
   return pb.collection(COLLECTION).getFullList<LocalityRecord>({
     sort: '-updated',
@@ -75,8 +58,7 @@ export const listLocalities = async (): Promise<LocalityRecord[]> => {
   });
 };
 
-// "Mine lokaliteter" — the admin's own records stay separate from the
-// everything-view listLocalities gives them.
+// "Mine lokaliteter" — an admin's own records, apart from listLocalities.
 export const listMyLocalities = async (
   userId: string,
 ): Promise<LocalityRecord[]> => {
@@ -92,22 +74,9 @@ export const getLocality = async (id: string): Promise<LocalityRecord> => {
     .getOne<LocalityRecord>(id, { expand: 'owner' });
 };
 
-/*
- * The share link's resolver (docs/lokalitet-view.md §10): a code, not an id.
- *
- * Uppercased on the way in because the code is *displayed* uppercase and
- * matched case-insensitively — people type it off a note, and SQLite's `=`
- * on a plain text column is not case-folding. The stored value is always
- * uppercase (`newLocalityCode` draws from an uppercase alphabet), so folding
- * the input is the whole of it.
- *
- * A miss and a record the reader may not see are the same 404 here: PB
- * applies the list rule before it counts rows, so `getFirstListItem` on a
- * private lokalitet somebody else owns throws exactly as it does on a code
- * that was never minted. That is the correct answer to give the caller too —
- * telling a stranger that a code exists but is not theirs is a leak, not a
- * better error message.
- */
+// Uppercased because SQLite's `=` on text does not case-fold. A miss and a
+// record the reader may not see are the same error on purpose: saying which
+// is a leak.
 export const getLocalityByCode = async (
   code: string,
 ): Promise<LocalityRecord> => {
@@ -115,19 +84,14 @@ export const getLocalityByCode = async (
     .collection(COLLECTION)
     .getFirstListItem<LocalityRecord>(
       pb.filter('code = {:code}', { code: code.toUpperCase() }),
-      // `requestKey: null` because the deep link can ask twice for the same
-      // code: a guest's attempt that missed, then the retry after they sign
-      // in (shareLink.ts). Auto-cancellation would abort the first, and an
-      // abort arrives in the same `catch` as a genuine miss — a spurious
-      // "finner ikke" for a lokalitet that is about to open.
+      // A deep link asks twice (guest miss, then the retry after sign-in) and
+      // an auto-cancelled first lands in the same catch as a genuine miss.
       { expand: 'owner', requestKey: null },
     );
 };
 
-// Crockford base32: the digits and the consonants, minus I, L, O and U, so
-// a code can be read aloud without being spelled out. Exactly 32 symbols,
-// and a byte is exactly eight of those, so `% 32` is uniform — no rejection
-// sampling and no modulo bias.
+// Crockford base32, so a code can be read aloud; 32 divides 256, so `% 32`
+// on a random byte is unbiased.
 const CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 const newLocalityCode = (): string => {
@@ -137,18 +101,13 @@ const newLocalityCode = (): string => {
   return code;
 };
 
-// PB reports a unique-index violation as a 400 with a per-field entry in
-// `response.data`. Our field is *called* `code`, and PB's own name for the
-// error string is also `code`, hence `data.code.code` — the second one is
-// the error kind, not the value we sent.
+// PB reports a unique-index violation as a 400 with a per-field entry; the
+// outer `code` is our field, the inner is PB's name for the error kind.
 const isCodeTaken = (err: unknown): boolean =>
   (err as { response?: { data?: Record<string, { code?: string }> } })?.response
     ?.data?.code?.code === 'validation_not_unique';
 
-// 32^6 is about 1.07 billion, so at this scale a second draw is already an
-// event nobody will see; the unique index is what makes "no collisions" a
-// fact instead of a hope, and this loop is what keeps that fact from
-// surfacing to the user as a failed "Ny lokalitet".
+// 32^6 ≈ 1.07 billion; one redraw is more than enough at this scale.
 const CODE_ATTEMPTS = 2;
 
 export const createLocality = async (
@@ -164,9 +123,6 @@ export const createLocality = async (
     matrikkel: input.matrikkel ?? '',
     visibility: input.visibility,
     bbox: input.bbox,
-    // Only when there is one. A relation field sent as `''` is a value PB
-    // accepts and stores as "no relation", but writing it on every create
-    // would put the fork machinery in the path of the ordinary one.
     ...(input.derivedFrom
       ? {
           derivedFrom: input.derivedFrom,
@@ -212,8 +168,6 @@ export const deleteLocality = async (id: string): Promise<void> => {
   await pb.collection(COLLECTION).delete(id);
 };
 
-// Realtime — emits on create/update/delete for any record the user is
-// allowed to see. Returns the unsubscribe fn.
 export const subscribeLocalities = (
   handler: (
     action: 'create' | 'update' | 'delete',

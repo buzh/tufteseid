@@ -23,9 +23,8 @@ export interface ThemeLayerCategory {
   featureInfoImageBaseUrl?: string;
   featureInfoFields?: FieldConfig[];
   extraWmsParams?: Record<string, string | number | boolean>;
-  // OpenLayers layer.minZoom — the layer is visible only when the view
-  // zoom is strictly greater than this. Cascades to layers in the
-  // category unless the layer sets its own.
+  // OpenLayers layer.minZoom: visible only above this zoom, strictly.
+  // Cascades to the category's layers unless one sets its own.
   minZoom?: number;
 }
 
@@ -95,12 +94,8 @@ export const getParentCategory = (
   return getCategoryById(config, category.parentId);
 };
 
-/**
- * A layer's name in the user's language. Shared by the picker and the figure
- * captions: a saved image lists the overlays that were on it, and the two
- * naming the same layer differently would make a figure hard to reproduce
- * from its own caption.
- */
+/** A layer's name in the user's language, shared by the picker and the figure
+ *  captions so a saved image names its overlays as the UI does. */
 export const themeLayerName = (id: string, language: string): string => {
   const def = getThemeLayerById(themeLayerConfig, id);
   if (!def) return id;

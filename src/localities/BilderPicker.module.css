@@ -1,12 +1,6 @@
-/*
- * The picker carousel — docs/lokalitet-view.md §4.3.
- *
- * It borrows the bottom slot from the lokalitet carousel, so it has to be
- * unmistakably not that carousel: same geometry (a surface that may not grow
- * downwards into the map), different dress. The accent-tinted header naming
- * the run, the tally and the rail of proposals are the difference between
- * "these are yours" and "these are offers".
- */
+/* The picker carousel. Same geometry as the lokalitet carousel it borrows the
+   bottom slot from — a surface that may not grow down into the map — in a
+   different dress, so the two are not mistaken for each other. */
 
 .picker {
   box-sizing: border-box;
@@ -84,8 +78,8 @@
   background: var(--c-bg-muted);
 }
 
-/* `contain`, not `cover`: the whole point of the card is that you are judging
-   this image, so the frame may not crop any of it away. */
+/* `contain`, not `cover`: the card is for judging the image, so the frame may
+   not crop any of it away. */
 .cardImage {
   display: block;
   max-width: 100%;
@@ -102,8 +96,7 @@
   color: var(--c-fg-muted);
 }
 
-/* The receipt. Keeping writes the record on the press, so the card has
-   something true to say rather than a promise about what closing will do. */
+/* The receipt: keeping writes the record on the press. */
 .keptMark {
   position: absolute;
   top: var(--sp-2);
@@ -119,8 +112,8 @@
   line-height: 18px;
 }
 
-/* The rail: where the fetch policy is visible. Card two spinning while you
-   judge card one, card five not started, and a discarded card simply gone. */
+/* The rail, where the fetch policy is visible: card two spinning while you
+   judge card one, card five not started, a discarded card gone. */
 .rail {
   display: flex;
   align-items: center;
@@ -214,9 +207,8 @@
   gap: var(--sp-2);
 }
 
-/* An anchor rather than a Button: the blob is already in hand, so `download`
-   on an href is the whole implementation and a click handler would only be a
-   longer way to say it. Dressed as a secondary button. */
+/* An anchor dressed as a secondary button: the blob is already in hand, so
+   `download` on an href is the whole implementation. */
 .download {
   display: inline-flex;
   align-items: center;

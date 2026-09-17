@@ -1,21 +1,8 @@
 import { atom } from 'jotai';
 
-/*
- * How many src/ui/ overlays (Popover, Dialog) are open right now.
- *
- * The keyboard layers in this app decide "does something else own the
- * keyboard?" by walking up from event.target for a [data-scope] attribute
- * (src/localities/useWorkspaceKeys.ts, src/map/useBackgroundCyclingKeys.ts).
- * That worked for kvib/Ark, which portalled to <body> and trapped focus, so
- * event.target was always inside the overlay.
- *
- * Our primitives also portal and also move focus — but a future one that
- * forgets to would leave event.target === document.body and let A/D/W/S/E
- * or N/U/B leak through to the map. This counter is the second, cheaper
- * check that does not depend on where focus happens to be.
- *
- * Increment on open, decrement on close, always in the same effect cleanup.
- */
+// How many src/ui/ overlays are open. The keyboard layers' [data-scope] walk
+// only works while focus is inside the overlay; this is the check that does
+// not depend on focus. Increment on open, decrement in the same cleanup.
 export const overlayOpenCountAtom = atom(0);
 
 export const anyOverlayOpenAtom = atom((get) => get(overlayOpenCountAtom) > 0);

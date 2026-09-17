@@ -1,19 +1,10 @@
-/*
- * One spec builder per producer of a saved raster.
- *
- * These live together rather than beside each producer so the wording, the
- * credit assignment and the level of detail stay the same across all of
- * them — a report with five figures from this app should read as five
- * figures from one instrument, not five from five.
- *
- * What goes in `settings` is the reproducibility contract: enough for
- * somebody else to ask the same service for the same picture and get it
- * back. That is why the raw WMS style name is printed verbatim rather than
- * prettified, why the multidirectional blend lists its azimuths *and* its
- * weights, and why a percentile stretch is named as one — a slope map
- * stretched 2–98 % and one stretched to its true range are different
- * pictures of the same ground.
- */
+// One spec builder per producer of a saved raster, kept together rather than
+// beside each producer so the wording and the credit assignment stay the same
+// across all of them. `settings` is the reproducibility contract: enough for
+// somebody else to ask the same service for the same picture. Hence the raw WMS
+// style name verbatim, the multidirectional blend's azimuths *and* weights, and
+// a percentile stretch named as one — a slope map stretched 2–98 % and one
+// stretched to its true range are different pictures of the same ground.
 
 import { t } from 'i18next';
 import type { FlyfotoProject } from '../localities/flyfotoProjects';
@@ -91,8 +82,7 @@ export const lidarExtractFigure = (
         ? t('figure.acq.density', { density: input.pointDensity })
         : null,
     ]) || undefined,
-  // The extract tool is DTM-only by design (lidarExtract/sources.ts), so the
-  // model is a constant here rather than a parameter.
+  // The extract tool is DTM-only, so the model is a constant here.
   settings: [
     t('figure.set.wmsStyle', { style: input.style }),
     t('figure.set.model', { model: 'DTM' }),
@@ -112,21 +102,15 @@ export type TerrainFigureInput = {
   model: DemModel;
   light: TerrainLight;
   dem: Dem;
-  /**
-   * Metres; `lrm` and the four horizon views only (`usesHorizon` in
-   * render.ts). Omitted means the view's default.
-   */
+  /** Metres; `lrm` and the horizon views only. Omitted means the default. */
   radius?: number;
 };
 
 /**
- * VAT's layer stack, as one line: what was blended over what, at what opacity,
- * stretched between what.
- *
- * Assembled from VAT_LAYERS rather than written out, because the whole point
- * of printing it is that somebody can rebuild the same composite in RVT — and
- * a hand-written caption is one edit away from describing a blend the code no
- * longer performs.
+ * VAT's layer stack as one line: what was blended over what, at what opacity,
+ * stretched between what. Assembled from VAT_LAYERS rather than written out,
+ * because a hand-written caption is one edit away from describing a blend the
+ * code no longer performs.
  */
 const vatStack = (): string =>
   VAT_LAYERS.map((layer) =>
@@ -146,9 +130,8 @@ const terrainSettings = ({
   radius,
 }: Pick<TerrainFigureInput, 'vis' | 'light' | 'dem' | 'radius'>): string[] => {
   const settings: string[] = [];
-  // Through the same clamp the render used rather than the number the caller
-  // held: on a 0.25 m grid the horizon scan caps its search at 6 m, and a
-  // caption claiming 20 m would describe a render nobody made.
+  // Through the same clamp the render used, not the number the caller held, or
+  // the caption describes a render nobody made.
   const r = clampRadius(vis, dem, radius ?? defaultRadius(vis));
   switch (vis) {
     case 'hillshade':
@@ -189,15 +172,9 @@ const terrainSettings = ({
         t('figure.set.stretch'),
       );
       break;
-    // Both opennesses come off the same horizon scan as sky-view factor, so
-    // they record the same two numbers — the radius the horizon was searched
-    // to and how many directions it was searched in. Named separately from
-    // the SVF line because "SVF-radius" on a positive-openness caption reads
-    // as the wrong parameter.
-    //
-    // Negative openness additionally records that its ramp is inverted, which
-    // is the difference between "these ditches are dark" and "these ridges are
-    // dark" for a reader holding the image and not the code.
+    // Both opennesses record the same two numbers as sky-view factor, but under
+    // their own label, because "SVF-radius" on an openness caption reads as the
+    // wrong parameter; negative openness also records its inverted ramp.
     case 'openPos':
       settings.push(
         t('figure.set.opennessRadius', { m: r }),
@@ -213,12 +190,9 @@ const terrainSettings = ({
         t('figure.set.stretch'),
       );
       break;
-    // The one view whose caption is longer than its controls. Nothing here is
-    // adjustable: the sun is frozen, the exaggeration is 1×, and the four
-    // layers are stretched between fixed values rather than to the
-    // rectangle's own percentiles — which is what lets two VAT renders of
-    // different hillsides be compared at all. Printing it is how a reader
-    // knows the picture was not tuned to flatter this particular ground.
+    // Nothing here is adjustable — frozen sun, 1× exaggeration, fixed stretches
+    // — and printing it is how a reader knows the picture was not tuned to
+    // flatter this particular ground.
     case 'vat':
       settings.push(
         t('figure.set.vatStack', { stack: vatStack() }),
@@ -231,11 +205,9 @@ const terrainSettings = ({
       );
       break;
   }
-  // To reach past 24 steps of this grid the horizon scan averages the DEM down
-  // first, so the four views in `usesHorizon` are read off a coarser surface
-  // than the hillshade beside them and than the resolution line below claims.
-  // Printed because it changes the picture: the same radius over a 1 m surface
-  // and over a 0.25 m one are two different measurements of the same ground.
+  // The horizon scan averages the DEM down to reach past its step budget, so
+  // these views are read off a coarser surface than the resolution line claims,
+  // and the same radius over two surfaces is two different measurements.
   if (usesHorizon(vis)) {
     const factor = horizonDecimation(dem.metresPerPx, r);
     if (factor > 1) {
@@ -245,8 +217,7 @@ const terrainSettings = ({
     }
   }
   // The grid is capped, so a large rectangle is served coarser than the
-  // acquisition under it publishes. Anyone comparing two renders of
-  // different-sized areas needs to know which one that happened to.
+  // acquisition under it publishes.
   if (dem.nativeMetresPerPx < dem.metresPerPx) {
     settings.push(
       t('figure.set.resampled', { m: dec(dem.nativeMetresPerPx, 2) }),
@@ -331,15 +302,10 @@ export type SketchFigureInput = {
 };
 
 /**
- * The one figure with **no credits line**, and that is the correct reading
- * rather than an omission: nothing in the pixels came from a public register.
- * A sketch is an interpretation, and the caption says so instead of naming a
- * rights holder who never saw it. `captionLayout` skips empty rows, so an
- * empty list simply leaves the row out (`draw.ts`).
- *
- * It is also the one figure whose extent is the *drawing's* rather than the
- * lokalitet's — a sketch is its strokes, so the rectangle printed is the one
- * `funn/render.ts` framed them in.
+ * The one figure with no credits line, and that is the reading rather than an
+ * omission: nothing in the pixels came from a public register, and the caption
+ * layout drops empty rows. Its extent is the *drawing's* rather than the
+ * lokalitet's — the rectangle `funn/render.ts` framed the strokes in.
  */
 export const sketchFigure = ({
   subject,
@@ -360,11 +326,9 @@ export const sketchFigure = ({
 // ---------------------------------------------------------------------------
 
 /**
- * Where one layer of a scene came from, as far as the credits line cares.
- *
- * Named by register rather than by attachment kind because that is the
- * question being asked — a LiDAR extract and a terrain render are two
- * products of hoydedata.no and one line on the figure.
+ * Where one layer of a scene came from, as far as the credits line cares. Named
+ * by register rather than by attachment kind: a LiDAR extract and a terrain
+ * render are two products of hoydedata.no and one line on the figure.
  */
 export type SceneLayerCredit = 'hoydedata' | 'nib' | 'kartverket' | 'none';
 
@@ -394,19 +358,12 @@ const SCENE_CREDITS: Record<SceneLayerCredit, Credit | null> = {
 };
 
 /**
- * The figure for a composition (docs/lokalitet-view.md §13.7).
- *
- * Its settings line is the stack itself, bottom to top, each layer with the
- * fade it was seen through — which is the whole reproducibility contract here.
- * Every other figure in this file names a service and the parameters it was
- * asked with; this one names *the pictures it is made of*, because that is
- * what was decided. A flatten whose caption did not say "1937 ortofoto at
- * 40 % over sky-view factor" would be a picture of an overlap nobody could
- * check, which is the one thing `src/figure/` exists to prevent.
- *
- * The credits are the union of its layers' — a scene over ortofoto owes NiB
- * exactly as a flyfoto grab does, and a scene of nothing but sketches owes
- * nobody, so the row goes out (`captionLayout` skips empty ones).
+ * The figure for a composition. Where every other figure here names a service
+ * and its parameters, this one names the pictures it is made of: the stack
+ * bottom to top, each layer with the fade it was seen through, since a flatten
+ * whose caption did not say "1937 ortofoto at 40 % over sky-view factor" is an
+ * overlap nobody can check. The credits are the union of its layers', so a
+ * scene of nothing but sketches owes nobody and the row goes out.
  */
 export const sceneFigure = ({
   subject,
@@ -443,10 +400,9 @@ export const sceneFigure = ({
 // ---------------------------------------------------------------------------
 
 /**
- * The screenshot is the one figure whose contents the app does not choose,
- * so its provenance is assembled from the live layer state instead: which
- * ground was under it, which theme layers were over it, and therefore whose
- * data is in the pixels.
+ * The one figure whose contents the app does not choose, so its provenance is
+ * assembled from the live layer state: which ground was under it, which theme
+ * layers over it, and therefore whose data is in the pixels.
  */
 export type ScreenshotFigureInput = {
   subject?: string;
@@ -456,13 +412,10 @@ export type ScreenshotFigureInput = {
   groundIsFlyfoto: boolean;
   themeLayers: ThemeLayerName[];
   /**
-   * How the heritage overlay was drawn — the render setting, and the
-   * sublayers left out of it. Omitted when no heritage layer was on.
-   *
-   * Not decoration: "outlines of the automatically protected sites only" and
-   * "every register, filled" are different claims about what the blank ground
-   * in the picture means, and only one of them says nothing was recorded
-   * there.
+   * How the heritage overlay was drawn — the render setting and the sublayers
+   * left out of it; omitted when no heritage layer was on. "Outlines of the
+   * automatically protected sites only" and "every register, filled" are
+   * different claims about what blank ground in the picture means.
    */
   heritageRender?: string;
   metresPerPx: number;
@@ -473,13 +426,10 @@ export type ScreenshotFigureInput = {
 };
 
 /**
- * The `heritageRender` line, from the live overlay settings. Here rather than
- * in `map/layers/heritage.ts` so that module stays what it is — the WMS
- * tables — and every string the caption prints keeps coming from one file.
- *
- * Returns undefined when the overlay is at its defaults *and* fully opaque:
- * a caption listing settings nobody changed is noise, and the defaults are
- * recoverable from the layer names already on the line above.
+ * The `heritageRender` line, from the live overlay settings. Here rather than in
+ * `map/layers/heritage.ts` so every string the caption prints comes from one
+ * file. Undefined when the overlay is at its defaults *and* fully opaque, since
+ * those are recoverable from the layer names on the line above.
  */
 export const describeHeritageRender = (
   details: ReadonlySet<HeritageDetail>,
@@ -495,7 +445,7 @@ export const describeHeritageRender = (
     );
   }
   // Printed as transparency, like the slider that set it: a caption that
-  // disagrees with the control it records is worse than no caption.
+  // disagrees with its own control is worse than none.
   if (opacity < 1) {
     parts.push(
       t('figure.set.heritageTransparency', {
@@ -534,8 +484,8 @@ export const screenshotFigure = ({
   metresPerPx,
   bbox25833,
   rotation,
-  // Kartverket is always in there — it is the topo base under every LiDAR
-  // and per-project ortofoto stack, and the whole picture in standard mode.
+  // Kartverket is always in there: the topo base under every LiDAR and
+  // per-project ortofoto stack, and the whole picture in standard mode.
   credits: dedupeCredits([
     CREDITS.kartverket,
     ...(groundIsFlyfoto ? [CREDITS.nib] : []),

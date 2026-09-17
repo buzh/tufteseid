@@ -54,9 +54,8 @@ const LocalityRow = ({
 }) => {
   const { t, i18n } = useTranslation();
 
-  // What the list is for: deciding which of these to reopen. So the row
-  // carries the numbers that distinguish them — how much work is in it,
-  // how big it is, when it last moved.
+  // The numbers that tell two rectangles apart: how much is in it, how big it
+  // is, when it last moved.
   const meta = [
     funnCount ? t('localities.summary.funn', { count: funnCount }) : null,
     bilderCount ? t('localities.summary.bilder', { count: bilderCount }) : null,
@@ -68,8 +67,7 @@ const LocalityRow = ({
     <div
       className={styles.row}
       onClick={() => onOpen(locality)}
-      // Pointing at a row lights up its rectangle in the map, so you can
-      // tell two similarly named areas apart without opening either.
+      // Lights up the rectangle on the map.
       onMouseEnter={() => setLocalityHighlight(locality.id)}
       onMouseLeave={() => setLocalityHighlight(null)}
       title={t('localities.panel.openHint')}
@@ -122,8 +120,7 @@ export const LocalitiesPanel = () => {
       console.warn('[LocalitiesPanel] load failed', e);
       setItems([]);
     }
-    // Counts are a nice-to-have on top of the list; a failure here leaves
-    // the rows without numbers rather than empty.
+    // A failure here leaves the rows without numbers rather than empty.
     try {
       const [finds, attachments] = await Promise.all([
         countFindsByLocality(),
@@ -165,9 +162,8 @@ export const LocalitiesPanel = () => {
     if (!items) return null;
     const q = query.trim().toLowerCase();
     if (!q) return items;
-    // Sted / kommune / matrikkel are searchable too — being able to type
-    // "Vang" or "12/6" and find the rectangle is most of the reason they are
-    // fields of their own rather than a paragraph of Beskrivelse.
+    // Sted / kommune / matrikkel are searchable too, so "Vang" or "12/6"
+    // finds the rectangle.
     return items.filter((l) =>
       [l.name, l.description, l.place, l.municipality, l.matrikkel].some((s) =>
         (s ?? '').toLowerCase().includes(q),

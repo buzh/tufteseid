@@ -1,10 +1,6 @@
-/*
- * The seam is drawn here rather than on the canvas so it stays crisp at any
- * device pixel ratio and can carry a grip that is a real focus target.
- * Everything is cased white-under-dark for the same reason the lokalitet
- * frame is: it has to read over both a grey hillshade and a bright ortofoto.
- */
-
+/* DOM rather than canvas, so the seam stays crisp at any device pixel ratio
+   and the grip is a real focus target. Cased so it reads over both a grey
+   hillshade and a bright ortofoto. */
 .root {
   position: absolute;
   inset: 0;
@@ -15,7 +11,7 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  /* Wider than the line: a 2 px grab target is a 2 px grab target. */
+  /* Wider than the line, which is too thin to grab. */
   width: 24px;
   margin-left: -12px;
   display: flex;
@@ -56,7 +52,6 @@
   box-shadow: var(--shadow-md);
 }
 
-/* Two ticks, so the pill reads as something to drag sideways. */
 .grip::before,
 .grip::after {
   content: '';

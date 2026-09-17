@@ -1,16 +1,7 @@
-// Relief visualizations computed from a float DEM (see dem.ts).
-//
-// Why not just a hillshade: a single-azimuth one hides every feature running
-// parallel to the light, which for earthwork spotting is its defining flaw —
-// a ditch lit end-on disappears. The illumination-independent visualizations
-// (sky-view factor, openness, local relief) are what archaeological
-// prospection actually leans on; see docs/terrain-analysis.md for the
-// references.
-//
-// Each compute* returns a Float32Array in the DEM's own grid, NaN where the
-// DEM has no coverage, and is deliberately separate from rendering so the
-// UI can cache an expensive pass (the horizon scan) while scrubbing a cheap
-// one (hillshade azimuth).
+// Relief visualizations over a float DEM. Each compute* returns a Float32Array
+// in the DEM's own grid, NaN where the DEM has no coverage, and is separate
+// from rendering so the expensive pass (the horizon scan) can be cached while
+// a cheap one (hillshade azimuth) is scrubbed.
 
 import type { Dem } from './dem';
 
@@ -24,20 +15,11 @@ export type Visualization =
   | 'lrm'
   | 'slope';
 
-// Azimuths for the multidirectional blend, with weights.
-//
-// Both parts are load-bearing. The azimuths span only three quadrants and
-// the weights peak at 315°, which keeps a net light direction from the
-// north-west (the cartographic convention, and what makes relief read as
-// relief rather than as a slope map). Meanwhile no direction is left
-// unlit, which is the whole point: a linear feature running parallel to a
-// single light source is invisible under it.
-//
-// Evenly spaced azimuths at equal weight do NOT work here, and the failure
-// is silent. The directional term cos(azimuth - aspect) then sums to zero
-// by symmetry and the blend collapses to cos(zenith)·cos(slope) — a slope
-// map. Measured on a 1 m Oslo DEM the giveaway was a maximum of exactly
-// 0.7071 = cos(45°), i.e. no cell anywhere brighter than flat ground.
+// Six azimuths over three quadrants only, weighted to peak at 315° for a net
+// light from the north-west. Spanning the full circle at equal weight cancels
+// the directional term by symmetry and collapses the blend to
+// cos(zenith)·cos(slope) — a slope map, whose tell is a maximum of exactly
+// 0.7071 at altitude 45°, i.e. nothing brighter than flat ground.
 export const MULTI_AZIMUTHS = [
   { azimuth: 225, weight: 3 },
   { azimuth: 270, weight: 4 },
@@ -47,55 +29,28 @@ export const MULTI_AZIMUTHS = [
   { azimuth: 90, weight: 2 },
 ];
 
-// How many directions the horizon scan walks. Its cost is width × height ×
-// directions × radius, and it is the expensive pass behind sky-view factor,
-// both opennesses and VAT alike. 16 is the usual compromise in the
-// literature — 8 leaves visible directional banding, 32 doubles the cost for
-// little gain.
+// Directions the horizon scan walks; the scan costs width × height ×
+// directions × steps. 8 bands visibly, 32 doubles the cost for little gain.
 export const SVF_DIRECTIONS = 16;
 
-// Hard ceiling on the horizon search radius in *steps*, whatever the metre
-// value works out to. The scan costs width × height × directions × steps, so
-// this is what keeps it a pass and not a coffee break.
-//
-// It is a budget in pixels, and that used to make it a limit in metres too: on
-// a 0.25 m grid, 24 steps is 6 m, and 6 m is shorter than the earthworks the
-// tool exists to find. `horizonDecimation` below is how the two were separated.
+// Hard ceiling on the horizon search radius in *steps*: reach is bought by
+// decimating, not by walking further.
 export const SVF_MAX_RADIUS_PX = 24;
 
-// The coarsest grid the horizon scan will decimate down to, in metres per
-// pixel — and therefore, with the step budget above, what sets how far the
-// radius can reach: 24 steps of 1 m is 24 m, which covers a burial mound.
-//
-// Why 1 m and not finer: the horizon is a question about landform, and the
-// per-project DTM does not carry landform detail below about here anyway. The
-// acquisitions behind the 0.25 m mosaic are mostly 4–5 points/m² — mean point
-// spacing 0.45–0.50 m — so a 0.25 m grid is roughly three-quarters
-// interpolation, and averaging four of its cells together throws away very
-// little that was ever measured. Kartverket's own national product is 1 m and
-// the prospection literature computes sky-view factor on 0.5–1 m DEMs.
-//
-// Why not coarser: past a metre the surface stops resolving the features whose
-// horizon is being measured, and a ditch that is two cells wide has no horizon
-// worth finding.
+// Coarsest grid the scan will decimate down to, in metres per pixel, so with
+// the step budget the reach is a flat 24 m on any grid at 1 m or finer; past a
+// metre the surface stops resolving the features whose horizon is measured.
 export const HORIZON_MIN_M_PER_PX = 1;
 
-// How far the scan may be decimated on this grid. 1 on anything at or coarser
-// than HORIZON_MIN_M_PER_PX, i.e. the whole rule is inert there.
+// 1 on anything at or coarser than HORIZON_MIN_M_PER_PX, i.e. inert there.
 const maxDecimation = (metresPerPx: number): number =>
   Math.max(1, Math.floor(HORIZON_MIN_M_PER_PX / metresPerPx));
 
 /**
- * The decimation this radius needs on this grid, and 1 when it needs none.
- *
- * Only as much as the radius asks for, which is the point: a 2 m search on a
- * 0.25 m grid is 8 steps, fits the budget, and runs at full resolution. The
- * coarsening arrives with the reach that requires it and no sooner, so the
- * fine end of the slider keeps every pixel the DEM has.
- *
- * Exported because a figure caption has to print it — the four horizon views
- * are then read off a different surface from the hillshade beside them, and
- * two renders at the same radius over different grids are different pictures.
+ * The decimation this radius needs on this grid, and 1 when it needs none: only
+ * as much as the radius asks for, so the fine end of the slider keeps every
+ * pixel the DEM has. A figure caption prints it, since the horizon views are
+ * then read off a coarser surface than the hillshade beside them.
  */
 export const horizonDecimation = (
   metresPerPx: number,
@@ -110,14 +65,10 @@ export const horizonDecimation = (
   );
 
 /**
- * The longest horizon search this grid can actually deliver, in metres.
- *
- * Derived from the two constants rather than chosen, and derived through
- * `maxDecimation` rather than from `HORIZON_MIN_M_PER_PX` directly, because
- * the decimation is an integer: on a 0.3 m grid it is 3, so the reach is 21.6 m
- * and not the 24 m a metre-based calculation would promise. `radiusRange` in
- * render.ts takes the slider's ceiling from here, so the control cannot offer
- * a position the scan would then quietly clamp.
+ * The longest horizon search this grid can deliver, in metres. Integer
+ * decimation makes it grid-dependent (21.6 m on a 0.3 m grid); `radiusRange` in
+ * render.ts takes the slider's ceiling from here, so the control cannot offer a
+ * position the scan would then quietly clamp.
  */
 export const horizonMaxRadiusMetres = (metresPerPx: number): number =>
   SVF_MAX_RADIUS_PX * metresPerPx * maxDecimation(metresPerPx);
@@ -126,10 +77,9 @@ export const horizonMaxRadiusMetres = (metresPerPx: number): number =>
 // Gradients
 // ---------------------------------------------------------------------------
 
-// Horn's 3×3 method, the same one GDAL and Esri use. Returns partial
-// derivatives in metres per metre. NaN anywhere in the neighbourhood
-// poisons the cell — better a hole than an invented slope at a coverage
-// edge, where the drop to no-data would read as a cliff.
+// Horn's 3×3 method, as in GDAL and Esri. Partial derivatives in metres per
+// metre; NaN anywhere in the neighbourhood poisons the cell rather than
+// inventing a slope at a coverage edge.
 function gradients(dem: Dem): { dzdx: Float32Array; dzdy: Float32Array } {
   const { width: w, height: h, data, metresPerPx } = dem;
   const dzdx = new Float32Array(w * h).fill(NaN);
@@ -185,8 +135,7 @@ export function computeSlope(dem: Dem, zFactor = 1): Float32Array {
 // ---------------------------------------------------------------------------
 
 // Illumination in 0..1. `azimuth` is compass degrees the light comes *from*
-// (315 = north-west, the cartographic convention); `altitude` is degrees
-// above the horizon.
+// (315 = north-west); `altitude` is degrees above the horizon.
 export function computeHillshade(
   dem: Dem,
   azimuth: number,
@@ -197,8 +146,7 @@ export function computeHillshade(
   return shadeFromGradients(dzdx, dzdy, azimuth, altitude, zFactor);
 }
 
-// Weighted blend of six hillshades. Costs one gradient pass and six cheap
-// trig passes, not six full recomputes.
+// Weighted blend of six hillshades off one gradient pass.
 export function computeMultiHillshade(
   dem: Dem,
   altitude: number,
@@ -248,13 +196,9 @@ function shadeFromGradients(
 // Local relief model
 // ---------------------------------------------------------------------------
 
-// Hesse's local relief model: the DEM minus a smoothed copy of itself, which
-// removes the landform-scale trend and leaves the small stuff standing out —
-// exactly the scale that earthworks live at. Output is signed metres.
-//
-// `radiusMetres` sets what counts as "landform scale": it must be
-// comfortably larger than the features you're hunting, or the smoothing eats
-// them too.
+// Hesse's local relief model: the DEM minus a smoothed copy of itself, in
+// signed metres. `radiusMetres` sets what counts as landform scale and must be
+// comfortably larger than the features hunted, or the smoothing eats them too.
 export function computeLrm(dem: Dem, radiusMetres: number): Float32Array {
   const radiusPx = Math.max(1, Math.round(radiusMetres / dem.metresPerPx));
   const smooth = boxBlurNaNAware(dem.data, dem.width, dem.height, radiusPx);
@@ -266,9 +210,9 @@ export function computeLrm(dem: Dem, radiusMetres: number): Float32Array {
   return out;
 }
 
-// Three box passes approximate a Gaussian closely enough here and stay O(n)
-// per pass via a running sum. NaN-aware: no-data cells contribute nothing
-// and don't drag their neighbours toward zero.
+// Three box passes approximate a Gaussian, O(n) each via a running sum.
+// NaN-aware: no-data cells contribute nothing rather than dragging their
+// neighbours toward zero.
 function boxBlurNaNAware(
   src: Float32Array,
   w: number,
@@ -335,7 +279,6 @@ function blurAxis(
 // The horizon scan: sky-view factor and openness, from one pass
 // ---------------------------------------------------------------------------
 
-/** What one walk of the horizon yields. All three grids, always. */
 export type HorizonFields = {
   /** Proportion of the sky hemisphere visible, 0..1. */
   svf: Float32Array;
@@ -346,37 +289,15 @@ export type HorizonFields = {
 };
 
 // Sky-view factor (Zakšek, Oštir & Kokalj 2011) and Yokoyama's positive and
-// negative openness, computed together because they are the same measurement
-// read three ways. Independent of any light direction, so nothing hides
-// because of its orientation: hollows and ditches go dark, banks and mounds
-// go bright, and it reads the same whichever way a feature runs.
-//
-// **The three come as a set on purpose.** The cost here is entirely the ray
-// walk — width × height × 16 directions × radius of cache-hostile pointer
-// chasing, seconds on a large lokalitet — and tracking two extrema instead of
-// one costs nothing measurable next to it. Returning all three lets the caller
-// cache one result and switch between the views for free, which is what makes
-// them a keyboard ring rather than three separate waits.
-//
-// **It scans a decimated copy when the radius asks for more reach than the step
-// budget allows**, and interpolates the three fields back. That is what lets a
-// radius be a distance rather than a pixel count: the budget is 24 steps, so on
-// a 0.25 m grid the search used to stop at 6 m — shorter than the mounds and
-// hollow ways it was being pointed at. See `horizonDecimation`.
-//
-// The two clamping rules are not the same, and that difference *is* the
-// difference between the measurements:
-//
-// - Sky-view caps the horizon at the horizontal. A cell can see at most a
-//   hemisphere, so a skyline that never rises above eye level contributes a
-//   full 1 and nothing below the horizontal is looked at.
-// - Openness does not clamp. The unclamped zenith angle is the whole point:
-//   it is what lets a cell on a ridge read above 90° and a cell in a pit read
-//   below it, and clamping would flatten every convexity to the same value.
-//
-// Negative openness is positive openness of the inverted surface. Inverting
-// negates every tangent, so `max(-tan) = -min(tan)` and the second extremum is
-// all the extra bookkeeping it needs.
+// negative openness: one ray walk read three ways, and returned as a set so the
+// caller caches one result and rings between the views for free. Independent of
+// light direction. Scans a decimated copy when the radius asks for more reach
+// than the step budget allows, then interpolates back (`horizonDecimation`).
+// The clamping rules differ, and that difference is the measurement: sky-view
+// caps the horizon at the horizontal, since a cell sees at most a hemisphere;
+// openness must not clamp, or every convexity flattens to the same value.
+// Negative openness is positive openness of the inverted surface, so the second
+// extremum is all the bookkeeping it needs: max(-tan) = -min(tan).
 export function computeHorizonFields(
   dem: Dem,
   radiusMetres: number,
@@ -384,10 +305,8 @@ export function computeHorizonFields(
   const factor = horizonDecimation(dem.metresPerPx, radiusMetres);
   if (factor === 1) return scanHorizon(dem, radiusMetres);
 
-  // Averaged down, scanned, and interpolated back — which buys the reach the
-  // step budget would otherwise cost (24 steps of 1 m instead of 24 of 0.25 m)
-  // *and* makes the pass factor² cheaper, because a wider horizon over fewer
-  // cells is the same walk over a sixteenth of the grid.
+  // Averaged down, scanned, and interpolated back: buys the reach the step
+  // budget would otherwise cost, and is factor² cheaper besides.
   const coarse = decimate(dem, factor);
   const scanned = scanHorizon(coarse, radiusMetres);
   const back = (field: Float32Array) =>
@@ -399,7 +318,6 @@ export function computeHorizonFields(
   };
 }
 
-/** The subset of a `Dem` the scan and its two resamplers need. */
 type Grid = {
   width: number;
   height: number;
@@ -407,11 +325,9 @@ type Grid = {
   metresPerPx: number;
 };
 
-// Block mean, NaN-aware, and a mean rather than a subsample on purpose: the
-// scan is looking for a skyline, and point-sampling a 0.25 m DTM every fourth
-// cell would hand it that grid's interpolation noise as if it were relief.
-// A block with no readable cell stays NaN, so a coverage hole survives the
-// round trip as a hole.
+// Block mean rather than a subsample: point-sampling a 0.25 m DTM every fourth
+// cell hands the scan that grid's interpolation noise as if it were relief. A
+// block with no readable cell stays NaN, so a coverage hole survives.
 function decimate(grid: Grid, factor: number): Grid {
   const w = Math.max(1, Math.ceil(grid.width / factor));
   const h = Math.max(1, Math.ceil(grid.height / factor));
@@ -441,15 +357,11 @@ function decimate(grid: Grid, factor: number): Grid {
   return { width: w, height: h, data, metresPerPx: grid.metresPerPx * factor };
 }
 
-// Bilinear, back to the DEM's own grid. Bilinear rather than nearest because
-// the result is looked at: sky-view factor blown up 4× by replication is a
-// field of 4×4 squares, and the eye reads those as structure.
-//
-// Two rules make it safe at a coverage edge. Corners with no value are dropped
-// from the weighted mean rather than poisoning it, so the field stays defined
-// right up to the hole; and `mask` — the DEM's own data — then cuts it back to
-// exactly the cells that have an elevation, since the averaged grid otherwise
-// bleeds up to `factor` pixels into ground nothing was measured on.
+// Bilinear back to the DEM's own grid; nearest at factor 4 is a field of 4×4
+// squares the eye reads as structure. Corners with no value drop out of the
+// weighted mean rather than poisoning it, and `mask` — the DEM's own data —
+// cuts the result back to cells that have an elevation, since the averaged grid
+// otherwise bleeds up to `factor` pixels into unmeasured ground.
 function upsample(
   field: Float32Array,
   src: Grid,
@@ -463,9 +375,8 @@ function upsample(
   const clampX = (v: number) => (v < 0 ? 0 : v >= sw ? sw - 1 : v);
 
   for (let y = 0; y < height; y++) {
-    // Pixel centres, not corners: the coarse cell's value belongs at the
-    // middle of the block it was averaged from, and half a coarse cell of
-    // offset is a visible shift of the whole field at factor 4.
+    // Pixel centres, not corners: half a coarse cell of offset is a visible
+    // shift of the whole field at factor 4.
     const fy = (y + 0.5) / factor - 0.5;
     const yf = Math.floor(fy);
     const ty = fy - yf;
@@ -516,14 +427,11 @@ function upsample(
   return out;
 }
 
-// The walk itself, over whatever grid it is handed — the DEM's own when the
-// radius fits in the step budget, a decimated copy when it does not.
+// The walk itself, over the DEM's own grid or a decimated copy of it.
 function scanHorizon(grid: Grid, radiusMetres: number): HorizonFields {
   const { width: w, height: h, data, metresPerPx } = grid;
-  // Still clamped, though `clampRadius` in render.ts now caps the request at
-  // what this grid can deliver, so it should never bind. Kept because a
-  // headless caller can reach this with any number at all, and the failure it
-  // prevents — a 30-second pass — is worse than the one it causes.
+  // Still clamped: `clampRadius` in render.ts caps the request first, but a
+  // headless caller can reach this with any number at all.
   const radiusPx = Math.min(
     SVF_MAX_RADIUS_PX,
     Math.max(1, Math.round(radiusMetres / metresPerPx)),
@@ -543,8 +451,7 @@ function scanHorizon(grid: Grid, radiusMetres: number): HorizonFields {
       const dx = Math.round(ux * r);
       const dy = Math.round(uy * r);
       const off = dy * w + dx;
-      // Near the origin successive steps can round to the same cell; skip
-      // the duplicates instead of sampling them twice.
+      // Near the origin successive steps can round to the same cell.
       if (off === lastOff) continue;
       lastOff = off;
       steps.push({ off, dx, dy, dist: Math.hypot(dx, dy) * metresPerPx });
@@ -567,10 +474,8 @@ function scanHorizon(grid: Grid, radiusMetres: number): HorizonFields {
       let zenith = 0;
       let nadir = 0;
       for (let d = 0; d < SVF_DIRECTIONS; d++) {
-        // Both start at 0 rather than at ±Infinity, so a direction with no
-        // readable cell at all — the grid edge, a coverage hole — reads as a
-        // flat horizon in every one of the three measurements instead of
-        // poisoning the cell.
+        // Start at 0, not ±Infinity: a direction with no readable cell at all
+        // reads as a flat horizon instead of poisoning the cell.
         let maxTan = 0;
         let minTan = 0;
         let seen = false;
@@ -610,19 +515,11 @@ function scanHorizon(grid: Grid, radiusMetres: number): HorizonFields {
 
 // Visualization for Archaeological Topography, as the Relief Visualization
 // Toolbox defines it (`rvt/blend.py`, "VAT - Archaeological"; Kokalj et al.
-// 2019, Remote Sensing 11(24):2946). Four layers, bottom first.
-//
-// Exported, and printed on every figure, for the same reason MULTI_AZIMUTHS
-// is: changing a number here silently changes what an old render means
-// relative to a new one, and the caption is what keeps that honest.
-//
-// **The stretches are absolute, not percentiles.** That is the opposite call
-// from every other view here, where `paintTerrainField` stretches 2–98 % to
-// get a legible picture out of whatever range this hillside happens to have.
-// VAT is calibrated: the four layers are mixed on the assumption that 0.7
-// sky-view means the same thing on two different hillsides, and re-stretching
-// the inputs — or the composite — would break exactly the comparability the
-// blend exists for.
+// 2019, Remote Sensing 11(24):2946). Four layers, bottom first, and printed on
+// every figure because changing a number here changes what an old render means.
+// The stretches are absolute, not this rectangle's percentiles as the other
+// physical views use: the blend is calibrated on 0.7 sky-view meaning the same
+// thing on two hillsides, which is what makes two VAT renders comparable.
 export const VAT_LAYERS = [
   { vis: 'hillshade', min: 0, max: 1, blend: 'normal', opacity: 100 },
   { vis: 'slope', min: 0, max: 50, blend: 'luminosity', opacity: 50 },
@@ -630,14 +527,10 @@ export const VAT_LAYERS = [
   { vis: 'svf', min: 0.7, max: 1, blend: 'multiply', opacity: 25 },
 ] as const;
 
-// VAT's sun does not move, and the exaggeration is 1×.
-//
-// Both are deliberate departures from this app's own defaults, which light at
-// z-factor 2 because it reads better. VAT's slope layer is normalised against
-// a fixed 0–50° and its hillshade against 0–1, so exaggerating the terrain
-// first would push both off the range the blend was tuned on. Freezing the sun
-// costs the azimuth slider for this one view and buys the thing VAT is for:
-// two VAT renders of two hillsides are the same picture made the same way.
+// VAT's sun is frozen and the exaggeration is 1×, against this app's own
+// z-factor 2 default: the slope layer is normalised against a fixed 0–50° and
+// the hillshade against 0–1, so exaggerating first pushes both off the range
+// the blend was tuned on, and a moving sun makes two VAT renders incomparable.
 export const VAT_AZIMUTH = 315;
 export const VAT_ALTITUDE = 35;
 export const VAT_Z_FACTOR = 1;
@@ -655,16 +548,12 @@ const overlay = (active: number, background: number): number =>
     : 2 * background * active;
 
 /**
- * Composite the four VAT layers. Inputs are the raw fields in their own units
- * — hillshade 0..1, slope in radians, positive openness in degrees, sky-view
+ * Composite the four VAT layers. Inputs are the raw fields in their own units —
+ * hillshade 0..1, slope in radians, positive openness in degrees, sky-view
  * 0..1 — and the result is 0..1, so it paints through the plain grey ramp with
- * no stretch.
- *
- * Simpler than the layer table looks, because two of RVT's three blend modes
- * collapse over single-band data: `blend_func.lum()` returns a greyscale image
- * unchanged, so a luminosity blend *is* the active layer, and RVT's opacity is
- * a plain linear mix (`active·o + background·(1−o)`). Only the overlay step
- * keeps its arithmetic.
+ * no stretch. Two of RVT's three blend modes collapse over single-band data: a
+ * luminosity blend is the active layer, and opacity is a plain linear mix
+ * (`active·o + background·(1−o)`). Only overlay keeps its arithmetic.
  */
 export function composeVat(
   hillshade: Float32Array,
@@ -689,8 +578,7 @@ export function composeVat(
       continue;
     }
 
-    // Slope gradient renders inverted — steep is dark — which is also what
-    // paintTerrainField does for the standalone slope view.
+    // Slope renders inverted: steep is dark.
     let p = 0.5 * (1 - norm(sl * toDeg, 0, 50)) + 0.5 * hs;
     const o = norm(op, 68, 93);
     p = 0.5 * overlay(o, p) + 0.5 * p;
@@ -706,17 +594,15 @@ export function composeVat(
 // Rendering
 // ---------------------------------------------------------------------------
 
-// Robust range for a stretch. Min/max is useless on this data: a single
-// no-data-adjacent spike, or the flat 0.0 plane the TOPOBATHY service
-// returns over water, flattens everything else into a couple of grey levels.
+// Robust range for a stretch. Min/max is useless here: one no-data-adjacent
+// spike flattens everything else into a couple of grey levels.
 export function percentileRange(
   values: Float32Array,
   lowPct: number,
   highPct: number,
 ): [number, number] {
   const finite: number[] = [];
-  // Sampling keeps this cheap on a multi-megapixel grid; the percentiles of
-  // a 1-in-N sample are indistinguishable at this precision.
+  // Percentiles of a 1-in-N sample are indistinguishable at this precision.
   const stride = Math.max(1, Math.floor(values.length / 200000));
   for (let i = 0; i < values.length; i += stride) {
     const v = values[i];
@@ -733,8 +619,8 @@ export function percentileRange(
 
 export type Ramp = 'grey' | 'greyInverted' | 'diverging';
 
-// Paint a computed field into RGBA. No-data goes fully transparent so the
-// coverage edge is visible as a hole rather than as black ground.
+// Paint a computed field into RGBA. No-data goes fully transparent, so a
+// coverage edge reads as a hole rather than as black ground.
 export function toImageData(
   values: Float32Array,
   width: number,
@@ -758,9 +644,8 @@ export function toImageData(
     t = t < 0 ? 0 : t > 1 ? 1 : t;
 
     if (ramp === 'diverging') {
-      // Centre the neutral tone on zero rather than on the midpoint of the
-      // range, so "no local relief" is always the same colour and the eye
-      // can compare two renders.
+      // Centre the neutral tone on zero, not on the midpoint of the range, so
+      // "no local relief" is the same colour across renders.
       const mid = (0 - lo) / span;
       const [r, g, b] = divergingColor(t, mid < 0 ? 0 : mid > 1 ? 1 : mid);
       px[o] = r;
@@ -777,9 +662,8 @@ export function toImageData(
   return img;
 }
 
-// Brown (below) → near-white (at zero) → blue-green (above). Chosen over the
-// usual red/blue so it stays legible for the red-green colour blind, which
-// the neutral-through-white midpoint also helps.
+// Brown (below) → near-white (at zero) → blue-green (above), rather than the
+// usual red/blue, so it stays legible for the red-green colour blind.
 function divergingColor(t: number, mid: number): [number, number, number] {
   if (t < mid) {
     const k = mid > 0 ? t / mid : 0;

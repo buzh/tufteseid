@@ -67,9 +67,6 @@ const InfoBoxElevationContent = ({ result }: { result: SearchResult }) => {
         {t('infoBox.heightEstimatedByInterpolation')}{' '}
         {numericValue.toFixed(1)} {t('infoBox.metersAboveSeaLevel')}
       </p>
-      {/* The caveat about how that number was arrived at is a hover label,
-          not the click-to-open popover it used to be — it is one sentence,
-          and nothing in it is worth a second click. */}
       <Tooltip
         label={t('infoBox.metersAboveSeaLevelTooltip')}
         placement="top"

@@ -1,26 +1,17 @@
-// Tiles a bbox into WMS-sized sub-requests, fetches them through the
-// same-origin /wms/geonorge/* Caddy handlers (so wmscache picks them up),
-// and paints each response into a shared per-canvas destination.
+// Tiles a bbox into WMS-sized sub-requests over the same-origin
+// /wms/geonorge/* handlers, so wmscache picks them up.
 
 import { fetchWithin } from '../shared/utils/deadline';
 import { LidarSource } from './sources';
 
-// How long one tile may take before it counts as a failure rather than as
-// work in progress. Generous, because a cold 2048² GetMap through wmscache to
-// Kartverket genuinely can take tens of seconds under load — but finite,
-// because the alternative is not slowness, it is a promise that never settles
-// and a caller that waits on it forever (src/shared/utils/deadline.ts). Every
-// caller of `fetchAndPaint` retries, so a tile that trips this gets three more
-// chances before it costs anything.
+// A cold 2048² GetMap through wmscache can take tens of seconds; callers retry.
 const TILE_TIMEOUT_MS = 45_000;
 
-// Kartverket's WMS caps GetMap size around 4096 pixels per side; we tile
-// below that to stay under any per-request limit and to keep individual
-// PNG decodes bounded.
+// Kartverket's WMS caps GetMap around 4096 px per side.
 export const MAX_TILE_PX = 2048;
 
-// Cap the final canvas so a huge selection + fine resolution can't
-// allocate a 500 MB browser canvas.
+// Caps the canvas, so a large fine-resolution selection cannot eat hundreds
+// of megabytes.
 export const MAX_CANVAS_PX_PER_SIDE = 12000;
 
 export type TilePlan = {
@@ -35,13 +26,8 @@ export type TilePlan = {
   }>;
 };
 
-// Build the tile grid for a given source bbox + resolution. The bbox is in
-// EPSG:25833. widthPx / heightPx are the final canvas dimensions.
-//
-// `maxSidePx` overrides the canvas cap for callers whose destination isn't a
-// canvas: the terrain tool assembles a Float32Array, where 4 bytes per pixel
-// (rather than a canvas's own bookkeeping) makes 12000² a 576 MB allocation.
-// See MAX_DEM_PX_PER_SIDE in src/terrain/dem.ts.
+// EPSG:25833. `maxSidePx` overrides the canvas cap for a caller painting
+// somewhere else — the terrain tool fills a Float32Array.
 export function planTiles(
   bbox: [number, number, number, number],
   metresPerPx: number,
@@ -54,9 +40,7 @@ export function planTiles(
   let widthPx = Math.max(1, Math.round(worldWidthM / metresPerPx));
   let heightPx = Math.max(1, Math.round(worldHeightM / metresPerPx));
 
-  // Enforce the per-canvas cap by scaling both axes together so we keep
-  // aspect ratio. The effective resolution the caller ends up with is
-  // metresPerPx / scale.
+  // Both axes scale together: effective resolution is metresPerPx / scale.
   const scale = Math.min(1, maxSidePx / Math.max(widthPx, heightPx));
   widthPx = Math.max(1, Math.round(widthPx * scale));
   heightPx = Math.max(1, Math.round(heightPx * scale));
@@ -75,8 +59,7 @@ export function planTiles(
       const dy = r * baseTileH;
       const w = Math.min(baseTileW, widthPx - dx);
       const h = Math.min(baseTileH, heightPx - dy);
-      // Convert canvas pixels → world metres. Y grows downward in canvas
-      // space but northing grows upward, so flip when computing bbox.
+      // Canvas y grows downward, northing upward, so the bbox flips.
       const tileMinX = minX + dx * effectiveMetresPerPx;
       const tileMaxX = tileMinX + w * effectiveMetresPerPx;
       const tileMaxY = maxY - dy * effectiveMetresPerPx;
@@ -117,8 +100,6 @@ export function buildGetMapUrl(
   return `${source.wmsUrl}?${params.toString()}`;
 }
 
-// Concurrency-limited fetch pool: run up to `limit` promises at a time,
-// invoke `onSettled` after each one resolves/rejects.
 export async function runWithConcurrency<T>(
   items: T[],
   limit: number,
@@ -133,8 +114,7 @@ export async function runWithConcurrency<T>(
         try {
           await worker(next.item, next.index);
         } catch {
-          // Swallow: the worker is responsible for surfacing its own errors
-          // via the callback path (status atom / progress notification).
+          // The worker surfaces its own errors.
         }
       }
     })(),
@@ -144,13 +124,8 @@ export async function runWithConcurrency<T>(
 
 export type TileResult = 'painted' | 'blank';
 
-// Kartverket's per-project WMS often returns a valid PNG of the requested
-// size but filled with a single uniform colour when the request lands
-// outside the project's actual coverage. Byte-size heuristics don't catch
-// these (a 2048² uniform PNG is ~16 KB, well above trivial-empty thresholds),
-// so we downsample-and-check for pixel variance instead: a 16×16 sample
-// of a truly uniform tile stays uniform; anything with real hillshade
-// content varies at that scale.
+// Outside coverage Kartverket's WMS returns a valid full-size PNG of one
+// colour that a byte-size heuristic misses, so test pixel variance instead.
 export async function fetchAndPaint(
   url: string,
   ctx: CanvasRenderingContext2D,
@@ -186,9 +161,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 }
 
 function isUniformImage(img: HTMLImageElement): boolean {
-  // Downsample to 16×16 in an offscreen canvas: cheap to read back and
-  // still averages across enough of the source that any real terrain
-  // detail shows up as variance.
+  // 16×16 is cheap to read back and still varies on any real terrain detail.
   const sampleSize = 16;
   const oc = document.createElement('canvas');
   oc.width = sampleSize;

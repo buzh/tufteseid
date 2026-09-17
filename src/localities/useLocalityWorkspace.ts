@@ -165,56 +165,27 @@ import { type PickerCandidate, usePickerRun } from './usePickerRun';
 import { useWorkspaceKeys } from './useWorkspaceKeys';
 import { isPinned, viewSpecOf } from './viewSpec';
 
-/**
- * What a signed-in user is to one lokalitet.
- *
- * Three values rather than a boolean because `admin` is neither of the other
- * two: PocketBase lets an admin change and delete anybody's records, but not
- * add content to them (see `canEdit` / `canAdd` below). Everyone else,
- * signed out included, is a reader.
- */
+/** PocketBase lets an admin change and delete anybody's records but not add
+ *  content to them, hence three values rather than a boolean. */
 export type LocalityAccess = 'owner' | 'admin' | 'reader';
 
-/**
- * Which of the two things you are doing inside the record — reading it, or
- * working on it (docs/lokalitet-view.md §1).
- *
- * The other axis entirely, and orthogonal to `LocalityAccess`: access is a
- * fact about the record, stance is a choice made inside it. A copy is not a
- * third stance.
- */
+/** Orthogonal to `LocalityAccess`: access is a fact about the record, stance
+ *  is a choice made inside it. */
 export type Stance = 'show' | 'edit';
 
-/*
- * How many acquisitions one picker run will take.
- *
- * A busy area has well over a hundred — Oslo lists 121 — and the cap used to
- * be about bandwidth: "Hent alle" fetched every one of them up front. Since
- * §4.3 the run fetches one card ahead of where you are standing, so stopping
- * at the third proposal costs three tile bursts whatever the cap says.
- *
- * It stays anyway, and now it bounds the *judging* rather than the traffic:
- * a rail of 121 near-identical photographs of one valley is not a thing
- * anybody triages, and a picker you abandon halfway is worse than a shorter
- * list of the newest ones.
- */
+// Caps how many acquisitions one picker run offers for judging; a busy area
+// lists well over a hundred.
 export const FLYFOTO_BATCH_MAX = 8;
 
-// Spacing between exhibit positions when the whole list has to be renumbered
-// (§4.4, `reorderBilde`). Big enough that ten further moves fit between any
-// two neighbours by halving, small enough that the values stay far below the
-// epoch-millisecond keys `nextAttachmentSort` mints — which is what keeps a
-// newly created bilde at the end of a hand-arranged exhibit.
+// Spacing between exhibit positions on a full renumber: room for ten further
+// moves by halving, yet far below the epoch-millisecond keys
+// `nextAttachmentSort` mints, which keeps a new bilde at the end.
 const SORT_STEP = 1000;
 
-// What the ground was, for the screenshot figure's source line. Keyed on the
-// background layer rather than asked of useGroundMode, which needs the whole
-// LiDAR + flyfoto control surface mounted to answer the same question.
+// What the ground was, for the screenshot figure's source line.
 const GROUND_LABEL_KEY: Record<BackgroundLayerName, string> = {
   // The five Standard cartographies name themselves rather than all reporting
-  // "Standard": a screenshot over the 1890s amtskart and one over the current
-  // topographic map are different documents, and the caption is the only place
-  // the file says which it is.
+  // "Standard"; the caption is the only place the file says which it is.
   topo: 'ribbon.standard.topo',
   topograatone: 'ribbon.standard.topograatone',
   toporaster: 'ribbon.standard.toporaster',
@@ -225,18 +196,16 @@ const GROUND_LABEL_KEY: Record<BackgroundLayerName, string> = {
   lidarProject: 'ribbon.mode.lidar',
   flyfoto: 'ribbon.mode.flyfoto',
   flyfotoProject: 'ribbon.mode.flyfoto',
-  // Never the value of the background atom — hybrid is a modifier — but the
+  // Never the value of the background atom (hybrid is a modifier), but the
   // union has to be covered.
   topoOverlay: 'ribbon.mode.hybrid',
 };
 
-// Hybrid is a LiDAR stack with names on it, so it credits the same way and
-// only the label differs.
+// Hybrid is a LiDAR stack with names on it: same credit, different label.
 const groundLabelKey = (layer: BackgroundLayerName, hybrid: boolean): string =>
   hybrid ? 'ribbon.mode.hybrid' : GROUND_LABEL_KEY[layer];
 
-// Which grounds put Norge i bilder pixels in the frame, i.e. whose credit
-// line has to name NiB as well as Kartverket.
+// Grounds whose credit line has to name NiB as well as Kartverket.
 const NIB_GROUNDS = new Set<BackgroundLayerName>(['flyfoto', 'flyfotoProject']);
 
 const bboxContains = (outer: LocalityBbox, inner: LocalityBbox): boolean =>
@@ -255,34 +224,23 @@ const bboxUnion = (a: LocalityBbox, b: LocalityBbox): LocalityBbox => [
 /**
  * Everything the lokalitet workspace does, minus the rendering.
  *
- * The panel it was extracted from was one component, so its local state
- * survived only because Layout keyed it on `locality.id`. The surface is now
- * two ribbon rows, a bottom edge, a map callout, two popovers and four
- * dialogs, and holding the state in any of them would scatter it across
- * siblings — in particular the funn draft, whose pen is on the bottom edge
- * and whose title is on a ribbon row, and the flyfoto notice → picker
- * handoff, which is a four-flag conversation between two dialogs.
- *
- * Mount this **once**. `useLocalityFinds` / `useLocalityAttachments` each
- * open a PocketBase realtime subscription that reloads the whole list on
- * every event, so a second call site means N subscriptions and N reloads
- * per change.
+ * Mount once: `useLocalityFinds` / `useLocalityAttachments` each open a
+ * PocketBase realtime subscription that reloads the whole list on every
+ * event, so a second call site means N subscriptions and N reloads per change.
  */
 export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const { t, i18n } = useTranslation();
   const map = useAtomValue(mapAtom);
-  // For the handful of values that are only wanted at the instant of a click —
-  // see the layer-row fades below. Reading them through the store is what
-  // keeps a slider drag from re-rendering everything this hook feeds.
+  // For values only wanted at the instant of a click (the layer-row fades):
+  // subscribing to them would re-render everything this hook feeds per frame.
   const store = useStore();
   const user = useAtomValue(currentUserAtom);
   const isAdmin = useAtomValue(isAdminAtom);
   const setActiveLocality = useSetAtom(activeLocalityAtom);
   const [editingId, setEditingId] = useAtom(editingLocalityIdAtom);
   const setCoverTerrainSpec = useSetAtom(coverTerrainSpecAtom);
-  // The pen: what has been asked for, what is actually up, and what is on it.
-  // The request is written here; the session and the scene are the surface's
-  // answer, and everything below reads them rather than a flag of its own.
+  // The pen: the request is written here, the session and scene are the
+  // surface's answer, and everything below reads those rather than a flag.
   const setDrawRequested = useSetAtom(drawRequestedAtom);
   const drawSession = useAtomValue(funnSessionAtom);
   const scene = useAtomValue(funnSceneAtom);
@@ -291,20 +249,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [sketchShown, setSketchShown] = useAtom(sketchShownAtom);
   const [sketchOpacity, setSketchOpacityMap] = useAtom(sketchOpacityAtom);
   const [sketchGroupShown, setSketchGroupShown] = useAtom(sketchGroupShownAtom);
-  /*
-   * The two ground groups' switches. Their controls own them (see `viewItems`
-   * and `fileItems` below) and this hook's business with them is mostly
-   * emptying them on the way out — except for what step 8 reads back off the
-   * row: a new sketch records what it was drawn over (`over`, §13.6), and
-   * `keepScene` records the whole arrangement (§13.7).
-   *
-   * Which is why the group switches are read and the *fades* are not. A group
-   * being off means its members are not on the map, so it changes what a keep
-   * would contain and the button's own enabled state with it; a fade changes
-   * neither, and subscribing to it here would re-render the whole workspace
-   * once per slider frame. `keepScene` reads those off the store at the
-   * instant of the press instead.
-   */
+  // The two ground groups' switches are subscribed to, their fades are not.
   const [visningShown, setVisningShown] = useAtom(visningShownAtom);
   const setVisningOpacity = useSetAtom(visningOpacityAtom);
   const [visningGroupShown, setVisningGroupShown] = useAtom(
@@ -323,56 +268,39 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const stripOpen = useAtomValue(bilderStripOpenAtom);
   const [funnOutside, setFunnOutside] = useAtom(funnOutsideAtom);
   const leaveCompare = useSetAtom(leaveCompareAtom);
-  // Read only so a screenshot can say whose pixels are in it. Both halves of
-  // the compare curtain, not the focused facade: a screenshot is of the whole
-  // map, so a split one has two grounds in it and — where one of them is
-  // ortofoto — two rights holders.
+  // Read so a screenshot can credit its pixels. Both compare halves, since a
+  // split screenshot has two grounds and possibly two rights holders.
   const background = useAtomValue(backgroundLayerHalves.a);
   const hybrid = useAtomValue(hybridOverlayHalves.a);
   const compareOn = useAtomValue(compareOnAtom);
   const backgroundB = useAtomValue(backgroundLayerHalves.b);
   const hybridB = useAtomValue(hybridOverlayHalves.b);
-  // What the heritage overlay is *drawing*, not what is ticked: a screenshot
-  // taken with the eye down has no heritage in its pixels, and the figure
-  // caption below names what is in the pixels.
+  // What the heritage overlay is drawing, not what is ticked: the figure
+  // caption names what is in the pixels.
   const themeLayers = useAtomValue(shownThemeLayersAtom);
   const heritageDetails = useAtomValue(heritageDetailsAtom);
   const heritageRender = useAtomValue(heritageRenderAtom);
   const heritageOpacity = useAtomValue(heritageOpacityAtom);
   const [shooting, setShooting] = useState(false);
   const [uploading, setUploading] = useState(false);
-  // Which borrowed File is being pulled across, if any (§7). An id rather
-  // than a bool because the tail can be a dozen cards long and the spinner
-  // belongs on the one that was pressed.
+  // An id, not a flag, so the spinner lands on the pressed card.
   const [takingId, setTakingId] = useState<string | null>(null);
-  // `Lag min kopi`: whether the dialog is up, and how far the fork has got.
   const [copyPrompt, setCopyPrompt] = useState(false);
   const [copyProgress, setCopyProgress] = useState<CopyProgress | null>(null);
-  // `Rapportpakke`: how far the bundle has got (§9). Same shape and the same
-  // banner rank as the copy's, because it is the same kind of wait — a long
-  // one with a countable middle.
   const [takeoutProgress, setTakeoutProgress] =
     useState<TakeoutProgress | null>(null);
-  // Whether the licensing notice is up, and what accepting it does. Two
-  // routes reach NiB now — the acquisition picker and `Behold` over the
-  // flyfoto ground — and consent is owed on both, so the notice grew a
-  // destination rather than a second copy.
+  // Whether the NiB licensing notice is up, and what accepting it does: two
+  // routes reach NiB and consent is owed on both.
   const [flyfotoNotice, setFlyfotoNotice] = useState<
     'picker' | 'behold' | null
   >(null);
-  // Whether the starter set is being written. A plain bool since §4.1.2: it
-  // used to name the style being fetched, because fetching three was minutes
-  // and the rail had nothing else to say — now the three cards appear almost
-  // at once and each says its own pin state.
   const [starterBusy, setStarterBusy] = useState(false);
-  // The acquisition picker, opened once the licensing notice is accepted.
   const [flyfotoPicker, setFlyfotoPicker] = useState(false);
   const [flyfotoProjects, setFlyfotoProjects] = useState<
     FlyfotoProject[] | null
   >(null);
   const [flyfotoProjectsError, setFlyfotoProjectsError] = useState(false);
 
-  // What this user *is* to this record. A fact, not a choice.
   const access: LocalityAccess =
     user == null
       ? 'reader'
@@ -382,44 +310,24 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           ? 'admin'
           : 'reader';
 
-  // And what they are *doing* in it. The other axis (§1): every lokalitet
-  // opens in show, and `Rediger` is the one way into the other stance.
   const stance: Stance = editingId === locality.id ? 'edit' : 'show';
 
-  // Two permissions, not one, because the server has two.
-  //
-  // `mayEdit` mirrors the update and delete rules, which are the same on all
-  // three collections: `owner = @request.auth.id || @request.auth.role =
-  // "admin"`.
-  //
-  // `mayAdd` is stricter, and deliberately so. The *create* rules on `finds`
-  // and `attachments` also demand `locality.owner = @request.auth.id`, so an
-  // admin who pressed "Nytt funn" on somebody else's site would collect a
-  // 403 after doing the work. Showing them that button is the same lie as
-  // hiding Slett, pointing the other way.
+  // Two permissions because the server has two: `mayEdit` mirrors the update
+  // and delete rules, while the create rules on `finds` and `attachments`
+  // also demand the parent lokalitet's owner, so an admin adding content
+  // collects a 403 after doing the work.
   const mayEdit = access !== 'reader';
   const mayAdd = access === 'owner';
 
-  // What the surfaces are actually handed: permission **and** stance. Folding
-  // the two together here rather than at each call site is what makes §2's
-  // invariant — *nothing in show writes* — hold everywhere at once, including
-  // in the places nobody remembers to check. A write verb whose gate is false
-  // is rendered absent, not disabled, so show mode has no write verbs at all
-  // rather than a row of greyed ones.
+  // Permission and stance folded together once here, so "nothing in show
+  // writes" holds at every call site. A false gate renders the verb absent,
+  // not disabled.
   const canEdit = mayEdit && stance === 'edit';
   const canAdd = mayAdd && stance === 'edit';
 
-  /*
-   * The edit transaction (docs/lokalitet-view.md §5.6).
-   *
-   * Everything below that used to write now writes *here* instead, and
-   * `Lagre` plays the buffer out to PocketBase in one pass. The exception is
-   * the lokalitet's own fields, which keep going onto `activeLocalityAtom`
-   * as they always did — half the app reads the rectangle off it, and a
-   * buffered bbox those never saw would make "Juster området refetches the
-   * DEM for free" stop being true. So `applyLocality` moves the live record
-   * and the buffer keeps the copy to put back.
-   */
+  // The edit transaction. The lokalitet's own fields are the exception to the
+  // buffer: they go onto `activeLocalityAtom` live, because half the app reads
+  // the rectangle off it. The buffer keeps the copy to put back.
   const localityRef = useRef(locality);
   localityRef.current = locality;
 
@@ -446,35 +354,24 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     applyLocality,
   });
 
-  // Recovery enters edit by itself: the buffer is the session, and putting
-  // it back without the stance that owns it would leave the work on screen
-  // with no way to save it (§5.6, consequence 4).
+  // Recovery enters edit by itself: restoring a buffer without the stance
+  // that owns it leaves the work on screen with no way to save it.
   useEffect(() => {
     if (restoredAt != null) setEditingId(locality.id);
   }, [restoredAt, locality.id, setEditingId]);
 
-  // …and the other direction. `enterEdit` opens the buffer, but it is not the
-  // only way into edit: a lokalitet made in this session arrives in it
-  // already, set by whichever creator made the record (§2). Stance without a
-  // buffer is the one state that would lose work silently — every write is a
-  // `mutateDraft`, and `mutate` is a no-op while `draft` is null — so the
-  // buffer follows the stance rather than the entrance.
-  //
-  // Which is also how a session survives its own `Lagre` and `Avbryt`: both
-  // empty the buffer without touching the stance, and this puts a fresh one
-  // back. Reopening *here* rather than at the end of those two is what keeps
-  // `baseLocality` honest — this runs on the render after the commit or the
-  // rollback has settled, so the new buffer's base is the record as it now
-  // stands rather than the one the callback closed over.
+  // The buffer follows the stance rather than the entrance: stance without a
+  // buffer loses work silently, since every write is a `mutateDraft` and that
+  // is a no-op while `draft` is null. Reopening here rather than at the end of
+  // `Lagre` / `Avbryt` runs a render later, so the new buffer's base is the
+  // record as it now stands.
   useEffect(() => {
     if (stance === 'edit' && !draft) beginDraft();
   }, [stance, draft, beginDraft]);
 
-  /*
-   * Realtime stands down for the length of the transaction (§5.6,
-   * consequence 5): the subscription stays up, but an event raises a flag
-   * instead of reloading a list the buffer is describing.
-   */
+  // Realtime stands down for the length of the transaction: the subscription
+  // stays up, but an event raises a flag instead of reloading a list the
+  // buffer is describing.
   const {
     items: serverFinds,
     changedElsewhere: findsChanged,
@@ -488,8 +385,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   } = useLocalityAttachments(locality.id, stance === 'edit');
   const changedElsewhere = findsChanged || attachmentsChanged;
 
-  // What every surface reads: the server's lists with the session laid over
-  // them. Nothing downstream knows the difference — see `draft.ts`.
+  // What every surface reads: the server's lists with the buffer laid over.
   const ownerId = user?.id ?? locality.owner;
   const findItems = useMemo(
     () => overlayFinds(serverFinds, draft, locality.id, ownerId),
@@ -500,13 +396,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [serverAttachments, draft, locality.id, ownerId],
   );
 
-  /*
-   * The deferred deletions (§5.6, consequence 2).
-   *
-   * One set for both collections — PocketBase ids are unique across them —
-   * because every surface that asks does so about one record at a time, and
-   * two sets would only be two things to remember to check.
-   */
+  // Deferred deletions, one set for both collections: PocketBase ids are
+  // unique across them.
   const deletedIds = useMemo(
     () =>
       new Set<string>([
@@ -516,19 +407,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [draft],
   );
 
-  /*
-   * A figure the pin queue just landed, put on the card it belongs to.
-   *
-   * The queue PATCHes the record and realtime would normally carry that back
-   * — but realtime is held back for the length of an edit session, and edit is
-   * exactly when pins happen: the sweep runs there, and so does the starter
-   * set on a lokalitet thirty seconds old. Without this the three cards the
-   * author is watching stay blank until they leave the stance, which is the
-   * whole complaint the write-through was for.
-   *
-   * Up here rather than beside the queue's other verbs because the starter set
-   * enqueues before those are declared.
-   */
+  // A figure the pin queue just landed: its PATCH would normally arrive by
+  // realtime, which is held back for the length of an edit session. Declared
+  // here because the starter set enqueues before the queue's other verbs.
   const applyPinned = useCallback(
     (rec: AttachmentRecord) =>
       setAttachmentItems((prev) =>
@@ -537,14 +418,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [setAttachmentItems],
   );
 
-  /** Whether `Avbryt` has anything to throw away, and what it would name. */
   const dirty = isDirty(draft);
   const counts = useMemo(
     () => (draft ? draftCounts(draft) : null),
     [draft],
   );
 
-  /** Take a deferred deletion back — the verb on the greyed card. */
   const restoreDeleted = useCallback(
     (id: string) => {
       mutateDraft((d) => undelete(d, id));
@@ -554,30 +433,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [mutateDraft, findItems],
   );
 
-  /*
-   * The exhibit (docs/lokalitet-view.md §4.4).
-   *
-   * `attachmentItems` arrives in `sort` order from the server. What the strip
-   * walks is this list minus the concealed ones — in show. In edit the hidden
-   * records are on the rail too, marked: concealment is one of the things you
-   * are there to change, and a curation control you cannot see the effect of
-   * is not one.
-   *
-   * That makes the *positions* differ between the two stances, which is why
-   * every ordering call below indexes into `attachmentItems` and never into
-   * this list: an exhibit order that depended on who was looking would not be
-   * an order.
-   */
+  // The exhibit. Positions differ between stances (edit shows the hidden
+  // records too), so every ordering call below indexes into
+  // `attachmentItems`, never into `bilderItems`.
   const { items: inheritedItems, unavailable: originalUnavailable } =
     useInheritedBilder(locality, serverAttachments, canAdd);
 
-  /**
-   * The borrowed tail: `derivedFrom`'s Files, which the copy did not carry
-   * (§7). Publishing the ids rather than the records is what keeps every
-   * ordering call below honest — those index into `attachmentItems`, which
-   * has none of these in it, and the tail is a *suffix* of `bilderItems`, so
-   * a position in the one is still a position in the other.
-   */
+  // The borrowed tail: `derivedFrom`'s Files, which the copy did not carry.
+  // A suffix of `bilderItems` and absent from `attachmentItems`, so a
+  // position in the one is still a position in the other.
   const inheritedIds = useMemo(
     () => new Set(inheritedItems.map((rec) => rec.id)),
     [inheritedItems],
@@ -591,27 +455,14 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     return inheritedItems.length > 0 ? [...own, ...inheritedItems] : own;
   }, [attachmentItems, canEdit, inheritedItems]);
 
-  /*
-   * Which bilde the bottom edge is pointing at (docs/lokalitet-view.md §4.3).
-   *
-   * Up here rather than in BilderStrip for two reasons: the strip unmounts
-   * when it is folded away, and ←/→ walk it from `useWorkspaceKeys`, which is
-   * mounted here.
-   *
-   * Since step 6 this said nothing about the map, and **that is reversed** —
-   * see `selectBilde`, defined with the map verbs it now needs.
-   */
+  // Which bilde the bottom edge is pointing at. Here rather than in
+  // BilderStrip because the strip unmounts when folded away and ←/→ walk it
+  // from `useWorkspaceKeys`, mounted here.
   const [activeBildeId, setActiveBildeId] = useState<string | null>(null);
 
-  // The record is no longer on the rail — deleted here or by another session,
-  // or concealed and then left behind when `Ferdig` drops the stance.
-  //
-  // Only the cursor needs sweeping. A layer member goes with its record for
-  // free: `viewItems` and `fileItems` apply the same two filters, so a record
-  // that has left the rail has left the pulldown, and the `<GroundMember>`
-  // under it unmounts and takes its pixels with it. The switch that outlives
-  // it is an id in a set that nothing lists, which the close/swap cleanup
-  // empties.
+  // Sweep the cursor when the record leaves the rail. Only the cursor: a
+  // layer member goes with its record for free, since `viewItems` /
+  // `fileItems` apply the same filters and the `<GroundMember>` unmounts.
   useEffect(() => {
     if (
       activeBildeId &&
@@ -622,89 +473,29 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     }
   }, [activeBildeId, bilderItems]);
 
-  /*
-   * Folding the rail away used to put the ground back, and unfolding it put
-   * the image back — `Bilder` as one gesture with two halves, with the card
-   * under the cursor and the pin both remembered in a ref across the fold.
-   *
-   * Step 6 deleted the whole of it, because the whole of it was undoing
-   * something this hook was doing to itself, and it stays deleted now that
-   * selecting a thumbnail shows it again. What made the fold destructive was
-   * that the rail was the image's *only* control, so folding it away hid the
-   * switch that was holding the image up. It is not: what is on the ground is
-   * the layer row's four pulldowns, which are on the row and stay on the row
-   * whatever the bottom edge is doing. So there is still nothing to drop,
-   * nothing to remember and nothing to give back — the cursor stays where it
-   * was, the image stays up, and unfolding shows the same card selected.
-   */
-
-  /**
-   * Point the rail at a record, and nothing else.
-   *
-   * For the surface selecting *for* you, as against `selectBilde`, which is a
-   * press and therefore also changes the map. `BilderCarousel` lands on the
-   * first image when edit opens, because a surface entered in order to change
-   * something should not make you pick a subject before you can — and landing
-   * there must not rearrange the ground on the way in.
-   */
+  /** Point the rail at a record without touching the map, for the surface
+   *  selecting for you; `selectBilde` is the press, and does both. */
   const focusBilde = useCallback((id: string | null) => {
     setActiveBildeId(id);
   }, []);
 
-  /*
-   * …and the other direction: the cursor follows the map.
-   *
-   * Whenever exactly one bilde is on the map, the rail points at it. That
-   * covers three gestures with one rule — W/S walking `[Visning ▾]`'s ring
-   * (§5.3), a switch pressed in any of the three pulldowns, and the arrival
-   * cover — none of which knows the rail exists, and all of which would
-   * otherwise leave the strip pointing at some other card while the ground
-   * shows this one.
-   *
-   * Exactly one, because that is the only arrangement a single cursor can
-   * describe honestly. Two members up is a comparison and the rail stays
-   * where it is; none up is the empty ground, and blanking the cursor there
-   * would close the detail panel every time someone switched a group off.
-   *
-   * No loop with `selectBilde`: it sets the shown set to the id it just
-   * pointed at, so this fires and finds the cursor already there.
-   */
+  // The other direction: exactly one bilde on the map moves the rail cursor
+  // to it, since one is the only arrangement a single cursor can describe.
   useEffect(() => {
     const shown = [...visningShown, ...bildeShown, ...sketchShown];
     if (shown.length !== 1) return;
     const id = shown[0];
-    // A set is never pruned (§13.4), so it can still name a record that has
-    // left the rail — and the sweep above would only have to undo this.
+    // A shown set is never pruned, so it can still name a record that has
+    // left the rail.
     if (!bilderItems?.some((a) => a.id === id)) return;
     setActiveBildeId((cur) => (cur === id ? cur : id));
   }, [visningShown, bildeShown, sketchShown, bilderItems]);
 
-  /*
-   * `Slett bildet` — **not** deferred, unlike every other write in edit.
-   *
-   * It was, and the deferral cost more than it bought. The confirm on the
-   * button already says the action cannot be undone, so the greyed card that
-   * followed was contradicting it; and getting the deletion to actually
-   * happen meant `Lagre`, which also ends the session — so tidying an exhibit
-   * of twelve renders was twelve rounds of leaving edit and coming back. That
-   * is the same reasoning `Slett lokaliteten` already runs on: a confirmed
-   * deletion is a decision, not a draft.
-   *
-   * So the request goes out here and the buffer forgets the record entirely
-   * (`forgetAttachment`). What is left is narrow and worth stating:
-   *
-   * - **A buffered spec never reached the server**, so there is nothing to
-   *   delete — dropping it from `newSpecs` is the whole operation.
-   * - **Realtime stands down in edit**, so the list will not notice on its
-   *   own; `setAttachmentItems` takes the record off it.
-   * - **A failure falls back to the old behaviour.** The tombstone stays, the
-   *   card greys, `Angre sletting` is on it and `Lagre` retries the DELETE.
-   *   That is the one path on which `deletedIds` still covers an attachment.
-   *
-   * The pin goes down with it either way: picking a frame lays it on the
-   * ground, so the ordinary path — pick it, decide against it, press `Slett`
-   * — would otherwise end with the image still on the map, named by nothing.
-   */
+  // `Slett bildet` goes out immediately rather than into the buffer. A
+  // buffered spec never reached the server, so dropping it from `newSpecs` is
+  // the whole operation; realtime stands down in edit, so the list has to be
+  // updated by hand; and on failure the tombstone stays and `Lagre` retries
+  // the DELETE — the one path on which `deletedIds` covers an attachment.
   const removeBilde = useCallback(
     async (rec: AttachmentRecord) => {
       mutateDraft((d) => dropAttachment(d, rec.id));
@@ -725,13 +516,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [mutateDraft, setAttachmentItems, t],
   );
 
-  // Into the buffer, which is also what makes the drag not snap back: there
-  // is no round trip to wait out any more.
-  //
-  // Four columns since step 9, not three: `funn` joined the curation set when
-  // it stopped being something a producer knew and became something the author
-  // says (§13.6). `meta` is still out of the signature, for the reason
-  // `placeUpload` gives — a caption edit must never be able to carry a spec.
+  // The four curation columns, into the buffer. `meta` is deliberately out of
+  // the signature: a caption edit must never be able to carry a spec.
   const patchBilde = useCallback(
     (
       rec: AttachmentRecord,
@@ -754,51 +540,22 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [patchBilde],
   );
 
-  /*
-   * Which funn this bilde belongs to (§13.6, §13.10 step 9).
-   *
-   * One id or none, written as the whole array — "belongs to" is a single
-   * answer, and `funnGroups.ts` reads it back as one. The array is what the
-   * column is, so the editor writes the column rather than a convention on top
-   * of it; a record that somehow held two would be corrected by the first edit
-   * rather than quietly half-read.
-   *
-   * `canEdit` rather than `canAdd`, like the caption beside it: this is an
-   * update, so an admin over somebody else's lokalitet may file their images.
-   */
+  // Which funn this bilde belongs to: one id or none, written as the whole
+  // array, so a record that somehow holds two is corrected by the first edit.
   const setBildeFunn = useCallback(
     (rec: AttachmentRecord, funnId: string | null) =>
       patchBilde(rec, { funn: funnId ? [funnId] : [] }),
     [patchBilde],
   );
 
-  // Keep it, do not show it (§4.4). The alternative to this field is deleting
-  // your working renders to make the exhibit tidy, and the seven you rejected
-  // are the evidence that you checked.
   const setBildeHidden = useCallback(
     (rec: AttachmentRecord, hidden: boolean) => patchBilde(rec, { hidden }),
     [patchBilde],
   );
 
-  /*
-   * `Plasser i ruta` and its undo — the upload opt-in (§13.5, §13.10 step 7).
-   *
-   * The only write in the whole layer-row thread, and it is deliberately not
-   * *on* the layer row: §13.8 says nothing in the row writes, and the switch
-   * that lays a File down has to stay a switch. Giving an upload an extent is
-   * a record edit of the same kind as a caption or a concealment, so it lives
-   * where those live — on the card, in edit, buffered until `Lagre`.
-   *
-   * The whole `meta` goes in the patch, not the one key, and that is
-   * `DraftAttachment.meta`'s rule rather than a choice here: PocketBase
-   * replaces a JSON field wholesale, so a partial patch is a deletion of
-   * everything it left out. `rec` is the overlaid record, so a second press in
-   * the same session reads what the first one buffered.
-   *
-   * Not `patchBilde`: that one is the three curation columns, and keeping
-   * `meta` out of its signature is what stops a caption edit from ever
-   * carrying a spec.
-   */
+  // `Plasser i ruta` and its undo: give an upload an assumed extent. The
+  // whole `meta` goes in the patch, never the one key — PocketBase replaces a
+  // JSON field wholesale, so a partial patch deletes everything it left out.
   const placeUpload = useCallback(
     async (rec: AttachmentRecord) => {
       if (!canEdit) return;
@@ -813,8 +570,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           withAttachment(d, rec.id, attachmentBaseOf(rec), { meta }),
         );
       } catch (e) {
-        // The aspect is the whole input, so there is no half-placement to
-        // leave behind: a file whose pixels will not decode gets no rectangle.
         console.warn('[locality] place upload failed', rec.id, e);
         toast.error({ title: t('localities.bilder.placeFailed') });
       }
@@ -835,24 +590,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [canEdit, mutateDraft],
   );
 
-  /*
-   * Move a bilde to a position in the exhibit.
-   *
-   * `sort` is an opaque key, so the ordinary move is a *value between the two
-   * new neighbours* and costs one PATCH — which matters here more than it
-   * usually would, because every write comes back as a realtime event and
-   * every realtime event reloads the whole list. Renumbering forty records to
-   * drag one card would be forty reloads.
-   *
-   * The fallback is that renumber, and it is reached in exactly two
-   * situations: neighbours one apart, and the first drag on a lokalitet whose
-   * records all predate the field and so all carry 0. Both are self-healing —
-   * once a run has been spaced out by `SORT_STEP` there is room again.
-   *
-   * Since step 13 both land in the buffer rather than on the server, so the
-   * renumber costs nothing at all until `Lagre` — but it is still worth
-   * avoiding, because at that point it becomes forty PATCHes in the commit.
-   */
+  // `sort` is opaque: the ordinary move picks a value between the two new
+  // neighbours and costs one PATCH, with a full renumber as the fallback when
+  // there is no gap. Self-healing, since a renumber respaces by `SORT_STEP`.
   const reorderBilde = useCallback(
     (id: string, toIndex: number) => {
       const list = attachmentItems;
@@ -882,9 +622,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         patchBilde(list[from], { sort: value });
         return;
       }
-      // No room. Space the whole exhibit out again, in the order it now
-      // reads, and leave it that way — the values stay far below any clock
-      // reading, so the next image created still lands last.
+      // No room: space the whole exhibit out again in the order it now reads.
       for (let i = 0; i < next.length; i++) {
         patchBilde(next[i], { sort: (i + 1) * SORT_STEP });
       }
@@ -894,26 +632,16 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
   // Funn draft. `draftFunnId` is the record the pen is bound to — null only
   // until the first shape closes, since drawing autosaves. `draftIsEdit`
-  // distinguishes the two ways in: a new funn, or "Rediger tegningen" on one
-  // that already exists.
+  // distinguishes a new funn from "Rediger tegningen" on an existing one.
   const [draftFunnId, setDraftFunnId] = useState<string | null>(null);
   const [draftIsEdit, setDraftIsEdit] = useState(false);
   const [funnTitle, setFunnTitle] = useState('');
-  /*
-   * What "Rediger tegningen" started from, so `Forkast funn` can put it back.
-   *
-   * §5.3's second depth-2 exit used to be offered only for a *new* funn,
-   * because under autosave the old shape was overwritten the moment the new
-   * one closed and a button promising to restore it would have been lying.
-   * Nothing is overwritten now, so the promise is keepable — but only if
-   * somebody remembers what the shape was, and this is that somebody.
-   */
+  // What "Rediger tegningen" started from, so `Forkast funn` can put it back.
   const [geometryBefore, setGeometryBefore] = useState<DraftFind | null>(null);
   // The autosave's flush, handed over once that hook has run further down. A
   // ref because the two halves point at each other: the hook is driven by
-  // callbacks defined here (create the record, patch it), and those callbacks
-  // in turn have to be able to write out whatever is still settling. The
-  // unmount path above needs it for the same reason.
+  // callbacks defined here, and those callbacks must be able to write out
+  // whatever is still settling.
   const flushDraftRef = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -934,46 +662,28 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setSelectedFunnId(null);
       setFunnOutside(false);
       hideFunnOnLayer(null);
-      // Keyed by find id, so the next lokalitet's funn are not in it — but a
-      // set left standing would come back with *this* lokalitet and open it
-      // with funn missing that its owner never switched off in this session.
+      // All of the following are keyed by this lokalitet's find or attachment
+      // ids, so a set left standing would come back with the next lokalitet
+      // and hide or fade records it never names.
       setFunnSwitchedOff(new Set());
-      // The overlays belong to this lokalitet's bilder, and the next one's
-      // ids are not these. Both halves: the layers come off the map and the
-      // set that decides which are up is emptied.
       setSketchOverlays([]);
       setSketchShown(new Set());
-      // The fades are keyed by attachment id and the group's switch is view
-      // state like the stance is — neither belongs to the next lokalitet, and
-      // a group left off would open it with the sketches mysteriously absent.
       setSketchOpacityMap(new Map());
       setSketchGroupShown(true);
-      // [Visning]'s three, on the same grounds. The group's own switch can
-      // leave the map with *no background at all* (§13.1), so a lokalitet
-      // closed with it off would hand the next one a white screen.
-      // `VisningControl` puts the tile layers back on unmount; this is what
-      // stops a swap — which does not unmount it — from carrying the
-      // arrangement across.
+      // [Visning]'s group switch can leave the map with no background at all,
+      // so a lokalitet closed with it off would hand the next one a white
+      // screen. `VisningControl` restores the tile layers on unmount; a swap
+      // does not unmount it, hence this.
       setVisningShown(new Set());
       setVisningOpacity(new Map());
       setVisningGroupShown(true);
-      // The latch is keyed to an id in the set just emptied, so leaving it
-      // standing would arm the next lokalitet's first ground change against a
-      // member that is not on the map — harmless today, and the kind of
-      // harmless that stops being so the moment ids repeat.
+      // Latched to an id in the set just emptied.
       setProvisionalView(null);
-      // [Bilde]'s three, on the first of those grounds alone: its members are
-      // attachment ids and the next lokalitet's are not these. This is also
-      // the sweep that used to be `usePinnedBilde`'s — one image on the ground
-      // became a set, so clearing it became emptying one.
       setBildeShown(new Set());
       setBildeOpacity(new Map());
       setBildeGroupShown(true);
-      // And the curtain comes down with the row that raised it
-      // (docs/lokalitet-view.md §8). Sammenlign's only control moved onto the
-      // lokalitet row, so leaving the lokalitet with it up would strand a
-      // second live tile stack on screen with no way to close it — which is
-      // Kartverket's request budget doubled, silently and indefinitely.
+      // Sammenlign's only control is on the lokalitet row, so leaving with the
+      // curtain up strands a second live tile stack with no way to close it.
       leaveCompare();
     };
   }, [
@@ -997,8 +707,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     leaveCompare,
   ]);
 
-  // The funn draft used to be reset by the whole panel remounting on a
-  // lokalitet swap. It no longer does, so clear it here.
+  // Nothing remounts on a lokalitet swap, so the funn draft is cleared here.
   useEffect(() => {
     setDraftFunnId(null);
     setDraftIsEdit(false);
@@ -1006,13 +715,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setGeometryBefore(null);
   }, [locality.id]);
 
-  /*
-   * The lokalitet's own fields: onto the live record *and* into the buffer.
-   *
-   * The atom write is not an optimistic update waiting for a server to
-   * confirm it — there is no request. It is where the value lives until
-   * `Lagre`, because that is where every other module reads it from.
-   */
+  // The lokalitet's own fields: onto the live record and into the buffer. The
+  // atom write is not optimistic — there is no request; it is where the value
+  // lives until `Lagre`, because that is where every other module reads it.
   const patchLocality = useCallback(
     (patch: LocalityPatch) => {
       applyLocality(patch);
@@ -1026,39 +731,24 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [setActiveLocality],
   );
 
-  // `Rediger`. Costs nothing on purpose (§2): no fetch, no write, the map
-  // does not move and the render does not blink — which is what lets show
-  // mode be absolute about writing nothing without being in the way. All it
-  // does is set the stance; the buffer follows it, above.
+  // `Rediger` only sets the stance; the buffer follows it, above.
   const enterEdit = useCallback(() => {
     if (!mayEdit) return;
     setEditingId(locality.id);
   }, [mayEdit, locality.id, setEditingId]);
 
-  // Stance leaves on unmount, but only if it is still *this* record's. The
-  // creators set the atom in the same batch as `activeLocalityAtom`, so a
-  // brand-new lokalitet's id is already in it by the time the outgoing
-  // workspace's cleanup runs; clearing unconditionally would put the new
-  // record straight back into show.
+  // Stance leaves on unmount, but only if it is still this record's: the
+  // creators set the atom in the same batch as `activeLocalityAtom`, so a new
+  // lokalitet's id is already in it when the outgoing cleanup runs and
+  // clearing unconditionally would put the new record back into show.
   useEffect(
     () => () => setEditingId((cur) => (cur === locality.id ? null : cur)),
     [locality.id, setEditingId],
   );
 
-  /*
-   * `Lag min kopi` (§7) — the reader's half of the same slot `Rediger` fills
-   * for an owner, and the only escalation left in the design: it copies,
-   * swaps you to the copy, and drops you in edit there. One prompt in one
-   * place, rather than an "sign this over to you first?" wrapper around
-   * every write path in the app.
-   *
-   * The prompt is not a confirmation of a risk — nothing is at risk — it is
-   * where the sentence about what does and does not come along gets said, and
-   * that sentence is the whole of §7 in two lines. Which is also why it
-   * cannot be skipped for an empty lokalitet: a copy that silently left the
-   * screenshots behind would be found out later, over the one image that
-   * mattered.
-   */
+  // `Lag min kopi`: copies, swaps you to the copy, and drops you in edit
+  // there. The prompt is where what does and does not come along gets said,
+  // so it is not skipped for an empty lokalitet.
   const openCopyPrompt = useCallback(() => setCopyPrompt(true), []);
   const closeCopyPrompt = useCallback(() => setCopyPrompt(false), []);
 
@@ -1083,11 +773,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           title: t('localities.copy.partial', { count: result.failed }),
         });
       }
-      // Straight into it, in edit — same batch, so the row never renders the
-      // copy in show first. The specs it carries have no pixels yet; the pin
-      // sweep in the copy's own workspace is what asks for them, which is
-      // also what keeps a fork from rendering a dozen figures for somebody
-      // who was only curious.
+      // Same batch, so the row never renders the copy in show first.
       setActiveLocality(result.rec);
       setEditingId(result.rec.id);
     } finally {
@@ -1104,14 +790,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     t,
   ]);
 
-  /*
-   * `Åpne originalen`, on the banner a copy carries (§5.7, rank 5).
-   *
-   * Fetched rather than assumed reachable: `derivedFrom` is
-   * `cascadeDelete: false`, so the relation outlives the record it points at
-   * and outlives being un-shared. That is the accepted cost of a fork, and
-   * this is where it has to be said out loud instead of opening nothing.
-   */
+  // Fetched rather than assumed reachable: `derivedFrom` is
+  // `cascadeDelete: false`, so the relation outlives the record it points at,
+  // and outlives that record being un-shared.
   const openOriginal = useCallback(async () => {
     const id = locality.derivedFrom;
     if (!id) return;
@@ -1139,31 +820,23 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     const projection = map.getView().getProjection().getCode();
     const extent = transformExtent(locality.bbox, 'EPSG:4326', projection);
     map.getView().fit(extent, {
-      // Measured, not guessed: the ribbon takes an unpredictable slice of
-      // the height at the top and the bottom edge another at the bottom, and
-      // centring the rectangle in the whole canvas puts it half behind
-      // both.
+      // Measured: the ribbon and the bottom edge each take an unpredictable
+      // slice of the canvas.
       padding: fitPadding(map),
       maxZoom: 18,
       duration: 400,
     });
   }, [map, locality.bbox]);
 
-  // Opening a lokalitet also grows the chrome — a second ribbon row, and the
-  // filmstrip along the bottom edge — so frame the rectangle in what is left
-  // rather than leaving it half behind the surfaces that just appeared.
-  //
-  // Keyed on the id and not the bbox on purpose: re-fitting on every bbox
-  // change would fight the "Juster området" drag, which persists a new
-  // rectangle after every gesture.
+  // Keyed on the id and not the bbox: re-fitting on every bbox change would
+  // fight the "Juster området" drag, which persists after every gesture.
   useEffect(() => {
     zoomToLocality();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locality.id]);
 
-  // The one deletion that is not deferred, because there is nothing left to
-  // defer it into: the record this transaction is about is going away, so
-  // the buffer goes with it rather than waiting to be offered back.
+  // Not deferred: the record the transaction is about is going away, so the
+  // buffer goes with it.
   const removeLocality = useCallback(async () => {
     try {
       await deleteLocality(locality.id);
@@ -1176,55 +849,31 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     }
   }, [locality.id, setActiveLocality, t]);
 
-  // Stopping is not discarding. The funn exists in the buffer from the moment
-  // the first shape closed and every change since has gone into it, so this
-  // only puts the pen down: flush whatever is still settling, take the surface
-  // away, and let the funn layer show the funn again.
+  // Stopping is not discarding: the funn is already in the buffer, so this
+  // only flushes what is settling and puts the pen down.
   const stopDraft = useCallback(() => {
     flushDraftRef.current();
     setDrawRequested(null);
     hideFunnOnLayer(null);
     if (draftFunnId) {
       const rec = findItems?.find((it) => it.id === draftFunnId);
-      // The flush a line ago may not have landed in state yet; the buffer's
-      // own re-render puts the newer shape up a tick later.
+      // The flush a line ago may not be in state yet; the buffer's re-render
+      // puts the newer shape up a tick later.
       if (rec) upsertFunnOnLayer(rec);
     }
     setDraftFunnId(null);
     setDraftIsEdit(false);
   }, [draftFunnId, findItems, setDrawRequested]);
 
-  /*
-   * The pen up, whichever of the two it was holding.
-   *
-   * Everything that takes the map back — opening the extract, grabbing the
-   * rectangle handles, leaving edit — has to end a drawing session, and since
-   * §9.3 there are two kinds of session to end. A funn draft has a record to
-   * settle and a layer to restore; a sketch has neither, so taking the surface
-   * away is all of it. Callers should not have to know which is up.
-   */
+  // End whichever drawing session is up: a funn draft has a record to settle
+  // and a layer to restore, a sketch has neither. Callers need not know which.
   const putPenDown = useCallback(() => {
     if (draftActive) stopDraft();
     else setDrawRequested(null);
   }, [draftActive, stopDraft, setDrawRequested]);
 
-  /*
-   * First finished shape → a row in the buffer.
-   *
-   * The autosave above this is unchanged and still fires on the same 700 ms
-   * settle: what changed is where it lands. That is the shape of §5.6 — the
-   * mechanism that keeps you from losing a stroke stays exactly as it was,
-   * and only the destination moves from PocketBase to a draft object, so
-   * "autosave suspended" costs nothing that was worth having.
-   *
-   * There is no undo toast any more, and it is not missed: the thing it
-   * undid was a write, and there is no longer a write to undo. `Forkast
-   * funn` on the row does the same job for the whole draft, and `Avbryt`
-   * does it for the session.
-   *
-   * Title falls back to a running number rather than blocking on one being
-   * typed: a funn you can rename is worth more than a funn you have to name.
-   */
+  // First finished shape becomes a row in the buffer. Title falls back to a
+  // running number rather than blocking on one being typed.
   const createDraftFunn = useCallback(
     async (geometry: FeatureCollection): Promise<boolean> => {
       if (!user) return false;
@@ -1259,15 +908,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [findItems, mutateDraft],
   );
 
-  // A lokalitet is meant to hold the whole extent of its funn. Drawing past
-  // the edge is therefore worth saying — as a standing remark in the draft
-  // band, not as a modal in the way of the pen.
-  //
   // The extent is kept as well as compared, because `Utvid området` needs the
-  // rectangle and not just the verdict. It comes from the same place the flag
-  // does — the autosave, on every settle — so the two can never describe
-  // different drawings, which is what growing the lokalitet to fit a shape
-  // that had since been moved back inside used to look like.
+  // rectangle and not just the verdict. Both come from the autosave's settle,
+  // so they can never describe different drawings.
   const drawnExtent = useRef<LocalityBbox | null>(null);
   const reportDrawnExtent = useCallback(
     (extent: LocalityBbox | null) => {
@@ -1290,12 +933,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     const drawn = drawnExtent.current;
     if (!drawn) return;
     const grown = bboxUnion(locality.bbox, drawn);
-    // The one place in the app where the size band is a refusal rather than a
-    // clamp. Everywhere else the rectangle is the thing being dragged, so
-    // stopping it at the ceiling is what the author asked for; here it is
-    // *derived* from a drawing, and a clamped union would put the funn back
-    // outside the rectangle it was grown to hold — the verb would appear to
-    // have done its job and not have done it.
+    // The size band refuses here rather than clamping: a clamped union would
+    // leave the funn outside the rectangle it was grown to hold.
     if (bboxExceedsMax(grown)) {
       toast.error({
         title: t('localities.funn.growTooLarge', { max: MAX_SIDE_M }),
@@ -1306,16 +945,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setFunnOutside(false);
   }, [locality.bbox, patchLocality, setFunnOutside, t]);
 
-  /*
-   * What every entrance to the pen has to do before it presses it.
-   *
-   * Three of them — `Nytt funn`, `Rediger tegningen`, `Tegn` — and the
-   * difference between them is one line each, at the end. The surface freezes
-   * the map and takes the screen, so anything that also wants the map has to be
-   * put down first: another drawing session, the rectangle handles, the
-   * extract dialog. Terreng stays, deliberately — it is a read-only view of the
-   * same rectangle and tracing what it shows is the whole reason to have it up.
-   */
+  // The pen freezes the map, so anything else that wants it goes down.
+  // Terreng stays: tracing what it shows is the point of having it up.
   const clearForPen = useCallback(() => {
     putPenDown();
     setAdjusting(false);
@@ -1326,15 +957,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     if (!canAdd || draftActive) return;
     clearForPen();
     hideFunnOnLayer(null);
-    // The `Funn` switch is a way of looking at the ground, not a way of
-    // working on it: drawing with the existing funn invisible is how you end
-    // up drawing the one you already have.
-    //
-    // The group flag only, not the per-member switches (§13.10 step 4). This
-    // one can be set by a keystroke and takes *everything* away, which is the
-    // hazard; switching off one named row is a deliberate statement about a
-    // funn you have therefore just looked at, and clearing it here would be
-    // the pen undoing a reading it was not asked about.
+    // Drawing with the existing funn invisible is how you draw one twice. The
+    // group flag only — it can be set by a keystroke and takes everything
+    // away; a per-member switch is a deliberate statement and is left alone.
     setFunnHidden(false);
     setDraftFunnId(null);
     setDraftIsEdit(false);
@@ -1343,15 +968,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setDrawRequested({ mode: 'funn' });
   }, [canAdd, draftActive, clearForPen, setFunnHidden, setDrawRequested]);
 
-  /*
-   * `Rediger tegningen`: the funn's own shape, back under the pen.
-   *
-   * The geometry goes up as the request's `seed` and the surface converts it
-   * into whatever frame it captures (`funn/geometry.ts`). Not a `resume`: a
-   * funn is geometry and has never had a scene, so there is nothing registered
-   * to a frame to put back — which is why the two arrive on the request as
-   * different fields rather than one nullable one.
-   */
+  // `Rediger tegningen`: the geometry goes up as the request's `seed` and the
+  // surface converts it into whatever frame it captures. A `seed` and not a
+  // `resume` — a funn is geometry and has no scene registered to a frame.
   const startGeometryEdit = useCallback(
     (f: LocalityFindRecord) => {
       if (!canAdd) return;
@@ -1360,43 +979,26 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setDraftFunnId(f.id);
       setDraftIsEdit(true);
       setFunnTitle(f.title);
-      // What `Forkast funn` will put back, taken from the overlaid record so
-      // that a second edit in the same session restores the first one's
-      // result rather than the server's copy.
+      // From the overlaid record, so a second edit in the same session
+      // restores the first one's result rather than the server's copy.
       setGeometryBefore(findBaseOf(f));
       setDrawRequested({ mode: 'funn', seed: f.geometry });
     },
     [canAdd, clearForPen, setDrawRequested],
   );
 
-  /*
-   * `Tegn`: the same pen, making a *layer* instead of a funn (§9.3).
-   *
-   * A funn is a claim about the ground — this ditch is here, at these
-   * coordinates — and it is stored as geometry because that is what a claim
-   * can be checked against. A sketch is a reading of an image: the mound this
-   * shadow implies, the outline the hillshade nearly shows, the arrow saying
-   * *look here*. Converting that to GeoJSON would be pretending it was a
-   * measurement, so the strokes themselves are what is kept.
-   *
-   * Hence two entrances rather than a mode switch inside one. Which of the two
-   * you are making is decided before the pen goes down, because it decides
-   * what the surface's tools are *for*, and a control that changed the meaning
-   * of everything already drawn would be the worst button in the app.
-   */
+  // `Tegn`: the same pen making a layer instead of a funn. A funn is stored as
+  // geometry, a sketch as the strokes, so which is being made is decided
+  // before the pen goes down rather than by a mode switch.
   const startSketch = useCallback(() => {
     if (!canAdd || sketchActive) return;
     clearForPen();
     setDrawRequested({ mode: 'sketch' });
   }, [canAdd, sketchActive, clearForPen, setDrawRequested]);
 
-  /**
-   * `Rediger skissen`: a stored scene back under the pen, on its own frame.
-   *
-   * A resume, not a seed: the scene is registered to the rectangle it was
-   * drawn over, and the surface flies back to that rectangle rather than
-   * re-registering the strokes to wherever the map happens to be standing.
-   */
+  // `Rediger skissen`: a resume, not a seed — the scene is registered to the
+  // rectangle it was drawn over, and the surface flies back to it rather than
+  // re-registering the strokes to wherever the map is standing.
   const resumeSketch = useCallback(
     (rec: AttachmentRecord) => {
       if (!canAdd) return;
@@ -1411,7 +1013,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [canAdd, clearForPen, setDrawRequested, t],
   );
 
-  /** Putting the pen down without keeping anything. Also `Avbryt` on the bar. */
   const stopSketch = useCallback(
     () => setDrawRequested(null),
     [setDrawRequested],
@@ -1422,21 +1023,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [attachmentItems],
   );
 
-  /*
-   * `Behold skissen` — the scene into the buffer, as a View (§4.1.2).
-   *
-   * A sketch is a View like an extract is: `meta` is the whole of it, the
-   * figure PNG is made afterwards by the pin queue, and that is what makes it
-   * something `Avbryt` can drop without deleting anything. What it stores that
-   * no other View does is `frame` — the rectangle the strokes are registered
-   * to — because a scene without one is a drawing of nowhere.
-   *
-   * The two relations are seeded from what was on screen and never asked
-   * about: the funn you had selected is what the drawing is about, the bilde
-   * on the ground is what it is a layer on (§9.3). Guessing is right here
-   * because the alternative is a dialog between the stroke and the record, and
-   * a wrong guess costs nothing — nothing cascades off either field.
-   */
+  // `Behold skissen`: the scene into the buffer as a View, `meta` carrying the
+  // whole of it including `frame`, the rectangle the strokes are registered
+  // to. `funn` and `over` are seeded from what was on screen; neither cascades.
   const keepSketch = useCallback(() => {
     if (!user || !canAdd) return;
     if (!drawSession || drawSession.mode !== 'sketch') return;
@@ -1447,9 +1036,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       toast.error({ title: t('localities.sketch.empty') });
       return;
     }
-    // Refused here, with a sentence, rather than at `Lagre` — where it would
-    // be one failed row among the session's writes — or silently in
-    // `localStorage`, where it would be a recovery copy that is not one.
+    // Refused here rather than at `Lagre`, where it would be one failed row
+    // among the session's writes.
     if (sceneBytes(elements) > SCENE_BUDGET_BYTES) {
       toast.error({ title: t('localities.sketch.tooBig') });
       return;
@@ -1458,9 +1046,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     const resumed = drawSession.resume;
     if (resumed) {
       const rec = attachmentItems?.find((it) => it.id === resumed.id);
-      // Gone while it was being drawn on — deleted in another tab, or
-      // tombstoned in this session's own list. Keeping it would resurrect a
-      // record the author has already said goodbye to.
+      // Deleted while it was being drawn on; keeping it would resurrect it.
       if (!rec) {
         toast.error({ title: t('localities.sketch.unreadable') });
         setDrawRequested(null);
@@ -1472,20 +1058,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     } else {
       const born = Date.now();
       const id = mintDraftId();
-      /*
-       * What this drawing is *on* — the `over` relation (§13.6).
-       *
-       * It used to be the pinned File, because one image on the ground was
-       * all there could be. The ground is a stack now, so the honest answer
-       * is every layer that was under the pen, and in the order they were in:
-       * [Visning]'s members first because they are underneath, then
-       * [Bilde]'s. The two sets are disjoint by `kind`, so filtering the one
-       * exhibit list twice is the row's own bottom-to-top.
-       *
-       * The ground preset is not in it and cannot be: `over` is a relation to
-       * attachments, and "the LiDAR hillshade as it was today" is not a
-       * record. That gap is what `kind: 'scene'` is for, in step 8.
-       */
+      // Every layer under the pen, bottom to top: [Visning]'s members then
+      // [Bilde]'s. The ground preset cannot be in it — `over` relates to
+      // attachments.
       const items = attachmentItems ?? [];
       const over = [
         ...items.filter((it) => visningShown.has(it.id)),
@@ -1503,10 +1078,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           over,
         }),
       );
-      // Shown straight away. Everything else about keeping an image leaves it
-      // on the rail to be looked at later; a transparent overlay that is not
-      // over anything is a card of nothing, so this one goes up on the ground
-      // it was just traced off.
       setSketchShown((cur) => new Set(cur).add(id));
     }
     setDrawRequested(null);
@@ -1527,12 +1098,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     t,
   ]);
 
-  /**
-   * The switch on one sketch — the card's eye, and [Skisse]'s member row.
-   *
-   * Two surfaces on one set rather than two states, so the rail and the row
-   * can never disagree about what is on the map (§13.10 step 3).
-   */
+  // The card's eye and [Skisse]'s member row are two surfaces on one set, so
+  // they cannot disagree about what is on the map.
   const toggleSketch = useCallback(
     (id: string) =>
       setSketchShown((cur) => {
@@ -1543,32 +1110,21 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [setSketchShown],
   );
 
-  /** One member's fade, 0–100 (§13.1: each member has its own opacity). */
+  /** One member's fade, 0–100. */
   const setSketchOpacity = useCallback(
     (id: string, value: number) =>
       setSketchOpacityMap((cur) => new Map(cur).set(id, value)),
     [setSketchOpacityMap],
   );
 
-  /** The group's label toggle: the whole of [Skisse] on or off the map. */
   const toggleSketchGroup = useCallback(
     () => setSketchGroupShown((cur) => !cur),
     [setSketchGroupShown],
   );
 
-  /*
-   * What [Skisse] lists. Deletions are out — a bilde awaiting `Lagre`'s
-   * compensating delete is not something to offer the map — and `hidden` ones
-   * are in **in edit and only there**, which is §13.8 said exactly: a hidden
-   * bilde has to stay reachable from the pulldown in edit, or curation becomes
-   * a way to lose your own images. In show it is out of the exhibit, and that
-   * is the same rule `bilderItems` applies two hundred lines up; a row that
-   * kept it would let a reader switch on an image its author put away.
-   *
-   * The one under the pen is out for the same reason the overlay effect skips
-   * it: its strokes are on the drawing surface, so a switch for it would be a
-   * switch that does nothing.
-   */
+  // What [Skisse] lists. Hidden ones are in, in edit only, so curation is not
+  // a way to lose your own images; the one under the pen is out, since its
+  // strokes are on the drawing surface and its switch would do nothing.
   const sketchItems = useMemo(
     () =>
       (attachmentItems ?? []).filter(
@@ -1581,16 +1137,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [attachmentItems, deletedIds, canEdit, drawSession],
   );
 
-  /*
-   * What [Visning] lists, on the same rule and by the same reading of `kind`
-   * (§13.1): an extract, a terrain render and a flyfoto grab are Views over
-   * the lokalitet's own rectangle and belong under the ground preset. A
-   * terrain render is stored as an `extract` — it has been since the kind list
-   * was fixed — so two kinds cover three producers.
-   *
-   * Borrowed Files are not here and cannot be: `inheritedItems` is the
-   * original's bytes (§7), and a File is [Bilde]'s from step 6 anyway.
-   */
+  // What [Visning] lists: the Views over the lokalitet's own rectangle. A
+  // terrain render is stored as an `extract`, so two kinds cover three
+  // producers.
   const viewItems = useMemo(
     () =>
       (attachmentItems ?? []).filter(
@@ -1602,24 +1151,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [attachmentItems, deletedIds, canEdit],
   );
 
-  /*
-   * What [Bilde] lists (§13.1, §13.10 steps 6 and 7) — the same two filters
-   * again, and two more that only a File needs.
-   *
-   * A File is bytes, so unlike a View it has nothing to render from — no file
-   * means no member, and a `bbox25833` is what says where the bytes go. Both
-   * are checked here rather than left to fail on the map, because the one
-   * thing a list of switches must not contain is a switch that cannot do
-   * anything. (A View is exempt from both: it can be produced from its spec,
-   * over the spec's own rectangle.)
-   *
-   * Which is also the whole of step 7's change to this list. A screenshot has
-   * always carried the extent it was taken of; an upload carries one only once
-   * somebody has pressed `Plasser i ruta` on it (§13.5). So the kind test
-   * widened to both Files and the `bbox25833` test — already here, already
-   * doing this job — is what keeps the unplaced ones out. An upload is not a
-   * second case; it is the same case arriving later.
-   */
+  // What [Bilde] lists. A File is bytes with nothing to render from, so the
+  // two extra filters: no file means no member, and `bbox25833` is what says
+  // where the bytes go — an upload gets one only from `Plasser i ruta`.
   const fileItems = useMemo(
     () =>
       (attachmentItems ?? []).filter(
@@ -1633,26 +1167,12 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [attachmentItems, deletedIds, canEdit],
   );
 
-  /*
-   * The shown sketches, onto the map (`map/sketchOverlay.ts`).
-   *
-   * Declared as a whole set on every change rather than added and removed one
-   * at a time: hiding a card, deleting one, rolling the session back and
-   * closing the lokalitet are four paths to the same map and only one of them
-   * is a removal.
-   *
-   * The parse is cached on the `meta` object's identity, which is what stops
-   * this from being an export storm. `sketchSceneOf` builds a new scene object
-   * each call, and the overlay module decides whether to re-render by
-   * comparing element arrays by reference — so an uncached parse would look
-   * like a new drawing on every keystroke in the name field.
-   *
-   * **In the order [Skisse] lists them** (§13.10 step 9), which since the
-   * pulldown groups by funn is no longer exhibit order. The row's one teaching
-   * claim is that position means depth (§13.1), so a grouping that reordered
-   * the list without reordering the paint would make the pulldown lie about
-   * the map two pixels from where it says it.
-   */
+  // The shown sketches onto the map, declared as a whole set on every change,
+  // in the order [Skisse] lists them — the pulldown groups by funn, and
+  // position in the row means depth on the map. The parse is cached on the
+  // `meta` object's identity: `sketchSceneOf` builds a new scene each call and
+  // the overlay module compares element arrays by reference, so an uncached
+  // parse would re-render every sketch on every keystroke.
   const sceneCache = useRef(new WeakMap<object, SketchScene | null>());
   useEffect(() => {
     const cache = sceneCache.current;
@@ -1660,8 +1180,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     for (const rec of orderedByFunn(attachmentItems ?? [], findItems)) {
       if (rec.kind !== 'sketch' || !rec.meta) continue;
       if (!sketchShown.has(rec.id) || deletedIds.has(rec.id)) continue;
-      // The one under the pen is on the surface already; a second copy of it
-      // on the map is the pre-edit strokes showing through the drawing.
+      // The one under the pen is on the surface already; a second copy would
+      // be the pre-edit strokes showing through the drawing.
       if (drawSession?.resume?.id === rec.id) continue;
       let stored = cache.get(rec.meta);
       if (stored === undefined) {
@@ -1688,20 +1208,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     drawSession,
   ]);
 
-  /*
-   * `Hent → LiDAR-uttrekk`: open the source-and-style dialog.
-   *
-   * There is nothing to seed any more. The extract used to carry a drawable
-   * sub-selection of its own, and §6 deleted it: **every image in a lokalitet
-   * covers the lokalitet's rectangle**. The filmstrip's whole value is that
-   * the ground does not move as you walk it, and one image over a hand-drawn
-   * sub-rectangle breaks register for the entire strip.
-   *
-   * So the tool is now a flag and the rectangle is `locality.bbox`, like it is
-   * for every other producer. The flag is still `ribbonToolAtom`, which is
-   * what keeps `U`, the Escape depth and the mutual exclusion with Terreng
-   * working unchanged.
-   */
+  // `Hent → LiDAR-uttrekk`. Nothing to seed: every image in a lokalitet covers
+  // the lokalitet's rectangle, so the tool is a flag on `ribbonToolAtom`,
+  // which is also what gives it `U`, the Escape depth and exclusion with
+  // Terreng.
   const openLidar = useCallback(() => {
     putPenDown();
     setAdjusting(false);
@@ -1717,32 +1227,16 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     else openLidar();
   }, [tool, closeLidar, openLidar]);
 
-  // Terreng and the extract are the same slot, so picking one drops the
-  // other; drawing is deliberately compatible with both, since terrain is a
-  // read-only view of the same rectangle and tracing what it shows is the
-  // whole reason to have it up.
-  //
-  // Both entering and leaving Terreng are row 1's job — it owns all five
-  // ground modes — and arrive as a plain write to ribbonToolAtom, so the
-  // slot's cleanup has to be an effect rather than something a handler here
-  // does on the way in.
+  // Entering and leaving Terreng are row 1's job and arrive as a plain write
+  // to ribbonToolAtom, so the slot's cleanup has to be an effect rather than
+  // something a handler here does on the way in.
   useEffect(() => {
     if (tool !== 'terrain') return;
     setAdjusting(false);
   }, [tool, setAdjusting]);
 
-  /*
-   * `Juster området` — and its own little transaction inside the big one
-   * (§5.3, depth 2: `[Bruk] [Angre]`).
-   *
-   * The pair was already on the row before this step and only one of the two
-   * buttons was honest: the gesture PATCHed the record on every release, so
-   * `Angre` had nothing to undo. It has now, because the rectangle the drag
-   * moves is the buffered one — but `Avbryt` is the wrong grain for it. You
-   * adjust the area in the middle of a session that has also kept nine
-   * images, and "put the rectangle back" must not mean "throw the session
-   * away". So this remembers where the rectangle started.
-   */
+  // `Juster området`'s own little transaction inside the edit buffer: `Angre`
+  // puts the rectangle back without throwing the whole session away.
   const [bboxBefore, setBboxBefore] = useState<LocalityBbox | null>(null);
 
   const toggleAdjusting = useCallback(() => {
@@ -1756,7 +1250,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setAdjusting(true);
   }, [adjusting, putPenDown, setAdjusting]);
 
-  /** `Bruk`: keep where the rectangle ended up (still buffered). */
+  /** `Bruk`: keep where the rectangle ended up, still buffered. */
   const applyAdjust = useCallback(() => {
     setAdjusting(false);
     setBboxBefore(null);
@@ -1769,9 +1263,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setBboxBefore(null);
   }, [bboxBefore, patchLocality, setAdjusting]);
 
-  // Mounts the move/resize interactions while adjustingLocalityAtom is set,
-  // and reports the rectangle after every finished gesture. Into the buffer,
-  // like every other write in edit.
   const onAdjustBbox = useCallback(
     (bbox: LocalityBbox) => patchLocality({ bbox }),
     [patchLocality],
@@ -1780,14 +1271,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
 
   const [saving, setSaving] = useState(false);
 
-  /*
-   * Putting the edit-only tools down.
-   *
-   * Both exits go through here, because every one of those tools is a write
-   * surface: leaving the pen armed or the extract selection live in a stance
-   * whose whole promise is that nothing writes would be the invariant
-   * leaking through the very door that closes it.
-   */
+  // Both exits from edit go through here: every edit-only tool is a write
+  // surface and must not be left armed in show.
   const standDown = useCallback(() => {
     putPenDown();
     setAdjusting(false);
@@ -1797,23 +1282,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   }, [putPenDown, setAdjusting, closeLidar, locality.id, setEditingId]);
 
   /**
-   * `Lagre` (§5.6) — and it no longer ends the session.
-   *
-   * Saving and leaving used to be one press, which made the transaction's
-   * only commit also its only exit: an author who wanted the last hour on the
-   * server before carrying on had to save, be thrown back into show, and
-   * press `Rediger` again. The three exits are orthogonal now — `Lagre` and
-   * `Avbryt` are about the buffer, `Avslutt` is about the stance — so this
-   * commits and hands the stance straight back. The buffer reopens by itself:
-   * see the effect that keeps one open for as long as edit lasts.
-   *
-   * The *pixels* still go out behind it, which is the third consequence taken
-   * at its word: the last step of a commit may be a tile burst that has not
-   * started yet, and holding the interface shut until every pixel exists
-   * would be holding it shut for a minute.
-   *
-   * Returns whether everything landed, because "Lagre og avslutt" in the exit
-   * confirm must not leave on a commit that half-failed.
+   * `Lagre`: commits the buffer and keeps the stance; the buffer reopens by
+   * itself. Pins go out behind it rather than being awaited. Returns whether
+   * everything landed, so "Lagre og avslutt" does not leave on a half-failure.
    */
   const saveEdit = useCallback(async (): Promise<boolean> => {
     if (saving) return false;
@@ -1828,22 +1299,14 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         // The buffered shapes on the map were pushed on under temporary ids;
         // the records that just landed have real ones.
         refreshFunnLayer();
-        // …and the lists have to be asked again, because the stance is still
-        // up and realtime is still held back. The buffer the overlay was
-        // reading the new funn and specs out of is empty now, so without this
-        // they would be nowhere for as long as the session lasts. Safe here
-        // and nowhere else: the buffer is empty because it was just played
-        // out, so there is nothing left to reload underneath.
+        // Realtime is still held back and the buffer the overlay was reading
+        // the new rows out of is now empty, so the lists must be asked again.
+        // Safe only here: the buffer was just played out.
         reloadFinds();
         reloadAttachments();
       }
-      /*
-       * A sketch that went up on the map when it was kept is remembered by
-       * the id it was kept under, and that was a draft id the commit has just
-       * replaced. Without this the overlay comes off the ground on `Lagre` —
-       * the record is still there, still shown, and the eye on its card reads
-       * the wrong way round.
-       */
+      // A shown sketch is remembered by the draft id the commit just
+      // replaced; without this its overlay comes off the map on `Lagre`.
       const renamed = result.renamedSpecs;
       if (renamed.size > 0) {
         setSketchShown(
@@ -1859,16 +1322,13 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         });
       }
       if (!result.ok) {
-        // The buffer now holds exactly what did not land, the exits are still
-        // on the row, and pressing `Lagre` again retries precisely that
-        // remainder — which is the only reading of "still in the draft" that
-        // the toast can honestly make.
+        // The buffer now holds exactly what did not land, so `Lagre` again
+        // retries that remainder.
         toast.error({
           title: t('localities.edit.saveFailed', { count: result.failed }),
         });
       } else if (wasChangedElsewhere) {
-        // Last write wins, which is acceptable for one author with two tabs.
-        // Doing it silently would not be (§5.6, consequence 5).
+        // Last write wins; say so rather than doing it silently.
         toast.create({ title: t('localities.edit.changedElsewhere') });
       }
       return result.ok;
@@ -1887,16 +1347,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     t,
   ]);
 
-  /**
-   * `Avbryt` — and it does not end the session either.
-   *
-   * The buffer is dropped and the eagerly written Files are deleted after
-   * it; the stance stays, and a fresh buffer opens behind this one. Undoing
-   * an afternoon's work and leaving the record are two different decisions,
-   * and `Avslutt` is the second one. The confirm that names what is being
-   * thrown away lives on the row, where the count is; by the time this runs
-   * the decision is made.
-   */
+  /** `Avbryt`: drop the buffer and delete the eagerly written Files. The
+   *  stance stays and a fresh buffer opens behind this one; the confirm lives
+   *  on the row, so by the time this runs the decision is made. */
   const cancelEdit = useCallback(async () => {
     const eager = draft?.eagerIds ?? [];
     if (eager.length > 0) {
@@ -1904,8 +1357,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         prev ? prev.filter((it) => !eager.includes(it.id)) : prev,
       );
     }
-    // Buffered shapes, deleted funn and edited geometry all came and went on
-    // the layer by hand; the server's copy is the truth again.
+    // Buffered shapes went onto the layer by hand; the server's copy is the
+    // truth again.
     refreshFunnLayer();
     const stuck = await rollbackDraft();
     if (stuck > 0) {
@@ -1915,22 +1368,14 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     }
   }, [draft, setAttachmentItems, rollbackDraft, t]);
 
-  /**
-   * `Avslutt`: put the edit-only tools down and leave the stance.
-   *
-   * The rollback rides along rather than being skipped when the buffer is
-   * clean, because a clean buffer is exactly the case where it costs nothing
-   * — and leaving one open in show would leave a `baseLocality` behind that
-   * the record could drift away from. The dirty case is the same call: the
-   * row asks first (`Forkast og avslutt`), and by the time this runs the
-   * decision is made.
-   */
+  /** `Avslutt`: put the edit-only tools down and leave the stance. The
+   *  rollback rides along even on a clean buffer, so no stale `baseLocality`
+   *  is left open in show. */
   const exitEdit = useCallback(async () => {
     standDown();
     await cancelEdit();
   }, [standDown, cancelEdit]);
 
-  // Capture the current view cropped to the rectangle → Bilder.
   const takeScreenshot = useCallback(async () => {
     if (!user || !canAdd || shooting) return;
     setShooting(true);
@@ -1980,16 +1425,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
             bbox25833: shot.bbox25833,
             metresPerPx: figure.metresPerPx,
             imageRect: figure.imageRect,
-            // What was on the map when the shutter went. The figure caption
-            // already prints this, but only into the pixels — and a caption
-            // is prose. These are the same facts in the machine's copy, so
-            // the record can say what a screenshot is of without OCR.
-            //
-            // Not enough to *restore* the view, and it is not meant to be: a
-            // screenshot is a picture of other layers at a moment (labels,
-            // funn, zoom, theme rendering) and no realistic amount of
-            // recorded state reproduces that. See docs/lokalitet-view.md
-            // §4.1.1 — this kind is a File, not a View.
+            // What was on the map when the shutter went, machine-readable
+            // beside the caption's prose. Not enough to restore the view, and
+            // not meant to be: a screenshot is a File, not a View.
             ground: background,
             hybrid,
             themeLayers: [...themeLayers],
@@ -2012,9 +1450,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         'skjermbilde.png',
       );
       setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
-      // Written eagerly, so the transaction owes a DELETE on `Avbryt`
-      // (§5.6). The alternative is holding a multi-megabyte blob in the
-      // buffer, which `localStorage` cannot take and a crash would lose.
+      // Written eagerly, so the transaction owes a DELETE on `Avbryt`: a
+      // multi-megabyte blob cannot live in the `localStorage` buffer.
       mutateDraft((d) => withEager(d, rec.id));
       toast.success({ title: t('localities.tools.screenshotSaved') });
     } catch (e) {
@@ -2046,9 +1483,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     i18n.language,
   ]);
 
-  // Upload lives here rather than in the Bilder column because the same
-  // verb is on the lokalitet ribbon row: two copies of the create call
-  // would be two places to keep the optimistic list update right.
   const uploadFile = useCallback(
     async (file: File) => {
       if (!user || !canAdd || uploading) return;
@@ -2080,24 +1514,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     ],
   );
 
-  /*
-   * `Ta med` — pull one of the original's Files into this copy (§7).
-   *
-   * The one route in the app that moves bytes sideways: down from the
-   * original's storage and back up into this record. Which is exactly why it
-   * is a button per card instead of part of the copy — twenty megabytes an
-   * image, paid once, by whoever decided the image was worth having.
-   *
-   * Eager and compensated, like every other File write in edit (§5.6): the
-   * blob cannot live in `localStorage`, so the record lands now and `Avbryt`
-   * owes it a DELETE. `meta.takenFrom` is what keeps the card from coming
-   * back on the borrowed tail afterwards.
-   *
-   * The whole `meta` comes across, which is how §13.5's "the flag travels into
-   * a copy" is already satisfied: an upload the original had placed arrives
-   * here placed, and still marked as assumed. The extent means the same thing
-   * on this side because a copy inherits the original's rectangle (§7).
-   */
+  // `Ta med`: pull one of the original's Files into this copy, bytes down and
+  // back up. Eager and compensated on `Avbryt` like every File write;
+  // `meta.takenFrom` keeps the card off the borrowed tail afterwards.
   const takeBilde = useCallback(
     async (rec: AttachmentRecord) => {
       if (!user || !canAdd || takingId) return;
@@ -2112,9 +1531,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
             locality: locality.id,
             kind: rec.kind,
             caption: rec.caption,
-            // Its place in the original's arrangement comes with it. The
-            // whole point of the borrowed tail is that these are the
-            // author's images, and where they sat was part of the reading.
+            // Its place in the original's arrangement comes with it.
             sort: rec.sort,
             hidden: rec.hidden,
             meta: { ...(rec.meta ?? {}), takenFrom: rec.id },
@@ -2137,19 +1554,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   );
 
   // The acquisition list is per-rectangle, so drop it when the rectangle
-  // moves or is resized. Keyed on the values rather than the array, which
-  // is a fresh identity on every record update.
+  // moves. Keyed on the values: the array is a fresh identity every update.
   const bboxKey = locality.bbox.join(',');
   useEffect(() => {
     setFlyfotoProjects(null);
     setFlyfotoProjectsError(false);
   }, [bboxKey]);
 
-  // The rectangle in the projected CRS every producer and every stored `meta`
-  // works in. Up here rather than beside `Behold`, which is where it used to
-  // live, because since §4.1.2 every write in this hook records it: it is the
-  // "same ground?" half of the duplicate guard, and the guard now has to work
-  // against specs whose pixels do not exist yet.
+  // The rectangle in EPSG:25833, the CRS every producer and every stored
+  // `meta` works in, and the "same ground?" half of the duplicate guard.
   const beholdBbox = useMemo(
     () =>
       transformExtent(locality.bbox, 'EPSG:4326', 'EPSG:25833') as [
@@ -2161,26 +1574,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [locality.bbox],
   );
 
-  /*
-   * One grab — which since §4.1.2 is one *row*, not one stitch.
-   *
-   * This used to be the slowest write in the app: a burst of NiB tiles, a
-   * stitch, a figure render and a multi-megabyte JPEG upload, all before the
-   * card appeared. It is now a POST of a few hundred bytes naming which
-   * acquisition the author wants, and `pinQueue` does the rest with nobody
-   * waiting. That is what makes the batch below — up to a dozen acquisitions
-   * of the same valley — a reasonable thing to offer.
-   *
-   * Returns whether the row was written. The batch counts those, and the
-   * count now means "acquisitions kept" rather than "acquisitions that turned
-   * out to have coverage" — which the picker could not know before either,
-   * having no way to ask NiB without fetching.
-   *
-   * Since step 13 it is not even a POST: the row goes in the draft buffer and
-   * is written at `Lagre`, which is also when the pin queue first hears about
-   * it. That is the payoff §4.1.2 was for — a View small enough to buffer is
-   * a View `Avbryt` can drop without deleting anything.
-   */
+  // One grab is one buffered row naming the acquisition, not a stitch; the
+  // pin queue fetches the pixels after `Lagre`. Returns whether the row was
+  // written, which means "kept", not "turned out to have coverage".
   const grabFlyfoto = useCallback(
     (project?: FlyfotoProject): boolean => {
       if (!user || !canAdd) return false;
@@ -2190,17 +1586,16 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       const born = Date.now();
       const spec: DraftSpec = {
         kind: 'flyfoto',
-        // A project's own year is what makes the gallery readable as a
-        // time series; the mosaic has no year, so it gets the date it was
-        // grabbed instead.
+        // A project's year makes the gallery readable as a time series; the
+        // mosaic has none, so it gets the date it was grabbed.
         caption: `${t('localities.tools.flyfotoCaption')} ${
           project ? label : new Date().toLocaleDateString(i18n.language)
         }`,
         sort: born,
         bornSort: born,
         hidden: false,
-        // The shared builder, since a scene's ground records the same
-        // acquisition the same way (`behold.ts`, §13.7).
+        // Shared with `behold.ts`, since a scene's ground records the same
+        // acquisition the same way.
         meta: flyfotoSpecMeta(project, beholdBbox),
       };
       mutateDraft((d) => withNewSpec(d, mintDraftId(), spec));
@@ -2209,14 +1604,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [user, canAdd, beholdBbox, mutateDraft, t, i18n.language],
   );
 
-  /*
-   * `Behold` over the flyfoto ground.
-   *
-   * The acquisition list no longer comes through here — since §4.3 picking
-   * acquisitions opens a picker run instead, and nothing is written until a
-   * card is kept. `Behold` is the other gesture: it keeps *what is already on
-   * screen*, so there is nothing to propose and nothing to triage.
-   */
+  // `Behold` over the flyfoto ground: keeps what is already on screen, with
+  // nothing to propose. Picking acquisitions goes through the picker instead.
   const runFlyfoto = useCallback(
     (project?: FlyfotoProject) => {
       if (grabFlyfoto(project)) {
@@ -2226,21 +1615,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [grabFlyfoto, t],
   );
 
-  /*
-   * A LiDAR reading of this rectangle, kept as its parameters (§4.1.2).
-   *
-   * `Behold` over the LiDAR ground. It used to hand this a finished
-   * `ExtractRaster`, i.e. a stitch that had already happened. A dataset, a
-   * style, a model and the rectangle is the entire question that stitch
-   * answers, so there is nothing left for the caller to fetch first: this
-   * takes the `LidarSource` straight from the catalogue and writes the row.
-   *
-   * Into the buffer, because this one is a decision made *inside* a session —
-   * the starter set writes the same row straight through, and the difference
-   * is which act it belongs to rather than what the row says. Either way it
-   * lands as an `extract` attachment with the same set of meta keys, so
-   * nothing downstream has to know which route produced an image.
-   */
+  // `Behold` over the LiDAR ground: dataset, style, model and rectangle are
+  // the whole spec, so nothing is fetched here. Into the buffer; the starter
+  // set writes the identical row straight through.
   const saveExtractSpec = useCallback(
     (source: LidarSource, style: string) => {
       if (!user) return;
@@ -2258,18 +1635,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [user, beholdBbox, mutateDraft],
   );
 
-  /*
-   * The picker runs (docs/lokalitet-view.md §4.3).
-   *
-   * `LiDAR-uttrekk` and `Flyfoto` keep their selection dialogs and change what
-   * happens *after* one: instead of every result being saved, the results open
-   * a keep/discard run in the bottom slot. The dialogs below build candidates
-   * and hand them over; `usePickerRun` owns the rest.
-   *
-   * The duplicate guard lives here because the collection does. Under §4.1.2
-   * keeping is free, which removed the cost and therefore the brake — so this
-   * is the brake, and it fires before the tile burst rather than after it.
-   */
+  // The duplicate guard lives here because the collection does, and it fires
+  // before the tile burst rather than after it.
   const isDuplicateKey = useCallback(
     (key: BeholdKey) =>
       (attachmentItems ?? []).some((rec) =>
@@ -2278,15 +1645,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [attachmentItems, beholdBbox],
   );
 
-  /*
-   * Keeping a proposal: `createAttachment`, not `createAttachmentSpec`.
-   *
-   * The one place a View is written with its pixels already attached. The card
-   * rendered the figure in order to be *looked at*, so keeping it stores those
-   * bytes rather than asking the pin queue for a second render of identical
-   * parameters — one fewer tile burst against a shared public edge, and the
-   * stored pin is literally what the author judged.
-   */
+  // Keeping a proposal is the one place a View is written with its pixels
+  // attached: the card already rendered the figure, so storing those bytes
+  // saves the pin queue a second identical tile burst.
   const keepPickerCandidate = useCallback(
     async (candidate: PickerCandidate, produced: Produced) => {
       if (!user || !canAdd) return false;
@@ -2307,8 +1668,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           produced.filename,
         );
         setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
-        // The pixels are the point of the gesture, so this one is written
-        // eagerly like a screenshot and compensated on `Avbryt`.
+        // Written eagerly like a screenshot, compensated on `Avbryt`.
         mutateDraft((d) => withEager(d, rec.id));
         return true;
       } catch (e) {
@@ -2329,27 +1689,21 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const startPicker = picker.start;
   const finishPicker = picker.finish;
 
-  // A run is a write surface, so it cannot outlive the stance that allowed
-  // it: leaving edit drops the picker along with the pen and the extract
-  // dialog. An effect rather than a line in `standDown` because `canAdd` can
-  // also go false without either exit being pressed.
+  // A run is a write surface and cannot outlive the stance. An effect rather
+  // than a line in `standDown`, because `canAdd` can also go false without
+  // either exit being pressed.
   useEffect(() => {
     if (!canAdd) finishPicker();
   }, [canAdd, finishPicker]);
 
-  /*
-   * `Hent` in the LiDAR dialog: the checked datasets × the checked styles.
-   *
-   * The candidate's `meta` is the same block `saveExtractSpec` writes, so a
-   * kept proposal is indistinguishable from one `Behold` or the starter set
-   * produced — nothing downstream has to know which route an image came by.
-   */
+  // `Hent` in the LiDAR dialog: the checked datasets × the checked styles. The
+  // candidate's `meta` is the same block `saveExtractSpec` writes, so a kept
+  // proposal is indistinguishable from a `Behold` or a starter-set row.
   const startLidarPicker = useCallback(
     (plans: { source: LidarSource; styles: string[] }[]) => {
       const candidates: PickerCandidate[] = [];
       for (const { source, styles } of plans) {
-        // The same reading `viewSpecOf` takes off the stored meta: the source
-        // key is 'national' or 'project:<name>'.
+        // As `viewSpecOf` reads it back: 'national' or 'project:<name>'.
         const projectName = source.key.startsWith('project:')
           ? source.key.slice('project:'.length)
           : null;
@@ -2431,48 +1785,17 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [beholdBbox, startPicker, t, i18n.language],
   );
 
-  /*
-   * The one-press starter set: the best LiDAR dataset over the rectangle,
-   * read three ways (docs/lokalitet-view.md §4.3). Three images you would
-   * fetch by hand anyway, in the order you would want to look at them.
-   *
-   * One dataset for all three, resolved once: three readings of the same
-   * acquisition are comparable, three readings of three acquisitions are
-   * not. `planStarterPack` also decides how many images this is — over
-   * ground no LiDAR project covers it is one, because the national mosaic
-   * publishes only `skyggerelieff`.
-   *
-   * It used to be minutes of tile bursts, reported style by style because
-   * there was that much to report. Since §4.1.2 the only slow thing left in
-   * it is the catalogue lookup, and the three writes after that are three
-   * small POSTs — so the whole run is over in about a second and the images
-   * themselves arrive one at a time from `pinQueue`, which is where the
-   * sequencing argument moved: one stitch already saturates its concurrency
-   * budget against a shared public edge, so overlapping two would not finish
-   * sooner.
-   *
-   * There is no abort any more, and that is the point rather than an
-   * omission. Closing the lokalitet used to cancel a run in flight because
-   * what was in flight was megabytes nobody would see; what is in flight now
-   * is three rows the author will find waiting next time, and abandoning them
-   * unpinned would be the worse outcome.
-   *
-   * **These three writes are outside the transaction**, unlike every other
-   * View this hook keeps. `Opprett` already wrote the lokalitet straight
-   * through — the starter set is the rest of that same act of creation, not
-   * an edit made inside it — and buffering it bought nothing but three blank
-   * frames on the rail with no way to fill them short of `Lagre`. Written
-   * through, they reach the pin queue immediately and the rail fills with
-   * pixels while the author is still typing the name. `Avbryt` therefore does
-   * not take them back, for the same reason it does not un-create the
-   * lokalitet.
-   */
+  // The starter set: one LiDAR dataset over the rectangle read three ways,
+  // resolved once so the readings are comparable. `planStarterPack` decides
+  // how many styles there are — the national mosaic publishes only
+  // `skyggerelieff`. These writes are outside the edit transaction, so they
+  // reach the pin queue at once and `Avbryt` does not take them back.
   const runStarterPack = useCallback(async () => {
     if (!user || !canAdd || starterBusy) return;
     setStarterBusy(true);
     try {
-      // The catalogue lookup is the first thing that can answer "is there any
-      // laser data here at all", and it costs one cached request.
+      // One cached request, and the first thing that can answer "is there any
+      // laser data here at all".
       const plan = await planStarterPack(locality.bbox);
       if (!plan) {
         toast.error({ title: t('localities.tools.starterNone') });
@@ -2536,38 +1859,21 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     t,
   ]);
 
-  /*
-   * …and on a brand-new lokalitet it runs itself (§4.3, §12).
-   *
-   * It used to be a menu item, which meant the three images most worth having
-   * arrived only for the people who already knew to ask. Framing a rectangle
-   * *is* the request: nothing else you would do first makes sense without
-   * them on the rail.
-   *
-   * Only ever from the creation sites' hand-off atom, so revisiting a
-   * lokalitet whose bilder were deliberately deleted does not refill it.
-   */
+  // On a brand-new lokalitet the starter set runs itself. Only ever from the
+  // creation sites' hand-off atom, so revisiting a lokalitet whose bilder were
+  // deliberately deleted does not refill it.
   const [pendingStarter, setPendingStarter] = useAtom(
     pendingStarterLocalityIdAtom,
   );
   useEffect(() => {
     if (pendingStarter !== locality.id) return;
-    // Cleared before the fetch rather than after: the run takes tens of
-    // seconds and this effect re-runs on every image it lands.
+    // Cleared before the run, which re-triggers this effect on every write.
     setPendingStarter(null);
     void runStarterPack();
   }, [pendingStarter, locality.id, setPendingStarter, runStarterPack]);
 
-  /*
-   * `Behold` — keep the ground on screen, whatever it is
-   * (docs/lokalitet-view.md §4.3, and `behold.ts` for the four-ground table).
-   *
-   * Row 1 publishes what its ground can offer; this is the side that turns
-   * that into a record. Which of the three fetches runs is decided here
-   * rather than there because two of them are the calls this hook already
-   * makes for the starter set and the acquisition picker — one save path,
-   * one optimistic update, one set of captions.
-   */
+  // `Behold`: row 1 publishes what its ground can offer, this side turns that
+  // into a record. Which arm runs is decided here so there is one save path.
   const offer = useAtomValue(beholdOfferAtom);
 
   // The offer said as the duplicate guard's key. Null where the ground has
@@ -2599,9 +1905,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     }
   }, [offer]);
 
-  // Hidden bilder count. Concealment is curation (§4.4), not deletion, and
-  // fetching a second copy of something the author put away is exactly the
-  // clutter the guard exists to prevent.
+  // Hidden bilder count: concealment is curation, not deletion, so a second
+  // copy of something the author put away is still a duplicate.
   const beholdDone = useMemo(() => {
     if (!beholdKey || !attachmentItems) return false;
     return attachmentItems.some((rec) =>
@@ -2609,10 +1914,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     );
   }, [beholdKey, beholdBbox, attachmentItems]);
 
-  // One image from the ortofoto ground, once the notice has been accepted.
-  // Straight through `runFlyfoto`, which is now only this: the acquisition
-  // dialog stopped saving per row when it started handing its rows to a
-  // picker run (§4.3), so `Behold` over Flyfoto is its last caller.
   const beholdFlyfoto = useCallback(() => {
     if (!offer || offer.ground !== 'flyfoto') return;
     void runFlyfoto(offer.project ?? undefined);
@@ -2621,9 +1922,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const behold = useCallback(() => {
     if (!user || !canAdd || !offer) return;
 
-    // Ortofoto is the one arm that cannot start with a fetch: NiB's terms
-    // have to be shown and accepted first, so the button's job here is to
-    // raise the notice and hand the work to `acceptFlyfotoNotice`.
+    // NiB's terms have to be accepted first, so this arm only raises the
+    // notice and hands the work to `acceptFlyfotoNotice`.
     if (offer.ground === 'flyfoto') {
       setFlyfotoNotice('behold');
       return;
@@ -2637,9 +1937,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     }
 
     if (offer.ground === 'terreng') {
-      // The only arm that cannot say what it is showing from a dataset
-      // name: eight visualizations and three sliders, all of it state row 1
-      // owns, so the offer carries a callback.
+      // The only arm whose render cannot be named from a dataset key: the
+      // visualization and its sliders are row 1's state, so the offer carries
+      // a callback instead.
       const spec = offer.describe();
       if (!spec) {
         toast.error({ title: t('localities.tools.beholdFailed') });
@@ -2660,44 +1960,16 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     }
   }, [user, canAdd, offer, saveExtractSpec, mutateDraft, t]);
 
-  /*
-   * `Oppsett` — the arrangement itself, kept as a record
-   * (docs/lokalitet-view.md §13.7, §13.10 step 8).
-   *
-   * `Behold` keeps *a ground*; this keeps *the stack over it*. Until now the
-   * only way to preserve a composition was `Ta skjermbilde`, which flattens it
-   * to bytes and throws away every component, every fade and every parameter —
-   * so a reader could see that a 1937 ortofoto had been laid over a sky-view
-   * render at 40 % but could not take it apart, re-read it at a different
-   * zoom, or check either half.
-   *
-   * It sits beside `Behold` on the lokalitet row and **not in the layer row**,
-   * which is §13.8 again: nothing in the row writes. The row is where the
-   * arrangement is made; keeping one is an act of authorship and belongs with
-   * the other write verbs, behind the same `canAdd`.
-   *
-   * No duplicate guard, unlike `Behold`. The guard exists because scrubbing a
-   * slider can leave forty near-identical renders; there is no gesture here
-   * that produces a scene as a side effect, and two keeps of the same stack
-   * are two decisions a minute apart rather than an accident.
-   */
+  // `Oppsett`: the stack over the ground, kept as components and fades rather
+  // than flattened bytes. No duplicate guard — nothing makes a scene by itself.
   const sceneCount = useMemo(
     () => (attachmentItems ?? []).filter((it) => it.kind === 'scene').length,
     [attachmentItems],
   );
 
-  /*
-   * The ground under the arrangement, or null where there is none to name.
-   *
-   * The group's switch gates it, for the same reason it gates the pixels: a
-   * group that is off is not on the map. (The preset's own switch used to gate
-   * it too; it is gone — the preset's row is the group's "no View" stop now,
-   * and a ground that is showing is a ground worth naming whether or not a
-   * View sits over part of it.) Standard and Hybrid answer null even when the
-   * group is on — there is no rectangle-fetch path for the topo WMS, so the
-   * honest record of a stack built over one is a stack over nothing
-   * (`sceneSpec.ts`).
-   */
+  // The ground under the arrangement, gated on the group's switch because a
+  // group that is off is not on the map. Standard and Hybrid answer null even
+  // when it is on: there is no rectangle-fetch path for the topo WMS.
   const sceneGround = useMemo(
     () => (visningGroupShown ? sceneGroundOf(offer, beholdBbox) : null),
     [visningGroupShown, offer, beholdBbox],
@@ -2719,15 +1991,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const keepScene = useCallback(() => {
     if (!user || !canKeepScene) return;
 
-    /*
-     * The stack, bottom to top — the row's own left-to-right (§13.1).
-     *
-     * Read off the three group lists rather than off the overlay module,
-     * because the order a group paints in is the order its control declared
-     * (`setGroundOverlayStack`) and that is this list filtered, not a separate
-     * fact. [Skisse] is last because a sketch is over both ground groups
-     * (`sketchOverlay.ts`, zIndex 2).
-     */
+    // Bottom to top, read off the three group lists in paint order; [Skisse]
+    // is last because a sketch is over both ground groups.
     const layers: SceneLayer[] = [];
     const take = (
       recs: readonly AttachmentRecord[],
@@ -2763,8 +2028,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           ground: sceneGround,
           layers,
         }),
-        // The same set, said as a relation. Neither half is derivable from the
-        // other and both are load-bearing — `sceneSpec.ts` has the argument.
+        // The same set as a relation; both halves are load-bearing.
         over: layers.map((l) => l.id),
       }),
     );
@@ -2792,26 +2056,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const recreate = useSetAtom(recreateViewAtom);
   const selectVisning = useSetAtom(selectVisningAtom);
 
-  /*
-   * …and back: put a kept arrangement on the map again (§13.7).
-   *
-   * A read, so it is offered in both stances and to a reader, like every other
-   * layer-row gesture. It is `Gjenskap` for a stack — and for the ground under
-   * it that is literally true: the bottom of a scene is a `GroundSpec`, so the
-   * preset goes back through `recreateViewAtom`, the same path the View row's
-   * apply takes.
-   *
-   * What it does **not** do is blank the ground when the scene has none. A
-   * scene over Standard and a scene with the preset switched off record the
-   * same nothing — neither is keepable as a spec — and the map always has a
-   * ground, so switching it off here would be inventing a decision the record
-   * does not contain. The flatten is the one that answers on white paper,
-   * where there is no live ground to show through.
-   *
-   * Members that have since been deleted are simply missing, which is what the
-   * uncascaded relation was chosen for; the toast says how many, because a
-   * restore that silently comes back smaller is a restore nobody can trust.
-   */
+  // `Gjenskap`: a kept arrangement back on the map, the ground through
+  // `recreateViewAtom`. A scene with no ground leaves the live one alone.
+  // Deleted members are simply missing — the relation does not cascade.
   const restoreScene = useCallback(
     (rec: AttachmentRecord) => {
       const composition = sceneCompositionOf(rec.meta);
@@ -2826,11 +2073,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       const skisse = new Set<string>();
       const fades = new Map<string, number>();
       let missing = 0;
-      // Scenes kept while `[Visning ▾]` was multi-select can name two Views,
-      // and the group shows one. `composition.layers` is bottom-to-top, so
-      // the last one wins and the ones under it are dropped — said out loud
-      // below, because a restore that silently comes back smaller is a
-      // restore nobody can trust.
+      // A scene may name several Views while the group shows one; `layers` is
+      // bottom-to-top, so the last wins and the rest are counted and reported.
       let dropped = 0;
       for (const layer of composition.layers) {
         const member = byId.get(layer.id);
@@ -2858,20 +2102,16 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         }
       }
 
-      // Replaced, not merged: restoring an arrangement means the map shows
-      // *that* arrangement, and a member left over from what was up before it
-      // is a layer the scene does not contain.
+      // Replaced, not merged: a member left over from what was up before is a
+      // layer the scene does not contain.
       setVisningShown(visning);
       setBildeShown(bilde);
       setSketchShown(skisse);
-      // An arrangement put back by hand is the user's statement about the
-      // stack, so the arrival guess is spent — whether or not the cover
-      // survived into it, a later ground change must not reach in and remove a
-      // layer the scene names.
+      // The arrival guess is spent, so a later ground change cannot reach in
+      // and remove a layer the scene names.
       setProvisionalView(null);
-      // The fades are merged, because `opacityByKey` is never pruned (§13.4):
-      // a member's fade outlives its member, and a scene has no opinion about
-      // the ones it does not include.
+      // The fades are merged, because a member's fade outlives its member and
+      // a scene has no opinion about the ones it does not include.
       const merge = (cur: ReadonlyMap<string, number>, ids: Set<string>) => {
         const next = new Map(cur);
         for (const id of ids) next.set(id, fades.get(id) ?? 100);
@@ -2881,8 +2121,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setBildeOpacity((cur) => merge(cur, bilde));
       setSketchOpacityMap((cur) => merge(cur, skisse));
 
-      // Every group on: a scene's members are on the map by definition, and a
-      // held-down group would show none of them.
+      // Every group on: a held-down group would show none of the members.
       setVisningGroupShown(true);
       setBildeGroupShown(true);
       setSketchGroupShown(true);
@@ -2890,11 +2129,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       const groundSpec = composition.ground
         ? viewSpecOf(composition.ground)
         : null;
-      // The scene's own ground, not the surviving View's: a scene records what
-      // was underneath its layers, and that is the answer even where the top
-      // layer is a render of some other ground. So the members go on the map
-      // by hand here rather than through `selectVisningAtom`, whose whole
-      // point is that choosing a View also enters it.
+      // The scene's own ground, not the surviving View's: hence the members
+      // went on by hand above rather than through `selectVisningAtom`, which
+      // also enters the View it lands on.
       if (groundSpec && groundSpec.kind !== 'scene') recreate(groundSpec);
 
       const notes = [
@@ -2928,46 +2165,10 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     ],
   );
 
-  /*
-   * Pressing a card on the rail: point at it, **and put it on the map**
-   * (docs/lokalitet-view.md §13.2, §13.8).
-   *
-   * That reverses step 6's rule, which was "picking a frame moves the cursor
-   * and nothing else", and the reversal is the whole of this change. Step 6
-   * was right that the rail must not be the *only* way to put an image up —
-   * one image at a time, silently refusing on the cards it could not place,
-   * was too weak for a surface whose point is comparison, and the four
-   * pulldowns are what fixed it. But it left the bottom edge with no map verb
-   * at all, and the bottom edge is where a visitor lands and what they press
-   * first: a row of thumbnails that a reader can click and watch nothing
-   * happen reads as broken, whatever the row above it can do. The author
-   * ordered these images for someone to walk through, and walking through
-   * them has to be the first thing that works.
-   *
-   * Reversed, not undone. Step 6's real content survives it: the pulldowns
-   * are still where several images at once, the fades and the depth order
-   * live, this defers to them by *speaking* their atoms rather than keeping a
-   * pin of its own, and nothing here writes to PocketBase. What comes back is
-   * one line of it — a press is a map gesture again.
-   *
-   * **One slide at a time.** All three sets are replaced, not merged, for
-   * `restoreScene`'s reason: walking a strip means each stop shows what that
-   * stop is, and a screenshot left switched on from two cards ago would be
-   * painting over the extract you just asked for. Building an arrangement is
-   * what the pulldowns and `Oppsett` are for — and a scene, pressed here,
-   * hands straight to `restoreScene`, since a scene *is* a set of layers.
-   *
-   * A card with nothing to show — an unpinned spec is fine, but a File with
-   * no extent, or one borrowed from the original (§7) — moves the cursor and
-   * leaves the map alone. Not blanks it: the reader asked to look at a card,
-   * not to clear the ground, and the card says on its own face why it cannot
-   * be placed.
-   *
-   * No toggle. Pressing the selected card again used to mean "nothing", back
-   * when nothing was cheap; now it would take the image off the ground, and
-   * the card most likely to be pressed twice is the cover the lokalitet opens
-   * on. "Nothing on the map" is the group switches' job, one row up.
-   */
+  // Pressing a card on the rail, through the pulldowns' own atoms. All three
+  // shown sets are replaced rather than merged, so each stop shows one slide;
+  // a card with nothing to show moves the cursor and leaves the map alone.
+  // Not a toggle — pressing the selected card again would bare the ground.
   const selectBilde = useCallback(
     (id: string | null) => {
       setActiveBildeId(id);
@@ -2978,24 +2179,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         restoreScene(rec);
         return;
       }
-      // Eligibility is the pulldowns' own — `viewItems` and `fileItems` are
-      // the lists `[Visning ▾]` and `[Bilde ▾]` switch, so a card that can be
-      // shown here is exactly a card with a switch up there.
-      // (`[Skisse ▾]` builds its own list inline from `attachmentItems`, so
-      // the sketch arm spells out the same two conditions: a drawing to show,
-      // and not one that is on its way out.)
+      // Eligibility is the pulldowns' own, so a card that can be shown here is
+      // exactly a card with a switch up there.
       const visning = viewItems.some((it) => it.id === id);
       const bilde = fileItems.some((it) => it.id === id);
       const skisse =
         rec.kind === 'sketch' && !!rec.meta && !deletedIds.has(id);
       if (!visning && !bilde && !skisse) return;
-      // A View goes through `[Visning ▾]`'s own entrance rather than straight
-      // at the atom, which is what makes a card and a pulldown row the same
-      // gesture: the ground the render was made on comes back with it, and the
-      // ribbon describes the image the reader is looking at. The rail is still
-      // speaking the row's atoms and owning no map machinery of its own — that
-      // is the rule step 6 left standing; the entrance is just where the rule
-      // now lives.
+      // A View goes through `[Visning ▾]`'s entrance rather than straight at
+      // the atom, so the ground the render was made on comes back with it.
       if (visning) selectVisning(id);
       else setVisningShown(new Set<string>());
       setBildeShown(bilde ? new Set([id]) : new Set<string>());
@@ -3003,10 +2195,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       setVisningGroupShown(true);
       setBildeGroupShown(true);
       setSketchGroupShown(true);
-      // Asking for an image by name is the user's statement about the stack,
-      // so the arrival guess is spent and the next ground press no longer
-      // reaches in to withdraw it (§10.1). `selectVisning` has already said so
-      // on its own arm; this is the other two.
+      // The arrival guess is spent, so the next ground press cannot withdraw
+      // the image. `selectVisning` already does this on its own arm.
       setProvisionalView(null);
     },
     [
@@ -3026,11 +2216,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     ],
   );
 
-  // ←/→. Wraps, and never lands on nothing: walking a rail past its end and
-  // getting an empty strip would be a worse answer than starting over. Through
-  // `selectBilde`, so the arrow keys and the pointer are the same gesture —
-  // two ways of walking a sequence that disagreed about whether the map comes
-  // with you would be worse than either.
+  // ←/→. Wraps, and never lands on nothing. Through `selectBilde`, so the
+  // arrow keys and the pointer are the same gesture.
   const stepBilde = useCallback(
     (delta: 1 | -1) => {
       const items = bilderItems;
@@ -3047,32 +2234,20 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [bilderItems, activeBildeId, selectBilde],
   );
 
-  /*
-   * Who may walk the rail: a strip that is open, not covered by the pen, and
-   * holding more than one frame. Both spellings are gated on it — ←/→ below,
-   * and A/D from row 1, through `railWalkable` — so the two cannot disagree
-   * about whose the strip is, which is also what lets the LiDAR style heading
-   * say which ring it is advertising (`bilderRing.ts`).
-   */
+  // Who may walk the rail. Both spellings gate on it — ←/→ below and A/D from
+  // row 1 through `railWalkable` — so the two cannot disagree about whose the
+  // strip is.
   const stripNavigable =
     stripOpen && !draftActive && (bilderItems?.length ?? 0) > 1;
 
-  /*
-   * …and not while a picker run is up. `useWorkspaceKeys` already stands ←/→
-   * down for the run by handling them itself first (§8.4), but A/D arrive
-   * through the *other* listener, which knows nothing about pickers — so the
-   * run's claim on the keyboard has to be made here, where the rail says
-   * whether it is walkable at all. Walking the collection behind a surface
-   * whose whole job is one decision at a time is the case that rule is for.
-   */
+  // …and not while a picker run is up. `useWorkspaceKeys` stands ←/→ down for
+  // the run itself, but A/D arrive through the other listener, which knows
+  // nothing about pickers, so the claim has to be made here.
   const railWalkable = stripNavigable && picker.run == null;
 
-  // A/D reach the rail across the sibling gap, so what crosses is the
-  // primitive plus a delegate that stays the same object while `stepBilde`
-  // underneath it is rebuilt on every cursor move. The ref is written in an
-  // effect rather than in the render body: a ref assignment during render is
-  // exactly the thing `react(refs)` is about, and the keyboard only ever reads
-  // it after a commit anyway.
+  // A/D reach the rail across the sibling gap, so what crosses is a delegate
+  // that stays the same object while `stepBilde` under it is rebuilt on every
+  // cursor move. Written in an effect, not the render body.
   const stepRef = useRef(stepBilde);
   useEffect(() => {
     stepRef.current = stepBilde;
@@ -3087,10 +2262,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     return () => setBilderRing(null);
   }, [railWalkable, stepDelegate, setBilderRing]);
 
-  // The NiB licensing notice. The starter set no longer goes through it: it
-  // stopped fetching ortofoto, so consent to NiB's terms is no longer being
-  // asked of someone who never asked for a photograph
-  // (docs/lokalitet-view.md §4.3).
+  // The NiB licensing notice. The starter set does not go through it — it
+  // fetches no ortofoto.
   const openFlyfotoNotice = useCallback(() => setFlyfotoNotice('picker'), []);
   const closeFlyfotoNotice = useCallback(() => setFlyfotoNotice(null), []);
   const acceptFlyfotoNotice = useCallback(() => {
@@ -3101,12 +2274,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   }, [flyfotoNotice, beholdFlyfoto]);
   const closeFlyfotoPicker = useCallback(() => setFlyfotoPicker(false), []);
 
-  // Fetch the acquisition list lazily, the first time the picker is opened
-  // for a given rectangle — and again if the rectangle is resized while it
-  // is open, since the effect above has just cleared it. Driving it from an
-  // effect rather than the open handler is what covers that second case;
-  // it also aborts a list still in flight when the picker is closed.
-  // Reopening is close to free either way: wmscache fronts the query.
+  // Fetch the acquisition list lazily, per rectangle. An effect rather than
+  // the open handler, so a resize while the picker is open refetches, and a
+  // list in flight is aborted when it closes.
   useEffect(() => {
     if (!flyfotoPicker || flyfotoProjects !== null) return;
     const ac = new AbortController();
@@ -3127,8 +2297,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     const extent = getFunnExtentOnLayer(id);
     if (!extent) return;
     map.getView().fit(extent, {
-      // A funn is small; give it more room than the chrome strictly needs so
-      // it lands in the middle of the free area rather than against an edge.
+      // Extra room beyond the chrome, so a small funn lands in the middle of
+      // the free area rather than against an edge.
       padding: fitPadding(map, FUNN_MARGIN_PX),
       maxZoom: 19,
       duration: 400,
@@ -3159,9 +2329,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [mutateDraft],
   );
 
-  // The draft band's own title and note edit the buffered record, same as a
-  // row in the list: on blur, and never to an empty title — the auto-name
-  // exists precisely so a funn always has one.
+  // On blur, and never to an empty title: a funn always has one.
   const commitDraftMeta = useCallback(() => {
     const rec = findItems?.find((it) => it.id === draftFunnId);
     if (!rec) return;
@@ -3174,19 +2342,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     saveFunnMeta(rec, title, rec.note);
   }, [findItems, draftFunnId, funnTitle, saveFunnMeta]);
 
-  /*
-   * `Slett` on a funn — deferred (§5.6, consequence 2).
-   *
-   * The record is not deleted; it is tombstoned, greyed in the list and
-   * taken off the map, and `Avbryt` gives it back. Which is why this is the
-   * one deletion in the app with no confirm of its own worth having: the
-   * decision is not final until `Lagre`, and the row offers `Angre sletting`
-   * for the whole of the session in between.
-   */
+  // `Slett` on a funn is deferred: tombstoned, greyed in the list and taken
+  // off the map, and `Avbryt` gives it back — hence no confirm.
   const removeFunn = useCallback(
     (f: LocalityFindRecord) => {
-      // Deleting the funn the pen is bound to would leave drawing armed
-      // against a record that is on its way out.
+      // Otherwise the pen stays armed against a record on its way out.
       if (f.id === draftFunnId) stopDraft();
       mutateDraft((d) => dropFind(d, f.id));
       removeFunnFromLayer(f.id);
@@ -3195,17 +2355,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [draftFunnId, stopDraft, mutateDraft, selectedFunnId, setSelectedFunnId],
   );
 
-  /**
-   * Depth 2's other exit (§5.3): put the pen down *and* take back what it
-   * made.
-   *
-   * Offered for both arms since step 13, which is what the transaction bought
-   * here. It used to be new-funn-only, because a geometry edit had already
-   * overwritten the old shape by the time the new one closed and a button
-   * promising otherwise would have been lying. Now nothing has been written
-   * either way: a fresh funn is forgotten, and an edited one gets the shape
-   * `startGeometryEdit` stashed put back.
-   */
+  /** `Forkast funn`: put the pen down and take back what it made — a fresh
+   *  funn is forgotten, an edited one gets `geometryBefore` put back. */
   const discardDraft = useCallback(() => {
     const id = draftFunnId;
     const rec = id ? (findItems?.find((it) => it.id === id) ?? null) : null;
@@ -3234,13 +2385,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   useWorkspaceKeys({
     navigable: mode !== 'draft',
     draftActive,
-    // All three are middle-zone verbs, so all three are edit-only — a
-    // keystroke that writes is still a write, and a shortcut nobody can see
-    // is the easiest place for §2's invariant to spring a leak. They stay
-    // gated on the same permission as the button they are advertised on.
-    //
-    // N is the same toggle as its button: it puts the pen down again rather
-    // than doing nothing the second time.
+    // All three write, so all three carry the same gate as the buttons they
+    // are advertised on. N toggles, like its button.
     onNewFunn: () => canAdd && (draftActive ? stopDraft() : startDraft()),
     onToggleLidar: () => canAdd && toggleLidar(),
     onScreenshot: () => canAdd && takeScreenshot(),
@@ -3255,42 +2401,24 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
             : items.length - 1
           : (at + delta + items.length) % items.length;
       setSelectedFunnId(items[next].id);
-      // In show, the funn are a tour: stepping through them takes the map
-      // with you (§6). In edit they are things you are working on and the
-      // view is where you put it, so ↑/↓ only move the selection and Enter
-      // is what flies.
+      // In show the funn are a tour and stepping takes the map with you; in
+      // edit the view stays where it was put and Enter is what flies.
       if (stance === 'show') zoomToFunn(items[next].id);
     },
     onZoomSelected: () => selectedFunnId && zoomToFunn(selectedFunnId),
-    // ←/→ walk the filmstrip (§4.3), and only while there is a strip to walk:
-    // OpenLayers' KeyboardPan has these keys otherwise, and taking panning
-    // away from a map with no images on the edge of it would be a straight
-    // loss. A/D do the same thing on the same gate, published for row 1 above;
-    // stepping either way goes through `selectBilde`, so the ground follows
-    // the cursor and each press is another reading of the same rectangle, in
-    // register.
+    // ←/→ walk the filmstrip, and only while there is a strip to walk:
+    // OpenLayers' KeyboardPan owns these keys otherwise.
     stripNavigable,
     onStepBilde: stepBilde,
 
-    // The picker layer (§4.3). It stands every binding above down while a run
-    // is live, which is the keyboard saying the same thing the bottom slot
-    // says: one surface, one decision.
+    // The picker layer stands every binding above down while a run is live.
     pickerActive: picker.run != null,
     onPickerStep: picker.step,
     onPickerKeep: () => void picker.keep(),
     onPickerDiscard: picker.discard,
     onPickerFinish: finishPicker,
-    // Outside-in, the same order the row's right zone is stacked in (§5.3):
-    // the deepest thing in flight goes first, and edit is a level of its own
-    // above closing. Escaping out of edit rather than out of the lokalitet is
-    // what keeps the key from throwing away a stance in one press.
-    //
-    // The edit arm is the one that changed at step 13, and it changed by
-    // getting quieter: leaving edit now means committing or discarding, and
-    // neither is a thing a stray Escape should decide. So it leaves only when
-    // there is nothing to lose, and an author with a buffer full of work has
-    // to say which of `Lagre`, `Avbryt` and `Avslutt` they meant — the key is
-    // `Avslutt` and nothing else.
+    // Outside-in: the deepest thing in flight goes first, and edit leaves only
+    // when the buffer is clean so a stray Escape cannot discard work.
     onEscape: () => {
       if (mode === 'lidar') closeLidar();
       else if (adjusting) undoAdjust();
@@ -3301,38 +2429,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     },
   });
 
-  // What the badge on `Bilder ▾` counts: the strip's own list, so a reader is
-  // told how many images the exhibit has rather than how many exist. In edit
-  // the hidden ones are on the rail, so they are in the count too — the number
-  // and the rail always agree about what you are about to open.
   const bilderCount = bilderItems?.length ?? 0;
-  // Whether the bottom edge has anything to be. Published rather than
-  // recomputed at each end, so the row's `Bilder ▾` and the portal in
-  // `LocalityRibbon` cannot disagree about whether pressing it does anything.
-  //
-  // `canAdd` is in it because an empty lokalitet you may add to still wants
-  // the edge — that is where the empty line saying so goes, and where the
-  // first image will land. An empty one you may *not* add to gets no bar: a
-  // reader has no use for a strip that says "run an extract".
+  // Published rather than recomputed at each end, so the row's `Bilder ▾` and
+  // the portal in `LocalityRibbon` cannot disagree about whether the bottom
+  // edge exists.
   const hasBilder = bilderCount > 0 || starterBusy || canAdd;
 
-  /*
-   * The cover (§4.4): the first non-hidden image in exhibit order.
-   *
-   * Derived, never stored, for the same reason the centre coordinate is not a
-   * field — a `cover` relation and a `sort` column can disagree, and then the
-   * exhibit has two first images. Dragging a frame to the front is what makes
-   * it the cover; there is no separate verb.
-   *
-   * Read off `attachmentItems` rather than `bilderItems` because the answer
-   * must not depend on who is looking: in edit the rail shows the hidden ones,
-   * and a cover that changed when you pressed Rediger would be a different
-   * lokalitet's cover.
-   *
-   * A card tombstoned this session is skipped even though it is still on the
-   * rail: the greying says it is leaving, and letting it stay the face of the
-   * lokalitet until `Lagre` would say the opposite.
-   */
+  // The cover: first non-hidden, non-tombstoned image in exhibit order. Read
+  // off `attachmentItems`, not `bilderItems`, so it does not change with the
+  // stance.
   const coverBildeId = useMemo(
     () =>
       attachmentItems?.find((a) => !a.hidden && !deletedIds.has(a.id))?.id ??
@@ -3340,33 +2445,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [attachmentItems, deletedIds],
   );
 
-  /*
-   * And the cover, on the ground, once — the answer to "I opened a lokalitet
-   * and its images were nowhere" (§13.10 step 5 left the map bare on arrival).
-   *
-   * The argument for opening with `visningShownAtom` empty was that switching
-   * a View on can start a WMS stitch, and that is true of an *unpinned* one:
-   * a spec renders itself live. A pinned one is a single file fetch and a
-   * decode. So the rule is the narrow one the cost allows — the cover, and
-   * only if it is a View and only if it already has its figure — and a
-   * lokalitet whose first image is a screenshot, or whose extracts are still
-   * in the pin queue, still opens on bare ground.
-   *
-   * The cover rather than all of them: it is the first non-hidden image in
-   * exhibit order, i.e. the one its author dragged to the front, and N
-   * stacked images is a pile nobody composed.
-   *
-   * Once per lokalitet, latched on the id, so it is an *arrival* and never
-   * something that reaches over the user's hand afterwards — neither when the
-   * pin queue lands a figure nor when curation moves the cover.
-   *
-   * Two refs rather than one, and the second is not optional: `useCollection`
-   * empties `items` from an effect of its own, so the first effect pass after
-   * a swap still holds the *previous* lokalitet's list. Latching there would
-   * read A's cover for B, or — where A had no images — spend B's one shot on
-   * an empty list. So the null is what arms the latch: a list is this
-   * lokalitet's only once we have seen it not be the last one's.
-   */
+  // Lay the cover on the ground once per lokalitet, only if it is a pinned
+  // View — an unpinned spec would start a WMS stitch on arrival. Two refs:
+  // `useCollection` empties `items` from an effect of its own, so the first
+  // pass after a swap still holds the previous lokalitet's list, and the null
+  // arming the latch is what stops B spending its one shot on A's cover.
   const coverLaidRef = useRef<string | null>(null);
   const listArmedRef = useRef<string | null>(null);
   useEffect(() => {
@@ -3381,25 +2464,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       (a) => !a.hidden && !deletedIds.has(a.id),
     );
     if (!cover) return;
-    // The rail starts on it too, and starts there whatever the cover turns
-    // out to be: a strip with no cursor has no detail line under it, so a
-    // lokalitet whose first image is a screenshot would open with its bottom
-    // edge saying nothing about the image it is showing you first. Where the
-    // cover *does* reach the ground, the sync effect above would land the
-    // cursor here anyway — this is the case it cannot cover.
+    // Unconditionally, even for a cover that never reaches the ground: a strip
+    // with no cursor has no detail line under it.
     setActiveBildeId(cover.id);
     if (!isPinned(cover)) return;
     if (cover.kind !== 'extract' && cover.kind !== 'flyfoto') return;
-    // Written directly rather than through `selectVisningAtom`, and this is
-    // the one place that is right: the group's entrance also *enters* the View
-    // (§10.1), and an arrival that moved the ribbon onto a ground nobody asked
-    // for would be the app making a guess it then has to be talked out of.
-    // Lay the pixels down, leave the controls alone.
+    // Written directly rather than through `selectVisningAtom`: that entrance
+    // also enters the View, moving the ribbon onto a ground nobody asked for.
     setVisningShown(new Set([cover.id]));
-    // And it is only a guess until the user has said otherwise: the first
-    // ground they ask for takes it back down, because an opaque image over the
-    // whole rectangle is exactly what a ground button has to be able to change
-    // (`provisionalViewAtom`).
+    // Provisional, so the first ground the user asks for takes it back down.
     setProvisionalView(cover.id);
   }, [
     locality.id,
@@ -3409,17 +2482,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     setProvisionalView,
   ]);
 
-  // The site's own terrain render, for §4.6 — entering Terreng over a
-  // lokalitet starts from what its owner was looking at rather than from a
-  // default hillshade at 315°/35°.
-  //
-  // Not `coverBildeId`: the cover is usually the extract, and a lokalitet
-  // whose first image is a flyfoto still has knobs worth seeding from. So this
-  // is the *first terrain render* in exhibit order, hidden ones skipped —
-  // curation moves it the same way it moves the cover, which is the property
-  // that matters. Published as an atom because `useTerrainAnalysis` is mounted
-  // from row 1, on the far side of the tree from the hook that holds the
-  // attachments.
+  // Seeds Terreng's knobs: the first terrain render in exhibit order, hidden
+  // ones skipped. Published as an atom because `useTerrainAnalysis` is mounted
+  // from ribbon row 1, across the tree from the attachments.
   const coverTerrainSpec = useMemo(() => {
     for (const rec of attachmentItems ?? []) {
       if (rec.hidden || deletedIds.has(rec.id)) continue;
@@ -3434,13 +2499,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     return () => setCoverTerrainSpec(null);
   }, [coverTerrainSpec, setCoverTerrainSpec]);
 
-  /*
-   * The pin queue's three entrances from the UI (§4.1.2).
-   *
-   * A job needs the rectangle and the subject, and both are this hook's — so
-   * the cards get verbs rather than the module, and no surface has to know
-   * that a pin is anything but "press this".
-   */
+  // The pin queue's entrances from the UI: a job needs the rectangle and the
+  // subject, and both are this hook's.
   const pinJob = useCallback(
     (rec: AttachmentRecord) => ({
       rec,
@@ -3461,25 +2521,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [pinJob],
   );
 
-  /*
-   * …and the sweep: unpinned Views this session has not yet offered the queue.
-   *
-   * A spec whose render failed — the tile burst timed out, the tab was closed
-   * mid-queue — stays a spec, and nothing would ever ask again. So opening the
-   * lokalitet asks, once per record per session (`pinAttempted`), which is the
-   * cheapest possible version of "retry when the queue fails" (§5.6).
-   *
-   * Gated on `canAdd`, and that is §2 being taken literally rather than
-   * caution: a pin is an `update`, an admin may make one and a reader may not,
-   * and *nothing in show writes*. So a reader sees the card say the image has
-   * not been fetched, and an owner materialises it by pressing `Rediger` — the
-   * same gate as every other write in this hook. It also means the sweep can
-   * never fire on the public lokalitet you are only passing through.
-   *
-   * Buffered specs are skipped, and so are tombstoned ones: neither has a
-   * record on the server to PATCH a figure onto. The specs this session made
-   * reach the queue from `saveEdit`, once they do.
-   */
+  // Retry sweep for specs whose render failed: once per record per session
+  // (`pinAttempted`). Gated on `canAdd` because a pin is an update. Buffered
+  // and tombstoned rows are skipped — neither has a server record to PATCH.
   useEffect(() => {
     if (!canAdd || !attachmentItems) return;
     for (const rec of attachmentItems) {
@@ -3490,29 +2534,14 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     }
   }, [canAdd, attachmentItems, deletedIds, pinJob]);
 
-  /*
-   * `Rapportpakke` — the whole lokalitet as a zip (§9).
-   *
-   * The exhibit it packs is `attachmentItems` minus the three things that are
-   * not in the record: the concealed (curation is what `hidden` is for, and a
-   * bundle that ignored it would ignore the author's own edit), the
-   * tombstoned, and the buffered. A draft spec has no server row to pin a
-   * figure onto, so `Lagre` is what puts this session's images in the report
-   * — the same sentence `Last ned` already makes on a card (§5.6).
-   *
-   * `forcePin` goes in only for `canAdd`. A pin is an `update` and nothing in
-   * show writes (§2), so a reader's bundle carries what is already pinned and
-   * the front page names the rest. That is the version of "refuses to produce
-   * a partial zip silently" that does not also refuse a reader a report.
-   */
+  // `Rapportpakke`: the lokalitet as a zip. It packs `attachmentItems` minus
+  // the hidden, the tombstoned and the buffered, and forces a pin only for
+  // `canAdd` — a reader's bundle carries what is pinned and the front page
+  // names the rest.
   const takeoutRunning = useRef(false);
   const runTakeout = useCallback(async () => {
-    /*
-     * A ref rather than `takeoutProgress`: the state is what the banner reads,
-     * but a second click in the same tick as the first sees the stale `false`
-     * captured by this callback and packs the lokalitet twice. The ref is
-     * written synchronously, so the guard holds before React has re-rendered.
-     */
+    // A ref, not `takeoutProgress`: a second click in the same tick sees the
+    // stale `false` this callback captured and packs the lokalitet twice.
     if (takeoutRunning.current) return;
     // Both lists are null while they load, and `?? []` would quietly pack an
     // empty exhibit and an empty funn table as though that were the record.
@@ -3531,11 +2560,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         pinnableInEdit: mayAdd && !canAdd,
         onProgress: setTakeoutProgress,
       });
-      // An anchor rather than `window.open`: a blob URL opened in a tab
-      // minutes after the click that asked for it is a popup and gets
-      // blocked, while a download attribute is a download. The URL is
-      // revoked on a timer because revoking it in the same tick cancels the
-      // transfer in some browsers.
+      // An anchor rather than `window.open`: a blob URL opened minutes after
+      // the click is a popup and gets blocked. Revoked on a timer because
+      // revoking in the same tick cancels the transfer in some browsers.
       const url = URL.createObjectURL(result.blob);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -3578,9 +2605,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     user,
     access,
     stance,
-    // Permission alone, for the one decision that is about what you *could*
-    // do rather than what you are doing: which button the row's `Rediger`
-    // slot holds.
+    // Permission without stance, for the row's `Rediger` slot.
     mayEdit,
     canEdit,
     canAdd,
@@ -3588,17 +2613,13 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     close,
     enterEdit,
 
-    /*
-     * The copy (§7) — the reader's way in, and the two things a copy knows
-     * about where it came from.
-     */
+    // the copy
     copyPrompt,
     openCopyPrompt,
     closeCopyPrompt,
     confirmCopy,
-    /** Non-null while the fork is being written: the banner's rank 2. */
     copyProgress,
-    /** The original's name and owner, frozen at copy time — banner rank 5. */
+    /** The original's name and owner, frozen at copy time. */
     derivedLabel: locality.derivedFrom
       ? locality.derivedFromLabel || null
       : null,
@@ -3609,30 +2630,19 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     removeLocality,
     patchLocality,
 
-    /*
-     * The transaction (§5.6). `Lagre` and `Avbryt`, and what the row needs to
-     * ask before the second one: whether there is anything to lose and how
-     * much of it there is.
-     */
+    // the edit transaction
     saveEdit,
     cancelEdit,
-    /** `Avslutt`: the stance verb, and the only one of the three that leaves. */
+    /** `Avslutt`: the only one of the three that leaves the stance. */
     exitEdit,
     saving,
     dirty,
     draftCounts: counts,
-    /** When a buffer came back off disk, for the recovery banner (§5.7). */
+    /** When a buffer came back off disk, for the recovery banner. */
     restoredAt,
-    /**
-     * `Forkast` on that banner: drop it and leave edit, nothing to confirm.
-     *
-     * `exitEdit` rather than `cancelEdit`, which is the one place the two
-     * still differ in the old way: the stance was not asked for here — it came
-     * with the recovered buffer — so throwing the buffer away should hand it
-     * back too.
-     */
+    /** `Forkast` on that banner: drops the buffer and the stance it arrived with. */
     discardRecovered: exitEdit,
-    /** Something moved on the server while the buffer was open (§5.6). */
+    /** Something moved on the server while the buffer was open. */
     changedElsewhere,
     /** Tombstoned this session — greyed, and `restoreDeleted` puts it back. */
     deletedIds,
@@ -3641,16 +2651,9 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // content
     findItems,
     // The exhibit, stance-filtered. The unfiltered list stays inside the hook:
-    // it is what the ordering calls index into, and publishing both would be
-    // publishing two answers to "which images does this lokalitet have".
+    // it is what the ordering calls index into.
     bilderItems,
-    /*
-     * The borrowed tail (§7): which of `bilderItems` belong to the original
-     * rather than to this copy. A set rather than a second list, because the
-     * carousel walks one rail and only needs to know which verbs a card gets
-     * — and because appending them made `bilderItems` a superset of the
-     * exhibit rather than a different list.
-     */
+    /** Which of `bilderItems` belong to the original rather than to this copy. */
     inheritedIds,
     /** The original could not be read at all — deleted, or no longer shared. */
     originalUnavailable,
@@ -3668,12 +2671,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     removeBilde,
     setBildeCaption,
     setBildeHidden,
-    /** Which funn it belongs to (§13.6) — the relation's editor, at last. */
     setBildeFunn,
     placeUpload,
     unplaceUpload,
     reorderBilde,
-    // the arrangement, kept and put back (§13.7)
+    // the arrangement, kept and put back
     keepScene,
     canKeepScene,
     restoreScene,
@@ -3703,22 +2705,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     funnOutside,
     growToFitDrawing,
 
-    /*
-     * The sketch arm of the same pen (§9.3).
-     *
-     * `sketchActive` is read off the session rather than a flag of its own, so
-     * it is true exactly while the surface is up — which is what the exits
-     * zone needs, since `Behold skissen` and `Avbryt` are the only way out of
-     * a frozen map.
-     *
-     * `sketchShown` is a set, not a slot: two readings of the same mound,
-     * traced off two different grounds, shown together over either, is the
-     * analysis the whole feature is for.
-     *
-     * The last four are [Skisse] on the layer row (§13.10 step 3): what the
-     * group lists, how far each member is faded, and the group's own switch.
-     * None of them writes — the whole row is a read, in both stances (§13.8).
-     */
+    // the sketch arm of the same pen, then [Skisse] on the layer row
     sketchActive,
     startSketch,
     stopSketch,
@@ -3732,29 +2719,17 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     sketchGroupShown,
     toggleSketchGroup,
 
-    /**
-     * What [Visning] lists (§13.10 step 5). Only the list: the group's four
-     * switches are atoms beside the mechanism they drive
-     * (`map/groundOverlay.ts`) and `VisningControl` reads them directly,
-     * because unlike [Skisse] — whose set is pressed from the card's eye as
-     * well — nothing outside the pulldown touches them.
-     */
+    // What [Visning] and [Bilde] list. Only the lists: their switches are
+    // atoms beside `map/groundOverlay.ts` and the controls read them directly.
     viewItems,
-    /**
-     * What [Bilde] lists (§13.10 step 6) — the Files that can lie on the
-     * ground. Published for the same reason `viewItems` is and gated the same
-     * way; the group's three switches are atoms beside the mechanism.
-     */
     fileItems,
 
     // tools
     tool,
     adjusting,
     toggleAdjusting,
-    // `Juster området`'s own [Bruk] [Angre] (§5.3, depth 2). Nested inside
-    // the transaction rather than leaning on it: you reshape the rectangle
-    // in the middle of a session, and `Avbryt` is the wrong grain for taking
-    // back one gesture.
+    // `Juster området`'s own [Bruk] [Angre], nested inside the transaction:
+    // `Avbryt` is the wrong grain for taking back one reshaping gesture.
     applyAdjust,
     undoAdjust,
     toggleLidar,
@@ -3775,45 +2750,37 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     flyfotoProjectsError,
     runFlyfoto,
 
-    // The picker runs (§4.3). The two dialogs above start one; `picker` is
-    // what `BilderPicker` renders and what the key layer drives.
+    // The picker runs: `picker` is what `BilderPicker` renders and what the
+    // key layer drives.
     picker,
     startLidarPicker,
     startFlyfotoPicker,
 
-    // the starter set. No verb: it runs itself on a new lokalitet now, and
-    // this is here because the rail has a moment — between the catalogue
-    // lookup and the three rows landing — with nothing on it yet.
+    // The starter set has no verb — it runs itself on a new lokalitet — but
+    // the rail is empty between the catalogue lookup and the three rows.
     starterBusy,
 
-    // The pin queue (§4.1.2), for the cards. `retryPin` is the button on a
-    // card whose render failed; `forcePin` is what `Last ned` presses, and
-    // the only caller that waits.
+    // The pin queue, for the cards: `retryPin` is the button on a card whose
+    // render failed, `forcePin` is what `Last ned` presses and waits on.
     retryPin,
     forcePin,
 
-    /*
-     * The Rapportpakke (§9): the verb, and how far it has got. Both stances
-     * and every access level — a bundle is a read, and the one thing in it
-     * that writes (the forced pin) is gated inside `runTakeout`.
-     */
+    // Rapportpakke, offered in both stances: the one write in it (the forced
+    // pin) is gated inside `runTakeout`.
     runTakeout,
     takeoutProgress,
 
     // Behold
     behold,
-    // Which of the five grounds is on screen — the button's label, its
-    // tooltip and whether it is offered at all all read this.
+    // Which of the five grounds is on screen: label, tooltip and whether the
+    // button is offered at all.
     beholdGround: offer?.ground ?? null,
-    // The ground can say what it would keep. False on Standard and Hybrid,
-    // and briefly false on the other three while a style list or a DEM is
-    // still in flight.
+    // Whether the ground can say what it would keep. False on Standard and
+    // Hybrid, and briefly on the other three while a style list or DEM loads.
     beholdReady: beholdKey != null,
     beholdDone,
   };
 };
 
-// What the rows, the bottom edge and the dialogs are handed. Derived
-// from the hook rather than declared, so adding a member to the return above
-// is all it takes to make it available to every consumer.
+/** What the rows, the bottom edge and the dialogs are handed. */
 export type LocalityWorkspaceApi = ReturnType<typeof useLocalityWorkspace>;

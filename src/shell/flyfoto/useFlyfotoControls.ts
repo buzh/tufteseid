@@ -11,12 +11,8 @@ import { activeFlyfotoProjectAtom } from '../../map/layers/config/backgroundLaye
 import type { CycleKey } from '../../map/useBackgroundCyclingKeys';
 import { countByEra, filterByEra, type FlyfotoEra } from './eras';
 
-// Furthest out the acquisition list is worth answering. Same reasoning as
-// MIN_FOOTPRINT_ZOOM in lidarFootprintsLayer, one level tighter: a flight
-// covers a town rather than a county, so the count climbs faster on the way
-// out — a regional view already intersects several hundred acquisitions,
-// and "these 400 flights touch this screen" is not a choice anyone is
-// making.
+// Furthest out the acquisition list is worth answering: a flight covers a
+// town, so a regional view already intersects several hundred of them.
 const MIN_FLYFOTO_ZOOM = 8;
 
 export type FlyfotoViewportStatus =
@@ -34,27 +30,10 @@ export type FlyfotoViewport = {
 const EMPTY_VIEWPORT: FlyfotoViewport = { status: 'idle', projects: [] };
 
 /**
- * Everything the flyfoto controls in the ribbon share: whether ortofoto is
- * the background at all, which acquisition is painting it, what the viewport
- * has to offer, which period of it the chips have narrowed that to, and the
- * W/S behaviour.
- *
- * Shaped after useLidarControls, but simpler in two ways that are worth
- * stating rather than rediscovering. Nothing on the map draws acquisition
- * footprints, so the list is plain component state instead of a shared atom
- * — and fetchFlyfotoProjectsForBbox doesn't return geometry to draw them
- * with anyway. And the list is one cached ArcGIS query rather than a fan-out
- * of footprint requests, so it is simply kept warm for the whole time
- * flyfoto is the background: no cycling flag, and no first W/S press that
- * only starts a fetch.
- *
- * Like useLidarControls, everything here is scoped to **the ortofoto
- * background being on**, not to ortofoto being the ground the user is
- * reading: Terreng covers the background without replacing it, so
- * `isFlyfotoBackground` stays true underneath it. Whether the picker is on the
- * bar and whether W/S reach `cycle` are useGroundMode's calls.
- *
- * Mount once, from RibbonGlobalRow.
+ * Mount once, from RibbonGlobalRow. The list is one cached ArcGIS query, not a
+ * fan-out like LiDAR's footprints, so it needs no cycling flag.
+ * `isFlyfotoBackground` is not "ortofoto is the ground being read" — Terreng
+ * covers the background without replacing it.
  */
 export const useFlyfotoControls = () => {
   const map = useAtomValue(mapAtom);
@@ -69,18 +48,15 @@ export const useFlyfotoControls = () => {
   const isProject = backgroundLayer === 'flyfotoProject';
   const isFlyfotoBackground = isMosaic || isProject;
 
-  // Which acquisitions cover the current view. Refetched on every moveend
-  // while flyfoto is the background — one query, answered from wmscache for
-  // any view anyone has already looked at.
+  // One query per moveend, answered from wmscache for a view already seen.
   useEffect(() => {
     if (!isFlyfotoBackground) {
       setViewport(EMPTY_VIEWPORT);
       return;
     }
     let cancelled = false;
-    // Panning fires refreshes faster than the service answers them; only the
-    // newest may write, or a slow early response overwrites the list for
-    // where the user actually ended up.
+    // Panning fires refreshes faster than the service answers, so only the
+    // newest may write.
     let latestRequest = 0;
     let inFlight: AbortController | null = null;
 
@@ -94,15 +70,14 @@ export const useFlyfotoControls = () => {
         | undefined;
       if (!extentLonLat) return;
 
-      // Claimed before the zoom check as well, so a fetch started while
-      // zoomed in can't land afterwards and overwrite the guard state.
+      // Claimed before the zoom check too, so a fetch started while zoomed in
+      // cannot land afterwards and overwrite the state.
       const request = ++latestRequest;
       inFlight?.abort();
       inFlight = null;
 
       // getZoom() is a log2 of the resolution, so an integral zoom can come
-      // back a hair under itself — don't lock the user out of the threshold
-      // level they are standing on.
+      // back a hair under itself; the epsilon keeps the threshold level usable.
       const zoom = map.getView().getZoom();
       if (zoom == null || zoom < MIN_FLYFOTO_ZOOM - 0.001) {
         setViewport({ status: 'zoomedOut', projects: [] });
@@ -111,9 +86,7 @@ export const useFlyfotoControls = () => {
 
       const controller = new AbortController();
       inFlight = controller;
-      // Keep the rows that are up while the next view loads: they are
-      // usually the same rows, and blanking the list on every pan makes the
-      // pulldown flicker.
+      // Keep the rows while the next view loads, or the pulldown flickers.
       setViewport((prev) => ({ ...prev, status: 'loading' }));
 
       fetchFlyfotoProjectsForBbox(extentLonLat, controller.signal)
@@ -138,11 +111,7 @@ export const useFlyfotoControls = () => {
     };
   }, [map, isFlyfotoBackground]);
 
-  // The period chips narrow one list, and everything that walks acquisitions
-  // walks the narrowed one — the pulldown rows, the count on the chip, and
-  // W/S. A filter the keyboard ignores would be worse than no filter: the
-  // whole point of picking "–1959" is that S then steps between the two
-  // pre-war flights instead of through eighteen modern omløp to reach them.
+  // The period-filtered list, which is what rows, counts and W/S all walk.
   const projects = useMemo(
     () => filterByEra(viewport.projects, era),
     [viewport.projects, era],
@@ -152,11 +121,8 @@ export const useFlyfotoControls = () => {
     [viewport.projects],
   );
 
-  // Called by useGroundMode when ortofoto stops being the ground on screen,
-  // for the same reason as LiDAR's: taking the pulldown off the bar unmounts
-  // it without it ever firing its open-change callback. The active
-  // acquisition is deliberately kept, the way the LiDAR dataset is — coming
-  // back should return to the year you left on.
+  // Called by useGroundMode: unmounting the pulldown never fires its
+  // open-change callback. The acquisition is kept, so you return to that year.
   const standDown = useCallback(() => setPickerOpen(false), []);
 
   const selectMosaic = () => setBackgroundLayer('flyfoto');
@@ -164,8 +130,7 @@ export const useFlyfotoControls = () => {
     setActiveProject(p);
     setBackgroundLayer('flyfotoProject');
   };
-  // Clicking a row picks *and* dismisses; the keyboard path below picks
-  // without closing, so you can watch the selection walk the open list.
+  // A row click picks and dismisses; W/S below picks without closing.
   const activateMosaic = () => {
     selectMosaic();
     setPickerOpen(false);
@@ -175,23 +140,18 @@ export const useFlyfotoControls = () => {
     setPickerOpen(false);
   };
 
-  // W/S walks the acquisition ring — the same ground in 2024, 1963 and 1937
-  // without leaving the map, which is the point of the mode. Reached only
-  // while Flyfoto is the ground on screen (useGroundMode dispatches), so
-  // there is no mode check here. A/D and E belong to LiDAR and are declined,
-  // as they would be in any mode that has no use for them.
+  // W/S walks the acquisitions. Dispatched by useGroundMode, so no mode check.
   const cycle = (key: CycleKey): boolean => {
     if (key !== 'w' && key !== 's') return false;
-    // Consumed even with nothing to walk to. In flyfoto mode W/S is this
-    // ring, and the list being mid-refresh after a pan is a transient the
-    // key should wait out rather than fall through on.
+    // Consumed even with nothing to walk to: a list mid-refresh is a transient
+    // the key should wait out rather than fall through on.
     if (viewport.status !== 'ready' || projects.length === 0) {
       return true;
     }
 
     const step = key === 's' ? 1 : -1;
-    // Index 0 is the seamless mosaic, then the acquisitions newest first —
-    // same order the pulldown lists them in, so S walks back in time.
+    // Index 0 is the mosaic, then the acquisitions newest first as the pulldown
+    // lists them, so S walks back in time.
     const entries = projects;
     const ring = entries.length + 1;
     const at = entries.findIndex((p) => p.id === activeProject?.id);
@@ -203,17 +163,14 @@ export const useFlyfotoControls = () => {
   };
 
   return {
-    // Keyboard
     cycle,
-    // Background, and being taken off the bar
     isFlyfotoBackground,
     isMosaic,
     isProject,
     standDown,
     activeProject,
-    // Dataset. `viewport` is what the query returned, `projects` is what the
-    // period chips left of it — the second is what anything walking or
-    // listing acquisitions should use.
+    // `viewport` is the raw query; `projects` is it after the period chips, and
+    // is what walking or listing should use.
     viewport,
     projects,
     era,
@@ -223,9 +180,7 @@ export const useFlyfotoControls = () => {
     setPickerOpen,
     activateMosaic,
     activateProject,
-    // Entering the mode from the ribbon's mode button. The mosaic is the
-    // only thing that renders everywhere, so it's what "Flyfoto" means
-    // until an acquisition is picked.
+    // The mosaic is the only thing that renders everywhere.
     enterFlyfoto: () => {
       if (!isFlyfotoBackground) setBackgroundLayer('flyfoto');
     },

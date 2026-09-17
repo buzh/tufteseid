@@ -1,29 +1,10 @@
-/*
- * Provenance figures: an image plus everything needed to say what it is a
- * picture of, who owns it, and exactly how it was made.
- *
- * Every raster this app keeps or hands out goes through here first. That is
- * not decoration — a relief render is an *interpretation* of the ground, and
- * a hillshade at 315°/35° and one at 135°/20° disagree about whether there is
- * a mound in the field. A figure that does not carry its own azimuth cannot
- * be checked by anyone, which is the difference between a picture and
- * evidence. Reporting a find to Riksantikvaren or to a county archaeologist
- * means handing over the second kind.
- *
- * What lands on the file:
- *
- *   - the image, whole and untouched — the caption is a matte *below* it, so
- *     no pixel of ground is covered. The cost is that the file is no longer
- *     pixel-registered to its bbox, so `imageRect` in the attachment meta
- *     records where the image sits inside it;
- *   - a scale bar and a north arrow, on the image, cased so they read on
- *     black relief and white ortofoto alike;
- *   - source, acquisition, processing settings, EPSG:25833 extent, geodetic
- *     centre, resolution, rights holder and licence, and when it was made.
- *
- * Spec builders per producer are in `./specs`; the canvas work is in
- * `./draw`.
- */
+// Provenance figures: the image plus what it is a picture of, who owns it and
+// how it was made — a hillshade at 315°/35° and one at 135°/20° disagree about
+// whether there is a mound in that field, so a render without its own azimuth
+// cannot be checked by anyone. Every raster the app keeps or hands out goes
+// through here. The caption is a matte *below* the image, so no pixel of ground
+// is covered and the file is not pixel-registered to its bbox; the attachment's
+// `imageRect` records where the image sits inside it.
 
 import { transform } from 'ol/proj';
 import i18n, { t } from 'i18next';
@@ -41,9 +22,8 @@ import {
 } from './draw';
 
 /**
- * A rights holder that has to be named on the figure. `holder` is a proper
- * name and is never translated; `termsKey` resolves to the licence or terms
- * line, which is.
+ * A rights holder named on the figure. `holder` is a proper name and is never
+ * translated; `termsKey` resolves to the licence line, which is.
  */
 export type Credit = { holder: string; termsKey: string };
 
@@ -58,10 +38,7 @@ export const CREDITS = {
     holder: 'Kartverket',
     termsKey: 'figure.terms.ccby',
   },
-  /**
-   * Ortofoto. Not open data: the app's flyfoto notice says the same thing at
-   * grab time, and this is that sentence following the image out of the app.
-   */
+  /** Ortofoto. Not open data; the grab-time notice, following the image out. */
   nib: {
     holder: 'Norge i bilder — Kartverket, Geovekst, NIBIO og kommunene',
     termsKey: 'figure.terms.nib',
@@ -92,51 +69,26 @@ export type FigureSpec = {
   produced?: Date;
 };
 
-/**
- * A caption needs room to be a caption. Below this the text wraps so hard
- * that the block ends up taller than the picture, so the image is matted
- * instead — which is also what a small figure looks like on a page.
- */
+// Below this the caption wraps so hard the block is taller than the picture, so
+// a narrower image is matted instead.
 const MIN_FIGURE_WIDTH = 560;
 
-/*
- * What the store will take — and therefore what a producer may hand it.
- *
- * `attachments.file` caps a figure at 50 MB
- * (`pocketbase/pb_migrations/1700000600_attachment_file_size.js`), and a figure
- * that does not fit is not a degraded image: it is *no* image. PocketBase
- * answers 400, the pin queue marks the record failed, and the retry button
- * fails the same way forever — which is exactly what a 1.7 km rectangle over a
- * 10 pkt LiDAR project did, at 66 Mpx and some 63 MB.
- *
- * So the fit lives here rather than in each of the four producers, for the same
- * reason the caption does: a downscale that happens behind the caption's back
- * puts "0.25 m/px" and a scale bar drawn to it on an image that is no longer at
- * that resolution, and a figure whose own numbers are wrong is the one failure
- * this module exists to prevent. `renderFigureBlob` therefore reports the
- * resolution it actually wrote, and every caller records *that* in `meta`.
- *
- * The pixel budget is the rule; the byte budget is the backstop. Kartverket's
- * 10 pkt relief encodes to about a byte per pixel, so 40 Mpx lands near 40 MB —
- * but that average hides a 250× spread (a no-data tile is 16 KB where a wooded
- * slope is 4 MB at the same 2048²), so the bytes are measured rather than
- * predicted and a figure still over the line is scaled again and re-encoded.
- */
+// What the store will take. `attachments.file` caps a figure at 50 MB and one
+// that does not fit is no image at all: PocketBase answers 400 and every retry
+// fails the same way. The fit lives here rather than in each producer so the
+// caption cannot be contradicted — a downscale behind its back puts "0.25 m/px"
+// and a scale bar drawn to it on an image at some other resolution, so
+// `renderFigureBlob` reports the resolution it actually wrote. The pixel budget
+// is the rule, the byte budget the backstop: encoded size spreads ~250× across
+// content, so it is measured rather than predicted.
 const MAX_STORED_PIXELS = 40_000_000;
 const MAX_STORED_BYTES = 50_000_000;
 
-/**
- * How many times it is worth re-encoding to find out. Each pass is seconds on
- * a canvas this size, and the geometric step converges in one from any
- * plausible starting point; the cap is there so a pathological encoder cannot
- * spin the queue.
- */
+// The geometric step converges in one pass from any plausible start; the cap is
+// so a pathological encoder cannot spin the queue.
 const MAX_FIT_PASSES = 3;
 
-/**
- * The image at a fraction of its size, smoothly. Used only to fit the store —
- * everything else about a figure keeps the pixels it was handed.
- */
+// Used only to fit the store; everything else keeps the pixels it was handed.
 const scaleCanvas = (
   src: HTMLCanvasElement,
   factor: number,
@@ -145,8 +97,7 @@ const scaleCanvas = (
   out.width = Math.max(1, Math.round(src.width * factor));
   out.height = Math.max(1, Math.round(src.height * factor));
   const ctx = out.getContext('2d');
-  // The unscaled canvas back: too large to store beats gone, and the byte
-  // check below will report honestly on whatever it is given.
+  // Too large to store beats gone, and the byte check reports on what it gets.
   if (!ctx) return src;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -167,8 +118,8 @@ const centreLatLon = (bbox25833: [number, number, number, number]): string => {
       'EPSG:25833',
       'EPSG:4326',
     );
-    // Norwegian hemisphere letters in every locale, like the rest of the
-    // app's coordinate readouts — they are read against Norwegian maps.
+    // Norwegian hemisphere letters in every locale, like the app's other
+    // coordinate readouts.
     return `${dec(lat, 5)}° N, ${dec(lon, 5)}° Ø`;
   } catch {
     return '';
@@ -227,9 +178,8 @@ const captionRows = (
 
 /**
  * Image + spec → the figure. Never throws and never returns a smaller image
- * than it was given: if a context cannot be obtained the source canvas comes
- * straight back, because losing the picture to save the caption would be the
- * wrong trade every time.
+ * than it was given: without a canvas context the source comes straight back,
+ * since losing the picture to save the caption is the wrong trade.
  */
 export const renderFigure = async (
   image: HTMLCanvasElement,
@@ -276,9 +226,8 @@ export const renderFigure = async (
     fontSize,
   });
   const radius = Math.round(Math.max(22, fontSize * 1.5));
-  // Skipped rather than squeezed: on an image too small to hold it, an arrow
-  // overlapping the scale bar reads as a mistake, and "which way is up" is
-  // the one thing a north-up raster can afford to leave implicit.
+  // Skipped rather than squeezed: on a small image an arrow overlapping the
+  // scale bar reads as a mistake, and the raster is north-up anyway.
   if (image.width > radius * 6 && image.height > radius * 6) {
     drawNorthArrow(ctx, {
       cx: dx + image.width - inset - radius,
@@ -304,12 +253,10 @@ export const figureBlob = (
   new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 
 /**
- * The whole path, for the callers that only want bytes — and the one place a
- * figure is made to fit the store (see MAX_STORED_PIXELS above).
- *
- * `metresPerPx` comes back because it may not be the one that went in: it is
- * the resolution of the pixels in the blob, which is what the caption says and
- * therefore what `meta` has to record.
+ * The whole path, for callers that only want bytes, and the one place a figure
+ * is fitted to the store. `metresPerPx` comes back because it may not be the
+ * one that went in: it is the resolution of the pixels in the blob, which is
+ * what the caption says and therefore what `meta` has to record.
  */
 export const renderFigureBlob = async (
   image: HTMLCanvasElement,
@@ -337,9 +284,7 @@ export const renderFigureBlob = async (
     if (blob.size <= MAX_STORED_BYTES || pass === MAX_FIT_PASSES) {
       return { blob, imageRect: figure.imageRect, metresPerPx };
     }
-    // Bytes do not fall quite as fast as pixels — a downscale averages detail
-    // together rather than removing it — so the geometric step is taken with a
-    // margin instead of exactly.
+    // Bytes do not fall as fast as pixels, so the step takes a margin.
     source = scaleCanvas(
       source,
       Math.sqrt(MAX_STORED_BYTES / blob.size) * 0.95,

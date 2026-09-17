@@ -91,9 +91,9 @@ export const getAddresses = async (
 
 export const normalizePlaceQuery = (input: string) => {
   const cleaned = input
-    .replace(/["]/g, '') // remove "
-    .replace(/^\s*,+/, '') //remove leading ,
-    .replace(/[?\\*;%]/g, '') //remove ?\*;%
+    .replace(/["]/g, '')
+    .replace(/^\s*,+/, '')
+    .replace(/[?\\*;%]/g, '')
     .trim();
 
   if (!cleaned) return null;
@@ -198,8 +198,7 @@ export const getRoads = async (query: string): Promise<Road[]> => {
   }
 };
 
-// Pattern: kommunenr/gnr/bnr or kommunenr/gnr/bnr/festenr
-// kommunenr is 4 digits, gnr and bnr are 1-5 digits
+// kommunenr/gnr/bnr(/festenr): 4 digits, then 1-5 each.
 const SLASH_ONLY_PATTERN = /^(\d{4})\/(\d{1,5})\/(\d{1,5})(\/\d{1,5})?$/;
 
 const normalizePropertyQuery = (query: string): string => {
@@ -211,7 +210,6 @@ const normalizePropertyQuery = (query: string): string => {
     const bnr = match[3];
     const festenr = match[4] || '';
 
-    // Convert to expected format: kommunenr-gnr/bnr(/festenr)
     return `${kommunenr}-${gnr}/${bnr}${festenr}`;
   }
 

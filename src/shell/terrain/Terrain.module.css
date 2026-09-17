@@ -1,13 +1,3 @@
-/*
- * Terrenganalyse on the ribbon. The render is on the map — see
- * map/groundOverlay.ts — so what is here is knobs and a resolution readout,
- * all of it on the one settings strip.
- *
- * Nothing here is a panel, and nothing here is a second row any more. One thin
- * line that lets the terrain through is the whole reason the knobs left the
- * dock column, and two of them was one more than the argument bought.
- */
-
 .status {
   display: flex;
   align-items: center;
@@ -21,8 +11,7 @@
   color: var(--c-danger);
 }
 
-/* Wraps as a unit inside the strip, so the knobs stay together when the line
-   runs out rather than leaving one orphan behind the resolution readout. */
+/* Wraps as a unit, so the knobs stay together when the strip runs out of line. */
 .sliders {
   display: flex;
   align-items: center;
@@ -30,9 +19,7 @@
   gap: var(--sp-2) var(--sp-4);
 }
 
-/* Label · track · readout on one line. Stacking the label over the track is
-   what made these a row of their own: it doubles the height of whatever it is
-   on, and this is chrome over the terrain it describes. */
+/* Label · track · readout on one line, to keep the strip 40 px tall. */
 .slider {
   display: flex;
   align-items: center;
@@ -48,9 +35,8 @@
   white-space: nowrap;
 }
 
-/* Travel matters more than tidiness — sweeping the azimuth is the most useful
-   gesture the tool has and a 40 px track cannot be swept — so the track
-   shrinks only so far and the strip wraps instead. */
+/* The track shrinks only so far — a swept azimuth needs travel — and the strip
+   wraps instead. */
 .slider input[type='range'] {
   flex: 1 1 110px;
   min-width: 64px;
@@ -58,8 +44,7 @@
   margin: 0;
 }
 
-/* Fixed width and right-aligned. The readout follows the track now, so a value
-   going from 5° to 315° would otherwise shove the thumb sideways mid-drag. */
+/* Fixed width: 5° widening to 315° would otherwise shove the thumb mid-drag. */
 .sliderValue {
   flex: none;
   min-width: 4.5ch;

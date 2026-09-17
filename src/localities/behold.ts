@@ -1,43 +1,7 @@
-/*
- * `Behold` — keep the ground you are looking at (docs/lokalitet-view.md §4.3).
- *
- * One verb on the lokalitet row, and it is the general answer to "how do I add
- * an image": dial the ground up on the map the way you want it, then press it.
- * What comes out is the rectangle *in that ground*, at the source's native
- * resolution — not a screenshot of it.
- *
- * | Ground on screen | What it writes                                        |
- * |------------------|-------------------------------------------------------|
- * | 2 LiDAR          | a spec: the active dataset, style and model           |
- * | 5 Terreng        | a spec: the current visualization and knobs           |
- * | 4 Flyfoto        | a spec: the active acquisition                        |
- * | 1 Standard, 3 Hybrid | nothing — disabled, the tooltip says Skjermbilde   |
- *
- * The last row is a refusal, not an omission. There is no rectangle-fetch path
- * for the topo WMS, and Hybrid's overlay is a *separate layer* the extract path
- * cannot see — so a `Behold` there would hand back a plain LiDAR hillshade
- * labelled as the hybrid view the user was reading. `Skjermbilde` is the honest
- * verb for those two and it already exists.
- *
- * ## Why this is an atom
- *
- * The button is on the lokalitet row and the answer is in row 1. The four
- * control hooks that know which ground is up, at which dataset and which
- * knobs, are mounted once in `RibbonGlobalRow`, which is a *sibling* of the
- * lokalitet row rather than its parent — the same split `coverTerrainSpecAtom`
- * crosses in the other direction. So row 1 publishes what its ground can
- * offer, and `useLocalityWorkspace` decides what to do with it.
- *
- * Only the terrain arm carries a describer, and since §4.1.2 that is all it
- * carries: a spec, not a figure. Terrain is the one ground whose parameters
- * are not recoverable from the map — eight visualizations, three sliders and
- * a model, all of them state inside `useTerrainAnalysis` — so the hook has to
- * say what it is currently showing. The other two arms name a dataset, and a
- * dataset name is the whole spec.
- *
- * Nothing here produces pixels any more. Keeping a View writes the row and
- * returns; `localities/pinQueue.ts` makes the image afterwards.
- */
+// `Behold` keeps the ground on screen as a spec. An atom because the button is
+// on the lokalitet row while the ground hooks are mounted once in
+// `RibbonGlobalRow`, a sibling rather than a parent. Nothing here makes pixels:
+// `pinQueue.ts` renders the spec afterwards.
 
 import { atom } from 'jotai';
 import type {
@@ -49,11 +13,9 @@ import type { LidarSource } from '../lidarExtract/sources';
 import type { FlyfotoProject } from './flyfotoProjects';
 
 /**
- * A row of parameters, and the record that will carry it (§4.1.2).
- *
- * `meta` here is the *identifying* half only — what was asked for. What making
- * the image reveals — `imageRect`, the resolution the source actually gave,
- * `renderedAt` — is written by the pin, not by this.
+ * A row of parameters and the record that will carry it. `meta` is the
+ * identifying half only; `imageRect`, the achieved resolution and `renderedAt`
+ * are written by the pin.
  */
 export type BeholdSpec = {
   kind: AttachmentKind;
@@ -62,49 +24,30 @@ export type BeholdSpec = {
 };
 
 export type BeholdOffer =
-  // Standard and Hybrid. Named rather than collapsed to `null` so the button
-  // can say *why* it is disabled — an absent offer and a refused one are
-  // different sentences, and the tooltip is the whole point of this row.
+  // Named rather than collapsed to `null` so the button can say why it is
+  // disabled: an absent offer and a refused one are different tooltips.
   | { ground: 'standard' | 'hybrid' }
   | {
       ground: 'lidar';
       // Null while the national mosaic's style list is still in flight.
       source: LidarSource | null;
       // Already clamped through `effectiveLidarStyle`, so this is the layer
-      // that will actually be requested rather than the DTM pick DOM is
-      // holding for later.
+      // that will actually be requested.
       style: string;
     }
   | {
       ground: 'terreng';
       // Null until a DEM has been fetched and painted.
       key: BeholdKey | null;
-      // Synchronous, because reading your own state is not work. That it costs
-      // nothing is the point: `Behold` on Terreng is now a POST of ~300 bytes.
-      //
-      // No `subject` argument, unlike the producer this replaced: the subject
-      // was for the figure's title line, and the figure is now the pin
-      // queue's business.
       describe: () => BeholdSpec | null;
     }
   | { ground: 'flyfoto'; project: FlyfotoProject | null };
 
 export const beholdOfferAtom = atom<BeholdOffer | null>(null);
 
-/*
- * The duplicate guard's natural key (§4.3).
- *
- * Same source, style, model and parameters over the same rectangle is the same
- * image, so the `meta` block is the key and `Behold` reads `Beholdt` while it
- * matches something already kept. Without it a session of scrubbing the
- * azimuth slider leaves forty near-identical renders, and `hidden` (§4.4) is
- * then curation against a mess this made.
- *
- * `kind` is here because the three producers do not write the same fields: a
- * LiDAR extract names its WMS dataset in `sourceKey`, a terrain render has no
- * dataset to name and is identified by its knobs instead, and a flyfoto grab
- * says which NiB acquisition it is in `nibSource` / `projectId`.
- */
+// The duplicate guard's natural key: same source, style, model and parameters
+// over the same rectangle is the same image, and `Behold` reads `Beholdt`
+// while it matches something already kept.
 export type BeholdKey = {
   kind: 'lidar' | 'terrain' | 'flyfoto';
   /** `project:X` | `national` for LiDAR, the acquisition id for NiB. */
@@ -120,20 +63,9 @@ export type BeholdKey = {
 /** The seamless best-available mosaic, as against one acquisition. */
 export const NIB_MOSAIC_KEY = 'mosaic';
 
-/*
- * The two grounds whose spec *is* a dataset name, written out.
- *
- * Here rather than at the producer because there are now two callers each:
- * `useLocalityWorkspace` keeping the ground as a bilde, and `sceneSpec.ts`
- * recording it as the bottom of an arrangement (§13.7). The same ground kept
- * two ways has to be the same row of parameters — `viewSpecOf` reads both
- * back, `attachmentMatchesKey` compares against both — and two copies of a
- * key list is how that stops being true.
- *
- * Terrain has no builder here: its parameters are state inside
- * `useTerrainAnalysis`, which is why that arm of the offer carries
- * `describe()` instead.
- */
+// The two grounds whose spec is a dataset name. Shared by `Behold` and
+// `sceneSpec.ts`: `viewSpecOf` and `attachmentMatchesKey` read both back, so
+// there must be exactly one key list. Terrain describes itself instead.
 export const lidarSpecMeta = (
   source: LidarSource,
   style: string,
@@ -151,27 +83,17 @@ export const flyfotoSpecMeta = (
   bbox25833: [number, number, number, number],
 ): AttachmentMeta => ({
   sourceLabel: 'Norge i bilder',
-  // The rectangle, but not the resolution: which acquisition over which
-  // ground is the spec, and what NiB actually serves for it is a fact about
-  // pixels that do not exist yet.
   bbox25833,
-  // Which NiB source this is, said in a way a machine can act on: the
-  // seamless mosaic and one acquisition are different requests, and "no
-  // projectName key" is a poor way to tell them apart once a reader has to
-  // re-lay this image on the map.
   ...(project
     ? {
         nibSource: 'project',
-        // The ImageServer's own selector (prosjektnavn), which is the same
-        // string as projectName today — kept as its own key because the
-        // display name is free to stop being the selector, and matching an
-        // acquisition by its year label breaks the day two projects share a
-        // year.
+        // The ImageServer's own selector (prosjektnavn); same string as
+        // projectName today, kept separate because the display name is free
+        // to stop being the selector.
         projectId: project.id,
         projectName: project.projectName,
-        // The acquisition's native resolution. `fetchFlyfoto` needs it to
-        // plan the tile grid, and unlike the stitch's own it is knowable
-        // before the stitch happens.
+        // The acquisition's native resolution, which `fetchFlyfoto` needs to
+        // plan the tile grid before the stitch exists.
         projectMetresPerPx: project.metresPerPx,
         year: project.year,
         photoDate: project.photoDate,
@@ -179,16 +101,11 @@ export const flyfotoSpecMeta = (
     : { nibSource: 'mosaic' }),
 });
 
-// Metres. The three producers all derive their extent from the same
-// `transformExtent(locality.bbox)`, so this only has to absorb a JSON round
-// trip — but a rectangle nudged by less than a metre by "Juster området" is
-// the same picture anyway, which is the behaviour worth having if it ever
-// does more than that.
+// Metres; absorbs a JSON round trip, and a sub-metre nudge is the same picture.
 const BBOX_TOLERANCE_M = 1;
 
-// Sliders emit exact values, so this only guards against float drift through
-// JSON. Not a "close enough" threshold: two hillshades one degree apart are
-// deliberately two images.
+// Float drift only, not a "close enough" threshold: two hillshades one degree
+// apart are deliberately two images.
 const PARAM_TOLERANCE = 1e-6;
 
 const num = (v: unknown): number | null =>
@@ -224,10 +141,8 @@ const sameParams = (
 
 /**
  * Whether this record is already the image `Behold` is about to produce.
- *
- * Deliberately strict about the rectangle: an image kept before "Juster
- * området" moved the bbox describes different ground, and offering `Beholdt`
- * for it would refuse to fetch the one the user can now see.
+ * Strict about the rectangle: a spec kept before "Juster området" moved the
+ * bbox describes different ground and must not read as `Beholdt`.
  */
 export const attachmentMatchesKey = (
   rec: AttachmentRecord,
@@ -250,9 +165,8 @@ export const attachmentMatchesKey = (
     case 'terrain':
       return (
         rec.kind === 'extract' &&
-        // What tells a terrain render from a LiDAR extract: they share a
-        // `kind` because they share a schema, and only the second one has a
-        // WMS dataset to name (see `viewSpecOf`).
+        // Terrain renders and LiDAR extracts share a `kind`; only the latter
+        // names a WMS dataset.
         str(meta.sourceKey) == null &&
         str(meta.style) === key.style &&
         (str(meta.model) ?? 'dtm') === key.model &&

@@ -5,33 +5,17 @@ import { cx } from './cx';
 import { Icon, type MaterialSymbol } from './Icon';
 import styles from './Toast.module.css';
 
-/*
- * Transient message region. Replaces kvib's `toaster` singleton.
- *
- * The store is a plain module-level list rather than an atom: the emitter is
- * called from non-React code (`createFromBbox.ts`, the workspace callbacks),
- * exactly one component ever reads it, and `useSyncExternalStore` covers that
- * without giving the kit a dependency on the app's jotai store.
- *
- * The region is a top-layer `popover`, not a z-index. Toasts are fired from
- * inside modal <dialog>s — a failed save from a lokalitet dialog, say — and
- * anything painted with an ordinary z-index loses to the top layer, i.e. the
- * message would be invisible precisely when it matters. Browsers without the
- * popover API ignore the attribute and fall back to `--z-toast`, which is
- * above everything except a modal.
- *
- * The known edge of that: `showModal()` makes everything outside the dialog
- * inert, the toast included, so while a modal is up the message is readable
- * but its close button is not clickable. It still times out on its own.
- */
+// The store is module-level rather than an atom because the emitter is called
+// from non-React code.
+//
+// A top-layer `popover`, not a z-index: toasts are fired from inside modal
+// <dialog>s, which the top layer paints over (`--z-toast` is the fallback).
+// Known edge: a modal makes everything outside it inert, so the toast's close
+// button is unclickable while one is up, though it still times out.
 
 export type ToastTone = 'info' | 'success' | 'warning' | 'error';
 
-/**
- * One verb offered alongside the message — in practice, undoing what the
- * message just reported. A toast with an action is how a surface can commit
- * something without asking first: the receipt carries the way back.
- */
+/** One verb alongside the message — in practice, undo. */
 export type ToastAction = {
   label: string;
   /** The toast dismisses itself first, then this runs. */
@@ -48,8 +32,7 @@ export type ToastOptions = {
 
 type ToastItem = ToastOptions & { id: number; tone: ToastTone };
 
-// Failures get longer than confirmations: a confirmation is a receipt for
-// something the user just watched happen, a failure is news.
+// Failures stay up longer than confirmations.
 const DEFAULT_DURATION: Record<ToastTone, number> = {
   info: 4000,
   success: 4000,
@@ -118,8 +101,7 @@ export const Toaster = ({ closeLabel = 'Lukk' }: { closeLabel?: string }) => {
   const ref = useRef<HTMLDivElement>(null);
   const hasItems = list.length > 0;
 
-  // An empty popover still paints its own box, so show it only while there is
-  // something in it.
+  // An empty popover still paints its own box.
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof el.showPopover !== 'function') return;

@@ -122,7 +122,6 @@ const searchQueryEffect = atomEffect((get, set) => {
   const parsedCoordinate = parseCoordinateInput(searchQuery, currentProjection);
 
   set(coordinateResultsAtom, parsedCoordinate);
-  //Early return when coordinate found, no need to search then
   if (parsedCoordinate !== null) {
     set(searchPendingAtom, false);
     return;

@@ -10,24 +10,10 @@ import {
 import type { CycleKey } from '../../map/useBackgroundCyclingKeys';
 
 /**
- * The Standard ground's own controls: which of the five cartographies is
- * drawing the map, and the W/S ring over them.
- *
- * The simplest of the three control hooks by a wide margin, and it is worth
- * saying why rather than looking for the machinery the other two have. There
- * is no viewport query, no relevance ranking and no footprints, because the
- * list does not depend on where you are looking: all five are national
- * products, the same five everywhere, known at build time. Amtskart is the
- * only one with a hole in it (Nordland was never mapped), and that is handled
- * where it belongs — a topo base under it, in `resolveStack`.
- *
- * Two pieces of state rather than one. `backgroundLayerAtom` is what is on
- * the map, `standardVariantAtom` is what Standard *means* — they agree
- * whenever Standard is the ground, and diverge on purpose while you are on
- * another one, so pressing 1 comes back to the map you left instead of
- * resetting to topo.
- *
- * Mount once, from RibbonGlobalRow.
+ * Mount once, from RibbonGlobalRow. Two pieces of state on purpose:
+ * `backgroundLayerAtom` is what is on the map, `standardVariantAtom` is what
+ * Standard means, and they diverge while another ground is up so pressing 1
+ * returns to the map you left.
  */
 export const useStandardControls = () => {
   const [backgroundLayer, setBackgroundLayer] = useAtom(backgroundLayerAtom);
@@ -35,8 +21,7 @@ export const useStandardControls = () => {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const isStandardBackground = isStandardVariant(backgroundLayer);
-  // What the strip should name. The background when it is one of ours, since
-  // that is what the eye is reading; the remembered pick otherwise.
+  // The background when it is one of ours, the remembered pick otherwise.
   const active: StandardVariant = isStandardBackground
     ? backgroundLayer
     : variant;
@@ -46,25 +31,15 @@ export const useStandardControls = () => {
     setBackgroundLayer(next);
   };
 
-  // Clicking a row picks *and* dismisses; W/S below picks without closing, so
-  // the selection can be walked down an open list. Same split as the other
-  // two pulldowns.
+  // A row click picks and dismisses; W/S below picks without closing.
   const activate = (next: StandardVariant) => {
     select(next);
     setPickerOpen(false);
   };
 
-  // There is no `standDown` here, unlike the other three control hooks. Theirs
-  // exists because their pulldowns leave the bar when their ground does, and
-  // an unmounted popover never fires its own open-change callback, so it would
-  // come back open. This one hangs off the `Kart` button, which is on row 1
-  // whatever ground is up — it is never unmounted, and closing it from
-  // useGroundMode would mean the list could not be opened from another ground
-  // at all, which is the thing the move onto the button bought.
+  // No `standDown`: this pulldown hangs off the always-mounted `Kart` button,
+  // and closing it from useGroundMode would make it unopenable elsewhere.
 
-  // W/S walks the five in the order they are listed, which puts the three
-  // modern renderings of the same ground next to each other and amtskart at
-  // the far end — one press from topo in the other direction.
   const cycle = (key: CycleKey): boolean => {
     if (key !== 'w' && key !== 's') return false;
     const step = key === 's' ? 1 : -1;
@@ -81,8 +56,7 @@ export const useStandardControls = () => {
     pickerOpen,
     setPickerOpen,
     activate,
-    // Entering the mode from row 1 or the digit 1. Not a pick, so it leaves
-    // the remembered variant alone and simply puts it back on the map.
+    // Not a pick, so it leaves the remembered variant alone.
     enterStandard: () => {
       if (!isStandardBackground) setBackgroundLayer(variant);
     },

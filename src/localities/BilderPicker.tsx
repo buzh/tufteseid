@@ -32,14 +32,7 @@ const Face = ({ card }: { card: PickerCard }) => {
   );
 };
 
-/*
- * One frame of the rail.
- *
- * The rail is what makes the fetch policy legible: card two is visibly
- * spinning while you judge card one, and card five visibly has not started.
- * It is also where discarding shows — the frame leaves, rather than greying
- * out, so twelve proposals become the four you are still considering.
- */
+// One frame of the rail. A discarded frame leaves rather than greying out.
 const Frame = ({
   card,
   selected,
@@ -80,18 +73,9 @@ const Frame = ({
 );
 
 /**
- * The picker carousel (docs/lokalitet-view.md §4.3).
- *
- * A run of proposals in the bottom slot, one card at a time, each keep or
- * discard. It **borrows** the slot from the lokalitet carousel rather than
- * being a fifth occupant of it, so the one-surface rule holds unchanged — and
- * it is deliberately not dressed like the carousel it displaced, because
- * "these are proposals" and "these are yours" must not look alike. Hence the
- * header naming the run and its progress, the tally, and `Ferdig`.
- *
- * Nothing here is a record until you press `Behold`. The rest were never
- * records: closing the run drops them, and the ones still in the queue are
- * never fetched at all.
+ * A run of proposals in the bottom slot, one card at a time, keep or discard.
+ * Nothing here is a record until `Behold`: closing the run drops the rest, and
+ * the ones still queued are never fetched.
  */
 export const BilderPicker = ({ picker }: { picker: PickerApi }) => {
   const { t } = useTranslation();
@@ -210,9 +194,8 @@ export const BilderPicker = ({ picker }: { picker: PickerApi }) => {
                 {t('localities.picker.keep')}
               </Button>
             )}
-            {/* The viewer's PNG download, which is where it went: the run is
-                the only place these pixels exist, so a proposal you want on
-                disk but not in the collection has to be takeable here. */}
+            {/* The run is the only place these pixels exist, so a proposal
+                wanted on disk but not in the collection is takeable here. */}
             {active.produced && active.url && (
               <a
                 className={styles.download}

@@ -9,12 +9,9 @@ import styles from './LidarFilters.module.css';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
-/**
- * Relevance filters for the dataset list. Closed by default, and safe to
- * leave that way: these rules only ever reprioritize — primary list versus
- * "mindre relevante" — and never hide data, so dialing them back always
- * reveals more of the same catalogue rather than something new.
- */
+// Relevance filters for the dataset list: they reprioritize — primary list
+// versus "mindre relevante" — rather than excluding anything themselves,
+// though the row cap in lidarRelevance.ts applies after them.
 export const LidarFilters = () => {
   const { t } = useTranslation();
   const [filters, setFilters] = useAtom(lidarFilterSettingsAtom);

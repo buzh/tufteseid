@@ -1,30 +1,6 @@
-/*
- * `Hent → LiDAR-uttrekk`: which datasets, read which ways
- * (docs/lokalitet-view.md §4.3, §6).
- *
- * What is left of the old dock panel, and it is the half that was worth
- * keeping: the source-and-style grid. Everything downstream of pressing go —
- * the fetch, the progress line, the fullscreen preview, the keep and the
- * download — is the picker carousel now, so this dialog's whole output is a
- * list of proposals.
- *
- * Two things went with the demotion.
- *
- * **The drawable sub-selection.** §6's invariant is that *every image in a
- * lokalitet covers the lokalitet's rectangle*, and this was the one producer
- * that could break it. The filmstrip's value is that the ground does not move
- * as you walk it; one image over a hand-drawn sub-rectangle breaks register
- * for the whole strip. So the extent is `locality.bbox`, like everywhere else,
- * and `Tegn nytt` is gone rather than disabled.
- *
- * **`Hent alle` as an act.** Checking eight boxes used to mean eight saved
- * images. It now means eight proposals, fetched one ahead of where you are
- * standing, most of which will never be requested.
- *
- * Styles are still chosen once for the whole run and applied to every enabled
- * source that advertises them — the alternative is unchecking 'skyggerelieff'
- * on each dataset in turn.
- */
+// `Hent → LiDAR-uttrekk`. The output is proposals for the picker carousel,
+// not saved images, and the extent is always `locality.bbox` — every image in
+// a lokalitet covers the same rectangle or the filmstrip loses register.
 
 import { transformExtent } from 'ol/proj';
 import { useEffect, useMemo, useState } from 'react';
@@ -39,9 +15,7 @@ import {
 } from './sources';
 import { MAX_CANVAS_PX_PER_SIDE } from './stitch';
 
-// skyggerelieff is the default hillshade every LiDAR source advertises;
-// keep it at the top of the style list so the most-common toggle is
-// always in the same spot.
+// The one hillshade every LiDAR source advertises; pinned first.
 const STYLE_ORDER_HEAD = ['skyggerelieff'];
 
 export const LidarExtractDialog = ({ ws }: { ws: LocalityWorkspaceApi }) => {
@@ -55,15 +29,10 @@ export const LidarExtractDialog = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   );
   const [enumerating, setEnumerating] = useState(false);
 
-  // Keyed on the values rather than the array, which is a fresh identity on
-  // every record update — "Juster området" should re-enumerate, a rename
-  // should not.
+  // Keyed on the values: the array is a fresh identity on every record update.
   const bboxKey = bbox.join(',');
 
-  // Enumerate while the dialog is up, and seed "everything checked" so the
-  // common case is one press. Local state rather than an atom since the
-  // panel stopped being a dock resident: nothing outside this dialog has
-  // ever read the list.
+  // Seeded all-checked so the common case is one press.
   useEffect(() => {
     if (!open) {
       setSources(null);
@@ -73,8 +42,7 @@ export const LidarExtractDialog = ({ ws }: { ws: LocalityWorkspaceApi }) => {
     }
     let cancelled = false;
     setEnumerating(true);
-    // DTM: this dialog is the multi-source grid, and it has never offered a
-    // model. `Behold` is the entrance that follows the ground on screen.
+    // DTM: this grid offers no model choice; `Behold` follows the ground.
     enumerateLidarSources(bbox, 'dtm')
       .then((list) => {
         if (cancelled) return;
@@ -104,8 +72,7 @@ export const LidarExtractDialog = ({ ws }: { ws: LocalityWorkspaceApi }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bboxKey]);
 
-  // What pressing `Hent` would propose — also the button's own count, so the
-  // number on it is the number of cards you are about to be shown.
+  // Also the button's count, so it names the cards you are about to see.
   const plans = useMemo(() => {
     const out: { source: LidarSource; styles: string[] }[] = [];
     for (const source of sources ?? []) {
@@ -251,8 +218,7 @@ const SourceCard = ({
   ].filter((x): x is string => x != null);
 
   return (
-    // The whole card is the label, so the click target is the card rather
-    // than a 13 px box in its corner.
+    // The whole card is the label, not just the checkbox.
     <label className={cx(styles.card, !enabled && styles.cardOff)}>
       <span className={styles.cardHead}>
         <input type="checkbox" checked={enabled} onChange={onToggle} />

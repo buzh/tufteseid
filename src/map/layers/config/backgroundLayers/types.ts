@@ -7,10 +7,9 @@ import {
   WMTSLayerName,
 } from '../../backgroundLayers';
 
-// Where a layer actually has data. Transformed to the view projection and
-// set as the layer's `extent`, so OL culls tiles outside coverage instead
-// of asking the origin to render them. Mandatory in practice for anything
-// that renders on the fly — see docs/wms-proxy-and-tiles.md.
+// Where a layer actually has data. Set as the layer's `extent` so OL culls
+// tiles outside coverage rather than asking the origin to render them — in
+// practice mandatory on the fly, to stay under Kartverket's rate limit.
 export type CoverageExtent = {
   extent: [number, number, number, number];
   crs: string;
@@ -44,13 +43,11 @@ export type WMSBackgroundLayer = BackgroundLayerBase & {
 export type ArcGISImageBackgroundLayer = BackgroundLayerBase & {
   type: 'ArcGISImage';
   layerName: ArcGISImageLayerName;
-  // The service root, ending in /ImageServer or /MapServer. OpenLayers
-  // appends /exportImage (or /export) itself and throws "Unknown Rest
-  // Service" if it can't, so this must not already carry the operation.
+  // The service root, ending in /ImageServer or /MapServer: OpenLayers appends
+  // /exportImage itself and throws "Unknown Rest Service" if it cannot.
   url: string;
-  // Merged over TileArcGISRest's own F / FORMAT / TRANSPARENT defaults,
-  // which it writes in upper case — a lower-case key here adds a second
-  // parameter instead of overriding.
+  // Merged over TileArcGISRest's upper-case F / FORMAT / TRANSPARENT defaults;
+  // a lower-case key adds a second parameter instead of overriding.
   params?: Record<string, string | number | boolean>;
   coverageExtent?: CoverageExtent;
 };

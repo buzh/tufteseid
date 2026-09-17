@@ -5,9 +5,8 @@ import { isAuthDialogOpenAtom } from './atoms-dialog';
 import styles from './AuthDialog.module.css';
 import { useOAuthProviders, useSignIn } from './hooks';
 
-// PB provider name → localised display label. Falls back to the raw
-// provider name if we haven't localised it yet — safe because PB's
-// name field is stable ("google", "github", "microsoft", …).
+// PB provider name to display label, falling back to the raw name, which is
+// stable ("google", "github", …).
 const providerLabel = (name: string): string => {
   const map: Record<string, string> = {
     google: 'Google',
@@ -31,9 +30,8 @@ export const AuthDialog = () => {
       await signIn(providerName);
       setIsOpen(false);
     } catch (e) {
-      // Popup blocked, user cancelled, or provider misconfigured. The
-      // PB error message is usually informative enough — surface it
-      // rather than swallowing.
+      // Popup blocked, cancelled, or the provider is misconfigured; PB's own
+      // message is usually informative.
       console.warn('[auth] sign-in failed', e);
     }
   };

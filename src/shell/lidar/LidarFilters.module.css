@@ -15,9 +15,8 @@
   color: var(--c-fg-muted);
 }
 
-/* Raw range input, as everywhere else in this app: the styled sliders in
-   the component libraries we have tried drop frames while dragging, and
-   these are all live-preview controls. */
+/* Raw range input, as everywhere else: these are live-preview controls and
+   styled sliders drop frames while dragging. */
 .range {
   display: block;
   width: 100%;
