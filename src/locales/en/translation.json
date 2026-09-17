@@ -413,8 +413,8 @@
     },
     "layers": {
       "visning": "Ground",
-      "visningHide": "Hide the ground and its layers on the map",
-      "visningShow": "Show the ground and its layers on the map again",
+      "visningHide": "Hide the views on the map",
+      "visningShow": "Show the views on the map again",
       "visningMembers": "Choose what lies in the ground",
       "ground": "Background",
       "view": "View {{n}}",

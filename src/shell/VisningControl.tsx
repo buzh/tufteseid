@@ -15,7 +15,6 @@ import {
   visningOpacityAtom,
   visningShownAtom,
 } from '../map/groundOverlay';
-import { setBackgroundHidden } from '../map/layers/config/backgroundLayers/utils';
 import { groundHandleAtom } from './groundHandle';
 import { GroundMember, useLayerFailures } from './groundMembers';
 import { LayerGroup, type LayerMember, LayerMembers } from './LayerGroup';
@@ -29,9 +28,9 @@ import {
 /*
  * `[Visning ▾]` — the layer row's bottom group: the ground preset and every
  * View, membership decided by `kind` alone. The rows are a selection, not
- * checkboxes. Held, not withdrawn: the group's switch holds the layers
- * `backgroundLayers/utils.ts` and `useTerrainAnalysis` declared, through
- * `setBackgroundHidden` and the held set, rather than reaching for either.
+ * checkboxes. The switch holds the Views and nothing else — the ground under
+ * them is the ribbon's, and stays as the ribbon left it. Held, not withdrawn:
+ * the keys stay declared and are skipped in the draw loop.
  */
 /** The preset's row id. Never an attachment id. */
 const GROUND_ROW = 'ground';
@@ -71,31 +70,26 @@ export const VisningControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
 
   // Keyed on the ids: the list is rebuilt on every realtime event.
   const stackKey = shownViews.map((rec) => rec.id).join(' ');
-  const keys = useMemo(
-    () => [TERRAIN_KEY, ...shownViews.map((rec) => viewKeyOf(rec.id))],
+  const viewKeys = useMemo(
+    () => shownViews.map((rec) => viewKeyOf(rec.id)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [stackKey],
   );
+  // Terrain is ordered here, under the Views, but is never held from here: it
+  // is the ribbon's ground, not one of this group's Views.
+  const keys = useMemo(() => [TERRAIN_KEY, ...viewKeys], [viewKeys]);
 
   useEffect(() => {
     setGroundOverlayStack(
       'visning',
       keys,
-      groupShown ? new Set<string>() : new Set(keys),
+      groupShown ? new Set<string>() : new Set(viewKeys),
     );
-  }, [keys, groupShown]);
+  }, [keys, viewKeys, groupShown]);
 
-  // The background tile layers are not in this module's stack at all.
-  useEffect(() => {
-    setBackgroundHidden(!groupShown);
-  }, [groupShown]);
-
-  // Unmounting must not leave the map with no ground and no way back.
+  // Unmounting withdraws the ordering; a key nobody ordered paints on top.
   useEffect(
-    () => () => {
-      setBackgroundHidden(false);
-      setGroundOverlayStack('visning', [], new Set<string>());
-    },
+    () => () => setGroundOverlayStack('visning', [], new Set<string>()),
     [],
   );
 

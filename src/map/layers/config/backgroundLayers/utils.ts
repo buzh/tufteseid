@@ -169,22 +169,6 @@ export type LayerNamespace = 'bg' | 'cmp';
 const isBackgroundLayer = (layer: BaseLayer): boolean =>
   String(layer.get('id') ?? '').startsWith('bg.');
 
-// Ground switched off, as `visible` rather than the opacity the swap spends.
-// Applied inside the swap too, and scoped to `bg.` only.
-let backgroundHidden = false;
-
-const applyBackgroundHidden = (layer: BaseLayer) =>
-  layer.setVisible(!backgroundHidden);
-
-export const setBackgroundHidden = (hidden: boolean) => {
-  if (backgroundHidden === hidden) return;
-  backgroundHidden = hidden;
-  const map = getDefaultStore().get(mapAtom);
-  for (const layer of map.getLayers().getArray()) {
-    if (isBackgroundLayer(layer)) applyBackgroundHidden(layer);
-  }
-};
-
 // Equal signatures mean equal pixels, so cycling datasets keeps the loaded
 // tiles of the base and fallback under them.
 const layerSignature = (
@@ -266,8 +250,6 @@ export const swapBackgroundLayers = (under: TileLayer[], over: TileLayer[]) => {
   }
 
   for (const layer of outgoing) layer.setOpacity(OUTGOING_OPACITY);
-  // Incoming layers only: the outgoing stack was set when the ground went off.
-  for (const layer of layers) applyBackgroundHidden(layer);
 
   const retire = () => {
     cancelPendingRetire?.();

@@ -413,8 +413,8 @@
     },
     "layers": {
       "visning": "Visning",
-      "visningHide": "Skjul bakken og visningene på kartet",
-      "visningShow": "Vis bakken og visningene på kartet igjen",
+      "visningHide": "Skjul visningene på kartet",
+      "visningShow": "Vis visningene på kartet igjen",
       "visningMembers": "Velg hva som ligger i bakken",
       "ground": "Bakgrunn",
       "view": "Visning {{n}}",

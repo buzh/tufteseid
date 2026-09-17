@@ -561,8 +561,11 @@ on row 1 is the same control with a panel of its own.
   resolution, `projection: 'EPSG:25833'`. The compare curtain
   (`COMPARE_Z = 1.5`) covers the whole group.
 
-`setBackgroundHidden` (`map/layers/config/backgroundLayers/utils.ts`) is scoped
-to `bg.` and does not touch `cmp.`.
+A group's switch holds that group's own members and no more. `[Visning ▾]`
+orders `TERRAIN_KEY` under its Views but never holds it, and does not touch the
+background tile layers at all: the ground is the ribbon's, and switching a View
+off must leave the map the reader configured out there. There is no way to
+blank the ground.
 
 `kind: 'scene'` (`src/localities/sceneSpec.ts`) keeps the arrangement itself:
 `meta = {bbox25833, ground, layers: [{id, opacity}]}` bottom-to-top plus the
@@ -827,7 +830,6 @@ Keep it
   aspect inside the rectangle, marked as assumed, removable again.
 - File an image under a funn with `Hører til`, badge readable in either stance.
 - See a member say so on its own switch when the layer could not be shown.
-- Take the ground away entirely and read a sketch and its funn on white.
 - Keep the whole arrangement — layers, order, fades, ground — with `Oppsett`.
 - Put one back with `Legg ut igjen`, in either stance, anything since deleted
   reported rather than missing.
@@ -949,6 +951,10 @@ Ours, not upstream's:
   in `LayerGroup.module.css`, `localities.layers.apply`, and with them
   `groundShownAtom` and the ground preset's separate switch. Do not give a
   member row a verb again.
+- Blanking the ground — `setBackgroundHidden` and `applyBackgroundHidden` in
+  `backgroundLayers/utils.ts`, and `[Visning ▾]` holding `TERRAIN_KEY` along
+  with its Views. The group's switch reached out of its own scope and took the
+  ribbon's ground with it; a layer group holds its own members only.
 - `Vis i ruta` / `Ta av ruta` and the pin mechanism behind them —
   `src/localities/usePinnedBilde.ts` with `canPinBilde`,
   `pinnedAttachmentIdAtom`, the workspace's `pinned` / `pin` / `pinOnWalk` and
