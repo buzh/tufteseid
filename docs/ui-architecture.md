@@ -352,7 +352,10 @@ ranks: recovered buffer, copy progress, Rapportpakke progress, *Delt av X*,
 admin-in-edit, *Kopiert fra X*. Detaljer is a dialog: Sted / Kommune / Matrikkel
 editable, Koordinater (`formatBboxCentre`) and Areal read-only, plus "Hent
 stedsdata på nytt" under `canEdit`. The centre coordinate is derived per render,
-never stored.
+never stored. In show the dialog holds only what the record says: an unfilled
+Sted / Kommune / Matrikkel row is absent rather than a blank line, Beskrivelse
+appears only when there is one, and Synlighet — a write verb whose state the
+row's badge already carries — is absent rather than a disabled segmented.
 
 On the map: `localityLayer.ts` (the open lokalitet draws nothing, the others
 faint; the fill is 1% white, for hit detection only), `funnLayer.ts` with

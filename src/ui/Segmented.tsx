@@ -26,7 +26,6 @@ export const Segmented = <T extends string>({
   value,
   options,
   onChange,
-  disabled,
   size = 'xs',
   label,
   className,
@@ -34,7 +33,6 @@ export const Segmented = <T extends string>({
   value: T;
   options: SegmentedOption<T>[];
   onChange: (value: T) => void;
-  disabled?: boolean;
   size?: 'xs' | 'sm';
   label?: string;
   className?: string;
@@ -53,7 +51,6 @@ export const Segmented = <T extends string>({
       aria-label={label}
       className={cx(styles.root, className)}
       onKeyDown={(e) => {
-        if (disabled) return;
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
           e.preventDefault();
           move(1);
@@ -73,7 +70,7 @@ export const Segmented = <T extends string>({
             aria-checked={selected}
             // Roving tabindex: one stop for the whole group.
             tabIndex={selected ? 0 : -1}
-            disabled={disabled || o.disabled}
+            disabled={o.disabled}
             title={o.title}
             className={cx(
               styles.option,

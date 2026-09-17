@@ -49,6 +49,11 @@ const TextRow = ({
     onCommit(next);
   };
 
+  // A reader gets no empty slots: the placeholder is transparent in read-only,
+  // so an unfilled field would be a label with a blank line under it inviting
+  // a click that does nothing. The owner keeps it — that is where they fill it.
+  if (readOnly && value === '') return null;
+
   return (
     <div className={styles.group}>
       <span className={styles.label}>{label}</span>
@@ -189,47 +194,55 @@ export const LocalityDetails = ({
     <div className={styles.root}>
       <LocationGroup locality={locality} canEdit={canEdit} onPatch={onPatch} />
 
-      <div className={styles.group}>
-        <span className={styles.label}>
-          {t('localities.workspace.description')}
-        </span>
-        <NoteInput
-          value={description}
-          onChange={setDescription}
-          onBlur={commitDescription}
-          placeholder={t('localities.workspace.descriptionPlaceholder')}
-          minRows={3}
-          readOnly={!canEdit}
-        />
-      </div>
+      {/* Three empty rows of textarea say "write here" to somebody who cannot.
+          The owner keeps the box whether or not it holds anything. */}
+      {(canEdit || locality.description) && (
+        <div className={styles.group}>
+          <span className={styles.label}>
+            {t('localities.workspace.description')}
+          </span>
+          <NoteInput
+            value={description}
+            onChange={setDescription}
+            onBlur={commitDescription}
+            placeholder={t('localities.workspace.descriptionPlaceholder')}
+            minRows={3}
+            readOnly={!canEdit}
+          />
+        </div>
+      )}
 
-      <div className={styles.group}>
-        <span className={styles.label}>
-          {t('localities.workspace.visibility')}
-        </span>
-        <Segmented<LocalityVisibility>
-          value={locality.visibility}
-          disabled={!canEdit}
-          label={t('localities.workspace.visibility')}
-          onChange={(v) => onPatch({ visibility: v })}
-          options={VISIBILITY_ORDER.map((v) => ({
-            value: v,
-            label: t(`localities.visibility.${v}`),
-          }))}
-        />
-        {locality.visibility === 'limited' && (
-          <span className={styles.hint}>
-            {t('localities.visibility.limitedHint')}
+      {/* Absent in show rather than disabled: publishing is a write verb, and
+          the state it sets is already a badge on the row behind this dialog.
+          The hints below it are advice to whoever is about to press one. */}
+      {canEdit && (
+        <div className={styles.group}>
+          <span className={styles.label}>
+            {t('localities.workspace.visibility')}
           </span>
-        )}
-        {/* Public means the open web, images included — not just signed-in
-            users — so say so before it is true. */}
-        {locality.visibility === 'public' && (
-          <span className={styles.hint}>
-            {t('localities.visibility.publicHint')}
-          </span>
-        )}
-      </div>
+          <Segmented<LocalityVisibility>
+            value={locality.visibility}
+            label={t('localities.workspace.visibility')}
+            onChange={(v) => onPatch({ visibility: v })}
+            options={VISIBILITY_ORDER.map((v) => ({
+              value: v,
+              label: t(`localities.visibility.${v}`),
+            }))}
+          />
+          {locality.visibility === 'limited' && (
+            <span className={styles.hint}>
+              {t('localities.visibility.limitedHint')}
+            </span>
+          )}
+          {/* Public means the open web, images included — not just signed-in
+              users — so say so before it is true. */}
+          {locality.visibility === 'public' && (
+            <span className={styles.hint}>
+              {t('localities.visibility.publicHint')}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className={styles.group}>
         {locality.expand?.owner && (
