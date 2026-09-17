@@ -62,137 +62,56 @@ all of them.
   GIS tool survey with verdicts and licences, and what's worth building next.
   **Read it before proposing a new analysis feature** — it records what was
   already rejected and why, so those don't get re-litigated.
-- `docs/lokalitet-view.md` — **built**: §12's build order is complete, so the
-  two axes, the View/File split, the row's zones, the bottom
-  filmstrip/carousel, curation, the picker carousels, **removing the dock**,
-  **the edit transaction**, **the copy**, **Terreng/Sammenlign on the row**,
-  **sharing** (`?lok=CODE`, `/l/CODE`, `Del`) and **the Rapportpakke** (the
-  takeout zip) are all live and are documented in `docs/ui-architecture.md`,
-  which is the record where the two disagree. Two builds landed *outside* the
-  numbered list and so are not in it at all: placing the rectangle before
-  creating it, and sketches as overlays. The whole design of making
-  "a lokalitet is open" a view of its own is here — the two axes (owner/reader ×
-  show/edit), **show writes nothing and edit is a transaction** (`Lagre` /
-  `Avbryt` over a client-side draft), the lokalitet row as three zones
-  (identity + short code / the tools, edit only / the exits, deepest-first),
-  **the split between a View and a File** — an extract, terrain render,
-  flyfoto or sketch is a row of parameters that is stored as a spec and pinned
-  to a figure PNG by a background queue after commit, while a screenshot or upload
-  is only ever bytes — which is what makes the draft bufferable, the copy
-  carry the images, and keeping one free; **removing
-  the right-hand dock** in favour of that row plus a bottom
-  filmstrip/carousel, the four routes an image takes into a lokalitet (three
-  auto-sourced LiDAR styles, a general `Behold` for the ground on screen, and
-  keep/discard picker carousels behind LiDAR-uttrekk and Flyfoto), curation
-  and the takeout bundle, and moving Terreng and Sammenlign off row 1 onto
-  the lokalitet row. Read it before building any of that; each step folds into
-  `docs/ui-architecture.md` §8 as it lands. **§13 is a separate thread and
-  the row itself is built, all nine steps**: the *layer row* — four `[thing ▾]`
-  groups
-  (Visning / Bilde / Skisse / Funn) matching the map's z-stack bottom-to-top,
-  each member switchable with its own opacity — which deletes `Gjenskap`, `Vis
-  i ruta` and the one-slot ground arbiter, makes a funn a container for images
-  as well as a sublocation, and gives an arrangement a record of its own
-  (`kind: 'scene'`, membership on the existing `over`). §13.10 is its build
-  order and all nine steps have landed: the ground overlay is a stack
-  and the
-  arbiter is gone; `src/localities/groundView.ts` can put a View on the map
-  as its own pixels over its own rectangle — rendering it live when there is no
-  pinned figure to lay down; `src/shell/LayerGroup.tsx` is the `[thing ▾]`
-  control itself; and all four groups wear it.
-  The component
-  is the *button and the pulldown frame* — a label that toggles the group, a
-  caret that opens it, a badge counting what is on the map — with the body a
-  render prop, so a group brings either the default `LayerMembers` (a switch
-  and a fade each) or a surface of its own, as `[Funn ▾]` brings `FunnList`.
-  `[Visning ▾]` (`src/shell/VisningControl.tsx`, §10.1 of the UI doc) holds the
-  ground preset at the bottom and every View in the lokalitet above it, so
-  switching an extract or a 1937 ortofoto onto the ground is now one pulldown,
-  and switching the whole group off leaves a sketch and its funn on white.
-  That group is a **selection, not a set of checkboxes**: one View at a time
-  over the ground, faded to read one against the other, and **pressing a row
-  enters the View** — the ground it was rendered on, its dataset, its knobs —
-  which is where `Gjenskap` finally went, from a button on the card, to a
-  button in the row, to the press itself. `src/shell/visningRing.ts` is the one
-  entrance (`selectVisningAtom`) and W/S go through it too, so the keys, the
-  pointer and the rail cannot disagree about what is up; stacking two Views is
-  gone on purpose and composing images is `[Bilde ▾]` and `Oppsett`. Two
-  earlier corrections to how that group *arrives*, both §10.1: a
-  lokalitet opens with its **cover** on the ground when the cover is a View
-  that has already been pinned (nothing else, and never a live render — the
-  old empty-on-open rule left a place whose point is three readings of one
-  rectangle showing none of them) — **provisionally**, since that image covers
-  the rectangle every ground speaks about, so the first ground the user asks
-  for withdraws it (`provisionalViewAtom`, and touching the group by hand
-  spends the latch instead) — and **W/S walk that group** rather than the
-  ground's dataset ring wherever there is a View to walk
-  (`src/shell/visningRing.ts`, §5.3 — which is also why the four dataset
-  pulldowns compose their `· W/S` heading instead of translating it).
-  `[Bilde ▾]` (`src/shell/BildeControl.tsx`) is the same control minus
-  the ground preset and minus the recreate, over the Files — checkboxes, since
-  a File has no spec to enter and several at once is the point — and step 6, which
-  built it, is where the whole pin mechanism went: `Vis i ruta`,
-  `usePinnedBilde`, `BildeTransparency` on the rectangle, the fold/unfold
-  restore, and the `Bilder` button's light, which four group labels answer
-  better than one. Step 6 also made the rail stop being a map control at all —
-  picking a frame moved the cursor and nothing else — and **that half is
-  reversed**: pressing a card shows that card, by standing its own group on it
-  (`selectBilde` in `useLocalityWorkspace`), and the cursor follows the map
-  back whenever exactly one bilde is up, so W/S and the pulldowns keep the
-  strip pointing at what is on the ground. The rule that survives is the one
-  step 6 was actually for: the rail speaks the row's atoms and owns no pin, no
-  fade and no depth order of its own, so several images at once is still the
-  pulldowns' job — and nothing on the rail writes in `show`. A card still may
-  not grow a *verb*; what it has is a press that means "show me this one" —
-  which is also what **A/D** mean now (`src/localities/bilderRing.ts`, §5.3):
-  the rail's ←/→ were borrowed from OpenLayers' pan, so it gets the letter keys
-  every other list in the app is walked with, on the same `stripNavigable`
-  gate and through the same `selectBilde`. That is the second ring the
-  lokalitet takes off the ground, after W/S: inside a lokalitet the LiDAR style
-  ring is the pulldown's, and its heading composes `· A/D` for the same reason
-  the four dataset headings compose `· W/S`. E is untouched by both.
-  Step 7 put the uploads in `[Bilde ▾]` without breaking that rule: an upload
-  has no georeference, so `Plasser i ruta` on its card
-  (`src/localities/uploadPlacement.ts`) gives the *record* an extent — the
-  largest rectangle of the image's own aspect centred in the lokalitet's,
-  written as `meta.bbox25833` with `meta.bboxAssumed: true` beside it and
-  marked as assumed on every surface that shows it. That is a curation verb
-  with a geometry in it, buffered into the edit transaction like a caption; the
-  switch it earns is the row's. It is deliberately not *in* the row — §13.8's
-  rule is that nothing in the layer row writes, which is why no group has a
-  stance gate anywhere in it.
-  Step 8 landed the arrangement as a record (`kind: 'scene'`,
-  `src/localities/sceneSpec.ts`, migration `1700000800`, **no new field**):
-  `over` is the membership and `meta` the order, the per-member fade and the
-  ground under them. A scene is a member of *no* group — eligibility is `kind`
-  and nothing claims `'scene'` — so it has no switch, cannot be put on the
-  ground, and cannot contain another scene. Its two verbs are `Oppsett` on the
-  row beside `Behold` (a write, buffered) and `Legg ut igjen` on its card (a
-  read, both stances), and its pin is a flatten the queue composites out of the
-  members' own ground pixels, captioned with the stack bottom to top. **A
-  scene names its members twice**, in `over` and in `meta.layers`, so every
-  place that re-mints ids — the commit, the copy — must translate both halves
-  (`remapSceneMeta`).
-  Step 9 finished the thread by widening `attachments.funn` — same column, no
-  migration — from "what a sketch is about" to **which funn this bilde belongs
-  to**, on every kind: `src/localities/funnGroups.ts` is the only reader
-  (`funnIdOf` is also the single place a dangling id becomes "none", since the
-  relation does not cascade), `BildeFunnPicker` on the bilde card is the
-  editor, and `[Bilde ▾]` and `[Skisse ▾]` group their members under funn
-  headings. The grouping is a **paint order**, not a sort — the grouped
-  sequence reaches `setGroundOverlayStack` and `setSketchOverlays` — because
-  position in a pulldown means depth. Three rules from steps 4–6 that hold
-  across all of it:
-  **opacity is a raster idea** — vector members get a switch and nothing else,
-  and so does the ground preset, whose fade would be three fades and lives on
-  the settings strip instead; **held is not withdrawn** — a group or preset
-  switch that takes down a layer somebody else declared must hand it back
-  unchanged, never reach for its producer; and the funn
-  row's `EyeSplit` polarity (label opens, eye hides) is now row 1's alone, on
-  `Kulturminner`.
+- `docs/lokalitet-view.md` — the design thread behind the lokalitet workspace,
+  and **it is built out**: §12's build order is complete (the two axes, the
+  View/File split, the row's zones, the bottom filmstrip/carousel, curation,
+  the picker carousels, removing the dock, the edit transaction, the copy,
+  Terreng/Sammenlign on the row, sharing, the Rapportpakke) and so is §13's,
+  the separate *layer row* thread, all nine steps. Two builds landed outside
+  the numbered lists and are in neither: placing the rectangle before creating
+  it, and sketches as overlays.
+
+  So read it for **why** — the arguments, the alternatives weighed, and the
+  record of what each step deleted. Read `docs/ui-architecture.md` §8–§10 for
+  **what the code does now**; it is the record where the two disagree, and
+  where the thread's later reversals are folded in rather than appended.
+
+  What the layer row is, in one paragraph, because everything on the lokalitet
+  row assumes it: four `[thing ▾]` groups — Visning · Bilde · Skisse · Funn —
+  left to right in the map's own z-order, each a label that holds the group off
+  the map, a caret that opens it, and a member list with a switch each.
+  `src/shell/LayerGroup.tsx` is the control; all four wear it. Four rules cut
+  across the whole row and are the ones to check a change against:
+
+  - **Producers declare, the layer row orders.** A producer calls
+    `setGroundOverlay(key, member)`; the group says what order its keys paint
+    in. Detail in the Terrenganalyse section below.
+  - **Held is not withdrawn.** A group label that takes a layer off the map
+    must hand it back unchanged, never reach for whoever declared it.
+  - **Opacity is a raster idea.** Vector members get a switch and nothing else,
+    and so does `[Visning ▾]`'s ground preset, whose fade would be three fades.
+  - **Nothing in the layer row writes.** No group has a stance gate anywhere in
+    it. Curation verbs that happen to have a geometry in them (`Plasser i
+    ruta`, `Hører til`) live on the bilde card and are buffered into the edit
+    transaction, and what they earn is a *switch*, which is the row's.
+
+  And two things about `[Visning ▾]` specifically, because they are recent and
+  they reversed earlier decisions in the same thread: the group is a
+  **selection, not a set of checkboxes** — one View over the ground at a time,
+  and **pressing a row enters that View**, putting the ribbon back on the
+  ground it was made on (which is where `Gjenskap` ended up). And the rail
+  presses the row: **pressing a bilde card shows that bilde**, through the
+  same atoms, so the cards, the pulldowns and the keys cannot disagree.
+  `src/shell/visningRing.ts` and `selectVisningAtom` are the one entrance.
+
 - `README.md` — third-party-facing install and admin guide (docker compose
   install, first-run PocketBase superuser, OAuth redirect URL, granting the
   app admin role, licence). Keep it accurate when any of that changes.
+- `docs/doc-debt.md` — **temporary**: a work order for the pass that brings the
+  docs above back into the present tense, with the ranked worklist, the test
+  for telling a deliberate historical record from a stale one, and the four
+  checks this workstation can actually run. Delete it when its worklist is
+  empty. Read it before a docs cleanup, and not otherwise.
 
 The inventory of **deliberate deletions** — upstream Norgeskart machinery
 that must not come back, and why each went — is `docs/ui-architecture.md`
@@ -212,6 +131,18 @@ that owns them.
   draggable curtain holding two full grounds on screen in register — on the
   lokalitet row with Terreng, and torn down when the lokalitet closes —
   `docs/ui-architecture.md` §5.2, §5.3, §5.8.
+- **…and inside a lokalitet, two of those rings belong to the lokalitet.**
+  W/S walk `[Visning ▾]` (`src/shell/visningRing.ts`) and A/D walk the bilder
+  rail (`src/localities/bilderRing.ts`), leaving the ground's dataset and style
+  rings to their pulldowns; E is untouched. Both are **reassignments, not
+  fallbacks**, and both decline in the same two cases — nothing to walk, and
+  the compare curtain's B half. Two consequences worth knowing before adding a
+  key: the routing is `useGroundMode.cycle`, never the listener (rings are
+  routed, not chained past each other by registration order, because both
+  listeners are capture-phase on `document`); and a pulldown heading that
+  advertises a ring **composes** its `· W/S` / `· A/D` suffix rather than
+  translating it, so the hint moves with the keys. `docs/ui-architecture.md`
+  §5.3, §8.4.
 - **LiDAR relief at 0.25 m per project or 1 m nationally**, DTM or DOM, with
   a style ring, and an *Automatisk* dataset that follows the viewport unless
   pinned — `docs/map-layers.md`, `docs/ui-architecture.md` §5.7.
@@ -766,4 +697,18 @@ Two policy facts that live here rather than with the endpoints:
   a name without local `node_modules`: `docs/ui-architecture.md` §11.
 - Commits use short imperative subject lines. Body explains the *why* when
   the reasoning isn't obvious from the diff. The `Co-Authored-By` trailer is
-  added by the commit workflow.
+  **not** added for you — write it into the message yourself.
+- Prose in these docs states what the code does *now*. A change that reverses
+  an earlier decision rewrites the paragraph that stated it; it does not append
+  a "this is now reversed" postscript to it. The *record* of the reversal
+  belongs in one of the two places that exist for it — `docs/ui-architecture.md`
+  §15 for machinery that must not come back, and `docs/lokalitet-view.md` for
+  the design argument a step was decided on. Layering corrections onto a live
+  description is how the two contradicted each other for a release
+  (`docs/doc-debt.md`).
+- Only three checks run on this workstation: `npx oxlint@1.83.0 <paths>`
+  (`src` reports 50 pre-existing findings — 42 errors, 8 warnings — so scope it
+  to the files you touched), JSON parse of the three locale files, and grep.
+  No typecheck. Say
+  which you ran and what it showed; "clean" means clean on the files you
+  changed, and pre-existing findings are worth naming as pre-existing.

@@ -1901,15 +1901,15 @@ keeps its place when the verbs appear and disappear with the stance: pressing
 `flex: 0 1 auto` for the same reason — it used to take the row's slack, and
 growing would now push the two zones after it out to the cell's far edge.
 
-**The contents zone is turning into the layer row** (`docs/lokalitet-view.md`
-§13.1). The end state is four `[thing ▾]` groups — Visning · Bilde · Skisse ·
-Funn — left to right in the map's own z-order, so the row teaches the stack.
-`src/shell/LayerGroup.tsx` is that control and **three of the four wear it**:
-`[Visning ▾]` (§10.1), `[Skisse ▾]` (§9.3) and `[Funn ▾]` (§8.6). The label
-takes the group off the map, the caret opens a pulldown, and every member has a
-switch. Visning is leftmost because it is the ground and everything else is
-over it; Skisse sits left of Funn because sketches are `zIndex: 2` and the funn
-layer is 5. `[Bilde ▾]` lands between Visning and Skisse.
+**The contents zone is the layer row** (`docs/lokalitet-view.md` §13.1, built).
+Four `[thing ▾]` groups — Visning · Bilde · Skisse · Funn — left to right in
+the map's own z-order, so the row teaches the stack. `src/shell/LayerGroup.tsx`
+is that control and **all four wear it**: `[Visning ▾]` (§10.1), `[Bilde ▾]`
+(§10.1), `[Skisse ▾]` (§9.3) and `[Funn ▾]` (§8.6). The label takes the group
+off the map, the caret opens a pulldown, and every member has a switch. Visning
+is leftmost because it is the ground and everything else is over it; Bilde sits
+over Visning; Skisse sits left of Funn because sketches are `zIndex: 2` and the
+funn layer is 5.
 
 Three properties of it that are not obvious from the screen. **The label
 toggles and the caret opens.** That is the opposite polarity to `EyeSplit`, and
@@ -2697,10 +2697,14 @@ pulldown it appears in is grouped by the answer.
 Three consequences of the separation, each of which had been paid for
 elsewhere:
 
-- **The cursor and the map are independent.** `focusBilde` and `selectBilde`
-  differ only in that a press toggles; neither touches the ground. The old rule
-  changed what you were looking at as a side effect of reading a caption,
-  refused silently on the cards it could not place, and could hold one image.
+- **The cursor moves the map, but only by pressing the row.** `selectBilde`
+  shows the frame you land on (§8.7.2); `focusBilde` is the quiet half that
+  moves the cursor and nothing else, for a surface selecting on your behalf.
+  Neither toggles, and neither holds a pin: what a press changes is the
+  membership atoms the groups own. The old rule this replaced changed what you
+  were looking at as a side effect of *reading a caption*, refused silently on
+  the cards it could not place, and could hold one image — none of which is
+  reachable from a press that goes through the groups.
 - **Folding the rail away costs nothing.** `Bilder` pressed shut used to put
   the pinned image down and remember it in a ref, because an overlay whose only
   control has been folded away is stranded. [Bilde] is on the row and stays
@@ -5686,15 +5690,16 @@ plausible-sounding reason to bring one back is exactly what the entry is for.
   surfaces (which took `Note` in `bilderCommon.tsx` with it, its last caller).
   A screenshot goes on the ground from `[Bilde ▾]` now, with a switch of its
   own, a fade of its own, and as many of its siblings beside it as you like
-  (§10.1). Three things went with the verb and none of them is missed: walking
-  the rail stopped moving what is on the map, so folding the bottom edge away
-  had nothing left to put down and nothing to give back; the `Bilder` button
-  stopped lighting for "a bilde is on the ground", because four group labels
-  answer that better than one light on a drawer; and `over` on a new sketch
-  stopped meaning "the one pinned image" and started meaning the whole ground
-  in row order (§9.3). Do not reintroduce a map verb on a card: the rail
-  curates the exhibit, the layer row composes the map, and one surface doing
-  both is how the arbiter above got built in the first place.
+  (§10.1). Three things went with the verb and none of them is missed: the rail
+  stopped owning a pin — pressing a card still moves the map, but by standing
+  that bilde's own group on it (`selectBilde`, §8.7.2), so folding the bottom
+  edge away has no layer of its own to put down and nothing to give back; the
+  `Bilder` button stopped lighting for "a bilde is on the ground", because four
+  group labels answer that better than one light on a drawer; and `over` on a
+  new sketch stopped meaning "the one pinned image" and started meaning the
+  whole ground in row order (§9.3). Do not reintroduce a map verb on a card:
+  the rail curates the exhibit, the layer row composes the map, and one surface
+  doing both is how the arbiter above got built in the first place.
 - **`BildeTransparency`** (same step) — the `ol/Overlay` slider on the
   lokalitet rectangle's top-right corner, its stylesheet, its `ErrorBoundary`
   in `LocalityRibbon` and `localities.bilder.transparency`. It was the second
