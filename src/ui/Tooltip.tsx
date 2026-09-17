@@ -10,6 +10,16 @@ import styles from './Tooltip.module.css';
 const MARGIN = 8;
 const GAP = 6;
 
+/**
+ * Focus that a pointer caused, rather than the keyboard. Clicking a trigger
+ * fires pointerdown — which closes the tip — and *then* focus, which used to
+ * re-open it over whatever the click just opened; every caret in the layer row
+ * put its own tooltip across the first row of its panel. `:focus-visible` is
+ * the browser's own answer to "did they mean to be told this", so defer to it.
+ */
+const focusedByPointer = (target: EventTarget): boolean =>
+  target instanceof Element && !target.matches(':focus-visible');
+
 export const Tooltip = ({
   label,
   children,
@@ -54,7 +64,9 @@ export const Tooltip = ({
         aria-describedby={open ? id : undefined}
         onPointerEnter={() => setOpen(true)}
         onPointerLeave={() => setOpen(false)}
-        onFocusCapture={() => setOpen(true)}
+        onFocusCapture={(e) => {
+          if (!focusedByPointer(e.target)) setOpen(true);
+        }}
         onBlurCapture={() => setOpen(false)}
         onPointerDown={() => setOpen(false)}
       >
