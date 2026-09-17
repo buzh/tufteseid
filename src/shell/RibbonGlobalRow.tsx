@@ -201,8 +201,9 @@ export const RibbonGlobalRow = () => {
         <div className={styles.divider} />
 
         <div className={styles.group}>
-          {/* One control with a seam: the noun opens the panel, the eye puts
-              the overlay on the map or takes it off. */}
+          {/* One control with a seam, the lokalitet row's `[thing ▾]`: the
+              noun puts the overlay on the map or takes it off, the caret
+              opens the panel. */}
           <HeritageControl />
         </div>
 

@@ -124,7 +124,7 @@ jotai on the default store — there is no `Provider`, so module-level code
 | `visningShownAtom`, `visningOpacityAtom`, `visningGroupShownAtom`, `provisionalViewAtom`, `bildeShownAtom`, `bildeOpacityAtom`, `bildeGroupShownAtom` | the two ground-overlay groups' control state | `src/map/groundOverlay.ts` |
 | `sketchShownAtom`, `sketchOpacityAtom`, `sketchGroupShownAtom` | `[Skisse ▾]` | `src/map/sketchOverlay.ts` |
 | `activeThemeLayersAtom`, `shownThemeLayersAtom` | the Kulturminner selection | `src/map/layers/atoms.ts` |
-| `heritageHiddenAtom`, `heritageDetailsAtom`, `heritageRenderAtom`, `heritageOpacityAtom` | the eye; kulturminner2's registers, render axis, fade | `src/map/layers/heritage.ts` |
+| `heritageHiddenAtom`, `heritageDetailsAtom`, `heritageRenderAtom`, `heritageOpacityAtom` | the group switch; kulturminner2's registers, render axis, fade | `src/map/layers/heritage.ts` |
 | `mapToolAtom` | `'measure' \| 'localities' \| null` | `src/map/overlay/atoms.ts` |
 | `overlayOpenCountAtom`, `anyOverlayOpenAtom` | is any popover/dialog up | `src/ui/overlayAtoms.ts` |
 | `ribbonToolAtom`, `workspaceModeAtom`, `localityDetailsOpenAtom`, `bilderStripOpenAtom`, `funnOutsideAtom` | ribbon/workspace mode | `src/localities/toolAtoms.ts` |
@@ -169,7 +169,7 @@ capped at one line.
 | 4 | `RibbonFunnDraftRow` | a funn draft is live |
 
 Row 1: `RibbonSearch`, Kart (1), LiDAR (2), Hybrid (3), Flyfoto (4),
-Kulturminner + its eye, Stedsinfo (I), Mål, Mine lokaliteter, Ny lokalitet,
+`[Kulturminner ▾]`, Stedsinfo (I), Mål, Mine lokaliteter, Ny lokalitet,
 `RibbonAccount`. Terreng (5) and Sammenlign are on the lokalitet row, because
 both read a rectangle. `LocalityRibbon` is the one mount point for
 `useLocalityWorkspace`; `useGroundMode` and `useTerrainAnalysis` are each
@@ -208,11 +208,11 @@ Ground-specific facts worth keeping:
   `prerender`/`postrender` + `getRenderPixel` in
   `src/map/compare/curtainLayers.ts`. Terreng is not offered as a B half, and
   closing a lokalitet tears the curtain down.
-- Kulturminner (`src/shell/heritage/HeritageControl.tsx` + `EyeSplit`): the eye
-  sets `heritageHiddenAtom`, which calls `setVisible(false)` and never removes a
-  layer. The panel carries the five Riksantikvaren services, kulturminner2's
-  three registers, the render axis (one value per LAYERS entry) and a Transparens
-  slider topping out at 80% (`MIN_HERITAGE_OPACITY = 0.2`).
+- Kulturminner (`src/shell/heritage/HeritageControl.tsx` + `LayerGroup`): the
+  label sets `heritageHiddenAtom`, which calls `setVisible(false)` and never
+  removes a layer. The caret's panel carries the five Riksantikvaren services,
+  kulturminner2's three registers, the render axis (one value per LAYERS entry)
+  and a Transparens slider topping out at 80% (`MIN_HERITAGE_OPACITY = 0.2`).
 - Ny lokalitet: `src/localities/bboxLimits.ts` — `MIN_SIDE_M = 50`,
   `MAX_SIDE_M = 1500`, measured in EPSG:25833. The ceiling ratchets down for
   records already larger and never snaps; everything clamps except
@@ -534,7 +534,8 @@ Four `[thing ▾]` groups — Visning · Bilde · Skisse · Funn — left to rig
 map's own z-order. Each is a label that holds the group off the map, a caret
 that opens it, and a member list with a switch each. `src/shell/LayerGroup.tsx`
 (with `LayerMembers` and its `select` flag) is the control and all four wear it;
-`LayerMember` carries `opacity?`, `warning`, `note` and `section`.
+`LayerMember` carries `opacity?`, `warning`, `note` and `section`. Kulturminner
+on row 1 is the same control with a panel of its own.
 
 | Group | Control | Semantics |
 | --- | --- | --- |
@@ -688,7 +689,7 @@ Choose what the terrain looks like
 
 Overlay the heritage record
 
-- Put the overlay on or off with the eye on `Kulturminner`, which also arms the
+- Put the overlay on or off with the `Kulturminner` label, which also arms the
   default register when nothing is on.
 - Switch any of the five Riksantikvaren services individually.
 - See the active-source count on the trigger, and clear them all.

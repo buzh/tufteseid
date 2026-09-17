@@ -5,10 +5,10 @@ import styles from './LayerGroup.module.css';
 import { ModeButton } from './ModeButton';
 
 /*
- * One `[thing ▾]` on the lokalitet row, used four times over: Visning, Bilde,
- * Skisse, Funn, left to right in the map's z-order. Nothing here writes, so
- * there is no stance gate. The label toggles and the caret opens, the opposite
- * polarity to `EyeSplit`.
+ * One `[thing ▾]`: the label toggles the group on the map, the caret opens the
+ * panel that says what is in it. Four times on the lokalitet row — Visning,
+ * Bilde, Skisse, Funn, left to right in the map's z-order — and once on row 1,
+ * for Kulturminner. Nothing here writes, so there is no stance gate.
  */
 
 export type LayerMember = {

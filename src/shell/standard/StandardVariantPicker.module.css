@@ -1,5 +1,6 @@
-/* The caret welded to the right edge of the `Kart` button: EyeSplit's seam, and
-   no fixed height, so it stretches to whatever the ModeButton beside it is. */
+/* The caret welded to the right edge of the `Kart` button: `LayerGroup`'s seam,
+   and no fixed height, so it stretches to whatever the ModeButton beside it
+   is. */
 .caret {
   display: inline-flex;
   align-items: center;

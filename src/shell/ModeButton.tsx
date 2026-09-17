@@ -24,8 +24,8 @@ export const ModeButton = ({
   active?: boolean;
   badge?: number | string;
   disabled?: boolean;
-  /** Left half of a split control (`LayerGroup`, `EyeSplit`): square that edge
-   *  off and pull the badge in off it. */
+  /** Left half of a split control (`LayerGroup`): square that edge off and
+   *  pull the badge in off it. */
   joinedRight?: boolean;
   onClick: () => void;
 }) => (

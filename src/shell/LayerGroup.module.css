@@ -1,5 +1,8 @@
-/* Seam geometry copied from `EyeSplit` rather than imported: the two differ
-   in polarity. */
+/*
+ * A ribbon control with a seam down it: one object, two hit targets. The caret
+ * stretches to whatever height the ModeButton beside it decides on, so the
+ * pair stays square when the ribbon shrinks its buttons on a phone.
+ */
 
 .group {
   display: inline-flex;
