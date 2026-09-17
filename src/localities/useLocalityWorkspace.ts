@@ -39,8 +39,7 @@ import {
   sketchShownAtom,
   type SketchOverlay,
 } from '../map/sketchOverlay';
-import { renderFigureBlob } from '../figure/figure';
-import { describeHeritageRender, screenshotFigure } from '../figure/specs';
+import { fitImageBlob } from '../figure/figure';
 import type { LidarSource } from '../lidarExtract/sources';
 import { mapAtom } from '../map/atoms';
 import {
@@ -60,11 +59,11 @@ import {
 } from '../map/layers/heritage';
 import { leaveCompareAtom } from '../map/compare/atoms';
 import { compareOnAtom } from '../map/compare/halves';
-import type { BackgroundLayerName } from '../map/layers/backgroundLayers';
 import {
   backgroundLayerHalves,
   hybridOverlayHalves,
 } from '../map/layers/config/backgroundLayers/atoms';
+import { saveBlob } from '../shared/utils/download';
 import { fitPadding, FUNN_MARGIN_PX } from '../shell/chromeInsets';
 import { recreateViewAtom } from '../shell/useRecreateView';
 import { selectVisningAtom } from '../shell/visningRing';
@@ -176,32 +175,6 @@ export const FLYFOTO_BATCH_MAX = 8;
 // `nextAttachmentSort` mints, which keeps a new bilde at the end.
 const SORT_STEP = 1000;
 
-// What the ground was, for the screenshot figure's source line.
-const GROUND_LABEL_KEY: Record<BackgroundLayerName, string> = {
-  // The five Standard cartographies name themselves rather than all reporting
-  // "Standard"; the caption is the only place the file says which it is.
-  topo: 'ribbon.standard.topo',
-  topograatone: 'ribbon.standard.topograatone',
-  toporaster: 'ribbon.standard.toporaster',
-  sjokartraster: 'ribbon.standard.sjokartraster',
-  amtskart: 'ribbon.standard.amtskart',
-  empty: 'ribbon.mode.standard',
-  lidarHillshade: 'ribbon.mode.lidar',
-  lidarProject: 'ribbon.mode.lidar',
-  flyfoto: 'ribbon.mode.flyfoto',
-  flyfotoProject: 'ribbon.mode.flyfoto',
-  // Never the value of the background atom (hybrid is a modifier), but the
-  // union has to be covered.
-  topoOverlay: 'ribbon.mode.hybrid',
-};
-
-// Hybrid is a LiDAR stack with names on it: same credit, different label.
-const groundLabelKey = (layer: BackgroundLayerName, hybrid: boolean): string =>
-  hybrid ? 'ribbon.mode.hybrid' : GROUND_LABEL_KEY[layer];
-
-// Grounds whose credit line has to name NiB as well as Kartverket.
-const NIB_GROUNDS = new Set<BackgroundLayerName>(['flyfoto', 'flyfotoProject']);
-
 const bboxContains = (outer: LocalityBbox, inner: LocalityBbox): boolean =>
   inner[0] >= outer[0] &&
   inner[1] >= outer[1] &&
@@ -255,7 +228,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const [bildeGroupShown, setBildeGroupShown] = useAtom(bildeGroupShownAtom);
   const [adjusting, setAdjusting] = useAtom(adjustingLocalityAtom);
   const [selectedFunnId, setSelectedFunnId] = useAtom(selectedFunnIdAtom);
-  const setFunnHidden = useSetAtom(funnHiddenAtom);
+  const [funnHidden, setFunnHidden] = useAtom(funnHiddenAtom);
   const setFunnSwitchedOff = useSetAtom(funnSwitchedOffAtom);
   const [tool, setTool] = useAtom(ribbonToolAtom);
   const mode = useAtomValue(workspaceModeAtom);
@@ -427,8 +400,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   // The exhibit. Positions differ between stances (edit shows the hidden
   // records too), so every ordering call below indexes into
   // `attachmentItems`, never into `bilderItems`.
-  const { items: inheritedItems, unavailable: originalUnavailable } =
-    useInheritedBilder(locality, serverAttachments, canAdd);
+  const {
+    items: inheritedItems,
+    unavailable: originalUnavailable,
+    owner: originalOwner,
+  } = useInheritedBilder(locality, serverAttachments, canAdd);
 
   // The borrowed tail: `derivedFrom`'s Files, which the copy did not carry.
   // A suffix of `bilderItems` and absent from `attachmentItems`, so a
@@ -1308,7 +1284,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         enqueuePin({
           rec,
           bbox4326: localityRef.current.bbox,
-          subject: localityRef.current.name || undefined,
           onPinned: applyPinned,
         });
       }
@@ -1376,34 +1351,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         toast.error({ title: t('localities.tools.screenshotFailed') });
         return;
       }
-      const figure = await renderFigureBlob(
-        shot.canvas,
-        screenshotFigure({
-          subject: locality.name || undefined,
-          groundLabel: compareOn
-            ? t('figure.source.compareGrounds', {
-                left: t(groundLabelKey(background, hybrid)),
-                right: t(groundLabelKey(backgroundB, hybridB)),
-              })
-            : t(groundLabelKey(background, hybrid)),
-          groundIsFlyfoto:
-            NIB_GROUNDS.has(background) ||
-            (compareOn && NIB_GROUNDS.has(backgroundB)),
-          themeLayers: [...themeLayers],
-          heritageRender: themeLayers.has('heritageSites')
-            ? describeHeritageRender(
-                heritageDetails,
-                heritageRender,
-                heritageOpacity,
-              )
-            : undefined,
-          metresPerPx: shot.metresPerPx,
-          bbox25833: shot.bbox25833,
-          rotation: shot.rotation,
-          language: i18n.language,
-        }),
-      );
-      if (!figure) {
+      const fitted = await fitImageBlob(shot.canvas, shot.metresPerPx);
+      if (!fitted) {
         toast.error({ title: t('localities.tools.screenshotFailed') });
         return;
       }
@@ -1414,14 +1363,28 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           caption: `${t('localities.tools.screenshotCaption')} ${new Date().toLocaleDateString(i18n.language)}`,
           meta: {
             bbox25833: shot.bbox25833,
-            metresPerPx: figure.metresPerPx,
-            imageRect: figure.imageRect,
+            metresPerPx: fitted.metresPerPx,
             // What was on the map when the shutter went, machine-readable
             // beside the caption's prose. Not enough to restore the view, and
-            // not meant to be: a screenshot is a File, not a View.
+            // not meant to be: a screenshot is a File, not a View. It is
+            // enough to write the legend from, which is why every one of
+            // these fields is here rather than baked into the pixels.
             ground: background,
             hybrid,
             themeLayers: [...themeLayers],
+            // The only figure that is ever off north, and the only one that
+            // earns a north arrow on the way out.
+            rotation: shot.rotation,
+            // Whether anything of the author's own was in the frame. A shot
+            // of nothing but the background and the public theme layers is a
+            // copy of somebody else's map; the moment a kept Visning, a
+            // Bilde, a skisse or a funn is in it, it is a composition and the
+            // author is named on it.
+            composed:
+              (visningGroupShown && visningShown.size > 0) ||
+              (bildeGroupShown && bildeShown.size > 0) ||
+              (sketchGroupShown && sketchShown.size > 0) ||
+              (!funnHidden && (findItems?.length ?? 0) > 0),
             ...(compareOn
               ? { compare: { ground: backgroundB, hybrid: hybridB } }
               : {}),
@@ -1437,7 +1400,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           },
         },
         user.id,
-        figure.blob,
+        fitted.blob,
         'skjermbilde.png',
       );
       setAttachmentItems((prev) => (prev ? [...prev, rec] : [rec]));
@@ -1457,7 +1420,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     shooting,
     map,
     locality.id,
-    locality.name,
     locality.bbox,
     background,
     hybrid,
@@ -1468,6 +1430,14 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     heritageDetails,
     heritageRender,
     heritageOpacity,
+    visningShown,
+    visningGroupShown,
+    bildeShown,
+    bildeGroupShown,
+    sketchShown,
+    sketchGroupShown,
+    funnHidden,
+    findItems,
     setAttachmentItems,
     mutateDraft,
     t,
@@ -1517,7 +1487,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
             // Its place in the original's arrangement comes with it.
             sort: rec.sort,
             hidden: rec.hidden,
-            meta: { ...(rec.meta ?? {}), takenFrom: rec.id },
+            // `takenFromAuthor` is denormalized rather than looked up: the
+            // legend is stamped from this record alone, possibly years after
+            // the original lokalitet was deleted, and a borrowed composition
+            // stays the original author's work.
+            meta: {
+              ...(rec.meta ?? {}),
+              takenFrom: rec.id,
+              ...(originalOwner ? { takenFromAuthor: originalOwner } : {}),
+            },
           },
           user.id,
           blob,
@@ -1533,7 +1511,16 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         setTakingId(null);
       }
     },
-    [user, canAdd, takingId, locality.id, setAttachmentItems, mutateDraft, t],
+    [
+      user,
+      canAdd,
+      takingId,
+      locality.id,
+      originalOwner,
+      setAttachmentItems,
+      mutateDraft,
+      t,
+    ],
   );
 
   // The acquisition list is per-rectangle, so drop it when the rectangle
@@ -1664,8 +1651,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   );
 
   const picker = usePickerRun({
+    locality,
     bbox4326: locality.bbox,
-    subject: locality.name || undefined,
     isDuplicate: isDuplicateKey,
     onKeep: keepPickerCandidate,
   });
@@ -1698,13 +1685,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
             subtitle: style,
             kind: 'extract',
             caption: `${source.label} · ${style}`,
-            meta: {
-              sourceKey: source.key,
-              sourceLabel: source.label,
-              style,
-              model,
-              bbox25833: beholdBbox,
-            },
+            meta: lidarSpecMeta(source, style, beholdBbox),
             spec: projectName
               ? { kind: 'lidar', source: { projectName }, style, model }
               : { kind: 'lidar', source: 'national', style, model },
@@ -1737,20 +1718,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
           caption: `${t('localities.tools.flyfotoCaption')} ${
             project ? label : new Date().toLocaleDateString(i18n.language)
           }`,
-          meta: {
-            sourceLabel: 'Norge i bilder',
-            bbox25833: beholdBbox,
-            ...(project
-              ? {
-                  nibSource: 'project',
-                  projectId: project.id,
-                  projectName: project.projectName,
-                  projectMetresPerPx: project.metresPerPx,
-                  year: project.year,
-                  photoDate: project.photoDate,
-                }
-              : { nibSource: 'mosaic' }),
-          },
+          meta: flyfotoSpecMeta(project ?? undefined, beholdBbox),
           spec: project
             ? { kind: 'flyfoto', source: { projectId: project.id } }
             : { kind: 'flyfoto', source: 'mosaic' },
@@ -1794,13 +1762,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
                 locality: locality.id,
                 kind: 'extract',
                 caption: `${plan.source.label} · ${style}`,
-                meta: {
-                  sourceKey: plan.source.key,
-                  sourceLabel: plan.source.label,
-                  style,
-                  model: plan.source.model,
-                  bbox25833: beholdBbox,
-                },
+                meta: lidarSpecMeta(plan.source, style, beholdBbox),
               },
               user.id,
             ),
@@ -1819,7 +1781,6 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         enqueuePin({
           rec,
           bbox4326: localityRef.current.bbox,
-          subject: localityRef.current.name || undefined,
           onPinned: applyPinned,
         });
       }
@@ -2481,16 +2442,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     return () => setCoverTerrainSpec(null);
   }, [coverTerrainSpec, setCoverTerrainSpec]);
 
-  // The pin queue's entrances from the UI: a job needs the rectangle and the
-  // subject, and both are this hook's.
+  // The pin queue's entrance from the UI: a job needs the rectangle, which is
+  // this hook's.
   const pinJob = useCallback(
     (rec: AttachmentRecord) => ({
       rec,
       bbox4326: locality.bbox,
-      subject: locality.name || undefined,
       onPinned: applyPinned,
     }),
-    [locality.bbox, locality.name, applyPinned],
+    [locality.bbox, applyPinned],
   );
 
   const retryPin = useCallback(
@@ -2542,18 +2502,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
         pinnableInEdit: mayAdd && !canAdd,
         onProgress: setTakeoutProgress,
       });
-      // An anchor rather than `window.open`: a blob URL opened minutes after
-      // the click is a popup and gets blocked. Revoked on a timer because
-      // revoking in the same tick cancels the transfer in some browsers.
-      const url = URL.createObjectURL(result.blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = result.filename;
-      // Firefox ignores a click on an anchor that is not in the document.
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      saveBlob(result.blob, result.filename);
       if (result.missing > 0) {
         toast.warning({
           title: t('localities.takeout.missing', { count: result.missing }),

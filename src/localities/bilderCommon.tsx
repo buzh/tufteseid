@@ -34,10 +34,12 @@ import {
   type MaterialSymbol,
   Menu,
   Spinner,
+  toast,
   Tooltip,
 } from '../ui';
 import styles from './bilderCommon.module.css';
 import { isDraftId } from './draft';
+import { downloadFigure } from './figureFile';
 import { funnIdOf } from './funnGroups';
 import { groundExtentOf } from './groundView';
 import { type PinState, pinStateOf, subscribePinQueue } from './pinQueue';
@@ -887,6 +889,48 @@ export const OpenOriginalButton = ({
       }}
     >
       {t('localities.bilder.openOriginal')}
+    </Button>
+  );
+};
+
+// The same file with its provenance plate on it. Sits beside `Åpne originalen`
+// rather than replacing it: one verb is the raster as the store holds it, the
+// other is the raster as it may be handed on. No force-pin here — the button
+// next to it already offers that, and offering it twice would put a write
+// behind a verb that reads.
+export const DownloadFigureButton = ({
+  ws,
+  rec,
+}: {
+  ws: LocalityWorkspaceApi;
+  rec: AttachmentRecord;
+}) => {
+  const { t } = useTranslation();
+  // Keyed on the record, for the reason `OpenOriginalButton` gives: the rail
+  // walks under this component without remounting it.
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const busy = busyId === rec.id;
+
+  if (!isPinned(rec)) return null;
+
+  return (
+    <Button
+      size="sm"
+      leftIcon="download"
+      disabled={busy}
+      onClick={() => {
+        setBusyId(rec.id);
+        downloadFigure(rec, ws.locality)
+          .catch((e) => {
+            console.warn('[bilder] download failed', e);
+            toast.error({ title: t('localities.bilder.downloadFailed') });
+          })
+          .finally(() => setBusyId((id) => (id === rec.id ? null : id)));
+      }}
+    >
+      {busy
+        ? t('localities.bilder.downloading')
+        : t('localities.bilder.download')}
     </Button>
   );
 };

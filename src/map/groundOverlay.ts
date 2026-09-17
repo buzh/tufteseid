@@ -33,8 +33,9 @@ export type GroundOverlayMember = {
   /** Terrain hands over the same canvas it paints into, so `setGroundOverlay`
    * is also the repaint call. */
   source: HTMLCanvasElement | HTMLImageElement;
-  /** The part of `source` that is ground, in its own pixels: `meta.imageRect`
-   * for a bilde, since a figure PNG carries a caption panel below the image. */
+  /** The part of `source` that is ground, in its own pixels. The whole image,
+   * except on a bilde pinned back when the file carried a caption panel — see
+   * `cropOf`. */
   crop: { x: number; y: number; width: number; height: number };
   /** EPSG:25833. The ground `crop` covers, edge to edge. */
   extent25833: [number, number, number, number];

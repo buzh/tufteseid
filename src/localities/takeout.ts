@@ -18,9 +18,15 @@ import {
 } from '../api/attachments';
 import type { LocalityRecord } from '../api/localities';
 import type { LocalityFindRecord } from '../api/localityFinds';
-import { type Credit, CREDITS } from '../figure/figure';
+import { type Credit, CREDITS, stampBlob } from '../figure/figure';
+import {
+  authorOf,
+  figureSpecOf,
+  stampContextOf,
+} from '../figure/fromRecord';
 import { fetchWithin } from '../shared/utils/deadline';
 import { type ZipEntry, zipStore } from '../shared/utils/zip';
+import { extensionOf, slug } from './figureFile';
 import {
   formatBboxArea,
   formatBboxCentre,
@@ -54,22 +60,6 @@ export type TakeoutResult = {
 };
 
 // ---- Small formatters ----
-
-const slug = (s: string, fallback: string): string => {
-  const out = s
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, '-')
-    .slice(0, 60)
-    .replace(/^-+|-+$/g, '');
-  return out || fallback;
-};
-
-// The server filename's own extension, so a JPEG flyfoto does not leave here
-// called `.png`. Defaults rather than throws: every producer writes one.
-const extensionOf = (rec: AttachmentRecord): string => {
-  const m = /\.([a-z0-9]+)$/i.exec(rec.file);
-  return m ? m[1].toLowerCase() : 'png';
-};
 
 const esc = (s: string): string =>
   s.replace(/[&<>"]/g, (c) => {
@@ -420,7 +410,15 @@ const indexHtml = (page: Page): string => {
   for (const credit of page.credits) {
     out.push(`<li>${esc(`${credit.holder} — ${t(credit.termsKey)}`)}</li>`);
   }
-  out.push(`<li>${esc(t('localities.takeout.sourcesSelf'))}</li>`, '</ul>');
+  out.push(
+    `<li>${esc(
+      t('localities.takeout.sourcesSelf', {
+        author: authorOf(page.locality),
+        app: t('figure.app'),
+      }),
+    )}</li>`,
+    '</ul>',
+  );
   out.push(`<p>${esc(t('localities.takeout.sourcesNote'))}</p>`);
 
   out.push(
@@ -475,7 +473,12 @@ const readmeText = (page: Page): string => {
   for (const credit of page.credits) {
     out.push(`  ${credit.holder} — ${t(credit.termsKey)}`);
   }
-  out.push(`  ${t('localities.takeout.sourcesSelf')}`);
+  out.push(
+    `  ${t('localities.takeout.sourcesSelf', {
+      author: authorOf(page.locality),
+      app: t('figure.app'),
+    })}`,
+  );
   out.push('', t('localities.takeout.sourcesNote'));
   out.push(
     '',
@@ -516,6 +519,9 @@ export const buildTakeout = async ({
 }): Promise<TakeoutResult> => {
   const packedAt = new Date();
   const locale = i18n.language;
+  // One context for the whole bundle: every figure in it is credited to the
+  // lokalitet's owner, whoever pressed the button.
+  const stampCtx = stampContextOf(locality, locale);
   const knownFunn = new Set(finds.map((f) => f.id));
   const titleOfFunn = new Map(finds.map((f) => [f.id, titleOf(f)] as const));
   const findRows = findRowsOf(finds);
@@ -577,7 +583,14 @@ export const buildTakeout = async ({
           { ms: FILE_DEADLINE_MS, what: 'takeout file' },
           (res) => res.blob(),
         );
-        files.push({ path, body: blob });
+        // The stored file is bare pixels; the legend goes on here, so a figure
+        // that leaves the app carries its own provenance and the copy on the
+        // map does not. Decode-draw-encode per image, which is the cost of a
+        // bundle whose pictures can still be read a decade from now.
+        files.push({
+          path,
+          body: await stampBlob(blob, figureSpecOf(rec, stampCtx)),
+        });
         images.push({
           rec,
           path,

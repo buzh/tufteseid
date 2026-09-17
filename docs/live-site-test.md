@@ -27,9 +27,9 @@ ploughed-down gravhauger in a v-formation, read off LiDAR.
 
 A *public* lokalitet with content is the fixture because the anonymous read path
 is the widest surface the app has — the register reads, the rail, the layer row,
-`[Visning ▾]`'s re-creation of a ground, the funn layer and the figure captions
-all answer without an account, and a reader is the one visitor who can be
-reproduced exactly.
+`[Visning ▾]`'s re-creation of a ground, the funn layer and `Last ned`'s
+stamped file all answer without an account, and a reader is the one visitor who
+can be reproduced exactly.
 
 What it deliberately does not hold, and what therefore has to be tested on a
 scratch lokalitet of your own: `screenshot`, `upload`, `flyfoto` and `scene`
@@ -107,7 +107,12 @@ run this; it needs no account and touches nothing.
    brings it back.
 4. **Bilder.** The rail along the bottom holds 12 frames; ← / → and A / D walk
    it, and each frame you land on goes up on the ground. `Bilder ▾` folds the
-   edge away and back without moving the map.
+   edge away and back without moving the map. The frame on the ground carries
+   no furniture: the store holds bare pixels. `Åpne originalen` opens exactly
+   those; `Last ned` saves the same picture with a provenance plate inset in
+   the bottom-left corner — title, dataset, settings, centre, scale bar and one
+   rights line per holder, in the language the app is in. Both work without an
+   account; switch to `en` and download again to see the plate follow.
 5. **The layer row.** `[Visning ▾]` lists the eleven extracts; picking one puts
    it on the ground *and takes the map back the way it was made*. `[Skisse ▾]`
    switches the sketch on over whatever ground is up. Every member has a fade;
@@ -126,8 +131,9 @@ run this; it needs no account and touches nothing.
    `løkstad-YYYY-MM-DD.zip`; it opens on `index.html` with the bilder in the
    rail's order and `funn/funn.geojson` + `funn.csv` beside them. A reader
    cannot pin, so any unpinned View is named on the front page instead of
-   silently missing, and the owner credit reads *Ukjent* for the same reason the
-   banner is absent.
+   silently missing. Every image in the zip carries the same plate `Last ned`
+   stamps. The owner credit reads *Ukjent*, on the front page and in the plate's
+   authored half both, for the same reason the banner is absent.
 10. **Del.** `⋮ → Del` copies `/l/JYBNQC` and says that anybody can open it.
 11. **Housekeeping.** Switch language nb → nn → en: no raw translation keys
     anywhere, and no `Norgeskart` or `Kartverket` in the chrome in any of the
@@ -190,8 +196,8 @@ in the console.
 ## What this does not cover
 
 The machine pass proves a byte came back, never that it was drawn: the canvas,
-Excalidraw, the figure pipeline with its burned-in scale bar and credit line,
-and every stitcher are the eye pass's job. Nothing here tests load, cache
+Excalidraw, the provenance plate a download is stamped with, and every stitcher
+are the eye pass's job. Nothing here tests load, cache
 eviction, a cold upstream's 5–14 s render, or the signed-in write rules beyond
 the steps above. And neither pass tests the admin asymmetry — an admin may
 rename and delete anybody's lokalitet but may not add funn or bilder to it —

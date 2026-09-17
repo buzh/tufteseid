@@ -1,6 +1,10 @@
+import i18n from 'i18next';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AttachmentKind, AttachmentMeta } from '../api/attachments';
-import type { LocalityBbox } from '../api/localities';
+import type { LocalityBbox, LocalityRecord } from '../api/localities';
+import { stampBlob } from '../figure/figure';
+import { figureSpecOf, stampContextOf } from '../figure/fromRecord';
+import { saveBlob } from '../shared/utils/download';
 import type { BeholdKey } from './behold';
 import { type Produced, renderSpec } from './pinQueue';
 import type { ViewSpec } from './viewSpec';
@@ -51,8 +55,9 @@ export type PickerRun = {
 };
 
 type Options = {
+  /** Whose lokalitet this is, for the plate a downloaded proposal carries. */
+  locality: LocalityRecord;
   bbox4326: LocalityBbox;
-  subject: string | undefined;
   isDuplicate: (key: BeholdKey) => boolean;
   /** Writes the record; `false` leaves the card keepable. */
   onKeep: (candidate: PickerCandidate, produced: Produced) => Promise<boolean>;
@@ -64,8 +69,8 @@ const revokeAll = (run: PickerRun | null) => {
 };
 
 export const usePickerRun = ({
+  locality,
   bbox4326,
-  subject,
   isDuplicate,
   onKeep,
 }: Options) => {
@@ -81,8 +86,8 @@ export const usePickerRun = ({
   // The callbacks below must not be re-created every time a card changes state.
   const runRef = useRef(run);
   runRef.current = run;
-  const opts = useRef({ bbox4326, subject, isDuplicate, onKeep });
-  opts.current = { bbox4326, subject, isDuplicate, onKeep };
+  const opts = useRef({ locality, bbox4326, isDuplicate, onKeep });
+  opts.current = { locality, bbox4326, isDuplicate, onKeep };
 
   const patch = useCallback(
     (id: string, next: Partial<PickerCard>) =>
@@ -113,7 +118,7 @@ export const usePickerRun = ({
     fetchingGen.current = gen;
     patch(candidate.id, { state: 'fetching' });
 
-    renderSpec(candidate.spec, opts.current.bbox4326, opts.current.subject)
+    renderSpec(candidate.spec, opts.current.bbox4326)
       .then((produced) => {
         if (gen !== generation.current) return;
         if (!produced) {
@@ -233,6 +238,27 @@ export const usePickerRun = ({
     }
   }, [step]);
 
+  /**
+   * The proposal on disk without joining the collection — the run is the only
+   * place these pixels exist. Stamped here rather than handed out as the object
+   * URL the card is showing: the thumbnail is a preview, the file is a
+   * publication. The spec is built from the two halves the keep would have
+   * written, so this file and the kept one's download are the same file.
+   */
+  const download = useCallback(async () => {
+    const prev = runRef.current;
+    const card = prev?.cards[prev.at];
+    if (!card?.produced) return;
+    const spec = figureSpecOf(
+      {
+        kind: card.candidate.kind,
+        meta: { ...card.candidate.meta, ...card.produced.meta },
+      },
+      stampContextOf(opts.current.locality, i18n.language),
+    );
+    saveBlob(await stampBlob(card.produced.blob, spec), card.produced.filename);
+  }, []);
+
   return {
     run,
     active: run ? (run.cards[run.at] ?? null) : null,
@@ -243,6 +269,7 @@ export const usePickerRun = ({
     step,
     keep,
     discard,
+    download,
   };
 };
 

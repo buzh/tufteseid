@@ -327,8 +327,8 @@
       "colTitle": "Tittel",
       "colNote": "Notat",
       "sourcesHeading": "Kilder og bruksvilkår",
-      "sourcesSelf": "Tegninger og notater: forfatteren",
-      "sourcesNote": "Hvert bilde har full kildeinformasjon trykt i sin egen bildetekst.",
+      "sourcesSelf": "Tegninger, visualiseringer og sammenstillinger: © {{author}} og {{app}} (CC BY 4.0)",
+      "sourcesNote": "Kildeopplysningene er trykt i hjørnet av hvert bilde. Opplastede filer står uten — der er det den som lastet dem opp som kjenner opphavet.",
       "filesHeading": "Filer i pakken",
       "generated": "Laget med {{app}}, {{date}}"
     },
@@ -444,6 +444,9 @@
       "delete": "Slett bildet",
       "captionPlaceholder": "Bildetekst…",
       "openOriginal": "Åpne originalen",
+      "download": "Last ned",
+      "downloading": "Laster ned…",
+      "downloadFailed": "Kunne ikke laste ned bildet.",
       "showStrip": "Vis bildestripen",
       "hideStrip": "Skjul bildestripen",
       "previous": "Forrige bilde",
@@ -729,17 +732,23 @@
   },
   "figure": {
     "app": "Tufteseid",
-    "label": {
-      "source": "Kilde",
-      "method": "Metode",
-      "area": "Område",
-      "image": "Bilde",
-      "rights": "Rettigheter",
-      "produced": "Laget"
+    "role": {
+      "hoydedata": "høydedata",
+      "skyggerelieff": "skyggerelieff",
+      "ortofoto": "ortofoto",
+      "kart": "kart",
+      "kulturminner": "kulturminner",
+      "visualisering": "visualisering",
+      "tegning": "tegning",
+      "sammenstilling": "sammenstilling"
     },
     "terms": {
       "ccby": "CC BY 4.0",
       "nib": "fri bruk privat, ikke-kommersielt"
+    },
+    "rights": {
+      "line": "{{role}}: © {{holder}} ({{terms}})",
+      "authors": "{{author}} og {{app}}"
     },
     "title": {
       "extract": "LiDAR-uttrekk",

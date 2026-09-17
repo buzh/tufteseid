@@ -46,7 +46,8 @@ const derivedLabel = (source: LocalityRecord): string => {
 
 // Minus what only a pin knows. `bbox25833` stays, because the queue renders
 // the spec's rectangle and a sub-rectangle extract would come back full-size;
-// `imageRect` and `renderedAt` describe a figure that does not exist yet.
+// `renderedAt` describes a render that has not happened yet, and `imageRect`
+// a caption panel no file carries any more.
 const specMetaOf = (meta: AttachmentMeta | null): AttachmentMeta => {
   const rest: AttachmentMeta = { ...(meta ?? {}) };
   delete rest.imageRect;

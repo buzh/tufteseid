@@ -6,6 +6,7 @@ import {
   BildeFunnPicker,
   BilderRail,
   CaptionField,
+  DownloadFigureButton,
   MetaLine,
   OpenOriginalButton,
   PinRetryButton,
@@ -108,6 +109,10 @@ export const BilderCarousel = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                 <SceneRestoreButton ws={ws} rec={active} />
                 <PinRetryButton ws={ws} rec={active} />
                 <OpenOriginalButton ws={ws} rec={active} />
+                {/* Not offered on a borrowed record: the plate would credit
+                    this lokalitet's owner for somebody else's picture. `Ta
+                    med` writes the original author onto the copy first. */}
+                <DownloadFigureButton ws={ws} rec={active} />
 
                 {/* Position in the exhibit order, for the keyboard and for
                     touch; dragging the frame is the other way. The index is a

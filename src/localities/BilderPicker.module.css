@@ -207,26 +207,6 @@
   gap: var(--sp-2);
 }
 
-/* An anchor dressed as a secondary button: the blob is already in hand, so
-   `download` on an href is the whole implementation. */
-.download {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  height: 28px;
-  padding: 0 var(--sp-3);
-  border: 1px solid var(--c-border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--c-bg);
-  color: var(--c-fg);
-  font-size: var(--font-xs);
-  text-decoration: none;
-}
-
-.download:hover {
-  background: var(--c-bg-hover);
-}
-
 .hint {
   margin: 0;
   font-size: var(--font-xs);

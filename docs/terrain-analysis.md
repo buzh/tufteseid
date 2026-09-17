@@ -99,13 +99,16 @@ memoises it in-tab instead.
 
 `MAX_DEM_PX_PER_SIDE` (3000) caps the assembled grid; `planTiles` scales
 resolution down to fit, and `Dem.nativeMetresPerPx` records what the
-acquisition actually publishes so a caption can say the render was resampled.
+acquisition actually publishes so the plate can say the render was resampled.
 
-## The visualizations, and what each caption records
+## The visualizations, and what each plate records
 
-`src/figure/` puts a caption panel under every kept or downloaded raster and
-`terrainFigure` builds it — a hillshade at 315°/35° and one at 135°/20°
-disagree about whether there is a mound in the same field.
+`src/figure/` stamps a provenance plate onto every raster leaving the app and
+`terrainFigure` builds the terrain one — a hillshade at 315°/35° and one at
+135°/20° disagree about whether there is a mound in the same field, so a render
+without its own azimuth cannot be checked by anyone. Everything in the table is
+read back out of the record's `meta` at download time, not frozen into the
+pixels at render time.
 
 | Visualization | Recorded |
 |---|---|
@@ -125,8 +128,8 @@ rectangle exceeded `MAX_DEM_PX_PER_SIDE`.
 
 - `MULTI_AZIMUTHS`, `SVF_DIRECTIONS` and `VAT_LAYERS` are exported because they
   are printed; changing one changes what old and new renders mean relative to
-  each other. The VAT line is assembled from `VAT_LAYERS`, so caption and blend
-  cannot drift.
+  each other. The VAT line is assembled from `VAT_LAYERS`, so the plate and the
+  blend cannot drift.
 - Slope and negative openness are drawn on a reversed grey ramp and both say
   so — negative openness is high in a depression, so painted straight it would
   put ditches in white while sky-view beside it puts them in black (RVT inverts
@@ -154,7 +157,7 @@ resolving the features whose horizon is being measured.
   `horizonMaxRadiusMetres` — 24 m on any grid at 1 m or finer, 24 × the cell
   size on a coarser one — and a saved spec can be replayed over another
   rectangle. `clampRadius(vis, dem, metres)` in `render.ts` is the single answer
-  both the render and the caption go through, and `radiusRange` takes the
+  both the render and the plate go through, and `radiusRange` takes the
   slider's ceiling from it. Skipping it puts "SVF-radius 40 m" on a 24 m render.
 - The four views off the scan are one ray walk read four ways (`usesHorizon`),
   the radius clamped through `'svf'` so all four resolve to the same number,

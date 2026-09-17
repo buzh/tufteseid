@@ -1,24 +1,17 @@
-// The drawing half of the provenance figure: the furnishings that go *on* the
-// image (scale bar, north arrow) and the caption block under it. Every
-// dimension derives from the one `fontSize` the caller computes from the image
-// width, so a 600 px screenshot and a 4000 px extract come out as the same
-// figure. The caption is paper, dark on near-white, because these end up in
-// reports; the furnishings are white on a translucent dark plate, because they
-// sit on ground that is black in one visualization and white in the next.
+// The drawing half of the provenance legend: a plate in the corner of the
+// image carrying what it is a picture of, and the north arrow for the one case
+// that needs one. Every dimension derives from the one `fontSize` the caller
+// computes from the image width, so a 600 px screenshot and a 4000 px extract
+// come out as the same legend. White on a translucent dark plate, because it
+// sits on ground that is black in one visualization and white in the next.
+//
+// Nothing here goes into a stored file. The legend is stamped on the way out —
+// see `figure.ts`.
 
 import i18n from 'i18next';
 
 const FAMILY = "'Mulish', system-ui, -apple-system, 'Segoe UI', sans-serif";
 
-// Caption.
-const PAPER = '#f6f6f4';
-const INK = '#16181a';
-const INK_DIM = '#5f646a';
-const RULE = '#c9ccd0';
-// Behind an image narrower than the caption needs (see MIN_FIGURE_WIDTH).
-export const MATTE = '#2a2d31';
-
-// Furnishings.
 const PLATE = 'rgba(10, 12, 14, 0.55)';
 const MARK = '#ffffff';
 const MARK_DARK = '#14171a';
@@ -28,7 +21,7 @@ const locale = () => i18n.language || 'nb';
 export const int = (value: number): string =>
   new Intl.NumberFormat(locale(), { maximumFractionDigits: 0 }).format(value);
 
-/** Drop the empties and join with the caption's separator. */
+/** Drop the empties and join with the legend's separator. */
 export const joinDot = (parts: (string | null | undefined | false)[]): string =>
   parts.filter(Boolean).join(' · ');
 
@@ -38,16 +31,16 @@ export const dec = (value: number, digits: number): string =>
   );
 
 /**
- * Linear in the image width between the two clamps, which keeps the caption a
+ * Linear in the image width between the two clamps, which keeps the legend a
  * roughly constant fraction of the figure at any raster size.
  */
-export const figureFontSize = (width: number): number =>
-  Math.round(Math.min(34, Math.max(13, width / 55)));
+export const legendFontSize = (width: number): number =>
+  Math.round(Math.min(28, Math.max(12, width / 75)));
 
 /**
  * Canvas text does not wait for webfonts — it silently falls through to the
- * next family in the stack, which would make two figures saved a second apart
- * look different. Covers the cold case only.
+ * next family in the stack, which would make two figures stamped a second
+ * apart look different. Covers the cold case only.
  */
 export const ensureFigureFont = async (size: number): Promise<void> => {
   const fonts = document.fonts;
@@ -58,7 +51,7 @@ export const ensureFigureFont = async (size: number): Promise<void> => {
       fonts.load(`700 ${size}px Mulish`),
     ]);
   } catch {
-    // A figure in the fallback face beats no figure.
+    // A legend in the fallback face beats no legend.
   }
 };
 
@@ -105,121 +98,6 @@ const roundRect = (
 };
 
 // ---------------------------------------------------------------------------
-// Caption
-// ---------------------------------------------------------------------------
-
-/** A labelled line. The one row with no label is the title. */
-export type CaptionRow = { label?: string; text: string };
-
-type LaidOutRow = {
-  label: string;
-  /** Where the text column starts, so wrapped lines hang under the first. */
-  indent: number;
-  lines: string[];
-  isTitle: boolean;
-};
-
-export type CaptionLayout = {
-  height: number;
-  /** Paint the block with its top edge at `top`. */
-  draw: (ctx: CanvasRenderingContext2D, top: number) => void;
-};
-
-/**
- * Measure first, paint later: the caption's height depends on how the text
- * wraps and the output canvas has to be sized before anything is drawn on it,
- * so this lays out against a throwaway context and hands back the height plus a
- * closure that repeats the same walk for real.
- */
-export const layoutCaption = (
-  measure: CanvasRenderingContext2D,
-  rows: CaptionRow[],
-  width: number,
-  fontSize: number,
-): CaptionLayout => {
-  const pad = Math.round(fontSize * 0.95);
-  const lineH = Math.round(fontSize * 1.32);
-  const titleSize = Math.round(fontSize * 1.22);
-  const titleLineH = Math.round(titleSize * 1.25);
-  const gapAfterTitle = Math.round(fontSize * 0.5);
-  const labelGap = Math.round(fontSize * 0.7);
-  const maxWidth = width - pad * 2;
-
-  const laidOut: LaidOutRow[] = [];
-  for (const row of rows) {
-    if (!row.text) continue;
-    const isTitle = !row.label;
-    if (isTitle) {
-      measure.font = font(titleSize, 700);
-      laidOut.push({
-        label: '',
-        indent: 0,
-        lines: wrap(measure, row.text, maxWidth),
-        isTitle,
-      });
-      continue;
-    }
-    measure.font = font(fontSize, 600);
-    const indent = Math.round(
-      measure.measureText(row.label ?? '').width + labelGap,
-    );
-    measure.font = font(fontSize);
-    laidOut.push({
-      label: row.label ?? '',
-      indent,
-      lines: wrap(measure, row.text, Math.max(40, maxWidth - indent)),
-      isTitle,
-    });
-  }
-
-  let height = pad * 2;
-  for (const row of laidOut) {
-    height += row.isTitle
-      ? row.lines.length * titleLineH + gapAfterTitle
-      : row.lines.length * lineH;
-  }
-
-  const draw = (ctx: CanvasRenderingContext2D, top: number) => {
-    ctx.save();
-    ctx.fillStyle = PAPER;
-    ctx.fillRect(0, top, width, height);
-    ctx.fillStyle = RULE;
-    ctx.fillRect(0, top, width, 1);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-
-    let y = top + pad;
-    for (const row of laidOut) {
-      if (row.isTitle) {
-        ctx.font = font(titleSize, 700);
-        ctx.fillStyle = INK;
-        for (const line of row.lines) {
-          y += titleLineH;
-          ctx.fillText(line, pad, y - Math.round(titleSize * 0.3));
-        }
-        y += gapAfterTitle;
-        continue;
-      }
-      row.lines.forEach((line, i) => {
-        y += lineH;
-        const baseline = y - Math.round(fontSize * 0.32);
-        if (i === 0) {
-          ctx.font = font(fontSize, 600);
-          ctx.fillStyle = INK_DIM;
-          ctx.fillText(row.label, pad, baseline);
-        }
-        ctx.font = font(fontSize);
-        ctx.fillStyle = INK;
-        ctx.fillText(line, pad + row.indent, baseline);
-      });
-    }
-    ctx.restore();
-  };
-
-  return { height, draw };
-};
-
-// ---------------------------------------------------------------------------
 // Scale bar
 // ---------------------------------------------------------------------------
 
@@ -233,63 +111,197 @@ const niceMetres = (raw: number): number => {
 const scaleLabel = (metres: number): string =>
   metres >= 1000 ? `${dec(metres / 1000, 1)} km` : `${int(metres)} m`;
 
-export type ScaleBarOptions = {
-  /** Left edge of the image area. */
+/** Under this the segments are indistinguishable and the bar is left off. */
+const MIN_BAR_PX = 24;
+
+type ScaleBar = { metres: number; barPx: number; label: string };
+
+const planScaleBar = (
+  metresPerPx: number,
+  targetPx: number,
+): ScaleBar | null => {
+  if (!Number.isFinite(metresPerPx) || metresPerPx <= 0) return null;
+  if (!Number.isFinite(targetPx) || targetPx <= 0) return null;
+  const metres = niceMetres(targetPx * metresPerPx);
+  const barPx = metres / metresPerPx;
+  if (!Number.isFinite(barPx) || barPx < MIN_BAR_PX) return null;
+  return { metres, barPx, label: scaleLabel(metres) };
+};
+
+/** Four alternating segments with the ground distance beside them. */
+const paintScaleBar = (
+  ctx: CanvasRenderingContext2D,
+  bar: ScaleBar,
+  x: number,
+  y: number,
+  barH: number,
+  labelSize: number,
+) => {
+  const seg = bar.barPx / 4;
+  for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = i % 2 === 0 ? MARK : MARK_DARK;
+    ctx.fillRect(x + i * seg, y, seg + 0.5, barH);
+  }
+  ctx.strokeStyle = MARK;
+  ctx.lineWidth = Math.max(1, Math.round(labelSize * 0.07));
+  ctx.strokeRect(x, y, bar.barPx, barH);
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = MARK;
+  ctx.font = font(labelSize, 700);
+  ctx.fillText(
+    bar.label,
+    x + bar.barPx + Math.round(labelSize * 0.6),
+    y + barH / 2,
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Legend
+// ---------------------------------------------------------------------------
+
+/**
+ * One line of the plate before wrapping. `title` is drawn bold; `rights` is
+ * the one row that may never be dropped, because it is the only part of the
+ * legend the licences actually require.
+ */
+export type LegendRow = { text: string; kind: 'title' | 'body' | 'rights' };
+
+export type LegendOptions = {
+  /** Left edge of the image. */
   x: number;
-  /** Bottom edge the bar sits above. */
-  bottom: number;
-  /** Image width, which the bar targets a fixed fraction of. */
+  /** Top edge of the image. */
+  y: number;
+  /** Image size — the plate is inset from its bottom-left corner. */
   width: number;
+  height: number;
+  rows: LegendRow[];
+  /** Of the image as it will be written, so the bar measures true. */
   metresPerPx: number;
   fontSize: number;
 };
 
-/**
- * Four alternating segments with the ground distance above them. `niceMetres`
- * rounds *down*, so the bar stays under the 22 % target and can never run off
- * the plate; the guard is for the other end, an image too small to carry one.
- */
-export const drawScaleBar = (
-  ctx: CanvasRenderingContext2D,
-  { x, bottom, width, metresPerPx, fontSize }: ScaleBarOptions,
-): void => {
-  if (!Number.isFinite(metresPerPx) || metresPerPx <= 0) return;
-  const metres = niceMetres(width * 0.22 * metresPerPx);
-  const barPx = metres / metresPerPx;
-  if (!Number.isFinite(barPx) || barPx < 24) return;
+// The plate is sized to its own longest line rather than to the image, so a
+// wide raster does not get a legend stretched across it; these bound that.
+const PLATE_MAX_FRACTION = 0.55;
+const PLATE_MIN_PX = 320;
 
-  const label = scaleLabel(metres);
+// The bar targets a fraction of the image, not of the plate: it is a statement
+// about the ground, and one that changed with how long the rights line was
+// would be a strange thing to measure with.
+const BAR_TARGET_FRACTION = 0.22;
+
+type Laid = { lines: string[]; kind: LegendRow['kind'] };
+
+/**
+ * Paint the legend into the image's bottom-left corner. Never throws and never
+ * touches a pixel outside the plate. Silently does nothing where there is no
+ * room, which is the right answer for a thumbnail — a plate covering half the
+ * ground is worse than no plate.
+ */
+export const drawLegend = (
+  ctx: CanvasRenderingContext2D,
+  { x, y, width, height, rows, metresPerPx, fontSize }: LegendOptions,
+): void => {
+  const inset = Math.round(fontSize * 0.9);
+  const pad = Math.round(fontSize * 0.75);
+  const lineH = Math.round(fontSize * 1.3);
+  const titleSize = Math.round(fontSize * 1.12);
+  const titleLineH = Math.round(titleSize * 1.3);
+  const gapAfterTitle = Math.round(fontSize * 0.34);
   const barH = Math.max(5, Math.round(fontSize * 0.42));
-  const labelSize = Math.round(fontSize * 0.9);
-  const pad = Math.round(fontSize * 0.5);
-  const gap = Math.round(fontSize * 0.28);
+  const barGap = Math.round(fontSize * 0.5);
+
+  const avail = width - inset * 2;
+  if (avail < PLATE_MIN_PX / 2) return;
+  const maxPlate = Math.min(
+    avail,
+    Math.max(PLATE_MIN_PX, width * PLATE_MAX_FRACTION),
+  );
+
+  const fontFor = (kind: LegendRow['kind']) =>
+    kind === 'title' ? font(titleSize, 700) : font(fontSize);
+
+  // One pass: measure unwrapped to choose a width, then wrap to it. Wrapping
+  // can only shorten a line, so the plate never ends up wider than measured.
+  let natural = 0;
+  for (const row of rows) {
+    if (!row.text) continue;
+    ctx.font = fontFor(row.kind);
+    natural = Math.max(natural, ctx.measureText(row.text).width);
+  }
+  const plateW = Math.max(
+    Math.min(avail, PLATE_MIN_PX),
+    Math.min(maxPlate, Math.ceil(natural) + pad * 2),
+  );
+  const textW = plateW - pad * 2;
+
+  const bar = planScaleBar(
+    metresPerPx,
+    Math.min(width * BAR_TARGET_FRACTION, textW),
+  );
+
+  const layOut = (source: LegendRow[]): { laid: Laid[]; plateH: number } => {
+    const laid: Laid[] = [];
+    let plateH = pad * 2 + (bar ? barGap + barH : 0);
+    for (const row of source) {
+      if (!row.text) continue;
+      ctx.font = fontFor(row.kind);
+      const lines = wrap(ctx, row.text, textW);
+      if (lines.length === 0) continue;
+      laid.push({ lines, kind: row.kind });
+      plateH +=
+        row.kind === 'title'
+          ? lines.length * titleLineH + gapAfterTitle
+          : lines.length * lineH;
+    }
+    return { laid, plateH };
+  };
+
+  // Shed the body before the plate eats the picture. Title and rights are the
+  // floor: what this is, and who it belongs to.
+  const maxPlateH = height - inset * 2;
+  let { laid, plateH } = layOut(rows);
+  if (plateH > maxPlateH) {
+    ({ laid, plateH } = layOut(rows.filter((r) => r.kind !== 'body')));
+  }
+  if (plateH > maxPlateH || laid.length === 0) return;
+
+  const plateX = x + inset;
+  const plateY = y + height - inset - plateH;
 
   ctx.save();
-  ctx.font = font(labelSize, 700);
-  const plateW = Math.max(barPx, ctx.measureText(label).width) + pad * 2;
-  const plateH = labelSize + gap + barH + pad * 2;
-  const plateX = x;
-  const plateY = bottom - plateH;
   ctx.fillStyle = PLATE;
   roundRect(ctx, plateX, plateY, plateW, plateH, Math.round(fontSize * 0.3));
   ctx.fill();
 
-  const barX = plateX + (plateW - barPx) / 2;
-  const barY = plateY + pad + labelSize + gap;
-
-  ctx.textAlign = 'center';
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = MARK;
-  ctx.fillText(label, plateX + plateW / 2, barY - gap);
-
-  const seg = barPx / 4;
-  for (let i = 0; i < 4; i++) {
-    ctx.fillStyle = i % 2 === 0 ? MARK : MARK_DARK;
-    ctx.fillRect(barX + i * seg, barY, seg + 0.5, barH);
+  let cursor = plateY + pad;
+  for (const row of laid) {
+    const isTitle = row.kind === 'title';
+    const size = isTitle ? titleSize : fontSize;
+    const step = isTitle ? titleLineH : lineH;
+    ctx.font = fontFor(row.kind);
+    ctx.fillStyle = MARK;
+    for (const line of row.lines) {
+      cursor += step;
+      ctx.fillText(line, plateX + pad, cursor - Math.round(size * 0.3));
+    }
+    if (isTitle) cursor += gapAfterTitle;
   }
-  ctx.strokeStyle = MARK;
-  ctx.lineWidth = Math.max(1, Math.round(fontSize * 0.07));
-  ctx.strokeRect(barX, barY, barPx, barH);
+
+  if (bar) {
+    paintScaleBar(
+      ctx,
+      bar,
+      plateX + pad,
+      cursor + barGap,
+      barH,
+      Math.round(fontSize * 0.9),
+    );
+  }
   ctx.restore();
 };
 
@@ -302,10 +314,11 @@ export type NorthArrowOptions = {
   cy: number;
   radius: number;
   /**
-   * OpenLayers view rotation in radians, positive clockwise; zero for every
-   * stitched raster (north-up in EPSG:25833) and non-zero only for a screenshot
-   * of a rotated map. The content is drawn rotated by the *negative* of it, so
-   * that is how far the arrow turns to keep pointing at grid north.
+   * OpenLayers view rotation in radians, positive clockwise. Every stitched
+   * raster is north-up in EPSG:25833 and gets no arrow at all; only a
+   * screenshot of a rotated map does. The content is drawn rotated by the
+   * *negative* of it, so that is how far the arrow turns to keep pointing at
+   * grid north.
    */
   rotation: number;
 };

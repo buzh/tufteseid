@@ -14,8 +14,8 @@ import type { FlyfotoProject } from './flyfotoProjects';
 
 /**
  * A row of parameters and the record that will carry it. `meta` is the
- * identifying half only; `imageRect`, the achieved resolution and `renderedAt`
- * are written by the pin.
+ * identifying half only; the achieved resolution and `renderedAt` are written
+ * by the pin.
  */
 export type BeholdSpec = {
   kind: AttachmentKind;
@@ -75,6 +75,12 @@ export const lidarSpecMeta = (
   sourceLabel: source.label,
   style,
   model: source.model,
+  // Neither is read back to re-request anything; both are here because the
+  // legend is stamped from the record long after the catalogue that knew them
+  // has gone, and "opptaksår 2016" is the difference between two readings of
+  // the same field. Null on the national mosaic, which publishes neither.
+  year: source.year,
+  pointDensity: source.pointDensity,
   bbox25833,
 });
 

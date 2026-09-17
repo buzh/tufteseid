@@ -327,8 +327,8 @@
       "colTitle": "Title",
       "colNote": "Note",
       "sourcesHeading": "Sources and terms of use",
-      "sourcesSelf": "Drawings and notes: the author",
-      "sourcesNote": "Every image carries full source information printed in its own caption.",
+      "sourcesSelf": "Drawings, visualisations and compositions: © {{author}} and {{app}} (CC BY 4.0)",
+      "sourcesNote": "Source information is printed in the corner of every image. Uploaded files carry none — there, only whoever uploaded them knows the provenance.",
       "filesHeading": "Files in this bundle",
       "generated": "Made with {{app}}, {{date}}"
     },
@@ -444,6 +444,9 @@
       "delete": "Delete the image",
       "captionPlaceholder": "Caption…",
       "openOriginal": "Open the original",
+      "download": "Download",
+      "downloading": "Downloading…",
+      "downloadFailed": "Could not download the image.",
       "showStrip": "Show the filmstrip",
       "hideStrip": "Hide the filmstrip",
       "previous": "Previous image",
@@ -729,17 +732,23 @@
   },
   "figure": {
     "app": "Tufteseid",
-    "label": {
-      "source": "Source",
-      "method": "Method",
-      "area": "Area",
-      "image": "Image",
-      "rights": "Rights",
-      "produced": "Produced"
+    "role": {
+      "hoydedata": "elevation data",
+      "skyggerelieff": "shaded relief",
+      "ortofoto": "orthophoto",
+      "kart": "map",
+      "kulturminner": "heritage records",
+      "visualisering": "visualisation",
+      "tegning": "drawing",
+      "sammenstilling": "composition"
     },
     "terms": {
       "ccby": "CC BY 4.0",
       "nib": "free for private, non-commercial use"
+    },
+    "rights": {
+      "line": "{{role}}: © {{holder}} ({{terms}})",
+      "authors": "{{author}} and {{app}}"
     },
     "title": {
       "extract": "LiDAR extract",

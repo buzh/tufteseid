@@ -3,8 +3,9 @@ import { LocalityBbox } from '../api/localities';
 
 // Read off what the producers can render, not what the map can frame: 1500 m
 // is the largest rectangle whose 0.25 m LiDAR extract still fits the 40 Mpx
-// store at native resolution, and below 50 m the caption panel is taller than
-// the image. Nothing migrates records, so a rectangle may exceed the band.
+// store at native resolution, and below 50 m the provenance plate a download
+// gets stamped with covers the image. Nothing migrates records, so a rectangle
+// may exceed the band.
 export const MIN_SIDE_M = 50;
 export const MAX_SIDE_M = 1500;
 

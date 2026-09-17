@@ -1,7 +1,8 @@
-// A kept bilde as a layer over its own rectangle: paint the pinned figure
-// where there is one, render the spec live where there is not. A pinned figure
-// is the source's own pixels cropped past the caption panel, so there is no
-// resolution ladder here; adding one means measuring the producers again.
+// A kept bilde as a layer over its own rectangle: paint the pinned file where
+// there is one, render the spec live where there is not. A pinned file is the
+// source's own pixels, edge to edge, so it goes on the ground unaltered and
+// there is no resolution ladder here; adding one means measuring the producers
+// again.
 
 import { transformExtent } from 'ol/proj';
 import { useEffect, useState } from 'react';
@@ -31,9 +32,10 @@ export const groundExtentOf = (meta: Record<string, unknown>) => {
     : null;
 };
 
-// Where the ground sits inside the figure PNG, in that file's own pixels: the
-// caption panel is drawn below the image, so a figure is taller than the
-// rectangle it shows. Records with no imageRect are pixel-registered already.
+// Where the ground sits inside the stored PNG, in that file's own pixels.
+// Stored files are bare ground now, so this is the whole image; the branch
+// survives for records pinned while the caption panel was still burned in
+// below it, whose `meta.imageRect` says how much of the file is map.
 const cropOf = (meta: Record<string, unknown>, img: HTMLImageElement) => {
   const r = meta.imageRect as Record<string, unknown> | undefined;
   const n = (v: unknown) =>
@@ -47,15 +49,15 @@ const cropOf = (meta: Record<string, unknown>, img: HTMLImageElement) => {
     : { x: 0, y: 0, width: img.naturalWidth, height: img.naturalHeight };
 };
 
-/** Ground edge to edge — no caption panel, so no crop to carry. */
+/** Ground edge to edge, so no crop to carry. */
 export type ViewRaster = {
   canvas: HTMLCanvasElement;
   extent25833: [number, number, number, number];
 };
 
 // Spec → ground pixels. Sibling of `pinQueue.renderSpec`, which produces the
-// captioned figure instead — that must not go on the map. `null` means the
-// source has nothing over this rectangle; a throw is a failure.
+// same pixels as a file to store. `null` means the source has nothing over
+// this rectangle; a throw is a failure.
 export const renderViewRaster = async (
   spec: ViewSpec,
   extent25833: [number, number, number, number],
@@ -261,9 +263,10 @@ export const useGroundView = (
     };
 
     if (isPinned(rec)) {
-      // The original, never a thumbnail: `meta.imageRect` is in the original
-      // file's pixels and nothing records the figure's own width, so a thumb
-      // cannot be scaled back to the ground without guessing.
+      // The original, never a thumbnail: a legacy record's `meta.imageRect`
+      // is in the original file's pixels and nothing records that file's own
+      // width, so a thumb cannot be scaled back to the ground without
+      // guessing.
       const img = new Image();
       img.src = getAttachmentUrl(rec);
       img

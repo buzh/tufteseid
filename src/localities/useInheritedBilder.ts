@@ -23,6 +23,12 @@ export type InheritedBilder = {
   items: AttachmentRecord[];
   /** The original could not be read — deleted, or no longer shared. */
   unavailable: boolean;
+  /**
+   * Whose pictures these are. `Ta med` writes it onto the copy, because a
+   * borrowed composition is still the original author's work and the legend
+   * on the way out has to say so long after the original is gone.
+   */
+  owner: string | null;
 };
 
 export const useInheritedBilder = (
@@ -33,6 +39,7 @@ export const useInheritedBilder = (
   const parentId = locality.derivedFrom || null;
   const [parentFiles, setParentFiles] = useState<AttachmentRecord[]>([]);
   const [unavailable, setUnavailable] = useState(false);
+  const [owner, setOwner] = useState<string | null>(null);
   // The parent can change under a swap between two copies, without unmount.
   const seq = useRef(0);
 
@@ -40,12 +47,15 @@ export const useInheritedBilder = (
     const mine = ++seq.current;
     setParentFiles([]);
     setUnavailable(false);
+    setOwner(null);
     if (!parentId) return;
     void (async () => {
       // Asked separately: an unreadable parent does not fail the attachment
       // list, the read rule just filters every row out.
       try {
-        await getLocality(parentId);
+        const parent = await getLocality(parentId);
+        if (seq.current !== mine) return;
+        setOwner(parent.expand?.owner?.name?.trim() || null);
       } catch (e) {
         if (seq.current !== mine) return;
         console.warn('[inheritedBilder] original unreadable', e);
@@ -82,5 +92,5 @@ export const useInheritedBilder = (
       : parentFiles.filter((rec) => !taken.has(rec.id));
   }, [parentFiles, own]);
 
-  return { items, unavailable };
+  return { items, unavailable, owner };
 };

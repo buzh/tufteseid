@@ -3,6 +3,7 @@ import {
   BildeBadges,
   BilderRail,
   CaptionField,
+  DownloadFigureButton,
   MetaLine,
   OpenOriginalButton,
   SceneRestoreButton,
@@ -40,6 +41,9 @@ const Detail = ({
         {/* No `PinRetryButton`: a pin is a write, and this surface is only
             mounted where `canAdd` is false. */}
         <OpenOriginalButton ws={ws} rec={rec} />
+        {/* Taking a copy away is reading too, and the plate it acquires on
+            the way is what makes it safe to pass on. */}
+        <DownloadFigureButton ws={ws} rec={rec} />
       </div>
     </div>
   );

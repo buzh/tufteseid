@@ -1,27 +1,24 @@
-// One spec builder per producer of a saved raster, kept together rather than
-// beside each producer so the wording and the credit assignment stay the same
-// across all of them. `settings` is the reproducibility contract: enough for
-// somebody else to ask the same service for the same picture. Hence the raw WMS
-// style name verbatim, the multidirectional blend's azimuths *and* weights, and
-// a percentile stretch named as one — a slope map stretched 2–98 % and one
+// One spec builder per producer of a raster, kept together rather than beside
+// each producer so the wording and the credit assignment stay the same across
+// all of them. `settings` is the reproducibility contract: enough for somebody
+// else to ask the same service for the same picture. Hence the raw WMS style
+// name verbatim, the multidirectional blend's azimuths *and* weights, and a
+// percentile stretch named as one — a slope map stretched 2–98 % and one
 // stretched to its true range are different pictures of the same ground.
+//
+// These run at stamp time, from a stored record rather than from the live
+// objects a render held, so every input here is something `meta` can carry.
+// `fromRecord.ts` is what reads it back.
 
 import { t } from 'i18next';
-import type { FlyfotoProject } from '../localities/flyfotoProjects';
 import {
   HERITAGE_DETAILS,
   type HeritageDetail,
   type HeritageRender,
 } from '../map/layers/heritage';
 import { themeLayerName } from '../map/layers/themeLayerConfigApi';
-import type { ThemeLayerName } from '../map/layers/themeWMS';
-import type { Dem, DemModel } from '../terrain/dem';
-import {
-  clampRadius,
-  defaultRadius,
-  usesHorizon,
-  type TerrainLight,
-} from '../terrain/render';
+import type { DemModel } from '../terrain/dem';
+import { defaultRadius, usesHorizon, type TerrainLight } from '../terrain/render';
 import {
   horizonDecimation,
   MULTI_AZIMUTHS,
@@ -33,30 +30,70 @@ import {
   type Visualization,
 } from '../terrain/shade';
 import { dec, joinDot } from './draw';
-import { type Credit, type FigureSpec, CREDITS } from './figure';
+import {
+  type AuthoredCredit,
+  type Credit,
+  CREDITS,
+  type FigureSpec,
+  type SourceCredit,
+} from './figure';
 
 type Bbox25833 = [number, number, number, number];
+
+/**
+ * What a dataset is *in this picture*, and what act produced the picture. The
+ * first four name pixels somebody else made; the last three name the author's
+ * own work, and choosing between `skyggerelieff` and `høydedata` is how a
+ * reader tells "Kartverket shaded this" from "we did".
+ */
+const ROLE = {
+  hoydedata: 'figure.role.hoydedata',
+  skyggerelieff: 'figure.role.skyggerelieff',
+  ortofoto: 'figure.role.ortofoto',
+  kart: 'figure.role.kart',
+  kulturminner: 'figure.role.kulturminner',
+  visualisering: 'figure.role.visualisering',
+  tegning: 'figure.role.tegning',
+  sammenstilling: 'figure.role.sammenstilling',
+} as const;
 
 /** The lokalitet's name in front of the product, when there is one. */
 const titleOf = (subject: string | undefined, product: string) =>
   subject ? `${subject} · ${product}` : product;
 
-/** Two rights holders with the same name are one line on the figure. */
-const dedupeCredits = (credits: Credit[]): Credit[] => {
+/** Two rights holders in the same role are one line on the legend. */
+const dedupeCredits = (credits: SourceCredit[]): SourceCredit[] => {
   const seen = new Set<string>();
   return credits.filter((c) => {
-    if (seen.has(c.holder)) return false;
-    seen.add(c.holder);
+    const key = `${c.roleKey}|${c.credit.holder}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
     return true;
   });
+};
+
+const source = (roleKey: string, credit: Credit): SourceCredit => ({
+  roleKey,
+  credit,
+});
+
+const authored = (roleKey: string, author: string): AuthoredCredit => ({
+  roleKey,
+  author,
+});
+
+/** Every spec builder takes these two. */
+type Common = {
+  subject?: string;
+  /** The lokalitet owner's display name — see `fromRecord.authorOf`. */
+  author: string;
 };
 
 // ---------------------------------------------------------------------------
 // LiDAR extract — Kartverket's pre-baked relief, stitched from WMS
 // ---------------------------------------------------------------------------
 
-export type LidarExtractFigureInput = {
-  subject?: string;
+export type LidarExtractFigureInput = Common & {
   /** The source's own name: a project name, or the national mosaic. */
   sourceLabel: string;
   /** The WMS style suffix, verbatim — this is what makes it re-requestable. */
@@ -67,13 +104,16 @@ export type LidarExtractFigureInput = {
   bbox25833: Bbox25833;
 };
 
+/**
+ * No authored credit, and that is the reading rather than an omission: the WMS
+ * hands back an already-shaded image and all the app did was ask for tiles and
+ * put them side by side. Whoever chose the style chose it from Kartverket's
+ * list.
+ */
 export const lidarExtractFigure = (
   input: LidarExtractFigureInput,
 ): FigureSpec => ({
-  title: titleOf(
-    input.subject,
-    `${t('figure.title.extract')} — ${input.style}`,
-  ),
+  title: titleOf(input.subject, `${t('figure.title.extract')} — ${input.style}`),
   source: joinDot([t('figure.source.lidarWms'), input.sourceLabel]),
   acquisition:
     joinDot([
@@ -89,27 +129,37 @@ export const lidarExtractFigure = (
   ],
   metresPerPx: input.metresPerPx,
   bbox25833: input.bbox25833,
-  credits: [CREDITS.hoydedata],
+  credits: [source(ROLE.skyggerelieff, CREDITS.hoydedata)],
 });
 
 // ---------------------------------------------------------------------------
 // Terrenganalyse — relief computed here from the float DEM
 // ---------------------------------------------------------------------------
 
-export type TerrainFigureInput = {
-  subject?: string;
+export type TerrainFigureInput = Common & {
   vis: Visualization;
   model: DemModel;
   light: TerrainLight;
-  dem: Dem;
-  /** Metres; `lrm` and the horizon views only. Omitted means the default. */
+  metresPerPx: number;
+  /**
+   * What the finest acquisition over the rectangle publishes. The grid is
+   * capped, so a large rectangle is served coarser than its source; omitted
+   * where they are equal or where the record predates the field.
+   */
+  nativeMetresPerPx?: number;
+  bbox25833: Bbox25833;
+  /**
+   * Metres; `lrm` and the horizon views only, and already through the render's
+   * own clamp — `pinQueue` writes back the radius that was used, not the one
+   * that was asked for. Omitted means the default.
+   */
   radius?: number;
 };
 
 /**
  * VAT's layer stack as one line: what was blended over what, at what opacity,
  * stretched between what. Assembled from VAT_LAYERS rather than written out,
- * because a hand-written caption is one edit away from describing a blend the
+ * because a hand-written legend is one edit away from describing a blend the
  * code no longer performs.
  */
 const vatStack = (): string =>
@@ -126,13 +176,15 @@ const vatStack = (): string =>
 const terrainSettings = ({
   vis,
   light,
-  dem,
+  metresPerPx,
+  nativeMetresPerPx,
   radius,
-}: Pick<TerrainFigureInput, 'vis' | 'light' | 'dem' | 'radius'>): string[] => {
+}: Pick<
+  TerrainFigureInput,
+  'vis' | 'light' | 'metresPerPx' | 'nativeMetresPerPx' | 'radius'
+>): string[] => {
   const settings: string[] = [];
-  // Through the same clamp the render used, not the number the caller held, or
-  // the caption describes a render nobody made.
-  const r = clampRadius(vis, dem, radius ?? defaultRadius(vis));
+  const r = radius ?? defaultRadius(vis);
   switch (vis) {
     case 'hillshade':
       settings.push(
@@ -173,7 +225,7 @@ const terrainSettings = ({
       );
       break;
     // Both opennesses record the same two numbers as sky-view factor, but under
-    // their own label, because "SVF-radius" on an openness caption reads as the
+    // their own label, because "SVF-radius" on an openness legend reads as the
     // wrong parameter; negative openness also records its inverted ramp.
     case 'openPos':
       settings.push(
@@ -209,54 +261,62 @@ const terrainSettings = ({
   // these views are read off a coarser surface than the resolution line claims,
   // and the same radius over two surfaces is two different measurements.
   if (usesHorizon(vis)) {
-    const factor = horizonDecimation(dem.metresPerPx, r);
+    const factor = horizonDecimation(metresPerPx, r);
     if (factor > 1) {
       settings.push(
-        t('figure.set.horizonGrid', { m: dec(dem.metresPerPx * factor, 2) }),
+        t('figure.set.horizonGrid', { m: dec(metresPerPx * factor, 2) }),
       );
     }
   }
-  // The grid is capped, so a large rectangle is served coarser than the
-  // acquisition under it publishes.
-  if (dem.nativeMetresPerPx < dem.metresPerPx) {
-    settings.push(
-      t('figure.set.resampled', { m: dec(dem.nativeMetresPerPx, 2) }),
-    );
+  if (nativeMetresPerPx != null && nativeMetresPerPx < metresPerPx) {
+    settings.push(t('figure.set.resampled', { m: dec(nativeMetresPerPx, 2) }));
   }
   return settings;
 };
 
-export const terrainFigure = ({
-  subject,
-  vis,
-  model,
-  light,
-  dem,
-  radius,
-}: TerrainFigureInput): FigureSpec => ({
+/**
+ * The first of the authored kinds. hoydedata.no served height *values*; every
+ * visible thing in the picture — the sun, the ramp, the stretch — was decided
+ * and computed here, which is why the author and the app are named on it.
+ */
+export const terrainFigure = (input: TerrainFigureInput): FigureSpec => ({
   title: titleOf(
-    subject,
-    `${t('figure.title.terrain')} — ${t(`localities.terrain.vis.${vis}`)}`,
+    input.subject,
+    `${t('figure.title.terrain')} — ${t(`localities.terrain.vis.${input.vis}`)}`,
   ),
-  source: t('figure.source.dem', { model: model.toUpperCase() }),
-  settings: terrainSettings({ vis, light, dem, radius }),
-  metresPerPx: dem.metresPerPx,
-  bbox25833: dem.bbox25833,
-  credits: [CREDITS.hoydedata],
+  source: t('figure.source.dem', { model: input.model.toUpperCase() }),
+  settings: terrainSettings(input),
+  metresPerPx: input.metresPerPx,
+  bbox25833: input.bbox25833,
+  credits: [source(ROLE.hoydedata, CREDITS.hoydedata)],
+  authored: authored(ROLE.visualisering, input.author),
 });
 
 // ---------------------------------------------------------------------------
 // Flyfoto — Norge i bilder ortofoto
 // ---------------------------------------------------------------------------
 
-export type FlyfotoFigureInput = {
-  subject?: string;
+/**
+ * The acquisition, flattened out of `FlyfotoProject` to the four fields the
+ * legend prints — the catalogue is long gone by stamp time, and these are what
+ * `flyfotoSpecMeta` put on the record.
+ */
+export type FlyfotoAcquisition = {
+  projectName: string;
+  year?: number | null;
+  photoDate?: string | null;
+  /** The acquisition's native resolution, not the stitch's. */
+  metresPerPx?: number | null;
+};
+
+export type FlyfotoFigureInput = Common & {
   /** Absent for the seamless best-available mosaic. */
-  project?: FlyfotoProject;
+  project?: FlyfotoAcquisition;
   metresPerPx: number;
   bbox25833: Bbox25833;
 };
 
+/** Untouched, as `figure.set.ortofoto` says: no authored credit. */
 export const flyfotoFigure = ({
   subject,
   project,
@@ -286,15 +346,14 @@ export const flyfotoFigure = ({
   settings: [t('figure.set.ortofoto')],
   metresPerPx,
   bbox25833,
-  credits: [CREDITS.nib],
+  credits: [source(ROLE.ortofoto, CREDITS.nib)],
 });
 
 // ---------------------------------------------------------------------------
 // Skisse — the author's own hand, re-exported
 // ---------------------------------------------------------------------------
 
-export type SketchFigureInput = {
-  subject?: string;
+export type SketchFigureInput = Common & {
   /** How many strokes and shapes the scene holds. */
   elements: number;
   metresPerPx: number;
@@ -302,13 +361,14 @@ export type SketchFigureInput = {
 };
 
 /**
- * The one figure with no credits line, and that is the reading rather than an
- * omission: nothing in the pixels came from a public register, and the caption
- * layout drops empty rows. Its extent is the *drawing's* rather than the
- * lokalitet's — the rectangle `funn/render.ts` framed the strokes in.
+ * The one figure with no source credit at all — nothing in the pixels came
+ * from a public register — and therefore the one whose rights line is entirely
+ * the authored half. Its extent is the *drawing's* rather than the lokalitet's:
+ * the rectangle `funn/render.ts` framed the strokes in.
  */
 export const sketchFigure = ({
   subject,
+  author,
   elements,
   metresPerPx,
   bbox25833,
@@ -319,6 +379,7 @@ export const sketchFigure = ({
   metresPerPx,
   bbox25833,
   credits: [],
+  authored: authored(ROLE.tegning, author),
 });
 
 // ---------------------------------------------------------------------------
@@ -328,9 +389,18 @@ export const sketchFigure = ({
 /**
  * Where one layer of a scene came from, as far as the credits line cares. Named
  * by register rather than by attachment kind: a LiDAR extract and a terrain
- * render are two products of hoydedata.no and one line on the figure.
+ * render are two products of hoydedata.no and one line on the legend. That
+ * coarseness is why the role here is the generic `høydedata` — at scene
+ * granularity the app cannot tell which of the two a member was.
  */
-export type SceneLayerCredit = 'hoydedata' | 'nib' | 'kartverket' | 'none';
+export const SCENE_LAYER_CREDITS = [
+  'hoydedata',
+  'nib',
+  'kartverket',
+  'none',
+] as const;
+
+export type SceneLayerCredit = (typeof SCENE_LAYER_CREDITS)[number];
 
 export type SceneFigureLayer = {
   /** The member's caption, or what kind of thing it is when it has none. */
@@ -340,8 +410,7 @@ export type SceneFigureLayer = {
   credit: SceneLayerCredit;
 };
 
-export type SceneFigureInput = {
-  subject?: string;
+export type SceneFigureInput = Common & {
   /** The ground preset, where the scene was built over one. */
   ground?: SceneFigureLayer;
   /** The members, **bottom-to-top** — the order they were painted in. */
@@ -350,10 +419,10 @@ export type SceneFigureInput = {
   bbox25833: Bbox25833;
 };
 
-const SCENE_CREDITS: Record<SceneLayerCredit, Credit | null> = {
-  hoydedata: CREDITS.hoydedata,
-  nib: CREDITS.nib,
-  kartverket: CREDITS.kartverket,
+const SCENE_CREDITS: Record<SceneLayerCredit, SourceCredit | null> = {
+  hoydedata: source(ROLE.hoydedata, CREDITS.hoydedata),
+  nib: source(ROLE.ortofoto, CREDITS.nib),
+  kartverket: source(ROLE.kart, CREDITS.kartverket),
   none: null,
 };
 
@@ -361,12 +430,14 @@ const SCENE_CREDITS: Record<SceneLayerCredit, Credit | null> = {
  * The figure for a composition. Where every other figure here names a service
  * and its parameters, this one names the pictures it is made of: the stack
  * bottom to top, each layer with the fade it was seen through, since a flatten
- * whose caption did not say "1937 ortofoto at 40 % over sky-view factor" is an
- * overlap nobody can check. The credits are the union of its layers', so a
- * scene of nothing but sketches owes nobody and the row goes out.
+ * whose legend did not say "1937 ortofoto at 40 % over sky-view factor" is an
+ * overlap nobody can check. The source credits are the union of its layers', so
+ * a scene of nothing but sketches owes nobody upstream — but the arrangement is
+ * always the author's, so the authored half is unconditional.
  */
 export const sceneFigure = ({
   subject,
+  author,
   ground,
   layers,
   metresPerPx,
@@ -390,8 +461,9 @@ export const sceneFigure = ({
     credits: dedupeCredits(
       all
         .map((layer) => SCENE_CREDITS[layer.credit])
-        .filter((c): c is Credit => c != null),
+        .filter((c): c is SourceCredit => c != null),
     ),
+    authored: authored(ROLE.sammenstilling, author),
   };
 };
 
@@ -404,13 +476,21 @@ export const sceneFigure = ({
  * assembled from the live layer state: which ground was under it, which theme
  * layers over it, and therefore whose data is in the pixels.
  */
-export type ScreenshotFigureInput = {
-  subject?: string;
+export type ScreenshotFigureInput = Common & {
   /** Ground mode, as the ribbon names it. */
   groundLabel: string;
   /** Whether the ground came from NiB rather than Kartverket. */
   groundIsFlyfoto: boolean;
-  themeLayers: ThemeLayerName[];
+  /** Theme layer ids; `themeLayerName` resolves each to its published name. */
+  themeLayers: string[];
+  /**
+   * Whether anything the author put on the map was in the frame — a kept View
+   * or Bilde on the ground, a sketch, a funn. A shot of nothing but the
+   * background and the public theme layers is a copy of somebody else's map
+   * and is credited as one; the moment the author's own reading is in the
+   * pixels it becomes a composition of theirs.
+   */
+  composed: boolean;
   /**
    * How the heritage overlay was drawn — the render setting and the sublayers
    * left out of it; omitted when no heritage layer was on. "Outlines of the
@@ -427,7 +507,7 @@ export type ScreenshotFigureInput = {
 
 /**
  * The `heritageRender` line, from the live overlay settings. Here rather than in
- * `map/layers/heritage.ts` so every string the caption prints comes from one
+ * `map/layers/heritage.ts` so every string the legend prints comes from one
  * file. Undefined when the overlay is at its defaults *and* fully opaque, since
  * those are recoverable from the layer names on the line above.
  */
@@ -444,7 +524,7 @@ export const describeHeritageRender = (
         .join(', ') || t('figure.set.heritageNone'),
     );
   }
-  // Printed as transparency, like the slider that set it: a caption that
+  // Printed as transparency, like the slider that set it: a legend that
   // disagrees with its own control is worse than none.
   if (opacity < 1) {
     parts.push(
@@ -459,9 +539,11 @@ export const describeHeritageRender = (
 
 export const screenshotFigure = ({
   subject,
+  author,
   groundLabel,
   groundIsFlyfoto,
   themeLayers,
+  composed,
   heritageRender,
   metresPerPx,
   bbox25833,
@@ -487,8 +569,11 @@ export const screenshotFigure = ({
   // Kartverket is always in there: the topo base under every LiDAR and
   // per-project ortofoto stack, and the whole picture in standard mode.
   credits: dedupeCredits([
-    CREDITS.kartverket,
-    ...(groundIsFlyfoto ? [CREDITS.nib] : []),
-    ...(themeLayers.length ? [CREDITS.riksantikvaren] : []),
+    source(ROLE.kart, CREDITS.kartverket),
+    ...(groundIsFlyfoto ? [source(ROLE.ortofoto, CREDITS.nib)] : []),
+    ...(themeLayers.length
+      ? [source(ROLE.kulturminner, CREDITS.riksantikvaren)]
+      : []),
   ]),
+  ...(composed ? { authored: authored(ROLE.sammenstilling, author) } : {}),
 });

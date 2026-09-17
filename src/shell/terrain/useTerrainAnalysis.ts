@@ -180,9 +180,9 @@ export const useTerrainAnalysis = () => {
   useEffect(() => () => setGroundOverlay(TERRAIN_KEY, null), []);
 
   /**
-   * A spec, not pixels — the pin queue paints it later, so `metresPerPx` and
-   * `imageRect` are deliberately absent. Null while the DEM loads, which
-   * callers treat as "not now" rather than an error.
+   * A spec, not pixels — the pin queue paints it later, so `metresPerPx` is
+   * deliberately absent. Null while the DEM loads, which callers treat as
+   * "not now" rather than an error.
    */
   const describe = useCallback((): BeholdSpec | null => {
     if (!dem) return null;

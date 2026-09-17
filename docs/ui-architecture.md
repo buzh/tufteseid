@@ -202,8 +202,8 @@ Ground-specific facts worth keeping:
   `moveend` is debounced 250 ms.
 - Sammenlign: `halved(initial)` returns `{a, b, focused}`, and only four things
   know about halves — `backgroundLayerAtomEffect` (pinned `.a`),
-  `compareLayerAtomEffect` (pinned `.b`), the screenshot caption, the A|B
-  switch. Stacks come from `resolveStack` / `buildStack` in
+  `compareLayerAtomEffect` (pinned `.b`), the screenshot's `meta.compare`, the
+  A|B switch. Stacks come from `resolveStack` / `buildStack` in
   `backgroundLayers/stack.ts` under the `bg.` and `cmp.` namespaces; the clip is
   `prerender`/`postrender` + `getRenderPixel` in
   `src/map/compare/curtainLayers.ts`. Terreng is not offered as a B half, and
@@ -375,9 +375,9 @@ pinned to a figure later. `screenshot | upload` are Files — bytes, with nothin
 behind them that could make the bytes again.
 
 ```
-View   createAttachmentSpec() → pinQueue.ts → renderSpec() → renderFigureBlob() → pinAttachment()
-File   renderFigureBlob()     → createAttachment()
-Last opp                      → createAttachment()   (no figure)
+View   createAttachmentSpec() → pinQueue.ts → renderSpec() → fitImageBlob() → pinAttachment()
+File   fitImageBlob()         → createAttachment()
+Last opp                      → createAttachment()   (bytes as they arrived)
 ```
 
 Producers: `starterPack.ts`, `behold.ts`, the flyfoto grab, "Behold skissen",
@@ -389,14 +389,16 @@ spec's own rectangle rather than the lokalitet's current one, and only ever for
 `canAdd`. End states are `empty`, `failed`, or success (entry deleted);
 `pinNow` jumps the queue. The spec writes `sourceKey`, `sourceLabel`, `style`,
 `model`, `bbox25833` and the terrain knobs; the pinner adds `metresPerPx`,
-`imageRect`, `renderedAt`. Everything it waits on is on a clock —
+`renderedAt` and whatever the plate will need but only the render knows —
+`year` and `pointDensity` for an extract, `nativeMetresPerPx` for a terrain
+render, `stack` for an Oppsett. Everything it waits on is on a clock —
 `src/shared/utils/deadline.ts` bounds each request (`fetchWithin`, including the
 body read) and each whole render or upload (`withDeadline`, 5 minutes each).
 
 `getAttachmentUrl` is a synchronous string build since migration `1700000900`;
 `useAttachmentUrl` counts thumbnail failures and falls back to the original. The
-ground overlay decodes the original file, never a thumbnail, because
-`meta.imageRect` is in original pixels (`groundView.ts`,
+ground overlay decodes the original file, never a thumbnail, because a legacy
+record's `meta.imageRect` is in original pixels (`groundView.ts`,
 `src/shell/groundMembers.tsx`).
 
 ### The bilder rail
@@ -584,30 +586,68 @@ and unconditionally from `RibbonGlobalRow`; it publishes `describe()` and
 lokalitet seeds the knobs once per lokalitet from `coverTerrainSpecAtom` through
 `restoreView`, except when `next.derivedFrom === previous.id`.
 
-## 11. Provenance figures
+## 11. Provenance plates
 
-Every raster the app keeps or hands out goes through
-`renderFigureBlob(canvas, spec)` in `src/figure/` (`draw.ts`, `figure.ts`,
-`specs.ts`) and comes back as a figure: the image untouched, a scale bar and
-north arrow on it, and a caption panel below naming the dataset, the
-acquisition, the processing settings, the EPSG:25833 extent, the geodetic
-centre, the rights holder and the licence.
+Nothing in the store carries a legend. PocketBase holds the bare raster, edge to
+edge and pixel-registered to `meta.bbox25833`, and the provenance lives beside
+it in the record's `meta`. The plate is composited on the way *out*, by whoever
+asked for a file: `Last ned` on a bilde, `Last ned` on a picker proposal, and
+every image in the Rapportpakke. `stampBlob(blob, spec)` in `src/figure/`
+(`draw.ts`, `figure.ts`, `specs.ts`, `fromRecord.ts`) decodes, draws and
+re-encodes in the type it was handed, and hands the original bytes back rather
+than throwing if any of that fails.
 
-- Scope is everything but "Last opp": both extract exits (Behold and the PNG
-  download), Behold on any ground, the flyfoto grab, Ta skjermbilde, and all
-  three steps of the starter set. An upload's provenance is unknown to the app.
-- Producers hand back a canvas, not a blob (`fetchFlyfoto`,
-  `captureLocalityScreenshot`, `renderTerrain`, `extractCanvas`).
-- The image is fitted to the store *before* captioning: `MAX_STORED_PIXELS`
-  40 Mpx, `MAX_STORED_BYTES` 50 MB as a re-encode backstop over
-  `MAX_FIT_PASSES` 3, `MIN_FIGURE_WIDTH` 560 px. The function returns the
-  resolution it actually wrote and callers record *that* as `meta.metresPerPx`.
-- The caption is a panel below rather than an overlay, so the file is not
-  pixel-registered to `bbox25833`; every attachment records `meta.imageRect`.
-- Text wrapping splits on `/ +/`, so U+00A0 thousands separators survive. The
-  north arrow is skipped under about six radii. `renderFigure` never throws.
+That split is why a stamped file comes out in the reader's language and the
+current wording rather than whatever was true when the pin ran, why the map can
+lay a kept View on the ground with no furniture riding along, and why the same
+image downloaded alone and inside a bundle is the same file.
+
+- `figureSpecOf(rec, ctx)` in `fromRecord.ts` rebuilds the spec on top of
+  `viewSpecOf`. It takes `{kind, meta}` rather than a record, so a picker
+  proposal with no row behind it yet stamps the same way a kept one will.
+  `null` means "no plate", which is an answer and not a failure: an upload's
+  provenance is not the app's to state, and a record whose `meta` has no
+  `metresPerPx` or no `bbox25833` gets bare pixels rather than a scale bar that
+  is a guess.
+- `specs.ts` is one builder per producer, kept together so the wording and the
+  credit assignment stay the same across all of them. `settings` is the
+  reproducibility contract: enough for somebody else to ask the same service for
+  the same picture.
+- The plate is inside the picture, inset from the bottom-left corner over a
+  translucent matte, so a stamped file is still registered to its bbox and can
+  still be read as a map. It is sized to its own longest row, bounded by
+  `PLATE_MIN_PX` 320 and `PLATE_MAX_FRACTION` 0.55; where there is no room it
+  draws nothing, which is the right answer for a thumbnail. Body rows are shed
+  before title and rights, which are the floor.
+- Rows: title (`<lokalitet> · <product>`), the dataset and which acquisition,
+  the settings, centre lat/lon and m/px, one rights line per holder, and the
+  scale bar on a row of its own at the foot. The bar targets 22 % of the
+  *image*, not of the plate — it is a statement about the ground. A north arrow
+  is drawn only where `rotation !== 0`, which in practice is a screenshot of a
+  rotated map: every stitched raster is north-up in EPSG:25833, and an arrow
+  that is always the same is furniture rather than a fact.
+- Rights has two halves. Upstream is credited by the part it plays in *this*
+  picture — the same holder is `høydedata` under a terrain render and
+  `skyggerelieff` under a LiDAR extract, and that difference is precisely the
+  statement about who did the visualising. Where the app made the picture rather
+  than fetching it whole — a terrain render, a skisse, an Oppsett, a kartutsnitt
+  with something drawn over it — the lokalitet's owner and Tufteseid are named
+  as co-authors. The terms are not negotiable: everything the tool makes for you
+  is CC BY 4.0, which is what lets a reading be quoted and argued with. NiB
+  ortofoto keeps its own notice.
+- Fitting the store is a separate job and happens at pin time, not at stamp
+  time: `fitImageBlob(canvas, metresPerPx)` with `MAX_STORED_PIXELS` 40 Mpx and
+  `MAX_STORED_BYTES` 50 MB as a re-encode backstop over `MAX_FIT_PASSES` 3. It
+  returns the resolution it actually wrote and callers record *that* as
+  `meta.metresPerPx`. A stamp never resizes.
+- `Åpne originalen` deliberately does not stamp: that verb is the unretouched
+  raster, and the distinction is worth keeping. `Last ned` sits beside it.
+- Legacy: records pinned while the caption was still a panel burned in below the
+  image carry `meta.imageRect`, and `groundView.cropOf` still reads it so they
+  land on the map in the right place.
+- Text wrapping splits on `/ +/`, so U+00A0 thousands separators survive.
 - Strings are under `figure.*`, and `src/figure/` reads `t` / `i18n` from
-  `'i18next'` directly, since three of its five call sites are outside React.
+  `'i18next'` directly, since most of its call sites are outside React.
 
 Measured limit: a 2025 reflight at 66 Mpx encoded to ~63 MB and PocketBase
 rejected it with `validation_file_size_limit`; the 10/20 pkt tiers now resolve
@@ -800,10 +840,11 @@ Keep it
 - Hide one from the exhibit without deleting it, and see hidden ones dashed on
   the rail while editing.
 - Fold the bottom edge away and back with `Bilder ▾`, leaving the map as it was.
-- See flyfoto captioned with its acquisition year.
-- Get every kept or downloaded image back as a report-ready figure — scale bar,
-  north arrow, dataset, acquisition, settings, extent, rights holder and licence
-  burned in — with only "Last opp" left as it arrived.
+- See flyfoto labelled with its acquisition year.
+- Take a copy of the image away with `Last ned`, stamped with a provenance plate
+  — title, dataset, acquisition, settings, centre, scale bar, rights holders and
+  licence — with only "Last opp" left as it arrived.
+- Take the same image away unretouched with `Åpne originalen`.
 - Hand the whole lokalitet over as `Rapportpakke`: a zip with `index.html`,
   `README.txt`, the images in curated order, and the funn as GeoJSON and CSV.
 

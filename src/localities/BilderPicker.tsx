@@ -195,16 +195,17 @@ export const BilderPicker = ({ picker }: { picker: PickerApi }) => {
               </Button>
             )}
             {/* The run is the only place these pixels exist, so a proposal
-                wanted on disk but not in the collection is takeable here. */}
-            {active.produced && active.url && (
-              <a
-                className={styles.download}
-                href={active.url}
-                download={active.produced.filename}
+                wanted on disk but not in the collection is takeable here. Not
+                an anchor at the card's object URL: the file leaving gets the
+                provenance plate, which means stamping on the press. */}
+            {active.produced && (
+              <Button
+                size="sm"
+                leftIcon="download"
+                onClick={() => void picker.download()}
               >
-                <Icon icon="download" size={16} />
                 {t('localities.picker.download')}
-              </a>
+              </Button>
             )}
             {active.state !== 'kept' && (
               <Button

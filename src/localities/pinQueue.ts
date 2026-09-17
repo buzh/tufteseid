@@ -26,15 +26,8 @@ import {
   pinAttachment,
 } from '../api/attachments';
 import type { LocalityBbox } from '../api/localities';
-import { renderFigureBlob } from '../figure/figure';
-import {
-  flyfotoFigure,
-  sceneFigure,
-  type SceneFigureLayer,
-  type SceneLayerCredit,
-  sketchFigure,
-  terrainFigure,
-} from '../figure/specs';
+import { fitImageBlob } from '../figure/figure';
+import type { SceneFigureLayer, SceneLayerCredit } from '../figure/specs';
 import { metresPerScenePx } from '../funn/frame';
 import { renderScene } from '../funn/render';
 import { enumerateLidarSources } from '../lidarExtract/sources';
@@ -47,7 +40,7 @@ import {
   renderViewRaster,
   type ViewRaster,
 } from './groundView';
-import { extractLidarFigure } from './starterPack';
+import { extractLidarRaster } from './starterPack';
 import { type GroundSpec, viewSpecOf, type ViewSpec } from './viewSpec';
 
 /**
@@ -60,8 +53,6 @@ export type PinJob = {
   rec: AttachmentRecord;
   /** The lokalitet's rectangle — the fallback, see `rectangleOf`. */
   bbox4326: LocalityBbox;
-  /** The lokalitet's name, for the figure's title line. */
-  subject?: string;
   /**
    * The pinned record, handed back to whoever is showing it. Needed because
    * realtime is held back for the length of an edit session, which is when
@@ -79,8 +70,8 @@ const UPLOAD_DEADLINE_MS = 300_000;
 
 // The longest side of a scene's flatten. 6000 px is the largest a single
 // member can be (1500 m, the bbox ceiling, at LiDAR's 0.25 m/px), so a flatten
-// never coarsens its sharpest layer, and 36 Mpx stays inside
-// `renderFigureBlob`'s 40 Mpx store fit so nothing is resampled twice.
+// never coarsens its sharpest layer, and 36 Mpx stays inside `fitImageBlob`'s
+// 40 Mpx store fit so nothing is resampled twice.
 const SCENE_MAX_SIDE_PX = 6000;
 
 // Filenames end up in a download dialog and in a takeout bundle, so keep them
@@ -214,16 +205,14 @@ const groundLabelOf = (spec: GroundSpec): string => {
 export const renderSpec = (
   spec: ViewSpec,
   bbox4326: LocalityBbox,
-  subject: string | undefined,
 ): Promise<Produced | null> =>
   withDeadline(RENDER_DEADLINE_MS, `${spec.kind} render`, (signal) =>
-    renderSpecWithin(spec, bbox4326, subject, signal),
+    renderSpecWithin(spec, bbox4326, signal),
   );
 
 const renderSpecWithin = async (
   spec: ViewSpec,
   bbox4326: LocalityBbox,
-  subject: string | undefined,
   signal: AbortSignal,
 ): Promise<Produced | null> => {
   switch (spec.kind) {
@@ -238,11 +227,11 @@ const renderSpecWithin = async (
       const source = sources.find((s) => s.key === wanted);
       // Retired upstream, or no longer covering this rectangle: `empty`.
       if (!source) return null;
-      const raster = await extractLidarFigure(
+      const raster = await extractLidarRaster(
         source,
         to25833(bbox4326),
         spec.style,
-        { subject, signal },
+        { signal },
       );
       if (!raster) return null;
       return {
@@ -251,7 +240,11 @@ const renderSpecWithin = async (
         meta: {
           metresPerPx: raster.metresPerPx,
           bbox25833: raster.bbox25833,
-          imageRect: raster.imageRect,
+          // The catalogue is resolved here and gone by stamp time; the legend
+          // prints both, and a row kept before either was recorded gets them
+          // filled in by its first pin.
+          year: source.year,
+          pointDensity: source.pointDensity,
         },
       };
     }
@@ -270,27 +263,23 @@ const renderSpecWithin = async (
         signal,
       });
       if (!render) return null;
-      const figure = await renderFigureBlob(
+      const fitted = await fitImageBlob(
         render.canvas,
-        terrainFigure({
-          subject,
-          vis: spec.vis,
-          model: spec.model,
-          light,
-          dem: render.dem,
-          // The clamped one — see `TerrainRender.radius`.
-          radius: render.radius,
-        }),
+        render.dem.metresPerPx,
       );
-      if (!figure) return null;
+      if (!fitted) return null;
       return {
-        blob: figure.blob,
+        blob: fitted.blob,
         filename: `terreng_${spec.vis}_${spec.model}.png`,
         meta: {
-          // The figure's, not the DEM's: this describes the pixels on the file.
-          metresPerPx: figure.metresPerPx,
+          // The file's, not the DEM's: the store fit may have coarsened it.
+          metresPerPx: fitted.metresPerPx,
           bbox25833: render.dem.bbox25833,
-          imageRect: figure.imageRect,
+          // What the finest acquisition over the rectangle publishes. The
+          // legend says "resampled from 0,25 m" off the gap between the two,
+          // which is the difference between a reading of the ground and a
+          // reading of an average of it.
+          nativeMetresPerPx: render.dem.nativeMetresPerPx,
           // Write the clamped radius back, or the duplicate guard never
           // matches and offers to fetch this again forever.
           ...(render.radius != null ? { radius: render.radius } : {}),
@@ -309,23 +298,14 @@ const renderSpecWithin = async (
         background: '#ffffff',
       });
       if (!render) return null;
-      const figure = await renderFigureBlob(
-        render.canvas,
-        sketchFigure({
-          subject,
-          elements: spec.scene.elements.length,
-          metresPerPx: render.metresPerPx,
-          bbox25833: render.bbox25833,
-        }),
-      );
-      if (!figure) return null;
+      const fitted = await fitImageBlob(render.canvas, render.metresPerPx);
+      if (!fitted) return null;
       return {
-        blob: figure.blob,
+        blob: fitted.blob,
         filename: 'skisse.png',
         meta: {
-          metresPerPx: figure.metresPerPx,
+          metresPerPx: fitted.metresPerPx,
           bbox25833: render.bbox25833,
-          imageRect: figure.imageRect,
         },
       };
     }
@@ -343,34 +323,27 @@ const renderSpecWithin = async (
       if (!result) return null;
       // JPEG all the way through, like the stitch itself: a lossless copy of a
       // lossy-sourced photograph is several times the bytes for nothing.
-      const figure = await renderFigureBlob(
+      const fitted = await fitImageBlob(
         result.canvas,
-        flyfotoFigure({
-          subject,
-          project,
-          metresPerPx: result.metresPerPx,
-          bbox25833: result.bbox25833,
-        }),
+        result.metresPerPx,
         'image/jpeg',
         0.9,
       );
-      if (!figure) return null;
+      if (!fitted) return null;
       return {
-        blob: figure.blob,
+        blob: fitted.blob,
         filename: 'flyfoto.jpg',
         meta: {
-          metresPerPx: figure.metresPerPx,
+          metresPerPx: fitted.metresPerPx,
           bbox25833: result.bbox25833,
-          imageRect: figure.imageRect,
         },
       };
     }
 
     case 'scene': {
-      // The flatten: the arrangement, drawn once, bottom to top. Members go
-      // through `groundRasterOf` rather than their pinned figures — a caption
-      // panel inside a composite is a picture of a card. Sequential: each
-      // member is up to 36 Mpx, so four at once is half a gigabyte of canvases.
+      // The flatten: the arrangement, drawn once, bottom to top. Sequential:
+      // each member is up to 36 Mpx, so four at once is half a gigabyte of
+      // canvases.
       const extent25833 = to25833(bbox4326);
       const [minX, minY, maxX, maxY] = extent25833;
       const widthM = maxX - minX;
@@ -455,7 +428,10 @@ const renderSpecWithin = async (
         ctx.restore();
       };
 
-      const captionGround: SceneFigureLayer | undefined =
+      // The stack as it lands, which is what goes on the record: a member
+      // deleted between the ask and the render is in `meta.layers` and not in
+      // the pixels, and the legend must describe the pixels.
+      const stackGround: SceneFigureLayer | undefined =
         ground && spec.ground
           ? {
               label: groundLabelOf(spec.ground),
@@ -464,7 +440,7 @@ const renderSpecWithin = async (
           : undefined;
       if (ground) place(ground, 1);
 
-      const captionLayers: SceneFigureLayer[] = [];
+      const stackLayers: SceneFigureLayer[] = [];
       for (const { layer, rec } of ordered) {
         const memberSpec = viewSpecOf(rec);
         let raster: ViewRaster | null;
@@ -483,11 +459,11 @@ const renderSpecWithin = async (
         } else {
           raster = await groundRasterOf(rec, signal);
         }
-        // A layer that did not land must leave the caption too: naming a layer
+        // A layer that did not land must leave the stack too: naming a layer
         // the pixels do not contain is what `src/figure/` exists to prevent.
         if (!raster) continue;
         place(raster, layer.opacity / 100);
-        captionLayers.push({
+        stackLayers.push({
           label: rec.caption.trim() || t(`localities.bilder.kind.${rec.kind}`),
           opacity: layer.opacity,
           credit: SCENE_CREDIT_BY_KIND[rec.kind],
@@ -495,26 +471,23 @@ const renderSpecWithin = async (
       }
 
       // Everything the scene named is gone or empty: nothing to retry against.
-      if (!captionGround && captionLayers.length === 0) return null;
+      if (!stackGround && stackLayers.length === 0) return null;
 
-      const figure = await renderFigureBlob(
-        canvas,
-        sceneFigure({
-          subject,
-          ground: captionGround,
-          layers: captionLayers,
-          metresPerPx,
-          bbox25833: extent25833,
-        }),
-      );
-      if (!figure) return null;
+      const fitted = await fitImageBlob(canvas, metresPerPx);
+      if (!fitted) return null;
       return {
-        blob: figure.blob,
+        blob: fitted.blob,
         filename: 'oppsett.png',
         meta: {
-          metresPerPx: figure.metresPerPx,
+          metresPerPx: fitted.metresPerPx,
           bbox25833: extent25833,
-          imageRect: figure.imageRect,
+          // Labels verbatim, because they are the members' own captions;
+          // credits as enum keys, so the rights lines they turn into are still
+          // written in the reader's language at stamp time.
+          stack: {
+            ...(stackGround ? { ground: stackGround } : {}),
+            layers: stackLayers,
+          },
         },
       };
     }
@@ -531,7 +504,7 @@ const runJob = async (job: PinJob): Promise<AttachmentRecord | null> => {
     return null;
   }
   const bbox4326 = rectangleOf(job.rec, job.bbox4326);
-  const produced = await renderSpec(spec, bbox4326, job.subject);
+  const produced = await renderSpec(spec, bbox4326);
   if (!produced) {
     states.set(job.rec.id, 'empty');
     return null;

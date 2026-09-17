@@ -1,11 +1,10 @@
 // The starter set: the best LiDAR dataset over a new rectangle, read three
 // ways, without being asked. `planStarterPack` resolves dataset and styles up
-// front; `extractLidarFigure` is what the pin queue calls afterwards, and
+// front; `extractLidarRaster` is what the pin queue calls afterwards, and
 // `Behold` over the LiDAR ground goes through it too.
 
 import type { LocalityBbox } from '../api/localities';
-import { type ImageRect, renderFigureBlob } from '../figure/figure';
-import { lidarExtractFigure } from '../figure/specs';
+import { fitImageBlob } from '../figure/figure';
 import { extractCanvas } from '../lidarExtract/run';
 import {
   enumerateLidarSources,
@@ -29,12 +28,9 @@ export type ExtractRaster = {
   /** Of the pixels actually written, which may be fewer than asked for. */
   metresPerPx: number;
   bbox25833: [number, number, number, number];
-  /** Where the image sits inside the figure; the caption is below it. */
-  imageRect: ImageRect;
 };
 
 export type ExtractOptions = {
-  subject?: string;
   /** Threaded into the stitch, so a caller with a deadline can stop it. */
   signal?: AbortSignal;
 };
@@ -71,40 +67,32 @@ export const planStarterPack = async (
   return { source, styles };
 };
 
-/** One styled LiDAR view of the rectangle, stitched from the WMS. */
-export const extractLidarFigure = async (
+/**
+ * One styled LiDAR view of the rectangle, stitched from the WMS. Bare pixels,
+ * edge to edge: the legend is stamped on the way out of the store, not into
+ * it — see `figure/figure.ts`.
+ */
+export const extractLidarRaster = async (
   source: LidarSource,
   bbox25833: [number, number, number, number],
   style: string,
-  { subject, signal }: ExtractOptions = {},
+  { signal }: ExtractOptions = {},
 ): Promise<ExtractRaster | null> => {
   const result = await extractCanvas(bbox25833, source, style, signal);
   if (!result) return null;
 
-  const figure = await renderFigureBlob(
-    result.canvas,
-    lidarExtractFigure({
-      subject,
-      sourceLabel: source.label,
-      style,
-      year: source.year,
-      pointDensity: source.pointDensity,
-      metresPerPx: result.metresPerPx,
-      bbox25833: result.bbox25833,
-    }),
-  );
-  if (!figure) return null;
+  const fitted = await fitImageBlob(result.canvas, result.metresPerPx);
+  if (!fitted) return null;
 
   return {
-    blob: figure.blob,
-    imageRect: figure.imageRect,
+    blob: fitted.blob,
     sourceKey: source.key,
     sourceLabel: source.label,
     style,
     model: source.model,
-    // The figure's, not the stitch's: an oversized rectangle is written at
-    // whatever resolution fit.
-    metresPerPx: figure.metresPerPx,
+    // What was written, not what was asked for: an oversized rectangle is
+    // stored at whatever resolution fit.
+    metresPerPx: fitted.metresPerPx,
     bbox25833: result.bbox25833,
   };
 };
