@@ -88,51 +88,92 @@ const writeCache = (key: string, value: Promise<LidarFootprint | null>) => {
   }
 };
 
-// One WFS name query; null means no rows for that name.
+// Features per request. A boundary with more disjoint parts than this comes
+// back as a valid, short FeatureCollection — the truncation raises nothing, and
+// reads on the map as a hole in the coverage — so the query pages until a page
+// comes back short.
+const PAGE_SIZE = 100;
+// Far past any real boundary. The cap is there so a service that ignores
+// STARTINDEX cannot keep the loop asking for the same page.
+const MAX_PAGES = 25;
+
+type NameQueryResult = {
+  geometries: Geometry[];
+  // Set when the paging stopped short of exhausting the rows. The parts in
+  // hand are still worth drawing; they are not worth remembering.
+  truncated: boolean;
+};
+
+// One WFS name query, paged; null means no rows for that name.
 const requestByName = async (
   project: LidarProject,
   projectName: string,
   projection: string,
-): Promise<Geometry[] | null> => {
+): Promise<NameQueryResult | null> => {
   const urn = crsUrn(projection);
-  const params = new URLSearchParams({
-    SERVICE: 'WFS',
-    VERSION: '2.0.0',
-    REQUEST: 'GetFeature',
-    TYPENAMES: TYPE_NAME,
-    OUTPUTFORMAT: 'geojson',
-    COUNT: '100',
-    FILTER: buildNameFilter(projectName),
-    ...(urn ? { SRSNAME: urn } : {}),
-  });
-  const res = await fetch(`${WFS_URL}?${params.toString()}`);
-  if (!res.ok) {
-    throw new Error(`Prosjektavgrensning WFS returned ${res.status}`);
-  }
-  const json = await res.json();
-
-  const dataProjection = epsgFromCrsMember(json) ?? projection;
-  const features = new GeoJSON().readFeatures(json, {
-    dataProjection,
-    featureProjection: projection,
-  });
-
+  const format = new GeoJSON();
   const geometries: Geometry[] = [];
-  for (const feature of features) {
-    const props = feature.getProperties() as WfsProperties;
-    // Further out than a rounding of the flying date is a different project.
-    const wfsYear = props.AARSTALL != null ? Number(props.AARSTALL) : null;
-    if (
-      project.year != null &&
-      wfsYear != null &&
-      Math.abs(project.year - wfsYear) > YEAR_TOLERANCE
-    ) {
-      continue;
+  let truncated = false;
+  let startIndex = 0;
+  let previousFirstId: string | number | undefined;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const params = new URLSearchParams({
+      SERVICE: 'WFS',
+      VERSION: '2.0.0',
+      REQUEST: 'GetFeature',
+      TYPENAMES: TYPE_NAME,
+      OUTPUTFORMAT: 'geojson',
+      COUNT: String(PAGE_SIZE),
+      STARTINDEX: String(startIndex),
+      FILTER: buildNameFilter(projectName),
+      ...(urn ? { SRSNAME: urn } : {}),
+    });
+    const res = await fetch(`${WFS_URL}?${params.toString()}`);
+    if (!res.ok) {
+      throw new Error(`Prosjektavgrensning WFS returned ${res.status}`);
     }
-    const geometry = feature.getGeometry();
-    if (geometry) geometries.push(geometry);
+    const json = await res.json();
+
+    const dataProjection = epsgFromCrsMember(json) ?? projection;
+    const features = format.readFeatures(json, {
+      dataProjection,
+      featureProjection: projection,
+    });
+    if (features.length === 0) break;
+
+    // The same row opening two consecutive pages means STARTINDEX was ignored
+    // and the rest of the rows are unreachable. Only when the service gives
+    // ids at all — without them there is nothing to compare and paging on the
+    // page length is the best available.
+    const firstId = features[0].getId();
+    if (firstId != null && firstId === previousFirstId) {
+      truncated = true;
+      break;
+    }
+    previousFirstId = firstId;
+
+    for (const feature of features) {
+      const props = feature.getProperties() as WfsProperties;
+      // Further out than a rounding of the flying date is a different project.
+      const wfsYear = props.AARSTALL != null ? Number(props.AARSTALL) : null;
+      if (
+        project.year != null &&
+        wfsYear != null &&
+        Math.abs(project.year - wfsYear) > YEAR_TOLERANCE
+      ) {
+        continue;
+      }
+      const geometry = feature.getGeometry();
+      if (geometry) geometries.push(geometry);
+    }
+
+    if (features.length < PAGE_SIZE) break;
+    startIndex += features.length;
+    if (page === MAX_PAGES - 1) truncated = true;
   }
-  return geometries.length > 0 ? geometries : null;
+
+  return geometries.length > 0 ? { geometries, truncated } : null;
 };
 
 // One project's boundary in the map's projection, or null if the WFS has none.
@@ -144,22 +185,32 @@ const fetchOne = (
   const cached = readCache(key);
   if (cached) return cached;
 
+  let truncated = false;
   const promise = (async () => {
-    let geometries = await requestByName(
-      project,
-      project.projectName,
-      projection,
-    );
+    let result = await requestByName(project, project.projectName, projection);
     const stripped = stripDensity(project.projectName);
-    if (!geometries && stripped !== project.projectName) {
-      geometries = await requestByName(project, stripped, projection);
+    if (!result && stripped !== project.projectName) {
+      result = await requestByName(project, stripped, projection);
     }
-    return geometries ? { project, geometries } : null;
+    if (!result) return null;
+    truncated = result.truncated;
+    return { project, geometries: result.geometries };
   })();
 
   writeCache(key, promise);
-  // A failed request must not become a permanent negative cache entry.
-  promise.catch(() => cache.delete(key));
+
+  // Entries never expire, so anything that is not the whole answer has to be
+  // taken back out: a failure, or a boundary the paging could not exhaust.
+  // Only this promise's entry, though — eviction under pressure can already
+  // have put a fresh one behind the same key.
+  const forget = () => {
+    if (cache.get(key) === promise) cache.delete(key);
+  };
+  promise.then(() => {
+    if (!truncated) return;
+    console.warn('[lidarFootprints] %s boundary came back short', project.id);
+    forget();
+  }, forget);
   return promise;
 };
 
