@@ -10,20 +10,20 @@ describe('mapToolAtom', () => {
 
   it('can be set to a tool', () => {
     const store = createStore();
-    store.set(mapToolAtom, 'layers');
-    expect(store.get(mapToolAtom)).toBe('layers');
+    store.set(mapToolAtom, 'measure');
+    expect(store.get(mapToolAtom)).toBe('measure');
   });
 
   it('can be switched between tools', () => {
     const store = createStore();
-    store.set(mapToolAtom, 'layers');
+    store.set(mapToolAtom, 'measure');
     store.set(mapToolAtom, 'localities');
     expect(store.get(mapToolAtom)).toBe('localities');
   });
 
   it('can be cleared back to null', () => {
     const store = createStore();
-    store.set(mapToolAtom, 'layers');
+    store.set(mapToolAtom, 'measure');
     store.set(mapToolAtom, null);
     expect(store.get(mapToolAtom)).toBeNull();
   });
