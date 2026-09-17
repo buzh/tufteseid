@@ -104,7 +104,9 @@ const GROUND_LABEL_KEY: Record<BackgroundLayerName, string> = {
 
 const backgroundOf = (v: unknown): BackgroundLayerName | null => {
   const s = str(v);
-  return s && Object.hasOwn(GROUND_LABEL_KEY, s)
+  // Own keys only, and not `Object.hasOwn`: the app compiles against ES2020.
+  // `s in …` would take `toString` off the prototype and hand `t()` a function.
+  return s && Object.prototype.hasOwnProperty.call(GROUND_LABEL_KEY, s)
     ? (s as BackgroundLayerName)
     : null;
 };
