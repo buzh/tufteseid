@@ -147,8 +147,7 @@ the whole vocabulary and writes go through `history.replaceState` only.
 - Round-trip: `lat`, `lon`, `zoom`, `backgroundLayer`, `hybrid`, `contours`,
   `lidarModel`, `themeLayers`, `heritageDetails`, `heritageRender`,
   `heritageOpacity`, `sok`, `markerLat`, `markerLon`, `showSelection`, `lok`.
-- In the union with no writers: `rotation`, `drawing`, `printTool`.
-  `projection` is read and never written.
+- Read and never written: `projection`.
 - Not persisted: the active LiDAR style and project, and the active flyfoto
   acquisition.
 
@@ -1008,8 +1007,7 @@ Fix-list; none of these are load-bearing.
 
 - `mapToolAtom`'s `'measure'` member renders nothing — measure is a ribbon
   popover.
-- `NKUrlParameter` carries `rotation`, `drawing` and `printTool` with no
-  writers; `projection` is read and never written.
+- `projection` is read out of the URL and never written back.
 - The active LiDAR style and project, the active flyfoto acquisition and the
   open lokalitet's viewport are not in the URL.
 - `trackPositionAtom` and its effect have no UI entry point.
