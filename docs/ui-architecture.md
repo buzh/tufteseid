@@ -117,7 +117,6 @@ jotai on the default store — there is no `Provider`, so module-level code
 | Atom | Holds | Lives in |
 | --- | --- | --- |
 | `mapAtom` | the `ol/Map` | `src/map/atoms.ts` |
-| `trackPositionAtom` | geolocation follow; no UI entry point | `src/map/geolocation/atoms.ts` |
 | `backgroundLayerAtom`, `standardVariantAtom`, `hybridOverlayAtom`, `hybridContoursAtom`, `activeLidarModelAtom`, `activeLidarStyleAtom`, `activeLidarProjectAtom`, `lidarPickerOpenAtom`, `lidarCyclingAtom`, `lidarAutoDatasetAtom`, `activeFlyfotoProjectAtom` | the ground and its modifiers; eight are `halved()` facades over an A/B pair | `src/map/layers/config/backgroundLayers/` |
 | `compareOnAtom`, `compareFocusAtom`, `focusedHalfAtom` | the curtain and which half the ribbon aims at | `src/map/compare/halves.ts` |
 | `compareSplitAtom` | seam position | `src/map/compare/atoms.ts` |
@@ -1011,7 +1010,6 @@ Fix-list; none of these are load-bearing.
 - `projection` is read out of the URL and never written back.
 - The active LiDAR style and project, the active flyfoto acquisition and the
   open lokalitet's viewport are not in the URL.
-- `trackPositionAtom` and its effect have no UI entry point.
 - Search has no keyboard support: no arrow-key walk of the result list.
 - The OL z-index ladder contains a `4.5` and a `1.5`.
 - The compare seam clamps at a flat 5–95% rather than against `chromeInsets`, so

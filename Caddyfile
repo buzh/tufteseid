@@ -26,7 +26,7 @@ route {
                 font-src 'self';
                 frame-ancestors 'self';
         "
-        header Permissions-Policy "geolocation=(self), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), accelerometer=(), camera=()"
+        header Permissions-Policy "geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), accelerometer=(), camera=()"
 
         # /l/K7M2QX — the short URL for a lokalitet. A redirect to
         # /?lok=K7M2QX and nothing more: the code is the key, so there is

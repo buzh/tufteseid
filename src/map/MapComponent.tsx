@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { ErrorBoundary } from '../shared/ErrorBoundary.tsx';
 import styles from './MapComponent.module.css';
 import { compareLayerAtomEffect } from './compare/atoms.ts';
-import { trackPostitionAtomEffect } from './geolocation/atoms.ts';
 import { themeLayerEffect } from './layers/atoms.ts';
 import { backgroundLayerAtomEffect } from './layers/config/backgroundLayers/atoms.ts';
 import { useMap } from './mapHooks.ts';
@@ -16,7 +15,6 @@ export const MapComponent = () => {
   const { t } = useTranslation();
   const { setTargetElement } = useMap();
   useAtom(themeLayerEffect);
-  useAtom(trackPostitionAtomEffect);
   useAtom(backgroundLayerAtomEffect);
   // The compare curtain's B stack: same resolveStack rules as the background
   // effect above, but into its own `cmp.` namespace, which the background
