@@ -1,57 +1,63 @@
-# vat-cache — prototype scripts behind the cached-VAT work order
+# vat-cache — building the cached cVAT ground
 
 Out-of-band tooling, not part of the SPA build. Nothing in `src/` imports it,
 the docker build does not see it, and `package.json` is untouched. It runs on
 whatever machine can reach `hoydedata.no` directly and has python.
 
-These are the scripts the sizing study was done with, kept because the next
-task replaces them with real tooling and the numbers they produced are the
-inputs to that design. `WORK-ORDER.md` is the brief. `docs/terrain-analysis.md`
-remains the authority on the operators themselves; `render.py` is a port of
-`src/terrain/shade.ts` and is wrong wherever the two disagree.
+RVT computes the pixels. `rvt.vis` makes the four layers and `rvt.blend_func`
+blends them; nothing here reimplements a visualization. `WORK-ORDER.md` is the
+brief and records why the parameters are what they are.
 
 ## Running
 
 ```
-python -m venv .venv && .venv/bin/pip install -r requirements.txt
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt --no-deps    # see requirements.txt
+.venv/bin/pip install "numpy<2.1" "scipy<1.15" pillow matplotlib
+
 .venv/bin/python coverage.py "Vestfold og Telemark 5pkt 2021"   # -> coverage.npz
-.venv/bin/python measure.py                                      # -> bytes per pixel
-.venv/bin/python sizing.py                                       # -> storage tables
+.venv/bin/python build_tiles.py --out /data/cvat --dry-run      # unit counts
+.venv/bin/python build_tiles.py --out /data/cvat --levels 15 --limit 20
+.venv/bin/python build_tiles.py --out /data/cvat --jobs 4
 ```
 
-`coverage.npz` is a build artefact; it is not committed.
+`coverage.npz` and `.venv/` are build artefacts; neither is committed.
+
+`--no-deps` is not optional: rvt-py declares gdal, rasterio, geopandas and
+jupyter for an IO layer none of this uses.
 
 ## The files
 
 | File | What it does |
 | --- | --- |
+| `cvat.py` | RVT's combined VAT: the parameters out of `VAT_Combined.rft.xml`, and the layer walk out of `render_all_images`. The one module that decides what a pixel is |
+| `build_tiles.py` | The batch: coverage → work units → fetch → `cvat` → 512 px RGBA WebP on the app's tile grid, with a manifest and resume |
 | `fetch_dem.py` | `exportImage` against `Prosjekt_DTM`, pinned to one `LAS_PROJECT_NAME`, plus the minimal tiled-float32 TIFF reader `dem.ts` also carries |
-| `render.py` | numpy port of `shade.ts`: Horn gradients, hillshade, the 16-direction horizon scan, `composeVat`, combined VAT, and the constants all of them read |
-| `coverage.py` | What ground an acquisition actually covers: catalogue rows, union rasterisation, sample-site picker, tile fill against the app's tile grid |
-| `measure.py` | Renders the samples, quantises, tiles, encodes — reports bytes per pixel per product |
+| `coverage.py` | What ground an acquisition covers: catalogue rows, union rasterisation, sample-site picker, tile fill against the app's tile grid |
+| `compare.py` | The candidate grids and radius rules, rendered side by side on one real patch — what decided §1 and §2 of the work order |
+| `render.py` | The numpy port of `shade.ts` the sizing study was done with. Superseded by `cvat.py` for anything that renders; kept because `measure.py` and `sizing.py` read against it |
+| `measure.py` | Renders samples, quantises, tiles, encodes — bytes per pixel per product |
 | `sizing.py` | Measured bytes per pixel + coverage → disk cost per zoom on the app's real ladder |
 
-## What they established
+## What is established
 
-For **Vestfold og Telemark 5pkt 2021**, measured over six sites spread across
-the acquisition (relief 36–395 m):
+For **Vestfold og Telemark 5pkt 2021**:
 
 - **Coverage is 1,106 km²**, not the 8,846 km² that summing `SHAPE.AREA` over
   the 270 catalogue rows suggests — the catalogue carries a row per overview
   level and each level re-covers the project. Envelope 185.6 × 102.9 km, 6 %
   filled. The rasteriser validates against a known 879.17 km² footprint to
-  879.2 km².
-- **Bytes per pixel**, 256 px tiles, fully covered only: VAT 0.607 PNG /
-  0.257 WebP q90; sky-view 0.613 / 0.269; positive openness 0.677 / 0.334;
-  negative openness 0.670 / 0.332.
-- **Compute is not the constraint.** 8.4 s per km² for VAT at 0.5 m on one
-  core, 1.3 s per km² for the horizon trio at 1 m. The DEM fetch is.
-- **Below 1 m the horizon family gets worse and dearer at once**, because
-  `SVF_MAX_RADIUS_PX` is a budget in steps: z15 costs 3.6× z14 and reads a
-  15.9 m horizon instead of a 31.7 m one. VAT is not subject to this — its
-  radii are fixed in metres by `VAT_PRESETS`.
-- **VAT is the only one of the four that tiles without a global stretch**, because
-  `composeVat` outputs 0..1 on absolute preset stretches. The other three would
-  need one pooled stretch per level, and a per-tile percentile is not an option
-  at all — neighbouring tiles would disagree, the fault that excluded
-  `dynamisk_farget_hoyde`.
+  879.2 km². Native DTM is 0.25 m, with overviews doubling from there.
+- **RVT's radii are pixels.** `max_rad` 10 px (general) and 20 px (flat) come to
+  5 m and 10 m only on the 0.5 m DEM the templates were calibrated on. The cache
+  holds the pixels, so every level is RVT's combined VAT of its own grid.
+- **The ladder is z15 → z12** on the app's shared grid, 941 / 313 / 116 / 46
+  work units of 4×4 tiles.
+- **Compute is not the constraint.** 3.7 s per km² at z15, about 10 s per work
+  unit including the fetch, so ~2.6 core-hours for z15 and ~1.5 for the rest.
+- **Tiles are RGBA WebP q90.** An opaque alpha channel is free (0.339 B/px
+  either way) and a half-covered tile is cheaper (0.153), so alpha is how
+  no-data is stored rather than a grey that would look like ground.
+- **Seams do not appear** at work-unit boundaries with a 24 px overlap: the step
+  across a unit join measures the same as the step between any two adjacent
+  columns inside one.

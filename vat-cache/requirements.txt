@@ -1,2 +1,12 @@
 numpy>=2.0
 pillow>=11.0
+# RVT computes the visualizations; `--no-deps` on install, because rvt-py
+# declares gdal, rasterio, geopandas and jupyter for an IO layer none of this
+# uses. `rvt.vis` and `rvt.blend_func` need only numpy, scipy and matplotlib —
+# `rvt.default` and `rvt.blend` are the ones that reach for GDAL.
+rvt-py==2.2.3
+# rvt.vis imports scipy.ndimage.morphology, removed in scipy 1.15.
+scipy<1.15
+# Only for rvt.blend_func's colormaps, which VAT does not use, but the module
+# imports it at the top.
+matplotlib>=3.7
