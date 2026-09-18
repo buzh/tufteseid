@@ -6,7 +6,6 @@ type LayerFunction = () => BaseLayer;
 
 export type MapLayer = {
   getLayer: LayerFunction;
-  maxZoom?: number;
 };
 
 export type MapLayers = {
