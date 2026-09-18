@@ -11,12 +11,10 @@ route {
         header Strict-Transport-Security max-age=31536000
         header X-Content-Type-Options nosniff
         header Referrer-Policy strict-origin
-        @allowedOrigins header_regexp Origin ^https://(kartkatalog\.)?geonorge\.no$
-        header @allowedOrigins Access-Control-Allow-Origin {http.request.header.Origin}
-        # style-src is 'self' now that emotion is gone with kvib: nothing
-        # injects a stylesheet at runtime any more, and the built CSS is a
-        # <link>. Inline style *attributes* are a separate directive, and they
-        # stay — React sets positions, sizes and picked colours that way.
+        # style-src is 'self': nothing injects a stylesheet at runtime and the
+        # built CSS is a <link>. Inline style *attributes* are a separate
+        # directive, and they stay — React sets positions, sizes and picked
+        # colours that way.
         header Content-Security-Policy "
                 default-src 'self';
                 script-src 'self';
