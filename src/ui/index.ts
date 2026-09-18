@@ -33,9 +33,4 @@ export {
   type ToastTone,
 } from './Toast';
 export { Tooltip } from './Tooltip';
-export {
-  BREAKPOINTS,
-  useBreakpointUp,
-  useMediaQuery,
-  type Breakpoint,
-} from './useMediaQuery';
+export { useMediaQuery } from './useMediaQuery';

@@ -24,16 +24,3 @@ export const useMediaQuery = (query: string): boolean =>
     () => window.matchMedia(query).matches,
     () => false, // SSR / first paint: assume desktop.
   );
-
-// In rem. Only `md` is load-bearing today.
-export const BREAKPOINTS = {
-  sm: 30, // 480px
-  md: 48, // 768px
-  lg: 62, // 992px
-  xl: 80, // 1280px
-} as const;
-
-export type Breakpoint = keyof typeof BREAKPOINTS;
-
-export const useBreakpointUp = (bp: Breakpoint): boolean =>
-  useMediaQuery(`(min-width: ${BREAKPOINTS[bp]}rem)`);
