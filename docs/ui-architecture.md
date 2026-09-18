@@ -33,11 +33,11 @@ One line each, with the symptom of breaking it.
 
 ## 3. Stack and boot
 
-Versions: React 19 (StrictMode) · Vite 8 · TypeScript ~7.0.2 · jotai ^2.20.3 +
+Versions: React 19 (StrictMode) · Vite 8 · TypeScript ~7.0.2 · jotai ^3.0.0 +
 jotai-effect · OpenLayers ^10.10.0 with proj4 (EPSG:25833) · PocketBase JS SDK
 ^0.28 · @tanstack/react-query ^5 (one consumer: the elevation lookup) ·
 i18next ^26 / react-i18next ^17 · material-symbols
-^0.40.2 · @fontsource/mulish · @excalidraw/excalidraw ^0.18.1 · uuid.
+^0.47.2 · @fontsource/mulish · @excalidraw/excalidraw ^0.18.1 · uuid.
 
 ```
 mainApp.tsx              the entry index.html loads: projInit(), then
@@ -919,8 +919,7 @@ From the inherited Norgeskart app:
   on it, the language picker, is `RibbonLanguage` on row 1 now.
 - Client-side routing — `BrowserRouter`, `Routes`, `Route`. `/` is the only
   path the app answers on; `/l/CODE` is a Caddy `redir` to `?lok=CODE`, not a
-  route. `react-router-dom` is still in `package.json` with no importer, to
-  come out when the lockfile is next regenerated.
+  route. `react-router-dom` is out of `package.json` too.
 - Dead dependencies: `maplibre-gl`, `@geoblocks/ol-maplibre-layer` (OpenLayers
   is the engine for WMS + EPSG:25833) and `fast-xml-parser` (native
   `DOMParser`).
