@@ -428,6 +428,14 @@ non-hidden record in exhibit order — never a field; `coverTerrainSpec` is the
 first non-hidden terrain View. Drag-to-reorder is `useRailReorder.ts`, Pointer
 Events on capture with touch excluded.
 
+The cover is laid on the ground once per lokalitet, and only if it is pinned:
+an unpinned spec would start a WMS stitch on arrival. A scene counts, and goes
+up as its own flatten rather than as the stack it describes — `Legg ut igjen`
+is a press, and it enters the ground the scene names. A scene kept over
+Standard or Hybrid is skipped: that flatten is on white paper and would blank
+the rectangle. The cover is provisional, so the first ground the reader asks
+for withdraws it (`provisionalViewAtom`).
+
 Four routes an image takes in:
 
 - Starter set (`starterPack.ts`), on `Opprett`: three readings of the best LiDAR
@@ -581,7 +589,16 @@ restores one in either stance, keeping only the topmost View and saying so
 (`localities.scene.oneView`), and reports what has since been deleted rather
 than silently dropping it. The pin is a flatten through `groundRasterOf` at the
 sharpest member's `metresPerPx`, floored at 1500 m / 6000 px; a scene with
-nothing to draw pins `empty`, not `failed`.
+nothing to draw pins `empty`, not `failed`. The sheet is white paper only when
+no ground rendered under the layers — with a ground it stays transparent where
+the ground is, so a terrain render's no-data holes do not become white patches
+over the map.
+
+A scene is not a layer and has no switch: it is never a row in `[Visning ▾]`
+nor a stop on its ring. The one exception is the arrival cover, which reaches
+`visningShownAtom` by id and paints its flatten; `ws.groundItems` — the Views
+plus the pinned scenes — is what the control mounts `<GroundMember>` from, so
+every path that replaces the shown set takes the flatten down for free.
 
 Which funn a bilde belongs to is read only through
 `src/localities/funnGroups.ts`, because the relation does not cascade and an id

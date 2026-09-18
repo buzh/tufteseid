@@ -193,7 +193,9 @@ export const setGroundOverlayStack = (
 
 /** Which View is on the ground, by attachment id. A set, though every writer
  * keeps it to at most one, and seeded with at most the cover on open: an
- * unpinned View can start a WMS stitch. */
+ * unpinned View can start a WMS stitch. The cover is the one id here that may
+ * name a scene, painted as its flatten rather than as the stack it
+ * describes. */
 export const visningShownAtom = atom<ReadonlySet<string>>(new Set<string>());
 
 /** The cover the workspace laid down: the first ground selection withdraws it,

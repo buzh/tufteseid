@@ -49,7 +49,11 @@ export const VisningControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
   const { failedIds, report } = useLayerFailures();
 
   const views = ws.viewItems;
-  const shownViews = views.filter((rec) => shown.has(rec.id));
+  // Off `groundItems`, not `views`: the arrival cover may be a scene, which
+  // paints as its own flatten without being a row here — nothing in this group
+  // can select one, and pressing any row replaces the shown set and takes it
+  // down.
+  const shownViews = ws.groundItems.filter((rec) => shown.has(rec.id));
 
   // Emptied on the way out: row 1 registers the keys and cannot see whether
   // this group is on screen.
@@ -149,7 +153,12 @@ export const VisningControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
         )}
         membersLabel={membersLabel}
         shown={groupShown}
-        shownCount={members.filter((m) => m.shown).length}
+        // A cover scene has no row and so is not in `members`, but it is on
+        // the map and this switch holds it, which is what the badge counts.
+        shownCount={
+          members.filter((m) => m.shown).length +
+          shownViews.filter((rec) => rec.kind === 'scene').length
+        }
         onToggle={() => setGroupShown(!groupShown)}
       >
         {() => (

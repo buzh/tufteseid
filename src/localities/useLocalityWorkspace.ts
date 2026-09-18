@@ -1119,6 +1119,26 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [attachmentItems, deletedIds, canEdit],
   );
 
+  // What may paint into `[Visning ▾]`'s stack: the Views it lists, plus a
+  // pinned scene. A scene is not a View — no row, no stop on the ring — and
+  // the arrival cover is the only writer that ever names one in the shown set,
+  // but its flatten is a picture over the same rectangle and has to reach
+  // `<GroundMember>` to be seen. Same filters as `viewItems`, so a hidden or
+  // tombstoned record takes its layer member down with it.
+  const groundItems = useMemo(
+    () => [
+      ...viewItems,
+      ...(attachmentItems ?? []).filter(
+        (it) =>
+          it.kind === 'scene' &&
+          isPinned(it) &&
+          !deletedIds.has(it.id) &&
+          (canEdit || !it.hidden),
+      ),
+    ],
+    [viewItems, attachmentItems, deletedIds, canEdit],
+  );
+
   // What [Bilde] lists. A File is bytes with nothing to render from, so the
   // two extra filters: no file means no member, and `bbox25833` is what says
   // where the bytes go — an upload gets one only from `Plasser i ruta`.
@@ -2389,8 +2409,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     [attachmentItems, deletedIds],
   );
 
-  // Lay the cover on the ground once per lokalitet, only if it is a pinned
-  // View — an unpinned spec would start a WMS stitch on arrival. Two refs:
+  // Lay the cover on the ground once per lokalitet, only if it is pinned — an
+  // unpinned spec would start a WMS stitch on arrival. Two refs:
   // `useCollection` empties `items` from an effect of its own, so the first
   // pass after a swap still holds the previous lokalitet's list, and the null
   // arming the latch is what stops B spending its one shot on A's cover.
@@ -2412,7 +2432,16 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // with no cursor has no detail line under it.
     setActiveBildeId(cover.id);
     if (!isPinned(cover)) return;
-    if (cover.kind !== 'extract' && cover.kind !== 'flyfoto') return;
+    if (cover.kind === 'scene') {
+      // The one time a scene reaches the ground by itself, and it goes as its
+      // own flatten rather than as a live arrangement: `Legg ut igjen` is a
+      // press, and restoring one enters the ground it names. Only a scene with
+      // a ground of its own — one kept over Standard or Hybrid flattens onto
+      // white paper, which here would blank the rectangle on arrival.
+      if (!sceneCompositionOf(cover.meta)?.ground) return;
+    } else if (cover.kind !== 'extract' && cover.kind !== 'flyfoto') {
+      return;
+    }
     // Written directly rather than through `selectVisningAtom`: that entrance
     // also enters the View, moving the ribbon onto a ground nobody asked for.
     setVisningShown(new Set([cover.id]));
@@ -2651,9 +2680,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     sketchGroupShown,
     toggleSketchGroup,
 
-    // What [Visning] and [Bilde] list. Only the lists: their switches are
-    // atoms beside `map/groundOverlay.ts` and the controls read them directly.
+    // What [Visning] and [Bilde] list, and what [Visning] may paint. Only the
+    // lists: their switches are atoms beside `map/groundOverlay.ts` and the
+    // controls read them directly.
     viewItems,
+    groundItems,
     fileItems,
 
     // tools

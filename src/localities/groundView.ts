@@ -129,7 +129,10 @@ export const renderViewRaster = async (
 
     case 'scene':
       // A scene is a statement about the stack, not a layer in it; the one
-      // place it becomes pixels is its own flatten, in the pin queue.
+      // place it becomes pixels is its own flatten, in the pin queue. A pinned
+      // one laid as the arrival cover never reaches here — the branch above
+      // paints that flatten — so this arm is the unpinned case, which has
+      // nothing to show.
       return null;
   }
 };

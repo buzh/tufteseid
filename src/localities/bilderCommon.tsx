@@ -704,9 +704,10 @@ export const PlaceUploadButton = ({
 };
 
 // `Legg ut igjen` — put a kept arrangement back on the map. A scene has no
-// switch anywhere, because it is not a layer (`groundView.ts` refuses to put
-// one on the ground), so this is its one verb. A read, so both stances and
-// every access level get it: applying an arrangement to your own screen
+// switch anywhere, because it is not a layer: the one time one is on the
+// ground by itself is as the arrival cover, laid as its own flatten. So this
+// is its one verb, and the only way to the live stack. A read, so both stances
+// and every access level get it: applying an arrangement to your own screen
 // writes nothing.
 export const SceneRestoreButton = ({
   ws,

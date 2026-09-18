@@ -395,10 +395,16 @@ const renderSpecWithin = async (
       canvas.height = Math.max(1, Math.round(heightM / metresPerPx));
       const ctx = canvas.getContext('2d');
       if (!ctx) return null;
-      // White paper: a scene built over Standard or Hybrid has no ground spec
-      // at all, and a transparent PNG in a report is a picture of nothing.
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // White paper only where there is no ground under the layers — a scene
+      // built over Standard or Hybrid has no ground spec at all, and a
+      // transparent PNG in a report is a picture of nothing. With a ground the
+      // sheet stays transparent where the ground is: a terrain render is
+      // transparent over its no-data, and white there would paint a patch over
+      // the map when the flatten is laid as a lokalitet's arrival cover.
+      if (!ground) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
 
       // Off the rounded canvas rather than off `metresPerPx`, so half a pixel
       // of rounding cannot walk the stack apart across its own rectangle.
