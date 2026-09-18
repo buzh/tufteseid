@@ -31,19 +31,6 @@ export const formatArea = (areaInSquareMeters: number) => {
   return `${formatNumberWithThousandSeparators(areaInSquareMeters / 1_000_000, 2)} km²`;
 };
 
-export const createHash = (text: string) => {
-  let hash = 0;
-
-  if (text.length == 0) return hash;
-
-  for (let i = 0; i < text.length; i++) {
-    const char = text.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash;
-  }
-  return hash;
-};
-
 export const computeLevenshteinDistance = (
   input1: string,
   input2: string,

@@ -47,14 +47,6 @@ export const getUrlParameter = (key: NKUrlParameter): string | null => {
   return getSearchParams().get(key);
 };
 
-export const setListUrlParameter = (
-  key: NKUrlParameter,
-  values: (string | number | boolean)[],
-): void => {
-  const url = new URL(window.location.href);
-  updateUrl(url, (params) => params.set(key, values.map(String).join(',')));
-};
-
 export const getListUrlParameter = (key: NKUrlParameter): string[] | null => {
   const param = getSearchParams().get(key);
   if (param) {
