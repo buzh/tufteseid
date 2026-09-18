@@ -75,7 +75,7 @@ const searchCoordinatesEffect = atomEffect((get, set) => {
       }
     })
     .catch(() => {
-      // error already tracked by trackApiError inside getPlaceNamesByLocation
+      // getPlaceNamesByLocation already logged it; nearby places are a nicety.
     });
 });
 
