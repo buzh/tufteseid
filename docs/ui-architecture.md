@@ -853,7 +853,8 @@ Analyse it
 
 - Run terrain analysis (DTM or DOM) with eight visualizations, by pulldown or W/S.
 - Set azimuth, altitude, exaggeration and Transparens live, plus a smoothing or
-  horizon-search radius for the five views that have one.
+  horizon-search radius for the four views that have one. VAT has none: it is
+  the one view with nothing to set, which is what makes two of them comparable.
 - Analyse the open lokalitet's rectangle, or with none open a window framed on
   the visible map — no account needed for either.
 - Change what is analysed by moving the rectangle under "Juster området", or

@@ -3,10 +3,10 @@ import { LocalityBbox } from '../api/localities';
 
 // Read off what the producers can render, not what the map can frame. The
 // ceiling is set by terrain analysis, the most expensive reader of a rectangle:
-// `MAX_DEM_PX_PER_SIDE` in `src/terrain/dem.ts` is derived as MAX_SIDE_M at the
-// finest elevation data that exists (0.25 m), so a DEM over a rectangle in the
-// band is never resampled. Below 50 m the provenance plate a download gets
-// stamped with covers the image.
+// `MAX_DEM_PX_PER_SIDE` in `src/terrain/dem.ts` is derived as MAX_SIDE_M plus
+// its horizon margin at the finest elevation data that exists (0.25 m), so a
+// DEM over a rectangle in the band is never resampled. Below 50 m the
+// provenance plate a download gets stamped with covers the image.
 export const MIN_SIDE_M = 50;
 export const MAX_SIDE_M = 1000;
 

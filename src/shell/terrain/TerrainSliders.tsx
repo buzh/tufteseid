@@ -13,8 +13,8 @@ export const TerrainSliders = ({ terrain }: { terrain: TerrainAnalysis }) => {
   if (!dem || loading) return null;
 
   // VAT is in neither list although it contains a hillshade and a slope: its
-  // sun and exaggeration are frozen (VAT_LAYERS in shade.ts) so two VAT renders
-  // stay comparable, and a knob here would break that silently.
+  // sun and exaggeration are frozen (VAT_PRESETS in shade.ts) so two VAT
+  // renders stay comparable, and a knob here would break that silently.
   const sunDependent = vis === 'hillshade';
   const usesZFactor =
     vis === 'hillshade' || vis === 'multiHillshade' || vis === 'slope';

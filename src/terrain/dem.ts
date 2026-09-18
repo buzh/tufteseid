@@ -42,12 +42,21 @@ const MOSAIC_RULE = JSON.stringify({
 // asking for more than a project holds only buys interpolation.
 const FINEST_M_PER_PX = 0.25;
 
-// Cap the assembled grid. Derived rather than chosen, so the two numbers
-// cannot drift: a rectangle is bounded by MAX_SIDE_M and the finest elevation
-// data is FINEST_M_PER_PX, so this is exactly what an in-band rectangle asks
-// for at native resolution and nothing in the band is ever resampled.
-// planTiles still scales down if one arrives out of band.
-const MAX_DEM_PX_PER_SIDE = MAX_SIDE_M / FINEST_M_PER_PX;
+// Ground fetched outside the rectangle on every side, and cropped off before
+// anything is painted. The horizon scan reads up to this far from a cell, so
+// without it a frame this wide around every render has its rays walking off the
+// edge of the grid — which reads as nothing there to block the sky, i.e. too
+// open, too bright, too convex. RVT pads the array by the search radius for the
+// same reason; real ground is the honest version of that padding. 24 m is the
+// longest reach any view here can ask for (`horizonMaxRadiusMetres`).
+export const DEM_MARGIN_M = 24;
+
+// Cap the assembled grid. Derived rather than chosen, so the numbers cannot
+// drift: a rectangle is bounded by MAX_SIDE_M, carries a margin on both sides,
+// and the finest elevation data is FINEST_M_PER_PX, so this is exactly what an
+// in-band rectangle asks for at native resolution and nothing in the band is
+// ever resampled. planTiles still scales down if one arrives out of band.
+const MAX_DEM_PX_PER_SIDE = (MAX_SIDE_M + 2 * DEM_MARGIN_M) / FINEST_M_PER_PX;
 
 const MAX_CONCURRENT = 3;
 const TILE_RETRIES = 3;
@@ -58,12 +67,23 @@ const CATALOGUE_TIMEOUT_MS = 20_000;
 const TILE_TIMEOUT_MS = 60_000;
 
 export type Dem = {
+  // The whole assembled grid, margin included. Every compute* runs over all of
+  // it; `window` is what survives to a canvas.
   width: number;
   height: number;
   // Row-major, north-up (row 0 is the northern edge), metres above the vertical
   // datum; NaN marks no coverage.
   data: Float32Array;
+  // The rectangle that was asked for. Unchanged by the margin, because it is
+  // what every caller means by "this DEM's extent".
   bbox25833: [number, number, number, number];
+  // What the grid actually spans: `bbox25833` grown by DEM_MARGIN_M.
+  grid25833: [number, number, number, number];
+  // Where `bbox25833` sits inside the grid, in pixels. Rendering, the
+  // percentile stretches and the stored extent all read this and never the
+  // margin — a stretch taken over ground the reader cannot see is a stretch
+  // they cannot check.
+  window: { x: number; y: number; width: number; height: number };
   metresPerPx: number;
   // What the finest acquisition covering the rectangle publishes: equal to
   // metresPerPx when the grid fits under MAX_DEM_PX_PER_SIDE, finer than it
@@ -190,6 +210,10 @@ export async function fetchDem(
     number,
   ];
 
+  // Probed on the rectangle, fetched on the rectangle plus its margin: the
+  // margin must not be able to pull a finer neighbouring acquisition in and
+  // resample the whole grid to a resolution the rectangle itself has no data
+  // for, and "no laser data here" has to stay an answer about the rectangle.
   const coverage = await probeCoverage(model, bbox25833, signal);
   // Same answer as an all-sparse stitch, for one small request instead of a
   // screenful of multi-megabyte ones.
@@ -197,7 +221,13 @@ export async function fetchDem(
   const nativeMetresPerPx =
     coverage === 'unknown' ? FINEST_M_PER_PX : coverage.metresPerPx;
 
-  const plan = planTiles(bbox25833, nativeMetresPerPx, MAX_DEM_PX_PER_SIDE);
+  const grid25833: [number, number, number, number] = [
+    bbox25833[0] - DEM_MARGIN_M,
+    bbox25833[1] - DEM_MARGIN_M,
+    bbox25833[2] + DEM_MARGIN_M,
+    bbox25833[3] + DEM_MARGIN_M,
+  ];
+  const plan = planTiles(grid25833, nativeMetresPerPx, MAX_DEM_PX_PER_SIDE);
   const data = new Float32Array(plan.widthPx * plan.heightPx);
   // Absent tiles must read as no-data, not sea level: a tile left at 0 is a
   // cliff edge in every derivative.
@@ -237,12 +267,27 @@ export async function fetchDem(
   }
   if (covered === 0) return null;
 
+  const metresPerPx = (grid25833[2] - grid25833[0]) / plan.widthPx;
+  // Rounded inward and clamped, so the window can never name a pixel the grid
+  // does not have — planTiles is free to have scaled the whole thing down.
+  const inset = Math.min(
+    Math.round(DEM_MARGIN_M / metresPerPx),
+    Math.floor((plan.widthPx - 1) / 2),
+    Math.floor((plan.heightPx - 1) / 2),
+  );
   return {
     width: plan.widthPx,
     height: plan.heightPx,
     data,
     bbox25833,
-    metresPerPx: (bbox25833[2] - bbox25833[0]) / plan.widthPx,
+    grid25833,
+    window: {
+      x: inset,
+      y: inset,
+      width: plan.widthPx - 2 * inset,
+      height: plan.heightPx - 2 * inset,
+    },
+    metresPerPx,
     nativeMetresPerPx,
     model,
   };

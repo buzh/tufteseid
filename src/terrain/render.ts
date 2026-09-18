@@ -9,18 +9,15 @@
 import type { LocalityBbox } from '../api/localities';
 import { fetchDem, type Dem, type DemModel } from './dem';
 import {
-  composeVat,
   computeHillshade,
   computeHorizonFields,
   computeLrm,
   computeMultiHillshade,
   computeSlope,
+  computeVat,
   horizonMaxRadiusMetres,
   percentileRange,
   toImageData,
-  VAT_ALTITUDE,
-  VAT_AZIMUTH,
-  VAT_Z_FACTOR,
   type HorizonFields,
   type Ramp,
   type Visualization,
@@ -36,15 +33,13 @@ export const DEFAULT_Z_FACTOR = 2;
 export const DEFAULT_LRM_RADIUS = 15;
 export const DEFAULT_SVF_RADIUS = 20;
 
-// The views read off the horizon scan (`computeHorizonFields`). They share one
-// radius and one result, so the first one asked for pays the whole cost and the
-// rest are a selection.
-const HORIZON_VIS: readonly Visualization[] = [
-  'svf',
-  'openPos',
-  'openNeg',
-  'vat',
-];
+// The views read off the horizon scan (`computeHorizonFields`) and offer the
+// reader a radius for it. They share one radius and one result, so the first
+// one asked for pays the whole cost and the rest are a selection. VAT is not
+// among them although it walks the same rays twice: its two radii are pinned by
+// the presets, the way its sun is, so it has neither a slider to answer nor a
+// scan to share.
+const HORIZON_VIS: readonly Visualization[] = ['svf', 'openPos', 'openNeg'];
 
 export const usesHorizon = (vis: Visualization): boolean =>
   HORIZON_VIS.includes(vis);
@@ -107,9 +102,10 @@ export const DEFAULT_LIGHT: TerrainLight = {
  * none. `radiusMetres` is the one knob on this side, so a control for it must
  * not fire per drag frame: the horizon scan is ~800 ms on a 600² grid. Pass
  * `horizon` to reuse a walk already made at this radius — that is what makes
- * switching between sky-view, the opennesses and VAT instant — or omit it and
+ * switching between sky-view and the two opennesses instant — or omit it and
  * this recomputes. VAT is on this side despite containing a hillshade, because
- * its sun is frozen (VAT_AZIMUTH).
+ * its sun is frozen (VAT_AZIMUTH); it walks its own two rays and takes no
+ * radius, so nothing it computes can be shared with the three above.
  */
 export const terrainStaticField = (
   dem: Dem,
@@ -117,6 +113,7 @@ export const terrainStaticField = (
   radiusMetres: number = defaultRadius(vis),
   horizon?: HorizonFields | null,
 ): Float32Array | null => {
+  if (vis === 'vat') return computeVat(dem);
   const radius = clampRadius(vis, dem, radiusMetres);
   if (vis === 'lrm') return computeLrm(dem, radius);
   if (!usesHorizon(vis)) return null;
@@ -127,15 +124,8 @@ export const terrainStaticField = (
       return fields.svf;
     case 'openPos':
       return fields.openPos;
-    case 'openNeg':
-      return fields.openNeg;
     default:
-      return composeVat(
-        computeHillshade(dem, VAT_AZIMUTH, VAT_ALTITUDE, VAT_Z_FACTOR),
-        computeSlope(dem, VAT_Z_FACTOR),
-        fields.openPos,
-        fields.svf,
-      );
+      return fields.openNeg;
   }
 };
 
@@ -168,28 +158,48 @@ export const terrainField = (
 };
 
 /**
+ * Cut a field computed over the whole grid back to the rectangle that was asked
+ * for. Every field is computed on the margin too — that is the point of having
+ * one — and none of it is shown.
+ */
+const cropToWindow = (field: Float32Array, dem: Dem): Float32Array => {
+  const { x, y, width, height } = dem.window;
+  if (width === dem.width && height === dem.height) return field;
+  const out = new Float32Array(width * height);
+  for (let row = 0; row < height; row++) {
+    out.set(
+      field.subarray((y + row) * dem.width + x, (y + row) * dem.width + x + width),
+      row * width,
+    );
+  }
+  return out;
+};
+
+/**
  * Field → pixels, onto `canvas` when one is passed (the panel reuses the
  * element the map's image layer draws from) or a fresh one otherwise. The
  * shaded views are already normalised to 0..1; the physical ones need a robust
  * stretch, or a single spike swallows the whole ramp.
  */
 export const paintTerrainField = (
-  field: Float32Array,
+  rawField: Float32Array,
   dem: Dem,
   vis: Visualization,
   canvas: HTMLCanvasElement = document.createElement('canvas'),
 ): HTMLCanvasElement | null => {
+  const field = cropToWindow(rawField, dem);
+  const { width, height } = dem.window;
   // Assigning either dimension resets the canvas, so only do it when the grid
   // changed; otherwise every slider frame reallocates a multi-megapixel buffer.
-  if (canvas.width !== dem.width || canvas.height !== dem.height) {
-    canvas.width = dem.width;
-    canvas.height = dem.height;
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
   }
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
 
-  // VAT needs no case: its four layers are mixed on absolute stretches
-  // (VAT_LAYERS) and it composites to 0..1, so re-stretching the composite to
+  // VAT needs no case: its layers are mixed on the absolute stretches in
+  // VAT_PRESETS and it composites to 0..1, so re-stretching the composite to
   // this hillside's percentiles would undo the calibration.
   let ramp: Ramp = 'grey';
   let range: [number, number] = [0, 1];
@@ -211,26 +221,27 @@ export const paintTerrainField = (
     const m = Math.max(Math.abs(lo), Math.abs(hi)) || 1;
     range = [-m, m];
   }
-  ctx.putImageData(
-    toImageData(field, dem.width, dem.height, ramp, range),
-    0,
-    0,
-  );
+  ctx.putImageData(toImageData(field, width, height, ramp, range), 0, 0);
   return canvas;
 };
 
 /**
- * The grid is sized from the bbox width, so the last row lands a fraction of a
- * pixel short of the southern edge; deriving the extent from the pixel count
- * rather than reusing `dem.bbox25833` keeps the image registered.
+ * Where a painted canvas actually lands. The grid is sized from the bbox width,
+ * so the last row falls a fraction of a pixel short of the southern edge, and
+ * the margin is cropped off in whole pixels; deriving the extent from the
+ * window's pixel offsets rather than reusing `dem.bbox25833` keeps the image
+ * registered against both.
  */
 export const demImageExtent = (dem: Dem): [number, number, number, number] => {
-  const [minX, , , maxY] = dem.bbox25833;
+  const [minX, , , maxY] = dem.grid25833;
+  const { x, y, width, height } = dem.window;
+  const west = minX + x * dem.metresPerPx;
+  const north = maxY - y * dem.metresPerPx;
   return [
-    minX,
-    maxY - dem.height * dem.metresPerPx,
-    minX + dem.width * dem.metresPerPx,
-    maxY,
+    west,
+    north - height * dem.metresPerPx,
+    west + width * dem.metresPerPx,
+    north,
   ];
 };
 

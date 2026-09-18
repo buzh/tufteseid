@@ -34,8 +34,9 @@ import {
 import { computeHorizonFields, type Visualization } from '../../terrain/shade';
 import { frameTerrainWindowAtom, terrainWindowAtom } from '../../terrain/window';
 
-// Pulldown and W/S order. VAT sits next to the three horizon views on purpose:
-// they share one ray walk, so walking between them is free rather than ~800 ms.
+// Pulldown and W/S order. The two lit views first, then VAT as the one view
+// that needs nothing set, then the three horizon views (which do share a ray
+// walk, so stepping between those three is free), then the two physical ones.
 export const VISUALIZATIONS: Visualization[] = [
   'hillshade',
   'multiHillshade',
@@ -78,8 +79,9 @@ export const useTerrainAnalysis = () => {
   const [opacity, setOpacity] = useState(100);
 
   // Two radii, split by quantity: smoothing distance (LRM) versus horizon
-  // search distance (svf, both opennesses, VAT). Switching within the horizon
-  // family must keep the number, or the horizon memo misses its cache.
+  // search distance (svf and both opennesses). Switching within the horizon
+  // family must keep the number, or the horizon memo misses its cache. VAT
+  // takes neither: its two search radii are pinned by the RVT presets.
   const [lrmRadius, setLrmRadius] = useState(DEFAULT_LRM_RADIUS);
   const [svfRadius, setSvfRadius] = useState(DEFAULT_SVF_RADIUS);
   const horizonVis = usesHorizon(vis);
@@ -132,10 +134,11 @@ export const useTerrainAnalysis = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bboxKey, model]);
 
-  // The one expensive pass, ~800 ms on a 600² grid, and read four ways (svf,
-  // both opennesses, VAT). Must not be keyed on `vis` or on azimuth, and is
-  // clamped through 'svf' so all four horizon views resolve to one radius —
-  // either mistake costs the whole scan per ring step, silently.
+  // The one expensive pass, ~800 ms on a 600² grid, and read three ways (svf
+  // and both opennesses). Must not be keyed on `vis` or on azimuth, and is
+  // clamped through 'svf' so all three resolve to one radius — either mistake
+  // costs the whole scan per ring step, silently. VAT walks its own rays, on
+  // its own grid, and is not in this memo.
   const horizonRadius = dem ? clampRadius('svf', dem, svfRadius) : svfRadius;
   const horizon = useMemo(
     () => (dem && horizonVis ? computeHorizonFields(dem, horizonRadius) : null),

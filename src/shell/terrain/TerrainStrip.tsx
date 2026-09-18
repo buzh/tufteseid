@@ -64,20 +64,22 @@ export const TerrainStrip = ({ terrain }: { terrain: TerrainAnalysis }) => {
         )}
         {/* Two readings: "0,50 m/px" alone doesn't say whether that is all the
             laser data there is or the grid cap biting, and only the capped
-            case is actionable (shrink the rectangle). */}
+            case is actionable (shrink the rectangle). The window's pixels, not
+            the grid's: the margin is fetched, never shown, and counting it here
+            would put a size on screen that no saved picture has. */}
         {!loading && !error && dem && (
           <span>
             {dem.metresPerPx > dem.nativeMetresPerPx * 1.05
               ? t('localities.terrain.resolutionCapped', {
                   m: dem.metresPerPx.toFixed(2),
-                  w: dem.width,
-                  h: dem.height,
+                  w: dem.window.width,
+                  h: dem.window.height,
                   src: dem.nativeMetresPerPx.toFixed(2),
                 })
               : t('localities.terrain.resolution', {
                   m: dem.metresPerPx.toFixed(2),
-                  w: dem.width,
-                  h: dem.height,
+                  w: dem.window.width,
+                  h: dem.window.height,
                 })}
           </span>
         )}

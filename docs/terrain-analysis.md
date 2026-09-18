@@ -116,12 +116,38 @@ arrives as one feature with `"BEST": null`, not as an empty `features` array.
 The response is under wmscache's 1000-byte store threshold, so `dem.ts`
 memoises it in-tab instead.
 
-`MAX_DEM_PX_PER_SIDE` (4000, derived as `MAX_SIDE_M / FINEST_M_PER_PX`) caps
-the assembled grid; `planTiles` scales resolution down to fit, and
-`Dem.nativeMetresPerPx` records what the acquisition actually publishes so the
-plate can say the render was resampled. Inside the band the two are equal by
-construction, so the resampled wording is reserved for a rectangle that got
-past the clamp.
+`MAX_DEM_PX_PER_SIDE` (4192, derived as
+`(MAX_SIDE_M + 2 × DEM_MARGIN_M) / FINEST_M_PER_PX`) caps the assembled grid;
+`planTiles` scales resolution down to fit, and `Dem.nativeMetresPerPx` records
+what the acquisition actually publishes so the plate can say the render was
+resampled. Inside the band the two are equal by construction, so the resampled
+wording is reserved for a rectangle that got past the clamp.
+
+### The margin
+
+`fetchDem` fetches `DEM_MARGIN_M` (24 m, the longest reach
+`horizonMaxRadiusMetres` can ask for) of extra ground on all four sides and
+crops it off before anything is painted. Without it the horizon rays along the
+edge walk off the grid, which reads as nothing there to block the sky — a
+24 m-wide frame around every render, too open, too bright, too convex. RVT pads
+the array by `radius_max` with `mode='reflect'`; real neighbouring ground is the
+honest version of that.
+
+The `Dem` therefore carries three extents, and mixing them up is the failure
+mode: `bbox25833` is the rectangle asked for, `grid25833` is that grown by the
+margin and is what `width × height` spans, and `window` is where the rectangle
+sits inside the grid in whole pixels. Everything that reaches a reader goes
+through `window` — the crop in `paintTerrainField`, the percentile stretches
+(a stretch taken over ground the reader cannot see is one they cannot check),
+the resolution readout, and `demImageExtent` for placing the canvas on the map.
+What is *stored* in an attachment's `meta` is `bbox25833` instead: it is what a
+re-render and the duplicate guard compare against, so it has to survive a round
+trip unchanged, and the painted window lands within half a pixel of it.
+
+The coverage probe deliberately still runs on the unpadded rectangle. Otherwise
+the margin could pull a finer neighbouring acquisition in and resample the whole
+grid to a resolution the rectangle itself has no data for, and "no laser data
+here" would stop being an answer about the rectangle.
 
 ## The visualizations, and what each plate records
 
@@ -136,7 +162,7 @@ pixels at render time.
 |---|---|
 | hillshade | azimuth, altitude, z-factor |
 | multidirectional | all six `MULTI_AZIMUTHS` *and* their weights, altitude, z-factor |
-| VAT | the whole `VAT_LAYERS` stack (vis, blend mode, opacity, absolute bounds), frozen sun 315°/35°, z-factor 1, horizon radius, `SVF_DIRECTIONS`, absolute stretch |
+| VAT | the `VAT_STACK` layers (vis, blend mode, opacity), both `VAT_PRESETS` in full (sun height, slope, openness and sky-view bounds, inner and outer radius) and the opacity they are combined at, frozen azimuth 315°, z-factor 1, `SVF_DIRECTIONS`, absolute stretch |
 | sky-view factor | horizon radius, `SVF_DIRECTIONS`, stretch |
 | positive openness | horizon radius, `SVF_DIRECTIONS`, stretch |
 | negative openness | horizon radius, `SVF_DIRECTIONS`, inverted ramp, stretch |
@@ -148,10 +174,10 @@ geodetic centre, grid resolution; `figure.set.horizonGrid` when the horizon
 scan decimated; `figure.set.resampled` with `nativeMetresPerPx` when the
 rectangle exceeded `MAX_DEM_PX_PER_SIDE`.
 
-- `MULTI_AZIMUTHS`, `SVF_DIRECTIONS` and `VAT_LAYERS` are exported because they
-  are printed; changing one changes what old and new renders mean relative to
-  each other. The VAT line is assembled from `VAT_LAYERS`, so the plate and the
-  blend cannot drift.
+- `MULTI_AZIMUTHS`, `SVF_DIRECTIONS`, `VAT_STACK` and `VAT_PRESETS` are exported
+  because they are printed; changing one changes what old and new renders mean
+  relative to each other. The VAT lines are assembled from the last two, so the
+  plate and the blend cannot drift.
 - Slope and negative openness are drawn on a reversed grey ramp and both say
   so — negative openness is high in a depression, so painted straight it would
   put ditches in white while sky-view beside it puts them in black (RVT inverts
@@ -159,6 +185,63 @@ rectangle exceeded `MAX_DEM_PX_PER_SIDE`.
 - VAT's stretches are absolute where every other view's are 2–98 % percentiles,
   and its sun is frozen: two VAT renders are comparable and two sky-view renders
   are not. Wiring the azimuth slider to VAT would break that silently.
+
+## VAT, and why it is two of them
+
+RVT's "VAT — Archaeological" is four layers over one another: hillshade at
+100 %, slope at 50 % luminosity, positive openness at 50 % overlay, sky-view
+factor at 25 % multiply (`VAT_STACK`, matching `rvt/blend.py`). Over
+single-band data two of the three blend modes collapse — a luminosity blend is
+the active layer, and an opacity is a plain linear mix — so `composeVat` is four
+lines of arithmetic, and only overlay keeps its own, driving off the
+*background* rather than the active layer as `rvt.blend_func.blend_overlay`
+does.
+
+What makes it work is the absolute stretches, and what makes a single set of
+them fail is gentle ground. RVT ships three terrain parameter sets in
+`settings/default_terrains_settings.json` — general, flat and steep — and the
+general one assumes relief that Norwegian farmland does not have. Measured on a
+synthetic 0.5° hillside at 0.25 m carrying a 12 m gravhaug, a 2 m ditch and a
+20 m bank 25 cm high:
+
+| stretches | whole image | ditch | mound | low bank |
+|---|---|---|---|---|
+| general | 0.52–0.87 (0.35) | 0.34 | 0.21 | 0.018 |
+| flat | 0.07–0.83 (0.76) | 0.74 | 0.63 | 0.086 |
+| flat, with its own sun and radii | 0.02–0.81 (0.79) | 0.66 | 0.65 | 0.107 |
+
+Under the general numbers the bank moves four grey levels out of 256. Upstream
+of the blend, positive openness over that scene spans 81.8–91.1° against a
+68–93° stretch and sky-view 0.858–1.000 against 0.7–1, so both horizon layers
+run at a third to a half of their intended contrast and VAT collapses towards
+hillshade-plus-slope.
+
+So the ring entry is RVT's *combined* VAT (`VAT_combined.py`): the general stack
+at 50 % over the flat one, which is their mean. Neither alone is offered.
+General goes flat on gentle ground, flat oversaturates on steep, and a reader
+choosing between them is being asked to classify the terrain before looking at
+it — which is what they came to the picture to do.
+
+Two details of the presets are restatements rather than copies. RVT gives the
+search radii in pixels (10 and 20) against the 0.5 m data it was written for;
+`VAT_PRESETS` states them in metres (5 m, and 10 m starting 4 m out), because a
+horizon angle over a fixed distance is a fact about the ground while over a
+fixed pixel count it is a fact about the grid, and the stretches are calibrated
+against the angle. And RVT's `svf_noise` is not a filter but an inner radius —
+skip the first 0/10/20/40 % of `r_max` — which `scanHorizon` takes as
+`innerMetres`. The three views that offer the reader a radius pass 0 for it:
+their radius is the one number on the legend, and a second hidden one under it
+would make that a fiction.
+
+VAT does not share the horizon family's ray walk, its radius slider or its
+decimation rule. It imposes its own grid through `vatDecimation`, targeting
+`VAT_SCAN_M_PER_PX` (0.5 m, RVT's own calibration resolution) and falling back
+to coarser only to stay under a budget of 1.2 M scanned cells, which is about
+three seconds for the pair. Scanning the same scene at 0.25 m instead bought
+5 % more contrast across a ditch and, with 3 cm of noise in the DEM, nearly
+doubled the speckle on featureless ground — grain, not signal. `vatDecimation`
+takes metres rather than a `Dem` so a figure caption can reach the same answer
+from a stored bbox.
 
 ## The horizon radius: reach is bought by decimating
 
@@ -181,9 +264,11 @@ resolving the features whose horizon is being measured.
   rectangle. `clampRadius(vis, dem, metres)` in `render.ts` is the single answer
   both the render and the plate go through, and `radiusRange` takes the
   slider's ceiling from it. Skipping it puts "SVF-radius 40 m" on a 24 m render.
-- The four views off the scan are one ray walk read four ways (`usesHorizon`),
-  the radius clamped through `'svf'` so all four resolve to the same number,
+- The three views off the scan are one ray walk read three ways (`usesHorizon`),
+  the radius clamped through `'svf'` so all three resolve to the same number,
   which is what lets the control surface cache it (`docs/ui-architecture.md`).
+  VAT is not among them: its radii are pinned by its presets the way its sun is,
+  so it has neither a slider to answer nor a scan to share.
 
 ## Tier 1 — server-side visualization sidecar (designed, not built)
 
@@ -191,9 +276,9 @@ A container on the `nib-proxy` pattern (`ghcr.io/osgeo/gdal:ubuntu-small` plus
 `rvt-py` and `rasterio`, optionally `whitebox-tools` — MIT core only, its
 Extension toolsets are proprietary), reachable only from wmscache, one POST
 `{bbox, model, visualization}` → PNG, results landing as attachments under a
-new `analyse` kind. Verdict: mostly overtaken, since VAT, sky-view and both
-opennesses turned out to be one ray walk plus a few lines of arithmetic and
-shipped client-side. What is left is the multiscale family (e3MSTP, multiscale
+new `analyse` kind. Verdict: mostly overtaken, since sky-view, both opennesses
+and VAT on top of them turned out to be a ray walk plus a few lines of
+arithmetic and shipped client-side. What is left is the multiscale family (e3MSTP, multiscale
 topographic position), which needs DEMs at several resolutions — one always-on
 Python service for one visualization family is a thin case.
 

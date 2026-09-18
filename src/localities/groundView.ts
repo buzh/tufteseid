@@ -12,7 +12,7 @@ import { extractCanvas } from '../lidarExtract/run';
 import { enumerateLidarSources } from '../lidarExtract/sources';
 import { setGroundOverlay } from '../map/groundOverlay';
 import { withDeadline } from '../shared/utils/deadline';
-import { renderTerrain } from '../terrain/render';
+import { demImageExtent, renderTerrain } from '../terrain/render';
 import { fetchFlyfoto } from './flyfoto';
 import { fetchFlyfotoProjectsForBbox } from './flyfotoProjects';
 import { isPinned, viewSpecOf, type ViewSpec } from './viewSpec';
@@ -103,7 +103,7 @@ export const renderViewRaster = async (
         signal,
       });
       return render
-        ? { canvas: render.canvas, extent25833: render.dem.bbox25833 }
+        ? { canvas: render.canvas, extent25833: demImageExtent(render.dem) }
         : null;
     }
 

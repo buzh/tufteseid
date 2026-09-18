@@ -18,16 +18,19 @@ import {
 } from '../map/layers/heritage';
 import { lidarStyleLabel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { themeLayerName } from '../map/layers/themeLayerConfigApi';
-import type { DemModel } from '../terrain/dem';
+import { DEM_MARGIN_M, type DemModel } from '../terrain/dem';
 import { defaultRadius, usesHorizon, type TerrainLight } from '../terrain/render';
 import {
   horizonDecimation,
   MULTI_AZIMUTHS,
   SVF_DIRECTIONS,
-  VAT_ALTITUDE,
   VAT_AZIMUTH,
-  VAT_LAYERS,
+  VAT_GENERAL_OPACITY,
+  VAT_PRESETS,
+  VAT_STACK,
   VAT_Z_FACTOR,
+  vatDecimation,
+  type VatTerrain,
   type Visualization,
 } from '../terrain/shade';
 import { dec, joinDot } from './draw';
@@ -163,31 +166,48 @@ export type TerrainFigureInput = Common & {
 };
 
 /**
- * VAT's layer stack as one line: what was blended over what, at what opacity,
- * stretched between what. Assembled from VAT_LAYERS rather than written out,
- * because a hand-written legend is one edit away from describing a blend the
- * code no longer performs.
+ * VAT's layer stack as one line: what was blended over what, at what opacity.
+ * Assembled from VAT_STACK rather than written out, because a hand-written
+ * legend is one edit away from describing a blend the code no longer performs.
  */
 const vatStack = (): string =>
-  VAT_LAYERS.map((layer) =>
+  VAT_STACK.map((layer) =>
     t('figure.set.vatLayer', {
       vis: t(`localities.terrain.vis.${layer.vis}`),
       blend: t(`figure.blend.${layer.blend}`),
       opacity: layer.opacity,
-      min: dec(layer.min, 2),
-      max: dec(layer.max, 2),
     }),
   ).join(' + ');
+
+/**
+ * One terrain preset's seven numbers. The stack above is the same on every VAT
+ * render ever made; these are the half that differs, and the same ground under
+ * the general stretches and under the flat ones is two different pictures.
+ */
+const vatPreset = (terrain: VatTerrain): string => {
+  const p = VAT_PRESETS[terrain];
+  return t('figure.set.vatPreset', {
+    name: t(`localities.terrain.vatTerrain.${terrain}`),
+    alt: p.sunAltitude,
+    slopeMax: p.slopeMax,
+    opMin: p.opennessMin,
+    opMax: p.opennessMax,
+    svfMin: dec(p.svfMin, 1),
+    inner: p.innerMetres,
+    radius: p.radiusMetres,
+  });
+};
 
 const terrainSettings = ({
   vis,
   light,
   metresPerPx,
   nativeMetresPerPx,
+  bbox25833,
   radius,
 }: Pick<
   TerrainFigureInput,
-  'vis' | 'light' | 'metresPerPx' | 'nativeMetresPerPx' | 'radius'
+  'vis' | 'light' | 'metresPerPx' | 'nativeMetresPerPx' | 'bbox25833' | 'radius'
 >): string[] => {
   const settings: string[] = [];
   const r = radius ?? defaultRadius(vis);
@@ -248,16 +268,20 @@ const terrainSettings = ({
         t('figure.set.stretch'),
       );
       break;
-    // Nothing here is adjustable — frozen sun, 1× exaggeration, fixed stretches
-    // — and printing it is how a reader knows the picture was not tuned to
-    // flatter this particular ground.
+    // Nothing here is adjustable — frozen azimuth, 1× exaggeration, fixed
+    // stretches — and printing it is how a reader knows the picture was not
+    // tuned to flatter this particular ground. The sun heights and the radii
+    // are inside the two preset lines, because each belongs to one of them.
     case 'vat':
       settings.push(
         t('figure.set.vatStack', { stack: vatStack() }),
+        t('figure.set.vatCombined', {
+          general: vatPreset('general'),
+          flat: vatPreset('flat'),
+          pct: VAT_GENERAL_OPACITY * 100,
+        }),
         t('figure.set.azimuth', { deg: VAT_AZIMUTH }),
-        t('figure.set.altitude', { deg: VAT_ALTITUDE }),
         t('figure.set.zFactor', { z: VAT_Z_FACTOR }),
-        t('figure.set.opennessRadius', { m: r }),
         t('figure.set.svfDirections', { n: SVF_DIRECTIONS }),
         t('figure.set.absoluteStretch'),
       );
@@ -266,13 +290,25 @@ const terrainSettings = ({
   // The horizon scan averages the DEM down to reach past its step budget, so
   // these views are read off a coarser surface than the resolution line claims,
   // and the same radius over two surfaces is two different measurements.
-  if (usesHorizon(vis)) {
-    const factor = horizonDecimation(metresPerPx, r);
-    if (factor > 1) {
-      settings.push(
-        t('figure.set.horizonGrid', { m: dec(metresPerPx * factor, 2) }),
-      );
-    }
+  // VAT is not in that family — it imposes its own grid rather than reaching
+  // for one — but the line means the same thing, and it is derived from the
+  // rectangle because that is all a stored record keeps. `metresPerPx` may have
+  // been coarsened by the store fit since; the product below is very nearly
+  // invariant to that, since both halves of `vatDecimation` are distances.
+  const scanFactor =
+    vis === 'vat'
+      ? vatDecimation(
+          bbox25833[2] - bbox25833[0] + 2 * DEM_MARGIN_M,
+          bbox25833[3] - bbox25833[1] + 2 * DEM_MARGIN_M,
+          metresPerPx,
+        )
+      : usesHorizon(vis)
+        ? horizonDecimation(metresPerPx, r)
+        : 1;
+  if (scanFactor > 1) {
+    settings.push(
+      t('figure.set.horizonGrid', { m: dec(metresPerPx * scanFactor, 2) }),
+    );
   }
   if (nativeMetresPerPx != null && nativeMetresPerPx < metresPerPx) {
     settings.push(t('figure.set.resampled', { m: dec(nativeMetresPerPx, 2) }));

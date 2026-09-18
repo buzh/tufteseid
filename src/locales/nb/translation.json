@@ -549,10 +549,14 @@
         "lrm": "Lokalrelieff",
         "slope": "Helning"
       },
+      "vatTerrain": {
+        "general": "generell",
+        "flat": "flat"
+      },
       "visMeta": {
         "hillshade": "én sol, du styrer den",
         "multiHillshade": "seks soler, ingenting i mørke",
-        "vat": "fire lag i ett bilde",
+        "vat": "fire lag, to oppskrifter",
         "svf": "hvor mye himmel",
         "openPos": "hauger, kanter og rygger",
         "openNeg": "søkk, grøfter og hulveier",
@@ -562,7 +566,7 @@
       "visHint": {
         "hillshade": "Én lyskilde. Dra på asimut for å sveipe lyset — strukturer som ligger parallelt med lyset er usynlige.",
         "multiHillshade": "Seks lysretninger vektet mot nordvest. Ingen retning blir liggende i mørke.",
-        "vat": "RVT-oppskriften «VAT – arkeologisk»: skyggerelieff, helning, positiv åpenhet og himmelsyn blandet i ett gråtonebilde. Fast lys og faste kontrastgrenser, så to VAT-bilder av ulike steder viser det samme.",
+        "vat": "RVT-oppskriften «VAT – arkeologisk»: skyggerelieff, helning, positiv åpenhet og himmelsyn blandet i ett gråtonebilde. Kjørt to ganger — én oppskrift for kupert terreng og én for flatt — og lagt sammen, så en gravhaug i åkeren kommer fram uten at en fjellside brenner ut. Fast lys og faste kontrastgrenser, så to VAT-bilder av ulike steder viser det samme.",
         "svf": "Hvor mye av himmelen som er synlig. Uavhengig av lysretning: søkk og grøfter blir mørke, hauger og voller lyse.",
         "openPos": "Gjennomsnittlig vinkel opp til horisonten i seksten retninger. Uavhengig av lysretning som himmelsyn, men fremhever det som stikker opp: hauger, kanter og rygger.",
         "openNeg": "Det samme målt nedover, som om terrenget var snudd. Tegnet med omvendt gråskala, som helning og himmelsyn, så det som går ned blir mørkt: grøfter, kullgroper og hulveier.",
@@ -776,7 +780,9 @@
       "svfDirections": "{{n}} retninger",
       "horizonGrid": "horisontsøk i {{m}} m rutenett",
       "vatStack": "VAT-stabel: {{stack}}",
-      "vatLayer": "{{vis}} ({{blend}}, {{opacity}} %, {{min}}–{{max}})",
+      "vatLayer": "{{vis}} ({{blend}}, {{opacity}} %)",
+      "vatPreset": "{{name}} (sol {{alt}}°, helning 0–{{slopeMax}}°, åpenhet {{opMin}}–{{opMax}}°, himmelsyn {{svfMin}}–1, radius {{inner}}–{{radius}} m)",
+      "vatCombined": "kombinert: {{general}} {{pct}} % over {{flat}}",
       "diverging": "divergerende fargeskala, symmetrisk om null",
       "inverted": "omvendt gråskala, høye verdier mørke",
       "stretch": "kontraststrekk 2–98 %",

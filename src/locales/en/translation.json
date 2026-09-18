@@ -549,10 +549,14 @@
         "lrm": "Local relief",
         "slope": "Slope"
       },
+      "vatTerrain": {
+        "general": "general",
+        "flat": "flat"
+      },
       "visMeta": {
         "hillshade": "one sun, yours to move",
         "multiHillshade": "six suns, nothing left unlit",
-        "vat": "four layers in one picture",
+        "vat": "four layers, two recipes",
         "svf": "how much sky",
         "openPos": "mounds, edges and ridges",
         "openNeg": "hollows, ditches and sunken roads",
@@ -562,7 +566,7 @@
       "visHint": {
         "hillshade": "One light source. Drag the azimuth to sweep it — features running parallel to the light are invisible.",
         "multiHillshade": "Six light directions weighted toward the north-west. No orientation is left unlit.",
-        "vat": "RVT's “VAT – Archaeological” recipe: hillshade, slope, positive openness and sky-view factor blended into one greyscale image. Fixed light and fixed contrast limits, so two VAT renders of different places mean the same thing.",
+        "vat": "RVT’s “VAT – Archaeological” recipe: hillshade, slope, positive openness and sky-view factor blended into one greyscale image. Run twice — once with the settings for rugged terrain, once with those for flat — and combined, so a burial mound in a field comes out without a mountainside burning white. Fixed light and fixed contrast limits, so two VAT renders of different places mean the same thing.",
         "svf": "How much of the sky is visible. Independent of light direction: hollows and ditches go dark, mounds and banks go bright.",
         "openPos": "Mean angle up to the horizon in sixteen directions. Independent of light direction like sky-view factor, but it brings out what stands proud: mounds, edges and ridges.",
         "openNeg": "The same measured downwards, as if the terrain were inverted. Drawn on a reversed grey ramp, like slope and sky-view factor, so what cuts in goes dark: ditches, charcoal pits and sunken roads.",
@@ -776,7 +780,9 @@
       "svfDirections": "{{n}} directions",
       "horizonGrid": "horizon searched on a {{m}} m grid",
       "vatStack": "VAT stack: {{stack}}",
-      "vatLayer": "{{vis}} ({{blend}}, {{opacity}} %, {{min}}–{{max}})",
+      "vatLayer": "{{vis}} ({{blend}}, {{opacity}} %)",
+      "vatPreset": "{{name}} (sun {{alt}}°, slope 0–{{slopeMax}}°, openness {{opMin}}–{{opMax}}°, sky-view {{svfMin}}–1, radius {{inner}}–{{radius}} m)",
+      "vatCombined": "combined: {{general}} {{pct}} % over {{flat}}",
       "diverging": "diverging ramp, symmetric about zero",
       "inverted": "reversed grey ramp, high values dark",
       "stretch": "contrast stretch 2–98 %",

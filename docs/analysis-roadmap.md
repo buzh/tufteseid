@@ -50,8 +50,9 @@ Files: `src/terrain/{dem,shade,render}.ts`, `src/shell/terrain/*`. Proxy route
 ## Tier 1 — server-side sidecar
 
 Overtaken in most of its scope: RVT's blend modes collapse on single-band data,
-so VAT is a few lines of arithmetic and openness is the sky-view ray walk read
-a second way — all four shipped client-side. What remains is the multiscale
+so VAT is a few lines of arithmetic over two runs of its own presets, and
+openness is the sky-view ray walk read a second way — all four shipped
+client-side. What remains is the multiscale
 family (e3MSTP, multiscale topographic position), which needs DEMs at several
 resolutions. Cost to weigh: a new always-on service and a Python dependency
 chain for one visualization family. Design in `docs/terrain-analysis.md`.

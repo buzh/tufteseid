@@ -274,6 +274,10 @@ const renderSpecWithin = async (
         meta: {
           // The file's, not the DEM's: the store fit may have coarsened it.
           metresPerPx: fitted.metresPerPx,
+          // The rectangle asked for, not `demImageExtent` — the painted window
+          // lands within half a pixel of it, and this number is what
+          // `rectangleOf` re-renders from and what the duplicate guard
+          // compares, so it has to survive a round trip unchanged.
           bbox25833: render.dem.bbox25833,
           // What the finest acquisition over the rectangle publishes. The
           // legend says "resampled from 0,25 m" off the gap between the two,
