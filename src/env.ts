@@ -26,7 +26,7 @@ const DEFAULT_ENV: Env = {
 
 declare global {
   interface Window {
-    __NK_CONFIG__?: Partial<Env> & {
+    __TUFTESEID_CONFIG__?: Partial<Env> & {
       layerProviderParameters?: Partial<layerProviderParameters>;
     };
   }
@@ -34,7 +34,7 @@ declare global {
 
 const getEnv = (): Env => {
   const override =
-    typeof window !== 'undefined' ? window.__NK_CONFIG__ : undefined;
+    typeof window !== 'undefined' ? window.__TUFTESEID_CONFIG__ : undefined;
   if (!override) return DEFAULT_ENV;
   return {
     ...DEFAULT_ENV,

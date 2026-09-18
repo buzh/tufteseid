@@ -890,7 +890,7 @@ From the inherited Norgeskart app:
 - Hostname-based environment detection in `src/env.ts`, with `envName` and
   `layerProviderParameters.geoNorgeWMS` — it matched Kartverket's domains, so
   every Tufteseid deployment silently ran the DEV table. Now `DEFAULT_ENV` plus
-  the `window.__NK_CONFIG__` override from the bind-mounted `config.js`.
+  the `window.__TUFTESEID_CONFIG__` override from the bind-mounted `config.js`.
 - Google Fonts (Raleway + Work Sans) in `index.html` — nothing set
   `font-family`. Mulish is self-hosted, so `font-src 'self'` suffices.
 - The generic theme-layer tree (`src/settings/map/themes/`,

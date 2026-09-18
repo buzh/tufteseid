@@ -118,7 +118,7 @@ ENTRY=$(grep -o 'src="/assets/[^"]*\.js"' "$TMP/body" | head -1 | sed 's/^src="/
 note "entry bundle ${ENTRY:-none found}"
 
 check csp-header "$BASE/" 200 text/html 300 '' "content-security-policy:.*default-src 'self'"
-check config-js "$BASE/config.js" 200 javascript 50 '__NK_CONFIG__'
+check config-js "$BASE/config.js" 200 javascript 50 '__TUFTESEID_CONFIG__'
 if [ -n "$ENTRY" ]; then
   check entry-bundle "$BASE$ENTRY" 200 javascript 500
 else

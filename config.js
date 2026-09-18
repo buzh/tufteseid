@@ -1,4 +1,4 @@
-window.__NK_CONFIG__ = {
+window.__TUFTESEID_CONFIG__ = {
   apiUrl: 'https://api.norgeskart.no',
   geoNorgeApiBaseUrl: 'https://ws.geonorge.no',
   pocketbaseUrl: '/pb',
