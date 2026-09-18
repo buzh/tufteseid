@@ -10,23 +10,23 @@ const updateUrl = (
 };
 
 export const setUrlParameter = (
-  key: NKUrlParameter,
+  key: UrlParameter,
   value: string | number | boolean,
 ): void => {
   const url = new URL(window.location.href);
   updateUrl(url, (params) => params.set(key, String(value)));
 };
 
-export const removeUrlParameter = (key: NKUrlParameter): void => {
+export const removeUrlParameter = (key: UrlParameter): void => {
   const url = new URL(window.location.href);
   updateUrl(url, (params) => params.delete(key));
 };
 
-export const getUrlParameter = (key: NKUrlParameter): string | null => {
+export const getUrlParameter = (key: UrlParameter): string | null => {
   return getSearchParams().get(key);
 };
 
-export const getListUrlParameter = (key: NKUrlParameter): string[] | null => {
+export const getListUrlParameter = (key: UrlParameter): string[] | null => {
   const param = getSearchParams().get(key);
   if (param) {
     return param.split(',');
@@ -35,7 +35,7 @@ export const getListUrlParameter = (key: NKUrlParameter): string[] | null => {
 };
 
 export const addToUrlListParameter = (
-  key: NKUrlParameter,
+  key: UrlParameter,
   value: string | number | boolean,
 ): void => {
   const param = getSearchParams().get(key);
@@ -50,7 +50,7 @@ export const addToUrlListParameter = (
 };
 
 export const removeFromUrlListParameter = (
-  key: NKUrlParameter,
+  key: UrlParameter,
   value: string | number | boolean,
 ): void => {
   const param = getSearchParams().get(key);
@@ -69,7 +69,7 @@ export const removeFromUrlListParameter = (
   });
 };
 
-export type NKUrlParameter =
+export type UrlParameter =
   | 'projection'
   | 'backgroundLayer'
   | 'hybrid'

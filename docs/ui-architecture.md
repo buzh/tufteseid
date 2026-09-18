@@ -142,7 +142,7 @@ jotai on the default store — there is no `Provider`, so module-level code
 
 ### URL persistence
 
-Hand-rolled in `src/shared/utils/urlUtils.ts`; the `NKUrlParameter` union is
+Hand-rolled in `src/shared/utils/urlUtils.ts`; the `UrlParameter` union is
 the whole vocabulary and writes go through `history.replaceState` only.
 
 - Round-trip: `lat`, `lon`, `zoom`, `backgroundLayer`, `hybrid`, `contours`,

@@ -4,7 +4,7 @@ import VectorLayer from 'ol/layer/Vector';
 import { transform } from 'ol/proj';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getPropertyGeometry } from '../../api/nkApiClient';
+import { getPropertyGeometry } from '../../api/matrikkelApi';
 import { getPropertyGeometryLayer } from '../../map/vectorLayers';
 import { mapAtom } from '../../map/atoms';
 import { mapLayers } from '../../map/layers';
