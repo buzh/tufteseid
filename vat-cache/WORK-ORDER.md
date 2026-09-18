@@ -174,8 +174,12 @@ arrives in one call and there is no mosaic to assemble.
 6. **Manifest** — `manifest.json` beside the tiles: acquisition, RVT version,
    both presets, the blend order, azimuth, the combined opacity, and per level
    the resolution, `r_max`/`r_min` in pixels and metres, overlap and encoding —
-   plus a digest over all of it. A run against an existing manifest with a
-   different digest stops rather than mixing two caches in one directory.
+   plus a digest. A run against an existing manifest with a different digest
+   stops rather than mixing two caches in one directory. The digest covers
+   everything but the per-level block: which levels an invocation happens to
+   build is not a property of the cache, and a store holding z15 has to accept
+   the run that adds z14. Each level's entry is derived from z and the settings
+   the digest does cover, so nothing escapes it.
 
 ## Acceptance
 

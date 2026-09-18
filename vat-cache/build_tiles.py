@@ -170,8 +170,9 @@ def build_unit(args):
 
 
 def settings(project, levels, unit_tiles):
-    """Everything that decides what the pixels are. The digest of this is what
-    makes a cache built under changed settings declare itself a different one."""
+    """Everything that decides what the pixels are. The digest of this, minus the
+    per-level entries, is what makes a cache built under changed settings declare
+    itself a different one — see `open_manifest`."""
     from importlib.metadata import version
 
     return {
@@ -217,8 +218,13 @@ def settings(project, levels, unit_tiles):
 def open_manifest(out, project, levels, unit_tiles, force):
     """Write the manifest, or check the one already there agrees with this run."""
     wanted = settings(project, levels, unit_tiles)
+    # Over everything except `levels`. Which levels one invocation builds is not
+    # a property of the cache: a level's entry is derived from z and the settings
+    # above it, and levels arrive one run at a time, so a store holding z15 has
+    # to accept the run that adds z14.
     digest = hashlib.sha256(
-        json.dumps(wanted, sort_keys=True).encode()
+        json.dumps({k: v for k, v in wanted.items() if k != "levels"},
+                   sort_keys=True).encode()
     ).hexdigest()[:16]
     wanted["digest"] = digest
     path = Path(out) / "manifest.json"
