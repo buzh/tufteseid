@@ -252,7 +252,8 @@ export const getElevation = async (
   url.searchParams.append('f', 'json');
   url.searchParams.append('geometry', `${xTransformed},${yTransformed}`);
   url.searchParams.append('geometryType', 'esriGeometryPoint');
-  url.searchParams.append('sr', '25833'); //TODO ta denne som input
+  // Fixed, and matches the transform above: the ImageServer is 25833-only.
+  url.searchParams.append('sr', '25833');
   url.searchParams.append('returnGeometry', 'false');
   url.searchParams.append('returnCatalogItems', 'false');
   let httpStatus;
@@ -318,7 +319,7 @@ export const getPropertyDetailsByMatrikkelId = async (
     !isNumeric(festenr) ||
     !isNumeric(seksjonsnr)
   ) {
-    throw new Error('Alle parametere må være numeriske verdier.'); //TODO, ta inn number?!
+    throw new Error('Alle parametere må være numeriske verdier.');
   }
 
   let url = `${env.apiUrl}/v1/matrikkel/eiendom/`;
