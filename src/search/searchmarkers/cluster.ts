@@ -1,12 +1,11 @@
 import { Feature } from 'ol';
 import { FeatureLike } from 'ol/Feature';
 import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style';
-import { createMarkerStyle } from './marker';
 
 export const clusterStyle = (
   feature: FeatureLike,
   hoveredResult: { lon: number; lat: number } | null,
-): Style => {
+): Style | undefined => {
   const clusterFeatures = feature.get('features');
 
   if (clusterFeatures && clusterFeatures.length > 1) {
@@ -36,11 +35,7 @@ export const clusterStyle = (
     });
   }
 
-  const singleFeature = clusterFeatures?.[0];
-  if (singleFeature) {
-    const style = singleFeature.getStyle?.();
-    if (style) return style;
-  }
-
-  return createMarkerStyle('blue');
+  // A cluster of one renders as the marker `createMarker` already styled it
+  // with. Nothing else can be in this layer, so an empty cluster draws nothing.
+  return clusterFeatures?.[0]?.getStyle?.();
 };

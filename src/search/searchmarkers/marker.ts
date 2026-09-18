@@ -9,7 +9,7 @@ import { SearchResult } from '../../types/searchTypes';
 // distinguishes a marker.
 type MarkerColor = 'red' | 'blue';
 
-export const createMarkerStyle = (iconSrc: string): Style => {
+const createMarkerStyle = (iconSrc: string): Style => {
   return new Style({
     image: new Icon({
       src: iconSrc,
