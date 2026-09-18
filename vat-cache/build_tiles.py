@@ -248,7 +248,9 @@ def main():
     p.add_argument("--unit-tiles", type=int, default=DEFAULT_UNIT_TILES)
     p.add_argument("--jobs", type=int, default=1,
                    help="units in parallel; every one is a fetch, so be kind")
-    p.add_argument("--limit", type=int, help="stop after this many units, for a pilot")
+    p.add_argument("--limit", type=int,
+                   help="stop after this many *unmarked* units, for a pilot; "
+                        "run it twice and it does the next batch, not the same one")
     p.add_argument("--dry-run", action="store_true", help="count units and stop")
     p.add_argument("--force", action="store_true",
                    help="write into a store whose manifest disagrees")

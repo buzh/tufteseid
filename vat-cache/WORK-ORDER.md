@@ -73,6 +73,10 @@ being encoded, not structure. At z13 a 2 px radius is one cell's height
 difference wearing openness' stretch. Side by side the z13 pair settles it — the
 pixel-locked tile reads as landscape relief, the metre-locked one as mush.
 
+The columns are a comparison of two rules on one rocky patch, not a budget. That
+patch runs dear: the z15 pilot came out at 0.280 B/px on fully covered tiles
+against the 0.320 above. §5 has the measured bytes.
+
 What this gives up is that the reach changes as you zoom, so the ladder is four
 related pictures rather than one picture at four sizes. That is what a
 multi-scale relief pyramid is, and it is a different thing from the fault that
@@ -126,6 +130,12 @@ footprint only half reaches. So alpha is free on full tiles and a saving on
 partial ones, and it is the honest answer for no-data, which would otherwise
 paint uncovered ground a real grey. q85 would be 0.274 and q95 0.423.
 
+The z15 pilot bears both out over 40 work units: 348 tiles, 17.3 MB, 73 % of the
+written area covered. **0.280 B/px on the 175 fully covered tiles**, 0.259 over
+covered ground across all of them — so the partial tiles cost 0.215 per covered
+pixel, less than the full ones. The edge of an acquisition is cheap, not dear,
+and the whole of z15 comes to **0.66 GB**.
+
 The caveat to record: a figure plate must not be generated from cached pixels.
 `src/figure/` renders from the float field through `paintTerrainField` and
 should keep doing that. The manifest's encoding line is what keeps a screenshot
@@ -169,16 +179,22 @@ arrives in one call and there is no mosaic to assemble.
 
 ## Acceptance
 
+The gates, and where they stand after the z15 pilot:
+
 - `coverage.py` reproduces 1,106 km² for the fixture acquisition, and the
-  rasteriser still returns 879.2 km² for the 879.17 km² footprint.
-- A pilot run over ~20 km² completes, resumes correctly after a kill, and its
-  tiles show no seams at work-unit boundaries.
-- Bytes per pixel and seconds per km² from the pilot replace the single-site
-  figures in the table above, which are one 500 m patch of rocky ground.
+  rasteriser returns 879.2 km² for the 879.17 km² footprint. **Holds.**
+- A pilot completes, resumes, and shows no seams at work-unit boundaries.
+  **Holds** over 40 units: a re-run skips every marked unit and takes the next
+  batch, and the step across a unit join measures the same as the step between
+  adjacent columns inside one.
+- Bytes per pixel from the pilot replace the single-patch figures wherever a
+  budget is quoted. **Done** — §5.
 - Changing one preset value produces a manifest that declares itself different
-  and refuses to write into the old cache.
-- Only then the full run: ~1.5 core-hours of arithmetic, ~22 GB fetched, and on
-  the single-site bytes ~1.3 GB written.
+  and refuses to write into the old cache. **Holds.**
+- Then the full run. On the pilot's rate: **~4.5 core-hours**, ~25 GB fetched,
+  **~0.9 GB written**. A work unit is the same 2096 px square at every level, so
+  it costs the same 11–13 s wherever it is — 1,416 units is the whole budget,
+  941 of them z15.
 
 ## Constraints carried from the repo
 

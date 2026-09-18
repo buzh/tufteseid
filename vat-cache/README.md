@@ -60,11 +60,15 @@ For **Vestfold og Telemark 5pkt 2021**:
   holds the pixels, so every level is RVT's combined VAT of its own grid.
 - **The ladder is z15 → z12** on the app's shared grid, 941 / 313 / 116 / 46
   work units of 4×4 tiles.
-- **Compute is not the constraint.** 3.7 s per km² at z15, about 10 s per work
-  unit including the fetch, so ~2.6 core-hours for z15 and ~1.5 for the rest.
+- **Compute is not the constraint.** A work unit is the same 2096 px square at
+  every level, so it costs the same 11–13 s wherever it is, fetch included:
+  ~3 core-hours for z15's 941 units and ~1.6 for the 475 above it.
 - **Tiles are RGBA WebP q90.** An opaque alpha channel is free (0.339 B/px
   either way) and a half-covered tile is cheaper (0.153), so alpha is how
   no-data is stored rather than a grey that would look like ground.
+- **The whole ladder is under a gigabyte.** Measured over 40 z15 units: 0.280
+  B/px on fully covered tiles, 0.259 over covered ground, which puts z15 at
+  0.66 GB and the four levels at ~0.9 GB against ~25 GB fetched.
 - **Seams do not appear** at work-unit boundaries with a 24 px overlap: the step
   across a unit join measures the same as the step between any two adjacent
   columns inside one.
