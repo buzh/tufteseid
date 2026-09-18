@@ -4,7 +4,10 @@ import { activeLocalityAtom } from '../localities/atoms';
 import { cycleBilderAtom } from '../localities/bilderRing';
 import { ribbonToolAtom } from '../localities/toolAtoms';
 import { focusedHalfAtom } from '../map/compare/halves';
-import { spendProvisionalViewAtom } from '../map/groundOverlay';
+import {
+  provisionalViewAtom,
+  spendProvisionalViewAtom,
+} from '../map/groundOverlay';
 import type { CycleKey } from '../map/useBackgroundCyclingKeys';
 import { frameTerrainWindowAtom, terrainWindowAtom } from '../terrain/window';
 import type { FlyfotoControls } from './flyfoto/useFlyfotoControls';
@@ -91,6 +94,15 @@ export const useGroundMode = (
         : 'kart';
 
   const modifiers = groundModifiers(mode);
+
+  // The arrival cover is a stored picture laid over the ground, and it is laid
+  // without moving the ring — entering the View it names would start a fetch,
+  // and for a terrain View a DEM download, for anyone who merely opened a
+  // shared link. So the ring says nothing rather than naming a ground that is
+  // not what is on screen; `[Visning ▾]` is the one signal until the first
+  // press spends the cover. `modifiers` is unaffected: the strip describes the
+  // ground underneath, which is still the one the controls would move.
+  const covered = useAtomValue(provisionalViewAtom) != null;
 
   const leaveTerrain = () => {
     setTool((cur) => (cur === 'terrain' ? null : cur));
@@ -231,7 +243,17 @@ export const useGroundMode = (
   // A getter: the ref changes without rendering.
   const previous = () => previousRef.current;
 
-  return { mode, modifiers, half, select, cycle, peekStart, peekEnd, previous };
+  return {
+    mode,
+    modifiers,
+    covered,
+    half,
+    select,
+    cycle,
+    peekStart,
+    peekEnd,
+    previous,
+  };
 };
 
 export type GroundControls = ReturnType<typeof useGroundMode>;

@@ -25,7 +25,11 @@ import { RibbonSearch } from './RibbonSearch';
 import { RibbonSettingsRow } from './RibbonSettingsRow';
 import styles from './Ribbon.module.css';
 import { useTerrainAnalysis } from './terrain/useTerrainAnalysis';
-import { GROUND_MODES, useGroundMode } from './useGroundMode';
+import {
+  GROUND_MODES,
+  type GroundMode,
+  useGroundMode,
+} from './useGroundMode';
 import { useRecreateView } from './useRecreateView';
 
 /**
@@ -60,6 +64,8 @@ export const RibbonGlobalRow = () => {
   });
   // Mounted here because applying a saved view writes all four control hooks.
   useRecreateView(ground, lidar, flyfoto, terrain);
+
+  const lit = (mode: GroundMode) => ground.mode === mode && !ground.covered;
 
   // A/D/W/S/E. Exactly one registered handler: `useGroundMode.cycle` routes
   // them rather than each ring registering and racing the others.
@@ -143,7 +149,9 @@ export const RibbonGlobalRow = () => {
       <div className={styles.row}>
         <RibbonSearch />
 
-        {/* The ring. Order is GROUND_MODES, which is also 1–5. */}
+        {/* The ring. Order is GROUND_MODES, which is also 1–5. Every button
+            reads through `lit`, so the whole ring goes dark together while an
+            arrival cover is on the ground. */}
         <div className={styles.group}>
           {/* First, and the ground a cold load arrives on: relief is the thing
               being read here. Lands on whatever the dataset pulldown is set
@@ -152,7 +160,7 @@ export const RibbonGlobalRow = () => {
             icon="landscape"
             label={t('ribbon.mode.lidar')}
             tooltip={`${t('ribbon.mode.lidarTip')} (1)`}
-            active={ground.mode === 'lidar'}
+            active={lit('lidar')}
             onClick={() => ground.select('lidar')}
           />
 
@@ -163,7 +171,7 @@ export const RibbonGlobalRow = () => {
               icon="map"
               label={t('ribbon.mode.kart')}
               tooltip={`${t('ribbon.mode.kartTip')} (2)`}
-              active={ground.mode === 'kart'}
+              active={lit('kart')}
               joinedRight
               onClick={() => ground.select('kart')}
             />
@@ -179,7 +187,7 @@ export const RibbonGlobalRow = () => {
             icon="signpost"
             label={t('ribbon.mode.hybrid')}
             tooltip={`${t('ribbon.mode.hybridTip')} (3)`}
-            active={ground.mode === 'hybrid'}
+            active={lit('hybrid')}
             onClick={() => ground.select('hybrid')}
           />
 
@@ -191,7 +199,7 @@ export const RibbonGlobalRow = () => {
             icon="satellite_alt"
             label={t('ribbon.mode.flyfoto')}
             tooltip={`${t('ribbon.mode.flyfotoTip')} (4)`}
-            active={ground.mode === 'flyfoto'}
+            active={lit('flyfoto')}
             onClick={() => ground.select('flyfoto')}
           />
 
@@ -209,7 +217,7 @@ export const RibbonGlobalRow = () => {
                 ? t('ribbon.compare.noTerrainRight')
                 : `${t('ribbon.terrain.tip')} (5)`
             }
-            active={ground.mode === 'terreng'}
+            active={lit('terreng')}
             disabled={ground.half === 'b'}
             onClick={() => ground.select('terreng')}
           />

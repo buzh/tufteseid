@@ -435,7 +435,13 @@ up as its own flatten rather than as the stack it describes — `Legg ut igjen`
 is a press, and it enters the ground the scene names. A scene kept over
 Kart or Hybrid is skipped: that flatten is on white paper and would blank
 the rectangle. The cover is provisional, so the first ground the reader asks
-for withdraws it (`provisionalViewAtom`).
+for withdraws it (`provisionalViewAtom`). While it is up the whole ground ring
+reads dark — not one button lit — because a stored View is over the ground and
+naming the ground underneath it would be a lie. Entering the View instead is
+what the bypass is avoiding: it would start a fetch, and for a terrain View a
+DEM download, for anyone who merely opened a shared link. `[Visning ▾]` is the
+one signal until the cover is spent; `groundModifiers` is unaffected, since the
+strip describes the ground the controls would still move.
 
 Four routes an image takes in:
 

@@ -97,7 +97,10 @@ run this; it needs no account and touches nothing.
    and the lokalitet row reads *Løkstad* with its code chip and a `public`
    badge, and a *Delt av* banner naming whatever the owner put in `credit` —
    absent where they cleared it, since the `users` record behind it is not a
-   guest's to read.
+   guest's to read. The first bilde is on the ground as the arrival cover, so
+   the ground ring reads dark — no button lit, whatever kind the cover is — and
+   `[Visning ▾]` is the only thing saying what you are looking at. The first
+   ground press takes the cover down and lights that button.
 2. **Stance.** The exits are `[Lukk] [⋮]` and nothing else — no `Rediger`
    (not the owner), no `Lag min kopi` (not signed in). `Nytt funn`, `Behold`,
    `Hent ▾` and `Skjermbilde` are absent, not greyed. `⋮` offers Zoom til
