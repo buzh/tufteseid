@@ -36,14 +36,14 @@ One line each, with the symptom of breaking it.
 Versions: React 19 (StrictMode) · Vite 8 · TypeScript ~7.0.2 · jotai ^2.20.3 +
 jotai-effect · OpenLayers ^10.10.0 with proj4 (EPSG:25833) · PocketBase JS SDK
 ^0.28 · @tanstack/react-query ^5 (one consumer: the elevation lookup) ·
-i18next ^26 / react-i18next ^17 · react-router-dom ^7 · material-symbols
+i18next ^26 / react-i18next ^17 · material-symbols
 ^0.40.2 · @fontsource/mulish · @excalidraw/excalidraw ^0.18.1 · uuid.
 
 ```
-main.tsx → mainApp.tsx   StrictMode → BrowserRouter → AtomWrapper →
+main.tsx → mainApp.tsx   StrictMode → AtomWrapper →
                          QueryClientProvider → App + Toaster
-App.tsx                  pbAuthSyncEffect above the router
-  /                      AppShell        /hjelp   HelpPage
+App.tsx                  pbAuthSyncEffect, F11, then AppShell. No router: the
+                         app answers on `/` and nowhere else.
 AppShell
   .map                   MapComponent    (unconditional, unkeyed, never moved)
   .overlay               CompareCurtain
@@ -170,7 +170,8 @@ capped at one line.
 
 Row 1: `RibbonSearch`, Kart (1), LiDAR (2), Hybrid (3), Flyfoto (4),
 `[Kulturminner ▾]`, Stedsinfo (I), Mål, Mine lokaliteter, Ny lokalitet,
-`RibbonAccount`. Terreng (5) and Sammenlign are on the lokalitet row, because
+`RibbonLanguage`, `RibbonAccount`. Terreng (5) and Sammenlign are on the
+lokalitet row, because
 both read a rectangle. `LocalityRibbon` is the one mount point for
 `useLocalityWorkspace`; `useGroundMode` and `useTerrainAnalysis` are each
 mounted once, in row 1.
@@ -485,7 +486,7 @@ end of the copy's carousel through `useInheritedBilder`, each with one `Ta med`
 `Del` (`shareLink.ts`) copies `/l/CODE`, and the open lokalitet rides in the URL
 as `?lok=CODE`. The short URL is six lines of `Caddyfile` — a `redir` behind
 `path_regexp ^/l/([0-9A-Za-z]+)$` — not a service and not an SPA fallback, so
-`/hjelp` is still 404 on a cold load. The boot code is captured at module
+any other path is still 404 on a cold load. The boot code is captured at module
 import; `getLocalityByCode` uppercases. A link always lands in `show`, framed on
 the rectangle (`zoomToLocality`); there is no viewport in it. Migration
 `1700000900` opened public reads and unprotected `attachments.file`, so a guest
@@ -689,7 +690,13 @@ Known traps: `terrain`, `filter_hdr` and `topography` do not exist; `elevation`,
 
 Three locales — `src/locales/{nb,nn,en}/translation.json` — reached through
 `t()`. A new string needs all three files, or i18next falls back and the surface
-reads in the wrong language.
+reads in the wrong language. One namespace, `translation`; the whole of each
+locale is bundled in `src/i18n.ts`, there is nothing lazy-loaded.
+
+`RibbonLanguage` at the right end of row 1 is the only language control, and it
+is deliberately outside the signed-in group — a guest following a shared link
+picks a language too. `changeLanguage` writes localStorage, which the detector
+reads ahead of `htmlTag`; with nothing stored, the browser decides.
 
 Two namespaces carry the ribbon and the lokalitet surfaces: `ribbon.*`
 (`mode`, `lidar`, `flyfoto`, `heritage`, `layers`, `search`, `terrain`) and
@@ -866,6 +873,8 @@ Keep it
 
 Housekeeping
 
+- Read the app in bokmål, nynorsk or English, signed in or not, the choice
+  remembered.
 - Sign out.
 
 ## 15. Removed upstream machinery — don't re-add
@@ -903,6 +912,16 @@ From the inherited Norgeskart app:
   own translations.
 - The drawing import/export dialogs (~900 lines), the nautical-mile unit, and
   the only call for a `FileUpload` dropzone.
+- The help page (`src/help/`, `/hjelp`, `src/types/tips.ts` and the three
+  `tipsandtricks.json` files) — Kartverket's tips-and-tricks grid plus a
+  "finner du det ikke?" list of their other services, describing an app this
+  one no longer is. Nothing ever navigated to it and Caddy has no SPA fallback,
+  so it was two years of strings behind a URL that 404s. The one live control
+  on it, the language picker, is `RibbonLanguage` on row 1 now.
+- Client-side routing — `BrowserRouter`, `Routes`, `Route`. `/` is the only
+  path the app answers on; `/l/CODE` is a Caddy `redir` to `?lok=CODE`, not a
+  route. `react-router-dom` is still in `package.json` with no importer, to
+  come out when the lockfile is next regenerated.
 - Dead dependencies: `maplibre-gl`, `@geoblocks/ol-maplibre-layer` (OpenLayers
   is the engine for WMS + EPSG:25833) and `fast-xml-parser` (native
   `DOMParser`).
@@ -914,8 +933,8 @@ From the kvib migration:
   `react-icons`. `style-src` is now `'self'`, with inline style attributes on
   their own `style-src-attr`.
 - `Accordion` — a controlled `Section` covers it.
-- `Select` — the language picker is a native `<select>`; the point-style picker
-  is a `Popover` of glyphs.
+- `Select` — the language picker is a `Menu` on the ribbon; the point-style
+  picker is a `Popover` of glyphs.
 - `Pagination` — one consumer, inline in `PlacesResults.tsx`.
 - A hand-built saturation/hue/alpha colour surface — `<input type="color">`
   plus recent swatches.
@@ -994,12 +1013,6 @@ Fix-list; none of these are load-bearing.
 - The active LiDAR style and project, the active flyfoto acquisition and the
   open lokalitet's viewport are not in the URL.
 - `trackPositionAtom` and its effect have no UI entry point.
-- `HelpPage` is unreachable: nothing navigates to `/hjelp`, and typing it is a
-  cold load, which 404s. It is off the functionality contract until it has an
-  entrance. What it still holds — tips and tricks, the only `LanguageSwitcher`
-  in the app, and the "finner du det ikke?" source list — is unreachable with
-  it, so the language choice a user gets is whatever the browser detector
-  picked.
 - Search has no keyboard support: no arrow-key walk of the result list.
 - The OL z-index ladder contains a `4.5` and a `1.5`.
 - The compare seam clamps at a flat 5–95% rather than against `chromeInsets`, so

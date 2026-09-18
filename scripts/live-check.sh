@@ -126,12 +126,11 @@ else
   printf '  %sFAIL%s %-26s index.html names no /assets/*.js\n' "$RED" "$OFF" entry-bundle
 fi
 check short-link "$BASE/l/$CODE" 302 '' 0 '' "location: /\?lok=$CODE"
-# Both 404 on purpose: `file_server` has no SPA fallback, so a wrong path stays
-# wrong — and /hjelp, a client-side route, is a cold load away from nothing.
-# docs/ui-architecture.md §8 states it; a 200 here means somebody added a
-# catch-all rewrite and every typo now answers with the app.
+# 404 on purpose: `file_server` has no SPA fallback, so a wrong path stays
+# wrong. There is no client-side routing left to need one — `/` is the only
+# path the app answers on. A 200 here means somebody added a catch-all rewrite
+# and every typo now answers with the app.
 check unknown-path "$BASE/tufteseid-no-such-path" 404 '' 0
-check help-route-404 "$BASE/hjelp" 404 '' 0
 
 # ----------------------------------------------------------------- pocketbase --
 

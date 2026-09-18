@@ -7,7 +7,6 @@ import '@fontsource/mulish/latin-700.css';
 import 'material-symbols/rounded.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import { AtomWrapper } from './AtomWrapper.tsx';
 import './index.css';
@@ -21,13 +20,11 @@ const queryClient = new QueryClient();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <AtomWrapper>
-        <QueryClientProvider client={queryClient}>
-          <App />
-          <Toaster />
-        </QueryClientProvider>
-      </AtomWrapper>
-    </BrowserRouter>
+    <AtomWrapper>
+      <QueryClientProvider client={queryClient}>
+        <App />
+        <Toaster />
+      </QueryClientProvider>
+    </AtomWrapper>
   </StrictMode>,
 );

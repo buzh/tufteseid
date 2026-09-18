@@ -76,9 +76,9 @@ Five checks assert an absence, and each is a rule rather than a screen:
   surfaces that name an author read `credit` off the lokalitet instead
   (migration `1700001000`); a record created before that field, or one whose
   owner cleared it, still has no name to print.
-- `unknown-path` — `file_server` still has no SPA fallback.
-- `help-route-404` — `/hjelp` is a client-side route and a cold load of it 404s
-  (`docs/ui-architecture.md` §8). A 200 means somebody added a catch-all.
+- `unknown-path` — `file_server` still has no SPA fallback, and the app has no
+  client-side routing that would want one: `/` is the only path it answers on.
+  A 200 means somebody added a catch-all.
 
 The probe rectangle is the fixture's, hardcoded: a raster liveness check does not
 care where it looks as long as the place has coverage, and deriving it from the

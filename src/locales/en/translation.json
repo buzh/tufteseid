@@ -99,17 +99,6 @@
       "retry": "Try again"
     }
   },
-  "tipsandtricks": {
-    "heading": "Tips and tricks",
-    "description": "Common questions and useful tips",
-    "categories": {
-      "propertyInfo": "Property information",
-      "map": "Map and viewing",
-      "drawing": "Drawing and measuring",
-      "search": "Search",
-      "sharing": "Sharing and export"
-    }
-  },
   "featureInfo": {
     "title": "Object information",
     "loading": "Loading information..."
@@ -595,23 +584,6 @@
       "sourceLabel": "Elevation data (Kartverket)",
       "failed": "Could not fetch elevation data.",
       "empty": "No LiDAR data covers this rectangle."
-    }
-  },
-  "helpPage": {
-    "header": {
-      "link": "Back to map"
-    },
-    "title": "How can we help you?",
-    "notFound": {
-      "heading": "Can't find what you're looking for?",
-      "description": "Perhaps a search in some of our other services can help you find what you're looking for.",
-      "propertyRegisterHeading": "Property Register",
-      "propertyRegisterDescription": "You can search by street name, address, or cadastral number.",
-      "propertyRegisterButton": "Go to the Property Register",
-      "norgeibilderDescription": "On norgeibilder.no, you can find an overview of orthophotos(scale-accurate aerial photographs) offered by the partners in the collaboration.",
-      "norgeibilderButton": "Go to Norgeibilder.no",
-      "hoydedataDescription": "Here you can find an overview of and access to elevation data provided by Kartverket online",
-      "hoydedataButton": "Go to hoydedata.no"
     }
   },
   "ribbon": {

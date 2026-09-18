@@ -17,6 +17,7 @@ import { HeritageControl } from './heritage/HeritageControl';
 import { useLidarControls } from './lidar/useLidarControls';
 import { ModeButton } from './ModeButton';
 import { RibbonAccount } from './RibbonAccount';
+import { RibbonLanguage } from './RibbonLanguage';
 import { RibbonMeasure } from './RibbonMeasure';
 import { RibbonSearch } from './RibbonSearch';
 import { RibbonSettingsRow } from './RibbonSettingsRow';
@@ -252,6 +253,10 @@ export const RibbonGlobalRow = () => {
         )}
 
         <div className={styles.spacer} />
+        {/* Before the account button rather than inside its pulldown: that
+            pulldown is a plain `Logg inn` for a guest, and the language is
+            not a signed-in setting. */}
+        <RibbonLanguage />
         <RibbonAccount />
       </div>
 

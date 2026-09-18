@@ -99,17 +99,6 @@
       "retry": "Prøv igjen"
     }
   },
-  "tipsandtricks": {
-    "heading": "Tips og triks",
-    "description": "Vanlige spørsmål og nyttige tips",
-    "categories": {
-      "propertyInfo": "Eiendomsinformasjon",
-      "map": "Kart og visning",
-      "drawing": "Tegning og måling",
-      "search": "Søk",
-      "sharing": "Dele og eksport"
-    }
-  },
   "featureInfo": {
     "title": "Objektinformasjon",
     "loading": "Henter informasjon..."
@@ -595,23 +584,6 @@
       "sourceLabel": "Høydedata (Kartverket)",
       "failed": "Klarte ikke å hente høydedata.",
       "empty": "Ingen laserdata dekker dette rektangelet."
-    }
-  },
-  "helpPage": {
-    "header": {
-      "link": "Tilbake"
-    },
-    "title": "Hva trenger du hjelp med?",
-    "notFound": {
-      "heading": "Finner du ikke det du leter etter?",
-      "description": "Kanskje et søk i noen av våre andre tjenester kan hjelpe deg å finne det du leter etter.",
-      "propertyRegisterHeading": "Eiendomsregisteret",
-      "propertyRegisterDescription": "Finn informasjon om eiendom. Du kan søke på vegnavn, adresser eller gårds- og bruksnummer.",
-      "propertyRegisterButton": "Gå til Eiendomsregisteret",
-      "norgeibilderDescription": "På norgeibilder.no får du oversikt over ortofoto(målestokkriktige flybilder) som samarbeidspartene i Norge i digitalt tilbyr.",
-      "norgeibilderButton": "Gå til Norgeibilder.no",
-      "hoydedataDescription": "Her får du oversikt og tilgang til høydedata som Kartverket tilbyr på internett.",
-      "hoydedataButton": "Gå til høydedata.no"
     }
   },
   "ribbon": {
