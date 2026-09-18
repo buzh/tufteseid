@@ -1,7 +1,10 @@
 """Build a cached combined-VAT tile set, one zoom level at a time.
 
-    python build_tiles.py --out /data/cvat --levels 15,14,13,12
-    python build_tiles.py --out /data/cvat --levels 15 --jobs 4
+    python build_tiles.py --out /site/tufteseid/data/cvat --levels 15,14,13,12
+    python build_tiles.py --out /site/tufteseid/data/cvat --levels 15 --jobs 4
+
+That path is the store docker-compose bind-mounts into the Caddy container at
+/var/www/cvat, so what this writes is what the app serves.
 
 Resumable: every work unit drops a marker when it finishes, and a re-run skips
 the marked ones. A unit that writes no tiles still marks, because "the footprint
@@ -130,8 +133,8 @@ def encode_tile(field):
         return None
     grey = cvat.byte_scale(field, c_min=0, c_max=1)
     alpha = np.where(covered, 255, 0).astype(np.uint8)
-    band = Image.fromarray(grey, "L")
-    image = Image.merge("RGBA", (band, band, band, Image.fromarray(alpha, "L")))
+    band = Image.fromarray(grey)
+    image = Image.merge("RGBA", (band, band, band, Image.fromarray(alpha)))
     buf = BytesIO()
     image.save(buf, "WEBP", quality=WEBP_QUALITY)
     return buf.getvalue()

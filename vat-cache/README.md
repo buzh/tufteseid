@@ -16,12 +16,19 @@ python -m venv .venv
 .venv/bin/pip install "numpy<2.1" "scipy<1.15" pillow matplotlib
 
 .venv/bin/python coverage.py "Vestfold og Telemark 5pkt 2021"   # -> coverage.npz
-.venv/bin/python build_tiles.py --out /data/cvat --dry-run      # unit counts
-.venv/bin/python build_tiles.py --out /data/cvat --levels 15 --limit 20
-.venv/bin/python build_tiles.py --out /data/cvat --jobs 4
+
+OUT=/site/tufteseid/data/cvat
+.venv/bin/python build_tiles.py --out $OUT --dry-run             # unit counts
+.venv/bin/python build_tiles.py --out $OUT --levels 15 --limit 20
+.venv/bin/python build_tiles.py --out $OUT --jobs 4
 ```
 
 `coverage.npz` and `.venv/` are build artefacts; neither is committed.
+
+`--out` is the store `docker-compose.yml` bind-mounts read-only into the Caddy
+container at `/var/www/cvat`, which is under Caddy's root — so a tile written
+here is served at `/cvat/<z>/<x>/<y>.webp` without a route of its own. Nothing
+in the app asks for one yet; registering the ground is a later task.
 
 `--no-deps` is not optional: rvt-py declares gdal, rasterio, geopandas and
 jupyter for an IO layer none of this uses.

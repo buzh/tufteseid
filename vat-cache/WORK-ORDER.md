@@ -155,7 +155,12 @@ arrives in one call and there is no mosaic to assemble.
 5. **Write** — 512 px RGBA WebP on the app's grid
    (`src/map/layers/wmsTileGrid.ts`: origin `[extent[0], extent[3]]` =
    −2500000, 9045984; resolutions 21664 / 2ⁿ), as `<z>/<x>/<y>.webp`. A tile
-   with no coverage at all is not written.
+   with no coverage at all is not written. The store is
+   `/site/tufteseid/data/cvat`, bind-mounted read-only at `/var/www/cvat`,
+   which is under Caddy's root — so the tiles are already reachable at
+   `/cvat/<z>/<x>/<y>.webp` and the eventual layer needs no proxy route, no
+   CSP host and no wmscache entry. A tile the footprint never reached answers
+   404, which is also what a tile outside the acquisition should answer.
 6. **Manifest** — `manifest.json` beside the tiles: acquisition, RVT version,
    both presets, the blend order, azimuth, the combined opacity, and per level
    the resolution, `r_max`/`r_min` in pixels and metres, overlap and encoding —
