@@ -40,7 +40,8 @@ i18next ^26 / react-i18next ^17 · material-symbols
 ^0.40.2 · @fontsource/mulish · @excalidraw/excalidraw ^0.18.1 · uuid.
 
 ```
-main.tsx → mainApp.tsx   StrictMode → AtomWrapper →
+mainApp.tsx              the entry index.html loads: projInit(), then
+                         StrictMode → AtomWrapper →
                          QueryClientProvider → App + Toaster
 App.tsx                  pbAuthSyncEffect, F11, then AppShell. No router: the
                          app answers on `/` and nowhere else.

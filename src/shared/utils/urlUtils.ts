@@ -1,32 +1,11 @@
-export const HASH_ROUTING_PREFIX = '#!?';
-
-const isUsingHashRouting = (url: URL): boolean => {
-  return url.hash.startsWith(HASH_ROUTING_PREFIX);
-};
-
-const getSearchParams = (): URLSearchParams => {
-  const url = new URL(window.location.href);
-  if (isUsingHashRouting(url)) {
-    const hashParams = url.hash.substring(HASH_ROUTING_PREFIX.length);
-    return new URLSearchParams(hashParams);
-  }
-  return url.searchParams;
-};
+const getSearchParams = (): URLSearchParams =>
+  new URL(window.location.href).searchParams;
 
 const updateUrl = (
   url: URL,
   updateFn: (params: URLSearchParams) => void,
 ): void => {
-  if (isUsingHashRouting(url)) {
-    const hashParams = new URLSearchParams(
-      url.hash.substring(HASH_ROUTING_PREFIX.length),
-    );
-    updateFn(hashParams);
-    url.hash = HASH_ROUTING_PREFIX + hashParams.toString();
-  } else {
-    url.hash = '';
-    updateFn(url.searchParams);
-  }
+  updateFn(url.searchParams);
   window.history.replaceState({}, '', url.toString());
 };
 
@@ -88,20 +67,6 @@ export const removeFromUrlListParameter = (
       params.set(key, values.join(','));
     }
   });
-};
-
-export const transitionHashToQuery = (): void => {
-  const url = new URL(window.location.href);
-  if (!isUsingHashRouting(url)) return;
-
-  const hashParams = new URLSearchParams(
-    url.hash.substring(HASH_ROUTING_PREFIX.length),
-  );
-  hashParams.forEach((value, key) => {
-    url.searchParams.set(key, value);
-  });
-  url.hash = '';
-  window.history.replaceState({}, '', url.toString());
 };
 
 export type NKUrlParameter =
