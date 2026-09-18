@@ -114,16 +114,13 @@ export type NKUrlParameter =
   | 'heritageDetails'
   | 'heritageRender'
   | 'heritageOpacity'
-  | 'rotation'
   | 'lat'
   | 'lon'
   | 'markerLat'
   | 'markerLon'
   | 'zoom'
-  | 'drawing'
   | 'sok'
   | 'showSelection'
-  | 'printTool'
   // The open lokalitet, as its six-character code, not its PB id; the only
   // parameter here that names a record, and so the only one that can fail to
   // resolve. `src/localities/shareLink.ts` owns both directions.
