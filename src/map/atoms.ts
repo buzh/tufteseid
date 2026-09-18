@@ -3,9 +3,8 @@ import { View } from 'ol';
 import { defaults as defaultControls, ScaleLine } from 'ol/control';
 import { defaults as defaultInteractions } from 'ol/interaction';
 import Map from 'ol/Map';
-import { get as getProjection, transform } from 'ol/proj';
+import { get as getProjection } from 'ol/proj';
 import { v4 as uuidv4 } from 'uuid';
-import { parseCoordinateInput } from '../shared/utils/coordinateParser';
 import { validateProjectionIdString } from '../shared/utils/enumUtils';
 import { getUrlParameter, setUrlParameter } from '../shared/utils/urlUtils';
 import { mapLayers } from './layers';
@@ -34,33 +33,9 @@ const getInitialMapView = () => {
     const parsedLon = parseFloat(lon);
     const parsedLat = parseFloat(lat);
     if (!Number.isNaN(parsedLon) && !Number.isNaN(parsedLat)) {
-      // We write the raw projected centre, so a degree-range value is a legacy
-      // or external link and has to be transformed.
-      if (Math.abs(parsedLat) <= 90 && Math.abs(parsedLon) <= 180) {
-        let centerResolved = false;
-        const sokParam = getUrlParameter('sok');
-        if (sokParam) {
-          const parsedCoord = parseCoordinateInput(sokParam, projectionId);
-          if (parsedCoord) {
-            initialCenter = transform(
-              [parsedCoord.lon, parsedCoord.lat],
-              parsedCoord.projection,
-              projectionId,
-            );
-            centerResolved = true;
-          }
-        }
-
-        if (!centerResolved) {
-          initialCenter = transform(
-            [parsedLon, parsedLat],
-            'EPSG:4326',
-            projectionId,
-          );
-        }
-      } else {
-        initialCenter = [parsedLon, parsedLat];
-      }
+      // `lat`/`lon` are the raw centre in whatever `projection` says, which is
+      // what the app writes back.
+      initialCenter = [parsedLon, parsedLat];
     }
   }
 
