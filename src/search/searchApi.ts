@@ -351,32 +351,3 @@ export const getPropertyDetailsByMatrikkelId = async (
     throw error;
   }
 };
-
-export const getPlaceNamesByCoordinates = async (
-  north: number,
-  east: number,
-): Promise<PlaceNamePointApiResponse> => {
-  const url = new URL('https://ws.geonorge.no/stedsnavn/v1/punkt');
-  url.searchParams.append('nord', north.toString());
-  url.searchParams.append('ost', east.toString());
-  url.searchParams.append('treffPerSide', '35');
-  url.searchParams.append('koordsys', '25833');
-  url.searchParams.append('radius', '150');
-  url.searchParams.append('side', '1');
-
-  let httpStatus;
-  try {
-    const res = await fetch(url.toString());
-    httpStatus = res.status;
-    if (!res.ok) throw new Error('Feil ved henting av stedsnavn');
-    return res.json();
-  } catch (error) {
-    trackApiError(error, {
-      url: url.toString(),
-      httpStatus,
-      query: `north:${north}, east:${east}`,
-      searchType: 'placeNamesByCoordinates',
-    });
-    throw error;
-  }
-};
