@@ -573,7 +573,7 @@ export const screenshotFigure = ({
   bbox25833,
   rotation,
   // Kartverket is always in there: the topo base under every LiDAR and
-  // per-project ortofoto stack, and the whole picture in standard mode.
+  // per-project ortofoto stack, and the whole picture in Kart mode.
   credits: dedupeCredits([
     source(ROLE.kart, CREDITS.kartverket),
     ...(groundIsFlyfoto ? [source(ROLE.ortofoto, CREDITS.nib)] : []),

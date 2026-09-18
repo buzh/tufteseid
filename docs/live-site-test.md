@@ -61,7 +61,7 @@ all — `docs/wms-proxy-and-tiles.md`.
 | Shell | Caddy is serving something other than the built SPA: a stale `/var/www`, a `config.js` that did not mount, a lost CSP header, or a rewrite that turned wrong paths into 200s |
 | PocketBase | the backend, its list rules or the `pbdata` volume — a failed migration shows up here first, as a 404 on the collection |
 | Same-origin upstreams | one prefix of the Caddy → wmscache → origin chain: the prefix itself, nginx's location for it, or the origin behind it |
-| Direct upstreams | a host the browser talks to itself. The deployment is innocent; search, the Standard ground or the elevation readout are down anyway |
+| Direct upstreams | a host the browser talks to itself. The deployment is innocent; search, the Kart ground or the elevation readout are down anyway |
 
 Five checks assert an absence, and each is a rule rather than a screen:
 

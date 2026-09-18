@@ -9,6 +9,10 @@ import {
   hybridOverlayHalves,
 } from '../layers/config/backgroundLayers/atoms';
 import { activeFlyfotoProjectHalves } from '../layers/config/backgroundLayers/flyfotoBackground';
+import {
+  type KartVariant,
+  kartVariantHalves,
+} from '../layers/config/backgroundLayers/kartVariants';
 import { lidarAutoDatasetHalves } from '../layers/config/backgroundLayers/lidarAuto';
 import {
   activeLidarModelHalves,
@@ -21,10 +25,6 @@ import {
   buildStack,
   resolveStack,
 } from '../layers/config/backgroundLayers/stack';
-import {
-  standardVariantHalves,
-  type StandardVariant,
-} from '../layers/config/backgroundLayers/standardVariants';
 import { clearCompareLayers, installCompareLayers } from './curtainLayers';
 import { compareFocusAtom, compareOnAtom, seedHalfB } from './halves';
 
@@ -36,7 +36,7 @@ import { compareFocusAtom, compareOnAtom, seedHalfB } from './halves';
 
 /** Every GroundMode except Terreng, spelled out rather than imported: this is
  * a map module and useGroundMode is a shell one. */
-export type CompareGround = 'standard' | 'lidar' | 'hybrid' | 'flyfoto';
+export type CompareGround = 'kart' | 'lidar' | 'hybrid' | 'flyfoto';
 
 /** Where the curtain edge sits, as a fraction of the map width. */
 export const compareSplitAtom = atom(0.5);
@@ -45,12 +45,12 @@ export const compareSplitAtom = atom(0.5);
 // ground before React re-renders with the focus switch.
 const groundLayer = (
   ground: CompareGround,
-  standardVariant: StandardVariant,
+  kartVariant: KartVariant,
   lidarProject: LidarProject | null,
   flyfotoProject: FlyfotoProject | null,
 ): BackgroundLayerName => {
   // Whichever cartography this half was last set to, not necessarily topo.
-  if (ground === 'standard') return standardVariant;
+  if (ground === 'kart') return kartVariant;
   if (ground === 'flyfoto') {
     return flyfotoProject ? 'flyfotoProject' : 'flyfoto';
   }
@@ -70,7 +70,7 @@ export const enterCompareAtom = atom(
       backgroundLayerHalves.b,
       groundLayer(
         ground,
-        get(standardVariantHalves.b),
+        get(kartVariantHalves.b),
         get(activeLidarProjectHalves.b),
         get(activeFlyfotoProjectHalves.b),
       ),

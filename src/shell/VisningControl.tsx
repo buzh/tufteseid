@@ -184,7 +184,7 @@ export const VisningControl = ({ ws }: { ws: LocalityWorkspaceApi }) => {
 };
 
 /** Acquisition, style and knobs under the ground's name, off `beholdOfferAtom`.
- * Standard and Hybrid say nothing: their cartography is part of the preset. */
+ * Kart and Hybrid say nothing: their cartography is part of the preset. */
 const groundMetaOf = (
   offer: BeholdOffer | null,
   mosaicLabel: string,

@@ -117,7 +117,7 @@ jotai on the default store — there is no `Provider`, so module-level code
 | Atom | Holds | Lives in |
 | --- | --- | --- |
 | `mapAtom` | the `ol/Map` | `src/map/atoms.ts` |
-| `backgroundLayerAtom`, `standardVariantAtom`, `hybridOverlayAtom`, `hybridContoursAtom`, `activeLidarModelAtom`, `activeLidarStyleAtom`, `activeLidarProjectAtom`, `lidarPickerOpenAtom`, `lidarCyclingAtom`, `lidarAutoDatasetAtom`, `activeFlyfotoProjectAtom` | the ground and its modifiers; eight are `halved()` facades over an A/B pair | `src/map/layers/config/backgroundLayers/` |
+| `backgroundLayerAtom`, `kartVariantAtom`, `hybridOverlayAtom`, `hybridContoursAtom`, `activeLidarModelAtom`, `activeLidarStyleAtom`, `activeLidarProjectAtom`, `lidarPickerOpenAtom`, `lidarCyclingAtom`, `lidarAutoDatasetAtom`, `activeFlyfotoProjectAtom` | the ground and its modifiers; eight are `halved()` facades over an A/B pair | `src/map/layers/config/backgroundLayers/` |
 | `compareOnAtom`, `compareFocusAtom`, `focusedHalfAtom` | the curtain and which half the ribbon aims at | `src/map/compare/halves.ts` |
 | `compareSplitAtom` | seam position | `src/map/compare/atoms.ts` |
 | `funnHiddenAtom`, `funnSwitchedOffAtom` | the funn group switch, and per-funn switches | `src/localities/atoms.ts` |
@@ -167,7 +167,7 @@ capped at one line.
 | 3 | `RibbonLocalityRow` | a lokalitet is open (or `RibbonPlaceLocalityRow` while one is being placed — the two are mutually exclusive) |
 | 4 | `RibbonFunnDraftRow` | a funn draft is live |
 
-Row 1: `RibbonSearch`, Kart (1), LiDAR (2), Hybrid (3), Flyfoto (4),
+Row 1: `RibbonSearch`, LiDAR (1), Kart (2), Hybrid (3), Flyfoto (4),
 `[Kulturminner ▾]`, Stedsinfo (I), Mål, Mine lokaliteter, Ny lokalitet,
 `RibbonLanguage`, `RibbonAccount`. Terreng (5) and Sammenlign are on the
 lokalitet row, because
@@ -184,8 +184,8 @@ buttons positional.
 
 | Ground | Strip |
 | --- | --- |
-| Kart (Standard) | none; the Karttype pulldown hangs off the button. `STANDARD_VARIANTS` = Topografisk, Gråtone, Rasterkart, Sjøkart, Amtskart |
 | LiDAR | dataset pulldown (Automatisk / national mosaic / per project) · style pulldown · DTM/DOM |
+| Kart | none; the Karttype pulldown hangs off the button. `KART_VARIANTS` = Topografisk, Gråtone, Rasterkart, Sjøkart, Amtskart |
 | Hybrid | the same, plus Høydekurver |
 | Flyfoto | acquisition pulldown · period chips (Alle / 2010– / 1990–2009 / 1960–1989 / –1959) |
 | Terreng | Visualisering pulldown (eight) · DTM/DOM · 2–4 sliders · resolution readout |
@@ -231,7 +231,7 @@ because Excalidraw's own shortcuts are the digits.
 
 | Key | Does | Declines when |
 | --- | --- | --- |
-| 1–5 | select ground: Standard, LiDAR, Hybrid, Flyfoto, Terreng | — |
+| 1–5 | select ground: LiDAR, Kart, Hybrid, Flyfoto, Terreng | — |
 | X (hold) | peek the previous ground, snap back on release; also on window blur | — |
 | A / D | walk the LiDAR style ring (top tier, wrapping) | no-op in DOM |
 | A / D, inside a lokalitet | walk the bilder rail (`src/localities/bilderRing.ts`) | three cases: nothing to walk, a live picker run, and the compare curtain's B half — `railWalkable = stripNavigable && picker.run == null`, crossed with `focusedHalfAtom === 'a'` |
@@ -432,7 +432,7 @@ The cover is laid on the ground once per lokalitet, and only if it is pinned:
 an unpinned spec would start a WMS stitch on arrival. A scene counts, and goes
 up as its own flatten rather than as the stack it describes — `Legg ut igjen`
 is a press, and it enters the ground the scene names. A scene kept over
-Standard or Hybrid is skipped: that flatten is on white paper and would blank
+Kart or Hybrid is skipped: that flatten is on white paper and would blank
 the rectangle. The cover is provisional, so the first ground the reader asks
 for withdraws it (`provisionalViewAtom`).
 
@@ -447,7 +447,7 @@ Four routes an image takes in:
   with `image/png` and a ~100-byte JSON error body.
 - Behold (`behold.ts`): keeps whatever ground is up, at the source's own
   resolution. LiDAR → dataset/style/model; Terreng → visualization + knobs;
-  Flyfoto → the acquisition, behind the NiB licensing notice; Standard and
+  Flyfoto → the acquisition, behind the NiB licensing notice; Kart and
   Hybrid disabled. The offer crosses the sibling gap on `beholdOfferAtom`;
   `attachmentMatchesKey` guards duplicates (bbox to 1 m, floats to 1e-6, `kind`
   part of the key, hidden records counted).
@@ -748,9 +748,9 @@ Find a place
 
 Choose what the terrain looks like
 
-- Switch Standard / LiDAR / Hybrid / Flyfoto / Terreng by button or digits 1–5.
+- Switch LiDAR / Kart / Hybrid / Flyfoto / Terreng by button or digits 1–5.
 - Hold X to peek at the previous ground, release to snap back.
-- Draw Standard as five cartographies: topographic, greyscale, scanned paper,
+- Draw Kart as five cartographies: topographic, greyscale, scanned paper,
   nautical chart, amtskart over a modern base.
 - Pick the national LiDAR mosaic or any per-project dataset.
 - See datasets ranked by viewport relevance, and expand to the rest.

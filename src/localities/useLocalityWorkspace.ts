@@ -1842,7 +1842,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const offer = useAtomValue(beholdOfferAtom);
 
   // The offer said as the duplicate guard's key. Null where the ground has
-  // nothing to keep (Standard, Hybrid) or is not ready to say what it would
+  // nothing to keep (Kart, Hybrid) or is not ready to say what it would
   // keep — a style list still in flight, a DEM still downloading.
   const beholdKey = useMemo((): BeholdKey | null => {
     if (!offer) return null;
@@ -1933,7 +1933,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   );
 
   // The ground under the arrangement, gated on the group's switch because a
-  // group that is off is not on the map. Standard and Hybrid answer null even
+  // group that is off is not on the map. Kart and Hybrid answer null even
   // when it is on: there is no rectangle-fetch path for the topo WMS.
   const sceneGround = useMemo(
     () => (visningGroupShown ? sceneGroundOf(offer, beholdBbox) : null),
@@ -2436,7 +2436,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
       // The one time a scene reaches the ground by itself, and it goes as its
       // own flatten rather than as a live arrangement: `Legg ut igjen` is a
       // press, and restoring one enters the ground it names. Only a scene with
-      // a ground of its own — one kept over Standard or Hybrid flattens onto
+      // a ground of its own — one kept over Kart or Hybrid flattens onto
       // white paper, which here would blank the rectangle on arrival.
       if (!sceneCompositionOf(cover.meta)?.ground) return;
     } else if (cover.kind !== 'extract' && cover.kind !== 'flyfoto') {
@@ -2738,7 +2738,7 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     // Which of the five grounds is on screen: label, tooltip and whether the
     // button is offered at all.
     beholdGround: offer?.ground ?? null,
-    // Whether the ground can say what it would keep. False on Standard and
+    // Whether the ground can say what it would keep. False on Kart and
     // Hybrid, and briefly on the other three while a style list or DEM loads.
     beholdReady: beholdKey != null,
     beholdDone,

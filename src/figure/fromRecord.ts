@@ -85,14 +85,14 @@ export const stampContextOf = (
 
 /** What the ground was, for the screenshot legend's source line. */
 const GROUND_LABEL_KEY: Record<BackgroundLayerName, string> = {
-  // The five Standard cartographies name themselves rather than all reporting
-  // "Standard"; the legend is the only place the file says which it is.
-  topo: 'ribbon.standard.topo',
-  topograatone: 'ribbon.standard.topograatone',
-  toporaster: 'ribbon.standard.toporaster',
-  sjokartraster: 'ribbon.standard.sjokartraster',
-  amtskart: 'ribbon.standard.amtskart',
-  empty: 'ribbon.mode.standard',
+  // The five Kart cartographies name themselves rather than all reporting
+  // "Kart"; the legend is the only place the file says which it is.
+  topo: 'ribbon.kart.topo',
+  topograatone: 'ribbon.kart.topograatone',
+  toporaster: 'ribbon.kart.toporaster',
+  sjokartraster: 'ribbon.kart.sjokartraster',
+  amtskart: 'ribbon.kart.amtskart',
+  empty: 'ribbon.mode.kart',
   lidarHillshade: 'ribbon.mode.lidar',
   lidarProject: 'ribbon.mode.lidar',
   flyfoto: 'ribbon.mode.flyfoto',

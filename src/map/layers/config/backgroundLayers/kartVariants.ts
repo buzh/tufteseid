@@ -3,10 +3,10 @@ import { halved } from '../../../compare/halves';
 import { BackgroundLayerName } from '../../backgroundLayers';
 import { WMSBackgroundLayer } from './types';
 
-// What "Standard" can be: four cartographies out of Kartverket's cache plus
+// What "Kart" can be: four cartographies out of Kartverket's cache plus
 // amtskart, the pre-1917 series. Variants on one ground, so they ride the
 // settings strip and the W/S ring like LiDAR datasets.
-export const STANDARD_VARIANTS = [
+export const KART_VARIANTS = [
   'topo',
   'topograatone',
   'toporaster',
@@ -14,11 +14,11 @@ export const STANDARD_VARIANTS = [
   'amtskart',
 ] as const satisfies readonly BackgroundLayerName[];
 
-export type StandardVariant = (typeof STANDARD_VARIANTS)[number];
+export type KartVariant = (typeof KART_VARIANTS)[number];
 
-const VARIANTS: ReadonlySet<string> = new Set(STANDARD_VARIANTS);
+const VARIANTS: ReadonlySet<string> = new Set(KART_VARIANTS);
 
-export const isStandardVariant = (name: string): name is StandardVariant =>
+export const isKartVariant = (name: string): name is KartVariant =>
   VARIANTS.has(name);
 
 /**
@@ -43,13 +43,13 @@ export const AMTSKART_CONFIG: WMSBackgroundLayer = {
   },
 };
 
-// Which variant Standard means, remembered while another ground is up. Seeded
+// Which variant Kart means, remembered while another ground is up. Seeded
 // from ?backgroundLayer, the parameter the background atom reads, so the two
 // cannot disagree on a cold load.
-const initialVariant = (): StandardVariant => {
+const initialVariant = (): KartVariant => {
   const fromUrl = getUrlParameter('backgroundLayer');
-  return fromUrl && isStandardVariant(fromUrl) ? fromUrl : 'topo';
+  return fromUrl && isKartVariant(fromUrl) ? fromUrl : 'topo';
 };
 
-export const standardVariantHalves = halved<StandardVariant>(initialVariant());
-export const standardVariantAtom = standardVariantHalves.focused;
+export const kartVariantHalves = halved<KartVariant>(initialVariant());
+export const kartVariantAtom = kartVariantHalves.focused;

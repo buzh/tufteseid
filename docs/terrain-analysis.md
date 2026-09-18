@@ -200,7 +200,7 @@ the notice the Flyfoto action shows.
   `Losmasser_temakart_sammenstilt`) — Quaternary deposits; a plain theme-layer
   addition, recipe in `docs/map-layers.md`.
 - **Kartverket historiske kart, the ØK sheets** — fornminne symbols surveyed
-  before 20th-century ploughing; Amtskartserien already ships as a Standard
+  before 20th-century ploughing; Amtskartserien already ships as a Kart
   variant, ØK does not.
 - **SSR toponyms as indicators** — the *haug / borg / hov / ve / vang / ring /
   offer / tingst-* families, off the place-name search that already exists.

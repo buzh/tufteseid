@@ -14,6 +14,8 @@ import { IconButton, Tooltip } from '../ui';
 import { useFlyfotoControls } from './flyfoto/useFlyfotoControls';
 import { groundHandleAtom } from './groundHandle';
 import { HeritageControl } from './heritage/HeritageControl';
+import { KartVariantPicker } from './kart/KartVariantPicker';
+import { useKartControls } from './kart/useKartControls';
 import { useLidarControls } from './lidar/useLidarControls';
 import { ModeButton } from './ModeButton';
 import { RibbonAccount } from './RibbonAccount';
@@ -22,8 +24,6 @@ import { RibbonMeasure } from './RibbonMeasure';
 import { RibbonSearch } from './RibbonSearch';
 import { RibbonSettingsRow } from './RibbonSettingsRow';
 import styles from './Ribbon.module.css';
-import { StandardVariantPicker } from './standard/StandardVariantPicker';
-import { useStandardControls } from './standard/useStandardControls';
 import { useTerrainAnalysis } from './terrain/useTerrainAnalysis';
 import { GROUND_MODES, useGroundMode } from './useGroundMode';
 import { useRecreateView } from './useRecreateView';
@@ -45,7 +45,7 @@ export const RibbonGlobalRow = () => {
   const isSignedIn = useAtomValue(isSignedInAtom);
   const [tool, setTool] = useAtom(mapToolAtom);
   const [infoTool, setInfoTool] = useAtom(infoToolAtom);
-  const standard = useStandardControls();
+  const kart = useKartControls();
   const lidar = useLidarControls();
   const flyfoto = useFlyfotoControls();
   // Nothing is written until `Opprett`, and it raises the sign-in dialog
@@ -56,7 +56,7 @@ export const RibbonGlobalRow = () => {
   // every time someone glanced at another ground.
   const terrain = useTerrainAnalysis();
   // Terreng with nothing open places a rectangle; the tool arms at the commit.
-  const ground = useGroundMode(standard, lidar, flyfoto, terrain, () => {
+  const ground = useGroundMode(kart, lidar, flyfoto, terrain, () => {
     startPlacement('terrain');
   });
   // Mounted here because applying a saved view writes all four control hooks.
@@ -146,32 +146,33 @@ export const RibbonGlobalRow = () => {
 
         {/* The ring. Order is GROUND_MODES, which is also 1–5. */}
         <div className={styles.group}>
+          {/* First, and the ground a cold load arrives on: relief is the thing
+              being read here. Lands on whatever the dataset pulldown is set
+              to — entering the ground is not itself a dataset pick. */}
+          <ModeButton
+            icon="landscape"
+            label={t('ribbon.mode.lidar')}
+            tooltip={`${t('ribbon.mode.lidarTip')} (1)`}
+            active={ground.mode === 'lidar'}
+            onClick={() => ground.select('lidar')}
+          />
+
           {/* The one ground whose dataset list hangs off its own button rather
               than off the settings strip, which is why it has no strip. */}
           <div className={styles.split}>
             <ModeButton
               icon="map"
-              label={t('ribbon.mode.standard')}
-              tooltip={`${t('ribbon.mode.standardTip')} (1)`}
-              active={ground.mode === 'standard'}
+              label={t('ribbon.mode.kart')}
+              tooltip={`${t('ribbon.mode.kartTip')} (2)`}
+              active={ground.mode === 'kart'}
               joinedRight
-              onClick={() => ground.select('standard')}
+              onClick={() => ground.select('kart')}
             />
-            <StandardVariantPicker
-              standard={standard}
-              onPickGround={() => ground.select('standard')}
+            <KartVariantPicker
+              kart={kart}
+              onPickGround={() => ground.select('kart')}
             />
           </div>
-
-          {/* Lands on whatever the dataset pulldown is set to: entering the
-              ground is not itself a dataset pick. */}
-          <ModeButton
-            icon="landscape"
-            label={t('ribbon.mode.lidar')}
-            tooltip={`${t('ribbon.mode.lidarTip')} (2)`}
-            active={ground.mode === 'lidar'}
-            onClick={() => ground.select('lidar')}
-          />
 
           {/* The LiDAR stack plus roads, rail and place names — still LiDAR's
               modifiers underneath. */}

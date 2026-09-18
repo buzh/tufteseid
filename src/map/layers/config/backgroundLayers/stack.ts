@@ -6,6 +6,7 @@ import {
   FLYFOTO_MOSAIC_CONFIG,
 } from './flyfotoBackground';
 import type { FlyfotoProject } from '../../../../localities/flyfotoProjects';
+import { AMTSKART_CONFIG } from './kartVariants';
 import { KvCacheBackgroundLayers } from './kvCache';
 import {
   DEFAULT_LIDAR_PROJECT_STYLE,
@@ -13,7 +14,6 @@ import {
   LidarProject,
   LIDAR_PROJECT_WMS_URL,
 } from './lidarProjects';
-import { AMTSKART_CONFIG } from './standardVariants';
 import { buildTopoOverlayConfig } from './topoOverlay';
 import {
   BackgroundLayer,

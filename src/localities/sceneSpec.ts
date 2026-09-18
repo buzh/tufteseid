@@ -107,7 +107,7 @@ export const sceneGroundOf = (
       const spec = offer.describe();
       return spec ? { kind: spec.kind, meta: spec.meta } : null;
     }
-    // Standard and Hybrid: no rectangle-fetch path for the topo WMS.
+    // Kart and Hybrid: no rectangle-fetch path for the topo WMS.
     default:
       return null;
   }

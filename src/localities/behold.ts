@@ -26,7 +26,7 @@ export type BeholdSpec = {
 export type BeholdOffer =
   // Named rather than collapsed to `null` so the button can say why it is
   // disabled: an absent offer and a refused one are different tooltips.
-  | { ground: 'standard' | 'hybrid' }
+  | { ground: 'kart' | 'hybrid' }
   | {
       ground: 'lidar';
       // Null while the national mosaic's style list is still in flight.

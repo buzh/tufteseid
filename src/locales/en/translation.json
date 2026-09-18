@@ -589,8 +589,8 @@
   },
   "ribbon": {
     "mode": {
-      "standard": "Map",
-      "standardTip": "Ordinary map — topographic, greyscale, raster, nautical chart or amtskart",
+      "kart": "Map",
+      "kartTip": "Ordinary map — topographic, greyscale, raster, nautical chart or amtskart",
       "lidar": "LiDAR",
       "lidarTip": "LiDAR relief (national mosaic or per project)",
       "hybrid": "Hybrid",
@@ -654,7 +654,7 @@
     "search": {
       "clear": "Clear search"
     },
-    "standard": {
+    "kart": {
       "datasetLabel": "Map type",
       "datasetHead": "Map type",
       "triggerTip": "Map type: {{name}} — pick another (W/S)",

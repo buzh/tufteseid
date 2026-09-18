@@ -39,11 +39,12 @@ const getDefaultBackgroundLayer = (): BackgroundLayerName => {
   if (layerNameFromUrl && VALID_STARTUP_LAYERS.has(layerNameFromUrl)) {
     return layerNameFromUrl;
   }
-  return 'topo';
+  // LiDAR relief is what this is for; Kart is a step away, not the arrival.
+  return 'lidarHillshade';
 };
 
 // Fetched WMTS capabilities, keyed by URL rather than layer name: Kartverket's
-// cache publishes all four Standard variants in one 35 kB document.
+// cache publishes all four Kart variants in one 35 kB document.
 export const backgroundLayerCapabilitiesCacheAtom = atom<
   Record<string, string>
 >({});

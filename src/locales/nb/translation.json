@@ -589,8 +589,8 @@
   },
   "ribbon": {
     "mode": {
-      "standard": "Kart",
-      "standardTip": "Vanlig kart — topografisk, gråtone, raster, sjøkart eller amtskart",
+      "kart": "Kart",
+      "kartTip": "Vanlig kart — topografisk, gråtone, raster, sjøkart eller amtskart",
       "lidar": "LiDAR",
       "lidarTip": "LiDAR-relieff (nasjonal mosaikk eller per prosjekt)",
       "hybrid": "Hybrid",
@@ -654,7 +654,7 @@
     "search": {
       "clear": "Tøm søk"
     },
-    "standard": {
+    "kart": {
       "datasetLabel": "Karttype",
       "datasetHead": "Karttype",
       "triggerTip": "Karttype: {{name}} — velg en annen (W/S)",

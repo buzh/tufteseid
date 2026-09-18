@@ -7,8 +7,8 @@ import { focusedHalfAtom } from '../map/compare/halves';
 import { spendProvisionalViewAtom } from '../map/groundOverlay';
 import type { CycleKey } from '../map/useBackgroundCyclingKeys';
 import type { FlyfotoControls } from './flyfoto/useFlyfotoControls';
+import type { KartControls } from './kart/useKartControls';
 import type { LidarControls } from './lidar/useLidarControls';
-import type { StandardControls } from './standard/useStandardControls';
 import type { TerrainAnalysis } from './terrain/useTerrainAnalysis';
 import { cycleVisningAtom } from './visningRing';
 
@@ -19,8 +19,8 @@ import { cycleVisningAtom } from './visningRing';
  * to which ground is being read; a control hook's own predicate is not.
  */
 export const GROUND_MODES = [
-  'standard',
   'lidar',
+  'kart',
   'hybrid',
   'flyfoto',
   'terreng',
@@ -35,10 +35,10 @@ export type GroundMode = (typeof GROUND_MODES)[number];
  */
 const groundModifiers = (
   mode: GroundMode,
-): 'standard' | 'lidar' | 'flyfoto' | 'terrain' => {
+): 'kart' | 'lidar' | 'flyfoto' | 'terrain' => {
   switch (mode) {
-    case 'standard':
-      return 'standard';
+    case 'kart':
+      return 'kart';
     // Hybrid is a modifier on the LiDAR stack, so it keeps LiDAR's modifiers.
     case 'lidar':
     case 'hybrid':
@@ -52,7 +52,7 @@ const groundModifiers = (
 
 /** Mount exactly once: a second mount means a second DEM. */
 export const useGroundMode = (
-  standard: StandardControls,
+  kart: KartControls,
   lidar: LidarControls,
   flyfoto: FlyfotoControls,
   terrain: TerrainAnalysis,
@@ -82,7 +82,7 @@ export const useGroundMode = (
         ? lidar.hybridOverlay
           ? 'hybrid'
           : 'lidar'
-        : 'standard';
+        : 'kart';
 
   const modifiers = groundModifiers(mode);
 
@@ -98,11 +98,11 @@ export const useGroundMode = (
       leaveTerrain();
     }
     switch (next) {
-      case 'standard':
+      case 'kart':
         lidar.setHybridOverlay(false);
         // Whichever cartography this half was last set to: entering a ground
         // is never a dataset pick.
-        standard.enterStandard();
+        kart.enterKart();
         break;
       case 'lidar':
         lidar.setHybridOverlay(false);
@@ -137,7 +137,8 @@ export const useGroundMode = (
 
   // Controls leaving the bar have to be told: an unmounted pulldown never
   // fires its open-change callback, and LiDAR's open flag paints footprints on
-  // the map. Standard's pulldown hangs off `Kart`, so it never leaves.
+  // the map. The Kart pulldown hangs off a button that is always on the row,
+  // so it never leaves.
   const { standDown: lidarStandDown } = lidar;
   const { standDown: flyfotoStandDown } = flyfoto;
   const { standDown: terrainStandDown } = terrain;
@@ -161,8 +162,8 @@ export const useGroundMode = (
       if (cycleBilder(key === 'd' ? 1 : -1)) return true;
     }
     switch (modifiers) {
-      case 'standard':
-        return standard.cycle(key);
+      case 'kart':
+        return kart.cycle(key);
       case 'lidar':
         return lidar.cycle(key);
       case 'flyfoto':

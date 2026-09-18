@@ -21,7 +21,7 @@ import type { GroundControls, GroundMode } from './useGroundMode';
 
 /** Exhaustive over GroundMode: a sixth ground is a type error here. */
 const SUBJECT_KEY: Record<GroundMode, string> = {
-  standard: 'ribbon.mode.standard',
+  kart: 'ribbon.mode.kart',
   lidar: 'ribbon.mode.lidar',
   hybrid: 'ribbon.mode.hybrid',
   flyfoto: 'ribbon.mode.flyfoto',
@@ -53,9 +53,9 @@ export const RibbonSettingsRow = ({
 
   const subject = t(SUBJECT_KEY[ground.mode]);
 
-  // Standard's controls are on its own button, so there is nothing for this
+  // Kart's controls are on its own button, so there is nothing for this
   // row to hold — except the A|B switch, which has nowhere else to go.
-  if (ground.modifiers === 'standard' && !compareOn) return null;
+  if (ground.modifiers === 'kart' && !compareOn) return null;
 
   const halfOptions: SegmentedOption<CompareHalf>[] = [
     { value: 'a', label: t('ribbon.compare.halfA') },

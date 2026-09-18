@@ -785,7 +785,7 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
             />
             {/* Whatever the map is showing, kept at the source's own
                 resolution rather than photographed off the screen. Disabled
-                rather than hidden on Standard and Hybrid, which cannot be
+                rather than hidden on Kart and Hybrid, which cannot be
                 fetched as data, so the row does not reflow as you walk the
                 ground ring; the tooltip names the verb that can. */}
             <ModeButton
@@ -796,7 +796,7 @@ export const RibbonLocalityRow = ({ ws }: { ws: LocalityWorkspaceApi }) => {
                   : t('localities.tools.behold')
               }
               tooltip={
-                ws.beholdGround === 'standard' || ws.beholdGround === 'hybrid'
+                ws.beholdGround === 'kart' || ws.beholdGround === 'hybrid'
                   ? t('localities.tools.beholdHintScreenshot')
                   : ws.beholdDone
                     ? t('localities.tools.beholdHintDone')
