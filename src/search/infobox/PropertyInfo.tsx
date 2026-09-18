@@ -143,7 +143,7 @@ export const PropertyInfo = ({
   if (isLoading || error || propertyDetails == null) return null;
 
   if (!property) {
-    return <>Ingen eiendomsinformasjon funnet.</>;
+    return <>{t('propertyInfo.notFound')}</>;
   }
 
   const hasMultipleAddresses =
