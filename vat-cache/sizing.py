@@ -9,7 +9,7 @@ Run:
     python sizing.py          # uses the measured defaults below
 """
 
-import numpy as np
+import math
 
 # EPSG:25833 extent, from setEUREF89Extents in euref89.ts.
 EXTENT = (-2500000.0, 3500000.0, 3045984.0, 9045984.0)
@@ -89,18 +89,35 @@ def ladder(product, zooms=range(11, 17)):
         )
 
 
-def stack(product, base_z, levels, label):
-    """Base level plus `levels - 1` coarser ones, all natively computed."""
+def stack_res(product, resolutions, label):
+    """One cost line over an explicit list of resolutions, all natively computed."""
     tp = tw = tpx = 0.0
-    for k in range(levels):
-        res = resolution(base_z - k)
-        tile_m = WMS_TILE_SIZE * res
-        px, png, webp = level_cost(product, res, fill_for(tile_m))
+    for res in resolutions:
+        px, png, webp = level_cost(product, res, fill_for(WMS_TILE_SIZE * res))
         tpx += px
         tp += png
         tw += webp
     print(f"  {label:<44} {tpx / 1e9:6.2f} Gpx  PNG {tp / 1e9:5.2f} GB  WebP90 {tw / 1e9:5.2f} GB")
     return tp, tw
+
+
+def stack(product, base_z, levels, label):
+    """Base level plus `levels - 1` coarser ones, on the app's ladder."""
+    return stack_res(product, [resolution(base_z - k) for k in range(levels)], label)
+
+
+def fetch_bytes(base_z, unit_z, margin_m=24.0, bytes_per_px=4):
+    """What the DEM fetch costs, fetching once at `base_z` and decimating for the
+    coarser levels. Two overheads the naive area/res**2 leaves out, and they pull
+    against each other: a work unit is grown by the margin on every side, which
+    favours large units, and a unit the footprint only clips is fetched whole,
+    which favours small ones."""
+    res = resolution(base_z)
+    side_px = WMS_TILE_SIZE * 2 ** (base_z - unit_z)
+    margin_px = math.ceil(margin_m / res)
+    grown = ((side_px + 2 * margin_px) / side_px) ** 2
+    fill = fill_for(WMS_TILE_SIZE * resolution(unit_z))
+    return COVERAGE_M2 / res**2 / fill * grown * bytes_per_px
 
 
 if __name__ == "__main__":
@@ -109,9 +126,19 @@ if __name__ == "__main__":
     ladder("opos")
     print("\ncandidate VAT caches")
     stack("vat", 15, 1, "z15 only (0.661 m/px)")
+    stack("vat", 15, 3, "z15 + z14/z13")
     stack("vat", 15, 4, "z15 + z14/z13/z12")
     stack("vat", 16, 1, "z16 only (0.331 m/px)")
     stack("vat", 16, 5, "z16 + z15/z14/z13/z12")
+    stack_res("vat", [0.5, 1.0, 2.0], "custom 0.5*2^n grid, three levels")
+
+    print("\nDEM fetch for z15 + z14/z13, by work-unit size")
+    for unit_z in (15, 14, 13, 12):
+        side_m = WMS_TILE_SIZE * resolution(unit_z)
+        print(
+            f"  work unit = one z{unit_z} tile ({side_m:5.0f} m)"
+            f"   {fetch_bytes(15, unit_z) / 1e9:5.1f} GB"
+        )
     print("\nhorizon family, for comparison (all three products)")
     for base, levels, label in ((14, 1, "z14 only"), (14, 4, "z14 + z13/z12/z11")):
         tp = tw = 0.0
