@@ -604,7 +604,7 @@
       "halfLabel": "Which half you are adjusting (C)",
       "halfA": "Left",
       "halfB": "Right",
-      "noTerrainRight": "Terrain cannot be the right half — it is an analysis of the whole map",
+      "noTerrainRight": "Analysis cannot be the right half — it covers the whole map",
       "divider": "Move the divider"
     },
     "info": {
@@ -710,7 +710,7 @@
       "contoursTip": "Draws contour lines alongside the roads and place names. The hillshade says it is steep; the contours say how many metres."
     },
     "terrain": {
-      "label": "Terrain",
+      "label": "Analysis",
       "tip": "Terrain analysis — fetch elevation data and light it yourself",
       "reframe": "Analyse here",
       "reframeTip": "Moves the analysis to what you are looking at now. It does not follow the map on its own — an elevation grid is a large download.",

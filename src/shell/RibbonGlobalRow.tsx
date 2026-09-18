@@ -164,13 +164,33 @@ export const RibbonGlobalRow = () => {
             onClick={() => ground.select('lidar')}
           />
 
+          {/* Beside LiDAR because it is the same relief read harder. The one
+              ground the client computes rather than fetches, so it is the one
+              bounded by a rectangle: an open lokalitet's, or a window framed on
+              the visible map and clamped into the same band. Disabled rather
+              than hidden on the curtain's B half — a render covers the whole
+              map and cannot be one side of a split — so the ring does not
+              reflow as you flip A|B. */}
+          <ModeButton
+            icon="biotech"
+            label={t('ribbon.terrain.label')}
+            tooltip={
+              ground.half === 'b'
+                ? t('ribbon.compare.noTerrainRight')
+                : `${t('ribbon.terrain.tip')} (2)`
+            }
+            active={lit('terreng')}
+            disabled={ground.half === 'b'}
+            onClick={() => ground.select('terreng')}
+          />
+
           {/* The one ground whose dataset list hangs off its own button rather
               than off the settings strip, which is why it has no strip. */}
           <div className={styles.split}>
             <ModeButton
               icon="map"
               label={t('ribbon.mode.kart')}
-              tooltip={`${t('ribbon.mode.kartTip')} (2)`}
+              tooltip={`${t('ribbon.mode.kartTip')} (3)`}
               active={lit('kart')}
               joinedRight
               onClick={() => ground.select('kart')}
@@ -186,7 +206,7 @@ export const RibbonGlobalRow = () => {
           <ModeButton
             icon="signpost"
             label={t('ribbon.mode.hybrid')}
-            tooltip={`${t('ribbon.mode.hybridTip')} (3)`}
+            tooltip={`${t('ribbon.mode.hybridTip')} (4)`}
             active={lit('hybrid')}
             onClick={() => ground.select('hybrid')}
           />
@@ -198,28 +218,9 @@ export const RibbonGlobalRow = () => {
           <ModeButton
             icon="satellite_alt"
             label={t('ribbon.mode.flyfoto')}
-            tooltip={`${t('ribbon.mode.flyfotoTip')} (4)`}
+            tooltip={`${t('ribbon.mode.flyfotoTip')} (5)`}
             active={lit('flyfoto')}
             onClick={() => ground.select('flyfoto')}
-          />
-
-          {/* The one ground the client computes rather than fetches, so it is
-              the one bounded by a rectangle: an open lokalitet's, or a window
-              framed on the visible map and clamped into the same band.
-              Disabled rather than hidden on the curtain's B half — a render
-              covers the whole map and cannot be one side of a split — so the
-              ring does not reflow as you flip A|B. */}
-          <ModeButton
-            icon="elevation"
-            label={t('ribbon.terrain.label')}
-            tooltip={
-              ground.half === 'b'
-                ? t('ribbon.compare.noTerrainRight')
-                : `${t('ribbon.terrain.tip')} (5)`
-            }
-            active={lit('terreng')}
-            disabled={ground.half === 'b'}
-            onClick={() => ground.select('terreng')}
           />
         </div>
 

@@ -34,8 +34,8 @@ import { compareFocusAtom, compareOnAtom, seedHalfB } from './halves';
 // live tile stacks are roughly twice the GetMap requests against a shared rate
 // limit.
 
-/** Every GroundMode except Terreng, spelled out rather than imported: this is
- * a map module and useGroundMode is a shell one. */
+/** Every GroundMode except `terreng` (Analyse), spelled out rather than
+ * imported: this is a map module and useGroundMode is a shell one. */
 export type CompareGround = 'kart' | 'lidar' | 'hybrid' | 'flyfoto';
 
 /** Where the curtain edge sits, as a fraction of the map width. */

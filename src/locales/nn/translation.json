@@ -604,7 +604,7 @@
       "halfLabel": "Kva for ei halvdel du justerer (C)",
       "halfA": "Venstre",
       "halfB": "Høgre",
-      "noTerrainRight": "Terreng kan ikkje vere høgre halvdel — det er ein analyse over heile kartet",
+      "noTerrainRight": "Analyse kan ikkje vere høgre halvdel — han dekkjer heile kartet",
       "divider": "Flytt skiljet"
     },
     "info": {
@@ -710,7 +710,7 @@
       "contoursTip": "Teiknar høgdekurver saman med vegar og stadnamn. Skyggerelieffet viser at det er bratt; kurvene seier kor mange meter."
     },
     "terrain": {
-      "label": "Terreng",
+      "label": "Analyse",
       "tip": "Terrenganalyse — hent høgdedata og lys dei opp sjølv",
       "reframe": "Analyser her",
       "reframeTip": "Flyttar analysen til det du ser no. Han følgjer ikkje kartet av seg sjølv — eit høgdegrid er ei stor nedlasting.",

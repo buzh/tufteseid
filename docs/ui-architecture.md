@@ -167,8 +167,8 @@ capped at one line.
 | 3 | `RibbonLocalityRow` | a lokalitet is open (or `RibbonPlaceLocalityRow` while one is being placed — the two are mutually exclusive) |
 | 4 | `RibbonFunnDraftRow` | a funn draft is live |
 
-Row 1: `RibbonSearch`, LiDAR (1), Kart (2), Hybrid (3), Flyfoto (4),
-Terreng (5), `[Kulturminner ▾]`, Stedsinfo (I), Mål, Mine lokaliteter, Ny
+Row 1: `RibbonSearch`, LiDAR (1), Analyse (2), Kart (3), Hybrid (4),
+Flyfoto (5), `[Kulturminner ▾]`, Stedsinfo (I), Mål, Mine lokaliteter, Ny
 lokalitet, `RibbonLanguage`, `RibbonAccount`. Sammenlign is on the lokalitet
 row. `LocalityRibbon` is the one mount point for `useLocalityWorkspace`;
 `useGroundMode` and `useTerrainAnalysis` are each mounted once, in row 1.
@@ -183,10 +183,10 @@ buttons positional.
 | Ground | Strip |
 | --- | --- |
 | LiDAR | dataset pulldown (Automatisk / national mosaic / per project) · style pulldown · DTM/DOM |
+| Analyse | Visualisering pulldown (eight) · DTM/DOM · 2–4 sliders · resolution readout |
 | Kart | none; the Karttype pulldown hangs off the button. `KART_VARIANTS` = Topografisk, Gråtone, Rasterkart, Sjøkart, Amtskart |
 | Hybrid | the same, plus Høydekurver |
 | Flyfoto | acquisition pulldown · period chips (Alle / 2010– / 1990–2009 / 1960–1989 / –1959) |
-| Terreng | Visualisering pulldown (eight) · DTM/DOM · 2–4 sliders · resolution readout |
 
 While the compare curtain is up, an A|B switch sits on the strip; the strip
 itself stays under Kart.
@@ -204,7 +204,7 @@ Ground-specific facts worth keeping:
   A|B switch. Stacks come from `resolveStack` / `buildStack` in
   `backgroundLayers/stack.ts` under the `bg.` and `cmp.` namespaces; the clip is
   `prerender`/`postrender` + `getRenderPixel` in
-  `src/map/compare/curtainLayers.ts`. Terreng is not offered as a B half, and
+  `src/map/compare/curtainLayers.ts`. Analyse is not offered as a B half, and
   closing a lokalitet tears the curtain down.
 - Kulturminner (`src/shell/heritage/HeritageControl.tsx` + `LayerGroup`): the
   label sets `heritageHiddenAtom`, which calls `setVisible(false)` and never
@@ -232,7 +232,7 @@ because Excalidraw's own shortcuts are the digits.
 
 | Key | Does | Declines when |
 | --- | --- | --- |
-| 1–5 | select ground: LiDAR, Kart, Hybrid, Flyfoto, Terreng | — |
+| 1–5 | select ground: LiDAR, Analyse, Kart, Hybrid, Flyfoto | — |
 | X (hold) | peek the previous ground, snap back on release; also on window blur | — |
 | A / D | walk the LiDAR style ring (top tier, wrapping) | no-op in DOM |
 | A / D, inside a lokalitet | walk the bilder rail (`src/localities/bilderRing.ts`) | three cases: nothing to walk, a live picker run, and the compare curtain's B half — `railWalkable = stripNavigable && picker.run == null`, crossed with `focusedHalfAtom === 'a'` |
@@ -453,7 +453,7 @@ Four routes an image takes in:
   mosaic publishes only `skyggerelieff` — asking for another returns HTTP 200
   with `image/png` and a ~100-byte JSON error body.
 - Behold (`behold.ts`): keeps whatever ground is up, at the source's own
-  resolution. LiDAR → dataset/style/model; Terreng → visualization + knobs;
+  resolution. LiDAR → dataset/style/model; Analyse → visualization + knobs;
   Flyfoto → the acquisition, behind the NiB licensing notice; Kart and
   Hybrid disabled. The offer crosses the sibling gap on `beholdOfferAtom`;
   `attachmentMatchesKey` guards duplicates (bbox to 1 m, floats to 1e-6, `kind`
@@ -613,7 +613,7 @@ that no longer names a funn has to read as "none" everywhere at once.
 `LayerMember.section` becomes a sticky heading in `LayerMembers`;
 `[Visning ▾]` is deliberately ungrouped.
 
-Terreng's own state is `src/shell/terrain/useTerrainAnalysis.ts`, mounted once
+Analyse's own state is `src/shell/terrain/useTerrainAnalysis.ts`, mounted once
 and unconditionally from `RibbonGlobalRow`; it publishes `describe()` and
 `beholdKey` and holds no write of its own. The analysed rectangle is the open
 lokalitet's bbox while `tool === 'terrain'`, and `terrainWindowAtom` when there
@@ -758,7 +758,7 @@ Find a place
 
 Choose what the terrain looks like
 
-- Switch LiDAR / Kart / Hybrid / Flyfoto / Terreng by button or digits 1–5.
+- Switch LiDAR / Analyse / Kart / Hybrid / Flyfoto by button or digits 1–5.
 - Hold X to peek at the previous ground, release to snap back.
 - Draw Kart as five cartographies: topographic, greyscale, scanned paper,
   nautical chart, amtskart over a modern base.

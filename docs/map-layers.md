@@ -15,9 +15,10 @@ projection, `EPSG:25833` by default (`DEFAULT_PROJECTION`, `src/map/atoms.ts`);
 
 ## The grounds
 
-`GROUND_MODES` (`src/shell/useGroundMode.ts`) is `lidar`, `kart`, `hybrid`,
-`flyfoto`, `terreng`. Terreng is not a background layer but a client-rendered
-overlay over whatever background is set. A cold load with no `?backgroundLayer`
+`GROUND_MODES` (`src/shell/useGroundMode.ts`) is `lidar`, `terreng`, `kart`,
+`hybrid`, `flyfoto`. `terreng` — labelled **Analyse** on the ribbon, beside
+LiDAR — is not a background layer but a client-rendered overlay over whatever
+background is set. A cold load with no `?backgroundLayer`
 arrives on `lidarHillshade`, the national relief mosaic
 (`getDefaultBackgroundLayer`, `config/backgroundLayers/atoms.ts`): reading
 relief is what the app is for, and Automatisk takes it to a per-project dataset
@@ -27,12 +28,12 @@ from there.
 |---|---|---|---|
 | LiDAR | `lidarHillshade` (national mosaic) | `/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833` (prefix `NHM_DTM_TOPOBATHY_25833`), DOM: `wms.hoyde-dom-nhm-25833` (`NHM_DOM_25833`) | Automatisk / national / per-project |
 | LiDAR | `lidarProject` (0.25 m per acquisition) | `/wms/geonorge/wms.hoyde-dtm-prosjekt`, DOM: `wms.hoyde-dom-prosjekt`; `LAYERS=<project id>:<style>` | same ring |
+| Analyse | — | `/arcgis/hoydedata/*`, see `docs/terrain-analysis.md` | the visualization list |
 | Kart | `topo`, `topograatone`, `toporaster`, `sjokartraster` (WMTS) | `cache.kartverket.no/v1/service` GetCapabilities, one document for all four | the five `KART_VARIANTS` |
 | Kart → Amtskart | `amtskart` (WMS, `LAYERS=amt1`, 1:200 000) | `/wms/geonorge/wms.historiskekart` | same ring |
 | Hybrid | `topoOverlay` (modifier, not a ground of its own) | `/wms/geonorge/wms.topo`, `TRANSPARENT=TRUE` | the LiDAR ring underneath |
 | Flyfoto | `flyfoto` (seamless mosaic, `LAYERS=ortofoto`, `FORMAT=image/jpeg`) | `/wms/nib/ortofoto` | ortofoto acquisitions |
 | Flyfoto | `flyfotoProject` (one acquisition; `TileArcGISRest`, not WMS) | `/arcgis/nib/ortofoto_prosjekter/ImageServer` | same ring |
-| Terreng | — | `/arcgis/hoydedata/*`, see `docs/terrain-analysis.md` | the visualization list |
 
 Configs live in `src/map/layers/config/backgroundLayers/`: `kvCache.ts` (WMTS
 cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),

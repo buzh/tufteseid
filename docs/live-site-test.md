@@ -122,12 +122,12 @@ run this; it needs no account and touches nothing.
    it on the ground *and takes the map back the way it was made*. `[Skisse ▾]`
    switches the sketch on over whatever ground is up. Every member has a fade;
    nothing in the row writes.
-6. **Grounds.** 1–5 walk Kart, LiDAR, Hybrid, Flyfoto, Terreng. Hold `X` to peek
+6. **Grounds.** 1–5 walk LiDAR, Analyse, Kart, Hybrid, Flyfoto. Hold `X` to peek
    at the previous one. On LiDAR, W / S walks `[Visning ▾]` here rather than the
    dataset ring, because a lokalitet is open. `Sammenlign` puts a second ground
    behind a draggable seam; `C` flips which half row 1 describes; leaving takes
    the second stack down.
-7. **Terreng.** `5` runs it over the rectangle with no account: pick a
+7. **Analyse.** `2` runs it over the rectangle with no account: pick a
    visualization, move a slider, watch it recompute. `Behold` is absent —
    keeping costs a record.
 8. **Write keys are dead.** `N`, `U` and `B` do nothing at all. They are gated on
@@ -140,12 +140,12 @@ run this; it needs no account and touches nothing.
    stamps. The front page and the plate's authored half both name the
    lokalitet's `credit`, and read *Ukjent* only where that field is empty.
 10. **Del.** `⋮ → Del` copies `/l/JYBNQC` and says that anybody can open it.
-11. **Terreng with nothing open.** `Lukk`, move the map somewhere with LiDAR
-    coverage, press `5`. A dashed frame appears on the visible map — clamped
+11. **Analyse with nothing open.** `Lukk`, move the map somewhere with LiDAR
+    coverage, press `2`. A dashed frame appears on the visible map — clamped
     into the band, so it is the same size zoomed right out as it is at 1000 m —
     and the render fills it. The settings strip offers `Analyser her` and
     nothing that keeps it; pan away and press `Analyser her` to move the window.
-    Pressing `5` twice does not start a second DEM, and holding `X` from
+    Pressing `2` twice does not start a second DEM, and holding `X` from
     another ground does not come back here. `1` leaves, and the frame goes with
     the render.
 12. **Housekeeping.** Switch language nb → nn → en: no raw translation keys

@@ -604,7 +604,7 @@
       "halfLabel": "Hvilken halvdel du justerer (C)",
       "halfA": "Venstre",
       "halfB": "Høyre",
-      "noTerrainRight": "Terreng kan ikke være høyre halvdel — det er en analyse over hele kartet",
+      "noTerrainRight": "Analyse kan ikke være høyre halvdel — den dekker hele kartet",
       "divider": "Flytt skillet"
     },
     "info": {
@@ -710,7 +710,7 @@
       "contoursTip": "Tegner høydekurver sammen med veier og stedsnavn. Skyggerelieffet viser at det er bratt; kurvene sier hvor mange meter."
     },
     "terrain": {
-      "label": "Terreng",
+      "label": "Analyse",
       "tip": "Terrenganalyse — hent høydedata og belys dem selv",
       "reframe": "Analyser her",
       "reframeTip": "Flytter analysen til det du ser nå. Den følger ikke kartet av seg selv — et høydegrid er en stor nedlasting.",

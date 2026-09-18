@@ -18,16 +18,17 @@ import { cycleVisningAtom } from './visningRing';
 
 /**
  * The five grounds, in digit order — `GROUND_KEYS` in
- * `useBackgroundCyclingKeys` is positional against this array. Terreng covers
- * the background rather than replacing it, so `mode` is the only honest answer
- * to which ground is being read; a control hook's own predicate is not.
+ * `useBackgroundCyclingKeys` is positional against this array. Analyse sits
+ * second, beside LiDAR: it is relief read harder, not a different map. It
+ * covers the background rather than replacing it, so `mode` is the only honest
+ * answer to which ground is being read; a control hook's own predicate is not.
  */
 export const GROUND_MODES = [
   'lidar',
+  'terreng',
   'kart',
   'hybrid',
   'flyfoto',
-  'terreng',
 ] as const;
 
 export type GroundMode = (typeof GROUND_MODES)[number];
@@ -150,10 +151,10 @@ export const useGroundMode = (
         break;
       case 'terreng':
         // Set, not toggled: the peek re-selects the mode you are on when it
-        // snaps back, so pressing 5 twice must be a no-op. Which is also why
+        // snaps back, so pressing 2 twice must be a no-op. Which is also why
         // an existing window is left where it is rather than re-framed —
         // moving the analysis is `Analyser her` on the settings strip, and a
-        // second DEM is not what a second press of 5 should buy.
+        // second DEM is not what a second press of 2 should buy.
         if (locality) setTool('terrain');
         else if (!terrainWindow && !frameTerrainWindow()) onNothingToFrame();
         break;

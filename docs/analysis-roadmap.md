@@ -20,7 +20,7 @@ independent; none is a prerequisite for the next.
 
 ## Tier 0 — built
 
-Terreng, on the lokalitet row, fetches the float DEM for the lokalitet's
+Analyse, in the ground ring on row 1, fetches the float DEM for the lokalitet's
 rectangle once and computes relief locally. Eight views: hillshade with a live
 azimuth slider, multidirectional hillshade, VAT, sky-view factor, positive and
 negative openness, local relief model, slope. Output keeps as an attachment of

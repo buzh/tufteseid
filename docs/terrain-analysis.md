@@ -13,7 +13,8 @@ Where it lives: `src/terrain/dem.ts` (fetch + TIFF reader), `shade.ts`
 `src/shell/terrain/` (the control surface, described in
 `docs/ui-architecture.md`), `src/figure/specs.ts` (`terrainFigure`).
 
-Terreng is the fifth ground on the ribbon and a read tool throughout: no
+**Analyse** is the second ground on the ribbon, beside LiDAR — the internal
+name stays `terreng` — and a read tool throughout: no
 account, no lokalitet, nothing written. It is also the one ground the client
 computes rather than fetches, so it is the one bounded by a rectangle, and
 there are two sources for that rectangle — never both at once:
