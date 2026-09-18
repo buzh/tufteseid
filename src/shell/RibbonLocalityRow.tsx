@@ -642,36 +642,16 @@ const EditExits = ({ ws }: { ws: LocalityWorkspaceApi }) => {
 };
 
 /**
- * Terreng and Sammenlign: both read a rectangle, so both are here rather than
- * on row 1, in either stance. `useGroundMode` stays mounted once in
+ * Sammenlign, the one read tool that is not a ground: it asks the map to hold
+ * still beside a second one, so it belongs with `Bilder ▾` in the reading zone
+ * and is present in either stance. `useGroundMode` stays mounted once in
  * `RibbonGlobalRow` and this reads the slice it publishes; `null` means row 1
  * has not rendered yet or crashed into its boundary.
  */
 const ReadTools = () => {
-  const { t } = useTranslation();
   const ground = useAtomValue(groundHandleAtom);
   if (!ground) return null;
-  return (
-    <>
-      {/* Digit 5 still selects it: the ring is a fact about GROUND_MODES, not
-          about which row draws the button. Disabled rather than hidden on the
-          curtain's B half — it is a render over the whole map and cannot be
-          one side of a split — so the row does not reflow as you flip A|B. */}
-      <ModeButton
-        icon="elevation"
-        label={t('ribbon.terrain.label')}
-        tooltip={
-          ground.half === 'b'
-            ? t('ribbon.compare.noTerrainRight')
-            : `${t('ribbon.terrain.tip')} (5)`
-        }
-        active={ground.mode === 'terreng'}
-        disabled={ground.half === 'b'}
-        onClick={() => ground.select('terreng')}
-      />
-      <CompareControl ground={ground} />
-    </>
-  );
+  return <CompareControl ground={ground} />;
 };
 
 /**

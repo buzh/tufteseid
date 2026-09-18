@@ -711,7 +711,10 @@
     },
     "terrain": {
       "label": "Terreng",
-      "tip": "Terrenganalyse av lokalitetens rektangel — hent høydedata og belys dem selv"
+      "tip": "Terrenganalyse — hent høydedata og belys dem selv",
+      "reframe": "Analyser her",
+      "reframeTip": "Flytter analysen til det du ser nå. Den følger ikke kartet av seg selv — et høydegrid er en stor nedlasting.",
+      "unavailable": "Fant ikke noe kartutsnitt å analysere."
     }
   },
   "figure": {

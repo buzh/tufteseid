@@ -711,7 +711,10 @@
     },
     "terrain": {
       "label": "Terrain",
-      "tip": "Terrain analysis of the lokalitet's rectangle — fetch elevation data and light it yourself"
+      "tip": "Terrain analysis — fetch elevation data and light it yourself",
+      "reframe": "Analyse here",
+      "reframeTip": "Moves the analysis to what you are looking at now. It does not follow the map on its own — an elevation grid is a large download.",
+      "unavailable": "Found no map view to analyse."
     }
   },
   "figure": {

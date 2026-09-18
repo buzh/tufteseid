@@ -3,6 +3,7 @@ import 'ol/ol.css';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ErrorBoundary } from '../shared/ErrorBoundary.tsx';
+import { terrainWindowLayerEffect } from '../terrain/windowLayer.ts';
 import styles from './MapComponent.module.css';
 import { compareLayerAtomEffect } from './compare/atoms.ts';
 import { themeLayerEffect } from './layers/atoms.ts';
@@ -20,6 +21,9 @@ export const MapComponent = () => {
   // effect above, but into its own `cmp.` namespace, which the background
   // swap does not sweep.
   useAtom(compareLayerAtomEffect);
+  // The frame around a standalone terrain analysis — furniture on the map, so
+  // it hangs off the atom here rather than off the terrain hook in the ribbon.
+  useAtom(terrainWindowLayerEffect);
 
   useEffect(() => {
     if (mapRef.current) {

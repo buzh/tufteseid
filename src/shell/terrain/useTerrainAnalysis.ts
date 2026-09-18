@@ -1,6 +1,6 @@
 // Mounted once, from RibbonGlobalRow: a second mount means a second DEM.
 
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LocalityBbox } from '../../api/localities';
@@ -32,6 +32,7 @@ import {
   usesHorizon,
 } from '../../terrain/render';
 import { computeHorizonFields, type Visualization } from '../../terrain/shade';
+import { frameTerrainWindowAtom, terrainWindowAtom } from '../../terrain/window';
 
 // Pulldown and W/S order. VAT sits next to the three horizon views on purpose:
 // they share one ray walk, so walking between them is free rather than ~800 ms.
@@ -51,11 +52,18 @@ export const useTerrainAnalysis = () => {
   const locality = useAtomValue(activeLocalityAtom);
   const coverTerrainSpec = useAtomValue(coverTerrainSpecAtom);
   const tool = useAtomValue(ribbonToolAtom);
+  const terrainWindow = useAtomValue(terrainWindowAtom);
+  const frameTerrainWindow = useSetAtom(frameTerrainWindowAtom);
 
-  // The lokalitet's own bbox rather than a copy, so "Juster området" refetches
-  // the DEM for free.
-  const bbox: LocalityBbox | null =
-    locality && tool === 'terrain' ? locality.bbox : null;
+  // With a lokalitet open, its own bbox rather than a copy, so "Juster området"
+  // refetches the DEM for free. Without one, the standalone window
+  // (`src/terrain/window.ts`), which `useGroundMode` clears the moment a
+  // lokalitet arrives — so the two branches can never both be live.
+  const bbox: LocalityBbox | null = locality
+    ? tool === 'terrain'
+      ? locality.bbox
+      : null
+    : terrainWindow;
 
   const [model, setModel] = useState<DemModel>('dtm');
   const [dem, setDem] = useState<Dem | null>(null);
@@ -176,8 +184,17 @@ export const useTerrainAnalysis = () => {
     setGroundOverlayOpacity(TERRAIN_KEY, opacity / 100);
   }, [opacity]);
 
-  // Only the render: a kept bilde is a member of its own.
-  useEffect(() => () => setGroundOverlay(TERRAIN_KEY, null), []);
+  // Only the render: a kept bilde is a member of its own. The window goes too,
+  // or row 1 crashing into its boundary would leave a frame on the map around
+  // an analysis that is no longer running.
+  const setTerrainWindow = useSetAtom(terrainWindowAtom);
+  useEffect(
+    () => () => {
+      setGroundOverlay(TERRAIN_KEY, null);
+      setTerrainWindow(null);
+    },
+    [setTerrainWindow],
+  );
 
   /**
    * A spec, not pixels — the pin queue paints it later, so `metresPerPx` is
@@ -304,6 +321,10 @@ export const useTerrainAnalysis = () => {
   return {
     cycle,
     standDown,
+    // Reading with nothing open: the rectangle is the window rather than a
+    // record's, so the strip offers to move it and nothing offers to keep it.
+    standalone: locality == null,
+    reframe: frameTerrainWindow,
     pickerOpen,
     setPickerOpen,
     activate,

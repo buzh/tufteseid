@@ -168,12 +168,10 @@ capped at one line.
 | 4 | `RibbonFunnDraftRow` | a funn draft is live |
 
 Row 1: `RibbonSearch`, LiDAR (1), Kart (2), Hybrid (3), Flyfoto (4),
-`[Kulturminner ▾]`, Stedsinfo (I), Mål, Mine lokaliteter, Ny lokalitet,
-`RibbonLanguage`, `RibbonAccount`. Terreng (5) and Sammenlign are on the
-lokalitet row, because
-both read a rectangle. `LocalityRibbon` is the one mount point for
-`useLocalityWorkspace`; `useGroundMode` and `useTerrainAnalysis` are each
-mounted once, in row 1.
+Terreng (5), `[Kulturminner ▾]`, Stedsinfo (I), Mål, Mine lokaliteter, Ny
+lokalitet, `RibbonLanguage`, `RibbonAccount`. Sammenlign is on the lokalitet
+row. `LocalityRibbon` is the one mount point for `useLocalityWorkspace`;
+`useGroundMode` and `useTerrainAnalysis` are each mounted once, in row 1.
 
 A mode is one of the five grounds and is exclusive; a modifier describes the
 mode you are in and lives on the settings strip. `GROUND_MODES` / `GROUND_KEYS`
@@ -214,9 +212,12 @@ Ground-specific facts worth keeping:
   kulturminner2's three registers, the render axis (one value per LAYERS entry)
   and a Transparens slider topping out at 80% (`MIN_HERITAGE_OPACITY = 0.2`).
 - Ny lokalitet: `src/localities/bboxLimits.ts` — `MIN_SIDE_M = 50`,
-  `MAX_SIDE_M = 1500`, measured in EPSG:25833. The ceiling ratchets down for
-  records already larger and never snaps; everything clamps except
-  `growToFitDrawing`, which refuses, and `copyLocality`, which is exempt.
+  `MAX_SIDE_M = 1000`, measured in EPSG:25833. The ceiling is set by terrain
+  analysis, the most expensive reader of a rectangle: `MAX_DEM_PX_PER_SIDE` is
+  derived from it, so a DEM over an in-band rectangle is never resampled. There
+  is no ratchet — a record found outside the band is brought into it by the
+  first gesture that touches it. Everything clamps except `growToFitDrawing`,
+  which refuses, and `copyLocality`, which is exempt.
   Placement is `localityPlacementAtom` + `useStartLocalityPlacement`
   (`placement.ts`), `RibbonPlaceLocalityRow`, `useLocalityPlacement` and
   `useBboxHandles` (one `Pointer` interaction).
@@ -334,7 +335,7 @@ Five zones in three grid cells (`1fr auto 1fr`): identity (`Lokalitet:`, name,
 short-code chip, visibility badge, banner slot) · contents (`Skisse ▾` ·
 `Funn ▾` · `Bilder ▾`, plus `Visning ▾` / `Bilde ▾`) · the work, edit only
 (Nytt funn · Behold · `Hent ▾` · Skjermbilde) · the ground tools, centre, both
-stances (Terreng · Sammenlign) · the exits, right, deepest first.
+stances (Sammenlign) · the exits, right, deepest first.
 
 | Depth | State | Exits |
 | --- | --- | --- |
@@ -588,7 +589,7 @@ blank the ground.
 restores one in either stance, keeping only the topmost View and saying so
 (`localities.scene.oneView`), and reports what has since been deleted rather
 than silently dropping it. The pin is a flatten through `groundRasterOf` at the
-sharpest member's `metresPerPx`, floored at 1500 m / 6000 px; a scene with
+sharpest member's `metresPerPx`, floored at 1000 m / 4000 px; a scene with
 nothing to draw pins `empty`, not `failed`. The sheet is white paper only when
 no ground rendered under the layers — with a ground it stays transparent where
 the ground is, so a terrain render's no-data holes do not become white patches
@@ -608,10 +609,13 @@ that no longer names a funn has to read as "none" everywhere at once.
 
 Terreng's own state is `src/shell/terrain/useTerrainAnalysis.ts`, mounted once
 and unconditionally from `RibbonGlobalRow`; it publishes `describe()` and
-`beholdKey` and holds no write of its own. The analysed rectangle is
-`locality && tool === 'terrain' ? locality.bbox : null`. Entering it over a
-lokalitet seeds the knobs once per lokalitet from `coverTerrainSpecAtom` through
-`restoreView`, except when `next.derivedFrom === previous.id`.
+`beholdKey` and holds no write of its own. The analysed rectangle is the open
+lokalitet's bbox while `tool === 'terrain'`, and `terrainWindowAtom` when there
+is no lokalitet — `useGroundMode` clears the window the moment one arrives and
+carries the ground over onto it, so the two branches can never both be live.
+Entering it over a lokalitet seeds the knobs once per lokalitet from
+`coverTerrainSpecAtom` through `restoreView`, except when
+`next.derivedFrom === previous.id`.
 
 ## 11. Provenance plates
 
@@ -792,7 +796,7 @@ Own an area
 - Move and resize it by any corner or edge with a live readout, then create it,
   or cancel with nothing written.
 - Have it named after the nearest stedsnavn.
-- Be stopped at 1500 m and 50 m per side, and told which limit and what it is.
+- Be stopped at 1000 m and 50 m per side, and told which limit and what it is.
 - Rename it, describe it, set its visibility (private / limited / public).
 - Read and edit its sted, kommune and matrikkel, pre-filled from the registers.
 - Re-ask the registers after moving the rectangle.
@@ -844,9 +848,10 @@ Analyse it
 - Run terrain analysis (DTM or DOM) with eight visualizations, by pulldown or W/S.
 - Set azimuth, altitude, exaggeration and Transparens live, plus a smoothing or
   horizon-search radius for the five views that have one.
-- Analyse the open lokalitet's rectangle, or with none open place one for the
-  purpose.
-- Change what is analysed by moving the rectangle under "Juster området".
+- Analyse the open lokalitet's rectangle, or with none open a window framed on
+  the visible map — no account needed for either.
+- Change what is analysed by moving the rectangle under "Juster området", or
+  the window with "Analyser her".
 - Press `Behold` to keep whatever ground is on screen at the source's own
   resolution, the button reading `Beholdt` while that exact view is kept.
 - Run a LiDAR extract over the rectangle at a chosen source and resolution, view
@@ -980,12 +985,15 @@ Ours, not upstream's:
 - `openSectionsAtom` / `WorkspaceSectionId` — nothing folds any more.
 - `Section`'s `scroll` prop, which only made sense in a fixed-height column.
   `Section` itself stays.
-- The standalone terrain entrance — `src/terrain/atoms.ts`
-  (`terrainStandaloneBboxAtom`), `src/terrain/useTerrainViewport.ts`, the strip's
-  "Flytt analysen hit" and "Lagre som ny lokalitet" with their
-  `localities.terrain.*` strings, the `save` path in `useTerrainAnalysis`, and
-  `ribbon.terrain.tooLarge` / `.unavailable`. Terreng reads the open lokalitet's
-  bbox and nothing else.
+- The standalone terrain analysis's way *out* — "Lagre som ny lokalitet" and
+  the `save` path in `useTerrainAnalysis`. The window reads; it does not become
+  a record. That was the ambiguity worth removing, not the entrance: two
+  controls that could disagree about which rectangle a save keeps. Making a
+  lokalitet is `Ny lokalitet`, and opening one under the window takes the
+  rectangle over.
+- `ribbon.terrain.tooLarge` — the window is clamped into the band about the
+  view centre, so a zoomed-out view is answered with a 1000 m square rather
+  than a refusal.
 - The ground-overlay arbiter — `GroundOverlayOwner`, the `owner` tag on the
   placement, `showGroundOverlay`, `hideGroundOverlay`, `groundOverlayOwner`,
   `subscribeGroundOverlay`, the displaced-side-drops-its-selection effects.

@@ -271,12 +271,7 @@ export const useBboxHandles = ({
       ) as [number, number];
       apply(
         transformExtent(
-          clampBboxSize(
-            toBbox([west, south, east, north]),
-            anchor,
-            // The ratchet: a record over the band may shrink, never snap.
-            toBbox(before),
-          ),
+          clampBboxSize(toBbox([west, south, east, north]), anchor),
           'EPSG:4326',
           projection,
         ),

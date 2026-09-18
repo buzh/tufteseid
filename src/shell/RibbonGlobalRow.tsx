@@ -10,7 +10,7 @@ import {
   useRegisterBackgroundCycle,
   useRegisterGroundKeys,
 } from '../map/useBackgroundCyclingKeys';
-import { IconButton, Tooltip } from '../ui';
+import { IconButton, toast, Tooltip } from '../ui';
 import { useFlyfotoControls } from './flyfoto/useFlyfotoControls';
 import { groundHandleAtom } from './groundHandle';
 import { HeritageControl } from './heritage/HeritageControl';
@@ -36,9 +36,9 @@ import { useRecreateView } from './useRecreateView';
  * second mount means a second DEM. What the sibling lokalitet row needs
  * crosses the gap on `groundHandleAtom` and `beholdOfferAtom`.
  *
- * Four of the five ground buttons are drawn here — Terreng's is on the
- * lokalitet row — but digit 5 still selects it: `GROUND_KEYS` is positional
- * against `GROUND_MODES`, not against what this row draws.
+ * All five grounds are drawn here, in `GROUND_MODES` order, which is also
+ * 1–5 — `GROUND_KEYS` in `useBackgroundCyclingKeys` is positional against that
+ * array.
  */
 export const RibbonGlobalRow = () => {
   const { t } = useTranslation();
@@ -49,15 +49,14 @@ export const RibbonGlobalRow = () => {
   const lidar = useLidarControls();
   const flyfoto = useFlyfotoControls();
   // Nothing is written until `Opprett`, and it raises the sign-in dialog
-  // itself, hence no `isSignedIn` check at either call site.
+  // itself, hence no `isSignedIn` check at the call site.
   const startPlacement = useStartLocalityPlacement();
 
   // Unconditional: gating it on `ground.modifiers` would throw the DEM away
   // every time someone glanced at another ground.
   const terrain = useTerrainAnalysis();
-  // Terreng with nothing open places a rectangle; the tool arms at the commit.
   const ground = useGroundMode(kart, lidar, flyfoto, terrain, () => {
-    startPlacement('terrain');
+    toast.error({ title: t('ribbon.terrain.unavailable') });
   });
   // Mounted here because applying a saved view writes all four control hooks.
   useRecreateView(ground, lidar, flyfoto, terrain);
@@ -196,8 +195,24 @@ export const RibbonGlobalRow = () => {
             onClick={() => ground.select('flyfoto')}
           />
 
-          {/* Terreng, the fifth ground, has its button on the lokalitet row.
-              Four buttons, five positions. */}
+          {/* The one ground the client computes rather than fetches, so it is
+              the one bounded by a rectangle: an open lokalitet's, or a window
+              framed on the visible map and clamped into the same band.
+              Disabled rather than hidden on the curtain's B half — a render
+              covers the whole map and cannot be one side of a split — so the
+              ring does not reflow as you flip A|B. */}
+          <ModeButton
+            icon="elevation"
+            label={t('ribbon.terrain.label')}
+            tooltip={
+              ground.half === 'b'
+                ? t('ribbon.compare.noTerrainRight')
+                : `${t('ribbon.terrain.tip')} (5)`
+            }
+            active={ground.mode === 'terreng'}
+            disabled={ground.half === 'b'}
+            onClick={() => ground.select('terreng')}
+          />
         </div>
 
         <div className={styles.divider} />

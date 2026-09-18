@@ -12,7 +12,9 @@ import { upsertLocalityOnLayer } from './localityLayer';
 
 // Where a new rectangle is seeded from, and how one is written. "Ny lokalitet"
 // seeds from the visible map and hands the rectangle to the author to place;
-// `Opprett` (placement.ts) is what writes.
+// `Opprett` (placement.ts) is what writes. Terreng's standalone window
+// (`src/terrain/window.ts`) frames the same rectangle, so the two agree about
+// what "the visible map" means.
 
 // At ≥8%, enough that transformExtent's corner-only reprojection cannot clip.
 const INSET_FRACTION = 0.08;
@@ -47,8 +49,8 @@ export const viewportBbox = (map: Map): LocalityBbox | null => {
   const bottomRight = map.getCoordinateFromPixel([right, bottom]);
   if (!topLeft || !bottomRight) return null;
 
-  // No ceiling here: placement clamps the seed into the band, so zooming right
-  // out gives a 1500 m rectangle rather than a refusal.
+  // No ceiling here: the callers clamp the seed into the band, so zooming
+  // right out gives a `MAX_SIDE_M` rectangle rather than a refusal.
   const projection = map.getView().getProjection();
   const extent = boundingExtent([topLeft, bottomRight]);
   return transformExtent(extent, projection, 'EPSG:4326') as LocalityBbox;

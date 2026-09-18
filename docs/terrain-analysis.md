@@ -11,11 +11,29 @@ RVT's `blend.py` / `blend_func.py` is the specification `composeVat` follows.
 Where it lives: `src/terrain/dem.ts` (fetch + TIFF reader), `shade.ts`
 (operators), `render.ts` (field → canvas, headless-capable),
 `src/shell/terrain/` (the control surface, described in
-`docs/ui-architecture.md`), `src/figure/specs.ts` (`terrainFigure`). The
-rectangle analysed is always an open lokalitet's bbox, read off the record
-rather than copied, so resizing the lokalitet refetches the DEM; Terreng is a
-read tool, available in full to a guest who followed a share link into a
-`public` lokalitet, and pressing it with nothing open places a lokalitet first.
+`docs/ui-architecture.md`), `src/figure/specs.ts` (`terrainFigure`).
+
+Terreng is the fifth ground on the ribbon and a read tool throughout: no
+account, no lokalitet, nothing written. It is also the one ground the client
+computes rather than fetches, so it is the one bounded by a rectangle, and
+there are two sources for that rectangle — never both at once:
+
+- **An open lokalitet's bbox**, read off the record rather than copied, so
+  resizing the lokalitet refetches the DEM. This is the branch that can keep
+  what it renders, through `Behold`.
+- **The standalone window** (`src/terrain/window.ts`), framed on the visible
+  map when the ground is entered with nothing open, clamped into the same
+  50–1000 m band, and drawn on the map by `windowLayer.ts`. It is held, not
+  recomputed: the analysis does not follow the map, because a DEM in the band
+  is 64 MB and 16 Mpx of arithmetic per visualization and a render that
+  followed would refetch all of it on every pan. `Analyser her` on the settings
+  strip moves it. Nothing keeps a standalone render — a lokalitet is what
+  keeping is for, and opening one under the window takes the rectangle over.
+
+The band is the containment, and it is exact rather than approximate:
+`MAX_DEM_PX_PER_SIDE` is derived as `MAX_SIDE_M / FINEST_M_PER_PX`, so a
+rectangle inside the band asks for precisely what the grid cap holds and is
+never resampled.
 
 ## The endpoint
 
@@ -97,9 +115,12 @@ arrives as one feature with `"BEST": null`, not as an empty `features` array.
 The response is under wmscache's 1000-byte store threshold, so `dem.ts`
 memoises it in-tab instead.
 
-`MAX_DEM_PX_PER_SIDE` (3000) caps the assembled grid; `planTiles` scales
-resolution down to fit, and `Dem.nativeMetresPerPx` records what the
-acquisition actually publishes so the plate can say the render was resampled.
+`MAX_DEM_PX_PER_SIDE` (4000, derived as `MAX_SIDE_M / FINEST_M_PER_PX`) caps
+the assembled grid; `planTiles` scales resolution down to fit, and
+`Dem.nativeMetresPerPx` records what the acquisition actually publishes so the
+plate can say the render was resampled. Inside the band the two are equal by
+construction, so the resampled wording is reserved for a rectangle that got
+past the clamp.
 
 ## The visualizations, and what each plate records
 

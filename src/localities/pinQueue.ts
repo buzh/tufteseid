@@ -68,11 +68,11 @@ export type PinJob = {
 const RENDER_DEADLINE_MS = 300_000;
 const UPLOAD_DEADLINE_MS = 300_000;
 
-// The longest side of a scene's flatten. 6000 px is the largest a single
-// member can be (1500 m, the bbox ceiling, at LiDAR's 0.25 m/px), so a flatten
-// never coarsens its sharpest layer, and 36 Mpx stays inside `fitImageBlob`'s
-// 40 Mpx store fit so nothing is resampled twice.
-const SCENE_MAX_SIDE_PX = 6000;
+// The longest side of a scene's flatten. 4000 px is the largest a single
+// member can be (MAX_SIDE_M, the bbox ceiling, at LiDAR's 0.25 m/px), so a
+// flatten never coarsens its sharpest layer, and 16 Mpx stays inside
+// `fitImageBlob`'s 40 Mpx store fit so nothing is resampled twice.
+const SCENE_MAX_SIDE_PX = 4000;
 
 // Filenames end up in a download dialog and in a takeout bundle, so keep them
 // to something a filesystem and a URL both accept.

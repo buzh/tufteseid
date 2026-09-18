@@ -1,6 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import type { DemModel } from '../../terrain/dem';
-import { Segmented, Spinner, type SegmentedOption } from '../../ui';
+import {
+  Button,
+  Segmented,
+  Spinner,
+  toast,
+  Tooltip,
+  type SegmentedOption,
+} from '../../ui';
 import styles from './Terrain.module.css';
 import { TerrainSliders } from './TerrainSliders';
 import { TerrainVisPicker } from './TerrainVisPicker';
@@ -26,6 +33,27 @@ export const TerrainStrip = ({ terrain }: { terrain: TerrainAnalysis }) => {
       />
 
       <TerrainSliders terrain={terrain} />
+
+      {/* Only without a lokalitet: there the rectangle is the record's, and
+          moving it is `Juster området`. The analysis deliberately does not
+          follow the map — a DEM in the band is 64 MB — so this is how you
+          bring it to what you are looking at. */}
+      {terrain.standalone && (
+        <Tooltip label={t('ribbon.terrain.reframeTip')}>
+          <Button
+            size="sm"
+            variant="ghost"
+            leftIcon="recenter"
+            onClick={() => {
+              if (!terrain.reframe()) {
+                toast.error({ title: t('ribbon.terrain.unavailable') });
+              }
+            }}
+          >
+            {t('ribbon.terrain.reframe')}
+          </Button>
+        </Tooltip>
+      )}
 
       <div className={styles.status}>
         {loading && <Spinner size={14} />}

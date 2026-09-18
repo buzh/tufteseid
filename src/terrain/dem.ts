@@ -8,6 +8,7 @@
 import { transformExtent } from 'ol/proj';
 import type { LocalityBbox } from '../api/localities';
 import { planTiles, runWithConcurrency } from '../lidarExtract/stitch';
+import { MAX_SIDE_M } from '../localities/bboxLimits';
 import { fetchWithin } from '../shared/utils/deadline';
 
 const IMAGE_SERVER_BASE = '/arcgis/hoydedata';
@@ -41,11 +42,12 @@ const MOSAIC_RULE = JSON.stringify({
 // asking for more than a project holds only buys interpolation.
 const FINEST_M_PER_PX = 0.25;
 
-// Cap the assembled grid: neighbourhood operators run over this Float32Array
-// several times, so 3000² is 36 MB and a sky-view factor pass over it is
-// already a few seconds. planTiles scales resolution down to fit, so a huge
-// lokalitet still works, just coarser.
-const MAX_DEM_PX_PER_SIDE = 3000;
+// Cap the assembled grid. Derived rather than chosen, so the two numbers
+// cannot drift: a rectangle is bounded by MAX_SIDE_M and the finest elevation
+// data is FINEST_M_PER_PX, so this is exactly what an in-band rectangle asks
+// for at native resolution and nothing in the band is ever resampled.
+// planTiles still scales down if one arrives out of band.
+const MAX_DEM_PX_PER_SIDE = MAX_SIDE_M / FINEST_M_PER_PX;
 
 const MAX_CONCURRENT = 3;
 const TILE_RETRIES = 3;

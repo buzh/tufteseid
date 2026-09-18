@@ -1,13 +1,14 @@
 import { transformExtent } from 'ol/proj';
 import { LocalityBbox } from '../api/localities';
 
-// Read off what the producers can render, not what the map can frame: 1500 m
-// is the largest rectangle whose 0.25 m LiDAR extract still fits the 40 Mpx
-// store at native resolution, and below 50 m the provenance plate a download
-// gets stamped with covers the image. Nothing migrates records, so a rectangle
-// may exceed the band.
+// Read off what the producers can render, not what the map can frame. The
+// ceiling is set by terrain analysis, the most expensive reader of a rectangle:
+// `MAX_DEM_PX_PER_SIDE` in `src/terrain/dem.ts` is derived as MAX_SIDE_M at the
+// finest elevation data that exists (0.25 m), so a DEM over a rectangle in the
+// band is never resampled. Below 50 m the provenance plate a download gets
+// stamped with covers the image.
 export const MIN_SIDE_M = 50;
-export const MAX_SIDE_M = 1500;
+export const MAX_SIDE_M = 1000;
 
 // Measured in EPSG:25833, like every producer. The view projection is wrong by
 // a factor of two at 60° N under EPSG:3857, and silently so.
@@ -31,25 +32,20 @@ export const bboxSpanMetres = (bbox: LocalityBbox): [number, number] => {
 export type BboxAnchor = 'centre' | [lon: number, lat: number];
 
 /**
- * Holds `anchor` still. `ceiling` is a ratchet for records already over
- * `MAX_SIDE_M`: the clamp takes whichever is larger, the band or the rectangle
- * as the gesture found it, so nudging a legacy corner cannot destroy it.
+ * Holds `anchor` still. No ratchet for a rectangle already over the band: the
+ * band is what makes the DEM grid exact, so a record outside it is brought in
+ * by the first gesture that touches it rather than carried.
  */
 export const clampBboxSize = (
   bbox: LocalityBbox,
   anchor: BboxAnchor,
-  ceiling?: LocalityBbox,
 ): LocalityBbox => {
   const [minX, minY, maxX, maxY] = toMetric(bbox);
   const width = maxX - minX;
   const height = maxY - minY;
 
-  const headroom = ceiling ? bboxSpanMetres(ceiling) : [0, 0];
-  const maxWidth = Math.max(MAX_SIDE_M, headroom[0]);
-  const maxHeight = Math.max(MAX_SIDE_M, headroom[1]);
-
-  const nextWidth = Math.min(Math.max(width, MIN_SIDE_M), maxWidth);
-  const nextHeight = Math.min(Math.max(height, MIN_SIDE_M), maxHeight);
+  const nextWidth = Math.min(Math.max(width, MIN_SIDE_M), MAX_SIDE_M);
+  const nextHeight = Math.min(Math.max(height, MIN_SIDE_M), MAX_SIDE_M);
   if (nextWidth === width && nextHeight === height) return bbox;
 
   if (anchor === 'centre') {

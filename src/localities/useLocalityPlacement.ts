@@ -13,7 +13,6 @@ import {
 import { bboxSpanMetres, MAX_SIDE_M, MIN_SIDE_M } from './bboxLimits';
 import { createLocalityFromBbox } from './createFromBbox';
 import { type LocalityPlacement, localityPlacementAtom } from './placement';
-import { ribbonToolAtom } from './toolAtoms';
 import { useBboxHandles } from './useBboxHandles';
 
 const PLACE_LAYER_ID = 'localityPlaceLayer';
@@ -44,7 +43,6 @@ export const useLocalityPlacement = (
   const setActiveLocality = useSetAtom(activeLocalityAtom);
   const setEditingLocalityId = useSetAtom(editingLocalityIdAtom);
   const setPendingStarter = useSetAtom(pendingStarterLocalityIdAtom);
-  const setRibbonTool = useSetAtom(ribbonToolAtom);
 
   const [bbox, setBbox] = useState<LocalityBbox>(placement.bbox);
   const [creating, setCreating] = useState(false);
@@ -89,8 +87,6 @@ export const useLocalityPlacement = (
       setActiveLocality(rec);
       setEditingLocalityId(rec.id);
       setPendingStarter(rec.id);
-      // Only on a create that worked, or the next lokalitet opens armed.
-      if (placement.then === 'terrain') setRibbonTool('terrain');
       setPlacement(null);
     } finally {
       setCreating(false);
@@ -99,12 +95,10 @@ export const useLocalityPlacement = (
     user,
     creating,
     placement.bbox,
-    placement.then,
     t,
     setActiveLocality,
     setEditingLocalityId,
     setPendingStarter,
-    setRibbonTool,
     setPlacement,
   ]);
 

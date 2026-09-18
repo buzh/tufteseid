@@ -6,6 +6,7 @@ import { ribbonToolAtom } from '../localities/toolAtoms';
 import { focusedHalfAtom } from '../map/compare/halves';
 import { spendProvisionalViewAtom } from '../map/groundOverlay';
 import type { CycleKey } from '../map/useBackgroundCyclingKeys';
+import { frameTerrainWindowAtom, terrainWindowAtom } from '../terrain/window';
 import type { FlyfotoControls } from './flyfoto/useFlyfotoControls';
 import type { KartControls } from './kart/useKartControls';
 import type { LidarControls } from './lidar/useLidarControls';
@@ -56,21 +57,26 @@ export const useGroundMode = (
   lidar: LidarControls,
   flyfoto: FlyfotoControls,
   terrain: TerrainAnalysis,
-  /** What pressing Terreng with nothing open does: propose a rectangle, or
-   * raise the sign-in dialog. */
-  placeForTerrain: () => void,
+  /** Reported when the chrome covers everything there is to frame — the only
+   * way entering Terreng with nothing open can fail. */
+  onNothingToFrame: () => void,
 ) => {
   const locality = useAtomValue(activeLocalityAtom);
   const [tool, setTool] = useAtom(ribbonToolAtom);
+  const [terrainWindow, setTerrainWindow] = useAtom(terrainWindowAtom);
+  const frameTerrainWindow = useSetAtom(frameTerrainWindowAtom);
   // Which half everything below sets and reports. Always 'a' with no curtain.
   const half = useAtomValue(focusedHalfAtom);
   const cycleVisning = useSetAtom(cycleVisningAtom);
   const cycleBilder = useSetAtom(cycleBilderAtom);
   const spendProvisional = useSetAtom(spendProvisionalViewAtom);
 
-  // A terrain render covers the whole map, so it cannot be one side of the
-  // split: on B, `mode` names B's raster ground even with one up on A.
-  const terrainActive = half === 'a' && locality != null && tool === 'terrain';
+  // Two rectangles, never both: a lokalitet's own bbox, or the standalone
+  // window framed on the visible map. A terrain render covers the whole map, so
+  // it cannot be one side of the split — on B, `mode` names B's raster ground
+  // even with one up on A.
+  const terrainActive =
+    half === 'a' && (locality ? tool === 'terrain' : terrainWindow != null);
 
   // Terreng first: it is the only ground that leaves another's background
   // switched on beneath it.
@@ -88,7 +94,21 @@ export const useGroundMode = (
 
   const leaveTerrain = () => {
     setTool((cur) => (cur === 'terrain' ? null : cur));
+    // The window goes with it rather than being kept warm: holding it would
+    // leave a frame on the map around a render that is no longer there.
+    setTerrainWindow(null);
   };
+
+  // Terreng follows a lokalitet that opens under it — created from the
+  // placement row, or picked out of the bookmark list — so the ground you were
+  // reading survives the arrival and moves onto the rectangle that now owns
+  // the question. The window is dropped in the same commit: only one rectangle
+  // is ever in play.
+  useEffect(() => {
+    if (!locality || terrainWindow == null) return;
+    setTerrainWindow(null);
+    setTool('terrain');
+  }, [locality, terrainWindow, setTerrainWindow, setTool]);
 
   const enter = (next: GroundMode) => {
     // On B the ring is four buttons, and must not disturb A's terrain render.
@@ -118,9 +138,12 @@ export const useGroundMode = (
         break;
       case 'terreng':
         // Set, not toggled: the peek re-selects the mode you are on when it
-        // snaps back, so pressing 5 twice must be a no-op.
+        // snaps back, so pressing 5 twice must be a no-op. Which is also why
+        // an existing window is left where it is rather than re-framed —
+        // moving the analysis is `Analyser her` on the settings strip, and a
+        // second DEM is not what a second press of 5 should buy.
         if (locality) setTool('terrain');
-        else placeForTerrain();
+        else if (!terrainWindow && !frameTerrainWindow()) onNothingToFrame();
         break;
     }
   };
@@ -190,8 +213,8 @@ export const useGroundMode = (
     if (peekFromRef.current) return;
     const previous = previousRef.current;
     if (!previous || previous === mode) return;
-    // `enter('terreng')` with nothing open starts placing a lokalitet, and key
-    // release would snap out of the mode and leave the placement behind.
+    // `enter('terreng')` with nothing open frames a window and starts a DEM
+    // download. A peek is a glance, not a 64 MB one.
     if (previous === 'terreng' && !locality) return;
     peekFromRef.current = mode;
     enter(previous);

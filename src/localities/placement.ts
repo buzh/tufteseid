@@ -20,15 +20,13 @@ export type LocalityPlacement = {
   // re-seeds the rectangle from the screen.
   id: string;
   bbox: LocalityBbox;
-  // Armed at the commit, only on success.
-  then: 'terrain' | null;
 };
 
 export const localityPlacementAtom = atom<LocalityPlacement | null>(null);
 
 let sessionCounter = 0;
 
-/** Both entrances to a new lokalitet. Writes nothing; `Opprett` does. */
+/** The way into a new lokalitet. Writes nothing; `Opprett` does. */
 export const useStartLocalityPlacement = () => {
   const { t } = useTranslation();
   const map = useAtomValue(mapAtom);
@@ -38,37 +36,33 @@ export const useStartLocalityPlacement = () => {
   const setActiveLocality = useSetAtom(activeLocalityAtom);
   const setTool = useSetAtom(mapToolAtom);
 
-  return useCallback(
-    (then: 'terrain' | null = null) => {
-      if (!isSignedIn) {
-        openAuthDialog(true);
-        return;
-      }
-      const seed = viewportBbox(map);
-      if (!seed) {
-        // The chrome is covering the whole map: nothing to seed from.
-        toast.error({ title: t('localities.createFailed') });
-        return;
-      }
-      setActiveLocality(null);
-      setTool(null);
-      sessionCounter += 1;
-      setPlacement({
-        id: `place-${sessionCounter}`,
-        // Clamped about the centre, so a viewport outside the band yields the
-        // nearest allowed rectangle rather than a refusal.
-        bbox: clampBboxSize(seed, 'centre'),
-        then,
-      });
-    },
-    [
-      isSignedIn,
-      openAuthDialog,
-      map,
-      t,
-      setActiveLocality,
-      setTool,
-      setPlacement,
-    ],
-  );
+  return useCallback(() => {
+    if (!isSignedIn) {
+      openAuthDialog(true);
+      return;
+    }
+    const seed = viewportBbox(map);
+    if (!seed) {
+      // The chrome is covering the whole map: nothing to seed from.
+      toast.error({ title: t('localities.createFailed') });
+      return;
+    }
+    setActiveLocality(null);
+    setTool(null);
+    sessionCounter += 1;
+    setPlacement({
+      id: `place-${sessionCounter}`,
+      // Clamped about the centre, so a viewport outside the band yields the
+      // nearest allowed rectangle rather than a refusal.
+      bbox: clampBboxSize(seed, 'centre'),
+    });
+  }, [
+    isSignedIn,
+    openAuthDialog,
+    map,
+    t,
+    setActiveLocality,
+    setTool,
+    setPlacement,
+  ]);
 };
