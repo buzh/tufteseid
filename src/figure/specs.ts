@@ -289,12 +289,13 @@ const terrainSettings = ({
   }
   // The horizon scan averages the DEM down to reach past its step budget, so
   // these views are read off a coarser surface than the resolution line claims,
-  // and the same radius over two surfaces is two different measurements.
-  // VAT is not in that family — it imposes its own grid rather than reaching
-  // for one — but the line means the same thing, and it is derived from the
-  // rectangle because that is all a stored record keeps. `metresPerPx` may have
-  // been coarsened by the store fit since; the product below is very nearly
-  // invariant to that, since both halves of `vatDecimation` are distances.
+  // and the same radius over two surfaces is two different measurements. VAT
+  // gets its own line: it does not reach for a coarser grid, it imposes one,
+  // and every layer of the stack is computed there rather than only the scan.
+  // It is derived from the rectangle because that is all a stored record keeps.
+  // `metresPerPx` may have been coarsened by the store fit since; the product
+  // below is very nearly invariant to that, since both halves of
+  // `vatDecimation` are distances.
   const scanFactor =
     vis === 'vat'
       ? vatDecimation(
@@ -306,9 +307,8 @@ const terrainSettings = ({
         ? horizonDecimation(metresPerPx, r)
         : 1;
   if (scanFactor > 1) {
-    settings.push(
-      t('figure.set.horizonGrid', { m: dec(metresPerPx * scanFactor, 2) }),
-    );
+    const key = vis === 'vat' ? 'figure.set.vatGrid' : 'figure.set.horizonGrid';
+    settings.push(t(key, { m: dec(metresPerPx * scanFactor, 2) }));
   }
   if (nativeMetresPerPx != null && nativeMetresPerPx < metresPerPx) {
     settings.push(t('figure.set.resampled', { m: dec(nativeMetresPerPx, 2) }));

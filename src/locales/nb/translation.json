@@ -779,6 +779,7 @@
       "opennessRadius": "åpenhetsradius {{m}} m",
       "svfDirections": "{{n}} retninger",
       "horizonGrid": "horisontsøk i {{m}} m rutenett",
+      "vatGrid": "hele stabelen beregnet i {{m}} m rutenett",
       "vatStack": "VAT-stabel: {{stack}}",
       "vatLayer": "{{vis}} ({{blend}}, {{opacity}} %)",
       "vatPreset": "{{name}} (sol {{alt}}°, helning 0–{{slopeMax}}°, åpenhet {{opMin}}–{{opMax}}°, himmelsyn {{svfMin}}–1, radius {{inner}}–{{radius}} m)",

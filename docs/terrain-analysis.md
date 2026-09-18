@@ -6,7 +6,8 @@ parallel to the sun. The visualizations that work for earthworks are
 illumination-independent and need elevation values, so this module fetches the
 raw float grid and computes relief in the browser. Reference: Kokalj & Hesse,
 *Airborne laser scanning raster data visualization* (ZRC SAZU, open access);
-RVT's `blend.py` / `blend_func.py` is the specification `composeVat` follows.
+what `composeVat` follows is RVT's `blend.py` / `blend_func.py` as they run, not
+`settings/blender_VAT.json` as it reads — see below for where the two differ.
 
 Where it lives: `src/terrain/dem.ts` (fetch + TIFF reader), `shade.ts`
 (operators), `render.ts` (field → canvas, headless-capable),
@@ -171,8 +172,9 @@ pixels at render time.
 
 Always, additionally: model (DTM/DOM), source mosaic, EPSG:25833 extent,
 geodetic centre, grid resolution; `figure.set.horizonGrid` when the horizon
-scan decimated; `figure.set.resampled` with `nativeMetresPerPx` when the
-rectangle exceeded `MAX_DEM_PX_PER_SIDE`.
+scan decimated, or `figure.set.vatGrid` — a separate line because VAT computes
+its whole stack there, not only its scan; `figure.set.resampled` with
+`nativeMetresPerPx` when the rectangle exceeded `MAX_DEM_PX_PER_SIDE`.
 
 - `MULTI_AZIMUTHS`, `SVF_DIRECTIONS`, `VAT_STACK` and `VAT_PRESETS` are exported
   because they are printed; changing one changes what old and new renders mean
@@ -189,13 +191,26 @@ rectangle exceeded `MAX_DEM_PX_PER_SIDE`.
 ## VAT, and why it is two of them
 
 RVT's "VAT — Archaeological" is four layers over one another: hillshade at
-100 %, slope at 50 % luminosity, positive openness at 50 % overlay, sky-view
-factor at 25 % multiply (`VAT_STACK`, matching `rvt/blend.py`). Over
-single-band data two of the three blend modes collapse — a luminosity blend is
-the active layer, and an opacity is a plain linear mix — so `composeVat` is four
-lines of arithmetic, and only overlay keeps its own, driving off the
-*background* rather than the active layer as `rvt.blend_func.blend_overlay`
-does.
+100 %, slope at 50 % luminosity, positive openness at 100 % overlay, sky-view
+factor at 25 % multiply (`VAT_STACK`). Over single-band data two of the three
+blend modes collapse — a luminosity blend is the active layer, and an opacity is
+a plain linear mix — so `composeVat` is four lines of arithmetic, and only
+overlay keeps its own, driving off the *background* rather than the active layer
+as `rvt.blend_func.blend_overlay` does.
+
+The openness layer's 100 % is copied from RVT's behaviour and not from its
+settings file, which says 50. `blend_overlay` writes its result into the
+background array it was handed and returns that same array, so the caller in
+`rvt/blend.py` — `render_images(top, background, opacity)` — mixes the blended
+layer with itself and the opacity does nothing. `blend_multiply` and
+`blend_screen` allocate, so the sky-view layer's 25 % survives; overlay and soft
+light are the two that get eaten. This has been RVT's behaviour since at least
+2023, so every published VAT image and every RVT plugin output an archaeologist
+has calibrated an eye against came out of that path. Honouring `blender_VAT.json`
+instead cost about 40 % of the composite's local contrast, measured across a
+ditch floor, a hollow, level ground and a bank crest — and the openness layer is
+what makes a low bank visible at all, so the half-strength version read as a
+soft hillshade with a wash over it.
 
 What makes it work is the absolute stretches, and what makes a single set of
 them fail is gentle ground. RVT ships three terrain parameter sets in
@@ -214,7 +229,10 @@ Under the general numbers the bank moves four grey levels out of 256. Upstream
 of the blend, positive openness over that scene spans 81.8–91.1° against a
 68–93° stretch and sky-view 0.858–1.000 against 0.7–1, so both horizon layers
 run at a third to a half of their intended contrast and VAT collapses towards
-hillshade-plus-slope.
+hillshade-plus-slope. Those composite figures were measured before the openness
+layer went to full strength and before the stack moved onto one grid, so the
+spans are now wider than the table says; the gap between the two parameter sets,
+which is what the table is here for, is not one the changes touch.
 
 So the ring entry is RVT's *combined* VAT (`VAT_combined.py`): the general stack
 at 50 % over the flat one, which is their mean. Neither alone is offered.
@@ -229,19 +247,31 @@ horizon angle over a fixed distance is a fact about the ground while over a
 fixed pixel count it is a fact about the grid, and the stretches are calibrated
 against the angle. And RVT's `svf_noise` is not a filter but an inner radius —
 skip the first 0/10/20/40 % of `r_max` — which `scanHorizon` takes as
-`innerMetres`. The three views that offer the reader a radius pass 0 for it:
-their radius is the one number on the legend, and a second hidden one under it
-would make that a fiction.
+`innerMetres`. Only VAT passes one: `computeHorizonFields`, which serves the
+three views that offer the reader a radius, starts its rays at the first cell,
+because that radius is the one number on the legend and a second hidden one
+under it would make that a fiction.
 
 VAT does not share the horizon family's ray walk, its radius slider or its
 decimation rule. It imposes its own grid through `vatDecimation`, targeting
 `VAT_SCAN_M_PER_PX` (0.5 m, RVT's own calibration resolution) and falling back
-to coarser only to stay under a budget of 1.2 M scanned cells, which is about
-three seconds for the pair. Scanning the same scene at 0.25 m instead bought
+to coarser only to stay under a budget of 1.2 M cells, which is about three
+seconds for the pair of scans. Reading the same scene at 0.25 m instead bought
 5 % more contrast across a ditch and, with 3 cm of noise in the DEM, nearly
 doubled the speckle on featureless ground — grain, not signal. `vatDecimation`
 takes metres rather than a `Dem` so a figure caption can reach the same answer
 from a stored bbox.
+
+All four layers are computed on that grid, not just the two horizon ones, and
+only the finished composite is interpolated back to the DEM's own resolution.
+RVT reads its whole stack off one surface and the stretches are calibrated
+together against it; splitting the difference — gradients at 0.25 m, horizon at
+0.5 m — produced a sharp hillshade with a blurred wash over it, and left the
+slope layer twice as sensitive to DEM noise as RVT's is. Three centimetres of
+noise over a two-cell baseline is 3.4° of slope at 0.25 m against 1.7° at 0.5 m,
+and the flat preset's entire slope stretch is 15°. Doing it this way is also
+cheaper: the gradient walk now runs over the same 1.2 M cells as the scans
+instead of over the full 17 M a kilometre-wide rectangle holds at 0.25 m.
 
 ## The horizon radius: reach is bought by decimating
 

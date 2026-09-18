@@ -779,6 +779,7 @@
       "opennessRadius": "openness radius {{m}} m",
       "svfDirections": "{{n}} directions",
       "horizonGrid": "horizon searched on a {{m}} m grid",
+      "vatGrid": "whole stack computed on a {{m}} m grid",
       "vatStack": "VAT stack: {{stack}}",
       "vatLayer": "{{vis}} ({{blend}}, {{opacity}} %)",
       "vatPreset": "{{name}} (sun {{alt}}°, slope 0–{{slopeMax}}°, openness {{opMin}}–{{opMax}}°, sky-view {{svfMin}}–1, radius {{inner}}–{{radius}} m)",
