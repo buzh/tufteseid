@@ -13,9 +13,7 @@
     "format": "prettier --write \"./**/*.{js,jsx,ts,tsx,css,json}\" --list-different",
     "format-check": "prettier --check \"{src,test}/**/*.{js,jsx,ts,tsx,css,json}\"",
     "format-specific": "prettier --write ",
-    "preview": "vite preview",
-    "aword": "node scripts/addWord.js",
-    "rword": "node scripts/removeWord.js"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.1",
