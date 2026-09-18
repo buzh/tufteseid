@@ -12,18 +12,6 @@ import {
 
 const env = getEnv();
 
-const trackApiError = (
-  error: unknown,
-  context: {
-    url?: string;
-    httpStatus?: number;
-    query?: string;
-    searchType: string;
-  },
-) => {
-  console.error(`Search API error [${context.searchType}]:`, error);
-};
-
 const normalizeAddressQuery = (query: string): string =>
   query.replace(/\s+/g, ' ').trim();
 
@@ -54,17 +42,14 @@ const emptyAddressResult = (query: string): AddressApiResponse => ({
 export const getAddresses = async (
   query: string,
 ): Promise<AddressApiResponse> => {
-  let url;
-  let httpStatus;
   try {
     const normalizedQuery = normalizeAddressQuery(query);
     if (isInvalidAddressSearch(normalizedQuery)) {
       return emptyAddressResult(query);
     }
     const encodedQuery = encodeURIComponent(normalizedQuery);
-    url = `${env.geoNorgeApiBaseUrl}/adresser/v1/sok?sok=${encodedQuery}&treffPerSide=100`;
+    const url = `${env.geoNorgeApiBaseUrl}/adresser/v1/sok?sok=${encodedQuery}&treffPerSide=100`;
     const res = await fetch(url);
-    httpStatus = res.status;
 
     if (!res.ok) {
       throw new Error(
@@ -73,7 +58,7 @@ export const getAddresses = async (
     }
     return res.json();
   } catch (error) {
-    trackApiError(error, { url, httpStatus, query, searchType: 'addresses' });
+    console.error(error);
     return {
       adresser: [],
       metadata: {
@@ -135,11 +120,7 @@ export const getPlaceNames = async (
     }
     return res.json();
   } catch (error) {
-    trackApiError(error, {
-      query,
-      url: url.toString(),
-      searchType: 'placeNames',
-    });
+    console.error(error);
 
     return {
       navn: [],
@@ -164,20 +145,17 @@ export const getPlaceNamesByLocation = async (
 ): Promise<PlaceNamePointApiResponse> => {
   const projectionEPSGNumber = projection.split(':')[1];
   const url = `${env.geoNorgeApiBaseUrl}/stedsnavn/v1/punkt?nord=${y}&ost=${x}&treffPerSide=35&koordsys=${projectionEPSGNumber}&radius=${radius}&side=1`;
-  let httpStatus;
   try {
     const res = await fetch(url);
-    httpStatus = res.status;
 
-    if (!res.ok) throw new Error('Feil ved henting av stedsnavn');
+    if (!res.ok) {
+      throw new Error(
+        `API failed [placeNamesByLocation]: ${res.status} for (${x}, ${y}) r=${radius} in ${projection}`,
+      );
+    }
     return res.json();
   } catch (error) {
-    trackApiError(error, {
-      url,
-      httpStatus,
-      query: `x:${x}, y:${y}, radius:${radius}, projection:${projection}`,
-      searchType: 'placeNamesByLocation',
-    });
+    console.error(error);
     throw error;
   }
 };
@@ -193,7 +171,7 @@ export const getRoads = async (query: string): Promise<Road[]> => {
     }
     return res.json();
   } catch (error) {
-    trackApiError(error, { query, url, searchType: 'roads' });
+    console.error(error);
     return [];
   }
 };
@@ -220,10 +198,8 @@ export const getProperties = async (query: string): Promise<Property[]> => {
   const normalizedQuery = normalizePropertyQuery(query);
   const encodedQuery = encodeURIComponent(normalizedQuery);
   const url = `${env.apiUrl}/v1/matrikkel/eie/${encodedQuery}`;
-  let httpStatus;
   try {
     const res = await fetch(url);
-    httpStatus = res.status;
     if (!res.ok) {
       throw new Error(
         `API failed [properties]: ${res.status} for "${query}", Statuscode:${res.status}`,
@@ -231,7 +207,7 @@ export const getProperties = async (query: string): Promise<Property[]> => {
     }
     return res.json();
   } catch (error) {
-    trackApiError(error, { query, url, httpStatus, searchType: 'properties' });
+    console.error(error);
     return [];
   }
 };
@@ -256,10 +232,8 @@ export const getElevation = async (
   url.searchParams.append('sr', '25833');
   url.searchParams.append('returnGeometry', 'false');
   url.searchParams.append('returnCatalogItems', 'false');
-  let httpStatus;
   try {
     const res = await fetch(url.toString());
-    httpStatus = res.status;
     if (!res.ok) {
       throw new Error(
         `API failed [elevation]: ${res.status} for coordinates (${x}, ${y}), Statuscode:${res.status}`,
@@ -267,11 +241,7 @@ export const getElevation = async (
     }
     return res.json();
   } catch (error) {
-    trackApiError(error, {
-      url: url.toString(),
-      httpStatus,
-      searchType: 'elevation',
-    });
+    console.error(error);
     throw error;
   }
 };
@@ -283,10 +253,8 @@ export const getPropetyInfoByCoordinates = async (lat: number, lon: number) => {
   url.searchParams.append('ost', lon.toString());
   url.searchParams.append('koordsys', '4258');
 
-  let httpStatus;
   try {
     const res = await fetch(url.toString());
-    httpStatus = res.status;
     if (!res.ok) {
       throw new Error(
         `API failed [propertyInfoByCoordinates]: ${res.status} for coordinates (${lat}, ${lon}), Statuscode:${res.status}`,
@@ -294,11 +262,7 @@ export const getPropetyInfoByCoordinates = async (lat: number, lon: number) => {
     }
     return res.json();
   } catch (error) {
-    trackApiError(error, {
-      url: url.toString(),
-      httpStatus,
-      searchType: 'propertyInfoByCoordinates',
-    });
+    console.error(error);
     throw error;
   }
 };
@@ -333,10 +297,8 @@ export const getPropertyDetailsByMatrikkelId = async (
     url += `${kommunenr}-${gardsnr}/${bruksnr}`;
   }
   url += `&KILDE:Eiendom KOMMUNENR:${kommunenr} GARDSNR:${gardsnr} BRUKSNR:${bruksnr} SEKSJONSNR:${seksjonsnr} FESTENR:${festenr}`;
-  let httpStatus;
   try {
     const res = await fetch(url);
-    httpStatus = res.status;
     if (!res.ok) {
       throw new Error(
         `API failed [propertyDetailsByMatrikkelId]: ${res.status} for matrikkelId (${kommunenr}-${gardsnr}/${bruksnr}/${festenr}/${seksjonsnr}), Statuscode:${res.status}`,
@@ -344,11 +306,7 @@ export const getPropertyDetailsByMatrikkelId = async (
     }
     return res.json();
   } catch (error) {
-    trackApiError(error, {
-      url,
-      httpStatus,
-      searchType: 'propertyDetailsByMatrikkelId',
-    });
+    console.error(error);
     throw error;
   }
 };
