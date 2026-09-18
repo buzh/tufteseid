@@ -5,7 +5,9 @@ import { Icon, Style } from 'ol/style';
 import { getInputCRS } from '../../shared/utils/crsUtils';
 import { SearchResult } from '../../types/searchTypes';
 
-type MakrerColor = 'red' | 'blue' | 'yellow' | 'green' | 'orange';
+// Blue for a result in the list, red for the selected one. Nothing else
+// distinguishes a marker.
+type MarkerColor = 'red' | 'blue';
 
 export const createMarkerStyle = (iconSrc: string): Style => {
   return new Style({
@@ -19,7 +21,7 @@ export const createMarkerStyle = (iconSrc: string): Style => {
 
 export const createMarker = (
   res: SearchResult,
-  markerColor: MakrerColor,
+  markerColor: MarkerColor,
   map: Map,
 ): Feature => {
   const iconSrc = `/location/location_${markerColor}.svg`;
@@ -33,20 +35,6 @@ export const createMarker = (
     ),
   });
   marker.setProperties({ searchResult: res });
-  marker.setStyle(createMarkerStyle(iconSrc));
-  return marker;
-};
-
-export const createMarkerFromCoordinate = (
-  lon: number,
-  lat: number,
-  markerColor: MakrerColor,
-): Feature => {
-  const marker = new Feature({
-    geometry: new Point([lon, lat]),
-  });
-  const iconSrc = `/location/location_${markerColor}.svg`;
-  marker.set('isMarker', true);
   marker.setStyle(createMarkerStyle(iconSrc));
   return marker;
 };
