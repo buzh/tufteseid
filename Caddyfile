@@ -24,7 +24,7 @@ route {
                 style-src 'self';
                 style-src-attr 'unsafe-inline';
                 font-src 'self';
-                frame-ancestors *;
+                frame-ancestors 'self';
         "
         header Permissions-Policy "geolocation=(self), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), accelerometer=(), camera=()"
 
