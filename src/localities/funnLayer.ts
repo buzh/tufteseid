@@ -26,15 +26,19 @@ import {
 export const FUNN_ID_PROPERTY = '__funnId';
 export const FUNN_LAYER_ID = 'funnLayer';
 
-// Barely filled: the relief under a funn is the evidence for it. The white
-// casing keeps the orange readable on hillshade and ortofoto alike.
+// Unfilled, and the outline itself half-transparent: the relief under a funn is
+// the evidence for it, and nothing drawn over it may compete. The white casing
+// keeps the orange readable on hillshade and ortofoto alike. The fill stays as a
+// transparent colour rather than being dropped — OL's hit detection repaints
+// fill and stroke in an opaque probe colour, so a funn with no Fill at all is
+// only clickable along its outline.
 const defaultFunnStyle = [
   new Style({
-    stroke: new Stroke({ color: 'rgba(255, 255, 255, 0.9)', width: 5 }),
+    stroke: new Stroke({ color: 'rgba(255, 255, 255, 0.5)', width: 5 }),
   }),
   new Style({
-    stroke: new Stroke({ color: '#FF6A00', width: 2.5 }),
-    fill: new Fill({ color: 'rgba(255, 106, 0, 0.12)' }),
+    stroke: new Stroke({ color: 'rgba(255, 106, 0, 0.7)', width: 2.5 }),
+    fill: new Fill({ color: 'rgba(255, 106, 0, 0)' }),
     image: new CircleStyle({
       radius: 7,
       fill: new Fill({ color: '#FF6A00' }),
