@@ -3,10 +3,10 @@
 Three name sets have to agree before a cached ground reaches a reader, and an
 acquisition missing from any one of them fails differently:
 
-- **`acquisitions.json`** — the shortlist, ranked by archaeological lokaliteter
-  per km² rather than by area. README.md records how the figures were counted
-  and the two traps the raw count walks into. Absent here just means nobody has
-  ranked it; `--all` lists the rest.
+- **`acquisitions.json`** — the build queue, ordered by point density and then
+  by what it joins onto, because the cache exists to be read at the resolution
+  the flight actually holds. README.md records the rule. Absent here just means
+  nobody has queued it; `--all` lists the rest.
 - **hoydedata.no's mosaic catalogue** — `LAS_PROJECT_NAME`, which `fetch_dem`
   pins the DEM request to. Absent here, every fetch comes back empty and a run
   writes a store that looks built and holds nothing.
@@ -30,7 +30,7 @@ from pathlib import Path
 from fetch_dem import QUERY
 
 HERE = Path(__file__).resolve().parent
-SHORTLIST = HERE / "acquisitions.json"
+QUEUE_FILE = HERE / "acquisitions.json"
 
 # Kartverket's per-project DTM WMS, the same document lidarProjects.ts parses —
 # reached directly rather than through the app's /wms/geonorge proxy, which only
@@ -52,12 +52,49 @@ def slug(project):
     return re.sub(r"[^0-9a-zæøå]+", "-", project.lower()).strip("-")
 
 
-def shortlist():
-    """The ranked candidates, in the order the file lists them. That order is
-    what `--get <i>` indexes, so it is deliberately a committed file rather than
+def build_queue():
+    """The build queue, in the order the file lists them. That order is what
+    `--get <i>` indexes, so it is deliberately a committed file rather than
     anything recomputed per run: an index that moves between two invocations
     would point at a different acquisition each time."""
-    return json.loads(SHORTLIST.read_text())["acquisitions"]
+    return json.loads(QUEUE_FILE.read_text())["acquisitions"]
+
+
+def native_cells(names, timeout=180):
+    """Each acquisition's finest published DTM cell, in metres, off the mosaic
+    catalogue's own `LOWPS` — which is what decides how deep the ladder goes.
+
+    The service publishes three values and they track point density: 1 m for
+    1–3 pkt, 0.5 m for 2–4 pkt, 0.25 m for 5 pkt and up. Nothing is finer than
+    0.25 m anywhere in the country, so the name's `10pkt` buys detail inside
+    that grid rather than a smaller one."""
+    if not names:
+        return {}
+    quoted = ",".join("'" + n.replace("'", "''") + "'" for n in names)
+    query = {
+        "where": f"LAS_PROJECT_NAME IN ({quoted})",
+        "f": "json",
+        "returnGeometry": "false",
+        "groupByFieldsForStatistics": "LAS_PROJECT_NAME",
+        "outStatistics": json.dumps([{
+            "statisticType": "min",
+            "onStatisticField": "lowps",
+            "outStatisticFieldName": "cell",
+        }]),
+    }
+    # POST, because the acquisition names are long and asking about a queue's
+    # worth of them at once overruns what the service accepts in a URL — it
+    # answers 404 rather than 414, so the failure does not name itself.
+    data = urllib.parse.urlencode(query).encode()
+    with urllib.request.urlopen(QUERY, data=data, timeout=timeout) as response:
+        body = json.load(response)
+    # The service answers statistics fields in upper case whatever they were
+    # asked for in, so read the name back rather than assuming either spelling.
+    return {
+        a["LAS_PROJECT_NAME"]: a.get("CELL", a.get("cell"))
+        for a in (f["attributes"] for f in body.get("features", []))
+        if a.get("LAS_PROJECT_NAME")
+    }
 
 
 def catalogue_names(timeout=180):

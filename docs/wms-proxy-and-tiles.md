@@ -34,9 +34,12 @@ would want the WMS host's `/skwms1/`, and both ArcGIS upstreams `/arcgis/`.
 to `/?lok=<code>`; `file_server` has no SPA fallback, so any other unknown path
 still 404s.
 
-`/cvat/<z>/<x>/<y>.webp` is not in the table because nothing proxies it: the
-tile store is bind-mounted read-only at `/var/www/cvat`, under Caddy's root, so
-`file_server` serves it with no route, no wmscache entry and no CSP host. The
+`/cvat/<acquisition>/<z>/<x>/<y>.webp` is not in the table because nothing
+proxies it: the tile store is bind-mounted read-only at `/var/www/cvat`, under
+Caddy's root, so `file_server` serves it with no route, no wmscache entry and no
+CSP host. The path segment is the acquisition's own directory, which the
+manifest hands the app as its tile template — overlapping flights are offered as
+separate rows and may not share a `<z>/<x>/<y>`. The
 404 on a tile that was never written is load-bearing — it is the coverage mask
 (`docs/map-layers.md`). `/cvat/manifest.json` beside the tiles is served the
 same way and fetched once per page load; `connect-src 'self'` already covers

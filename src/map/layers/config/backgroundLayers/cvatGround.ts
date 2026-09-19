@@ -26,13 +26,19 @@ import { XYZBackgroundLayer } from './types';
  */
 export type CvatAcquisition = {
   project: LidarProject;
+  /** This acquisition's own directory in the store, as the manifest states it.
+   *  Two flights over one landscape are two pictures of it and the app offers
+   *  both, so their tiles cannot share a `<z>/<x>/<y>`. */
+  path: string;
   /** The coarsest and deepest levels written, on the app's own grid
-   *  (`wmsTileGrid.ts`): z15 is 0.661 m/px, z12 5.289 m/px. Radii are RVT's own
-   *  pixels at every level, so the levels of one acquisition are related
-   *  pictures rather than one picture at several sizes — the reach of the
-   *  visualization grows as you zoom out. Per acquisition, because a level
-   *  built for one is not built for another, and a half-built acquisition is
-   *  the normal state of a store that is still growing. */
+   *  (`wmsTileGrid.ts`): z16 is 0.331 m/px, z12 5.289 m/px. How deep depends on
+   *  the flight — z16 only where hoydedata.no publishes a 0.25 m DTM, z15 where
+   *  it publishes 0.5 m, since below the DEM's own cell the picture is of the
+   *  interpolation. Radii are RVT's own pixels at every level, so the levels of
+   *  one acquisition are related pictures rather than one picture at several
+   *  sizes — the reach of the visualization grows as you zoom out. Per
+   *  acquisition, because a level built for one is not built for another, and a
+   *  half-built acquisition is the normal state of a store that is growing. */
   minZoom: number;
   maxZoom: number;
 };
@@ -50,14 +56,14 @@ export const activeCvatAcquisitionAtom = activeCvatAcquisitionHalves.focused;
 
 const CVAT_MANIFEST_URL = '/cvat/manifest.json';
 
-/** The tile template. One namespace for the whole store: a tile carries no
- *  provenance and the acquisitions are curated not to overlap, so two of them
- *  never contend for one tile. */
-const CVAT_TILE_URL = '/cvat/{z}/{x}/{y}.webp';
+/** The tile template, given the acquisition's own directory. Each acquisition
+ *  has one, because a tile carries no provenance and overlapping flights are
+ *  the point rather than an accident to curate away. */
+const cvatTileUrl = (path: string) => `/cvat/${path}/{z}/{x}/{y}.webp`;
 
 /** What `build_tiles.py` writes under `acquisitions`: acquisition name to the
- *  levels built for it. */
-export type CvatStore = Record<string, number[]>;
+ *  levels built for it and the directory they are in. */
+export type CvatStore = Record<string, { levels: number[]; path: string }>;
 
 const parseStore = (body: unknown): CvatStore => {
   if (!body || typeof body !== 'object') return {};
@@ -65,10 +71,17 @@ const parseStore = (body: unknown): CvatStore => {
   if (!block || typeof block !== 'object') return {};
   const store: CvatStore = {};
   for (const [name, entry] of Object.entries(block)) {
-    const levels = (entry as { levels?: unknown })?.levels;
+    const { levels, path } = (entry ?? {}) as { levels?: unknown; path?: unknown };
     if (!Array.isArray(levels)) continue;
     const zs = levels.filter((z): z is number => Number.isInteger(z));
-    if (zs.length > 0) store[name] = zs;
+    // No path means a manifest written before the store was divided per
+    // acquisition. Guessing the slug rule here would be a second copy of it;
+    // any `vatcache.py` run rewrites the entry with its own.
+    if (typeof path !== 'string' || path === '') {
+      console.warn(`[cvat] ${name} has no path in the manifest`);
+      continue;
+    }
+    if (zs.length > 0) store[name] = { levels: zs, path };
   }
   return store;
 };
@@ -105,14 +118,19 @@ export const resolveCvatAcquisitions = (
   store: CvatStore,
   projects: LidarProject[],
 ): CvatAcquisition[] =>
-  Object.entries(store).flatMap(([id, levels]) => {
+  Object.entries(store).flatMap(([id, { levels, path }]) => {
     const project = projects.find((p) => p.id === id);
     if (!project) {
       console.warn(`[cvat] ${id} is in the store but not in the catalogue`);
       return [];
     }
     return [
-      { project, minZoom: Math.min(...levels), maxZoom: Math.max(...levels) },
+      {
+        project,
+        path,
+        minZoom: Math.min(...levels),
+        maxZoom: Math.max(...levels),
+      },
     ];
   });
 
@@ -125,18 +143,17 @@ export const resolveCvatAcquisitions = (
  * transparency is the coverage mask, with the faded mosaic underneath showing
  * through.
  *
- * Where two acquisitions' envelopes overlap, this layer will draw the other
- * one's tiles: the store is one namespace and a tile does not say who made it.
- * The picture is the same product either way — one recipe, one digest — so what
- * that costs is the acquisition named on a figure plate, in the sliver where
- * one acquisition's envelope covers another's ground.
+ * Overlap is expected and is the reason each acquisition has its own directory.
+ * Two flights over one landscape are two readings of it — a 5 pkt from 2021 and
+ * a 10 pkt from 2025 are not the same ground twice — so both are offered as
+ * rows and each draws only its own tiles.
  */
 export const buildCvatGroundConfig = (
   acquisition: CvatAcquisition,
 ): XYZBackgroundLayer => ({
   type: 'XYZ',
   layerName: 'lidarCvat',
-  url: CVAT_TILE_URL,
+  url: cvatTileUrl(acquisition.path),
   projection: 'EPSG:25833',
   minZoom: acquisition.minZoom,
   maxZoom: acquisition.maxZoom,

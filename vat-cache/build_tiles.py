@@ -4,13 +4,13 @@ verified afterwards. `vatcache.py` is the command line over all of it.
 The store is what docker-compose bind-mounts into the Caddy container at
 /var/www/cvat, so what this writes is what the app serves.
 
-One store holds several acquisitions. Their tiles share the `<z>/<x>/<y>`
-namespace, which is safe because footprints do not overlap where it matters and
-a tile carries no provenance of its own — the manifest's `acquisitions` block
-is the record of what is in here. Markers are *not* shared: they live under the
-acquisition that made them, because two acquisitions can land in one work unit
-while owning different tiles inside it, and a marker from one must not persuade
-the other that its own tiles are already written.
+One store holds several acquisitions, each in its own directory:
+`<slug>/<z>/<x>/<y>.webp`, with the slug recorded in the manifest as the
+acquisition's `path`. Overlap is the reason. Two flights over one landscape are
+two pictures of it — a 5pkt from 2015 and a 10pkt from 2025 are not the same
+ground twice — and the app offers both as rows, so their tiles cannot be
+allowed to contend for one name. Markers live under the same slug, as they
+always have.
 
 Resumable: every work unit drops a marker when it finishes, and a re-run skips
 the marked ones. A unit that writes no tiles still marks, because "the footprint
@@ -57,12 +57,30 @@ OVERLAP_PX = 24
 # at 15000, so the only reason not to go bigger is that a unit the footprint
 # merely clips is fetched whole.
 DEFAULT_UNIT_TILES = 4
-DEFAULT_LEVELS = (15, 14, 13, 12)
+# Every level the store can hold, deepest first. What one acquisition is built
+# to is `levels_for` its own DTM, not this: z16 on a 0.5 m flight would render
+# the interpolation between cells.
+DEFAULT_LEVELS = (16, 15, 14, 13, 12)
+COARSEST_LEVEL = 12
 WEBP_QUALITY = 90
 
 
 def resolution(z):
     return MAX_RESOLUTION / 2**z
+
+
+def levels_for(native_cell):
+    """The ladder for a DTM of this cell size: as deep as the grid the data is
+    published on supports, and never deeper.
+
+    A level is worth building while its pixel is no finer than the DEM's own
+    cell — z16 (0.331 m/px) on Kartverket's 0.25 m grid, z15 (0.661 m/px) on the
+    0.5 m one. Below that the fetch resamples one height value into four pixels
+    and RVT reads the interpolation as terrain."""
+    z = COARSEST_LEVEL
+    while z < DEFAULT_LEVELS[0] and resolution(z + 1) >= native_cell:
+        z += 1
+    return tuple(range(z, COARSEST_LEVEL - 1, -1))
 
 
 def tile_span(z):
@@ -155,17 +173,24 @@ def encode_tile(field):
     return buf.getvalue()
 
 
-def tile_path(out, z, ux, uy, unit_tiles, i, j):
+def tile_dir(out, project):
+    """The acquisition's own corner of the store, and what the manifest hands
+    the app as its `path`. Two flights over one landscape are two pictures of
+    it, both offered, so neither may write into the other's tiles."""
+    return Path(out) / slug(project)
+
+
+def tile_path(out, project, z, ux, uy, unit_tiles, i, j):
     """Where the (i, j)-th tile of one work unit lands. The one place the unit
     grid is turned into the app's tile coordinates, so a check cannot disagree
     with the writer about which tiles a unit owns."""
     x, y = ux * unit_tiles + i, uy * unit_tiles + j
-    return Path(out) / str(z) / str(x) / f"{y}.webp"
+    return tile_dir(out, project) / str(z) / str(x) / f"{y}.webp"
 
 
-def unit_tile_paths(out, z, ux, uy, unit_tiles):
+def unit_tile_paths(out, project, z, ux, uy, unit_tiles):
     return [
-        tile_path(out, z, ux, uy, unit_tiles, i, j)
+        tile_path(out, project, z, ux, uy, unit_tiles, i, j)
         for j in range(unit_tiles)
         for i in range(unit_tiles)
     ]
@@ -188,7 +213,7 @@ def build_unit(args):
             blob = encode_tile(tile)
             if blob is None:
                 continue
-            path = tile_path(out, z, ux, uy, unit_tiles, i, j)
+            path = tile_path(out, project, z, ux, uy, unit_tiles, i, j)
             path.parent.mkdir(parents=True, exist_ok=True)
             # Write then rename: a kill mid-write must not leave a half tile
             # that the marker then declares finished.
@@ -269,10 +294,13 @@ def open_manifest(out, project, levels, unit_tiles, force):
     digest = _digest(recipe)
     path = Path(out) / "manifest.json"
 
-    # What ground is in the store, and at which levels. Per acquisition, because
-    # a level built for one is not built for another: a reader asking "is z12
-    # here for Østfold" must not be answered by Vestfold's z12.
-    acquisitions = {project: {"levels": sorted(levels, reverse=True)}}
+    # What ground is in the store, where its tiles are, and at which levels. Per
+    # acquisition, because a level built for one is not built for another: a
+    # reader asking "is z12 here for Østfold" must not be answered by Vestfold's
+    # z12. `path` is the app's tile template, so the slug rule lives here alone
+    # and no second implementation of it can drift.
+    entry = {"levels": sorted(levels, reverse=True), "path": slug(project)}
+    acquisitions = {project: entry}
 
     if path.exists():
         have = json.loads(path.read_text())
@@ -300,7 +328,15 @@ def open_manifest(out, project, levels, unit_tiles, force):
             merged.setdefault(have["acquisition"], {"levels": sorted(
                 (int(z) for z in have.get("levels", {})), reverse=True)})
         was = merged.get(project, {}).get("levels", [])
-        merged[project] = {"levels": sorted(set(was) | set(levels), reverse=True)}
+        merged[project] = {**entry, "levels": sorted(set(was) | set(levels),
+                                                     reverse=True)}
+        # Entries written before the store was divided per acquisition carry no
+        # path, and the app drops those rather than guessing at a template. Any
+        # run repairs every one of them, because the slug is a pure function of
+        # the name — which is why moving an old store's levels under its slug is
+        # the whole migration.
+        for name, was_entry in merged.items():
+            merged[name] = {**was_entry, "path": slug(name)}
         acquisitions = merged
 
     wanted = {**recipe, "digest": digest, "acquisitions": acquisitions}
@@ -312,10 +348,11 @@ def open_manifest(out, project, levels, unit_tiles, force):
 def marker_dir(out, project, z):
     """Where one acquisition's finished-unit markers for level z live.
 
-    Namespaced by acquisition: two of them can share a work unit while owning
-    different tiles inside it, so one's marker must not tell the other that its
-    own tiles are written. Vestfold og Telemark 5pkt 2021 and Viken laser -
-    Østfold 5pkt del1 2022 share exactly two z12 units and no tiles at all."""
+    Namespaced by acquisition, for the same reason the tiles are: overlap is
+    expected and wanted, so two acquisitions can own the same work unit and the
+    same tile coordinates inside it. Vestfold 10pkt 2025 lies almost wholly on
+    top of Vestfold og Telemark 5pkt 2021, and one's marker must not tell the
+    other that its tiles are written."""
     return Path(out) / ".units" / slug(project) / str(z)
 
 
@@ -483,7 +520,7 @@ def check_level(out, project, coverage, z, unit_tiles=DEFAULT_UNIT_TILES,
             result.todo.append((ux, uy))
             continue
         here = 0
-        for path in unit_tile_paths(out, z, ux, uy, unit_tiles):
+        for path in unit_tile_paths(out, project, z, ux, uy, unit_tiles):
             part = path.with_suffix(".webp.part")
             if part.exists():
                 result.parts.append(part)
@@ -508,18 +545,18 @@ def unmark(out, project, z, units, unit_tiles=DEFAULT_UNIT_TILES):
     place would outlive the repair meant to clear it."""
     marks = marker_dir(out, project, z)
     for ux, uy in units:
-        for path in unit_tile_paths(out, z, ux, uy, unit_tiles):
+        for path in unit_tile_paths(out, project, z, ux, uy, unit_tiles):
             path.unlink(missing_ok=True)
             path.with_suffix(".webp.part").unlink(missing_ok=True)
         (marks / f"{ux}_{uy}").unlink(missing_ok=True)
 
 
-def store_tiles(out, z):
-    """Every tile on disk at this level, whoever wrote it. The namespace is
-    shared, so this is the one figure that is about the store rather than about
-    a single acquisition."""
+def store_tiles(out, project, z):
+    """Every tile on disk at this level of this acquisition — including the ones
+    no work unit claims, which is what makes it worth reading off disk rather
+    than deriving from the markers."""
     found = set()
-    level = Path(out) / str(z)
+    level = tile_dir(out, project) / str(z)
     if not level.is_dir():
         return found
     for column in level.iterdir():

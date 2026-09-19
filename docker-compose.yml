@@ -16,8 +16,9 @@ services:
       # - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # The cached combined-VAT ground, built out of band by
       # vat-cache/vatcache.py --get <n>, which writes here by default. Mounted under
-      # Caddy's root, so file_server serves it at /cvat/<z>/<x>/<y>.webp and no
-      # route of its own is needed. A host path rather than a named volume:
+      # Caddy's root, so file_server serves it at
+      # /cvat/<acquisition>/<z>/<x>/<y>.webp and no route of its own is needed.
+      # A host path rather than a named volume:
       # the store is written by a script on the host, is several GB, and
       # survives the stack being rebuilt. Third-party install: point this at
       # your own store, or leave it — an empty directory answers 404, which is

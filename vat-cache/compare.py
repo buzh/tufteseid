@@ -24,7 +24,10 @@ import fetch_dem
 from cvat import cvat, radii_for
 
 # The app's ladder: max(EPSG:25833 extent span) / 256 / 2**z, from wmsTileGrid.ts.
-LEVELS = {"z15": 0.66113, "z14": 1.32227, "z13": 2.64453, "z12": 5.28906}
+# z16 is the base over a 0.25 m DTM and still coarser than it, so it is an area
+# average of the native fetch like every other row rather than an upsample.
+LEVELS = {"z16": 0.33057, "z15": 0.66113, "z14": 1.32227,
+          "z13": 2.64453, "z12": 5.28906}
 NATIVE_M_PER_PX = 0.25
 SIDE_M = 500
 # Dropped from every edge before measuring: the horizon scan reads a short

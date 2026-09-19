@@ -1,56 +1,148 @@
 {
-  "method": "Ranked on the register this app is read against, not on area. Archaeological lokaliteter only - lokalitetskategori = L-ARK on geonorge's Kulturminner WFS, counted per 5 km cell with resultType=hits and weighted by that cell's covered fraction of the footprint union, so the figure is lokaliteter inside the acquisition rather than inside its envelope. README.md records the two traps the raw count walks into.",
+  "rule": "Only flights hoydedata.no publishes on the 0.25 m grid, because that is the grid the z16 base is built to read. Densest first, then outward from ground the store already holds, so the map fills as a region rather than as scattered patches. Overlap is not a reason to skip one: two flights over one landscape become two rows.",
   "acquisitions": [
     {
-      "name": "Viken laser - Østfold 5pkt del1 2022",
-      "coverage_km2": 997,
-      "lokaliteter": 6460,
-      "per_km2": 6.48
+      "name": "Gjerdrum 50pkt 2021",
+      "pkt": 50,
+      "cell_m": 0.25,
+      "where": "Romerike, the Gjerdrum quick-clay slide",
+      "note": "The densest flight in the country, and 29 km² of it. A day's work for the deepest ground the cache can hold."
     },
     {
-      "name": "NDH Østfold 5pkt 2015",
-      "coverage_km2": 1154,
-      "lokaliteter": 6610,
-      "per_km2": 5.72,
-      "overlaps": ["Viken laser - Østfold 5pkt del1 2022"],
-      "note": "Shares 648 km² with del1 2022: two vintages of one landscape, and only one belongs in a store whose tiles share a namespace."
+      "name": "NDH Trondheim 30pkt 2022",
+      "pkt": 30,
+      "cell_m": 0.25,
+      "where": "Trondheim and Strindfjorden"
     },
     {
-      "name": "Hedmarken 5pkt del1 2025",
-      "coverage_km2": 856,
-      "lokaliteter": 4060,
-      "per_km2": 4.74
-    },
-    {
-      "name": "Viken laser - Østfold 5pkt del2 2022",
-      "coverage_km2": 571,
-      "lokaliteter": 2620,
-      "per_km2": 4.59
-    },
-    {
-      "name": "NDH Jæren-Randaberg-Sola 5pkt 2017",
-      "coverage_km2": 1088,
-      "lokaliteter": 4470,
-      "per_km2": 4.11
+      "name": "Trondheim 30pkt 2020",
+      "pkt": 30,
+      "cell_m": 0.25,
+      "where": "Trondheim, the inner city",
+      "note": "Under the 2022 flight almost entirely. Two years apart at the same density: the pair that shows what a second row is for."
     },
     {
       "name": "Vestfold 10pkt 2025",
-      "coverage_km2": 905,
-      "lokaliteter": 3710,
-      "per_km2": 4.1
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Vestfold, over the fixture acquisition",
+      "note": "Twice the density of the ground already in the store and on top of it. The first acquisition this store holds two of."
+    },
+    {
+      "name": "Grenland Vestfold 10pkt Vest 2022",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Grenland, west of the fjord"
+    },
+    {
+      "name": "Grenland Vestfold 10pkt Øst 2022",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Grenland, east of the fjord"
+    },
+    {
+      "name": "Grenland Vestfold 10pkt Sor 2022",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Grenland, the coast south of Porsgrunn"
+    },
+    {
+      "name": "Larvik 10pkt 2010",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Larvik and Brunlanes",
+      "note": "Fifteen years under the 2025 Vestfold flight. The oldest 10 pkt in the country, and worth holding for what has been built over since."
+    },
+    {
+      "name": "Viken 2022 - Østfold 10pkt",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Østfold, Glomma to the Swedish border"
+    },
+    {
+      "name": "Viken Laser - Viken vest 10pkt del 2 2022",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Buskerud, the lower Drammen valley"
+    },
+    {
+      "name": "Viken Laser - Viken vest 10pkt del 1 2022",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Buskerud, Lier to Ringerike"
+    },
+    {
+      "name": "Oslo 10pkt 2024",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Oslo and Nordmarka"
+    },
+    {
+      "name": "Øst-Telemark 10pkt Sør 2023",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Øst-Telemark, Notodden and Bandak"
+    },
+    {
+      "name": "Øst-Telemark 10pkt Vest 2023",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Øst-Telemark, Tinnsjø west"
+    },
+    {
+      "name": "Øst-Telemark 10pkt Øst 2023",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Øst-Telemark, Tinnsjø east"
+    },
+    {
+      "name": "Øst-Telemark 10pkt Nord 2023",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Øst-Telemark, Tinn and Rjukan"
+    },
+    {
+      "name": "Nissedal Kviteseid 10pkt 2024",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Telemark, Nisserfjorden and Kviteseid"
+    },
+    {
+      "name": "Vest-Telemark Søndre 10pkt 2025",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Vest-Telemark, Fyresdal and Tørdal"
+    },
+    {
+      "name": "Vest-Telemark Midtre 10pkt 2025",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Vest-Telemark, Vinje and Åmot"
+    },
+    {
+      "name": "Vest-Telemark Nordre 10pkt 2025",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Vest-Telemark, Haukeli and the Hardangervidda edge"
+    },
+    {
+      "name": "NDH Lillesand-Grimstad-Arendal 10pkt 2023",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Agder, the coast from Lillesand to Arendal"
+    },
+    {
+      "name": "Kristiansand 10pkt 2025",
+      "pkt": 10,
+      "cell_m": 0.25,
+      "where": "Agder, Kristiansand and Søgne"
     },
     {
       "name": "Vestfold og Telemark 5pkt 2021",
-      "coverage_km2": 1106,
-      "lokaliteter": 3610,
-      "per_km2": 3.26,
-      "note": "The fixture acquisition: every measured figure in WORK-ORDER.md was taken over this ground."
-    },
-    {
-      "name": "Viken laser - Romerike 5pkt 2022",
-      "coverage_km2": 845,
-      "lokaliteter": 1730,
-      "per_km2": 2.05
+      "pkt": 5,
+      "cell_m": 0.25,
+      "where": "Vestfold and inner Telemark, 1 106 km²",
+      "note": "The store's first acquisition and the fixture every figure in WORK-ORDER.md was measured on. Last in the queue now, not first: it is the sparsest flight on this list, and the 2025 Vestfold one covers its eastern half at twice the density."
     }
   ]
 }

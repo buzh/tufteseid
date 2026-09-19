@@ -62,6 +62,7 @@ fixture acquisition, WebP q90 bytes per pixel:
 | level | m/px | reach, general / flat | B/px | metre-locked reach | B/px |
 | --- | --- | --- | --- | --- | --- |
 | RVT calibration | 0.500 | 5.0 / 10.0 m | 0.306 | — | — |
+| z16 | 0.331 | 3.3 / 6.6 m | **0.288** | 5.0 / 9.9 m (15/30 px) | 0.282 |
 | z15 | 0.661 | 6.6 / 13.2 m | **0.320** | 5.3 / 9.9 m (8/15 px) | 0.329 |
 | z14 | 1.322 | 13.2 / 26.4 m | **0.332** | 5.3 / 10.6 m (4/8 px) | 0.380 |
 | z13 | 2.645 | 26.4 / 52.9 m | **0.344** | 5.3 / 10.6 m (2/4 px) | 0.432 |
@@ -72,6 +73,11 @@ say what that is: rising entropy per pixel at every step down, which is noise
 being encoded, not structure. At z13 a 2 px radius is one cell's height
 difference wearing openness' stretch. Side by side the z13 pair settles it — the
 pixel-locked tile reads as landscape relief, the metre-locked one as mush.
+
+z16 is the one level where the two rules do not diverge, because there is no
+sampling to lose: 15/30 px on a 0.331 m grid is the calibrated reach and both
+come out around 0.285 B/px. The pixel rule is kept there anyway, so that one
+sentence describes every level of the ladder.
 
 The columns are a comparison of two rules on one rocky patch, not a budget. That
 patch runs dear: the z15 pilot came out at 0.280 B/px on fully covered tiles
@@ -89,12 +95,34 @@ right for the Analyse tab, where the reader is handed one rectangle at one
 resolution and the legend names a radius. A pyramid is the case the argument
 does not cover.
 
-### 2. Four levels, z15 down to z12
+### 2. The ladder ends where the DTM does: z16 down to z12
 
 Pixel-locked radii make z12 a real visualization rather than a signed slope, so
 the ladder runs to the level the app's overview borrowing would otherwise have
-to fake. z15 (0.661 m) is the base: 0.331 m at z16 is finer than any calibration
-RVT offers and buys grain rather than ground.
+to fake. The base is not a fixed level but a property of the flight: build down
+to the last level whose pixel is no finer than the DEM's own cell, and no
+further. Kartverket publishes three cell sizes and they track point density, so
+in practice that is **z16 (0.331 m) on a 0.25 m DTM, z15 (0.661 m) on a 0.5 m
+one, z14 on 1 m**. Below the cell the service resamples one height value into
+four pixels and RVT reads the interpolation as terrain, which is the fault this
+rule exists to prevent. `levels_for` in `build_tiles.py` is the rule; nothing
+asks for levels by hand.
+
+That 0.25 m grid is finer than the 0.5 m the VAT templates were calibrated
+against, and the measurement says to use it anyway. On `compare.py`'s two sites
+at q90, **z16 costs 0.288 and 0.324 B/px against z15's 0.320 and 0.364** — bytes
+per pixel *falling* as the grid halves, which is the signature of structure
+being resolved rather than noise being encoded. It is the exact opposite of what
+the metre-locked column in §1 does (0.329 → 0.503 as its sampling degrades), and
+it is what settles the question: at z16 tracks, ditches and low mounds separate
+that z15 renders as one smear. Per km² it is dearer, because there are four
+times the pixels; §5 prices the store.
+
+This reverses the original ruling, which held z15 as the base on the grounds
+that 0.331 m is off-calibration and "buys grain rather than ground". Off
+calibration it is, and §1 already accepts that at the other four levels for the
+same reason: RVT's parameters are in pixels, so every level of a pyramid is a
+different reach and none of them is the template's own. Grain it is not.
 
 ### 3. Each level is its own job
 
@@ -134,7 +162,11 @@ The z15 pilot bears both out over 40 work units: 348 tiles, 17.3 MB, 73 % of the
 written area covered. **0.280 B/px on the 175 fully covered tiles**, 0.259 over
 covered ground across all of them — so the partial tiles cost 0.215 per covered
 pixel, less than the full ones. The edge of an acquisition is cheap, not dear,
-and the whole of z15 comes to **0.66 GB**.
+and the whole of z15 comes to **0.66 GB** over the 1 106 km² fixture.
+
+z16 quadruples the pixels at 0.91 of the bytes each (§2), so it is **~3.6× the
+z15 level on its own** — ~2.4 GB over the same ground, and the largest single
+line in the budget.
 
 The caveat to record: a figure plate must not be generated from cached pixels.
 `src/figure/` renders from the float field through `paintTerrainField` and
@@ -143,8 +175,8 @@ of this ground honest if one ever becomes an attachment.
 
 ### 6. Fetch direct, not through wmscache
 
-~22 GB of float TIFF across the four levels would evict most of wmscache's
-25 GB LRU for one-shot reads. The batch talks to `hoydedata.no` directly and
+~90 GB of float TIFF across the ladder would evict wmscache's whole 25 GB LRU
+several times over for one-shot reads. The batch talks to `hoydedata.no` directly and
 writes to its own volume. `exportImage` caps at 15000 px a side, so a work unit
 arrives in one call and there is no mosaic to assemble.
 
@@ -167,13 +199,16 @@ arrives in one call and there is no mosaic to assemble.
 4. **Render** — `cvat.py`, which is RVT.
 5. **Write** — 512 px RGBA WebP on the app's grid
    (`src/map/layers/wmsTileGrid.ts`: origin `[extent[0], extent[3]]` =
-   −2500000, 9045984; resolutions 21664 / 2ⁿ), as `<z>/<x>/<y>.webp`. A tile
-   with no coverage at all is not written. The store is
-   `/site/tufteseid/data/cvat`, bind-mounted read-only at `/var/www/cvat`,
-   which is under Caddy's root — so the tiles are already reachable at
-   `/cvat/<z>/<x>/<y>.webp` and the eventual layer needs no proxy route, no
-   CSP host and no wmscache entry. A tile the footprint never reached answers
-   404, which is also what a tile outside the acquisition should answer.
+   −2500000, 9045984; resolutions 21664 / 2ⁿ), as
+   `<acquisition-slug>/<z>/<x>/<y>.webp`. Per acquisition, because overlapping
+   flights are wanted — two readings of one landscape, offered as two rows —
+   and one namespace would have them overwrite each other. A tile with no
+   coverage at all is not written. The store is `/site/tufteseid/data/cvat`,
+   bind-mounted read-only at `/var/www/cvat`, which is under Caddy's root — so
+   the tiles are already reachable at `/cvat/<slug>/<z>/<x>/<y>.webp` and the
+   layer needs no proxy route, no CSP host and no wmscache entry. A tile the
+   footprint never reached answers 404, which is also what a tile outside the
+   acquisition should answer.
 6. **Manifest** — `manifest.json` beside the tiles: acquisition, RVT version,
    both presets, the blend order, azimuth, the combined opacity, and per level
    the resolution, `r_max`/`r_min` in pixels and metres, overlap and encoding —
@@ -182,7 +217,9 @@ arrives in one call and there is no mosaic to assemble.
    everything but the per-level block: which levels an invocation happens to
    build is not a property of the cache, and a store holding z15 has to accept
    the run that adds z14. Each level's entry is derived from z and the settings
-   the digest does cover, so nothing escapes it.
+   the digest does cover, so nothing escapes it. Acquisitions accumulate for the
+   same reason and are outside it too; each names its own levels and its own
+   `path`, which is the directory above and the app's tile template.
 
 ## Acceptance
 
@@ -198,10 +235,13 @@ The gates, and where they stand after the z15 pilot:
   budget is quoted. **Done** — §5.
 - Changing one preset value produces a manifest that declares itself different
   and refuses to write into the old cache. **Holds.**
-- Then the full run. On the pilot's rate: **~4.5 core-hours**, ~25 GB fetched,
-  **~0.9 GB written**. A work unit is the same 2096 px square at every level, so
-  it costs the same 11–13 s wherever it is — 1,416 units is the whole budget,
-  941 of them z15.
+- Then the full run. A work unit is the same 2096 px square at every level, so
+  it costs the same 11–13 s wherever it is, and the unit count quadruples per
+  level down: over the fixture, 941 at z15 and 3,764 at z16. On the pilot's
+  rate, the whole 0.25 m ladder is **~16.5 core-hours**, ~90 GB fetched and
+  **~3.3 GB written** for 1 106 km² — of which z16 is three quarters. z15–z12
+  alone, which is all a 0.5 m flight is owed, stays at ~4.5 core-hours and
+  ~0.9 GB.
 
 ## Constraints carried from the repo
 

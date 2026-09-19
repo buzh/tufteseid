@@ -10,11 +10,16 @@
     .venv/bin/python vatcache.py -c 3 -g            audit it, then repair it
 
 An acquisition is named by its position in the list `-l` prints, which is the
-committed shortlist in `acquisitions.json` followed by anything the store holds
-that is not on it. Naming one thing picks the footprint, the mask, the DEM
-request and the marker directory together, which is the point: the one mistake
-this batch could make silently was pairing a mask with the wrong project, and an
-index cannot make it.
+committed queue in `acquisitions.json` followed by anything the store holds that
+is not on it. Naming one thing picks the footprint, the mask, the DEM request,
+the marker directory and the tile directory together, which is the point: the
+one mistake this batch could make silently was pairing a mask with the wrong
+project, and an index cannot make it.
+
+How deep the ladder goes is not asked for either. It comes off the cell size
+hoydedata.no publishes the acquisition on — z16 for the 0.25 m flights, z15 for
+the 0.5 m ones — so a queue of mixed densities builds each to what it holds and
+no further. `--levels` overrides it.
 
 `--out` is the store — the directory docker-compose bind-mounts read-only into
 the Caddy container at /var/www/cvat. Masks are derived on first use and live
@@ -74,10 +79,10 @@ def store_levels(manifest):
 
 
 def catalogue(out):
-    """The numbered list. The shortlist in its committed order, then whatever
+    """The numbered list. The build queue in its committed order, then whatever
     else the store holds — an acquisition somebody built off-list still has to
     be reachable by index, or it can be neither checked nor extended."""
-    rows = [dict(row, listed=True) for row in acquisitions.shortlist()]
+    rows = [dict(row, listed=True) for row in acquisitions.build_queue()]
     known = {row["name"] for row in rows}
     for name in sorted(store_levels(read_manifest(out))):
         if name not in known:
@@ -111,8 +116,9 @@ def size(nbytes):
 
 
 def level_range(levels):
-    """z15–z12 when the ladder is whole, the levels one by one when it is not —
-    a gap in the middle is the thing worth seeing."""
+    """z16–z12 when the ladder is unbroken, the levels one by one when it is not
+    — a gap in the middle is the thing worth seeing. How deep whole *is* depends
+    on the acquisition, so this reads the run rather than assuming a base."""
     if not levels:
         return "—"
     if len(levels) == 1:
@@ -125,31 +131,45 @@ def level_range(levels):
 def do_list(out, rows, verbose, pattern):
     built = store_levels(read_manifest(out))
     names_cat = names_wms = None
+    cells = {}
     if verbose:
         print("asking hoydedata.no and the per-project WMS what they publish…")
         names_cat = acquisitions.catalogue_names()
         names_wms = acquisitions.wms_names()
+        cells = acquisitions.native_cells([row["name"] for row in rows])
         print()
 
     width = max(len(row["name"]) for row in rows)
     if not verbose:
-        print(f"  #  {'acquisition'.ljust(width)}  /km²  in store")
+        print(f"  #  {'acquisition'.ljust(width)}  pkt  in store")
     for row in rows:
         name = row["name"]
         levels = built.get(name, [])
         if not verbose:
-            rank = f"{row['per_km2']:.2f}" if row.get("per_km2") else "   —"
-            print(f" {row['index']:2}  {name.ljust(width)}  {rank}  "
+            pkt = f"{row['pkt']:3}" if row.get("pkt") else "  —"
+            print(f" {row['index']:2}  {name.ljust(width)}  {pkt}  "
                   f"{level_range(levels)}")
             continue
 
         print(f" {row['index']:2}  {name}")
-        if row.get("listed"):
-            print(f"     rank     {row['per_km2']:.2f} lokaliteter/km² — "
-                  f"{spaced(row['coverage_km2'])} km², "
-                  f"~{spaced(row['lokaliteter'])} arkeologiske")
+        # The committed cell is what the queue was ordered on; the catalogue's
+        # is what the next build will actually ask the ladder for. They should
+        # agree, and a reflight that changed the answer is worth seeing.
+        cell = cells.get(name)
+        listed_cell = row.get("cell_m")
+        drift = "" if cell is None or listed_cell in (None, cell) else \
+            f"  (acquisitions.json says {listed_cell} m)"
+        density = f"{row['pkt']} pkt · " if row.get("pkt") else ""
+        if cell:
+            print(f"     grid     {density}{cell} m cells → "
+                  f"{level_range(list(build_tiles.levels_for(cell)))}{drift}")
         else:
-            print("     rank     not on the shortlist; found in the store")
+            print(f"     grid     {density}cell unknown — hoydedata.no has no "
+                  "row for this name")
+        if row.get("where"):
+            print(f"     where    {row['where']}")
+        if not row.get("listed"):
+            print("     where    not in acquisitions.json; found in the store")
         print(f"     store    {level_range(levels)}")
         # Off the markers, so there is no total to divide by: deriving a mask
         # to get one would turn listing the acquisitions into building them.
@@ -166,9 +186,6 @@ def do_list(out, rows, verbose, pattern):
         # the WMS is tiles the app never asks for.
         print(f"     names    hoydedata {'ok' if name in names_cat else 'MISSING'}"
               f"  ·  wms {'ok' if name in names_wms else 'MISSING'}")
-        for other in row.get("overlaps", []):
-            state = "in the store" if other in built else "not built"
-            print(f"     overlaps {other} ({state})")
         if row.get("note"):
             print(f"     note     {row['note']}")
         print()
@@ -181,7 +198,10 @@ def do_list(out, rows, verbose, pattern):
     print(f"\n{len(hits)} of {len(every)} acquisitions {title}:")
     for name in hits:
         print(f"     {name}{'  ← ' + level_range(built[name]) if name in built else ''}")
-    print("\nTo build one of these, add it to acquisitions.json with its rank.")
+    print("\nTo build one of these, add it to acquisitions.json. Only the name "
+          "has to be right;\nthe ladder comes off the catalogue's own cell size, "
+          "and a flight published on\n0.5 m or 1 m stops at z15 or z14 whatever "
+          "the file says about it.")
 
 
 # ---------------------------------------------------------------------------
@@ -205,25 +225,36 @@ def mask_for(project):
     return mask
 
 
+def build_levels(row, asked):
+    """How deep to build this acquisition, when the command line did not say.
+
+    Off the catalogue's own cell size rather than the committed file, because
+    the cell is what makes a level worth having: z16 over a 0.5 m flight would
+    render the interpolation between height values as if it were ground. The
+    committed `cell_m` is only the figure the queue was ordered on, and a
+    reflight can change it under us."""
+    if asked:
+        return asked
+    project = row["name"]
+    cell = acquisitions.native_cells([project]).get(project)
+    if cell is None:
+        sys.exit(
+            f"hoydedata.no's catalogue has no row for {project!r}, so there is "
+            "no cell size to\npick levels from — and nothing to fetch either. "
+            "Check the name against -l --all."
+        )
+    levels = build_tiles.levels_for(cell)
+    print(f"{project}: {cell} m cells → {level_range(list(levels))}\n")
+    return list(levels)
+
+
 def do_get(out, row, args):
     project = row["name"]
-    built = store_levels(read_manifest(out))
-    # Tiles share one namespace, so two acquisitions over the same ground
-    # overwrite each other's pixels and neither manifest entry is then true of
-    # what is on disk. The shortlist records which pairs do this.
-    clashes = [o for o in row.get("overlaps", []) if o in built]
-    if clashes and not args.force:
-        sys.exit(
-            f"{project} overlaps {', '.join(clashes)}, already in the store.\n"
-            "Their tiles would contend for the same <z>/<x>/<y>, and a tile "
-            "carries no provenance to tell them apart.\nDrop one, or pass "
-            "--force if the overlap is not where you are building."
-        )
     build_tiles.build(
         out,
         project,
         mask_for(project),
-        levels=args.levels,
+        levels=build_levels(row, args.levels),
         unit_tiles=args.unit_tiles,
         jobs=args.jobs,
         limit=args.limit,
@@ -300,10 +331,11 @@ def do_check(out, row, args):
     if row is None and not manifest:
         sys.exit(f"no manifest in {out}; there is no store here to check.")
 
+    built = store_levels(manifest)
     if row is not None:
         projects = [row["name"]]
     else:
-        projects = sorted(store_levels(manifest))
+        projects = sorted(built)
         print(f"{out}  manifest {manifest.get('digest', '—')}  "
               f"{plural(len(projects), 'acquisition')}\n")
         if not projects:
@@ -313,14 +345,16 @@ def do_check(out, row, args):
 
     found = {}
     for project in projects:
+        # The manifest's own levels, because those are what the store claims to
+        # hold: checking an acquisition against every level the tool can build
+        # would report a 0.5 m flight as missing the z16 it was never owed.
+        levels = args.levels or built.get(project) or list(build_tiles.DEFAULT_LEVELS)
         reports = check_acquisition(
-            out, project, args.levels, args.unit_tiles, args.verbose
+            out, project, levels, args.unit_tiles, args.verbose
         )
         found[project] = reports
+        report_orphans(out, project, levels, args.unit_tiles)
         print()
-
-    if row is None:
-        report_orphans(out, projects, args.levels, args.unit_tiles)
 
     hurt = {
         project: {r.z: r.repairable for r in reports if r.repairable}
@@ -373,24 +407,24 @@ def check_names(projects):
     print()
 
 
-def report_orphans(out, projects, levels, unit_tiles):
-    """Tiles nobody claims. Only answerable across the whole store: a tile
-    outside one acquisition's units may well be inside another's."""
+def report_orphans(out, project, levels, unit_tiles):
+    """Tiles under this acquisition that no finished unit of it claims.
+
+    An acquisition owns its own directory, so this is answerable one at a time
+    and the answer is unambiguous — which it was not while the store was one
+    namespace and a stray tile might have been the neighbour's."""
     for z in levels:
-        on_disk = build_tiles.store_tiles(out, z)
+        on_disk = build_tiles.store_tiles(out, project, z)
         if not on_disk:
             continue
-        claimed = set()
-        for project in projects:
-            claimed |= build_tiles.tiles_under(
-                build_tiles.marked_units(out, project, z), unit_tiles
-            )
+        claimed = build_tiles.tiles_under(
+            build_tiles.marked_units(out, project, z), unit_tiles
+        )
         orphans = on_disk - claimed
         if orphans:
             sample = ", ".join(f"{x}/{y}" for x, y in sorted(orphans)[:5])
-            print(f"z{z}: {plural(len(orphans), 'tile belongs', 'tiles belong')} to "
-                  f"no finished unit of any acquisition in the manifest "
-                  f"({sample}…)")
+            print(f"  z{z}  {plural(len(orphans), 'tile belongs', 'tiles belong')} "
+                  f"to no finished unit ({sample}…)")
 
 
 # ---------------------------------------------------------------------------
@@ -417,8 +451,10 @@ def main():
                         "store when N is left off")
     p.add_argument("-o", "--out", default=DEFAULT_STORE, metavar="DIR",
                    help=f"the tile store (default {DEFAULT_STORE})")
-    p.add_argument("--levels", default=",".join(str(z) for z in build_tiles.DEFAULT_LEVELS),
-                   help="zoom levels, coarsest last")
+    p.add_argument("--levels",
+                   help="zoom levels, coarsest last. Left off, --get builds as "
+                        "deep as the acquisition's own DTM cell allows and "
+                        "--check reads whatever the manifest says is there")
     p.add_argument("--unit-tiles", type=int, default=build_tiles.DEFAULT_UNIT_TILES,
                    help="tiles along one side of a work unit")
     p.add_argument("--jobs", type=int, default=1,
@@ -428,15 +464,15 @@ def main():
                         "twice and it does the next batch, not the same one")
     p.add_argument("--dry-run", action="store_true", help="count units and stop")
     p.add_argument("--force", action="store_true",
-                   help="build into a store whose manifest disagrees, or over an "
-                        "acquisition the shortlist says overlaps a built one")
+                   help="build into a store whose manifest disagrees about the "
+                        "recipe")
     args = p.parse_args()
 
     if args.get is None and args.check is None and not (args.list or args.all is not None):
         p.print_help()
         return
 
-    args.levels = [int(z) for z in args.levels.split(",")]
+    args.levels = [int(z) for z in args.levels.split(",")] if args.levels else None
     rows = catalogue(args.out)
 
     if args.list or args.all is not None:

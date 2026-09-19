@@ -28,7 +28,7 @@ from there.
 |---|---|---|---|
 | LiDAR | `lidarHillshade` (national mosaic) | `/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833` (prefix `NHM_DTM_TOPOBATHY_25833`), DOM: `wms.hoyde-dom-nhm-25833` (`NHM_DOM_25833`) | Automatisk / national / per-project |
 | LiDAR | `lidarProject` (0.25 m per acquisition) | `/wms/geonorge/wms.hoyde-dtm-prosjekt`, DOM: `wms.hoyde-dom-prosjekt`; `LAYERS=<project id>:<style>` | same ring |
-| LiDAR | `lidarCvat` (**Arkeologisk relieff**, one row per cached acquisition, precomputed) | `/cvat/{z}/{x}/{y}.webp` — our own tile store, served off disk, no service behind it | same ring |
+| LiDAR | `lidarCvat` (**Arkeologisk relieff**, one row per cached acquisition, precomputed) | `/cvat/<acquisition>/{z}/{x}/{y}.webp` — our own tile store, served off disk, no service behind it | same ring |
 | Analyse | — | `/arcgis/hoydedata/*`, see `docs/terrain-analysis.md` | the visualization list |
 | Kart | `topo`, `topograatone`, `toporaster`, `sjokartraster` (WMTS) | `cache.kartverket.no/v1/service` GetCapabilities, one document for all four | the five `KART_VARIANTS` |
 | Kart → Amtskart | `amtskart` (WMS, `LAYERS=amt1`, 1:200 000) | `/wms/geonorge/wms.historiskekart` | same ring |
@@ -57,14 +57,23 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
 - `lidarCvat` is not a service. `vat-cache/vatcache.py` runs RVT over an
   acquisition's DTM and writes the combined VAT — hillshade, slope, positive
   openness, sky-view in one picture — as 512 px RGBA WebP on the app's own tile
-  grid, z15 (0.661 m/px) to z12 (5.289 m/px), with `/cvat/manifest.json` beside
-  the tiles recording presets, blend order, per-level radii, the run's digest
-  and which acquisitions are in the store at which levels. Caddy's
+  grid, down to z12 (5.289 m/px), with `/cvat/manifest.json` beside the tiles
+  recording presets, blend order, per-level radii, the run's digest and which
+  acquisitions are in the store, at which levels, in which directory. How deep
+  the ladder goes is the acquisition's own: z16 (0.331 m/px) where hoydedata.no
+  publishes a 0.25 m DTM, z15 (0.661 m/px) where it publishes 0.5 m, because
+  below the DEM's cell the picture is of the interpolation. Caddy's
   `file_server` serves the bind-mounted store, so there is no proxy route, no
   wmscache entry and no CSP host. Radii are RVT pixels at every level, so an
   acquisition's levels are related pictures of the same terrain rather than one
   picture at several sizes: the reach of the visualization grows as you zoom
   out, and the tooltip says so.
+- **Acquisitions may overlap, and two rows is the point.** Each owns a directory
+  in the store — the manifest's `path`, which is the whole tile template the app
+  builds — so a 5 pkt flight from 2021 and a 10 pkt one from 2025 over the same
+  landscape are two readings of it, both offered, neither overwriting the other.
+  Auto ranks them by coverage and then by depth: where both cover the view, the
+  one that reaches z16 wins and the other stays in the pulldown.
 - **The store is read at runtime, not compiled in.** `fetchCvatStore()` reads
   `/cvat/manifest.json` once per page load and `resolveCvatAcquisitions()`
   joins its `acquisitions` block to the LiDAR catalogue, so a batch run that

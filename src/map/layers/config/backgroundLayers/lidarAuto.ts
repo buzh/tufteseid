@@ -63,15 +63,28 @@ export const chooseAutoDataset = ({
   const ratioOf = (id: string): number =>
     viewport.primary.find((e) => e.project.id === id)?.areaRatio ?? 0;
 
-  // The best-covered cached acquisition on screen, ranked off the same viewport
-  // list the projects are: "best" has to mean the same thing for both, or the
-  // two halves of the comparison below are not comparable.
+  // The best cached acquisition on screen. Coverage first, off the same
+  // viewport list the projects are ranked by — "best" has to mean the same
+  // thing for both, or the two halves of the comparison below are not
+  // comparable.
+  //
+  // Where two of them both cover the view, coverage has stopped separating them
+  // and the deeper ladder wins: the flights that reach z16 were flown at four
+  // times the density, and that is the whole reason the store holds two
+  // pictures of one landscape. The shallower one stays a row in the picker.
   const bestCached = cached.reduce<{
     acquisition: CvatAcquisition;
     ratio: number;
   } | null>((best, acquisition) => {
     const ratio = ratioOf(acquisition.project.id);
-    return best && best.ratio >= ratio ? best : { acquisition, ratio };
+    if (!best) return { acquisition, ratio };
+    const bothCover =
+      ratio >= AUTO_ENGAGE_COVERAGE && best.ratio >= AUTO_ENGAGE_COVERAGE;
+    const wins =
+      bothCover && acquisition.maxZoom !== best.acquisition.maxZoom
+        ? acquisition.maxZoom > best.acquisition.maxZoom
+        : ratio > best.ratio;
+    return wins ? { acquisition, ratio } : best;
   }, null);
 
   // The cache and the same acquisition's WMS are one ground, so hysteresis is
