@@ -103,6 +103,33 @@ overwrite each other's pixels, and a tile carries nothing that says who made it.
 Adding another acquisition does not change the recipe, so it does not change
 the digest and needs no `--force`.
 
+### Dividing a store built before that
+
+A store written under the shared namespace has every acquisition's tiles in one
+`<z>/<x>/<y>` tree. The pixels are right and only their location is wrong, so
+`migrate_store.py` moves them rather than rebuilding tens of core-hours of them:
+
+    .venv/bin/python migrate_store.py /site/tufteseid/data/cvat          # report
+    .venv/bin/python migrate_store.py /site/tufteseid/data/cvat --apply
+
+It reports first and moves nothing without `--apply`. A tile carries no
+provenance, so what attributes it is the acquisitions' rasterised footprints:
+the tile belongs to the one whose mask reaches it. That is exact wherever the
+footprints are disjoint, which over a curated store is nearly everywhere. Where
+two masks reach one tile it genuinely could be either — whichever run came last
+won, and nothing on disk records which — so those tiles go and their work units
+are handed back, which the report names per acquisition and level. Refill them
+with an ordinary `--get` of each acquisition named; until then the store has
+holes there, and `-c` reports the units as never built.
+
+The masks come from `coverage.py`, derived on the spot if `coverage-<slug>.npz`
+is not beside the script — minutes and one catalogue query per acquisition. The
+last step rewrites the manifest through `open_manifest`, so it refuses a store
+whose recipe has drifted; it checks that before moving anything, because a
+divided store with a pathless manifest is the one state the app cannot read.
+
+Deletable once no store in the old layout remains.
+
 The app reads the manifest, so that is the whole deploy: finish a run, and the
 acquisition is a row in the LiDAR dataset pulldown on the next page load. No
 rebuild, no code change, nothing to restart — `file_server` is already serving
@@ -124,12 +151,13 @@ jupyter for an IO layer none of this uses.
 
 | File | What it does |
 | --- | --- |
-| `vatcache.py` | The command line: the numbered list, the build, the audit and the repair. The only file with a `main` |
+| `vatcache.py` | The command line: the numbered list, the build, the audit and the repair. Everything routine goes through it |
 | `acquisitions.py` | Acquisition identity: the queue, the published cell size that sets the ladder, and the two name sets — hoydedata's catalogue and the per-project WMS — that have to carry a name verbatim before its tiles reach a reader |
 | `acquisitions.json` | The queue itself, in the order `--get` indexes. Committed, so an index means the same thing between two invocations |
 | `cvat.py` | RVT's combined VAT: the parameters out of `VAT_Combined.rft.xml`, and the layer walk out of `render_all_images`. The one module that decides what a pixel is |
 | `build_tiles.py` | The store: its geometry, a level built into it, the manifest, the markers, and the audit that reads all of it back |
 | `fetch_dem.py` | `exportImage` against `Prosjekt_DTM`, pinned to one `LAS_PROJECT_NAME`, plus the minimal tiled-float32 TIFF reader `dem.ts` also carries |
+| `migrate_store.py` | One-off: divides a store built under the shared tile namespace into a directory per acquisition, attributing each tile by footprint. Its own `main`, deletable once no such store remains |
 | `coverage.py` | What ground an acquisition covers: catalogue rows, union rasterisation, sample-site picker, tile fill against the app's tile grid |
 | `compare.py` | The candidate grids and radius rules, rendered side by side on one real patch — what decided §1 and §2 of the work order, including the z16-against-z15 pair |
 | `render.py` | The numpy port of `shade.ts` the sizing study was done with. Superseded by `cvat.py` for anything that renders; kept because `measure.py` and `sizing.py` read against it |

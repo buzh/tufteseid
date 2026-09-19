@@ -288,6 +288,21 @@ def _digest(recipe, acquisition=None):
     return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()[:16]
 
 
+def manifest_agrees(have, unit_tiles):
+    """Was this manifest written under the recipe this code computes?
+
+    The levels passed to `settings` are immaterial — the digest is over
+    everything but them — so this is answerable without knowing what a run
+    intends to build, which is what lets a migration ask it up front."""
+    recipe = settings([COARSEST_LEVEL], unit_tiles)
+    digest = _digest(recipe)
+    # A manifest from when a store held exactly one acquisition carried it
+    # inside the digest. Same recipe, older shape.
+    single = have.get("acquisition") if "acquisitions" not in have else None
+    return have.get("digest") in (
+        digest, _digest(recipe, single) if single else None)
+
+
 def open_manifest(out, project, levels, unit_tiles, force):
     """Write the manifest, or check the one already there agrees with this run."""
     recipe = settings(levels, unit_tiles)
@@ -309,10 +324,7 @@ def open_manifest(out, project, levels, unit_tiles, force):
         # making the operator reach for --force, which would equally have waved
         # through a recipe that really had changed.
         legacy = "acquisitions" not in have and "acquisition" in have
-        agrees = have.get("digest") == digest or (
-            legacy and have.get("digest") == _digest(recipe, have["acquisition"])
-        )
-        if not agrees and not force:
+        if not manifest_agrees(have, unit_tiles) and not force:
             sys.exit(
                 f"{path} was built under different settings "
                 f"(digest {have.get('digest')}, this run {digest}).\n"
