@@ -7,7 +7,12 @@ whole project: for Vestfold og Telemark 5pkt 2021 the sum is 8846 km2 across
 LOWPS group sums to the same 1106 km2 - and rasterising the union confirms it.
 
 Run:
-    python coverage.py "Vestfold og Telemark 5pkt 2021"
+    python coverage.py "Vestfold og Telemark 5pkt 2021" coverage-vt-2021.npz
+
+The second argument names the output and defaults to coverage.npz. A store holds
+several acquisitions, so give each mask its own file: build_tiles.py reads the
+acquisition back off it and refuses to pair one acquisition's footprint with
+another's DEM.
 """
 
 import sys
@@ -141,7 +146,7 @@ def tile_fill(mask, cell, tile_m, grid_origin=(-2500000.0, 9045984.0), mask_orig
     return int(hit.sum()), float((counts[hit] / per_tile).mean())
 
 
-def main(project):
+def main(project, out="coverage.npz"):
     feats = footprints(project)
     by_category = {}
     for f in feats:
@@ -162,14 +167,24 @@ def main(project):
     print(f"           {(x1 - x0) / 1000:.1f} x {(y1 - y0) / 1000:.1f} km, {area / ((x1 - x0) * (y1 - y0)) * 100:.0f} % filled")
 
     np.savez(
-        "coverage.npz",
+        out,
         mask=mask,
         bounds=np.array(bounds),
         cell=cell,
         sites=sample_sites(mask, bounds, cell),
+        # build_tiles.py refuses to pair this mask with another acquisition's
+        # DEM. Without the stamp that mistake is silent: every unit fetches
+        # ground the project never flew, comes back all-NaN, writes no tile and
+        # marks itself done.
+        project=project,
     )
-    print("\n  wrote coverage.npz (mask, bounds, cell, sites)")
+    print(f"\n  wrote {out} (mask, bounds, cell, sites, project)")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else DEFAULT_PROJECT)
+    # A store holds several acquisitions, so name the file after the one it is
+    # of rather than overwriting the last.
+    main(
+        sys.argv[1] if len(sys.argv) > 1 else DEFAULT_PROJECT,
+        sys.argv[2] if len(sys.argv) > 2 else "coverage.npz",
+    )

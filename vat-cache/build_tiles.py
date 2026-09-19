@@ -1,10 +1,18 @@
 """Build a cached combined-VAT tile set, one zoom level at a time.
 
-    python build_tiles.py --out /site/tufteseid/data/cvat --levels 15,14,13,12
-    python build_tiles.py --out /site/tufteseid/data/cvat --levels 15 --jobs 4
+    python build_tiles.py --out /site/tufteseid/data/cvat \
+        --project "Vestfold og Telemark 5pkt 2021" --coverage coverage.npz
 
 That path is the store docker-compose bind-mounts into the Caddy container at
 /var/www/cvat, so what this writes is what the app serves.
+
+One store holds several acquisitions. Their tiles share the `<z>/<x>/<y>`
+namespace, which is safe because footprints do not overlap where it matters and
+a tile carries no provenance of its own — the manifest's `acquisitions` block
+is the record of what is in here. Markers are *not* shared: they live under the
+acquisition that made them, because two acquisitions can land in one work unit
+while owning different tiles inside it, and a marker from one must not persuade
+the other that its own tiles are already written.
 
 Resumable: every work unit drops a marker when it finishes, and a re-run skips
 the marked ones. A unit that writes no tiles still marks, because "the footprint
@@ -19,6 +27,7 @@ is what makes the levels independent in the first place.
 import argparse
 import hashlib
 import json
+import re
 import sys
 import time
 import urllib.error
@@ -76,6 +85,12 @@ class Coverage:
         self.mask = data["mask"]
         self.x0, self.x1, self.y0, self.y1 = (float(v) for v in data["bounds"])
         self.cell = float(data["cell"])
+        # Which acquisition this mask is of. coverage.py stamps it so that a run
+        # cannot pair one acquisition's footprint with another's DEM: that pins
+        # the fetch to a project which never flew the ground the mask points at,
+        # so every unit comes back all-NaN, writes nothing, and marks itself
+        # done. Files written before the stamp existed carry None.
+        self.project = str(data["project"]) if "project" in data.files else None
 
     def reaches(self, west, south, east, north):
         if east <= self.x0 or west >= self.x1 or north <= self.y0 or south >= self.y1:
@@ -169,17 +184,19 @@ def build_unit(args):
     return z, ux, uy, written
 
 
-def settings(project, levels, unit_tiles):
-    """Everything that decides what the pixels are. The digest of this, minus the
-    per-level entries, is what makes a cache built under changed settings declare
-    itself a different one — see `open_manifest`."""
+def settings(levels, unit_tiles):
+    """The recipe: everything that decides what a pixel is, given ground to read.
+    The digest of this, minus the per-level entries, is what makes a cache built
+    under changed settings declare itself a different one — see `open_manifest`.
+
+    Which acquisitions the store covers is deliberately not in here. The recipe
+    is what has to agree between runs; the acquisitions are what accumulate."""
     from importlib.metadata import version
 
     return {
         "generator": "vat-cache/build_tiles.py",
         "renderer": f"rvt-py {version('rvt-py')}",
         "source": "hoydedata.no Prosjekt_DTM exportImage, pixelType=F32",
-        "acquisition": project,
         "visualization": "RVT combined VAT (VAT_Combined.rft.xml)",
         "presets": cvat.VAT_PRESETS,
         "blend_order": ["Hillshade normal 100", "Slope luminosity 50",
@@ -215,22 +232,44 @@ def settings(project, levels, unit_tiles):
     }
 
 
+def _digest(recipe, acquisition=None):
+    """Digest of the recipe, over everything except `levels`. Which levels one
+    invocation builds is not a property of the cache: a level's entry is derived
+    from z and the settings above it, and levels arrive one run at a time, so a
+    store holding z15 has to accept the run that adds z14. Acquisitions
+    accumulate the same way and for the same reason, so they are not in here.
+
+    `acquisition` reproduces the digest of a manifest from when a store held
+    exactly one, which is how `open_manifest` recognises that shape as the same
+    recipe rather than a changed one."""
+    body = {k: v for k, v in recipe.items() if k != "levels"}
+    if acquisition is not None:
+        body["acquisition"] = acquisition
+    return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()[:16]
+
+
 def open_manifest(out, project, levels, unit_tiles, force):
     """Write the manifest, or check the one already there agrees with this run."""
-    wanted = settings(project, levels, unit_tiles)
-    # Over everything except `levels`. Which levels one invocation builds is not
-    # a property of the cache: a level's entry is derived from z and the settings
-    # above it, and levels arrive one run at a time, so a store holding z15 has
-    # to accept the run that adds z14.
-    digest = hashlib.sha256(
-        json.dumps({k: v for k, v in wanted.items() if k != "levels"},
-                   sort_keys=True).encode()
-    ).hexdigest()[:16]
-    wanted["digest"] = digest
+    recipe = settings(levels, unit_tiles)
+    digest = _digest(recipe)
     path = Path(out) / "manifest.json"
+
+    # What ground is in the store, and at which levels. Per acquisition, because
+    # a level built for one is not built for another: a reader asking "is z12
+    # here for Østfold" must not be answered by Vestfold's z12.
+    acquisitions = {project: {"levels": sorted(levels, reverse=True)}}
+
     if path.exists():
         have = json.loads(path.read_text())
-        if have.get("digest") != digest and not force:
+        # A manifest from when a store held exactly one acquisition carried it
+        # inside the digest. Same recipe, older shape: migrate it rather than
+        # making the operator reach for --force, which would equally have waved
+        # through a recipe that really had changed.
+        legacy = "acquisitions" not in have and "acquisition" in have
+        agrees = have.get("digest") == digest or (
+            legacy and have.get("digest") == _digest(recipe, have["acquisition"])
+        )
+        if not agrees and not force:
             sys.exit(
                 f"{path} was built under different settings "
                 f"(digest {have.get('digest')}, this run {digest}).\n"
@@ -238,16 +277,48 @@ def open_manifest(out, project, levels, unit_tiles, force):
                 "an empty directory, or pass --force if you know why."
             )
         # Levels arrive one run at a time; keep the ones already built.
-        wanted["levels"] = {**have.get("levels", {}), **wanted["levels"]}
+        recipe["levels"] = {**have.get("levels", {}), **recipe["levels"]}
+        # Same for acquisitions, and for each one the union of its levels. The
+        # legacy shape's single acquisition owns whatever levels the store had.
+        merged = dict(have.get("acquisitions", {}))
+        if legacy:
+            merged.setdefault(have["acquisition"], {"levels": sorted(
+                (int(z) for z in have.get("levels", {})), reverse=True)})
+        was = merged.get(project, {}).get("levels", [])
+        merged[project] = {"levels": sorted(set(was) | set(levels), reverse=True)}
+        acquisitions = merged
+
+    wanted = {**recipe, "digest": digest, "acquisitions": acquisitions}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(wanted, indent=2, sort_keys=True))
     return digest
 
 
+def marker_dir(out, project, z):
+    """Where one acquisition's finished-unit markers for level z live.
+
+    Namespaced by acquisition: two of them can share a work unit while owning
+    different tiles inside it, so one's marker must not tell the other that its
+    own tiles are written. Vestfold og Telemark 5pkt 2021 and Viken laser -
+    Østfold 5pkt del1 2022 share exactly two z12 units and no tiles at all."""
+    return Path(out) / ".units" / slug(project) / str(z)
+
+
+def slug(project):
+    """A directory name for an acquisition. Readable rather than opaque, so the
+    marker tree can be read with ls; the acquisition names differ by region,
+    density and year, so this cannot collide in practice."""
+    return re.sub(r"[^0-9a-zæøå]+", "-", project.lower()).strip("-")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--out", required=True, help="tile store directory")
-    p.add_argument("--project", default=fetch_dem.DEFAULT_PROJECT)
+    # No default. The store holds several acquisitions and the coverage file is
+    # chosen separately, so a default here is a silent way to pair one
+    # acquisition's footprint with another's DEM.
+    p.add_argument("--project", required=True,
+                   help=f'LAS_PROJECT_NAME, e.g. "{fetch_dem.DEFAULT_PROJECT}"')
     p.add_argument("--coverage", default="coverage.npz",
                    help="from coverage.py, for the footprint union")
     p.add_argument("--levels", default=",".join(str(z) for z in DEFAULT_LEVELS))
@@ -266,13 +337,30 @@ def main():
     coverage = Coverage(args.coverage)
     out = Path(args.out)
 
+    # The mask and the DEM have to be of the same ground. Pairing them wrongly
+    # is not loud: the fetch is pinned to a project that never flew there, every
+    # unit comes back all-NaN, nothing is written, and every unit marks itself
+    # done — a store that looks built and is empty.
+    if coverage.project is None:
+        sys.exit(
+            f"{args.coverage} carries no acquisition name, so it cannot be "
+            f"checked against --project.\nRe-run: python coverage.py "
+            f'"{args.project}"'
+        )
+    if coverage.project != args.project:
+        sys.exit(
+            f"{args.coverage} is the footprint of {coverage.project!r}, but "
+            f"--project says {args.project!r}.\nOne of the two is wrong; they "
+            "have to name the same acquisition."
+        )
+
     if not args.dry_run:
         digest = open_manifest(out, args.project, levels, args.unit_tiles, args.force)
         print(f"{out}  manifest {digest}  {args.project}")
 
     for z in levels:
         units = coverage.units(z, args.unit_tiles)
-        marks = out / ".units" / str(z)
+        marks = marker_dir(out, args.project, z)
         pending = [u for u in units if not (marks / f"{u[0]}_{u[1]}").exists()]
         side_km = tile_span(z) * args.unit_tiles / 1000
         print(f"\nz{z}  {resolution(z):.4f} m/px  unit {side_km:.2f} km  "
