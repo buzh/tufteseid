@@ -12,7 +12,12 @@ import {
   hybridContoursAtom,
   hybridOverlayAtom,
 } from '../../map/layers/config/backgroundLayers/atoms';
-import { CVAT_ACQUISITION_ID } from '../../map/layers/config/backgroundLayers/cvatGround';
+import {
+  activeCvatAcquisitionAtom,
+  type CvatAcquisition,
+  fetchCvatStore,
+  resolveCvatAcquisitions,
+} from '../../map/layers/config/backgroundLayers/cvatGround';
 import {
   chooseAutoDataset,
   type LidarDataset,
@@ -59,6 +64,8 @@ export const useLidarControls = () => {
     activeLidarProjectAtom,
   );
   const [activeLidarStyle, setActiveLidarStyle] = useAtom(activeLidarStyleAtom);
+  // Which cached acquisition the cached ground is showing.
+  const [activeCvat, setActiveCvat] = useAtom(activeCvatAcquisitionAtom);
   const [lidarModel, setLidarModel] = useAtom(activeLidarModelAtom);
   // Follows the viewport unless pinned; the rules are lidarAuto.ts.
   const [autoDataset, setAutoDataset] = useAtom(lidarAutoDatasetAtom);
@@ -91,6 +98,26 @@ export const useLidarControls = () => {
       cancelled = true;
     };
   }, []);
+
+  // What the cVAT store holds, joined to the catalogue rows the acquisitions
+  // are named after. Read once per load from the manifest rather than compiled
+  // in, so a batch run that finishes on the server is in the app on the next
+  // reload and needs no deploy. Empty on an install without a store.
+  const [cvatAcquisitions, setCvatAcquisitions] = useState<CvatAcquisition[]>(
+    [],
+  );
+  useEffect(() => {
+    if (!allProjects) return;
+    let cancelled = false;
+    fetchCvatStore().then((store) => {
+      if (!cancelled) {
+        setCvatAcquisitions(resolveCvatAcquisitions(store, allProjects));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [allProjects]);
 
   // The national mosaic's styles; a project's are already in the catalogue.
   useEffect(() => {
@@ -180,9 +207,15 @@ export const useLidarControls = () => {
   );
   // No style to clamp: the cache is one visualization, and leaving the held
   // style alone is what lets it survive the trip through the cached ground.
-  const selectCvat = useCallback(() => {
-    setBackgroundLayer('lidarCvat');
-  }, [setBackgroundLayer]);
+  // The acquisition is the pick, though — the store holds several, each its own
+  // envelope and its own set of levels.
+  const selectCvat = useCallback(
+    (acquisition: CvatAcquisition) => {
+      setActiveCvat(acquisition);
+      setBackgroundLayer('lidarCvat');
+    },
+    [setActiveCvat, setBackgroundLayer],
+  );
 
   // What the resolver's hysteresis is measured against: the ground drawing
   // now, not the acquisition atom, which keeps its last value under the mosaic.
@@ -190,13 +223,26 @@ export const useLidarControls = () => {
   // render would re-decide on every keystroke anywhere in the app.
   const currentDataset = useMemo(
     (): LidarDataset =>
-      isLidarCvat
-        ? { kind: 'cvat' }
+      isLidarCvat && activeCvat
+        ? { kind: 'cvat', acquisition: activeCvat }
         : isLidarProject && activeLidarProject
           ? { kind: 'project', project: activeLidarProject }
           : { kind: 'national' },
-    [isLidarCvat, isLidarProject, activeLidarProject],
+    [isLidarCvat, activeCvat, isLidarProject, activeLidarProject],
   );
+
+  // The cached acquisitions the viewport touches, in the order the project rows
+  // are in. Both tiers, unlike the project list's own split: the cache is
+  // scarce and deliberately built, so if any of it is on screen it is worth
+  // offering, even at the sliver of coverage that demotes a project.
+  const cvatEntries = useMemo(() => {
+    if (viewport.status !== 'ready' || cvatAcquisitions.length === 0) return [];
+    const byId = new Map(cvatAcquisitions.map((a) => [a.project.id, a]));
+    return [...viewport.primary, ...viewport.secondary].flatMap((e) => {
+      const acquisition = byId.get(e.project.id);
+      return acquisition ? [{ acquisition, areaRatio: e.areaRatio }] : [];
+    });
+  }, [viewport, cvatAcquisitions]);
 
   // A row click picks and dismisses; the keyboard path below picks without
   // closing. Both are the user speaking, so both pin.
@@ -210,9 +256,9 @@ export const useLidarControls = () => {
     selectProject(p);
     setPickerOpen(false);
   };
-  const activateCvat = () => {
+  const activateCvat = (acquisition: CvatAcquisition) => {
     setAutoDataset(false);
-    selectCvat();
+    selectCvat(acquisition);
     setPickerOpen(false);
   };
   const activateAuto = () => {
@@ -223,10 +269,11 @@ export const useLidarControls = () => {
       resolution,
       viewport,
       current: { kind: 'national' },
+      cached: cvatAcquisitions,
     });
     if (choice.kind === 'national') selectNational();
     else if (choice.kind === 'project') selectProject(choice.project);
-    else if (choice.kind === 'cvat') selectCvat();
+    else if (choice.kind === 'cvat') selectCvat(choice.acquisition);
     setPickerOpen(false);
   };
 
@@ -239,10 +286,11 @@ export const useLidarControls = () => {
           resolution,
           viewport,
           current: { kind: 'national' },
+          cached: cvatAcquisitions,
         })
       : ({ kind: 'hold' } as const);
     if (choice.kind === 'project') selectProject(choice.project);
-    else if (choice.kind === 'cvat') selectCvat();
+    else if (choice.kind === 'cvat') selectCvat(choice.acquisition);
     else selectNational();
   };
 
@@ -255,6 +303,7 @@ export const useLidarControls = () => {
       resolution,
       viewport,
       current: currentDataset,
+      cached: cvatAcquisitions,
     });
     if (choice.kind === 'national') {
       if (!isNationalMosaic) selectNational();
@@ -263,21 +312,61 @@ export const useLidarControls = () => {
         selectProject(choice.project);
       }
     } else if (choice.kind === 'cvat') {
-      if (!isLidarCvat) selectCvat();
+      const showing =
+        isLidarCvat && activeCvat?.project.id === choice.acquisition.project.id;
+      if (!showing) selectCvat(choice.acquisition);
     }
   }, [
     isLidarBackground,
     autoDataset,
     resolution,
     viewport,
+    cvatAcquisitions,
     isLidarProject,
     isNationalMosaic,
     isLidarCvat,
     activeLidarProject,
+    activeCvat,
     currentDataset,
     selectNational,
     selectProject,
     selectCvat,
+  ]);
+
+  // A shared link names the layer, not the acquisition it was over, so a cold
+  // load onto the cached ground arrives with none and draws nothing. Usually
+  // the resolver above fills it in — but inside its hysteresis band it
+  // deliberately decides nothing, and the layer would stay blank there. So take
+  // the acquisition off the footprint ranking directly, and hand the ground
+  // back to the mosaic when the ranking says none of the cache is on screen.
+  useEffect(() => {
+    if (!isLidarCvat || activeCvat) return;
+    if (viewport.status === 'idle' || viewport.status === 'loading') return;
+    // Only where the resolver has deliberately decided nothing. Both effects
+    // run in the same pass off the same stale `activeCvat`, so anywhere the
+    // resolver does have an answer this would be a second writer racing it.
+    const holding =
+      chooseAutoDataset({
+        resolution,
+        viewport,
+        current: currentDataset,
+        cached: cvatAcquisitions,
+      }).kind === 'hold';
+    if (autoDataset && !holding) return;
+    const best = cvatEntries[0];
+    if (best) selectCvat(best.acquisition);
+    else selectNational();
+  }, [
+    isLidarCvat,
+    activeCvat,
+    autoDataset,
+    resolution,
+    viewport,
+    currentDataset,
+    cvatAcquisitions,
+    cvatEntries,
+    selectCvat,
+    selectNational,
   ]);
 
   // Called by useGroundMode: unmounting the pulldown never fires its open-change
@@ -315,18 +404,13 @@ export const useLidarControls = () => {
   // publish.
   // Over the cached ground the stitch is of its acquisition, not of whatever
   // the mosaic would give back: the cache has no WMS behind it, but the
-  // acquisition it was computed from is in the same catalogue under the same
-  // name. Null until the catalogue lands, as for the mosaic's styles.
-  const cvatProject = useMemo(
-    () => allProjects?.find((p) => p.id === CVAT_ACQUISITION_ID) ?? null,
-    [allProjects],
-  );
-
+  // acquisition it was computed from is the catalogue row the cached ground
+  // carries, so the stitch asks that project's WMS for the same ground.
   const activeLidarSource = useMemo((): LidarSource | null => {
     // DTM regardless of what is held, matching the faded fallback under it and
     // the cached pixels themselves.
     if (isLidarCvat) {
-      return cvatProject ? projectLidarSource(cvatProject, 'dtm') : null;
+      return activeCvat ? projectLidarSource(activeCvat.project, 'dtm') : null;
     }
     if (isLidarProject && activeLidarProject) {
       return projectLidarSource(activeLidarProject, lidarModel);
@@ -335,7 +419,7 @@ export const useLidarControls = () => {
     return nationalLidarSource(nationalStyles, lidarModel);
   }, [
     isLidarCvat,
-    cvatProject,
+    activeCvat,
     isLidarProject,
     activeLidarProject,
     nationalStyles,
@@ -390,18 +474,24 @@ export const useLidarControls = () => {
     armCycling();
     if (viewport.status !== 'ready') return true;
 
-    // Index 0 is the national mosaic and 1 the cached ground — the two fixed
-    // datasets, in pulldown order — then the primary projects.
+    // Pulldown order: the national mosaic, then whatever of the cache is on
+    // screen — usually one acquisition and often none — then the primary
+    // projects.
     const entries = viewport.primary;
-    const FIXED = 2;
+    const FIXED = 1 + cvatEntries.length;
     const ring = entries.length + FIXED;
     const at = entries.findIndex(
       (e) => e.project.id === activeLidarProject?.id,
     );
+    const cvatAt = isLidarCvat
+      ? cvatEntries.findIndex(
+          (e) => e.acquisition.project.id === activeCvat?.project.id,
+        )
+      : -1;
     const from = isNationalMosaic
       ? 0
-      : isLidarCvat
-        ? 1
+      : cvatAt >= 0
+        ? 1 + cvatAt
         : at >= 0
           ? at + FIXED
           : step > 0
@@ -411,7 +501,7 @@ export const useLidarControls = () => {
     // Walking pins, or the resolver takes the background back on the next pan.
     setAutoDataset(false);
     if (next === 0) selectNational();
-    else if (next === 1) selectCvat();
+    else if (next < FIXED) selectCvat(cvatEntries[next - 1].acquisition);
     else selectProject(entries[next - FIXED].project);
     return true;
   };
@@ -439,6 +529,8 @@ export const useLidarControls = () => {
     activateNational,
     activateProject,
     activateCvat,
+    cvatEntries,
+    activeCvat,
     autoDataset,
     activateAuto,
     datasetStyles,

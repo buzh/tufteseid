@@ -15,6 +15,7 @@ import type { AttachmentKind, AttachmentMeta } from '../api/attachments';
 import { creditOf, type LocalityRecord } from '../api/localities';
 import { viewSpecOf } from '../localities/viewSpec';
 import type { BackgroundLayerName } from '../map/layers/backgroundLayers';
+import { CVAT_LEGACY_ACQUISITION_ID } from '../map/layers/config/backgroundLayers/cvatGround';
 import {
   HERITAGE_DETAILS,
   HERITAGE_RENDERS,
@@ -130,6 +131,15 @@ const LIDAR_WMS_GROUNDS = new Set<BackgroundLayerName>([
 ]);
 
 /**
+ * Which cached acquisition one half of the shot was over. Records written
+ * before the store held a second one did not say, and did not have to: there
+ * was one, and the constant names it. Anything since carries the name it was
+ * actually drawn from.
+ */
+const cvatAcquisitionOf = (half: Record<string, unknown>): string =>
+  str(half.cvatAcquisition) ?? CVAT_LEGACY_ACQUISITION_ID;
+
+/**
  * The heritage overlay's settings, re-read. Absent, malformed or at its
  * defaults all come back undefined, which is the same thing on the plate.
  */
@@ -182,6 +192,14 @@ const screenshotSpec = (
       (layer != null && LIDAR_WMS_GROUNDS.has(layer)) ||
       (layerB != null && LIDAR_WMS_GROUNDS.has(layerB)),
     groundIsCvat: layer === 'lidarCvat' || layerB === 'lidarCvat',
+    cvatAcquisitions: [
+      ...new Set([
+        ...(layer === 'lidarCvat' ? [cvatAcquisitionOf(meta)] : []),
+        ...(layerB === 'lidarCvat' && compare
+          ? [cvatAcquisitionOf(compare)]
+          : []),
+      ]),
+    ],
     themeLayers,
     // Missing on records written before the field existed, and false is the
     // safe reading: it credits nobody the pixels do not owe.

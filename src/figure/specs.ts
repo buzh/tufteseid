@@ -17,7 +17,6 @@ import {
   type HeritageRender,
 } from '../map/layers/heritage';
 import {
-  CVAT_ACQUISITION_ID,
   CVAT_AZIMUTH,
   CVAT_GENERAL_OPACITY,
   CVAT_RADIUS_PX,
@@ -544,6 +543,13 @@ export type ScreenshotFigureInput = Common & {
    * acquisition, its renderer and its parameters.
    */
   groundIsCvat: boolean;
+  /**
+   * Which cached acquisitions were on screen, as the record named them —
+   * usually one, two when both halves of a comparison were cached ground. Empty
+   * on a record written before the store held more than one and the acquisition
+   * therefore went unrecorded; `CVAT_LEGACY_ACQUISITION_ID` is what those were.
+   */
+  cvatAcquisitions: string[];
   /** Theme layer ids; `themeLayerName` resolves each to its published name. */
   themeLayers: string[];
   /**
@@ -602,10 +608,11 @@ export const describeHeritageRender = (
 
 /**
  * How the cached ground was made, for a shot taken over it. The one ground the
- * app can describe this closely: it holds the acquisition and the parameters as
- * constants, because it built the pixels rather than asking a service for them.
- * The stretches are not printed — the template names them, and `cvatGround.ts`
- * says where the full set lives.
+ * app can describe this closely: it holds the recipe as constants, because it
+ * built the pixels rather than asking a service for them. One recipe for the
+ * whole store, so this says nothing about which acquisition — that is the
+ * `acquisition` line's job. The stretches are not printed — the template names
+ * them, and `cvatGround.ts` says where the full set lives.
  */
 const cvatSettings = (): string[] => [
   t('figure.set.cvat', { renderer: CVAT_RENDERER, template: CVAT_TEMPLATE }),
@@ -629,6 +636,7 @@ export const screenshotFigure = ({
   groundIsFlyfoto,
   groundIsLidarWms,
   groundIsCvat,
+  cvatAcquisitions,
   themeLayers,
   composed,
   heritageRender,
@@ -641,13 +649,11 @@ export const screenshotFigure = ({
   source: joinDot([t('figure.source.map'), groundLabel]),
   // The cached ground is the only one of these the app can name an acquisition
   // for: a LiDAR or ortofoto ground is whatever the ring was on and the record
-  // keeps only the mode, but there is exactly one cVAT store and the layer
-  // config holds its name.
+  // keeps only the mode, while the cached ground is drawn one acquisition at a
+  // time and the record says which.
   acquisition:
     joinDot([
-      groundIsCvat
-        ? t('figure.acq.project', { name: CVAT_ACQUISITION_ID })
-        : null,
+      ...cvatAcquisitions.map((name) => t('figure.acq.project', { name })),
       themeLayers.length
         ? t('figure.acq.overlays', {
             layers: themeLayers

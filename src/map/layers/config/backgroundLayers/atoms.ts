@@ -8,6 +8,7 @@ import {
 import { mapAtom } from '../../../atoms';
 import { halved } from '../../../compare/halves';
 import { BackgroundLayerName } from '../../backgroundLayers';
+import { activeCvatAcquisitionHalves } from './cvatGround';
 import { activeFlyfotoProjectHalves } from './flyfotoBackground';
 import {
   activeLidarModelHalves,
@@ -19,11 +20,12 @@ import { buildStack, LIDAR_LAYERS, resolveStack } from './stack';
 import { clearBackgroundLayer, swapBackgroundLayers } from './utils';
 
 // Startup values the URL parameter may name. Not `lidarProject` or
-// `flyfotoProject`: their acquisition atom starts null, so a cold load into
-// either renders nothing. `lidarCvat` is in it because its source does not
-// start null — a cold load is honest, the cache where it reaches and the faded
-// mosaic and topo elsewhere, so a shared link to a lokalitet in Vestfold opens
-// on the ground it was read on.
+// `flyfotoProject`: their acquisition atom starts null and only the user can
+// fill it, so a cold load into either renders nothing, indefinitely.
+// `lidarCvat` is in it because its acquisition is *derived*: Automatisk is on
+// at startup, so the footprint ranking names the cached acquisition the view is
+// over as soon as it lands, and a shared link to a lokalitet read on the cached
+// ground opens on it.
 const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'topo',
   'topograatone',
@@ -86,6 +88,9 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
   const activeLidarProject = get(activeLidarProjectHalves.a);
   const activeLidarStyle = get(activeLidarStyleHalves.a);
   const activeLidarModel = get(activeLidarModelHalves.a);
+  // Same for the cached ground: another acquisition is another envelope and
+  // another set of levels, so the XYZ layer is rebuilt rather than reused.
+  const activeCvatAcquisition = get(activeCvatAcquisitionHalves.a);
   // Same for the flyfoto acquisition: another year rebuilds its mosaicRule.
   const activeFlyfotoProject = get(activeFlyfotoProjectHalves.a);
   const hybridOverlay = get(hybridOverlayHalves.a);
@@ -99,6 +104,7 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
 
   const stack = resolveStack(layerName, {
     lidarProject: activeLidarProject,
+    cvatAcquisition: activeCvatAcquisition,
     // DOM publishes one style, so the model has the last word.
     lidarStyle: effectiveLidarStyle(activeLidarStyle, activeLidarModel),
     lidarModel: activeLidarModel,
@@ -108,7 +114,13 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
   });
 
   if (!stack) {
-    if (layerName === 'lidarProject' || layerName === 'flyfotoProject') {
+    if (
+      layerName === 'lidarProject' ||
+      layerName === 'flyfotoProject' ||
+      // Waiting on the manifest and the footprint ranking, a tick after a cold
+      // load into the cached ground. Also not an error.
+      layerName === 'lidarCvat'
+    ) {
       // Nothing picked out of the archive yet: not an error.
       return;
     }

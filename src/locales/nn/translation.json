@@ -685,7 +685,7 @@
       "nationalMosaic": "Nasjonal mosaikk",
       "nationalMeta": "heile Noreg",
       "cvat": "Arkeologisk relieff",
-      "cvatHint": "Ferdig utrekna arkeologisk relieff: RVT sin kombinerte VAT over høgdedataa frå eitt LiDAR-opptak. Rekkjevidda i utrekninga veks når du zoomar ut, så dei fire nivåa er skylde bilete av same terrenget.",
+      "cvatHint": "Ferdig utrekna arkeologisk relieff: RVT sin kombinerte VAT over høgdedataa frå dette LiDAR-opptaket. Rekkjevidda i utrekninga veks når du zoomar ut, så nivåa er skylde bilete av same terrenget.",
       "projectsHint": "Prosjekt, mest dekning først. Hald over for omriss.",
       "loadingCatalogue": "Hentar katalog…",
       "loadingFootprints": "Hentar omriss…",

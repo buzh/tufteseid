@@ -28,7 +28,7 @@ from there.
 |---|---|---|---|
 | LiDAR | `lidarHillshade` (national mosaic) | `/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833` (prefix `NHM_DTM_TOPOBATHY_25833`), DOM: `wms.hoyde-dom-nhm-25833` (`NHM_DOM_25833`) | Automatisk / national / per-project |
 | LiDAR | `lidarProject` (0.25 m per acquisition) | `/wms/geonorge/wms.hoyde-dtm-prosjekt`, DOM: `wms.hoyde-dom-prosjekt`; `LAYERS=<project id>:<style>` | same ring |
-| LiDAR | `lidarCvat` (**Arkeologisk relieff**, one acquisition, precomputed) | `/cvat/{z}/{x}/{y}.webp` — our own tile store, served off disk, no service behind it | same ring |
+| LiDAR | `lidarCvat` (**Arkeologisk relieff**, one row per cached acquisition, precomputed) | `/cvat/{z}/{x}/{y}.webp` — our own tile store, served off disk, no service behind it | same ring |
 | Analyse | — | `/arcgis/hoydedata/*`, see `docs/terrain-analysis.md` | the visualization list |
 | Kart | `topo`, `topograatone`, `toporaster`, `sjokartraster` (WMTS) | `cache.kartverket.no/v1/service` GetCapabilities, one document for all four | the five `KART_VARIANTS` |
 | Kart → Amtskart | `amtskart` (WMS, `LAYERS=amt1`, 1:200 000) | `/wms/geonorge/wms.historiskekart` | same ring |
@@ -54,20 +54,32 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   (`helning_prosent`) fails silently: HTTP 200, `Content-Type: image/png`, a
   ~100-byte JSON body, a blank map. `?lidarModel=dom` persists the choice,
   absent means DTM, and the LiDAR extract is DTM-only.
-- `lidarCvat` is not a service. `vat-cache/build_tiles.py` runs RVT over one
+- `lidarCvat` is not a service. `vat-cache/build_tiles.py` runs RVT over an
   acquisition's DTM and writes the combined VAT — hillshade, slope, positive
   openness, sky-view in one picture — as 512 px RGBA WebP on the app's own tile
   grid, z15 (0.661 m/px) to z12 (5.289 m/px), with `/cvat/manifest.json` beside
-  the tiles recording presets, blend order, per-level radii and the run's
-  digest. Caddy's `file_server` serves the bind-mounted store, so there is no
-  proxy route, no wmscache entry and no CSP host. Radii are RVT pixels at every
-  level, so the four levels are related pictures of the same terrain rather
-  than one picture at four sizes: the reach of the visualization grows as you
-  zoom out, and the tooltip says so.
+  the tiles recording presets, blend order, per-level radii, the run's digest
+  and which acquisitions are in the store at which levels. Caddy's
+  `file_server` serves the bind-mounted store, so there is no proxy route, no
+  wmscache entry and no CSP host. Radii are RVT pixels at every level, so an
+  acquisition's levels are related pictures of the same terrain rather than one
+  picture at several sizes: the reach of the visualization grows as you zoom
+  out, and the tooltip says so.
+- **The store is read at runtime, not compiled in.** `fetchCvatStore()` reads
+  `/cvat/manifest.json` once per page load and `resolveCvatAcquisitions()`
+  joins its `acquisitions` block to the LiDAR catalogue, so a batch run that
+  lands on the server is in the app on the next reload with no deploy and no
+  code change. An acquisition the catalogue does not publish is dropped with a
+  warning — without its row there is no footprint to rank it by and no envelope
+  to cull with. An install without a store answers 404, which parses as an
+  empty store: no cached rows anywhere, rather than a dataset that is offered
+  and draws nothing. Levels are per acquisition, so a half-built one draws at
+  the levels it has and nowhere else.
 - It is the one ground whose relief nobody upstream computed, so it is the one
   that has to say where it came from. The dataset chip's tooltip names the
-  acquisition beside the label; a kartutsnitt taken over it carries the
-  acquisition on its provenance plate, the renderer, the template, the blend
+  acquisition beside the label; a kartutsnitt taken over it records which
+  acquisition was showing (`meta.cvatAcquisition`) and carries it on its
+  provenance plate, with the renderer, the template, the blend
   stack, the combine and the pixel radii, and credits Kartverket under
   `høydedata` rather than `skyggerelieff` — the height values are theirs, the
   picture is not. The constants the plate prints live beside the layer config in
@@ -77,18 +89,33 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   from it: a downloaded figure travels off this host. Rebuilding the store under
   changed parameters — a new digest in the manifest — means editing that block
   too.
-- Its coverage needs no polygon. The layer's `extent` is the store's envelope
-  (185.6 × 102.9 km) and culls everything outside; inside it the 94 % that were
-  never written answer 404, OpenLayers marks those tiles errored and leaves
-  them transparent, and the faded national mosaic underneath shows through.
-  `maxResolution` hides the layer one step coarser than z12 rather than letting
-  OL clamp and ask for four screenfuls to upscale.
-- `CVAT_ACQUISITION_ID` (`cvatGround.ts`) is byte-identical to the
-  `LidarProject.id` the per-project WMS publishes, so `chooseAutoDataset` tests
-  the footprint against the viewport ranking it already has and `Behold`
-  stitches the acquisition's own WMS — DTM, `skyggerelieff` — with no name
-  mapping and no second coverage source. There is one acquisition, hence a
-  constant; with two the list comes off the manifest.
+- Its coverage needs no polygon. The layer's `extent` is the showing
+  acquisition's own envelope and culls everything outside; inside it the ~94 %
+  that were never written answer 404, OpenLayers marks those tiles errored and
+  leaves them transparent, and the faded national mosaic underneath shows
+  through. `maxResolution` hides the layer one step coarser than the
+  acquisition's coarsest level rather than letting OL clamp and ask for four
+  screenfuls to upscale. The whole store is one `<z>/<x>/<y>` namespace and a
+  tile carries no provenance, so where two acquisitions' envelopes overlap the
+  layer draws the neighbour's tiles: the picture is the same product either way
+  — one recipe, one digest — and what it costs is the name on a figure plate,
+  in the sliver where one envelope covers the other's ground.
+- The manifest's acquisition names are byte-identical to the `LidarProject.id`
+  the per-project WMS publishes, which is what the whole wiring rests on:
+  `CvatAcquisition` carries the catalogue row itself, so `chooseAutoDataset`
+  ranks the cache off the viewport list it already has, the envelope comes from
+  the same row, and `Behold` stitches that project's own WMS — DTM,
+  `skyggerelieff` — with no name mapping and no second coverage source. An
+  acquisition whose name does not appear verbatim in the per-project WMS
+  `GetCapabilities` cannot be wired in at all; `vat-cache/README.md` says so at
+  the point where the next one is chosen.
+- Which acquisition is drawing is `activeCvatAcquisitionHalves`
+  (`cvatGround.ts`), halved like the LiDAR project and seeded into the compare
+  curtain's B side with it. It starts null, so a cold load into
+  `?backgroundLayer=lidarCvat` draws nothing for a tick — the URL names the
+  layer, not the ground it was over — and then `useLidarControls` takes the
+  acquisition off the footprint ranking, or hands the ground back to the mosaic
+  if none of the cache is on screen.
 - Hybrid's `LAYERS` is always the five reference groups
   `kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,fkb_presentasjonsdata` —
   the generalized `kd_*` groups stop around 1:25 000 and the `fkb_*` ones take

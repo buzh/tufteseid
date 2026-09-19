@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CVAT_ACQUISITION_ID } from '../../map/layers/config/backgroundLayers/cvatGround';
+import type { CvatAcquisition } from '../../map/layers/config/backgroundLayers/cvatGround';
 import type { LidarViewportEntry } from '../../map/layers/config/backgroundLayers/lidarRelevance';
 import { Button, CountBadge, IconButton, Popover, Spinner } from '../../ui';
 import { PulldownDisclosure, PulldownItem } from '../Pulldown';
@@ -48,9 +48,16 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
 
   // The chip is one line wide, so the acquisition only fits in its tooltip —
   // and the cached ground is the one dataset whose label does not name it.
-  const datasetTitle = lidar.isLidarCvat
-    ? `${datasetLabel} · ${CVAT_ACQUISITION_ID}`
-    : datasetLabel;
+  const datasetTitle =
+    lidar.isLidarCvat && lidar.activeCvat
+      ? `${datasetLabel} · ${lidar.activeCvat.project.id}`
+      : datasetLabel;
+
+  // Whether a cached row is the one drawing. By acquisition, since every one of
+  // them carries the same label.
+  const showingCvat = (acquisition: CvatAcquisition) =>
+    lidar.isLidarCvat &&
+    lidar.activeCvat?.project.id === acquisition.project.id;
 
   // The glyph for "Automatisk landed here", each row deciding for itself
   // whether it is the one showing.
@@ -152,18 +159,29 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
         markLabel={t('ribbon.lidar.autoMark')}
         onActivate={lidar.activateNational}
       />
-      {/* Ours, not a service: one acquisition, precomputed, on our own disk.
-          Its meta is the acquisition rather than a translated phrase — that is
-          the coverage, and it is the same word in every language. */}
-      <PulldownItem
-        label={t('ribbon.lidar.cvat')}
-        meta={CVAT_ACQUISITION_ID}
-        hint={t('ribbon.lidar.cvatHint')}
-        active={!autoDataset && lidar.isLidarCvat}
-        mark={autoMark(lidar.isLidarCvat)}
-        markLabel={t('ribbon.lidar.autoMark')}
-        onActivate={lidar.activateCvat}
-      />
+      {/* Ours, not a service: precomputed acquisitions on our own disk, one row
+          each and only for the ones the viewport touches — off cached ground
+          there is nothing here to pick. Every row carries the same label, so
+          the meta is the acquisition and the share of the screen it paints
+          rather than a translated phrase; the acquisition is the coverage, and
+          it is the same word in every language. */}
+      {lidar.cvatEntries.map(({ acquisition, areaRatio }) => (
+        <PulldownItem
+          key={acquisition.project.id}
+          label={t('ribbon.lidar.cvat')}
+          meta={[acquisition.project.id, coverageLabel(areaRatio)]
+            .filter((s): s is string => !!s)
+            .join(' · ')}
+          hint={t('ribbon.lidar.cvatHint')}
+          active={!autoDataset && showingCvat(acquisition)}
+          mark={autoMark(showingCvat(acquisition))}
+          markLabel={t('ribbon.lidar.autoMark')}
+          onActivate={() => lidar.activateCvat(acquisition)}
+          onHover={(hovering) =>
+            lidar.setHoveredProjectId(hovering ? acquisition.project.id : null)
+          }
+        />
+      ))}
       <div className={styles.rule} />
       <p className={styles.hint}>{t('ribbon.lidar.projectsHint')}</p>
 

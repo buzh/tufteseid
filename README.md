@@ -64,8 +64,10 @@ The **Arkeologisk relieff** background is the one picture this project
 computes rather than fetches: relief visualizations made with the Relief
 Visualization Toolbox from Kartverket's LiDAR terrain model and stored as
 tiles ([`vat-cache/`](vat-cache/README.md)). The elevation data behind it
-stays Kartverket's, on Kartverket's licence. The store is optional — an
-install without it simply shows the national mosaic there.
+stays Kartverket's, on Kartverket's licence. The store is optional and
+read at runtime — an install without it simply shows the national mosaic
+there, and one that grows by another acquisition offers it on the next
+page load, with no rebuild.
 
 MIT — see [`LICENCE`](LICENCE). Upstream copyright by Statens Kartverk
 (The Norwegian Mapping Authority) is preserved as required. Web

@@ -1,6 +1,6 @@
 import TileLayer from 'ol/layer/Tile';
 import { BackgroundLayerName } from '../../backgroundLayers';
-import { CVAT_GROUND_CONFIG } from './cvatGround';
+import { buildCvatGroundConfig, type CvatAcquisition } from './cvatGround';
 import { buildNationalLidarConfig } from './elevation';
 import {
   buildFlyfotoProjectConfig,
@@ -56,15 +56,12 @@ const emptyBackgroundLayer: EmptyBackgroundLayer = {
   layerName: 'empty',
 };
 
-// Only the fixed layers; the four whose style or acquisition is a runtime
+// Only the fixed layers; the five whose style or acquisition is a runtime
 // choice are built from atoms by `pickLayerConfig` below.
 export const allConfiguredBackgroundLayers = [
   emptyBackgroundLayer,
   ...KvCacheBackgroundLayers,
   AMTSKART_CONFIG,
-  // Static, not a `pickLayerConfig` branch: the source is one URL on our own
-  // disk, not a runtime choice of acquisition or style.
-  CVAT_GROUND_CONFIG,
 ];
 
 const buildLidarProjectConfig = (
@@ -85,6 +82,9 @@ const buildLidarProjectConfig = (
 
 export type StackOptions = {
   lidarProject: LidarProject | null;
+  /** Which acquisition the cached ground is showing. Null before the manifest
+      and the catalogue have both landed, and so a normal state at startup. */
+  cvatAcquisition: CvatAcquisition | null;
   /** Already clamped for the model — see `effectiveLidarStyle`. */
   lidarStyle: string;
   lidarModel: LidarModel;
@@ -122,6 +122,10 @@ const pickLayerConfig = (
         : undefined;
     case 'lidarHillshade':
       return buildNationalLidarConfig(opts.lidarStyle, opts.lidarModel);
+    case 'lidarCvat':
+      return opts.cvatAcquisition
+        ? buildCvatGroundConfig(opts.cvatAcquisition)
+        : undefined;
     case 'flyfoto':
       return FLYFOTO_MOSAIC_CONFIG;
     case 'flyfotoProject':

@@ -685,7 +685,7 @@
       "nationalMosaic": "Nasjonal mosaikk",
       "nationalMeta": "hele Norge",
       "cvat": "Arkeologisk relieff",
-      "cvatHint": "Ferdig beregnet arkeologisk relieff: RVTs kombinerte VAT over høydedataene fra ett LiDAR-opptak. Rekkevidden i beregningen vokser når du zoomer ut, så de fire nivåene er beslektede bilder av samme terreng.",
+      "cvatHint": "Ferdig beregnet arkeologisk relieff: RVTs kombinerte VAT over høydedataene fra dette LiDAR-opptaket. Rekkevidden i beregningen vokser når du zoomer ut, så nivåene er beslektede bilder av samme terreng.",
       "projectsHint": "Prosjekter, mest dekning først. Hold over for omriss.",
       "loadingCatalogue": "Henter katalog…",
       "loadingFootprints": "Henter omriss…",

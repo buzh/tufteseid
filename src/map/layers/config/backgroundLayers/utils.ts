@@ -230,8 +230,15 @@ const layerSignature = (
     return `arcgis|${config.url}|${params}|${projection}`;
   }
   // Without this arm every dataset cycle rebuilds the layer rather than
-  // reusing it, and a cached ground that is already drawn flashes.
-  if (config.type === 'XYZ') return `xyz|${config.url}|${projection}`;
+  // reusing it, and a cached ground that is already drawn flashes. The levels
+  // and the extent are in the signature because the URL is not: the whole cVAT
+  // store is one tile namespace, and two acquisitions in it differ by nothing
+  // else.
+  if (config.type === 'XYZ') {
+    const extent = JSON.stringify(config.coverageExtent);
+    const levels = `${config.minZoom}-${config.maxZoom}`;
+    return `xyz|${config.url}|${levels}|${extent}|${projection}`;
+  }
   return null;
 };
 

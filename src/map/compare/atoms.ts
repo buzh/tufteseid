@@ -8,6 +8,10 @@ import {
   hybridContoursHalves,
   hybridOverlayHalves,
 } from '../layers/config/backgroundLayers/atoms';
+import {
+  activeCvatAcquisitionHalves,
+  type CvatAcquisition,
+} from '../layers/config/backgroundLayers/cvatGround';
 import { activeFlyfotoProjectHalves } from '../layers/config/backgroundLayers/flyfotoBackground';
 import {
   type KartVariant,
@@ -49,6 +53,7 @@ const groundLayer = (
   kartVariant: KartVariant,
   lidarProject: LidarProject | null,
   flyfotoProject: FlyfotoProject | null,
+  cvatAcquisition: CvatAcquisition | null,
 ): BackgroundLayerName => {
   // Whichever cartography this half was last set to, not necessarily topo.
   if (ground === 'kart') return kartVariant;
@@ -57,8 +62,10 @@ const groundLayer = (
   }
   // `seeded` is A's layer, already copied over: entering the curtain on the
   // cached ground keeps it, rather than dropping to the WMS dataset A was not
-  // showing. The two WMS datasets are still chosen by whether one is held.
-  if (seeded === 'lidarCvat') return 'lidarCvat';
+  // showing. Its acquisition was copied with it, and without one there would be
+  // nothing to draw. The two WMS datasets are still chosen by whether one is
+  // held.
+  if (seeded === 'lidarCvat' && cvatAcquisition) return 'lidarCvat';
   return lidarProject ? 'lidarProject' : 'lidarHillshade';
 };
 
@@ -79,6 +86,7 @@ export const enterCompareAtom = atom(
         get(kartVariantHalves.b),
         get(activeLidarProjectHalves.b),
         get(activeFlyfotoProjectHalves.b),
+        get(activeCvatAcquisitionHalves.b),
       ),
     );
     set(compareOnAtom, true);
@@ -105,6 +113,7 @@ export const compareLayerAtomEffect = atomEffect((get) => {
   const lidarStyle = get(activeLidarStyleHalves.b);
   const lidarModel = get(activeLidarModelHalves.b);
   const flyfotoProject = get(activeFlyfotoProjectHalves.b);
+  const cvatAcquisition = get(activeCvatAcquisitionHalves.b);
 
   const generation = ++compareGeneration;
 
@@ -116,6 +125,7 @@ export const compareLayerAtomEffect = atomEffect((get) => {
 
   const stack = resolveStack(layerName, {
     lidarProject,
+    cvatAcquisition,
     lidarStyle: effectiveLidarStyle(lidarStyle, lidarModel),
     lidarModel,
     flyfotoProject,

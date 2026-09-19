@@ -63,6 +63,7 @@ import {
   backgroundLayerHalves,
   hybridOverlayHalves,
 } from '../map/layers/config/backgroundLayers/atoms';
+import { activeCvatAcquisitionHalves } from '../map/layers/config/backgroundLayers/cvatGround';
 import { lidarStyleLabel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { saveBlob } from '../shared/utils/download';
 import { fitPadding, FUNN_MARGIN_PX } from '../shell/chromeInsets';
@@ -243,6 +244,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
   const compareOn = useAtomValue(compareOnAtom);
   const backgroundB = useAtomValue(backgroundLayerHalves.b);
   const hybridB = useAtomValue(hybridOverlayHalves.b);
+  // The cached ground is the one ground whose acquisition the plate can name,
+  // and the store holds several, so which one it was has to be written down at
+  // the shutter: nothing else in the record says.
+  const cvatA = useAtomValue(activeCvatAcquisitionHalves.a);
+  const cvatB = useAtomValue(activeCvatAcquisitionHalves.b);
   // What the heritage overlay is drawing, not what is ticked: the figure
   // caption names what is in the pixels.
   const themeLayers = useAtomValue(shownThemeLayersAtom);
@@ -1392,6 +1398,11 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
             // these fields is here rather than baked into the pixels.
             ground: background,
             hybrid,
+            // Only under the cached ground: anywhere else it would name an
+            // acquisition that is not in the pixels.
+            ...(background === 'lidarCvat' && cvatA
+              ? { cvatAcquisition: cvatA.project.id }
+              : {}),
             themeLayers: [...themeLayers],
             // The only figure that is ever off north, and the only one that
             // earns a north arrow on the way out.
@@ -1407,7 +1418,15 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
               (sketchGroupShown && sketchShown.size > 0) ||
               (!funnHidden && (findItems?.length ?? 0) > 0),
             ...(compareOn
-              ? { compare: { ground: backgroundB, hybrid: hybridB } }
+              ? {
+                  compare: {
+                    ground: backgroundB,
+                    hybrid: hybridB,
+                    ...(backgroundB === 'lidarCvat' && cvatB
+                      ? { cvatAcquisition: cvatB.project.id }
+                      : {}),
+                  },
+                }
               : {}),
             ...(themeLayers.has('heritageSites')
               ? {
@@ -1447,6 +1466,8 @@ export const useLocalityWorkspace = (locality: LocalityRecord) => {
     compareOn,
     backgroundB,
     hybridB,
+    cvatA,
+    cvatB,
     themeLayers,
     heritageDetails,
     heritageRender,

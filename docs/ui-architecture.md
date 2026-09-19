@@ -197,19 +197,28 @@ Ground-specific facts worth keeping:
   `chooseAutoDataset`): engages a per-project dataset at ≤1 m/px
   (`AUTO_ENGAGE_M_PER_PX`), releases above 2 m/px; engages at >50% on-screen
   coverage, releases below 35%. The candidate is `viewport.primary[0]`;
-  `moveend` is debounced 250 ms. Inside the cached ground's acquisition the
-  cache wins outright, even over a newer or denser acquisition ranked above it:
+  `moveend` is debounced 250 ms. Inside a cached acquisition — the best-covered
+  one, ranked off the same viewport list the projects are — the cache wins
+  outright, even over a newer or denser acquisition ranked above it:
   it is the better picture, it is on our own disk, and it spares a rate-limited
   upstream. The cache and that acquisition's WMS count as *one* incumbent for
   the release band, so Automatisk moves to the cache once and holds rather than
   flapping between the two forms of the same ground.
 - Arkeologisk relieff (`lidarCvat`) is a dataset in the LiDAR ring, not a style
-  and not a ground of its own. It is one precomputed visualization of one
+  and not a ground of its own. It is one precomputed visualization of a whole
   acquisition (`docs/map-layers.md`), so the style pulldown and DTM/DOM leave
   the strip while it is showing and A/D and E decline: both would be levers
   attached to nothing. `Behold` still stitches from the acquisition's own WMS,
   DTM and `skyggerelieff`, because the hidden levers must not decide an extract
   nobody can see them set.
+- The store holds several acquisitions and grows without a deploy, so the
+  pulldown lists one Arkeologisk relieff row per cached acquisition the
+  viewport touches — usually one, and off cached ground none at all. The rows
+  share a label, so the meta line carries the acquisition and the share of the
+  screen it paints. Hovering one draws its footprint like a project row.
+  Unlike the project list the rows are not tiered: the cache is scarce and
+  deliberately built, so any of it on screen is worth offering even at the
+  sliver of coverage that would demote a project.
 - Sammenlign: `halved(initial)` returns `{a, b, focused}`, and only four things
   know about halves — `backgroundLayerAtomEffect` (pinned `.a`),
   `compareLayerAtomEffect` (pinned `.b`), the screenshot's `meta.compare`, the
@@ -248,7 +257,7 @@ because Excalidraw's own shortcuts are the digits.
 | X (hold) | peek the previous ground, snap back on release; also on window blur | — |
 | A / D | walk the LiDAR style ring (top tier, wrapping) | no-op in DOM, and on the cached ground, which publishes no styles |
 | A / D, inside a lokalitet | walk the bilder rail (`src/localities/bilderRing.ts`) | three cases: nothing to walk, a live picker run, and the compare curtain's B half — `railWalkable = stripNavigable && picker.run == null`, crossed with `focusedHalfAtom === 'a'` |
-| W / S | walk the active ground's dataset ring — under LiDAR the national mosaic and Arkeologisk relieff are two fixed stops ahead of the viewport's acquisitions | — |
+| W / S | walk the active ground's dataset ring — under LiDAR the national mosaic is the first stop, then one per cached acquisition on screen, then the viewport's acquisitions | — |
 | W / S, inside a lokalitet | walk `[Visning ▾]` (`src/shell/visningRing.ts`), over `ring.length + 1` stops with "no View" first, entering the View it lands on | two cases: an empty ring, and the curtain's B half |
 | E | DTM / DOM | the cached ground, which is DTM only |
 | H | hide / show the funn group | — |
@@ -779,8 +788,8 @@ Choose what the terrain looks like
 - Hold X to peek at the previous ground, release to snap back.
 - Draw Kart as five cartographies: topographic, greyscale, scanned paper,
   nautical chart, amtskart over a modern base.
-- Pick the national LiDAR mosaic, the precomputed Arkeologisk relieff, or any
-  per-project dataset.
+- Pick the national LiDAR mosaic, a precomputed Arkeologisk relieff acquisition
+  covering the view, or any per-project dataset.
 - See datasets ranked by viewport relevance, and expand to the rest.
 - Preview a project's footprint on hover.
 - Pick a render style, and expand to the full style list.

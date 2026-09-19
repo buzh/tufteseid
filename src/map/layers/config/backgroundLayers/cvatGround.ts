@@ -1,45 +1,157 @@
 // The cached ground: RVT's combined VAT — hillshade, slope, positive openness
-// and sky-view in one picture — precomputed over a single LiDAR acquisition and
+// and sky-view in one picture — precomputed over whole LiDAR acquisitions and
 // written to disk as plain tiles. `vat-cache/build_tiles.py` made them and
 // `/cvat/manifest.json` beside them states the presets, the blend order, the
-// radii per level and the digest of the run.
+// radii per level, the digest of the run and — the part this module reads at
+// runtime — which acquisitions are in the store and at which levels.
 //
 // Not a service: Caddy's own `file_server` serves the bind-mounted store, so
 // there is no proxy route, no wmscache entry and no CSP host — `img-src 'self'`
-// already covers it.
+// already covers it, and `connect-src 'self'` the manifest.
 
+import { halved } from '../../../compare/halves';
 import type { VatStackLayer } from '../../../../terrain/shade';
+import type { LidarProject } from './lidarProjects';
 import { XYZBackgroundLayer } from './types';
 
 /**
- * The one acquisition in the store. Byte-identical to the `LidarProject.id` the
- * per-project WMS publishes, which is what lets `chooseAutoDataset` test the
- * footprint against the viewport ranking it already has, with no name mapping
- * and no second coverage source.
+ * One acquisition in the store: the catalogue row the tiles were computed from,
+ * and the levels that were written for it.
  *
- * A constant because there is one. With two the list comes off the manifest.
+ * The catalogue row rather than a name, because the acquisition in the manifest
+ * is byte-identical to the `LidarProject.id` the per-project WMS publishes —
+ * which is what lets the footprint ranking the app already has say where the
+ * cache reaches, with no name mapping and no second coverage source. It also
+ * carries the envelope for the layer's extent and is what `Behold` stitches.
  */
-export const CVAT_ACQUISITION_ID = 'Vestfold og Telemark 5pkt 2021';
+export type CvatAcquisition = {
+  project: LidarProject;
+  /** The coarsest and deepest levels written, on the app's own grid
+   *  (`wmsTileGrid.ts`): z15 is 0.661 m/px, z12 5.289 m/px. Radii are RVT's own
+   *  pixels at every level, so the levels of one acquisition are related
+   *  pictures rather than one picture at several sizes — the reach of the
+   *  visualization grows as you zoom out. Per acquisition, because a level
+   *  built for one is not built for another, and a half-built acquisition is
+   *  the normal state of a store that is still growing. */
+  minZoom: number;
+  maxZoom: number;
+};
+
+/** Which cached acquisition is drawing. Null until one is picked, so a cold
+ *  load into `?backgroundLayer=lidarCvat` draws nothing until the footprint
+ *  ranking says which acquisition the view is over — a tick, and then the
+ *  ground the link was shared on. */
+export const activeCvatAcquisitionHalves = halved<CvatAcquisition | null>(null);
+export const activeCvatAcquisitionAtom = activeCvatAcquisitionHalves.focused;
+
+// ---------------------------------------------------------------------------
+// What is in the store, asked at runtime
+// ---------------------------------------------------------------------------
+
+const CVAT_MANIFEST_URL = '/cvat/manifest.json';
+
+/** The tile template. One namespace for the whole store: a tile carries no
+ *  provenance and the acquisitions are curated not to overlap, so two of them
+ *  never contend for one tile. */
+const CVAT_TILE_URL = '/cvat/{z}/{x}/{y}.webp';
+
+/** What `build_tiles.py` writes under `acquisitions`: acquisition name to the
+ *  levels built for it. */
+export type CvatStore = Record<string, number[]>;
+
+const parseStore = (body: unknown): CvatStore => {
+  if (!body || typeof body !== 'object') return {};
+  const block = (body as Record<string, unknown>).acquisitions;
+  if (!block || typeof block !== 'object') return {};
+  const store: CvatStore = {};
+  for (const [name, entry] of Object.entries(block)) {
+    const levels = (entry as { levels?: unknown })?.levels;
+    if (!Array.isArray(levels)) continue;
+    const zs = levels.filter((z): z is number => Number.isInteger(z));
+    if (zs.length > 0) store[name] = zs;
+  }
+  return store;
+};
+
+// One fetch per page load, shared by every caller. The store grows by a batch
+// run on the server, not by anything the tab does, so re-reading it mid-session
+// would only cost a request; a reload picks up whatever has landed since.
+let storePromise: Promise<CvatStore> | null = null;
 
 /**
- * The levels `build_tiles.py` wrote, on the app's own grid (`wmsTileGrid.ts`):
- * z15 at 0.661 m/px down to z12 at 5.289 m/px. Radii are RVT's own pixels at
- * every level, so the four are related pictures rather than one at four sizes —
- * the reach of the visualization grows as you zoom out.
+ * What the store holds. An install without one answers 404 — `file_server` has
+ * no SPA fallback to turn that into an index page — and an empty store is the
+ * honest answer: no cached rows anywhere in the app, rather than a dataset that
+ * is offered and draws nothing.
  */
-const CVAT_MIN_ZOOM = 12;
-const CVAT_MAX_ZOOM = 15;
+export const fetchCvatStore = (): Promise<CvatStore> => {
+  storePromise ??= fetch(CVAT_MANIFEST_URL)
+    .then((res) => (res.ok ? res.json() : null))
+    .then(parseStore)
+    .catch((err) => {
+      console.warn('[cvat] manifest unavailable', err);
+      return {};
+    });
+  return storePromise;
+};
 
 /**
- * The store's envelope, 185.6 × 102.9 km, of which the acquisition fills 6 %.
- * As the layer's extent it stops OL asking outside; inside it the 94 % that
- * were never written answer 404, which OL marks errored and leaves
- * transparent — and that transparency is the coverage mask, with the faded
- * mosaic underneath showing through.
+ * The store joined to the LiDAR catalogue. An acquisition the catalogue does
+ * not publish is dropped with a warning rather than half-wired: without the
+ * catalogue row there is no footprint to rank it by and no envelope to cull
+ * with, so it could only be offered everywhere and described as nothing.
  */
-const CVAT_COVERAGE_EXTENT_25833: [number, number, number, number] = [
-  61055, 6557418, 246691, 6660366,
-];
+export const resolveCvatAcquisitions = (
+  store: CvatStore,
+  projects: LidarProject[],
+): CvatAcquisition[] =>
+  Object.entries(store).flatMap(([id, levels]) => {
+    const project = projects.find((p) => p.id === id);
+    if (!project) {
+      console.warn(`[cvat] ${id} is in the store but not in the catalogue`);
+      return [];
+    }
+    return [
+      { project, minZoom: Math.min(...levels), maxZoom: Math.max(...levels) },
+    ];
+  });
+
+/**
+ * The layer for one cached acquisition.
+ *
+ * The extent is the acquisition's own envelope, of which the acquisition itself
+ * fills a few per cent. It stops OL asking outside; inside it the tiles nobody
+ * wrote answer 404, which OL marks errored and leaves transparent — and that
+ * transparency is the coverage mask, with the faded mosaic underneath showing
+ * through.
+ *
+ * Where two acquisitions' envelopes overlap, this layer will draw the other
+ * one's tiles: the store is one namespace and a tile does not say who made it.
+ * The picture is the same product either way — one recipe, one digest — so what
+ * that costs is the acquisition named on a figure plate, in the sliver where
+ * one acquisition's envelope covers another's ground.
+ */
+export const buildCvatGroundConfig = (
+  acquisition: CvatAcquisition,
+): XYZBackgroundLayer => ({
+  type: 'XYZ',
+  layerName: 'lidarCvat',
+  url: CVAT_TILE_URL,
+  projection: 'EPSG:25833',
+  minZoom: acquisition.minZoom,
+  maxZoom: acquisition.maxZoom,
+  coverageExtent: {
+    extent: acquisition.project.bboxLonLat,
+    crs: 'EPSG:4326',
+  },
+});
+
+/**
+ * The acquisition a screenshot was taken over, for records written before the
+ * store held more than one and the figure plate therefore had nothing to record.
+ * There was exactly one until then, and this was it.
+ */
+export const CVAT_LEGACY_ACQUISITION_ID = 'Vestfold og Telemark 5pkt 2021';
 
 // ---------------------------------------------------------------------------
 // What the pixels are, for the provenance plate
@@ -56,6 +168,10 @@ const CVAT_COVERAGE_EXTENT_25833: [number, number, number, number] = [
 // downloaded figure travels off this host, and a plate that could only be
 // written while the store answered would be missing from exactly the files that
 // leave. `vat-cache/cvat.py` is where these numbers come from.
+//
+// One set of them for the whole store, not one per acquisition: the recipe is
+// what has to agree between runs, and a store whose manifest disagrees with the
+// run about it refuses to be written into.
 //
 // Not `VAT_STACK` from `terrain/shade.ts`, which transcribes the same RVT
 // template for the client-side render. The two agree today; they describe
@@ -90,20 +206,10 @@ export const CVAT_SUN_ALTITUDE = { general: 35, flat: 15 } as const;
 
 /**
  * RVT's `max_rad`, in RVT's own pixels and the same number at every level —
- * which is why the four levels are related pictures rather than one picture at
- * four sizes.
+ * which is why the levels are related pictures rather than one picture at
+ * several sizes.
  */
 export const CVAT_RADIUS_PX = { general: 10, flat: 20 } as const;
 
 /** Percent of the general preset laid over the flat one. */
 export const CVAT_GENERAL_OPACITY = 50;
-
-export const CVAT_GROUND_CONFIG: XYZBackgroundLayer = {
-  type: 'XYZ',
-  layerName: 'lidarCvat',
-  url: '/cvat/{z}/{x}/{y}.webp',
-  projection: 'EPSG:25833',
-  minZoom: CVAT_MIN_ZOOM,
-  maxZoom: CVAT_MAX_ZOOM,
-  coverageExtent: { extent: CVAT_COVERAGE_EXTENT_25833, crs: 'EPSG:25833' },
-};

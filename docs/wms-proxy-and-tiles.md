@@ -38,7 +38,9 @@ still 404s.
 tile store is bind-mounted read-only at `/var/www/cvat`, under Caddy's root, so
 `file_server` serves it with no route, no wmscache entry and no CSP host. The
 404 on a tile that was never written is load-bearing — it is the coverage mask
-(`docs/map-layers.md`).
+(`docs/map-layers.md`). `/cvat/manifest.json` beside the tiles is served the
+same way and fetched once per page load; `connect-src 'self'` already covers
+it, and its own 404 on an install without a store reads as an empty store.
 
 ## Cache rules (wmscache)
 

@@ -45,16 +45,22 @@ it: Vestfold og Telemark 5pkt 2021 and Viken laser - Østfold 5pkt del1 2022
 share exactly two z12 units and no tiles at all, and one's marker must not
 persuade the other that its own tiles are written.
 
-Adding a second acquisition does not change the recipe, so it does not change
+Adding another acquisition does not change the recipe, so it does not change
 the digest and needs no `--force`.
+
+The app reads the manifest, so that is the whole deploy: finish a run, and the
+acquisition is a row in the LiDAR dataset pulldown on the next page load. No
+rebuild, no code change, nothing to restart — `file_server` is already serving
+both the manifest and the tiles.
 
 `--out` is the store `docker-compose.yml` bind-mounts read-only into the Caddy
 container at `/var/www/cvat`, which is under Caddy's root — so a tile written
 here is served at `/cvat/<z>/<x>/<y>.webp` without a route of its own. The app
-asks for them as **Arkeologisk relieff**, a dataset in the LiDAR ring
+asks for them as **Arkeologisk relieff**, a dataset in the LiDAR ring with one
+row per acquisition the viewport touches
 (`src/map/layers/config/backgroundLayers/cvatGround.ts`, `docs/map-layers.md`);
-an install without the store answers 404 for every tile, which is exactly what
-a hole in coverage looks like, so the faded national mosaic shows instead.
+an install without the store answers 404 for the manifest, which reads as an
+empty store and takes the rows off the list entirely.
 
 `--no-deps` is not optional: rvt-py declares gdal, rasterio, geopandas and
 jupyter for an IO layer none of this uses.
@@ -109,7 +115,7 @@ acquisition* rather than inside its envelope.
 
 | Acquisition | Coverage | Ark. lokaliteter | per km² |
 | --- | ---: | ---: | ---: |
-| Viken laser - Østfold 5pkt del1 2022 | 997 km² | ~6 460 | 6.48 |
+| Viken laser - Østfold 5pkt del1 2022 *(built)* | 997 km² | ~6 460 | 6.48 |
 | NDH Østfold 5pkt 2015 | 1 154 km² | ~6 610 | 5.72 |
 | Hedmarken 5pkt del1 2025 | 856 km² | ~4 060 | 4.74 |
 | Viken laser - Østfold 5pkt del2 2022 | 571 km² | ~2 620 | 4.59 |
@@ -125,5 +131,7 @@ bygningsmasse in a built-over city, which is not ground anyone reads relief off.
 they are two vintages of one landscape and only one belongs in the store.
 
 The acquisition name must also appear verbatim in the per-project WMS
-`GetCapabilities`, or `chooseAutoDataset` cannot match the cache against the
-footprint ranking it already has. Every name above does.
+`GetCapabilities`. That is what the app joins the manifest to: without the
+catalogue row there is no footprint to rank the cache by and no envelope to
+cull with, so `resolveCvatAcquisitions` drops the acquisition with a console
+warning and its tiles are never asked for. Every name above matches.
