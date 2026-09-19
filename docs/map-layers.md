@@ -54,7 +54,7 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   (`helning_prosent`) fails silently: HTTP 200, `Content-Type: image/png`, a
   ~100-byte JSON body, a blank map. `?lidarModel=dom` persists the choice,
   absent means DTM, and the LiDAR extract is DTM-only.
-- `lidarCvat` is not a service. `vat-cache/build_tiles.py` runs RVT over an
+- `lidarCvat` is not a service. `vat-cache/vatcache.py` runs RVT over an
   acquisition's DTM and writes the combined VAT — hillshade, slope, positive
   openness, sky-view in one picture — as 512 px RGBA WebP on the app's own tile
   grid, z15 (0.661 m/px) to z12 (5.289 m/px), with `/cvat/manifest.json` beside

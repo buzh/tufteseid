@@ -6,22 +6,23 @@ whole project: for Vestfold og Telemark 5pkt 2021 the sum is 8846 km2 across
 270 rows while the ground is 1106 km2. Splitting by CATEGORY shows it - each
 LOWPS group sums to the same 1106 km2 - and rasterising the union confirms it.
 
-Run:
-    python coverage.py "Vestfold og Telemark 5pkt 2021" coverage-vt-2021.npz
-
-The second argument names the output and defaults to coverage.npz. A store holds
-several acquisitions, so give each mask its own file: build_tiles.py reads the
-acquisition back off it and refuses to pair one acquisition's footprint with
-another's DEM.
+`vatcache.py` drives this: a mask is named after the acquisition it is of and
+derived on first use, so nothing ever chooses a mask separately from a project.
+That pairing was the one silent mistake in the batch — a fetch pinned to a
+project that never flew the ground the mask points at returns all-NaN for every
+unit, writes no tile, and marks each one done.
 """
 
-import sys
+from pathlib import Path
 
 import numpy as np
 
-from fetch_dem import DEFAULT_PROJECT, catalogue
+from acquisitions import slug
+from fetch_dem import catalogue
 
 CELL = 25.0  # rasterisation cell, metres
+
+HERE = Path(__file__).resolve().parent
 
 
 def _shoelace(ring):
@@ -146,7 +147,27 @@ def tile_fill(mask, cell, tile_m, grid_origin=(-2500000.0, 9045984.0), mask_orig
     return int(hit.sum()), float((counts[hit] / per_tile).mean())
 
 
-def main(project, out="coverage.npz"):
+def mask_file(project, directory=None):
+    """Where this acquisition's mask lives. Named after the acquisition rather
+    than overwriting one `coverage.npz`, because a store holds several."""
+    return Path(directory or HERE) / f"coverage-{slug(project)}.npz"
+
+
+def load_or_build(project, directory=None):
+    """The acquisition's mask, derived on first use. Returns its path.
+
+    Deriving costs one catalogue query with geometry and a scanline fill over
+    the envelope — minutes, once per acquisition, against the hours the tiles
+    themselves take."""
+    path = mask_file(project, directory)
+    if not path.exists():
+        print(f"no mask for {project!r} yet; deriving {path.name}\n")
+        build_mask(project, path)
+        print()
+    return path
+
+
+def build_mask(project, out):
     feats = footprints(project)
     by_category = {}
     for f in feats:
@@ -178,13 +199,5 @@ def main(project, out="coverage.npz"):
         # marks itself done.
         project=project,
     )
-    print(f"\n  wrote {out} (mask, bounds, cell, sites, project)")
-
-
-if __name__ == "__main__":
-    # A store holds several acquisitions, so name the file after the one it is
-    # of rather than overwriting the last.
-    main(
-        sys.argv[1] if len(sys.argv) > 1 else DEFAULT_PROJECT,
-        sys.argv[2] if len(sys.argv) > 2 else "coverage.npz",
-    )
+    print(f"\n  wrote {Path(out).name} (mask, bounds, cell, sites, project)")
+    return area

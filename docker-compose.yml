@@ -15,7 +15,7 @@ services:
       # Optional: override the baked-in Caddyfile without rebuilding.
       # - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # The cached combined-VAT ground, built out of band by
-      # vat-cache/build_tiles.py --out /site/tufteseid/data/cvat. Mounted under
+      # vat-cache/vatcache.py --get <n>, which writes here by default. Mounted under
       # Caddy's root, so file_server serves it at /cvat/<z>/<x>/<y>.webp and no
       # route of its own is needed. A host path rather than a named volume:
       # the store is written by a script on the host, is several GB, and

@@ -150,10 +150,13 @@ arrives in one call and there is no mosaic to assemble.
 
 ## Shape of the tool
 
-`build_tiles.py <project>`, one level at a time, resumable.
+`vatcache.py --get <n>`, one level at a time, resumable.
 
 1. **Coverage** — `coverage.py`'s footprint union decides which tiles the
-   acquisition reaches. Units the footprint misses are never fetched.
+   acquisition reaches. Units the footprint misses are never fetched. The mask
+   is derived from the acquisition on first use rather than named separately:
+   pairing one acquisition's footprint with another's DEM was the only mistake
+   here that produced no error, just an empty store.
 2. **Work unit** — an N×N block of tiles of the level being built, default 4,
    so 2096 px and ~18 MB at any level. Units are ordered and each records a
    marker when done, because a unit that legitimately writes no tiles is not the

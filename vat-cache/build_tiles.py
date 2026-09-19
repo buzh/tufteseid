@@ -1,9 +1,7 @@
-"""Build a cached combined-VAT tile set, one zoom level at a time.
+"""The tile store: its geometry, how a level is built into it, and how it is
+verified afterwards. `vatcache.py` is the command line over all of it.
 
-    python build_tiles.py --out /site/tufteseid/data/cvat \
-        --project "Vestfold og Telemark 5pkt 2021" --coverage coverage.npz
-
-That path is the store docker-compose bind-mounts into the Caddy container at
+The store is what docker-compose bind-mounts into the Caddy container at
 /var/www/cvat, so what this writes is what the app serves.
 
 One store holds several acquisitions. Their tiles share the `<z>/<x>/<y>`
@@ -16,7 +14,9 @@ the other that its own tiles are already written.
 
 Resumable: every work unit drops a marker when it finishes, and a re-run skips
 the marked ones. A unit that writes no tiles still marks, because "the footprint
-turned out not to reach here" and "never ran" are different states.
+turned out not to reach here" and "never ran" are different states. That is also
+why a check reads the markers rather than counting tiles: only the marker can
+tell an edge unit that legitimately holds nothing from one that never ran.
 
 Each level is an independent job — its own fetch, its own scan, its own tiles —
 so levels can be built in any order, or one rebuilt without the others. See
@@ -24,14 +24,13 @@ WORK-ORDER.md for why the radii are RVT's pixels rather than fixed metres, which
 is what makes the levels independent in the first place.
 """
 
-import argparse
 import hashlib
 import json
-import re
 import sys
 import time
 import urllib.error
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
 
@@ -40,6 +39,7 @@ from PIL import Image
 
 import cvat
 import fetch_dem
+from acquisitions import slug
 
 # The app's shared tile grid, from src/map/layers/wmsTileGrid.ts: resolutions are
 # max(EPSG:25833 extent span) / 256 / 2**z and the origin is the extent's
@@ -155,6 +155,22 @@ def encode_tile(field):
     return buf.getvalue()
 
 
+def tile_path(out, z, ux, uy, unit_tiles, i, j):
+    """Where the (i, j)-th tile of one work unit lands. The one place the unit
+    grid is turned into the app's tile coordinates, so a check cannot disagree
+    with the writer about which tiles a unit owns."""
+    x, y = ux * unit_tiles + i, uy * unit_tiles + j
+    return Path(out) / str(z) / str(x) / f"{y}.webp"
+
+
+def unit_tile_paths(out, z, ux, uy, unit_tiles):
+    return [
+        tile_path(out, z, ux, uy, unit_tiles, i, j)
+        for j in range(unit_tiles)
+        for i in range(unit_tiles)
+    ]
+
+
 def build_unit(args):
     """Fetch, render and write one work unit. Runs in a worker process."""
     z, ux, uy, unit_tiles, project, out = args
@@ -172,8 +188,7 @@ def build_unit(args):
             blob = encode_tile(tile)
             if blob is None:
                 continue
-            x, y = ux * unit_tiles + i, uy * unit_tiles + j
-            path = Path(out) / str(z) / str(x) / f"{y}.webp"
+            path = tile_path(out, z, ux, uy, unit_tiles, i, j)
             path.parent.mkdir(parents=True, exist_ok=True)
             # Write then rename: a kill mid-write must not leave a half tile
             # that the marker then declares finished.
@@ -304,90 +319,73 @@ def marker_dir(out, project, z):
     return Path(out) / ".units" / slug(project) / str(z)
 
 
-def slug(project):
-    """A directory name for an acquisition. Readable rather than opaque, so the
-    marker tree can be read with ls; the acquisition names differ by region,
-    density and year, so this cannot collide in practice."""
-    return re.sub(r"[^0-9a-zæøå]+", "-", project.lower()).strip("-")
+def marked_units(out, project, z):
+    """The units this acquisition has finished at this level, off the markers
+    alone. Cheap enough to ask for a progress figure without a mask at hand."""
+    found = set()
+    for mark in marker_dir(out, project, z).glob("*_*"):
+        ux, _, uy = mark.name.partition("_")
+        try:
+            found.add((int(ux), int(uy)))
+        except ValueError:
+            continue
+    return found
 
 
-def main():
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--out", required=True, help="tile store directory")
-    # No default. The store holds several acquisitions and the coverage file is
-    # chosen separately, so a default here is a silent way to pair one
-    # acquisition's footprint with another's DEM.
-    p.add_argument("--project", required=True,
-                   help=f'LAS_PROJECT_NAME, e.g. "{fetch_dem.DEFAULT_PROJECT}"')
-    p.add_argument("--coverage", default="coverage.npz",
-                   help="from coverage.py, for the footprint union")
-    p.add_argument("--levels", default=",".join(str(z) for z in DEFAULT_LEVELS))
-    p.add_argument("--unit-tiles", type=int, default=DEFAULT_UNIT_TILES)
-    p.add_argument("--jobs", type=int, default=1,
-                   help="units in parallel; every one is a fetch, so be kind")
-    p.add_argument("--limit", type=int,
-                   help="stop after this many *unmarked* units, for a pilot; "
-                        "run it twice and it does the next batch, not the same one")
-    p.add_argument("--dry-run", action="store_true", help="count units and stop")
-    p.add_argument("--force", action="store_true",
-                   help="write into a store whose manifest disagrees")
-    args = p.parse_args()
-
-    levels = [int(z) for z in args.levels.split(",")]
-    coverage = Coverage(args.coverage)
-    out = Path(args.out)
+def build(out, project, coverage, levels, unit_tiles=DEFAULT_UNIT_TILES,
+          jobs=1, limit=None, dry_run=False, force=False):
+    """Build the named levels for one acquisition, skipping finished units."""
+    out = Path(out)
 
     # The mask and the DEM have to be of the same ground. Pairing them wrongly
     # is not loud: the fetch is pinned to a project that never flew there, every
     # unit comes back all-NaN, nothing is written, and every unit marks itself
-    # done — a store that looks built and is empty.
-    if coverage.project is None:
+    # done — a store that looks built and is empty. vatcache.py derives the mask
+    # from the acquisition so the two cannot drift, but a mask written by hand
+    # still reaches here.
+    if coverage.project != project:
         sys.exit(
-            f"{args.coverage} carries no acquisition name, so it cannot be "
-            f"checked against --project.\nRe-run: python coverage.py "
-            f'"{args.project}"'
-        )
-    if coverage.project != args.project:
-        sys.exit(
-            f"{args.coverage} is the footprint of {coverage.project!r}, but "
-            f"--project says {args.project!r}.\nOne of the two is wrong; they "
-            "have to name the same acquisition."
+            f"the mask is the footprint of {coverage.project!r}, but the "
+            f"acquisition is {project!r}.\nOne of the two is wrong; they have "
+            "to name the same ground."
         )
 
-    if not args.dry_run:
-        digest = open_manifest(out, args.project, levels, args.unit_tiles, args.force)
-        print(f"{out}  manifest {digest}  {args.project}")
+    if not dry_run:
+        digest = open_manifest(out, project, levels, unit_tiles, force)
+        print(f"{out}  manifest {digest}  {project}")
 
     for z in levels:
-        units = coverage.units(z, args.unit_tiles)
-        marks = marker_dir(out, args.project, z)
-        pending = [u for u in units if not (marks / f"{u[0]}_{u[1]}").exists()]
-        side_km = tile_span(z) * args.unit_tiles / 1000
+        units = coverage.units(z, unit_tiles)
+        marks = marker_dir(out, project, z)
+        done = marked_units(out, project, z)
+        pending = [u for u in units if u not in done]
+        side_km = tile_span(z) * unit_tiles / 1000
         print(f"\nz{z}  {resolution(z):.4f} m/px  unit {side_km:.2f} km  "
               f"{len(units)} units, {len(pending)} to do")
-        if args.dry_run:
+        if dry_run:
             continue
-        if args.limit:
-            pending = pending[: args.limit]
+        if limit:
+            pending = pending[:limit]
+        if not pending:
+            continue
         marks.mkdir(parents=True, exist_ok=True)
 
         started, tiles = time.perf_counter(), 0
-        work = [(z, ux, uy, args.unit_tiles, args.project, str(out))
-                for ux, uy in pending]
-        if args.jobs > 1:
-            with ProcessPoolExecutor(max_workers=args.jobs) as pool:
+        work = [(z, ux, uy, unit_tiles, project, str(out)) for ux, uy in pending]
+        if jobs > 1:
+            with ProcessPoolExecutor(max_workers=jobs) as pool:
                 futures = {pool.submit(build_unit, w): w for w in work}
-                for done, future in enumerate(as_completed(futures), 1):
+                for finished, future in enumerate(as_completed(futures), 1):
                     _z, ux, uy, n = future.result()
                     (marks / f"{ux}_{uy}").touch()
                     tiles += n
-                    report(done, len(work), tiles, started)
+                    report(finished, len(work), tiles, started)
         else:
-            for done, item in enumerate(work, 1):
+            for finished, item in enumerate(work, 1):
                 _z, ux, uy, n = build_unit(item)
                 (marks / f"{ux}_{uy}").touch()
                 tiles += n
-                report(done, len(work), tiles, started)
+                report(finished, len(work), tiles, started)
         print()
 
 
@@ -398,5 +396,152 @@ def report(done, total, tiles, started):
           f"{(total - done) * rate / 3600:.1f} h left", end="", flush=True)
 
 
-if __name__ == "__main__":
-    main()
+# ---------------------------------------------------------------------------
+# Verifying what is there
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class LevelCheck:
+    """What one level of one acquisition holds, against what the mask says it
+    should.
+
+    `todo` and `broken` are repaired the same way — hand the unit back to the
+    build — and are counted apart only because they say different things about
+    the run that produced them: one never finished, the other wrote a file the
+    app cannot draw."""
+
+    z: int
+    unit_tiles: int = DEFAULT_UNIT_TILES
+    units: int = 0
+    done: int = 0
+    tiles: int = 0
+    bytes: int = 0
+    empty: int = 0
+    todo: list = field(default_factory=list)
+    broken: list = field(default_factory=list)
+    parts: list = field(default_factory=list)
+    stray: list = field(default_factory=list)
+
+    @property
+    def ok(self):
+        return not (self.todo or self.broken or self.parts)
+
+    @property
+    def repairable(self):
+        """Units to hand back: the unbuilt ones, plus the ones holding a file
+        that does not decode or a leftover half-write."""
+        hurt = {unit_of(p, self.unit_tiles) for p in self.broken + self.parts}
+        return sorted(set(self.todo) | hurt)
+
+
+def unit_of(path, unit_tiles):
+    """Which work unit a tile path belongs to. The inverse of `tile_path`."""
+    x, y = int(path.parent.name), int(path.name.split(".")[0])
+    return x // unit_tiles, y // unit_tiles
+
+
+def readable_tile(path):
+    """Does this file decode to a tile a browser will draw?
+
+    A full decode rather than a header read, because the failure worth finding
+    is truncation and a truncated WebP carries an intact header. Writes go to
+    `.part` and rename, so this should never fire — which is the reason it is
+    worth asking. ~5 ms a tile, so a whole level is a minute or two."""
+    try:
+        with Image.open(path) as image:
+            image.load()
+            return image.size == (TILE_PX, TILE_PX)
+    except Exception:
+        # Anything Pillow raises on is an image the app cannot draw. Which of
+        # its half-dozen exception types it was does not change the repair.
+        return False
+
+
+def check_level(out, project, coverage, z, unit_tiles=DEFAULT_UNIT_TILES,
+                progress=None):
+    """Read one level of one acquisition off disk and tally it against the mask.
+
+    The markers are the authority on what should be there, not the mask alone: a
+    unit the footprint merely clips can legitimately hold no tile at all, and
+    only the marker separates that from a unit that never ran."""
+    out = Path(out)
+    result = LevelCheck(z=z, unit_tiles=unit_tiles)
+    units = coverage.units(z, unit_tiles)
+    result.units = len(units)
+
+    marked = marked_units(out, project, z)
+    # A marker for a unit the footprint does not reach: the mask was rebuilt, or
+    # --unit-tiles changed between runs. Harmless in itself, but it means marker
+    # and mask no longer describe the same division of the ground.
+    result.stray = sorted(marked - set(units))
+
+    for seen, (ux, uy) in enumerate(units, 1):
+        if progress:
+            progress(seen, len(units))
+        if (ux, uy) not in marked:
+            result.todo.append((ux, uy))
+            continue
+        here = 0
+        for path in unit_tile_paths(out, z, ux, uy, unit_tiles):
+            part = path.with_suffix(".webp.part")
+            if part.exists():
+                result.parts.append(part)
+            if not path.exists():
+                continue
+            here += 1
+            result.bytes += path.stat().st_size
+            if not readable_tile(path):
+                result.broken.append(path)
+        result.tiles += here
+        # A finished unit holding nothing is the footprint clipping its corner,
+        # and normal at the edge. Every unit empty is the wrong-project trap.
+        if here == 0:
+            result.empty += 1
+    result.done = len(units) - len(result.todo)
+    return result
+
+
+def unmark(out, project, z, units, unit_tiles=DEFAULT_UNIT_TILES):
+    """Hand these units back to the build. Their tiles go first: a rebuild that
+    decides a tile is all-NaN writes nothing there, so a broken file left in
+    place would outlive the repair meant to clear it."""
+    marks = marker_dir(out, project, z)
+    for ux, uy in units:
+        for path in unit_tile_paths(out, z, ux, uy, unit_tiles):
+            path.unlink(missing_ok=True)
+            path.with_suffix(".webp.part").unlink(missing_ok=True)
+        (marks / f"{ux}_{uy}").unlink(missing_ok=True)
+
+
+def store_tiles(out, z):
+    """Every tile on disk at this level, whoever wrote it. The namespace is
+    shared, so this is the one figure that is about the store rather than about
+    a single acquisition."""
+    found = set()
+    level = Path(out) / str(z)
+    if not level.is_dir():
+        return found
+    for column in level.iterdir():
+        if not column.is_dir():
+            continue
+        try:
+            x = int(column.name)
+        except ValueError:
+            continue
+        for tile in column.glob("*.webp"):
+            try:
+                found.add((x, int(tile.stem)))
+            except ValueError:
+                continue
+    return found
+
+
+def tiles_under(units, unit_tiles):
+    """The tile coordinates a set of work units covers."""
+    return {
+        (ux * unit_tiles + i, uy * unit_tiles + j)
+        for ux, uy in units
+        for j in range(unit_tiles)
+        for i in range(unit_tiles)
+    }

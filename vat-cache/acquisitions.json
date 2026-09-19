@@ -1,0 +1,56 @@
+{
+  "method": "Ranked on the register this app is read against, not on area. Archaeological lokaliteter only - lokalitetskategori = L-ARK on geonorge's Kulturminner WFS, counted per 5 km cell with resultType=hits and weighted by that cell's covered fraction of the footprint union, so the figure is lokaliteter inside the acquisition rather than inside its envelope. README.md records the two traps the raw count walks into.",
+  "acquisitions": [
+    {
+      "name": "Viken laser - Østfold 5pkt del1 2022",
+      "coverage_km2": 997,
+      "lokaliteter": 6460,
+      "per_km2": 6.48
+    },
+    {
+      "name": "NDH Østfold 5pkt 2015",
+      "coverage_km2": 1154,
+      "lokaliteter": 6610,
+      "per_km2": 5.72,
+      "overlaps": ["Viken laser - Østfold 5pkt del1 2022"],
+      "note": "Shares 648 km² with del1 2022: two vintages of one landscape, and only one belongs in a store whose tiles share a namespace."
+    },
+    {
+      "name": "Hedmarken 5pkt del1 2025",
+      "coverage_km2": 856,
+      "lokaliteter": 4060,
+      "per_km2": 4.74
+    },
+    {
+      "name": "Viken laser - Østfold 5pkt del2 2022",
+      "coverage_km2": 571,
+      "lokaliteter": 2620,
+      "per_km2": 4.59
+    },
+    {
+      "name": "NDH Jæren-Randaberg-Sola 5pkt 2017",
+      "coverage_km2": 1088,
+      "lokaliteter": 4470,
+      "per_km2": 4.11
+    },
+    {
+      "name": "Vestfold 10pkt 2025",
+      "coverage_km2": 905,
+      "lokaliteter": 3710,
+      "per_km2": 4.1
+    },
+    {
+      "name": "Vestfold og Telemark 5pkt 2021",
+      "coverage_km2": 1106,
+      "lokaliteter": 3610,
+      "per_km2": 3.26,
+      "note": "The fixture acquisition: every measured figure in WORK-ORDER.md was taken over this ground."
+    },
+    {
+      "name": "Viken laser - Romerike 5pkt 2022",
+      "coverage_km2": 845,
+      "lokaliteter": 1730,
+      "per_km2": 2.05
+    }
+  ]
+}

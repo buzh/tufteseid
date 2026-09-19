@@ -1,6 +1,6 @@
 // The cached ground: RVT's combined VAT — hillshade, slope, positive openness
 // and sky-view in one picture — precomputed over whole LiDAR acquisitions and
-// written to disk as plain tiles. `vat-cache/build_tiles.py` made them and
+// written to disk as plain tiles. `vat-cache/vatcache.py` made them and
 // `/cvat/manifest.json` beside them states the presets, the blend order, the
 // radii per level, the digest of the run and — the part this module reads at
 // runtime — which acquisitions are in the store and at which levels.

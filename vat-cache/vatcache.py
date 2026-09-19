@@ -1,0 +1,467 @@
+"""The cached cVAT ground, from the command line.
+
+    .venv/bin/python vatcache.py -l                 what is worth building, and
+                                                    what the store already holds
+    .venv/bin/python vatcache.py -l -v              with the figures behind it
+    .venv/bin/python vatcache.py -l --all østfold   everything Kartverket flew
+    .venv/bin/python vatcache.py -g 3               build acquisition 3
+    .venv/bin/python vatcache.py -c                 audit the whole store
+    .venv/bin/python vatcache.py -c 3               audit one acquisition
+    .venv/bin/python vatcache.py -c 3 -g            audit it, then repair it
+
+An acquisition is named by its position in the list `-l` prints, which is the
+committed shortlist in `acquisitions.json` followed by anything the store holds
+that is not on it. Naming one thing picks the footprint, the mask, the DEM
+request and the marker directory together, which is the point: the one mistake
+this batch could make silently was pairing a mask with the wrong project, and an
+index cannot make it.
+
+`--out` is the store — the directory docker-compose bind-mounts read-only into
+the Caddy container at /var/www/cvat. Masks are derived on first use and live
+beside this script as `coverage-<slug>.npz`.
+"""
+
+import argparse
+import json
+import sys
+import time
+from pathlib import Path
+
+import acquisitions
+import build_tiles
+import coverage as coverage_mod
+
+# Where the store is on the server that serves it. README.md and
+# docker-compose.yml both name this path; --out is for a copy somewhere else.
+DEFAULT_STORE = "/site/tufteseid/data/cvat"
+
+# -g and -c both take an optional index, and "given without one" has to be told
+# apart from "not given at all" — argparse spends None on the latter.
+BARE = -1
+
+
+# ---------------------------------------------------------------------------
+# The list
+# ---------------------------------------------------------------------------
+
+
+def read_manifest(out):
+    path = Path(out) / "manifest.json"
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text())
+    except ValueError as err:
+        print(f"warning: {path} does not parse ({err})", file=sys.stderr)
+        return {}
+
+
+def store_levels(manifest):
+    """Acquisition name to the levels the manifest says are built for it.
+
+    Reads the same block `parseStore` in cvatGround.ts reads, plus the shape a
+    store held when it carried exactly one acquisition."""
+    block = manifest.get("acquisitions")
+    if isinstance(block, dict):
+        return {
+            name: sorted((entry or {}).get("levels", []), reverse=True)
+            for name, entry in block.items()
+        }
+    if "acquisition" in manifest:
+        levels = sorted((int(z) for z in manifest.get("levels", {})), reverse=True)
+        return {manifest["acquisition"]: levels}
+    return {}
+
+
+def catalogue(out):
+    """The numbered list. The shortlist in its committed order, then whatever
+    else the store holds — an acquisition somebody built off-list still has to
+    be reachable by index, or it can be neither checked nor extended."""
+    rows = [dict(row, listed=True) for row in acquisitions.shortlist()]
+    known = {row["name"] for row in rows}
+    for name in sorted(store_levels(read_manifest(out))):
+        if name not in known:
+            rows.append({"name": name, "listed": False})
+    for i, row in enumerate(rows, 1):
+        row["index"] = i
+    return rows
+
+
+def pick(rows, index):
+    if index is None or index == BARE:
+        return None
+    if not 1 <= index <= len(rows):
+        sys.exit(f"no acquisition {index}; the list runs 1..{len(rows)}. Try -l")
+    return rows[index - 1]
+
+
+def spaced(n):
+    """1 106, the way the figures are written in the README and the docs."""
+    return f"{n:,}".replace(",", " ")
+
+
+def plural(n, one, many=None):
+    return f"{spaced(n)} {one if n == 1 else (many or one + 's')}"
+
+
+def size(nbytes):
+    """A store runs to hundreds of megabytes per level; a pilot to a handful."""
+    return (f"{nbytes / 1e9:.2f} GB" if nbytes >= 1e9
+            else f"{nbytes / 1e6:.1f} MB")
+
+
+def level_range(levels):
+    """z15–z12 when the ladder is whole, the levels one by one when it is not —
+    a gap in the middle is the thing worth seeing."""
+    if not levels:
+        return "—"
+    if len(levels) == 1:
+        return f"z{levels[0]}"
+    if len(levels) == max(levels) - min(levels) + 1:
+        return f"z{max(levels)}–z{min(levels)}"
+    return ", ".join(f"z{z}" for z in sorted(levels, reverse=True))
+
+
+def do_list(out, rows, verbose, pattern):
+    built = store_levels(read_manifest(out))
+    names_cat = names_wms = None
+    if verbose:
+        print("asking hoydedata.no and the per-project WMS what they publish…")
+        names_cat = acquisitions.catalogue_names()
+        names_wms = acquisitions.wms_names()
+        print()
+
+    width = max(len(row["name"]) for row in rows)
+    if not verbose:
+        print(f"  #  {'acquisition'.ljust(width)}  /km²  in store")
+    for row in rows:
+        name = row["name"]
+        levels = built.get(name, [])
+        if not verbose:
+            rank = f"{row['per_km2']:.2f}" if row.get("per_km2") else "   —"
+            print(f" {row['index']:2}  {name.ljust(width)}  {rank}  "
+                  f"{level_range(levels)}")
+            continue
+
+        print(f" {row['index']:2}  {name}")
+        if row.get("listed"):
+            print(f"     rank     {row['per_km2']:.2f} lokaliteter/km² — "
+                  f"{spaced(row['coverage_km2'])} km², "
+                  f"~{spaced(row['lokaliteter'])} arkeologiske")
+        else:
+            print("     rank     not on the shortlist; found in the store")
+        print(f"     store    {level_range(levels)}")
+        # Off the markers, so there is no total to divide by: deriving a mask
+        # to get one would turn listing the acquisitions into building them.
+        counts = {
+            z: len(build_tiles.marked_units(out, name, z))
+            for z in build_tiles.DEFAULT_LEVELS
+        }
+        marks = ", ".join(f"z{z} {spaced(n)}" for z, n in counts.items() if n)
+        print(f"     units    {marks or '—'}")
+        mask = coverage_mod.mask_file(name)
+        print(f"     mask     {mask.name if mask.exists() else '— (derived on --get)'}")
+        # Both name sets have to carry the acquisition verbatim, and they fail
+        # differently: missing from hoydedata is nothing to render, missing from
+        # the WMS is tiles the app never asks for.
+        print(f"     names    hoydedata {'ok' if name in names_cat else 'MISSING'}"
+              f"  ·  wms {'ok' if name in names_wms else 'MISSING'}")
+        for other in row.get("overlaps", []):
+            state = "in the store" if other in built else "not built"
+            print(f"     overlaps {other} ({state})")
+        if row.get("note"):
+            print(f"     note     {row['note']}")
+        print()
+
+    if pattern is None:
+        return
+    every = sorted(acquisitions.catalogue_names())
+    hits = [n for n in every if pattern.casefold() in n.casefold()]
+    title = f"matching {pattern!r}" if pattern else "in the catalogue"
+    print(f"\n{len(hits)} of {len(every)} acquisitions {title}:")
+    for name in hits:
+        print(f"     {name}{'  ← ' + level_range(built[name]) if name in built else ''}")
+    print("\nTo build one of these, add it to acquisitions.json with its rank.")
+
+
+# ---------------------------------------------------------------------------
+# Building
+# ---------------------------------------------------------------------------
+
+
+def mask_for(project):
+    """The acquisition's footprint, derived on first use."""
+    path = coverage_mod.load_or_build(project)
+    mask = build_tiles.Coverage(path)
+    # Masks written before the stamp existed name no acquisition, so nothing
+    # can tell whether this one is of the right ground. Deriving it again is
+    # minutes, and the alternative is a run that fetches somewhere else.
+    if mask.project is None:
+        sys.exit(
+            f"{path.name} carries no acquisition name, so it cannot be checked "
+            f"against {project!r}.\nDelete it and the next run derives one: "
+            f"rm {path}"
+        )
+    return mask
+
+
+def do_get(out, row, args):
+    project = row["name"]
+    built = store_levels(read_manifest(out))
+    # Tiles share one namespace, so two acquisitions over the same ground
+    # overwrite each other's pixels and neither manifest entry is then true of
+    # what is on disk. The shortlist records which pairs do this.
+    clashes = [o for o in row.get("overlaps", []) if o in built]
+    if clashes and not args.force:
+        sys.exit(
+            f"{project} overlaps {', '.join(clashes)}, already in the store.\n"
+            "Their tiles would contend for the same <z>/<x>/<y>, and a tile "
+            "carries no provenance to tell them apart.\nDrop one, or pass "
+            "--force if the overlap is not where you are building."
+        )
+    build_tiles.build(
+        out,
+        project,
+        mask_for(project),
+        levels=args.levels,
+        unit_tiles=args.unit_tiles,
+        jobs=args.jobs,
+        limit=args.limit,
+        dry_run=args.dry_run,
+        force=args.force,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Checking, and repairing what the check found
+# ---------------------------------------------------------------------------
+
+
+def ticker(z):
+    """A progress line for the scan. A level is tens of thousands of decodes,
+    which is long enough that silence reads as a hang."""
+    last = [0.0]
+
+    def tick(seen, total):
+        now = time.perf_counter()
+        if now - last[0] < 0.5 and seen < total:
+            return
+        last[0] = now
+        print(f"\r  z{z} scanning {seen}/{total} units…", end="", flush=True)
+
+    return tick
+
+
+def check_acquisition(out, project, levels, unit_tiles, verbose):
+    """Every named level of one acquisition, printed as it goes."""
+    mask = mask_for(project)
+    print(f"{project}")
+    reports = []
+    for z in levels:
+        result = build_tiles.check_level(
+            out, project, mask, z, unit_tiles, progress=ticker(z)
+        )
+        reports.append(result)
+        state = "ok" if result.ok else "INCOMPLETE"
+        print(f"\r  z{z}  {result.done}/{result.units} units, "
+              f"{spaced(result.tiles)} tiles, {size(result.bytes)}   {state}"
+              + " " * 16)
+        if result.todo:
+            print(f"        {plural(len(result.todo), 'unit')} never built")
+        if result.broken:
+            print(f"        {plural(len(result.broken), 'tile does', 'tiles do')} "
+                  "not decode")
+        if result.parts:
+            print(f"        {plural(len(result.parts), 'half-written .part file')}")
+        if result.stray:
+            print(f"        {plural(len(result.stray), 'marker')} outside the "
+                  "footprint (mask or --unit-tiles changed since)")
+        # Some empty units are the footprint clipping a corner. All of them is
+        # the fetch having been pinned to ground the acquisition never flew.
+        if result.empty and result.empty == result.done:
+            print("        every finished unit is empty — the mask and the DEM "
+                  "are of different ground")
+        elif result.empty:
+            print(f"        {plural(result.empty, 'finished unit holds', 'finished units hold')}"
+                  " no tile (footprint edge)")
+        if verbose:
+            for unit in result.todo[:40]:
+                print(f"          todo   {unit[0]}_{unit[1]}")
+            for path in result.broken[:40]:
+                print(f"          broken {path}")
+            for path in result.parts[:40]:
+                print(f"          part   {path}")
+    return reports
+
+
+def do_check(out, row, args):
+    """Audit one acquisition, or the whole store when none is named."""
+    manifest = read_manifest(out)
+    if row is None and not manifest:
+        sys.exit(f"no manifest in {out}; there is no store here to check.")
+
+    if row is not None:
+        projects = [row["name"]]
+    else:
+        projects = sorted(store_levels(manifest))
+        print(f"{out}  manifest {manifest.get('digest', '—')}  "
+              f"{plural(len(projects), 'acquisition')}\n")
+        if not projects:
+            sys.exit("the manifest names no acquisition, so there is nothing "
+                     "here to check against a footprint.")
+    check_names(projects)
+
+    found = {}
+    for project in projects:
+        reports = check_acquisition(
+            out, project, args.levels, args.unit_tiles, args.verbose
+        )
+        found[project] = reports
+        print()
+
+    if row is None:
+        report_orphans(out, projects, args.levels, args.unit_tiles)
+
+    hurt = {
+        project: {r.z: r.repairable for r in reports if r.repairable}
+        for project, reports in found.items()
+    }
+    hurt = {p: levels for p, levels in hurt.items() if levels}
+    if not hurt:
+        print("nothing missing.")
+        return
+    total = sum(len(u) for levels in hurt.values() for u in levels.values())
+    if not args.fix:
+        print(f"{plural(total, 'work unit')} to (re)build. Add --get to fix.")
+        return
+    # A repair clears the unit before rebuilding it, so a dry run would be all
+    # of the destruction and none of the repair.
+    if args.dry_run:
+        print(f"{plural(total, 'work unit')} to (re)build. Drop --dry-run to fix.")
+        return
+
+    print(f"repairing {plural(total, 'work unit')}.\n")
+    for project, levels in hurt.items():
+        for z, units in levels.items():
+            build_tiles.unmark(out, project, z, units, args.unit_tiles)
+        build_tiles.build(
+            out,
+            project,
+            mask_for(project),
+            levels=sorted(levels, reverse=True),
+            unit_tiles=args.unit_tiles,
+            jobs=args.jobs,
+            # Not forced. A repair run whose recipe has drifted from the store's
+            # would fill the holes with pixels the rest of the level is not made
+            # of, which is the one thing the digest exists to stop.
+            force=args.force,
+        )
+
+
+def check_names(projects):
+    """Whether the store's acquisitions are still names the app can join on."""
+    cat, wms = acquisitions.catalogue_names(), acquisitions.wms_names()
+    for project in projects:
+        if project not in cat:
+            print(f"  {project}: not in hoydedata.no's catalogue — nothing here "
+                  "can be rebuilt or extended")
+        if project not in wms:
+            print(f"  {project}: not a layer prefix in the per-project WMS — the "
+                  "app drops it and never asks for its tiles")
+    if all(p in cat and p in wms for p in projects):
+        print("  every acquisition is published by both the catalogue and the WMS")
+    print()
+
+
+def report_orphans(out, projects, levels, unit_tiles):
+    """Tiles nobody claims. Only answerable across the whole store: a tile
+    outside one acquisition's units may well be inside another's."""
+    for z in levels:
+        on_disk = build_tiles.store_tiles(out, z)
+        if not on_disk:
+            continue
+        claimed = set()
+        for project in projects:
+            claimed |= build_tiles.tiles_under(
+                build_tiles.marked_units(out, project, z), unit_tiles
+            )
+        orphans = on_disk - claimed
+        if orphans:
+            sample = ", ".join(f"{x}/{y}" for x, y in sorted(orphans)[:5])
+            print(f"z{z}: {plural(len(orphans), 'tile belongs', 'tiles belong')} to "
+                  f"no finished unit of any acquisition in the manifest "
+                  f"({sample}…)")
+
+
+# ---------------------------------------------------------------------------
+
+
+def main():
+    p = argparse.ArgumentParser(
+        prog="vatcache",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("-l", "--list", action="store_true",
+                   help="the acquisitions, numbered, and what the store holds")
+    p.add_argument("--all", nargs="?", const="", metavar="PATTERN",
+                   help="with -l, also every acquisition hoydedata.no carries, "
+                        "optionally filtered by substring")
+    p.add_argument("-v", "--verbose", action="store_true",
+                   help="the figures behind the list; for -c, name every unit")
+    p.add_argument("-g", "--get", nargs="?", type=int, const=BARE, metavar="N",
+                   help="build acquisition N. Bare, alongside -c, it repairs "
+                        "whatever the check found")
+    p.add_argument("-c", "--check", nargs="?", type=int, const=BARE, metavar="N",
+                   help="verify the tiles of acquisition N, or of the whole "
+                        "store when N is left off")
+    p.add_argument("-o", "--out", default=DEFAULT_STORE, metavar="DIR",
+                   help=f"the tile store (default {DEFAULT_STORE})")
+    p.add_argument("--levels", default=",".join(str(z) for z in build_tiles.DEFAULT_LEVELS),
+                   help="zoom levels, coarsest last")
+    p.add_argument("--unit-tiles", type=int, default=build_tiles.DEFAULT_UNIT_TILES,
+                   help="tiles along one side of a work unit")
+    p.add_argument("--jobs", type=int, default=1,
+                   help="units in parallel; every one is a fetch, so be kind")
+    p.add_argument("--limit", type=int,
+                   help="stop after this many unbuilt units, for a pilot; run it "
+                        "twice and it does the next batch, not the same one")
+    p.add_argument("--dry-run", action="store_true", help="count units and stop")
+    p.add_argument("--force", action="store_true",
+                   help="build into a store whose manifest disagrees, or over an "
+                        "acquisition the shortlist says overlaps a built one")
+    args = p.parse_args()
+
+    if args.get is None and args.check is None and not (args.list or args.all is not None):
+        p.print_help()
+        return
+
+    args.levels = [int(z) for z in args.levels.split(",")]
+    rows = catalogue(args.out)
+
+    if args.list or args.all is not None:
+        do_list(args.out, rows, args.verbose, args.all)
+        if args.get is None and args.check is None:
+            return
+        print()
+
+    # One index between them. -c 3 -g and -c -g 3 are the same request; naming
+    # two different ones is not a request at all.
+    if args.get not in (None, BARE) and args.check not in (None, BARE) \
+            and args.get != args.check:
+        sys.exit(f"--get {args.get} and --check {args.check} name different "
+                 "acquisitions; there is only one to act on.")
+    index = args.get if args.get not in (None, BARE) else args.check
+    row = pick(rows, index)
+    args.fix = args.get is not None
+
+    if args.check is not None:
+        do_check(args.out, row, args)
+    elif row is None:
+        sys.exit("--get needs the number of an acquisition. Try -l")
+    else:
+        do_get(args.out, row, args)
+
+
+if __name__ == "__main__":
+    main()
