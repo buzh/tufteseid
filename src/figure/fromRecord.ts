@@ -121,6 +121,14 @@ const groundLabel = (layer: BackgroundLayerName | null, hybrid: boolean) =>
 // Grounds whose credit line has to name NiB as well as Kartverket.
 const NIB_GROUNDS = new Set<BackgroundLayerName>(['flyfoto', 'flyfotoProject']);
 
+// Relief Kartverket's own WMS shaded, as against the cached ground below,
+// which was shaded here. Either way the pixels are Kartverket's height data;
+// the role on the rights line is which of us visualised it.
+const LIDAR_WMS_GROUNDS = new Set<BackgroundLayerName>([
+  'lidarHillshade',
+  'lidarProject',
+]);
+
 /**
  * The heritage overlay's settings, re-read. Absent, malformed or at its
  * defaults all come back undefined, which is the same thing on the plate.
@@ -165,9 +173,15 @@ const screenshotSpec = (
           right: groundLabel(layerB, compare.hybrid === true),
         })
       : groundLabel(layer, hybrid),
+    // Either side of a comparison puts its ground in the file, so each flag is
+    // the union: the plate describes the pixels, not the left half of them.
     groundIsFlyfoto:
       (layer != null && NIB_GROUNDS.has(layer)) ||
       (layerB != null && NIB_GROUNDS.has(layerB)),
+    groundIsLidarWms:
+      (layer != null && LIDAR_WMS_GROUNDS.has(layer)) ||
+      (layerB != null && LIDAR_WMS_GROUNDS.has(layerB)),
+    groundIsCvat: layer === 'lidarCvat' || layerB === 'lidarCvat',
     themeLayers,
     // Missing on records written before the field existed, and false is the
     // safe reading: it credits nobody the pixels do not owe.

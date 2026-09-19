@@ -64,6 +64,19 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   level, so the four levels are related pictures of the same terrain rather
   than one picture at four sizes: the reach of the visualization grows as you
   zoom out, and the tooltip says so.
+- It is the one ground whose relief nobody upstream computed, so it is the one
+  that has to say where it came from. The dataset chip's tooltip names the
+  acquisition beside the label; a kartutsnitt taken over it carries the
+  acquisition on its provenance plate, the renderer, the template, the blend
+  stack, the combine and the pixel radii, and credits Kartverket under
+  `høydedata` rather than `skyggerelieff` — the height values are theirs, the
+  picture is not. The constants the plate prints live beside the layer config in
+  `cvatGround.ts` (`CVAT_RENDERER`, `CVAT_TEMPLATE`, `CVAT_STACK`,
+  `CVAT_AZIMUTH`, `CVAT_SUN_ALTITUDE`, `CVAT_RADIUS_PX`,
+  `CVAT_GENERAL_OPACITY`), transcribed from the manifest rather than fetched
+  from it: a downloaded figure travels off this host. Rebuilding the store under
+  changed parameters — a new digest in the manifest — means editing that block
+  too.
 - Its coverage needs no polygon. The layer's `extent` is the store's envelope
   (185.6 × 102.9 km) and culls everything outside; inside it the 94 % that were
   never written answer 404, OpenLayers marks those tiles errored and leaves

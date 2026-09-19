@@ -46,6 +46,12 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
       ? lidar.activeLidarProject.projectName
       : t('ribbon.lidar.nationalMosaic');
 
+  // The chip is one line wide, so the acquisition only fits in its tooltip —
+  // and the cached ground is the one dataset whose label does not name it.
+  const datasetTitle = lidar.isLidarCvat
+    ? `${datasetLabel} · ${CVAT_ACQUISITION_ID}`
+    : datasetLabel;
+
   // The glyph for "Automatisk landed here", each row deciding for itself
   // whether it is the one showing.
   const autoMark = (showing: boolean | undefined) =>
@@ -92,10 +98,10 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
             leftIcon={autoDataset ? AUTO_ICON : undefined}
             title={
               autoDataset
-                ? t('ribbon.lidar.autoChipTip', { dataset: datasetLabel })
+                ? t('ribbon.lidar.autoChipTip', { dataset: datasetTitle })
                 : lidar.isLidarCvat
-                  ? `${datasetLabel} — ${t('ribbon.lidar.cvatHint')}`
-                  : datasetLabel
+                  ? `${datasetTitle} — ${t('ribbon.lidar.cvatHint')}`
+                  : datasetTitle
             }
             rightIcon={lidar.cyclingPending ? undefined : 'arrow_drop_down'}
             onClick={() => lidar.setPickerOpen(!lidar.pickerOpen)}

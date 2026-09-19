@@ -16,6 +16,16 @@ import {
   type HeritageDetail,
   type HeritageRender,
 } from '../map/layers/heritage';
+import {
+  CVAT_ACQUISITION_ID,
+  CVAT_AZIMUTH,
+  CVAT_GENERAL_OPACITY,
+  CVAT_RADIUS_PX,
+  CVAT_RENDERER,
+  CVAT_STACK,
+  CVAT_SUN_ALTITUDE,
+  CVAT_TEMPLATE,
+} from '../map/layers/config/backgroundLayers/cvatGround';
 import { lidarStyleLabel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { themeLayerName } from '../map/layers/themeLayerConfigApi';
 import { DEM_MARGIN_M, type DemModel } from '../terrain/dem';
@@ -30,6 +40,7 @@ import {
   VAT_STACK,
   VAT_Z_FACTOR,
   vatDecimation,
+  type VatStackLayer,
   type VatTerrain,
   type Visualization,
 } from '../terrain/shade';
@@ -170,14 +181,16 @@ export type TerrainFigureInput = Common & {
  * Assembled from VAT_STACK rather than written out, because a hand-written
  * legend is one edit away from describing a blend the code no longer performs.
  */
-const vatStack = (): string =>
-  VAT_STACK.map((layer) =>
-    t('figure.set.vatLayer', {
-      vis: t(`localities.terrain.vis.${layer.vis}`),
-      blend: t(`figure.blend.${layer.blend}`),
-      opacity: layer.opacity,
-    }),
-  ).join(' + ');
+const vatStack = (stack: readonly VatStackLayer[]): string =>
+  stack
+    .map((layer) =>
+      t('figure.set.vatLayer', {
+        vis: t(`localities.terrain.vis.${layer.vis}`),
+        blend: t(`figure.blend.${layer.blend}`),
+        opacity: layer.opacity,
+      }),
+    )
+    .join(' + ');
 
 /**
  * One terrain preset's seven numbers. The stack above is the same on every VAT
@@ -274,7 +287,7 @@ const terrainSettings = ({
     // are inside the two preset lines, because each belongs to one of them.
     case 'vat':
       settings.push(
-        t('figure.set.vatStack', { stack: vatStack() }),
+        t('figure.set.vatStack', { stack: vatStack(VAT_STACK) }),
         t('figure.set.vatCombined', {
           general: vatPreset('general'),
           flat: vatPreset('flat'),
@@ -523,6 +536,14 @@ export type ScreenshotFigureInput = Common & {
   groundLabel: string;
   /** Whether the ground came from NiB rather than Kartverket. */
   groundIsFlyfoto: boolean;
+  /** Whether the ground was relief Kartverket's own WMS handed back shaded. */
+  groundIsLidarWms: boolean;
+  /**
+   * Whether the ground was the cached cVAT. The one ground in the picture that
+   * nobody upstream visualised, so it is the one that has to name its
+   * acquisition, its renderer and its parameters.
+   */
+  groundIsCvat: boolean;
   /** Theme layer ids; `themeLayerName` resolves each to its published name. */
   themeLayers: string[];
   /**
@@ -579,11 +600,35 @@ export const describeHeritageRender = (
   return joinDot(parts);
 };
 
+/**
+ * How the cached ground was made, for a shot taken over it. The one ground the
+ * app can describe this closely: it holds the acquisition and the parameters as
+ * constants, because it built the pixels rather than asking a service for them.
+ * The stretches are not printed — the template names them, and `cvatGround.ts`
+ * says where the full set lives.
+ */
+const cvatSettings = (): string[] => [
+  t('figure.set.cvat', { renderer: CVAT_RENDERER, template: CVAT_TEMPLATE }),
+  t('figure.set.vatStack', { stack: vatStack(CVAT_STACK) }),
+  t('figure.set.cvatCombined', {
+    pct: CVAT_GENERAL_OPACITY,
+    generalAlt: CVAT_SUN_ALTITUDE.general,
+    flatAlt: CVAT_SUN_ALTITUDE.flat,
+  }),
+  t('figure.set.azimuth', { deg: CVAT_AZIMUTH }),
+  t('figure.set.cvatRadii', {
+    general: CVAT_RADIUS_PX.general,
+    flat: CVAT_RADIUS_PX.flat,
+  }),
+];
+
 export const screenshotFigure = ({
   subject,
   author,
   groundLabel,
   groundIsFlyfoto,
+  groundIsLidarWms,
+  groundIsCvat,
   themeLayers,
   composed,
   heritageRender,
@@ -594,24 +639,43 @@ export const screenshotFigure = ({
 }: ScreenshotFigureInput): FigureSpec => ({
   title: titleOf(subject, t('figure.title.screenshot')),
   source: joinDot([t('figure.source.map'), groundLabel]),
-  acquisition: themeLayers.length
-    ? t('figure.acq.overlays', {
-        layers: themeLayers
-          .map((id) => themeLayerName(id, language))
-          .join(', '),
-      })
-    : undefined,
+  // The cached ground is the only one of these the app can name an acquisition
+  // for: a LiDAR or ortofoto ground is whatever the ring was on and the record
+  // keeps only the mode, but there is exactly one cVAT store and the layer
+  // config holds its name.
+  acquisition:
+    joinDot([
+      groundIsCvat
+        ? t('figure.acq.project', { name: CVAT_ACQUISITION_ID })
+        : null,
+      themeLayers.length
+        ? t('figure.acq.overlays', {
+            layers: themeLayers
+              .map((id) => themeLayerName(id, language))
+              .join(', '),
+          })
+        : null,
+    ]) || undefined,
   settings: [
     t('figure.set.composite'),
+    ...(groundIsCvat ? cvatSettings() : []),
     ...(heritageRender ? [heritageRender] : []),
   ],
   metresPerPx,
   bbox25833,
   rotation,
   // Kartverket is always in there: the topo base under every LiDAR and
-  // per-project ortofoto stack, and the whole picture in Kart mode.
+  // per-project ortofoto stack, and the whole picture in Kart mode. Which role
+  // it is credited under is the statement about who did the visualising —
+  // `skyggerelieff` where the LiDAR WMS handed back a shaded image,
+  // `høydedata` under the cached ground, whose relief was computed here from
+  // the height values.
   credits: dedupeCredits([
     source(ROLE.kart, CREDITS.kartverket),
+    ...(groundIsLidarWms
+      ? [source(ROLE.skyggerelieff, CREDITS.hoydedata)]
+      : []),
+    ...(groundIsCvat ? [source(ROLE.hoydedata, CREDITS.hoydedata)] : []),
     ...(groundIsFlyfoto ? [source(ROLE.ortofoto, CREDITS.nib)] : []),
     ...(themeLayers.length
       ? [source(ROLE.kulturminner, CREDITS.riksantikvaren)]

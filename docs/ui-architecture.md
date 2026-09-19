@@ -678,7 +678,12 @@ image downloaded alone and inside a bundle is the same file.
 - Rights has two halves. Upstream is credited by the part it plays in *this*
   picture — the same holder is `høydedata` under a terrain render and
   `skyggerelieff` under a LiDAR extract, and that difference is precisely the
-  statement about who did the visualising. Where the app made the picture rather
+  statement about who did the visualising. A kartutsnitt applies the same rule
+  to whichever ground was under it: `skyggerelieff` where Kartverket's WMS
+  handed the relief back shaded, `høydedata` over **Arkeologisk relieff**, whose
+  pixels were computed here — and that shot also names the acquisition and the
+  RVT parameters in its settings row, since it is the one ground the app can
+  describe that closely. Where the app made the picture rather
   than fetching it whole — a terrain render, a skisse, an Oppsett, a kartutsnitt
   with something drawn over it — the lokalitet's owner and Tufteseid are named
   as co-authors. `authorOf` takes that name from `creditOf(locality)`: the

@@ -660,6 +660,17 @@ export const vatDecimation = (
 };
 
 /**
+ * One layer of a VAT blend. Named because the cached ground (`cvatGround.ts`)
+ * describes its own stack in the same vocabulary, and the legend prints both
+ * through `figure.set.vatLayer`.
+ */
+export type VatStackLayer = {
+  vis: Visualization;
+  blend: 'normal' | 'luminosity' | 'overlay' | 'multiply';
+  opacity: number;
+};
+
+/**
  * What `composeVat` blends, as data, for the figure legend to read. The
  * compositor does not consume it — four lines of arithmetic read better written
  * out than driven off a table — so the two have to move together, and this
@@ -678,11 +689,7 @@ export const vatDecimation = (
  * 40 % of the composite's local contrast, which is most of what makes a low
  * bank visible at all.
  */
-export const VAT_STACK: readonly {
-  vis: Visualization;
-  blend: 'normal' | 'luminosity' | 'overlay' | 'multiply';
-  opacity: number;
-}[] = [
+export const VAT_STACK: readonly VatStackLayer[] = [
   { vis: 'hillshade', blend: 'normal', opacity: 100 },
   { vis: 'slope', blend: 'luminosity', opacity: 50 },
   { vis: 'openPos', blend: 'overlay', opacity: 100 },
