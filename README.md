@@ -60,6 +60,13 @@ Kartverket's Norgeskart. Map and elevation data come from Kartverket and
 Geonorge, heritage data from Riksantikvaren; nothing you find here has
 been vetted by any of them.
 
+The **Arkeologisk relieff** background is the one picture this project
+computes rather than fetches: relief visualizations made with the Relief
+Visualization Toolbox from Kartverket's LiDAR terrain model and stored as
+tiles ([`vat-cache/`](vat-cache/README.md)). The elevation data behind it
+stays Kartverket's, on Kartverket's licence. The store is optional — an
+install without it simply shows the national mosaic there.
+
 MIT — see [`LICENCE`](LICENCE). Upstream copyright by Statens Kartverk
 (The Norwegian Mapping Authority) is preserved as required. Web
 services from Kartverket and Riksantikvaren are subject to their own

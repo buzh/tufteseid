@@ -13,6 +13,9 @@ export type WMSLayerName =
 // mosaic and /wms/ortofoto_prosjekter 403s, so this is an ArcGIS ImageServer.
 export type ArcGISImageLayerName = 'flyfotoProject';
 
+// Our own cached ground: a plain tile store on disk, not a service.
+export type XYZLayerName = 'lidarCvat';
+
 export type EmptyLayerName = 'empty';
 
 // Each name is the WMTS identifier Kartverket's cache is asked for.
@@ -20,4 +23,8 @@ export type WMTSLayerName =
   'topo' | 'topograatone' | 'toporaster' | 'sjokartraster';
 
 export type BackgroundLayerName =
-  WMTSLayerName | WMSLayerName | ArcGISImageLayerName | EmptyLayerName;
+  | WMTSLayerName
+  | WMSLayerName
+  | ArcGISImageLayerName
+  | XYZLayerName
+  | EmptyLayerName;

@@ -27,8 +27,11 @@ OUT=/site/tufteseid/data/cvat
 
 `--out` is the store `docker-compose.yml` bind-mounts read-only into the Caddy
 container at `/var/www/cvat`, which is under Caddy's root — so a tile written
-here is served at `/cvat/<z>/<x>/<y>.webp` without a route of its own. Nothing
-in the app asks for one yet; registering the ground is a later task.
+here is served at `/cvat/<z>/<x>/<y>.webp` without a route of its own. The app
+asks for them as **Arkeologisk relieff**, a dataset in the LiDAR ring
+(`src/map/layers/config/backgroundLayers/cvatGround.ts`, `docs/map-layers.md`);
+an install without the store answers 404 for every tile, which is exactly what
+a hole in coverage looks like, so the faded national mosaic shows instead.
 
 `--no-deps` is not optional: rvt-py declares gdal, rasterio, geopandas and
 jupyter for an IO layer none of this uses.

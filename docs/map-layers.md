@@ -28,6 +28,7 @@ from there.
 |---|---|---|---|
 | LiDAR | `lidarHillshade` (national mosaic) | `/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833` (prefix `NHM_DTM_TOPOBATHY_25833`), DOM: `wms.hoyde-dom-nhm-25833` (`NHM_DOM_25833`) | Automatisk / national / per-project |
 | LiDAR | `lidarProject` (0.25 m per acquisition) | `/wms/geonorge/wms.hoyde-dtm-prosjekt`, DOM: `wms.hoyde-dom-prosjekt`; `LAYERS=<project id>:<style>` | same ring |
+| LiDAR | `lidarCvat` (**Arkeologisk relieff**, one acquisition, precomputed) | `/cvat/{z}/{x}/{y}.webp` — our own tile store, served off disk, no service behind it | same ring |
 | Analyse | — | `/arcgis/hoydedata/*`, see `docs/terrain-analysis.md` | the visualization list |
 | Kart | `topo`, `topograatone`, `toporaster`, `sjokartraster` (WMTS) | `cache.kartverket.no/v1/service` GetCapabilities, one document for all four | the five `KART_VARIANTS` |
 | Kart → Amtskart | `amtskart` (WMS, `LAYERS=amt1`, 1:200 000) | `/wms/geonorge/wms.historiskekart` | same ring |
@@ -37,8 +38,8 @@ from there.
 
 Configs live in `src/map/layers/config/backgroundLayers/`: `kvCache.ts` (WMTS
 cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
-`elevation.ts` + `lidarProjects.ts`, `topoOverlay.ts`, `flyfotoBackground.ts`.
-Name unions are in `src/map/layers/backgroundLayers.ts`.
+`elevation.ts` + `lidarProjects.ts`, `cvatGround.ts`, `topoOverlay.ts`,
+`flyfotoBackground.ts`. Name unions are in `src/map/layers/backgroundLayers.ts`.
 
 ### Service facts
 
@@ -53,6 +54,28 @@ Name unions are in `src/map/layers/backgroundLayers.ts`.
   (`helning_prosent`) fails silently: HTTP 200, `Content-Type: image/png`, a
   ~100-byte JSON body, a blank map. `?lidarModel=dom` persists the choice,
   absent means DTM, and the LiDAR extract is DTM-only.
+- `lidarCvat` is not a service. `vat-cache/build_tiles.py` runs RVT over one
+  acquisition's DTM and writes the combined VAT — hillshade, slope, positive
+  openness, sky-view in one picture — as 512 px RGBA WebP on the app's own tile
+  grid, z15 (0.661 m/px) to z12 (5.289 m/px), with `/cvat/manifest.json` beside
+  the tiles recording presets, blend order, per-level radii and the run's
+  digest. Caddy's `file_server` serves the bind-mounted store, so there is no
+  proxy route, no wmscache entry and no CSP host. Radii are RVT pixels at every
+  level, so the four levels are related pictures of the same terrain rather
+  than one picture at four sizes: the reach of the visualization grows as you
+  zoom out, and the tooltip says so.
+- Its coverage needs no polygon. The layer's `extent` is the store's envelope
+  (185.6 × 102.9 km) and culls everything outside; inside it the 94 % that were
+  never written answer 404, OpenLayers marks those tiles errored and leaves
+  them transparent, and the faded national mosaic underneath shows through.
+  `maxResolution` hides the layer one step coarser than z12 rather than letting
+  OL clamp and ask for four screenfuls to upscale.
+- `CVAT_ACQUISITION_ID` (`cvatGround.ts`) is byte-identical to the
+  `LidarProject.id` the per-project WMS publishes, so `chooseAutoDataset` tests
+  the footprint against the viewport ranking it already has and `Behold`
+  stitches the acquisition's own WMS — DTM, `skyggerelieff` — with no name
+  mapping and no second coverage source. There is one acquisition, hence a
+  constant; with two the list comes off the manifest.
 - Hybrid's `LAYERS` is always the five reference groups
   `kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,fkb_presentasjonsdata` —
   the generalized `kd_*` groups stop around 1:25 000 and the `fkb_*` ones take
@@ -88,11 +111,14 @@ A ground is never one layer. `resolveStack` / `buildStack`
 (`config/backgroundLayers/stack.ts`) build one, bottom-first:
 
 1. a topo base for everything in `NEEDS_TOPO_BASE` (`lidarProject`,
-   `lidarHillshade`, `flyfotoProject`, `amtskart` — all return transparent PNGs
-   outside coverage);
+   `lidarHillshade`, `lidarCvat`, `flyfotoProject`, `amtskart` — all leave the
+   ground outside coverage transparent);
 2. a seamless fallback at `FALLBACK_OPACITY` when a per-project dataset is
-   active — the national mosaic under `lidarProject`, the best-available
-   ortofoto mosaic under `flyfotoProject`;
+   active — the national mosaic under `lidarProject` and under `lidarCvat`, the
+   best-available ortofoto mosaic under `flyfotoProject`. The LiDAR fallback is
+   always `skyggerelieff`, and under the cached ground always DTM: that ground
+   has no model toggle, so a held DOM would fill its holes with a surface
+   mosaic nobody could turn off;
 3. the active dataset;
 4. the topo overlay, in hybrid.
 
@@ -229,9 +255,13 @@ stedsnavn with its place, kommune and matrikkel fields filled.
 
 ## Recipe: add a background layer
 
-1. Add the id to `WMTSLayerName`, `WMSLayerName` or `ArcGISImageLayerName`
-   (`src/map/layers/backgroundLayers.ts`); the matching discriminant is the
-   `type` field on `BackgroundLayer` in `config/backgroundLayers/types.ts`.
+1. Add the id to `WMTSLayerName`, `WMSLayerName`, `ArcGISImageLayerName` or
+   `XYZLayerName` (`src/map/layers/backgroundLayers.ts`); the matching
+   discriminant is the `type` field on `BackgroundLayer` in
+   `config/backgroundLayers/types.ts`. A fourth type also needs a builder and a
+   `layerSignature` arm in `utils.ts` — without the signature every dataset
+   cycle rebuilds the layer instead of reusing it, and a ground already drawn
+   flashes.
 2. Create or extend a config in `src/map/layers/config/backgroundLayers/` and
    spread it into `allConfiguredBackgroundLayers` in `stack.ts`.
    `coverageExtent` is mandatory for WMS and ArcGISImage layers —

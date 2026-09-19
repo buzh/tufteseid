@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CVAT_ACQUISITION_ID } from '../../map/layers/config/backgroundLayers/cvatGround';
 import type { LidarViewportEntry } from '../../map/layers/config/backgroundLayers/lidarRelevance';
 import { Button, CountBadge, IconButton, Popover, Spinner } from '../../ui';
 import { PulldownDisclosure, PulldownItem } from '../Pulldown';
@@ -39,16 +40,16 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
 
   const { viewport, allProjects, autoDataset } = lidar;
 
-  const datasetLabel =
-    lidar.isLidarProject && lidar.activeLidarProject
+  const datasetLabel = lidar.isLidarCvat
+    ? t('ribbon.lidar.cvat')
+    : lidar.isLidarProject && lidar.activeLidarProject
       ? lidar.activeLidarProject.projectName
       : t('ribbon.lidar.nationalMosaic');
 
-  const isAutoRow = (projectId: string | null) =>
-    autoDataset &&
-    (projectId == null
-      ? lidar.isNationalMosaic
-      : lidar.isLidarProject && lidar.activeLidarProject?.id === projectId);
+  // The glyph for "Automatisk landed here", each row deciding for itself
+  // whether it is the one showing.
+  const autoMark = (showing: boolean | undefined) =>
+    autoDataset && showing ? AUTO_ICON : undefined;
 
   const renderRow = (entry: LidarViewportEntry) => (
     <PulldownItem
@@ -60,7 +61,10 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
         lidar.isLidarProject &&
         lidar.activeLidarProject?.id === entry.project.id
       }
-      mark={isAutoRow(entry.project.id) ? AUTO_ICON : undefined}
+      mark={autoMark(
+        lidar.isLidarProject &&
+          lidar.activeLidarProject?.id === entry.project.id,
+      )}
       markLabel={t('ribbon.lidar.autoMark')}
       onActivate={() => lidar.activateProject(entry.project)}
       onHover={(hovering) =>
@@ -89,7 +93,9 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
             title={
               autoDataset
                 ? t('ribbon.lidar.autoChipTip', { dataset: datasetLabel })
-                : datasetLabel
+                : lidar.isLidarCvat
+                  ? `${datasetLabel} — ${t('ribbon.lidar.cvatHint')}`
+                  : datasetLabel
             }
             rightIcon={lidar.cyclingPending ? undefined : 'arrow_drop_down'}
             onClick={() => lidar.setPickerOpen(!lidar.pickerOpen)}
@@ -136,9 +142,21 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
         label={t('ribbon.lidar.nationalMosaic')}
         meta={t('ribbon.lidar.nationalMeta')}
         active={!autoDataset && lidar.isNationalMosaic}
-        mark={isAutoRow(null) ? AUTO_ICON : undefined}
+        mark={autoMark(lidar.isNationalMosaic)}
         markLabel={t('ribbon.lidar.autoMark')}
         onActivate={lidar.activateNational}
+      />
+      {/* Ours, not a service: one acquisition, precomputed, on our own disk.
+          Its meta is the acquisition rather than a translated phrase — that is
+          the coverage, and it is the same word in every language. */}
+      <PulldownItem
+        label={t('ribbon.lidar.cvat')}
+        meta={CVAT_ACQUISITION_ID}
+        hint={t('ribbon.lidar.cvatHint')}
+        active={!autoDataset && lidar.isLidarCvat}
+        mark={autoMark(lidar.isLidarCvat)}
+        markLabel={t('ribbon.lidar.autoMark')}
+        onActivate={lidar.activateCvat}
       />
       <div className={styles.rule} />
       <p className={styles.hint}>{t('ribbon.lidar.projectsHint')}</p>

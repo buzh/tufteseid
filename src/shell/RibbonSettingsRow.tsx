@@ -93,11 +93,15 @@ export const RibbonSettingsRow = ({
           {/* Only when the dataset publishes more than one styled variant. */}
           {lidar.datasetStyles.length > 1 && <LidarStylePicker lidar={lidar} />}
           {/* Outside that guard: DOM publishes one style, so the style chip
-              disappears in DOM mode and would take this with it. */}
-          <LidarModelToggle
-            model={lidar.lidarModel}
-            onSelect={lidar.setLidarModel}
-          />
+              disappears in DOM mode and would take this with it. Gone over the
+              cached ground, which is DTM and one visualization — both controls
+              would be levers attached to nothing. */}
+          {!lidar.isLidarCvat && (
+            <LidarModelToggle
+              model={lidar.lidarModel}
+              onSelect={lidar.setLidarModel}
+            />
+          )}
           {/* Keyed on the mode, not the modifiers: contours ride in the hybrid
               overlay's request, absent in plain LiDAR. */}
           {ground.mode === 'hybrid' && (

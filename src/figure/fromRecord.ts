@@ -95,6 +95,9 @@ const GROUND_LABEL_KEY: Record<BackgroundLayerName, string> = {
   empty: 'ribbon.mode.kart',
   lidarHillshade: 'ribbon.mode.lidar',
   lidarProject: 'ribbon.mode.lidar',
+  // Named rather than folded into LiDAR: the pixels are a derived product
+  // computed here, and the legend is the only place the file says so.
+  lidarCvat: 'ribbon.lidar.cvat',
   flyfoto: 'ribbon.mode.flyfoto',
   flyfotoProject: 'ribbon.mode.flyfoto',
   // Never the value of the background atom (hybrid is a modifier), but the

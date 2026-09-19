@@ -6,6 +6,7 @@ import { transformExtent } from 'ol/proj';
 import TileArcGISRest from 'ol/source/TileArcGISRest';
 import TileWMS from 'ol/source/TileWMS';
 import WMTS, { optionsFromCapabilities } from 'ol/source/WMTS';
+import XYZ from 'ol/source/XYZ';
 import { mapAtom } from '../../../atoms';
 import {
   getWMSTileGrid,
@@ -19,6 +20,7 @@ import {
   CoverageExtent,
   WMSBackgroundLayer,
   WMTSBackgroundLayer,
+  XYZBackgroundLayer,
 } from './types';
 
 export const getWMTSLayer = async (
@@ -142,6 +144,47 @@ export const getArcGISImageLayer = (
   });
 };
 
+// A tile store of ours, on the grid it was written on rather than the view's:
+// OL reprojects if a `?projection=` ever puts the view somewhere else.
+export const getXYZLayer = (
+  layerConfig: XYZBackgroundLayer,
+): TileLayer | null => {
+  const store = getDefaultStore();
+  const map = store.get(mapAtom);
+  const viewProjection = map.getView().getProjection().getCode();
+
+  const tileGrid = getWMSTileGrid(
+    layerConfig.projection,
+    layerConfig.minZoom,
+    layerConfig.maxZoom,
+  );
+  // The grid carries the store's origin and levels; without it the tiles would
+  // be asked for on a grid nobody wrote them on.
+  if (!tileGrid) return null;
+
+  const source = new XYZ({
+    url: layerConfig.url,
+    projection: layerConfig.projection,
+    tileGrid,
+    zDirection: WMS_Z_DIRECTION,
+  });
+
+  const extent = toViewExtent(layerConfig.coverageExtent, viewProjection);
+  return new TileLayer({
+    source,
+    properties: { id: `bg.${layerConfig.layerName}` },
+    // One zoom step coarser than the store's own coarsest level and the layer
+    // goes: OL would clamp to that level and ask for four screenfuls of tiles
+    // to upscale, and the faded mosaic underneath is the better picture there.
+    maxResolution: tileGrid.getResolution(layerConfig.minZoom) * 2,
+    // Static files off our own disk, so preloading a level either side of the
+    // one on screen costs nothing and takes the blank out of a zoom step.
+    preload: 2,
+    cacheSize: WMS_TILE_CACHE_SIZE,
+    ...(extent ? { extent } : {}),
+  });
+};
+
 export const getLayerFromConfig = async (
   layerConfig: BackgroundLayer,
   projection?: string,
@@ -154,6 +197,9 @@ export const getLayerFromConfig = async (
   }
   if (layerConfig.type === 'ArcGISImage') {
     return getArcGISImageLayer(layerConfig);
+  }
+  if (layerConfig.type === 'XYZ') {
+    return getXYZLayer(layerConfig);
   }
   console.warn(`Unsupported layer type for layerconfig: ${layerConfig}`);
   return null;
@@ -183,6 +229,9 @@ const layerSignature = (
     const params = JSON.stringify(config.params);
     return `arcgis|${config.url}|${params}|${projection}`;
   }
+  // Without this arm every dataset cycle rebuilds the layer rather than
+  // reusing it, and a cached ground that is already drawn flashes.
+  if (config.type === 'XYZ') return `xyz|${config.url}|${projection}`;
   return null;
 };
 

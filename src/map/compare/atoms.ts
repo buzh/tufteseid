@@ -45,6 +45,7 @@ export const compareSplitAtom = atom(0.5);
 // ground before React re-renders with the focus switch.
 const groundLayer = (
   ground: CompareGround,
+  seeded: BackgroundLayerName,
   kartVariant: KartVariant,
   lidarProject: LidarProject | null,
   flyfotoProject: FlyfotoProject | null,
@@ -54,6 +55,10 @@ const groundLayer = (
   if (ground === 'flyfoto') {
     return flyfotoProject ? 'flyfotoProject' : 'flyfoto';
   }
+  // `seeded` is A's layer, already copied over: entering the curtain on the
+  // cached ground keeps it, rather than dropping to the WMS dataset A was not
+  // showing. The two WMS datasets are still chosen by whether one is held.
+  if (seeded === 'lidarCvat') return 'lidarCvat';
   return lidarProject ? 'lidarProject' : 'lidarHillshade';
 };
 
@@ -70,6 +75,7 @@ export const enterCompareAtom = atom(
       backgroundLayerHalves.b,
       groundLayer(
         ground,
+        get(backgroundLayerHalves.b),
         get(kartVariantHalves.b),
         get(activeLidarProjectHalves.b),
         get(activeFlyfotoProjectHalves.b),

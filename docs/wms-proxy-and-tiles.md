@@ -34,6 +34,12 @@ would want the WMS host's `/skwms1/`, and both ArcGIS upstreams `/arcgis/`.
 to `/?lok=<code>`; `file_server` has no SPA fallback, so any other unknown path
 still 404s.
 
+`/cvat/<z>/<x>/<y>.webp` is not in the table because nothing proxies it: the
+tile store is bind-mounted read-only at `/var/www/cvat`, under Caddy's root, so
+`file_server` serves it with no route, no wmscache entry and no CSP host. The
+404 on a tile that was never written is load-bearing — it is the coverage mask
+(`docs/map-layers.md`).
+
 ## Cache rules (wmscache)
 
 `nginx/wms-cache.conf` holds the cache zone, the `$skip_cache` map and one
@@ -154,11 +160,15 @@ is fewer requests.
 - One tile queue per `Map`, shared by every layer: `maxTilesLoading: 48`
   (`src/map/atoms.ts`) against OL's default 16, capped to 8 while animating. A
   cold LiDAR WMS tile takes 3–12 s; the topo WMTS base answers in ~130 ms.
-- `preload: 2` on the WMTS base, `preload: 0` on WMS, ArcGISImage and theme
-  layers — free on a pre-rendered base, ruinous on an on-the-fly renderer.
+- `preload: 2` on the WMTS base and on the cached cVAT ground, `preload: 0` on
+  WMS, ArcGISImage and theme layers — free on a pre-rendered base or on files
+  off our own disk, ruinous on an on-the-fly renderer.
 - 512 px tiles for every `TileWMS`, background and theme, from an explicit
   `TileGrid` on the View's own resolution ladder
-  (`src/map/layers/wmsTileGrid.ts`), so tiles never resample. At 256 px a
+  (`src/map/layers/wmsTileGrid.ts`), so tiles never resample. `getWMSTileGrid`
+  takes an optional level range for a store holding only some levels — the
+  cached ground passes z12–z15 — and still hands over the whole resolution
+  array, indexed by absolute z, fenced by `minZoom` and the array's end. At 256 px a
   1600×1000 viewport is ~35 tiles per layer per level, and LiDAR project mode
   stacks two WMS layers: 70 requests a zoom step, two steps to the limiter.
   Bytes are a wash, 146 060 for one 512 px hillshade tile against 4 × ~36 800.

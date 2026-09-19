@@ -1,8 +1,10 @@
-// "Automatisk": the viewport chooses between the national mosaic (seamless 1 m)
-// and a per-acquisition project (0.25 m, with holes). It only decides, writing
-// through the same selectNational / selectProject.
+// "Automatisk": the viewport chooses between the national mosaic (seamless 1 m),
+// a per-acquisition project (0.25 m, with holes) and our own cached ground. It
+// only decides, writing through the same selectNational / selectProject /
+// selectCvat.
 
 import { halved } from '../../../compare/halves';
+import { CVAT_ACQUISITION_ID } from './cvatGround';
 import type { LidarProject } from './lidarProjects';
 import type { LidarViewportState } from './lidarRelevance';
 
@@ -23,9 +25,15 @@ export const AUTO_RELEASE_M_PER_PX = 2;
 export const AUTO_ENGAGE_COVERAGE = 0.5;
 export const AUTO_RELEASE_COVERAGE = 0.35;
 
-export type LidarAutoChoice =
+/** Which dataset is drawing, spelled out: a bare `LidarProject | null` cannot
+ *  say "this acquisition, from the cache". */
+export type LidarDataset =
   | { kind: 'national' }
   | { kind: 'project'; project: LidarProject }
+  | { kind: 'cvat' };
+
+export type LidarAutoChoice =
+  | LidarDataset
   // Coverage still loading, or a hysteresis band: leave the dataset alone.
   | { kind: 'hold' };
 
@@ -36,9 +44,9 @@ export const chooseAutoDataset = ({
 }: {
   resolution: number | null;
   viewport: LidarViewportState;
-  // The active project, or null for the mosaic. Not activeLidarProjectAtom:
-  // selecting the mosaic leaves that holding the last project.
-  current: LidarProject | null;
+  // What is drawing now. Not activeLidarProjectAtom: selecting the mosaic
+  // leaves that holding the last project.
+  current: LidarDataset;
 }): LidarAutoChoice => {
   if (resolution == null) return { kind: 'hold' };
   if (resolution > AUTO_RELEASE_M_PER_PX) return { kind: 'national' };
@@ -48,14 +56,31 @@ export const chooseAutoDataset = ({
   if (viewport.status === 'zoomedOut') return { kind: 'national' };
   if (viewport.status !== 'ready') return { kind: 'hold' };
 
-  // Keep the incumbent while it still owns a fair share of the screen, or
-  // panning along a seam reshuffles the ranking every few hundred metres.
-  if (current) {
-    const held = viewport.primary.find((e) => e.project.id === current.id);
-    if (held && held.areaRatio >= AUTO_RELEASE_COVERAGE) {
+  const ratioOf = (id: string): number =>
+    viewport.primary.find((e) => e.project.id === id)?.areaRatio ?? 0;
+  const cvatRatio = ratioOf(CVAT_ACQUISITION_ID);
+
+  // The cache and the same acquisition's WMS are one ground, so hysteresis is
+  // about the acquisition and not about which of the two is drawing it: a
+  // project incumbent that *is* the cached acquisition moves to the cache once
+  // and then holds there, rather than flapping between the two.
+  const holdsCvat =
+    current.kind === 'cvat' ||
+    (current.kind === 'project' && current.project.id === CVAT_ACQUISITION_ID);
+  if (holdsCvat) {
+    if (cvatRatio >= AUTO_RELEASE_COVERAGE) return { kind: 'cvat' };
+  } else if (current.kind === 'project') {
+    // Keep the incumbent while it still owns a fair share of the screen, or
+    // panning along a seam reshuffles the ranking every few hundred metres.
+    if (ratioOf(current.project.id) >= AUTO_RELEASE_COVERAGE) {
       return { kind: 'hold' };
     }
   }
+
+  // Inside the footprint the cache wins outright, even against a newer or
+  // denser acquisition that would rank above it: it is the better picture, it
+  // is on our own disk, and it spares a rate-limited upstream.
+  if (cvatRatio >= AUTO_ENGAGE_COVERAGE) return { kind: 'cvat' };
 
   // The top of the list the pulldown would show; anything cleverer disagrees.
   const best = viewport.primary[0];

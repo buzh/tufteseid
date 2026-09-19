@@ -1,5 +1,6 @@
 import TileLayer from 'ol/layer/Tile';
 import { BackgroundLayerName } from '../../backgroundLayers';
+import { CVAT_GROUND_CONFIG } from './cvatGround';
 import { buildNationalLidarConfig } from './elevation';
 import {
   buildFlyfotoProjectConfig,
@@ -32,15 +33,19 @@ import { buildOrReuseBackgroundLayer, LayerNamespace } from './utils';
 const NEEDS_TOPO_BASE = new Set<BackgroundLayerName>([
   'lidarProject',
   'lidarHillshade',
+  'lidarCvat',
   'flyfotoProject',
   'amtskart',
 ]);
 
 // Which layers the LiDAR modifiers mean anything for — not NEEDS_TOPO_BASE,
-// which also holds flyfotoProject.
+// which also holds flyfotoProject. The cached ground is in it because the
+// hybrid overlay and its contours mean the same thing over relief however the
+// relief was computed.
 export const LIDAR_LAYERS = new Set<BackgroundLayerName>([
   'lidarProject',
   'lidarHillshade',
+  'lidarCvat',
 ]);
 
 // How far the layer under a per-project dataset is dimmed.
@@ -57,6 +62,9 @@ export const allConfiguredBackgroundLayers = [
   emptyBackgroundLayer,
   ...KvCacheBackgroundLayers,
   AMTSKART_CONFIG,
+  // Static, not a `pickLayerConfig` branch: the source is one URL on our own
+  // disk, not a runtime choice of acquisition or style.
+  CVAT_GROUND_CONFIG,
 ];
 
 const buildLidarProjectConfig = (
@@ -144,14 +152,19 @@ export const resolveStack = (
     if (topo) under.push({ config: topo, opacity: 1 });
   }
 
-  // The seamless product of the same kind goes under a per-project dataset,
-  // faded. The LiDAR fallback is fixed to skyggerelieff, the mosaic's only one.
+  // The seamless product of the same kind goes under a dataset that has holes,
+  // faded. The LiDAR fallback is fixed to skyggerelieff, the mosaic's only one —
+  // and to DTM under the cached ground, which was computed from terrain and has
+  // no model toggle on the bar: a held DOM would put a surface mosaic in the
+  // holes with no way to say otherwise.
   const fallback =
     layerName === 'lidarProject'
       ? buildNationalLidarConfig(DEFAULT_LIDAR_PROJECT_STYLE, opts.lidarModel)
-      : layerName === 'flyfotoProject'
-        ? FLYFOTO_MOSAIC_CONFIG
-        : null;
+      : layerName === 'lidarCvat'
+        ? buildNationalLidarConfig(DEFAULT_LIDAR_PROJECT_STYLE, 'dtm')
+        : layerName === 'flyfotoProject'
+          ? FLYFOTO_MOSAIC_CONFIG
+          : null;
   if (fallback) under.push({ config: fallback, opacity: FALLBACK_OPACITY });
 
   // Only over terrain: on the topo map it redraws the base's roads and names.

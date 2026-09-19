@@ -5,6 +5,7 @@ import {
   EmptyLayerName,
   WMSLayerName,
   WMTSLayerName,
+  XYZLayerName,
 } from '../../backgroundLayers';
 
 // Where a layer actually has data. Set as the layer's `extent` so OL culls
@@ -52,6 +53,22 @@ export type ArcGISImageBackgroundLayer = BackgroundLayerBase & {
   coverageExtent?: CoverageExtent;
 };
 
+// A tile store addressed by {z}/{x}/{y} rather than a service asked to render:
+// no capabilities, no params, and only the levels somebody wrote.
+export type XYZBackgroundLayer = BackgroundLayerBase & {
+  type: 'XYZ';
+  layerName: XYZLayerName;
+  /** Template with `{z}`, `{x}` and `{y}`. */
+  url: string;
+  /** The grid the tiles were written on, whatever the view is set to. */
+  projection: ProjectionIdentifier;
+  /** The levels the store holds, inclusive; outside them nothing is asked for.
+   *  Absolute z on that grid, not an offset. */
+  minZoom: number;
+  maxZoom: number;
+  coverageExtent?: CoverageExtent;
+};
+
 export type EmptyBackgroundLayer = BackgroundLayerBase & {
   type: 'Empty';
   layerName: EmptyLayerName;
@@ -61,4 +78,5 @@ export type BackgroundLayer =
   | WMTSBackgroundLayer
   | WMSBackgroundLayer
   | ArcGISImageBackgroundLayer
+  | XYZBackgroundLayer
   | EmptyBackgroundLayer;

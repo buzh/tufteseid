@@ -684,6 +684,8 @@
       "autoChipTip": "{{dataset}} — chosen automatically for this view. Pick a dataset from the list to pin it.",
       "nationalMosaic": "National mosaic",
       "nationalMeta": "all of Norway",
+      "cvat": "Archaeological relief",
+      "cvatHint": "Precomputed archaeological relief over a single LiDAR acquisition. The reach of the computation grows as you zoom out, so the four levels are related pictures of the same terrain.",
       "projectsHint": "Projects, most coverage first. Hover for outline.",
       "loadingCatalogue": "Loading catalogue…",
       "loadingFootprints": "Loading outlines…",

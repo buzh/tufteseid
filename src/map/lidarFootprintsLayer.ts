@@ -118,7 +118,9 @@ export const useLidarFootprintsLayer = () => {
   const setHoveredProjectId = useSetAtom(hoveredLidarProjectIdAtom);
 
   const isLidarBackground =
-    backgroundLayer === 'lidarProject' || backgroundLayer === 'lidarHillshade';
+    backgroundLayer === 'lidarProject' ||
+    backgroundLayer === 'lidarHillshade' ||
+    backgroundLayer === 'lidarCvat';
   // Both, because the atom can be left true if the popover unmounts without
   // closing itself (which is why useGroundMode calls standDown).
   const picking = isLidarBackground && pickerOpen;

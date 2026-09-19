@@ -20,7 +20,10 @@ import { clearBackgroundLayer, swapBackgroundLayers } from './utils';
 
 // Startup values the URL parameter may name. Not `lidarProject` or
 // `flyfotoProject`: their acquisition atom starts null, so a cold load into
-// either renders nothing.
+// either renders nothing. `lidarCvat` is in it because its source does not
+// start null — a cold load is honest, the cache where it reaches and the faded
+// mosaic and topo elsewhere, so a shared link to a lokalitet in Vestfold opens
+// on the ground it was read on.
 const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'topo',
   'topograatone',
@@ -28,6 +31,7 @@ const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'sjokartraster',
   'amtskart',
   'lidarHillshade',
+  'lidarCvat',
   'flyfoto',
   'empty',
 ]);
