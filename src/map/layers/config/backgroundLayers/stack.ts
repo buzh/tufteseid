@@ -14,6 +14,7 @@ import {
   LidarModel,
   LidarProject,
   LIDAR_PROJECT_WMS_URL,
+  wmsLidarStyle,
 } from './lidarProjects';
 import { buildTopoOverlayConfig } from './topoOverlay';
 import {
@@ -73,7 +74,10 @@ const buildLidarProjectConfig = (
   layerName: 'lidarProject',
   url: LIDAR_PROJECT_WMS_URL[model],
   props: {
-    LAYERS: `${project.id}:${style}`,
+    // `wmsLidarStyle`, because `cvat` is a render of this flight that no
+    // service publishes: a stack that arrived here holding it would ask for a
+    // layer name the WMS answers with a JSON error body and a blank tile.
+    LAYERS: `${project.id}:${wmsLidarStyle(style)}`,
     VERSION: '1.3.0',
   },
   // The acquisition's own footprint: the service advertises every project.

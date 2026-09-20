@@ -182,7 +182,7 @@ buttons positional.
 
 | Ground | Strip |
 | --- | --- |
-| LiDAR | dataset pulldown (Automatisk / national mosaic / Arkeologisk relieff / per project) · style pulldown · DTM/DOM |
+| LiDAR | dataset pulldown (Automatisk / national mosaic / per project) · style pulldown (the WMS styles, plus Arkeologisk relieff where it is cached) · DTM/DOM |
 | Analyse | Visualisering pulldown (eight) · DTM/DOM · 2–4 sliders · resolution readout |
 | Kart | none; the Karttype pulldown hangs off the button. `KART_VARIANTS` = Topografisk, Gråtone, Rasterkart, Sjøkart, Amtskart |
 | Hybrid | the same, plus Høydekurver |
@@ -197,28 +197,26 @@ Ground-specific facts worth keeping:
   `chooseAutoDataset`): engages a per-project dataset at ≤1 m/px
   (`AUTO_ENGAGE_M_PER_PX`), releases above 2 m/px; engages at >50% on-screen
   coverage, releases below 35%. The candidate is `viewport.primary[0]`;
-  `moveend` is debounced 250 ms. Inside a cached acquisition — the best-covered
-  one, ranked off the same viewport list the projects are — the cache wins
-  outright, even over a newer or denser acquisition ranked above it:
-  it is the better picture, it is on our own disk, and it spares a rate-limited
-  upstream. The cache and that acquisition's WMS count as *one* incumbent for
-  the release band, so Automatisk moves to the cache once and holds rather than
-  flapping between the two forms of the same ground.
-- Arkeologisk relieff (`lidarCvat`) is a dataset in the LiDAR ring, not a style
-  and not a ground of its own. It is one precomputed visualization of a whole
-  acquisition (`docs/map-layers.md`), so the style pulldown and DTM/DOM leave
-  the strip while it is showing and A/D and E decline: both would be levers
-  attached to nothing. `Behold` still stitches from the acquisition's own WMS,
-  DTM and `skyggerelieff`, because the hidden levers must not decide an extract
-  nobody can see them set.
-- The store holds several acquisitions and grows without a deploy, so the
-  pulldown lists one Arkeologisk relieff row per cached acquisition the
-  viewport touches — usually one, and off cached ground none at all. The rows
-  share a label, so the meta line carries the acquisition and the share of the
-  screen it paints. Hovering one draws its footprint like a project row.
-  Unlike the project list the rows are not tiered: the cache is scarce and
-  deliberately built, so any of it on screen is worth offering even at the
-  sliver of coverage that would demote a project.
+  `moveend` is debounced 250 ms. It decides flights only — our cached renders
+  are not candidates, because they are not datasets — and writes through the
+  same `selectNational` / `selectProject` a click does.
+- Arkeologisk relieff (`lidarCvat`) is a *render* of a flight, the tier
+  Kartverket's `skyggerelieff` sits in, not a dataset beside the flight it was
+  computed from. So it is an entry in the style pulldown and on the A/D ring —
+  first in the list, where the store holds the flight showing — and the dataset
+  pulldown gives each flight one row whichever of its two renders is drawing.
+  Picking it moves the ground to the cache and picking any other style moves it
+  back to the WMS; `selectStyle` / `selectModel` re-name the ground for it, so
+  the name and the render cannot disagree. E is a legitimate move off it: the
+  cache was computed from terrain, so DOM lands on the flight's DOM WMS. What
+  the strip shows is unchanged by the cache — the style pulldown and DTM/DOM
+  are on the bar in LiDAR mode, full stop. `Behold` stitches the flight's own
+  WMS asked for `skyggerelieff` (`stitchStyle`, via `wmsLidarStyle`), because
+  the cache has no service behind it to stitch from.
+- The store grows without a deploy, and nothing in the UI enumerates it: what
+  it holds shows up as a `cvat` entry on whichever flights it has rendered,
+  read off the manifest at load. The dataset chip's tooltip names the render
+  beside the flight, since the chip is one line wide.
 - Sammenlign: `halved(initial)` returns `{a, b, focused}`, and only four things
   know about halves — `backgroundLayerAtomEffect` (pinned `.a`),
   `compareLayerAtomEffect` (pinned `.b`), the screenshot's `meta.compare`, the
@@ -788,11 +786,12 @@ Choose what the terrain looks like
 - Hold X to peek at the previous ground, release to snap back.
 - Draw Kart as five cartographies: topographic, greyscale, scanned paper,
   nautical chart, amtskart over a modern base.
-- Pick the national LiDAR mosaic, a precomputed Arkeologisk relieff acquisition
-  covering the view, or any per-project dataset.
+- Pick the national LiDAR mosaic or any per-project dataset covering the view.
 - See datasets ranked by viewport relevance, and expand to the rest.
 - Preview a project's footprint on hover.
 - Pick a render style, and expand to the full style list.
+- Read a project off the precomputed Arkeologisk relieff where we hold it,
+  as the first entry in that list.
 - Switch DTM / DOM.
 - Draw contour lines over the hybrid overlay.
 - Pick the ortofoto mosaic or any historical acquisition over the view.

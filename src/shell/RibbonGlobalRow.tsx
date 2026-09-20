@@ -100,7 +100,9 @@ export const RibbonGlobalRow = () => {
   // gap. A dataset name except under terrain, which carries a callback.
   const setBeholdOffer = useSetAtom(beholdOfferAtom);
   // Destructured: the control objects are fresh every render.
-  const { activeLidarSource, shownStyle } = lidar;
+  // `stitchStyle`, not `shownStyle`: over a cached render the offer is of the
+  // flight's own WMS, which does not publish `cvat`.
+  const { activeLidarSource, stitchStyle } = lidar;
   const { describe: terrainDescribe, beholdKey: terrainKey } = terrain;
   const flyfotoProject = flyfoto.activeProject;
   useEffect(() => {
@@ -110,7 +112,7 @@ export const RibbonGlobalRow = () => {
         offer = {
           ground: 'lidar',
           source: activeLidarSource,
-          style: shownStyle,
+          style: stitchStyle,
         };
         break;
       case 'flyfoto':
@@ -133,7 +135,7 @@ export const RibbonGlobalRow = () => {
   }, [
     groundMode,
     activeLidarSource,
-    shownStyle,
+    stitchStyle,
     flyfotoProject,
     terrainKey,
     terrainDescribe,

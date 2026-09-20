@@ -27,8 +27,8 @@ from there.
 | Ground | Layer name(s) | Service / prefix | Dataset ring (W/S) |
 |---|---|---|---|
 | LiDAR | `lidarHillshade` (national mosaic) | `/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833` (prefix `NHM_DTM_TOPOBATHY_25833`), DOM: `wms.hoyde-dom-nhm-25833` (`NHM_DOM_25833`) | Automatisk / national / per-project |
-| LiDAR | `lidarProject` (0.25 m per acquisition) | `/wms/geonorge/wms.hoyde-dtm-prosjekt`, DOM: `wms.hoyde-dom-prosjekt`; `LAYERS=<project id>:<style>` | same ring |
-| LiDAR | `lidarCvat` (**Arkeologisk relieff**, one row per cached acquisition, precomputed) | `/cvat/<acquisition>/{z}/{x}/{y}.webp` — our own tile store, served off disk, no service behind it | same ring |
+| LiDAR | `lidarProject` (0.25 m per acquisition, rendered by the WMS) | `/wms/geonorge/wms.hoyde-dtm-prosjekt`, DOM: `wms.hoyde-dom-prosjekt`; `LAYERS=<project id>:<style>` | same ring |
+| LiDAR | `lidarCvat` (the same acquisition, rendered by us: **Arkeologisk relieff**) | `/cvat/<acquisition>/{z}/{x}/{y}.webp` — our own tile store, served off disk, no service behind it | not on it — it is the `cvat` entry of the style ring (A/D) |
 | Analyse | — | `/arcgis/hoydedata/*`, see `docs/terrain-analysis.md` | the visualization list |
 | Kart | `topo`, `topograatone`, `toporaster`, `sjokartraster` (WMTS) | `cache.kartverket.no/v1/service` GetCapabilities, one document for all four | the five `KART_VARIANTS` |
 | Kart → Amtskart | `amtskart` (WMS, `LAYERS=amt1`, 1:200 000) | `/wms/geonorge/wms.historiskekart` | same ring |
@@ -54,6 +54,18 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   (`helning_prosent`) fails silently: HTTP 200, `Content-Type: image/png`, a
   ~100-byte JSON body, a blank map. `?lidarModel=dom` persists the choice,
   absent means DTM, and the LiDAR extract is DTM-only.
+- **`lidarCvat` is a render of a flight, not a dataset beside one.** The
+  dataset is the acquisition; whether its relief is computed by Kartverket's
+  WMS or by us is the render chosen on it, so `cvat` is a member of the style
+  vocabulary (`CVAT_STYLE`, at the head of `TIER_A_STYLES`) offered by
+  `stylesForFlight()` wherever the store holds that flight, and the two layer
+  names are the two grounds one flight can be drawn under.
+  `lidarFlightGround(style, model)` is the only namer, called by
+  `useLidarControls` and by `compare/atoms.ts`; `wmsLidarStyle()` guards the
+  GetMap so a stray `cvat` can never reach the service. The name is kept as a
+  `BackgroundLayerName` rather than folded into `lidarProject` because the URL,
+  a screenshot's `meta.ground` and the figure plate all read it to say which
+  render made the picture.
 - `lidarCvat` is not a service. `vat-cache/vatcache.py` runs RVT over an
   acquisition's DTM and writes the combined VAT — hillshade, slope, positive
   openness, sky-view in one picture — as 512 px RGBA WebP on the app's own tile
@@ -72,8 +84,11 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   in the store — the manifest's `path`, which is the whole tile template the app
   builds — so a 5 pkt flight from 2021 and a 10 pkt one from 2025 over the same
   landscape are two readings of it, both offered, neither overwriting the other.
-  Auto ranks them by coverage and then by depth: where both cover the view, the
-  one that reaches z16 wins and the other stays in the pulldown.
+  They are two rows because they are two *flights*, ranked against each other by
+  coverage, year and density like any other pair; the store having rendered both
+  adds no row and breaks no tie. Ladder depth is not a tiebreak, because it is
+  not independent of the ranking — z16 exists only where hoydedata publishes a
+  0.25 m DTM, which is where the denser, newer flight already wins.
 - **The store is read at runtime, not compiled in.** `fetchCvatStore()` reads
   `/cvat/manifest.json` once per page load and `resolveCvatAcquisitions()`
   joins its `acquisitions` block to the LiDAR catalogue, so a batch run that
@@ -111,20 +126,24 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   in the sliver where one envelope covers the other's ground.
 - The manifest's acquisition names are byte-identical to the `LidarProject.id`
   the per-project WMS publishes, which is what the whole wiring rests on:
-  `CvatAcquisition` carries the catalogue row itself, so `chooseAutoDataset`
-  ranks the cache off the viewport list it already has, the envelope comes from
-  the same row, and `Behold` stitches that project's own WMS — DTM,
+  `CvatAcquisition` carries the catalogue row itself, so `cvatFor()` joins a
+  chosen flight to its cached render by id alone, the envelope comes from the
+  same row, and `Behold` stitches that project's own WMS — DTM,
   `skyggerelieff` — with no name mapping and no second coverage source. An
   acquisition whose name does not appear verbatim in the per-project WMS
   `GetCapabilities` cannot be wired in at all; `vat-cache/README.md` says so at
   the point where the next one is chosen.
 - Which acquisition is drawing is `activeCvatAcquisitionHalves`
   (`cvatGround.ts`), halved like the LiDAR project and seeded into the compare
-  curtain's B side with it. It starts null, so a cold load into
-  `?backgroundLayer=lidarCvat` draws nothing for a tick — the URL names the
-  layer, not the ground it was over — and then `useLidarControls` takes the
-  acquisition off the footprint ranking, or hands the ground back to the mosaic
-  if none of the cache is on screen.
+  curtain's B side with it. It is written only in lockstep with
+  `activeLidarProjectAtom`, by `selectProject` — the flight is the choice and
+  this follows it, so the two can never name different acquisitions. It starts
+  null, so a cold load into `?backgroundLayer=lidarCvat` draws nothing for a
+  tick — the URL names the render, not the flight it was of. Nothing extra
+  fills it in: Automatisk is on at every cold load, so the footprint ranking
+  names the flight as soon as it lands and `preferredLidarRender()` puts the
+  render back on the cache where the store holds it. Where it does not, the
+  link resolves to that flight's WMS.
 - Hybrid's `LAYERS` is always the five reference groups
   `kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,fkb_presentasjonsdata` —
   the generalized `kd_*` groups stop around 1:25 000 and the `fkb_*` ones take

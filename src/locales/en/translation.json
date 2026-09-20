@@ -701,6 +701,7 @@
       "styleLabel": "Visualization",
       "styleHead": "Visualization",
       "style": {
+        "cvat": "Archaeological relief",
         "skyggerelieff": "Hillshade",
         "multiskyggerelieff": "Multi-directional hillshade",
         "helning_prosent": "Slope in percent",

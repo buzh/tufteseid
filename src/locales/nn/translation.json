@@ -701,6 +701,7 @@
       "styleLabel": "Visingsstil",
       "styleHead": "Visingsstil",
       "style": {
+        "cvat": "Arkeologisk relieff",
         "skyggerelieff": "Skyggerelieff",
         "multiskyggerelieff": "Multiskyggerelieff",
         "helning_prosent": "Helling i prosent",

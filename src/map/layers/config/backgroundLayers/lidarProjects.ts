@@ -55,6 +55,16 @@ export const LIDAR_COVERAGE_EXTENT_25833: [number, number, number, number] = [
 ];
 export const DEFAULT_LIDAR_PROJECT_STYLE = 'skyggerelieff';
 
+/**
+ * Our own cached VAT, as a member of the style vocabulary.
+ *
+ * It is not a WMS style and no service publishes it — it is a rendering of a
+ * flight, the same role `skyggerelieff` plays when Kartverket's WMS renders
+ * one, and it belongs in the same tier. `cvatGround.ts` owns the pixels;
+ * everything here is about where the choice sits.
+ */
+export const CVAT_STYLE = 'cvat';
+
 // Every DOM layer publishes skyggerelieff and the excluded
 // dynamisk_farget_hoyde, so a constant rather than a second caps fetch.
 const DOM_STYLES = [DEFAULT_LIDAR_PROJECT_STYLE];
@@ -65,21 +75,52 @@ export const stylesForModel = (
 ): string[] => (model === 'dom' ? DOM_STYLES : styles);
 
 // The style actually requested: asking a DOM layer for one it does not publish
-// fails silently (see resolveLidarStyle), so the model wins.
+// fails silently (see resolveLidarStyle), so the model wins. The cache goes the
+// same way — it was computed from terrain, so DOM leaves it for the WMS.
 export const effectiveLidarStyle = (
   style: string,
   model: LidarModel,
 ): string => (model === 'dom' ? DOM_STYLES[0] : style);
 
+/**
+ * Which of the two flight grounds a render lands on.
+ *
+ * The flight is the dataset; whether its relief comes off our own disk or off
+ * Kartverket's WMS is the render chosen on it, and the layer name is the only
+ * thing that carries which — the URL, a saved screenshot's `meta.ground` and
+ * the figure plate all read it. One namer, because a surface that moved the
+ * style or the model without it would put `cvat` in a GetMap.
+ */
+export const lidarFlightGround = (
+  style: string,
+  model: LidarModel,
+): 'lidarProject' | 'lidarCvat' =>
+  effectiveLidarStyle(style, model) === CVAT_STYLE
+    ? 'lidarCvat'
+    : 'lidarProject';
+
+/**
+ * The style a WMS may be asked for. The cache has no service behind it, so a
+ * stitch of that ground asks the flight's own WMS for the plain hillshade —
+ * the nearest thing upstream has to what is on screen.
+ */
+export const wmsLidarStyle = (style: string): string =>
+  style === CVAT_STYLE ? DEFAULT_LIDAR_PROJECT_STYLE : style;
+
 // Shown first in the style pulldown; anything else sits behind its overflow.
+// The cache leads it where the store has the flight: it is the best picture we
+// have of that ground.
 export const TIER_A_STYLES = [
+  CVAT_STYLE,
   'skyggerelieff',
   'multiskyggerelieff',
   'helning_prosent',
 ];
 
 // The national mosaic publishes only skyggerelieff; asking it for a per-project
-// style answers HTTP 200 image/png with a ~100 byte JSON error body.
+// style answers HTTP 200 image/png with a ~100 byte JSON error body. `cvat` is
+// never in a mosaic's list and only in a flight's where the store holds it, so
+// the same clamp carries a render off the cache onto a ground that has none.
 export const resolveLidarStyle = (
   published: string[],
   preferred: string,
@@ -89,6 +130,24 @@ export const resolveLidarStyle = (
     : (TIER_A_STYLES.find((s) => published.includes(s)) ??
       published[0] ??
       DEFAULT_LIDAR_PROJECT_STYLE);
+
+/**
+ * The clamp above, plus the one upgrade: skyggerelieff is the default nobody
+ * reached for and `cvat` is the same hillshade computed better, so a flight the
+ * store holds is rendered from our own disk. A style the reader did reach for —
+ * a slope, a multi-directional shade — is a different picture and is kept.
+ *
+ * Deliberately not inside `resolveLidarStyle`: recreating a saved View has to
+ * give back the render it recorded, and a View that recorded the WMS hillshade
+ * would come back off the cache instead.
+ */
+export const preferredLidarRender = (
+  published: string[],
+  preferred: string,
+): string =>
+  preferred === DEFAULT_LIDAR_PROJECT_STYLE && published.includes(CVAT_STYLE)
+    ? CVAT_STYLE
+    : resolveLidarStyle(published, preferred);
 
 // Advertised but unusable: `None` renders near-uniform, and
 // `dynamisk_farget_hoyde` ramps per tile, so neighbouring tiles disagree.

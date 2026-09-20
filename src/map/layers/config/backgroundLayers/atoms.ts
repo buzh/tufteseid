@@ -22,10 +22,11 @@ import { clearBackgroundLayer, swapBackgroundLayers } from './utils';
 // Startup values the URL parameter may name. Not `lidarProject` or
 // `flyfotoProject`: their acquisition atom starts null and only the user can
 // fill it, so a cold load into either renders nothing, indefinitely.
-// `lidarCvat` is in it because its acquisition is *derived*: Automatisk is on
-// at startup, so the footprint ranking names the cached acquisition the view is
-// over as soon as it lands, and a shared link to a lokalitet read on the cached
-// ground opens on it.
+// `lidarCvat` is in it because the flight under it is *derived*: Automatisk is
+// on at every cold load, so the footprint ranking names the flight the view is
+// over as soon as it lands, and `resolveLidarStyle` puts the render back on our
+// cache where the store holds it — so a shared link to a lokalitet read on the
+// cached ground opens on it.
 const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'topo',
   'topograatone',

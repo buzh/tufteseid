@@ -7,9 +7,10 @@ import { PulldownDisclosure, PulldownItem } from '../Pulldown';
 import styles from '../Pulldown.module.css';
 import type { LidarControls } from './useLidarControls';
 
-// The styled variants the WMS publishes for the active dataset; the tier-A
-// list is the ring A/D walks, when a bilder rail has not taken A/D. Rendered
-// only when there is more than one style.
+// How the active dataset is rendered: the styles its WMS publishes, plus our
+// own cached VAT at the head of the list where the store holds that flight.
+// The tier-A list is the ring A/D walks, when a bilder rail has not taken A/D.
+// Rendered only when there is more than one render.
 export const LidarStylePicker = ({ lidar }: { lidar: LidarControls }) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);

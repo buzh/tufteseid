@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CvatAcquisition } from '../../map/layers/config/backgroundLayers/cvatGround';
 import type { LidarViewportEntry } from '../../map/layers/config/backgroundLayers/lidarRelevance';
 import { Button, CountBadge, IconButton, Popover, Spinner } from '../../ui';
 import { PulldownDisclosure, PulldownItem } from '../Pulldown';
@@ -27,9 +26,11 @@ const projectMeta = (entry: LidarViewportEntry): string =>
 // icon, so the symbol means the same open or shut.
 const AUTO_ICON = 'bolt';
 
-// The national mosaic, one acquisition, or Automatisk. Under auto the list
-// marks the resolved row but leaves Automatisk the active one: two accented
-// rows would not say which a click undoes.
+// The national mosaic, one flight, or Automatisk. One row per flight: which of
+// its renders is drawing — Kartverket's WMS or our own cache — is the style
+// pulldown's business, not this one's. Under auto the list marks the resolved
+// row but leaves Automatisk the active one: two accented rows would not say
+// which a click undoes.
 export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
   const { t } = useTranslation();
   // Blank inside a lokalitet whose Views have taken W/S: the heading must not
@@ -40,24 +41,20 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
 
   const { viewport, allProjects, autoDataset } = lidar;
 
-  const datasetLabel = lidar.isLidarCvat
-    ? t('ribbon.lidar.cvat')
-    : lidar.isLidarProject && lidar.activeLidarProject
+  const datasetLabel =
+    lidar.isLidarFlight && lidar.activeLidarProject
       ? lidar.activeLidarProject.projectName
       : t('ribbon.lidar.nationalMosaic');
 
-  // The chip is one line wide, so the acquisition only fits in its tooltip —
-  // and the cached ground is the one dataset whose label does not name it.
-  const datasetTitle =
-    lidar.isLidarCvat && lidar.activeCvat
-      ? `${datasetLabel} · ${lidar.activeCvat.project.id}`
-      : datasetLabel;
+  // The chip is one line wide, so that the pixels are ours only fits in the
+  // tooltip.
+  const datasetTitle = lidar.isLidarCvat
+    ? `${datasetLabel} · ${t('ribbon.lidar.cvat')}`
+    : datasetLabel;
 
-  // Whether a cached row is the one drawing. By acquisition, since every one of
-  // them carries the same label.
-  const showingCvat = (acquisition: CvatAcquisition) =>
-    lidar.isLidarCvat &&
-    lidar.activeCvat?.project.id === acquisition.project.id;
+  // Whether a row is the flight drawing, under either of its renders.
+  const showingFlight = (id: string) =>
+    lidar.isLidarFlight && lidar.activeLidarProject?.id === id;
 
   // The glyph for "Automatisk landed here", each row deciding for itself
   // whether it is the one showing.
@@ -69,15 +66,8 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
       key={entry.project.id}
       label={entry.project.projectName}
       meta={projectMeta(entry)}
-      active={
-        !autoDataset &&
-        lidar.isLidarProject &&
-        lidar.activeLidarProject?.id === entry.project.id
-      }
-      mark={autoMark(
-        lidar.isLidarProject &&
-          lidar.activeLidarProject?.id === entry.project.id,
-      )}
+      active={!autoDataset && showingFlight(entry.project.id)}
+      mark={autoMark(showingFlight(entry.project.id))}
       markLabel={t('ribbon.lidar.autoMark')}
       onActivate={() => lidar.activateProject(entry.project)}
       onHover={(hovering) =>
@@ -159,29 +149,6 @@ export const LidarDatasetPicker = ({ lidar }: { lidar: LidarControls }) => {
         markLabel={t('ribbon.lidar.autoMark')}
         onActivate={lidar.activateNational}
       />
-      {/* Ours, not a service: precomputed acquisitions on our own disk, one row
-          each and only for the ones the viewport touches — off cached ground
-          there is nothing here to pick. Every row carries the same label, so
-          the meta is the acquisition and the share of the screen it paints
-          rather than a translated phrase; the acquisition is the coverage, and
-          it is the same word in every language. */}
-      {lidar.cvatEntries.map(({ acquisition, areaRatio }) => (
-        <PulldownItem
-          key={acquisition.project.id}
-          label={t('ribbon.lidar.cvat')}
-          meta={[acquisition.project.id, coverageLabel(areaRatio)]
-            .filter((s): s is string => !!s)
-            .join(' · ')}
-          hint={t('ribbon.lidar.cvatHint')}
-          active={!autoDataset && showingCvat(acquisition)}
-          mark={autoMark(showingCvat(acquisition))}
-          markLabel={t('ribbon.lidar.autoMark')}
-          onActivate={() => lidar.activateCvat(acquisition)}
-          onHover={(hovering) =>
-            lidar.setHoveredProjectId(hovering ? acquisition.project.id : null)
-          }
-        />
-      ))}
       <div className={styles.rule} />
       <p className={styles.hint}>{t('ribbon.lidar.projectsHint')}</p>
 

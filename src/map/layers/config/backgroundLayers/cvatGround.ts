@@ -11,7 +11,7 @@
 
 import { halved } from '../../../compare/halves';
 import type { VatStackLayer } from '../../../../terrain/shade';
-import type { LidarProject } from './lidarProjects';
+import { CVAT_STYLE, type LidarProject } from './lidarProjects';
 import { XYZBackgroundLayer } from './types';
 
 /**
@@ -43,10 +43,16 @@ export type CvatAcquisition = {
   maxZoom: number;
 };
 
-/** Which cached acquisition is drawing. Null until one is picked, so a cold
- *  load into `?backgroundLayer=lidarCvat` draws nothing until the footprint
- *  ranking says which acquisition the view is over — a tick, and then the
- *  ground the link was shared on. */
+/**
+ * The cached render of the flight that is selected, or null where the store has
+ * no tiles for it. Written in lockstep with `activeLidarProjectAtom` — the
+ * flight is the choice and this follows it, so the two can never name different
+ * acquisitions.
+ *
+ * Null at a cold load into `?backgroundLayer=lidarCvat`, which draws nothing
+ * until Automatisk has named a flight — a tick, and then the ground the link
+ * was shared on.
+ */
 export const activeCvatAcquisitionHalves = halved<CvatAcquisition | null>(null);
 export const activeCvatAcquisitionAtom = activeCvatAcquisitionHalves.focused;
 
@@ -133,6 +139,23 @@ export const resolveCvatAcquisitions = (
       },
     ];
   });
+
+/** The store's render of one flight, or null where it holds none. */
+export const cvatFor = (
+  cached: CvatAcquisition[],
+  project: LidarProject | null,
+): CvatAcquisition | null =>
+  (project && cached.find((a) => a.project.id === project.id)) || null;
+
+/**
+ * The renders offered on one flight: ours first where the store has it, then
+ * whatever its WMS publishes. This is the whole of the cache's place in the UI
+ * — a row in the style ring, not a dataset beside the flight it came from.
+ */
+export const stylesForFlight = (
+  project: LidarProject,
+  cached: CvatAcquisition | null,
+): string[] => (cached ? [CVAT_STYLE, ...project.styles] : project.styles);
 
 /**
  * The layer for one cached acquisition.

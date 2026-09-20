@@ -79,12 +79,14 @@ export const useRecreateView = (
       case 'lidar': {
         ground.select('lidar');
         lidar.setLidarModel(spec.model);
+        // The recorded render is handed to the activation rather than set
+        // first, so the dataset clamps it to what that ground offers: asking a
+        // LiDAR WMS for a style it does not have answers HTTP 200 with a JSON
+        // error body, i.e. a blank map and no error. Passing it also keeps the
+        // cache out of it — a View that recorded the WMS hillshade comes back
+        // on the WMS hillshade, even where the store holds that flight.
         if (spec.source === 'national') {
-          // Style first, so `activateNational` clamps it to what the dataset
-          // publishes: asking a LiDAR WMS for a style it does not have answers
-          // HTTP 200 with a JSON error body, i.e. a blank map and no error.
-          lidar.setActiveLidarStyle(spec.style);
-          lidar.activateNational();
+          lidar.activateNational(spec.style);
           done();
           break;
         }
@@ -100,10 +102,10 @@ export const useRecreateView = (
             // Clamped against the model too: DOM publishes one style whatever
             // the DTM catalogue lists.
             const published = stylesForModel(project.styles, spec.model);
-            lidar.setActiveLidarStyle(
+            lidar.activateProject(
+              project,
               published.includes(spec.style) ? spec.style : published[0],
             );
-            lidar.activateProject(project);
             done();
           })
           .catch(() => {

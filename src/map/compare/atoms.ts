@@ -8,10 +8,7 @@ import {
   hybridContoursHalves,
   hybridOverlayHalves,
 } from '../layers/config/backgroundLayers/atoms';
-import {
-  activeCvatAcquisitionHalves,
-  type CvatAcquisition,
-} from '../layers/config/backgroundLayers/cvatGround';
+import { activeCvatAcquisitionHalves } from '../layers/config/backgroundLayers/cvatGround';
 import { activeFlyfotoProjectHalves } from '../layers/config/backgroundLayers/flyfotoBackground';
 import {
   type KartVariant,
@@ -23,6 +20,8 @@ import {
   activeLidarProjectHalves,
   activeLidarStyleHalves,
   effectiveLidarStyle,
+  lidarFlightGround,
+  type LidarModel,
   LidarProject,
 } from '../layers/config/backgroundLayers/lidarProjects';
 import {
@@ -49,24 +48,23 @@ export const compareSplitAtom = atom(0.5);
 // ground before React re-renders with the focus switch.
 const groundLayer = (
   ground: CompareGround,
-  seeded: BackgroundLayerName,
   kartVariant: KartVariant,
   lidarProject: LidarProject | null,
   flyfotoProject: FlyfotoProject | null,
-  cvatAcquisition: CvatAcquisition | null,
+  lidarStyle: string,
+  lidarModel: LidarModel,
 ): BackgroundLayerName => {
   // Whichever cartography this half was last set to, not necessarily topo.
   if (ground === 'kart') return kartVariant;
   if (ground === 'flyfoto') {
     return flyfotoProject ? 'flyfotoProject' : 'flyfoto';
   }
-  // `seeded` is A's layer, already copied over: entering the curtain on the
-  // cached ground keeps it, rather than dropping to the WMS dataset A was not
-  // showing. Its acquisition was copied with it, and without one there would be
-  // nothing to draw. The two WMS datasets are still chosen by whether one is
-  // held.
-  if (seeded === 'lidarCvat' && cvatAcquisition) return 'lidarCvat';
-  return lidarProject ? 'lidarProject' : 'lidarHillshade';
+  // A flight if one is held, and then `lidarFlightGround` off the render held
+  // with it — the same namer `useLidarControls` uses, so entering the curtain
+  // on a cached render keeps the cache and entering it on a WMS style does not
+  // hand the cache's layer name to a GetMap.
+  if (!lidarProject) return 'lidarHillshade';
+  return lidarFlightGround(lidarStyle, lidarModel);
 };
 
 // B starts as a copy of A and is then moved, so the only difference is the one
@@ -82,11 +80,11 @@ export const enterCompareAtom = atom(
       backgroundLayerHalves.b,
       groundLayer(
         ground,
-        get(backgroundLayerHalves.b),
         get(kartVariantHalves.b),
         get(activeLidarProjectHalves.b),
         get(activeFlyfotoProjectHalves.b),
-        get(activeCvatAcquisitionHalves.b),
+        get(activeLidarStyleHalves.b),
+        get(activeLidarModelHalves.b),
       ),
     );
     set(compareOnAtom, true);
