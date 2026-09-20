@@ -5,6 +5,7 @@
     .venv/bin/python vatcache.py -l -v              with the figures behind it
     .venv/bin/python vatcache.py -l --all østfold   everything Kartverket flew
     .venv/bin/python vatcache.py -g 3               build acquisition 3
+    .venv/bin/python vatcache.py -g 3 -z 15         build only its z15
     .venv/bin/python vatcache.py -c                 audit the whole store
     .venv/bin/python vatcache.py -c 3               audit one acquisition
     .venv/bin/python vatcache.py -c 3 -g            audit it, then repair it
@@ -16,10 +17,17 @@ the marker directory and the tile directory together, which is the point: the
 one mistake this batch could make silently was pairing a mask with the wrong
 project, and an index cannot make it.
 
-How deep the ladder goes is not asked for either. It comes off the cell size
+How deep the ladder goes needs no asking. It comes off the cell size
 hoydedata.no publishes the acquisition on — z16 for the 0.25 m flights, z15 for
 the 0.5 m ones — so a queue of mixed densities builds each to what it holds and
-no further. `--levels` overrides it.
+no further.
+
+`-z` names levels when part of that ladder is what you want rather than all of
+it: `-z 15` for a pilot, `-z 16-14` for a range, `-z 16,12` for two. It is a way
+of building less, never a way around the cell — a level finer than the
+acquisition's own DTM is refused, because rendering the interpolation between
+height values as terrain is the fault the ladder exists to prevent. Under `-c`
+it narrows the audit, where any level the store holds is fair to read.
 
 `--out` is the store — the directory docker-compose bind-mounts read-only into
 the Caddy container at /var/www/cvat. Masks are derived on first use and live
@@ -128,6 +136,39 @@ def level_range(levels):
     return ", ".join(f"z{z}" for z in sorted(levels, reverse=True))
 
 
+def parse_levels(text):
+    """`-z 14`, `-z 16,14,12`, `-z 16-14`: one level, a list, or an inclusive
+    range. A range may be written either way up, because which end is "first"
+    depends on whether you are thinking in zoom or in metres.
+
+    Deepest first whatever the order asked in — that is the order a build wants
+    and the order the manifest records, so a level set cannot arrive meaning one
+    thing and be stored meaning another.
+
+    Bounded by the ladder `build_tiles` defines. A level outside it has nowhere
+    to go: the manifest hands the app its `minZoom`/`maxZoom` straight, so a z17
+    in the store is a level the reader asks for and no flight in the country can
+    answer."""
+    deepest, coarsest = build_tiles.DEFAULT_LEVELS[0], build_tiles.COARSEST_LEVEL
+    found = set()
+    for piece in (p.strip() for p in text.split(",")):
+        if not piece:
+            continue
+        low, dash, high = piece.partition("-")
+        try:
+            ends = [int(low), int(high)] if dash else [int(low)]
+        except ValueError:
+            sys.exit(f"-z: {piece!r} is not a zoom level, or a range of them "
+                     "written as 16-14")
+        if not all(coarsest <= z <= deepest for z in ends):
+            sys.exit(f"-z: {piece} is outside the store's ladder, which runs "
+                     f"z{deepest} down to z{coarsest}")
+        found.update(range(min(ends), max(ends) + 1))
+    if not found:
+        sys.exit("-z: no zoom level named")
+    return sorted(found, reverse=True)
+
+
 def do_list(out, rows, verbose, pattern):
     built = store_levels(read_manifest(out))
     names_cat = names_wms = None
@@ -226,15 +267,19 @@ def mask_for(project):
 
 
 def build_levels(row, asked):
-    """How deep to build this acquisition, when the command line did not say.
+    """Which levels to build for this acquisition.
 
-    Off the catalogue's own cell size rather than the committed file, because
-    the cell is what makes a level worth having: z16 over a 0.5 m flight would
-    render the interpolation between height values as if it were ground. The
-    committed `cell_m` is only the figure the queue was ordered on, and a
-    reflight can change it under us."""
-    if asked:
-        return asked
+    The ladder comes off the catalogue's own cell size rather than the committed
+    file, because the cell is what makes a level worth having: z16 over a 0.5 m
+    flight would render the interpolation between height values as if it were
+    ground. The committed `cell_m` is only the figure the queue was ordered on,
+    and a reflight can change it under us.
+
+    `-z` is measured against that same cell rather than replacing it. Naming
+    levels is for building part of a ladder — one level again, or a pilot before
+    the rest — and the one thing it must not become is a way past the rule the
+    ladder is. So the cell is read whether or not levels were asked for, and it
+    is read before the mask is derived, which is minutes."""
     project = row["name"]
     cell = acquisitions.native_cells([project]).get(project)
     if cell is None:
@@ -243,18 +288,34 @@ def build_levels(row, asked):
             "no cell size to\npick levels from — and nothing to fetch either. "
             "Check the name against -l --all."
         )
-    levels = build_tiles.levels_for(cell)
-    print(f"{project}: {cell} m cells → {level_range(list(levels))}\n")
-    return list(levels)
+    earned = list(build_tiles.levels_for(cell))
+    if not asked:
+        print(f"{project}: {cell} m cells → {level_range(earned)}\n")
+        return earned
+
+    finer = [z for z in asked if z > earned[0]]
+    if finer:
+        sys.exit(
+            f"{project} is published on {cell} m cells, so its ladder is "
+            f"{level_range(earned)}.\n{level_range(finer)} would be finer than "
+            "the DTM, which renders the interpolation\nbetween height values as "
+            "terrain. Build it on a flight that holds it."
+        )
+    print(f"{project}: {cell} m cells → {level_range(earned)}, "
+          f"building {level_range(asked)}\n")
+    return asked
 
 
 def do_get(out, row, args):
     project = row["name"]
+    # Levels first: deriving a footprint takes minutes, and a level this
+    # acquisition cannot hold should say so before any of them are spent.
+    levels = build_levels(row, args.levels)
     build_tiles.build(
         out,
         project,
         mask_for(project),
-        levels=build_levels(row, args.levels),
+        levels=levels,
         unit_tiles=args.unit_tiles,
         jobs=args.jobs,
         limit=args.limit,
@@ -451,10 +512,12 @@ def main():
                         "store when N is left off")
     p.add_argument("-o", "--out", default=DEFAULT_STORE, metavar="DIR",
                    help=f"the tile store (default {DEFAULT_STORE})")
-    p.add_argument("--levels",
-                   help="zoom levels, coarsest last. Left off, --get builds as "
-                        "deep as the acquisition's own DTM cell allows and "
-                        "--check reads whatever the manifest says is there")
+    p.add_argument("-z", "--levels", metavar="SPEC",
+                   help="which zoom levels to work on: one (15), a list "
+                        "(16,14,12) or an inclusive range (16-14). Left off, "
+                        "--get builds as deep as the acquisition's own DTM cell "
+                        "allows and --check reads whatever the manifest says is "
+                        "there")
     p.add_argument("--unit-tiles", type=int, default=build_tiles.DEFAULT_UNIT_TILES,
                    help="tiles along one side of a work unit")
     p.add_argument("--jobs", type=int, default=1,
@@ -472,7 +535,7 @@ def main():
         p.print_help()
         return
 
-    args.levels = [int(z) for z in args.levels.split(",")] if args.levels else None
+    args.levels = parse_levels(args.levels) if args.levels else None
     rows = catalogue(args.out)
 
     if args.list or args.all is not None:

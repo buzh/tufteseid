@@ -24,8 +24,9 @@ in the list, never by a path:
 .venv/bin/python vatcache.py -l -v              the figures behind it
 .venv/bin/python vatcache.py -l --all østfold   everything Kartverket flew
 .venv/bin/python vatcache.py -g 7 --dry-run     unit counts, nothing written
-.venv/bin/python vatcache.py -g 7 --levels 15 --limit 20   pilot
+.venv/bin/python vatcache.py -g 7 -z 15 --limit 20         pilot
 .venv/bin/python vatcache.py -g 7 --jobs 4      the run
+.venv/bin/python vatcache.py -g 7 -z 16         one level of it again
 .venv/bin/python vatcache.py -c 7               audit it afterwards
 .venv/bin/python vatcache.py -c 7 -g            audit it, then repair it
 .venv/bin/python vatcache.py -c                 audit the whole store
@@ -33,13 +34,21 @@ in the list, never by a path:
 
 `--out` is the store and defaults to `/site/tufteseid/data/cvat`.
 
-**How deep is not asked for.** `--get` reads the cell size hoydedata.no
-publishes the acquisition on and builds down to the last level whose pixel is no
-finer: z16 on a 0.25 m DTM, z15 on 0.5 m, z14 on 1 m. Below the cell the service
+**How deep needs no asking.** `--get` reads the cell size hoydedata.no publishes
+the acquisition on and builds down to the last level whose pixel is no finer:
+z16 on a 0.25 m DTM, z15 on 0.5 m, z14 on 1 m. Below the cell the service
 resamples one height value into four pixels and RVT renders the interpolation as
-if it were terrain. `--levels` overrides it, which is what the pilot line above
-is doing. `-c` without `--levels` checks whatever the manifest says is there, so
-a 0.5 m flight is not reported as missing the z16 it was never owed.
+if it were terrain. `-c` without `-z` checks whatever the manifest says is there,
+so a 0.5 m flight is not reported as missing the z16 it was never owed.
+
+**`-z` picks levels out of that ladder.** One (`-z 15`), a list (`-z 16,14,12`)
+or an inclusive range written either way up (`-z 16-14`), always applied deepest
+first. Levels are independent jobs, so this is how a pilot is run before the
+rest and how one level is rebuilt without touching its neighbours. It builds
+less, never deeper: a level finer than the acquisition's own DTM cell is refused
+with the ladder that flight does earn, because that is the whole of what the
+cell rule is for. Under `-c` there is no such limit — reading a level the store
+holds is fair whatever it was built from.
 
 **One index picks everything.** The footprint mask, the DEM request, the tile
 directory, the marker directory and the manifest entry all come off the same
@@ -65,7 +74,7 @@ the footprint merely clips can legitimately hold no tile, and only the marker
 separates that from a unit that never ran. It then decodes every tile the marked
 units own — a full decode rather than a header read, because the failure worth
 finding is truncation and a truncated WebP carries an intact header. Around 5 ms
-a tile, so narrow it with `--levels` when you only want one.
+a tile, so narrow it with `-z` when you only want one level.
 
 What it reports, and what each means:
 

@@ -105,8 +105,12 @@ further. Kartverket publishes three cell sizes and they track point density, so
 in practice that is **z16 (0.331 m) on a 0.25 m DTM, z15 (0.661 m) on a 0.5 m
 one, z14 on 1 m**. Below the cell the service resamples one height value into
 four pixels and RVT reads the interpolation as terrain, which is the fault this
-rule exists to prevent. `levels_for` in `build_tiles.py` is the rule; nothing
-asks for levels by hand.
+rule exists to prevent. `levels_for` in `build_tiles.py` is the rule.
+
+Levels *are* asked for by hand — `-z`, since §3 makes each one an independent
+job and a pilot or a rebuild wants one at a time — but only downwards. The rule
+is checked against what was asked rather than replaced by it, so naming a level
+can build less of a ladder and never a level the flight does not hold.
 
 That 0.25 m grid is finer than the 0.5 m the VAT templates were calibrated
 against, and the measurement says to use it anyway. On `compare.py`'s two sites
