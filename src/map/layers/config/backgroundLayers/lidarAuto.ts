@@ -10,8 +10,10 @@ import { halved } from '../../../compare/halves';
 import type { LidarProject } from './lidarProjects';
 import type { LidarViewportState } from './lidarRelevance';
 
-// Whether the dataset follows the viewport. Cleared by any explicit pick, and
-// by entering compare on the B half (src/map/compare/atoms.ts).
+// Whether the dataset follows the viewport. Cleared by the toggle beside the
+// ribbon's chips, by any pick out of either chip — the render counts, because a
+// dataset switch re-derives it — and by entering compare on the B half
+// (src/map/compare/atoms.ts).
 export const lidarAutoDatasetHalves = halved(true);
 export const lidarAutoDatasetAtom = lidarAutoDatasetHalves.focused;
 

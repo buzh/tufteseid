@@ -36,6 +36,7 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
     activeLidarProject,
     activeCvat,
     lidarModel,
+    autoDataset,
   } = lidar;
 
   const label = lidarStyleLabel(shownStyle);
@@ -94,7 +95,16 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
   return (
     <Menu width={320}>
       <Menu.Target>
-        <RibbonChip icon="texture" label={label} hint={hint} />
+        {/* Automatisk does not pick the render, but every dataset it picks
+            re-derives one through `preferredLidarRender` — so while it is on,
+            this is its answer as much as the reader's. Dimmed for that, and
+            choosing here pins the dataset too. */}
+        <RibbonChip
+          icon="texture"
+          label={label}
+          hint={hint}
+          dimmed={autoDataset}
+        />
       </Menu.Target>
       <Menu.Dropdown>
         {/* The provenance, where the reader is choosing between pictures rather

@@ -15,6 +15,11 @@ type RibbonChipProps = ComponentPropsWithoutRef<'button'> & {
   hint?: ReactNode;
   /** Left off where the chip is a readout rather than a menu target. */
   withChevron?: boolean;
+  /**
+   * Automatisk chose this, not the reader. Dims the chip without closing it —
+   * it still opens, and picking something is how the wheel is taken back.
+   */
+  dimmed?: boolean;
   ref?: Ref<HTMLButtonElement>;
 };
 
@@ -23,10 +28,14 @@ export const RibbonChip = ({
   label,
   hint,
   withChevron = true,
+  dimmed = false,
   className,
   ...rest
 }: RibbonChipProps) => (
-  <UnstyledButton className={cx(styles.chip, className)} {...rest}>
+  <UnstyledButton
+    className={cx(styles.chip, dimmed && styles.chipDimmed, className)}
+    {...rest}
+  >
     {icon && <Icon icon={icon} size={20} className={styles.chipIcon} />}
     <span className={styles.chipText}>
       <span className={styles.chipLabel}>{label}</span>

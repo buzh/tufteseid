@@ -11,6 +11,7 @@ import { Button, Group, SegmentedControl, Text, Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import type { LidarModel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { Icon } from '../ui/Icon';
+import { AutoToggle } from './AutoToggle';
 import { DatasetMenu } from './DatasetMenu';
 import { RenderMenu } from './RenderMenu';
 import styles from './Ribbon.module.css';
@@ -30,6 +31,9 @@ export const Ribbon = () => {
 
         {lidar.isLidarBackground ? (
           <>
+            {/* Ahead of the pair it governs, not between them: with Automatisk
+                on, both chips are its answer. */}
+            <AutoToggle lidar={lidar} />
             <DatasetMenu lidar={lidar} />
             <RenderMenu lidar={lidar} />
             {/* Per segment, not around the control: the two models are two

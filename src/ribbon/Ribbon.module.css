@@ -48,6 +48,18 @@
   outline-offset: 1px;
 }
 
+/* Automatisk is holding the pen. Dim at rest so the ribbon says who chose, but
+   full strength under the cursor: these still open, and picking a row in one is
+   how the reader takes the choice back. */
+.chipDimmed {
+  opacity: 0.5;
+}
+
+.chipDimmed:hover,
+.chipDimmed:focus-visible {
+  opacity: 1;
+}
+
 /* A readout rather than a target: no hover affordance, no pointer. */
 .chipStatic {
   cursor: default;

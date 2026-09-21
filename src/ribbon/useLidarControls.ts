@@ -189,14 +189,27 @@ export const useLidarControls = () => {
   // the name is a function of the render: picking `cvat` moves to the cached
   // tiles and picking anything else moves back to the WMS, and DOM does the same
   // by way of `effectiveLidarStyle`. On the mosaic there is nothing to re-name.
+  //
+  // Picking a render unpins the dataset too. Automatisk does not choose the
+  // render, but it re-derives it on every dataset switch — `preferredLidarRender`
+  // would move a deliberate skyggerelieff onto the cache the moment the next
+  // flight has one. Having just said which picture they want, the reader should
+  // keep it.
   const selectStyle = useCallback(
     (style: string) => {
+      setAutoDataset(false);
       setActiveLidarStyle(style);
       if (isLidarFlight) {
         setBackgroundLayer(lidarFlightGround(style, lidarModel));
       }
     },
-    [isLidarFlight, lidarModel, setActiveLidarStyle, setBackgroundLayer],
+    [
+      isLidarFlight,
+      lidarModel,
+      setAutoDataset,
+      setActiveLidarStyle,
+      setBackgroundLayer,
+    ],
   );
   const selectModel = useCallback(
     (model: LidarModel) => {
@@ -208,8 +221,7 @@ export const useLidarControls = () => {
     [isLidarFlight, activeLidarStyle, setLidarModel, setBackgroundLayer],
   );
 
-  // A row click picks and dismisses. All three are the user speaking, so all
-  // three pin — except Automatisk, which is the user handing the choice back.
+  // A row click picks and dismisses. Both are the user speaking, so both pin.
   const activateNational = () => {
     setAutoDataset(false);
     selectNational();
@@ -220,14 +232,25 @@ export const useLidarControls = () => {
     selectProject(p);
     setPickerOpen(false);
   };
-  const activateAuto = () => {
+
+  // Automatisk is the one control that hands the choice back rather than making
+  // one, which is why it is a button beside the pulldowns and not a row inside
+  // one: with it on, every row in there is something Automatisk may overrule on
+  // the next pan.
+  //
+  // Switching it off changes nothing on screen — the pin lands on whatever is
+  // already drawing. Switching it on re-decides at once, with a null incumbent
+  // so the resolver cannot inherit the pin and leave Automatisk looking like it
+  // did nothing.
+  const toggleAuto = () => {
+    if (autoDataset) {
+      setAutoDataset(false);
+      return;
+    }
     setAutoDataset(true);
-    // A null incumbent so the resolver cannot inherit the pin and leave
-    // Automatisk looking like it did nothing.
     const choice = chooseAutoDataset({ resolution, viewport, current: null });
     if (choice.kind === 'national') selectNational();
     else if (choice.kind === 'project') selectProject(choice.project);
-    setPickerOpen(false);
   };
 
   // Not a dataset pick, so it must not pin. With auto on the dataset is chosen
@@ -324,7 +347,7 @@ export const useLidarControls = () => {
     cachedFlightIds,
     viewport,
     autoDataset,
-    activateAuto,
+    toggleAuto,
     activateNational,
     activateProject,
     pickerOpen,

@@ -1,7 +1,11 @@
-// Which LiDAR dataset the map is reading: Automatisk, the national mosaic, or
-// one acquisition. Rows come off `lidarViewportAtom`, which the footprint layer
+// Which LiDAR dataset the map is reading: the national mosaic, or one
+// acquisition. Rows come off `lidarViewportAtom`, which the footprint layer
 // fills from the same WFS pass that draws the outlines — so hovering a row
 // paints where it lies.
+//
+// Automatisk is not a row here; it is the button beside the chip. While it is
+// on this menu is dimmed and every row in it still works — clicking one is how
+// the reader takes the choice back.
 
 import { Badge, Group, Menu, ScrollArea, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +29,6 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
     autoDataset,
     isNationalMosaic,
     isLidarFlight,
-    activateAuto,
     activateNational,
     activateProject,
     pickerOpen,
@@ -37,13 +40,13 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
     isLidarFlight && activeLidarProject
       ? activeLidarProject.projectName
       : t('ribbon.dataset.national');
-  const shownFacts =
+  // Just the facts, in both states: with Automatisk on, the lit button and the
+  // dimmed chip already say who chose, and saying it a third time costs the
+  // line that would otherwise carry the year and the density.
+  const hint =
     isLidarFlight && activeLidarProject
       ? flightFacts(activeLidarProject)
       : t('ribbon.dataset.nationalHint');
-  const hint = autoDataset
-    ? `${t('ribbon.dataset.auto')} · ${shownFacts}`
-    : shownFacts;
 
   const row = (entry: LidarViewportEntry) => {
     const { project, areaRatio } = entry;
@@ -116,23 +119,14 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
       width={360}
     >
       <Menu.Target>
-        <RibbonChip icon="layers" label={shown} hint={hint} />
+        <RibbonChip
+          icon="layers"
+          label={shown}
+          hint={hint}
+          dimmed={autoDataset}
+        />
       </Menu.Target>
       <Menu.Dropdown>
-        <Menu.Item
-          onClick={activateAuto}
-          leftSection={
-            autoDataset ? <Icon icon="check" size={18} /> : <Icon icon="autorenew" size={18} />
-          }
-        >
-          <Text size="sm">{t('ribbon.dataset.auto')}</Text>
-          <Text size="xs" c="dimmed">
-            {t('ribbon.dataset.autoHint')}
-          </Text>
-        </Menu.Item>
-
-        <Menu.Divider />
-
         <Menu.Item
           onClick={activateNational}
           leftSection={

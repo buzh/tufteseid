@@ -16,9 +16,12 @@
     "lidar": "LiDAR",
     "offLidar": "Kartet viser ikke LiDAR nå",
     "enterLidar": "Vis LiDAR",
+    "auto": {
+      "label": "Automatisk",
+      "offHint": "La utsnittet velge datasett",
+      "onHint": "Følger utsnittet. Velg selv for å slå av."
+    },
     "dataset": {
-      "auto": "Automatisk",
-      "autoHint": "Følger utsnittet",
       "national": "Nasjonal mosaikk",
       "nationalHint": "1 m, sømløs over hele landet",
       "inView": "Dekker utsnittet",
