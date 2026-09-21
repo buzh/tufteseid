@@ -50,10 +50,17 @@ services:
   #
   # A host path for the caches rather than a named volume, like the cVAT store
   # and unlike wmscache's 25 GB LRU: MapProxy never evicts, so this grows until
-  # somebody looks at it, and it should be somewhere they can. The image runs
-  # as uid 1000, so first run wants
+  # somebody looks at it, and it should be somewhere they can.
+  #
+  # It has to be writable by the image's `mapproxy` user, which is uid 100 gid
+  # 101 in 7.0.0-alpine-nginx — not the 1000 the project's own Dockerfile
+  # defaults to, so check rather than assume when the tag moves. MapProxy locks
+  # beside each MBTiles file before it builds its layer list, so getting this
+  # wrong is not a slow cache, it is uwsgi exiting at import and every
+  # /cache/… answering 502. First run wants
   #   sudo mkdir -p /site/tufteseid/data/mapproxy
-  #   sudo chown 1000:1000 /site/tufteseid/data/mapproxy
+  #   sudo chown -R 100:101 /site/tufteseid/data/mapproxy
+  # and docs/wms-proxy-and-tiles.md has the one-liner that asks the image.
   # Third-party install: point it anywhere writable — an empty directory fills
   # itself on demand.
   mapproxy:

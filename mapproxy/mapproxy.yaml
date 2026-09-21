@@ -280,7 +280,9 @@ globals:
     # Absolute, since `base_dir` is otherwise read relative to this file. The
     # MBTiles filenames above are absolute too; this is what the lock
     # directories hang off. Bind-mounted from the host and must be writable by
-    # uid 1000, the image's `mapproxy` user.
+    # the image's `mapproxy` user — uid 100, gid 101 in 7.0.0-alpine-nginx.
+    # MapProxy locks beside each MBTiles file before it builds its layer list,
+    # so a directory it cannot write to is a startup failure, not a slow cache.
     base_dir: /mapproxy/config/cache_data
   image:
     # Meta-tiling means MapProxy always decodes and re-encodes, so what a tile

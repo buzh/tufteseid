@@ -191,10 +191,27 @@ by where people look; watch `du`. And `X-Cache-Status` stops meaning anything
 for these six layers, because they no longer pass through nginx.
 
 **The store** is one MBTiles database per cache, under a host bind mount
-(`/site/tufteseid/data/mapproxy`) rather than a named volume: the image runs as
-uid 1000 where a fresh volume's mountpoint is root-owned, and a cache nobody
-evicts should be somewhere an operator can see. First run wants
-`sudo mkdir -p` and `sudo chown 1000:1000` on that path.
+(`/site/tufteseid/data/mapproxy`) rather than a named volume: a cache nobody
+evicts should be on the filesystem that has room for it and where an operator
+will think to look, beside the cVAT store rather than under `/var/lib/docker`.
+
+The cost of that choice is ownership. A named volume would inherit the image's
+own, but a bind mount arrives with the host's, and MapProxy takes an init lock
+*beside* each MBTiles file before it will even build its layer list — so a cache
+directory it cannot write to is a startup failure, not a degraded mode. The
+symptom is an empty 502 on every `/cache/…`: uwsgi's master exits on the import
+error and Caddy never reaches anything. Ask the image which user it is rather
+than trusting a number here — `7.0.0-alpine-nginx` answers `uid=100 gid=101`,
+which is not the `USER_UID=1000` its own Dockerfile defaults to:
+
+```
+docker compose run --rm --entrypoint sh mapproxy -c \
+  'id; touch /mapproxy/config/cache_data/probe && echo WRITABLE || echo DENIED'
+sudo chown -R 100:101 /site/tufteseid/data/mapproxy
+```
+
+One directory covers it: `lock_dir` and `tile_lock_dir` both default under
+`base_dir`, which is the mount.
 
 ## The NiB token
 
