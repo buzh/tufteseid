@@ -3,10 +3,15 @@ import { cx } from './cx';
 import styles from './Icon.module.css';
 
 // Material Symbols glyph; the font is loaded app-wide in src/mainApp.tsx, so
-// this renders the ligature and nothing else. The `MaterialSymbol` union
-// comes from the same package — a name that is not in it fails the docker
-// build; docs/ui-architecture.md, "Icons and the build gotcha", has how to
-// check a name without local node_modules.
+// this renders the ligature and nothing else. The `MaterialSymbol` union comes
+// from the same package, and a plausible-looking name that is not in it fails
+// the docker build. The workstation has no node_modules to check against, so:
+//
+//   curl -sL https://registry.npmjs.org/material-symbols/-/material-symbols-0.47.2.tgz \
+//     | tar xz -O package/index.d.ts | grep '"terrain"'
+//
+// Known traps: `terrain`, `filter_hdr` and `topography` do not exist;
+// `elevation`, `landscape` and `altitude` do.
 export type { MaterialSymbol };
 
 export const Icon = ({

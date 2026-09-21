@@ -10,13 +10,16 @@ what `composeVat` follows is RVT's `blend.py` / `blend_func.py` as they run, not
 `settings/blender_VAT.json` as it reads — see below for where the two differ.
 
 Where it lives: `src/terrain/dem.ts` (fetch + TIFF reader), `shade.ts`
-(operators), `render.ts` (field → canvas, headless-capable),
-`src/shell/terrain/` (the control surface, described in
-`docs/ui-architecture.md`), `src/figure/specs.ts` (`terrainFigure`).
+(operators), `render.ts` (field → canvas, headless-capable), `window.ts` and
+`windowLayer.ts` (the rectangle being read, and its frame on the map).
 
-**Analyse** is the second ground on the ribbon, beside LiDAR — the internal
-name stays `terreng` — and a read tool throughout: no
-account, no lokalitet, nothing written. It is also the one ground the client
+There is no control surface: the old one went down with the rest of the
+interface (`docs/state-of-the-branch.md`). Everything above is headless and
+callable, which is the point — a new surface drives `render.ts`, it does not
+reimplement it.
+
+Terrain analysis — internal name `terreng` — is a read tool throughout:
+nothing is written. It is also the one ground the client
 computes rather than fetches, so it is the one bounded by a rectangle, and
 there are two sources for that rectangle — never both at once:
 
@@ -152,12 +155,12 @@ here" would stop being an answer about the rectangle.
 
 ## The visualizations, and what each plate records
 
-`src/figure/` stamps a provenance plate onto every raster leaving the app and
-`terrainFigure` builds the terrain one — a hillshade at 315°/35° and one at
-135°/20° disagree about whether there is a mound in the same field, so a render
-without its own azimuth cannot be checked by anyone. Everything in the table is
-read back out of the record's `meta` at download time, not frozen into the
-pixels at render time.
+A hillshade at 315°/35° and one at 135°/20° disagree about whether there is a
+mound in the same field, so a render without its own parameters recorded
+alongside cannot be checked by anyone. The old interface stamped a provenance
+plate onto every raster leaving the app; that went with the rest of it, and
+whatever replaces it owes the same table. These are the parameters that have to
+survive a render:
 
 | Visualization | Recorded |
 |---|---|
@@ -296,7 +299,7 @@ resolving the features whose horizon is being measured.
   slider's ceiling from it. Skipping it puts "SVF-radius 40 m" on a 24 m render.
 - The three views off the scan are one ray walk read three ways (`usesHorizon`),
   the radius clamped through `'svf'` so all three resolve to the same number,
-  which is what lets the control surface cache it (`docs/ui-architecture.md`).
+  which is what lets a control surface memoize it across slider moves.
   VAT is not among them: its radii are pinned by its presets the way its sun is,
   so it has neither a slider to answer nor a scan to share.
 
@@ -348,5 +351,3 @@ the notice the Flyfoto action shows.
 - **Point clouds via PDAL** — re-deriving ground from raw LAZ recovers low
   earthworks the DTM smooths away under canopy; needs the async order API and
   server-side processing.
-
-What has been ruled out, and why, is in `docs/analysis-roadmap.md`.

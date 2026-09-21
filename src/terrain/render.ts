@@ -6,7 +6,7 @@
 // multi-second recompute per frame. `radius` is the only knob on the expensive
 // side, which is why its slider commits on release.
 
-import type { LocalityBbox } from '../api/localities';
+import type { Bbox } from '../map/bbox';
 import { fetchDem, type Dem, type DemModel } from './dem';
 import {
   computeHillshade,
@@ -273,7 +273,7 @@ export type TerrainRender = {
  * reporting "no coverage" for a network fault would be a lie.
  */
 export const renderTerrain = async (
-  bbox: LocalityBbox,
+  bbox: Bbox,
   {
     vis,
     model = 'dtm',

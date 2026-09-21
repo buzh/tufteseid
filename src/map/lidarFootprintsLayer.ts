@@ -103,7 +103,7 @@ const getOrCreateLayer = (map: OlMap): VectorLayer => {
   return layer;
 };
 
-/** Mount once, from `src/shell/useMapSideEffects.ts`. */
+/** Mount once, from whatever owns the map's side effects. */
 export const useLidarFootprintsLayer = () => {
   const map = useAtomValue(mapAtom);
   const backgroundLayer = useAtomValue(backgroundLayerAtom);

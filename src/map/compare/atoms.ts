@@ -1,6 +1,6 @@
 import { atom, getDefaultStore } from 'jotai';
 import { atomEffect } from 'jotai-effect';
-import type { FlyfotoProject } from '../../localities/flyfotoProjects';
+import type { FlyfotoProject } from '../layers/config/backgroundLayers/flyfotoProjects';
 import { mapAtom } from '../atoms';
 import { BackgroundLayerName } from '../layers/backgroundLayers';
 import {
@@ -115,7 +115,7 @@ export const compareLayerAtomEffect = atomEffect((get) => {
 
   const generation = ++compareGeneration;
 
-  // 'empty' is unreachable from the ribbon but reachable from ?backgroundLayer.
+  // 'empty' is not offered as a choice but is reachable from ?backgroundLayer.
   if (!on || layerName === 'empty') {
     clearCompareLayers();
     return;

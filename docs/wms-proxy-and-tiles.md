@@ -227,8 +227,8 @@ put every recipient into double spend on a shared budget.
    this upstream needs a different lifetime or timeout.
 4. `/wms/<host-slug>/…` as `wmsUrl` in the layer config. No CSP entry.
 5. For a background layer, `coverageExtent` from its GetCapabilities.
-6. The layer-config half — name union, config file, ribbon control,
-   `infoFormat` — is `docs/map-layers.md`.
+6. The layer-config half — name union, config file, `infoFormat` — is
+   `docs/map-layers.md`.
 
 ## Verifying
 

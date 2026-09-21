@@ -14,8 +14,8 @@ import {
 // background swap never sweeps one up; the reuse signature is namespaced too,
 // so A and B never share a layer instance.
 
-// Above the background (0) and the ground overlay (1), below the sketches (2),
-// measure (3), the rectangles (4) and funn (5) — marks cross the divider.
+// Above the background (0), below everything a future UI draws on top of it:
+// marks cross the divider rather than being clipped with the ground.
 export const COMPARE_Z = 1.5;
 
 const CMP_PREFIX = 'cmp.';

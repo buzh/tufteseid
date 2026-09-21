@@ -11,7 +11,6 @@ import App from './App.tsx';
 import { AtomWrapper } from './AtomWrapper.tsx';
 import './index.css';
 import { projInit } from './map/projections/proj/projInit.ts';
-import { Toaster } from './ui';
 projInit();
 
 // Module scope: constructing it in the element tree would throw the whole
@@ -23,7 +22,6 @@ createRoot(document.getElementById('root')!).render(
     <AtomWrapper>
       <QueryClientProvider client={queryClient}>
         <App />
-        <Toaster />
       </QueryClientProvider>
     </AtomWrapper>
   </StrictMode>,

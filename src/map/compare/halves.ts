@@ -1,6 +1,6 @@
 import { atom, type Getter, type Setter } from 'jotai';
 
-// The two halves of the compare curtain, and which one the ribbon is pointed
+// The two halves of the compare curtain, and which one the controls point
 // at: every piece of ground state is two primitives behind a facade routing to
 // the focused half, so the existing controls describe B unchanged. Imports
 // nothing but jotai — half the background config imports this, so anything else

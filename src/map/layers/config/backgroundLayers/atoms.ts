@@ -25,7 +25,7 @@ import { clearBackgroundLayer, swapBackgroundLayers } from './utils';
 // `lidarCvat` is in it because the flight under it is *derived*: Automatisk is
 // on at every cold load, so the footprint ranking names the flight the view is
 // over as soon as it lands, and `resolveLidarStyle` puts the render back on our
-// cache where the store holds it — so a shared link to a lokalitet read on the
+// cache where the store holds it — so a shared link to a view read on the
 // cached ground opens on it.
 const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'topo',
@@ -82,8 +82,8 @@ let swapGeneration = 0;
 
 export const backgroundLayerAtomEffect = atomEffect((get) => {
   const generation = ++swapGeneration;
-  // The A half throughout, never the facade: the ribbon pointing at the
-  // curtain's B half must not rebuild the map's own background.
+  // The A half throughout, never the facade: controls pointed at the curtain's
+  // B half must not rebuild the map's own background.
   const layerName = get(backgroundLayerHalves.a);
   // Read so switching project, style or model rebuilds the LiDAR WMS layer.
   const activeLidarProject = get(activeLidarProjectHalves.a);

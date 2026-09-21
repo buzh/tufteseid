@@ -1,12 +1,14 @@
 # Map content — what is drawn, and where it comes from
 
-The background grounds and the services behind them, the Kulturminner theme
-layers from Riksantikvaren, and the three public point registers a rectangle
-can be described with. Read before touching `src/map/layers/`,
-`src/localities/flyfoto*.ts` or `src/localities/localityContext.ts`. Proxying,
+The background grounds and the services behind them, and the Kulturminner theme
+layers from Riksantikvaren. Read before touching `src/map/layers/`. Proxying,
 caching, tile grids and the Kartverket rate limit are
-`docs/wms-proxy-and-tiles.md`; the float-elevation path behind Terreng is
-`docs/terrain-analysis.md`; the controls are `docs/ui-architecture.md`.
+`docs/wms-proxy-and-tiles.md`; the float-elevation path behind terrain analysis
+is `docs/terrain-analysis.md`.
+
+There are no controls over any of this at the moment — the interface was taken
+down to the map and is being rebuilt (`docs/state-of-the-branch.md`). Every
+ground below is still reachable by writing its atom or by `?backgroundLayer=`.
 
 All WMS requests are `VERSION=1.3.0`, same-origin through a `/wms/…` prefix.
 Nothing sets `SRS`/`CRS` by hand — OpenLayers writes it from the view
@@ -15,10 +17,10 @@ projection, `EPSG:25833` by default (`DEFAULT_PROJECTION`, `src/map/atoms.ts`);
 
 ## The grounds
 
-`GROUND_MODES` (`src/shell/useGroundMode.ts`) is `lidar`, `terreng`, `kart`,
-`hybrid`, `flyfoto`. `terreng` — labelled **Analyse** on the ribbon, beside
-LiDAR — is not a background layer but a client-rendered overlay over whatever
-background is set. A cold load with no `?backgroundLayer`
+The grounds the old interface grouped as `lidar`, `terreng`, `kart`, `hybrid`
+and `flyfoto`. `terreng` is not a background layer at all but a client-rendered
+overlay over whatever background is set (`docs/terrain-analysis.md`); the rest
+are entries in the stack below. A cold load with no `?backgroundLayer`
 arrives on `lidarHillshade`, the national relief mosaic
 (`getDefaultBackgroundLayer`, `config/backgroundLayers/atoms.ts`): reading
 relief is what the app is for, and Automatisk takes it to a per-project dataset
@@ -170,8 +172,8 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
 - Old NiB WMS endpoints die September 2026; this uses
   `services.norgeibilder.no/wms/*`. The imagery is free for private,
   non-commercial use, publishing and commercial use being the user's
-  responsibility; `localities.tools.flyfotoNotice*` gates every grab, never
-  browsing.
+  responsibility, so anything that grabs pixels rather than browsing them has
+  to say so at the point of the grab.
 
 ## The background stack
 
@@ -205,14 +207,12 @@ installs the result without a gap: 1–2 go *under* the outgoing layers, 3–4
   match, so cycling rebuilds only what changed — and a reused layer may carry
   an earlier fade, so callers set opacity explicitly on every layer they pass.
 
-Map z-order: backgrounds at the default zIndex 0 (ordered by collection
-position), the ground overlay at 1 (`src/map/groundOverlay.ts`), the compare
-curtain at 1.5, sketches at 2, measure at 3, lokalitet rectangles at 4, the funn
-highlight at 4.5, funn at 5, the search marker at 6, the bbox handles at 8, and
-the Kulturminner theme layers on top at 10 — set by the caller that adds them
-(`src/map/layers/atoms.ts`), not by the factory in `themeWMS.ts`. The ground
-overlay is itself an ordered stack composited into one canvas —
-`docs/ui-architecture.md`.
+Map z-order, of what is left: backgrounds at the default zIndex 0 (ordered by
+collection position), the compare curtain at 1.5, the terrain-analysis window
+frame at 4, and the Kulturminner theme layers on top at 10 — set by the caller
+that adds them (`src/map/layers/atoms.ts`), not by the factory in
+`themeWMS.ts`. 1, 2, 3 and 5–9 were the old interface's overlays and are free;
+a new one should write down what it puts there.
 
 ## Kulturminner (theme layers, Riksantikvaren)
 
@@ -272,40 +272,6 @@ Contracts:
 Whether a feature's `linkkulturminnesok` URL resolves is asked separately
 (`src/map/featureInfo/kulturminnesok.ts`, `docs/wms-proxy-and-tiles.md`).
 
-## What the registers know about a point
-
-`src/localities/localityContext.ts` asks three anonymous GeoNorge endpoints in
-parallel, over `ws.geonorge.no` directly (already in the CSP, a few kB each,
-not worth a wmscache route). `createLocalityFromBbox` awaits the result before
-writing the record, so a new lokalitet arrives named after the nearest
-stedsnavn with its place, kommune and matrikkel fields filled.
-
-| Endpoint | Answers |
-|---|---|
-| `stedsnavn/v1/punkt` | place names near the centre, point + radius |
-| `kommuneinfo/v1/punkt` | the kommune |
-| `eiendom/v1/punkt` | matrikkel parcels, point + radius |
-
-- Never fatal, never slow: every lookup degrades to `''` and the whole thing is
-  capped at `TIMEOUT_MS` (6 s). A lokalitet at sea, across the border or during
-  a GeoNorge outage is still a lokalitet.
-- Type, not distance, picks the name. `navneobjekttype` is sorted into three
-  tiers drawn from the register's own 291-type vocabulary
-  (`ws.geonorge.no/stedsnavn/v1/navneobjekttyper`): deny (administrative and
-  statistical geography — Kommune, Fylke, Poststed, Grunnkrets, …), promote
-  (Gard, Bruk, Seter/støl, Tuft, Heller, Gammel bosettingsplass, …, worth
-  `PROMOTE_BONUS_M` and no more) and demote (built infrastructure). Anything
-  unlisted is the neutral middle, the natural-landscape vocabulary. Without the
-  tiers, cities name lokaliteter after venues and coasts after
-  vannstandsmålere.
-- Only `stedstatus = aktiv` names are eligible; a place with no `hovednavn`
-  picks a settled spelling over the first `foreslått` one.
-- `/eiendom/v1/punkt`, not `/punkt/omrader` — the same list minus teig polygons
-  nothing draws (4.5 kB vs 249 kB). Parcels with gnr ≥ 9000 (road, rail,
-  watercourse) and null-gnr water surfaces are dropped, the kommune number is
-  prefixed only outside the resolved kommune, and the list is capped at
-  `MAX_MATRIKKEL` (8).
-
 ## Recipe: add a theme layer
 
 1. A config in `src/map/layers/config/themeLayers/` exporting a
@@ -337,9 +303,7 @@ stedsnavn with its place, kommune and matrikkel fields filled.
 3. A layer whose concrete source is a runtime choice gets a branch in
    `pickLayerConfig` rather than a static entry, and stays out of
    `VALID_STARTUP_LAYERS`, since a cold load onto it would render nothing.
-4. Give it a control: a ground is a `ModeButton` in
-   `src/shell/RibbonGlobalRow.tsx`, a choice within a ground a `Pulldown` on
-   `src/shell/RibbonSettingsRow.tsx`. `src/shell/lidar/` and
-   `src/shell/flyfoto/` are the worked examples, W/S ring included.
-5. Translations under `ribbon.*` in
-   `src/locales/{nb,nn,en}/translation.json`.
+4. Give it a control. There is no control surface yet; until there is, a new
+   ground is reachable by setting `backgroundLayerAtom` and by
+   `?backgroundLayer=` if it is safe to cold-load onto.
+5. Translations in `src/locales/{nb,nn,en}/translation.json`.

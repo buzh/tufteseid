@@ -8,9 +8,6 @@
 # Defaults are the reference deployment and its shared lokalitet. curl is the
 # only dependency. Safe against production: nothing here writes, and the one
 # POST exists to be refused.
-#
-# The procedure this is half of — and what each failure means — is
-# docs/live-site-test.md.
 
 set -uo pipefail
 

@@ -63,7 +63,7 @@ export const getWMTSLayer = async (
     }
 
     const layer = new TileLayer({
-      // Untainted canvas for skjermbilde; cache.kartverket.no sends ACAO:*.
+      // Untainted canvas, so the map can be read back into one; cache.kartverket.no sends ACAO:*.
       source: new WMTS({ ...layerOptions, crossOrigin: 'anonymous' }),
       properties: { id: `bg.${layerConfig.layerName}` },
       // Pre-rendered and ~130 ms a tile, so preloading coarser levels is cheap.

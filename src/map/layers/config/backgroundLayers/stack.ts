@@ -6,7 +6,7 @@ import {
   buildFlyfotoProjectConfig,
   FLYFOTO_MOSAIC_CONFIG,
 } from './flyfotoBackground';
-import type { FlyfotoProject } from '../../../../localities/flyfotoProjects';
+import type { FlyfotoProject } from './flyfotoProjects';
 import { AMTSKART_CONFIG } from './kartVariants';
 import { KvCacheBackgroundLayers } from './kvCache';
 import {

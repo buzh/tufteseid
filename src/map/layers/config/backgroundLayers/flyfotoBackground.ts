@@ -8,8 +8,8 @@ import {
   FLYFOTO_PROJECT_IMAGESERVER,
   FLYFOTO_WMS_URL,
   flyfotoMosaicRule,
-} from '../../../../localities/flyfoto';
-import type { FlyfotoProject } from '../../../../localities/flyfotoProjects';
+} from './flyfoto';
+import type { FlyfotoProject } from './flyfotoProjects';
 import { halved } from '../../../compare/halves';
 import type { ArcGISImageBackgroundLayer, WMSBackgroundLayer } from './types';
 

@@ -22,7 +22,7 @@ export const MapComponent = () => {
   // swap does not sweep.
   useAtom(compareLayerAtomEffect);
   // The frame around a standalone terrain analysis — furniture on the map, so
-  // it hangs off the atom here rather than off the terrain hook in the ribbon.
+  // it hangs off the atom here rather than off whatever drives the analysis.
   useAtom(terrainWindowLayerEffect);
 
   useEffect(() => {

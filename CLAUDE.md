@@ -2,16 +2,23 @@
 
 Map viewer for reading Norwegian LiDAR terrain against the Riksantikvaren
 heritage register (Kulturminner). Hard fork of Kartverket's Norgeskart, not
-tracking upstream. Working branch: `main`.
+tracking upstream. Working branch: `new-ui`.
+
+**The interface is being rebuilt from nothing.** This branch kept OpenLayers,
+the WMS/cache path and the headless computation behind them, and deleted every
+surface on top — ribbon, lokaliteter, funn, drawing, search UI, the UI kit.
+`src/App.tsx` renders the map and nothing else. Read
+`docs/state-of-the-branch.md` before adding the first control: it lists what
+survived, what the atoms are called, and what is deliberately still broken.
+`main` holds the old app and is still deployable.
 
 ## Scope
 
 Keep what an amateur reading relief-shaded terrain against the heritage record
 needs: Kulturminner theme layers, LiDAR hillshade and per-project LiDAR
-backgrounds, LiDAR tile extract, client-side terrain analysis, lokaliteter with
-their drawing and imagery, place/property search. Drop the rest. Before
-re-adding an upstream Norgeskart feature, ask whether this use case needs it —
-`docs/ui-architecture.md` lists what was deliberately removed.
+backgrounds, LiDAR tile extract, client-side terrain analysis, place/property
+search. What the user's own records look like is an open question on this
+branch — the old lokalitet/funn model was deleted rather than ported.
 
 Not affiliated with Kartverket or Riksantikvaren. The app is de-branded on
 purpose: no Norgeskart naming or Kartverket visual identity in user-visible
@@ -24,13 +31,10 @@ Each owns its subject; this file keeps only what is true across all of them.
 
 | Doc | Subject | Read before touching |
 | --- | --- | --- |
-| `docs/ui-architecture.md` | The whole user interface: shell geometry, ribbon, lokalitet surfaces, drawing, layer row, state and URL persistence, keyboard map, and the inventory of user-facing actions | anything under `src/` that renders |
-| `docs/map-layers.md` | What is drawn on the map: background grounds, theme layers, the point registers, and the recipes for adding another | `src/map/layers/`, `src/localities/localityContext.ts`, any new map source |
+| `docs/state-of-the-branch.md` | What the strip kept and deleted, the atoms a new interface writes to, and the loose ends left open | anything under `src/`, and especially before building a surface |
+| `docs/map-layers.md` | What is drawn on the map: background grounds, theme layers, and the recipes for adding another | `src/map/layers/`, any new map source |
 | `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
-| `docs/analysis-roadmap.md` | Where lokalitet analysis stands, the GIS tool survey and its verdicts | proposing a new analysis feature |
-| `docs/live-site-test.md` | Verifying a running deployment: the fixture lokalitet, `scripts/live-check.sh`, the eye pass, what to do around a deploy | claiming something works in production |
-| `docs/open-questions.md` | Decisions deliberately not taken | closing one |
 | `README.md` | Third-party install and admin guide | any change to install, first-run or licensing |
 
 ## Working here
@@ -39,8 +43,10 @@ Each owns its subject; this file keeps only what is true across all of them.
   daemon. Do not run `npm install`, `tsc`, `npm run build`, `npm test`,
   `docker compose`, or `curl localhost:3030`. Print the commands for the user to
   run on the server. TypeScript errors surface in the docker build output.
-- **No new dependencies.** `package-lock.json` cannot be regenerated here. The
-  one exception ever made is `@excalidraw/excalidraw`.
+- **No new dependencies without a server round trip.** `package-lock.json`
+  cannot be regenerated here, so adding or removing one is an `npm install`
+  the user runs on the server and pastes back. That is a cost, not a ban — the
+  new interface is allowed to take a dependency if it earns one.
 - **Three checks run locally**: `npx oxlint@1.83.0 <paths>` (scope it to the
   files you touched; `src` carries pre-existing findings — name them as
   pre-existing), a JSON parse of the three locale files, and grep.
@@ -50,10 +56,12 @@ Each owns its subject; this file keeps only what is true across all of them.
   workstation and server — mint a fresh one wherever the call is made.
 - **`icon="…"` props** are typed against the `MaterialSymbol` union from
   `material-symbols`, re-exported by `src/ui/Icon.tsx`. A plausible name that
-  isn't in the union fails the docker build; `docs/ui-architecture.md` has the
-  procedure for checking one without local `node_modules`.
-- **Three languages.** User-visible strings go through `t()` into
-  `src/locales/{nb,nn,en}/translation.json`. A new string needs all three files.
+  isn't in the union fails the docker build; the comment on that re-export has
+  the procedure for checking one without local `node_modules`.
+- **`t()` from day one, `nb` only.** User-visible strings go through `t()` into
+  `src/locales/nb/translation.json` so the retrofit stays free. `nn` and `en`
+  are stubs while the interface moves — do not hold work up for them, and do
+  not add English or Nynorsk guesses to make the files match.
 - **Keep unused code out.** A helper with no live caller after a change gets
   deleted, not kept "for later".
 - **Commits**: short imperative subject; body explains the *why* when the diff
@@ -76,8 +84,9 @@ scripts/live-check.sh https://<host> <lokalitet-code>
 ```
 
 - `scripts/live-check.sh` runs from the workstation too — the live origin is
-  public. It is the machine half of `docs/live-site-test.md`; read that for the
-  eye pass and for what a red line means.
+  public. Its raster half still holds; its PocketBase half probes the old
+  collections and will need rewriting with the new data model
+  (`docs/state-of-the-branch.md`).
 
 - Changed anything under `nginx/`? Also `docker compose restart wmscache`. The
   configs are bind-mounted but nginx only reads them at startup, and

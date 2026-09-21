@@ -7,7 +7,6 @@ import { get as getProjection } from 'ol/proj';
 import { v4 as uuidv4 } from 'uuid';
 import { validateProjectionIdString } from '../shared/utils/enumUtils';
 import { getUrlParameter, setUrlParameter } from '../shared/utils/urlUtils';
-import { mapLayers } from './layers';
 import { ProjectionIdentifier } from './projections/types';
 
 export const DEFAULT_PROJECTION: ProjectionIdentifier = 'EPSG:25833';
@@ -74,9 +73,6 @@ export const mapAtom = atom<Map>(() => {
     // slot and the ~130 ms topo base never gets scheduled.
     maxTilesLoading: 48,
   });
-
-  map.addLayer(mapLayers.markerLayer.getLayer());
-  map.addLayer(mapLayers.measureLayer.getLayer());
 
   const intialView = getInitialMapView();
 

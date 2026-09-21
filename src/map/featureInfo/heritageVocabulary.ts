@@ -1,4 +1,4 @@
-import type { MaterialSymbol } from '../../ui';
+import type { MaterialSymbol } from '../../ui/Icon';
 
 // The two closed vocabularies the Kulturminner popup draws as icons, keyed on
 // the labels kart.ra.no puts on the wire rather than Geonorge's SOSI register

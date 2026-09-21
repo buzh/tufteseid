@@ -13,9 +13,8 @@ import { terrainWindowAtom } from './window';
 // and when the answer is nothing, because the render itself is transparent
 // wherever there is no laser coverage.
 //
-// A lokalitet's frame from `localityLayer` in a different hand: dashed and
-// cased the same way so it reads as the same kind of object, but thinner and
-// unnamed, because nothing owns this one and there is nothing to click.
+// Dashed and cased, thin and unnamed: nothing owns this rectangle and there is
+// nothing to click on it.
 const CASING = 'rgba(255, 255, 255, 0.4)';
 const FRAME = 'rgba(255, 106, 0, 0.55)';
 
@@ -46,7 +45,7 @@ export const terrainWindowLayerEffect = atomEffect((get) => {
       }),
     ],
   });
-  // Above the ground overlay the render lands on, below the lokalitet frames.
+  // Above the background and whatever the render itself lands on.
   const layer = new VectorLayer({
     zIndex: 4,
     source,

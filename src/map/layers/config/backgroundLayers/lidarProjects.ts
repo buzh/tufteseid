@@ -154,17 +154,16 @@ export const preferredLidarRender = (
 const EXCLUDED_STYLES = new Set<string>(['None', 'dynamisk_farget_hoyde']);
 
 /**
- * The suffix in Norwegian prose, for the places a reader is being told what
- * they are looking at: the style pulldown, a bilde's caption, a plate's title.
- * The raw suffix stays the reproducibility contract and `figure.set.wmsStyle`
- * still prints it verbatim, so this never replaces it — it sits beside it.
+ * The suffix in Norwegian prose, for wherever a reader is being told which
+ * render they are looking at. The raw suffix stays the reproducibility
+ * contract, so this never replaces it — it sits beside it.
  *
  * The list comes from GetCapabilities rather than from here, so an unadvertised
  * suffix is prettified instead of dropped: five is what the two services
  * publish today, not a closed set.
  */
 export const lidarStyleLabel = (style: string): string => {
-  const known = t(`ribbon.lidar.style.${style}`, { defaultValue: '' });
+  const known = t(`lidar.style.${style}`, { defaultValue: '' });
   if (known) return known;
   const spaced = style.replace(/_/g, ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);

@@ -1,11 +1,11 @@
-// The NiB ortofoto acquisitions ("prosjekter") over a lokalitet, from NiB's own
+// The NiB ortofoto acquisitions ("prosjekter") over a bbox, from NiB's own
 // project index. Not Kartverket's wms.georef_nib, which looks like the obvious
 // index but is a planning layer: prosjektfase P/U, start years in the future,
 // empty project names.
 
 import { transformExtent } from 'ol/proj';
-import type { LocalityBbox } from '../api/localities';
-import { fetchWithin } from '../shared/utils/deadline';
+import type { Bbox } from '../../../bbox';
+import { fetchWithin } from '../../../../shared/utils/deadline';
 
 // A ceiling on a stalled connection, not on the query.
 const PROJECTS_TIMEOUT_MS = 20_000;
@@ -15,7 +15,7 @@ const PROJECTS_TIMEOUT_MS = 20_000;
 const PROJECTS_URL = '/arcgis/nib/prosjekter/MapServer/4/query';
 
 // ortofototype 6 = "Satellittbilde": the nationwide 10 m Sentinel-2 mosaics,
-// which cover everywhere and would list under every lokalitet.
+// which cover everywhere and would list under every rectangle.
 const SATELLITE_ORTOFOTOTYPE = 6;
 
 export type FlyfotoProject = {
@@ -92,7 +92,7 @@ function byNewest(a: FlyfotoProject, b: FlyfotoProject): number {
 
 // The server filters against the real outlines, not their bounding boxes.
 export async function fetchFlyfotoProjectsForBbox(
-  bbox4326: LocalityBbox,
+  bbox4326: Bbox,
   signal?: AbortSignal,
 ): Promise<FlyfotoProject[]> {
   // The service wants a projected CRS, and 25833 is the flyfoto path's.

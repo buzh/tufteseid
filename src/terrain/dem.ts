@@ -6,9 +6,8 @@
 // docs/terrain-analysis.md.
 
 import { transformExtent } from 'ol/proj';
-import type { LocalityBbox } from '../api/localities';
 import { planTiles, runWithConcurrency } from '../lidarExtract/stitch';
-import { MAX_SIDE_M } from '../localities/bboxLimits';
+import { MAX_SIDE_M, type Bbox } from '../map/bbox';
 import { fetchWithin } from '../shared/utils/deadline';
 
 const IMAGE_SERVER_BASE = '/arcgis/hoydedata';
@@ -200,7 +199,7 @@ export type FetchDemOptions = {
 // Null when the bbox is entirely outside LiDAR coverage; throws when every tile
 // request failed. Same contract as fetchFlyfoto.
 export async function fetchDem(
-  bbox4326: LocalityBbox,
+  bbox4326: Bbox,
   { model = 'dtm', signal }: FetchDemOptions = {},
 ): Promise<Dem | null> {
   const bbox25833 = transformExtent(bbox4326, 'EPSG:4326', 'EPSG:25833') as [

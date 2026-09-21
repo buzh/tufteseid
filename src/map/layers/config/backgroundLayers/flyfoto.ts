@@ -1,15 +1,15 @@
-// Norge i bilder ortofoto over a lokalitet's bbox: the seamless mosaic or one
-// acquisition, one stitcher. Same-origin through /wms/nib/* and /arcgis/nib/*
+// Norge i bilder ortofoto over a bbox: the seamless mosaic or one acquisition,
+// one stitcher. Same-origin through /wms/nib/* and /arcgis/nib/*
 // → Caddy → wmscache → nib-proxy (which injects the anonymous token). Tiling
 // and concurrency are src/lidarExtract/stitch.ts.
 
 import { transformExtent } from 'ol/proj';
-import type { LocalityBbox } from '../api/localities';
+import type { Bbox } from '../../../bbox';
 import {
   fetchAndPaint,
   planTiles,
   runWithConcurrency,
-} from '../lidarExtract/stitch';
+} from '../../../../lidarExtract/stitch';
 import type { FlyfotoProject } from './flyfotoProjects';
 
 export const FLYFOTO_WMS_URL = '/wms/nib/ortofoto';
@@ -100,7 +100,7 @@ export type FlyfotoOptions = {
 // Null when nothing painted and nothing failed: outside coverage. A grab where
 // every tile errored throws instead.
 export async function fetchFlyfoto(
-  bbox4326: LocalityBbox,
+  bbox4326: Bbox,
   { project, signal }: FlyfotoOptions = {},
 ): Promise<FlyfotoResult | null> {
   const bbox25833 = transformExtent(bbox4326, 'EPSG:4326', 'EPSG:25833') as [

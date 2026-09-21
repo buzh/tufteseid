@@ -81,12 +81,4 @@ export type UrlParameter =
   | 'heritageOpacity'
   | 'lat'
   | 'lon'
-  | 'markerLat'
-  | 'markerLon'
-  | 'zoom'
-  | 'sok'
-  | 'showSelection'
-  // The open lokalitet, as its six-character code, not its PB id; the only
-  // parameter here that names a record, and so the only one that can fail to
-  // resolve. `src/localities/shareLink.ts` owns both directions.
-  | 'lok';
+  | 'zoom';
