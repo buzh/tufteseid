@@ -299,7 +299,9 @@ Whether a feature's `linkkulturminnesok` URL resolves is asked separately
    `config/backgroundLayers/types.ts`. A fourth type also needs a builder and a
    `layerSignature` arm in `utils.ts` — without the signature every dataset
    cycle rebuilds the layer instead of reusing it, and a ground already drawn
-   flashes.
+   flashes. A new builder also calls `guardTileSource(source, url)` before
+   handing the source to the layer, or that ground goes on hammering a dead
+   upstream while everything else has stopped (`docs/wms-proxy-and-tiles.md`).
 2. Create or extend a config in `src/map/layers/config/backgroundLayers/` and
    spread it into `allConfiguredBackgroundLayers` in `stack.ts`.
    `coverageExtent` is mandatory for WMS and ArcGISImage layers —

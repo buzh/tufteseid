@@ -9,6 +9,7 @@ import { transformExtent } from 'ol/proj';
 import { planTiles, runWithConcurrency } from '../lidarExtract/stitch';
 import { MAX_SIDE_M, type Bbox } from '../map/bbox';
 import { fetchWithin } from '../shared/utils/deadline';
+import { isUpstreamDown } from '../upstream/health';
 
 const IMAGE_SERVER_BASE = '/arcgis/hoydedata';
 
@@ -247,8 +248,14 @@ export async function fetchDem(
         );
         if (blitTile(raster, data, plan.widthPx, tile.dx, tile.dy)) covered++;
         return;
-      } catch {
+      } catch (err) {
         if (signal?.aborted) return;
+        // Nothing was asked of the network, so backing off before asking again
+        // only spends the user's time; the breaker is the thing waiting now.
+        if (isUpstreamDown(err)) {
+          failed++;
+          return;
+        }
         if (attempt === TILE_RETRIES - 1) {
           failed++;
           return;

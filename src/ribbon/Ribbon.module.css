@@ -104,6 +104,32 @@
   color: var(--mantine-color-dimmed);
 }
 
+/* An upstream is not answering. Red rather than the papaya accent: the accent
+   means "this is where the controls are", and a fault has to read as the other
+   thing. Only the border and the icon carry it — a filled red chip in a ribbon
+   this dense reads as an alarm, and the map underneath is still usable. */
+.chipWarn {
+  border-color: var(--mantine-color-red-8);
+}
+
+.chipWarn .chipIcon {
+  color: var(--mantine-color-red-4);
+}
+
+/* Pushes the fault to the right of the LiDAR controls, so it appears without
+   moving anything the reader was about to click. */
+.statusSpacer {
+  flex: 1 1 auto;
+  min-width: var(--mantine-spacing-md);
+}
+
+/* One origin's row in the popover. */
+.outage + .outage {
+  margin-top: var(--mantine-spacing-sm);
+  padding-top: var(--mantine-spacing-sm);
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
 /* A Menu.Label is normally two or three words; this one is a paragraph. */
 .provenance {
   white-space: normal;

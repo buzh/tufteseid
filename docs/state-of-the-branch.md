@@ -7,9 +7,11 @@ re-deriving four years of Kartverket and Riksantikvaren service quirks.
 
 The rebuild has reached one surface. `src/App.tsx` renders a ribbon above
 `MapComponent`: it says which LiDAR dataset and which render of it are drawing,
-and switches both (`src/ribbon/`). There is still no search box, no lokaliteter,
-no funn, no drawing and no account, and no control over the Kart, Flyfoto,
-Amtskart or Hybrid grounds — those remain a `set()` away.
+and switches both (`src/ribbon/`). At the far end of that row, and only when
+there is something to say, it names an external service that has stopped
+answering. There is still no search box, no lokaliteter, no funn, no drawing and
+no account, and no control over the Kart, Flyfoto, Amtskart or Hybrid grounds —
+those remain a `set()` away.
 
 **Mantine is the design system, and the app is dark.** `MantineProvider` and
 the theme (`src/ui/theme.ts`) are mounted at the root, and every surface is
@@ -67,6 +69,17 @@ and `theme.ts`. The rest of the kit went, `tokens.css` with it — the four
 stylesheets that still read its custom properties were rewritten onto
 `--mantine-*` when the app went dark, and a second set of tokens that has to be
 kept in step with the first is exactly the thing not worth maintaining.
+
+## What was added
+
+`src/upstream/` is the one thing on this branch that is neither kept nor
+rebuilt. It is a circuit breaker over the four external map origins plus the
+ribbon chip that reports one being down — written after a Kartverket height
+outage that the app had no way to notice and no way to mention. Every tile
+source goes through `guardTileSource`, and every non-tile request to those
+origins through `fetchWithin`, which is now the admission point as well as the
+deadline. The rules, the thresholds and the two cache interactions that make
+the probes honest are in `docs/wms-proxy-and-tiles.md`.
 
 ## What went
 
@@ -135,6 +148,6 @@ the surfaces that wrote them.
   keeps the viewport list warm while the keyboard ring walks datasets, and the
   ring (`useBackgroundCyclingKeys`, W/S/A/D/E) went with the old shell. It costs
   nothing false today and comes back with those keys.
-- **The ribbon covers the LiDAR ring only.** No ground switch, no Hybrid
-  overlay or contours toggle, no compare curtain, no search — the atoms for all
-  of them are live and unwritten.
+- **The ribbon covers the LiDAR ring only**, plus the upstream fault chip. No
+  ground switch, no Hybrid overlay or contours toggle, no compare curtain, no
+  search — the atoms for all of them are live and unwritten.

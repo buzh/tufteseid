@@ -3,6 +3,8 @@
 
 import GeoJSON from 'ol/format/GeoJSON';
 import { Geometry } from 'ol/geom';
+import { fetchWithin } from '../../../../shared/utils/deadline';
+import { isUpstreamDown } from '../../../../upstream/health';
 import { LidarProject } from './lidarProjects';
 
 const WFS_URL = '/wfs/geonorge/wfs.hoyde-hoydedata-metadata-prosjekt';
@@ -44,6 +46,11 @@ const stripDensity = (name: string): string =>
     .trim();
 
 const YEAR_TOLERANCE = 2;
+
+// Per page, and six of these run at once over up to sixty projects: without a
+// budget of its own a stalled WFS parks the whole fan-out until the proxy gives
+// up at thirty seconds, once per project. Well over the 300-900 ms a page takes.
+const PAGE_TIMEOUT_MS = 12000;
 
 type WfsProperties = {
   LAS_PROJECT_NAME?: string;
@@ -129,11 +136,11 @@ const requestByName = async (
       FILTER: buildNameFilter(projectName),
       ...(urn ? { SRSNAME: urn } : {}),
     });
-    const res = await fetch(`${WFS_URL}?${params.toString()}`);
-    if (!res.ok) {
-      throw new Error(`Prosjektavgrensning WFS returned ${res.status}`);
-    }
-    const json = await res.json();
+    const json = await fetchWithin(
+      `${WFS_URL}?${params.toString()}`,
+      { ms: PAGE_TIMEOUT_MS, what: `Prosjektavgrensning ${projectName}` },
+      (res) => res.json(),
+    );
 
     const dataProjection = epsgFromCrsMember(json) ?? projection;
     const features = format.readFeatures(json, {
@@ -233,6 +240,14 @@ export async function fetchLidarFootprints(
         const footprint = await fetchOne(project, projection);
         if (footprint) out.set(project.id, footprint);
       } catch (err) {
+        // The breaker is open: every remaining project would fail the same
+        // way, instantly and without a request. Drop the queue rather than
+        // walk sixty of them, and say nothing — the ribbon is already saying
+        // it, once, for all of them.
+        if (isUpstreamDown(err)) {
+          queue.length = 0;
+          return;
+        }
         // One project's boundary failing shouldn't blank the whole list.
         console.warn('[lidarFootprints] %s failed', project.id, err);
       }

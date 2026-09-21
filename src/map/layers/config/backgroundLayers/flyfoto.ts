@@ -10,6 +10,7 @@ import {
   planTiles,
   runWithConcurrency,
 } from '../../../../lidarExtract/stitch';
+import { isUpstreamDown } from '../../../../upstream/health';
 import type { FlyfotoProject } from './flyfotoProjects';
 
 export const FLYFOTO_WMS_URL = '/wms/nib/ortofoto';
@@ -142,8 +143,14 @@ export async function fetchFlyfoto(
         );
         if (result === 'painted') painted++;
         return;
-      } catch {
+      } catch (err) {
         if (signal?.aborted) return;
+        // Refused by the breaker, so nothing was asked of the network and
+        // sleeping before asking again only spends the user's time.
+        if (isUpstreamDown(err)) {
+          failed++;
+          return;
+        }
         if (attempt === TILE_RETRIES - 1) {
           failed++;
           return;

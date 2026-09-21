@@ -15,6 +15,7 @@ import { AutoToggle } from './AutoToggle';
 import { DatasetMenu } from './DatasetMenu';
 import { RenderMenu } from './RenderMenu';
 import styles from './Ribbon.module.css';
+import { UpstreamStatus } from './UpstreamStatus';
 import { useLidarControls } from './useLidarControls';
 
 export const Ribbon = () => {
@@ -76,6 +77,11 @@ export const Ribbon = () => {
             </Button>
           </>
         )}
+
+        {/* Outside the branch: the topo ground under everything and the
+            Kulturminner themes over it are drawn whichever dataset the LiDAR
+            ring is on, so their outages have to be sayable off-LiDAR too. */}
+        <UpstreamStatus />
       </Group>
     </header>
   );

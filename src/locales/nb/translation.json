@@ -53,5 +53,25 @@
       "title": "Noe gikk galt her",
       "retry": "Prøv igjen"
     }
+  },
+  "upstream": {
+    "notAnswering": "svarer ikke",
+    "severalDown": "{{count}} tjenester",
+    "explain": "Kartet hentes fra tjenester utenfor Tufteseid. Det som allerede er lastet blir stående; resten kommer når tjenesten svarer igjen.",
+    "probing": "Sjekker …",
+    "retryIn": "Prøver igjen om {{seconds}} s",
+    "retryNow": "Prøv igjen",
+    "origin": {
+      "hoyde": "Høydedata",
+      "kartverketCache": "Bakgrunnskart",
+      "ra": "Kulturminner",
+      "nib": "Flyfoto"
+    },
+    "affects": {
+      "hoyde": "Terrengskygge, LiDAR-prosjekter og terrenganalyse",
+      "kartverketCache": "Det topografiske kartet under de andre lagene",
+      "ra": "Kulturminnelagene over terrenget",
+      "nib": "Ortofoto som bakgrunn"
+    }
   }
 }

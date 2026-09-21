@@ -204,16 +204,66 @@ is fewer requests.
 - Ortofoto backgrounds ask for JPEG — 68 kB against 528 kB per 512 px tile over
   Oslo, and the mosaic has no transparency to lose. A single acquisition needs
   transparent gaps and uses `jpgpng`.
-- Tile loading stays OpenLayers' default. A former `retryBlankTileLoadFunction`
-  retried anything under 800 bytes, but the no-data PNG is deterministic, so it
-  only ever refetched real no-coverage tiles at 4 origin requests each. Fix a
-  blank-where-there-is-data tile at wmscache, which can see the upstream.
+- Tiles load through `guardTileSource` (`src/upstream/tileGuard.ts`), which is
+  admission control and nothing else — it sets `image.src` exactly as
+  OpenLayers' own loader does, unless the breaker below has the origin shut. A
+  former `retryBlankTileLoadFunction` retried anything under 800 bytes, and is
+  gone: the no-data PNG is deterministic, so it only ever refetched real
+  no-coverage tiles at 4 origin requests each. Fix a blank-where-there-is-data
+  tile at wmscache, which can see the upstream.
 
 The compare curtain (`src/map/compare/`) is the deliberate exception: a second
 full background stack out of the same queue, so a screenful costs about twice
 what it normally does. Hence it is a mode you enter and leave, the B stack is
 torn down on exit, and it is not persisted to the URL — a shared link must not
 put every recipient into double spend on a shared budget.
+
+## When an upstream stops answering
+
+`src/upstream/` is a circuit breaker per external origin, and the ribbon chip
+that says one is open. It exists because of what an outage costs without it: on
+2026-09-21 every Kartverket height endpoint answered 504 after a flat 30 s —
+`proxy_read_timeout`, which does not fail over, because a slow render is
+usually a render — and the app kept asking. A screenful is a dozen tiles, each
+pan queued a dozen more, the footprint WFS fired up to sixty lookups a viewport
+at three tries each, and the reader was told none of it.
+
+**Four origins**, grouped by what fails together rather than by hostname
+(`origins.ts`): `hoyde` (`/wms/geonorge/wms.hoyde-*`, `/wfs/geonorge/wfs.hoyde-*`
+and `/arcgis/hoydedata/*` — one backend, and they went down as one),
+`kartverketCache` (cache.kartverket.no, direct from the browser),
+`ra` (`/wms/ra/*`), `nib` (`/wms/nib/*`, `/arcgis/nib/*`). Matched by URL
+prefix, so nothing has to be declared per layer. `wms.topo`, `wms.historiskekart`
+and `/kms/` are deliberately in no origin: a different renderer, up through that
+outage, and one layer each.
+
+**Tripping.** Three failures net of successes inside a minute. Net, not
+consecutive: `proxy_cache_use_stale` serves cached tiles straight through an
+upstream 504, so a pan over half-visited ground interleaves hits and failures,
+and a rule that zeroed on any success would hold the counter under the
+threshold while eleven twelfths of the map stayed blank.
+
+**While open**, no request goes out at all. Tiles are marked `ERROR` without
+touching the network (the slot is freed — a tile left `LOADING` holds one of
+the 48); `fetchWithin` throws `UpstreamDownError` before fetching, which the
+retry loops in `dem.ts`, `flyfoto.ts`, `lidarExtract/run.ts` and the footprint
+fan-out short-circuit on rather than sleep between attempts that cost nothing.
+
+**Recovery is measured, not guessed.** A 1×1 GetMap (the coarsest WMTS tile for
+cache.kartverket.no) on a 20 → 40 → 80 → 120 s backoff. `status >= 500` is a
+failure and everything else, 4xx included, is the service being alive: the whole
+mechanism fails open, so a probe URL that goes stale reads as *up* rather than
+wedging an origin shut. On success the guarded sources on the map are
+`refresh()`ed — OpenLayers caches the `ERROR` state and will not re-request
+without it. The backoff only resets after a minute of continuous health, which
+is what stops a flapping service re-probing every 20 s forever.
+
+Two cache interactions are load-bearing. The probes are under the 300-byte
+`$skip_cache` floor, so they are neither stored in the 25 GB LRU nor answered
+from it; and `probeUrl()` puts a cache-buster on the proxied ones besides,
+because a probe served stale through `proxy_cache_use_stale … http_504` is the
+one failure the breaker cannot recover from. The WMTS probe goes direct to a CDN
+that sends `max-age`, so that one carries `cache: 'no-store'` instead.
 
 ## Recipe: add an external map source
 
@@ -229,6 +279,10 @@ put every recipient into double spend on a shared budget.
 5. For a background layer, `coverageExtent` from its GetCapabilities.
 6. The layer-config half — name union, config file, `infoFormat` — is
    `docs/map-layers.md`.
+7. Nothing for the breaker unless the new source is a *fifth* thing that can
+   fail on its own: a layer under one of the four prefixes is covered already,
+   and one under none of them simply has no breaker, which is the right answer
+   for a single overlay.
 
 ## Verifying
 

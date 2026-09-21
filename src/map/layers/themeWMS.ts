@@ -1,5 +1,6 @@
 import TileLayer from 'ol/layer/Tile';
 import { TileWMS } from 'ol/source';
+import { guardTileSource } from '../../upstream/tileGuard';
 import type {
   ThemeLayerConfig,
   ThemeLayerDefinition,
@@ -80,16 +81,19 @@ export const createThemeLayerFromConfig = (
     ...overrides,
   };
 
+  const source = new TileWMS({
+    url: wmsUrl,
+    params: { ...wmsParams, TILED: true },
+    projection: projection,
+    // The same 512 px grid as the WMS backgrounds: RA's MapServer is the
+    // slowest origin, and there are half as many seams to clip a label.
+    tileGrid: getWMSTileGrid(projection),
+    zDirection: WMS_Z_DIRECTION,
+  });
+  guardTileSource(source, wmsUrl);
+
   return new TileLayer({
-    source: new TileWMS({
-      url: wmsUrl,
-      params: { ...wmsParams, TILED: true },
-      projection: projection,
-      // The same 512 px grid as the WMS backgrounds: RA's MapServer is the
-      // slowest origin, and there are half as many seams to clip a label.
-      tileGrid: getWMSTileGrid(projection),
-      zDirection: WMS_Z_DIRECTION,
-    }),
+    source,
     properties: layerProperties,
     cacheSize: WMS_TILE_CACHE_SIZE,
     // preload 0 as on the WMS backgrounds: on-the-fly renders sharing the one

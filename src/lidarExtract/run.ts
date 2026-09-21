@@ -1,6 +1,7 @@
 // One (source × style) stitched at that source's native ground resolution.
 // Zero painted tiles means the rectangle is outside its coverage.
 
+import { isUpstreamDown } from '../upstream/health';
 import { LidarSource, nativeResolutionMetersPerPx } from './sources';
 import {
   buildGetMapUrl,
@@ -49,6 +50,9 @@ async function paintTile(
     } catch (err) {
       lastErr = err;
       if (signal.aborted) return { kind: 'aborted' };
+      // Refused by the breaker: no request went out, so the backoff has
+      // nothing to back off from. Fail the tile and let the ribbon say why.
+      if (isUpstreamDown(err)) break;
       if (attempt < TILE_MAX_RETRIES) {
         await sleep(TILE_RETRY_BASE_MS * 2 ** attempt, signal);
       }

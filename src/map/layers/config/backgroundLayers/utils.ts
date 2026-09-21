@@ -7,6 +7,8 @@ import TileArcGISRest from 'ol/source/TileArcGISRest';
 import TileWMS from 'ol/source/TileWMS';
 import WMTS, { optionsFromCapabilities } from 'ol/source/WMTS';
 import XYZ from 'ol/source/XYZ';
+import { fetchWithin } from '../../../../shared/utils/deadline';
+import { guardTileSource } from '../../../../upstream/tileGuard';
 import { mapAtom } from '../../../atoms';
 import {
   getWMSTileGrid,
@@ -23,6 +25,11 @@ import {
   XYZBackgroundLayer,
 } from './types';
 
+// One document describing a provider's whole catalogue, so it is bigger than a
+// tile but still small; the layer cannot be built without it, and waiting past
+// this for it is waiting for nothing.
+const CAPABILITIES_TIMEOUT_MS = 15000;
+
 export const getWMTSLayer = async (
   layerConfig: WMTSBackgroundLayer,
   projection = 'EPSG:25833',
@@ -37,13 +44,11 @@ export const getWMTSLayer = async (
     if (cache[url]) {
       capabilitiesText = cache[url]!;
     } else {
-      const capabilitiesResponse = await fetch(url);
-      if (!capabilitiesResponse.ok) {
-        throw new Error(
-          `Failed to fetch capabilities for layer ${layerConfig.layerName}: ${capabilitiesResponse.statusText}`,
-        );
-      }
-      capabilitiesText = await capabilitiesResponse.text();
+      capabilitiesText = await fetchWithin(
+        url,
+        { ms: CAPABILITIES_TIMEOUT_MS, what: `capabilities ${url}` },
+        (res) => res.text(),
+      );
       store.set(backgroundLayerCapabilitiesCacheAtom, {
         ...cache,
         [url]: capabilitiesText,
@@ -62,9 +67,14 @@ export const getWMTSLayer = async (
       );
     }
 
+    // Untainted canvas, so the map can be read back into one; cache.kartverket.no sends ACAO:*.
+    const source = new WMTS({ ...layerOptions, crossOrigin: 'anonymous' });
+    // The tile URL out of the capabilities, not the capabilities URL: the two
+    // are the same host today, and the breaker should not depend on that.
+    guardTileSource(source, layerOptions.urls?.[0] ?? url);
+
     const layer = new TileLayer({
-      // Untainted canvas, so the map can be read back into one; cache.kartverket.no sends ACAO:*.
-      source: new WMTS({ ...layerOptions, crossOrigin: 'anonymous' }),
+      source,
       properties: { id: `bg.${layerConfig.layerName}` },
       // Pre-rendered and ~130 ms a tile, so preloading coarser levels is cheap.
       preload: 2,
@@ -104,6 +114,7 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
     tileGrid: getWMSTileGrid(projection),
     zDirection: WMS_Z_DIRECTION,
   });
+  guardTileSource(source, layerConfig.url);
   const extent = toViewExtent(layerConfig.coverageExtent, projection);
   // preload 0, unlike the WMTS base: these render on the fly (3-12 s cold) and
   // each preloaded tile holds a tile slot for that long.
@@ -133,6 +144,7 @@ export const getArcGISImageLayer = (
     // DPI scale by pixel ratio and wmscache keys the same ground twice.
     hidpi: false,
   });
+  guardTileSource(source, layerConfig.url);
 
   const extent = toViewExtent(layerConfig.coverageExtent, projection);
   return new TileLayer({
@@ -145,7 +157,10 @@ export const getArcGISImageLayer = (
 };
 
 // A tile store of ours, on the grid it was written on rather than the view's:
-// OL reprojects if a `?projection=` ever puts the view somewhere else.
+// OL reprojects if a `?projection=` ever puts the view somewhere else. No
+// `guardTileSource` here, alone among the four: these are static files off the
+// same disk Caddy is serving the app from, and if that is down there is no app
+// to say so in.
 export const getXYZLayer = (
   layerConfig: XYZBackgroundLayer,
 ): TileLayer | null => {
