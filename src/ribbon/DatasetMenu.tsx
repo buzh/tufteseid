@@ -119,8 +119,12 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
       width={360}
     >
       <Menu.Target>
+        {/* A flight is one aircraft over one county on one day, and the chip's
+            own facts — the year and the density — are facts about that flight.
+            The mosaic is not a flight: it keeps `layers`, because what it is is
+            every flight stacked and levelled to 1 m. */}
         <RibbonChip
-          icon="layers"
+          icon={flight ? 'flight' : 'layers'}
           label={shown}
           title={title}
           aria-label={title}
