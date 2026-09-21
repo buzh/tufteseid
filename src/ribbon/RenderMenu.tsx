@@ -19,10 +19,33 @@ import {
   CVAT_STYLE,
   lidarStyleLabel,
 } from '../map/layers/config/backgroundLayers/lidarProjects';
-import { Icon } from '../ui/Icon';
+import { Icon, type MaterialSymbol } from '../ui/Icon';
 import { RibbonChip } from './RibbonChip';
 import styles from './Ribbon.module.css';
 import type { LidarControls } from './useLidarControls';
+
+// What each render does to the height model, in one glyph. The pairs are the
+// point: a half-lit disc against a burst of rays is one sun against many, which
+// is the whole difference between the two hillshades; a per-cent sign against a
+// set square is the same slope read in two units.
+//
+// `cvat` keeps `database` rather than a second sun. It is a hillshade too, but
+// the fact worth a glyph there is that it came off our own disk — every other
+// render on this menu is Kartverket's.
+//
+// The list is open: `lidarStyleLabel` prettifies a suffix GetCapabilities
+// advertises and we have never seen, so an unmapped style falls back to the
+// generic `texture` rather than to nothing.
+const STYLE_ICONS: Record<string, MaterialSymbol> = {
+  [CVAT_STYLE]: 'database',
+  skyggerelieff: 'contrast',
+  multiskyggerelieff: 'flare',
+  helning_prosent: 'percent',
+  helning_grader: 'square_foot',
+};
+
+const styleIcon = (style: string): MaterialSymbol =>
+  STYLE_ICONS[style] ?? 'texture';
 
 export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
   const { t } = useTranslation();
@@ -51,7 +74,7 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
   // drawing is the one thing on this ribbon the reader can see by looking at
   // the map. What the picture does not say is whose render it is, so the cache
   // keeps the `database` icon it carries on its own row below.
-  const chipIcon = isLidarCvat ? 'database' : 'texture';
+  const chipIcon = isLidarCvat ? 'database' : styleIcon(shownStyle);
   const chipTitle = t('ribbon.render.chipTitle', {
     render: label,
     source: hint,
@@ -74,18 +97,16 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
     );
   }
 
+  // The check moved right so the left slot can say what the render *is* on
+  // every row, checked or not — a gutter that only fills in when a row is
+  // active makes the reader compare names to find the other pictures.
   const row = (style: string) => (
     <Menu.Item
       key={style}
       onClick={() => selectStyle(style)}
-      leftSection={
-        style === shownStyle ? (
-          <Icon icon="check" size={18} />
-        ) : style === CVAT_STYLE ? (
-          <Icon icon="database" size={18} />
-        ) : (
-          <span className={styles.gutter} />
-        )
+      leftSection={<Icon icon={styleIcon(style)} size={18} />}
+      rightSection={
+        style === shownStyle ? <Icon icon="check" size={18} /> : undefined
       }
     >
       <Text size="sm">{lidarStyleLabel(style)}</Text>
@@ -133,7 +154,10 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
           </Menu.Label>
         )}
         {cacheMissing && (
-          <Menu.Item disabled leftSection={<Icon icon="database" size={18} />}>
+          <Menu.Item
+            disabled
+            leftSection={<Icon icon={styleIcon(CVAT_STYLE)} size={18} />}
+          >
             <Text size="sm">{lidarStyleLabel(CVAT_STYLE)}</Text>
             <Text size="xs" c="dimmed">
               {t('ribbon.render.cvatMissing')}
