@@ -10,7 +10,7 @@
 }
 
 .error {
-  padding: var(--sp-6);
-  font-size: var(--font-sm);
-  color: var(--c-fg-muted);
+  padding: var(--mantine-spacing-md);
+  font-size: var(--mantine-font-size-sm);
+  color: var(--mantine-color-dimmed);
 }

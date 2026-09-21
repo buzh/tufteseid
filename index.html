@@ -1,5 +1,10 @@
 <!doctype html>
-<html lang="nb">
+<!-- The attribute is what Mantine's stylesheet keys its dark variables off, and
+     it is set statically because the alternative is Mantine's ColorSchemeScript,
+     an inline <script> the CSP has no nonce to give it. Static also means no
+     white flash: the page is dark before React mounts. Keep it in step with
+     `defaultColorScheme` in src/mainApp.tsx. -->
+<html lang="nb" data-mantine-color-scheme="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

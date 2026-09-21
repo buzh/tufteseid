@@ -15,13 +15,15 @@
   }
 }
 
+/* Anthracite and translucent, so it belongs to the app rather than to the map,
+   and still reads over hillshade — which is the light thing underneath it. */
 .ol-scale-line-inner {
-  border: 2px solid #333;
+  border: 2px solid rgba(215, 221, 224, 0.85);
   border-top: none;
-  color: #333;
+  color: rgba(215, 221, 224, 0.95);
   font-size: 12px;
   text-align: center;
-  background: rgba(233, 229, 229, 0.7);
+  background: rgba(41, 49, 51, 0.72);
   padding: 2px 5px;
 }
 

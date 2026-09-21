@@ -13,9 +13,11 @@ the UI kit. What has been built back is a top ribbon over the LiDAR ring
 survived, what the atoms are called, and what is deliberately still broken.
 `main` holds the old app and is still deployable.
 
-New surfaces use Mantine primitives and the theme in `src/ui/theme.ts`.
-`src/ui/tokens.css` is the old design system and is not for new work — it stays
-only while the surviving map stylesheets read it.
+Surfaces are Mantine primitives styled from the theme in `src/ui/theme.ts`:
+anthracite ground, papaya accent, **dark only** — there is no light scheme to
+keep in step, and CSS that hard-codes a light surface will look wrong. Reach
+for `--mantine-*` custom properties rather than literals; the old
+`src/ui/tokens.css` is gone.
 
 ## Scope
 

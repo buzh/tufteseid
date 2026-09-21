@@ -11,14 +11,26 @@ and switches both (`src/ribbon/`). There is still no search box, no lokaliteter,
 no funn, no drawing and no account, and no control over the Kart, Flyfoto,
 Amtskart or Hybrid grounds — those remain a `set()` away.
 
-**Mantine is the design system.** `MantineProvider` and the theme
-(`src/ui/theme.ts`) are mounted at the root, and new surfaces are built from its
-primitives. `src/ui/tokens.css` is the old system's remains and stays only while
-the surviving map stylesheets read it. One consequence is in the `Caddyfile`:
-Mantine writes its CSS variables into a runtime `<style>` element, so
-`style-src` had to become `style-src-elem 'self' 'unsafe-inline'`. A nonce would
-be stricter and is not available — Caddy serves this as static files, so there
-is no per-request value to mint.
+**Mantine is the design system, and the app is dark.** `MantineProvider` and
+the theme (`src/ui/theme.ts`) are mounted at the root, and every surface is
+built from its primitives and its variables. The palette is anthracite grey —
+shade 7 is RAL 7016, and the ramp is registered as Mantine's `dark` as well as
+under its own name, which is what makes the page that colour — with papaya
+orange as the accent, chosen because the accent has to be findable against
+terrain and the old green sat inside both hillshade and ortofoto.
+
+There is **no light scheme**. `defaultColorScheme="dark"` is set on the
+provider and `data-mantine-color-scheme="dark"` statically on `<html>`, the
+second so the first paint is already dark; Mantine's `ColorSchemeScript` would
+do the same job with an inline `<script>` the CSP has no nonce to give it.
+Nothing offers a toggle, and CSS that hard-codes a light surface will look
+wrong.
+
+One consequence of Mantine is in the `Caddyfile`: it writes its CSS variables
+into a runtime `<style>` element, so `style-src` had to become
+`style-src-elem 'self' 'unsafe-inline'`. A nonce would be stricter and is not
+available — Caddy serves this as static files, so there is no per-request value
+to mint.
 
 ## What was kept, and why
 
@@ -49,11 +61,12 @@ The compare curtain is here in full because the `halved()` facade in
 is a pair, `.a` on the map and `.b` behind the curtain — and unpicking it would
 have meant rewriting the layer machinery that this branch exists to preserve.
 
-**`src/ui/`, reduced to two files.** `Icon.tsx` because `MaterialSymbol` is the
-union that keeps a plausible-but-absent icon name out of the build, and
-`tokens.css` because the surviving stylesheets read its custom properties. The
-rest of the kit went, and `theme.ts` replaced it: the primitives are Mantine's
-now.
+**`src/ui/`, reduced to three files.** `Icon.tsx`, because `MaterialSymbol` is
+the union that keeps a plausible-but-absent icon name out of the build; `cx.ts`;
+and `theme.ts`. The rest of the kit went, `tokens.css` with it — the four
+stylesheets that still read its custom properties were rewritten onto
+`--mantine-*` when the app went dark, and a second set of tokens that has to be
+kept in step with the first is exactly the thing not worth maintaining.
 
 ## What went
 

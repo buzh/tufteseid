@@ -23,7 +23,9 @@ const queryClient = new QueryClient();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <MantineProvider theme={theme} defaultColorScheme="light">
+    {/* `index.html` carries the same value on <html>, so the first paint is
+        already dark — see the comment there. */}
+    <MantineProvider theme={theme} defaultColorScheme="dark">
       <AtomWrapper>
         <QueryClientProvider client={queryClient}>
           <App />

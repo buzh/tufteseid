@@ -1,35 +1,39 @@
+/* Mantine's `light` variant of a colour is the scheme-aware pair: a tinted
+   surface and a text colour that reads on it. That is the whole of what this
+   box needs, and it follows the colour scheme without a second set of tokens. */
+
 .fallback {
   pointer-events: auto;
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-4);
-  margin: var(--sp-2);
-  padding: var(--sp-3) var(--sp-5);
-  border: 1px solid var(--c-red-100);
-  border-radius: var(--radius-md);
-  background: var(--c-red-50);
-  color: var(--c-fg);
-  font-size: var(--font-sm);
-  box-shadow: var(--shadow-sm);
+  gap: var(--mantine-spacing-xs);
+  margin: 4px;
+  padding: 6px var(--mantine-spacing-sm);
+  border: 1px solid var(--mantine-color-red-light-hover);
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-red-light);
+  color: var(--mantine-color-red-light-color);
+  font-size: var(--mantine-font-size-sm);
+  box-shadow: var(--mantine-shadow-sm);
 }
 
 .retry {
   flex: none;
-  border: 1px solid var(--c-red-100);
-  border-radius: var(--radius-sm);
-  background: var(--c-gray-0);
-  padding: var(--sp-1) var(--sp-4);
+  border: 1px solid var(--mantine-color-red-light-hover);
+  border-radius: var(--mantine-radius-sm);
+  background: transparent;
+  padding: 2px var(--mantine-spacing-xs);
   font: inherit;
-  font-size: var(--font-xs);
-  color: var(--c-danger);
+  font-size: var(--mantine-font-size-xs);
+  color: inherit;
   cursor: pointer;
 }
 
 .retry:hover {
-  background: var(--c-red-50);
+  background: var(--mantine-color-red-light-hover);
 }
 
 .retry:focus-visible {
-  outline: 2px solid var(--c-focus);
+  outline: 2px solid var(--mantine-primary-color-filled);
   outline-offset: 1px;
 }
