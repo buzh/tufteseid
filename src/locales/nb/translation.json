@@ -46,8 +46,9 @@
     "model": {
       "dtm": "Terreng",
       "dom": "Overflate",
-      "dtmHint": "Terrengmodell (DTM) — bakken, uten vegetasjon og bygninger",
-      "domHint": "Overflatemodell (DOM) — trekroner og tak. Bare skyggerelieff, og ingen cache: den er regnet ut fra terrenget."
+      "aria": "Høydemodell: {{model}}",
+      "toDtm": "Bytt til terrengmodell (DTM) — bakken, uten vegetasjon og bygninger",
+      "toDom": "Bytt til overflatemodell (DOM) — trekroner og tak. Bare skyggerelieff, og ingen cache: den er regnet ut fra terrenget."
     }
   },
   "shared": {

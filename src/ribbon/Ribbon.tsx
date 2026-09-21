@@ -7,12 +7,12 @@
 // (`docs/map-layers.md`); when the ribbon grows a ground switch this row becomes
 // the LiDAR arm of it.
 
-import { Button, Group, SegmentedControl, Text, Tooltip } from '@mantine/core';
+import { Button, Group, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
-import type { LidarModel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { Icon } from '../ui/Icon';
 import { AutoToggle } from './AutoToggle';
 import { DatasetMenu } from './DatasetMenu';
+import { ModelToggle } from './ModelToggle';
 import { RenderMenu } from './RenderMenu';
 import styles from './Ribbon.module.css';
 import { UpstreamStatus } from './UpstreamStatus';
@@ -37,32 +37,7 @@ export const Ribbon = () => {
             <AutoToggle lidar={lidar} />
             <DatasetMenu lidar={lidar} />
             <RenderMenu lidar={lidar} />
-            {/* Per segment, not around the control: the two models are two
-                different pictures, and a tooltip on the pair could only
-                describe one of them. */}
-            <SegmentedControl
-              size="xs"
-              value={lidar.lidarModel}
-              onChange={(value) => lidar.selectModel(value as LidarModel)}
-              data={[
-                {
-                  value: 'dtm',
-                  label: (
-                    <Tooltip label={t('ribbon.model.dtmHint')}>
-                      <span>{t('ribbon.model.dtm')}</span>
-                    </Tooltip>
-                  ),
-                },
-                {
-                  value: 'dom',
-                  label: (
-                    <Tooltip label={t('ribbon.model.domHint')}>
-                      <span>{t('ribbon.model.dom')}</span>
-                    </Tooltip>
-                  ),
-                },
-              ]}
-            />
+            <ModelToggle lidar={lidar} />
           </>
         ) : (
           // A cold load on `?backgroundLayer=topo` or any other ground the URL
