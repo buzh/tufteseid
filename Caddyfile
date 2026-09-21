@@ -139,12 +139,14 @@ route {
         # comes back 404 from MapProxy rather than being refused here, which is
         # the same answer and one less list to keep in step.
         #
-        # :9090 and the /mapproxy prefix are the -nginx image's own: uwsgi
-        # behind nginx, SCRIPT_NAME /mapproxy.
+        # :80 and the /mapproxy prefix are the -nginx image's own: uwsgi behind
+        # nginx, SCRIPT_NAME /mapproxy. The port is pinned to the image tag —
+        # mapproxy moved it to 9090 after 7.0.0 — so check the tag's own
+        # docker/nginx-default.conf when bumping, not the one on master.
         @tileCache path_regexp tileCache ^/cache/([a-z0-9-]+)/(\d{1,2}/\d{1,7}/\d{1,7}\.(?:png|jpeg))$
         handle @tileCache {
                 rewrite * /mapproxy/tms/1.0.0/{re.tileCache.1}/tufteseid25833/{re.tileCache.2}
-                reverse_proxy http://mapproxy:9090
+                reverse_proxy http://mapproxy:80
         }
 
         # The cached combined-VAT ground. One MBTiles database per LiDAR

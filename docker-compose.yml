@@ -45,8 +45,9 @@ services:
   # recognises the shed response that nginx structurally cannot see. Caddy
   # proxies /cache/* here; recipes and grid are ./mapproxy/mapproxy.yaml.
   #
-  # The -nginx flavour: nginx + uwsgi on :9090, MapProxy mounted under
-  # /mapproxy/. Not exposed on the host.
+  # The -nginx flavour: nginx + uwsgi on :80, MapProxy mounted under
+  # /mapproxy/. Both are the tag's, not the project's: master moved the listener
+  # to 9090 after 7.0.0. Not exposed on the host.
   #
   # A host path for the caches rather than a named volume, like the cVAT store
   # and unlike wmscache's 25 GB LRU: MapProxy never evicts, so this grows until

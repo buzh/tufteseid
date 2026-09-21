@@ -49,7 +49,7 @@ through wmscache at all:
 
 | Same-origin prefix | Internal | Upstream |
 |---|---|---|
-| `/cache/lidar-dtm/…` | `mapproxy:9090/mapproxy/tms/1.0.0/lidar-dtm/tufteseid25833/…` | `wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-topobathy-25833` |
+| `/cache/lidar-dtm/…` | `mapproxy:80/mapproxy/tms/1.0.0/lidar-dtm/tufteseid25833/…` | `wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-topobathy-25833` |
 | `/cache/lidar-dom/…` | same, `lidar-dom` | `wms.geonorge.no/skwms1/wms.hoyde-dom-nhm-25833` |
 | `/cache/topo-ref/…`, `/cache/topo-ref-contours/…` | same | `wms.geonorge.no/skwms1/wms.topo` |
 | `/cache/amtskart/…` | same | `wms.geonorge.no/skwms1/wms.historiskekart` |
@@ -57,10 +57,16 @@ through wmscache at all:
 
 One Caddy block covers all six: a `path_regexp` takes the layer name out of the
 path and substitutes it into MapProxy's TMS path, so the grid name and the
-service version are written once. `:9090` and the `/mapproxy` prefix are the
+service version are written once. `:80` and the `/mapproxy` prefix are the
 `-alpine-nginx` image's own (nginx in front of uwsgi, `SCRIPT_NAME=/mapproxy`).
 A `/cache/` name MapProxy does not publish 404s from MapProxy, which is the
 same answer as refusing it at the edge and one less list to keep in step.
+
+Both of those are properties of the pinned tag, not of MapProxy: the listener
+moved to 9090 after 7.0.0. Read `docker/nginx-default.conf` at the tag being
+pinned, not on `master`, when bumping the image. The symptom of getting it
+wrong is indistinguishable from MapProxy being down — Caddy cannot dial, so
+every `/cache/…` is an empty 502 while the container sits there healthy.
 
 `/cvat/<acquisition>/<z>/<x>/<y>.webp` is not in the table because it never
 leaves the stack: `handle_path /cvat/*` hands it to the `cvat-tiles` sidecar
