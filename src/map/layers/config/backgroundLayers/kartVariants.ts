@@ -1,7 +1,8 @@
 import { getUrlParameter } from '../../../../shared/utils/urlUtils';
 import { halved } from '../../../compare/halves';
 import { BackgroundLayerName } from '../../backgroundLayers';
-import { WMSBackgroundLayer } from './types';
+import { VIEW_MAX_ZOOM } from '../../wmsTileGrid';
+import { XYZBackgroundLayer } from './types';
 
 // What "Kart" can be: four cartographies out of Kartverket's cache plus
 // amtskart, the pre-1917 series. Variants on one ground, so they ride the
@@ -22,20 +23,23 @@ export const isKartVariant = (name: string): name is KartVariant =>
   VARIANTS.has(name);
 
 /**
- * Amtskartserien (1:200 000), georeferenced and stitched. TRANSPARENT and in
+ * Amtskartserien (1:200 000), georeferenced and stitched. Transparent and in
  * NEEDS_TOPO_BASE: publication stopped around 1917, before Nordland.
+ *
+ * Read out of our MapProxy cache of wms.historiskekart's `amt1` — the heaviest
+ * tile in the app at ~586 kB of scanned sheet, and the one where holding it
+ * pays most. Which layer, and why not the service's `georefererte`, is in
+ * mapproxy/mapproxy.yaml.
  */
-export const AMTSKART_CONFIG: WMSBackgroundLayer = {
-  type: 'WMS',
+export const AMTSKART_CONFIG: XYZBackgroundLayer = {
+  type: 'XYZ',
   layerName: 'amtskart',
-  url: '/wms/geonorge/wms.historiskekart',
-  props: {
-    // `amt1` is the seamless mosaic; the service's other layer, `georefererte`,
-    // wants the id of one specific scanned map.
-    LAYERS: 'amt1',
-    TRANSPARENT: true,
-    VERSION: '1.3.0',
-  },
+  url: '/cache/amtskart/{z}/{x}/{y}.png',
+  projection: 'EPSG:25833',
+  minZoom: 0,
+  maxZoom: VIEW_MAX_ZOOM,
+  // A miss is a GetMap upstream; see the field's own note in types.ts.
+  preload: 0,
   // The layer's declared EPSG:25833 bounds; without it OL asks for open ocean.
   coverageExtent: {
     extent: [-127998, 6377920, 1145510, 7976800],

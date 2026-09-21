@@ -16,6 +16,7 @@ services:
       # - ./Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
       - wmscache
+      - mapproxy
       - pocketbase
       - cvat-tiles
 
@@ -36,6 +37,35 @@ services:
     volumes:
       - /site/tufteseid/data/cvat:/store:ro
 
+  # Tile cache in front of the upstreams whose layer and style never change:
+  # the two national LiDAR mosaics, the hybrid overlay with and without
+  # contours, amtskart and the ortofoto mosaic. Meta-tiling turns 4 or 16 tile
+  # requests into one GetMap, which is the lever left after 512 px tiles
+  # against wms.geonorge.no's ~120-per-window budget, and MapProxy's WMS client
+  # recognises the shed response that nginx structurally cannot see. Caddy
+  # proxies /cache/* here; recipes and grid are ./mapproxy/mapproxy.yaml.
+  #
+  # The -nginx flavour: nginx + uwsgi on :9090, MapProxy mounted under
+  # /mapproxy/. Not exposed on the host.
+  #
+  # A host path for the caches rather than a named volume, like the cVAT store
+  # and unlike wmscache's 25 GB LRU: MapProxy never evicts, so this grows until
+  # somebody looks at it, and it should be somewhere they can. The image runs
+  # as uid 1000, so first run wants
+  #   sudo mkdir -p /site/tufteseid/data/mapproxy
+  #   sudo chown 1000:1000 /site/tufteseid/data/mapproxy
+  # Third-party install: point it anywhere writable — an empty directory fills
+  # itself on demand.
+  mapproxy:
+    image: ghcr.io/mapproxy/mapproxy/mapproxy:7.0.0-alpine-nginx
+    restart: unless-stopped
+    volumes:
+      - ./mapproxy/mapproxy.yaml:/mapproxy/config/mapproxy.yaml:ro
+      - ./mapproxy/seed.yaml:/mapproxy/config/seed.yaml:ro
+      - /site/tufteseid/data/mapproxy:/mapproxy/config/cache_data
+    depends_on:
+      - nib-proxy
+
   # Backend for lokaliteter. Serves the SPA's /pb/* API (proxied by
   # Caddy) for user auth (OAuth via Google/GitHub/OIDC/…) and the
   # localities / finds / attachments collections. SQLite-backed; state
@@ -52,9 +82,10 @@ services:
       - pbdata:/pb_data
       - ./pocketbase/pb_migrations:/pb_migrations:ro
 
-  # Caching reverse proxy for every external WMS the app uses (Kartverket
-  # theme + LiDAR, Riksantikvaren Kulturminner, matrikkel), plus an
-  # uncached pass-through for the GeoNorge WFS. Caddy forwards
+  # Caching reverse proxy for every external WMS whose parameters are chosen at
+  # request time (Kartverket theme + per-project LiDAR, Riksantikvaren
+  # Kulturminner, matrikkel), plus an uncached pass-through for the GeoNorge
+  # WFS. The half with fixed parameters is mapproxy's. Caddy forwards
   # /wms/* and /wfs/* here; successful tile responses are cached on disk
   # (25 GB LRU). Not exposed on the host — only reachable from the
   # tufteseid container on the compose network.
@@ -72,11 +103,11 @@ services:
   # needs an access token even for the imagery norgeibilder.no shows
   # anonymously; that token is minted anonymously (Referer only) and bound
   # to the requesting IP + referer, so it has to be minted and used
-  # server-side. wmscache proxies /nib-wms/* here; this mints/refreshes
-  # the token, injects it toward services.norgeibilder.no, and re-mints on
-  # auth failure. Zero deps (Node 24 global fetch); see nib-proxy/server.mjs.
-  # Not exposed on the host — only reachable from wmscache on the compose
-  # network.
+  # server-side. wmscache proxies /nib-wms/* here and mapproxy fetches the
+  # ortofoto mosaic through it; this mints/refreshes the token, injects it
+  # toward services.norgeibilder.no, and re-mints on auth failure. Zero deps
+  # (Node 24 global fetch); see nib-proxy/server.mjs. Not exposed on the host —
+  # only reachable from the two of them on the compose network.
   nib-proxy:
     build: ./nib-proxy
     restart: unless-stopped

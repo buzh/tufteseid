@@ -1,0 +1,58 @@
+# Pre-filling the caches, by hand and never on a schedule.
+#
+# The coarse levels are what every cold visitor lands on and what a pan across
+# Norway burns the shared GetMap budget on fastest, so they are the levels
+# worth paying for once instead of on demand. Deeper than z9 is a judgement
+# about disk: z10 is four times the tiles of z9, and nobody reads relief at
+# 42 m/px for long, so the levels people actually work at are better left to
+# fill themselves where they are looked at.
+#
+# Run it, from the server:
+#
+#   docker compose exec mapproxy mapproxy-seed -c 4 \
+#     -f /mapproxy/config/mapproxy.yaml -s /mapproxy/config/seed.yaml \
+#     --seed ALL
+#
+# No `refresh_before` anywhere below, and that is not an omission: MBTiles
+# stores no per-tile timestamp, so any refresh time at all makes MapProxy
+# rebuild every tile in the task rather than the stale ones. Without one a run
+# fills the gaps and leaves what is already there, which makes it safe to
+# re-run and safe to interrupt.
+
+coverages:
+  # The same three boxes the sources are clipped to — each service's own
+  # declared EPSG:25833 bounds.
+  lidar:
+    bbox: [-100275, 6399725, 1150255, 8000275]
+    srs: 'EPSG:25833'
+  topo:
+    bbox: [-127998, 6377920, 1145510, 7976800]
+    srs: 'EPSG:25833'
+  flyfoto:
+    bbox: [-250025, 6299985, 1211155, 8985010]
+    srs: 'EPSG:25833'
+
+seeds:
+  relief:
+    caches: [lidar-dtm, lidar-dom]
+    grids: [tufteseid25833]
+    coverages: [lidar]
+    levels:
+      from: 0
+      to: 9
+
+  overlay:
+    caches: [topo-ref, topo-ref-contours, amtskart]
+    grids: [tufteseid25833]
+    coverages: [topo]
+    levels:
+      from: 0
+      to: 9
+
+  ortofoto:
+    caches: [flyfoto]
+    grids: [tufteseid25833]
+    coverages: [flyfoto]
+    levels:
+      from: 0
+      to: 9

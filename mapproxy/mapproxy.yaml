@@ -1,0 +1,311 @@
+# MapProxy: a tile cache in front of the upstreams whose parameters never move.
+#
+# Why it exists. wms.geonorge.no meters GetMap by source IP — the server's,
+# shared by every visitor — at roughly 120 in a short window, and answers over
+# budget with HTTP 200 and a 238-byte `application/vnd.ogc.se_xml`. wmscache
+# cannot see that (nginx's `proxy_next_upstream` reads status codes only) and
+# OpenLayers marks the tile ERROR and never retries. MapProxy adds the two
+# defences left: meta-tiling, which turns 4 or 16 tiles into one GetMap, and a
+# client that knows a ServiceException when it sees one and raises rather than
+# storing it.
+#
+# What it does *not* take. A cache block is one fixed layer+style, so everything
+# parameterized at request time stays on wmscache: the per-project LiDAR
+# (1936 projects x their styles), the Kulturminner themes, the WFS, the float
+# DEM, the per-acquisition ortofoto, the LiDAR extract's arbitrary-bbox GetMaps.
+# MapProxy is a fifth service beside wmscache, not a replacement for it, and it
+# talks to the upstreams directly rather than through wmscache — a 25 GB LRU in
+# front of a permanent store would evict what it just handed over.
+#
+# Served to the browser as `/cache/<layer>/{z}/{x}/{y}.<ext>` (Caddyfile), which
+# rewrites into the TMS path below. The app sees plain XYZ tiles.
+
+services:
+  tms:
+    # Our grid counts rows from the north, like the app's and like every other
+    # tile store here; TMS's own default is from the south.
+    origin: 'nw'
+    # `/tms/1.0.0/<layer>/tufteseid25833/…` rather than `…/EPSG25833/…`. One
+    # grid, and its name says whose it is.
+    use_grid_names: true
+
+grids:
+  # `src/map/layers/wmsTileGrid.ts`, level for level. EPSG:25833's extent is
+  # square (both spans 5 545 984), so the app's `maxResolution` — the larger
+  # span over the View's 256 px ladder — is 21664.0 exactly, and halving from
+  # there reproduces z16 = 0.331 m/px and z12 = 5.289. Nothing is reprojected
+  # and nothing is resampled; a tile MapProxy stores is a tile the app asked
+  # for. Level 0 is half a tile wide, level z holds 2**(z-1) tiles per side,
+  # which is also what the cVAT store is built on.
+  tufteseid25833:
+    srs: 'EPSG:25833'
+    bbox: [-2500000.0, 3500000.0, 3045984.0, 9045984.0]
+    bbox_srs: 'EPSG:25833'
+    origin: 'nw'
+    min_res: 21664.0
+    res_factor: 2
+    tile_size: [512, 512]
+    # z0 through z20, the View's own maxZoom.
+    num_levels: 21
+
+caches:
+  # ---- LiDAR relief, the national mosaics -------------------------------
+  #
+  # 2x2 rather than 4x4, and no buffer. Hillshade has no labels or sheet edges
+  # to cut through, so a seam costs nothing; the reason to stay small is the
+  # tail. A 2048 px render measured 1.4 s and a 1024 px one 0.85 s against a
+  # warm upstream, but the per-project service behind the same backend takes
+  # 3-12 s cold, and a 16-tile meta request that goes that way holds a worker —
+  # and sixteen tiles — for the whole of it. Raise it once the server has
+  # numbers for a cold region.
+  lidar-dtm:
+    grids: [tufteseid25833]
+    sources: [lidar_dtm_wms]
+    format: relief_png
+    meta_size: [2, 2]
+    meta_buffer: 0
+    cache:
+      type: mbtiles
+      filename: /mapproxy/config/cache_data/lidar-dtm.mbtiles
+
+  lidar-dom:
+    grids: [tufteseid25833]
+    sources: [lidar_dom_wms]
+    format: relief_png
+    meta_size: [2, 2]
+    meta_buffer: 0
+    cache:
+      type: mbtiles
+      filename: /mapproxy/config/cache_data/lidar-dom.mbtiles
+
+  # ---- The hybrid overlay, with and without contours --------------------
+  #
+  # Two caches because the contour toggle is two different LAYERS lists on one
+  # GetMap — `src/…/topoOverlay.ts` keeps them on one request rather than
+  # stacking a second layer, and that decision survives here as two stores.
+  # 4x4 with a buffer: labels and symbols straddle tile edges, and a
+  # label clipped at a seam is the one artefact meta-tiling exists to avoid.
+  topo-ref:
+    grids: [tufteseid25833]
+    sources: [topo_ref_wms]
+    format: overlay_png
+    meta_size: [4, 4]
+    meta_buffer: 80
+    cache:
+      type: mbtiles
+      filename: /mapproxy/config/cache_data/topo-ref.mbtiles
+
+  topo-ref-contours:
+    grids: [tufteseid25833]
+    sources: [topo_ref_contours_wms]
+    format: overlay_png
+    meta_size: [4, 4]
+    meta_buffer: 80
+    cache:
+      type: mbtiles
+      filename: /mapproxy/config/cache_data/topo-ref-contours.mbtiles
+
+  # ---- Amtskartserien ---------------------------------------------------
+  #
+  # The heaviest tile in the app: a 512 px render off wms.historiskekart is
+  # ~586 kB of scanned sheet, and a 2208 px meta render is 13.5 MB in 2.7 s.
+  # Worth the 4x4 for the sheet edges alone.
+  #
+  # The one PNG here that is *not* paletted. 256 colours would cut a tile to
+  # 63 kB, but a scanned sheet's paper tone is scan grain across tens of
+  # thousands of near-identical creams, and quantizing it mottles the paper
+  # visibly at 1:1. Full colour stores 454 kB, still under what the service
+  # sends.
+  amtskart:
+    grids: [tufteseid25833]
+    sources: [amtskart_wms]
+    format: image/png
+    meta_size: [4, 4]
+    meta_buffer: 80
+    cache:
+      type: mbtiles
+      filename: /mapproxy/config/cache_data/amtskart.mbtiles
+
+  # ---- Norge i bilder, the seamless mosaic ------------------------------
+  #
+  # JPEG, as the WMS layer already was: the mosaic is opaque over its whole
+  # extent, so there is no transparency to lose and PNG would cost 8x.
+  flyfoto:
+    grids: [tufteseid25833]
+    sources: [flyfoto_wms]
+    format: image/jpeg
+    meta_size: [2, 2]
+    meta_buffer: 0
+    cache:
+      type: mbtiles
+      filename: /mapproxy/config/cache_data/flyfoto.mbtiles
+
+sources:
+  # No `on_error` anywhere below, deliberately. A shed response or a
+  # non-image body should reach the browser as a 500, so `src/upstream/`
+  # trips and the ribbon says an origin is down; `response: transparent`
+  # would cache the outage as a blank map and tell nobody.
+  #
+  # `supported_srs` pins every request to EPSG:25833, which is what the grid is
+  # in — without it MapProxy is free to ask in another SRS and reproject.
+  #
+  # `client_timeout` is a ceiling on how long one worker is held. Generous
+  # against the measurements above, and short enough that an upstream hanging
+  # for its own 30 s `proxy_read_timeout` does not wedge the whole service.
+
+  lidar_dtm_wms:
+    type: wms
+    req:
+      url: https://wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-topobathy-25833?
+      layers: NHM_DTM_TOPOBATHY_25833:skyggerelieff
+    supported_srs: ['EPSG:25833']
+    concurrent_requests: 4
+    http:
+      client_timeout: 60
+    # The service's own declared EPSG:25833 bounds, so a meta-tile over the
+    # Atlantic is never requested. Same numbers as the layer configs'
+    # `coverageExtent`; OpenLayers culls on its side, this culls on ours.
+    coverage:
+      bbox: [-100275, 6399725, 1150255, 8000275]
+      srs: 'EPSG:25833'
+
+  lidar_dom_wms:
+    type: wms
+    req:
+      url: https://wms.geonorge.no/skwms1/wms.hoyde-dom-nhm-25833?
+      layers: NHM_DOM_25833:skyggerelieff
+    supported_srs: ['EPSG:25833']
+    concurrent_requests: 4
+    http:
+      client_timeout: 60
+    coverage:
+      bbox: [-100275, 6399725, 1150255, 8000275]
+      srs: 'EPSG:25833'
+
+  # The hybrid overlay's reference features: wms.topo renders any subset of its
+  # group layers. Two families because the kd_* groups stop around 1:25 000
+  # where the fkb_* ones take over; asking for all five lets the server pick per
+  # scale. This list and the one below are the whole definition of the overlay —
+  # `src/…/topoOverlay.ts` names the cache and nothing else.
+  topo_ref_wms:
+    type: wms
+    req:
+      url: https://wms.geonorge.no/skwms1/wms.topo?
+      layers: kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,fkb_presentasjonsdata
+      transparent: true
+    supported_srs: ['EPSG:25833']
+    concurrent_requests: 4
+    http:
+      client_timeout: 60
+    coverage:
+      bbox: [-127998, 6377920, 1145510, 7976800]
+      srs: 'EPSG:25833'
+
+  # The same five plus the contours, on one request rather than a second layer
+  # stacked over the first. Same kd_/fkb_ handover — kd_hoydekurver draws at
+  # 1:70 000 and is blank at 1:7 000, fkb_hoydekurver the inverse — and
+  # hoydekurver_1m / _5m come back empty, so they are not asked for.
+  topo_ref_contours_wms:
+    type: wms
+    req:
+      url: https://wms.geonorge.no/skwms1/wms.topo?
+      layers: kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,fkb_presentasjonsdata,kd_hoydekurver,fkb_hoydekurver
+      transparent: true
+    supported_srs: ['EPSG:25833']
+    concurrent_requests: 4
+    http:
+      client_timeout: 60
+    coverage:
+      bbox: [-127998, 6377920, 1145510, 7976800]
+      srs: 'EPSG:25833'
+
+  # `amt1` is the seamless mosaic; the service's other layer, `georefererte`,
+  # wants the id of one scanned sheet and so is not a fixed-parameter source.
+  amtskart_wms:
+    type: wms
+    req:
+      url: https://wms.geonorge.no/skwms1/wms.historiskekart?
+      layers: amt1
+      transparent: true
+    supported_srs: ['EPSG:25833']
+    concurrent_requests: 4
+    http:
+      client_timeout: 60
+    coverage:
+      bbox: [-127998, 6377920, 1145510, 7976800]
+      srs: 'EPSG:25833'
+
+  # Through nib-proxy, not straight to NiB: the token is anonymous but bound to
+  # the IP and referer that minted it, so it has to be injected server-side.
+  # The sidecar takes a bare service name and rebuilds
+  # services.norgeibilder.no/wms/ortofoto from it.
+  flyfoto_wms:
+    type: wms
+    req:
+      url: http://nib-proxy:8080/ortofoto?
+      layers: ortofoto
+      format: image/jpeg
+    supported_srs: ['EPSG:25833']
+    concurrent_requests: 4
+    http:
+      client_timeout: 60
+    coverage:
+      bbox: [-250025, 6299985, 1211155, 8985010]
+      srs: 'EPSG:25833'
+
+layers:
+  # The TMS service publishes every layer with a name and one cached source.
+  # Names are the `/cache/<name>/` segment the browser asks for.
+  - name: lidar-dtm
+    title: LiDAR DTM skyggerelieff, nasjonal mosaikk
+    sources: [lidar-dtm]
+  - name: lidar-dom
+    title: LiDAR DOM skyggerelieff, nasjonal mosaikk
+    sources: [lidar-dom]
+  - name: topo-ref
+    title: Referansedata fra wms.topo
+    sources: [topo-ref]
+  - name: topo-ref-contours
+    title: Referansedata fra wms.topo, med høydekurver
+    sources: [topo-ref-contours]
+  - name: amtskart
+    title: Amtskartserien, sammenhengende
+    sources: [amtskart]
+  - name: flyfoto
+    title: Ortofoto, sammenhengende mosaikk
+    sources: [flyfoto]
+
+globals:
+  cache:
+    # Absolute, since `base_dir` is otherwise read relative to this file. The
+    # MBTiles filenames above are absolute too; this is what the lock
+    # directories hang off. Bind-mounted from the host and must be writable by
+    # uid 1000, the image's `mapproxy` user.
+    base_dir: /mapproxy/config/cache_data
+  image:
+    # Meta-tiling means MapProxy always decodes and re-encodes, so what a tile
+    # costs on disk and on the wire is decided here rather than upstream.
+    formats:
+      # Palette PNG for the two reliefs. Kartverket serves `skyggerelieff` as
+      # 8-bit greyscale — 242 and 255 distinct values in the tiles measured —
+      # so 256 colours is not a reduction, while MapProxy's default RGB
+      # re-encode would roughly double the bytes the upstream sent. Measured on
+      # one 512 px tile: 29 kB from the service, 56 kB as RGB, 14 kB as this.
+      relief_png:
+        format: image/png
+        mode: P
+        colors: 256
+        encoding_options:
+          quantizer: fastoctree
+      # The same, keeping the alpha channel, for the hybrid overlay. A
+      # wms.topo tile holds ~2000 colours and 4 % partially transparent pixels
+      # — the halos around place names — and quantizing both is invisible
+      # composited over relief, at 17 kB against 52 kB from the service and
+      # 69 kB as RGBA.
+      overlay_png:
+        format: image/png
+        mode: P
+        colors: 256
+        transparent: true
+        encoding_options:
+          quantizer: fastoctree

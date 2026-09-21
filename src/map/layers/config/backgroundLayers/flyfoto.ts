@@ -13,8 +13,10 @@ import {
 import { isUpstreamDown } from '../../../../upstream/health';
 import type { FlyfotoProject } from './flyfotoProjects';
 
-export const FLYFOTO_WMS_URL = '/wms/nib/ortofoto';
-export const FLYFOTO_LAYER = 'ortofoto';
+// Only the stitcher's own GetMaps go here now: the mosaic ground is read out of
+// MapProxy's cache, which asks this same layer on its own (mapproxy.yaml).
+const FLYFOTO_WMS_URL = '/wms/nib/ortofoto';
+const FLYFOTO_LAYER = 'ortofoto';
 
 // One acquisition is not a WMS operation: /wms/ortofoto publishes only the
 // merged layer. It is an ArcGIS ImageServer whose catalogue carries a

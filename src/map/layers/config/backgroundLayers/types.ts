@@ -66,6 +66,13 @@ export type XYZBackgroundLayer = BackgroundLayerBase & {
    *  Absolute z on that grid, not an offset. */
   minZoom: number;
   maxZoom: number;
+  /** How many levels either side of the one on screen to fetch ahead. 2 for a
+   *  store that is only ever read — ours, under /cvat/ — where the tile comes
+   *  back in milliseconds and the prefetch takes the blank out of a zoom step.
+   *  0 for MapProxy's /cache/, where a miss is an upstream render: a preloaded
+   *  tile would hold a tile slot for as long as that takes, which is the same
+   *  reason the WMS layers preload 0. */
+  preload: 0 | 2;
   coverageExtent?: CoverageExtent;
 };
 

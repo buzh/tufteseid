@@ -15,7 +15,9 @@ const WMS_TILE_SIZE = 512;
 const VIEW_TILE_SIZE = 256;
 
 // The View's maxZoom (20), and so the last level a source is ever asked for.
-const MAX_ZOOM = 20;
+// Exported for the cached layers whose store is built to the view's full depth,
+// so the floor for "as deep as it goes" is stated once.
+export const VIEW_MAX_ZOOM = 20;
 
 const cache = new Map<string, TileGrid | null>();
 
@@ -58,7 +60,7 @@ const build = (
 export const getWMSTileGrid = (
   projectionCode: string,
   minZoom = 0,
-  maxZoom = MAX_ZOOM,
+  maxZoom = VIEW_MAX_ZOOM,
 ): TileGrid | undefined => {
   const key = `${projectionCode}|${minZoom}|${maxZoom}`;
   if (!cache.has(key)) {

@@ -9,12 +9,21 @@
 // left the neighbouring `wms.topograatone` answering in 190 ms. So they are one
 // row here, and one breaker at runtime.
 //
-// The same evidence is why `/wms/geonorge/wms.topo` and `wms.historiskekart` —
-// the Hybrid overlay and the Amtskart ground — are in no row at all, even
-// though they share a hostname with the height services. They are a different
-// renderer, they stayed up through that outage, and they are each one layer on
-// one surface: an outage of theirs is a blank overlay, not a blank map. The
-// Kulturminnesøk record API behind `/kms/` is left out for the same reason.
+// The same evidence is why the Hybrid overlay and the Amtskart ground — now
+// `/cache/topo-ref*` and `/cache/amtskart`, wms.topo and wms.historiskekart
+// underneath — are in no row at all, even though they share a hostname with the
+// height services. They are a different renderer, they stayed up through that
+// outage, and they are each one layer on one surface: an outage of theirs is a
+// blank overlay, not a blank map. The Kulturminnesøk record API behind `/kms/`
+// is left out for the same reason.
+//
+// The `/cache/` prefixes that *are* listed below are MapProxy's, and a hit
+// there answers off disk with no upstream involved — so the breaker will blank
+// tiles MapProxy could have served. That is the trade taken deliberately: a
+// miss holds a 60 s `client_timeout` against the source, and a screenful of
+// those wedges MapProxy's worker pool for every layer, including the ones whose
+// upstream is healthy. Better to stop asking, and say so on the ribbon, than to
+// half-draw while claiming to be up.
 
 import { getEnv } from '../env';
 
@@ -75,7 +84,9 @@ type Origin = {
 export const ORIGINS: Record<OriginId, Origin> = {
   // Kartverket's height services. `/arcgis/hoydedata/` is the float DEM behind
   // src/terrain — a different hostname (hoydedata.no) that went down in the
-  // same hour, which is the whole argument for one row rather than two.
+  // same hour, which is the whole argument for one row rather than two. The
+  // probe stays on the WMS namespace and not on `/cache/lidar-dtm`: a MapProxy
+  // tile can be a hit, and a hit would report a dead service as up.
   hoyde: {
     probeUrl: wmsProbe(
       '/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833',
@@ -85,6 +96,7 @@ export const ORIGINS: Record<OriginId, Origin> = {
       '/wms/geonorge/wms.hoyde-',
       '/wfs/geonorge/wfs.hoyde-',
       '/arcgis/hoydedata/',
+      '/cache/lidar-',
     ],
   },
   // The pre-rendered base under every ground. Straight from the browser, not
@@ -112,7 +124,7 @@ export const ORIGINS: Record<OriginId, Origin> = {
   },
   nib: {
     probeUrl: wmsProbe('/wms/nib/ortofoto', 'ortofoto', 'image/jpeg'),
-    prefixes: ['/wms/nib/', '/arcgis/nib/'],
+    prefixes: ['/wms/nib/', '/arcgis/nib/', '/cache/flyfoto'],
   },
 };
 

@@ -3,15 +3,11 @@
 // /wms/ortofoto_prosjekter 403s), so it comes from an ArcGIS ImageServer, its
 // catalogue's `prosjektnavn` column picked with a mosaicRule `where` clause.
 
-import {
-  FLYFOTO_LAYER,
-  FLYFOTO_PROJECT_IMAGESERVER,
-  FLYFOTO_WMS_URL,
-  flyfotoMosaicRule,
-} from './flyfoto';
+import { FLYFOTO_PROJECT_IMAGESERVER, flyfotoMosaicRule } from './flyfoto';
 import type { FlyfotoProject } from './flyfotoProjects';
 import { halved } from '../../../compare/halves';
-import type { ArcGISImageBackgroundLayer, WMSBackgroundLayer } from './types';
+import { VIEW_MAX_ZOOM } from '../../wmsTileGrid';
+import type { ArcGISImageBackgroundLayer, XYZBackgroundLayer } from './types';
 
 // The <BoundingBox CRS="EPSG:25833"> the ortofoto WMS advertises; without it OL
 // asks for on-the-fly renders over the Atlantic on every zoom out.
@@ -19,17 +15,19 @@ const FLYFOTO_COVERAGE_EXTENT_25833: [number, number, number, number] = [
   -250025, 6299985, 1211155, 8985010,
 ];
 
-// JPEG, not PNG: 68 kB against 528 kB for a 512 px tile over Oslo, and the
-// mosaic is opaque over its whole extent, so there is no transparency to lose.
-export const FLYFOTO_MOSAIC_CONFIG: WMSBackgroundLayer = {
-  type: 'WMS',
+// Our MapProxy cache of the mosaic, which reaches NiB through the same
+// token-injecting sidecar wmscache does. JPEG, not PNG: 68 kB against 528 kB
+// for a 512 px tile over Oslo, and the mosaic is opaque over its whole extent,
+// so there is no transparency to lose.
+export const FLYFOTO_MOSAIC_CONFIG: XYZBackgroundLayer = {
+  type: 'XYZ',
   layerName: 'flyfoto',
-  url: FLYFOTO_WMS_URL,
-  props: {
-    LAYERS: FLYFOTO_LAYER,
-    VERSION: '1.3.0',
-    FORMAT: 'image/jpeg',
-  },
+  url: '/cache/flyfoto/{z}/{x}/{y}.jpeg',
+  projection: 'EPSG:25833',
+  minZoom: 0,
+  maxZoom: VIEW_MAX_ZOOM,
+  // A miss is a GetMap upstream; see the field's own note in types.ts.
+  preload: 0,
   coverageExtent: {
     extent: FLYFOTO_COVERAGE_EXTENT_25833,
     crs: 'EPSG:25833',

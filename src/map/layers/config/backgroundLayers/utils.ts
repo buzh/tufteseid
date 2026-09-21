@@ -156,11 +156,14 @@ export const getArcGISImageLayer = (
   });
 };
 
-// A tile store of ours, on the grid it was written on rather than the view's:
-// OL reprojects if a `?projection=` ever puts the view somewhere else. No
-// `guardTileSource` here, alone among the four: these are static files off the
-// same disk Caddy is serving the app from, and if that is down there is no app
-// to say so in.
+// A tile store, on the grid it was written on rather than the view's: OL
+// reprojects if a `?projection=` ever puts the view somewhere else.
+//
+// Guarded like the rest, even though some of these stores are ours and cannot
+// be down without the app being down with them: `guardTileSource` returns
+// without doing anything for a URL no origin in `src/upstream/` claims, so the
+// cVAT ground is unaffected and MapProxy's `/cache/` — where a miss reaches
+// through to Kartverket or NiB — is covered without a second code path.
 export const getXYZLayer = (
   layerConfig: XYZBackgroundLayer,
 ): TileLayer | null => {
@@ -183,6 +186,7 @@ export const getXYZLayer = (
     tileGrid,
     zDirection: WMS_Z_DIRECTION,
   });
+  guardTileSource(source, layerConfig.url);
 
   const extent = toViewExtent(layerConfig.coverageExtent, viewProjection);
   return new TileLayer({
@@ -192,9 +196,8 @@ export const getXYZLayer = (
     // goes: OL would clamp to that level and ask for four screenfuls of tiles
     // to upscale, and the faded mosaic underneath is the better picture there.
     maxResolution: tileGrid.getResolution(layerConfig.minZoom) * 2,
-    // Static files off our own disk, so preloading a level either side of the
-    // one on screen costs nothing and takes the blank out of a zoom step.
-    preload: 2,
+    // Per store, because what a miss costs differs: see the field in types.ts.
+    preload: layerConfig.preload,
     cacheSize: WMS_TILE_CACHE_SIZE,
     ...(extent ? { extent } : {}),
   });
@@ -246,9 +249,8 @@ const layerSignature = (
   }
   // Without this arm every dataset cycle rebuilds the layer rather than
   // reusing it, and a cached ground that is already drawn flashes. The levels
-  // and the extent are in the signature because the URL is not: the whole cVAT
-  // store is one tile namespace, and two acquisitions in it differ by nothing
-  // else.
+  // and the extent join the url because they are what fences which of the
+  // store's tiles are ever asked for; the url alone names the store.
   if (config.type === 'XYZ') {
     const extent = JSON.stringify(config.coverageExtent);
     const levels = `${config.minZoom}-${config.maxZoom}`;

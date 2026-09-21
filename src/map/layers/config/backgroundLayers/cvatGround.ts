@@ -184,6 +184,10 @@ export const buildCvatGroundConfig = (
   projection: 'EPSG:25833',
   minZoom: acquisition.minZoom,
   maxZoom: acquisition.maxZoom,
+  // Nothing upstream to reach through to: a miss is a SELECT against a
+  // bind-mounted database, so fetching a level either side of the one on screen
+  // costs nothing and takes the blank out of a zoom step.
+  preload: 2,
   coverageExtent: {
     extent: acquisition.project.bboxLonLat,
     crs: 'EPSG:4326',

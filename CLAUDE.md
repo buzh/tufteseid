@@ -40,7 +40,7 @@ Each owns its subject; this file keeps only what is true across all of them.
 | --- | --- | --- |
 | `docs/state-of-the-branch.md` | What the strip kept and deleted, the atoms a new interface writes to, and the loose ends left open | anything under `src/`, and especially before building a surface |
 | `docs/map-layers.md` | What is drawn on the map: background grounds, theme layers, and the recipes for adding another | `src/map/layers/`, any new map source |
-| `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
+| `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream and Caddy → mapproxy → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
 | `README.md` | Third-party install and admin guide | any change to install, first-run or licensing |
 
@@ -86,7 +86,7 @@ the container; compose maps host `127.0.0.1:3030 → 3000`.
 git pull
 docker compose build --pull tufteseid cvat-tiles
 docker compose up -d
-docker compose logs -f tufteseid wmscache
+docker compose logs -f tufteseid wmscache mapproxy
 scripts/live-check.sh https://<host> <lokalitet-code>
 ```
 
@@ -97,7 +97,8 @@ scripts/live-check.sh https://<host> <lokalitet-code>
 
 - Changed anything under `nginx/`? Also `docker compose restart wmscache`. The
   configs are bind-mounted but nginx only reads them at startup, and
-  `docker compose up -d` does not recreate the container.
+  `docker compose up -d` does not recreate the container. Same for `mapproxy/`
+  and `docker compose restart mapproxy`.
 - Added or changed a migration in `pocketbase/pb_migrations/`? Also
   `docker compose restart pocketbase`, then check its logs. Symptom of
   forgetting: API calls against the collection 404, which the SPA may surface
@@ -109,9 +110,10 @@ scripts/live-check.sh https://<host> <lokalitet-code>
 | --- | --- |
 | `tufteseid` | `node:24-alpine` builds the SPA, `caddy:2.10.0-alpine` serves `/var/www`. `config.js` bind-mounted at runtime. |
 | `pocketbase` | Backend for lokaliteter (auth + user content), pinned to 0.40.2. Serves `/pb/*`. SQLite on the `pbdata` volume. |
-| `nib-proxy` | Token-injecting sidecar for Norge i bilder ortofoto. Reachable only from wmscache. |
+| `nib-proxy` | Token-injecting sidecar for Norge i bilder ortofoto. Reachable only from wmscache and mapproxy. |
 | `cvat-tiles` | `node:24-alpine`, zero deps. Serves `/cvat/*` out of one MBTiles database per LiDAR acquisition in the bind-mounted store. Built out of band by `vat-cache/`. |
-| `wmscache` | `nginx:1.27-alpine` reverse proxy + 25 GB disk cache in front of every external WMS/WFS/ArcGIS service, plus Kulturminnesøk's record API. |
+| `mapproxy` | `mapproxy:7.0.0-alpine-nginx`. Serves `/cache/*`: the six upstream layers whose parameters never change, meta-tiled onto the app's own grid and held in MBTiles. Config in `mapproxy/`, store bind-mounted. |
+| `wmscache` | `nginx:1.27-alpine` reverse proxy + 25 GB disk cache in front of every external WMS/WFS/ArcGIS service whose parameters are chosen at request time, plus Kulturminnesøk's record API. |
 
 ## PocketBase
 

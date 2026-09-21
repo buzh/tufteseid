@@ -16,6 +16,12 @@ Nothing sets `SRS`/`CRS` by hand — OpenLayers writes it from the view
 projection, `EPSG:25833` by default (`DEFAULT_PROJECTION`, `src/map/atoms.ts`);
 `coverageExtent` declares its own CRS and is transformed to that projection.
 
+A `/cache/…` prefix means the browser is not asking a WMS at all: those layers
+are `{z}/{x}/{y}` tiles out of MapProxy, which asks the WMS on our behalf and
+keeps the answer (`docs/wms-proxy-and-tiles.md`). The upstream and its `LAYERS`
+are named in the table below all the same, because that is still what the pixels
+are; where they are written down is `mapproxy/mapproxy.yaml`.
+
 ## The grounds
 
 The grounds the old interface grouped as `lidar`, `terreng`, `kart`, `hybrid`
@@ -29,14 +35,14 @@ from there.
 
 | Ground | Layer name(s) | Service / prefix | Dataset ring (W/S) |
 |---|---|---|---|
-| LiDAR | `lidarHillshade` (national mosaic) | `/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833` (prefix `NHM_DTM_TOPOBATHY_25833`), DOM: `wms.hoyde-dom-nhm-25833` (`NHM_DOM_25833`) | Automatisk / national / per-project |
+| LiDAR | `lidarHillshade` (national mosaic) | `/cache/lidar-dtm`, DOM `/cache/lidar-dom`, to z16 — MapProxy over `wms.hoyde-dtm-nhm-topobathy-25833:skyggerelieff` and `wms.hoyde-dom-nhm-25833:skyggerelieff`. Any other style falls back to `/wms/geonorge/wms.hoyde-…` direct | Automatisk / national / per-project |
 | LiDAR | `lidarProject` (0.25 m per acquisition, rendered by the WMS) | `/wms/geonorge/wms.hoyde-dtm-prosjekt`, DOM: `wms.hoyde-dom-prosjekt`; `LAYERS=<project id>:<style>` | same ring |
 | LiDAR | `lidarCvat` (the same acquisition, rendered by us: **Arkeologisk relieff**) | `/cvat/<acquisition>/{z}/{x}/{y}.webp` — our own tile store, read out of MBTiles by the `cvat-tiles` sidecar, nothing upstream | not on it — it is the `cvat` entry of the style ring (A/D) |
 | Analyse | — | `/arcgis/hoydedata/*`, see `docs/terrain-analysis.md` | the visualization list |
 | Kart | `topo`, `topograatone`, `toporaster`, `sjokartraster` (WMTS) | `cache.kartverket.no/v1/service` GetCapabilities, one document for all four | the five `KART_VARIANTS` |
-| Kart → Amtskart | `amtskart` (WMS, `LAYERS=amt1`, 1:200 000) | `/wms/geonorge/wms.historiskekart` | same ring |
-| Hybrid | `topoOverlay` (modifier, not a ground of its own) | `/wms/geonorge/wms.topo`, `TRANSPARENT=TRUE` | the LiDAR ring underneath |
-| Flyfoto | `flyfoto` (seamless mosaic, `LAYERS=ortofoto`, `FORMAT=image/jpeg`) | `/wms/nib/ortofoto` | ortofoto acquisitions |
+| Kart → Amtskart | `amtskart` (1:200 000) | `/cache/amtskart` — MapProxy over `wms.historiskekart`, `LAYERS=amt1`, transparent | same ring |
+| Hybrid | `topoOverlay` (modifier, not a ground of its own) | `/cache/topo-ref`, or `/cache/topo-ref-contours` with contours on — MapProxy over `wms.topo`, transparent | the LiDAR ring underneath |
+| Flyfoto | `flyfoto` (seamless mosaic, JPEG) | `/cache/flyfoto` — MapProxy over `/wms/nib/ortofoto`'s `ortofoto`, through the same token sidecar | ortofoto acquisitions |
 | Flyfoto | `flyfotoProject` (one acquisition; `TileArcGISRest`, not WMS) | `/arcgis/nib/ortofoto_prosjekter/ImageServer` | same ring |
 
 Configs live in `src/map/layers/config/backgroundLayers/`: `kvCache.ts` (WMTS
@@ -154,8 +160,10 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   `kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,fkb_presentasjonsdata` —
   the generalized `kd_*` groups stop around 1:25 000 and the `fkb_*` ones take
   over — with `kd_hoydekurver,fkb_hoydekurver` appended to the same value for
-  contours rather than a second `TileWMS`. The published `hoydekurver_1m` /
-  `_5m` are raw feature layers and render nothing at any scale.
+  contours rather than stacked as a second layer. The published `hoydekurver_1m`
+  / `_5m` are raw feature layers and render nothing at any scale. Both lists
+  now live in `mapproxy/mapproxy.yaml` as two sources, and the contour toggle
+  picks between two caches; `topoOverlay.ts` names the cache and nothing else.
 - NiB publishes no per-project WMS: `/wms/ortofoto` serves only the merged
   `ortofoto` layer and `/wms/ortofoto_prosjekter` 403s. One acquisition comes
   off the ImageServer's mosaic catalogue with
@@ -305,8 +313,11 @@ Whether a feature's `linkkulturminnesok` URL resolves is asked separately
    upstream while everything else has stopped (`docs/wms-proxy-and-tiles.md`).
 2. Create or extend a config in `src/map/layers/config/backgroundLayers/` and
    spread it into `allConfiguredBackgroundLayers` in `stack.ts`.
-   `coverageExtent` is mandatory for WMS and ArcGISImage layers —
-   `docs/wms-proxy-and-tiles.md`.
+   `coverageExtent` is mandatory for anything that can reach an upstream, XYZ
+   over `/cache/` included, and `XYZBackgroundLayer` also wants `preload` —
+   `docs/wms-proxy-and-tiles.md` for both. If the source is a fixed
+   layer+style, it should be a MapProxy cache rather than a `TileWMS`; that
+   recipe is in the same doc.
 3. A layer whose concrete source is a runtime choice gets a branch in
    `pickLayerConfig` rather than a static entry, and stays out of
    `VALID_STARTUP_LAYERS`, since a cold load onto it would render nothing.
