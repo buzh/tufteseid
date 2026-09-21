@@ -28,6 +28,7 @@ export const FLYFOTO_MOSAIC_CONFIG: XYZBackgroundLayer = {
   maxZoom: VIEW_MAX_ZOOM,
   // A miss is a GetMap upstream; see the field's own note in types.ts.
   preload: 0,
+  sparse: false,
   coverageExtent: {
     extent: FLYFOTO_COVERAGE_EXTENT_25833,
     crs: 'EPSG:25833',

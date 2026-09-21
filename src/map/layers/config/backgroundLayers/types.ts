@@ -73,6 +73,14 @@ export type XYZBackgroundLayer = BackgroundLayerBase & {
    *  tile would hold a tile slot for as long as that takes, which is the same
    *  reason the WMS layers preload 0. */
   preload: 0 | 2;
+  /** Whether the store holds tiles only where there is something to show, so a
+   *  404 inside the extent is the coverage mask and not a dropped request. True
+   *  for ours under /cvat/, false for MapProxy's /cache/, which culls to a
+   *  coverage polygon and answers a blank image inside it. It is what turns the
+   *  retry in `tileGuard.ts` off: an `<img>` error carries no status, so a mask
+   *  would be asked for three times and answer the same thing each time — a
+   *  whole screenful of that at a level the store only partly reaches. */
+  sparse: boolean;
   coverageExtent?: CoverageExtent;
 };
 

@@ -30,5 +30,6 @@ export const buildTopoOverlayConfig = (
   maxZoom: VIEW_MAX_ZOOM,
   // A miss is a GetMap upstream; see the field's own note in types.ts.
   preload: 0,
+  sparse: false,
   coverageExtent: TOPO_COVERAGE_EXTENT_25833,
 });

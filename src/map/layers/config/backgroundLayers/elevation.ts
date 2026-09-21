@@ -49,6 +49,7 @@ export const buildNationalLidarConfig = (
       // A miss here is a GetMap upstream, so preloading would hold tile slots
       // through a 3-12 s render; that a hit is instant does not change it.
       preload: 0,
+      sparse: false,
       coverageExtent,
     };
   }

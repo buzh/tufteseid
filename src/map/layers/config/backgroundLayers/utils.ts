@@ -160,10 +160,12 @@ export const getArcGISImageLayer = (
 // reprojects if a `?projection=` ever puts the view somewhere else.
 //
 // Guarded like the rest, even though some of these stores are ours and cannot
-// be down without the app being down with them: `guardTileSource` returns
-// without doing anything for a URL no origin in `src/upstream/` claims, so the
-// cVAT ground is unaffected and MapProxy's `/cache/` — where a miss reaches
-// through to Kartverket or NiB — is covered without a second code path.
+// be down without the app being down with them: the breaker half of
+// `guardTileSource` does nothing for a URL no origin in `src/upstream/` claims,
+// so the cVAT ground is outside it and MapProxy's `/cache/` — where a miss
+// reaches through to Kartverket or NiB — is covered without a second code path.
+// The retry half is the one a sparse store has to be kept out of, which is what
+// `sparse` says (`types.ts`).
 export const getXYZLayer = (
   layerConfig: XYZBackgroundLayer,
 ): TileLayer | null => {
@@ -186,7 +188,7 @@ export const getXYZLayer = (
     tileGrid,
     zDirection: WMS_Z_DIRECTION,
   });
-  guardTileSource(source, layerConfig.url);
+  guardTileSource(source, layerConfig.url, { retry: !layerConfig.sparse });
 
   const extent = toViewExtent(layerConfig.coverageExtent, viewProjection);
   return new TileLayer({

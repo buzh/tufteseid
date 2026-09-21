@@ -168,7 +168,14 @@ export const stylesForFlight = (
  * fills a few per cent. It stops OL asking outside; inside it the tiles nobody
  * wrote answer 404, which OL marks errored and leaves transparent — and that
  * transparency is the coverage mask, with the faded mosaic underneath showing
- * through.
+ * through. That is what `sparse` says, and the mask is why: a retry would ask
+ * three times for every tile of it and be told the same thing three times.
+ *
+ * `maxZoom` is the deepest level written *anywhere* in the acquisition, and one
+ * flight can be 0.25 m DTM over a town and 0.5 m over the forest behind it — so
+ * the deepest level is often the mask's own edge, and a link shared at it opens
+ * on the level below drawn large. That is the store being honest about its
+ * reach rather than something to cap away.
  *
  * Overlap is expected and is the reason each acquisition has its own namespace.
  * Two flights over one landscape are two readings of it — a 5 pkt from 2021 and
@@ -188,6 +195,7 @@ export const buildCvatGroundConfig = (
   // bind-mounted database, so fetching a level either side of the one on screen
   // costs nothing and takes the blank out of a zoom step.
   preload: 2,
+  sparse: true,
   coverageExtent: {
     extent: acquisition.project.bboxLonLat,
     crs: 'EPSG:4326',

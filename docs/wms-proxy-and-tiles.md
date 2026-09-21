@@ -361,16 +361,25 @@ is fewer requests.
   transparent gaps and uses `jpgpng`.
 - Tiles load through `guardTileSource` (`src/upstream/tileGuard.ts`): admission
   control for the origins the breaker knows, and a bounded retry for every
-  source, including the ones it does not. Two retries at 400 ms and 900 ms plus
-  up to 300 ms of jitter, then the tile is left `ERROR`. OpenLayers asks once and
-  caches the `ERROR`, so without this the ~1-in-200 upstream 502 above is a hole
-  that lasts until the page is reloaded — and only at the zoom level it happened
-  on, each level being its own set of tiles. That is what "works, but some tiles
-  at some zoom levels are missing" is. Every failed try still reports to the
-  breaker, so an outage trips it in fewer tiles than before, not more; a tile the
-  breaker *refused* is not retried, the answer being known, and comes back via
-  `refresh()`. `/cache/topo-ref*` and `/cache/amtskart` need the retry most: in
-  no origin, they have no probe and no `refresh()` to fall back on.
+  source that reaches an upstream, including the ones no origin claims. Two
+  retries at 400 ms and 900 ms plus up to 300 ms of jitter, then the tile is left
+  `ERROR`. OpenLayers asks once and caches the `ERROR`, so without this the
+  ~1-in-200 upstream 502 above is a hole that lasts until the page is reloaded —
+  and only at the zoom level it happened on, each level being its own set of
+  tiles. That is what "works, but some tiles at some zoom levels are missing" is.
+  Every failed try still reports to the breaker, so an outage trips it in fewer
+  tiles than before, not more; a tile the breaker *refused* is not retried, the
+  answer being known, and comes back via `refresh()`. `/cache/topo-ref*` and
+  `/cache/amtskart` need the retry most: in no origin, they have no probe and no
+  `refresh()` to fall back on.
+- The cVAT ground is the one source that opts out, with `sparse: true` on its
+  layer config. Its store holds tiles only where the flight does, so a 404 inside
+  the extent is the coverage mask rather than a dropped request — and an `<img>`
+  error carries no status, so the retry cannot tell the two apart. Left on, every
+  tile of the mask would be asked for three times over 1.3 s, which at a level
+  the acquisition only partly reaches is the whole screen. MapProxy's `/cache/`
+  needs no such flag: it culls to a coverage polygon and answers a blank image,
+  HTTP 200, inside it.
 - A former `retryBlankTileLoadFunction` retried anything under 800 bytes, and is
   gone — a different thing from the retry above, which keys on a failed request
   and not on the size of a successful one. The no-data PNG is deterministic, so

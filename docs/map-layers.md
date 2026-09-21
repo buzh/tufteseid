@@ -310,12 +310,13 @@ Whether a feature's `linkkulturminnesok` URL resolves is asked separately
    cycle rebuilds the layer instead of reusing it, and a ground already drawn
    flashes. A new builder also calls `guardTileSource(source, url)` before
    handing the source to the layer, or that ground goes on hammering a dead
-   upstream while everything else has stopped (`docs/wms-proxy-and-tiles.md`).
+   upstream while everything else has stopped — with `{ retry: false }` where a
+   404 is the source's own coverage mask (`docs/wms-proxy-and-tiles.md`).
 2. Create or extend a config in `src/map/layers/config/backgroundLayers/` and
    spread it into `allConfiguredBackgroundLayers` in `stack.ts`.
    `coverageExtent` is mandatory for anything that can reach an upstream, XYZ
-   over `/cache/` included, and `XYZBackgroundLayer` also wants `preload` —
-   `docs/wms-proxy-and-tiles.md` for both. If the source is a fixed
+   over `/cache/` included, and `XYZBackgroundLayer` also wants `preload` and
+   `sparse` — `docs/wms-proxy-and-tiles.md` for all three. If the source is a fixed
    layer+style, it should be a MapProxy cache rather than a `TileWMS`; that
    recipe is in the same doc.
 3. A layer whose concrete source is a runtime choice gets a branch in

@@ -13,6 +13,12 @@
 // per level and per tile, so what a reader sees is a map that mostly works with
 // patches missing at the zoom they happened to be at. Two retries on a short
 // jittered backoff close that, and cost nothing when nothing is failing.
+//
+// There is nothing to close where a missing tile is the answer. An `<img>`
+// error carries no status, so a 404 that means "nobody wrote a tile here" reads
+// exactly like a 502 that means "ask again" — and a sparse store asked three
+// times returns the mask three times. Hence `retry: false`, which the cVAT
+// ground passes and nothing else does.
 
 import { getDefaultStore } from 'jotai';
 import type ImageTile from 'ol/ImageTile';
@@ -49,21 +55,34 @@ const RETRY_JITTER_MS = 300;
  */
 const attempts = new WeakMap<Tile, number>();
 
+type GuardOptions = {
+  /**
+   * Whether a request that produced no picture is worth making again. Off for
+   * a sparse store — see the header, and `sparse` in the layer config.
+   */
+  retry?: boolean;
+};
+
 /**
  * Put `source` behind the retry, and behind the breaker for whichever origin
  * `url` belongs to.
  *
- * Every source gets the retry, including the ones no origin claims: `/cache/
- * topo-ref*` and `/cache/amtskart` are in no row on purpose (`origins.ts`), and
- * that reasoning is about whether to *stop asking* during an outage. It says
- * nothing about a single dropped request, and those two are the layers with the
- * least recourse — with no origin there is no probe and no `refresh()`, so
- * without this a hole in them is permanent.
+ * The retry wants no origin of its own: `/cache/topo-ref*` and
+ * `/cache/amtskart` are in no row on purpose (`origins.ts`), and that reasoning
+ * is about whether to *stop asking* during an outage. It says nothing about a
+ * single dropped request, and those two are the layers with the least recourse
+ * — with no origin there is no probe and no `refresh()`, so without this a hole
+ * in them is permanent. What it does want is a source where a failed request is
+ * the only reason a tile can fail to arrive.
  *
  * Called by the four background builders and by the theme builder, with the
  * URL each of them already has in hand.
  */
-export const guardTileSource = (source: TileImage, url: string): void => {
+export const guardTileSource = (
+  source: TileImage,
+  url: string,
+  { retry = true }: GuardOptions = {},
+): void => {
   const origin = originForUrl(url);
   if (origin) source.set(GUARD_PROP, origin);
 
@@ -101,7 +120,7 @@ export const guardTileSource = (source: TileImage, url: string): void => {
         // spend three. Which is the right way round: retrying is what we stop
         // doing once the origin is known to be down.
         if (origin) reportFailure(origin);
-        const delay = RETRY_DELAY_MS[attempt - 1];
+        const delay = retry ? RETRY_DELAY_MS[attempt - 1] : undefined;
         if (delay === undefined) return;
         window.setTimeout(
           () => {

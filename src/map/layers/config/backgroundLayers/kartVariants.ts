@@ -40,6 +40,7 @@ export const AMTSKART_CONFIG: XYZBackgroundLayer = {
   maxZoom: VIEW_MAX_ZOOM,
   // A miss is a GetMap upstream; see the field's own note in types.ts.
   preload: 0,
+  sparse: false,
   // The layer's declared EPSG:25833 bounds; without it OL asks for open ocean.
   coverageExtent: {
     extent: [-127998, 6377920, 1145510, 7976800],
