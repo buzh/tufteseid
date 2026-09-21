@@ -12,7 +12,7 @@ import { Tooltip, UnstyledButton } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { cx } from '../ui/cx';
 import { Icon } from '../ui/Icon';
-import styles from './Ribbon.module.css';
+import styles from './controls.module.css';
 import type { LidarControls } from './useLidarControls';
 
 export const ModelToggle = ({ lidar }: { lidar: LidarControls }) => {
@@ -25,14 +25,16 @@ export const ModelToggle = ({ lidar }: { lidar: LidarControls }) => {
     // What the click does, not what is showing: the lit half already says the
     // latter, and the model it would switch to is the thing no glyph can carry.
     <Tooltip
-      label={isDom ? t('ribbon.model.toDtm') : t('ribbon.model.toDom')}
-      multiline
-      w={260}
+      label={
+        isDom ? t('lidarControls.model.toDtm') : t('lidarControls.model.toDom')
+      }
     >
       <UnstyledButton
         className={styles.modelToggle}
-        aria-label={t('ribbon.model.aria', {
-          model: isDom ? t('ribbon.model.dom') : t('ribbon.model.dtm'),
+        aria-label={t('lidarControls.model.aria', {
+          model: isDom
+            ? t('lidarControls.model.dom')
+            : t('lidarControls.model.dtm'),
         })}
         aria-pressed={isDom}
         onClick={() => selectModel(isDom ? 'dtm' : 'dom')}

@@ -19,9 +19,9 @@ import {
   CVAT_STYLE,
   lidarStyleLabel,
 } from '../map/layers/config/backgroundLayers/lidarProjects';
+import { ControlChip } from '../ui/ControlChip';
 import { Icon, type MaterialSymbol } from '../ui/Icon';
-import { RibbonChip } from './RibbonChip';
-import styles from './Ribbon.module.css';
+import styles from './controls.module.css';
 import type { LidarControls } from './useLidarControls';
 
 // What each render does to the height model, in one glyph. The pairs are the
@@ -67,15 +67,15 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
   // The one ground whose relief nobody upstream computed has to say so; every
   // other render on this menu is Kartverket's picture of Kartverket's heights.
   const hint = isLidarCvat
-    ? t('ribbon.render.cvatHint')
-    : t('ribbon.render.wmsHint');
+    ? t('lidarControls.render.cvatHint')
+    : t('lidarControls.render.wmsHint');
 
   // Icon alone: the names are long ("Multiskyggerelieff"), and which render is
-  // drawing is the one thing on this ribbon the reader can see by looking at
+  // drawing is the one thing in this row the reader can see by looking at
   // the map. What the picture does not say is whose render it is, so the cache
   // keeps the `database` icon it carries on its own row below.
   const chipIcon = isLidarCvat ? 'database' : styleIcon(shownStyle);
-  const chipTitle = t('ribbon.render.chipTitle', {
+  const chipTitle = t('lidarControls.render.chipTitle', {
     render: label,
     source: hint,
   });
@@ -86,12 +86,12 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
   // a choice that is not there.
   if (lidarModel === 'dom') {
     return (
-      <Tooltip label={t('ribbon.render.domLocked')}>
-        <RibbonChip
+      <Tooltip label={t('lidarControls.render.domLocked')}>
+        <ControlChip
           icon={chipIcon}
           aria-label={chipTitle}
           withChevron={false}
-          className={styles.chipStatic}
+          readout
         />
       </Tooltip>
     );
@@ -112,7 +112,7 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
       <Text size="sm">{lidarStyleLabel(style)}</Text>
       {style === CVAT_STYLE && (
         <Text size="xs" c="dimmed">
-          {t('ribbon.render.cvatHint')}
+          {t('lidarControls.render.cvatHint')}
         </Text>
       )}
     </Menu.Item>
@@ -129,7 +129,7 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
             re-derives one through `preferredLidarRender` — so while it is on,
             this is its answer as much as the reader's. Dimmed for that, and
             choosing here pins the dataset too. */}
-        <RibbonChip
+        <ControlChip
           icon={chipIcon}
           title={chipTitle}
           aria-label={chipTitle}
@@ -144,7 +144,7 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
             child, and nesting the two is undocumented in both directions. */}
         {isLidarCvat && activeCvat && (
           <Menu.Label className={styles.provenance}>
-            {t('ribbon.render.cvatProvenance', {
+            {t('lidarControls.render.cvatProvenance', {
               acquisition: activeCvat.project.projectName,
               renderer: CVAT_RENDERER,
               template: CVAT_TEMPLATE,
@@ -160,14 +160,14 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
           >
             <Text size="sm">{lidarStyleLabel(CVAT_STYLE)}</Text>
             <Text size="xs" c="dimmed">
-              {t('ribbon.render.cvatMissing')}
+              {t('lidarControls.render.cvatMissing')}
             </Text>
           </Menu.Item>
         )}
         {tierAStyles.map(row)}
         {tierBStyles.length > 0 && (
           <>
-            <Menu.Label>{t('ribbon.render.more')}</Menu.Label>
+            <Menu.Label>{t('lidarControls.render.more')}</Menu.Label>
             {tierBStyles.map(row)}
           </>
         )}

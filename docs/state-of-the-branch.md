@@ -7,11 +7,19 @@ re-deriving four years of Kartverket and Riksantikvaren service quirks.
 
 The rebuild has reached one surface. `src/App.tsx` renders a ribbon above
 `MapComponent`: it says which LiDAR dataset and which render of it are drawing,
-and switches both (`src/ribbon/`). At the far end of that row, and only when
-there is something to say, it names an external service that has stopped
-answering. There is still no search box, no lokaliteter, no funn, no drawing and
-no account, and no control over the Kart, Flyfoto, Amtskart or Hybrid grounds —
-those remain a `set()` away.
+and switches both. At the far end of that row, and only when there is something
+to say, it names an external service that has stopped answering. There is still
+no search box, no lokaliteter, no funn, no drawing and no account, and no
+control over the Kart, Flyfoto, Amtskart or Hybrid grounds — those remain a
+`set()` away.
+
+The band and the controls are two things. `src/ribbon/` is the band: the strip,
+the wordmark, the upstream fault chip. `src/lidarControls/` is the surface it
+hosts — `LidarControlGroup`, four elements whose design is settled, taking a
+`useLidarControls` object and no atoms of their own. Another host mounts the
+group; what it would have to do about there being one controller is at the top
+of `useLidarControls.ts`. The chip both wear is `src/ui/ControlChip.tsx`, and
+the one metric they all share is `--control-height` in `src/index.css`.
 
 **Mantine is the design system, and the app is dark.** `MantineProvider` and
 the theme (`src/ui/theme.ts`) are mounted at the root, and every surface is
@@ -98,11 +106,16 @@ it is in `git log` on `main`.
 Every ground is a Jotai atom. Writing one rebuilds the stack, and
 `backgroundLayerAtomEffect` (mounted by `MapComponent`) does the work.
 
-The LiDAR ones now have a writer: `useLidarControls` (`src/ribbon/`), which the
-ribbon mounts once. Do not reach past it for `activeLidarStyleAtom` or
+The LiDAR ones now have a writer: `useLidarControls` (`src/lidarControls/`),
+which the ribbon mounts once. Do not reach past it for `activeLidarStyleAtom` or
 `backgroundLayerAtom` on a flight — on a flight the ground's *name* is a
 function of the render (`lidarFlightGround`), and the two would end up naming
 different things. Everything else in the table below still has no writer at all.
+
+Every atom the controller touches is the `.focused` facade of a `halved()` pair,
+so the controls already describe whichever side of the compare curtain has
+focus. One group plus a focus switch is a working split view today; a group per
+pane is the change described at the top of that file.
 
 | Atom | Module | Does |
 | --- | --- | --- |

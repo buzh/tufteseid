@@ -9,11 +9,7 @@
       "dynamisk_farget_hoyde": "Dynamisk fargelagt høyde"
     }
   },
-  "map": {
-    "errorMessage": "Noe gikk veldig galt med kartet"
-  },
-  "ribbon": {
-    "lidar": "LiDAR",
+  "lidarControls": {
     "offLidar": "Kartet viser ikke LiDAR nå",
     "enterLidar": "Vis LiDAR",
     "auto": {
@@ -50,6 +46,12 @@
       "toDtm": "Bytt til terrengmodell (DTM) — bakken, uten vegetasjon og bygninger",
       "toDom": "Bytt til overflatemodell (DOM) — trekroner og tak. Bare skyggerelieff, og ingen cache: den er regnet ut fra terrenget."
     }
+  },
+  "map": {
+    "errorMessage": "Noe gikk veldig galt med kartet"
+  },
+  "ribbon": {
+    "lidar": "LiDAR"
   },
   "shared": {
     "errorBoundary": {

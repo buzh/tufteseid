@@ -1,0 +1,91 @@
+/* The chip's own box. Lives in `src/ui/` rather than beside any one control
+   row because two unrelated surfaces wear it — the LiDAR controls and the
+   upstream fault chip — and a CSS module cannot be reached across directories
+   any other way than by the component that owns it. Every variant is a prop
+   for the same reason: a caller passing `className` could not name a class in
+   here, and a hashed `.chipIcon` in the caller's own module would not match
+   the one below. */
+
+/* One line, and `--control-height` so a row of chips, toggles and buttons is a
+   single band rather than a tall chip with buttons floating in the middle. */
+.chip {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  max-width: 16rem;
+  height: var(--control-height);
+  padding: 0 8px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-default);
+}
+
+.chip:hover {
+  background: var(--mantine-color-default-hover);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 1px;
+}
+
+/* Something else is holding the pen. Dim at rest so the row says who chose, but
+   full strength under the cursor: these still open, and picking a row in one is
+   how the reader takes the choice back. */
+.chipDimmed {
+  opacity: 0.5;
+}
+
+.chipDimmed:hover,
+.chipDimmed:focus-visible {
+  opacity: 1;
+}
+
+/* A readout rather than a target: no hover affordance, no pointer. */
+.chipReadout {
+  cursor: default;
+}
+
+.chipReadout:hover {
+  background: var(--mantine-color-default);
+}
+
+.chipIcon {
+  flex: none;
+  color: var(--mantine-color-dimmed);
+}
+
+.chipLabel {
+  overflow: hidden;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Trails the label on the same line, so it reads as the rest of the phrase. */
+.chipHint {
+  overflow: hidden;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chipChevron {
+  flex: none;
+  color: var(--mantine-color-dimmed);
+}
+
+/* An upstream is not answering. Red rather than the papaya accent: the accent
+   means "this is where the controls are", and a fault has to read as the other
+   thing. Only the border and the icon carry it — a filled red chip in a row
+   this dense reads as an alarm, and the map underneath is still usable. */
+.chipWarn {
+  border-color: var(--mantine-color-red-8);
+}
+
+.chipWarn .chipIcon {
+  color: var(--mantine-color-red-4);
+}

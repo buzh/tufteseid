@@ -1,5 +1,9 @@
-/* The ribbon is a band above the map, not a floating panel over it: the map is
-   what is being read, and a control that covers terrain competes with it. */
+/* The band itself, and nothing that sits in it. The controls style themselves
+   (`lidarControls/controls.module.css`) and the chip they share is a `src/ui/`
+   primitive, so this file describes only the strip the map is pushed down by.
+
+   A band above the map, not a floating panel over it: the map is what is being
+   read, and a control that covers terrain competes with it. */
 
 .ribbon {
   flex: none;
@@ -25,141 +29,8 @@
   margin-right: var(--mantine-spacing-xs);
 }
 
-/* --- the menu targets --- */
-
-/* One line, and the height of a `size="xs"` Button so the ribbon is a single
-   band rather than a tall chip with buttons floating in the middle of it. */
-.chip {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 6px;
-  max-width: 16rem;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--mantine-color-default-border);
-  border-radius: var(--mantine-radius-sm);
-  background: var(--mantine-color-default);
-}
-
-.chip:hover {
-  background: var(--mantine-color-default-hover);
-}
-
-.chip:focus-visible {
-  outline: 2px solid var(--mantine-primary-color-filled);
-  outline-offset: 1px;
-}
-
-/* Automatisk is holding the pen. Dim at rest so the ribbon says who chose, but
-   full strength under the cursor: these still open, and picking a row in one is
-   how the reader takes the choice back. */
-.chipDimmed {
-  opacity: 0.5;
-}
-
-.chipDimmed:hover,
-.chipDimmed:focus-visible {
-  opacity: 1;
-}
-
-/* A readout rather than a target: no hover affordance, no pointer. */
-.chipStatic {
-  cursor: default;
-}
-
-.chipStatic:hover {
-  background: var(--mantine-color-default);
-}
-
-.chipIcon {
-  flex: none;
-  color: var(--mantine-color-dimmed);
-}
-
-.chipLabel {
-  overflow: hidden;
-  font-size: var(--mantine-font-size-sm);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Trails the label on the same line, so it reads as the rest of the phrase. */
-.chipHint {
-  overflow: hidden;
-  color: var(--mantine-color-dimmed);
-  font-size: var(--mantine-font-size-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chipChevron {
-  flex: none;
-  color: var(--mantine-color-dimmed);
-}
-
-/* --- the model toggle --- */
-
-/* The chip's box, split across the middle. Both halves are always drawn: the
-   one that is dark is the picture the reader is not looking at, and a toggle
-   that hid it would be a button with nothing to say about its other state. */
-.modelToggle {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  width: 34px;
-  height: 30px;
-  overflow: hidden;
-  border: 1px solid var(--mantine-color-default-border);
-  border-radius: var(--mantine-radius-sm);
-  background: var(--mantine-color-default);
-}
-
-.modelToggle:hover {
-  background: var(--mantine-color-default-hover);
-}
-
-.modelToggle:focus-visible {
-  outline: 2px solid var(--mantine-primary-color-filled);
-  outline-offset: 1px;
-}
-
-.modelHalf {
-  display: flex;
-  flex: 1 1 50%;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-  color: var(--mantine-color-dimmed);
-}
-
-/* The divider: one line between the two, drawn on the lower half so it does not
-   double with the chip's own border. */
-.modelHalf + .modelHalf {
-  border-top: 1px solid var(--mantine-color-default-border);
-}
-
-/* Drawing now. Papaya, like everything else on this ribbon that means "this is
-   the answer" — opacity alone reads as disabled at 14px. */
-.modelHalfOn {
-  color: var(--mantine-primary-color-filled);
-}
-
-/* An upstream is not answering. Red rather than the papaya accent: the accent
-   means "this is where the controls are", and a fault has to read as the other
-   thing. Only the border and the icon carry it — a filled red chip in a ribbon
-   this dense reads as an alarm, and the map underneath is still usable. */
-.chipWarn {
-  border-color: var(--mantine-color-red-8);
-}
-
-.chipWarn .chipIcon {
-  color: var(--mantine-color-red-4);
-}
-
-/* Pushes the fault to the right of the LiDAR controls, so it appears without
-   moving anything the reader was about to click. */
+/* Pushes the fault chip to the right of the LiDAR controls, so it appears
+   without moving anything the reader was about to click. */
 .statusSpacer {
   flex: 1 1 auto;
   min-width: var(--mantine-spacing-md);
@@ -170,17 +41,4 @@
   margin-top: var(--mantine-spacing-sm);
   padding-top: var(--mantine-spacing-sm);
   border-top: 1px solid var(--mantine-color-default-border);
-}
-
-/* A Menu.Label is normally two or three words; this one is a paragraph. */
-.provenance {
-  white-space: normal;
-  line-height: 1.4;
-}
-
-/* Holds the width of a Menu.Item's check, so rows without one still line up. */
-.gutter {
-  display: block;
-  width: 18px;
-  height: 18px;
 }

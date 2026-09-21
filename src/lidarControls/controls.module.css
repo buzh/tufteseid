@@ -1,0 +1,92 @@
+/* What the four controls need that `ui/ControlChip` does not already carry.
+   Deliberately says nothing about the band they sit in — the ribbon's own
+   stylesheet does that, and a second host (a pane in a split view) has to be
+   able to mount the group without inheriting a border-bottom. */
+
+/* --- the group --- */
+
+/* One row that never compresses. Whether a narrow window scrolls or clips is
+   the host's call — the ribbon scrolls — but the group must not answer it by
+   squeezing four controls into three controls' worth of space. Emphatically not
+   a scroll container itself: nested inside the ribbon's, the inner one would
+   take the overflow and the wordmark would stay put while the controls slid
+   under it. */
+.group {
+  flex: none;
+}
+
+/* --- Automatisk --- */
+
+/* Icon-only, at the size of the model toggle. The height and the padding go
+   through Mantine's own variables rather than through `height` and `padding`:
+   `.mantine-Button-root` sets both from them at the same specificity as this
+   class, so declaring the properties directly would leave the result depending
+   on which stylesheet the bundler injected last. `width` it does not set, so
+   that one is safe as a property. */
+.iconButton {
+  --button-height: var(--control-height);
+  --button-padding-x: 0;
+  width: var(--control-icon-width);
+}
+
+/* --- the model toggle --- */
+
+/* The chip's box, split across the middle. Both halves are always drawn: the
+   one that is dark is the picture the reader is not looking at, and a toggle
+   that hid it would be a button with nothing to say about its other state. */
+.modelToggle {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: var(--control-icon-width);
+  height: var(--control-height);
+  overflow: hidden;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-default);
+}
+
+.modelToggle:hover {
+  background: var(--mantine-color-default-hover);
+}
+
+.modelToggle:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 1px;
+}
+
+.modelHalf {
+  display: flex;
+  flex: 1 1 50%;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  color: var(--mantine-color-dimmed);
+}
+
+/* The divider: one line between the two, drawn on the lower half so it does not
+   double with the chip's own border. */
+.modelHalf + .modelHalf {
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+/* Drawing now. Papaya, like everything else in this row that means "this is the
+   answer" — opacity alone reads as disabled at 14px. */
+.modelHalfOn {
+  color: var(--mantine-primary-color-filled);
+}
+
+/* --- inside the menus --- */
+
+/* Holds the width of a Menu.Item's check, so rows without one still line up. */
+.gutter {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+/* A Menu.Label is normally two or three words; this one is a paragraph. */
+.provenance {
+  white-space: normal;
+  line-height: 1.4;
+}

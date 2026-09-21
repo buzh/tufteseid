@@ -1,10 +1,23 @@
 // The LiDAR ring's controller: which flight is drawing, which render of it, and
-// which model. Everything the ribbon does to the map goes through here, because
+// which model. Everything the controls do to the map goes through here, because
 // the three are not independent — the ground's *name* is a function of the
 // render, and a render is only on offer where the dataset publishes it.
 //
-// Mount once. Two mounts is two catalogue fetches and two Automatisk resolvers
-// writing the same atoms.
+// Mount once. Two mounts is two Automatisk resolvers writing the same atoms,
+// and two copies of the catalogue in component state — the fetches themselves
+// are cached at module level, so the network cost is paid once either way.
+//
+// That is the one thing standing between `LidarControlGroup` and a second host.
+// The atoms below are not the blocker: every one of them is the `.focused`
+// facade of a `halved()` pair (`map/compare/halves.ts`), so these controls
+// already describe whichever side of the compare curtain has focus, and a split
+// view that moves focus between panes works today with one group.
+//
+// A split view that wants a group *per pane* — both live, each writing its own
+// half — needs this hook to take a `CompareHalf` and read `…Halves.a` /
+// `…Halves.b` instead of the facade, and the Automatisk effect to be the
+// caller's to mount rather than unconditionally on. Nothing else in the four
+// controls knows which half it is on: they take this object and no atoms.
 
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';

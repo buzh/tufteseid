@@ -7,13 +7,14 @@
 // off (`useLidarControls`).
 //
 // Icon alone, at the size of the model toggle: the word "Automatisk" was the
-// widest thing on the ribbon and said nothing the filled state does not. What
+// widest thing in the row and said nothing the filled state does not. What
 // it does say — that this is a mode, on or off — the fill carries, and the rest
 // is one hover away.
 
 import { Button, Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '../ui/Icon';
+import styles from './controls.module.css';
 import type { LidarControls } from './useLidarControls';
 
 export const AutoToggle = ({ lidar }: { lidar: LidarControls }) => {
@@ -24,14 +25,17 @@ export const AutoToggle = ({ lidar }: { lidar: LidarControls }) => {
     // The tooltip says what the click does, which is the opposite thing in each
     // state — the label alone cannot, since it is the same word either way.
     <Tooltip
-      label={autoDataset ? t('ribbon.auto.onHint') : t('ribbon.auto.offHint')}
+      label={
+        autoDataset
+          ? t('lidarControls.auto.onHint')
+          : t('lidarControls.auto.offHint')
+      }
     >
       <Button
         size="xs"
         variant={autoDataset ? 'filled' : 'default'}
-        w={34}
-        px={0}
-        aria-label={t('ribbon.auto.label')}
+        className={styles.iconButton}
+        aria-label={t('lidarControls.auto.label')}
         aria-pressed={autoDataset}
         onClick={toggleAuto}
       >

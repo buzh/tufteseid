@@ -6,7 +6,8 @@ caching, tile grids and the Kartverket rate limit are
 `docs/wms-proxy-and-tiles.md`; the float-elevation path behind terrain analysis
 is `docs/terrain-analysis.md`.
 
-The ribbon drives the LiDAR ring and nothing else so far (`src/ribbon/`, and
+The ribbon drives the LiDAR ring and nothing else so far (`src/lidarControls/`
+for the controls, `src/ribbon/` for the band that hosts them, and
 `docs/state-of-the-branch.md` for what the rebuild has reached). Every other
 ground below is still reachable only by writing its atom or by
 `?backgroundLayer=`.

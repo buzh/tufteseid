@@ -11,9 +11,9 @@ import { Badge, Group, Menu, ScrollArea, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import type { LidarProject } from '../map/layers/config/backgroundLayers/lidarProjects';
 import type { LidarViewportEntry } from '../map/layers/config/backgroundLayers/lidarRelevance';
+import { ControlChip } from '../ui/ControlChip';
 import { Icon } from '../ui/Icon';
-import { RibbonChip } from './RibbonChip';
-import styles from './Ribbon.module.css';
+import styles from './controls.module.css';
 import type { LidarControls } from './useLidarControls';
 
 /** "2025 · 10pkt", the two things that rank one flight against another. */
@@ -43,10 +43,10 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
   const flight = isLidarFlight ? activeLidarProject : null;
   const shown = flight
     ? flightFacts(flight) || flight.projectName
-    : t('ribbon.dataset.nationalShort');
+    : t('lidarControls.dataset.nationalShort');
   const title = flight
     ? `${flight.projectName} · ${flightFacts(flight)}`
-    : `${t('ribbon.dataset.national')} · ${t('ribbon.dataset.nationalHint')}`;
+    : `${t('lidarControls.dataset.national')} · ${t('lidarControls.dataset.nationalHint')}`;
 
   const row = (entry: LidarViewportEntry) => {
     const { project, areaRatio } = entry;
@@ -66,7 +66,7 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
             <Text size="sm">{project.projectName}</Text>
             <Text size="xs" c="dimmed">
               {flightFacts(project)} ·{' '}
-              {t('ribbon.dataset.coverage', {
+              {t('lidarControls.dataset.coverage', {
                 percent: Math.round(areaRatio * 100),
               })}
             </Text>
@@ -77,7 +77,7 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
               can ask for of it. */}
           {cachedFlightIds.has(project.id) && (
             <Badge size="xs" variant="light" leftSection={<Icon icon="database" size={12} />}>
-              {t('ribbon.dataset.cached')}
+              {t('lidarControls.dataset.cached')}
             </Badge>
           )}
         </Group>
@@ -87,24 +87,26 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
 
   const status = () => {
     if (viewport.status === 'loading' || viewport.status === 'idle') {
-      return <Menu.Item disabled>{t('ribbon.dataset.loading')}</Menu.Item>;
+      return (
+        <Menu.Item disabled>{t('lidarControls.dataset.loading')}</Menu.Item>
+      );
     }
     if (viewport.status === 'zoomedOut') {
       return (
         <Menu.Item disabled leftSection={<Icon icon="zoom_in" size={18} />}>
-          {t('ribbon.dataset.zoomedOut')}
+          {t('lidarControls.dataset.zoomedOut')}
         </Menu.Item>
       );
     }
     if (viewport.status === 'error') {
       return (
         <Menu.Item disabled leftSection={<Icon icon="warning" size={18} />}>
-          {t('ribbon.dataset.error')}
+          {t('lidarControls.dataset.error')}
         </Menu.Item>
       );
     }
     if (viewport.primary.length + viewport.secondary.length === 0) {
-      return <Menu.Item disabled>{t('ribbon.dataset.none')}</Menu.Item>;
+      return <Menu.Item disabled>{t('lidarControls.dataset.none')}</Menu.Item>;
     }
     return null;
   };
@@ -123,7 +125,7 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
             own facts — the year and the density — are facts about that flight.
             The mosaic is not a flight: it keeps `layers`, because what it is is
             every flight stacked and levelled to 1 m. */}
-        <RibbonChip
+        <ControlChip
           icon={flight ? 'flight' : 'layers'}
           label={shown}
           title={title}
@@ -142,9 +144,9 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
             )
           }
         >
-          <Text size="sm">{t('ribbon.dataset.national')}</Text>
+          <Text size="sm">{t('lidarControls.dataset.national')}</Text>
           <Text size="xs" c="dimmed">
-            {t('ribbon.dataset.nationalHint')}
+            {t('lidarControls.dataset.nationalHint')}
           </Text>
         </Menu.Item>
 
@@ -152,13 +154,13 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
           {status()}
           {viewport.primary.length > 0 && (
             <>
-              <Menu.Label>{t('ribbon.dataset.inView')}</Menu.Label>
+              <Menu.Label>{t('lidarControls.dataset.inView')}</Menu.Label>
               {viewport.primary.map(row)}
             </>
           )}
           {viewport.secondary.length > 0 && (
             <>
-              <Menu.Label>{t('ribbon.dataset.alsoHere')}</Menu.Label>
+              <Menu.Label>{t('lidarControls.dataset.alsoHere')}</Menu.Label>
               {viewport.secondary.map(row)}
             </>
           )}

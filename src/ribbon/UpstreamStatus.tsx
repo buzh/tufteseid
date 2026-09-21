@@ -11,6 +11,7 @@ import { Button, Group, Popover, Stack, Text } from '@mantine/core';
 import { useAtomValue } from 'jotai';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ControlChip } from '../ui/ControlChip';
 import { Icon } from '../ui/Icon';
 import {
   probeNow,
@@ -18,7 +19,6 @@ import {
   type OriginStatus,
 } from '../upstream/health';
 import { ORIGIN_IDS, type OriginId } from '../upstream/origins';
-import { RibbonChip } from './RibbonChip';
 import styles from './Ribbon.module.css';
 
 // The one thing here that moves without any state changing, so it owns the
@@ -70,8 +70,8 @@ const OutagePopover = ({
       withinPortal
     >
       <Popover.Target>
-        <RibbonChip
-          className={styles.chipWarn}
+        <ControlChip
+          warn
           icon="cloud_off"
           label={
             down.length === 1
