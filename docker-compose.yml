@@ -14,19 +14,27 @@ services:
       - ./config.js:/var/www/config.js:ro
       # Optional: override the baked-in Caddyfile without rebuilding.
       # - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      # The cached combined-VAT ground, built out of band by
-      # vat-cache/vatcache.py --get <n>, which writes here by default. Mounted under
-      # Caddy's root, so file_server serves it at
-      # /cvat/<acquisition>/<z>/<x>/<y>.webp and no route of its own is needed.
-      # A host path rather than a named volume:
-      # the store is written by a script on the host, is several GB, and
-      # survives the stack being rebuilt. Third-party install: point this at
-      # your own store, or leave it — an empty directory answers 404, which is
-      # what a tile outside the LiDAR footprint looks like anyway.
-      - /site/tufteseid/data/cvat:/var/www/cvat:ro
     depends_on:
       - wmscache
       - pocketbase
+      - cvat-tiles
+
+  # The cached combined-VAT ground: one MBTiles database per LiDAR
+  # acquisition, one indexed SELECT per tile. Caddy proxies /cvat/* here.
+  # Built out of band by vat-cache/vatcache.py --get <n>, which writes to
+  # the host path below by default.
+  #
+  # A host path rather than a named volume: the store is written by a script
+  # on the host, is tens of GB, and survives the stack being rebuilt.
+  # Third-party install: point this at your own store, or leave it — an empty
+  # directory answers 404, which is what a tile outside the LiDAR footprint
+  # looks like anyway. Zero deps (node:sqlite is compiled into Node 24); see
+  # cvat-tiles/server.mjs. Not exposed on the host.
+  cvat-tiles:
+    build: ./cvat-tiles
+    restart: unless-stopped
+    volumes:
+      - /site/tufteseid/data/cvat:/store:ro
 
   # Backend for lokaliteter. Serves the SPA's /pb/* API (proxied by
   # Caddy) for user auth (OAuth via Google/GitHub/OIDC/…) and the

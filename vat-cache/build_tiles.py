@@ -1,22 +1,22 @@
 """The tile store: its geometry, how a level is built into it, and how it is
 verified afterwards. `vatcache.py` is the command line over all of it.
 
-The store is what docker-compose bind-mounts into the Caddy container at
-/var/www/cvat, so what this writes is what the app serves.
+The store is what docker-compose bind-mounts into the cvat-tiles sidecar, so
+what this writes is what the app serves.
 
-One store holds several acquisitions, each in its own directory:
-`<slug>/<z>/<x>/<y>.webp`, with the slug recorded in the manifest as the
-acquisition's `path`. Overlap is the reason. Two flights over one landscape are
-two pictures of it — a 5pkt from 2015 and a 10pkt from 2025 are not the same
-ground twice — and the app offers both as rows, so their tiles cannot be
-allowed to contend for one name. Markers live under the same slug, as they
-always have.
+One store holds several acquisitions, each in its own database:
+`<slug>.mbtiles`, with the slug recorded in the manifest as the acquisition's
+`path`. Overlap is the reason there is one per acquisition. Two flights over one
+landscape are two pictures of it — a 5pkt from 2015 and a 10pkt from 2025 are
+not the same ground twice — and the app offers both as rows, so their tiles
+cannot be allowed to contend for one name.
 
-Resumable: every work unit drops a marker when it finishes, and a re-run skips
-the marked ones. A unit that writes no tiles still marks, because "the footprint
-turned out not to reach here" and "never ran" are different states. That is also
-why a check reads the markers rather than counting tiles: only the marker can
-tell an edge unit that legitimately holds nothing from one that never ran.
+Resumable: every work unit records itself when it finishes, and a re-run skips
+the recorded ones. A unit that writes no tiles still records, because "the
+footprint turned out not to reach here" and "never ran" are different states.
+That is also why a check reads the `units` table rather than counting tiles:
+only it can tell an edge unit that legitimately holds nothing from one that
+never ran.
 
 Each level is an independent job — its own fetch, its own scan, its own tiles —
 so levels can be built in any order, or one rebuilt without the others. See
@@ -26,6 +26,7 @@ is what makes the levels independent in the first place.
 
 import hashlib
 import json
+import sqlite3
 import sys
 import time
 import urllib.error
@@ -173,32 +174,199 @@ def encode_tile(field):
     return buf.getvalue()
 
 
-def tile_dir(out, project):
-    """The acquisition's own corner of the store, and what the manifest hands
-    the app as its `path`. Two flights over one landscape are two pictures of
-    it, both offered, so neither may write into the other's tiles."""
-    return Path(out) / slug(project)
+# ---------------------------------------------------------------------------
+# The store
+# ---------------------------------------------------------------------------
+
+STORE_SUFFIX = ".mbtiles"
+
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS metadata (name TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS tiles (
+    zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB);
+CREATE UNIQUE INDEX IF NOT EXISTS tile_index
+    ON tiles (zoom_level, tile_column, tile_row);
+CREATE TABLE IF NOT EXISTS units (
+    zoom_level INTEGER, unit_x INTEGER, unit_y INTEGER,
+    PRIMARY KEY (zoom_level, unit_x, unit_y));
+"""
 
 
-def tile_path(out, project, z, ux, uy, unit_tiles, i, j):
-    """Where the (i, j)-th tile of one work unit lands. The one place the unit
-    grid is turned into the app's tile coordinates, so a check cannot disagree
-    with the writer about which tiles a unit owns."""
-    x, y = ux * unit_tiles + i, uy * unit_tiles + j
-    return tile_dir(out, project) / str(z) / str(x) / f"{y}.webp"
+def store_path(out, project):
+    """The acquisition's own database. Its stem is what the manifest hands the
+    app as `path`, so the slug rule lives in one place and the app's tile
+    template needs to know nothing about the container."""
+    return Path(out) / f"{slug(project)}{STORE_SUFFIX}"
 
 
-def unit_tile_paths(out, project, z, ux, uy, unit_tiles):
-    return [
-        tile_path(out, project, z, ux, uy, unit_tiles, i, j)
-        for j in range(unit_tiles)
-        for i in range(unit_tiles)
-    ]
+def tiles_per_side(z):
+    """How many tiles the grid holds across at this level.
+
+    The EPSG:25833 extent is square and 256 tiles of 512 px wide at z9, so it
+    is 2**(z-1) — which is the figure the row flip below needs and the one
+    thing the grid's own module does not spell out."""
+    return 2 ** (z - 1)
+
+
+def tms_row(z, y):
+    """The store's row for the app's y, and back again — MBTiles counts rows
+    from the south, the app's grid from the north. Its own inverse, which is
+    why the reader (`cvat-tiles/server.mjs`) can apply the same formula."""
+    return tiles_per_side(z) - 1 - y
+
+
+def unit_rect(z, ux, uy, unit_tiles):
+    """The (column, row) rectangle one work unit owns, in the store's own
+    coordinates: first and last column, first and last row. The rows come out
+    the other way up from the y range, hence the swap."""
+    x0, y0 = ux * unit_tiles, uy * unit_tiles
+    return (x0, x0 + unit_tiles - 1,
+            tms_row(z, y0 + unit_tiles - 1), tms_row(z, y0))
+
+
+class Store:
+    """One acquisition's tiles, in one SQLite database.
+
+    MBTiles as a container, not as a tileset a stranger can read: the rows are
+    the spec's, but the grid under them is EPSG:25833 (`wmsTileGrid.ts`), so a
+    generic reader would hang these tiles somewhere in the Atlantic. The
+    manifest beside the databases and `cvat-tiles/server.mjs` are the readers,
+    and both know the grid.
+
+    Left in the default journal mode on purpose. WAL wants to write two files
+    beside the database, which a read-only opener cannot do — and the sidecar
+    holds these open read-only while a batch run appends to them. A unit is one
+    transaction every eleven seconds, so there is nothing here to tune.
+    """
+
+    def __init__(self, path, write=False):
+        self.path = Path(path)
+        if write:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.db = sqlite3.connect(self.path, timeout=30)
+            self.db.executescript(_SCHEMA)
+        else:
+            self.db = sqlite3.connect(f"file:{self.path}?mode=ro",
+                                      uri=True, timeout=30)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
+
+    def close(self):
+        self.db.close()
+
+    def stamp(self, project):
+        """What the file is, for whoever opens it with sqlite3 rather than
+        through the app. Nothing in the stack reads these rows — the manifest
+        is the authority on the recipe — but a database that cannot say what
+        it holds is a liability in a directory of nine of them."""
+        span = self.db.execute(
+            "SELECT min(zoom_level), max(zoom_level) FROM tiles").fetchone()
+        rows = {
+            "name": project,
+            "format": "webp",
+            "type": "overlay",
+            "version": "1",
+            "crs": "EPSG:25833",
+            "description": (
+                "RVT combined VAT over hoydedata.no DTM. Grid is the app's "
+                "own (src/map/layers/wmsTileGrid.ts): 512 px tiles, origin "
+                "north-west, resolution 21664 / 2**z. tile_row is TMS, "
+                "2**(z-1) - 1 - y. See manifest.json beside this file."),
+        }
+        if span[0] is not None:
+            rows["minzoom"], rows["maxzoom"] = str(span[0]), str(span[1])
+        with self.db:
+            self.db.executemany(
+                "INSERT INTO metadata (name, value) VALUES (?, ?) "
+                "ON CONFLICT(name) DO UPDATE SET value = excluded.value",
+                list(rows.items()))
+
+    def units(self, z):
+        """The units finished at this level."""
+        return {
+            (ux, uy) for ux, uy in self.db.execute(
+                "SELECT unit_x, unit_y FROM units WHERE zoom_level = ?", (z,))
+        }
+
+    def tiles_in(self, z, ux, uy, unit_tiles):
+        """(x, y, blob) for every tile this work unit holds."""
+        x0, x1, r0, r1 = unit_rect(z, ux, uy, unit_tiles)
+        rows = self.db.execute(
+            "SELECT tile_column, tile_row, tile_data FROM tiles "
+            "WHERE zoom_level = ? AND tile_column BETWEEN ? AND ? "
+            "AND tile_row BETWEEN ? AND ?", (z, x0, x1, r0, r1))
+        return [(x, tms_row(z, row), blob) for x, row, blob in rows]
+
+    def coords(self, z):
+        """Every tile coordinate at this level, whatever unit it belongs to."""
+        return {
+            (x, tms_row(z, row)) for x, row in self.db.execute(
+                "SELECT tile_column, tile_row FROM tiles WHERE zoom_level = ?",
+                (z,))
+        }
+
+    def _put(self, z, tiles):
+        """The insert itself, in whatever transaction the caller has open."""
+        self.db.executemany(
+            "INSERT INTO tiles (zoom_level, tile_column, tile_row, tile_data) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(zoom_level, tile_column, tile_row) "
+            "DO UPDATE SET tile_data = excluded.tile_data",
+            [(z, x, tms_row(z, y), blob) for x, y, blob in tiles])
+
+    def write_tiles(self, z, tiles):
+        """Tiles with no claim to being a finished unit — what `pack_store.py`
+        has for a tile that was on disk under no marker."""
+        with self.db:
+            self._put(z, tiles)
+
+    def write_unit(self, z, ux, uy, tiles):
+        """One work unit's tiles and its record of being finished, in one
+        transaction.
+
+        Together, because the record is what declares the unit done: a kill
+        between the two would leave a unit that reads as built and is not. That
+        is the whole of what the old write-to-`.part`-and-rename dance bought,
+        and the transaction buys it for the unit rather than for one tile."""
+        with self.db:
+            self._put(z, tiles)
+            self.db.execute(
+                "INSERT OR IGNORE INTO units (zoom_level, unit_x, unit_y) "
+                "VALUES (?, ?, ?)", (z, ux, uy))
+
+    def drop_units(self, z, units, unit_tiles):
+        """Hand these units back to the build, tiles and record together."""
+        with self.db:
+            for ux, uy in units:
+                x0, x1, r0, r1 = unit_rect(z, ux, uy, unit_tiles)
+                self.db.execute(
+                    "DELETE FROM tiles WHERE zoom_level = ? "
+                    "AND tile_column BETWEEN ? AND ? AND tile_row BETWEEN ? AND ?",
+                    (z, x0, x1, r0, r1))
+                self.db.execute(
+                    "DELETE FROM units WHERE zoom_level = ? AND unit_x = ? "
+                    "AND unit_y = ?", (z, ux, uy))
+
+
+def read_store(out, project):
+    """This acquisition's database open read-only, or None where the store
+    holds none of it. Read-only so that asking a question of a store — how far
+    a build got, what a level holds — cannot create one."""
+    path = store_path(out, project)
+    return Store(path) if path.exists() else None
 
 
 def build_unit(args):
-    """Fetch, render and write one work unit. Runs in a worker process."""
-    z, ux, uy, unit_tiles, project, out = args
+    """Fetch and render one work unit. Runs in a worker process.
+
+    Returns its tiles rather than writing them: the store is one database per
+    acquisition, and the parent is its only writer. A few megabytes back over
+    the pipe per eleven seconds of render."""
+    z, ux, uy, unit_tiles, project = args
     res = resolution(z)
     dem = fetch_unit(z, ux, uy, unit_tiles, project)
     # radius_in_metres=False: RVT's max_rad as written, so this level is RVT's
@@ -206,22 +374,14 @@ def build_unit(args):
     composite = cvat.cvat(dem, res, radius_in_metres=False)
     inner = composite[OVERLAP_PX:-OVERLAP_PX, OVERLAP_PX:-OVERLAP_PX]
 
-    written = 0
+    tiles = []
     for j in range(unit_tiles):
         for i in range(unit_tiles):
             tile = inner[j * TILE_PX:(j + 1) * TILE_PX, i * TILE_PX:(i + 1) * TILE_PX]
             blob = encode_tile(tile)
-            if blob is None:
-                continue
-            path = tile_path(out, project, z, ux, uy, unit_tiles, i, j)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            # Write then rename: a kill mid-write must not leave a half tile
-            # that the marker then declares finished.
-            tmp = path.with_suffix(".webp.part")
-            tmp.write_bytes(blob)
-            tmp.replace(path)
-            written += 1
-    return z, ux, uy, written
+            if blob is not None:
+                tiles.append((ux * unit_tiles + i, uy * unit_tiles + j, blob))
+    return z, ux, uy, tiles
 
 
 def settings(levels, unit_tiles):
@@ -258,6 +418,12 @@ def settings(levels, unit_tiles):
             "note": "src/map/layers/wmsTileGrid.ts; resolution = max_resolution / 2**z",
         },
         "encoding": f"RGBA WebP q{WEBP_QUALITY}, alpha is coverage",
+        # In the digest, though it decides nothing about a pixel: a store of
+        # loose files and a store of databases are not one store, and a build
+        # that opened the wrong one would write a second copy of the ground
+        # beside the first. The recipe check is the guard that already exists.
+        "container": ("MBTiles (SQLite) per acquisition, <path>.mbtiles; "
+                      "tile_row is TMS, 2**(z-1) - 1 - y"),
         "overlap_px": OVERLAP_PX,
         "unit_tiles": unit_tiles,
         "levels": {
@@ -312,8 +478,8 @@ def open_manifest(out, project, levels, unit_tiles, force):
     # What ground is in the store, where its tiles are, and at which levels. Per
     # acquisition, because a level built for one is not built for another: a
     # reader asking "is z12 here for Østfold" must not be answered by Vestfold's
-    # z12. `path` is the app's tile template, so the slug rule lives here alone
-    # and no second implementation of it can drift.
+    # z12. `path` is the app's tile template and the database's own stem, so the
+    # slug rule lives here alone and no second implementation of it can drift.
     entry = {"levels": sorted(levels, reverse=True), "path": slug(project)}
     acquisitions = {project: entry}
 
@@ -325,11 +491,18 @@ def open_manifest(out, project, levels, unit_tiles, force):
         # through a recipe that really had changed.
         legacy = "acquisitions" not in have and "acquisition" in have
         if not manifest_agrees(have, unit_tiles) and not force:
+            # The likeliest reason today is a store of loose tile files, which
+            # this code can no longer write into. That one has a repair rather
+            # than a decision, so name it.
+            packable = "container" not in have
             sys.exit(
                 f"{path} was built under different settings "
                 f"(digest {have.get('digest')}, this run {digest}).\n"
-                "A cache mixing two settings cannot say what it is. Build into "
-                "an empty directory, or pass --force if you know why."
+                + ("This store holds loose tile files. Pack it first:\n"
+                   f"  python pack_store.py {out} --apply\n"
+                   if packable else
+                   "A cache mixing two settings cannot say what it is. Build "
+                   "into an empty directory, or pass --force if you know why.")
             )
         # Levels arrive one run at a time; keep the ones already built.
         recipe["levels"] = {**have.get("levels", {}), **recipe["levels"]}
@@ -357,28 +530,20 @@ def open_manifest(out, project, levels, unit_tiles, force):
     return digest
 
 
-def marker_dir(out, project, z):
-    """Where one acquisition's finished-unit markers for level z live.
-
-    Namespaced by acquisition, for the same reason the tiles are: overlap is
-    expected and wanted, so two acquisitions can own the same work unit and the
-    same tile coordinates inside it. Vestfold 10pkt 2025 lies almost wholly on
-    top of Vestfold og Telemark 5pkt 2021, and one's marker must not tell the
-    other that its tiles are written."""
-    return Path(out) / ".units" / slug(project) / str(z)
-
-
 def marked_units(out, project, z):
-    """The units this acquisition has finished at this level, off the markers
-    alone. Cheap enough to ask for a progress figure without a mask at hand."""
-    found = set()
-    for mark in marker_dir(out, project, z).glob("*_*"):
-        ux, _, uy = mark.name.partition("_")
-        try:
-            found.add((int(ux), int(uy)))
-        except ValueError:
-            continue
-    return found
+    """The units this acquisition has finished at this level.
+
+    Per acquisition, for the same reason the tiles are: overlap is expected and
+    wanted, so two acquisitions can own the same work unit and the same tile
+    coordinates inside it. Vestfold 10pkt 2025 lies almost wholly on top of
+    Vestfold og Telemark 5pkt 2021, and one's record must not tell the other
+    that its tiles are written. Cheap enough to ask for a progress figure
+    without a mask at hand."""
+    store = read_store(out, project)
+    if store is None:
+        return set()
+    with store:
+        return store.units(z)
 
 
 def build(out, project, coverage, levels, unit_tiles=DEFAULT_UNIT_TILES,
@@ -399,43 +564,51 @@ def build(out, project, coverage, levels, unit_tiles=DEFAULT_UNIT_TILES,
             "to name the same ground."
         )
 
+    store = None
     if not dry_run:
         digest = open_manifest(out, project, levels, unit_tiles, force)
         print(f"{out}  manifest {digest}  {project}")
+        store = Store(store_path(out, project), write=True)
+        store.stamp(project)
 
-    for z in levels:
-        units = coverage.units(z, unit_tiles)
-        marks = marker_dir(out, project, z)
-        done = marked_units(out, project, z)
-        pending = [u for u in units if u not in done]
-        side_km = tile_span(z) * unit_tiles / 1000
-        print(f"\nz{z}  {resolution(z):.4f} m/px  unit {side_km:.2f} km  "
-              f"{len(units)} units, {len(pending)} to do")
-        if dry_run:
-            continue
-        if limit:
-            pending = pending[:limit]
-        if not pending:
-            continue
-        marks.mkdir(parents=True, exist_ok=True)
+    try:
+        for z in levels:
+            units = coverage.units(z, unit_tiles)
+            done = store.units(z) if store else marked_units(out, project, z)
+            pending = [u for u in units if u not in done]
+            side_km = tile_span(z) * unit_tiles / 1000
+            print(f"\nz{z}  {resolution(z):.4f} m/px  unit {side_km:.2f} km  "
+                  f"{len(units)} units, {len(pending)} to do")
+            if dry_run:
+                continue
+            if limit:
+                pending = pending[:limit]
+            if not pending:
+                continue
 
-        started, tiles = time.perf_counter(), 0
-        work = [(z, ux, uy, unit_tiles, project, str(out)) for ux, uy in pending]
-        if jobs > 1:
-            with ProcessPoolExecutor(max_workers=jobs) as pool:
-                futures = {pool.submit(build_unit, w): w for w in work}
-                for finished, future in enumerate(as_completed(futures), 1):
-                    _z, ux, uy, n = future.result()
-                    (marks / f"{ux}_{uy}").touch()
-                    tiles += n
+            started, tiles = time.perf_counter(), 0
+            work = [(z, ux, uy, unit_tiles, project) for ux, uy in pending]
+            if jobs > 1:
+                with ProcessPoolExecutor(max_workers=jobs) as pool:
+                    futures = {pool.submit(build_unit, w): w for w in work}
+                    for finished, future in enumerate(as_completed(futures), 1):
+                        _z, ux, uy, made = future.result()
+                        store.write_unit(z, ux, uy, made)
+                        tiles += len(made)
+                        report(finished, len(work), tiles, started)
+            else:
+                for finished, item in enumerate(work, 1):
+                    _z, ux, uy, made = build_unit(item)
+                    store.write_unit(z, ux, uy, made)
+                    tiles += len(made)
                     report(finished, len(work), tiles, started)
-        else:
-            for finished, item in enumerate(work, 1):
-                _z, ux, uy, n = build_unit(item)
-                (marks / f"{ux}_{uy}").touch()
-                tiles += n
-                report(finished, len(work), tiles, started)
-        print()
+            print()
+    finally:
+        if store:
+            # Again at the end, for the level span: the first stamp was written
+            # before this run's tiles were.
+            store.stamp(project)
+            store.close()
 
 
 def report(done, total, tiles, started):
@@ -457,7 +630,7 @@ class LevelCheck:
 
     `todo` and `broken` are repaired the same way — hand the unit back to the
     build — and are counted apart only because they say different things about
-    the run that produced them: one never finished, the other wrote a file the
+    the run that produced them: one never finished, the other stored bytes the
     app cannot draw."""
 
     z: int
@@ -469,36 +642,38 @@ class LevelCheck:
     empty: int = 0
     todo: list = field(default_factory=list)
     broken: list = field(default_factory=list)
-    parts: list = field(default_factory=list)
     stray: list = field(default_factory=list)
 
     @property
     def ok(self):
-        return not (self.todo or self.broken or self.parts)
+        return not (self.todo or self.broken)
 
     @property
     def repairable(self):
-        """Units to hand back: the unbuilt ones, plus the ones holding a file
-        that does not decode or a leftover half-write."""
-        hurt = {unit_of(p, self.unit_tiles) for p in self.broken + self.parts}
+        """Units to hand back: the unbuilt ones, plus the ones holding a tile
+        that does not decode."""
+        hurt = {unit_of(t, self.unit_tiles) for t in self.broken}
         return sorted(set(self.todo) | hurt)
 
 
-def unit_of(path, unit_tiles):
-    """Which work unit a tile path belongs to. The inverse of `tile_path`."""
-    x, y = int(path.parent.name), int(path.name.split(".")[0])
+def unit_of(tile, unit_tiles):
+    """Which work unit a tile belongs to. The inverse of the division
+    `build_unit` makes."""
+    x, y = tile
     return x // unit_tiles, y // unit_tiles
 
 
-def readable_tile(path):
-    """Does this file decode to a tile a browser will draw?
+def readable_tile(blob):
+    """Does this decode to a tile a browser will draw?
 
     A full decode rather than a header read, because the failure worth finding
-    is truncation and a truncated WebP carries an intact header. Writes go to
-    `.part` and rename, so this should never fire — which is the reason it is
-    worth asking. ~5 ms a tile, so a whole level is a minute or two."""
+    is truncation and a truncated WebP carries an intact header. A unit's tiles
+    land in one transaction, so a half-written tile is no longer reachable —
+    which is what makes this worth asking: what it can still find is a blob
+    that rotted under the filesystem, not a run that was killed. ~5 ms a tile,
+    so a whole level is a minute or two."""
     try:
-        with Image.open(path) as image:
+        with Image.open(BytesIO(blob)) as image:
             image.load()
             return image.size == (TILE_PX, TILE_PX)
     except Exception:
@@ -509,81 +684,69 @@ def readable_tile(path):
 
 def check_level(out, project, coverage, z, unit_tiles=DEFAULT_UNIT_TILES,
                 progress=None):
-    """Read one level of one acquisition off disk and tally it against the mask.
+    """Read one level of one acquisition out of the store and tally it against
+    the mask.
 
-    The markers are the authority on what should be there, not the mask alone: a
-    unit the footprint merely clips can legitimately hold no tile at all, and
-    only the marker separates that from a unit that never ran."""
-    out = Path(out)
+    The `units` table is the authority on what should be there, not the mask
+    alone: a unit the footprint merely clips can legitimately hold no tile at
+    all, and only its record separates that from a unit that never ran."""
     result = LevelCheck(z=z, unit_tiles=unit_tiles)
     units = coverage.units(z, unit_tiles)
     result.units = len(units)
 
-    marked = marked_units(out, project, z)
-    # A marker for a unit the footprint does not reach: the mask was rebuilt, or
-    # --unit-tiles changed between runs. Harmless in itself, but it means marker
-    # and mask no longer describe the same division of the ground.
-    result.stray = sorted(marked - set(units))
+    store = read_store(out, project)
+    try:
+        marked = store.units(z) if store else set()
+        # A unit the footprint does not reach: the mask was rebuilt, or
+        # --unit-tiles changed between runs. Harmless in itself, but it means
+        # the store and the mask no longer describe the same division.
+        result.stray = sorted(marked - set(units))
 
-    for seen, (ux, uy) in enumerate(units, 1):
-        if progress:
-            progress(seen, len(units))
-        if (ux, uy) not in marked:
-            result.todo.append((ux, uy))
-            continue
-        here = 0
-        for path in unit_tile_paths(out, project, z, ux, uy, unit_tiles):
-            part = path.with_suffix(".webp.part")
-            if part.exists():
-                result.parts.append(part)
-            if not path.exists():
+        for seen, (ux, uy) in enumerate(units, 1):
+            if progress:
+                progress(seen, len(units))
+            if (ux, uy) not in marked:
+                result.todo.append((ux, uy))
                 continue
-            here += 1
-            result.bytes += path.stat().st_size
-            if not readable_tile(path):
-                result.broken.append(path)
-        result.tiles += here
-        # A finished unit holding nothing is the footprint clipping its corner,
-        # and normal at the edge. Every unit empty is the wrong-project trap.
-        if here == 0:
-            result.empty += 1
+            here = 0
+            for x, y, blob in store.tiles_in(z, ux, uy, unit_tiles):
+                here += 1
+                result.bytes += len(blob)
+                if not readable_tile(blob):
+                    result.broken.append((x, y))
+            result.tiles += here
+            # A finished unit holding nothing is the footprint clipping its
+            # corner, normal at the edge. Every unit empty is the wrong-project
+            # trap.
+            if here == 0:
+                result.empty += 1
+    finally:
+        if store:
+            store.close()
     result.done = len(units) - len(result.todo)
     return result
 
 
 def unmark(out, project, z, units, unit_tiles=DEFAULT_UNIT_TILES):
-    """Hand these units back to the build. Their tiles go first: a rebuild that
-    decides a tile is all-NaN writes nothing there, so a broken file left in
-    place would outlive the repair meant to clear it."""
-    marks = marker_dir(out, project, z)
-    for ux, uy in units:
-        for path in unit_tile_paths(out, project, z, ux, uy, unit_tiles):
-            path.unlink(missing_ok=True)
-            path.with_suffix(".webp.part").unlink(missing_ok=True)
-        (marks / f"{ux}_{uy}").unlink(missing_ok=True)
+    """Hand these units back to the build. Their tiles go with them: a rebuild
+    that decides a tile is all-NaN writes nothing there, so a broken tile left
+    in place would outlive the repair meant to clear it."""
+    path = store_path(out, project)
+    if not path.exists():
+        return
+    with Store(path, write=True) as store:
+        store.drop_units(z, units, unit_tiles)
 
 
 def store_tiles(out, project, z):
-    """Every tile on disk at this level of this acquisition — including the ones
-    no work unit claims, which is what makes it worth reading off disk rather
-    than deriving from the markers."""
-    found = set()
-    level = tile_dir(out, project) / str(z)
-    if not level.is_dir():
-        return found
-    for column in level.iterdir():
-        if not column.is_dir():
-            continue
-        try:
-            x = int(column.name)
-        except ValueError:
-            continue
-        for tile in column.glob("*.webp"):
-            try:
-                found.add((x, int(tile.stem)))
-            except ValueError:
-                continue
-    return found
+    """Every tile in the store at this level of this acquisition — including
+    the ones no finished unit claims, which is what makes it worth reading from
+    the tiles table rather than deriving from the units one."""
+    store = read_store(out, project)
+    if store is None:
+        return set()
+    with store:
+        return store.coords(z)
 
 
 def tiles_under(units, unit_tiles):

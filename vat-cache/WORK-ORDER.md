@@ -194,9 +194,9 @@ arrives in one call and there is no mosaic to assemble.
    pairing one acquisition's footprint with another's DEM was the only mistake
    here that produced no error, just an empty store.
 2. **Work unit** — an N×N block of tiles of the level being built, default 4,
-   so 2096 px and ~18 MB at any level. Units are ordered and each records a
-   marker when done, because a unit that legitimately writes no tiles is not the
-   same as one that never ran.
+   so 2096 px and ~18 MB at any level. Units are ordered and each records itself
+   when done, because a unit that legitimately writes no tiles is not the same
+   as one that never ran.
 3. **Fetch** — `exportImage`, `pixelType=F32`, `renderingRule` `None`,
    mosaicRule pinned to the acquisition, overlap added and cropped after render.
    Retry with backoff; this is the step that will fail overnight.
@@ -204,13 +204,13 @@ arrives in one call and there is no mosaic to assemble.
 5. **Write** — 512 px RGBA WebP on the app's grid
    (`src/map/layers/wmsTileGrid.ts`: origin `[extent[0], extent[3]]` =
    −2500000, 9045984; resolutions 21664 / 2ⁿ), as
-   `<acquisition-slug>/<z>/<x>/<y>.webp`. Per acquisition, because overlapping
-   flights are wanted — two readings of one landscape, offered as two rows —
-   and one namespace would have them overwrite each other. A tile with no
-   coverage at all is not written. The store is `/site/tufteseid/data/cvat`,
-   bind-mounted read-only at `/var/www/cvat`, which is under Caddy's root — so
-   the tiles are already reachable at `/cvat/<slug>/<z>/<x>/<y>.webp` and the
-   layer needs no proxy route, no CSP host and no wmscache entry. A tile the
+   rows of `<acquisition-slug>.mbtiles`, one database per acquisition, because
+   overlapping flights are wanted — two readings of one landscape, offered as
+   two rows — and one namespace would have them overwrite each other. A tile
+   with no coverage at all is not written. The store is
+   `/site/tufteseid/data/cvat`, bind-mounted read-only into the `cvat-tiles`
+   sidecar, which answers `/cvat/<slug>/<z>/<x>/<y>.webp` with one indexed
+   SELECT — so the layer needs no CSP host and no wmscache entry. A tile the
    footprint never reached answers 404, which is also what a tile outside the
    acquisition should answer.
 6. **Manifest** — `manifest.json` beside the tiles: acquisition, RVT version,

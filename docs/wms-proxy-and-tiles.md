@@ -16,6 +16,10 @@ token-injecting sidecar for Norge i bilder, reachable only from wmscache on the
 compose network — the only internal upstream, and the only one resolved at
 request time (Docker DNS `127.0.0.11`), since a compose service's IP changes.
 
+`cvat-tiles` is beside that chain rather than in it: Caddy proxies `/cvat/*`
+straight to it, and what it serves is ours, computed here and read off disk, so
+there is nothing upstream to cache.
+
 ## Prefixes
 
 | Same-origin prefix | Internal (nginx) | Upstream |
@@ -34,16 +38,25 @@ would want the WMS host's `/skwms1/`, and both ArcGIS upstreams `/arcgis/`.
 to `/?lok=<code>`; `file_server` has no SPA fallback, so any other unknown path
 still 404s.
 
-`/cvat/<acquisition>/<z>/<x>/<y>.webp` is not in the table because nothing
-proxies it: the tile store is bind-mounted read-only at `/var/www/cvat`, under
-Caddy's root, so `file_server` serves it with no route, no wmscache entry and no
-CSP host. The path segment is the acquisition's own directory, which the
-manifest hands the app as its tile template — overlapping flights are offered as
-separate rows and may not share a `<z>/<x>/<y>`. The
-404 on a tile that was never written is load-bearing — it is the coverage mask
-(`docs/map-layers.md`). `/cvat/manifest.json` beside the tiles is served the
-same way and fetched once per page load; `connect-src 'self'` already covers
-it, and its own 404 on an install without a store reads as an empty store.
+`/cvat/<acquisition>/<z>/<x>/<y>.webp` is not in the table because it never
+leaves the stack: `handle_path /cvat/*` hands it to the `cvat-tiles` sidecar
+(`node:24-alpine`, zero deps, `node:sqlite`), which turns it into one indexed
+`SELECT` against `<acquisition>.mbtiles` in the bind-mounted store. No wmscache
+entry and no CSP host. The path segment is the acquisition's own database,
+which the manifest hands the app as its tile template — overlapping flights are
+offered as separate rows and may not share a `<z>/<x>/<y>`. The 404 on a tile
+that was never written is load-bearing — it is the coverage mask
+(`docs/map-layers.md`) — so the sidecar answers a missing row with one rather
+than with a blank tile. `/cvat/manifest.json` is read off the same directory
+and fetched once per page load; `connect-src 'self'` already covers it, and its
+own 404 on an install without a store reads as an empty store.
+
+One database per acquisition rather than a tree of files: an acquisition is
+~83 000 WebP tiles, the store holds nine of them, and the inodes dwarfed the
+bytes. MBTiles is the container only — `tile_row` is the spec's, counted from
+the south, but the grid under it is the app's EPSG:25833 one, so a generic
+MBTiles reader would place these tiles in the Atlantic. A store of loose files
+is packed with `vat-cache/pack_store.py`.
 
 ## Cache rules (wmscache)
 
@@ -166,13 +179,13 @@ is fewer requests.
   (`src/map/atoms.ts`) against OL's default 16, capped to 8 while animating. A
   cold LiDAR WMS tile takes 3–12 s; the topo WMTS base answers in ~130 ms.
 - `preload: 2` on the WMTS base and on the cached cVAT ground, `preload: 0` on
-  WMS, ArcGISImage and theme layers — free on a pre-rendered base or on files
-  off our own disk, ruinous on an on-the-fly renderer.
+  WMS, ArcGISImage and theme layers — free on a pre-rendered base or on a
+  database of ours, ruinous on an on-the-fly renderer.
 - 512 px tiles for every `TileWMS`, background and theme, from an explicit
   `TileGrid` on the View's own resolution ladder
   (`src/map/layers/wmsTileGrid.ts`), so tiles never resample. `getWMSTileGrid`
-  takes an optional level range for a store holding only some levels — the
-  cached ground passes z12–z15 — and still hands over the whole resolution
+  takes an optional level range for a store holding only some levels — a cVAT
+  acquisition passes z12–z15 — and still hands over the whole resolution
   array, indexed by absolute z, fenced by `minZoom` and the array's end. At 256 px a
   1600×1000 viewport is ~35 tiles per layer per level, and LiDAR project mode
   stacks two WMS layers: 70 requests a zoom step, two steps to the limiter.

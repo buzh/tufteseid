@@ -84,7 +84,7 @@ the container; compose maps host `127.0.0.1:3030 → 3000`.
 
 ```
 git pull
-docker compose build --pull tufteseid
+docker compose build --pull tufteseid cvat-tiles
 docker compose up -d
 docker compose logs -f tufteseid wmscache
 scripts/live-check.sh https://<host> <lokalitet-code>
@@ -110,6 +110,7 @@ scripts/live-check.sh https://<host> <lokalitet-code>
 | `tufteseid` | `node:24-alpine` builds the SPA, `caddy:2.10.0-alpine` serves `/var/www`. `config.js` bind-mounted at runtime. |
 | `pocketbase` | Backend for lokaliteter (auth + user content), pinned to 0.40.2. Serves `/pb/*`. SQLite on the `pbdata` volume. |
 | `nib-proxy` | Token-injecting sidecar for Norge i bilder ortofoto. Reachable only from wmscache. |
+| `cvat-tiles` | `node:24-alpine`, zero deps. Serves `/cvat/*` out of one MBTiles database per LiDAR acquisition in the bind-mounted store. Built out of band by `vat-cache/`. |
 | `wmscache` | `nginx:1.27-alpine` reverse proxy + 25 GB disk cache in front of every external WMS/WFS/ArcGIS service, plus Kulturminnesøk's record API. |
 
 ## PocketBase

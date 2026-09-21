@@ -128,6 +128,19 @@ route {
                 reverse_proxy http://wmscache
         }
 
+        # The cached combined-VAT ground. One MBTiles database per LiDAR
+        # acquisition, served a tile at a time by the cvat-tiles sidecar —
+        # /cvat/<acquisition>/<z>/<x>/<y>.webp, and /cvat/manifest.json
+        # beside it saying which acquisitions the store holds. Same URLs
+        # the store answered when it was a bind-mounted tree of files under
+        # Caddy's own root, which is why the app needs to know nothing
+        # about the change. Inside the route block so it is matched before
+        # `file_server`, which would otherwise answer /cvat/* out of
+        # /var/www.
+        handle_path /cvat/* {
+                reverse_proxy http://cvat-tiles:8080
+        }
+
         # PocketBase — backend for lokaliteter (auth + user content).
         # Kept same-origin so browser auth cookies "just work" and there's
         # no CORS to configure. The full OAuth2 redirect flow bounces

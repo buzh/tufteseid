@@ -1,13 +1,16 @@
 // The cached ground: RVT's combined VAT — hillshade, slope, positive openness
 // and sky-view in one picture — precomputed over whole LiDAR acquisitions and
-// written to disk as plain tiles. `vat-cache/vatcache.py` made them and
-// `/cvat/manifest.json` beside them states the presets, the blend order, the
-// radii per level, the digest of the run and — the part this module reads at
-// runtime — which acquisitions are in the store and at which levels.
+// written to an MBTiles database per acquisition. `vat-cache/vatcache.py` made
+// them and `/cvat/manifest.json` beside them states the presets, the blend
+// order, the radii per level, the digest of the run and — the part this module
+// reads at runtime — which acquisitions are in the store and at which levels.
 //
-// Not a service: Caddy's own `file_server` serves the bind-mounted store, so
-// there is no proxy route, no wmscache entry and no CSP host — `img-src 'self'`
-// already covers it, and `connect-src 'self'` the manifest.
+// Nothing upstream: the `cvat-tiles` sidecar reads the bind-mounted store and
+// answers a tile at a time, so there is no wmscache entry and no CSP host —
+// `img-src 'self'` already covers it, and `connect-src 'self'` the manifest.
+// The URLs below are the ones the store answered when it was a tree of files
+// under Caddy's own root; the container changed underneath them and this module
+// did not.
 
 import { halved } from '../../../compare/halves';
 import type { VatStackLayer } from '../../../../terrain/shade';
@@ -26,9 +29,10 @@ import { XYZBackgroundLayer } from './types';
  */
 export type CvatAcquisition = {
   project: LidarProject;
-  /** This acquisition's own directory in the store, as the manifest states it.
-   *  Two flights over one landscape are two pictures of it and the app offers
-   *  both, so their tiles cannot share a `<z>/<x>/<y>`. */
+  /** This acquisition's own namespace in the store, as the manifest states it —
+   *  a database of its own on the server, one path segment here. Two flights
+   *  over one landscape are two pictures of it and the app offers both, so
+   *  their tiles cannot share a `<z>/<x>/<y>`. */
   path: string;
   /** The coarsest and deepest levels written, on the app's own grid
    *  (`wmsTileGrid.ts`): z16 is 0.331 m/px, z12 5.289 m/px. How deep depends on
@@ -62,13 +66,13 @@ export const activeCvatAcquisitionAtom = activeCvatAcquisitionHalves.focused;
 
 const CVAT_MANIFEST_URL = '/cvat/manifest.json';
 
-/** The tile template, given the acquisition's own directory. Each acquisition
+/** The tile template, given the acquisition's own namespace. Each acquisition
  *  has one, because a tile carries no provenance and overlapping flights are
  *  the point rather than an accident to curate away. */
 const cvatTileUrl = (path: string) => `/cvat/${path}/{z}/{x}/{y}.webp`;
 
 /** What `build_tiles.py` writes under `acquisitions`: acquisition name to the
- *  levels built for it and the directory they are in. */
+ *  levels built for it and the namespace they are in. */
 export type CvatStore = Record<string, { levels: number[]; path: string }>;
 
 const parseStore = (body: unknown): CvatStore => {
@@ -98,8 +102,8 @@ const parseStore = (body: unknown): CvatStore => {
 let storePromise: Promise<CvatStore> | null = null;
 
 /**
- * What the store holds. An install without one answers 404 — `file_server` has
- * no SPA fallback to turn that into an index page — and an empty store is the
+ * What the store holds. An install without one answers 404 — the sidecar has no
+ * SPA fallback to turn that into an index page — and an empty store is the
  * honest answer: no cached rows anywhere in the app, rather than a dataset that
  * is offered and draws nothing.
  */
@@ -166,7 +170,7 @@ export const stylesForFlight = (
  * transparency is the coverage mask, with the faded mosaic underneath showing
  * through.
  *
- * Overlap is expected and is the reason each acquisition has its own directory.
+ * Overlap is expected and is the reason each acquisition has its own namespace.
  * Two flights over one landscape are two readings of it — a 5 pkt from 2021 and
  * a 10 pkt from 2025 are not the same ground twice — so both are offered as
  * rows and each draws only its own tiles.

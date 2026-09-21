@@ -31,7 +31,7 @@ from there.
 |---|---|---|---|
 | LiDAR | `lidarHillshade` (national mosaic) | `/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833` (prefix `NHM_DTM_TOPOBATHY_25833`), DOM: `wms.hoyde-dom-nhm-25833` (`NHM_DOM_25833`) | Automatisk / national / per-project |
 | LiDAR | `lidarProject` (0.25 m per acquisition, rendered by the WMS) | `/wms/geonorge/wms.hoyde-dtm-prosjekt`, DOM: `wms.hoyde-dom-prosjekt`; `LAYERS=<project id>:<style>` | same ring |
-| LiDAR | `lidarCvat` (the same acquisition, rendered by us: **Arkeologisk relieff**) | `/cvat/<acquisition>/{z}/{x}/{y}.webp` — our own tile store, served off disk, no service behind it | not on it — it is the `cvat` entry of the style ring (A/D) |
+| LiDAR | `lidarCvat` (the same acquisition, rendered by us: **Arkeologisk relieff**) | `/cvat/<acquisition>/{z}/{x}/{y}.webp` — our own tile store, read out of MBTiles by the `cvat-tiles` sidecar, nothing upstream | not on it — it is the `cvat` entry of the style ring (A/D) |
 | Analyse | — | `/arcgis/hoydedata/*`, see `docs/terrain-analysis.md` | the visualization list |
 | Kart | `topo`, `topograatone`, `toporaster`, `sjokartraster` (WMTS) | `cache.kartverket.no/v1/service` GetCapabilities, one document for all four | the five `KART_VARIANTS` |
 | Kart → Amtskart | `amtskart` (WMS, `LAYERS=amt1`, 1:200 000) | `/wms/geonorge/wms.historiskekart` | same ring |
@@ -69,24 +69,26 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   `BackgroundLayerName` rather than folded into `lidarProject` because the URL,
   a screenshot's `meta.ground` and the figure plate all read it to say which
   render made the picture.
-- `lidarCvat` is not a service. `vat-cache/vatcache.py` runs RVT over an
+- `lidarCvat` has nothing upstream. `vat-cache/vatcache.py` runs RVT over an
   acquisition's DTM and writes the combined VAT — hillshade, slope, positive
   openness, sky-view in one picture — as 512 px RGBA WebP on the app's own tile
   grid, down to z12 (5.289 m/px), with `/cvat/manifest.json` beside the tiles
   recording presets, blend order, per-level radii, the run's digest and which
-  acquisitions are in the store, at which levels, in which directory. How deep
+  acquisitions are in the store, at which levels, under which name. How deep
   the ladder goes is the acquisition's own: z16 (0.331 m/px) where hoydedata.no
   publishes a 0.25 m DTM, z15 (0.661 m/px) where it publishes 0.5 m, because
-  below the DEM's cell the picture is of the interpolation. Caddy's
-  `file_server` serves the bind-mounted store, so there is no proxy route, no
-  wmscache entry and no CSP host. Radii are RVT pixels at every level, so an
-  acquisition's levels are related pictures of the same terrain rather than one
-  picture at several sizes: the reach of the visualization grows as you zoom
-  out, and the tooltip says so.
-- **Acquisitions may overlap, and two rows is the point.** Each owns a directory
-  in the store — the manifest's `path`, which is the whole tile template the app
-  builds — so a 5 pkt flight from 2021 and a 10 pkt one from 2025 over the same
-  landscape are two readings of it, both offered, neither overwriting the other.
+  below the DEM's cell the picture is of the interpolation. What serves it is
+  the `cvat-tiles` sidecar, turning the URL into one indexed `SELECT` against
+  the acquisition's MBTiles database in the bind-mounted store; no upstream
+  means no wmscache entry, and same-origin means no CSP host. Radii are RVT
+  pixels at every level, so an acquisition's levels are related pictures of the
+  same terrain rather than one picture at several sizes: the reach of the
+  visualization grows as you zoom out, and the tooltip says so.
+- **Acquisitions may overlap, and two rows is the point.** Each owns a database
+  in the store — named by the manifest's `path`, which is also the segment the
+  app puts in the tile template — so a 5 pkt flight from 2021 and a 10 pkt one
+  from 2025 over the same landscape are two readings of it, both offered,
+  neither overwriting the other.
   They are two rows because they are two *flights*, ranked against each other by
   coverage, year and density like any other pair; the store having rendered both
   adds no row and breaks no tie. Ladder depth is not a tiebreak, because it is
@@ -124,11 +126,10 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   leaves them transparent, and the faded national mosaic underneath shows
   through. `maxResolution` hides the layer one step coarser than the
   acquisition's coarsest level rather than letting OL clamp and ask for four
-  screenfuls to upscale. The whole store is one `<z>/<x>/<y>` namespace and a
-  tile carries no provenance, so where two acquisitions' envelopes overlap the
-  layer draws the neighbour's tiles: the picture is the same product either way
-  — one recipe, one digest — and what it costs is the name on a figure plate,
-  in the sliver where one envelope covers the other's ground.
+  screenfuls to upscale. Where two acquisitions' envelopes overlap the layer
+  still draws only the showing one's tiles — each has its own namespace, so
+  there is nothing of the neighbour's to answer with, and the envelope's own
+  ~94 % of unwritten ground stays transparent.
 - The manifest's acquisition names are byte-identical to the `LidarProject.id`
   the per-project WMS publishes, which is what the whole wiring rests on:
   `CvatAcquisition` carries the catalogue row itself, so `cvatFor()` joins a

@@ -50,9 +50,9 @@ with the ladder that flight does earn, because that is the whole of what the
 cell rule is for. Under `-c` there is no such limit — reading a level the store
 holds is fair whatever it was built from.
 
-**One index picks everything.** The footprint mask, the DEM request, the tile
-directory, the marker directory and the manifest entry all come off the same
-number, which is what retires the one mistake the batch could make silently: a
+**One index picks everything.** The footprint mask, the DEM request, the
+acquisition's database and its manifest entry all come off the same number,
+which is what retires the one mistake the batch could make silently: a
 mask paired with a project that never flew the ground it points at returns
 all-NaN for every unit, writes no tile, and marks each one done, leaving a store
 that looks built and is empty. Masks are derived on first `--get` and cached
@@ -69,39 +69,50 @@ one's cell size earns.
 
 ## Checking a store
 
-`-c` reads the markers, not the tiles, for what *should* be there: a work unit
-the footprint merely clips can legitimately hold no tile, and only the marker
-separates that from a unit that never ran. It then decodes every tile the marked
-units own — a full decode rather than a header read, because the failure worth
-finding is truncation and a truncated WebP carries an intact header. Around 5 ms
-a tile, so narrow it with `-z` when you only want one level.
+`-c` reads the `units` table, not the tiles, for what *should* be there: a work
+unit the footprint merely clips can legitimately hold no tile, and only its
+record separates that from a unit that never ran. It then decodes every tile
+those units own — a full decode rather than a header read, because the failure
+worth finding is truncation and a truncated WebP carries an intact header.
+Around 5 ms a tile, so narrow it with `-z` when you only want one level.
 
 What it reports, and what each means:
 
 | Line | What happened |
 | --- | --- |
 | *n* units never built | the run stopped, or `--limit` cut it |
-| *n* tiles do not decode | a write that did not survive; the app draws a broken image |
-| *n* half-written `.part` files | killed mid-write, before the rename |
-| *n* markers outside the footprint | the mask or `--unit-tiles` changed since the run |
+| *n* tiles do not decode | a blob that rotted; the app draws a broken image |
+| *n* finished units outside the footprint | the mask or `--unit-tiles` changed since the run |
 | *n* finished units hold no tile | the footprint edge — normal, unless it is *every* unit, which is the mask and the DEM being of different ground |
-| *n* tiles belong to no finished unit | tiles under this acquisition that none of its finished units claims |
+| *n* tiles belong to no finished unit | tiles in this acquisition's database that none of its finished units claims |
 
 Adding `-g` repairs it. Both kinds of damage are repaired the same way — delete
-the unit's tiles, drop its marker, let the build take it again. The tiles go
-first because a rebuild that decides a tile is all-NaN writes nothing there, so
-a broken file left in place would outlive the repair meant to clear it.
+the unit's tiles, drop its record, let the build take it again. They go in one
+transaction, and the tiles have to go at all because a rebuild that decides a
+tile is all-NaN writes nothing there, so a broken tile left in place would
+outlive the repair meant to clear it.
 
 Orphan tiles are reported and never deleted. Reporting them is unambiguous now
-that each acquisition owns a directory; deleting them still is not, because the
+that each acquisition owns a database; deleting them still is not, because the
 reason one is there is usually a `--unit-tiles` that changed between runs.
+
+There is no half-written tile to find any more. A unit's tiles and its record
+land in one transaction, so the state the old `.part`-and-rename dance was
+guarding against is not reachable.
 
 ## Several acquisitions in one store
 
-Each owns a directory: `<acquisition-slug>/<z>/<x>/<y>.webp`, with the slug
-recorded in the manifest as that acquisition's `path` and nowhere else, so the
-app has a template to read and no second copy of the slug rule to drift from.
-Markers sit under the same slug, at `.units/<acquisition-slug>/<z>/`.
+Each owns a database: `<acquisition-slug>.mbtiles`, with the slug recorded in
+the manifest as that acquisition's `path` and nowhere else, so the app has a
+template to read and no second copy of the slug rule to drift from. The
+finished work units are a table in the same file, which is what makes a build
+resumable.
+
+MBTiles as a container, not as a tileset a stranger can read: `tile_row` is the
+spec's, counted from the south, but the grid under it is the app's own
+EPSG:25833 one (`src/map/layers/wmsTileGrid.ts`), so a generic MBTiles reader
+would hang these tiles somewhere in the Atlantic. `metadata` says as much. The
+readers that matter are `cvat-tiles/server.mjs` and the manifest.
 
 **Overlap is the reason, and it is wanted.** Two flights over one landscape are
 two readings of it — Vestfold og Telemark 5pkt 2021 and Vestfold 10pkt 2025 are
@@ -112,41 +123,52 @@ overwrite each other's pixels, and a tile carries nothing that says who made it.
 Adding another acquisition does not change the recipe, so it does not change
 the digest and needs no `--force`.
 
-### Dividing a store built before that
+### Packing a store of loose files
 
-A store written under the shared namespace has every acquisition's tiles in one
-`<z>/<x>/<y>` tree. The pixels are right and only their location is wrong, so
-`migrate_store.py` moves them rather than rebuilding tens of core-hours of them:
+Before the databases, a store was a tree of `<slug>/<z>/<x>/<y>.webp` — some
+83 000 files per acquisition, nine of them, and a backup that spends its night
+calling `stat()`. The pixels are right and only their container is wrong, so
+`pack_store.py` moves them rather than rebuilding tens of core-hours of them:
 
-    .venv/bin/python migrate_store.py /site/tufteseid/data/cvat          # report
-    .venv/bin/python migrate_store.py /site/tufteseid/data/cvat --apply
+    .venv/bin/python pack_store.py /site/tufteseid/data/cvat          # report
+    .venv/bin/python pack_store.py /site/tufteseid/data/cvat --apply
 
-It reports first and moves nothing without `--apply`. A tile carries no
-provenance, so what attributes it is the acquisitions' rasterised footprints:
-the tile belongs to the one whose mask reaches it. That is exact wherever the
-footprints are disjoint, which over a curated store is nearly everywhere. Where
-two masks reach one tile it genuinely could be either — whichever run came last
-won, and nothing on disk records which — so those tiles go and their work units
-are handed back, which the report names per acquisition and level. Refill them
+It reports first and writes nothing without `--apply`, and even then it only
+adds: the databases are new names beside the old tree, the previous manifest is
+kept as `manifest.json.pre-pack`, and what is now redundant is printed rather
+than deleted. Pack before the stack is rebuilt — while Caddy is still serving
+the files itself, both stores are readable, and the switch to the sidecar is
+one `docker compose up -d`.
+
+It also handles a store from before the tiles were divided per acquisition,
+where everything shares one `<z>/<x>/<y>` tree. A tile carries no provenance, so
+what attributes it is the acquisitions' rasterised footprints: the tile belongs
+to the one whose mask reaches it. That is exact wherever the footprints are
+disjoint, which over a curated store is nearly everywhere. Where two masks reach
+one tile it genuinely could be either — whichever run came last won, and nothing
+on disk records which — so those tiles are left behind and their whole work
+units handed back, which the report names per acquisition and level. Refill them
 with an ordinary `--get` of each acquisition named; until then the store has
 holes there, and `-c` reports the units as never built.
 
 The masks come from `coverage.py`, derived on the spot if `coverage-<slug>.npz`
-is not beside the script — minutes and one catalogue query per acquisition. The
-last step rewrites the manifest through `open_manifest`, so it refuses a store
-whose recipe has drifted; it checks that before moving anything, because a
-divided store with a pathless manifest is the one state the app cannot read.
+is not beside the script — minutes and one catalogue query per acquisition.
 
-Deletable once no store in the old layout remains.
+The recipe digest now names the container, so a manifest written before the
+databases cannot match one written after: that is how a build refuses to write
+MBTiles beside a tree of files it cannot see, and it is why the packer
+reproduces the pre-MBTiles digest to check the store it is about to read.
 
-The app reads the manifest, so that is the whole deploy: finish a run, and the
+Deletable once no store of loose files remains.
+
+The app reads the manifest, so a finished run is the whole deploy: the
 acquisition is a row in the LiDAR dataset pulldown on the next page load. No
-rebuild, no code change, nothing to restart — `file_server` is already serving
-both the manifest and the tiles.
+rebuild, no code change, nothing to restart — the sidecar opens a database it
+has not seen on the first request for it.
 
-`--out` is the store `docker-compose.yml` bind-mounts read-only into the Caddy
-container at `/var/www/cvat`, which is under Caddy's root — so a tile written
-here is served at `/cvat/<slug>/<z>/<x>/<y>.webp` without a route of its own.
+`--out` is the store `docker-compose.yml` bind-mounts read-only into the
+`cvat-tiles` sidecar, which answers `/cvat/<slug>/<z>/<x>/<y>.webp` with one
+indexed `SELECT` and `/cvat/manifest.json` off the same directory.
 The app asks for them as **Arkeologisk relieff**, a dataset in the LiDAR ring
 with one row per acquisition the viewport touches
 (`src/map/layers/config/backgroundLayers/cvatGround.ts`, `docs/map-layers.md`);
@@ -164,9 +186,9 @@ jupyter for an IO layer none of this uses.
 | `acquisitions.py` | Acquisition identity: the queue, the published cell size that sets the ladder, and the two name sets — hoydedata's catalogue and the per-project WMS — that have to carry a name verbatim before its tiles reach a reader |
 | `acquisitions.json` | The queue itself, in the order `--get` indexes. Committed, so an index means the same thing between two invocations |
 | `cvat.py` | RVT's combined VAT: the parameters out of `VAT_Combined.rft.xml`, and the layer walk out of `render_all_images`. The one module that decides what a pixel is |
-| `build_tiles.py` | The store: its geometry, a level built into it, the manifest, the markers, and the audit that reads all of it back |
+| `build_tiles.py` | The store: its geometry, the MBTiles container, a level built into it, the manifest, and the audit that reads all of it back |
 | `fetch_dem.py` | `exportImage` against `Prosjekt_DTM`, pinned to one `LAS_PROJECT_NAME`, plus the minimal tiled-float32 TIFF reader `dem.ts` also carries |
-| `migrate_store.py` | One-off: divides a store built under the shared tile namespace into a directory per acquisition, attributing each tile by footprint. Its own `main`, deletable once no such store remains |
+| `pack_store.py` | One-off: packs a store of loose tile files into one MBTiles database per acquisition, attributing by footprint where an old store shared one namespace. Its own `main`, deletable once no such store remains |
 | `coverage.py` | What ground an acquisition covers: catalogue rows, union rasterisation, sample-site picker, tile fill against the app's tile grid |
 | `compare.py` | The candidate grids and radius rules, rendered side by side on one real patch — what decided §1 and §2 of the work order, including the z16-against-z15 pair |
 | `render.py` | The numpy port of `shade.ts` the sizing study was done with. Superseded by `cvat.py` for anything that renders; kept because `measure.py` and `sizing.py` read against it |

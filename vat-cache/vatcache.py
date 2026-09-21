@@ -12,10 +12,10 @@
 
 An acquisition is named by its position in the list `-l` prints, which is the
 committed queue in `acquisitions.json` followed by anything the store holds that
-is not on it. Naming one thing picks the footprint, the mask, the DEM request,
-the marker directory and the tile directory together, which is the point: the
-one mistake this batch could make silently was pairing a mask with the wrong
-project, and an index cannot make it.
+is not on it. Naming one thing picks the footprint, the mask, the DEM request
+and the database together, which is the point: the one mistake this batch could
+make silently was pairing a mask with the wrong project, and an index cannot
+make it.
 
 How deep the ladder goes needs no asking. It comes off the cell size
 hoydedata.no publishes the acquisition on — z16 for the 0.25 m flights, z15 for
@@ -30,8 +30,9 @@ height values as terrain is the fault the ladder exists to prevent. Under `-c`
 it narrows the audit, where any level the store holds is fair to read.
 
 `--out` is the store — the directory docker-compose bind-mounts read-only into
-the Caddy container at /var/www/cvat. Masks are derived on first use and live
-beside this script as `coverage-<slug>.npz`.
+the cvat-tiles sidecar, holding one `<slug>.mbtiles` per acquisition beside the
+manifest. Masks are derived on first use and live beside this script as
+`coverage-<slug>.npz`.
 """
 
 import argparse
@@ -212,8 +213,9 @@ def do_list(out, rows, verbose, pattern):
         if not row.get("listed"):
             print("     where    not in acquisitions.json; found in the store")
         print(f"     store    {level_range(levels)}")
-        # Off the markers, so there is no total to divide by: deriving a mask
-        # to get one would turn listing the acquisitions into building them.
+        # Off the units table, so there is no total to divide by: deriving a
+        # mask to get one would turn listing the acquisitions into building
+        # them.
         counts = {
             z: len(build_tiles.marked_units(out, name, z))
             for z in build_tiles.DEFAULT_LEVELS
@@ -363,11 +365,9 @@ def check_acquisition(out, project, levels, unit_tiles, verbose):
         if result.broken:
             print(f"        {plural(len(result.broken), 'tile does', 'tiles do')} "
                   "not decode")
-        if result.parts:
-            print(f"        {plural(len(result.parts), 'half-written .part file')}")
         if result.stray:
-            print(f"        {plural(len(result.stray), 'marker')} outside the "
-                  "footprint (mask or --unit-tiles changed since)")
+            print(f"        {plural(len(result.stray), 'finished unit')} outside "
+                  "the footprint (mask or --unit-tiles changed since)")
         # Some empty units are the footprint clipping a corner. All of them is
         # the fetch having been pinned to ground the acquisition never flew.
         if result.empty and result.empty == result.done:
@@ -378,11 +378,9 @@ def check_acquisition(out, project, levels, unit_tiles, verbose):
                   " no tile (footprint edge)")
         if verbose:
             for unit in result.todo[:40]:
-                print(f"          todo   {unit[0]}_{unit[1]}")
-            for path in result.broken[:40]:
-                print(f"          broken {path}")
-            for path in result.parts[:40]:
-                print(f"          part   {path}")
+                print(f"          todo   unit {unit[0]}_{unit[1]}")
+            for x, y in result.broken[:40]:
+                print(f"          broken z{result.z}/{x}/{y}")
     return reports
 
 
@@ -471,7 +469,7 @@ def check_names(projects):
 def report_orphans(out, project, levels, unit_tiles):
     """Tiles under this acquisition that no finished unit of it claims.
 
-    An acquisition owns its own directory, so this is answerable one at a time
+    An acquisition owns its own database, so this is answerable one at a time
     and the answer is unambiguous — which it was not while the store was one
     namespace and a stray tile might have been the neighbour's."""
     for z in levels:
