@@ -12,6 +12,39 @@
   "map": {
     "errorMessage": "Noe gikk veldig galt med kartet"
   },
+  "ribbon": {
+    "lidar": "LiDAR",
+    "offLidar": "Kartet viser ikke LiDAR nå",
+    "enterLidar": "Vis LiDAR",
+    "dataset": {
+      "auto": "Automatisk",
+      "autoHint": "Følger utsnittet",
+      "national": "Nasjonal mosaikk",
+      "nationalHint": "1 m, sømløs over hele landet",
+      "inView": "Dekker utsnittet",
+      "alsoHere": "Eldre eller delvis dekning",
+      "coverage": "{{percent}} % av utsnittet",
+      "cached": "I cachen",
+      "loading": "Henter dekning …",
+      "zoomedOut": "Zoom inn for å velge enkeltdatasett",
+      "error": "Fant ikke dekningen for utsnittet",
+      "none": "Ingen datasett dekker utsnittet"
+    },
+    "render": {
+      "more": "Flere gjengivelser",
+      "cvatHint": "Vår egen gjengivelse, fra disk",
+      "wmsHint": "Kartverkets skyggelegging",
+      "cvatMissing": "Ikke bygget for dette datasettet ennå",
+      "cvatProvenance": "Arkeologisk relieff over «{{acquisition}}»: {{renderer}} {{template}}, radius {{general}}/{{flat}} piksler. Høydene er Kartverkets, bildet er vårt.",
+      "domLocked": "Overflatemodellen publiserer bare skyggerelieff"
+    },
+    "model": {
+      "dtm": "Terreng",
+      "dom": "Overflate",
+      "dtmHint": "Terrengmodell (DTM) — bakken, uten vegetasjon og bygninger",
+      "domHint": "Overflatemodell (DOM) — trekroner og tak. Bare skyggerelieff, og ingen cache: den er regnet ut fra terrenget."
+    }
+  },
   "shared": {
     "errorBoundary": {
       "title": "Noe gikk galt her",

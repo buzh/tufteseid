@@ -4,13 +4,18 @@ Map viewer for reading Norwegian LiDAR terrain against the Riksantikvaren
 heritage register (Kulturminner). Hard fork of Kartverket's Norgeskart, not
 tracking upstream. Working branch: `new-ui`.
 
-**The interface is being rebuilt from nothing.** This branch kept OpenLayers,
-the WMS/cache path and the headless computation behind them, and deleted every
-surface on top — ribbon, lokaliteter, funn, drawing, search UI, the UI kit.
-`src/App.tsx` renders the map and nothing else. Read
-`docs/state-of-the-branch.md` before adding the first control: it lists what
+**The interface is being rebuilt from nothing, on Mantine.** This branch kept
+OpenLayers, the WMS/cache path and the headless computation behind them, and
+deleted every surface on top — ribbon, lokaliteter, funn, drawing, search UI,
+the UI kit. What has been built back is a top ribbon over the LiDAR ring
+(`src/ribbon/`); everything else is still atoms with no writer. Read
+`docs/state-of-the-branch.md` before adding the next control: it lists what
 survived, what the atoms are called, and what is deliberately still broken.
 `main` holds the old app and is still deployable.
+
+New surfaces use Mantine primitives and the theme in `src/ui/theme.ts`.
+`src/ui/tokens.css` is the old design system and is not for new work — it stays
+only while the surviving map stylesheets read it.
 
 ## Scope
 

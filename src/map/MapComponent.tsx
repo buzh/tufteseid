@@ -8,6 +8,7 @@ import styles from './MapComponent.module.css';
 import { compareLayerAtomEffect } from './compare/atoms.ts';
 import { themeLayerEffect } from './layers/atoms.ts';
 import { backgroundLayerAtomEffect } from './layers/config/backgroundLayers/atoms.ts';
+import { useLidarFootprintsLayer } from './lidarFootprintsLayer.ts';
 import { useMap } from './mapHooks.ts';
 
 export const MapComponent = () => {
@@ -17,6 +18,10 @@ export const MapComponent = () => {
   const { setTargetElement } = useMap();
   useAtom(themeLayerEffect);
   useAtom(backgroundLayerAtomEffect);
+  // Where the LiDAR acquisitions lie, drawn while the ribbon's dataset menu is
+  // open — and, whether or not it is, the WFS pass that fills
+  // `lidarViewportAtom`, which is what Automatisk and the menu's rows both read.
+  useLidarFootprintsLayer();
   // The compare curtain's B stack: same resolveStack rules as the background
   // effect above, but into its own `cmp.` namespace, which the background
   // swap does not sweep.

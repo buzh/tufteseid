@@ -1,5 +1,6 @@
-/* Custom properties on :root, with no runtime style injection, so the CSP
-   needs no `style-src 'unsafe-inline'`. */
+/* What is left of the old design system: the surviving map stylesheets read
+   these custom properties, so they stay until those are rebuilt. New surfaces
+   use the Mantine theme (`src/ui/theme.ts`) and its variables instead. */
 
 :root {
   /* Neutrals. Text lives at 600–900, borders at 200–400, surfaces at 0–100. */

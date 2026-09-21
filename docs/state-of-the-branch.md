@@ -1,14 +1,24 @@
-# State of the branch — the map, with nothing on top of it
+# State of the branch — the map, and a ribbon over the LiDAR ring
 
 This branch took the interface down to the map and kept the machinery that
-draws it. `src/App.tsx` renders `MapComponent` and nothing else: there is no
-ribbon, no search box, no lokaliteter, no funn, no drawing, no account. The map
-loads, the LiDAR hillshade grounds it, and every ground and theme layer below
-is a `set()` away.
+draws it. 290 files became 79. The point was not to make the app smaller — it
+was to make the next interface unconstrained by the last one, without
+re-deriving four years of Kartverket and Riksantikvaren service quirks.
 
-290 files became 79. The point was not to make the app smaller — it was to make
-the next interface unconstrained by the last one, without re-deriving four
-years of Kartverket and Riksantikvaren service quirks.
+The rebuild has reached one surface. `src/App.tsx` renders a ribbon above
+`MapComponent`: it says which LiDAR dataset and which render of it are drawing,
+and switches both (`src/ribbon/`). There is still no search box, no lokaliteter,
+no funn, no drawing and no account, and no control over the Kart, Flyfoto,
+Amtskart or Hybrid grounds — those remain a `set()` away.
+
+**Mantine is the design system.** `MantineProvider` and the theme
+(`src/ui/theme.ts`) are mounted at the root, and new surfaces are built from its
+primitives. `src/ui/tokens.css` is the old system's remains and stays only while
+the surviving map stylesheets read it. One consequence is in the `Caddyfile`:
+Mantine writes its CSS variables into a runtime `<style>` element, so
+`style-src` had to become `style-src-elem 'self' 'unsafe-inline'`. A nonce would
+be stricter and is not available — Caddy serves this as static files, so there
+is no per-request value to mint.
 
 ## What was kept, and why
 
@@ -27,8 +37,12 @@ that is fine: they take arguments and return values.
 | `src/lidarExtract/` | the extract dialog | `extractCanvas` (`run.ts`) |
 | `src/map/featureInfo/` fetchers | the Kulturminner popup | `fetchAllFeatureInfo` (`featureInfoService.ts`), `kulturminnesok.ts` |
 | `src/search/searchApi.ts` | the search box | the place / address / property / coordinate queries |
-| `src/map/lidarFootprintsLayer.ts` | the dataset pulldown | mount once against the map |
 | `src/map/compare/` | the compare curtain | `enterCompareAtom`, `compareSplitAtom` |
+
+`src/map/lidarFootprintsLayer.ts` was on that list and is off it:
+`MapComponent` mounts it again. It is what fills `lidarViewportAtom`, which the
+ribbon's dataset menu lists and Automatisk decides from, and it paints the
+outlines while that menu is open.
 
 The compare curtain is here in full because the `halved()` facade in
 `compare/halves.ts` is load-bearing in the background atoms — every ground atom
@@ -38,7 +52,8 @@ have meant rewriting the layer machinery that this branch exists to preserve.
 **`src/ui/`, reduced to two files.** `Icon.tsx` because `MaterialSymbol` is the
 union that keeps a plausible-but-absent icon name out of the build, and
 `tokens.css` because the surviving stylesheets read its custom properties. The
-rest of the kit went; a new interface picks its own primitives.
+rest of the kit went, and `theme.ts` replaced it: the primitives are Mantine's
+now.
 
 ## What went
 
@@ -52,10 +67,16 @@ and the vector layers nothing draws into any more.
 and `docs/live-site-test.md` described that interface and went with it. All of
 it is in `git log` on `main`.
 
-## Driving the map without an interface
+## Driving the map
 
 Every ground is a Jotai atom. Writing one rebuilds the stack, and
 `backgroundLayerAtomEffect` (mounted by `MapComponent`) does the work.
+
+The LiDAR ones now have a writer: `useLidarControls` (`src/ribbon/`), which the
+ribbon mounts once. Do not reach past it for `activeLidarStyleAtom` or
+`backgroundLayerAtom` on a flight — on a flight the ground's *name* is a
+function of the render (`lidarFlightGround`), and the two would end up naming
+different things. Everything else in the table below still has no writer at all.
 
 | Atom | Module | Does |
 | --- | --- | --- |
@@ -95,5 +116,12 @@ the surfaces that wrote them.
 - **Only `nb` is a moving target.** Strings still go through `t()` so the
   retrofit stays free, but `nn` and `en` carry only what survived the cut and
   are not expected to keep pace until the interface stops moving.
-- **Map z-indices 1, 2, 3 and 5–9 are free.** They were the old interface's
+- **Map z-indices 1, 2 and 5–9 are free.** They were the old interface's
   overlays; `docs/map-layers.md` records what still occupies the rest.
+- **`lidarCyclingAtom` has a reader and no writer.** `lidarFootprintsLayer`
+  keeps the viewport list warm while the keyboard ring walks datasets, and the
+  ring (`useBackgroundCyclingKeys`, W/S/A/D/E) went with the old shell. It costs
+  nothing false today and comes back with those keys.
+- **The ribbon covers the LiDAR ring only.** No ground switch, no Hybrid
+  overlay or contours toggle, no compare curtain, no search — the atoms for all
+  of them are live and unwritten.

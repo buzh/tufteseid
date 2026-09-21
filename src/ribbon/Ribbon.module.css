@@ -1,0 +1,106 @@
+/* The ribbon is a band above the map, not a floating panel over it: the map is
+   what is being read, and a control that covers terrain competes with it. */
+
+.ribbon {
+  flex: none;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+  background: var(--mantine-color-body);
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+
+/* One row, and it scrolls rather than wraps — a ribbon that grows a second line
+   moves the map down under the reader's cursor. */
+.group {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.mark {
+  flex: none;
+  color: var(--mantine-primary-color-filled);
+}
+
+.markLabel {
+  flex: none;
+  margin-right: var(--mantine-spacing-xs);
+}
+
+/* --- the menu targets --- */
+
+.chip {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  max-width: 22rem;
+  padding: 4px 8px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-default);
+}
+
+.chip:hover {
+  background: var(--mantine-color-default-hover);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 1px;
+}
+
+/* A readout rather than a target: no hover affordance, no pointer. */
+.chipStatic {
+  cursor: default;
+}
+
+.chipStatic:hover {
+  background: var(--mantine-color-default);
+}
+
+.chipIcon {
+  flex: none;
+  color: var(--mantine-color-dimmed);
+}
+
+.chipText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+}
+
+.chipLabel {
+  overflow: hidden;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chipHint {
+  overflow: hidden;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chipChevron {
+  flex: none;
+  color: var(--mantine-color-dimmed);
+}
+
+/* A Menu.Label is normally two or three words; this one is a paragraph. */
+.provenance {
+  white-space: normal;
+  line-height: 1.4;
+}
+
+/* Holds the width of a Menu.Item's check, so rows without one still line up. */
+.gutter {
+  display: block;
+  width: 18px;
+  height: 18px;
+}

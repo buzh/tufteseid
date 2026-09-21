@@ -11,17 +11,23 @@ route {
         header Strict-Transport-Security max-age=31536000
         header X-Content-Type-Options nosniff
         header Referrer-Policy strict-origin
-        # style-src is 'self': nothing injects a stylesheet at runtime and the
-        # built CSS is a <link>. Inline style *attributes* are a separate
-        # directive, and they stay — React sets positions, sizes and picked
-        # colours that way.
+        # The two style directives are split because they are two different
+        # risks. `style-src-elem` allows inline <style> *elements*: MantineProvider
+        # writes the theme's CSS variables into one at runtime, and it is not
+        # optional — turning it off (`withCssVariables={false}`) means
+        # transcribing Mantine's whole variable set into a stylesheet here and
+        # re-transcribing it on every upgrade. A nonce is the stricter answer and
+        # is not available: this is a static `file_server`, so there is no
+        # per-request value to mint. `style-src-attr` allows inline style
+        # *attributes*, which was already the case — React sets positions, sizes
+        # and picked colours that way.
         header Content-Security-Policy "
                 default-src 'self';
                 script-src 'self';
                 worker-src 'self' blob:;
                 img-src 'self' data: blob: cache.kartverket.no;
                 connect-src 'self' data: blob: *.geonorge.no *.norgeskart.no cache.kartverket.no hoydedata.no;
-                style-src 'self';
+                style-src-elem 'self' 'unsafe-inline';
                 style-src-attr 'unsafe-inline';
                 font-src 'self';
                 frame-ancestors 'self';

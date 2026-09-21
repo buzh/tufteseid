@@ -6,9 +6,10 @@ caching, tile grids and the Kartverket rate limit are
 `docs/wms-proxy-and-tiles.md`; the float-elevation path behind terrain analysis
 is `docs/terrain-analysis.md`.
 
-There are no controls over any of this at the moment — the interface was taken
-down to the map and is being rebuilt (`docs/state-of-the-branch.md`). Every
-ground below is still reachable by writing its atom or by `?backgroundLayer=`.
+The ribbon drives the LiDAR ring and nothing else so far (`src/ribbon/`, and
+`docs/state-of-the-branch.md` for what the rebuild has reached). Every other
+ground below is still reachable only by writing its atom or by
+`?backgroundLayer=`.
 
 All WMS requests are `VERSION=1.3.0`, same-origin through a `/wms/…` prefix.
 Nothing sets `SRS`/`CRS` by hand — OpenLayers writes it from the view
@@ -102,8 +103,10 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   and draws nothing. Levels are per acquisition, so a half-built one draws at
   the levels it has and nowhere else.
 - It is the one ground whose relief nobody upstream computed, so it is the one
-  that has to say where it came from. The dataset chip's tooltip names the
-  acquisition beside the label; a kartutsnitt taken over it records which
+  that has to say where it came from. The render menu prints the acquisition,
+  the renderer, the template and the radii at the head of its dropdown, where
+  the reader is choosing between pictures rather than hovering for a caption; a
+  kartutsnitt taken over it records which
   acquisition was showing (`meta.cvatAcquisition`) and carries it on its
   provenance plate, with the renderer, the template, the blend
   stack, the combine and the pixel radii, and credits Kartverket under
@@ -208,11 +211,12 @@ installs the result without a gap: 1–2 go *under* the outgoing layers, 3–4
   an earlier fade, so callers set opacity explicitly on every layer they pass.
 
 Map z-order, of what is left: backgrounds at the default zIndex 0 (ordered by
-collection position), the compare curtain at 1.5, the terrain-analysis window
-frame at 4, and the Kulturminner theme layers on top at 10 — set by the caller
-that adds them (`src/map/layers/atoms.ts`), not by the factory in
-`themeWMS.ts`. 1, 2, 3 and 5–9 were the old interface's overlays and are free;
-a new one should write down what it puts there.
+collection position), the compare curtain at 1.5, the LiDAR footprint outlines
+at 3 (`lidarFootprintsLayer.ts`, visible only while the ribbon's dataset menu is
+open), the terrain-analysis window frame at 4, and the Kulturminner theme layers
+on top at 10 — set by the caller that adds them (`src/map/layers/atoms.ts`), not
+by the factory in `themeWMS.ts`. 1, 2 and 5–9 were the old interface's overlays
+and are free; a new one should write down what it puts there.
 
 ## Kulturminner (theme layers, Riksantikvaren)
 
@@ -303,7 +307,7 @@ Whether a feature's `linkkulturminnesok` URL resolves is asked separately
 3. A layer whose concrete source is a runtime choice gets a branch in
    `pickLayerConfig` rather than a static entry, and stays out of
    `VALID_STARTUP_LAYERS`, since a cold load onto it would render nothing.
-4. Give it a control. There is no control surface yet; until there is, a new
-   ground is reachable by setting `backgroundLayerAtom` and by
-   `?backgroundLayer=` if it is safe to cold-load onto.
+4. Give it a control. The ribbon covers the LiDAR ring only; a ground outside it
+   is reachable by setting `backgroundLayerAtom` and by `?backgroundLayer=` if
+   it is safe to cold-load onto, until the ribbon grows a ground switch.
 5. Translations in `src/locales/{nb,nn,en}/translation.json`.

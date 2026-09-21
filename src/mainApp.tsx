@@ -1,9 +1,12 @@
+import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // Self-hosted, and only the four weights the UI kit asks for.
 import '@fontsource/mulish/latin-400.css';
 import '@fontsource/mulish/latin-500.css';
 import '@fontsource/mulish/latin-600.css';
 import '@fontsource/mulish/latin-700.css';
+// Mantine first, so `index.css` and the CSS modules win the cascade against it.
+import '@mantine/core/styles.css';
 import 'material-symbols/rounded.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -11,6 +14,7 @@ import App from './App.tsx';
 import { AtomWrapper } from './AtomWrapper.tsx';
 import './index.css';
 import { projInit } from './map/projections/proj/projInit.ts';
+import { theme } from './ui/theme.ts';
 projInit();
 
 // Module scope: constructing it in the element tree would throw the whole
@@ -19,10 +23,12 @@ const queryClient = new QueryClient();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AtomWrapper>
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>
-    </AtomWrapper>
+    <MantineProvider theme={theme} defaultColorScheme="light">
+      <AtomWrapper>
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      </AtomWrapper>
+    </MantineProvider>
   </StrictMode>,
 );

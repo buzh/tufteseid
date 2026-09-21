@@ -1,0 +1,15 @@
+/* Ribbon above, map filling what is left. A column rather than an overlay: the
+   map's own height has to be a real number for OpenLayers to size its canvas,
+   and furniture floating over terrain hides the thing being read. */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.map {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
