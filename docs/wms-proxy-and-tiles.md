@@ -49,7 +49,7 @@ through wmscache at all:
 
 | Same-origin prefix | Internal | Upstream |
 |---|---|---|
-| `/cache/lidar-dtm/…` | `mapproxy:80/mapproxy/tms/1.0.0/lidar-dtm/tufteseid25833/…` | `wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-topobathy-25833` |
+| `/cache/lidar-dtm/…` | `mapproxy:80/mapproxy/tiles/lidar-dtm/tufteseid25833/…` | `wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-topobathy-25833` |
 | `/cache/lidar-dom/…` | same, `lidar-dom` | `wms.geonorge.no/skwms1/wms.hoyde-dom-nhm-25833` |
 | `/cache/topo-ref/…`, `/cache/topo-ref-contours/…` | same | `wms.geonorge.no/skwms1/wms.topo` |
 | `/cache/amtskart/…` | same | `wms.geonorge.no/skwms1/wms.historiskekart` |
@@ -67,6 +67,20 @@ moved to 9090 after 7.0.0. Read `docker/nginx-default.conf` at the tag being
 pinned, not on `master`, when bumping the image. The symptom of getting it
 wrong is indistinguishable from MapProxy being down — Caddy cannot dial, so
 every `/cache/…` is an empty 502 while the container sits there healthy.
+
+**`/tiles`, not `/tms/1.0.0`.** The two endpoints serve the same caches off the
+same grid and differ in one thing: which end of the world row 0 is at. Ours
+counts from the north, because the app's grid does and so does the cVAT store.
+TMS is specified to count from the south, so MapProxy hard-codes `origin = sw`
+on a TMS request and consults the `origin: nw` in `mapproxy.yaml` only for
+requests that left it unset — which is `/tiles` and nothing else. The setting
+is not ignored on `/tms`; it is overruled, silently.
+
+What that looks like is worth knowing, because it is not a flipped map. The
+mirrored row lands outside the source's coverage, MapProxy culls it, and every
+tile comes back HTTP 200 as the same 2198-byte transparent PNG — the same
+bytes for all six layers, and for the JPEG one too. A blank map answering
+instantly and identically on every layer is this, not an outage.
 
 `/cvat/<acquisition>/<z>/<x>/<y>.webp` is not in the table because it never
 leaves the stack: `handle_path /cvat/*` hands it to the `cvat-tiles` sidecar

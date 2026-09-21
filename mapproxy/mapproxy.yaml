@@ -21,12 +21,17 @@
 # rewrites into the TMS path below. The app sees plain XYZ tiles.
 
 services:
+  # One service block, two endpoints. Caddy rewrites to `/tiles/…` and never to
+  # `/tms/1.0.0/…`, because only the former honours the origin below: a TMS
+  # request carries a hard-coded `sw`, TMS being specified to count rows from
+  # the south, and MapProxy applies this setting only where the request left it
+  # unset. See the Caddyfile for what asking the wrong one looks like.
   tms:
     # Our grid counts rows from the north, like the app's and like every other
-    # tile store here; TMS's own default is from the south.
+    # tile store here.
     origin: 'nw'
-    # `/tms/1.0.0/<layer>/tufteseid25833/…` rather than `…/EPSG25833/…`. One
-    # grid, and its name says whose it is.
+    # `/tiles/<layer>/tufteseid25833/…` rather than `…/EPSG25833/…`. One grid,
+    # and its name says whose it is.
     use_grid_names: true
 
 grids:

@@ -130,8 +130,8 @@ route {
 
         # The MapProxy caches: the six upstream layers whose parameters never
         # change, held as tiles on the app's own grid. `/cache/<layer>/z/x/y.png`
-        # rather than MapProxy's TMS path, so the app asks for plain XYZ tiles
-        # and the grid name and service version live in exactly one place.
+        # rather than MapProxy's own path, so the app asks for plain XYZ tiles
+        # and the grid name and the endpoint live in exactly one place.
         #
         # One regexp rather than six blocks, unlike the wmscache handlers above:
         # those pick between hosts, this is one service and one rewrite with the
@@ -139,13 +139,23 @@ route {
         # comes back 404 from MapProxy rather than being refused here, which is
         # the same answer and one less list to keep in step.
         #
+        # `/tiles`, not `/tms/1.0.0`, and that is load-bearing. Our rows count
+        # from the north, like the app's grid and the cVAT store; TMS is
+        # specified to count from the south, so MapProxy hard-codes
+        # `origin = 'sw'` on a TMS request and the `origin: 'nw'` in
+        # mapproxy.yaml is only consulted when the request left it unset. Ask
+        # /tms and every tile is mirrored about the equator of the grid — which
+        # reads as a blank map, not as a wrong one, because the flipped row
+        # lands outside each source's coverage and gets culled to a
+        # transparent tile.
+        #
         # :80 and the /mapproxy prefix are the -nginx image's own: uwsgi behind
         # nginx, SCRIPT_NAME /mapproxy. The port is pinned to the image tag —
         # mapproxy moved it to 9090 after 7.0.0 — so check the tag's own
         # docker/nginx-default.conf when bumping, not the one on master.
         @tileCache path_regexp tileCache ^/cache/([a-z0-9-]+)/(\d{1,2}/\d{1,7}/\d{1,7}\.(?:png|jpeg))$
         handle @tileCache {
-                rewrite * /mapproxy/tms/1.0.0/{re.tileCache.1}/tufteseid25833/{re.tileCache.2}
+                rewrite * /mapproxy/tiles/{re.tileCache.1}/tufteseid25833/{re.tileCache.2}
                 reverse_proxy http://mapproxy:80
         }
 
