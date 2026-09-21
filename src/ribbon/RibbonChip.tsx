@@ -1,7 +1,12 @@
-// The ribbon's menu target: a label that says what is showing, and a hint under
-// it that says how it got there. Two lines because the answer to "what am I
-// looking at" is never one word — a dataset without its year and density, or a
-// render without whose render it is, does not tell the reader anything.
+// The ribbon's menu target: one line, the height of the buttons beside it, said
+// in as few characters as the axis allows. A chip is a readout of what is
+// showing, not a description of how it got there — the full name of a flight
+// and the provenance of a render belong in the menu the chip opens, and
+// repeating them here costs the band a second line and the map the room.
+//
+// What the chip leaves out goes in `title` and `aria-label`, so it is still one
+// hover away. Not a Mantine `Tooltip`: `Menu.Target` and `Tooltip` both clone
+// their single child, and nesting the two is undocumented in both directions.
 
 import { UnstyledButton } from '@mantine/core';
 import type { ComponentPropsWithoutRef, ReactNode, Ref } from 'react';
@@ -11,7 +16,9 @@ import styles from './Ribbon.module.css';
 
 type RibbonChipProps = ComponentPropsWithoutRef<'button'> & {
   icon?: MaterialSymbol;
-  label: ReactNode;
+  /** Left off where the icon is the whole readout. */
+  label?: ReactNode;
+  /** Trails the label in the dimmed colour, on the same line. */
   hint?: ReactNode;
   /** Left off where the chip is a readout rather than a menu target. */
   withChevron?: boolean;
@@ -36,15 +43,13 @@ export const RibbonChip = ({
     className={cx(styles.chip, dimmed && styles.chipDimmed, className)}
     {...rest}
   >
-    {icon && <Icon icon={icon} size={20} className={styles.chipIcon} />}
-    <span className={styles.chipText}>
-      <span className={styles.chipLabel}>{label}</span>
-      {hint && <span className={styles.chipHint}>{hint}</span>}
-    </span>
+    {icon && <Icon icon={icon} size={18} className={styles.chipIcon} />}
+    {label && <span className={styles.chipLabel}>{label}</span>}
+    {hint && <span className={styles.chipHint}>{hint}</span>}
     {withChevron && (
       <Icon
         icon="keyboard_arrow_down"
-        size={18}
+        size={16}
         className={styles.chipChevron}
       />
     )}

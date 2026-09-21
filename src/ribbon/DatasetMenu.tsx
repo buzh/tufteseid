@@ -36,17 +36,17 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
     setHoveredProjectId,
   } = lidar;
 
-  const shown =
-    isLidarFlight && activeLidarProject
-      ? activeLidarProject.projectName
-      : t('ribbon.dataset.national');
-  // Just the facts, in both states: with Automatisk on, the lit button and the
-  // dimmed chip already say who chose, and saying it a third time costs the
-  // line that would otherwise carry the year and the density.
-  const hint =
-    isLidarFlight && activeLidarProject
-      ? flightFacts(activeLidarProject)
-      : t('ribbon.dataset.nationalHint');
+  // The year and the density, not the project name: "Vestfold" is where the
+  // reader already is, while the two facts that rank one flight against another
+  // are what the chip is being read for. The name is a hover away in `title`,
+  // and spelled out on the checked row of the menu this opens.
+  const flight = isLidarFlight ? activeLidarProject : null;
+  const shown = flight
+    ? flightFacts(flight) || flight.projectName
+    : t('ribbon.dataset.nationalShort');
+  const title = flight
+    ? `${flight.projectName} · ${flightFacts(flight)}`
+    : `${t('ribbon.dataset.national')} · ${t('ribbon.dataset.nationalHint')}`;
 
   const row = (entry: LidarViewportEntry) => {
     const { project, areaRatio } = entry;
@@ -122,7 +122,8 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
         <RibbonChip
           icon="layers"
           label={shown}
-          hint={hint}
+          title={title}
+          aria-label={title}
           dimmed={autoDataset}
         />
       </Menu.Target>

@@ -47,6 +47,16 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
     ? t('ribbon.render.cvatHint')
     : t('ribbon.render.wmsHint');
 
+  // Icon alone: the names are long ("Multiskyggerelieff"), and which render is
+  // drawing is the one thing on this ribbon the reader can see by looking at
+  // the map. What the picture does not say is whose render it is, so the cache
+  // keeps the `database` icon it carries on its own row below.
+  const chipIcon = isLidarCvat ? 'database' : 'texture';
+  const chipTitle = t('ribbon.render.chipTitle', {
+    render: label,
+    source: hint,
+  });
+
   // DOM publishes one style, so there is nothing to choose — and the cache goes
   // with it, since it was computed from terrain and has no surface twin. No
   // Menu at all rather than a menu of one: a chevron over a single row promises
@@ -55,9 +65,8 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
     return (
       <Tooltip label={t('ribbon.render.domLocked')}>
         <RibbonChip
-          icon="texture"
-          label={label}
-          hint={hint}
+          icon={chipIcon}
+          aria-label={chipTitle}
           withChevron={false}
           className={styles.chipStatic}
         />
@@ -100,9 +109,9 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
             this is its answer as much as the reader's. Dimmed for that, and
             choosing here pins the dataset too. */}
         <RibbonChip
-          icon="texture"
-          label={label}
-          hint={hint}
+          icon={chipIcon}
+          title={chipTitle}
+          aria-label={chipTitle}
           dimmed={autoDataset}
         />
       </Menu.Target>
