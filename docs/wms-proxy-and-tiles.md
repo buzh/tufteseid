@@ -91,16 +91,22 @@ which the manifest hands the app as its tile template — overlapping flights ar
 offered as separate rows and may not share a `<z>/<x>/<y>`. The 404 on a tile
 that was never written is load-bearing — it is the coverage mask
 (`docs/map-layers.md`) — so the sidecar answers a missing row with one rather
-than with a blank tile. `/cvat/manifest.json` is read off the same directory
-and fetched once per page load; `connect-src 'self'` already covers it, and its
-own 404 on an install without a store reads as an empty store.
+than with a blank tile.
+
+`/cvat/manifest.json` is not a file. The sidecar surveys the directory, reads
+each database's own `metadata` for the acquisition it names and the levels it
+holds, and answers that; a survey is at most one per ten seconds, and it
+releases a cached handle whose file has been replaced underneath it. So a
+database copied into the store needs no manifest edited, nothing imported and
+nothing restarted, and an install with no store answers an empty list rather
+than an error. The app fetches it once per page load, and `connect-src 'self'`
+already covers it.
 
 One database per acquisition rather than a tree of files: an acquisition is
 ~83 000 WebP tiles, the store holds nine of them, and the inodes dwarfed the
 bytes. MBTiles is the container only — `tile_row` is the spec's, counted from
 the south, but the grid under it is the app's EPSG:25833 one, so a generic
-MBTiles reader would place these tiles in the Atlantic. A store of loose files
-is packed with `vat-cache/pack_store.py`.
+MBTiles reader would place these tiles in the Atlantic.
 
 ## Cache rules (wmscache)
 

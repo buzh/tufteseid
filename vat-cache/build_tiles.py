@@ -1,14 +1,16 @@
-"""The tile store: its geometry, how a level is built into it, and how it is
-verified afterwards. `vatcache.py` is the command line over all of it.
+"""One acquisition's tiles: the geometry, how a level is built, and how it is
+verified afterwards. `makevat.py` builds over this and `vatcache.py` audits.
 
-The store is what docker-compose bind-mounts into the cvat-tiles sidecar, so
-what this writes is what the app serves.
+An acquisition is one database, `<slug>.mbtiles`, and it is the whole of itself:
+it carries its own name, levels and recipe in its `metadata` table, so nothing
+beside it has to be kept in step. A store is then simply a directory of them,
+which is what docker-compose bind-mounts into the cvat-tiles sidecar — and the
+sidecar builds `/cvat/manifest.json` by reading the files rather than being told
+about them, which is what makes copying one in the whole of a deploy.
 
-One store holds several acquisitions, each in its own database:
-`<slug>.mbtiles`, with the slug recorded in the manifest as the acquisition's
-`path`. Overlap is the reason there is one per acquisition. Two flights over one
-landscape are two pictures of it — a 5pkt from 2015 and a 10pkt from 2025 are
-not the same ground twice — and the app offers both as rows, so their tiles
+Overlap is the reason there is one database per acquisition. Two flights over
+one landscape are two pictures of it — a 5pkt from 2015 and a 10pkt from 2025
+are not the same ground twice — and the app offers both as rows, so their tiles
 cannot be allowed to contend for one name.
 
 Resumable: every work unit records itself when it finishes, and a re-run skips
@@ -193,9 +195,9 @@ CREATE TABLE IF NOT EXISTS units (
 
 
 def store_path(out, project):
-    """The acquisition's own database. Its stem is what the manifest hands the
-    app as `path`, so the slug rule lives in one place and the app's tile
-    template needs to know nothing about the container."""
+    """The acquisition's own database. Its stem is the `path` the sidecar hands
+    the app, so the slug rule lives in one place and the app's tile template
+    needs to know nothing about the container."""
     return Path(out) / f"{slug(project)}{STORE_SUFFIX}"
 
 
@@ -229,9 +231,8 @@ class Store:
 
     MBTiles as a container, not as a tileset a stranger can read: the rows are
     the spec's, but the grid under them is EPSG:25833 (`wmsTileGrid.ts`), so a
-    generic reader would hang these tiles somewhere in the Atlantic. The
-    manifest beside the databases and `cvat-tiles/server.mjs` are the readers,
-    and both know the grid.
+    generic reader would hang these tiles somewhere in the Atlantic.
+    `cvat-tiles/server.mjs` is the reader, and it knows the grid.
 
     Left in the default journal mode on purpose. WAL wants to write two files
     beside the database, which a read-only opener cannot do — and the sidecar
@@ -258,27 +259,59 @@ class Store:
     def close(self):
         self.db.close()
 
-    def stamp(self, project):
-        """What the file is, for whoever opens it with sqlite3 rather than
-        through the app. Nothing in the stack reads these rows — the manifest
-        is the authority on the recipe — but a database that cannot say what
-        it holds is a liability in a directory of nine of them."""
+    def levels(self):
+        """Which levels this database holds, deepest first. Read from the tiles
+        rather than from the stamp, because this is what the stamp records."""
+        return [z for (z,) in self.db.execute(
+            "SELECT DISTINCT zoom_level FROM tiles ORDER BY zoom_level DESC")]
+
+    def meta(self, key):
+        """One row of the stamp, or None. For asking a file what it is before
+        writing to it."""
+        row = self.db.execute(
+            "SELECT value FROM metadata WHERE name = ?", (key,)).fetchone()
+        return row[0] if row else None
+
+    def stamp(self, project, recipe=None):
+        """What the file is — for whoever opens it with sqlite3, and for the
+        sidecar, which derives `/cvat/manifest.json` from these rows rather
+        than from anything written beside them.
+
+        That is what makes a database the whole of a delivery: `name` is the
+        acquisition, byte-identical to hoydedata's catalogue and to the
+        `LidarProject.id` the per-project WMS publishes, which is what the app
+        joins on; `levels` is what it draws at. Copying the file into a store is
+        then the entire deploy, because there is nothing else to tell.
+
+        The recipe is provenance and no code reads it. It is here rather than in
+        a file beside it for the same reason: a database that travels between
+        hosts has to be able to say what its pixels are made of."""
         span = self.db.execute(
             "SELECT min(zoom_level), max(zoom_level) FROM tiles").fetchone()
+        levels = self.levels()
         rows = {
             "name": project,
             "format": "webp",
             "type": "overlay",
             "version": "1",
             "crs": "EPSG:25833",
+            "levels": json.dumps(levels),
             "description": (
                 "RVT combined VAT over hoydedata.no DTM. Grid is the app's "
                 "own (src/map/layers/wmsTileGrid.ts): 512 px tiles, origin "
                 "north-west, resolution 21664 / 2**z. tile_row is TMS, "
-                "2**(z-1) - 1 - y. See manifest.json beside this file."),
+                "2**(z-1) - 1 - y. The `recipe` row is what made the pixels."),
         }
         if span[0] is not None:
             rows["minzoom"], rows["maxzoom"] = str(span[0]), str(span[1])
+        if recipe is not None:
+            # The digested body, so `digest` is sha256 of `recipe` and a reader
+            # can check one against the other. The per-level entries are left
+            # out because they are derived from z and the rest of the recipe.
+            rows["recipe"] = json.dumps(
+                {k: v for k, v in recipe.items() if k != "levels"},
+                sort_keys=True)
+            rows["digest"] = recipe_digest(recipe)
         with self.db:
             self.db.executemany(
                 "INSERT INTO metadata (name, value) VALUES (?, ?) "
@@ -317,12 +350,6 @@ class Store:
             "ON CONFLICT(zoom_level, tile_column, tile_row) "
             "DO UPDATE SET tile_data = excluded.tile_data",
             [(z, x, tms_row(z, y), blob) for x, y, blob in tiles])
-
-    def write_tiles(self, z, tiles):
-        """Tiles with no claim to being a finished unit — what `pack_store.py`
-        has for a tile that was on disk under no marker."""
-        with self.db:
-            self._put(z, tiles)
 
     def write_unit(self, z, ux, uy, tiles):
         """One work unit's tiles and its record of being finished, in one
@@ -386,11 +413,10 @@ def build_unit(args):
 
 def settings(levels, unit_tiles):
     """The recipe: everything that decides what a pixel is, given ground to read.
-    The digest of this, minus the per-level entries, is what makes a cache built
-    under changed settings declare itself a different one — see `open_manifest`.
-
-    Which acquisitions the store covers is deliberately not in here. The recipe
-    is what has to agree between runs; the acquisitions are what accumulate."""
+    The digest of this, minus the per-level entries, is stamped into each
+    database beside the recipe itself, and is what makes tiles built under
+    changed settings declare themselves a different picture — see
+    `recipe_digest`."""
     from importlib.metadata import version
 
     return {
@@ -418,10 +444,10 @@ def settings(levels, unit_tiles):
             "note": "src/map/layers/wmsTileGrid.ts; resolution = max_resolution / 2**z",
         },
         "encoding": f"RGBA WebP q{WEBP_QUALITY}, alpha is coverage",
-        # In the digest, though it decides nothing about a pixel: a store of
-        # loose files and a store of databases are not one store, and a build
-        # that opened the wrong one would write a second copy of the ground
-        # beside the first. The recipe check is the guard that already exists.
+        # In the digest, though it decides nothing about a pixel: a tree of
+        # loose files and a database are not the same delivery, and the digest
+        # is the only thing that would have noticed a build writing the one
+        # where the other was meant.
         "container": ("MBTiles (SQLite) per acquisition, <path>.mbtiles; "
                       "tile_row is TMS, 2**(z-1) - 1 - y"),
         "overlap_px": OVERLAP_PX,
@@ -438,96 +464,17 @@ def settings(levels, unit_tiles):
     }
 
 
-def _digest(recipe, acquisition=None):
+def recipe_digest(recipe):
     """Digest of the recipe, over everything except `levels`. Which levels one
     invocation builds is not a property of the cache: a level's entry is derived
     from z and the settings above it, and levels arrive one run at a time, so a
-    store holding z15 has to accept the run that adds z14. Acquisitions
-    accumulate the same way and for the same reason, so they are not in here.
+    database holding z15 has to accept the run that adds z14.
 
-    `acquisition` reproduces the digest of a manifest from when a store held
-    exactly one, which is how `open_manifest` recognises that shape as the same
-    recipe rather than a changed one."""
+    Stamped into each database as `digest`, beside the `recipe` it is of, so a
+    build that means to extend a file can tell whether the pixels already in it
+    were made the same way.""" 
     body = {k: v for k, v in recipe.items() if k != "levels"}
-    if acquisition is not None:
-        body["acquisition"] = acquisition
     return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()[:16]
-
-
-def manifest_agrees(have, unit_tiles):
-    """Was this manifest written under the recipe this code computes?
-
-    The levels passed to `settings` are immaterial — the digest is over
-    everything but them — so this is answerable without knowing what a run
-    intends to build, which is what lets a migration ask it up front."""
-    recipe = settings([COARSEST_LEVEL], unit_tiles)
-    digest = _digest(recipe)
-    # A manifest from when a store held exactly one acquisition carried it
-    # inside the digest. Same recipe, older shape.
-    single = have.get("acquisition") if "acquisitions" not in have else None
-    return have.get("digest") in (
-        digest, _digest(recipe, single) if single else None)
-
-
-def open_manifest(out, project, levels, unit_tiles, force):
-    """Write the manifest, or check the one already there agrees with this run."""
-    recipe = settings(levels, unit_tiles)
-    digest = _digest(recipe)
-    path = Path(out) / "manifest.json"
-
-    # What ground is in the store, where its tiles are, and at which levels. Per
-    # acquisition, because a level built for one is not built for another: a
-    # reader asking "is z12 here for Østfold" must not be answered by Vestfold's
-    # z12. `path` is the app's tile template and the database's own stem, so the
-    # slug rule lives here alone and no second implementation of it can drift.
-    entry = {"levels": sorted(levels, reverse=True), "path": slug(project)}
-    acquisitions = {project: entry}
-
-    if path.exists():
-        have = json.loads(path.read_text())
-        # A manifest from when a store held exactly one acquisition carried it
-        # inside the digest. Same recipe, older shape: migrate it rather than
-        # making the operator reach for --force, which would equally have waved
-        # through a recipe that really had changed.
-        legacy = "acquisitions" not in have and "acquisition" in have
-        if not manifest_agrees(have, unit_tiles) and not force:
-            # The likeliest reason today is a store of loose tile files, which
-            # this code can no longer write into. That one has a repair rather
-            # than a decision, so name it.
-            packable = "container" not in have
-            sys.exit(
-                f"{path} was built under different settings "
-                f"(digest {have.get('digest')}, this run {digest}).\n"
-                + ("This store holds loose tile files. Pack it first:\n"
-                   f"  python pack_store.py {out} --apply\n"
-                   if packable else
-                   "A cache mixing two settings cannot say what it is. Build "
-                   "into an empty directory, or pass --force if you know why.")
-            )
-        # Levels arrive one run at a time; keep the ones already built.
-        recipe["levels"] = {**have.get("levels", {}), **recipe["levels"]}
-        # Same for acquisitions, and for each one the union of its levels. The
-        # legacy shape's single acquisition owns whatever levels the store had.
-        merged = dict(have.get("acquisitions", {}))
-        if legacy:
-            merged.setdefault(have["acquisition"], {"levels": sorted(
-                (int(z) for z in have.get("levels", {})), reverse=True)})
-        was = merged.get(project, {}).get("levels", [])
-        merged[project] = {**entry, "levels": sorted(set(was) | set(levels),
-                                                     reverse=True)}
-        # Entries written before the store was divided per acquisition carry no
-        # path, and the app drops those rather than guessing at a template. Any
-        # run repairs every one of them, because the slug is a pure function of
-        # the name — which is why moving an old store's levels under its slug is
-        # the whole migration.
-        for name, was_entry in merged.items():
-            merged[name] = {**was_entry, "path": slug(name)}
-        acquisitions = merged
-
-    wanted = {**recipe, "digest": digest, "acquisitions": acquisitions}
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(wanted, indent=2, sort_keys=True))
-    return digest
 
 
 def marked_units(out, project, z):
@@ -546,69 +493,61 @@ def marked_units(out, project, z):
         return store.units(z)
 
 
-def build(out, project, coverage, levels, unit_tiles=DEFAULT_UNIT_TILES,
-          jobs=1, limit=None, dry_run=False, force=False):
-    """Build the named levels for one acquisition, skipping finished units."""
-    out = Path(out)
+def run_levels(store, project, coverage, levels, unit_tiles=DEFAULT_UNIT_TILES,
+               jobs=1, limit=None, done=None):
+    """Build the named levels for one acquisition into an open store, skipping
+    units already recorded there.
 
-    # The mask and the DEM have to be of the same ground. Pairing them wrongly
-    # is not loud: the fetch is pinned to a project that never flew there, every
-    # unit comes back all-NaN, nothing is written, and every unit marks itself
-    # done — a store that looks built and is empty. vatcache.py derives the mask
-    # from the acquisition so the two cannot drift, but a mask written by hand
-    # still reaches here.
+    The loop that does the work, with nothing said about where the database sits
+    or what else is beside it: `build()` below drives it over a whole store,
+    makevat.py drives it over one file. `store` is None for a dry run, and
+    `done` then has to say what a real run would skip.
+
+    The mask and the DEM have to be of the same ground. Pairing them wrongly is
+    not loud: the fetch is pinned to a project that never flew there, every unit
+    comes back all-NaN, nothing is written, and every unit marks itself done — a
+    database that looks built and is empty. Both callers derive the mask from
+    the acquisition so the two cannot drift, but a mask written by hand still
+    reaches here."""
     if coverage.project != project:
         sys.exit(
             f"the mask is the footprint of {coverage.project!r}, but the "
             f"acquisition is {project!r}.\nOne of the two is wrong; they have "
             "to name the same ground."
         )
+    if done is None:
+        done = store.units if store else (lambda z: set())
 
-    store = None
-    if not dry_run:
-        digest = open_manifest(out, project, levels, unit_tiles, force)
-        print(f"{out}  manifest {digest}  {project}")
-        store = Store(store_path(out, project), write=True)
-        store.stamp(project)
+    for z in levels:
+        units = coverage.units(z, unit_tiles)
+        pending = [u for u in units if u not in done(z)]
+        side_km = tile_span(z) * unit_tiles / 1000
+        print(f"\nz{z}  {resolution(z):.4f} m/px  unit {side_km:.2f} km  "
+              f"{len(units)} units, {len(pending)} to do")
+        if store is None:
+            continue
+        if limit:
+            pending = pending[:limit]
+        if not pending:
+            continue
 
-    try:
-        for z in levels:
-            units = coverage.units(z, unit_tiles)
-            done = store.units(z) if store else marked_units(out, project, z)
-            pending = [u for u in units if u not in done]
-            side_km = tile_span(z) * unit_tiles / 1000
-            print(f"\nz{z}  {resolution(z):.4f} m/px  unit {side_km:.2f} km  "
-                  f"{len(units)} units, {len(pending)} to do")
-            if dry_run:
-                continue
-            if limit:
-                pending = pending[:limit]
-            if not pending:
-                continue
-
-            started, tiles = time.perf_counter(), 0
-            work = [(z, ux, uy, unit_tiles, project) for ux, uy in pending]
-            if jobs > 1:
-                with ProcessPoolExecutor(max_workers=jobs) as pool:
-                    futures = {pool.submit(build_unit, w): w for w in work}
-                    for finished, future in enumerate(as_completed(futures), 1):
-                        _z, ux, uy, made = future.result()
-                        store.write_unit(z, ux, uy, made)
-                        tiles += len(made)
-                        report(finished, len(work), tiles, started)
-            else:
-                for finished, item in enumerate(work, 1):
-                    _z, ux, uy, made = build_unit(item)
+        started, tiles = time.perf_counter(), 0
+        work = [(z, ux, uy, unit_tiles, project) for ux, uy in pending]
+        if jobs > 1:
+            with ProcessPoolExecutor(max_workers=jobs) as pool:
+                futures = {pool.submit(build_unit, w): w for w in work}
+                for finished, future in enumerate(as_completed(futures), 1):
+                    _z, ux, uy, made = future.result()
                     store.write_unit(z, ux, uy, made)
                     tiles += len(made)
                     report(finished, len(work), tiles, started)
-            print()
-    finally:
-        if store:
-            # Again at the end, for the level span: the first stamp was written
-            # before this run's tiles were.
-            store.stamp(project)
-            store.close()
+        else:
+            for finished, item in enumerate(work, 1):
+                _z, ux, uy, made = build_unit(item)
+                store.write_unit(z, ux, uy, made)
+                tiles += len(made)
+                report(finished, len(work), tiles, started)
+        print()
 
 
 def report(done, total, tiles, started):

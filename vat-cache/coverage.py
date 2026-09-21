@@ -111,6 +111,12 @@ def sample_sites(mask, bounds, cell, count=6, side_m=1024.0, seed=7):
             candidates.append((x0 + (i + 0.5) * cell, y0 + (j + 0.5) * cell))
         if len(candidates) > 4000:
             break
+    if not candidates:
+        # No square of this size fits inside the footprint. Supplementary
+        # acquisitions are a few hundred metres across, so this is ordinary
+        # rather than a fault — and the sites are only somewhere for measure.py
+        # to render a comparison. Nothing the build needs is affected.
+        return np.empty((0, 2))
     candidates = np.array(candidates)
 
     picked = [candidates[0]]

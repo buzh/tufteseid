@@ -97,6 +97,26 @@ def native_cells(names, timeout=180):
     }
 
 
+# How many acquisitions to ask about cells in one POST. The whole catalogue in
+# one request would be a 46 kB WHERE clause; this is eleven requests and two
+# seconds for all of it.
+_CELL_CHUNK = 150
+
+
+def catalogue_cells(names, timeout=180):
+    """`native_cells` for a list too long to ask about at once.
+
+    Asking with `groupByFieldsForStatistics` over the whole mosaic instead looks
+    like it would answer this in one request, and does — for the first thousand
+    groups. Statistics queries ignore `resultOffset`, and the service sets no
+    `exceededTransferLimit` on them, so that shape silently returns two thirds of
+    the catalogue and nothing says which third is missing."""
+    cells = {}
+    for i in range(0, len(names), _CELL_CHUNK):
+        cells.update(native_cells(names[i:i + _CELL_CHUNK], timeout))
+    return cells
+
+
 def catalogue_names(timeout=180):
     """Every distinct LAS_PROJECT_NAME hoydedata.no's mosaic catalogue carries."""
     names, offset = set(), 0

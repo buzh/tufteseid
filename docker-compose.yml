@@ -22,8 +22,12 @@ services:
 
   # The cached combined-VAT ground: one MBTiles database per LiDAR
   # acquisition, one indexed SELECT per tile. Caddy proxies /cvat/* here.
-  # Built out of band by vat-cache/vatcache.py --get <n>, which writes to
-  # the host path below by default.
+  # Built out of band by vat-cache/makevat.py -g <n>, here or on a machine
+  # with more CPU; copying the file it writes into the host path below is
+  # the whole deploy, with nothing stopped and nothing restarted. Each
+  # database names its own acquisition and levels, and the sidecar builds
+  # /cvat/manifest.json by reading the files it finds — there is no manifest
+  # on disk to keep in step.
   #
   # A host path rather than a named volume: the store is written by a script
   # on the host, is tens of GB, and survives the stack being rebuilt.

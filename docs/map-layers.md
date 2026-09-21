@@ -75,12 +75,12 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   `BackgroundLayerName` rather than folded into `lidarProject` because the URL,
   a screenshot's `meta.ground` and the figure plate all read it to say which
   render made the picture.
-- `lidarCvat` has nothing upstream. `vat-cache/vatcache.py` runs RVT over an
+- `lidarCvat` has nothing upstream. `vat-cache/makevat.py` runs RVT over an
   acquisition's DTM and writes the combined VAT — hillshade, slope, positive
   openness, sky-view in one picture — as 512 px RGBA WebP on the app's own tile
-  grid, down to z12 (5.289 m/px), with `/cvat/manifest.json` beside the tiles
-  recording presets, blend order, per-level radii, the run's digest and which
-  acquisitions are in the store, at which levels, under which name. How deep
+  grid, down to z12 (5.289 m/px), into one MBTiles database whose own `metadata`
+  table records the acquisition's name, the levels written for it, the presets,
+  the blend order, the per-level radii and the run's digest. How deep
   the ladder goes is the acquisition's own: z16 (0.331 m/px) where hoydedata.no
   publishes a 0.25 m DTM, z15 (0.661 m/px) where it publishes 0.5 m, because
   below the DEM's cell the picture is of the interpolation. What serves it is
@@ -91,10 +91,10 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   same terrain rather than one picture at several sizes: the reach of the
   visualization grows as you zoom out, and the tooltip says so.
 - **Acquisitions may overlap, and two rows is the point.** Each owns a database
-  in the store — named by the manifest's `path`, which is also the segment the
-  app puts in the tile template — so a 5 pkt flight from 2021 and a 10 pkt one
-  from 2025 over the same landscape are two readings of it, both offered,
-  neither overwriting the other.
+  in the store, whose filename the manifest reports as that acquisition's `path`
+  and the app puts in the tile template — so a 5 pkt flight from 2021 and a
+  10 pkt one from 2025 over the same landscape are two readings of it, both
+  offered, neither overwriting the other.
   They are two rows because they are two *flights*, ranked against each other by
   coverage, year and density like any other pair; the store having rendered both
   adds no row and breaks no tie. Ladder depth is not a tiebreak, because it is
@@ -102,14 +102,17 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   0.25 m DTM, which is where the denser, newer flight already wins.
 - **The store is read at runtime, not compiled in.** `fetchCvatStore()` reads
   `/cvat/manifest.json` once per page load and `resolveCvatAcquisitions()`
-  joins its `acquisitions` block to the LiDAR catalogue, so a batch run that
-  lands on the server is in the app on the next reload with no deploy and no
-  code change. An acquisition the catalogue does not publish is dropped with a
-  warning — without its row there is no footprint to rank it by and no envelope
-  to cull with. An install without a store answers 404, which parses as an
-  empty store: no cached rows anywhere, rather than a dataset that is offered
-  and draws nothing. Levels are per acquisition, so a half-built one draws at
-  the levels it has and nowhere else.
+  joins its `acquisitions` block to the LiDAR catalogue, so a database copied
+  onto the server is in the app on the next reload with no deploy and no code
+  change. That manifest is not a file: the sidecar surveys the store and reads
+  each database's `metadata` for the name and the levels it claims, so there is
+  no inventory beside the tiles that can disagree with them, and copying a file
+  in is the whole delivery. An acquisition the catalogue does not publish is
+  dropped with a warning — without its row there is no footprint to rank it by
+  and no envelope to cull with. An install without a store answers an empty
+  `acquisitions` block, which is no cached rows anywhere rather than a dataset
+  that is offered and draws nothing. Levels are per acquisition, so a half-built
+  one draws at the levels it has and nowhere else.
 - It is the one ground whose relief nobody upstream computed, so it is the one
   that has to say where it came from. The render menu prints the acquisition,
   the renderer, the template and the radii at the head of its dropdown, where
@@ -122,10 +125,10 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   picture is not. The constants the plate prints live beside the layer config in
   `cvatGround.ts` (`CVAT_RENDERER`, `CVAT_TEMPLATE`, `CVAT_STACK`,
   `CVAT_AZIMUTH`, `CVAT_SUN_ALTITUDE`, `CVAT_RADIUS_PX`,
-  `CVAT_GENERAL_OPACITY`), transcribed from the manifest rather than fetched
-  from it: a downloaded figure travels off this host. Rebuilding the store under
-  changed parameters — a new digest in the manifest — means editing that block
-  too.
+  `CVAT_GENERAL_OPACITY`), transcribed from the recipe the databases carry
+  rather than fetched from it: a downloaded figure travels off this host.
+  Rebuilding the store under changed parameters — a new digest stamped into the
+  files — means editing that block too.
 - Its coverage needs no polygon. The layer's `extent` is the showing
   acquisition's own envelope and culls everything outside; inside it the ~94 %
   that were never written answer 404, OpenLayers marks those tiles errored and

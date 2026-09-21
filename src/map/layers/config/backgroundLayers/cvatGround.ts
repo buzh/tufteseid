@@ -1,9 +1,10 @@
 // The cached ground: RVT's combined VAT — hillshade, slope, positive openness
 // and sky-view in one picture — precomputed over whole LiDAR acquisitions and
-// written to an MBTiles database per acquisition. `vat-cache/vatcache.py` made
-// them and `/cvat/manifest.json` beside them states the presets, the blend
-// order, the radii per level, the digest of the run and — the part this module
-// reads at runtime — which acquisitions are in the store and at which levels.
+// written to an MBTiles database per acquisition by `vat-cache/makevat.py`.
+// Each database states its own presets, blend order, radii and run digest in
+// its `metadata` table; `/cvat/manifest.json` is the part this module reads at
+// runtime — which acquisitions are in the store and at which levels — and is
+// built by the sidecar out of the files it finds, not written beside them.
 //
 // Nothing upstream: the `cvat-tiles` sidecar reads the bind-mounted store and
 // answers a tile at a time, so there is no wmscache entry and no CSP host —
@@ -71,7 +72,7 @@ const CVAT_MANIFEST_URL = '/cvat/manifest.json';
  *  the point rather than an accident to curate away. */
 const cvatTileUrl = (path: string) => `/cvat/${path}/{z}/{x}/{y}.webp`;
 
-/** What `build_tiles.py` writes under `acquisitions`: acquisition name to the
+/** What the sidecar synthesizes under `acquisitions`: acquisition name to the
  *  levels built for it and the namespace they are in. */
 export type CvatStore = Record<string, { levels: number[]; path: string }>;
 
@@ -84,9 +85,9 @@ const parseStore = (body: unknown): CvatStore => {
     const { levels, path } = (entry ?? {}) as { levels?: unknown; path?: unknown };
     if (!Array.isArray(levels)) continue;
     const zs = levels.filter((z): z is number => Number.isInteger(z));
-    // No path means a manifest written before the store was divided per
-    // acquisition. Guessing the slug rule here would be a second copy of it;
-    // any `vatcache.py` run rewrites the entry with its own.
+    // No path means a manifest from before the store was divided per
+    // acquisition. Guessing the slug rule here would be a second copy of it,
+    // and the sidecar now takes the path from the database's own filename.
     if (typeof path !== 'string' || path === '') {
       console.warn(`[cvat] ${name} has no path in the manifest`);
       continue;
@@ -96,16 +97,17 @@ const parseStore = (body: unknown): CvatStore => {
   return store;
 };
 
-// One fetch per page load, shared by every caller. The store grows by a batch
-// run on the server, not by anything the tab does, so re-reading it mid-session
-// would only cost a request; a reload picks up whatever has landed since.
+// One fetch per page load, shared by every caller. The store grows by a file
+// landing in a directory on the server, not by anything the tab does, so
+// re-reading it mid-session would only cost a request; a reload picks up
+// whatever has been copied in since.
 let storePromise: Promise<CvatStore> | null = null;
 
 /**
- * What the store holds. An install without one answers 404 — the sidecar has no
- * SPA fallback to turn that into an index page — and an empty store is the
- * honest answer: no cached rows anywhere in the app, rather than a dataset that
- * is offered and draws nothing.
+ * What the store holds. An install without one answers an empty `acquisitions`
+ * block, which is the honest answer: no cached rows anywhere in the app, rather
+ * than a dataset that is offered and draws nothing. The `catch` is for the
+ * sidecar being unreachable, and lands in the same place.
  */
 export const fetchCvatStore = (): Promise<CvatStore> => {
   storePromise ??= fetch(CVAT_MANIFEST_URL)

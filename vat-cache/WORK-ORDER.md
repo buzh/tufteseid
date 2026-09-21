@@ -55,9 +55,9 @@ to on the 0.5 m DEM the templates were calibrated against. A pyramid has to
 choose which of the two to hold constant, and the choice is the whole design.
 
 **Hold the pixels.** Every level is then literally RVT's combined VAT with
-default parameters on that level's grid, the manifest says so in one line, and
-no parameter is off-calibration anywhere. Measured over a 500 m patch of the
-fixture acquisition, WebP q90 bytes per pixel:
+default parameters on that level's grid, the recipe stamped into the file says
+so in one line, and no parameter is off-calibration anywhere. Measured over a
+500 m patch of the fixture acquisition, WebP q90 bytes per pixel:
 
 | level | m/px | reach, general / flat | B/px | metre-locked reach | B/px |
 | --- | --- | --- | --- | --- | --- |
@@ -174,8 +174,8 @@ line in the budget.
 
 The caveat to record: a figure plate must not be generated from cached pixels.
 `src/figure/` renders from the float field through `paintTerrainField` and
-should keep doing that. The manifest's encoding line is what keeps a screenshot
-of this ground honest if one ever becomes an attachment.
+should keep doing that. The encoding line in the file's own recipe is what keeps
+a screenshot of this ground honest if one ever becomes an attachment.
 
 ### 6. Fetch direct, not through wmscache
 
@@ -186,7 +186,7 @@ arrives in one call and there is no mosaic to assemble.
 
 ## Shape of the tool
 
-`vatcache.py --get <n>`, one level at a time, resumable.
+`makevat.py -g <n>`, one level at a time, resumable.
 
 1. **Coverage** — `coverage.py`'s footprint union decides which tiles the
    acquisition reaches. Units the footprint misses are never fetched. The mask
@@ -213,17 +213,20 @@ arrives in one call and there is no mosaic to assemble.
    SELECT — so the layer needs no CSP host and no wmscache entry. A tile the
    footprint never reached answers 404, which is also what a tile outside the
    acquisition should answer.
-6. **Manifest** — `manifest.json` beside the tiles: acquisition, RVT version,
-   both presets, the blend order, azimuth, the combined opacity, and per level
-   the resolution, `r_max`/`r_min` in pixels and metres, overlap and encoding —
-   plus a digest. A run against an existing manifest with a different digest
-   stops rather than mixing two caches in one directory. The digest covers
+6. **Self-description** — each database's own `metadata` table: acquisition, RVT
+   version, both presets, the blend order, azimuth, the combined opacity, and
+   per level the resolution, `r_max`/`r_min` in pixels and metres, overlap and
+   encoding — plus a digest. A run against a file carrying a different digest
+   stops rather than mixing two caches in one acquisition. The digest covers
    everything but the per-level block: which levels an invocation happens to
-   build is not a property of the cache, and a store holding z15 has to accept
+   build is not a property of the cache, and a file holding z15 has to accept
    the run that adds z14. Each level's entry is derived from z and the settings
-   the digest does cover, so nothing escapes it. Acquisitions accumulate for the
-   same reason and are outside it too; each names its own levels and its own
-   `path`, which is the directory above and the app's tile template.
+   the digest does cover, so nothing escapes it. Acquisitions are outside it for
+   the same reason, and further out: one is one file, so they cannot be mixed by
+   accident at all. The file states its own name and levels, and
+   `cvat-tiles/server.mjs` builds `/cvat/manifest.json` by reading the store
+   rather than being told about it — which is what makes a copy the whole
+   deploy.
 
 ## Acceptance
 
@@ -237,7 +240,7 @@ The gates, and where they stand after the z15 pilot:
   adjacent columns inside one.
 - Bytes per pixel from the pilot replace the single-patch figures wherever a
   budget is quoted. **Done** — §5.
-- Changing one preset value produces a manifest that declares itself different
+- Changing one preset value produces a recipe that declares itself different
   and refuses to write into the old cache. **Holds.**
 - Then the full run. A work unit is the same 2096 px square at every level, so
   it costs the same 11–13 s wherever it is, and the unit count quadruples per

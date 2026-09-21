@@ -66,7 +66,10 @@ tiles ([`vat-cache/`](vat-cache/README.md)). The elevation data behind it
 stays Kartverket's, on Kartverket's licence. The store is optional and
 read at runtime — an install without it simply shows the national mosaic
 there, and one that grows by another acquisition offers it on the next
-page load, with no rebuild.
+page load, with no rebuild. It need not be computed here either:
+`vat-cache/makevat.py` renders one acquisition into one self-contained
+file on whatever machine has the cores, and copying that file into the
+store is the whole of the deploy.
 
 MIT — see [`LICENCE`](LICENCE). Upstream copyright by Statens Kartverk
 (The Norwegian Mapping Authority) is preserved as required. Web
