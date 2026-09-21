@@ -134,7 +134,18 @@ nginx rejects a duplicate `proxy_cache_valid`, `proxy_read_timeout` or
   group never retries, silently. `max_fails=0` on every peer, or a burst of
   502s marks all three down (`no live upstreams`, a blank viewport).
   `keepalive_timeout 20s`, under nginx's 60s default: a socket the far end
-  closed first 502s in ~60 ms, and every peer draws on one pool.
+  closed first 502s in ~60 ms, and every peer draws on one pool. 20 s is not the
+  number to reach for when a 502 shows up — wms.geonorge.no (istio-envoy) holds
+  an idle connection past 75 s, so ours closes first by a wide margin. Measure
+  before moving it.
+- Those three tries are all the retrying nginx can usefully do, and they do not
+  catch everything: about one cold GetMap in 200 against the per-project LiDAR
+  namespace comes back 502 from Kartverket's own front (`server: nginx/1.20.1`,
+  not ours) under a burst, and survives all three. They go out back to back,
+  with no directive to space them, so all three land in the same shed window.
+  Adding peers to buy more of them only hits a shedding origin harder. The lever
+  that works is a *delayed* retry, and that lives in the client
+  (`src/upstream/tileGuard.ts`).
 - `timeout` goes in the WFS and `/kms-api/` `proxy_next_upstream` lists only.
   Those answer in ~0.25 s or hang forever; a WMS can take 5–14 s cold, where a
   read timeout means a live render and a retry queues a second for one tile.
@@ -348,13 +359,23 @@ is fewer requests.
 - Ortofoto backgrounds ask for JPEG — 68 kB against 528 kB per 512 px tile over
   Oslo, and the mosaic has no transparency to lose. A single acquisition needs
   transparent gaps and uses `jpgpng`.
-- Tiles load through `guardTileSource` (`src/upstream/tileGuard.ts`), which is
-  admission control and nothing else — it sets `image.src` exactly as
-  OpenLayers' own loader does, unless the breaker below has the origin shut. A
-  former `retryBlankTileLoadFunction` retried anything under 800 bytes, and is
-  gone: the no-data PNG is deterministic, so it only ever refetched real
-  no-coverage tiles at 4 origin requests each. Fix a blank-where-there-is-data
-  tile at wmscache, which can see the upstream.
+- Tiles load through `guardTileSource` (`src/upstream/tileGuard.ts`): admission
+  control for the origins the breaker knows, and a bounded retry for every
+  source, including the ones it does not. Two retries at 400 ms and 900 ms plus
+  up to 300 ms of jitter, then the tile is left `ERROR`. OpenLayers asks once and
+  caches the `ERROR`, so without this the ~1-in-200 upstream 502 above is a hole
+  that lasts until the page is reloaded — and only at the zoom level it happened
+  on, each level being its own set of tiles. That is what "works, but some tiles
+  at some zoom levels are missing" is. Every failed try still reports to the
+  breaker, so an outage trips it in fewer tiles than before, not more; a tile the
+  breaker *refused* is not retried, the answer being known, and comes back via
+  `refresh()`. `/cache/topo-ref*` and `/cache/amtskart` need the retry most: in
+  no origin, they have no probe and no `refresh()` to fall back on.
+- A former `retryBlankTileLoadFunction` retried anything under 800 bytes, and is
+  gone — a different thing from the retry above, which keys on a failed request
+  and not on the size of a successful one. The no-data PNG is deterministic, so
+  it only ever refetched real no-coverage tiles at 4 origin requests each. Fix a
+  blank-where-there-is-data tile at wmscache, which can see the upstream.
 
 The compare curtain (`src/map/compare/`) is the deliberate exception: a second
 full background stack out of the same queue, so a screenful costs about twice

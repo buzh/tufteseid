@@ -15,7 +15,9 @@
 // height services. They are a different renderer, they stayed up through that
 // outage, and they are each one layer on one surface: an outage of theirs is a
 // blank overlay, not a blank map. The Kulturminnesøk record API behind `/kms/`
-// is left out for the same reason.
+// is left out for the same reason. Being in no row costs them the breaker and
+// the probe, not the retry — `tileGuard.ts` gives that to every source, which
+// is what keeps a dropped request from being permanent here of all places.
 //
 // The `/cache/` prefixes that *are* listed below are MapProxy's, and a hit
 // there answers off disk with no upstream involved — so the breaker will blank

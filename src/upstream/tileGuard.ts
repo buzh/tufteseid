@@ -1,15 +1,24 @@
-// The breaker, applied to a tile source.
+// The breaker and the retry, applied to a tile source.
 //
-// Both halves of the loop live in one place, and they have to: admission and
-// reporting must agree about which requests are real. Reading failures off the
-// source's `tileloaderror` event instead would count the tiles this file
-// refused, and an origin that was merely quiet would be held down by the
-// evidence of its own being held down.
+// Both halves of the breaker's loop live in one place, and they have to:
+// admission and reporting must agree about which requests are real. Reading
+// failures off the source's `tileloaderror` event instead would count the tiles
+// this file refused, and an origin that was merely quiet would be held down by
+// the evidence of its own being held down.
+//
+// The retry is here for a different reason. OpenLayers asks for a tile once: a
+// dropped request leaves the tile ERROR and nothing re-asks, so one 502 in a
+// pan is a hole that stays until the page is reloaded. The rate is low —
+// roughly one in 250 against the per-project LiDAR namespace — but a hole is
+// per level and per tile, so what a reader sees is a map that mostly works with
+// patches missing at the zoom they happened to be at. Two retries on a short
+// jittered backoff close that, and cost nothing when nothing is failing.
 
 import { getDefaultStore } from 'jotai';
 import type ImageTile from 'ol/ImageTile';
 import Layer from 'ol/layer/Layer';
 import type TileImage from 'ol/source/TileImage';
+import type Tile from 'ol/Tile';
 import TileState from 'ol/TileState';
 import { mapAtom } from '../map/atoms';
 import {
@@ -24,32 +33,90 @@ import { originForUrl, type OriginId } from './origins';
 const GUARD_PROP = 'upstreamOrigin';
 
 /**
- * Put `source` behind the breaker for whichever origin `url` belongs to. A URL
- * no origin claims is left alone — the source keeps OpenLayers' own loader.
+ * Gap before each retry, before jitter. Its length is the retry count — a tile
+ * is tried once, then once more per entry here — so there is one number to
+ * change and nothing to keep in step with it.
+ */
+const RETRY_DELAY_MS = [400, 900];
+/** Up to this much again, so a failed screenful does not retry in lockstep. */
+const RETRY_JITTER_MS = 300;
+
+/**
+ * Tries spent on a tile so far. Keyed by the tile because `load()` re-enters
+ * the loader below with the same tile and a fresh image, and weak because the
+ * source disposes its tiles on `refresh()` and `clear()` — a reloaded tile is a
+ * new object and starts over, which is what should happen.
+ */
+const attempts = new WeakMap<Tile, number>();
+
+/**
+ * Put `source` behind the retry, and behind the breaker for whichever origin
+ * `url` belongs to.
+ *
+ * Every source gets the retry, including the ones no origin claims: `/cache/
+ * topo-ref*` and `/cache/amtskart` are in no row on purpose (`origins.ts`), and
+ * that reasoning is about whether to *stop asking* during an outage. It says
+ * nothing about a single dropped request, and those two are the layers with the
+ * least recourse — with no origin there is no probe and no `refresh()`, so
+ * without this a hole in them is permanent.
  *
  * Called by the four background builders and by the theme builder, with the
  * URL each of them already has in hand.
  */
 export const guardTileSource = (source: TileImage, url: string): void => {
   const origin = originForUrl(url);
-  if (!origin) return;
-  source.set(GUARD_PROP, origin);
+  if (origin) source.set(GUARD_PROP, origin);
 
   source.setTileLoadFunction((tile, src) => {
-    if (!mayRequest(origin)) {
+    if (origin && !mayRequest(origin)) {
       // Not a deferral: OpenLayers keeps no queue of its own for this, and a
       // tile left LOADING would hold one of the sixteen slots the whole map
       // shares. ERROR frees the slot and is undone by `refresh()` below.
+      //
+      // Not counted as an attempt either, and not retried: while the breaker is
+      // open the answer would be the same, and the way back is the probe.
       tile.setState(TileState.ERROR);
       return;
     }
+    const attempt = (attempts.get(tile) ?? 0) + 1;
+    attempts.set(tile, attempt);
+
     const image = (tile as ImageTile).getImage() as HTMLImageElement;
     // Ours are additional to the ones OpenLayers attaches after this returns;
     // it still drives the tile's own state.
-    image.addEventListener('load', () => reportSuccess(origin), { once: true });
-    image.addEventListener('error', () => reportFailure(origin), {
-      once: true,
-    });
+    image.addEventListener(
+      'load',
+      () => {
+        attempts.delete(tile);
+        if (origin) reportSuccess(origin);
+      },
+      { once: true },
+    );
+    image.addEventListener(
+      'error',
+      () => {
+        // Every try that failed is reported, not just the last one, so the
+        // breaker still counts requests that produced no picture and trips on
+        // the third — sooner in tiles than before, because one tile can now
+        // spend three. Which is the right way round: retrying is what we stop
+        // doing once the origin is known to be down.
+        if (origin) reportFailure(origin);
+        const delay = RETRY_DELAY_MS[attempt - 1];
+        if (delay === undefined) return;
+        window.setTimeout(
+          () => {
+            // OpenLayers has marked the tile ERROR by now; `load()` on an
+            // errored tile puts it back to IDLE with a fresh image and calls
+            // straight back in here. Checking the state first is also how a
+            // tile that something else has already reloaded — a `refresh()`
+            // landing mid-backoff — is left alone.
+            if (tile.getState() === TileState.ERROR) tile.load();
+          },
+          delay + Math.random() * RETRY_JITTER_MS,
+        );
+      },
+      { once: true },
+    );
     image.src = src;
   });
 };

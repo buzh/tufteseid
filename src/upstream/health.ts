@@ -12,9 +12,14 @@
 //
 // So: count failures net of successes, and three ahead, stop issuing requests
 // to that origin at all. Recovery is not guessed at but measured, by one tiny
-// probe on a growing backoff (`origins.ts`). Nothing here retries a tile;
-// OpenLayers marks a refused tile ERROR and never asks again, so the way back
-// is `refresh()` on the sources once the probe says the service is real again.
+// probe on a growing backoff (`origins.ts`).
+//
+// A tile that merely failed is tried twice more by `tileGuard.ts`, and every
+// try that failed reports here — so an outage is still three failed requests
+// from tripping, reached in fewer tiles than before rather than more. A tile
+// this breaker *refused* is not retried, the answer being known in advance, so
+// the way back for those is `refresh()` on the sources once the probe says the
+// service is real again.
 
 import { atom, getDefaultStore } from 'jotai';
 import { ORIGIN_IDS, ORIGINS, type OriginId } from './origins';
