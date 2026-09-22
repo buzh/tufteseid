@@ -13,9 +13,7 @@
     "emptyEra": "Ingen flyfoto fra denne perioden dekker utsnittet"
   },
   "grounds": {
-    "chipTitle": "{{ground}} — {{hint}}",
-    "none": "Ingen bakgrunn",
-    "noneHint": "Kartet har ingen bakgrunn nå — velg en",
+    "tooltip": "{{ground}} — {{hint}}",
     "lidar": {
       "name": "LiDAR",
       "hint": "Relieff regnet ut av laserskanning"

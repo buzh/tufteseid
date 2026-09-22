@@ -25,7 +25,7 @@ import { Group } from '@mantine/core';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { FlyfotoControlGroup, useFlyfotoControls } from '../flyfotoControls';
-import { GroundMenu, useGroundControls } from '../grounds';
+import { GroundSwitch, useGroundControls } from '../grounds';
 import { KartControlGroup, useKartControls } from '../kartControls';
 import { LidarControlGroup, useLidarControls } from '../lidarControls';
 import { type CompareHalf, compareOnAtom } from '../map/compare/halves';
@@ -63,7 +63,7 @@ export const GroundSection = ({ half }: { half: CompareHalf }) => {
       role="group"
       aria-label={sectionLabel}
     >
-      <GroundMenu ground={ground} />
+      <GroundSwitch ground={ground} />
 
       {ground.mode === 'lidar' && <LidarControlGroup lidar={lidar} />}
       {ground.mode === 'kart' && <KartControlGroup kart={kart} />}

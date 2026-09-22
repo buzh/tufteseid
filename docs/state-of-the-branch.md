@@ -44,7 +44,7 @@ Everything inside `GroundSection` is a surface mounted from its own directory:
 
 | Directory | Is |
 | --- | --- |
-| `src/grounds/` | the ground switch — `GroundMenu`, one chip, three rows, and `useGroundControls` which derives which ground is up from the half's background atom rather than storing it |
+| `src/grounds/` | the ground switch — `GroundSwitch`, three buttons in a `ControlUnit` with the live one lit, and `useGroundControls` which derives which ground is up from the half's background atom rather than storing it |
 | `src/lidarControls/` | the LiDAR arm — `LidarControlGroup`, four elements whose design is settled |
 | `src/kartControls/` | the Kart arm — one chip over `KART_VARIANTS`, and the memory of which variant Kart means while another ground is up |
 | `src/flyfotoControls/` | the Flyfoto arm — the NiB mosaic or one acquisition over the viewport, with the period filter inside its own dropdown |
