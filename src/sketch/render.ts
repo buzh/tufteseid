@@ -9,6 +9,12 @@
 // placement below is computed from those same bounds: an estimate two pixels
 // out is a drawing two pixels off the terrain it traces, every time it is shown.
 
+// First, and not merged into the imports below: the dynamic import in
+// `excalidraw()` is the second way into the editor bundle, and the bundle reads
+// the font path off the global when it evaluates — whichever way in reached it
+// first. A spot opened from a short link renders here without the editor ever
+// mounting, so `SketchCanvas`'s copy of this import is not enough.
+import './excalidrawAssets';
 import { transformExtent } from 'ol/proj';
 
 import { sceneToCoord, type SketchFrame } from './frame';

@@ -14,13 +14,17 @@ import { defineConfig } from 'vitest/config';
  * where that path expects them.
  *
  * Not `public/`: the fonts are a build artefact of a dependency and would be
- * ~40 MB of vendored binaries in the repo. Copied out of `node_modules` at
+ * 12.5 MB of vendored binaries in the repo. Copied out of `node_modules` at
  * build time, and streamed straight from there in dev.
  *
- * Xiaolai is skipped. It is the CJK fallback and it is most of the weight —
- * several hundred subsetted files — and the app ships in Norwegian Bokmål,
- * Nynorsk and English. Pasted CJK text falls back to a system font, which is
- * what would happen on a machine without the webfont anyway.
+ * All of them, Xiaolai included. Xiaolai is the CJK fallback and it is 209 of
+ * the 234 files and 12 of the 12.5 MB, so leaving it out reads like free
+ * weight — but Excalidraw names it in every font stack it hands to
+ * `document.fonts.load`, and every FontFace it builds lists esm.sh after our
+ * own URL as a last resort. A subset we do not serve is therefore not a quiet
+ * fall back to a system font: it is a cross-origin request, one per subset,
+ * that `font-src 'self'` blocks and logs. The files are static and each is
+ * fetched only when a glyph in its range is drawn.
  */
 function excalidrawFonts(): Plugin {
   const [devRoot, prodRoot] = ['dist/dev/fonts', 'dist/prod/fonts'].map((rel) =>
@@ -30,7 +34,6 @@ function excalidrawFonts(): Plugin {
   // both, so a single order would put the dev font set in the deploy.
   const serveRoots = [devRoot, prodRoot];
   const buildRoots = [prodRoot, devRoot];
-  const skipXiaolai = (src: string) => !src.includes(`${path.sep}Xiaolai`);
   let outDir = 'dist';
 
   return {
@@ -60,10 +63,7 @@ function excalidrawFonts(): Plugin {
         this.warn('Excalidraw fonts not found; text on a drawing will 404');
         return;
       }
-      cpSync(root, path.resolve(outDir, 'fonts'), {
-        recursive: true,
-        filter: skipXiaolai,
-      });
+      cpSync(root, path.resolve(outDir, 'fonts'), { recursive: true });
     },
   };
 }
