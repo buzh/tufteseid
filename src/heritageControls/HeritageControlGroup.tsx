@@ -7,12 +7,16 @@
 // the relief against what is recorded there, and it has to be one press with
 // nothing to read. Which registers and which render is asked once a session.
 //
+// But one control, so they stand in a `ControlUnit` rather than a `Group`: the
+// chip is a readout of what the button turned on, and set a gap apart the two
+// read as unrelated neighbours in a band whose other members genuinely are.
+//
 // The chip is absent while the overlay is off, not disabled: with nothing
 // drawing there is no readout for it to carry, and a filter over an empty map
 // is a control the reader has to turn something else on before it means
-// anything.
+// anything. The button is left rounded on all four corners by its going.
 
-import { Group } from '@mantine/core';
+import { ControlUnit } from '../ui/ControlUnit';
 import { HeritageMenu } from './HeritageMenu';
 import { HeritageToggle } from './HeritageToggle';
 import type { HeritageControls } from './useHeritageControls';
@@ -22,8 +26,8 @@ export const HeritageControlGroup = ({
 }: {
   heritage: HeritageControls;
 }) => (
-  <Group gap="xs" wrap="nowrap" flex="none">
+  <ControlUnit>
     <HeritageToggle heritage={heritage} />
     {heritage.shown && <HeritageMenu heritage={heritage} />}
-  </Group>
+  </ControlUnit>
 );

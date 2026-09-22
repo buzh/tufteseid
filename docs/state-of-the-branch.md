@@ -57,12 +57,22 @@ for a mode that is on, or split across the middle for two states that are one
 picture. The metrics they share are `--control-height` and
 `--control-icon-width` in `src/index.css`.
 
+Where several of those boxes are one control rather than neighbours, they stand
+in `ControlUnit`: a third primitive that draws them as a single shape — shared
+edge, outer radius only, no gap. It styles its children by position rather than
+by a class they wear, because the boxes arrive already wrapped in a `Tooltip` or
+a `Popover.Target` and because the set changes as a chip comes and goes; the
+survivor of a departure is rounded on all four corners again without anything
+being told. Kulturminner is the one that wears it today.
+
 `ToolSection` mounts one surface the same way, on the same seam:
 `src/heritageControls/` is the Kulturminner overlay — `HeritageToggle`, the
 button that puts Riksantikvaren's registers over whatever ground is drawing,
-and beside it, only while they are up, `HeritageMenu`: the chip that reads out
-the render and opens the five sources, the three registers inside
-kulturminner2, the seven renders and the transparency. It is not an arm and
+and joined to it, only while they are up, `HeritageMenu`: the chip that reads
+out the render and opens the five sources, the three registers inside
+kulturminner2, the seven renders and the transparency. The two share one box —
+the chip is a readout of what the button turned on, not a control standing next
+to it — which is why the chip carries no glyph of its own. It is not an arm and
 belongs to no ground, which is what puts it at the other end of the band. Off
 is `heritageHiddenAtom`, a blind rather than a clearing, so the reader's
 selection survives taking the overlay off to look at the terrain; the button is

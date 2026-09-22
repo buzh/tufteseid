@@ -1,6 +1,11 @@
-// What the overlay is made of, behind the chip beside the button. It appears
+// What the overlay is made of, behind the chip joined to the button. It appears
 // only while the overlay is on: a filter over nothing is a control the reader
 // has to turn something else on before it means anything.
+//
+// No glyph on the chip. Every other chip in the band leads with one because it
+// is the whole of what the control is about, but this one shares a box with the
+// castle and a second glyph an eighth of an inch from it would be read as a
+// second subject. The chevron already says the chip opens.
 //
 // A Popover rather than a Menu. Every row in here is a setting the reader
 // leaves set — five sources, three registers inside one of them, one render out
@@ -102,7 +107,6 @@ export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
     >
       <Popover.Target>
         <ControlChip
-          icon="tune"
           label={label}
           hint={tooFarOut ? t('heritageControls.zoomedOut') : undefined}
           title={title}
