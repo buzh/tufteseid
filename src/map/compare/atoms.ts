@@ -11,6 +11,7 @@ import {
 import { activeCvatAcquisitionHalves } from '../layers/config/backgroundLayers/cvatGround';
 import { activeFlyfotoProjectHalves } from '../layers/config/backgroundLayers/flyfotoBackground';
 import {
+  isKartVariant,
   type KartVariant,
   kartVariantHalves,
 } from '../layers/config/backgroundLayers/kartVariants';
@@ -28,24 +29,29 @@ import {
   buildStack,
   resolveStack,
 } from '../layers/config/backgroundLayers/stack';
-import { clearCompareLayers, installCompareLayers } from './curtainLayers';
-import { compareFocusAtom, compareOnAtom, seedHalfB } from './halves';
+import {
+  clearCompareLayers,
+  compareHost,
+  installCompareLayers,
+} from './compareLayers';
+import { seedHalfB, type ViewMode, viewModeAtom } from './halves';
 
-// Sammenlign — the same ground twice: the ordinary background stack keeps the
-// whole map (A), a second stack built by the same rules is clipped to the right
-// of a draggable edge (B). Nothing here is persisted to the URL, because two
-// live tile stacks are roughly twice the GetMap requests against a shared rate
-// limit.
+// Two grounds at once — the same view read twice. The ordinary background stack
+// is the A half and keeps the left of the screen; a second stack built by the
+// same rules is the B half. Which shape that takes is `viewModeAtom`
+// (`halves.ts`); what it costs is why neither shape is persisted to the URL —
+// two live tile stacks are roughly twice the GetMap requests against a rate
+// limit this deployment shares across every visitor.
 
-/** Every GroundMode except `terreng` (Analyse), spelled out rather than
- * imported: this is a map module and useGroundMode is a shell one. */
-export type CompareGround = 'kart' | 'lidar' | 'hybrid' | 'flyfoto';
+/** Every GroundMode, spelled out rather than imported: this is a map module and
+ * `src/grounds/` is a surface one. */
+export type CompareGround = 'kart' | 'lidar' | 'flyfoto';
 
 /** Where the curtain edge sits, as a fraction of the map width. */
 export const compareSplitAtom = atom(0.5);
 
-// `useGroundMode.select`'s mapping again, because entering compare writes B's
-// ground before React re-renders with the focus switch.
+// The arms' own entry rules again, because seeding B happens before React
+// re-renders with the second ground section mounted.
 const groundLayer = (
   ground: CompareGround,
   kartVariant: KartVariant,
@@ -60,49 +66,56 @@ const groundLayer = (
     return flyfotoProject ? 'flyfotoProject' : 'flyfoto';
   }
   // A flight if one is held, and then `lidarFlightGround` off the render held
-  // with it — the same namer `useLidarControls` uses, so entering the curtain
-  // on a cached render keeps the cache and entering it on a WMS style does not
-  // hand the cache's layer name to a GetMap.
+  // with it — the same namer `useLidarControls` uses, so entering on a cached
+  // render keeps the cache and entering on a WMS style does not hand the
+  // cache's layer name to a GetMap.
   if (!lidarProject) return 'lidarHillshade';
   return lidarFlightGround(lidarStyle, lidarModel);
 };
 
-// B starts as a copy of A and is then moved, so the only difference is the one
-// thing asked for.
-export const enterCompareAtom = atom(
+// What B opens on. The two grounds this app exists to read against each other
+// are relief and cartography, so B is whichever of those A is not; ortofoto is
+// a ground the reader asks for rather than one a second pane guesses at.
+const contrastingGround = (a: BackgroundLayerName): CompareGround =>
+  isKartVariant(a) ? 'lidar' : 'kart';
+
+/**
+ * Pick a view. B starts as a copy of A and is then moved off it, so the only
+ * difference is the comparison itself — and only on the way out of `single`:
+ * moving between the curtain and the split keeps B where the reader put it.
+ */
+export const selectViewModeAtom = atom(
   null,
-  (get, set, ground: CompareGround) => {
-    seedHalfB(get, set);
-    // A comparison term that follows the viewport is not a comparison term.
-    set(lidarAutoDatasetHalves.b, false);
-    set(hybridOverlayHalves.b, ground === 'hybrid');
-    set(
-      backgroundLayerHalves.b,
-      groundLayer(
-        ground,
-        get(kartVariantHalves.b),
-        get(activeLidarProjectHalves.b),
-        get(activeFlyfotoProjectHalves.b),
-        get(activeLidarStyleHalves.b),
-        get(activeLidarModelHalves.b),
-      ),
-    );
-    set(compareOnAtom, true);
-    set(compareFocusAtom, 'b');
+  (get, set, mode: ViewMode) => {
+    const previous = get(viewModeAtom);
+    if (mode === previous) return;
+    if (previous === 'single' && mode !== 'single') {
+      seedHalfB(get, set);
+      // A comparison term that follows the viewport is not a comparison term.
+      set(lidarAutoDatasetHalves.b, false);
+      const ground = contrastingGround(get(backgroundLayerHalves.a));
+      set(
+        backgroundLayerHalves.b,
+        groundLayer(
+          ground,
+          get(kartVariantHalves.b),
+          get(activeLidarProjectHalves.b),
+          get(activeFlyfotoProjectHalves.b),
+          get(activeLidarStyleHalves.b),
+          get(activeLidarModelHalves.b),
+        ),
+      );
+    }
+    set(viewModeAtom, mode);
   },
 );
-
-export const leaveCompareAtom = atom(null, (_get, set) => {
-  set(compareOnAtom, false);
-  set(compareFocusAtom, 'a');
-});
 
 // The build awaits, and an earlier run resolving last would install a stack the
 // user has already changed.
 let compareGeneration = 0;
 
 export const compareLayerAtomEffect = atomEffect((get) => {
-  const on = get(compareOnAtom);
+  const mode = get(viewModeAtom);
   // The B half throughout, mirroring backgroundLayerAtomEffect's A half.
   const layerName = get(backgroundLayerHalves.b);
   const hybridOverlay = get(hybridOverlayHalves.b);
@@ -116,7 +129,7 @@ export const compareLayerAtomEffect = atomEffect((get) => {
   const generation = ++compareGeneration;
 
   // 'empty' is not offered as a choice but is reachable from ?backgroundLayer.
-  if (!on || layerName === 'empty') {
+  if (mode === 'single' || layerName === 'empty') {
     clearCompareLayers();
     return;
   }
@@ -134,9 +147,16 @@ export const compareLayerAtomEffect = atomEffect((get) => {
 
   const install = async () => {
     try {
-      const map = getDefaultStore().get(mapAtom);
-      const projection = map.getView().getProjection().getCode();
-      const built = await buildStack(stack, projection, 'cmp');
+      // Resolved before the await as well as after: the host is what the layers
+      // are built into, and a mode change mid-build would build into one map
+      // and install into the other.
+      const host = compareHost();
+      const projection = getDefaultStore()
+        .get(mapAtom)
+        .getView()
+        .getProjection()
+        .getCode();
+      const built = await buildStack(stack, projection, 'cmp', host);
       if (generation !== compareGeneration) return;
       if (!built) return;
 
@@ -146,6 +166,7 @@ export const compareLayerAtomEffect = atomEffect((get) => {
       installCompareLayers(
         built.under.map((e) => e.layer),
         built.over.map((e) => e.layer),
+        { host, clip: mode === 'curtain' },
       );
     } catch (error) {
       console.error('[compare] failed to build the B stack', error);

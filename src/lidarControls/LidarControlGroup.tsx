@@ -10,10 +10,9 @@
 // offer where the dataset publishes it; the model sits last because it is the
 // one axis that survives every dataset.
 //
-// It takes the controller rather than calling `useLidarControls` itself. That
-// is the seam a second instance goes through: see the note at the top of
-// `useLidarControls.ts` for what a split view would have to do about the fact
-// that there is currently only one.
+// It takes the controller rather than calling `useLidarControls` itself, which
+// is what lets a two-ground view mount one of these per pane: the controller
+// knows which half it writes and nothing in the four controls does.
 
 import { Group } from '@mantine/core';
 import { useEffect } from 'react';
@@ -25,7 +24,7 @@ import { RenderMenu } from './RenderMenu';
 import type { LidarControls } from './useLidarControls';
 
 export const LidarControlGroup = ({ lidar }: { lidar: LidarControls }) => {
-  // `lidarPickerOpenAtom` is shared with the map, and an unmount never fires
+  // The half's picker atom is shared with the map, and an unmount never fires
   // the dataset menu's own close callback. It hangs off this group rather than
   // off the controller because the group is what comes and goes: the controller
   // outlives a trip to another ground, and a picker left open would have the

@@ -50,7 +50,7 @@ export type CvatAcquisition = {
 
 /**
  * The cached render of the flight that is selected, or null where the store has
- * no tiles for it. Written in lockstep with `activeLidarProjectAtom` — the
+ * no tiles for it. Written in lockstep with `activeLidarProjectHalves` — the
  * flight is the choice and this follows it, so the two can never name different
  * acquisitions.
  *
@@ -59,7 +59,6 @@ export type CvatAcquisition = {
  * was shared on.
  */
 export const activeCvatAcquisitionHalves = halved<CvatAcquisition | null>(null);
-export const activeCvatAcquisitionAtom = activeCvatAcquisitionHalves.focused;
 
 // ---------------------------------------------------------------------------
 // What is in the store, asked at runtime

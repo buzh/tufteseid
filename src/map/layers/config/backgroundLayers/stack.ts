@@ -1,4 +1,5 @@
 import TileLayer from 'ol/layer/Tile';
+import type OlMap from 'ol/Map';
 import { BackgroundLayerName } from '../../backgroundLayers';
 import { buildCvatGroundConfig, type CvatAcquisition } from './cvatGround';
 import { buildNationalLidarConfig } from './elevation';
@@ -192,16 +193,19 @@ export type BuiltStack = { under: BuiltLayer[]; over: BuiltLayer[] };
 
 /** The same stack as OL layers. Opacity comes back alongside each layer rather
  *  than applied, since a run found stale afterwards must not have faded a layer
- *  the current stack still uses. `null` if the featured layer failed. */
+ *  the current stack still uses. `null` if the featured layer failed. `host` is
+ *  the map the layers are destined for, and only the split view's right pane
+ *  passes one. */
 export const buildStack = async (
   stack: ResolvedStack,
   projection: string,
   ns: LayerNamespace = 'bg',
+  host?: OlMap,
 ): Promise<BuiltStack | null> => {
   const build = (entries: StackEntry[]) =>
     Promise.all(
       entries.map(async (e) => ({
-        layer: await buildOrReuseBackgroundLayer(e.config, projection, ns),
+        layer: await buildOrReuseBackgroundLayer(e.config, projection, ns, host),
         opacity: e.opacity,
       })),
     );

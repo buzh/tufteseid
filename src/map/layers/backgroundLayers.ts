@@ -2,7 +2,7 @@
 export type WMSLayerName =
   // Only the mosaic's non-default styles reach here; skyggerelieff is cached.
   | 'lidarHillshade'
-  // Project and style come from activeLidarProjectAtom, not a static config.
+  // Project and style come from the half's own atoms, not a static config.
   | 'lidarProject';
 
 // One ortofoto acquisition, not a WMS: /wms/ortofoto publishes only the merged

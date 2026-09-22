@@ -1,22 +1,25 @@
 // The middle of the band: how the map is being looked at, rather than what it
 // is drawing.
 //
-// That is the compare curtain — `compareOnAtom`, `compareSplitAtom` and
-// `enterCompareAtom` (`src/map/compare/atoms.ts`), all live and none of them
-// written by any surface yet. The curtain belongs here and not in
-// `GroundSection` because it does not choose a ground: it puts two of them on
-// the screen at once and gives one of them focus, and every atom the arms write
-// is the `.focused` facade of a `halved()` pair, so the ground section already
-// describes whichever side has it.
+// One control — the view: one ground over the whole map, two under a draggable
+// seam, or two panes side by side on one view. It belongs here and not in
+// `GroundSection` because it chooses no ground: it says how many of them are on
+// the screen, and the ground sections on either side of it say which.
 //
-// Empty until that control is built, and deliberately still mounted — the
-// section is the slack that pushes `ToolSection` to the right-hand end, and a
-// band whose middle appears only once it has contents would move the tools
-// sideways the first time the reader opened the curtain.
+// Which is also why this section is the hinge of the row. In a two-ground view
+// the B section stands immediately to its right, so the control that put the
+// second ground on the screen sits between the two grounds it governs.
 
 import { Group } from '@mantine/core';
+import { useViewControls, ViewControlGroup } from '../viewControls';
 import styles from './Ribbon.module.css';
 
-export const ViewSection = () => (
-  <Group gap="xs" wrap="nowrap" className={styles.views} />
-);
+export const ViewSection = () => {
+  const view = useViewControls();
+
+  return (
+    <Group gap="xs" wrap="nowrap" className={styles.views}>
+      <ViewControlGroup view={view} />
+    </Group>
+  );
+};

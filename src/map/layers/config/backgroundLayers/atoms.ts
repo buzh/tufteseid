@@ -6,7 +6,7 @@ import {
   setUrlParameter,
 } from '../../../../shared/utils/urlUtils';
 import { mapAtom } from '../../../atoms';
-import { halved } from '../../../compare/halves';
+import { acrossHalves, halved } from '../../../compare/halves';
 import { BackgroundLayerName } from '../../backgroundLayers';
 import { activeCvatAcquisitionHalves } from './cvatGround';
 import { activeFlyfotoProjectHalves } from './flyfotoBackground';
@@ -56,25 +56,27 @@ export const backgroundLayerCapabilitiesCacheAtom = atom<
   Record<string, string>
 >({});
 
-// Two halves and a facade (src/map/compare/halves.ts): `.a` is the ordinary
-// background, `.b` the curtain's right side, and the facade the focused one.
+// Two halves (src/map/compare/halves.ts): `.a` is the left of the screen and
+// the whole of it while one ground is up, `.b` the right of a two-ground view.
+// A surface writes the half it belongs to; nothing writes "the current one".
 export const backgroundLayerHalves = halved<BackgroundLayerName>(
   getDefaultBackgroundLayer(),
 );
-export const backgroundLayerAtom = backgroundLayerHalves.focused;
+
+/** Every ground on the screen — one, or both while two are up. What a surface
+ *  belonging to the map rather than to a half asks. */
+export const liveBackgroundLayersAtom = acrossHalves(backgroundLayerHalves);
 
 // Kartverket's transparent roads/railways/place-names overlay over the relief.
 // A modifier, not a background, so toggling leaves the dataset underneath.
 export const hybridOverlayHalves = halved<boolean>(
   getUrlParameter('hybrid') === 'true',
 );
-export const hybridOverlayAtom = hybridOverlayHalves.focused;
 
 // Contours are two more group layers in that overlay's own GetMap.
 export const hybridContoursHalves = halved<boolean>(
   getUrlParameter('contours') === 'true',
 );
-export const hybridContoursAtom = hybridContoursHalves.focused;
 
 // Which run of the effect below is current: the build awaits and key-repeat
 // outruns it, so a stale run must not install a stack already cycled past.
@@ -82,8 +84,8 @@ let swapGeneration = 0;
 
 export const backgroundLayerAtomEffect = atomEffect((get) => {
   const generation = ++swapGeneration;
-  // The A half throughout, never the facade: controls pointed at the curtain's
-  // B half must not rebuild the map's own background.
+  // The A half throughout: this is the left of the screen, and the whole of it
+  // while one ground is up. The B half is `compareLayerAtomEffect`'s.
   const layerName = get(backgroundLayerHalves.a);
   // Read so switching project, style or model rebuilds the LiDAR WMS layer.
   const activeLidarProject = get(activeLidarProjectHalves.a);

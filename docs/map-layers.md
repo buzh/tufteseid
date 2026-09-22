@@ -150,9 +150,9 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   `GetCapabilities` cannot be wired in at all; `vat-cache/README.md` says so at
   the point where the next one is chosen.
 - Which acquisition is drawing is `activeCvatAcquisitionHalves`
-  (`cvatGround.ts`), halved like the LiDAR project and seeded into the compare
-  curtain's B side with it. It is written only in lockstep with
-  `activeLidarProjectAtom`, by `selectProject` — the flight is the choice and
+  (`cvatGround.ts`), halved like the LiDAR project and seeded into the B half
+  with it. It is written only in lockstep with
+  `activeLidarProjectHalves`, by `selectProject` — the flight is the choice and
   this follows it, so the two can never name different acquisitions. It starts
   null, so a cold load into `?backgroundLayer=lidarCvat` draws nothing for a
   tick — the URL names the render, not the flight it was of. Nothing extra
@@ -212,8 +212,10 @@ A ground is never one layer. `resolveStack` / `buildStack`
 installs the result without a gap: 1–2 go *under* the outgoing layers, 3–4
 *over* them. Rules:
 
-- `resolveStack` is pure and `buildStack` awaits, so the compare curtain
-  (`src/map/compare/`) resolves a second stack by the same rules.
+- `resolveStack` is pure and `buildStack` awaits, so the two-ground views
+  (`src/map/compare/`) resolve a second stack by the same rules. `buildStack`
+  takes the host map, because in the split view that second stack is built into
+  the right pane's own map and an OL layer belongs to one map at a time.
 - The URL follows the *resolved* stack, not the atoms: `?hybrid=true` and
   `?contours=true` are written only when the overlay ended up in it.
 - Outgoing layers are dimmed to `OUTGOING_OPACITY` and removed on the next
@@ -224,7 +226,8 @@ installs the result without a gap: 1–2 go *under* the outgoing layers, 3–4
   an earlier fade, so callers set opacity explicitly on every layer they pass.
 
 Map z-order, of what is left: backgrounds at the default zIndex 0 (ordered by
-collection position), the compare curtain at 1.5, the LiDAR footprint outlines
+collection position), the B half of a two-ground view at 1.5 (`COMPARE_Z`),
+the LiDAR footprint outlines
 at 3 (`lidarFootprintsLayer.ts`, visible only while the ribbon's dataset menu is
 open), the terrain-analysis window frame at 4, and the Kulturminner theme layers
 on top at 10 — set by the caller that adds them (`src/map/layers/atoms.ts`), not
@@ -249,6 +252,12 @@ Config `src/map/layers/config/themeLayers/culturalHeritage.ts`, registered in
 The category sets `infoFormat: 'application/vnd.ogc.gml'` so
 `parseXmlFeatureInfo` (MapServer `msGMLOutput`) produces structured fields;
 left unset, the WMS returns HTML and the card shows a placeholder.
+
+`themeLayerEffect` (`src/map/layers/atoms.ts`) puts them on the map, and in the
+split view on both maps: a ticked register belongs to the reading rather than to
+a half, so `syncThemeLayers` is called once per map and each gets its own layer
+instances off the same config. Only the main map's result writes
+`?themeLayers=` or drops a reading — the second pane is a mirror.
 
 These five are also the only layers on the map a pointer can question.
 `heritageQuery.ts` asks them by id rather than by the `theme.` prefix — who is
@@ -339,6 +348,6 @@ Whether a feature's `linkkulturminnesok` URL resolves is asked separately
    menu; a ground of its own is a fourth arm plus an entry in `GROUND_MODES`
    and `groundOf` (`src/grounds/`), which is what decides that the arm is the
    one on screen. Until it has either, it is reachable by setting
-   `backgroundLayerAtom` and by `?backgroundLayer=` if it is safe to cold-load
-   onto.
+   `backgroundLayerHalves.a` and by `?backgroundLayer=` if it is safe to
+   cold-load onto.
 5. Translations in `src/locales/{nb,nn,en}/translation.json`.

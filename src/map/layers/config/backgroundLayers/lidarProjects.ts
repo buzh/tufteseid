@@ -4,7 +4,7 @@
 import { t } from 'i18next';
 import { fetchWithin } from '../../../../shared/utils/deadline';
 import { getUrlParameter } from '../../../../shared/utils/urlUtils';
-import { halved } from '../../../compare/halves';
+import { acrossHalves, halved } from '../../../compare/halves';
 
 // Roomy: the document is some 8 MB of XML the proxy may be fetching cold.
 const CAPS_TIMEOUT_MS = 60_000;
@@ -31,17 +31,17 @@ const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 // What the background effect builds a WMS request from under 'lidarProject'.
 export const activeLidarProjectHalves = halved<LidarProject | null>(null);
-export const activeLidarProjectAtom = activeLidarProjectHalves.focused;
+
+/** The flight each drawing half is on, for the footprint the map outlines. */
+export const liveLidarProjectsAtom = acrossHalves(activeLidarProjectHalves);
 
 // Holds the picked DTM style: DOM has one, so effectiveLidarStyle overrides
 // rather than overwrites and the DTM choice survives the trip.
 export const activeLidarStyleHalves = halved<string>('skyggerelieff');
-export const activeLidarStyleAtom = activeLidarStyleHalves.focused;
 
 export const activeLidarModelHalves = halved<LidarModel>(
   getUrlParameter('lidarModel') === 'dom' ? 'dom' : 'dtm',
 );
-export const activeLidarModelAtom = activeLidarModelHalves.focused;
 
 export const LIDAR_PROJECT_WMS_URL: Record<LidarModel, string> = {
   dtm: '/wms/geonorge/wms.hoyde-dtm-prosjekt',

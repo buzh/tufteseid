@@ -1,10 +1,13 @@
 import { atom, getDefaultStore } from 'jotai';
 import { atomEffect } from 'jotai-effect';
+import type OlMap from 'ol/Map';
 import {
   addToUrlListParameter,
   removeFromUrlListParameter,
 } from '../../shared/utils/urlUtils';
 import { mapAtom } from '../atoms';
+import { viewModeAtom } from '../compare/halves';
+import { getSplitMap, peekSplitMap } from '../compare/splitMap';
 import { heritagePopupAtom, heritageTipAtom } from '../featureInfo/atoms';
 import {
   type HeritageDetail,
@@ -60,15 +63,33 @@ const paramsFor = (
     ? heritageSitesParams(details, render)
     : null;
 
-export const themeLayerEffect = atomEffect((get) => {
-  const themeLayers = get(activeThemeLayersAtom);
-  // Read so a change re-runs this effect and reshapes the layers on the map.
-  const heritageDetails = get(heritageDetailsAtom);
-  const heritageRender = get(heritageRenderAtom);
-  const heritageOpacity = get(heritageOpacityAtom);
-  const heritageHidden = get(heritageHiddenAtom);
-  const store = getDefaultStore();
-  const map = store.get(mapAtom);
+type ThemeLayerSettings = {
+  themeLayers: ReadonlySet<ThemeLayerName>;
+  heritageDetails: ReadonlySet<HeritageDetail>;
+  heritageRender: HeritageRender;
+  heritageOpacity: number;
+  heritageHidden: boolean;
+};
+
+/**
+ * Bring one map's `theme.` layers in line with the settings, and say what
+ * changed. Takes a map rather than reading `mapAtom` because the split view has
+ * two of them and an OL layer belongs to one map at a time: each gets its own
+ * instances, built from the same config.
+ *
+ * Nothing outside the map is touched in here — the URL and the open readings
+ * follow the main map alone, and are the caller's to write.
+ */
+const syncThemeLayers = (
+  map: OlMap,
+  {
+    themeLayers,
+    heritageDetails,
+    heritageRender,
+    heritageOpacity,
+    heritageHidden,
+  }: ThemeLayerSettings,
+): { added: ThemeLayerName[]; removed: ThemeLayerName[] } => {
   const mapProjection = map.getView().getProjection().getCode();
   const themelayersActive = new Set(
     map
@@ -121,7 +142,6 @@ export const themeLayerEffect = atomEffect((get) => {
     }
     layerToAdd.setZIndex(10);
     map.addLayer(layerToAdd);
-    addToUrlListParameter('themeLayers', layerName);
   });
 
   themeLayersToRemove.forEach((layerName) => {
@@ -129,11 +149,7 @@ export const themeLayerEffect = atomEffect((get) => {
       .getLayers()
       .getArray()
       .find((layer) => layer.get('id') === `theme.${layerName}`);
-    if (layer) {
-      map.removeLayer(layer);
-      forgetReadingsFrom(`theme.${layerName}`);
-    }
-    removeFromUrlListParameter('themeLayers', layerName);
+    if (layer) map.removeLayer(layer);
   });
 
   // Reshape whatever is on the map now, including the layers just added.
@@ -164,17 +180,63 @@ export const themeLayerEffect = atomEffect((get) => {
       source.updateParams(params);
     });
 
+  return { added: themeLayersToAdd, removed: themeLayersToRemove };
+};
+
+export const themeLayerEffect = atomEffect((get) => {
+  // Read so a change re-runs this effect and reshapes the layers on the map.
+  const settings: ThemeLayerSettings = {
+    themeLayers: get(activeThemeLayersAtom),
+    heritageDetails: get(heritageDetailsAtom),
+    heritageRender: get(heritageRenderAtom),
+    heritageOpacity: get(heritageOpacityAtom),
+    heritageHidden: get(heritageHiddenAtom),
+  };
+  const mode = get(viewModeAtom);
+  const store = getDefaultStore();
+
+  const { added, removed } = syncThemeLayers(store.get(mapAtom), settings);
+
+  // The registers belong to the reading, not to a half: a ticked register draws
+  // over both panes of a split, so the second map gets the same set. Created
+  // here when the split is the view, because this effect is mounted ahead of
+  // the one that builds the B ground and would otherwise leave the new pane
+  // bare until the next change. Outside the split the pane is emptied rather
+  // than left holding a set that will have moved on by the time it is shown
+  // again.
+  const pane = mode === 'split' ? getSplitMap() : peekSplitMap();
+  if (pane) {
+    syncThemeLayers(pane, {
+      ...settings,
+      themeLayers: mode === 'split' ? settings.themeLayers : NO_THEME_LAYERS,
+    });
+  }
+
+  // Off the main map's result alone. The URL says what the reader ticked, and a
+  // reading is what a layer answered — a mirror in the second pane is neither.
+  for (const layerName of added) {
+    addToUrlListParameter('themeLayers', layerName);
+  }
+  for (const layerName of removed) {
+    removeFromUrlListParameter('themeLayers', layerName);
+    forgetReadingsFrom(`theme.${layerName}`);
+  }
+
   // The blind is over every source at once, and a card describing a register
   // nobody can see is a reading of an empty map. Not the same for a reshape: the
   // registers and the render change what is drawn, but what the reading named is
   // still recorded there, and clearing it would punish a reader for adjusting
   // the picture while reading a card.
-  if (heritageHidden) {
+  if (settings.heritageHidden) {
     store.set(heritageTipAtom, null);
     store.set(heritagePopupAtom, null);
   }
 
-  writeHeritageUrlParameters(heritageDetails, heritageRender, heritageOpacity);
+  writeHeritageUrlParameters(
+    settings.heritageDetails,
+    settings.heritageRender,
+    settings.heritageOpacity,
+  );
 });
 
 type WmsSource = {

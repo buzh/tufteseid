@@ -5,23 +5,25 @@ draws it. 290 files became 79. The point was not to make the app smaller — it
 was to make the next interface unconstrained by the last one, without
 re-deriving four years of Kartverket and Riksantikvaren service quirks.
 
-The rebuild has reached the background and the record over it. `src/App.tsx`
-renders a ribbon above `MapComponent`: it says which ground is drawing — LiDAR
-relief, one of Kartverket's map series, or ortofoto — and which dataset within
-it, and switches both. At the other end of the row it puts Riksantikvaren's
-heritage layers over whatever that ground is, and says what of them; and only
-when there is something to say, it names an external service that has stopped
-answering. There is still no search box, no lokaliteter, no funn, no drawing
-and no account, and no control over the Hybrid overlay, its contours or the
-compare curtain — those remain a `set()` away.
+The rebuild has reached the background, the record over it, and how many of
+them are on the screen at once. `src/App.tsx` renders a ribbon above
+`MapComponent`: it says which ground is drawing — LiDAR relief, one of
+Kartverket's map series, or ortofoto — and which dataset within it, and switches
+both; in the middle it chooses the view, which is how many grounds are up and in
+what shape. At the other end of the row it puts Riksantikvaren's heritage layers
+over whatever that ground is, and says what of them; and only when there is
+something to say, it names an external service that has stopped answering.
+There is still no search box, no lokaliteter, no funn, no drawing and no
+account, and no control over the Hybrid overlay or its contours — those remain
+a `set()` away.
 
 The band and the controls are separate things. `src/ribbon/` is the band, and it
-is laid out in three sections, each with its own subject and its own file:
+is laid out in sections, each with its own subject and its own file:
 
 | Section | Holds | Is about |
 | --- | --- | --- |
 | `GroundSection` | the ground switch and the arm belonging to it | what is drawn under everything |
-| `ViewSection` | the compare curtain, once it is built | how the map is being looked at |
+| `ViewSection` | the view: one ground, the curtain, or the split | how the map is being looked at |
 | `ToolSection` | the Kulturminner overlay and the upstream fault chip | what applies whichever ground is up |
 
 The split is by subject, not by position. A control belongs to the left because
@@ -29,28 +31,39 @@ it chooses the one picture the whole map is made of, to the middle because it
 changes how that picture is presented rather than which one it is, and to the
 right because it is true of all three grounds at once. Which section a new
 control goes in should be a question about the control, never about where there
-is room. `Ribbon.tsx` itself is layout and nothing else; the middle section is
-also the slack that holds the tools at the right-hand end, which is why it stays
-mounted while empty.
+is room. `Ribbon.tsx` itself is layout and nothing else.
+
+`GroundSection` is the one section that appears twice. A two-ground view mounts
+a second immediately right of the view control, so the row reads left to right
+as the screen does: the left half's ground, the view that put them both up, the
+right half's ground. Each takes a `half` and writes nothing else. The slack is
+after all of that, as a `margin-left: auto` on the tools, so nothing already on
+the row moves when the second section appears.
 
 Everything inside `GroundSection` is a surface mounted from its own directory:
 
 | Directory | Is |
 | --- | --- |
-| `src/grounds/` | the ground switch — `GroundMenu`, one chip, three rows, and `useGroundControls` which derives which ground is up from `backgroundLayerAtom` rather than storing it |
+| `src/grounds/` | the ground switch — `GroundMenu`, one chip, three rows, and `useGroundControls` which derives which ground is up from the half's background atom rather than storing it |
 | `src/lidarControls/` | the LiDAR arm — `LidarControlGroup`, four elements whose design is settled |
 | `src/kartControls/` | the Kart arm — one chip over `KART_VARIANTS`, and the memory of which variant Kart means while another ground is up |
 | `src/flyfotoControls/` | the Flyfoto arm — the NiB mosaic or one acquisition over the viewport, with the period filter inside its own dropdown |
 
-That section is the ground switch and then one arm, never two: a row carrying
-the controls of a ground that is not drawing would be three surfaces claiming
-the same map. It mounts all three controllers regardless, because each remembers
+A section is the ground switch and then one arm, never two: a row carrying the
+controls of a ground that is not drawing would be three surfaces claiming the
+same map. It mounts all three controllers regardless, because each remembers
 something across a visit to another ground.
 
+`src/viewControls/` is the middle one, and the only arm that is not per half: a
+view is a property of the map. Three buttons in a `ControlUnit`, one per
+`ViewMode`, and a controller thin enough to be two lines — the work of changing
+view is what the B half has to be seeded with, and that is `selectViewModeAtom`
+beside the layer code it writes.
+
 Every arm takes a controller object and no atoms of its own, so another host
-can mount it; what a second host would have to do about there being one LiDAR
-controller is at the top of `useLidarControls.ts`. A row of controls is made of
-two shapes, and both are `src/ui/` primitives: `ControlChip`, the line of text
+can mount it — which is exactly what the second ground section does. A row of
+controls is made of two shapes, and both are `src/ui/` primitives:
+`ControlChip`, the line of text
 that grows to fit what it is reporting and opens a menu, and `ControlButton`,
 the fixed square holding one glyph that is the whole control — filled in papaya
 for a mode that is on, or split across the middle for two states that are one
@@ -139,7 +152,6 @@ that is fine: they take arguments and return values.
 | `src/terrain/` | the Analyse ribbon | `renderTerrain`, `terrainStaticField` / `terrainField` (`render.ts`) |
 | `src/lidarExtract/` | the extract dialog | `extractCanvas` (`run.ts`) |
 | `src/search/searchApi.ts` | the search box | the place / address / property / coordinate queries |
-| `src/map/compare/` | the compare curtain | `enterCompareAtom`, `compareSplitAtom` |
 
 `src/map/featureInfo/` was on that list and is off it: `src/heritageInfo/` is
 its caller again. What came back is not what went — the fetcher is scoped to the
@@ -152,10 +164,9 @@ into `heritageSummary.ts` so a surface receives data rather than markup.
 ribbon's dataset menu lists and Automatisk decides from, and it paints the
 outlines while that menu is open.
 
-The compare curtain is here in full because the `halved()` facade in
-`compare/halves.ts` is load-bearing in the background atoms — every ground atom
-is a pair, `.a` on the map and `.b` behind the curtain — and unpicking it would
-have meant rewriting the layer machinery that this branch exists to preserve.
+`src/map/compare/` was on that list and is off it: `ViewSection` drives it. It
+kept its curtain and grew a split; what it lost is focus, which the ground
+section per half made unnecessary. See *Two grounds at once* below.
 
 **`src/ui/`, reduced to three files.** `Icon.tsx`, because `MaterialSymbol` is
 the union that keeps a plausible-but-absent icon name out of the build; `cx.ts`;
@@ -192,42 +203,93 @@ it is in `git log` on `main`.
 Every ground is a Jotai atom. Writing one rebuilds the stack, and
 `backgroundLayerAtomEffect` (mounted by `MapComponent`) does the work.
 
-`backgroundLayerAtom` now has three writers, one per arm, and the ribbon mounts
-each once. Reach for the arm's controller rather than the atom: on a LiDAR
-flight the ground's *name* is a function of the render (`lidarFlightGround`),
-so `useLidarControls` writes the style and the name together; on Kart the name
-has to land in `kartVariantAtom` too, or the ground is forgotten the moment you
-leave it; on Flyfoto the acquisition travels with the name. Which ground a name
-belongs to is derived by `groundOf` (`src/grounds/`) out of the vocabularies the
-layer code already keeps, so a ground that gains a member gains it in one place.
+**Every ground atom is a pair**, not one atom: `halved()` in
+`compare/halves.ts` makes an `.a` and a `.b`, `.a` being the left of the screen
+and the whole of it while one ground is up. There is no facade over the pair and
+no notion of focus — a surface says which half it is driving, and the band
+mounts a ground section per half that is drawing. What a surface belonging to
+the map rather than to a half reads instead is `acrossHalves(pair)`: an array of
+that pair's values for every live half, in `liveHalvesAtom` order, so two of
+them can be zipped. `lidarFootprintsLayer` and the tile guard are the callers.
 
-The rows below without an arm still have no writer at all.
+Each half of `backgroundLayerHalves` has three writers, one per arm, and a
+ground section mounts each once. Reach for the arm's controller rather than the
+atom: on a LiDAR flight the ground's *name* is a function of the render
+(`lidarFlightGround`), so `useLidarControls` writes the style and the name
+together; on Kart the name has to land in `kartVariantHalves` too, or the ground
+is forgotten the moment you leave it; on Flyfoto the acquisition travels with the
+name. Which ground a name belongs to is derived by `groundOf` (`src/grounds/`)
+out of the vocabularies the layer code already keeps, so a ground that gains a
+member gains it in one place.
 
-Every atom the arms touch is the `.focused` facade of a `halved()` pair, so the
-controls already describe whichever side of the compare curtain has focus. One
-row plus a focus switch is a working split view today; a row per pane is the
-change described at the top of `useLidarControls.ts`.
+The rows below without a writer still have none.
 
 | Atom | Module | Does | Written by |
 | --- | --- | --- | --- |
-| `backgroundLayerAtom` | `layers/config/backgroundLayers/atoms.ts` | which ground | all three arms |
-| `hybridOverlayAtom`, `hybridContoursAtom` | same | Kartverket's transparent overlay | — |
-| `kartVariantAtom` | `…/kartVariants.ts` | which cartography | `useKartControls` |
-| `activeLidarProjectAtom`, `activeLidarStyleAtom`, `activeLidarModelAtom` | `…/lidarProjects.ts` | per-project LiDAR | `useLidarControls` |
-| `lidarAutoDatasetAtom` | `…/lidarAuto.ts` | pick the dataset from the viewport | `useLidarControls` |
-| `activeCvatAcquisitionAtom` | `…/cvatGround.ts` | our own cached VAT render | `useLidarControls` |
-| `activeFlyfotoProjectAtom` | `…/flyfotoBackground.ts` | one NiB acquisition | `useFlyfotoControls` |
+| `backgroundLayerHalves` | `layers/config/backgroundLayers/atoms.ts` | which ground | all three arms |
+| `hybridOverlayHalves`, `hybridContoursHalves` | same | Kartverket's transparent overlay | — |
+| `kartVariantHalves` | `…/kartVariants.ts` | which cartography | `useKartControls` |
+| `activeLidarProjectHalves`, `activeLidarStyleHalves`, `activeLidarModelHalves` | `…/lidarProjects.ts` | per-project LiDAR | `useLidarControls` |
+| `lidarAutoDatasetHalves` | `…/lidarAuto.ts` | pick the dataset from the viewport | `useLidarControls` |
+| `activeCvatAcquisitionHalves` | `…/cvatGround.ts` | our own cached VAT render | `useLidarControls` |
+| `activeFlyfotoProjectHalves` | `…/flyfotoBackground.ts` | one NiB acquisition | `useFlyfotoControls` |
+| `lidarPickerOpenHalves` | `…/lidarRelevance.ts` | that half's dataset pulldown is open | `useLidarControls` |
+| `viewModeAtom` | `map/compare/halves.ts` | one ground, the curtain, or the split | `useViewControls` via `selectViewModeAtom` |
+| `compareSplitAtom` | `map/compare/atoms.ts` | where the curtain's edge sits | `CompareCurtain` |
 | `activeThemeLayersAtom` | `layers/atoms.ts` | which Kulturminner layers | `useHeritageControls` |
 | `heritageDetailsAtom`, `heritageRenderAtom`, `heritageOpacityAtom`, `heritageHiddenAtom` | `layers/heritage.ts` | how they are drawn | `useHeritageControls` |
 | `heritageTipAtom`, `heritagePopupAtom` | `map/featureInfo/atoms.ts` | what the pointer found, and what a click kept | `useHeritageInfo` |
 | `terrainWindowAtom`, `frameTerrainWindowAtom` | `terrain/window.ts` | the rectangle under analysis | — |
-| `compareOnAtom`, `compareSplitAtom`, `enterCompareAtom` | `map/compare/atoms.ts` | the curtain | — |
 
 The URL still carries `projection`, `backgroundLayer`, `hybrid`, `contours`,
 `lidarModel`, `themeLayers`, `heritage*`, `lat`, `lon` and `zoom`
 (`UrlParameter`, `src/shared/utils/urlUtils.ts`), so a cold load lands where it
 is told. `lok`, `sok`, `markerLat`, `markerLon` and `showSelection` went with
-the surfaces that wrote them.
+the surfaces that wrote them. The A half is what all of that describes: the
+view mode and everything in B are session state.
+
+## Two grounds at once
+
+`viewModeAtom` has three values, and the two that are not `single` put a second
+ground on the screen:
+
+| View | Is |
+| --- | --- |
+| `single` | one ground over the whole map |
+| `curtain` | two grounds in one viewport, B clipped to the right of a draggable edge |
+| `split` | two viewports side by side on one shared `View`, so the centre of each half is the same point |
+
+The split is two OpenLayers maps sharing one `View` **object**, not two views
+kept in step: same centre, resolution and projection at every instant, each
+rendered into its own half-width viewport, and dragging either one moves both.
+The second map is `compare/splitMap.ts`, a lazy module singleton — `peekSplitMap`
+answers "is there one" without making one, which is what lets the tile guard and
+the theme-layer effect walk whatever maps exist. Its header records why
+translating the B stack inside one map was rejected.
+
+The B ground's layers carry a `cmp.` prefix and go into whichever map the view
+mode names (`compareHost`). An OL layer belongs to one map at a time, so a
+change of view rebuilds the B stack in the new host rather than moving it; the
+reuse signature is namespaced too, so A and B never share an instance.
+
+Neither two-ground view is persisted to the URL. Two live tile stacks are
+roughly twice the GetMap requests against a rate limit this deployment shares
+across every visitor, so a shared link opens on one ground and the reader asks
+for the second.
+
+Entering a two-ground view seeds every `.b` from its `.a` (`seedHalfB`, a
+registry rather than a list, so a pair added later cannot open B on a `null`),
+then moves B off A: onto whichever of relief and cartography A is not, with
+Automatisk off, because a comparison term that follows the viewport is not a
+comparison term. Moving between the curtain and the split leaves B where the
+reader put it.
+
+What is mirrored into the second pane and what is not: the Kulturminner theme
+layers are, because a ticked register belongs to the reading rather than to a
+half (`syncThemeLayers`, called once per map). The heritage tip and card are
+not — `src/heritageInfo/` and `src/map/featureInfo/` are wired to the main map,
+so the right-hand pane draws the register but does not answer questions about
+it.
 
 ## Loose ends, deliberately left
 
@@ -253,11 +315,16 @@ the surfaces that wrote them.
   keeps the viewport list warm while the keyboard ring walks datasets, and the
   ring (`useBackgroundCyclingKeys`, W/S/A/D/E) went with the old shell. It costs
   nothing false today and comes back with those keys.
-- **The view section of the ribbon is empty.** The ground section is built, and
-  the tool section holds the Kulturminner overlay and the upstream fault chip;
-  no Hybrid overlay or contours, no compare curtain, no search — the atoms for
-  all of them are live and unwritten. The three sections say where each of those
-  goes when it is written; Hybrid is the next one in, and the only question it
+- **The second pane is looked at, not asked.** The Kulturminner tip and card
+  come off the main map only, so a feature under the right-hand half of a split
+  answers nothing. Same for the terrain frame and the LiDAR extract. Wiring
+  `src/map/featureInfo/` to whichever map was clicked is the fix; nothing here
+  assumes one map except those callers.
+- **Hybrid has no control.** The ground section is built, the view section is
+  built, and the tool section holds the Kulturminner overlay and the upstream
+  fault chip; no Hybrid overlay or contours, no search — the atoms for both are
+  live and unwritten. The sections say where each of those goes when it is
+  written; Hybrid is the next one in, and the only question it
   raises is whether a modifier over the ground belongs to the ground section or
   the tool section.
 - **Nothing walks the rings.** The arms list and pick; there is no W/S step

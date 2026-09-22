@@ -27,6 +27,7 @@ import type TileImage from 'ol/source/TileImage';
 import type Tile from 'ol/Tile';
 import TileState from 'ol/TileState';
 import { mapAtom } from '../map/atoms';
+import { peekSplitMap } from '../map/compare/splitMap';
 import {
   mayRequest,
   onOriginRecovered,
@@ -140,18 +141,23 @@ export const guardTileSource = (
   });
 };
 
-// Walked rather than kept in a registry of our own: the map's collection is by
+// Walked rather than kept in a registry of our own: a map's collection is by
 // definition the set of sources that can still put something on screen, and a
-// swapped-out ground should neither be refreshed nor kept alive by us.
+// swapped-out ground should neither be refreshed nor kept alive by us. Both
+// maps, because the split view's second pane draws its ground out of the same
+// upstreams and a recovery that reached only the left half would leave the
+// right one holding the blank tiles of an outage that is over.
 const refreshSourcesFor = (origin: OriginId) => {
-  const map = getDefaultStore().get(mapAtom);
-  for (const layer of map.getLayers().getArray()) {
-    if (!(layer instanceof Layer)) continue;
-    const source = layer.getSource();
-    if (source?.get(GUARD_PROP) === origin) source.refresh();
+  for (const map of [getDefaultStore().get(mapAtom), peekSplitMap()]) {
+    if (!map) continue;
+    for (const layer of map.getLayers().getArray()) {
+      if (!(layer instanceof Layer)) continue;
+      const source = layer.getSource();
+      if (source?.get(GUARD_PROP) === origin) source.refresh();
+    }
   }
 };
 
 // Module scope, so importing the guard is all a caller has to do. There is one
-// breaker set and one map, so there is one listener.
+// breaker set, so there is one listener.
 onOriginRecovered(refreshSourcesFor);

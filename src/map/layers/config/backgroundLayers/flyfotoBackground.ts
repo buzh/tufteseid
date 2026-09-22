@@ -53,6 +53,5 @@ export const buildFlyfotoProjectConfig = (
 });
 
 // Which acquisition 'flyfotoProject' means; null until one is picked, which is
-// why it is not a valid startup layer. Halved for the compare curtain.
+// why it is not a valid startup layer. Halved for the two-ground views.
 export const activeFlyfotoProjectHalves = halved<FlyfotoProject | null>(null);
-export const activeFlyfotoProjectAtom = activeFlyfotoProjectHalves.focused;

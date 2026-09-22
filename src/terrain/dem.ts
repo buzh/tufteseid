@@ -14,7 +14,7 @@ import { isUpstreamDown } from '../upstream/health';
 const IMAGE_SERVER_BASE = '/arcgis/hoydedata';
 
 // Terrain (bare earth) vs surface (first return — canopy and buildings).
-// Mirrors activeLidarModelAtom on the map background.
+// Mirrors the LiDAR model on the map background (`activeLidarModelHalves`).
 export type DemModel = 'dtm' | 'dom';
 
 // The per-acquisition mosaics at 0.25 m, not the national NHM_* ones at 1 m:

@@ -6,7 +6,7 @@
 // one, so which of the two renders a chosen flight is drawn with is settled in
 // the style tier by `resolveLidarStyle` — see `lidarProjects.ts`.
 
-import { halved } from '../../../compare/halves';
+import { acrossHalves, halved } from '../../../compare/halves';
 import type { LidarProject } from './lidarProjects';
 import type { LidarViewportState } from './lidarRelevance';
 
@@ -15,7 +15,10 @@ import type { LidarViewportState } from './lidarRelevance';
 // dataset switch re-derives it — and by entering compare on the B half
 // (src/map/compare/atoms.ts).
 export const lidarAutoDatasetHalves = halved(true);
-export const lidarAutoDatasetAtom = lidarAutoDatasetHalves.focused;
+
+/** Automatisk, per half that is drawing. The footprint layer keeps the viewport
+ *  list warm for whichever halves are asking for it. */
+export const liveLidarAutoAtom = acrossHalves(lidarAutoDatasetHalves);
 
 // View resolution in metres per pixel (EPSG:25833, so ground metres). The
 // mosaic is a 1 m grid, so below 1 m/px a project starts buying resolution.
@@ -42,8 +45,8 @@ export const chooseAutoDataset = ({
 }: {
   resolution: number | null;
   viewport: LidarViewportState;
-  // The flight drawing now, or null for the mosaic. Not activeLidarProjectAtom:
-  // selecting the mosaic leaves that holding the last one.
+  // The flight drawing now, or null for the mosaic. Not the half's own
+  // project atom: selecting the mosaic leaves that holding the last one.
   current: LidarProject | null;
 }): LidarAutoChoice => {
   if (resolution == null) return { kind: 'hold' };

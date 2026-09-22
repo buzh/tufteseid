@@ -2,6 +2,7 @@ import { getDefaultStore } from 'jotai';
 import { WMTSCapabilities } from 'ol/format';
 import type BaseLayer from 'ol/layer/Base';
 import TileLayer from 'ol/layer/Tile';
+import type OlMap from 'ol/Map';
 import { transformExtent } from 'ol/proj';
 import TileArcGISRest from 'ol/source/TileArcGISRest';
 import TileWMS from 'ol/source/TileWMS';
@@ -263,13 +264,19 @@ const layerSignature = (
 
 // Reuses the layer already on the map when it would render identically, so
 // callers must set opacity explicitly: it may carry an earlier swap's fade.
+//
+// `host` is which map to look in, and defaults to the one map there usually is.
+// An OL layer belongs to one map at a time, so the split view's right pane has
+// to search its own collection: a hit in the other one would be an instance the
+// install then has to steal, and the pane it was stolen from would go blank.
 export const buildOrReuseBackgroundLayer = async (
   config: BackgroundLayer,
   projection: string,
   ns: LayerNamespace = 'bg',
+  host?: OlMap,
 ): Promise<TileLayer | null> => {
   const store = getDefaultStore();
-  const map = store.get(mapAtom);
+  const map = host ?? store.get(mapAtom);
   const base = layerSignature(config, projection);
   const signature = base && `${ns}|${base}`;
   if (signature) {

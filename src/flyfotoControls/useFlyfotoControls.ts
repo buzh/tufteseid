@@ -1,19 +1,22 @@
 // The Flyfoto arm's controller: the seamless NiB mosaic, or one acquisition
 // out of the archive over the viewport.
 //
-// Mount once. The list is one cached ArcGIS query per moveend rather than
-// LiDAR's WFS fan-out, so a second mount costs a duplicate query rather than a
-// second resolver writing atoms — cheap, but still nothing to pay twice.
+// One per half, and the half is the only thing that differs between them. The
+// list is one cached ArcGIS query per moveend rather than LiDAR's WFS fan-out,
+// so two panes both on Flyfoto cost one duplicate query — answered out of
+// wmscache, since the two ask the same viewport the same question.
 //
-// Only queried while Flyfoto is the ground. The archive index is an upstream
-// call on every pan, and an arm that is not on screen has nobody to answer.
+// Only queried while Flyfoto is that half's ground. The archive index is an
+// upstream call on every pan, and an arm that is not on screen has nobody to
+// answer.
 
 import { useAtom, useAtomValue } from 'jotai';
 import { transformExtent } from 'ol/proj';
 import { useEffect, useMemo, useState } from 'react';
 import { mapAtom } from '../map/atoms';
-import { backgroundLayerAtom } from '../map/layers/config/backgroundLayers/atoms';
-import { activeFlyfotoProjectAtom } from '../map/layers/config/backgroundLayers/flyfotoBackground';
+import type { CompareHalf } from '../map/compare/halves';
+import { backgroundLayerHalves } from '../map/layers/config/backgroundLayers/atoms';
+import { activeFlyfotoProjectHalves } from '../map/layers/config/backgroundLayers/flyfotoBackground';
 import {
   fetchFlyfotoProjectsForBbox,
   type FlyfotoProject,
@@ -38,10 +41,14 @@ export type FlyfotoViewport = {
 
 const EMPTY_VIEWPORT: FlyfotoViewport = { status: 'idle', projects: [] };
 
-export const useFlyfotoControls = () => {
+export const useFlyfotoControls = (half: CompareHalf) => {
   const map = useAtomValue(mapAtom);
-  const [backgroundLayer, setBackgroundLayer] = useAtom(backgroundLayerAtom);
-  const [activeProject, setActiveProject] = useAtom(activeFlyfotoProjectAtom);
+  const [backgroundLayer, setBackgroundLayer] = useAtom(
+    backgroundLayerHalves[half],
+  );
+  const [activeProject, setActiveProject] = useAtom(
+    activeFlyfotoProjectHalves[half],
+  );
 
   const [viewport, setViewport] = useState<FlyfotoViewport>(EMPTY_VIEWPORT);
   const [era, setEra] = useState<FlyfotoEra>('all');

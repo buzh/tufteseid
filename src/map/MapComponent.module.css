@@ -4,8 +4,18 @@
   height: 100%;
 }
 
-.map {
+/* One or two viewports side by side. A row rather than a fraction the map is
+   given: the split's two halves are the same width, and OL resizes each map off
+   its own target element. */
+.panes {
+  display: flex;
   width: 100%;
+  height: 100%;
+}
+
+.map {
+  flex: 1 1 0;
+  min-width: 0;
   height: 100%;
 }
 

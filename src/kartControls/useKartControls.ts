@@ -1,25 +1,26 @@
 // The Kart arm's controller. One axis — which cartography — and two pieces of
 // state on purpose.
 //
-// `backgroundLayerAtom` is what is on the map; `kartVariantAtom` is what Kart
+// The background half is what is on the map; the variant half is what Kart
 // *means*. They diverge the moment another ground is up, and that divergence is
 // the point: coming back to Kart from LiDAR returns to the map you left rather
-// than to topo. Nothing else in here remembers anything, so there is no reason
-// to mount it more than once — but nothing breaks if a second host does, since
-// both atoms are the `.focused` facade of a `halved()` pair and neither is
-// written by an effect.
+// than to topo. Both are per half, so the two panes of a two-ground view
+// remember their own cartography.
 
 import { useAtom } from 'jotai';
-import { backgroundLayerAtom } from '../map/layers/config/backgroundLayers/atoms';
+import type { CompareHalf } from '../map/compare/halves';
+import { backgroundLayerHalves } from '../map/layers/config/backgroundLayers/atoms';
 import {
   isKartVariant,
-  kartVariantAtom,
+  kartVariantHalves,
   type KartVariant,
 } from '../map/layers/config/backgroundLayers/kartVariants';
 
-export const useKartControls = () => {
-  const [backgroundLayer, setBackgroundLayer] = useAtom(backgroundLayerAtom);
-  const [variant, setVariant] = useAtom(kartVariantAtom);
+export const useKartControls = (half: CompareHalf) => {
+  const [backgroundLayer, setBackgroundLayer] = useAtom(
+    backgroundLayerHalves[half],
+  );
+  const [variant, setVariant] = useAtom(kartVariantHalves[half]);
 
   const isKartBackground = isKartVariant(backgroundLayer);
   // The background where it is one of ours, the remembered pick otherwise.

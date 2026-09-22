@@ -20,28 +20,29 @@
   scrollbar-width: thin;
 }
 
-/* The ground section keeps its natural width. It is the widest of the three —
-   four controls on a LiDAR flight — and the one the reader aims at, so it is
-   the last thing that should move or shrink. */
+/* A ground section keeps its natural width. It is the widest section — four
+   controls on a LiDAR flight — and the one the reader aims at, so it is the
+   last thing that should move or shrink. Both halves use this class: the two
+   are the same control at the same size, and a right half that sat differently
+   from the left would read as a different thing. */
 .grounds {
   flex: none;
 }
 
-/* The view section takes the slack. That is what puts the tools at the
-   right-hand end and its own contents between the two, and it holds the row
-   open by a margin even while it is empty, so the tools never sit flush against
-   the ground controls. */
+/* The view sits against the ground sections on either side of it, so it keeps
+   its natural width too: it is the hinge between the two halves, not a spacer
+   between the left of the row and the right. */
 .views {
-  flex: 1 1 auto;
-  min-width: var(--mantine-spacing-md);
-  justify-content: center;
+  flex: none;
 }
 
-/* The far end. Empty most of the time — a chip appearing in it must not move
-   anything the reader was about to click, which is why the slack is in the
-   middle rather than here. */
+/* The far end, and where the slack is — the margin below pushes it there. The
+   tools are empty most of the time, and a chip appearing in one must not move
+   anything the reader was about to click; putting the slack ahead of them means
+   nothing left of it moves when the second ground section appears either. */
 .tools {
   flex: none;
+  margin-left: auto;
 }
 
 /* One origin's row in the fault popover. */

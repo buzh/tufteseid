@@ -1,46 +1,78 @@
-import { atom, type Getter, type Setter } from 'jotai';
+import { atom, type Getter, type PrimitiveAtom, type Setter } from 'jotai';
 
-// The two halves of the compare curtain, and which one the controls point
-// at: every piece of ground state is two primitives behind a facade routing to
-// the focused half, so the existing controls describe B unchanged. Imports
-// nothing but jotai — half the background config imports this, so anything else
-// would be a cycle.
+// How many grounds are on the screen, and the two halves of the state that
+// describes them. Every piece of ground state is two primitives: `a` is the
+// left of the screen — and the whole of it while one ground is up — and `b` the
+// right. A surface says which half it is driving; there is no notion of focus,
+// because the band carries a ground section per half.
+//
+// Imports nothing but jotai: half the background config imports this, so
+// anything else would be a cycle.
 
 export type CompareHalf = 'a' | 'b';
 
-/** Whether the curtain is up. Not persisted: see compareLayerAtomEffect. */
-export const compareOnAtom = atom(false);
+const BOTH_HALVES = ['a', 'b'] as const;
 
-/** Which half the ribbon is adjusting. Read through `focusedHalfAtom`, which
- * forces 'a' while the curtain is down. */
-export const compareFocusAtom = atom<CompareHalf>('a');
+/**
+ * How the map is being looked at:
+ *
+ * | `single`  | one ground over the whole map |
+ * | `curtain` | two grounds in one viewport, B clipped right of a draggable edge |
+ * | `split`   | two viewports side by side on one view, so each half is centred on the same point |
+ *
+ * Not persisted to the URL, because two live tile stacks are roughly twice the
+ * GetMap requests against a shared rate limit: a shared link opens on one
+ * ground and the reader asks for the second.
+ */
+export type ViewMode = 'single' | 'curtain' | 'split';
 
-export const focusedHalfAtom = atom<CompareHalf>((get) =>
-  get(compareOnAtom) ? get(compareFocusAtom) : 'a',
+export const VIEW_MODES = ['single', 'curtain', 'split'] as const;
+
+export const viewModeAtom = atom<ViewMode>('single');
+
+/** Whether the B half is drawing at all — true in both two-ground views. */
+export const compareOnAtom = atom((get) => get(viewModeAtom) !== 'single');
+
+/**
+ * The halves that are drawing, in screen order. Every array produced by
+ * `acrossHalves` is indexed the same way, so a caller can zip two of them.
+ */
+const liveHalvesAtom = atom<readonly CompareHalf[]>((get) =>
+  get(compareOnAtom) ? BOTH_HALVES : ['a'],
 );
 
-type Update<T> = T | ((prev: T) => T);
+export type Halved<T> = {
+  a: PrimitiveAtom<T>;
+  b: PrimitiveAtom<T>;
+};
 
 const SEEDERS: ((get: Getter, set: Setter) => void)[] = [];
 
-/** One piece of ground state, twice, behind a focused facade. */
-export const halved = <T>(initial: T) => {
+/** One piece of ground state, once per half. */
+export const halved = <T>(initial: T): Halved<T> => {
   const a = atom(initial);
   const b = atom(initial);
   SEEDERS.push((get, set) => set(b, get(a)));
-  const focused = atom(
-    (get) => get(get(focusedHalfAtom) === 'b' ? b : a),
-    (get, set, update: Update<T>) =>
-      set(get(focusedHalfAtom) === 'b' ? b : a, update),
-  );
-  return { a, b, focused };
+  return { a, b };
 };
 
 /**
- * Copy every pair's A value into its B value, so the curtain opens on two
- * identical halves. A registry rather than a list, because a pair added later
- * and forgotten would open B on its initial value — `null` for an acquisition,
- * which renders nothing.
+ * One pair read across every half that is drawing: one value while a single
+ * ground is up, two while both are, in `liveHalvesAtom` order.
+ *
+ * What a surface belonging to the map rather than to a half reads. The
+ * footprint layer draws for whichever halves are on LiDAR, and the tile guard
+ * refreshes whatever is on either — neither has a half of its own to point at.
+ */
+export const acrossHalves = <T>(pair: Halved<T>) =>
+  atom<T[]>((get) => get(liveHalvesAtom).map((half) => get(pair[half])));
+
+/**
+ * Copy every pair's A value into its B value, so a two-ground view opens on two
+ * identical halves and the one thing the reader then changes is the comparison.
+ * A registry rather than a list, because a pair added later and forgotten would
+ * open B on its initial value — `null` for an acquisition, which renders
+ * nothing.
  */
 export const seedHalfB = (get: Getter, set: Setter): void => {
   for (const seed of SEEDERS) seed(get, set);

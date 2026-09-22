@@ -181,5 +181,19 @@
       "ra": "Kulturminnelagene over terrenget",
       "nib": "Ortofoto som bakgrunn"
     }
+  },
+  "viewControls": {
+    "tooltip": "{{view}} — {{hint}}",
+    "divider": "Flytt skillelinjen",
+    "mode": {
+      "single": "Ett underlag",
+      "curtain": "Gardin",
+      "split": "Delt skjerm"
+    },
+    "meta": {
+      "single": "hele kartet viser det samme",
+      "curtain": "to underlag i samme rute, skilt av en linje du drar",
+      "split": "to ruter side om side, sentrert på samme punkt"
+    }
   }
 }

@@ -1,6 +1,13 @@
 // Draws where a LiDAR project lies while the dataset pulldown is open. The
 // fetch and the relevance classification also happen here, into
 // lidarViewportAtom, so one WFS pass serves both the shapes and the list.
+//
+// Belongs to the map rather than to a half, so it reads the `live…` atoms:
+// arrays holding one value per half that is drawing, all indexed the same way
+// (`acrossHalves` in `compare/halves.ts`). A two-ground view has two dataset
+// pulldowns and two active flights; there is one viewport query and one
+// footprint layer between them, because both halves are looking at the same
+// extent through the same view.
 
 import { useAtomValue, useSetAtom } from 'jotai';
 import { Feature } from 'ol';
@@ -12,10 +19,10 @@ import VectorSource from 'ol/source/Vector';
 import { Fill, Stroke, Style } from 'ol/style';
 import { useEffect } from 'react';
 import { mapAtom } from './atoms';
-import { backgroundLayerAtom } from './layers/config/backgroundLayers/atoms';
+import { liveBackgroundLayersAtom } from './layers/config/backgroundLayers/atoms';
 import {
   AUTO_ENGAGE_M_PER_PX,
-  lidarAutoDatasetAtom,
+  liveLidarAutoAtom,
 } from './layers/config/backgroundLayers/lidarAuto';
 import {
   fetchLidarFootprints,
@@ -23,10 +30,10 @@ import {
   viewportCoverage,
 } from './layers/config/backgroundLayers/lidarFootprints';
 import {
-  activeLidarProjectAtom,
   bboxIntersects,
   bboxOverlapRatio,
   fetchLidarProjects,
+  liveLidarProjectsAtom,
   sortProjectsByRelevance,
 } from './layers/config/backgroundLayers/lidarProjects';
 import {
@@ -35,11 +42,12 @@ import {
   hoveredLidarProjectIdAtom,
   lidarCyclingAtom,
   lidarFilterSettingsAtom,
-  lidarPickerOpenAtom,
   lidarViewportAtom,
   LidarViewportEntry,
+  livePickerOpenAtom,
   sortByOnScreenCoverage,
 } from './layers/config/backgroundLayers/lidarRelevance';
+import { LIDAR_LAYERS } from './layers/config/backgroundLayers/stack';
 
 export const LIDAR_FOOTPRINTS_LAYER_ID = 'lidarFootprintsLayer';
 
@@ -106,27 +114,30 @@ const getOrCreateLayer = (map: OlMap): VectorLayer => {
 /** Mount once, from whatever owns the map's side effects. */
 export const useLidarFootprintsLayer = () => {
   const map = useAtomValue(mapAtom);
-  const backgroundLayer = useAtomValue(backgroundLayerAtom);
-  const activeLidarProject = useAtomValue(activeLidarProjectAtom);
+  const backgroundLayers = useAtomValue(liveBackgroundLayersAtom);
+  const liveProjects = useAtomValue(liveLidarProjectsAtom);
   const filters = useAtomValue(lidarFilterSettingsAtom);
   const viewport = useAtomValue(lidarViewportAtom);
   const setViewport = useSetAtom(lidarViewportAtom);
-  const pickerOpen = useAtomValue(lidarPickerOpenAtom);
+  const pickersOpen = useAtomValue(livePickerOpenAtom);
   const cycling = useAtomValue(lidarCyclingAtom);
-  const autoDataset = useAtomValue(lidarAutoDatasetAtom);
+  const autoDatasets = useAtomValue(liveLidarAutoAtom);
   const hoveredProjectId = useAtomValue(hoveredLidarProjectIdAtom);
   const setHoveredProjectId = useSetAtom(hoveredLidarProjectIdAtom);
 
-  const isLidarBackground =
-    backgroundLayer === 'lidarProject' ||
-    backgroundLayer === 'lidarHillshade' ||
-    backgroundLayer === 'lidarCvat';
-  // Both, because the atom can be left true if the popover unmounts without
-  // closing itself (which is why useGroundMode calls standDown).
-  const picking = isLidarBackground && pickerOpen;
+  // Which halves are on LiDAR at all. Every other array here is indexed the
+  // same way, so the conditions below can be read off pairwise.
+  const onLidar = backgroundLayers.map((name) => LIDAR_LAYERS.has(name));
+  const anyLidar = onLidar.some(Boolean);
+  // A half's own ground and its own pulldown, because the picker atom can be
+  // left true if the popover unmounts without closing itself (which is why
+  // `LidarControlGroup` stands it down).
+  const picking = onLidar.some((lidar, i) => lidar && pickersOpen[i]);
   // Cycling and auto both want the fetch and neither wants the drawing.
   const wantsViewport =
-    picking || (isLidarBackground && (cycling || autoDataset));
+    picking ||
+    (anyLidar && cycling) ||
+    onLidar.some((lidar, i) => lidar && autoDatasets[i]);
 
   // Hover is cleared on the way out, so it does not flash back on reopen.
   useEffect(() => {
@@ -250,7 +261,8 @@ export const useLidarFootprintsLayer = () => {
     };
   }, [map, wantsViewport, picking, cycling, filters, setViewport]);
 
-  // The hovered row's footprint and the active dataset's, off the same lists.
+  // The hovered row's footprint and every live half's active dataset, off the
+  // same lists.
   useEffect(() => {
     const layer = getOrCreateLayer(map);
     const source = layer.getSource();
@@ -271,11 +283,23 @@ export const useLidarFootprintsLayer = () => {
       }
     };
 
-    // Hovering the active dataset's own row reads as hover, not active.
-    const activeEntry = byId(activeLidarProject?.id);
-    if (activeEntry && activeEntry.project.id !== hoveredProjectId) {
-      draw(activeEntry, 'active');
-    }
+    // A set, not one per half: two panes reading the same acquisition would
+    // otherwise stack two identical outlines and thicken it.
+    const activeIds = new Set(
+      liveProjects.flatMap((project, i) =>
+        project && LIDAR_LAYERS.has(backgroundLayers[i]) ? [project.id] : [],
+      ),
+    );
+    // Hovering an active dataset's own row reads as hover, not active.
+    if (hoveredProjectId) activeIds.delete(hoveredProjectId);
+    for (const id of activeIds) draw(byId(id), 'active');
     draw(byId(hoveredProjectId), 'hover');
-  }, [map, picking, viewport, activeLidarProject, hoveredProjectId]);
+  }, [
+    map,
+    picking,
+    viewport,
+    liveProjects,
+    backgroundLayers,
+    hoveredProjectId,
+  ]);
 };

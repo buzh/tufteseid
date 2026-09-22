@@ -3,6 +3,7 @@
 
 import { atom } from 'jotai';
 import { Geometry } from 'ol/geom';
+import { acrossHalves, halved } from '../../../compare/halves';
 import { LidarProject, sortProjectsByRelevance } from './lidarProjects';
 
 export type LidarFilterSettings = {
@@ -126,7 +127,12 @@ export const lidarViewportAtom = atom<LidarViewportState>(
 );
 
 // The footprint polygons are a picking aid, so they hang off the pulldown.
-export const lidarPickerOpenAtom = atom(false);
+// Halved: with a ground section per half there are two dataset pulldowns, and
+// one atom between them would open both at once.
+export const lidarPickerOpenHalves = halved(false);
+
+/** Whether any drawing half has its dataset pulldown open. */
+export const livePickerOpenAtom = acrossHalves(lidarPickerOpenHalves);
 
 // Set while datasets are cycled from the keyboard: same WFS fetch, no polygons.
 // Cleared by useLidarControls after an idle period.

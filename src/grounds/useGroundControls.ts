@@ -3,9 +3,12 @@
 // A ground is a family of background layers rather than a layer: LiDAR is the
 // national mosaic plus every acquisition under either of its two renders, Kart
 // is the five cartographies, Flyfoto is the seamless ortofoto mosaic plus every
-// NiB acquisition. `backgroundLayerAtom` holds one member of one family, so
-// which family it belongs to is derived here and never stored — a second piece
-// of state would be one that can disagree with what is on the map.
+// NiB acquisition. A half of `backgroundLayerHalves` holds one member of one
+// family, so which family it belongs to is derived here and never stored — a
+// second piece of state would be one that can disagree with what is on the map.
+//
+// One of these per half that is drawing: the band mounts a ground section for
+// the left of the screen and, in a two-ground view, a second for the right.
 //
 // The membership tests are the vocabularies the layer code already keeps
 // (`LIDAR_LAYERS`, `isKartVariant`), not a table of names in here, so a ground
@@ -18,8 +21,9 @@
 // writing the background atom itself.
 
 import { useAtomValue } from 'jotai';
+import type { CompareHalf } from '../map/compare/halves';
 import type { BackgroundLayerName } from '../map/layers/backgroundLayers';
-import { backgroundLayerAtom } from '../map/layers/config/backgroundLayers/atoms';
+import { backgroundLayerHalves } from '../map/layers/config/backgroundLayers/atoms';
 import { isKartVariant } from '../map/layers/config/backgroundLayers/kartVariants';
 import { LIDAR_LAYERS } from '../map/layers/config/backgroundLayers/stack';
 
@@ -38,8 +42,11 @@ export const groundOf = (name: BackgroundLayerName): GroundMode | null => {
   return null;
 };
 
-export const useGroundControls = (enter: Record<GroundMode, () => void>) => {
-  const backgroundLayer = useAtomValue(backgroundLayerAtom);
+export const useGroundControls = (
+  half: CompareHalf,
+  enter: Record<GroundMode, () => void>,
+) => {
+  const backgroundLayer = useAtomValue(backgroundLayerHalves[half]);
   const mode = groundOf(backgroundLayer);
 
   return {

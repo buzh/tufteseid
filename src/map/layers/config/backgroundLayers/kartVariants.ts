@@ -57,4 +57,3 @@ const initialVariant = (): KartVariant => {
 };
 
 export const kartVariantHalves = halved<KartVariant>(initialVariant());
-export const kartVariantAtom = kartVariantHalves.focused;

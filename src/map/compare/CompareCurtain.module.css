@@ -1,0 +1,72 @@
+/* DOM rather than canvas, so the seam stays crisp at any device pixel ratio
+   and the grip is a real focus target. Cased so it reads over both a grey
+   hillshade and a bright ortofoto — the casing is white against the theme's own
+   dark furniture on purpose: it is drawn over terrain, not over a surface. */
+.root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Wider than the line, which is too thin to grab. */
+  width: 24px;
+  margin-left: -12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ew-resize;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.handle:focus-visible {
+  outline: none;
+}
+
+.handle:focus-visible .line,
+.handle:focus-visible .grip {
+  box-shadow: 0 0 0 2px var(--mantine-primary-color-filled);
+}
+
+.line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--mantine-color-dark-9);
+  box-shadow:
+    -1px 0 0 rgb(255 255 255 / 85%),
+    1px 0 0 rgb(255 255 255 / 85%);
+}
+
+.grip {
+  position: relative;
+  width: 18px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--mantine-color-body);
+  border: 1px solid var(--mantine-color-default-border);
+  box-shadow: var(--mantine-shadow-md);
+}
+
+.grip::before,
+.grip::after {
+  content: '';
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  width: 1px;
+  background: var(--mantine-color-dimmed);
+}
+
+.grip::before {
+  left: 6px;
+}
+
+.grip::after {
+  right: 6px;
+}

@@ -3,28 +3,22 @@
 // the three are not independent — the ground's *name* is a function of the
 // render, and a render is only on offer where the dataset publishes it.
 //
-// Mount once. Two mounts is two Automatisk resolvers writing the same atoms,
-// and two copies of the catalogue in component state — the fetches themselves
-// are cached at module level, so the network cost is paid once either way.
+// One per half. Each writes its own side of every pair in
+// `map/compare/halves.ts`, so the two panes of a two-ground view hold different
+// flights, renders and models without knowing about each other, and each runs
+// its own Automatisk resolver over its own dataset.
 //
-// That is the one thing standing between `LidarControlGroup` and a second host.
-// The atoms below are not the blocker: every one of them is the `.focused`
-// facade of a `halved()` pair (`map/compare/halves.ts`), so these controls
-// already describe whichever side of the compare curtain has focus, and a split
-// view that moves focus between panes works today with one group.
-//
-// A split view that wants a group *per pane* — both live, each writing its own
-// half — needs this hook to take a `CompareHalf` and read `…Halves.a` /
-// `…Halves.b` instead of the facade, and the Automatisk effect to be the
-// caller's to mount rather than unconditionally on. Nothing else in the four
-// controls knows which half it is on: they take this object and no atoms.
+// What two mounts do cost is two copies of the catalogue, the cVAT manifest and
+// the national style list in component state. The fetches behind all three are
+// cached at module level, so the network cost is paid once either way.
 
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
 import { mapAtom } from '../map/atoms';
-import { backgroundLayerAtom } from '../map/layers/config/backgroundLayers/atoms';
+import type { CompareHalf } from '../map/compare/halves';
+import { backgroundLayerHalves } from '../map/layers/config/backgroundLayers/atoms';
 import {
-  activeCvatAcquisitionAtom,
+  activeCvatAcquisitionHalves,
   type CvatAcquisition,
   cvatFor,
   fetchCvatStore,
@@ -33,12 +27,12 @@ import {
 } from '../map/layers/config/backgroundLayers/cvatGround';
 import {
   chooseAutoDataset,
-  lidarAutoDatasetAtom,
+  lidarAutoDatasetHalves,
 } from '../map/layers/config/backgroundLayers/lidarAuto';
 import {
-  activeLidarModelAtom,
-  activeLidarProjectAtom,
-  activeLidarStyleAtom,
+  activeLidarModelHalves,
+  activeLidarProjectHalves,
+  activeLidarStyleHalves,
   DEFAULT_LIDAR_PROJECT_STYLE,
   effectiveLidarStyle,
   fetchLidarProjects,
@@ -53,26 +47,30 @@ import {
 } from '../map/layers/config/backgroundLayers/lidarProjects';
 import {
   hoveredLidarProjectIdAtom,
-  lidarPickerOpenAtom,
+  lidarPickerOpenHalves,
   lidarViewportAtom,
 } from '../map/layers/config/backgroundLayers/lidarRelevance';
 
-export const useLidarControls = () => {
+export const useLidarControls = (half: CompareHalf) => {
   const map = useAtomValue(mapAtom);
-  const [backgroundLayer, setBackgroundLayer] = useAtom(backgroundLayerAtom);
-  const [activeLidarProject, setActiveLidarProject] = useAtom(
-    activeLidarProjectAtom,
+  const [backgroundLayer, setBackgroundLayer] = useAtom(
+    backgroundLayerHalves[half],
   );
-  const [activeLidarStyle, setActiveLidarStyle] = useAtom(activeLidarStyleAtom);
+  const [activeLidarProject, setActiveLidarProject] = useAtom(
+    activeLidarProjectHalves[half],
+  );
+  const [activeLidarStyle, setActiveLidarStyle] = useAtom(
+    activeLidarStyleHalves[half],
+  );
   // The cached render of the flight above, or null where the store has none.
   // Written only beside it, by `selectProject`, so the two cannot disagree.
-  const [activeCvat, setActiveCvat] = useAtom(activeCvatAcquisitionAtom);
-  const [lidarModel, setLidarModel] = useAtom(activeLidarModelAtom);
+  const [activeCvat, setActiveCvat] = useAtom(activeCvatAcquisitionHalves[half]);
+  const [lidarModel, setLidarModel] = useAtom(activeLidarModelHalves[half]);
   // Follows the viewport unless pinned; the rules are `lidarAuto.ts`.
-  const [autoDataset, setAutoDataset] = useAtom(lidarAutoDatasetAtom);
+  const [autoDataset, setAutoDataset] = useAtom(lidarAutoDatasetHalves[half]);
 
   // An atom because `lidarFootprintsLayer` paints footprints only while open.
-  const [pickerOpen, setPickerOpen] = useAtom(lidarPickerOpenAtom);
+  const [pickerOpen, setPickerOpen] = useAtom(lidarPickerOpenHalves[half]);
   const setHoveredProjectId = useSetAtom(hoveredLidarProjectIdAtom);
 
   // Fetched by `lidarFootprintsLayer`, so the pulldown and the map share one

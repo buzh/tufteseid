@@ -1,9 +1,13 @@
-// The left of the band: which ground is drawing, and the controls of that one
-// ground.
+// Which ground is drawing, and the controls of that one ground.
+//
+// One per half that is on the screen: the A section is the left of the band and
+// the whole map's ground while one is up, and a two-ground view mounts a second
+// for B to the right of the view control. The half is the only argument —
+// everything below is written against `half` and none of the four controllers
+// knows there is another section.
 //
 // The controls themselves live in their own directories, because they are
-// surfaces and this is a place to put one: a pane in a split view would mount
-// the same arms against its own controllers.
+// surfaces and this is a place to put one.
 //
 // The section is the ground switch and then the arm belonging to whatever the
 // switch says. One arm at a time: a row carrying the controls of a ground that
@@ -22,15 +26,16 @@ import { FlyfotoControlGroup, useFlyfotoControls } from '../flyfotoControls';
 import { GroundMenu, useGroundControls } from '../grounds';
 import { KartControlGroup, useKartControls } from '../kartControls';
 import { LidarControlGroup, useLidarControls } from '../lidarControls';
+import type { CompareHalf } from '../map/compare/halves';
 import styles from './Ribbon.module.css';
 
-export const GroundSection = () => {
-  const lidar = useLidarControls();
-  const kart = useKartControls();
-  const flyfoto = useFlyfotoControls();
+export const GroundSection = ({ half }: { half: CompareHalf }) => {
+  const lidar = useLidarControls(half);
+  const kart = useKartControls(half);
+  const flyfoto = useFlyfotoControls(half);
   // Entering a ground is the arm's own business — each remembers a different
   // thing about where the reader left it, and `useGroundControls` says why.
-  const ground = useGroundControls({
+  const ground = useGroundControls(half, {
     lidar: lidar.enterLidar,
     kart: kart.enterKart,
     flyfoto: flyfoto.enterFlyfoto,

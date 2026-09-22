@@ -1,0 +1,9 @@
+/* Half the row, and the seam between the two panes is this pane's own left
+   border — one line rather than two adjoining ones, so it stays a hairline. */
+.pane {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  border-left: 2px solid var(--mantine-color-dark-9);
+  touch-action: none;
+}
