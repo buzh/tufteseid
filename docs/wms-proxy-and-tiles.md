@@ -390,6 +390,20 @@ is fewer requests.
   Bytes are a wash, 146 060 for one 512 px hillshade tile against 4 × ~36 800.
   It stays 512×512 on HiDPI: `TileWMS` pins its pixel ratio to 1 unless
   `serverType` is set, and none of these sources sets one.
+- `interpolate: false` on the relief: the national mosaic's `/cache/` ground,
+  the same mosaic's WMS for its other styles, the per-project LiDAR WMS and the
+  cached cVAT ground. All four are capped below the view's own depth by the
+  bullet above, so the levels a reader spends most time on are drawn upsampled,
+  and OL's default smoothing resamples each tile on its own: the bilinear
+  kernel clamps at the tile's edge, so the last column of one tile and the
+  first of the next meet as a hard step through a field that is smooth
+  everywhere else. Measured on two adjacent `/cache/` tiles, an ×8 upsample
+  steps 1.75 grey levels at the seam against 0.00 either side of it — one
+  straight line the height of the tile. Nearest-neighbour has no kernel to
+  clamp and so nothing to break at the seam, and visible pixels are the honest
+  picture of a 1 m product read at z20's 0.021 m/px. The photographs, the
+  scanned sheets and the label overlay keep the default: there the blocks cost
+  more than the seam.
 - `WMS_TILE_CACHE_SIZE = 128`, ~10 screenfuls at 512 px, or OL has nothing to
   borrow while a new level loads; `WMS_Z_DIRECTION = 1`, the coarser of two
   bracketing levels, so the 250 ms zoom animation does not fetch a second ring.

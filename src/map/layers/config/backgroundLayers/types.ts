@@ -46,6 +46,8 @@ export type WMSBackgroundLayer = BackgroundLayerBase & {
    *  right only for a source that genuinely resolves that far — none here do.
    *  Not part of `layerSignature`: it is fixed per layer, not per dataset. */
   maxZoom?: number;
+  /** As on `XYZBackgroundLayer`. */
+  interpolate?: boolean;
   coverageExtent?: CoverageExtent;
 };
 
@@ -97,6 +99,20 @@ export type XYZBackgroundLayer = BackgroundLayerBase & {
    *  `layerSignature`: it is derived from `url` and changes no pixels while the
    *  origin is up. */
   heldUrl?: string;
+  /** Whether to smooth the tile when it is drawn at anything other than 1:1.
+   *  OL's default is true, and above a layer's deepest level that draws a seam:
+   *  each tile is resampled on its own and the bilinear kernel clamps at the
+   *  tile's own edge, so the last column of one tile and the first of the next
+   *  meet as a hard step through a field that is smooth everywhere else. It
+   *  measures as a 1.75 grey-level jump against 0.00 either side of it at z19
+   *  — one straight line the height of the tile, a couple of pixels wide.
+   *  False on the relief layers, which are all capped below the view's own
+   *  depth: nearest-neighbour has no kernel to clamp, so there is nothing to
+   *  break at the seam, and blocky is the honest picture of a 1 m product read
+   *  at z20's 0.021 m/px. True where magnification is the point and the blocks
+   *  would cost more than the seam — the ortofoto, the sheets, the labels.
+   *  Not part of `layerSignature`: it is fixed per layer, not per dataset. */
+  interpolate?: boolean;
   coverageExtent?: CoverageExtent;
 };
 

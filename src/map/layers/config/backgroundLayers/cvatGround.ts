@@ -346,6 +346,10 @@ export const buildCvatGroundConfig = (
   // costs nothing and takes the blank out of a zoom step.
   preload: 2,
   sparse: true,
+  // The store stops at z15 or z16 and the view goes to z20, so the levels a
+  // reader spends most time on are drawn upsampled — where smoothing each tile
+  // on its own puts a seam at every tile edge (`types.ts`).
+  interpolate: false,
   coverageExtent: acquisition.extent25833
     ? { extent: acquisition.extent25833, crs: 'EPSG:25833' }
     : { extent: acquisition.project.bboxLonLat, crs: 'EPSG:4326' },

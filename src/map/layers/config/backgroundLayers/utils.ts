@@ -117,6 +117,10 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
     // upsamples the deepest real level instead of ordering a render per tile.
     tileGrid: getWMSTileGrid(projection, 0, layerConfig.maxZoom),
     zDirection: WMS_Z_DIRECTION,
+    // Off on the relief, where the cap above means every deep view is drawn
+    // upsampled and per-tile smoothing seams (`types.ts`). Undefined is OL's
+    // own default, true.
+    interpolate: layerConfig.interpolate,
   });
   guardTileSource(source, layerConfig.url);
   const extent = toViewExtent(layerConfig.coverageExtent, projection);
@@ -191,6 +195,10 @@ export const getXYZLayer = (
     projection: layerConfig.projection,
     tileGrid,
     zDirection: WMS_Z_DIRECTION,
+    // Off on the relief stores, whose deepest level is well above the view's:
+    // smoothing each tile on its own seams at every tile edge (`types.ts`).
+    // Undefined is OL's own default, true.
+    interpolate: layerConfig.interpolate,
   });
   guardTileSource(source, layerConfig.url, {
     retry: !layerConfig.sparse,

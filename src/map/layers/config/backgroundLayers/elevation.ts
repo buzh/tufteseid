@@ -27,7 +27,9 @@ const NATIONAL_HELD_URL: Record<LidarModel, string> = {
 
 // A 1 m product, so past z16 (0.33 m/px) the service is upsampling its own grid
 // and OL upsampling the z16 tile says the same thing — without four more levels
-// of upstream renders and cache growth. Reads as softer edges when zoomed in.
+// of upstream renders and cache growth. Reads as visible pixels when zoomed in,
+// which is what `interpolate: false` below is for: smoothed, the upsampling
+// would draw a seam at every tile edge (`types.ts`).
 const NATIONAL_CACHE_MAX_ZOOM = 16;
 
 /**
@@ -57,6 +59,7 @@ export const buildNationalLidarConfig = (
       projection: 'EPSG:25833',
       minZoom: 0,
       maxZoom: NATIONAL_CACHE_MAX_ZOOM,
+      interpolate: false,
       // A miss here is a GetMap upstream, so preloading would hold tile slots
       // through a 3-12 s render; that a hit is instant does not change it.
       preload: 0,
@@ -78,6 +81,7 @@ export const buildNationalLidarConfig = (
     // and it matters more here, because a level past it is an on-the-fly
     // render per tile rather than a MapProxy hit.
     maxZoom: NATIONAL_CACHE_MAX_ZOOM,
+    interpolate: false,
     coverageExtent,
   };
 };

@@ -91,6 +91,10 @@ const buildLidarProjectConfig = (
     VERSION: '1.3.0',
   },
   maxZoom: LIDAR_PROJECT_MAX_ZOOM,
+  // Relief, and capped three levels below the view's own depth, so every deep
+  // view of it is upsampled: smoothed, that seams at every tile edge
+  // (`types.ts`).
+  interpolate: false,
   // The acquisition's own footprint: the service advertises every project.
   coverageExtent: { extent: project.bboxLonLat, crs: 'EPSG:4326' },
 });
