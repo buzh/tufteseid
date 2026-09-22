@@ -11,10 +11,10 @@ them are on the screen at once. `src/App.tsx` renders a ribbon above
 Kartverket's map series, or ortofoto — and which dataset within it, and switches
 both; in the middle it chooses the view, which is how many grounds are up and in
 what shape. At the other end of the row it puts Riksantikvaren's heritage layers
-over whatever that ground is, and says what of them; and only when there is
-something to say, it names an external service that has stopped answering.
-There is still no search box, no lokaliteter, no funn, no drawing and no
-account.
+over whatever that ground is, and says what of them; it starts a lokalitet of
+the reader's own and says whether there is an account behind the session; and
+only when there is something to say, it names an external service that has
+stopped answering. There is still no search box.
 
 The band and the controls are separate things. `src/ribbon/` is the band, and it
 is laid out in sections, each with its own subject and its own file:
@@ -23,7 +23,7 @@ is laid out in sections, each with its own subject and its own file:
 | --- | --- | --- |
 | `GroundSection` | the ground switch and the arm belonging to it | what is drawn under everything |
 | `ViewSection` | the view: one ground, the curtain, or the split | how the map is being looked at |
-| `ToolSection` | the Kulturminner overlay, the terrain analysis switch and the upstream fault chip | what applies whichever ground is up |
+| `ToolSection` | the Kulturminner overlay, the terrain analysis switch, the `+` that starts a lokalitet, the account button and the upstream fault chip | what applies whichever ground is up |
 
 The split is by subject, not by position. A control belongs to the left because
 it chooses the one picture the whole map is made of, to the middle because it
@@ -77,7 +77,7 @@ a `Popover.Target` and because the set changes as a chip comes and goes; the
 survivor of a departure is rounded on all four corners again without anything
 being told. Kulturminner is the only control wearing it today.
 
-`ToolSection` mounts two subjects, and they are not the same shape.
+`ToolSection` mounts four subjects, and they are not the same shape.
 `src/heritageControls/` is the Kulturminner overlay — `HeritageToggle`, the
 button that puts Riksantikvaren's registers over whatever ground is drawing,
 and joined to it, only while they are up, `HeritageMenu`: the chip that reads
@@ -146,6 +146,73 @@ with no pointer to leave with would sit over the map until the next one. The
 parsing, grouping and field knowledge behind both surfaces is in
 `src/map/featureInfo/` and returns plain data; every string the reader sees is
 chosen in `src/heritageInfo/`.
+
+## The reader's own lokaliteter
+
+The third and fourth subjects in the tool section are the `+` that starts a
+lokalitet (`src/spotControls/`) and the account button beside it (`src/auth/`).
+They are neighbours because one is the other's precondition: nothing here can be
+kept without an account, and pressing `+` signed out opens the sign-in dialog
+rather than a draft.
+
+**A lokalitet on this branch is one `spots` record and nothing else.** The old
+three-collection model — `localities`, `finds`, `attachments` — was deleted
+rather than ported. What replaced it is a single row: a name, a description, a
+point, an optional drawing, a visibility and a six-character code.
+`pocketbase/pb_migrations/1700001100_spots.js` is the schema and says field by
+field what it does differently. Pictures, scenes and the funn/bilde distinction
+are deliberately out.
+
+The workflow is four gestures and the box reads down them in that order: place
+the pin, name it, say what you saw, draw over the terrain, save. `src/spots/` is
+the map half — the draft atoms, the draggable pin (`pinAdjust.ts`, modelled on
+the terrain window's handles), the layer of saved pins, the place-name lookup
+that fills the name field in while the pin stands still (`spotName.ts`, whose
+ranking vocabulary came over from `main` unchanged), and the short link.
+`src/spotControls/` is the box: `SpotPanel` while it is being written,
+`SpotCard` once it has been saved, sharing one stylesheet and one corner because
+only ever one of them is up.
+
+Three draft atoms rather than one, split by who writes them at what rate.
+`spotDraftAtom` is written by the pin drag sixty times a second, `spotFormAtom`
+by a keystroke, `spotSketchAtom` by the canvas settling. Folded into one, a
+typed character would redraw the pin and a dragged pin would re-render two text
+inputs.
+
+**What the layer lists depends on who is looking.** Signed in, it is your own
+spots and every public one, which is the index the record is for. Signed out, it
+draws only the single record a short link resolved — a visitor who followed
+`/l/K7M2QX` came for that spot, and turning the map into a gazetteer of
+everybody's public pins for anyone who loads the page is a different product
+with different consent.
+
+A spot is private when it is written and made public as a second, separate
+decision, taken in the card once there is something to share. What the surfaces
+gate on is what the server enforces: a record is readable if it is public, or
+yours, or you are an admin — no account needed for the first — while creating
+one is yours only and changing or deleting one is owner or admin. So `SpotCard`
+carries one permission, owner-or-admin, and there is no show/edit stance on this
+branch: the old model's `mayAdd` was about putting funn inside somebody else's
+lokalitet, and a spot has nothing inside it.
+
+`src/sketch/` is the drawing. It is `main`'s `src/funn/` with the funn taken out
+— the frame maths, the freeze, the CSS transform that slaves the map to the
+scene rather than the other way round, the wheel rewrite and the
+export-at-view-resolution overlay, all unchanged; the two draw modes, the GeoJSON
+conversion, the attachment records and the autosave, all gone. Drawing freezes
+the map and captures a frame — the viewport's ground extent in the view's own
+projection — so scene pixels have a place on the ground for as long as the pen
+is down. The canvas may still be panned and zoomed; the map follows it with a
+transform OpenLayers cannot see, which is what keeps the frame valid. Excalidraw
+stays on its light theme against the app's dark chrome, because its dark theme
+is a filter over the canvas and the strokes would be kept in colours other than
+the ones they were drawn in.
+
+`src/auth/` is PocketBase's `authStore` mirrored into `currentUserAtom` by an
+`atomEffect` mounted at the root, plus a dialog. OAuth2 only: there is no
+password form and no guest flow, and the dialog lists whatever
+`listAuthMethods()` reports, so adding a provider stays an admin-UI change with
+no code in it.
 
 **Mantine is the design system, and the app is dark.** `MantineProvider` and
 the theme (`src/ui/theme.ts`) are mounted at the root, and every surface is
@@ -241,6 +308,13 @@ clients), `src/measure/`, the search UI, `src/map/overlay/`,
 `src/map/groundOverlay.ts`, `src/map/composite.ts`, `src/map/interactions.ts`,
 and the vector layers nothing draws into any more.
 
+Three of those are back, and none of them as it was. `src/auth/` is an OAuth2
+dialog over a mirrored `authStore`, where it used to carry password and guest
+flows. `src/api/` is a PocketBase singleton and one collection client, where it
+used to be three. And `src/funn/` came back as `src/sketch/`, which is the
+drawing without the funn. `src/localities/`, `src/figure/` and `src/measure/`
+are still gone, and the data model the first two described is not coming back.
+
 `docs/ui-architecture.md`, `docs/analysis-roadmap.md`, `docs/open-questions.md`
 and `docs/live-site-test.md` described that interface and went with it. All of
 it is in `git log` on `main`.
@@ -287,13 +361,19 @@ The rows below without a writer still have none.
 | `heritageDetailsAtom`, `heritageRenderAtom`, `heritageOpacityAtom`, `heritageHiddenAtom` | `layers/heritage.ts` | how they are drawn | `useHeritageControls` |
 | `heritageTipAtom`, `heritagePopupAtom` | `map/featureInfo/atoms.ts` | what the pointer found, and what a click kept | `useHeritageInfo` |
 | `terrainWindowAtom`, `terrainAdjustingAtom` (+ the `open`/`adjust`/`close` writers) | `terrain/window.ts` | the rectangle under analysis, null for no analysis, and whether it is still being placed | `useTerrainToggle`, `useTerrainControls`, `windowAdjust.ts` |
+| `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom` (+ the `open`/`edit`/`close`/`setStage` writers) | `spots/atoms.ts` | the lokalitet being written: where its pin is and which gesture has the pointer, what has been typed, what has been drawn | `SpotToggle`, `useSpotDraft`, `pinAdjust.ts`, `SketchCanvas` |
+| `activeSpotAtom` | same | the lokalitet being read — opened by a click or by `?lok=` | `useSpotLayer`, `useSpotShareLink`, `SpotCard`, `useSpotDraft` |
+| `sketchSessionAtom` | `sketch/session.ts` | the map is frozen and Excalidraw has it | `useSketchSession` |
+| `currentUserAtom`, `isAuthDialogOpenAtom` | `auth/atoms.ts` | who is signed in, and whether the dialog is up | `pbAuthSyncEffect`, `AuthButton`, `AuthDialog` |
 
 The URL still carries `projection`, `backgroundLayer`, `hybrid`, `contours`,
 `lidarModel`, `themeLayers`, `heritage*`, `lat`, `lon` and `zoom`
 (`UrlParameter`, `src/shared/utils/urlUtils.ts`), so a cold load lands where it
-is told. `lok`, `sok`, `markerLat`, `markerLon` and `showSelection` went with
-the surfaces that wrote them. The A half is what all of that describes: the
-view mode and everything in B are session state.
+is told, plus `lok` — the only parameter that names a record rather than a
+setting, written by whatever lokalitet is open and read once at import
+(`src/spots/shareLink.ts`). `sok`, `markerLat`, `markerLon` and `showSelection`
+went with the surfaces that wrote them. The A half is what all of that
+describes: the view mode and everything in B are session state.
 
 ## Two grounds at once
 
@@ -356,24 +436,34 @@ analysis was framed over and not the analysis.
 
 ## Loose ends, deliberately left
 
-- **`package.json` still lists `@excalidraw/excalidraw`, `pocketbase` and
-  `@tanstack/react-query`** with nothing importing the first two. Removing a
+- **`@tanstack/react-query` is listed and imported by nothing.** Removing a
   dependency means regenerating `package-lock.json`, which the workstation
-  cannot do; it is one server-side `npm install` whenever the new model is
-  known. The Excalidraw font plugin is already out of `vite.config.ts`.
-- **PocketBase still runs the old schema.** `localities`, `finds` and
-  `attachments` are untouched on disk and unreferenced by the client. The new
-  model gets new migrations; nothing was dropped, because dropping a collection
-  before knowing what replaces it only loses the test data twice.
+  cannot do; it is one server-side `npm install` whenever something else needs
+  one anyway. `@excalidraw/excalidraw` and `pocketbase` were on this list and
+  are off it — `src/sketch/` and `src/api/` import them, and the Excalidraw
+  font plugin is back in `vite.config.ts`.
+- **PocketBase still carries the old collections.** `localities`, `finds` and
+  `attachments` are untouched on disk and unreferenced by the client, which now
+  reads `spots` and nothing else. Nothing was dropped: the old rows are test
+  data on a test host, and a migration that deletes three collections is worth
+  writing once, when there is no chance of wanting to read them again.
 - **`scripts/live-check.sh` still probes the old collections** and takes a
   lokalitet code. Its raster half — the one that matters on this branch — is
-  correct; the PocketBase half checks a schema the client no longer reads.
-- **No route but `/`.** Caddy has no SPA fallback, unchanged.
+  correct; the PocketBase half checks a schema the client no longer reads, and
+  wants rewriting against `spots` and a spot code.
+- **No route but `/`.** Caddy has no SPA fallback, unchanged. `/l/<code>` is a
+  `redir` to `/?lok=<code>` on one narrow pattern and not a route — a catch-all
+  rewrite to `index.html` would turn every wrong path into a 200.
+- **A lokalitet has no index but the map.** Your spots are pins where they are;
+  there is no list, no ordering by date and no way to find one whose ground you
+  cannot remember. That is the next surface this subject wants, and it probably
+  arrives with the search box rather than before it.
 - **Only `nb` is a moving target.** Strings still go through `t()` so the
   retrofit stays free, but `nn` and `en` carry only what survived the cut and
   are not expected to keep pace until the interface stops moving.
-- **Map z-indices 2 and 5–9 are free.** They were the old interface's
-  overlays; `docs/map-layers.md` records what still occupies the rest.
+- **Map z-indices 5 and 7–9 are free.** They were the old interface's overlays;
+  2 has since gone to a lokalitet's drawing and 6 to its pin, and
+  `docs/map-layers.md` records what occupies the rest.
 - **`lidarCyclingAtom` has a reader and no writer.** `lidarFootprintsLayer`
   keeps the viewport list warm while the keyboard ring walks datasets, and the
   ring (`useBackgroundCyclingKeys`, W/S/A/D/E) went with the old shell. It costs
@@ -386,8 +476,8 @@ analysis was framed over and not the analysis.
   assumes one map except those callers.
 - **There is no search box.** The ground section is built, the view section is
   built, and the tool section holds the Kulturminner overlay, the terrain
-  analysis switch and the upstream fault chip. Search is the next surface in,
-  and the tool section is where it goes: it belongs to no ground.
+  analysis switch, the lokalitet `+` and the account. Search is the next surface
+  in, and the tool section is where it goes: it belongs to no ground.
 - **Hybrid is a LiDAR control, not a tool.** The overlay went into the LiDAR
   arm rather than the tool section because `resolveStack` draws it only over a
   LiDAR ground (`LIDAR_LAYERS`) — a switch in the tool section would be inert

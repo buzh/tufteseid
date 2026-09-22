@@ -7,11 +7,13 @@ tracking upstream. Working branch: `new-ui`.
 **The interface is being rebuilt from nothing, on Mantine.** This branch kept
 OpenLayers, the WMS/cache path and the headless computation behind them, and
 deleted every surface on top — ribbon, lokaliteter, funn, drawing, search UI,
-the UI kit. What has been built back is the background: a ground switch
-(`src/grounds/`) and one arm per ground — `src/lidarControls/`,
-`src/kartControls/`, `src/flyfotoControls/` — in a top band that hosts them
-(`src/ribbon/`). Everything else is still atoms with no writer. Read
-`docs/state-of-the-branch.md` before adding the next control: it lists what
+the UI kit. What has been built back is the background — a ground switch
+(`src/grounds/`) and one arm per ground — in a top band that hosts them
+(`src/ribbon/`), the Kulturminner overlay and its card, the terrain analysis,
+and the reader's own lokaliteter: a pin, a box, a drawing over the ground, an
+account and a short link (`src/spots/`, `src/spotControls/`, `src/sketch/`,
+`src/auth/`). There is still no search box and no index of your own records.
+Read `docs/state-of-the-branch.md` before adding the next control: it lists what
 survived, what the atoms are called, and what is deliberately still broken.
 `main` holds the old app and is still deployable.
 
@@ -26,8 +28,10 @@ for `--mantine-*` custom properties rather than literals; the old
 Keep what an amateur reading relief-shaded terrain against the heritage record
 needs: Kulturminner theme layers, LiDAR hillshade and per-project LiDAR
 backgrounds, LiDAR tile extract, client-side terrain analysis, place/property
-search. What the user's own records look like is an open question on this
-branch — the old lokalitet/funn model was deleted rather than ported.
+search, and a record of the reader's own. That last one is deliberately small on
+this branch: the old lokalitet/funn/bilde model was deleted rather than ported,
+and what replaced it is one `spots` row — a pin, a name, a description and an
+optional drawing. Pictures and scenes are out until something asks for them.
 
 Not affiliated with Kartverket or Riksantikvaren. The app is de-branded on
 purpose: no Norgeskart naming or Kartverket visual identity in user-visible
@@ -94,9 +98,8 @@ scripts/live-check.sh https://<host> <lokalitet-code>
 ```
 
 - `scripts/live-check.sh` runs from the workstation too — the live origin is
-  public. Its raster half still holds; its PocketBase half probes the old
-  collections and will need rewriting with the new data model
-  (`docs/state-of-the-branch.md`).
+  public. Its raster half still holds; its PocketBase half probes `localities`
+  and wants rewriting against `spots` and a spot code.
 
 - First run on a new host wants `sudo mkdir -p /site/tufteseid/data/logs`
   alongside the cVAT and MapProxy store directories — Caddy's access log is a
@@ -117,7 +120,7 @@ scripts/live-check.sh https://<host> <lokalitet-code>
 | Service | What it is |
 | --- | --- |
 | `tufteseid` | `node:24-alpine` builds the SPA, `caddy:2.10.0-alpine` serves `/var/www`. `config.js` bind-mounted at runtime. |
-| `pocketbase` | Backend for lokaliteter (auth + user content), pinned to 0.40.2. Serves `/pb/*`. SQLite on the `pbdata` volume. |
+| `pocketbase` | Backend for lokaliteter (OAuth2 + user content), pinned to 0.40.2. Serves `/pb/*`. SQLite on the `pbdata` volume. |
 | `nib-proxy` | Token-injecting sidecar for Norge i bilder ortofoto. Reachable only from wmscache and mapproxy. |
 | `cvat-tiles` | `node:24-alpine`, zero deps. Serves `/cvat/*` out of one MBTiles database per LiDAR acquisition in the bind-mounted store. Built out of band by `vat-cache/`. |
 | `mapproxy` | `mapproxy:7.0.0-alpine-nginx`. Serves `/cache/*`: the six upstream layers whose parameters never change, meta-tiled onto the app's own grid and held in MBTiles. Config in `mapproxy/`, store bind-mounted. |
@@ -143,44 +146,36 @@ field classes), **not** the 0.22 `Dao` API.
 
 ### Collections
 
-- **`localities`** — `owner` (→ users, cascade), `code` (six characters of
-  Crockford base32, unique, generated client-side and retried on the
-  unique-index 400), `name`, `description`, `place`, `municipality`,
-  `matrikkel`, `credit` (the author's name, denormalized off the account
-  because `users` is closed to guests), `visibility` (private | limited |
-  public), `bbox` (json, `[minLon, minLat, maxLon, maxLat]` EPSG:4326),
-  `derivedFrom` (→ localities, **no** cascade — a fork outlives its original) +
-  `derivedFromLabel`. The centre coordinate is deliberately not a field: it is
-  derived per render.
-- **`finds`** — `locality` (cascade), `owner` (denormalized so rules stay
-  cheap), `title`, `note`, `status` (mulig | sannsynlig | avkreftet |
-  rapportert), `geometry` (json GeoJSON FeatureCollection, EPSG:4326).
-- **`attachments`** — `locality`, `owner`, `kind` (extract | screenshot |
-  upload | flyfoto | sketch | scene), `file` (≤50 MB, png/jpeg/webp, optional),
-  `caption`, `meta` (json, ≤2 MB), `funn` and `over` (uncascaded relations →
-  finds and → attachments), `sort`, `hidden`.
+One collection carries the reader's records:
+
+- **`spots`** (id `pbc_spots`) — `owner` (→ users, cascade), `code` (six
+  characters of Crockford base32, unique from the first migration, generated
+  client-side and retried on the unique-index 400), `name`, `description`,
+  `credit` (the author's name, denormalized off the account because `users` is
+  closed to guests), `visibility` (private | public), `point` (json,
+  `[lon, lat]` EPSG:4326), `sketch` (json ≤5 MB: an Excalidraw scene plus the
+  frame that georeferences it, or null).
+
+A point rather than a bbox because placing a pin is one gesture where dragging
+corners is four, and two values because `limited` had no groups behind it.
 
 Client side: `src/api/pocketbase.ts` (singleton, `pocketbaseUrl` defaults
-`/pb`), `src/api/localities.ts`, `localityFinds.ts`, `attachments.ts`.
+`/pb`) and `src/api/spots.ts`.
+
+`localities`, `finds` and `attachments` are still on disk from the old model and
+are read by nothing. Leave them alone rather than adding a migration to drop
+them — see the loose ends in `docs/state-of-the-branch.md`.
 
 ### Permissions
 
-Server-enforced, same shape on all three collections:
+Server-enforced:
 
-- **read** — the record (or its lokalitet) is public, *no account needed*; or
-  signed in and (owns it, or `@request.auth.role = "admin"`)
-- **create** — signed in, owns the record, and owns the parent lokalitet
+- **read** — the record is public, *no account needed*; or signed in and (owns
+  it, or `@request.auth.role = "admin"`)
+- **create** — signed in and owns the record
 - **update/delete** — owner or admin
 
-That asymmetry is why the UI carries two permissions rather than one:
-`mayEdit` (owner *or* admin) and `mayAdd` (owner only). An admin can rename,
-reshape and delete anybody's lokalitet but cannot put new funn or bilder in it.
-
-Crossed with that is **stance**, `show` | `edit` — a per-session choice, held in
-`editingLocalityIdAtom` and never stored. Nothing in `show` writes: the write
-verbs are absent there, not disabled. A lokalitet opens in `show` unless it was
-just created here or has a restored draft. Surfaces gate on the product:
-`canEdit = mayEdit && stance === 'edit'`, `canAdd = mayAdd && stance === 'edit'`.
-
-`limited` visibility is a placeholder that behaves as `private` until groups
-exist.
+So the UI carries one permission, `mayEdit` (owner *or* admin): an admin can
+rename, reshape and delete anybody's lokalitet. There is no show/edit stance —
+the old model's `mayAdd` and `editingLocalityIdAtom` went with the funn and the
+bilder, and nothing on this branch has children to gate.
