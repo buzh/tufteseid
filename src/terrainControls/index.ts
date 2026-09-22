@@ -1,10 +1,12 @@
-// The Terrenganalyse control surface: the button and its chip, the controller
-// they take, and the controller's type. The two pieces are not exported
-// separately — the group is the control, and a host that mounted the chip
-// without the button would be offering a rack of knobs over an analysis it has
-// no way to start or to stop.
-export { TerrainControlGroup } from './TerrainControlGroup';
-export {
-  type TerrainControls,
-  useTerrainControls,
-} from './useTerrainControls';
+// The Terrenganalyse control surface, and it has two hosts.
+//
+// `TerrainToggle` stands in the band's tool section and is the whole on/off
+// control. `TerrainSurface` is mounted by `MapComponent` and is the analysis
+// itself — the controller, the DEM, and the box of settings floating on the
+// map. Neither takes anything from its host: the two meet in
+// `terrainWindowAtom`, which is the rectangle and the on switch both.
+//
+// `TerrainSurface` is mounted once and nowhere else. A second would be a second
+// DEM, a second horizon scan and a second canvas over the same ground.
+export { TerrainSurface } from './TerrainSurface';
+export { TerrainToggle } from './TerrainToggle';

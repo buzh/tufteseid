@@ -1,21 +1,21 @@
 // Terrenganalyse's controller: whether the client is computing its own relief
 // over a rectangle of ground, and what of it.
 //
-// Not an arm. The analysis paints over LiDAR relief, Kartverket's cartography
-// and ortofoto alike, so it belongs to the tool end of the band and is mounted
-// once — a second mount would be a second DEM, a second horizon scan and a
-// second canvas over the same ground.
+// Mounted by `MapComponent`, beside the map and not in the band, because that
+// is where its surface floats. Mounted unconditionally, though the box only
+// appears while an analysis is up: everything below the rectangle is held here
+// in component state, and a hook that came and went with the box would hand a
+// reader their default sun back every time they took a render down to look at
+// the ground under it.
+//
+// Exactly one mount. A second would be a second DEM, a second horizon scan and
+// a second canvas over the same ground.
 //
 // `terrainWindowAtom` is the on switch as well as the rectangle: null is the
-// analysis off. Nothing else records it, which is what keeps the frame on the
-// map (`windowLayer.ts`), the render (`terrainLayer.ts`) and the chip from
-// disagreeing about whether there is an analysis.
-//
-// Everything below the atom is held in component state, so it survives an off
-// and back on: a reader who takes the render down to look at the ground under
-// it gets their own sun back, not the default one. The DEM does not — it is the
-// expensive thing, and holding 19 MB against a rectangle the reader has left is
-// what the off switch is for.
+// analysis off. Nothing else records it, which is what lets the ribbon's button
+// (`useTerrainToggle`) start and stop the analysis without touching any of this
+// — it writes the atom, and the frame on the map (`windowLayer.ts`), the render
+// (`terrainLayer.ts`) and the box all follow from there.
 
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -39,23 +39,10 @@ import { computeHorizonFields, type Visualization } from '../terrain/shade';
 import { setTerrainOpacity, setTerrainRender } from '../terrain/terrainLayer';
 import { frameTerrainWindowAtom, terrainWindowAtom } from '../terrain/window';
 
-// Menu order. The two lit views first, then VAT as the one view that needs
-// nothing set, then the three horizon views — which share a ray walk, so
-// stepping between those three is free — and the two physical ones last.
-export const VISUALIZATIONS: readonly Visualization[] = [
-  'hillshade',
-  'multiHillshade',
-  'vat',
-  'svf',
-  'openPos',
-  'openNeg',
-  'lrm',
-  'slope',
-];
-
-// One fetch's outcome, stamped with what it was a fetch of. The stamp is what
-// lets the hook derive "is this still the answer" during render instead of
-// clearing three flags from an effect every time the rectangle moves.
+// One fetch's outcome, stamped with what it was a fetch of. The fetch effect's
+// cleanup drops it, so nothing stale is held for long — but a cleanup runs
+// after the render that caused it, so there is exactly one pass in which the
+// rectangle is new and this is the previous one's. The stamp is what covers it.
 type DemResult = {
   bbox: Bbox;
   model: DemModel;
@@ -73,7 +60,7 @@ export const useTerrainControls = () => {
 
   // Derived rather than cleared. A grid belongs to the rectangle and the model
   // it was fetched for, so the moment either changes it stops being the answer
-  // — there is no window in which the chip reads out the previous rectangle's
+  // — there is no window in which the box reads out the previous rectangle's
   // resolution, and no loading flag that can be left standing by a fetch that
   // ended in a way nobody thought about.
   const answer =
@@ -113,8 +100,15 @@ export const useTerrainControls = () => {
 
   // Keyed on the atom's array identity, which is safe here because nothing
   // writes an equal one: `frameTerrainWindowAtom` builds a fresh rectangle out
-  // of the viewport and the off switch writes null. The abort matters —
-  // `Analyser her` retriggers this while several megabytes are still in flight.
+  // of the viewport and the off switch writes null.
+  //
+  // The cleanup is where the grid is released, and it is the only place — 19 MB
+  // is the whole reason the analysis has an off switch, and holding it against
+  // a rectangle the reader has left is what the off switch is for. Putting it
+  // here rather than in the verbs means the verbs are pure atom writes, which
+  // is what lets the ribbon's button stop an analysis it holds no state for.
+  // The abort matters for the same reason `Analyser her` runs through here:
+  // both retrigger this while several megabytes are still in flight.
   useEffect(() => {
     if (!bbox) return;
     const controller = new AbortController();
@@ -130,7 +124,10 @@ export const useTerrainControls = () => {
         if (controller.signal.aborted) return;
         setResult({ bbox, model, dem: null, error: 'failed' });
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      setResult(null);
+    };
   }, [bbox, model]);
 
   // The one expensive pass — some 800 ms on a 600² grid — read three ways
@@ -194,26 +191,15 @@ export const useTerrainControls = () => {
     [setWindow],
   );
 
-  const on = bbox !== null;
-
-  // Both verbs drop the held grid rather than leaving it to the derivation
-  // above: stale is not the same as freed, and this is where the 19 MB goes.
-  // `frameWindow` answering false is the map having no size yet, which is
-  // before first layout and so not a state a reader can press a button in.
-  const stop = () => {
-    setResult(null);
-    setWindow(null);
-  };
-  const reframe = () => {
-    setResult(null);
-    frameWindow();
-  };
-
   return {
-    on,
-    toggle: () => (on ? stop() : reframe()),
-    /** Move the analysis to what is on the screen now. */
-    reframe,
+    /** There is a rectangle, so there is a box to draw. */
+    on: bbox !== null,
+    /**
+     * Move the analysis to what is on the screen now. Answering false is the
+     * map having no size yet, which is before first layout and so not a state
+     * a reader can press a button in; the caller passes over it in silence.
+     */
+    reframe: frameWindow,
     /** Metres on a side, once there is a grid to measure. */
     sideMetres: dem ? Math.round(dem.bbox25833[2] - dem.bbox25833[0]) : null,
     vis,

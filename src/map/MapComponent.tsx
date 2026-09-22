@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { HeritageInfo } from '../heritageInfo';
 import { ErrorBoundary } from '../shared/ErrorBoundary.tsx';
 import { terrainWindowLayerEffect } from '../terrain/windowLayer.ts';
+import { TerrainSurface } from '../terrainControls';
 import styles from './MapComponent.module.css';
 import { compareLayerAtomEffect } from './compare/atoms.ts';
 import { CompareCurtain } from './compare/CompareCurtain.tsx';
@@ -66,6 +67,14 @@ export const MapComponent = () => {
           on some shape the register served takes only itself down. */}
       <ErrorBoundary fallback={null} name="kulturminner">
         <HeritageInfo />
+      </ErrorBoundary>
+      {/* The terrain analysis: the DEM behind it, and the box of settings when
+          one is running. Positioned against this rectangle rather than the
+          window, so it sits under the band without being told how tall the band
+          is. Outside the map's own boundary for the same reason the card is: a
+          panel that throws takes only itself down. */}
+      <ErrorBoundary fallback={null} name="terreng">
+        <TerrainSurface />
       </ErrorBoundary>
     </div>
   );

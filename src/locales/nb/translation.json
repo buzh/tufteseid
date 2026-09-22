@@ -201,12 +201,16 @@
       "slope": "bratthet"
     },
     "visGroup": {
-      "vat": "Flere mål blandet i ett bilde.",
-      "svf": "Uten lyskilde — samme bilde uansett hvor sola står."
+      "lit": "Belyst",
+      "blend": "Blandet",
+      "unlit": "Uten lyskilde"
     },
     "model": {
       "dtm": "Terreng (DTM)",
-      "dom": "Overflate (DOM)"
+      "dom": "Overflate (DOM)",
+      "aria": "Høydemodell: {{model}}",
+      "toDtm": "Bytt til terrengmodell (DTM) — bakken, uten vegetasjon og bygninger. Henter høydedataene på nytt.",
+      "toDom": "Bytt til overflatemodell (DOM) — trekroner og tak. Henter høydedataene på nytt."
     },
     "azimuth": "Lysretning",
     "altitude": "Solhøyde",

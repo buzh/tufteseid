@@ -1,7 +1,12 @@
 // Terrenganalyse, on or off. The whole control is the box: one press frames a
 // square on what you are looking at, fetches the float heights under it and
-// paints the relief itself; the next takes the render and the frame down
-// together.
+// paints the relief itself; the next takes the render, the frame and the
+// settings box down together.
+//
+// A button alone, with no chip beside it. Everything there is to say about a
+// running analysis — which visualization, at what resolution, in what light —
+// is in the box floating over the map, and a readout in the band saying the
+// same thing a hand's width away would be a second place to look.
 //
 // On is a fetch, not a blind. Every other toggle in the band switches something
 // already in the browser, so off can be a cover over a kept selection; here off
@@ -13,11 +18,11 @@
 import { Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { ControlButton } from '../ui/ControlButton';
-import type { TerrainControls } from './useTerrainControls';
+import { useTerrainToggle } from './useTerrainToggle';
 
-export const TerrainToggle = ({ terrain }: { terrain: TerrainControls }) => {
+export const TerrainToggle = () => {
   const { t } = useTranslation();
-  const { on, toggle } = terrain;
+  const { on, toggle } = useTerrainToggle();
 
   return (
     // The tooltip says what the click does, which is the opposite thing in each

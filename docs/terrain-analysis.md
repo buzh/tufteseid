@@ -50,31 +50,55 @@ somewhere to put one, the analysis is something you look at and then take down.
 
 ## The control surface
 
-`src/terrainControls/` — a `ControlButton` and, only while the analysis is
-running, a `ControlChip` joined to it in a `ControlUnit`, the same two shapes
-the Kulturminner overlay wears and for the same reason. It sits in the band's
-tool section because it applies whichever ground is up, and it is mounted
-exactly once: a second `useTerrainControls` is a second DEM, a second horizon
-scan and a second canvas over the same ground.
+`src/terrainControls/`, and it has two hosts. They share no props and no
+component state: both reach `terrainWindowAtom`, which is the rectangle and the
+on switch at once.
 
-- **The button** frames the square, fetches and paints. Off is not a blind, as
-  it is on Kulturminner — it drops the grid, which is the 19 MB and most of the
-  reason the control exists. What survives in component state is the reading:
-  visualization, sun, exaggeration, both radii, transparency.
-- **The chip** reads out the visualization and carries the fetch as its hint —
-  `henter høydedata …`, then the square's side and the grid resolution, or what
-  went wrong. A DEM is megabytes over the slowest origin in the stack, so
-  "nothing has appeared yet" has to be answerable without opening anything.
-- **The menu** is a Popover, not a Menu: everything in it is a setting the
-  reader leaves set, and a Menu closing on the first click would make lighting a
-  hillshade one trip per degree. Rectangle first (the hint and `Analyser her`),
-  then the eight visualizations, the height model, and only the sliders the
-  current visualization reads — two for sky-view factor, five for a hillshade.
-- **The radius slider commits on release** for the horizon views and streams for
-  LRM. `useTerrainControls` memoizes `computeHorizonFields` separately from the
-  lit pass and keys it on neither `vis` nor the azimuth, which is what makes
-  switching between sky-view and the two opennesses instant and what keeps a
-  multi-second recompute off every frame of a drag.
+- **`TerrainToggle`**, in the band's tool section, because whether the client is
+  computing relief is true whichever ground is up. One `ControlButton` and
+  nothing else — two atom writes, no state. Off is not a blind, as it is on
+  Kulturminner: it drops the grid, which is the 19 MB and most of the reason the
+  control exists.
+- **`TerrainSurface`**, mounted by `MapComponent`, is the analysis — the
+  controller, the DEM, and the box. Mounted once, because a second is a second
+  DEM, a second horizon scan and a second canvas over the same ground; mounted
+  unconditionally, because the reading it holds in component state
+  (visualization, sun, exaggeration, both radii, transparency) has to survive
+  taking a render down to look at the ground under it. A component of its own
+  rather than a hook call in `MapComponent`, so that an azimuth drag re-renders
+  the box and not the panes, the curtain and the heritage card with it.
+
+**The box floats on the map rather than hanging off the band.** Everything in it
+changes a picture the reader is looking at while they turn it — a sun moving
+across relief, a radius opening a hollow, a transparency letting the ground back
+through — and a dropdown that covers the map and closes on the first click makes
+each of those a round trip. Top left: the zoom and rotate controls are off, the
+right half of a split belongs to the second pane, and the scale line has the
+bottom left. It is positioned against the map's own rectangle, so it sits under
+the band without being told how tall the band is, and the header folds the rest
+away — the box costs a corner of the view, and giving that back must not cost
+the grid.
+
+Inside it, in order: the rectangle (`Analyser her`, with the why in its tooltip
+rather than pinned open), the eight visualizations as one pulldown grouped lit /
+blended / unlit with the chosen one's meaning under it, the height model as the
+same split `ControlButton` the LiDAR ground wears in the band, and only the
+sliders the current visualization reads — two tracks for sky-view factor, four
+for a hillshade. The header carries the fetch: `henter høydedata …`, then the
+square's side and the grid resolution, or what went wrong. A DEM is megabytes
+over the slowest origin in the stack, so "nothing has appeared yet" has to be
+answerable at a glance.
+
+**The radius slider commits on release** for the horizon views and streams for
+LRM. `useTerrainControls` memoizes `computeHorizonFields` separately from the lit
+pass and keys it on neither `vis` nor the azimuth, which is what makes switching
+between sky-view and the two opennesses instant and what keeps a multi-second
+recompute off every frame of a drag.
+
+The grid is released in the fetch effect's cleanup, not in a verb. That is what
+lets the band's button stop an analysis it holds no state for: starting and
+stopping are writes to the atom, and the controller drops the DEM when the
+rectangle it belonged to goes away.
 
 The render lands on the map through `terrainLayer.ts`: one `ImageLayer` over an
 `ImageCanvasSource` fixed to EPSG:25833 at zIndex 1, drawing the canvas

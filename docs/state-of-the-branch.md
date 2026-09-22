@@ -24,7 +24,7 @@ is laid out in sections, each with its own subject and its own file:
 | --- | --- | --- |
 | `GroundSection` | the ground switch and the arm belonging to it | what is drawn under everything |
 | `ViewSection` | the view: one ground, the curtain, or the split | how the map is being looked at |
-| `ToolSection` | the Kulturminner overlay, terrain analysis and the upstream fault chip | what applies whichever ground is up |
+| `ToolSection` | the Kulturminner overlay, the terrain analysis switch and the upstream fault chip | what applies whichever ground is up |
 
 The split is by subject, not by position. A control belongs to the left because
 it chooses the one picture the whole map is made of, to the middle because it
@@ -76,9 +76,9 @@ edge, outer radius only, no gap. It styles its children by position rather than
 by a class they wear, because the boxes arrive already wrapped in a `Tooltip` or
 a `Popover.Target` and because the set changes as a chip comes and goes; the
 survivor of a departure is rounded on all four corners again without anything
-being told. Kulturminner and the terrain analysis both wear it today.
+being told. Kulturminner is the only control wearing it today.
 
-`ToolSection` mounts two surfaces the same way, on the same seam.
+`ToolSection` mounts two subjects, and they are not the same shape.
 `src/heritageControls/` is the Kulturminner overlay — `HeritageToggle`, the
 button that puts Riksantikvaren's registers over whatever ground is drawing,
 and joined to it, only while they are up, `HeritageMenu`: the chip that reads
@@ -95,25 +95,35 @@ the chip says that is not a setting is that the map is too far out for any
 ticked source to draw — every RA service here is capped below city scale, and
 an overlay that is on and invisible otherwise reads as an empty register.
 
-`src/terrainControls/` is the second, in the same two shapes: a button that
-frames a square of ground and fetches a height grid for it, and the chip that
-appears only while one is up. It is next to Kulturminner because it too is true
-of all three grounds — the client's own relief is read against cartography and
-ortofoto as readily as against Kartverket's hillshade. Two things are unlike the
-overlay. Off is not a blind: it drops the grid, which is 19 MB, and only the
-reading survives — visualization, sun, exaggeration, radii, transparency, all in
-component state, so a reader who takes the render down to look at what is under
-it gets their own sun back. And the rectangle is not the map: `terrainWindowAtom`
-holds the square that was framed, the analysis does not follow a pan, and
-`Analyser her` is what moves it. That atom is also the on switch, null being off,
-which is what keeps the frame, the render and the chip from disagreeing about
-whether there is an analysis. The square itself is `squareBboxWithin` — the
-largest that fits inside the visible map, at most 500 m on a side
-(`docs/terrain-analysis.md`).
+`src/terrainControls/` is the second, and only its switch is in the band.
+`TerrainToggle` is one `ControlButton` and nothing else — no chip beside it,
+because what it turns on is not a setting the band can read out in a line. It is
+next to Kulturminner because it too is true of all three grounds — the client's
+own relief is read against cartography and ortofoto as readily as against
+Kartverket's hillshade. The rest of the surface is `TerrainSurface`, mounted by
+`MapComponent` over the map: the controller that holds the DEM and the render,
+and, while there is an analysis, a box floating at the top left with the
+settings in it. The two hosts share no props and no component state — they meet
+in `terrainWindowAtom`, which is the rectangle and the on switch at once, so
+starting and stopping are pure atom writes and the toggle holds nothing. The
+settings are in a box rather than a dropdown because every one of them changes a
+picture the reader is looking at while they turn it; the fold in the box's
+header gives the corner of the view back without dropping the grid.
 
-The first surface that is not in the band is `src/heritageInfo/`, mounted by
-`MapComponent` beside the map rather than in it: the register is readable as
-well as visible. A pointer **at rest** over a Kulturminner feature raises a tip
+Two things are unlike the overlay. Off is not a blind: it drops the grid, which
+is 19 MB, and only the reading survives — visualization, sun, exaggeration,
+radii, transparency, all in component state, which is why the controller is
+mounted whether or not there is an analysis, so a reader who takes the render
+down to look at what is under it gets their own sun back. And the rectangle is
+not the map: `terrainWindowAtom` holds the square that was framed, the analysis
+does not follow a pan, and `Analyser her` is what moves it. The square itself is
+`squareBboxWithin` — the largest that fits inside the visible map, at most 500 m
+on a side (`docs/terrain-analysis.md`).
+
+`src/heritageInfo/` is the other surface `MapComponent` mounts beside the map —
+beside it rather than in it, and each in an `ErrorBoundary` of its own, so
+neither the terrain box nor a card built on some shape the register served can
+take the map down with it. The register is readable as well as visible. A pointer **at rest** over a Kulturminner feature raises a tip
 naming what is there, and a click opens a card with the fields and the two
 links out — Askeladden and Kulturminnesøk. Both are OpenLayers `Overlay`s
 portalled into by React (`useMapOverlay`), so they are pinned to the ground and
@@ -180,10 +190,11 @@ ribbon's dataset menu lists and Automatisk decides from, and it paints the
 outlines while that menu is open.
 
 `src/terrain/` was on that list and is off it: `src/terrainControls/` drives it
-again. The operators, the DEM reader and `render.ts` are untouched — what is new
-is the surface, `terrainLayer.ts` to put the painted canvas on the map, and a
-rectangle that is capped at 500 m square and framed inside the visible map
-rather than clamped from it (`docs/terrain-analysis.md`).
+again, from a switch in the band and a box floating on the map. The operators,
+the DEM reader and `render.ts` are untouched — what is new is the surface,
+`terrainLayer.ts` to put the painted canvas on the map, and a rectangle that is
+capped at 500 m square and framed inside the visible map rather than clamped
+from it (`docs/terrain-analysis.md`).
 
 `src/map/compare/` was on that list and is off it: `ViewSection` drives it. It
 kept its curtain and grew a split; what it lost is focus, which the ground
@@ -269,7 +280,7 @@ The rows below without a writer still have none.
 | `activeThemeLayersAtom` | `layers/atoms.ts` | which Kulturminner layers | `useHeritageControls` |
 | `heritageDetailsAtom`, `heritageRenderAtom`, `heritageOpacityAtom`, `heritageHiddenAtom` | `layers/heritage.ts` | how they are drawn | `useHeritageControls` |
 | `heritageTipAtom`, `heritagePopupAtom` | `map/featureInfo/atoms.ts` | what the pointer found, and what a click kept | `useHeritageInfo` |
-| `terrainWindowAtom`, `frameTerrainWindowAtom` | `terrain/window.ts` | the rectangle under analysis, and null for no analysis | `useTerrainControls` |
+| `terrainWindowAtom`, `frameTerrainWindowAtom` | `terrain/window.ts` | the rectangle under analysis, and null for no analysis | `useTerrainToggle`, `useTerrainControls` |
 
 The URL still carries `projection`, `backgroundLayer`, `hybrid`, `contours`,
 `lidarModel`, `themeLayers`, `heritage*`, `lat`, `lon` and `zoom`
@@ -369,11 +380,11 @@ analysis was framed over and not the analysis.
   assumes one map except those callers.
 - **Hybrid has no control.** The ground section is built, the view section is
   built, and the tool section holds the Kulturminner overlay, the terrain
-  analysis and the upstream fault chip; no Hybrid overlay or contours, no search
-  — the atoms for both are live and unwritten. The sections say where each of those goes when it is
-  written; Hybrid is the next one in, and the only question it
-  raises is whether a modifier over the ground belongs to the ground section or
-  the tool section.
+  analysis switch and the upstream fault chip; no Hybrid overlay or contours, no
+  search — the atoms for both are live and unwritten. The sections say where each
+  of those goes when it is written; Hybrid is the next one in, and the only
+  question it raises is whether a modifier over the ground belongs to the ground
+  section or the tool section.
 - **Nothing walks the rings.** The arms list and pick; there is no W/S step
   through datasets, variants or acquisitions, because those keys went with the
   old shell (`lidarCyclingAtom` above).
