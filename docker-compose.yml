@@ -12,6 +12,14 @@ services:
       # Runtime config injected into the SPA. Edit in place; it is read
       # on page load, so no rebuild or restart is needed.
       - ./config.js:/var/www/config.js:ro
+      # The access log, written by the `log` block in the Caddyfile and read
+      # from the host by scripts/usage-report.sh. A host path rather than a
+      # named volume for the same reason as the two stores below: something
+      # outside the stack reads it. First run wants
+      #   sudo mkdir -p /site/tufteseid/data/logs
+      # Third-party install: point it anywhere writable, or drop both this
+      # line and the Caddyfile's `log` block to keep no request log at all.
+      - /site/tufteseid/data/logs:/var/log/caddy
       # Optional: override the baked-in Caddyfile without rebuilding.
       # - ./Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
@@ -71,6 +79,11 @@ services:
   mapproxy:
     image: ghcr.io/mapproxy/mapproxy/mapproxy:7.0.0-alpine-nginx
     restart: unless-stopped
+    # Same reason as wmscache: bounded, because nothing else bounds it.
+    logging:
+      options:
+        max-size: "20m"
+        max-file: "3"
     volumes:
       - ./mapproxy/mapproxy.yaml:/mapproxy/config/mapproxy.yaml:ro
       - ./mapproxy/seed.yaml:/mapproxy/config/seed.yaml:ro
@@ -104,6 +117,16 @@ services:
   wmscache:
     image: nginx:1.27-alpine
     restart: unless-stopped
+    # The access log is the only record of what this proxy actually asked the
+    # upstreams for — scripts/usage-report.sh reads it back out of here with
+    # `docker compose logs` — and Docker's json-file driver keeps every line
+    # forever unless told not to. 200 MB of the `wmscache` log_format is on the
+    # order of a million requests, which is a long window at this site's
+    # traffic and a bounded one at any other.
+    logging:
+      options:
+        max-size: "50m"
+        max-file: "4"
     volumes:
       - ./nginx/wms-cache.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/wms-proxy-common.conf:/etc/nginx/wms-proxy-common.conf:ro

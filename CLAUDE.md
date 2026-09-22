@@ -44,6 +44,7 @@ Each owns its subject; this file keeps only what is true across all of them.
 | `docs/map-layers.md` | What is drawn on the map: background grounds, theme layers, and the recipes for adding another | `src/map/layers/`, any new map source |
 | `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream and Caddy → mapproxy → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
+| `docs/monitoring.md` | What the access logs record and what reads them back: the usage report, the cron health check, retention, why there is no scraper | `scripts/usage-report.sh`, `scripts/health-check.sh`, any log format or `logging:` cap |
 | `README.md` | Third-party install and admin guide | any change to install, first-run or licensing |
 
 ## Working here
@@ -96,6 +97,11 @@ scripts/live-check.sh https://<host> <lokalitet-code>
   public. Its raster half still holds; its PocketBase half probes the old
   collections and will need rewriting with the new data model
   (`docs/state-of-the-branch.md`).
+
+- First run on a new host wants `sudo mkdir -p /site/tufteseid/data/logs`
+  alongside the cVAT and MapProxy store directories — Caddy's access log is a
+  bind mount, and `scripts/usage-report.sh` and `scripts/health-check.sh` both
+  read it (`docs/monitoring.md`).
 
 - Changed anything under `nginx/`? Also `docker compose restart wmscache`. The
   configs are bind-mounted but nginx only reads them at startup, and

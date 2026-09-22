@@ -1,11 +1,55 @@
 {
         servers {
                 metrics
+
+                # Caddy is not the edge: the host's TLS terminator reaches it
+                # over the Docker bridge, so `$remote_addr` is the bridge and
+                # every request in the access log would come from the same
+                # address — one visitor, forever. `private_ranges` trusts the
+                # bridge to have set X-Forwarded-For (the default value of
+                # `client_ip_headers`), which is what fills the log's
+                # `client_ip` field and what GoAccess counts.
+                #
+                # This is a statement about the deployment, not about Caddy: it
+                # is only true while nothing reaches :3000 except a proxy on a
+                # private address. Publishing the port beyond 127.0.0.1 in
+                # docker-compose.yml would make it a spoofable header.
+                trusted_proxies static private_ranges
         }
-        admin :2019
+
+        # Loopback inside the container, not its network address. The admin API
+        # rewrites Caddy's running config and has no authentication of its own,
+        # so on :2019 it is reachable from every other service on the compose
+        # network. The Prometheus metrics that `servers { metrics }` collects
+        # ride on this same listener — reach them with
+        #   docker compose exec tufteseid wget -qO- localhost:2019/metrics
+        # and see docs/monitoring.md before opening a listener for a scraper.
+        admin localhost:2019
 }
 
 :3000
+
+# The request log. Caddy logs errors unasked but never requests, so this block
+# is the whole of the record that anybody visited. JSON rather than a console
+# format because the one plaintext format GoAccess reads out of the box —
+# Common Log Format — comes from a plugin, and a plugin means building Caddy
+# with xcaddy instead of pulling the official image.
+#
+# A host path, like the cVAT and MapProxy stores and unlike the wmscache
+# volume: scripts/usage-report.sh reads this from outside the stack, and it
+# should survive the stack being rebuilt. First run wants
+#   sudo mkdir -p /site/tufteseid/data/logs
+#
+# Rolled files are gzipped, and 10 × 20 MB is the whole of the retention. The
+# report is rebuilt from the whole set on every run rather than accumulated
+# into a database, so running it twice in an hour counts nothing twice.
+log {
+        output file /var/log/caddy/access.log {
+                roll_size 20mb
+                roll_keep 10
+        }
+        format json
+}
 
 route {
         header Strict-Transport-Security max-age=31536000

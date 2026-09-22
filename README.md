@@ -51,6 +51,29 @@ proxied map service and each service the browser calls directly — with
 the exit status as the verdict. curl is all it needs, it writes
 nothing, and it is safe to run against a live install.
 
+## See who is using it
+
+Caddy writes an access log to a host path, which needs to exist before
+the stack starts:
+
+```sh
+sudo mkdir -p /site/tufteseid/data/logs /site/tufteseid/data/stats
+docker compose up -d
+docker compose restart wmscache
+scripts/usage-report.sh
+```
+
+That writes a GoAccess report to the stats directory and prints what the
+traffic was made of and how much of it reached Kartverket, Riksantikvaren
+or Norge i bilder rather than being answered from cache here. Its
+companion `scripts/health-check.sh` is the same data with thresholds on
+it, silent unless something is wrong, meant for cron.
+
+No analytics are collected in the browser: the app ships no tracker, and
+every number comes out of logs the server writes anyway. See
+[`docs/monitoring.md`](docs/monitoring.md), including what to change if
+you do not want a request log at all.
+
 ## Licence
 
 Tufteseid is not Norgeskart and is not operated by Kartverket. It is an
