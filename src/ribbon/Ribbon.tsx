@@ -18,8 +18,14 @@
 // The ground section is the one that appears twice. A two-ground view mounts a
 // second immediately right of the view control, so the row reads left to right
 // as the screen does: the left half's ground, the view that put them both up,
-// the right half's ground. The slack is after that, between the sections and
-// the tools, so nothing already on the row moves when the second one appears.
+// the right half's ground.
+//
+// The band is three columns and the view has the middle one, so it sits on the
+// centre line of the row whatever the sections beside it are carrying — it is
+// the one control the reader can go back to without looking. That is why the
+// two side tracks are wrappers rather than the sections themselves: the right
+// one carries both the B section and the tools, and a grid needs exactly three
+// children to have a middle.
 
 import { useAtomValue } from 'jotai';
 import { compareOnAtom } from '../map/compare/halves';
@@ -33,10 +39,14 @@ export const Ribbon = () => {
 
   return (
     <header className={styles.ribbon}>
-      <GroundSection half="a" />
+      <div className={styles.side}>
+        <GroundSection half="a" />
+      </div>
       <ViewSection />
-      {twoGrounds && <GroundSection half="b" />}
-      <ToolSection />
+      <div className={styles.side}>
+        {twoGrounds && <GroundSection half="b" />}
+        <ToolSection />
+      </div>
     </header>
   );
 };
