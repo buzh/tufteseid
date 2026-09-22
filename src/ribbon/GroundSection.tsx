@@ -17,9 +17,9 @@
 // acquisition, the LiDAR flight and render), and a controller unmounted with
 // its arm would forget it.
 //
-// Still unbuilt here, with live atoms and no writer: the Hybrid overlay and its
-// contours — two booleans, and the only open question is whether a modifier
-// over the ground belongs to this section or to `ToolSection`.
+// The Hybrid overlay is not a control of this section: it draws only over a
+// LiDAR ground, so it is the last box of the LiDAR arm rather than a modifier
+// standing beside the switch.
 
 import { Group } from '@mantine/core';
 import { useAtomValue } from 'jotai';

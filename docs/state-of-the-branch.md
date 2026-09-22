@@ -14,8 +14,7 @@ what shape. At the other end of the row it puts Riksantikvaren's heritage layers
 over whatever that ground is, and says what of them; and only when there is
 something to say, it names an external service that has stopped answering.
 There is still no search box, no lokaliteter, no funn, no drawing and no
-account, and no control over the Hybrid overlay or its contours — those remain
-a `set()` away.
+account.
 
 The band and the controls are separate things. `src/ribbon/` is the band, and it
 is laid out in sections, each with its own subject and its own file:
@@ -45,7 +44,7 @@ Everything inside `GroundSection` is a surface mounted from its own directory:
 | Directory | Is |
 | --- | --- |
 | `src/grounds/` | the ground switch — `GroundSwitch`, three buttons in a `ControlUnit` with the live one lit, and `useGroundControls` which derives which ground is up from the half's background atom rather than storing it |
-| `src/lidarControls/` | the LiDAR arm — `LidarControlGroup`, four elements whose design is settled |
+| `src/lidarControls/` | the LiDAR arm — `LidarControlGroup`, five elements whose design is settled, the last of them the Hybrid overlay and its contours |
 | `src/kartControls/` | the Kart arm — one chip over `KART_VARIANTS`, and the memory of which variant Kart means while another ground is up |
 | `src/flyfotoControls/` | the Flyfoto arm — the NiB mosaic or one acquisition over the viewport, with the period filter inside its own dropdown |
 
@@ -275,7 +274,7 @@ The rows below without a writer still have none.
 | Atom | Module | Does | Written by |
 | --- | --- | --- | --- |
 | `backgroundLayerHalves` | `layers/config/backgroundLayers/atoms.ts` | which ground | all three arms |
-| `hybridOverlayHalves`, `hybridContoursHalves` | same | Kartverket's transparent overlay | — |
+| `hybridOverlayHalves`, `hybridContoursHalves` | same | Kartverket's transparent overlay | `useLidarControls` |
 | `kartVariantHalves` | `…/kartVariants.ts` | which cartography | `useKartControls` |
 | `activeLidarProjectHalves`, `activeLidarStyleHalves`, `activeLidarModelHalves` | `…/lidarProjects.ts` | per-project LiDAR | `useLidarControls` |
 | `lidarAutoDatasetHalves` | `…/lidarAuto.ts` | pick the dataset from the viewport | `useLidarControls` |
@@ -385,13 +384,16 @@ analysis was framed over and not the analysis.
   the LiDAR extract. Wiring
   `src/map/featureInfo/` to whichever map was clicked is the fix; nothing here
   assumes one map except those callers.
-- **Hybrid has no control.** The ground section is built, the view section is
+- **There is no search box.** The ground section is built, the view section is
   built, and the tool section holds the Kulturminner overlay, the terrain
-  analysis switch and the upstream fault chip; no Hybrid overlay or contours, no
-  search — the atoms for both are live and unwritten. The sections say where each
-  of those goes when it is written; Hybrid is the next one in, and the only
-  question it raises is whether a modifier over the ground belongs to the ground
-  section or the tool section.
+  analysis switch and the upstream fault chip. Search is the next surface in,
+  and the tool section is where it goes: it belongs to no ground.
+- **Hybrid is a LiDAR control, not a tool.** The overlay went into the LiDAR
+  arm rather than the tool section because `resolveStack` draws it only over a
+  LiDAR ground (`LIDAR_LAYERS`) — a switch in the tool section would be inert
+  on two of the three grounds. If the overlay is ever wanted over ortofoto,
+  which is what "hybrid" means in Norgeskart, both the test in `resolveStack`
+  and the control's home move together.
 - **Nothing walks the rings.** The arms list and pick; there is no W/S step
   through datasets, variants or acquisitions, because those keys went with the
   old shell (`lidarCyclingAtom` above).

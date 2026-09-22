@@ -1,4 +1,4 @@
-// The LiDAR arm: four elements in one row.
+// The LiDAR arm: five elements in one row.
 //
 // This is the whole surface, not a convenience wrapper — a host renders this
 // and gets the controls and their order rather than reassembling them. It
@@ -7,18 +7,21 @@
 // one. The order is an argument: Automatisk stands ahead of the
 // pair it governs, because with it on both chips are its answer rather than the
 // reader's; the dataset comes before the render because a render is only on
-// offer where the dataset publishes it; the model sits last because it is the
-// one axis that survives every dataset.
+// offer where the dataset publishes it; the model sits after them because it is
+// the one axis that survives every dataset. Hybrid is last because it is not
+// about the relief at all — it is what is written over whichever relief the
+// four before it settled on.
 //
 // It takes the controller rather than calling `useLidarControls` itself, which
 // is what lets a two-ground view mount one of these per pane: the controller
-// knows which half it writes and nothing in the four controls does.
+// knows which half it writes and nothing in the five controls does.
 
 import { Group } from '@mantine/core';
 import { useEffect } from 'react';
 import { AutoToggle } from './AutoToggle';
 import styles from './controls.module.css';
 import { DatasetMenu } from './DatasetMenu';
+import { HybridToggle } from './HybridToggle';
 import { ModelToggle } from './ModelToggle';
 import { RenderMenu } from './RenderMenu';
 import type { LidarControls } from './useLidarControls';
@@ -45,6 +48,7 @@ export const LidarControlGroup = ({ lidar }: { lidar: LidarControls }) => {
       <DatasetMenu lidar={lidar} />
       <RenderMenu lidar={lidar} />
       <ModelToggle lidar={lidar} />
+      <HybridToggle lidar={lidar} />
     </Group>
   );
 };

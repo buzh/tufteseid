@@ -146,6 +146,14 @@
       "cvatProvenance": "Arkeologisk relieff over «{{acquisition}}»: {{renderer}} {{template}}, radius {{general}}/{{flat}} piksler. Høydene er Kartverkets, bildet er vårt.",
       "domLocked": "Overflatemodellen publiserer bare skyggerelieff"
     },
+    "hybrid": {
+      "label": "Referanselag",
+      "offHint": "Legg veier, jernbane og stedsnavn over relieffet",
+      "onHint": "Ta bort veier, jernbane og stedsnavn",
+      "contours": "Høydekurver",
+      "contoursOffHint": "Ta med høydekurver i referanselaget",
+      "contoursOnHint": "Ta bort høydekurvene"
+    },
     "model": {
       "dtm": "Terreng",
       "dom": "Overflate",

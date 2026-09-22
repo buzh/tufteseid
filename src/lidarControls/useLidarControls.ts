@@ -1,7 +1,9 @@
-// The LiDAR ring's controller: which flight is drawing, which render of it, and
-// which model. Everything the controls do to the map goes through here, because
-// the three are not independent — the ground's *name* is a function of the
-// render, and a render is only on offer where the dataset publishes it.
+// The LiDAR ring's controller: which flight is drawing, which render of it,
+// which model, and whether the reference overlay is written over it. Everything
+// the controls do to the map goes through here, because the first three are not
+// independent — the ground's *name* is a function of the render, and a render is
+// only on offer where the dataset publishes it. The overlay is independent of
+// all three, which is the whole of what its two booleans have to say.
 //
 // One per half. Each writes its own side of every pair in
 // `map/compare/halves.ts`, so the two panes of a two-ground view hold different
@@ -17,7 +19,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { mapAtom } from '../map/atoms';
 import { viewportBbox } from '../map/bbox';
 import type { CompareHalf } from '../map/compare/halves';
-import { backgroundLayerHalves } from '../map/layers/config/backgroundLayers/atoms';
+import {
+  backgroundLayerHalves,
+  hybridContoursHalves,
+  hybridOverlayHalves,
+} from '../map/layers/config/backgroundLayers/atoms';
 import {
   activeCvatAcquisitionHalves,
   type CvatAcquisition,
@@ -68,6 +74,14 @@ export const useLidarControls = (half: CompareHalf) => {
   const [lidarModel, setLidarModel] = useAtom(activeLidarModelHalves[half]);
   // Follows the viewport unless pinned; the rules are `lidarAuto.ts`.
   const [autoDataset, setAutoDataset] = useAtom(lidarAutoDatasetHalves[half]);
+  // Kartverket's reference overlay over the relief, and its contours. Both are
+  // modifiers rather than datasets: they survive every dataset, render and
+  // model switch, and `resolveStack` draws them only over a LiDAR ground —
+  // which is why they are on this controller and not one of the other arms'.
+  const [hybridOverlay, setHybridOverlay] = useAtom(hybridOverlayHalves[half]);
+  const [hybridContours, setHybridContours] = useAtom(
+    hybridContoursHalves[half],
+  );
 
   // An atom because `lidarFootprintsLayer` paints footprints only while open.
   const [pickerOpen, setPickerOpen] = useAtom(lidarPickerOpenHalves[half]);
@@ -369,6 +383,15 @@ export const useLidarControls = (half: CompareHalf) => {
     selectStyle,
     lidarModel,
     selectModel,
+
+    // The overlay. Contours keep their value while it is off rather than being
+    // cleared with it: the stack already treats them as inert without it, and a
+    // reader who turns the overlay off to look at the bare relief should get
+    // the same overlay back when they turn it on again.
+    hybridOverlay,
+    toggleHybrid: () => setHybridOverlay((on) => !on),
+    hybridContours,
+    toggleContours: () => setHybridContours((on) => !on),
   };
 };
 

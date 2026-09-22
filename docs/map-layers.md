@@ -8,8 +8,9 @@ is `docs/terrain-analysis.md`.
 
 The ribbon drives all three grounds below: a ground switch (`src/grounds/`) and
 one arm per ground — `src/lidarControls/`, `src/kartControls/`,
-`src/flyfotoControls/` — in the band at `src/ribbon/`. What it does not drive
-is the Hybrid overlay and its contours, which stay a `set()` away;
+`src/flyfotoControls/` — in the band at `src/ribbon/`. The Hybrid overlay and
+its contours are the last two boxes of the LiDAR arm, because that is the only
+ground `resolveStack` draws them over;
 `docs/state-of-the-branch.md` has the rest of what the rebuild has reached.
 
 All WMS requests are `VERSION=1.3.0`, same-origin through a `/wms/…` prefix.
