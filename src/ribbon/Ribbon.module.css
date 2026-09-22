@@ -1,32 +1,50 @@
-/* The band itself, and nothing that sits in it. Each arm styles itself and the
-   chip they all wear is a `src/ui/` primitive, so this file describes only the
-   strip the map is pushed down by.
+/* The band and its three sections, and nothing that stands in them. Each arm
+   styles itself and the chip they all wear is a `src/ui/` primitive, so this
+   file describes only the strip the map is pushed down by and where along it
+   the three sections sit.
 
    A band above the map, not a floating panel over it: the map is what is being
    read, and a control that covers terrain competes with it. */
 
+/* One row, and it scrolls rather than wraps — a ribbon that grows a second line
+   moves the map down under the reader's cursor. */
 .ribbon {
   flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
   padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
   background: var(--mantine-color-body);
   border-bottom: 1px solid var(--mantine-color-default-border);
-}
-
-/* One row, and it scrolls rather than wraps — a ribbon that grows a second line
-   moves the map down under the reader's cursor. */
-.group {
   overflow-x: auto;
   scrollbar-width: thin;
 }
 
-/* Pushes the fault chip to the right of the controls, so it appears without
-   moving anything the reader was about to click. */
-.statusSpacer {
-  flex: 1 1 auto;
-  min-width: var(--mantine-spacing-md);
+/* The ground section keeps its natural width. It is the widest of the three —
+   four controls on a LiDAR flight — and the one the reader aims at, so it is
+   the last thing that should move or shrink. */
+.grounds {
+  flex: none;
 }
 
-/* One origin's row in the popover. */
+/* The view section takes the slack. That is what puts the tools at the
+   right-hand end and its own contents between the two, and it holds the row
+   open by a margin even while it is empty, so the tools never sit flush against
+   the ground controls. */
+.views {
+  flex: 1 1 auto;
+  min-width: var(--mantine-spacing-md);
+  justify-content: center;
+}
+
+/* The far end. Empty most of the time — a chip appearing in it must not move
+   anything the reader was about to click, which is why the slack is in the
+   middle rather than here. */
+.tools {
+  flex: none;
+}
+
+/* One origin's row in the fault popover. */
 .outage + .outage {
   margin-top: var(--mantine-spacing-sm);
   padding-top: var(--mantine-spacing-sm);

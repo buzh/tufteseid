@@ -14,9 +14,25 @@ search box, no lokaliteter, no funn, no drawing and no account, and no control
 over the Hybrid overlay, its contours or the compare curtain — those remain a
 `set()` away.
 
-The band and the controls are separate things. `src/ribbon/` is the band: the
-strip and the upstream fault chip. Everything in it is a surface mounted from
-its own directory:
+The band and the controls are separate things. `src/ribbon/` is the band, and it
+is laid out in three sections, each with its own subject and its own file:
+
+| Section | Holds | Is about |
+| --- | --- | --- |
+| `GroundSection` | the ground switch and the arm belonging to it | what is drawn under everything |
+| `ViewSection` | the compare curtain, once it is built | how the map is being looked at |
+| `ToolSection` | the Kulturminner overlay, once it is built; the upstream fault chip | what applies whichever ground is up |
+
+The split is by subject, not by position. A control belongs to the left because
+it chooses the one picture the whole map is made of, to the middle because it
+changes how that picture is presented rather than which one it is, and to the
+right because it is true of all three grounds at once. Which section a new
+control goes in should be a question about the control, never about where there
+is room. `Ribbon.tsx` itself is layout and nothing else; the middle section is
+also the slack that holds the tools at the right-hand end, which is why it stays
+mounted while empty.
+
+Everything inside `GroundSection` is a surface mounted from its own directory:
 
 | Directory | Is |
 | --- | --- |
@@ -25,10 +41,10 @@ its own directory:
 | `src/kartControls/` | the Kart arm — one chip over `KART_VARIANTS`, and the memory of which variant Kart means while another ground is up |
 | `src/flyfotoControls/` | the Flyfoto arm — the NiB mosaic or one acquisition over the viewport, with the period filter inside its own dropdown |
 
-The row is the ground switch and then one arm, never two: a row carrying the
-controls of a ground that is not drawing would be three surfaces claiming the
-same map. The ribbon mounts all three controllers regardless, because each
-remembers something across a visit to another ground.
+That section is the ground switch and then one arm, never two: a row carrying
+the controls of a ground that is not drawing would be three surfaces claiming
+the same map. It mounts all three controllers regardless, because each remembers
+something across a visit to another ground.
 
 Every arm takes a controller object and no atoms of its own, so another host
 can mount it; what a second host would have to do about there being one LiDAR
@@ -181,11 +197,13 @@ the surfaces that wrote them.
   keeps the viewport list warm while the keyboard ring walks datasets, and the
   ring (`useBackgroundCyclingKeys`, W/S/A/D/E) went with the old shell. It costs
   nothing false today and comes back with those keys.
-- **The ribbon covers the three grounds**, plus the upstream fault chip. No
-  Hybrid overlay or contours toggle, no compare curtain, no Kulturminner
-  themes, no search — the atoms for all of them are live and unwritten. Hybrid
-  is the next one in: it is two booleans, and the only question it raises is
-  whether a modifier belongs to the LiDAR arm or to the band.
+- **Only the ground section of the ribbon is built**, plus the upstream fault
+  chip in the tool section. The view section is empty and the Kulturminner
+  themes have no toggle; no Hybrid overlay or contours, no compare curtain, no
+  search — the atoms for all of them are live and unwritten. The three sections
+  say where each of those goes when it is written; Hybrid is the next one in,
+  and the only question it raises is whether a modifier over the ground belongs
+  to the ground section or the tool section.
 - **Nothing walks the rings.** The arms list and pick; there is no W/S step
   through datasets, variants or acquisitions, because those keys went with the
   old shell (`lidarCyclingAtom` above).

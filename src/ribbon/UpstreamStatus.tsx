@@ -2,10 +2,11 @@
 //
 // Absent while everything answers — a permanent green light is furniture, and
 // the ribbon has no room for furniture. When an origin goes down the chip
-// appears at the right-hand end of the row, away from the controls the reader's
-// cursor is already heading for, and says which part of the map has stopped
-// arriving rather than which company's server it came off. "Flyfoto svarer
-// ikke" is the fact a reader can act on; the hostname behind it is not.
+// appears in `ToolSection`, at the far end of the row and away from the
+// controls the reader's cursor is already heading for, and says which part of
+// the map has stopped arriving rather than which company's server it came off.
+// "Flyfoto svarer ikke" is the fact a reader can act on; the hostname behind it
+// is not.
 
 import { Button, Group, Popover, Stack, Text } from '@mantine/core';
 import { useAtomValue } from 'jotai';
@@ -121,10 +122,5 @@ export const UpstreamStatus = () => {
   const health = useAtomValue(upstreamHealthAtom);
   const down = ORIGIN_IDS.filter((id) => health[id].down);
   if (down.length === 0) return null;
-  return (
-    <>
-      <span className={styles.statusSpacer} />
-      <OutagePopover down={down} health={health} />
-    </>
-  );
+  return <OutagePopover down={down} health={health} />;
 };
