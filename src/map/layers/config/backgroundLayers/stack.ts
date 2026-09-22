@@ -53,6 +53,15 @@ export const LIDAR_LAYERS = new Set<BackgroundLayerName>([
 // How far the layer under a per-project dataset is dimmed.
 const FALLBACK_OPACITY = 0.6;
 
+// NDH project rasters are 0.25 m at their finest and 0.5 m for most flights,
+// so z17 (0.166 m/px) already asks the renderer for more than it holds. The
+// three levels above it are pure interpolation, and this is the most expensive
+// service in the stack to ask: 3-12 s a cold tile, parameterized per project so
+// MapProxy can never cache it, and on the shared wms.geonorge.no budget. One
+// level of magnification past native is kept deliberately — it is the
+// difference between a soft image and no image when reading a small feature.
+const LIDAR_PROJECT_MAX_ZOOM = 17;
+
 const emptyBackgroundLayer: EmptyBackgroundLayer = {
   type: 'Empty',
   layerName: 'empty',
@@ -81,6 +90,7 @@ const buildLidarProjectConfig = (
     LAYERS: `${project.id}:${wmsLidarStyle(style)}`,
     VERSION: '1.3.0',
   },
+  maxZoom: LIDAR_PROJECT_MAX_ZOOM,
   // The acquisition's own footprint: the service advertises every project.
   coverageExtent: { extent: project.bboxLonLat, crs: 'EPSG:4326' },
 });

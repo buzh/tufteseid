@@ -27,6 +27,10 @@ import { countByEra, filterByEra, type FlyfotoEra } from './eras';
 // so a regional view already intersects several hundred of them.
 const MIN_FLYFOTO_ZOOM = 8;
 
+// Matches REFRESH_DEBOUNCE_MS in lidarFootprintsLayer.ts; the two viewport
+// passes answer the same shape of question and should cost the same.
+const REFRESH_DEBOUNCE_MS = 250;
+
 export type FlyfotoViewportStatus =
   | 'idle'
   | 'loading'
@@ -109,11 +113,21 @@ export const useFlyfotoControls = (half: CompareHalf) => {
     };
 
     refresh();
-    map.on('moveend', refresh);
+    // Same 250 ms as the LiDAR footprint pass, for the same reason: a pan that
+    // ends in two or three quick moveends should cost one archive query rather
+    // than three. Aborting the superseded ones cuts our wait, not the work the
+    // ImageServer has already started.
+    let debounce: number | undefined;
+    const onMoveEnd = () => {
+      window.clearTimeout(debounce);
+      debounce = window.setTimeout(refresh, REFRESH_DEBOUNCE_MS);
+    };
+    map.on('moveend', onMoveEnd);
     return () => {
       cancelled = true;
+      window.clearTimeout(debounce);
       inFlight?.abort();
-      map.un('moveend', refresh);
+      map.un('moveend', onMoveEnd);
       // Emptied on the way out, not on the way in: the rows belong to a
       // viewport read while Flyfoto was the ground, and a reader who leaves,
       // pans across the country and comes back must not be shown the last

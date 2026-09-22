@@ -32,6 +32,7 @@ import { liveBackgroundLayersAtom } from './layers/config/backgroundLayers/atoms
 import { fetchCvatAcquisitions } from './layers/config/backgroundLayers/cvatGround';
 import {
   AUTO_ENGAGE_M_PER_PX,
+  AUTO_RELEASE_COVERAGE,
   liveLidarAutoAtom,
 } from './layers/config/backgroundLayers/lidarAuto';
 import {
@@ -289,6 +290,23 @@ export const useLidarFootprintsLayer = () => {
               (a, b) =>
                 b.maxRatio - a.maxRatio ||
                 sortProjectsByRelevance(a.project, b.project),
+            )
+            // With the pulldown closed and no cycling, the only reader of this
+            // list is `chooseAutoDataset`, whose two gates are areaRatio >=
+            // AUTO_ENGAGE_COVERAGE to take a flight and >=
+            // AUTO_RELEASE_COVERAGE to keep the incumbent. maxRatio is an upper
+            // bound on areaRatio, so a candidate under the lower of the two
+            // cannot satisfy either gate and its boundary fetch can only
+            // confirm that. Automatisk is on by default and refreshes for a
+            // whole LiDAR session, so without this cut a first pan into
+            // well-flown ground spends up to 60 WFS lookups — each one a page,
+            // two when the name misses — to answer a question three of them
+            // settle. Opening the pulldown re-runs this effect (`picking` is a
+            // dep) and refetches at the full cap, so the rows the reader
+            // actually sees are never the narrowed list.
+            .filter(
+              (e) =>
+                picking || cycling || e.maxRatio >= AUTO_RELEASE_COVERAGE,
             )
             .slice(0, FOOTPRINT_FETCH_CAP)
             .map(({ project }) => project);

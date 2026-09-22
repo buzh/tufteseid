@@ -112,7 +112,9 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
     url: layerConfig.url,
     params: { ...layerConfig.props },
     // 512 px on the view's ladder, a request-count decision (wmsTileGrid.ts).
-    tileGrid: getWMSTileGrid(projection),
+    // Capped at the source's own resolution where it has one: over the cap OL
+    // upsamples the deepest real level instead of ordering a render per tile.
+    tileGrid: getWMSTileGrid(projection, 0, layerConfig.maxZoom),
     zDirection: WMS_Z_DIRECTION,
   });
   guardTileSource(source, layerConfig.url);
@@ -139,7 +141,7 @@ export const getArcGISImageLayer = (
   const source = new TileArcGISRest({
     url: layerConfig.url,
     params: { ...layerConfig.params },
-    tileGrid: getWMSTileGrid(projection),
+    tileGrid: getWMSTileGrid(projection, 0, layerConfig.maxZoom),
     zDirection: WMS_Z_DIRECTION,
     // Off, so a tile is 512x512 at DPI 90 whatever the display; on, SIZE and
     // DPI scale by pixel ratio and wmscache keys the same ground twice.

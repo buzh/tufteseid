@@ -74,6 +74,10 @@ export const buildNationalLidarConfig = (
       LAYERS: `${NATIONAL_WMS[model].prefix}:${style}`,
       VERSION: '1.3.0',
     },
+    // The same 1 m product as the cached branch above, so the same ceiling —
+    // and it matters more here, because a level past it is an on-the-fly
+    // render per tile rather than a MapProxy hit.
+    maxZoom: NATIONAL_CACHE_MAX_ZOOM,
     coverageExtent,
   };
 };

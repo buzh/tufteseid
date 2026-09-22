@@ -38,6 +38,14 @@ export type WMSBackgroundLayer = BackgroundLayerBase & {
   layerName: WMSLayerName;
   url: string;
   props?: Record<string, string | number | boolean>;
+  /** The deepest level worth asking this service for, absolute z on the view's
+   *  ladder. Past a source's own ground sample distance the renderer is
+   *  upsampling its own grid, and OL upsampling the last real level says the
+   *  same thing without spending four more levels of on-the-fly renders
+   *  against a metered origin. Defaults to the view's own max (20), which is
+   *  right only for a source that genuinely resolves that far — none here do.
+   *  Not part of `layerSignature`: it is fixed per layer, not per dataset. */
+  maxZoom?: number;
   coverageExtent?: CoverageExtent;
 };
 
@@ -50,6 +58,8 @@ export type ArcGISImageBackgroundLayer = BackgroundLayerBase & {
   // Merged over TileArcGISRest's upper-case F / FORMAT / TRANSPARENT defaults;
   // a lower-case key adds a second parameter instead of overriding.
   params?: Record<string, string | number | boolean>;
+  /** As on `WMSBackgroundLayer`. */
+  maxZoom?: number;
   coverageExtent?: CoverageExtent;
 };
 

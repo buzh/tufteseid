@@ -15,6 +15,8 @@ const FLYFOTO_COVERAGE_EXTENT_25833: [number, number, number, number] = [
   -250025, 6299985, 1211155, 8985010,
 ];
 
+const FLYFOTO_PROJECT_MAX_ZOOM = 18;
+
 // Our MapProxy cache of the mosaic, which reaches NiB through the same
 // token-injecting sidecar wmscache does. JPEG, not PNG: 68 kB against 528 kB
 // for a 512 px tile over Oslo, and the mosaic is opaque over its whole extent,
@@ -48,6 +50,12 @@ export const buildFlyfotoProjectConfig = (
     FORMAT: 'jpgpng',
     mosaicRule: flyfotoMosaicRule(project.id),
   },
+  // Ortofoto acquisitions run 0.04 m over cities and 0.25-0.5 m in the field;
+  // z18 is 0.083 m/px, which covers all but the very finest urban flights and
+  // leaves z19-z20 as interpolation nobody can read anything new out of. Set
+  // one level deeper than the LiDAR cap because the spread is wider and a
+  // photograph rewards magnification in a way a hillshade does not.
+  maxZoom: FLYFOTO_PROJECT_MAX_ZOOM,
   // The acquisition's own bounds: the ImageServer advertises every flight.
   coverageExtent: { extent: project.bboxLonLat, crs: 'EPSG:4326' },
 });
