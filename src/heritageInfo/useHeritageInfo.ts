@@ -22,6 +22,7 @@ import {
   queryHeritageAt,
 } from '../map/featureInfo/heritageQuery';
 import type { FeatureInfoReading } from '../map/featureInfo/types';
+import { terrainAdjustingAtom } from '../terrain/window';
 
 /** How long the pointer has to hold still. Long enough that crossing the map
  *  asks nothing, short enough that stopping to look feels answered. */
@@ -73,6 +74,15 @@ export const useHeritageInfo = (): HeritageInfo => {
       map.on('pointermove', (e) => {
         if (e.dragging) return;
         if ((e.originalEvent as PointerEvent).pointerType === 'touch') return;
+        // Placing the terrain rectangle takes the pointer. That drag owns the
+        // cursor — it says which corner is under the hand — and a tip raised
+        // over the ground being framed answers a question nobody asked. Read
+        // from the store rather than taken as a dependency so that turning it
+        // on does not rebind every listener in here.
+        if (store.get(terrainAdjustingAtom)) {
+          forget();
+          return;
+        }
         stopHovering();
         setTip(null);
         if (!heritageIsQueryable(map)) {

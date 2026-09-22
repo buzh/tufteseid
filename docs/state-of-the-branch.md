@@ -104,21 +104,28 @@ Kartverket's hillshade. The rest of the surface is `TerrainSurface`, mounted by
 `MapComponent` over the map: the controller that holds the DEM and the render,
 and, while there is an analysis, a box floating at the top left with the
 settings in it. The two hosts share no props and no component state — they meet
-in `terrainWindowAtom`, which is the rectangle and the on switch at once, so
-starting and stopping are pure atom writes and the toggle holds nothing. The
-settings are in a box rather than a dropdown because every one of them changes a
-picture the reader is looking at while they turn it; the fold in the box's
-header gives the corner of the view back without dropping the grid.
+in `terrainWindowAtom`, which is the rectangle and the on switch at once, and in
+`terrainAdjustingAtom`, which says the rectangle is still being placed. Every
+verb in the surface is a write to one of those two, which is why the toggle
+holds nothing. The settings are in a box rather than a dropdown because every
+one of them changes a picture the reader is looking at while they turn it; the
+fold in the box's header gives the corner of the view back without dropping the
+grid.
 
-Two things are unlike the overlay. Off is not a blind: it drops the grid, which
-is 19 MB, and only the reading survives — visualization, sun, exaggeration,
-radii, transparency, all in component state, which is why the controller is
-mounted whether or not there is an analysis, so a reader who takes the render
-down to look at what is under it gets their own sun back. And the rectangle is
-not the map: `terrainWindowAtom` holds the square that was framed, the analysis
-does not follow a pan, and `Analyser her` is what moves it. The square itself is
+Three things are unlike the overlay. Off is not a blind: it drops the grid,
+which is 19 MB, and only the reading survives — visualization, sun,
+exaggeration, radii, transparency, all in component state, which is why the
+controller is mounted whether or not there is an analysis, so a reader who takes
+the render down to look at what is under it gets their own sun back. The
+rectangle is not the map: `terrainWindowAtom` holds the square that was framed,
+the analysis does not follow a pan, and `Juster` in the box is what gives it
+back. And the switch does not start the work — it puts a square on the screen
+with handles on its corners (`windowAdjust.ts`) and waits for `Start`, because
+one press that both frames the screen and pulls 19 MB spends a reader's
+bandwidth on the ground they happened to be looking at. The square itself is
 `squareBboxWithin` — the largest that fits inside the visible map, at most 500 m
-on a side (`docs/terrain-analysis.md`).
+on a side, and no smaller than `MIN_SIDE_M` once a hand is on it
+(`docs/terrain-analysis.md`).
 
 `src/heritageInfo/` is the other surface `MapComponent` mounts beside the map —
 beside it rather than in it, and each in an `ErrorBoundary` of its own, so
@@ -280,7 +287,7 @@ The rows below without a writer still have none.
 | `activeThemeLayersAtom` | `layers/atoms.ts` | which Kulturminner layers | `useHeritageControls` |
 | `heritageDetailsAtom`, `heritageRenderAtom`, `heritageOpacityAtom`, `heritageHiddenAtom` | `layers/heritage.ts` | how they are drawn | `useHeritageControls` |
 | `heritageTipAtom`, `heritagePopupAtom` | `map/featureInfo/atoms.ts` | what the pointer found, and what a click kept | `useHeritageInfo` |
-| `terrainWindowAtom`, `frameTerrainWindowAtom` | `terrain/window.ts` | the rectangle under analysis, and null for no analysis | `useTerrainToggle`, `useTerrainControls` |
+| `terrainWindowAtom`, `terrainAdjustingAtom` (+ the `open`/`adjust`/`close` writers) | `terrain/window.ts` | the rectangle under analysis, null for no analysis, and whether it is still being placed | `useTerrainToggle`, `useTerrainControls`, `windowAdjust.ts` |
 
 The URL still carries `projection`, `backgroundLayer`, `hybrid`, `contours`,
 `lidarModel`, `themeLayers`, `heritage*`, `lat`, `lon` and `zoom`

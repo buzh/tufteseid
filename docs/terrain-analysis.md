@@ -10,17 +10,21 @@ what `composeVat` follows is RVT's `blend.py` / `blend_func.py` as they run, not
 `settings/blender_VAT.json` as it reads — see below for where the two differ.
 
 Where it lives: `src/terrain/dem.ts` (fetch + TIFF reader), `shade.ts`
-(operators), `render.ts` (field → canvas), `window.ts` and
-`windowLayer.ts` (the rectangle being read, and its frame on the map),
-`terrainLayer.ts` (the finished canvas on the map). The control surface is
-`src/terrainControls/`, mounted in the band's tool section — see below.
+(operators), `render.ts` (field → canvas), `window.ts`, `windowLayer.ts` and
+`windowAdjust.ts` (the rectangle being read, its frame on the map, and placing
+it by hand), `terrainLayer.ts` (the finished canvas on the map). The control
+surface is `src/terrainControls/`, split between the band's tool section and a
+box floating on the map — see below.
 
 Terrain analysis — internal name `terreng` — is a read tool throughout: nothing
 is written. It is also the one picture the client computes rather than fetches,
 so it is the one bounded by a rectangle, and that rectangle is
 `terrainWindowAtom` (`src/terrain/window.ts`): a square, framed on the visible
-map at the moment the reader asked for it, drawn by `windowLayer.ts`, and null
-when there is no analysis running. Nothing else records the tool being on.
+map when the reader turns the tool on and then placed by hand, and null when
+there is no analysis running. Nothing else records the tool being on.
+`terrainAdjustingAtom` beside it says whether the square is still being placed,
+which is the difference between a rectangle that has cost nothing and one that
+has cost a download.
 
 **The square is the largest one that fits inside the visible map, and at most
 `MAX_SIDE_M` (500 m) on a side** — `squareBboxWithin` in `src/map/bbox.ts`, over
@@ -29,14 +33,16 @@ the inset viewport from `viewportBbox`. Three things are load-bearing there:
 - *Square*, because the ceiling is: clamping each axis on its own keeps the
   screen's aspect and hands a reader who asked for the cap a 500 × 280 m
   analysis on a wide window.
-- *Inside*, because an analysis is a rectangle held still while the reader pans,
-  and one that started off the edges of the screen is one whose edges they never
-  saw. There is no minimum side for the same reason — a floor is the one rule
-  that could push the square back out past the edge.
+- *Inside*, because the square framed on the screen is the one the reader then
+  takes hold of, and one that started off the edges is one they cannot reach the
+  corners of. `squareBboxWithin` has no minimum side for the same reason — a
+  floor is the one rule that could push the square back out past the edge. The
+  drag does have one, `MIN_SIDE_M`, because there it is the hand aiming at a
+  size and nothing is going to be pushed anywhere.
 - *Held, not recomputed*: the analysis does not follow the map, because a DEM at
   the ceiling is 19 MB and 4.8 Mpx of arithmetic per visualization and a render
-  that followed would refetch all of it on every pan. `Analyser her` in the
-  menu moves it; the off switch drops it, and with it the grid.
+  that followed would refetch all of it on every pan. `Juster` in the box gives
+  the rectangle back; the off switch drops it, and with it the grid.
 
 500 m is also exact rather than approximate. It is a whole number of cells at
 every resolution the per-project mosaics publish — 2000 px at 0.25 m, 1000 at
@@ -52,13 +58,14 @@ somewhere to put one, the analysis is something you look at and then take down.
 
 `src/terrainControls/`, and it has two hosts. They share no props and no
 component state: both reach `terrainWindowAtom`, which is the rectangle and the
-on switch at once.
+on switch at once, and `terrainAdjustingAtom`, which says the rectangle is still
+being placed.
 
 - **`TerrainToggle`**, in the band's tool section, because whether the client is
   computing relief is true whichever ground is up. One `ControlButton` and
   nothing else — two atom writes, no state. Off is not a blind, as it is on
   Kulturminner: it drops the grid, which is the 19 MB and most of the reason the
-  control exists.
+  control exists. On downloads nothing: it frames a square and hands it over.
 - **`TerrainSurface`**, mounted by `MapComponent`, is the analysis — the
   controller, the DEM, and the box. Mounted once, because a second is a second
   DEM, a second horizon scan and a second canvas over the same ground; mounted
@@ -79,15 +86,43 @@ the band without being told how tall the band is, and the header folds the rest
 away — the box costs a corner of the view, and giving that back must not cost
 the grid.
 
-Inside it, in order: the rectangle (`Analyser her`, with the why in its tooltip
-rather than pinned open), the eight visualizations as one pulldown grouped lit /
-blended / unlit with the chosen one's meaning under it, the height model as the
-same split `ControlButton` the LiDAR ground wears in the band, and only the
-sliders the current visualization reads — two tracks for sky-view factor, four
-for a hillshade. The header carries the fetch: `henter høydedata …`, then the
-square's side and the grid resolution, or what went wrong. A DEM is megabytes
-over the slowest origin in the stack, so "nothing has appeared yet" has to be
-answerable at a glance.
+Inside it, in order: one button that is either `Start` or `Juster`, the eight
+visualizations as one pulldown grouped lit / blended / unlit with the chosen
+one's meaning under it, the height model as the same split `ControlButton` the
+LiDAR ground wears in the band, and only the sliders the current visualization
+reads — two tracks for sky-view factor, four for a hillshade. The header carries
+the state: the side length while the square is being dragged, then `henter
+høydedata …`, then the side and the grid resolution, or what went wrong. A DEM
+is megabytes over the slowest origin in the stack, so "nothing has appeared yet"
+has to be answerable at a glance.
+
+**The rectangle is placed before anything is fetched.** `terrainAdjustingAtom`
+is that state: there is a square on the map and no grid under it. It is where
+the analysis opens, `Start` is what leaves it, and `Juster` is what returns to
+it. The reason is the download — framing the screen and pulling 19 MB in one
+press charges a reader for the ground they happened to be looking at, and the
+only way back is to pan and press again. Free until `Start`, the square can be
+dragged onto the mound and pulled in to the 200 m that actually matters.
+
+`src/terrain/windowAdjust.ts` is the drag: a solid frame with four corner
+handles and one `ol/interaction/Pointer`, mounted by the controller and gone
+again the moment `Start` is pressed, at which point the dashed
+`windowLayer.ts` frame takes over. Inside the square moves it, a corner resizes
+it about the opposite corner, and anywhere else is the map's own pan, so the
+reader can still navigate while choosing. The square stays square in EPSG:25833
+and is clamped to `MIN_SIDE_M`…`MAX_SIDE_M`; the direction of a resize is fixed
+when the corner is grabbed, so pulling a hand through the anchor collapses the
+square rather than turning it inside out. The drag writes `terrainWindowAtom` on
+every frame rather than on release — the atom stays the only copy of the
+rectangle, the geometry is redrawn from a `store.sub` and the side length in the
+box reads straight out of it, and nothing expensive is listening because
+`terrainAdjustingAtom` is holding the fetch off. While it is up, the Kulturminner
+hover stands down: that drag owns the cursor and a tip over the ground being
+framed answers a question nobody asked.
+
+`Juster` reframes onto the current view only when the rectangle has gone off the
+screen entirely. A reader who can still see a corner of it means that rectangle;
+one who has panned a valley away means the ground in front of them.
 
 **The radius slider commits on release** for the horizon views and streams for
 LRM. `useTerrainControls` memoizes `computeHorizonFields` separately from the lit
@@ -96,9 +131,12 @@ between sky-view and the two opennesses instant and what keeps a multi-second
 recompute off every frame of a drag.
 
 The grid is released in the fetch effect's cleanup, not in a verb. That is what
-lets the band's button stop an analysis it holds no state for: starting and
-stopping are writes to the atom, and the controller drops the DEM when the
-rectangle it belonged to goes away.
+lets the band's button stop an analysis it holds no state for: every verb here —
+on, off, `Start`, `Juster` — is a write to one of the two atoms, and the
+controller drops the DEM when the rectangle it belonged to goes away or goes
+back to being placed. `terrainAdjustingAtom` is a key on that effect and not
+merely a guard inside it, which is what makes `Start` begin the fetch at a
+moment when the rectangle itself has not changed.
 
 The render lands on the map through `terrainLayer.ts`: one `ImageLayer` over an
 `ImageCanvasSource` fixed to EPSG:25833 at zIndex 1, drawing the canvas

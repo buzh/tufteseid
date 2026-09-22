@@ -1,19 +1,19 @@
-// Terrenganalyse, on or off. The whole control is the box: one press frames a
-// square on what you are looking at, fetches the float heights under it and
-// paints the relief itself; the next takes the render, the frame and the
-// settings box down together.
+// Terrenganalyse, on or off. One press puts a square on what you are looking at
+// and gives you hold of it; the next takes the square, the render and the
+// settings box down together. Nothing is downloaded either way — reading the
+// heights is `Start`, in the box.
 //
 // A button alone, with no chip beside it. Everything there is to say about a
 // running analysis — which visualization, at what resolution, in what light —
 // is in the box floating over the map, and a readout in the band saying the
 // same thing a hand's width away would be a second place to look.
 //
-// On is a fetch, not a blind. Every other toggle in the band switches something
-// already in the browser, so off can be a cover over a kept selection; here off
-// releases 19 MB of elevation for a rectangle the reader has panned away from,
-// which is most of the reason the control exists. What survives is the reading
-// — the visualization, the sun, the radius — so coming back is one press and
-// the same picture somewhere else.
+// Off is not a blind. Every other toggle in the band switches something already
+// in the browser, so off can be a cover over a kept selection; here off releases
+// 19 MB of elevation for a rectangle the reader has panned away from, which is
+// most of the reason the control exists. What survives is the reading — the
+// visualization, the sun, the radius — so coming back is one press and the same
+// picture somewhere else.
 
 import { Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';

@@ -174,10 +174,13 @@
   },
   "terrainControls": {
     "label": "Terrenganalyse",
-    "show": "Analyser terrenget du ser nå — hent høydedata og belys dem selv",
+    "show": "Marker et område å analysere — du henter høydedataene når rektangelet står der du vil",
     "hide": "Avslutt terrenganalysen",
-    "windowHint": "Analysen leser det største kvadratet som får plass i utsnittet, høyst {{max}} × {{max}} m. Den følger ikke kartet av seg selv — et høydegrid er en stor nedlasting.",
-    "reframe": "Analyser her",
+    "start": "Start analysen",
+    "startHint": "Hent høydedata for rektangelet slik det står nå, og belys dem her i nettleseren.",
+    "adjust": "Juster utsnittet",
+    "adjustHint": "Ta tak i rektangelet igjen: dra det for å flytte det, dra i et hjørne for å endre størrelsen. Høyst {{max}} × {{max}} m. Analysen følger ikke kartet av seg selv — et høydegrid er en stor nedlasting.",
+    "placing": "{{side}} m · dra rektangelet, hjørnene endrer størrelsen",
     "visHead": "Visualisering",
     "modelHead": "Høydemodell",
     "vis": {

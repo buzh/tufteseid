@@ -267,7 +267,9 @@ the background it is read against, under the B half so a curtain can still be
 drawn across it), the B half of a two-ground view at 1.5 (`COMPARE_Z`),
 the LiDAR footprint outlines
 at 3 (`lidarFootprintsLayer.ts`, visible only while the ribbon's dataset menu is
-open), the terrain-analysis window frame at 4, and the Kulturminner theme layers
+open), the terrain-analysis window frame at 4 — dashed from
+`windowLayer.ts` while the analysis is standing, solid with corner handles from
+`windowAdjust.ts` while it is being placed, never both — and the Kulturminner theme layers
 on top at 10 — set by the caller that adds them (`src/map/layers/atoms.ts`), not
 by the factory in `themeWMS.ts`. 2 and 5–9 were the old interface's overlays
 and are free; a new one should write down what it puts there.

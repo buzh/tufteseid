@@ -12,6 +12,13 @@
 // list they are in is a taxonomy, not an order of preference: lit views, then
 // the composite, then the views that need no light source at all. The meaning
 // of whichever one is chosen is the line under it.
+//
+// The top of the box is one button that is either `Start` or `Juster`, never
+// both, because they are the two ends of one thing: the rectangle is being
+// placed, or it is being read. `Start` is the only control in the app that
+// begins a download of this size, so it is filled and it is the first thing in
+// the box; `Juster` is quiet, because getting back to the rectangle is cheap
+// and frequent.
 
 import {
   Button,
@@ -49,6 +56,7 @@ const VIS_GROUPS: readonly {
 export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
   const { t } = useTranslation();
   const {
+    adjusting,
     vis,
     setVis,
     model,
@@ -63,27 +71,31 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
   } = terrain;
   const [open, setOpen] = useState(true);
 
-  // Three states in one line, in the order they happen: the fetch, what it
-  // found, and — the usual case — what is on the map. The capped wording is
-  // the only one of the two resolutions that is actionable, and on a rectangle
-  // inside the cap it can never appear, since the grid is exact there by
-  // construction.
-  const status = loading
-    ? t('terrainControls.loading')
-    : error
-      ? t(`terrainControls.${error}Short`)
-      : dem
-        ? t(
-            dem.metresPerPx > dem.nativeMetresPerPx * 1.05
-              ? 'terrainControls.resolutionCapped'
-              : 'terrainControls.resolution',
-            {
-              side: sideMetres,
-              m: dem.metresPerPx.toFixed(2),
-              src: dem.nativeMetresPerPx.toFixed(2),
-            },
-          )
-        : undefined;
+  // Four states in one line, in the order they happen: the rectangle being
+  // placed, the fetch, what it found, and — the usual case — what is on the
+  // map. While it is being placed the line is a live readout of the drag, which
+  // is the only number saying how much ground is under the hand. The capped
+  // wording is the only one of the two resolutions that is actionable, and on a
+  // rectangle inside the cap it can never appear, since the grid is exact there
+  // by construction.
+  const status = adjusting
+    ? t('terrainControls.placing', { side: sideMetres })
+    : loading
+      ? t('terrainControls.loading')
+      : error
+        ? t(`terrainControls.${error}Short`)
+        : dem
+          ? t(
+              dem.metresPerPx > dem.nativeMetresPerPx * 1.05
+                ? 'terrainControls.resolutionCapped'
+                : 'terrainControls.resolution',
+              {
+                side: sideMetres,
+                m: dem.metresPerPx.toFixed(2),
+                src: dem.nativeMetresPerPx.toFixed(2),
+              },
+            )
+          : undefined;
 
   // VAT is in neither list although it holds a hillshade and a slope: its sun
   // and its exaggeration are frozen (`VAT_PRESETS`) so that two VAT renders of
@@ -123,18 +135,30 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
                 rather than set. The why is in the tooltip — it is a paragraph,
                 and a paragraph pinned open in a box this size is the paragraph
                 you stop reading. */}
-            <Tooltip
-              label={t('terrainControls.windowHint', { max: MAX_SIDE_M })}
-            >
-              <Button
-                size="xs"
-                variant="default"
-                leftSection={<Icon icon="recenter" size={16} />}
-                onClick={() => terrain.reframe()}
+            {adjusting ? (
+              <Tooltip label={t('terrainControls.startHint')}>
+                <Button
+                  size="xs"
+                  leftSection={<Icon icon="play_arrow" size={16} />}
+                  onClick={terrain.start}
+                >
+                  {t('terrainControls.start')}
+                </Button>
+              </Tooltip>
+            ) : (
+              <Tooltip
+                label={t('terrainControls.adjustHint', { max: MAX_SIDE_M })}
               >
-                {t('terrainControls.reframe')}
-              </Button>
-            </Tooltip>
+                <Button
+                  size="xs"
+                  variant="default"
+                  leftSection={<Icon icon="crop_free" size={16} />}
+                  onClick={() => terrain.adjust()}
+                >
+                  {t('terrainControls.adjust')}
+                </Button>
+              </Tooltip>
+            )}
             {error && (
               <Text size="xs" c="orange">
                 {t(`terrainControls.${error}`)}
@@ -191,9 +215,16 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
 
             {/* Only the sliders this visualization reads, absent rather than
                 disabled: two tracks for sky-view factor, four for a
-                hillshade, one for VAT. */}
-            <Divider />
-            {sunDependent && (
+                hillshade, one for VAT.
+
+                And none at all while the rectangle is being placed. There is
+                nothing on the map for a sun to move across, and the box is
+                standing over the ground the reader is in the middle of
+                choosing — the shortest it can be is the most useful it can be.
+                The two above stay because both of them change what gets
+                fetched. */}
+            {!adjusting && <Divider />}
+            {!adjusting && sunDependent && (
               <SliderRow
                 label={t('terrainControls.azimuth')}
                 value={terrain.azimuth}
@@ -204,7 +235,7 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
                 onChange={terrain.setAzimuth}
               />
             )}
-            {(sunDependent || vis === 'multiHillshade') && (
+            {!adjusting && (sunDependent || vis === 'multiHillshade') && (
               <SliderRow
                 label={t('terrainControls.altitude')}
                 value={terrain.altitude}
@@ -215,7 +246,7 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
                 onChange={terrain.setAltitude}
               />
             )}
-            {usesZFactor && (
+            {!adjusting && usesZFactor && (
               <SliderRow
                 label={t('terrainControls.zFactor')}
                 value={terrain.zFactor}
@@ -232,7 +263,7 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
                 moving — but never on the value, which would remount it on
                 every commit and drop focus mid arrow-key. Deferred for the
                 horizon views, whose scan is some 800 ms a pass. */}
-            {radiusLimits && (
+            {!adjusting && radiusLimits && (
               <SliderRow
                 key={`${vis}-${radiusLimits.max}`}
                 label={t(
@@ -251,15 +282,17 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
             )}
             {/* Counted as transparency — 0 % is fully covering — while the
                 controller holds opacity, which is what OpenLayers wants. */}
-            <SliderRow
-              label={t('terrainControls.transparency')}
-              value={transparency}
-              min={0}
-              max={100}
-              step={5}
-              suffix=" %"
-              onChange={(value) => setOpacity(100 - value)}
-            />
+            {!adjusting && (
+              <SliderRow
+                label={t('terrainControls.transparency')}
+                value={transparency}
+                min={0}
+                max={100}
+                step={5}
+                suffix=" %"
+                onChange={(value) => setOpacity(100 - value)}
+              />
+            )}
           </Stack>
         </div>
       )}

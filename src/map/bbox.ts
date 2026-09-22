@@ -27,9 +27,18 @@ export type Bbox = [
 // reader could not see the edges of on any ordinary screen.
 export const MAX_SIDE_M = 500;
 
+// The smallest square a hand is allowed to drag one down to. Not a producer
+// limit — it is the point below which an analysis stops being one: 50 m is 200
+// px of the finest grid that exists, and a corner handle pulled past its
+// opposite one would otherwise leave a rectangle with no area and a render with
+// no pixels. `squareBboxWithin` deliberately has no floor for the opposite
+// reason, spelled out on it: nothing there is aiming at a size, so a minimum is
+// the one rule that could push the square back off the screen.
+export const MIN_SIDE_M = 50;
+
 // Measured in EPSG:25833, like every producer. The view projection is wrong by
 // a factor of two at 60° N under EPSG:3857, and silently so.
-const toMetric = (bbox: Bbox): [number, number, number, number] =>
+export const bboxToMetric = (bbox: Bbox): [number, number, number, number] =>
   transformExtent(bbox, 'EPSG:4326', 'EPSG:25833') as [
     number,
     number,
@@ -37,8 +46,25 @@ const toMetric = (bbox: Bbox): [number, number, number, number] =>
     number,
   ];
 
-const toGeodetic = (extent: [number, number, number, number]): Bbox =>
-  transformExtent(extent, 'EPSG:25833', 'EPSG:4326') as Bbox;
+export const bboxFromMetric = (
+  extent: [number, number, number, number],
+): Bbox => transformExtent(extent, 'EPSG:25833', 'EPSG:4326') as Bbox;
+
+/**
+ * How wide the rectangle is on the ground, for a readout. Width and not the
+ * mean of the two sides: a square built in EPSG:25833 and carried here as a
+ * lon/lat extent comes back a metre or two taller than it went out, because a
+ * projected square's north edge is a curve in latitude and the extent takes its
+ * highest point. The width is the number the square was built to.
+ */
+export const bboxWidthMetres = (bbox: Bbox): number => {
+  const [minX, , maxX] = bboxToMetric(bbox);
+  return maxX - minX;
+};
+
+/** Do the two lon/lat rectangles share any ground at all. */
+export const bboxOverlaps = (a: Bbox, b: Bbox): boolean =>
+  a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
 
 /**
  * The largest square a producer will render inside `bbox`: the shorter of its
@@ -57,11 +83,11 @@ const toGeodetic = (extent: [number, number, number, number]): Bbox =>
  * analysis worth making, the screen is the honest answer.
  */
 export const squareBboxWithin = (bbox: Bbox): Bbox => {
-  const [minX, minY, maxX, maxY] = toMetric(bbox);
+  const [minX, minY, maxX, maxY] = bboxToMetric(bbox);
   const side = Math.min(maxX - minX, maxY - minY, MAX_SIDE_M);
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
-  return toGeodetic([
+  return bboxFromMetric([
     cx - side / 2,
     cy - side / 2,
     cx + side / 2,
