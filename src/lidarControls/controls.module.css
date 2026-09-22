@@ -15,20 +15,6 @@
   flex: none;
 }
 
-/* --- Automatisk --- */
-
-/* Icon-only, at the size of the model toggle. The height and the padding go
-   through Mantine's own variables rather than through `height` and `padding`:
-   `.mantine-Button-root` sets both from them at the same specificity as this
-   class, so declaring the properties directly would leave the result depending
-   on which stylesheet the bundler injected last. `width` it does not set, so
-   that one is safe as a property. */
-.iconButton {
-  --button-height: var(--control-height);
-  --button-padding-x: 0;
-  width: var(--control-icon-width);
-}
-
 /* --- the model toggle --- */
 
 /* The chip's box, split across the middle. Both halves are always drawn: the
