@@ -28,7 +28,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 export const AuthDialog = () => {
   const { t } = useTranslation();
   const [open, setOpen] = useAtom(isAuthDialogOpenAtom);
-  const { providers, error } = useOAuthProviders();
+  const { providers, failed } = useOAuthProviders();
   const signIn = useSignIn();
 
   const handle = async (provider: string) => {
@@ -55,9 +55,9 @@ export const AuthDialog = () => {
           {t('auth.blurb')}
         </Text>
 
-        {error && <Alert color="red">{t('auth.providersError')}</Alert>}
+        {failed && <Alert color="red">{t('auth.providersError')}</Alert>}
 
-        {!error && providers == null && <Loader size="sm" />}
+        {!failed && providers == null && <Loader size="sm" />}
 
         {providers?.length === 0 && (
           <Alert color="yellow">{t('auth.noProviders')}</Alert>

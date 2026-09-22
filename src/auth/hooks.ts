@@ -13,7 +13,9 @@ export const useOAuthProviders = () => {
   const [providers, setProviders] = useState<OAuthProvider[] | null>(
     cachedProviders,
   );
-  const [error, setError] = useState<unknown>(null);
+  // A flag, not the error: the dialog says one fixed sentence either way, and
+  // what actually went wrong is worth more in the console than in the modal.
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (cachedProviders) return;
@@ -25,14 +27,15 @@ export const useOAuthProviders = () => {
         if (live) setProviders(cachedProviders);
       })
       .catch((err) => {
-        if (live) setError(err);
+        console.warn('[auth] listing providers failed', err);
+        if (live) setFailed(true);
       });
     return () => {
       live = false;
     };
   }, []);
 
-  return { providers, error };
+  return { providers, failed };
 };
 
 /** The SDK's all-in-one popup flow, bouncing through /pb/api/oauth2-redirect. */
