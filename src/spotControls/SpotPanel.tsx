@@ -13,7 +13,7 @@ import { cx } from '../ui/cx';
 import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
 import { formatPoint } from '../spots/geo';
-import styles from './SpotPanel.module.css';
+import styles from './SpotBox.module.css';
 import type { SpotDraftController } from './useSpotDraft';
 
 export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {

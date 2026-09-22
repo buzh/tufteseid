@@ -1,7 +1,12 @@
-/* The box that accompanies a draft. Top right, where the terrain analysis has
-   the top left: the two can be up at once — framing a relief analysis and then
-   marking what it showed is the whole workflow this app is for — and a box that
-   moved depending on what else was open would be a box the reader has to find.
+/* The spot box, in both its faces: the draft being written (`SpotPanel`) and
+   the spot being read (`SpotCard`). One stylesheet because they are one box as
+   far as a reader is concerned — the card is what the panel becomes once it has
+   been saved — and only one of them is ever up.
+
+   Top right, where the terrain analysis has the top left: the two can be up at
+   once — framing a relief analysis and then marking what it showed is the whole
+   workflow this app is for — and a box that moved depending on what else was
+   open would be a box the reader has to find.
 
    Positioned against the map's own rectangle, so it sits under the band without
    knowing the band's height. */
@@ -83,4 +88,22 @@
   gap: var(--mantine-spacing-xs);
   padding: var(--mantine-spacing-xs);
   border-top: 1px solid var(--mantine-color-default-border);
+}
+
+/* Card only. What the author wrote, kept as they wrote it: a description is
+   prose with paragraphs in it, and collapsing them would make a field note
+   read as one block. */
+.prose {
+  font-size: var(--mantine-font-size-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Card only. The line under the prose: who wrote it, and where it is. Dimmed,
+   because it is provenance rather than content. */
+.meta {
+  margin-top: var(--mantine-spacing-xs);
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-dimmed);
 }

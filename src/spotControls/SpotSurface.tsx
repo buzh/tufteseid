@@ -21,6 +21,7 @@ import { activeSpotAtom, spotDraftAtom } from '../spots/atoms';
 import { useSpotPinAdjust } from '../spots/pinAdjust';
 import { useSpotShareLink } from '../spots/shareLink';
 import { useSpotLayer } from '../spots/spotLayer';
+import { SpotCard } from './SpotCard';
 import { SpotPanel } from './SpotPanel';
 import { useSpotDraft } from './useSpotDraft';
 
@@ -59,7 +60,14 @@ export const SpotSurface = () => {
           canvas isolates Excalidraw's own z-ladder but still occupies the
           whole map rectangle. */}
       {session && <SketchCanvas key={session.id} session={session} />}
-      {draft && <SpotDraftBox key={draft.id} />}
+      {/* One box at a time, and the draft wins: they occupy the same corner,
+          and a draft is the thing the reader is doing. Keyed on the spot so
+          opening a second one does not inherit the first one's confirm. */}
+      {draft ? (
+        <SpotDraftBox key={draft.id} />
+      ) : (
+        active && <SpotCard key={active.id} spot={active} />
+      )}
     </>
   );
 };
