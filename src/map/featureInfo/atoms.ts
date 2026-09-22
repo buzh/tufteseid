@@ -1,9 +1,17 @@
 import { atom } from 'jotai';
-import type { FeatureInfoResult } from './types';
+import type { FeatureInfoReading } from './types';
 
-// What the last GetFeatureInfo came back with. `layers/atoms.ts` prunes it when
-// a theme layer is switched off, so a reading never outlives the layer it came
-// from.
-export const featureInfoResultAtom = atom<FeatureInfoResult | null>(null);
+// The two readings a pointer over the Kulturminner layers produces, and the one
+// place they are held. Two atoms rather than one with a mode, because they have
+// different lifetimes: the tip is gone the moment the pointer moves, the card
+// stays until it is dismissed, and a reader hovering elsewhere while a card is
+// open is doing two things at once.
+//
+// `layers/atoms.ts` prunes both when a theme layer is switched off, so a reading
+// never outlives the register it came out of.
 
-export const featureInfoPanelOpenAtom = atom<boolean>(false);
+/** What a resting pointer found: the mouseover, and nothing the reader chose. */
+export const heritageTipAtom = atom<FeatureInfoReading | null>(null);
+
+/** What a click found: the card, with the details and the outward links. */
+export const heritagePopupAtom = atom<FeatureInfoReading | null>(null);

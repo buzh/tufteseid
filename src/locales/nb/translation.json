@@ -76,6 +76,37 @@
       "amtskart": "amtskartserien 1826–1917, mangler Nordland"
     }
   },
+  "kulturminner": {
+    "title_one": "Kulturminne",
+    "title_other": "{{count}} kulturminner",
+    "close": "Lukk",
+    "laster": "Henter …",
+    "klikkForDetaljer": "Klikk for detaljer",
+    "flereHer_one": "+ 1 til her",
+    "flereHer_other": "+ {{count}} til her",
+    "fallbackName": "Uten navn",
+    "lokalitet": "Lokalitet",
+    "enkeltminne": "Enkeltminne",
+    "sikringssone": "Sikringssone",
+    "sefrak": "SEFRAK-bygning",
+    "kulturmiljo": "Kulturmiljø",
+    "brukerminne": "Brukerminne",
+    "registrertAv": "Registrert av",
+    "registrert": "Registrert",
+    "kategori": "Kategori",
+    "vernestatus": "Vernestatus",
+    "datering": "Datering",
+    "kommune": "Kommune",
+    "antallEnkeltminner": "Enkeltminner totalt",
+    "ulikeVernestatus": "Ulike vernestatus",
+    "flereDateringer": "Flere dateringer",
+    "descriptionMore": "Mer",
+    "descriptionLess": "Mindre",
+    "enkeltminner_one": "1 enkeltminne",
+    "enkeltminner_other": "{{count}} enkeltminner",
+    "enkeltminneNumber": "Enkeltminne #{{id}}",
+    "kulturminnesokMangler": "Kulturminnesøk har ingen oppføring for dette kulturminnet – lenken åpner en tom side."
+  },
   "lidar": {
     "style": {
       "cvat": "Arkeologisk relieff",

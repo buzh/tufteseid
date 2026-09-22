@@ -5,10 +5,7 @@ import {
   removeFromUrlListParameter,
 } from '../../shared/utils/urlUtils';
 import { mapAtom } from '../atoms';
-import {
-  featureInfoPanelOpenAtom,
-  featureInfoResultAtom,
-} from '../featureInfo/atoms';
+import { heritagePopupAtom, heritageTipAtom } from '../featureInfo/atoms';
 import {
   type HeritageDetail,
   heritageDetailsAtom,
@@ -39,6 +36,20 @@ export const shownThemeLayersAtom = atom<ReadonlySet<ThemeLayerName>>((get) =>
 // offers the registers and the renders has to know which source they belong to,
 // and a second copy of the name is how the two would come apart.
 export const RESHAPEABLE_THEME_LAYER: ThemeLayerName = 'heritageSites';
+
+// A reading is what a layer answered, so it cannot outlive the layer. Dropping
+// the source's own features rather than the whole reading is what keeps a card
+// standing when one of several ticked registers is turned off underneath it.
+const forgetReadingsFrom = (layerId: string) => {
+  const store = getDefaultStore();
+  for (const readingAtom of [heritageTipAtom, heritagePopupAtom]) {
+    const reading = store.get(readingAtom);
+    if (!reading) continue;
+    const layers = reading.layers.filter((l) => l.layerId !== layerId);
+    if (layers.length === reading.layers.length) continue;
+    store.set(readingAtom, layers.length > 0 ? { ...reading, layers } : null);
+  }
+};
 
 const paramsFor = (
   layerName: ThemeLayerName,
@@ -120,23 +131,7 @@ export const themeLayerEffect = atomEffect((get) => {
       .find((layer) => layer.get('id') === `theme.${layerName}`);
     if (layer) {
       map.removeLayer(layer);
-
-      const store = getDefaultStore();
-      const currentResult = store.get(featureInfoResultAtom);
-      if (currentResult) {
-        const remainingLayers = currentResult.layers.filter(
-          (l) => l.layerId !== `theme.${layerName}`,
-        );
-        if (remainingLayers.length === 0) {
-          store.set(featureInfoResultAtom, null);
-          store.set(featureInfoPanelOpenAtom, false);
-        } else if (remainingLayers.length !== currentResult.layers.length) {
-          store.set(featureInfoResultAtom, {
-            ...currentResult,
-            layers: remainingLayers,
-          });
-        }
-      }
+      forgetReadingsFrom(`theme.${layerName}`);
     }
     removeFromUrlListParameter('themeLayers', layerName);
   });
@@ -168,6 +163,16 @@ export const themeLayerEffect = atomEffect((get) => {
         return;
       source.updateParams(params);
     });
+
+  // The blind is over every source at once, and a card describing a register
+  // nobody can see is a reading of an empty map. Not the same for a reshape: the
+  // registers and the render change what is drawn, but what the reading named is
+  // still recorded there, and clearing it would punish a reader for adjusting
+  // the picture while reading a card.
+  if (heritageHidden) {
+    store.set(heritageTipAtom, null);
+    store.set(heritagePopupAtom, null);
+  }
 
   writeHeritageUrlParameters(heritageDetails, heritageRender, heritageOpacity);
 });

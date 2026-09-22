@@ -274,6 +274,30 @@ One directory covers it: `lock_dir` and `tile_lock_dir` both default under
   gaps opaque black, `png32` costs eight times the bytes (68 kB vs 555 kB on a
   512 px tile over Oslo).
 
+## GetFeatureInfo against Riksantikvaren
+
+The only request in the app a *pointer* makes, and the one whose volume is set
+by how the interface behaves rather than by what is on screen. One
+GetFeatureInfo per ticked RA layer per question, over `/wms/ra/*` — the same
+location, the same 180-day cache and the same 30 s read timeout as the tiles,
+against the slowest origin in the stack.
+
+The cache key is the request URI, and a GetFeatureInfo URI carries the tile
+bbox, the sublayers, the styles and the pixel inside it, so two questions are
+one entry only if they are the same question to the pixel. That is why
+`src/map/featureInfo/heritageQuery.ts` snaps the pixel to a 6 px grid before it
+becomes a coordinate, and why hover and click build the identical URL: it is
+what turns a hand holding still into one entry rather than thirty. Three things
+in front of that: a URL-keyed memo in `featureInfoService.ts` (400 entries,
+negative answers included, but never when an attempt failed — a dropped request
+must not cache a hole), the rest delay before a hover asks at all, and
+`fetchWithin`, which puts these on the `ra` breaker with a 12 s deadline so a
+dead origin refuses them instead of queueing one per pause.
+
+Raising `FEATURE_COUNT`, adding a register, or asking on plain pointer movement
+each multiply this directly. Measure the request count in the network panel
+while sweeping a dense area before changing any of them.
+
 ## Kulturminnesøk link checking
 
 `/kms/*` is the one upstream here that is not a map source: one JSON lookup per

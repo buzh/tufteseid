@@ -1,0 +1,80 @@
+/* Narrow on purpose: the tip follows a pointer that is reading terrain, and a
+   box wide enough to cover the mound it describes defeats itself. Names wrap
+   rather than truncate — a truncated gardsnamn is not a name. */
+.tip {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: max-content;
+  max-width: 17rem;
+  padding: 6px 8px;
+  background: var(--mantine-color-body);
+  /* The overlay element is inert; nothing in here takes that back. */
+  pointer-events: none;
+}
+
+.waiting {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+}
+
+.waitingLabel {
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+/* Baseline-aligned with the name beside it rather than with the row box, or a
+   two-line name pushes the glyph to the middle of nowhere. */
+.rowIcon {
+  flex: none;
+  transform: translateY(2px);
+  color: var(--mantine-color-dimmed);
+}
+
+.rowText {
+  min-width: 0;
+}
+
+.rowTitle {
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* Trails the name on the same line: `art` is what the name means, not a second
+   fact about it. */
+.rowSubtitle {
+  margin-left: 6px;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+.tone {
+  flex: none;
+  align-self: flex-start;
+  padding: 1px 6px;
+  border-radius: var(--mantine-radius-sm);
+  font-size: var(--mantine-font-size-xs);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.overflow,
+.hint {
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+}
+
+.hint {
+  padding-top: 2px;
+  border-top: 1px solid var(--mantine-color-default-border);
+}

@@ -248,7 +248,14 @@ Config `src/map/layers/config/themeLayers/culturalHeritage.ts`, registered in
 
 The category sets `infoFormat: 'application/vnd.ogc.gml'` so
 `parseXmlFeatureInfo` (MapServer `msGMLOutput`) produces structured fields;
-left unset, the WMS returns HTML and the popup shows a placeholder.
+left unset, the WMS returns HTML and the card shows a placeholder.
+
+These five are also the only layers on the map a pointer can question.
+`heritageQuery.ts` asks them by id rather than by the `theme.` prefix — who is
+asking decides which registers may answer — and `src/heritageInfo/` is what puts
+the question and draws the tip and the card. A sublayer that draws but does not
+answer is invisible to that surface, and `isRendering` means a register hidden
+behind the blind is never asked about.
 
 ### What `kulturminner2` exposes
 

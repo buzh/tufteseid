@@ -1,18 +1,14 @@
-import { Feature } from 'ol';
 import { Coordinate } from 'ol/coordinate';
-import { Geometry } from 'ol/geom';
 import BaseLayer from 'ol/layer/Base';
 import ImageLayer from 'ol/layer/Image';
 import Layer from 'ol/layer/Layer';
 import TileLayer from 'ol/layer/Tile';
-import VectorLayer from 'ol/layer/Vector';
 import Map from 'ol/Map';
 import { ImageWMS, TileWMS } from 'ol/source';
-import VectorSource from 'ol/source/Vector';
+import { fetchWithin } from '../../shared/utils/deadline';
 import type { FieldConfig } from '../layers/themeLayerConfigApi';
 import type {
   FeatureInfoFeature,
-  FeatureInfoResult,
   FeatureProperties,
   InfoFormat,
   LayerFeatureInfo,
@@ -27,7 +23,14 @@ export type QueryableWMSLayer = TileLayer | ImageLayer<ImageWMS>;
 const isRendering = (layer: BaseLayer, map: Map): boolean =>
   layer instanceof Layer && layer.isVisible(map.getView());
 
-export const getQueryableWMSLayers = (map: Map): QueryableWMSLayer[] => {
+/** The WMS layers on the map that a click can be put to: queryable, drawing at
+ *  this zoom, and among the ids the caller is asking about. Scoped by id rather
+ *  than by `theme.` prefix, because who is asking decides which registers an
+ *  answer may come from. */
+export const getQueryableWMSLayers = (
+  map: Map,
+  ids: ReadonlySet<string>,
+): QueryableWMSLayer[] => {
   return map
     .getLayers()
     .getArray()
@@ -39,28 +42,14 @@ export const getQueryableWMSLayers = (map: Map): QueryableWMSLayer[] => {
       if (!isTileWMS && !isImageWMS) return false;
 
       const id = layer.get('id');
-      const isThemeLayer = typeof id === 'string' && id.startsWith('theme.');
       const isQueryable = layer.get('queryable') === true;
 
-      return isThemeLayer && isQueryable && isRendering(layer, map);
-    });
-};
-
-export const getVisibleVectorLayers = (
-  map: Map,
-): VectorLayer<VectorSource<Feature<Geometry>>>[] => {
-  return map
-    .getLayers()
-    .getArray()
-    .filter((layer): layer is VectorLayer<VectorSource<Feature<Geometry>>> => {
-      if (!(layer instanceof VectorLayer)) return false;
-      const source = layer.getSource();
-      if (!(source instanceof VectorSource)) return false;
-
-      const id = layer.get('id');
-      const isThemeLayer = typeof id === 'string' && id.startsWith('theme.');
-
-      return isThemeLayer && isRendering(layer, map);
+      return (
+        typeof id === 'string' &&
+        ids.has(id) &&
+        isQueryable &&
+        isRendering(layer, map)
+      );
     });
 };
 
@@ -356,10 +345,38 @@ export const parseFeatureInfo = (
   return parseJsonFeatureInfo(data);
 };
 
+// What one layer answered about one point, keyed by the GetFeatureInfo URL —
+// which carries the sublayers, the styles, the tile bbox and the pixel in it, so
+// a reshaped register or a panned map is a different key and needs no
+// invalidating. The hover and the click ask the same question of the same
+// snapped point (`heritageQuery.ts`), so this is also what makes a click on a
+// spot whose tip is up open instantly rather than asking RA twice.
+//
+// Bounded and oldest-first: a `Map` iterates in insertion order, so the eviction
+// is by age rather than by use. Approximate, and enough — what the reader is
+// about to ask again is what they just asked, not what they asked fifty points
+// ago.
+const MEMO_LIMIT = 400;
+const memo = new Map<string, FeatureInfoFeature[]>();
+
+const remember = (key: string, features: FeatureInfoFeature[]) => {
+  if (memo.size >= MEMO_LIMIT) {
+    const oldest = memo.keys().next().value;
+    if (oldest !== undefined) memo.delete(oldest);
+  }
+  memo.set(key, features);
+};
+
+/** RA is the slowest origin in the stack and a GetFeatureInfo is a query, not a
+ *  render; past this the reader has moved on. Well under wmscache's 30 s read
+ *  timeout, so a hung request is dropped here rather than held open. */
+export const FEATURE_INFO_DEADLINE_MS = 12_000;
+
 export const fetchLayerFeatureInfo = async (
   layer: QueryableWMSLayer,
   coordinate: Coordinate,
   map: Map,
+  signal?: AbortSignal,
 ): Promise<LayerFeatureInfo> => {
   const layerId = layer.get('id') as string;
   const layerTitle =
@@ -367,210 +384,87 @@ export const fetchLayerFeatureInfo = async (
 
   const preferredFormat = layer.get('infoFormat') as InfoFormat | undefined;
   const imageBaseUrl = layer.get('featureInfoImageBaseUrl') as
-    string | undefined;
+    | string
+    | undefined;
   const fieldConfigs = layer.get('featureInfoFields') as
-    FieldConfig[] | undefined;
+    | FieldConfig[]
+    | undefined;
+
+  const answer = (
+    features: FeatureInfoFeature[],
+    error?: string,
+  ): LayerFeatureInfo => ({
+    layerId,
+    layerTitle,
+    features,
+    ...(error ? { error } : {}),
+    ...(imageBaseUrl ? { imageBaseUrl } : {}),
+    ...(fieldConfigs ? { fieldConfigs } : {}),
+  });
 
   const formatsToTry: InfoFormat[] = preferredFormat
     ? [preferredFormat]
     : ['application/json', 'application/vnd.ogc.gml', 'text/xml', 'text/plain'];
 
+  // The first format's URL is the memo key whichever format ends up answering:
+  // the formats differ only in `INFO_FORMAT`, and the rest of the URL is the
+  // question.
+  const key = buildFeatureInfoUrl(layer, coordinate, map, formatsToTry[0]);
+  if (!key) return answer([], 'Could not build GetFeatureInfo URL');
+  const remembered = memo.get(key);
+  if (remembered) return answer(remembered);
+
+  // An empty answer is worth remembering — most of the map has nothing on it —
+  // but only when every format was actually asked. A request that failed or was
+  // dropped looks identical here and would cache a hole.
+  let failed = false;
+
   for (const format of formatsToTry) {
     const url = buildFeatureInfoUrl(layer, coordinate, map, format);
-    if (!url) {
-      return {
-        layerId,
-        layerTitle,
-        features: [],
-        error: 'Could not build GetFeatureInfo URL',
-        ...(imageBaseUrl ? { imageBaseUrl } : {}),
-        ...(fieldConfigs ? { fieldConfigs } : {}),
-      };
-    }
+    if (!url) return answer([], 'Could not build GetFeatureInfo URL');
 
     try {
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        continue;
-      }
-
-      const contentType = response.headers.get('content-type') || format;
-      const isJson = contentType.includes('json');
-      const data = isJson ? await response.json() : await response.text();
+      // Through `fetchWithin` rather than `fetch`: this is a non-tile request to
+      // an external origin, so it is the breaker's to admit or refuse, and a
+      // reader sweeping a dead RA must not queue a lookup per pause.
+      const { contentType, data } = await fetchWithin(
+        url,
+        {
+          ms: FEATURE_INFO_DEADLINE_MS,
+          what: `GetFeatureInfo ${layerId}`,
+          signal,
+        },
+        async (res) => {
+          const contentType = res.headers.get('content-type') || format;
+          return {
+            contentType,
+            data: contentType.includes('json')
+              ? ((await res.json()) as object)
+              : await res.text(),
+          };
+        },
+      );
 
       const features = parseFeatureInfo(data, contentType);
 
       if (features.length > 0) {
-        return {
-          layerId,
-          layerTitle,
-          features,
-          ...(imageBaseUrl ? { imageBaseUrl } : {}),
-          ...(fieldConfigs ? { fieldConfigs } : {}),
-        };
+        remember(key, features);
+        return answer(features);
       }
 
-      if (isJson) {
-        return {
-          layerId,
-          layerTitle,
-          features: [],
-          ...(imageBaseUrl ? { imageBaseUrl } : {}),
-          ...(fieldConfigs ? { fieldConfigs } : {}),
-        };
+      // JSON is structured enough that an empty answer is the answer; the text
+      // formats are not, so a parse that found nothing tries the next one.
+      if (contentType.includes('json')) {
+        remember(key, features);
+        return answer(features);
       }
     } catch (error) {
-      console.warn(
-        `Failed to fetch feature info with format ${format}:`,
-        error,
-      );
+      failed = true;
+      if (signal?.aborted) throw error;
+      console.warn(`Failed to fetch feature info with format ${format}:`, error);
     }
   }
 
-  return {
-    layerId,
-    layerTitle,
-    features: [],
-    ...(imageBaseUrl ? { imageBaseUrl } : {}),
-    ...(fieldConfigs ? { fieldConfigs } : {}),
-  };
-};
-
-export const getVectorFeaturesAtPixel = (
-  map: Map,
-  pixel: [number, number],
-): LayerFeatureInfo[] => {
-  const visibleVectorLayers = getVisibleVectorLayers(map);
-
-  if (visibleVectorLayers.length === 0) {
-    return [];
-  }
-
-  type VectorLayerType = VectorLayer<VectorSource<Feature<Geometry>>>;
-  const layerFeaturesRecord: Record<
-    string,
-    { layer: VectorLayerType; features: FeatureInfoFeature[] }
-  > = {};
-
-  visibleVectorLayers.forEach((layer) => {
-    const id = (layer.get('id') as string) || String(Math.random());
-    layerFeaturesRecord[id] = { layer, features: [] };
-  });
-
-  map.forEachFeatureAtPixel(
-    pixel,
-    (feature, layer) => {
-      if (layer instanceof VectorLayer) {
-        const layerId = (layer.get('id') as string) || '';
-        const record = layerFeaturesRecord[layerId];
-
-        if (record) {
-          const properties = feature.getProperties();
-          const featureInfo: FeatureInfoFeature = {
-            properties: {},
-          };
-
-          const featureId = feature.getId();
-          if (featureId !== undefined) {
-            featureInfo.id = String(featureId);
-          }
-
-          for (const [key, value] of Object.entries(properties)) {
-            if (
-              key === 'geometry' ||
-              key.startsWith('_') ||
-              value instanceof Geometry
-            ) {
-              continue;
-            }
-
-            if (value === null || value === undefined) {
-              continue;
-            } else if (typeof value === 'object') {
-              featureInfo.properties[key] = JSON.stringify(value);
-            } else {
-              featureInfo.properties[key] = value;
-            }
-          }
-
-          if (Object.keys(featureInfo.properties).length > 0) {
-            record.features.push(featureInfo);
-          }
-        }
-      }
-    },
-    {
-      hitTolerance: 5, // Allow clicking slightly off the feature
-    },
-  );
-
-  const results: LayerFeatureInfo[] = [];
-
-  for (const record of Object.values(layerFeaturesRecord)) {
-    if (record.features.length > 0) {
-      const layerId = (record.layer.get('id') as string) || 'unknown';
-      const layerTitle =
-        (record.layer.get('layerTitle') as string) ||
-        (record.layer.get('title') as string) ||
-        layerId.replace('theme.', '');
-
-      results.push({
-        layerId,
-        layerTitle,
-        features: record.features,
-      });
-    }
-  }
-
-  return results;
-};
-
-export const fetchAllFeatureInfo = async (
-  map: Map,
-  coordinate: Coordinate,
-  pixel: [number, number],
-): Promise<FeatureInfoResult> => {
-  const queryableWMSLayers = getQueryableWMSLayers(map);
-
-  const vectorLayerResults = getVectorFeaturesAtPixel(map, pixel);
-
-  const wmsLayerResults =
-    queryableWMSLayers.length > 0
-      ? await Promise.all(
-          queryableWMSLayers.map((layer) =>
-            fetchLayerFeatureInfo(layer, coordinate, map),
-          ),
-        )
-      : [];
-
-  const wmsLayersWithFeatures = wmsLayerResults.filter(
-    (result) => result.features.length > 0 || result.error,
-  );
-
-  const allLayers = [...vectorLayerResults, ...wmsLayersWithFeatures];
-
-  return {
-    coordinate: coordinate as [number, number],
-    layers: allLayers,
-    timestamp: Date.now(),
-  };
-};
-
-export const hasVisibleQueryableLayers = (map: Map): boolean => {
-  return getQueryableWMSLayers(map).length > 0;
-};
-
-export const hasVisibleLayerWithIdIn = (
-  map: Map,
-  layerIds: ReadonlySet<string>,
-): boolean => {
-  return map
-    .getLayers()
-    .getArray()
-    .some((layer) => {
-      if (!isRendering(layer, map)) return false;
-      const id = layer.get('id');
-      return typeof id === 'string' && layerIds.has(id);
-    });
+  if (!failed) remember(key, []);
+  return answer([]);
 };

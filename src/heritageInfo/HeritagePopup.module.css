@@ -1,0 +1,202 @@
+/* The overlay element is `pointer-events: none` so the map stays draggable
+   around the card; this box takes it back. Sized to the text rather than to the
+   screen: a card wider than a paragraph is hard to read, and one taller than
+   half the view hides the terrain it is about. */
+.popup {
+  box-sizing: border-box;
+  width: 90vw;
+  max-width: 26rem;
+  max-height: 60vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--mantine-spacing-sm);
+  background: var(--mantine-color-body);
+  pointer-events: auto;
+  scrollbar-width: thin;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mantine-spacing-sm);
+  margin-bottom: var(--mantine-spacing-xs);
+}
+
+.headerTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-sm);
+}
+
+.card {
+  min-width: 0;
+  padding: var(--mantine-spacing-xs);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mantine-spacing-xs);
+}
+
+.kindIcon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  margin-top: 1px;
+  border-radius: var(--mantine-radius-sm);
+  color: var(--mantine-color-dimmed);
+}
+
+.kindIcon:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 1px;
+}
+
+.cardTitles {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardTitle {
+  font-size: var(--mantine-font-size-md);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.cardSubtitle {
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+/* The register's own id, kept quiet but kept: it is what a reader quotes back
+   at Askeladden. Tabular so a column of them lines up. */
+.cardId {
+  flex: none;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--mantine-spacing-xs);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-default);
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  line-height: 1.5;
+}
+
+.chipText {
+  overflow-wrap: anywhere;
+}
+
+.description {
+  margin-top: var(--mantine-spacing-xs);
+  font-size: var(--mantine-font-size-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.nested {
+  margin-top: var(--mantine-spacing-xs);
+}
+
+.nestedToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 700;
+}
+
+.nestedToggle:hover {
+  color: var(--mantine-color-text);
+}
+
+.nestedList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-xs);
+  margin-top: 4px;
+}
+
+/* A rule down the left rather than an indent alone: these are parts of the
+   record above them, not siblings of it. */
+.nestedItem {
+  padding-left: var(--mantine-spacing-xs);
+  border-left: 2px solid var(--mantine-color-default-border);
+}
+
+.nestedItem .chips {
+  margin-top: 2px;
+}
+
+.nestedName {
+  font-size: var(--mantine-font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.nestedSubtitle {
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mantine-spacing-sm);
+  margin-top: var(--mantine-spacing-xs);
+  font-size: var(--mantine-font-size-sm);
+}
+
+.link {
+  font-size: inherit;
+}
+
+/* Kulturminnesøk has no entry behind this one: still a link, and still the
+   register's own, but it lands on an empty page. */
+.linkMissing {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--mantine-color-dimmed);
+  text-decoration: underline dotted;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

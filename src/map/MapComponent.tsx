@@ -2,6 +2,7 @@ import { useAtom } from 'jotai';
 import 'ol/ol.css';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { HeritageInfo } from '../heritageInfo';
 import { ErrorBoundary } from '../shared/ErrorBoundary.tsx';
 import { terrainWindowLayerEffect } from '../terrain/windowLayer.ts';
 import styles from './MapComponent.module.css';
@@ -45,6 +46,12 @@ export const MapComponent = () => {
         fallback={<p className={styles.error}>{t('map.errorMessage')}</p>}
       >
         <div ref={mapRef} id="map" className={styles.map} />
+      </ErrorBoundary>
+      {/* Overlays on the map, so they are mounted beside it rather than inside
+          the boundary that reports the map itself as lost. A card that throws
+          on some shape the register served takes only itself down. */}
+      <ErrorBoundary fallback={null} name="kulturminner">
+        <HeritageInfo />
       </ErrorBoundary>
     </div>
   );

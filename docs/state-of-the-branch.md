@@ -82,6 +82,26 @@ the chip says that is not a setting is that the map is too far out for any
 ticked source to draw — every RA service here is capped below city scale, and
 an overlay that is on and invisible otherwise reads as an empty register.
 
+The first surface that is not in the band is `src/heritageInfo/`, mounted by
+`MapComponent` beside the map rather than in it: the register is readable as
+well as visible. A pointer **at rest** over a Kulturminner feature raises a tip
+naming what is there, and a click opens a card with the fields and the two
+links out — Askeladden and Kulturminnesøk. Both are OpenLayers `Overlay`s
+portalled into by React (`useMapOverlay`), so they are pinned to the ground and
+not to the screen. The tip never takes the pointer; the card does, and is the
+only one of the two that can be selected, scrolled or followed.
+
+The cost model is the design. Every question is one GetFeatureInfo per ticked
+register against `kart.ra.no`, the slowest origin in the stack, so: the hover
+fires only after the pointer has held still (a sweep across the map asks
+nothing), the pixel is snapped to a grid before it becomes a coordinate, and
+hover and click ask the identical question so they share one memo and a click
+on a spot whose tip is already up asks nothing. Touch is left out — a tap is a click there, and a tip
+with no pointer to leave with would sit over the map until the next one. The
+parsing, grouping and field knowledge behind both surfaces is in
+`src/map/featureInfo/` and returns plain data; every string the reader sees is
+chosen in `src/heritageInfo/`.
+
 **Mantine is the design system, and the app is dark.** `MantineProvider` and
 the theme (`src/ui/theme.ts`) are mounted at the root, and every surface is
 built from its primitives and its variables. The palette is anthracite grey —
@@ -118,9 +138,14 @@ that is fine: they take arguments and return values.
 | --- | --- | --- |
 | `src/terrain/` | the Analyse ribbon | `renderTerrain`, `terrainStaticField` / `terrainField` (`render.ts`) |
 | `src/lidarExtract/` | the extract dialog | `extractCanvas` (`run.ts`) |
-| `src/map/featureInfo/` fetchers | the Kulturminner popup | `fetchAllFeatureInfo` (`featureInfoService.ts`), `kulturminnesok.ts` |
 | `src/search/searchApi.ts` | the search box | the place / address / property / coordinate queries |
 | `src/map/compare/` | the compare curtain | `enterCompareAtom`, `compareSplitAtom` |
+
+`src/map/featureInfo/` was on that list and is off it: `src/heritageInfo/` is
+its caller again. What came back is not what went — the fetcher is scoped to the
+ids the caller names and routed through `fetchWithin`, the vector-feature half
+had no layers left to query and went, and the rendering knowledge was split out
+into `heritageSummary.ts` so a surface receives data rather than markup.
 
 `src/map/lidarFootprintsLayer.ts` was on that list and is off it:
 `MapComponent` mounts it again. It is what fills `lidarViewportAtom`, which the
@@ -194,6 +219,7 @@ change described at the top of `useLidarControls.ts`.
 | `activeFlyfotoProjectAtom` | `…/flyfotoBackground.ts` | one NiB acquisition | `useFlyfotoControls` |
 | `activeThemeLayersAtom` | `layers/atoms.ts` | which Kulturminner layers | `useHeritageControls` |
 | `heritageDetailsAtom`, `heritageRenderAtom`, `heritageOpacityAtom`, `heritageHiddenAtom` | `layers/heritage.ts` | how they are drawn | `useHeritageControls` |
+| `heritageTipAtom`, `heritagePopupAtom` | `map/featureInfo/atoms.ts` | what the pointer found, and what a click kept | `useHeritageInfo` |
 | `terrainWindowAtom`, `frameTerrainWindowAtom` | `terrain/window.ts` | the rectangle under analysis | — |
 | `compareOnAtom`, `compareSplitAtom`, `enterCompareAtom` | `map/compare/atoms.ts` | the curtain | — |
 

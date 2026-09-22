@@ -18,10 +18,13 @@ export interface LayerFeatureInfo {
   fieldConfigs?: FieldConfig[];
 }
 
-export interface FeatureInfoResult {
+/** One reading: what every queryable layer answered about one point on the map.
+ *  The coordinate is the snapped one that was actually asked about, so a surface
+ *  anchors itself where the question was put rather than where the pointer
+ *  happened to be. */
+export interface FeatureInfoReading {
   coordinate: [number, number];
   layers: LayerFeatureInfo[];
-  timestamp: number;
 }
 
 export type InfoFormat =
