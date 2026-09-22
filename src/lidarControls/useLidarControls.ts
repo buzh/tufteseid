@@ -15,6 +15,7 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
 import { mapAtom } from '../map/atoms';
+import { viewportBbox } from '../map/bbox';
 import type { CompareHalf } from '../map/compare/halves';
 import { backgroundLayerHalves } from '../map/layers/config/backgroundLayers/atoms';
 import {
@@ -27,6 +28,7 @@ import {
 import {
   chooseAutoDataset,
   lidarAutoDatasetHalves,
+  pinnedFlightLeftBehind,
 } from '../map/layers/config/backgroundLayers/lidarAuto';
 import {
   activeLidarModelHalves,
@@ -282,6 +284,34 @@ export const useLidarControls = (half: CompareHalf) => {
     selectNational,
     selectProject,
   ]);
+
+  // The other direction, and the only thing that ever turns Automatisk back on
+  // by itself: a pin is a choice about a flight, and once the reader has panned
+  // clear of that flight it is a choice about nothing — the background is blank
+  // ground, and the way out is a toggle they have to remember pressing. So the
+  // pin lapses and the resolver above takes the next screen.
+  //
+  // Its own `moveend`, not the resolution one: this needs the extent rather
+  // than the scale, it is subscribed only while a pinned flight is drawing, and
+  // reading the rectangle here keeps it out of component state — a new array
+  // every pan would re-render the ring for a question answered in place.
+  //
+  // Moves only, never on mount: the pulldown lists every flight that touches
+  // the viewport, so one picked off the far end of that list can be under the
+  // bar the moment it is picked, and a pick undone before the reader has moved
+  // is not a lapsed pin — it is a control that does not work.
+  useEffect(() => {
+    if (autoDataset || !isLidarFlight || !activeLidarProject) return;
+    const check = () => {
+      if (pinnedFlightLeftBehind(activeLidarProject, viewportBbox(map))) {
+        setAutoDataset(true);
+      }
+    };
+    map.on('moveend', check);
+    return () => {
+      map.un('moveend', check);
+    };
+  }, [map, autoDataset, isLidarFlight, activeLidarProject, setAutoDataset]);
 
   // A shared `?backgroundLayer=lidarCvat` names the ground but not the flight,
   // so it arrives with none and draws nothing for a tick. Nothing extra is
