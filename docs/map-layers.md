@@ -36,7 +36,7 @@ from there.
 
 | Ground | Layer name(s) | Service / prefix | Dataset ring (W/S) |
 |---|---|---|---|
-| LiDAR | `lidarHillshade` (national mosaic) | `/cache/lidar-dtm`, DOM `/cache/lidar-dom`, to z16 — MapProxy over `wms.hoyde-dtm-nhm-topobathy-25833:skyggerelieff` and `wms.hoyde-dom-nhm-25833:skyggerelieff`. Any other style falls back to `/wms/geonorge/wms.hoyde-…` direct | Automatisk / national / per-project |
+| LiDAR | `lidarHillshade` (national mosaic) | `/cache/lidar-dtm`, DOM `/cache/lidar-dom`, to z16 — MapProxy over `wms.hoyde-dtm-nhm-topobathy-25833:skyggerelieff` and `wms.hoyde-dom-nhm-25833:skyggerelieff`; `…-held` siblings while the `hoyde` breaker is open. Any other style falls back to `/wms/geonorge/wms.hoyde-…` direct | Automatisk / national / per-project |
 | LiDAR | `lidarProject` (0.25 m per acquisition, rendered by the WMS) | `/wms/geonorge/wms.hoyde-dtm-prosjekt`, DOM: `wms.hoyde-dom-prosjekt`; `LAYERS=<project id>:<style>` | same ring |
 | LiDAR | `lidarCvat` (the same acquisition, rendered by us: **Arkeologisk relieff**) | `/cvat/<acquisition>/{z}/{x}/{y}.webp` — our own tile store, read out of MBTiles by the `cvat-tiles` sidecar, nothing upstream | not on it — it is the `cvat` entry of the style ring (A/D) |
 | Analyse | — | `/arcgis/hoydedata/*`, see `docs/terrain-analysis.md` | the visualization list |
@@ -103,17 +103,30 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   0.25 m DTM, which is where the denser, newer flight already wins.
 - **The store is read at runtime, not compiled in.** `fetchCvatStore()` reads
   `/cvat/manifest.json` once per page load and `resolveCvatAcquisitions()`
-  joins its `acquisitions` block to the LiDAR catalogue, so a database copied
-  onto the server is in the app on the next reload with no deploy and no code
-  change. That manifest is not a file: the sidecar surveys the store and reads
-  each database's `metadata` for the name and the levels it claims, so there is
-  no inventory beside the tiles that can disagree with them, and copying a file
-  in is the whole delivery. An acquisition the catalogue does not publish is
-  dropped with a warning — without its row there is no footprint to rank it by
-  and no envelope to cull with. An install without a store answers an empty
-  `acquisitions` block, which is no cached rows anywhere rather than a dataset
-  that is offered and draws nothing. Levels are per acquisition, so a half-built
-  one draws at the levels it has and nowhere else.
+  places its `acquisitions` block, so a database copied onto the server is in
+  the app on the next reload with no deploy and no code change. That manifest is
+  not a file: the sidecar surveys the store, reads each database's `metadata`
+  for the name and the levels it claims, and takes the envelope off the tiles
+  table — inclusive tile indices at the coarsest level held, flipped from
+  MBTiles' south-origin rows to the app's. So there is no inventory beside the
+  tiles that can disagree with them, and copying a file in is the whole
+  delivery. An install without a store answers an empty `acquisitions` block,
+  which is no cached rows anywhere rather than a dataset that is offered and
+  draws nothing. Levels are per acquisition, so a half-built one draws at the
+  levels it has and nowhere else.
+- **The store stands on its own.** The LiDAR catalogue is asked for and not
+  depended on. Where it has a row for the acquisition that row wins, because it
+  carries the flight's WMS styles and the manifest cannot know them. Where it
+  has none — a flight Kartverket has dropped, or an outage — `placeFromStore()`
+  makes a row out of the manifest: the acquisition name is the id, the year and
+  point density come out of that name by the catalogue parser's own two
+  readers, and the envelope out of the tile indices. Such a flight offers the
+  cached render and no other, which is honest and is also all that can be drawn
+  while the service publishing the others is down. That matters because the
+  catalogue is an 8 MB GetCapabilities off the same høydedata backend as the
+  national mosaic: the hour our own tiles are the only relief left is exactly
+  the hour that document does not answer. `fetchLidarProjects()` also falls back
+  past its week-long TTL to whatever copy localStorage still holds.
 - It is the one ground whose relief nobody upstream computed, so it is the one
   that has to say where it came from. The render menu prints the acquisition,
   the renderer, the template and the radii at the head of its dropdown, where
@@ -130,8 +143,9 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   rather than fetched from it: a downloaded figure travels off this host.
   Rebuilding the store under changed parameters — a new digest stamped into the
   files — means editing that block too.
-- Its coverage needs no polygon. The layer's `extent` is the showing
-  acquisition's own envelope and culls everything outside; inside it the ~94 %
+- Its coverage needs no polygon. The layer's `extent` is the store's own
+  envelope out of the manifest — the catalogue's bbox only where the manifest
+  carries none, an older sidecar — and culls everything outside; inside it the ~94 %
   that were never written answer 404, OpenLayers marks those tiles errored and
   leaves them transparent, and the faded national mosaic underneath shows
   through. `maxResolution` hides the layer one step coarser than the

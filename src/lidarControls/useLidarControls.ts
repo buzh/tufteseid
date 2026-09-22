@@ -8,9 +8,9 @@
 // flights, renders and models without knowing about each other, and each runs
 // its own Automatisk resolver over its own dataset.
 //
-// What two mounts do cost is two copies of the catalogue, the cVAT manifest and
-// the national style list in component state. The fetches behind all three are
-// cached at module level, so the network cost is paid once either way.
+// What two mounts do cost is two copies of the placed cVAT store and the
+// national style list in component state. The fetches behind both are cached at
+// module level, so the network cost is paid once either way.
 
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
@@ -21,8 +21,7 @@ import {
   activeCvatAcquisitionHalves,
   type CvatAcquisition,
   cvatFor,
-  fetchCvatStore,
-  resolveCvatAcquisitions,
+  fetchCvatAcquisitions,
   stylesForFlight,
 } from '../map/layers/config/backgroundLayers/cvatGround';
 import {
@@ -35,7 +34,6 @@ import {
   activeLidarStyleHalves,
   DEFAULT_LIDAR_PROJECT_STYLE,
   effectiveLidarStyle,
-  fetchLidarProjects,
   fetchNationalLidarStyles,
   lidarFlightGround,
   type LidarModel,
@@ -77,44 +75,23 @@ export const useLidarControls = (half: CompareHalf) => {
   // WFS pass over the viewport.
   const viewport = useAtomValue(lidarViewportAtom);
 
-  // ~1900 rows of GetCapabilities, cached a week in localStorage by the fetcher.
-  // Only the cVAT join below needs the whole catalogue; the picker's rows come
-  // off the viewport.
-  const [allProjects, setAllProjects] = useState<LidarProject[] | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetchLidarProjects()
-      .then((projects) => {
-        if (!cancelled) setAllProjects(projects);
-      })
-      .catch((err) => {
-        console.warn('[lidar] fetchLidarProjects failed', err);
-        if (!cancelled) setAllProjects([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // What the cVAT store holds, joined to the catalogue rows its acquisitions are
-  // named after. Read from the manifest once per load rather than compiled in,
-  // so a batch run that lands on the server is in the app on the next reload
-  // with no deploy. Empty on an install without a store.
+  // What the cVAT store holds, placed — off the catalogue where it has a row
+  // for the acquisition and off the manifest's own envelope where it has not.
+  // Read at runtime rather than compiled in, so a batch run that lands on the
+  // server is in the app on the next reload with no deploy. Empty on an install
+  // without a store, and never a rejection: see `fetchCvatAcquisitions`.
   const [cvatAcquisitions, setCvatAcquisitions] = useState<CvatAcquisition[]>(
     [],
   );
   useEffect(() => {
-    if (!allProjects) return;
     let cancelled = false;
-    fetchCvatStore().then((store) => {
-      if (!cancelled) {
-        setCvatAcquisitions(resolveCvatAcquisitions(store, allProjects));
-      }
+    fetchCvatAcquisitions().then((held) => {
+      if (!cancelled) setCvatAcquisitions(held);
     });
     return () => {
       cancelled = true;
     };
-  }, [allProjects]);
+  }, []);
 
   // The national mosaic's styles; a flight's are already in the catalogue row.
   const [nationalStyles, setNationalStyles] = useState<string[]>([]);

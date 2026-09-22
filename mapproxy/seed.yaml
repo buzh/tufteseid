@@ -19,6 +19,10 @@
 # fills the gaps and leaves what is already there, which makes it safe to
 # re-run and safe to interrupt.
 
+# `lidar-dtm-held` and `lidar-dom-held` are deliberately in no seed below. They
+# are the same two MBTiles files with no source behind them, so there is nothing
+# for a seeder to fetch; what fills them is the live caches they read.
+
 coverages:
   # The same three boxes the sources are clipped to — each service's own
   # declared EPSG:25833 bounds.

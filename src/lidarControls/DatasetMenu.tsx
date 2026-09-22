@@ -48,6 +48,10 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
     ? `${flight.projectName} · ${flightFacts(flight)}`
     : `${t('lidarControls.dataset.national')} · ${t('lidarControls.dataset.nationalHint')}`;
 
+  // Kartverket is not answering and the rows are the cVAT store's own. They are
+  // described differently for it: see the two places below.
+  const held = viewport.status === 'held';
+
   const row = (entry: LidarViewportEntry) => {
     const { project, areaRatio } = entry;
     const active = isLidarFlight && activeLidarProject?.id === project.id;
@@ -64,11 +68,15 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
         <Group gap="xs" wrap="nowrap" justify="space-between">
           <div>
             <Text size="sm">{project.projectName}</Text>
+            {/* No percentage on a held row: that list is ranked on the store's
+                envelopes, so the number would be an upper bound printed as a
+                measurement. The facts off the acquisition's name still hold. */}
             <Text size="xs" c="dimmed">
-              {flightFacts(project)} ·{' '}
-              {t('lidarControls.dataset.coverage', {
-                percent: Math.round(areaRatio * 100),
-              })}
+              {held
+                ? flightFacts(project)
+                : `${flightFacts(project)} · ${t('lidarControls.dataset.coverage', {
+                    percent: Math.round(areaRatio * 100),
+                  })}`}
             </Text>
           </div>
           {/* The store having rendered a flight is not a tiebreak — it does not
@@ -95,6 +103,16 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
       return (
         <Menu.Item disabled leftSection={<Icon icon="zoom_in" size={18} />}>
           {t('lidarControls.dataset.zoomedOut')}
+        </Menu.Item>
+      );
+    }
+    // Not an error line: the rows below it are real and every one of them
+    // draws. What it says is why the list is short and why the mosaic under it
+    // has holes today.
+    if (viewport.status === 'held') {
+      return (
+        <Menu.Item disabled leftSection={<Icon icon="cloud_off" size={18} />}>
+          {t('lidarControls.dataset.held')}
         </Menu.Item>
       );
     }
@@ -145,8 +163,13 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
           }
         >
           <Text size="sm">{t('lidarControls.dataset.national')}</Text>
+          {/* Still offered during an outage, and still the right row for ground
+              no flight in the store reaches — but it is no longer seamless, so
+              it must not go on saying it is. */}
           <Text size="xs" c="dimmed">
-            {t('lidarControls.dataset.nationalHint')}
+            {held
+              ? t('lidarControls.dataset.nationalHeldHint')
+              : t('lidarControls.dataset.nationalHint')}
           </Text>
         </Menu.Item>
 
@@ -154,7 +177,13 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
           {status()}
           {viewport.primary.length > 0 && (
             <>
-              <Menu.Label>{t('lidarControls.dataset.inView')}</Menu.Label>
+              <Menu.Label>
+                {t(
+                  held
+                    ? 'lidarControls.dataset.heldInView'
+                    : 'lidarControls.dataset.inView',
+                )}
+              </Menu.Label>
               {viewport.primary.map(row)}
             </>
           )}

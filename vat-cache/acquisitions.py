@@ -12,9 +12,11 @@ acquisition missing from any one of them fails differently:
   writes a store that looks built and holds nothing.
 - **Kartverket's per-project WMS** — the layer-name prefix, which is the
   `LidarProject.id` the app publishes and the key `resolveCvatAcquisitions`
-  joins the manifest on. Absent here, the tiles are built, correct, and never
-  asked for: the app drops the acquisition with a console warning because
-  without the catalogue row it has no footprint to rank the cache by.
+  joins the manifest on. Absent here, the tiles are still offered: the sidecar
+  publishes each database's envelope, so the app places the acquisition off its
+  own store and reads the year and density out of the name. What is lost is the
+  flight's WMS styles, so it is the cached render or nothing — which is the
+  right outcome anyway for a flight the service does not publish.
 
 The names are compared verbatim. They differ by region, density and year and
 carry Norwegian letters and hyphens, so there is no normalisation to be had —

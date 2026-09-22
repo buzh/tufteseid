@@ -189,7 +189,10 @@ export const getXYZLayer = (
     tileGrid,
     zDirection: WMS_Z_DIRECTION,
   });
-  guardTileSource(source, layerConfig.url, { retry: !layerConfig.sparse });
+  guardTileSource(source, layerConfig.url, {
+    retry: !layerConfig.sparse,
+    heldUrl: layerConfig.heldUrl,
+  });
 
   const extent = toViewExtent(layerConfig.coverageExtent, viewProjection);
   return new TileLayer({

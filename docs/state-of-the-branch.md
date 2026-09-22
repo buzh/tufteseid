@@ -186,6 +186,15 @@ origins through `fetchWithin`, which is now the admission point as well as the
 deadline. The rules, the thresholds and the two cache interactions that make
 the probes honest are in `docs/wms-proxy-and-tiles.md`.
 
+Noticing is half of it; the other half is still drawing what does not need the
+dead origin. A `hoyde` outage now leaves three things standing: the national
+mosaic reads MapProxy's `lidar-*-held` siblings, which serve what is stored and
+nothing else; the cVAT store places its own acquisitions out of the envelope in
+`/cvat/manifest.json` rather than off Kartverket's catalogue; and
+`lidarViewportAtom` takes a `held` status, whose rows are the cached flights
+over the viewport, which the dataset menu labels as such and Automatisk picks
+from. `docs/map-layers.md` and `docs/wms-proxy-and-tiles.md` have the detail.
+
 ## What went
 
 `src/shell/` (ribbon, layer rows, ground modes), `src/localities/`, `src/funn/`,

@@ -20,12 +20,19 @@
 // is what keeps a dropped request from being permanent here of all places.
 //
 // The `/cache/` prefixes that *are* listed below are MapProxy's, and a hit
-// there answers off disk with no upstream involved — so the breaker will blank
-// tiles MapProxy could have served. That is the trade taken deliberately: a
-// miss holds a 60 s `client_timeout` against the source, and a screenful of
-// those wedges MapProxy's worker pool for every layer, including the ones whose
-// upstream is healthy. Better to stop asking, and say so on the ribbon, than to
-// half-draw while claiming to be up.
+// there answers off disk with no upstream involved. Refusing a hit throws away
+// a tile we own; letting a miss through holds a worker for the source's 60 s
+// `client_timeout`, and a screenful of those wedges MapProxy's pool for every
+// layer, including the ones whose upstream is healthy. The two LiDAR mosaics
+// take neither horn: each has a read-only sibling in `mapproxy.yaml` —
+// `lidar-dtm-held`, `lidar-dom-held` — over the same MBTiles file with no
+// source behind it, and `tileGuard.ts` redirects to it while this breaker is
+// open. Stored tiles keep drawing, a miss is a transparent tile rather than a
+// stalled worker, and nothing reaches upstream either way. That is why the two
+// exact prefixes are listed below and not `/cache/lidar-`, which would have
+// matched the siblings and refused them too. `/cache/flyfoto` has no sibling
+// and is still refused outright: better a blank ground, and the ribbon saying
+// so, than half a map that claims to be up.
 
 import { getEnv } from '../env';
 
@@ -98,7 +105,10 @@ export const ORIGINS: Record<OriginId, Origin> = {
       '/wms/geonorge/wms.hoyde-',
       '/wfs/geonorge/wfs.hoyde-',
       '/arcgis/hoydedata/',
-      '/cache/lidar-',
+      // The two live mosaics by name. Not `/cache/lidar-`: that also spells
+      // `/cache/lidar-dtm-held/`, and the held siblings are the way out.
+      '/cache/lidar-dtm/',
+      '/cache/lidar-dom/',
     ],
   },
   // The pre-rendered base under every ground. Straight from the browser, not

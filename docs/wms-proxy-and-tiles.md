@@ -51,13 +51,20 @@ through wmscache at all:
 |---|---|---|
 | `/cache/lidar-dtm/…` | `mapproxy:80/mapproxy/tiles/lidar-dtm/tufteseid25833/…` | `wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-topobathy-25833` |
 | `/cache/lidar-dom/…` | same, `lidar-dom` | `wms.geonorge.no/skwms1/wms.hoyde-dom-nhm-25833` |
+| `/cache/lidar-dtm-held/…`, `/cache/lidar-dom-held/…` | same | none — `sources: []` over the same two MBTiles files |
 | `/cache/topo-ref/…`, `/cache/topo-ref-contours/…` | same | `wms.geonorge.no/skwms1/wms.topo` |
 | `/cache/amtskart/…` | same | `wms.geonorge.no/skwms1/wms.historiskekart` |
 | `/cache/flyfoto/…` | same | nib-proxy → `services.norgeibilder.no/wms/ortofoto` |
 
-One Caddy block covers all six: a `path_regexp` takes the layer name out of the
+The two `-held` layers are the same caches without a source under them: same
+grid, same MBTiles file, `sources: []`, so MapProxy serves what it has stored
+and answers a miss with a transparent tile instead of a GetMap. They exist for
+the `hoyde` breaker — see *When an upstream stops answering* — and are never
+written to, never seeded, and never asked for while the origin is up.
+
+One Caddy block covers them all: a `path_regexp` takes the layer name out of the
 path and substitutes it into MapProxy's TMS path, so the grid name and the
-service version are written once. `:80` and the `/mapproxy` prefix are the
+service version are written once, and a new layer name needs no Caddy change. `:80` and the `/mapproxy` prefix are the
 `-alpine-nginx` image's own (nginx in front of uwsgi, `SCRIPT_NAME=/mapproxy`).
 A `/cache/` name MapProxy does not publish 404s from MapProxy, which is the
 same answer as refusing it at the edge and one less list to keep in step.
@@ -402,7 +409,9 @@ is fewer requests.
   tiles. That is what "works, but some tiles at some zoom levels are missing" is.
   Every failed try still reports to the breaker, so an outage trips it in fewer
   tiles than before, not more; a tile the breaker *refused* is not retried, the
-  answer being known, and comes back via `refresh()`. `/cache/topo-ref*` and
+  answer being known, and comes back via `refresh()`. A layer carrying a
+  `heldUrl` is redirected to that store rather than refused — the two national
+  mosaics, and only them. `/cache/topo-ref*` and
   `/cache/amtskart` need the retry most: in no origin, they have no probe and no
   `refresh()` to fall back on.
 - The cVAT ground is the one source that opts out, with `sparse: true` on its
@@ -439,19 +448,26 @@ at three tries each, and the reader was told none of it.
 
 **Four origins**, grouped by what fails together rather than by hostname
 (`origins.ts`): `hoyde` (`/wms/geonorge/wms.hoyde-*`, `/wfs/geonorge/wfs.hoyde-*`,
-`/arcgis/hoydedata/*` and `/cache/lidar-*` — one backend, and they went down as
-one), `kartverketCache` (cache.kartverket.no, direct from the browser),
-`ra` (`/wms/ra/*`), `nib` (`/wms/nib/*`, `/arcgis/nib/*`, `/cache/flyfoto`).
+`/arcgis/hoydedata/*`, `/cache/lidar-dtm/` and `/cache/lidar-dom/` — one
+backend, and they went down as one), `kartverketCache` (cache.kartverket.no,
+direct from the browser), `ra` (`/wms/ra/*`), `nib` (`/wms/nib/*`,
+`/arcgis/nib/*`, `/cache/flyfoto`).
 Matched by URL prefix, so nothing has to be declared per layer.
 `/cache/topo-ref*`, `/cache/amtskart` and `/kms/` are deliberately in no origin:
 a different renderer, up through that outage, and one layer each.
 
-Putting the two `/cache/` prefixes under the breaker costs something real — a
-warm MapProxy tile is blanked during an outage it could have served — and is
-still the right side of the trade. A miss holds a 60 s `client_timeout` against
-the source, and a screenful of those ties up MapProxy's workers for every layer,
-including the ones whose upstream is fine. Revisit it with evidence, not with
-the intuition that a cache hit should always be served.
+**The held siblings.** Putting a `/cache/` prefix under the breaker is a choice
+between two bad ends: refuse the request and blank a tile MapProxy already has
+on disk, or let it through and have a miss hold a 60 s `client_timeout` that
+ties up workers for every layer, including the ones whose upstream is fine. The
+two national LiDAR mosaics take neither. `mapproxy.yaml` publishes
+`lidar-dtm-held` and `lidar-dom-held` over the same MBTiles files with no source
+behind them, and `guardTileSource` rewrites a tile's URL to the sibling while
+the breaker is open — everything stored still draws, a miss is a transparent
+tile, and nothing reaches upstream either way. The prefixes are spelled out in
+full for that reason: `/cache/lidar-` would match `lidar-dtm-held` too and
+refuse the way out. `/cache/flyfoto` has no sibling and is still refused
+outright; the same recipe would give it one.
 
 **Tripping.** Three failures net of successes inside a minute. Net, not
 consecutive: `proxy_cache_use_stale` serves cached tiles straight through an

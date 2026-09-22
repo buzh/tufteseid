@@ -81,6 +81,12 @@ export type XYZBackgroundLayer = BackgroundLayerBase & {
    *  would be asked for three times and answer the same thing each time — a
    *  whole screenful of that at a level the store only partly reaches. */
   sparse: boolean;
+  /** A second template over the same tiles with no upstream behind it, read
+   *  instead of `url` while this layer's origin is down. Only the two national
+   *  mosaics have one — see `origins.ts` and `tileGuard.ts`. It does not enter
+   *  `layerSignature`: it is derived from `url` and changes no pixels while the
+   *  origin is up. */
+  heldUrl?: string;
   coverageExtent?: CoverageExtent;
 };
 

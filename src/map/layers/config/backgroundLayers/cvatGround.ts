@@ -3,8 +3,16 @@
 // written to an MBTiles database per acquisition by `vat-cache/makevat.py`.
 // Each database states its own presets, blend order, radii and run digest in
 // its `metadata` table; `/cvat/manifest.json` is the part this module reads at
-// runtime — which acquisitions are in the store and at which levels — and is
-// built by the sidecar out of the files it finds, not written beside them.
+// runtime — which acquisitions are in the store, at which levels, and over
+// which tiles — and is built by the sidecar out of the files it finds, not
+// written beside them.
+//
+// The envelope in that manifest is what lets the store stand alone. Kartverket
+// publishes a catalogue row for every flight, and where one is to be had it is
+// the better description — it names the WMS styles the flight can also be drawn
+// in. But it comes off the same backend as the national mosaic, so the hour our
+// own tiles are the only relief left is the hour that catalogue does not
+// answer, and an acquisition placed only by it would go missing exactly then.
 //
 // Nothing upstream: the `cvat-tiles` sidecar reads the bind-mounted store and
 // answers a tile at a time, so there is no wmscache entry and no CSP host —
@@ -13,20 +21,31 @@
 // under Caddy's own root; the container changed underneath them and this module
 // did not.
 
+import { extend } from 'ol/extent';
+import { transformExtent } from 'ol/proj';
 import { halved } from '../../../compare/halves';
 import type { VatStackLayer } from '../../../../terrain/shade';
-import { CVAT_STYLE, type LidarProject } from './lidarProjects';
+import { getWMSTileGrid } from '../../wmsTileGrid';
+import {
+  CVAT_STYLE,
+  fetchLidarProjects,
+  parsePointDensity,
+  parseYear,
+  type LidarProject,
+} from './lidarProjects';
 import { XYZBackgroundLayer } from './types';
 
 /**
- * One acquisition in the store: the catalogue row the tiles were computed from,
- * and the levels that were written for it.
+ * One acquisition in the store: a catalogue row for the flight the tiles were
+ * computed from, the levels that were written for it, and where they lie.
  *
- * The catalogue row rather than a name, because the acquisition in the manifest
+ * A catalogue row rather than a name, because the acquisition in the manifest
  * is byte-identical to the `LidarProject.id` the per-project WMS publishes —
  * which is what lets the footprint ranking the app already has say where the
- * cache reaches, with no name mapping and no second coverage source. It also
- * carries the envelope for the layer's extent and is what `Behold` stitches.
+ * cache reaches, with no name mapping and no second coverage source. It is also
+ * what `Behold` stitches. Where the catalogue has no row for the name, one is
+ * made out of the store's own manifest (`placeFromStore`): the same shape, with
+ * no WMS styles in it, since those are the one thing only the service knows.
  */
 export type CvatAcquisition = {
   project: LidarProject;
@@ -46,6 +65,11 @@ export type CvatAcquisition = {
    *  half-built acquisition is the normal state of a store that is growing. */
   minZoom: number;
   maxZoom: number;
+  /** The store's own envelope in EPSG:25833, from the tile indices the manifest
+   *  carries. Tighter than the catalogue's bbox and true of these tiles rather
+   *  than of the flight, so it is the better extent to cull with where it is
+   *  there. Null against a sidecar too old to publish one. */
+  extent25833: [number, number, number, number] | null;
 };
 
 /**
@@ -71,9 +95,41 @@ const CVAT_MANIFEST_URL = '/cvat/manifest.json';
  *  the point rather than an accident to curate away. */
 const cvatTileUrl = (path: string) => `/cvat/${path}/{z}/{x}/{y}.webp`;
 
+/** Where an acquisition lies, as inclusive tile indices on the app's own grid
+ *  (`wmsTileGrid.ts`) at one level — the coarsest the store holds for it. An
+ *  envelope, not a footprint: the holes inside it are the 404s. Read off the
+ *  tiles table by `cvat-tiles/server.mjs`, which also flips MBTiles' row count
+ *  to the app's, so `y0` is the northern edge. */
+export type CvatBounds = {
+  z: number;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+};
+
 /** What the sidecar synthesizes under `acquisitions`: acquisition name to the
- *  levels built for it and the namespace they are in. */
-export type CvatStore = Record<string, { levels: number[]; path: string }>;
+ *  levels built for it, the namespace they are in, and their envelope. */
+export type CvatStore = Record<
+  string,
+  { levels: number[]; path: string; bounds: CvatBounds | null }
+>;
+
+const parseBounds = (raw: unknown): CvatBounds | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const b = raw as Record<string, unknown>;
+  const at = (k: string): number | null =>
+    Number.isInteger(b[k]) ? (b[k] as number) : null;
+  const z = at('z');
+  const x0 = at('x0');
+  const y0 = at('y0');
+  const x1 = at('x1');
+  const y1 = at('y1');
+  if (z === null || x0 === null || y0 === null || x1 === null || y1 === null) {
+    return null;
+  }
+  return { z, x0, y0, x1, y1 };
+};
 
 const parseStore = (body: unknown): CvatStore => {
   if (!body || typeof body !== 'object') return {};
@@ -81,7 +137,11 @@ const parseStore = (body: unknown): CvatStore => {
   if (!block || typeof block !== 'object') return {};
   const store: CvatStore = {};
   for (const [name, entry] of Object.entries(block)) {
-    const { levels, path } = (entry ?? {}) as { levels?: unknown; path?: unknown };
+    const { levels, path, bounds } = (entry ?? {}) as {
+      levels?: unknown;
+      path?: unknown;
+      bounds?: unknown;
+    };
     if (!Array.isArray(levels)) continue;
     const zs = levels.filter((z): z is number => Number.isInteger(z));
     // No path means a manifest from before the store was divided per
@@ -91,7 +151,11 @@ const parseStore = (body: unknown): CvatStore => {
       console.warn(`[cvat] ${name} has no path in the manifest`);
       continue;
     }
-    if (zs.length > 0) store[name] = { levels: zs, path };
+    // A missing envelope is not fatal: an older sidecar publishes none, and
+    // such an acquisition still draws wherever the catalogue can place it.
+    if (zs.length > 0) {
+      store[name] = { levels: zs, path, bounds: parseBounds(bounds) };
+    }
   }
   return store;
 };
@@ -119,20 +183,82 @@ export const fetchCvatStore = (): Promise<CvatStore> => {
   return storePromise;
 };
 
+/** The manifest's tile indices as an extent in projected metres. */
+const boundsExtent25833 = (
+  bounds: CvatBounds,
+): [number, number, number, number] | null => {
+  const grid = getWMSTileGrid('EPSG:25833');
+  if (!grid) return null;
+  const { z, x0, y0, x1, y1 } = bounds;
+  const e = extend(
+    grid.getTileCoordExtent([z, x0, y0]),
+    grid.getTileCoordExtent([z, x1, y1]),
+  );
+  return [e[0], e[1], e[2], e[3]];
+};
+
 /**
- * The store joined to the LiDAR catalogue. An acquisition the catalogue does
- * not publish is dropped with a warning rather than half-wired: without the
- * catalogue row there is no footprint to rank it by and no envelope to cull
- * with, so it could only be offered everywhere and described as nothing.
+ * A catalogue row for an acquisition the catalogue has not given us.
+ *
+ * The name is the id, because the store's names *are* the WMS layer prefixes —
+ * that identity is what made the join possible in the first place. Year and
+ * point density come out of that name by the same two readers the catalogue's
+ * own parser uses, and the envelope out of the store's tile indices.
+ *
+ * No styles, and that is the honest shape rather than a gap: the flight's WMS
+ * renders are precisely what this does not know, and during the outage this
+ * exists for they could not be drawn anyway. A flight placed this way offers
+ * the cached render and nothing else.
+ */
+const placeFromStore = (
+  id: string,
+  extent25833: [number, number, number, number] | null,
+): LidarProject | null => {
+  if (!extent25833) return null;
+  const lonLat = transformExtent(
+    extent25833,
+    'EPSG:25833',
+    'EPSG:4326',
+    // The envelope's north and south edges bow under the transform; sampling
+    // the sides keeps the lon/lat box around all of it rather than through it.
+    8,
+  );
+  return {
+    id,
+    projectName: id,
+    year: parseYear(id),
+    pointDensity: parsePointDensity(id),
+    bboxLonLat: [lonLat[0], lonLat[1], lonLat[2], lonLat[3]],
+    styles: [],
+  };
+};
+
+// The join runs on every footprint refresh, and an acquisition the catalogue
+// will never name would otherwise say so once a pan.
+const warned = new Set<string>();
+
+/**
+ * The store, placed. The catalogue wins where it has a row — it carries the
+ * flight's WMS styles — and the manifest's own envelope places the rest. Only
+ * an acquisition that is in neither, which means an old sidecar and a flight
+ * the catalogue has dropped, has nowhere to be put and is left out.
  */
 export const resolveCvatAcquisitions = (
   store: CvatStore,
   projects: LidarProject[],
 ): CvatAcquisition[] =>
-  Object.entries(store).flatMap(([id, { levels, path }]) => {
-    const project = projects.find((p) => p.id === id);
+  Object.entries(store).flatMap(([id, { levels, path, bounds }]) => {
+    const extent25833 = bounds ? boundsExtent25833(bounds) : null;
+    const project =
+      projects.find((p) => p.id === id) ?? placeFromStore(id, extent25833);
     if (!project) {
-      console.warn(`[cvat] ${id} is in the store but not in the catalogue`);
+      if (!warned.has(id)) {
+        warned.add(id);
+        console.warn(
+          `[cvat] ${id} is in the store, absent from the catalogue and ` +
+            'carries no envelope in the manifest; nothing can place it',
+        );
+      }
       return [];
     }
     return [
@@ -141,9 +267,30 @@ export const resolveCvatAcquisitions = (
         path,
         minZoom: Math.min(...levels),
         maxZoom: Math.max(...levels),
+        extent25833,
       },
     ];
   });
+
+/**
+ * The store, placed, as one call.
+ *
+ * The catalogue is asked for and not depended on: `fetchLidarProjects` answers
+ * from its week of localStorage, falls back to a stale copy, and only then
+ * throws — and a throw here is an empty list of rows, not an empty list of
+ * acquisitions. See the header for why that asymmetry is the whole point.
+ *
+ * Not memoised, unlike the two fetches behind it. Both answer from a cache or
+ * fail at once, the join is a handful of entries, and re-running it is how a
+ * list built during an outage picks the catalogue back up afterwards.
+ */
+export const fetchCvatAcquisitions = async (): Promise<CvatAcquisition[]> => {
+  const [store, projects] = await Promise.all([
+    fetchCvatStore(),
+    fetchLidarProjects().catch(() => [] as LidarProject[]),
+  ]);
+  return resolveCvatAcquisitions(store, projects);
+};
 
 /** The store's render of one flight, or null where it holds none. */
 export const cvatFor = (
@@ -165,8 +312,10 @@ export const stylesForFlight = (
 /**
  * The layer for one cached acquisition.
  *
- * The extent is the acquisition's own envelope, of which the acquisition itself
- * fills a few per cent. It stops OL asking outside; inside it the tiles nobody
+ * The extent is the store's own envelope where the manifest carries one and the
+ * catalogue's bbox otherwise — the store's being the tighter of the two, since
+ * it bounds the tiles rather than the flight. Either way the acquisition fills
+ * a few per cent of it. It stops OL asking outside; inside it the tiles nobody
  * wrote answer 404, which OL marks errored and leaves transparent — and that
  * transparency is the coverage mask, with the faded mosaic underneath showing
  * through. That is what `sparse` says, and the mask is why: a retry would ask
@@ -197,10 +346,9 @@ export const buildCvatGroundConfig = (
   // costs nothing and takes the blank out of a zoom step.
   preload: 2,
   sparse: true,
-  coverageExtent: {
-    extent: acquisition.project.bboxLonLat,
-    crs: 'EPSG:4326',
-  },
+  coverageExtent: acquisition.extent25833
+    ? { extent: acquisition.extent25833, crs: 'EPSG:25833' }
+    : { extent: acquisition.project.bboxLonLat, crs: 'EPSG:4326' },
 });
 
 /**

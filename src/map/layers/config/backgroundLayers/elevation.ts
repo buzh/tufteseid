@@ -15,6 +15,16 @@ const NATIONAL_CACHE_URL: Record<LidarModel, string> = {
   dom: '/cache/lidar-dom/{z}/{x}/{y}.png',
 };
 
+// The same two MBTiles files published a second time with no source behind
+// them, for the hours wms.geonorge is not answering: what the store already
+// holds still draws, and what it does not comes back transparent instead of
+// occupying a MapProxy worker until its 60 s timeout. `tileGuard.ts` swaps to
+// these while the `hoyde` breaker is open and back when the probe succeeds.
+const NATIONAL_HELD_URL: Record<LidarModel, string> = {
+  dtm: '/cache/lidar-dtm-held/{z}/{x}/{y}.png',
+  dom: '/cache/lidar-dom-held/{z}/{x}/{y}.png',
+};
+
 // A 1 m product, so past z16 (0.33 m/px) the service is upsampling its own grid
 // and OL upsampling the z16 tile says the same thing — without four more levels
 // of upstream renders and cache growth. Reads as softer edges when zoomed in.
@@ -43,6 +53,7 @@ export const buildNationalLidarConfig = (
       type: 'XYZ',
       layerName: 'lidarHillshade',
       url: NATIONAL_CACHE_URL[model],
+      heldUrl: NATIONAL_HELD_URL[model],
       projection: 'EPSG:25833',
       minZoom: 0,
       maxZoom: NATIONAL_CACHE_MAX_ZOOM,

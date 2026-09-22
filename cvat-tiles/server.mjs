@@ -22,6 +22,13 @@
 // nothing to restart — and that is what lets the tiles be computed on a machine
 // that knows nothing about this one.
 //
+// The manifest also publishes each acquisition's envelope in tile indices, read
+// off the tiles table. The app would otherwise have to get it from Kartverket's
+// per-project LiDAR GetCapabilities to know where the flight is — and that
+// document comes off the same backend as the national mosaic, so the hour the
+// store matters most is the hour the app cannot place what it holds. With the
+// envelope here, a database in this directory is enough on its own.
+//
 // The 404 is load-bearing. A tile nobody wrote is a tile outside the flight's
 // footprint: OpenLayers marks it errored and leaves it transparent, and that
 // transparency is how the acquisition's own outline appears on the map. So a
@@ -143,7 +150,7 @@ function miss(res) {
 
 /**
  * What one database says it is: the acquisition name the app joins the LiDAR
- * catalogue on, and the levels it holds.
+ * catalogue on, the levels it holds, and where on the grid it lies.
  *
  * Opened and closed for the question rather than through `acquire`, because
  * this runs over every file in the store including ones nobody will ask a tile
@@ -166,7 +173,8 @@ function inspect(slug) {
       console.warn(`[cvat] ${slug}${SUFFIX} names no acquisition; skipping`);
       return null;
     }
-    return { name, levels: levelsOf(db, rows) };
+    const levels = levelsOf(db, rows);
+    return { name, levels, bounds: boundsOf(db, levels) };
   } catch (err) {
     console.warn(`[cvat] ${slug}${SUFFIX} does not read: ${err?.message ?? err}`);
     return null;
@@ -206,6 +214,39 @@ function levelsOf(db, rows) {
     .prepare('SELECT DISTINCT zoom_level AS z FROM tiles ORDER BY z DESC')
     .all()
     .map((r) => r.z);
+}
+
+/**
+ * Where the acquisition lies, as inclusive tile indices on the app's grid at
+ * the coarsest level the file holds. An envelope, not a footprint: the holes
+ * inside it are the 404s, and that is the only shape a flight's coverage ever
+ * had here. Enough to place it on the map, rank it against the viewport and
+ * cull requests outside it.
+ *
+ * The coarsest level, for two reasons. Every level is cut from the same
+ * coverage mask, so a deeper level's tiles lie inside the coarser tiles
+ * covering the same ground, and the coarsest envelope contains them all. And it
+ * is the level with the fewest rows, so this is four index lookups over a few
+ * hundred entries rather than a walk of 80 000.
+ *
+ * Rows come back flipped to the app's north-origin y, so nothing downstream has
+ * to know that MBTiles counts from the south. Flipping reverses the order,
+ * hence min and max changing places.
+ */
+function boundsOf(db, levels) {
+  const z = Math.min(...levels);
+  if (!Number.isInteger(z)) return null;
+  const at = db
+    .prepare(
+      'SELECT min(tile_column) AS x0, max(tile_column) AS x1, ' +
+        'min(tile_row) AS r0, max(tile_row) AS r1 ' +
+        'FROM tiles WHERE zoom_level = ?',
+    )
+    .get(z);
+  // Null when the level is named in the stamp but holds nothing — a run
+  // interrupted before its coarsest level, which has no envelope to publish.
+  if (at?.x0 == null) return null;
+  return { z, x0: at.x0, y0: tmsRow(z, at.r1), x1: at.x1, y1: tmsRow(z, at.r0) };
 }
 
 /** Every database in the store, with a mark that moves when the file does. */
@@ -269,7 +310,13 @@ async function rebuild() {
   const acquisitions = {};
   for (const { slug } of found) {
     const said = inspect(slug);
-    if (said) acquisitions[said.name] = { levels: said.levels, path: slug };
+    if (said) {
+      acquisitions[said.name] = {
+        levels: said.levels,
+        path: slug,
+        bounds: said.bounds,
+      };
+    }
   }
   body = Buffer.from(JSON.stringify({ acquisitions }));
   console.log(

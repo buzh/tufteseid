@@ -55,6 +55,20 @@ export const chooseAutoDataset = ({
 
   // Too wide for the footprint WFS: fall back to the layer that always covers.
   if (viewport.status === 'zoomedOut') return { kind: 'national' };
+
+  // Kartverket is down and the list is what the cVAT store holds here. The
+  // mosaic is no longer the layer that always covers — it draws whatever
+  // MapProxy already had and nothing else — so the ranking below runs on the
+  // held list unchanged, minus the incumbent rule: there is no seam to pan
+  // along when the alternative is a store of nine flights, and the reader
+  // arriving here mid-outage should be given the one picture there is.
+  if (viewport.status === 'held') {
+    const best = viewport.primary[0];
+    return best && best.areaRatio >= AUTO_ENGAGE_COVERAGE
+      ? { kind: 'project', project: best.project }
+      : { kind: 'national' };
+  }
+
   if (viewport.status !== 'ready') return { kind: 'hold' };
 
   // Keep the incumbent while it still owns a fair share of the screen, or

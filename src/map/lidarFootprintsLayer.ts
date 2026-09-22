@@ -29,6 +29,7 @@ import { mapAtom } from './atoms';
 import { type ViewMode, viewModeAtom } from './compare/halves';
 import { getSplitMap, peekSplitMap } from './compare/splitMap';
 import { liveBackgroundLayersAtom } from './layers/config/backgroundLayers/atoms';
+import { fetchCvatAcquisitions } from './layers/config/backgroundLayers/cvatGround';
 import {
   AUTO_ENGAGE_M_PER_PX,
   liveLidarAutoAtom,
@@ -51,6 +52,7 @@ import {
   hoveredLidarProjectIdAtom,
   lidarCyclingAtom,
   lidarFilterSettingsAtom,
+  type LidarFilterSettings,
   lidarViewportAtom,
   LidarViewportEntry,
   livePickerOpenAtom,
@@ -75,6 +77,31 @@ const FOOTPRINT_FETCH_CAP = 60;
 const REFRESH_DEBOUNCE_MS = 250;
 
 type Tier = 'hover' | 'active';
+
+/**
+ * The cached acquisitions covering a viewport, tiered the same way the WFS list
+ * is, for when the WFS list cannot be had.
+ *
+ * `geometries: []` is the answer and not a gap: the store publishes an envelope
+ * per acquisition, so there is no outline to draw and `areaRatio` is an upper
+ * bound rather than what the flight paints. The pulldown reads the viewport's
+ * status rather than the ratio when this is the list it is showing.
+ */
+const heldInView = async (
+  extentLonLat: [number, number, number, number],
+  filters: LidarFilterSettings,
+): Promise<{ primary: LidarViewportEntry[]; secondary: LidarViewportEntry[] }> =>
+  classifyRelevance(
+    (await fetchCvatAcquisitions())
+      .map((a) => ({
+        project: a.project,
+        geometries: [],
+        areaRatio: bboxOverlapRatio(a.project.bboxLonLat, extentLonLat),
+      }))
+      .filter((e) => e.areaRatio > 0)
+      .sort(sortByOnScreenCoverage),
+    filters,
+  );
 
 // A white casing under a saturated core: the base is either green topo or
 // grey-brown hillshade, and a plain coloured outline vanishes into one of them.
@@ -287,9 +314,20 @@ export const useLidarFootprintsLayer = () => {
             },
           );
         })
-        .catch((err) => {
+        .catch(async (err) => {
           console.warn('[lidarFootprintsLayer] refresh failed', err);
-          if (!isStale()) setViewport(emptyLidarViewport('error'));
+          // Kartverket is not answering — the catalogue, the footprint WFS or
+          // both, since one backend renders the lot. The cVAT store needs
+          // neither, so what it holds over this viewport is offered in place of
+          // an empty list. Only then `error`, which now means what it says:
+          // nothing upstream and nothing of our own.
+          const held = await heldInView(extentLonLat, filters);
+          if (isStale()) return;
+          setViewport(
+            held.primary.length + held.secondary.length > 0
+              ? { status: 'held', ...held }
+              : emptyLidarViewport('error'),
+          );
         });
     };
 

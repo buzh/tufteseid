@@ -19,6 +19,13 @@
 // exactly like a 502 that means "ask again" — and a sparse store asked three
 // times returns the mask three times. Hence `retry: false`, which the cVAT
 // ground passes and nothing else does.
+//
+// The third option, `heldUrl`, is for a layer that has somewhere to go while
+// the breaker is open. Refusing is the right default — a refused request is one
+// the origin does not have to survive — but the two national LiDAR mosaics are
+// served out of MapProxy, and most of what the reader is looking at is already
+// on our disk. So they name a read-only sibling store, and a tile asked for
+// during an outage is rewritten to it rather than dropped. See `origins.ts`.
 
 import { getDefaultStore } from 'jotai';
 import type ImageTile from 'ol/ImageTile';
@@ -62,6 +69,20 @@ type GuardOptions = {
    * a sparse store — see the header, and `sparse` in the layer config.
    */
   retry?: boolean;
+  /**
+   * A store with the same tiles in it and nothing upstream behind it, as a
+   * template differing from `url` only in the part that names the store. Given
+   * one, a tile asked for while the breaker is open goes there instead of
+   * failing.
+   */
+  heldUrl?: string;
+};
+
+/** Everything in a tile template before the first placeholder: the part that
+ *  names the store, which is the only part a held sibling changes. */
+const storePrefix = (template: string): string => {
+  const cut = template.indexOf('{');
+  return cut < 0 ? template : template.slice(0, cut);
 };
 
 /**
@@ -82,13 +103,27 @@ type GuardOptions = {
 export const guardTileSource = (
   source: TileImage,
   url: string,
-  { retry = true }: GuardOptions = {},
+  { retry = true, heldUrl }: GuardOptions = {},
 ): void => {
   const origin = originForUrl(url);
   if (origin) source.set(GUARD_PROP, origin);
 
+  const livePrefix = storePrefix(url);
+  const heldPrefix = heldUrl ? storePrefix(heldUrl) : null;
+
   source.setTileLoadFunction((tile, src) => {
+    const image = (tile as ImageTile).getImage() as HTMLImageElement;
+
     if (origin && !mayRequest(origin)) {
+      if (heldPrefix !== null && src.startsWith(livePrefix)) {
+        // Neither reported nor counted as an attempt: nothing upstream is
+        // being asked, so this can neither trip the breaker nor be what
+        // recovers it. Not retried either — a tile the store does not hold is
+        // a blank, and asking twice blanks twice. `refresh()` below puts the
+        // layer back on the live store once the probe succeeds.
+        image.src = heldPrefix + src.slice(livePrefix.length);
+        return;
+      }
       // Not a deferral: OpenLayers keeps no queue of its own for this, and a
       // tile left LOADING would hold one of the sixteen slots the whole map
       // shares. ERROR frees the slot and is undone by `refresh()` below.
@@ -101,7 +136,6 @@ export const guardTileSource = (
     const attempt = (attempts.get(tile) ?? 0) + 1;
     attempts.set(tile, attempt);
 
-    const image = (tile as ImageTile).getImage() as HTMLImageElement;
     // Ours are additional to the ones OpenLayers attaches after this returns;
     // it still drives the tile's own state.
     image.addEventListener(

@@ -110,6 +110,12 @@ export type LidarViewportStatus =
   | 'ready'
   // Viewport too wide to ask the WFS about.
   | 'zoomedOut'
+  // Kartverket is not answering, and the entries are what the cVAT store holds
+  // over this viewport instead. A shorter list and a poorer one — envelopes
+  // rather than footprints, so `areaRatio` is an upper bound and `geometries`
+  // is empty — but every row in it can actually be drawn, which during an
+  // outage none of the others can.
+  | 'held'
   | 'error';
 
 export type LidarViewportState = {

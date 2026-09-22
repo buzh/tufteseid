@@ -83,6 +83,31 @@ caches:
       type: mbtiles
       filename: /mapproxy/config/cache_data/lidar-dom.mbtiles
 
+  # The same two stores read-only, over the same two files. A cache with
+  # `sources: []` never asks anything upstream: it answers out of the MBTiles
+  # and returns a blank tile for ground it does not hold. That is what the app
+  # reads while the height breaker is open (`src/upstream/origins.ts`) — the
+  # mosaic tiles already on disk are the ones nothing upstream is needed for,
+  # and refusing them because wms.geonorge is throttling throws away the half of
+  # the map we own. The pair exists rather than dropping `/cache/lidar-` from
+  # the breaker's prefixes because a miss on the live cache is a GetMap that
+  # holds a worker for `client_timeout`; a miss here costs a lookup.
+  lidar-dtm-held:
+    grids: [tufteseid25833]
+    sources: []
+    format: relief_png_held
+    cache:
+      type: mbtiles
+      filename: /mapproxy/config/cache_data/lidar-dtm.mbtiles
+
+  lidar-dom-held:
+    grids: [tufteseid25833]
+    sources: []
+    format: relief_png_held
+    cache:
+      type: mbtiles
+      filename: /mapproxy/config/cache_data/lidar-dom.mbtiles
+
   # ---- The hybrid overlay, with and without contours --------------------
   #
   # Two caches because the contour toggle is two different LAYERS lists on one
@@ -267,6 +292,12 @@ layers:
   - name: lidar-dom
     title: LiDAR DOM skyggerelieff, nasjonal mosaikk
     sources: [lidar-dom]
+  - name: lidar-dtm-held
+    title: LiDAR DTM skyggerelieff, bare det mosaikklageret alt har
+    sources: [lidar-dtm-held]
+  - name: lidar-dom-held
+    title: LiDAR DOM skyggerelieff, bare det mosaikklageret alt har
+    sources: [lidar-dom-held]
   - name: topo-ref
     title: Referansedata fra wms.topo
     sources: [topo-ref]
@@ -302,6 +333,19 @@ globals:
         format: image/png
         mode: P
         colors: 256
+        encoding_options:
+          quantizer: fastoctree
+      # `relief_png` with an alpha channel, for the two read-only siblings
+      # only. Stored tiles pass through untouched either way; what this decides
+      # is the blank tile MapProxy synthesizes for ground the store does not
+      # hold. Without `transparent` that blank is opaque white, which would hide
+      # the topo base under the relief and read as a map that has gone wrong
+      # rather than one that has a hole.
+      relief_png_held:
+        format: image/png
+        mode: P
+        colors: 256
+        transparent: true
         encoding_options:
           quantizer: fastoctree
       # The same, keeping the alpha channel, for the hybrid overlay. A

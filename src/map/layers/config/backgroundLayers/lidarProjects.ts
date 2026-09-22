@@ -178,14 +178,28 @@ export function fetchLidarProjects(): Promise<LidarProject[]> {
   const cached = readCache();
   if (cached) return Promise.resolve(cached);
   inflight = (async () => {
-    const xml = await fetchWithin(
-      CAPS_URL,
-      { ms: CAPS_TIMEOUT_MS, what: 'LiDAR GetCapabilities' },
-      (res) => res.text(),
-    );
-    const projects = parseCapabilities(xml);
-    writeCache(projects);
-    return projects;
+    try {
+      const xml = await fetchWithin(
+        CAPS_URL,
+        { ms: CAPS_TIMEOUT_MS, what: 'LiDAR GetCapabilities' },
+        (res) => res.text(),
+      );
+      const projects = parseCapabilities(xml);
+      writeCache(projects);
+      return projects;
+    } catch (err) {
+      // Past the week, but still the catalogue. Acquisitions are added to this
+      // document, not revised, so an old copy names the same flights over the
+      // same ground and is only missing the newest — against which the
+      // alternative is a reader who can pick no dataset at all until Kartverket
+      // answers again. The TTL is there to pick up new flights, and that is
+      // worth nothing during an outage. The `ts` is deliberately left alone, so
+      // the next call tries the network again.
+      const stale = readCache(true);
+      if (!stale) throw err;
+      console.warn('[lidar] catalogue unavailable; using the stale copy', err);
+      return stale;
+    }
   })().finally(() => {
     inflight = null;
   });
@@ -281,22 +295,24 @@ function unionBbox(
   return [minLon, minLat, maxLon, maxLat];
 }
 
-function parseYear(name: string): number | null {
+// Exported for the cached ground, which reads the same facts off the same
+// acquisition name when the catalogue has no row to read them from.
+export function parseYear(name: string): number | null {
   const m = name.match(/\b(19|20)\d{2}\b/);
   return m ? parseInt(m[0], 10) : null;
 }
 
-function parsePointDensity(name: string): string | null {
+export function parsePointDensity(name: string): string | null {
   const m = name.match(/\b(\d+)\s*(pkt|pnt)\b/i);
   return m ? `${m[1]}${m[2].toLowerCase()}` : null;
 }
 
-function readCache(): LidarProject[] | null {
+function readCache(stale = false): LidarProject[] | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CachedEntry;
-    if (Date.now() - parsed.ts > CACHE_TTL_MS) return null;
+    if (!stale && Date.now() - parsed.ts > CACHE_TTL_MS) return null;
     return parsed.projects;
   } catch {
     return null;
