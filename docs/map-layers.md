@@ -232,12 +232,34 @@ installs the result without a gap: 1–2 go *under* the outgoing layers, 3–4
   the right pane's own map and an OL layer belongs to one map at a time.
 - The URL follows the *resolved* stack, not the atoms: `?hybrid=true` and
   `?contours=true` are written only when the overlay ended up in it.
-- Outgoing layers are dimmed to `OUTGOING_OPACITY` and removed on the next
+- Outgoing layers are dimmed to `OUTGOING_OPACITY` and retired on the next
   `rendercomplete` (`SWAP_TIMEOUT_MS`, 15 s, as a backstop); tearing down first
   makes every W/S step flash topo.
 - `buildOrReuseBackgroundLayer` reuses a layer whose url + params + projection
   match, so cycling rebuilds only what changed — and a reused layer may carry
   an earlier fade, so callers set opacity explicitly on every layer they pass.
+
+### The layer pool
+
+`src/map/layers/layerPool.ts`. A tile cache lives on the layer's renderer, so a
+layer taken off a map loses everything it had loaded, and the next look at the
+same ground pays a full screenful of GetMap at a rate limit the whole
+deployment shares. The pool keeps retired layers for `POOL_TTL_MS` (5 minutes),
+up to `MAX_POOLED` (8, one background stack and one B stack), so going to a
+second ground and back, ticking a Kulturminner register off and on, or moving
+between the curtain and the split costs nothing.
+
+- Every removal goes through `retireLayer(map, layer)` rather than
+  `map.removeLayer`, and only what actually came off a map is kept.
+- The key is `POOL_KEY`, the same value the in-collection lookups match on: for
+  a background that is `layerSignature` namespaced by `bg`/`cmp`, for a theme
+  layer `themeLayerPoolKey(id, projection)`. A layer without one is dropped.
+- The pool lookup may cross hosts where the in-collection one may not, because
+  nothing in the pool is on a map. That is what lets the split pane take back
+  the instance the curtain just retired.
+- A pooled layer carries whatever state it left with — fade, visibility,
+  curtain clip and extent. The installers set all of those on every incoming
+  layer, not only on new ones.
 
 Map z-order, of what is left: backgrounds at the default zIndex 0 (ordered by
 collection position), the B half of a two-ground view at 1.5 (`COMPARE_Z`),
@@ -343,8 +365,9 @@ Whether a feature's `linkkulturminnesok` URL resolves is asked separately
    discriminant is the `type` field on `BackgroundLayer` in
    `config/backgroundLayers/types.ts`. A fourth type also needs a builder and a
    `layerSignature` arm in `utils.ts` — without the signature every dataset
-   cycle rebuilds the layer instead of reusing it, and a ground already drawn
-   flashes. A new builder also calls `guardTileSource(source, url)` before
+   cycle rebuilds the layer instead of reusing it, the pool never holds it, and
+   a ground already drawn flashes. A new builder also calls
+   `guardTileSource(source, url)` before
    handing the source to the layer, or that ground goes on hammering a dead
    upstream while everything else has stopped — with `{ retry: false }` where a
    404 is the source's own coverage mask (`docs/wms-proxy-and-tiles.md`).

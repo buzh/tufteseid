@@ -1,6 +1,7 @@
 import TileLayer from 'ol/layer/Tile';
 import { TileWMS } from 'ol/source';
 import { guardTileSource } from '../../upstream/tileGuard';
+import { POOL_KEY } from './layerPool';
 import type {
   ThemeLayerConfig,
   ThemeLayerDefinition,
@@ -22,6 +23,19 @@ export type ThemeLayerName =
   | 'sefrakBuildings'
   | 'protectedBuildings'
   | 'userReportedHeritage';
+
+/**
+ * What makes two theme layers interchangeable, so one taken off a map can be
+ * given back rather than rebuilt (`layerPool.ts`).
+ *
+ * Everything fixed at construction — the service URL, the feature-info wiring,
+ * the minimum zoom, the grid — is derived from the definition and the
+ * projection, so those two are the whole key. LAYERS and STYLES are not in it:
+ * they are the one thing `updateParams` can change on a live layer, and the
+ * caller reshapes whatever is on the map straight after adding it.
+ */
+export const themeLayerPoolKey = (layerId: string, projection: string) =>
+  `theme|${layerId}|${projection}`;
 
 /** `overrides` pins LAYERS/STYLES at construction: kulturminner2's settings can
  *  differ from the config defaults on the first frame, and correcting
@@ -56,6 +70,7 @@ export const createThemeLayerFromConfig = (
 
   const layerProperties = {
     id: `theme.${layerDef.id}`,
+    [POOL_KEY]: themeLayerPoolKey(layerDef.id, projection),
     queryable: layerDef.queryable ?? false,
     layerTitle: layerDef.name.nb || layerDef.id,
     ...(infoFormat ? { infoFormat } : {}),

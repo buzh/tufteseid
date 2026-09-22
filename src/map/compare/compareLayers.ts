@@ -10,6 +10,7 @@ import {
   OUTGOING_OPACITY,
   SWAP_TIMEOUT_MS,
 } from '../layers/config/backgroundLayers/utils';
+import { retireLayer } from '../layers/layerPool';
 import type { ViewMode } from './halves';
 import { getSplitMap, peekSplitMap } from './splitMap';
 
@@ -38,12 +39,17 @@ const isCompareLayer = (layer: BaseLayer): boolean =>
 
 const getMainMap = () => getDefaultStore().get(mapAtom);
 
-/** Strips one map of the B half. Says whether it was holding any. */
+/** Strips one map of the B half. Says whether it was holding any.
+ *
+ *  Retired rather than dropped, and this is the pool's best case: a change of
+ *  view mode moves the whole B stack between hosts, so what comes off here is
+ *  precisely what the other host is about to build. A pooled layer is on no map,
+ *  so it can cross. */
 const clearFrom = (map: OlMap): boolean => {
   let removed = false;
   for (const layer of map.getLayers().getArray().slice()) {
     if (isCompareLayer(layer)) {
-      map.removeLayer(layer);
+      retireLayer(map, layer);
       removed = true;
     }
   }
@@ -163,6 +169,12 @@ const trackCurtain = (on: boolean) => {
 // Both ways, and flagged so it is idempotent: layers survive installs, so a
 // second attach would clip twice a frame and a missing detach would carry the
 // curtain's geometry into a pane that draws the B ground whole.
+//
+// They survive the pool as well, flag and stashed extent and handlers with
+// them. That is why this is called on every incoming layer rather than only on
+// the new ones: a layer that left the curtain and comes back into the split is
+// unclipped here, and one that comes back into the curtain is left alone and
+// then re-extended by `applyCurtainExtents` below.
 const setClip = (layer: TileLayer, on: boolean) => {
   if (Boolean(layer.get('cmpClip')) === on) return;
   layer.set('cmpClip', on);
@@ -229,7 +241,7 @@ export const installCompareLayers = (
 
   const retire = () => {
     cancelPendingRetire?.();
-    for (const layer of outgoing) host.removeLayer(layer);
+    for (const layer of outgoing) retireLayer(host, layer);
   };
   const timer = setTimeout(retire, SWAP_TIMEOUT_MS);
   cancelPendingRetire = () => {

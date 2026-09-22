@@ -278,12 +278,15 @@ translating the B stack inside one map was rejected.
 
 The B ground's layers carry a `cmp.` prefix and go into whichever map the view
 mode names (`compareHostFor`). An OL layer belongs to one map at a time, so a
-change of view rebuilds the B stack in the new host rather than moving it; the
-reuse signature is namespaced too, so A and B never share an instance. The host
-is resolved once, from the mode the effect read, and the map it is *not* is
-emptied before the build rather than after it (`clearCompareLayersExcept`) —
-every way a build can end without installing would otherwise leave the previous
-view still drawing.
+change of view resolves the B stack afresh in the new host rather than moving
+layers between collections; the reuse signature is namespaced too, so A and B
+never share an instance. The host is resolved once, from the mode the effect
+read, and the map it is *not* is emptied before the build rather than after it
+(`clearCompareLayersExcept`) — every way a build can end without installing
+would otherwise leave the previous view still drawing. Emptying it retires its
+layers into the pool (`layers/layerPool.ts`, `docs/map-layers.md`), and a pooled
+layer is on no map, so the new host's build takes back the instances the old one
+just gave up: the stack is resolved again, but its tiles are not refetched.
 
 Neither two-ground view is persisted to the URL: a shared link opens on one
 ground and the reader asks for the second, rather than every recipient landing

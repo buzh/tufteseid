@@ -19,8 +19,13 @@ import {
   heritageSitesParams,
   writeHeritageUrlParameters,
 } from './heritage';
+import { retireLayer, takePooledLayer } from './layerPool';
 import { getThemeLayerById, themeLayerConfig } from './themeLayerConfigApi';
-import { createThemeLayerFromConfig, ThemeLayerName } from './themeWMS';
+import {
+  createThemeLayerFromConfig,
+  ThemeLayerName,
+  themeLayerPoolKey,
+} from './themeWMS';
 
 export const activeThemeLayersAtom = atom<Set<ThemeLayerName>>(new Set([]));
 
@@ -133,12 +138,18 @@ const syncThemeLayers = (
     }
 
     const params = paramsFor(layerName, heritageDetails, heritageRender);
-    const layerToAdd = createThemeLayerFromConfig(
-      themeLayerConfig,
-      layerDef,
-      mapProjection,
-      params ?? undefined,
-    );
+    // A register ticked off a moment ago still has its tiles: take that layer
+    // back rather than asking RA's MapServer — the slowest origin in the app —
+    // for the same screen again. The reshape below corrects its registers if
+    // they moved on while it was off the map.
+    const layerToAdd =
+      takePooledLayer(themeLayerPoolKey(layerName, mapProjection)) ??
+      createThemeLayerFromConfig(
+        themeLayerConfig,
+        layerDef,
+        mapProjection,
+        params ?? undefined,
+      );
 
     if (!layerToAdd) {
       console.warn(
@@ -156,7 +167,7 @@ const syncThemeLayers = (
       .getLayers()
       .getArray()
       .find((layer) => layer.get('id') === `theme.${layerName}`);
-    if (layer) map.removeLayer(layer);
+    if (layer) retireLayer(map, layer);
   });
 
   // Reshape whatever is on the map now, including the layers just added.

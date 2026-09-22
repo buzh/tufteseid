@@ -11,6 +11,7 @@ import XYZ from 'ol/source/XYZ';
 import { fetchWithin } from '../../../../shared/utils/deadline';
 import { guardTileSource } from '../../../../upstream/tileGuard';
 import { mapAtom } from '../../../atoms';
+import { POOL_KEY, retireLayer, takePooledLayer } from '../../layerPool';
 import {
   getWMSTileGrid,
   WMS_TILE_CACHE_SIZE,
@@ -274,6 +275,10 @@ const layerSignature = (
 // An OL layer belongs to one map at a time, so the split view's right pane has
 // to search its own collection: a hit in the other one would be an instance the
 // install then has to steal, and the pane it was stolen from would go blank.
+//
+// The pool behind it (`layerPool.ts`) has no such restriction — nothing there is
+// on a map — so a ground that was swapped out a minute ago comes back with its
+// tiles, and a B stack retired from one host is what the other host installs.
 export const buildOrReuseBackgroundLayer = async (
   config: BackgroundLayer,
   projection: string,
@@ -288,14 +293,16 @@ export const buildOrReuseBackgroundLayer = async (
     const existing = map
       .getLayers()
       .getArray()
-      .find((l) => l.get('sig') === signature);
+      .find((l) => l.get(POOL_KEY) === signature);
     if (existing) return existing as TileLayer;
+    const pooled = takePooledLayer(signature);
+    if (pooled) return pooled;
   }
   const layer = await getLayerFromConfig(config, projection);
   if (layer) {
     // The builders all stamp `bg.<name>`; anything else renames on the way out.
     if (ns !== 'bg') layer.set('id', `${ns}.${config.layerName}`);
-    if (signature) layer.set('sig', signature);
+    if (signature) layer.set(POOL_KEY, signature);
   }
   return layer;
 };
@@ -338,9 +345,11 @@ export const swapBackgroundLayers = (under: TileLayer[], over: TileLayer[]) => {
 
   for (const layer of outgoing) layer.setOpacity(OUTGOING_OPACITY);
 
+  // Retired rather than removed: the reader who just changed ground is the
+  // reader most likely to change back, and this is what they change back to.
   const retire = () => {
     cancelPendingRetire?.();
-    for (const layer of outgoing) map.removeLayer(layer);
+    for (const layer of outgoing) retireLayer(map, layer);
   };
   const timer = setTimeout(retire, SWAP_TIMEOUT_MS);
   cancelPendingRetire = () => {
@@ -361,7 +370,7 @@ export const clearBackgroundLayer = () => {
   allLayers.forEach((layer) => {
     try {
       if (isBackgroundLayer(layer)) {
-        map.removeLayer(layer);
+        retireLayer(map, layer);
       }
     } catch (error) {
       console.error('Error while clearing background layers:', error);
