@@ -184,7 +184,11 @@ spots and every public one, which is the index the record is for. Signed out, it
 draws only the single record a short link resolved — a visitor who followed
 `/l/K7M2QX` came for that spot, and turning the map into a gazetteer of
 everybody's public pins for anyone who loads the page is a different product
-with different consent.
+with different consent. A code that resolves to nothing for a guest opens the
+sign-in dialog with a line saying why, and the code is held in the client so
+that signing in is also the retry: the server answers a private spot and a
+missing one with the same 404, and an account is the only way to tell them
+apart.
 
 A spot is private when it is written and made public as a second, separate
 decision, taken in the card once there is something to share. What the surfaces
@@ -207,6 +211,12 @@ transform OpenLayers cannot see, which is what keeps the frame valid. Excalidraw
 stays on its light theme against the app's dark chrome, because its dark theme
 is a filter over the canvas and the strokes would be kept in colours other than
 the ones they were drawn in.
+
+The editor is a chunk of its own on both paths into it — `React.lazy` in
+`SpotSurface` for the canvas, a cached dynamic `import()` in `sketch/render.ts`
+for the overlay's re-export. It is megabytes, this surface mounts with the map,
+and most sessions never open a draft at all. Opening one warms the chunk, so
+pressing `Tegn` does not wait on the network with the map already frozen.
 
 `src/auth/` is PocketBase's `authStore` mirrored into `currentUserAtom` by an
 `atomEffect` mounted at the root, plus a dialog. OAuth2 only: there is no
@@ -364,7 +374,7 @@ The rows below without a writer still have none.
 | `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom` (+ the `open`/`edit`/`close`/`setStage` writers) | `spots/atoms.ts` | the lokalitet being written: where its pin is and which gesture has the pointer, what has been typed, what has been drawn | `SpotToggle`, `useSpotDraft`, `pinAdjust.ts`, `SketchCanvas` |
 | `activeSpotAtom` | same | the lokalitet being read — opened by a click or by `?lok=` | `useSpotLayer`, `useSpotShareLink`, `SpotCard`, `useSpotDraft` |
 | `sketchSessionAtom` | `sketch/session.ts` | the map is frozen and Excalidraw has it | `useSketchSession` |
-| `currentUserAtom`, `isAuthDialogOpenAtom` | `auth/atoms.ts` | who is signed in, and whether the dialog is up | `pbAuthSyncEffect`, `AuthButton`, `AuthDialog` |
+| `currentUserAtom`, `isAuthDialogOpenAtom`, `authPromptAtom` | `auth/atoms.ts` | who is signed in, whether the dialog is up, and why — when the reader did not press anything | `pbAuthSyncEffect`, `AuthButton`, `AuthDialog`, `useSpotShareLink` |
 
 The URL still carries `projection`, `backgroundLayer`, `hybrid`, `contours`,
 `lidarModel`, `themeLayers`, `heritage*`, `lat`, `lon` and `zoom`

@@ -38,6 +38,13 @@ export type SpotRecord = {
   updated: string;
 };
 
+// The column widths from `pb_migrations/1700001100_spots.js`, mirrored so the
+// box can stop at them. The server rejects an over-long field with a 400 that
+// says only that the save failed, which is the wrong advice: retrying does the
+// same thing, and nothing in it names the field at fault.
+export const SPOT_NAME_MAX = 200;
+export const SPOT_DESCRIPTION_MAX = 20000;
+
 export type NewSpotInput = {
   name: string;
   description?: string;

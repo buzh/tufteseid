@@ -18,10 +18,10 @@ import { metresPerScenePx } from './frame';
 import { renderScene, type SceneRender } from './render';
 import type { Sketch } from './scene';
 
-// Map z-indices 2 and 5-9 were left free by the strip
-// (docs/state-of-the-branch.md). The drawing takes 2: under the terrain
-// analysis and its frame (4) and under the pin it belongs to (6), because it is
-// the thing being annotated rather than an annotation of its own.
+// The drawing takes z-index 2: over the terrain analysis it was traced from
+// (1), under that analysis's frame (4) and under the pin it belongs to (6),
+// because it is what is being annotated rather than an annotation of its own.
+// The inventory is in docs/map-layers.md.
 const Z_INDEX = 2;
 
 // How far the view may drift from the export's resolution before it is redrawn.
@@ -57,16 +57,25 @@ const ensureRender = (entry: Entry, scale: number) => {
     return;
   }
   entry.pending = scale;
-  void renderScene(entry.sketch.frame, entry.sketch.elements, scale).then(
-    (render) => {
+  void renderScene(entry.sketch.frame, entry.sketch.elements, scale)
+    .then((render) => {
       if (!entry.live) return;
       entry.pending = null;
       entry.renderedScale = scale;
       if (!render) return;
       entry.render = render;
       entry.redraw();
-    },
-  );
+    })
+    .catch((e) => {
+      // `renderScene` says it never throws, and this is what makes a broken
+      // promise there cost one export rather than the layer: `pending` left set
+      // is a guard nothing clears again, and the drawing would stay blank for
+      // the rest of the session.
+      console.warn('[sketch] overlay render failed', e);
+      if (!entry.live) return;
+      entry.pending = null;
+      entry.renderedScale = scale;
+    });
 };
 
 const drawEntry =

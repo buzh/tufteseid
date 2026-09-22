@@ -11,7 +11,11 @@ import { transform } from 'ol/proj';
 import { useEffect, useRef } from 'react';
 
 import { getSpotByCode, type SpotRecord } from '../api/spots';
-import { currentUserAtom } from '../auth/atoms';
+import {
+  authPromptAtom,
+  currentUserAtom,
+  isAuthDialogOpenAtom,
+} from '../auth/atoms';
 import { mapAtom } from '../map/atoms';
 import {
   getUrlParameter,
@@ -40,38 +44,58 @@ export const useSpotShareLink = () => {
   const user = useAtomValue(currentUserAtom);
   const active = useAtomValue(activeSpotAtom);
   const setActive = useSetAtom(activeSpotAtom);
+  const setAuthDialogOpen = useSetAtom(isAuthDialogOpenAtom);
+  const setAuthPrompt = useSetAtom(authPromptAtom);
 
   /** Whether the boot code has had its answer. Until it has, the writer stays
    *  out of the way — it must not delete the parameter it is about to read. */
   const settled = useRef(bootCode == null);
 
+  /** The code still waiting on one. Held here rather than re-read off the URL,
+   *  which the writer below owns from the moment this settles — a guest who was
+   *  turned away keeps their retry either way. */
+  const unresolved = useRef(bootCode);
+
   // Runs immediately (pb.authStore rehydrates at import, so the first request
   // already carries any stored token) and again whenever the user changes, so
   // signing in retries a code that a guest could not see.
   useEffect(() => {
-    if (settled.current || !bootCode) return;
+    const code = unresolved.current;
+    if (!code) return;
     let live = true;
 
-    getSpotByCode(bootCode)
+    getSpotByCode(code)
       .then((record) => {
         if (!live) return;
+        unresolved.current = null;
         settled.current = true;
         setActive(record);
       })
       .catch(() => {
         if (!live) return;
-        // No account: the visitor may be the signed-out owner of a private
-        // spot, so leave it unsettled and let a sign-in try again.
-        if (!user) return;
+        // Settled either way, so the writer below stops standing aside: a
+        // reader who never gets an answer to this code should still have the
+        // parameter follow whatever they open next.
         settled.current = true;
-        removeUrlParameter('lok');
-        console.warn('[spots] no spot for code', bootCode);
+        if (user) {
+          unresolved.current = null;
+          removeUrlParameter('lok');
+          console.warn('[spots] no spot for code', code);
+          return;
+        }
+        // Signed out, and the server does not say which of the two this is: a
+        // private spot the visitor may well own, or no spot at all. The sign-in
+        // is the one useful answer to both, and it is also the retry — this
+        // effect runs again with an account behind it. The parameter stays on
+        // the URL for the same reason: a reload is the other way to retry.
+        setAuthPrompt('spotLink');
+        setAuthDialogOpen(true);
       });
 
     return () => {
       live = false;
     };
-  }, [user, setActive]);
+  }, [user, setActive, setAuthDialogOpen, setAuthPrompt]);
 
   // Move the map to whatever is open, keyed on the id: re-centring on every
   // field change would fight a reader who is panning around their own spot.

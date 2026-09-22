@@ -88,6 +88,7 @@
     "title_one": "Kulturminne",
     "title_other": "{{count}} kulturminner",
     "close": "Lukk",
+    "linkNeedsAccount": "Lenken peker til en lokalitet du må være innlogget for å se — eller som ikke finnes.",
     "laster": "Henter …",
     "klikkForDetaljer": "Klikk for detaljer",
     "flereHer_one": "+ 1 til her",

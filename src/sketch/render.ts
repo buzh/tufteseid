@@ -63,12 +63,24 @@ export const renderScene = async (
   // Restored before the bounds are read: `exportToCanvas` restores again on the
   // way in and reads its own bounds off that, and restoring only on its side
   // would put the placement and the pixels on two different rectangles.
-  const restored = mod
-    .restoreElements(elements, null)
-    .filter((el) => !el.isDeleted);
-  if (restored.length === 0) return null;
+  //
+  // Guarded, because `spots.sketch` is a free-form JSON column and `sketchOf`
+  // checks the frame rather than the elements: one malformed element is a throw
+  // out of Excalidraw's own code, and this function promises its caller a null.
+  let restored: ReturnType<ExcalidrawModule['restoreElements']>;
+  let bounds: ReturnType<ExcalidrawModule['getCommonBounds']>;
+  try {
+    restored = mod
+      .restoreElements(elements, null)
+      .filter((el) => !el.isDeleted);
+    if (restored.length === 0) return null;
+    bounds = mod.getCommonBounds(restored);
+  } catch (e) {
+    console.warn('[sketch] scene could not be restored', e);
+    return null;
+  }
 
-  const [minX, minY, maxX, maxY] = mod.getCommonBounds(restored);
+  const [minX, minY, maxX, maxY] = bounds;
   const sceneWidth = maxX - minX + EXPORT_PADDING * 2;
   const sceneHeight = maxY - minY + EXPORT_PADDING * 2;
   if (!(sceneWidth > 0) || !(sceneHeight > 0)) return null;

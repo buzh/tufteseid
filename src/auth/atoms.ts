@@ -23,7 +23,9 @@ export const pbAuthSyncEffect = atomEffect((_get, set) => {
 // Derived so a component does not re-render on an unrelated user field.
 export const isSignedInAtom = atom((get) => get(currentUserAtom) != null);
 
-export const roleAtom = atom<Role>((get) => {
+// Not exported: `isAdminAtom` is the only question anything asks, and a second
+// way to ask it is a second thing to keep in step with the server's rules.
+const roleAtom = atom<Role>((get) => {
   const user = get(currentUserAtom);
   if (!user) return 'guest';
   return user.role ?? 'user';
@@ -35,3 +37,13 @@ export const isAdminAtom = atom((get) => get(roleAtom) === 'admin');
 // once at the top of the app and opened from several places — the sign-in
 // button, and any verb that turns out to need an account.
 export const isAuthDialogOpenAtom = atom(false);
+
+/**
+ * Why the dialog is up, when the reader did not ask for it. Null for the button
+ * in the band, which needs no explanation; `spotLink` for a followed link that
+ * resolved to nothing a guest may see, where a modal with no reason on it is
+ * the app appearing to demand an account out of nowhere.
+ */
+export type AuthPrompt = 'spotLink';
+
+export const authPromptAtom = atom<AuthPrompt | null>(null);

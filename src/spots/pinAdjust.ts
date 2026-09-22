@@ -1,6 +1,12 @@
-// Placing the pin by hand: drag it anywhere on the map. Live only while the
-// draft is in its `pin` stage, which is the stage a draft opens in and the one
+// The draft's pin: drawn for as long as there is a draft, and draggable while
+// the draft is in its `pin` stage — the stage a draft opens in and the one
 // `Endre` returns it to.
+//
+// Two effects, because the two have different lives. The pin stays on through
+// the sketch stage: `spotLayer.ts` stands the saved record's own pin down while
+// it is being edited, so this is the only thing marking where the spot is, and
+// a new draft has no saved record to fall back on at all. The interaction does
+// not, because the canvas covers the map and would swallow a drag aimed at it.
 //
 // The same shape as `terrain/windowAdjust.ts` and for the same reasons: the
 // draft atom is the only copy of the position, the geometry on the map is
@@ -24,35 +30,40 @@ import VectorSource from 'ol/source/Vector';
 import { useEffect } from 'react';
 
 import { mapAtom } from '../map/atoms';
+import { cursorLease } from '../map/cursorLease';
 import { spotDraftAtom } from './atoms';
 import { PIN_Z_INDEX, draftPinStyle } from './pinStyle';
 
 /** How near the pin counts as taking hold of it, in pixels around its anchor. */
 const GRAB_PX = 18;
 
+type Store = ReturnType<typeof useStore>;
+
+/** Where the pin stands, in view coordinates. Null once the reader has put the
+ *  draft down — an interaction can outlive one pointer event. */
+const positionIn = (store: Store, view: string) => {
+  const current = store.get(spotDraftAtom);
+  if (!current) return null;
+  return transform(current.point, 'EPSG:4326', view);
+};
+
 /**
  * Mount once, from the spot controller. Adds nothing to the map unless a draft
- * is in its pin stage, so a draft whose author has moved on to drawing carries
- * no interaction and the plain pin (`spotLayer.ts`) is all that is drawn.
+ * is open.
  */
 export const useSpotPinAdjust = () => {
   const map = useAtomValue(mapAtom);
   const draft = useAtomValue(spotDraftAtom);
   const store = useStore();
-  const live = draft?.stage === 'pin';
+  const open = draft !== null;
+  const placing = draft?.stage === 'pin';
 
+  // The pin. Keeps the halo through the sketch stage, where it cannot be
+  // grabbed: it still says which of the pins on the map is the one being
+  // written, which is what the reader is drawing about.
   useEffect(() => {
-    if (!live) return;
+    if (!open) return;
     const view = map.getView().getProjection().getCode();
-    const viewport = map.getViewport();
-
-    /** Where the pin stands, in view coordinates. Null once the reader has put
-     *  the draft down — the interaction can outlive one pointer event. */
-    const positionNow = () => {
-      const current = store.get(spotDraftAtom);
-      if (!current) return null;
-      return transform(current.point, 'EPSG:4326', view);
-    };
 
     const pin = new Feature();
     const source = new VectorSource({ wrapX: false, features: [pin] });
@@ -64,12 +75,32 @@ export const useSpotPinAdjust = () => {
     });
 
     const redraw = () => {
-      const position = positionNow();
+      const position = positionIn(store, view);
       if (position) pin.setGeometry(new Point(position));
     };
 
+    redraw();
+    map.addLayer(layer);
+    // Imperative rather than a React dependency: the drag writes the draft on
+    // every frame, and rebuilding the layer to follow it would be the one
+    // expensive thing in here.
+    const unsubscribe = store.sub(spotDraftAtom, redraw);
+
+    return () => {
+      unsubscribe();
+      map.removeLayer(layer);
+      source.dispose();
+    };
+  }, [map, open, store]);
+
+  // Taking hold of it.
+  useEffect(() => {
+    if (!placing) return;
+    const view = map.getView().getProjection().getCode();
+    const cursor = cursorLease(map.getViewport());
+
     const overPin = (event: MapBrowserEvent): boolean => {
-      const position = positionNow();
+      const position = positionIn(store, view);
       if (!position) return false;
       const pixel = map.getPixelFromCoordinate(position);
       if (!pixel) return false;
@@ -104,7 +135,7 @@ export const useSpotPinAdjust = () => {
     };
 
     const handleMoveEvent = (event: MapBrowserEvent) => {
-      viewport.style.cursor = overPin(event) ? 'move' : '';
+      cursor.set(overPin(event) ? 'move' : null);
     };
 
     const interaction = new PointerInteraction({
@@ -114,20 +145,11 @@ export const useSpotPinAdjust = () => {
       handleMoveEvent,
     });
 
-    redraw();
-    map.addLayer(layer);
     map.addInteraction(interaction);
-    // Imperative rather than a React dependency: the drag writes the draft on
-    // every frame, and rebuilding the layer and the interaction sixty times a
-    // second to follow it would be the one expensive thing in here.
-    const unsubscribe = store.sub(spotDraftAtom, redraw);
 
     return () => {
-      unsubscribe();
       map.removeInteraction(interaction);
-      map.removeLayer(layer);
-      source.dispose();
-      viewport.style.cursor = '';
+      cursor.release();
     };
-  }, [map, live, store]);
+  }, [map, placing, store]);
 };

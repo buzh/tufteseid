@@ -16,12 +16,14 @@ import { getDefaultStore, useAtom, useAtomValue } from 'jotai';
 import { unByKey } from 'ol/Observable';
 import { useCallback, useEffect, useState } from 'react';
 import { mapAtom } from '../map/atoms';
+import { cursorLease } from '../map/cursorLease';
 import { heritagePopupAtom, heritageTipAtom } from '../map/featureInfo/atoms';
 import {
   heritageIsQueryable,
   queryHeritageAt,
 } from '../map/featureInfo/heritageQuery';
 import type { FeatureInfoReading } from '../map/featureInfo/types';
+import { spotAtPixel } from '../spots/hitTest';
 import { terrainAdjustingAtom } from '../terrain/window';
 
 /** How long the pointer has to hold still. Long enough that crossing the map
@@ -52,9 +54,11 @@ export const useHeritageInfo = (): HeritageInfo => {
     let clickQuery: AbortController | null = null;
 
     // The cursor is the only thing that says a feature is clickable before it is
-    // clicked, so it is set from the hover's answer rather than guessed.
+    // clicked, so it is set from the hover's answer rather than guessed. Held on
+    // a lease, because the pin and the terrain rectangle write it too.
+    const cursor = cursorLease(viewport);
     const setHit = (hit: boolean) => {
-      viewport.style.cursor = hit ? 'pointer' : '';
+      cursor.set(hit ? 'pointer' : null);
     };
 
     const stopHovering = () => {
@@ -116,6 +120,10 @@ export const useHeritageInfo = (): HeritageInfo => {
 
       map.on('singleclick', (e) => {
         if (!heritageIsQueryable(map)) return;
+        // A click on one of the reader's own pins is that pin's: it opens the
+        // card, and the register answering the same click would raise a popup
+        // over it (`spots/spotLayer.ts`).
+        if (spotAtPixel(map, e.pixel)) return;
         stopHovering();
         setTip(null);
         clickQuery?.abort();
@@ -155,7 +163,7 @@ export const useHeritageInfo = (): HeritageInfo => {
       window.removeEventListener('keydown', onKeyDown);
       stopHovering();
       clickQuery?.abort();
-      viewport.style.cursor = '';
+      cursor.release();
     };
   }, [map, setTip, setPopup]);
 

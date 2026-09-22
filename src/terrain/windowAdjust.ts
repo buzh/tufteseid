@@ -35,6 +35,7 @@ import VectorSource from 'ol/source/Vector';
 import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
 import { useEffect } from 'react';
 import { mapAtom } from '../map/atoms';
+import { cursorLease } from '../map/cursorLease';
 import {
   bboxFromMetric,
   bboxToMetric,
@@ -110,7 +111,9 @@ export const useTerrainWindowAdjust = () => {
   useEffect(() => {
     if (!adjusting) return;
     const view = map.getView().getProjection().getCode();
-    const viewport = map.getViewport();
+    // Leased, not written: the spot pin and the Kulturminner hover point at the
+    // same property and may be live at the same time (`map/cursorLease.ts`).
+    const cursor = cursorLease(map.getViewport());
 
     const toMetric = (c: Coordinate): Coordinate =>
       transform(c, view, 'EPSG:25833');
@@ -238,12 +241,13 @@ export const useTerrainWindowAdjust = () => {
       const corner = cornerUnder(event);
       const extent = extentNow();
       const here = toMetric(event.coordinate);
-      viewport.style.cursor =
+      cursor.set(
         corner >= 0
           ? RESIZE_CURSORS[corner]
           : extent && containsXY(extent, here[0], here[1])
             ? 'move'
-            : '';
+            : null,
+      );
     };
 
     const interaction = new PointerInteraction({
@@ -266,7 +270,7 @@ export const useTerrainWindowAdjust = () => {
       map.removeInteraction(interaction);
       map.removeLayer(layer);
       source.dispose();
-      viewport.style.cursor = '';
+      cursor.release();
     };
   }, [map, adjusting, store]);
 };

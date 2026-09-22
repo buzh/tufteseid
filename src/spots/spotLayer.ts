@@ -7,7 +7,7 @@
 // spot, and turning the map into a gazetteer of everybody's public pins for
 // anyone who loads the page is a different product with different consent.
 
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { Feature } from 'ol';
 import type { FeatureLike } from 'ol/Feature';
 import type MapBrowserEvent from 'ol/MapBrowserEvent';
@@ -21,13 +21,21 @@ import { listSpots, subscribeSpots, type SpotRecord } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
 import { mapAtom } from '../map/atoms';
 import { activeSpotAtom, spotDraftAtom } from './atoms';
+import { SPOT_LAYER_ID, SPOT_RECORD_KEY, spotAtPixel } from './hitTest';
 import { PIN_Z_INDEX, spotStyle } from './pinStyle';
 
-const LAYER_ID = 'spotsLayer';
-const RECORD_KEY = 'spotRecord';
-
-/** How far off a pin a click still counts, in pixels. */
-const HIT_TOLERANCE = 6;
+const draw = (source: VectorSource, view: string, records: SpotRecord[]) => {
+  source.clear();
+  source.addFeatures(
+    records.map((record) => {
+      const feature = new Feature({
+        geometry: new Point(transform(record.point, 'EPSG:4326', view)),
+      });
+      feature.set(SPOT_RECORD_KEY, record);
+      return feature;
+    }),
+  );
+};
 
 export const useSpotLayer = () => {
   const map = useAtomValue(mapAtom);
@@ -35,52 +43,59 @@ export const useSpotLayer = () => {
   const active = useAtomValue(activeSpotAtom);
   const draft = useAtomValue(spotDraftAtom);
   const setActive = useSetAtom(activeSpotAtom);
+  const store = useStore();
 
   const source = useMemo(() => new VectorSource({ wrapX: false }), []);
 
   // The layer outlives every list: rebuilding it on a sign-in would take the
   // pins off the map and put them back.
   useEffect(() => {
+    /** The record being edited, whose pin `pinAdjust.ts` is drawing instead —
+     *  otherwise it stands at its saved point while the draft's stands where
+     *  the reader has dragged it, and the spot has two pins. */
+    let hidden = store.get(spotDraftAtom)?.recordId ?? null;
+
     const layer = new VectorLayer({
       zIndex: PIN_Z_INDEX,
       source,
       style: (feature: FeatureLike) => {
-        const record = feature.get(RECORD_KEY) as SpotRecord;
-        return spotStyle(record.name, record.id === active?.id);
+        const record = feature.get(SPOT_RECORD_KEY) as SpotRecord;
+        if (record.id === hidden) return undefined;
+        const open = store.get(activeSpotAtom);
+        return spotStyle(record.name, record.id === open?.id);
       },
-      properties: { id: LAYER_ID },
+      properties: { id: SPOT_LAYER_ID },
     });
     map.addLayer(layer);
+
+    // Read out of the store and redrawn from a subscription rather than taken
+    // as dependencies: the layer is built once and the style function is the
+    // same object for its whole life, so a value closed over here would be the
+    // one it was built with — null, at first render, for both of these.
+    const unsubscribe = [
+      store.sub(activeSpotAtom, () => layer.changed()),
+      store.sub(spotDraftAtom, () => {
+        // Only on the record, not on the draft: the pin drag writes that atom
+        // on every frame and none of those frames change what is drawn here.
+        const next = store.get(spotDraftAtom)?.recordId ?? null;
+        if (next === hidden) return;
+        hidden = next;
+        layer.changed();
+      }),
+    ];
+
     return () => {
+      unsubscribe.forEach((off) => off());
       map.removeLayer(layer);
     };
-    // `active` is read inside the style function, which OL re-runs on every
-    // render pass, so it is not a dependency: naming it here would rebuild the
-    // layer every time a different spot was opened.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, source]);
+  }, [map, source, store]);
 
-  // Which records are on it.
+  // Signed in: the list, and realtime on top of it. Deliberately not keyed on
+  // what is open — opening a spot is a read, and rebuilding this would drop the
+  // subscription, refetch the list and auto-cancel the request it superseded.
   useEffect(() => {
+    if (!user) return;
     const view = map.getView().getProjection().getCode();
-
-    const draw = (records: SpotRecord[]) => {
-      source.clear();
-      source.addFeatures(
-        records.map((record) => {
-          const feature = new Feature({
-            geometry: new Point(transform(record.point, 'EPSG:4326', view)),
-          });
-          feature.set(RECORD_KEY, record);
-          return feature;
-        }),
-      );
-    };
-
-    if (!user) {
-      draw(active ? [active] : []);
-      return;
-    }
 
     let live = true;
     const records = new Map<string, SpotRecord>();
@@ -89,7 +104,7 @@ export const useSpotLayer = () => {
       .then((list) => {
         if (!live) return;
         for (const record of list) records.set(record.id, record);
-        draw([...records.values()]);
+        draw(source, view, [...records.values()]);
       })
       .catch((err) => console.warn('[spots] list failed', err));
 
@@ -97,31 +112,30 @@ export const useSpotLayer = () => {
       if (!live) return;
       if (action === 'delete') records.delete(record.id);
       else records.set(record.id, record);
-      draw([...records.values()]);
+      draw(source, view, [...records.values()]);
     });
 
     return () => {
       live = false;
       unsubscribe();
     };
+  }, [map, source, user]);
+
+  // Signed out: the one record a short link resolved, and nothing else.
+  useEffect(() => {
+    if (user) return;
+    const view = map.getView().getProjection().getCode();
+    draw(source, view, active ? [active] : []);
   }, [map, source, user, active]);
 
-  // Opening one. Restricted to this layer rather than hit-testing the map,
-  // so a click that lands on a Kulturminner feature is still the register's.
+  // Opening one.
   useEffect(() => {
     const onClick = (event: MapBrowserEvent) => {
       // Deaf while a draft is open: the pin is being placed, and a click that
       // opened somebody else's spot mid-placement would replace the box the
       // reader is typing in.
       if (draft) return;
-      const hit = map.forEachFeatureAtPixel(
-        event.pixel,
-        (feature) => feature.get(RECORD_KEY) as SpotRecord | undefined,
-        {
-          hitTolerance: HIT_TOLERANCE,
-          layerFilter: (layer) => layer.get('id') === LAYER_ID,
-        },
-      );
+      const hit = spotAtPixel(map, event.pixel);
       if (hit) setActive(hit);
     };
     map.on('singleclick', onClick);

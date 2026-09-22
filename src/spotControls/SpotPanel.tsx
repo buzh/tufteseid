@@ -9,6 +9,7 @@
 import { Alert, Button, Group, Textarea, TextInput, Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 
+import { SPOT_DESCRIPTION_MAX, SPOT_NAME_MAX } from '../api/spots';
 import { cx } from '../ui/cx';
 import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
@@ -31,8 +32,11 @@ export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {
       </div>
 
       <div className={styles.body}>
+        {/* Capped at the column's own width, like the drawing is: the reader
+            finds out while they are typing rather than from a failed save. */}
         <TextInput
           size="xs"
+          maxLength={SPOT_NAME_MAX}
           label={t('spots.name')}
           placeholder={
             spot.suggesting ? t('spots.namePlaceholderBusy') : t('spots.namePlaceholder')
@@ -44,6 +48,7 @@ export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {
         <Textarea
           size="xs"
           mt="xs"
+          maxLength={SPOT_DESCRIPTION_MAX}
           label={t('spots.description')}
           placeholder={t('spots.descriptionPlaceholder')}
           autosize

@@ -23,9 +23,13 @@ import { defineConfig } from 'vitest/config';
  * what would happen on a machine without the webfont anyway.
  */
 function excalidrawFonts(): Plugin {
-  const roots = ['dist/dev/fonts', 'dist/prod/fonts'].map((rel) =>
+  const [devRoot, prodRoot] = ['dist/dev/fonts', 'dist/prod/fonts'].map((rel) =>
     path.resolve('node_modules/@excalidraw/excalidraw', rel),
   );
+  // Dev first when serving, production first when building — the package ships
+  // both, so a single order would put the dev font set in the deploy.
+  const serveRoots = [devRoot, prodRoot];
+  const buildRoots = [prodRoot, devRoot];
   const skipXiaolai = (src: string) => !src.includes(`${path.sep}Xiaolai`);
   let outDir = 'dist';
 
@@ -44,14 +48,14 @@ function excalidrawFonts(): Plugin {
         // path.normalize collapses '..', so a leading one is the only way out
         // of the font directory and the only thing left to reject.
         if (rel.startsWith('..')) return next();
-        const root = roots.find((dir) => existsSync(path.join(dir, rel)));
+        const root = serveRoots.find((dir) => existsSync(path.join(dir, rel)));
         if (!root) return next();
         res.setHeader('Content-Type', 'font/woff2');
         createReadStream(path.join(root, rel)).pipe(res);
       });
     },
     closeBundle() {
-      const root = roots.find((dir) => existsSync(dir));
+      const root = buildRoots.find((dir) => existsSync(dir));
       if (!root) {
         this.warn('Excalidraw fonts not found; text on a drawing will 404');
         return;

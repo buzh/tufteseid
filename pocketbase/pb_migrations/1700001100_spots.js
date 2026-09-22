@@ -19,8 +19,9 @@
 //    handles, and the handles were the fiddly part of the surface. A pin at
 //    the centre of what you are looking at is one gesture. A reader who needs
 //    an extent draws one.
-//  * `geometry` is optional. A spot with nothing drawn on it is a legitimate
-//    spot — "something is here" is a finding.
+//  * `sketch` is optional, and it is the only shape a spot has. A spot with
+//    nothing drawn on it is a legitimate spot — "something is here" is a
+//    finding.
 //  * `visibility` is two-valued. `limited` was a placeholder on the old
 //    collection that behaved as `private` for its whole life; it comes back
 //    when groups do, and adding a value to a SelectField later is cheaper
@@ -37,8 +38,9 @@
 //
 // Read rules follow 1700000900: a public spot needs no account, everything
 // else needs one and needs to be somebody. Write rules are owner-only for
-// create, owner-or-admin for update and delete — which is what makes the
-// client carry two permissions rather than one.
+// create, owner-or-admin for update and delete. The client carries one
+// permission off the back of that, `mayEdit` — a record has no children to
+// gate, so there is no second stance to take on it.
 //
 // Collection ids are deliberately *not* equal to any collection name:
 // PocketBase ≥0.23 rejects a collection whose name matches an existing id.

@@ -9,10 +9,11 @@
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style';
 
-// Map z-indices 2 and 5-9 were left free by the strip (docs/state-of-the-branch.md).
-// The pin takes 6: over the terrain analysis and its frame (4), under the
-// Kulturminner theme layers (10), because a heritage polygon is the record the
-// reader is checking their own spot against and it should not be hidden by it.
+// The pin takes z-index 6: over the terrain analysis and its frame (4), under
+// the Kulturminner theme layers (10), because a heritage polygon is the record
+// the reader is checking their own spot against and it should not be hidden by
+// it. The inventory of what is where is in docs/map-layers.md; 5 and 7–9 are
+// what is left.
 export const PIN_Z_INDEX = 6;
 
 const ACCENT = 'rgba(255, 106, 0, 0.95)';

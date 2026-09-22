@@ -11,7 +11,7 @@
 
 import { Alert, Button, Group, Switch, Tooltip } from '@mantine/core';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { deleteSpot, updateSpot, type SpotRecord } from '../api/spots';
@@ -33,6 +33,14 @@ const FAILURE_TEXT: Record<Failure, string> = {
   copy: 'spots.copyFailed',
 };
 
+/** How long the copy button says it copied. Long enough to be read, short
+ *  enough that the next click gets an acknowledgement of its own. */
+const COPIED_MS = 2000;
+
+/** How long a delete stays armed. A red button left armed for the rest of the
+ *  card's life turns a stray click minutes later into a deletion. */
+const CONFIRM_MS = 5000;
+
 export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   const { t } = useTranslation();
   const user = useAtomValue(currentUserAtom);
@@ -52,6 +60,23 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   // and delete anybody's spot. `mayAdd` has no counterpart here — a card adds
   // nothing.
   const mayEdit = user != null && (user.id === spot.owner || isAdmin);
+
+  // Both of these are acknowledgements, not modes: nothing else takes them
+  // down, so they take themselves down. The cleanup covers the card being
+  // closed, and the delete that actually goes through.
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), COPIED_MS);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  useEffect(() => {
+    // Not while the delete is in flight: disarming under a request that is
+    // about to finish would put "Slett" back on a button that is deleting.
+    if (!confirming || busy) return;
+    const timer = setTimeout(() => setConfirming(false), CONFIRM_MS);
+    return () => clearTimeout(timer);
+  }, [confirming, busy]);
 
   const setVisibility = (makePublic: boolean) => {
     setBusy(true);

@@ -11,7 +11,7 @@ import { Alert, Button, Loader, Modal, Stack, Text } from '@mantine/core';
 import { useAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
-import { isAuthDialogOpenAtom } from './atoms';
+import { authPromptAtom, isAuthDialogOpenAtom } from './atoms';
 import { useOAuthProviders, useSignIn } from './hooks';
 
 // PocketBase reports a provider's `displayName`, but its casing follows
@@ -28,13 +28,19 @@ const PROVIDER_LABELS: Record<string, string> = {
 export const AuthDialog = () => {
   const { t } = useTranslation();
   const [open, setOpen] = useAtom(isAuthDialogOpenAtom);
+  const [prompt, setPrompt] = useAtom(authPromptAtom);
   const { providers, failed } = useOAuthProviders();
   const signIn = useSignIn();
+
+  const close = () => {
+    setOpen(false);
+    setPrompt(null);
+  };
 
   const handle = async (provider: string) => {
     try {
       await signIn(provider);
-      setOpen(false);
+      close();
     } catch (err) {
       // Blocked popup, cancelled window, misconfigured provider. Nothing here
       // can tell them apart, and the reader can see the dialog is still up.
@@ -45,12 +51,18 @@ export const AuthDialog = () => {
   return (
     <Modal
       opened={open}
-      onClose={() => setOpen(false)}
+      onClose={close}
       title={t('auth.title')}
       centered
       size="sm"
     >
       <Stack gap="sm">
+        {/* Why it opened, when the reader did not press anything: a followed
+            link that resolved to nothing they are allowed to see. */}
+        {prompt === 'spotLink' && (
+          <Alert color="yellow">{t('spots.linkNeedsAccount')}</Alert>
+        )}
+
         <Text size="sm" c="dimmed">
           {t('auth.blurb')}
         </Text>
