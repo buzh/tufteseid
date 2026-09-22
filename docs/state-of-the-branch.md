@@ -1,25 +1,40 @@
-# State of the branch — the map, and a ribbon over the LiDAR ring
+# State of the branch — the map, and a ribbon over the grounds
 
 This branch took the interface down to the map and kept the machinery that
 draws it. 290 files became 79. The point was not to make the app smaller — it
 was to make the next interface unconstrained by the last one, without
 re-deriving four years of Kartverket and Riksantikvaren service quirks.
 
-The rebuild has reached one surface. `src/App.tsx` renders a ribbon above
-`MapComponent`: it says which LiDAR dataset and which render of it are drawing,
-and switches both. At the far end of that row, and only when there is something
-to say, it names an external service that has stopped answering. There is still
-no search box, no lokaliteter, no funn, no drawing and no account, and no
-control over the Kart, Flyfoto, Amtskart or Hybrid grounds — those remain a
+The rebuild has reached the background. `src/App.tsx` renders a ribbon above
+`MapComponent`: it says which ground is drawing — LiDAR relief, one of
+Kartverket's map series, or ortofoto — and which dataset within it, and
+switches both. At the far end of that row, and only when there is something to
+say, it names an external service that has stopped answering. There is still no
+search box, no lokaliteter, no funn, no drawing and no account, and no control
+over the Hybrid overlay, its contours or the compare curtain — those remain a
 `set()` away.
 
-The band and the controls are two things. `src/ribbon/` is the band: the strip,
-the wordmark, the upstream fault chip. `src/lidarControls/` is the surface it
-hosts — `LidarControlGroup`, four elements whose design is settled, taking a
-`useLidarControls` object and no atoms of their own. Another host mounts the
-group; what it would have to do about there being one controller is at the top
-of `useLidarControls.ts`. The chip both wear is `src/ui/ControlChip.tsx`, and
-the one metric they all share is `--control-height` in `src/index.css`.
+The band and the controls are separate things. `src/ribbon/` is the band: the
+strip and the upstream fault chip. Everything in it is a surface mounted from
+its own directory:
+
+| Directory | Is |
+| --- | --- |
+| `src/grounds/` | the ground switch — `GroundMenu`, one chip, three rows, and `useGroundControls` which derives which ground is up from `backgroundLayerAtom` rather than storing it |
+| `src/lidarControls/` | the LiDAR arm — `LidarControlGroup`, four elements whose design is settled |
+| `src/kartControls/` | the Kart arm — one chip over `KART_VARIANTS`, and the memory of which variant Kart means while another ground is up |
+| `src/flyfotoControls/` | the Flyfoto arm — the NiB mosaic or one acquisition over the viewport, with the period filter inside its own dropdown |
+
+The row is the ground switch and then one arm, never two: a row carrying the
+controls of a ground that is not drawing would be three surfaces claiming the
+same map. The ribbon mounts all three controllers regardless, because each
+remembers something across a visit to another ground.
+
+Every arm takes a controller object and no atoms of its own, so another host
+can mount it; what a second host would have to do about there being one LiDAR
+controller is at the top of `useLidarControls.ts`. The chip they all wear is
+`src/ui/ControlChip.tsx`, and the one metric they share is `--control-height`
+in `src/index.css`.
 
 **Mantine is the design system, and the app is dark.** `MantineProvider` and
 the theme (`src/ui/theme.ts`) are mounted at the root, and every surface is
@@ -106,30 +121,35 @@ it is in `git log` on `main`.
 Every ground is a Jotai atom. Writing one rebuilds the stack, and
 `backgroundLayerAtomEffect` (mounted by `MapComponent`) does the work.
 
-The LiDAR ones now have a writer: `useLidarControls` (`src/lidarControls/`),
-which the ribbon mounts once. Do not reach past it for `activeLidarStyleAtom` or
-`backgroundLayerAtom` on a flight — on a flight the ground's *name* is a
-function of the render (`lidarFlightGround`), and the two would end up naming
-different things. Everything else in the table below still has no writer at all.
+`backgroundLayerAtom` now has three writers, one per arm, and the ribbon mounts
+each once. Reach for the arm's controller rather than the atom: on a LiDAR
+flight the ground's *name* is a function of the render (`lidarFlightGround`),
+so `useLidarControls` writes the style and the name together; on Kart the name
+has to land in `kartVariantAtom` too, or the ground is forgotten the moment you
+leave it; on Flyfoto the acquisition travels with the name. Which ground a name
+belongs to is derived by `groundOf` (`src/grounds/`) out of the vocabularies the
+layer code already keeps, so a ground that gains a member gains it in one place.
 
-Every atom the controller touches is the `.focused` facade of a `halved()` pair,
-so the controls already describe whichever side of the compare curtain has
-focus. One group plus a focus switch is a working split view today; a group per
-pane is the change described at the top of that file.
+The rows below without an arm still have no writer at all.
 
-| Atom | Module | Does |
-| --- | --- | --- |
-| `backgroundLayerAtom` | `layers/config/backgroundLayers/atoms.ts` | which ground |
-| `hybridOverlayAtom`, `hybridContoursAtom` | same | Kartverket's transparent overlay |
-| `kartVariantAtom` | `…/kartVariants.ts` | which cartography |
-| `activeLidarProjectAtom`, `activeLidarStyleAtom`, `activeLidarModelAtom` | `…/lidarProjects.ts` | per-project LiDAR |
-| `lidarAutoDatasetAtom` | `…/lidarAuto.ts` | pick the dataset from the viewport |
-| `activeCvatAcquisitionAtom` | `…/cvatGround.ts` | our own cached VAT render |
-| `activeFlyfotoProjectAtom` | `…/flyfotoBackground.ts` | one NiB acquisition |
-| `activeThemeLayersAtom` | `layers/atoms.ts` | which Kulturminner layers |
-| `heritageDetailsAtom`, `heritageRenderAtom`, `heritageOpacityAtom`, `heritageHiddenAtom` | `layers/heritage.ts` | how they are drawn |
-| `terrainWindowAtom`, `frameTerrainWindowAtom` | `terrain/window.ts` | the rectangle under analysis |
-| `compareOnAtom`, `compareSplitAtom`, `enterCompareAtom` | `map/compare/atoms.ts` | the curtain |
+Every atom the arms touch is the `.focused` facade of a `halved()` pair, so the
+controls already describe whichever side of the compare curtain has focus. One
+row plus a focus switch is a working split view today; a row per pane is the
+change described at the top of `useLidarControls.ts`.
+
+| Atom | Module | Does | Written by |
+| --- | --- | --- | --- |
+| `backgroundLayerAtom` | `layers/config/backgroundLayers/atoms.ts` | which ground | all three arms |
+| `hybridOverlayAtom`, `hybridContoursAtom` | same | Kartverket's transparent overlay | — |
+| `kartVariantAtom` | `…/kartVariants.ts` | which cartography | `useKartControls` |
+| `activeLidarProjectAtom`, `activeLidarStyleAtom`, `activeLidarModelAtom` | `…/lidarProjects.ts` | per-project LiDAR | `useLidarControls` |
+| `lidarAutoDatasetAtom` | `…/lidarAuto.ts` | pick the dataset from the viewport | `useLidarControls` |
+| `activeCvatAcquisitionAtom` | `…/cvatGround.ts` | our own cached VAT render | `useLidarControls` |
+| `activeFlyfotoProjectAtom` | `…/flyfotoBackground.ts` | one NiB acquisition | `useFlyfotoControls` |
+| `activeThemeLayersAtom` | `layers/atoms.ts` | which Kulturminner layers | — |
+| `heritageDetailsAtom`, `heritageRenderAtom`, `heritageOpacityAtom`, `heritageHiddenAtom` | `layers/heritage.ts` | how they are drawn | — |
+| `terrainWindowAtom`, `frameTerrainWindowAtom` | `terrain/window.ts` | the rectangle under analysis | — |
+| `compareOnAtom`, `compareSplitAtom`, `enterCompareAtom` | `map/compare/atoms.ts` | the curtain | — |
 
 The URL still carries `projection`, `backgroundLayer`, `hybrid`, `contours`,
 `lidarModel`, `themeLayers`, `heritage*`, `lat`, `lon` and `zoom`
@@ -161,6 +181,11 @@ the surfaces that wrote them.
   keeps the viewport list warm while the keyboard ring walks datasets, and the
   ring (`useBackgroundCyclingKeys`, W/S/A/D/E) went with the old shell. It costs
   nothing false today and comes back with those keys.
-- **The ribbon covers the LiDAR ring only**, plus the upstream fault chip. No
-  ground switch, no Hybrid overlay or contours toggle, no compare curtain, no
-  search — the atoms for all of them are live and unwritten.
+- **The ribbon covers the three grounds**, plus the upstream fault chip. No
+  Hybrid overlay or contours toggle, no compare curtain, no Kulturminner
+  themes, no search — the atoms for all of them are live and unwritten. Hybrid
+  is the next one in: it is two booleans, and the only question it raises is
+  whether a modifier belongs to the LiDAR arm or to the band.
+- **Nothing walks the rings.** The arms list and pick; there is no W/S step
+  through datasets, variants or acquisitions, because those keys went with the
+  old shell (`lidarCyclingAtom` above).

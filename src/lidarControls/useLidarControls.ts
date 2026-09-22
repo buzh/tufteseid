@@ -316,17 +316,6 @@ export const useLidarControls = () => {
   // it. Where it does not, the link resolves to the flight's WMS, which is the
   // honest answer rather than a blank.
 
-  // `lidarPickerOpenAtom` is shared with the map, and an unmount never fires the
-  // menu's own close callback — so the map would keep painting footprints over
-  // whatever came next.
-  useEffect(
-    () => () => {
-      setPickerOpen(false);
-      setHoveredProjectId(null);
-    },
-    [setPickerOpen, setHoveredProjectId],
-  );
-
   // The renders on offer for the ground: a flight's WMS styles, our cache ahead
   // of them where the store holds that flight, or the mosaic's one style.
   // Collapses to one in DOM mode, which takes the cache with it — it was
@@ -348,7 +337,6 @@ export const useLidarControls = () => {
   const cachedFlightIds = new Set(cvatAcquisitions.map((a) => a.project.id));
 
   return {
-    isLidarBackground,
     isNationalMosaic,
     isLidarFlight,
     isLidarCvat,

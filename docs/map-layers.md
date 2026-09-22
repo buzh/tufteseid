@@ -6,11 +6,11 @@ caching, tile grids and the Kartverket rate limit are
 `docs/wms-proxy-and-tiles.md`; the float-elevation path behind terrain analysis
 is `docs/terrain-analysis.md`.
 
-The ribbon drives the LiDAR ring and nothing else so far (`src/lidarControls/`
-for the controls, `src/ribbon/` for the band that hosts them, and
-`docs/state-of-the-branch.md` for what the rebuild has reached). Every other
-ground below is still reachable only by writing its atom or by
-`?backgroundLayer=`.
+The ribbon drives all three grounds below: a ground switch (`src/grounds/`) and
+one arm per ground — `src/lidarControls/`, `src/kartControls/`,
+`src/flyfotoControls/` — in the band at `src/ribbon/`. What it does not drive
+is the Hybrid overlay and its contours, which stay a `set()` away;
+`docs/state-of-the-branch.md` has the rest of what the rebuild has reached.
 
 All WMS requests are `VERSION=1.3.0`, same-origin through a `/wms/…` prefix.
 Nothing sets `SRS`/`CRS` by hand — OpenLayers writes it from the view
@@ -326,7 +326,10 @@ Whether a feature's `linkkulturminnesok` URL resolves is asked separately
 3. A layer whose concrete source is a runtime choice gets a branch in
    `pickLayerConfig` rather than a static entry, and stays out of
    `VALID_STARTUP_LAYERS`, since a cold load onto it would render nothing.
-4. Give it a control. The ribbon covers the LiDAR ring only; a ground outside it
-   is reachable by setting `backgroundLayerAtom` and by `?backgroundLayer=` if
-   it is safe to cold-load onto, until the ribbon grows a ground switch.
+4. Give it a control. A new member of an existing ground is a row in that arm's
+   menu; a ground of its own is a fourth arm plus an entry in `GROUND_MODES`
+   and `groundOf` (`src/grounds/`), which is what decides that the arm is the
+   one on screen. Until it has either, it is reachable by setting
+   `backgroundLayerAtom` and by `?backgroundLayer=` if it is safe to cold-load
+   onto.
 5. Translations in `src/locales/{nb,nn,en}/translation.json`.

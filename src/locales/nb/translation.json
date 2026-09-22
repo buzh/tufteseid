@@ -1,4 +1,52 @@
 {
+  "flyfotoControls": {
+    "mosaic": "Beste mosaikk",
+    "mosaicShort": "Mosaikk · nyeste",
+    "mosaicHint": "nyeste tilgjengelige, sømløs over hele landet",
+    "projectsLabel": "Enkeltprosjekter, nyeste først",
+    "eraAria": "Periode",
+    "eraAll": "Alle",
+    "loading": "Henter flyfotoprosjekter …",
+    "zoomedOut": "Zoom inn for å velge enkeltprosjekt",
+    "error": "Fant ikke flyfotoprosjektene for utsnittet",
+    "empty": "Ingen enkeltprosjekter dekker utsnittet",
+    "emptyEra": "Ingen flyfoto fra denne perioden dekker utsnittet"
+  },
+  "grounds": {
+    "chipTitle": "{{ground}} — {{hint}}",
+    "none": "Ingen bakgrunn",
+    "noneHint": "Kartet har ingen bakgrunn nå — velg en",
+    "lidar": {
+      "name": "LiDAR",
+      "hint": "Relieff regnet ut av laserskanning"
+    },
+    "kart": {
+      "name": "Kart",
+      "hint": "Kartverkets kartserier, og amtskart fra før 1917"
+    },
+    "flyfoto": {
+      "name": "Flyfoto",
+      "hint": "Ortofoto fra Norge i bilder"
+    }
+  },
+  "kartControls": {
+    "chipTitle": "{{variant}} — {{hint}}",
+    "historicHint": "Eldre kartverk, tegnet før 1900-tallet endret landskapet.",
+    "variant": {
+      "topo": "Topografisk",
+      "topograatone": "Gråtone",
+      "toporaster": "Rasterkart",
+      "sjokartraster": "Sjøkart",
+      "amtskart": "Amtskart"
+    },
+    "meta": {
+      "topo": "det vanlige kartet",
+      "topograatone": "dempet, for farger oppå",
+      "toporaster": "papirkartets egen tegning",
+      "sjokartraster": "dybder og skjær langs kysten",
+      "amtskart": "amtskartserien 1826–1917, mangler Nordland"
+    }
+  },
   "lidar": {
     "style": {
       "cvat": "Arkeologisk relieff",
@@ -10,8 +58,6 @@
     }
   },
   "lidarControls": {
-    "offLidar": "Kartet viser ikke LiDAR nå",
-    "enterLidar": "Vis LiDAR",
     "auto": {
       "label": "Automatisk",
       "offHint": "La utsnittet velge datasett",
@@ -49,9 +95,6 @@
   },
   "map": {
     "errorMessage": "Noe gikk veldig galt med kartet"
-  },
-  "ribbon": {
-    "lidar": "LiDAR"
   },
   "shared": {
     "errorBoundary": {

@@ -7,9 +7,10 @@ tracking upstream. Working branch: `new-ui`.
 **The interface is being rebuilt from nothing, on Mantine.** This branch kept
 OpenLayers, the WMS/cache path and the headless computation behind them, and
 deleted every surface on top — ribbon, lokaliteter, funn, drawing, search UI,
-the UI kit. What has been built back is a settled four-element control surface
-for the LiDAR ring (`src/lidarControls/`) and a top band that hosts it
-(`src/ribbon/`); everything else is still atoms with no writer. Read
+the UI kit. What has been built back is the background: a ground switch
+(`src/grounds/`) and one arm per ground — `src/lidarControls/`,
+`src/kartControls/`, `src/flyfotoControls/` — in a top band that hosts them
+(`src/ribbon/`). Everything else is still atoms with no writer. Read
 `docs/state-of-the-branch.md` before adding the next control: it lists what
 survived, what the atoms are called, and what is deliberately still broken.
 `main` holds the old app and is still deployable.

@@ -1,6 +1,6 @@
-/* The band itself, and nothing that sits in it. The controls style themselves
-   (`lidarControls/controls.module.css`) and the chip they share is a `src/ui/`
-   primitive, so this file describes only the strip the map is pushed down by.
+/* The band itself, and nothing that sits in it. Each arm styles itself and the
+   chip they all wear is a `src/ui/` primitive, so this file describes only the
+   strip the map is pushed down by.
 
    A band above the map, not a floating panel over it: the map is what is being
    read, and a control that covers terrain competes with it. */
@@ -19,18 +19,8 @@
   scrollbar-width: thin;
 }
 
-.mark {
-  flex: none;
-  color: var(--mantine-primary-color-filled);
-}
-
-.markLabel {
-  flex: none;
-  margin-right: var(--mantine-spacing-xs);
-}
-
-/* Pushes the fault chip to the right of the LiDAR controls, so it appears
-   without moving anything the reader was about to click. */
+/* Pushes the fault chip to the right of the controls, so it appears without
+   moving anything the reader was about to click. */
 .statusSpacer {
   flex: 1 1 auto;
   min-width: var(--mantine-spacing-md);
