@@ -9,6 +9,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { createSpot, updateSpot, type SpotRecord } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
+import { SKETCH_BUDGET_BYTES, sketchBytes } from '../sketch/scene';
+import { sketchNow } from '../sketch/session';
 import {
   activeSpotAtom,
   closeSpotDraftAtom,
@@ -41,6 +43,8 @@ export type SpotDraftController = {
   hasSketch: boolean;
   saving: boolean;
   saveError: boolean;
+  /** The drawing is past what the column will hold; nothing was sent. */
+  sketchTooBig: boolean;
   canSave: boolean;
   save: () => void;
   abort: () => void;
@@ -57,6 +61,7 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
   const [suggesting, setSuggesting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [sketchTooBig, setSketchTooBig] = useState(false);
 
   /**
    * Whether the author has had the field. Once they have, the register never
@@ -111,14 +116,27 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
 
   const save = useCallback(() => {
     if (!user || !name) return;
+
+    // Not the settled drawing: `Lagre` pressed on the tail of a stroke reads
+    // the canvas directly, so the last stroke is in what is kept.
+    const drawing = sketchNow(sketch);
+    // Measured here rather than on every settle, which would mean stringifying
+    // the whole scene between pointer samples. The column is capped server
+    // side, so the alternative to this is a 400 after the work is done.
+    if (sketchBytes(drawing) > SKETCH_BUDGET_BYTES) {
+      setSketchTooBig(true);
+      return;
+    }
+
     setSaving(true);
     setSaveError(false);
+    setSketchTooBig(false);
 
     const body = {
       name,
       description: form.description,
       point: draft.point,
-      sketch,
+      sketch: drawing,
     };
 
     const written: Promise<SpotRecord> = draft.recordId
@@ -158,6 +176,7 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
     hasSketch: (sketch?.elements.length ?? 0) > 0,
     saving,
     saveError,
+    sketchTooBig,
     canSave,
     save,
     abort: closeDraft,

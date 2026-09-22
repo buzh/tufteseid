@@ -1,6 +1,7 @@
-// The spots' half of the map: the saved pins, the short link, and — while a
-// draft is open — the pin in the reader's hand and the box beside it.
-// `MapComponent` mounts this and passes it nothing.
+// The spots' half of the map: the saved pins, the short link, the drawing over
+// the ground, and — while a draft is open — the pin in the reader's hand, the
+// canvas, and the box beside them. `MapComponent` mounts this and passes it
+// nothing.
 //
 // A component of its own rather than a hook call in the host, for the same
 // reason `TerrainSurface` is one: the draft controller is where the name and
@@ -9,8 +10,14 @@
 // curtain and the heritage card alongside it.
 
 import { useAtomValue } from 'jotai';
+import { useMemo } from 'react';
 
-import { spotDraftAtom } from '../spots/atoms';
+import { useSketchOverlay } from '../sketch/overlay';
+import { sketchOf } from '../sketch/scene';
+import { sketchSessionAtom } from '../sketch/session';
+import { SketchCanvas } from '../sketch/SketchCanvas';
+import { useSketchSession } from '../sketch/useSketchSession';
+import { activeSpotAtom, spotDraftAtom } from '../spots/atoms';
 import { useSpotPinAdjust } from '../spots/pinAdjust';
 import { useSpotShareLink } from '../spots/shareLink';
 import { useSpotLayer } from '../spots/spotLayer';
@@ -29,10 +36,30 @@ const SpotDraftBox = () => {
 
 export const SpotSurface = () => {
   const draft = useAtomValue(spotDraftAtom);
+  const active = useAtomValue(activeSpotAtom);
+  const session = useAtomValue(sketchSessionAtom);
+
+  // The open spot's drawing, checked rather than trusted (`sketchOf`). Null
+  // while a canvas is up: a spot being redrawn would otherwise be on the map
+  // twice, once as it was saved and once as it is being changed.
+  const shown = useMemo(
+    () => (session ? null : sketchOf(active?.sketch)),
+    [session, active],
+  );
 
   useSpotLayer();
   useSpotShareLink();
   useSpotPinAdjust();
+  useSketchSession(draft?.stage === 'sketch');
+  useSketchOverlay(shown);
 
-  return draft ? <SpotDraftBox key={draft.id} /> : null;
+  return (
+    <>
+      {/* Before the box in document order, so the box paints over it: the
+          canvas isolates Excalidraw's own z-ladder but still occupies the
+          whole map rectangle. */}
+      {session && <SketchCanvas key={session.id} session={session} />}
+      {draft && <SpotDraftBox key={draft.id} />}
+    </>
+  );
 };

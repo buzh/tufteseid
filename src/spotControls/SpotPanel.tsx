@@ -86,6 +86,12 @@ export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {
           </span>
         </Group>
 
+        {spot.sketchTooBig && (
+          <Alert color="red" mt="xs" p="xs">
+            {t('spots.sketchTooBig')}
+          </Alert>
+        )}
+
         {spot.saveError && (
           <Alert color="red" mt="xs" p="xs">
             {t('spots.saveFailed')}

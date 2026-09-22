@@ -1,0 +1,73 @@
+/*
+ * Excalidraw re-pointed at the Mantine theme. `:global(...)` throughout because
+ * the class names are the library's own internals and can move in a version
+ * bump; each block says what it is for, so a broken selector can be recognised
+ * as broken rather than deleted.
+ */
+
+/*
+ * The map's own rectangle, which is what `MapComponent` positions its overlays
+ * against: Excalidraw's islands place themselves inside this box, so they land
+ * clear of the band with no height measured anywhere, and the scene is scrolled
+ * to compensate (`initialSceneView`). `isolation` contains Excalidraw's
+ * internal z-ladder, which climbs past 1000 and would otherwise paint its
+ * popovers over the band and over the draft box beside it.
+ */
+.surface {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  isolation: isolate;
+}
+
+.surface :global(.excalidraw) {
+  /* Surfaces and text. Anthracite, like every other panel over the map. */
+  --island-bg-color: var(--mantine-color-body);
+  --default-bg-color: var(--mantine-color-body);
+  --popup-bg-color: var(--mantine-color-body);
+  --popup-secondary-bg-color: var(--mantine-color-dark-6);
+  --popup-text-color: var(--mantine-color-text);
+  --text-primary-color: var(--mantine-color-text);
+  --icon-fill-color: var(--mantine-color-text);
+  --dialog-border-color: var(--mantine-color-default-border);
+
+  /* Accent. Excalidraw's own is indigo; ours is papaya. */
+  --color-primary: var(--mantine-color-papaya-5);
+  --color-primary-hover: var(--mantine-color-papaya-4);
+  --color-primary-darker: var(--mantine-color-papaya-6);
+  --color-primary-darkest: var(--mantine-color-papaya-7);
+  --color-primary-light: var(--mantine-color-papaya-9);
+  --color-primary-light-darker: var(--mantine-color-papaya-8);
+
+  /* Controls. */
+  --button-color: var(--mantine-color-text);
+  --button-bg: transparent;
+  --button-border: transparent;
+  --button-hover-bg: var(--mantine-color-dark-5);
+  --button-hover-border: var(--mantine-color-default-border);
+  --button-hover-color: var(--mantine-color-text);
+  --button-active-bg: var(--mantine-color-dark-4);
+  --button-active-border: var(--mantine-color-dark-3);
+  --button-destructive-bg-color: var(--mantine-color-dark-6);
+  --button-destructive-color: var(--mantine-color-red-5);
+  --input-bg-color: var(--mantine-color-body);
+  --input-border-color: var(--mantine-color-default-border);
+  --input-hover-bg-color: var(--mantine-color-dark-5);
+  --input-label-color: var(--mantine-color-dimmed);
+
+  --border-radius-md: var(--mantine-radius-md);
+  --border-radius-lg: var(--mantine-radius-lg);
+  --shadow-island: var(--mantine-shadow-md);
+}
+
+/*
+ * Hidden: the hamburger, whose document verbs `UIOptions.canvasActions` empties
+ * while still rendering the button; the shape library, which is excalidraw.com
+ * content that `connect-src` would have to be widened for; and help, a shortcut
+ * sheet for features that are mostly turned off.
+ */
+.surface :global(.main-menu-trigger),
+.surface :global(.sidebar-triggers),
+.surface :global(.help-icon) {
+  display: none;
+}
