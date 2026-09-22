@@ -1,7 +1,7 @@
-/* What the four controls need that `ui/ControlChip` does not already carry.
-   Deliberately says nothing about the band they sit in — the ribbon's own
-   stylesheet does that, and a second host (a pane in a split view) has to be
-   able to mount the group without inheriting a border-bottom. */
+/* What the four controls need that `ui/ControlChip` and `ui/ControlButton` do
+   not already carry. Deliberately says nothing about the band they sit in — the
+   ribbon's own stylesheet does that, and a second host (a pane in a split view)
+   has to be able to mount the group without inheriting a border-bottom. */
 
 /* --- the group --- */
 
@@ -13,53 +13,6 @@
    under it. */
 .group {
   flex: none;
-}
-
-/* --- the model toggle --- */
-
-/* The chip's box, split across the middle. Both halves are always drawn: the
-   one that is dark is the picture the reader is not looking at, and a toggle
-   that hid it would be a button with nothing to say about its other state. */
-.modelToggle {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  width: var(--control-icon-width);
-  height: var(--control-height);
-  overflow: hidden;
-  border: 1px solid var(--mantine-color-default-border);
-  border-radius: var(--mantine-radius-sm);
-  background: var(--mantine-color-default);
-}
-
-.modelToggle:hover {
-  background: var(--mantine-color-default-hover);
-}
-
-.modelToggle:focus-visible {
-  outline: 2px solid var(--mantine-primary-color-filled);
-  outline-offset: 1px;
-}
-
-.modelHalf {
-  display: flex;
-  flex: 1 1 50%;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-  color: var(--mantine-color-dimmed);
-}
-
-/* The divider: one line between the two, drawn on the lower half so it does not
-   double with the chip's own border. */
-.modelHalf + .modelHalf {
-  border-top: 1px solid var(--mantine-color-default-border);
-}
-
-/* Drawing now. Papaya, like everything else in this row that means "this is the
-   answer" — opacity alone reads as disabled at 14px. */
-.modelHalfOn {
-  color: var(--mantine-primary-color-filled);
 }
 
 /* --- inside the menus --- */

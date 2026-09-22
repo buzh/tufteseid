@@ -48,9 +48,13 @@ something across a visit to another ground.
 
 Every arm takes a controller object and no atoms of its own, so another host
 can mount it; what a second host would have to do about there being one LiDAR
-controller is at the top of `useLidarControls.ts`. The chip they all wear is
-`src/ui/ControlChip.tsx`, and the one metric they share is `--control-height`
-in `src/index.css`.
+controller is at the top of `useLidarControls.ts`. A row of controls is made of
+two shapes, and both are `src/ui/` primitives: `ControlChip`, the line of text
+that grows to fit what it is reporting and opens a menu, and `ControlButton`,
+the fixed square holding one glyph that is the whole control — filled in papaya
+for a mode that is on, or split across the middle for two states that are one
+picture. The metrics they share are `--control-height` and
+`--control-icon-width` in `src/index.css`.
 
 **Mantine is the design system, and the app is dark.** `MantineProvider` and
 the theme (`src/ui/theme.ts`) are mounted at the root, and every surface is

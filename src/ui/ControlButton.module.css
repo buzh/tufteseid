@@ -1,0 +1,80 @@
+/* The chip's box at icon width. A row of map controls is made of two shapes and
+   this is the other one: same height, same border, same radius, same hover — a
+   fixed square where the chip is a line of text that grows.
+
+   Lives beside `ControlChip` for the same reason it does: the rules are in a CSS
+   module, so a second directory wearing the style cannot name a class in here,
+   and writing the box out again is how the two got half a pixel apart in the
+   first place. */
+
+.button {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-icon-width);
+  height: var(--control-height);
+  overflow: hidden;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-default);
+  color: var(--mantine-color-text);
+}
+
+.button:hover {
+  background: var(--mantine-color-default-hover);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 1px;
+}
+
+/* On. The whole box in papaya, which is what a mode looks like when it is the
+   mode: the reader should be able to find it in the row without reading it.
+   `--mantine-primary-color-contrast` is the dark text the theme's `autoContrast`
+   works out for this shade, so the glyph stays legible on the fill. */
+.buttonOn {
+  border-color: var(--mantine-primary-color-filled);
+  background: var(--mantine-primary-color-filled);
+  color: var(--mantine-primary-color-contrast);
+}
+
+/* After `.button:hover`, not before: the two have the same specificity, so this
+   only wins on source order. */
+.buttonOn:hover {
+  background: var(--mantine-primary-color-filled-hover);
+}
+
+/* --- the split face --- */
+
+/* Two glyphs stacked in the one box, for a control whose two states are one
+   picture seen twice. Both halves are always drawn: the dark one is the state
+   the reader is not in, and a toggle that hid it would be a button with nothing
+   to say about its other half. Stretch rather than the box's own centring, or
+   the halves would be glyph-wide and the divider would stop short of the edge. */
+.split {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.half {
+  display: flex;
+  flex: 1 1 50%;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  color: var(--mantine-color-dimmed);
+}
+
+/* The divider: one line between the two, drawn on the lower half so it does not
+   double with the box's own border. */
+.half + .half {
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+/* This half is what is drawing. Papaya, like everything else in the row that
+   means "this is the answer" — opacity alone reads as disabled at 14px. */
+.halfLit {
+  color: var(--mantine-primary-color-filled);
+}
