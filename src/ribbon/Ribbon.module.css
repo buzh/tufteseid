@@ -39,10 +39,21 @@
 /* The far end, and where the slack is — the margin below pushes it there. The
    tools are empty most of the time, and a chip appearing in one must not move
    anything the reader was about to click; putting the slack ahead of them means
-   nothing left of it moves when the second ground section appears either. */
+   nothing left of it moves when the second ground section appears either.
+
+   Stuck to the right edge of the scrollport, because on a narrow screen a
+   second ground section is what pushes the row past it. What is in here — the
+   Kulturminner overlay, the sign that an upstream has stopped answering — is
+   true of both grounds and is the one part of the band that must not go and
+   hide behind a horizontal scrollbar. It carries the band's own background so
+   the sections scrolling under it do not show through. */
 .tools {
   flex: none;
   margin-left: auto;
+  position: sticky;
+  right: 0;
+  padding-left: var(--mantine-spacing-xs);
+  background: var(--mantine-color-body);
 }
 
 /* One origin's row in the fault popover. */

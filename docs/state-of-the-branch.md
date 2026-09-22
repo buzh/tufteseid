@@ -268,9 +268,13 @@ the theme-layer effect walk whatever maps exist. Its header records why
 translating the B stack inside one map was rejected.
 
 The B ground's layers carry a `cmp.` prefix and go into whichever map the view
-mode names (`compareHost`). An OL layer belongs to one map at a time, so a
+mode names (`compareHostFor`). An OL layer belongs to one map at a time, so a
 change of view rebuilds the B stack in the new host rather than moving it; the
-reuse signature is namespaced too, so A and B never share an instance.
+reuse signature is namespaced too, so A and B never share an instance. The host
+is resolved once, from the mode the effect read, and the map it is *not* is
+emptied before the build rather than after it (`clearCompareLayersExcept`) —
+every way a build can end without installing would otherwise leave the previous
+view still drawing.
 
 Neither two-ground view is persisted to the URL. Two live tile stacks are
 roughly twice the GetMap requests against a rate limit this deployment shares
@@ -281,15 +285,20 @@ Entering a two-ground view seeds every `.b` from its `.a` (`seedHalfB`, a
 registry rather than a list, so a pair added later cannot open B on a `null`),
 then moves B off A: onto whichever of relief and cartography A is not, with
 Automatisk off, because a comparison term that follows the viewport is not a
-comparison term. Moving between the curtain and the split leaves B where the
-reader put it.
+comparison term. B enters LiDAR on the national mosaic rather than on the flight
+the half is holding — that flight is wherever the reader last looked at one, and
+with the pin just set nothing would re-rank it against this screen. Moving
+between the curtain and the split leaves B where the reader put it.
 
 What is mirrored into the second pane and what is not: the Kulturminner theme
 layers are, because a ticked register belongs to the reading rather than to a
-half (`syncThemeLayers`, called once per map). The heritage tip and card are
-not — `src/heritageInfo/` and `src/map/featureInfo/` are wired to the main map,
-so the right-hand pane draws the register but does not answer questions about
-it.
+half (`syncThemeLayers`, called once per map). The LiDAR footprint outlines are
+split rather than mirrored — one viewport query for both halves, but a layer per
+pane drawing that pane's own flight, because an outline over the wrong ground
+names the wrong picture (`footprintTargets`). The heritage tip and card are
+not there at all — `src/heritageInfo/` and `src/map/featureInfo/` are wired to
+the main map, so the right-hand pane draws the register but does not answer
+questions about it.
 
 ## Loose ends, deliberately left
 

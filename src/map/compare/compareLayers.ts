@@ -9,7 +9,7 @@ import {
   OUTGOING_OPACITY,
   SWAP_TIMEOUT_MS,
 } from '../layers/config/backgroundLayers/utils';
-import { viewModeAtom } from './halves';
+import type { ViewMode } from './halves';
 import { getSplitMap, peekSplitMap } from './splitMap';
 
 // The B half's layers, and where they go. Two hosts, one per two-ground view:
@@ -37,18 +37,25 @@ const isCompareLayer = (layer: BaseLayer): boolean =>
 
 const getMainMap = () => getDefaultStore().get(mapAtom);
 
-const clearFrom = (map: OlMap) => {
+/** Strips one map of the B half. Says whether it was holding any. */
+const clearFrom = (map: OlMap): boolean => {
+  let removed = false;
   for (const layer of map.getLayers().getArray().slice()) {
-    if (isCompareLayer(layer)) map.removeLayer(layer);
+    if (isCompareLayer(layer)) {
+      map.removeLayer(layer);
+      removed = true;
+    }
   }
+  return removed;
 };
 
-/** Where the B stack draws in the view mode that is up. Creates the right
- *  pane's map when asked for it, so only call it once split is the mode. */
-export const compareHost = (): OlMap =>
-  getDefaultStore().get(viewModeAtom) === 'split'
-    ? getSplitMap()
-    : getMainMap();
+/** Where the B stack draws in a given view mode. Creates the right pane's map
+ *  when asked for `split`, so only ask with the mode that is up. Takes the mode
+ *  rather than reading it: the caller resolves the host, builds into it and
+ *  installs into it across an await, and a second read could answer
+ *  differently — the three have to be one decision. */
+export const compareHostFor = (mode: ViewMode): OlMap =>
+  mode === 'split' ? getSplitMap() : getMainMap();
 
 // Nothing here is WebGL, so narrow OL's context union once.
 const canvas2d = (
@@ -85,12 +92,19 @@ const clipToRightOfSplit = (e: RenderEvent) => {
 
 const unclip = (e: RenderEvent) => canvas2d(e)?.restore();
 
-const attachClip = (layer: TileLayer) => {
-  // Layers survive installs, and a second pair would clip twice a frame.
-  if (layer.get('cmpClip')) return;
-  layer.set('cmpClip', true);
-  layer.on('prerender', clipToRightOfSplit);
-  layer.on('postrender', unclip);
+// Both ways, and flagged so it is idempotent: layers survive installs, so a
+// second attach would clip twice a frame and a missing detach would carry the
+// curtain's geometry into a pane that draws the B ground whole.
+const setClip = (layer: TileLayer, on: boolean) => {
+  if (Boolean(layer.get('cmpClip')) === on) return;
+  layer.set('cmpClip', on);
+  if (on) {
+    layer.on('prerender', clipToRightOfSplit);
+    layer.on('postrender', unclip);
+  } else {
+    layer.un('prerender', clipToRightOfSplit);
+    layer.un('postrender', unclip);
+  }
 };
 
 // Its own variable: the B stack and the background stack swap independently.
@@ -113,13 +127,6 @@ export const installCompareLayers = (
   // open the gap the deferral avoids.
   cancelPendingRetire?.();
 
-  // Anything the other host is still holding belongs to a view mode that is no
-  // longer up, and nothing will ever retire it from there.
-  for (const other of [getMainMap(), peekSplitMap()]) {
-    if (!other || other === host) continue;
-    clearFrom(other);
-  }
-
   const outgoing = collection
     .getArray()
     .filter(
@@ -127,13 +134,13 @@ export const installCompareLayers = (
     ) as TileLayer[];
 
   under.forEach((layer, i) => {
-    if (clip) attachClip(layer);
+    setClip(layer, clip);
     layer.setZIndex(COMPARE_Z);
     collection.remove(layer);
     collection.insertAt(i, layer);
   });
   for (const layer of over) {
-    if (clip) attachClip(layer);
+    setClip(layer, clip);
     layer.setZIndex(COMPARE_Z);
     collection.remove(layer);
     collection.push(layer);
@@ -160,6 +167,26 @@ export const clearCompareLayers = () => {
   clearFrom(getMainMap());
   const pane = peekSplitMap();
   if (pane) clearFrom(pane);
+};
+
+/**
+ * Take the B half off every host but this one.
+ *
+ * A change of view mode moves the B stack between maps, and what the map it
+ * left is holding belongs to a view nobody is looking at: nothing in the new
+ * host will ever retire it. Called by the effect before the build rather than
+ * by the install after it, because every way the build can end without
+ * installing — an unresolvable stack, a rejected fetch, a generation the reader
+ * has already superseded — would otherwise leave the old host drawing.
+ */
+export const clearCompareLayersExcept = (host: OlMap) => {
+  for (const other of [getMainMap(), peekSplitMap()]) {
+    if (!other || other === host) continue;
+    // Only where something went: the deferred retire belongs to whichever host
+    // was installed into last, and cancelling it on a no-op sweep would leave
+    // that host's outgoing layers faded on top of the stack for good.
+    if (clearFrom(other)) cancelPendingRetire?.();
+  }
 };
 
 export const setCurtainSplit = (fraction: number) => {

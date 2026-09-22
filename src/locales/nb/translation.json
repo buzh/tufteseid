@@ -156,6 +156,13 @@
   "map": {
     "errorMessage": "Noe gikk veldig galt med kartet"
   },
+  "ribbon": {
+    "groundSection": {
+      "only": "Underlag",
+      "left": "Underlag, venstre halvdel",
+      "right": "Underlag, høyre halvdel"
+    }
+  },
   "shared": {
     "errorBoundary": {
       "title": "Noe gikk galt her",

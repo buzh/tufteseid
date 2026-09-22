@@ -14,7 +14,7 @@ export type CompareHalf = 'a' | 'b';
 const BOTH_HALVES = ['a', 'b'] as const;
 
 /**
- * How the map is being looked at:
+ * How the map is being looked at, in the order the view control offers them:
  *
  * | `single`  | one ground over the whole map |
  * | `curtain` | two grounds in one viewport, B clipped right of a draggable edge |
@@ -24,9 +24,11 @@ const BOTH_HALVES = ['a', 'b'] as const;
  * GetMap requests against a shared rate limit: a shared link opens on one
  * ground and the reader asks for the second.
  */
-export type ViewMode = 'single' | 'curtain' | 'split';
-
 export const VIEW_MODES = ['single', 'curtain', 'split'] as const;
+
+/** The list above, as the type. Derived rather than spelled out twice: a fourth
+ *  mode written into only one of them would render no button and typecheck. */
+export type ViewMode = (typeof VIEW_MODES)[number];
 
 export const viewModeAtom = atom<ViewMode>('single');
 

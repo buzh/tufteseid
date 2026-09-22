@@ -1,9 +1,10 @@
-/* Half the row, and the seam between the two panes is this pane's own left
-   border — one line rather than two adjoining ones, so it stays a hairline. */
+/* Half the row, to the pixel. The seam is the row's gap
+   (`MapComponent.module.css`), so nothing here may take width off the pane: the
+   two viewports have to be the same size for the shared `View` to mean what the
+   split view says it means. */
 .pane {
   flex: 1 1 0;
   min-width: 0;
   height: 100%;
-  border-left: 2px solid var(--mantine-color-dark-9);
   touch-action: none;
 }

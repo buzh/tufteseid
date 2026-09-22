@@ -5,9 +5,16 @@
 // Belongs to the map rather than to a half, so it reads the `live…` atoms:
 // arrays holding one value per half that is drawing, all indexed the same way
 // (`acrossHalves` in `compare/halves.ts`). A two-ground view has two dataset
-// pulldowns and two active flights; there is one viewport query and one
-// footprint layer between them, because both halves are looking at the same
-// extent through the same view.
+// pulldowns and two active flights, and one viewport query between them: both
+// halves look at the same extent through the same view, so what covers the
+// screen is asked once.
+//
+// Where the outlines go is a different question, and the answer is the pane
+// that is showing the flight they describe. The curtain is one viewport, so its
+// two halves share one layer on the main map. The split is two, so each pane
+// gets its own layer carrying its own half's dataset — drawing B's flight over
+// A's ground would point at the wrong picture, and the pulldown that opened is
+// itself a half's.
 
 import { useAtomValue, useSetAtom } from 'jotai';
 import { Feature } from 'ol';
@@ -19,6 +26,8 @@ import VectorSource from 'ol/source/Vector';
 import { Fill, Stroke, Style } from 'ol/style';
 import { useEffect } from 'react';
 import { mapAtom } from './atoms';
+import { type ViewMode, viewModeAtom } from './compare/halves';
+import { getSplitMap, peekSplitMap } from './compare/splitMap';
 import { liveBackgroundLayersAtom } from './layers/config/backgroundLayers/atoms';
 import {
   AUTO_ENGAGE_M_PER_PX,
@@ -94,12 +103,16 @@ const ACTIVE_STYLE = [
 const styleFor = (feature: FeatureLike): Style[] =>
   feature.get('tier') === 'hover' ? HOVER_STYLE : ACTIVE_STYLE;
 
-const getOrCreateLayer = (map: OlMap): VectorLayer => {
-  const existing = map
+const findLayer = (map: OlMap): VectorLayer | undefined =>
+  map
     .getLayers()
     .getArray()
     .find((l) => l.get('id') === LIDAR_FOOTPRINTS_LAYER_ID) as
-    VectorLayer | undefined;
+    | VectorLayer
+    | undefined;
+
+const getOrCreateLayer = (map: OlMap): VectorLayer => {
+  const existing = findLayer(map);
   if (existing) return existing;
   const layer = new VectorLayer({
     source: new VectorSource(),
@@ -111,9 +124,38 @@ const getOrCreateLayer = (map: OlMap): VectorLayer => {
   return layer;
 };
 
+/**
+ * The maps drawing footprints, and which halves' active flights each one is to
+ * outline. One entry outside the split, carrying every live half; two in it,
+ * one per pane, because each pane draws a ground of its own.
+ */
+const footprintTargets = (
+  main: OlMap,
+  mode: ViewMode,
+  halfCount: number,
+): { host: OlMap; halves: number[] }[] => {
+  const all = Array.from({ length: halfCount }, (_, i) => i);
+  if (mode !== 'split') return [{ host: main, halves: all }];
+  return [
+    { host: main, halves: all.slice(0, 1) },
+    { host: getSplitMap(), halves: all.slice(1) },
+  ];
+};
+
+/** The right pane's layer while the right pane is not a target, so what it was
+ *  last showing does not come back with it. Never creates one: the pane may
+ *  have no map yet, and this must not conjure a second map on an install that
+ *  has never opened the split. */
+const strandedLayer = (mode: ViewMode): VectorLayer | undefined => {
+  if (mode === 'split') return undefined;
+  const pane = peekSplitMap();
+  return pane ? findLayer(pane) : undefined;
+};
+
 /** Mount once, from whatever owns the map's side effects. */
 export const useLidarFootprintsLayer = () => {
   const map = useAtomValue(mapAtom);
+  const mode = useAtomValue(viewModeAtom);
   const backgroundLayers = useAtomValue(liveBackgroundLayersAtom);
   const liveProjects = useAtomValue(liveLidarProjectsAtom);
   const filters = useAtomValue(lidarFilterSettingsAtom);
@@ -139,12 +181,16 @@ export const useLidarFootprintsLayer = () => {
     (anyLidar && cycling) ||
     onLidar.some((lidar, i) => lidar && autoDatasets[i]);
 
+  const halfCount = backgroundLayers.length;
+
   // Hover is cleared on the way out, so it does not flash back on reopen.
   useEffect(() => {
-    const layer = getOrCreateLayer(map);
-    layer.setVisible(picking);
+    for (const { host } of footprintTargets(map, mode, halfCount)) {
+      getOrCreateLayer(host).setVisible(picking);
+    }
+    strandedLayer(mode)?.setVisible(false);
     if (!picking) setHoveredProjectId(null);
-  }, [map, picking, setHoveredProjectId]);
+  }, [map, mode, halfCount, picking, setHoveredProjectId]);
 
   useEffect(() => {
     if (!wantsViewport) {
@@ -261,20 +307,22 @@ export const useLidarFootprintsLayer = () => {
     };
   }, [map, wantsViewport, picking, cycling, filters, setViewport]);
 
-  // The hovered row's footprint and every live half's active dataset, off the
-  // same lists.
+  // The hovered row's footprint and the active dataset of whichever halves the
+  // host is showing, off the same lists.
   useEffect(() => {
-    const layer = getOrCreateLayer(map);
-    const source = layer.getSource();
-    if (!source) return;
-    source.clear();
-    if (!picking) return;
+    strandedLayer(mode)?.getSource()?.clear();
 
     const entries = [...viewport.primary, ...viewport.secondary];
     const byId = (id: string | null | undefined) =>
       id ? entries.find((e) => e.project.id === id) : undefined;
 
-    const draw = (entry: LidarViewportEntry | undefined, tier: Tier) => {
+    // A feature per source rather than one shared between them: an OL feature
+    // in two sources is one object two renderers hold listeners on.
+    const draw = (
+      source: VectorSource,
+      entry: LidarViewportEntry | undefined,
+      tier: Tier,
+    ) => {
       if (!entry) return;
       for (const geometry of entry.geometries) {
         const feature = new Feature({ geometry });
@@ -283,19 +331,31 @@ export const useLidarFootprintsLayer = () => {
       }
     };
 
-    // A set, not one per half: two panes reading the same acquisition would
-    // otherwise stack two identical outlines and thicken it.
-    const activeIds = new Set(
-      liveProjects.flatMap((project, i) =>
-        project && LIDAR_LAYERS.has(backgroundLayers[i]) ? [project.id] : [],
-      ),
-    );
-    // Hovering an active dataset's own row reads as hover, not active.
-    if (hoveredProjectId) activeIds.delete(hoveredProjectId);
-    for (const id of activeIds) draw(byId(id), 'active');
-    draw(byId(hoveredProjectId), 'hover');
+    for (const { host, halves } of footprintTargets(map, mode, halfCount)) {
+      const source = getOrCreateLayer(host).getSource();
+      if (!source) continue;
+      source.clear();
+      if (!picking) continue;
+
+      // A set, not one per half: in the curtain two halves reading the same
+      // acquisition would otherwise stack two identical outlines and thicken it.
+      const activeIds = new Set(
+        halves.flatMap((i) => {
+          const project = liveProjects[i];
+          return project && LIDAR_LAYERS.has(backgroundLayers[i])
+            ? [project.id]
+            : [];
+        }),
+      );
+      // Hovering an active dataset's own row reads as hover, not active.
+      if (hoveredProjectId) activeIds.delete(hoveredProjectId);
+      for (const id of activeIds) draw(source, byId(id), 'active');
+      draw(source, byId(hoveredProjectId), 'hover');
+    }
   }, [
     map,
+    mode,
+    halfCount,
     picking,
     viewport,
     liveProjects,

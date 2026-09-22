@@ -109,6 +109,12 @@ const syncThemeLayers = (
     (layerName) => !themeLayers.has(layerName),
   );
 
+  // The ones that actually reached the map. A layer with no config, or none the
+  // map's projection can be served in, warns and is skipped — and must not be
+  // reported as added, or the caller would write a register that has never
+  // drawn into the URL, where it would survive every reload.
+  const added: ThemeLayerName[] = [];
+
   themeLayersToAdd.forEach((layerName) => {
     const layerExists = map
       .getLayers()
@@ -142,6 +148,7 @@ const syncThemeLayers = (
     }
     layerToAdd.setZIndex(10);
     map.addLayer(layerToAdd);
+    added.push(layerName);
   });
 
   themeLayersToRemove.forEach((layerName) => {
@@ -180,7 +187,7 @@ const syncThemeLayers = (
       source.updateParams(params);
     });
 
-  return { added: themeLayersToAdd, removed: themeLayersToRemove };
+  return { added, removed: themeLayersToRemove };
 };
 
 export const themeLayerEffect = atomEffect((get) => {

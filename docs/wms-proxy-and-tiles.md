@@ -339,7 +339,10 @@ is fewer requests.
 
 - One tile queue per `Map`, shared by every layer: `maxTilesLoading: 48`
   (`src/map/atoms.ts`) against OL's default 16, capped to 8 while animating. A
-  cold LiDAR WMS tile takes 3–12 s; the topo WMTS base answers in ~130 ms.
+  cold LiDAR WMS tile takes 3–12 s; the topo WMTS base answers in ~130 ms. The
+  split view is a second `Map` (`src/map/compare/splitMap.ts`) with a queue of
+  its own, sized the same, so it can have 96 tiles in flight rather than 48 —
+  the queue is a per-map scheduler and not a budget against the upstream.
 - `preload: 2` on the WMTS base and on the cached cVAT ground, `preload: 0`
   everywhere else — free on a pre-rendered base or on a database of ours,
   ruinous where a miss reaches an on-the-fly renderer. The `/cache/` layers are
@@ -416,11 +419,13 @@ is fewer requests.
   it only ever refetched real no-coverage tiles at 4 origin requests each. Fix a
   blank-where-there-is-data tile at wmscache, which can see the upstream.
 
-The compare curtain (`src/map/compare/`) is the deliberate exception: a second
-full background stack out of the same queue, so a screenful costs about twice
-what it normally does. Hence it is a mode you enter and leave, the B stack is
-torn down on exit, and it is not persisted to the URL — a shared link must not
-put every recipient into double spend on a shared budget.
+The two-ground views (`src/map/compare/`) are the deliberate exception: a second
+full background stack, so a screenful costs about twice what it normally does.
+The curtain draws it out of the main map's queue and the split out of the second
+map's, which makes the split the faster of the two off a cold cache and the
+heavier per second against the rate limit. Hence both are modes you enter and
+leave, the B stack is torn down on exit, and neither is persisted to the URL — a
+shared link must not put every recipient into double spend on a shared budget.
 
 ## When an upstream stops answering
 

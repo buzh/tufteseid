@@ -7,7 +7,7 @@
 // seam over a map that is not clipped would be a line drawn across one ground.
 
 import { useAtom } from 'jotai';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { compareSplitAtom } from './atoms';
 import styles from './CompareCurtain.module.css';
@@ -27,14 +27,21 @@ export const CompareCurtain = () => {
   const [dragging, setDragging] = useState(false);
 
   // React draws the seam from the atom; the clip reads a module-level copy.
-  useEffect(() => {
-    setCurtainSplit(split);
-  }, [split]);
+  // Both written in the handler, in this order: OL renders on the next
+  // animation frame and React commits before the same frame's paint, so the
+  // line and the edge of the imagery move together. Through an effect the
+  // render would be scheduled only after the browser had painted the handle,
+  // and a drag would show a strip of A to the right of the seam the whole way.
+  const applySplit = (fraction: number) => {
+    const next = clamp(fraction);
+    setCurtainSplit(next);
+    setSplit(next);
+  };
 
   const moveTo = (clientX: number) => {
     const rect = rootRef.current?.getBoundingClientRect();
     if (!rect || rect.width === 0) return;
-    setSplit(clamp((clientX - rect.left) / rect.width));
+    applySplit((clientX - rect.left) / rect.width);
   };
 
   return (
@@ -50,12 +57,19 @@ export const CompareCurtain = () => {
         className={styles.handle}
         style={{ left: `${split * 100}%` }}
         onPointerDown={(e) => {
+          // The primary button only. A right-click's `pointerup` is swallowed
+          // by the context menu, so a drag started on one would never end and
+          // the seam would follow the cursor across the map.
+          if (!e.isPrimary || e.button !== 0) return;
           e.currentTarget.setPointerCapture(e.pointerId);
           setDragging(true);
         }}
         onPointerMove={(e) => dragging && moveTo(e.clientX)}
         onPointerUp={(e) => {
-          e.currentTarget.releasePointerCapture(e.pointerId);
+          // A pointer that was refused above never took the capture.
+          if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+          }
           setDragging(false);
         }}
         onPointerCancel={() => setDragging(false)}
@@ -64,9 +78,7 @@ export const CompareCurtain = () => {
           // Stop the map's own arrow-key panning.
           e.preventDefault();
           e.stopPropagation();
-          setSplit((s) =>
-            clamp(s + (e.key === 'ArrowLeft' ? -1 : 1) * KEY_STEP),
-          );
+          applySplit(split + (e.key === 'ArrowLeft' ? -1 : 1) * KEY_STEP);
         }}
       >
         <span className={styles.line} />

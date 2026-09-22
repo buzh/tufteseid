@@ -22,14 +22,28 @@
 // over the ground belongs to this section or to `ToolSection`.
 
 import { Group } from '@mantine/core';
+import { useAtomValue } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import { FlyfotoControlGroup, useFlyfotoControls } from '../flyfotoControls';
 import { GroundMenu, useGroundControls } from '../grounds';
 import { KartControlGroup, useKartControls } from '../kartControls';
 import { LidarControlGroup, useLidarControls } from '../lidarControls';
-import type { CompareHalf } from '../map/compare/halves';
+import { type CompareHalf, compareOnAtom } from '../map/compare/halves';
 import styles from './Ribbon.module.css';
 
 export const GroundSection = ({ half }: { half: CompareHalf }) => {
+  const { t } = useTranslation();
+  // A two-ground view mounts this twice, so every control in it has a twin with
+  // the same name. Nothing inside says which half it drives — the reader can
+  // see, because the section stands over the ground it belongs to, and a
+  // screen-reader user cannot. The name is on the section rather than on each
+  // of its four controls: one label, announced on the way in, and the controls
+  // stay named for what they do.
+  const twoGrounds = useAtomValue(compareOnAtom);
+  const sectionLabel = twoGrounds
+    ? t(`ribbon.groundSection.${half === 'a' ? 'left' : 'right'}`)
+    : t('ribbon.groundSection.only');
+
   const lidar = useLidarControls(half);
   const kart = useKartControls(half);
   const flyfoto = useFlyfotoControls(half);
@@ -42,7 +56,13 @@ export const GroundSection = ({ half }: { half: CompareHalf }) => {
   });
 
   return (
-    <Group gap="xs" wrap="nowrap" className={styles.grounds}>
+    <Group
+      gap="xs"
+      wrap="nowrap"
+      className={styles.grounds}
+      role="group"
+      aria-label={sectionLabel}
+    >
       <GroundMenu ground={ground} />
 
       {ground.mode === 'lidar' && <LidarControlGroup lidar={lidar} />}

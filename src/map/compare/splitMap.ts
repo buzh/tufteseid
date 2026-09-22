@@ -1,4 +1,5 @@
 import { getDefaultStore } from 'jotai';
+import { defaults as defaultControls } from 'ol/control';
 import { defaults as defaultInteractions } from 'ol/interaction';
 import OlMap from 'ol/Map';
 import { mapAtom } from '../atoms';
@@ -23,7 +24,9 @@ import { mapAtom } from '../atoms';
 // One thing the sharing does cost: `Map#updateSize` writes its own viewport
 // size into the view, so with two maps the last to resize wins. It is harmless
 // here because the size is only read to fit a constrained extent, and this app
-// constrains none — and because the two panes are the same width anyway.
+// constrains none — and because the two panes are the same width, which is why
+// the seam between them is a gap in the row rather than a border on the pane
+// (`MapComponent.module.css`).
 //
 // Lazy, and a module singleton rather than an atom: `peekSplitMap` has to be
 // able to answer "is there one" without creating one, because the tile guard
@@ -37,9 +40,12 @@ export const getSplitMap = (): OlMap => {
   if (splitMap) return splitMap;
   const main = getDefaultStore().get(mapAtom);
   splitMap = new OlMap({
-    // One scale line for the pair: the two panes share a resolution, so a
-    // second copy of it would say the same thing twice.
-    controls: [],
+    // The attribution, and nothing else. This pane draws a ground the other one
+    // does not, and some of the services behind it are licensed on being
+    // credited where they are shown — a split screenshot crediting only its left
+    // half is the case this view is for. No scale line, though: the two panes
+    // share a resolution, so a second copy would say the same thing twice.
+    controls: defaultControls({ zoom: false, rotate: false }),
     // Keyboard off, unlike the main map. That one listens on `document`, so
     // with both of them armed an arrow key would pan the shared view twice.
     interactions: defaultInteractions({

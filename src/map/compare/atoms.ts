@@ -1,6 +1,5 @@
-import { atom, getDefaultStore } from 'jotai';
+import { atom, type Getter, getDefaultStore, type Setter } from 'jotai';
 import { atomEffect } from 'jotai-effect';
-import type { FlyfotoProject } from '../layers/config/backgroundLayers/flyfotoProjects';
 import { mapAtom } from '../atoms';
 import { BackgroundLayerName } from '../layers/backgroundLayers';
 import {
@@ -12,7 +11,6 @@ import { activeCvatAcquisitionHalves } from '../layers/config/backgroundLayers/c
 import { activeFlyfotoProjectHalves } from '../layers/config/backgroundLayers/flyfotoBackground';
 import {
   isKartVariant,
-  type KartVariant,
   kartVariantHalves,
 } from '../layers/config/backgroundLayers/kartVariants';
 import { lidarAutoDatasetHalves } from '../layers/config/backgroundLayers/lidarAuto';
@@ -20,10 +18,8 @@ import {
   activeLidarModelHalves,
   activeLidarProjectHalves,
   activeLidarStyleHalves,
+  DEFAULT_LIDAR_PROJECT_STYLE,
   effectiveLidarStyle,
-  lidarFlightGround,
-  type LidarModel,
-  LidarProject,
 } from '../layers/config/backgroundLayers/lidarProjects';
 import {
   buildStack,
@@ -31,7 +27,8 @@ import {
 } from '../layers/config/backgroundLayers/stack';
 import {
   clearCompareLayers,
-  compareHost,
+  clearCompareLayersExcept,
+  compareHostFor,
   installCompareLayers,
 } from './compareLayers';
 import { seedHalfB, type ViewMode, viewModeAtom } from './halves';
@@ -43,41 +40,32 @@ import { seedHalfB, type ViewMode, viewModeAtom } from './halves';
 // two live tile stacks are roughly twice the GetMap requests against a rate
 // limit this deployment shares across every visitor.
 
-/** Every GroundMode, spelled out rather than imported: this is a map module and
- * `src/grounds/` is a surface one. */
-export type CompareGround = 'kart' | 'lidar' | 'flyfoto';
-
 /** Where the curtain edge sits, as a fraction of the map width. */
 export const compareSplitAtom = atom(0.5);
-
-// The arms' own entry rules again, because seeding B happens before React
-// re-renders with the second ground section mounted.
-const groundLayer = (
-  ground: CompareGround,
-  kartVariant: KartVariant,
-  lidarProject: LidarProject | null,
-  flyfotoProject: FlyfotoProject | null,
-  lidarStyle: string,
-  lidarModel: LidarModel,
-): BackgroundLayerName => {
-  // Whichever cartography this half was last set to, not necessarily topo.
-  if (ground === 'kart') return kartVariant;
-  if (ground === 'flyfoto') {
-    return flyfotoProject ? 'flyfotoProject' : 'flyfoto';
-  }
-  // A flight if one is held, and then `lidarFlightGround` off the render held
-  // with it — the same namer `useLidarControls` uses, so entering on a cached
-  // render keeps the cache and entering on a WMS style does not hand the
-  // cache's layer name to a GetMap.
-  if (!lidarProject) return 'lidarHillshade';
-  return lidarFlightGround(lidarStyle, lidarModel);
-};
 
 // What B opens on. The two grounds this app exists to read against each other
 // are relief and cartography, so B is whichever of those A is not; ortofoto is
 // a ground the reader asks for rather than one a second pane guesses at.
-const contrastingGround = (a: BackgroundLayerName): CompareGround =>
+const contrastingGround = (a: BackgroundLayerName): 'kart' | 'lidar' =>
   isKartVariant(a) ? 'lidar' : 'kart';
+
+// The arms' own entry rules again, because seeding B happens before React
+// re-renders with the second ground section mounted.
+const enterGroundB = (ground: 'kart' | 'lidar', get: Getter, set: Setter) => {
+  // Whichever cartography this half was last set to, not necessarily topo.
+  if (ground === 'kart') {
+    set(backgroundLayerHalves.b, get(kartVariantHalves.b));
+    return;
+  }
+  // `enterLidar` with Automatisk off, which is what B has just been pinned to:
+  // the national mosaic, not the held flight. A held flight is wherever the
+  // reader last looked at one — `chooseAutoDataset` leaves it there after a
+  // move to the mosaic or to another ground — so it need not cover this screen,
+  // and with the pin set nothing would re-rank it. The mosaic covers the
+  // country, and B's own dataset menu is right there for a flight.
+  set(activeLidarStyleHalves.b, DEFAULT_LIDAR_PROJECT_STYLE);
+  set(backgroundLayerHalves.b, 'lidarHillshade');
+};
 
 /**
  * Pick a view. B starts as a copy of A and is then moved off it, so the only
@@ -93,18 +81,7 @@ export const selectViewModeAtom = atom(
       seedHalfB(get, set);
       // A comparison term that follows the viewport is not a comparison term.
       set(lidarAutoDatasetHalves.b, false);
-      const ground = contrastingGround(get(backgroundLayerHalves.a));
-      set(
-        backgroundLayerHalves.b,
-        groundLayer(
-          ground,
-          get(kartVariantHalves.b),
-          get(activeLidarProjectHalves.b),
-          get(activeFlyfotoProjectHalves.b),
-          get(activeLidarStyleHalves.b),
-          get(activeLidarModelHalves.b),
-        ),
-      );
+      enterGroundB(contrastingGround(get(backgroundLayerHalves.a)), get, set);
     }
     set(viewModeAtom, mode);
   },
@@ -134,6 +111,16 @@ export const compareLayerAtomEffect = atomEffect((get) => {
     return;
   }
 
+  // One decision, made here and carried through the build: which map the stack
+  // goes into, and whether it is clipped. The map it is *not* going into is
+  // swept on the spot rather than by the install, because every way the build
+  // below can end without installing — an unresolvable stack, a rejected fetch,
+  // a superseded generation — would otherwise leave the host of a view nobody
+  // is looking at still drawing.
+  const host = compareHostFor(mode);
+  clearCompareLayersExcept(host);
+  const clip = mode === 'curtain';
+
   const stack = resolveStack(layerName, {
     lidarProject,
     cvatAcquisition,
@@ -147,10 +134,6 @@ export const compareLayerAtomEffect = atomEffect((get) => {
 
   const install = async () => {
     try {
-      // Resolved before the await as well as after: the host is what the layers
-      // are built into, and a mode change mid-build would build into one map
-      // and install into the other.
-      const host = compareHost();
       const projection = getDefaultStore()
         .get(mapAtom)
         .getView()
@@ -166,7 +149,7 @@ export const compareLayerAtomEffect = atomEffect((get) => {
       installCompareLayers(
         built.under.map((e) => e.layer),
         built.over.map((e) => e.layer),
-        { host, clip: mode === 'curtain' },
+        { host, clip },
       );
     } catch (error) {
       console.error('[compare] failed to build the B stack', error);

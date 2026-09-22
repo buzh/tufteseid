@@ -3,8 +3,11 @@
 //
 // It stands where the wordmark used to, and does that job better — the band
 // already had to say which ring the controls belonged to, and a chip that says
-// it can also change it. Everything after it in the row belongs to the ground
-// named here, which is why it is first and why there is exactly one of it.
+// it can also change it. Everything after it in its section belongs to the
+// ground named here, which is why it is first in one. There is one per half
+// that is drawing, so in a two-ground view there are two, and which half each
+// one drives is said by the section around it rather than by the chip
+// (`GroundSection`).
 //
 // Three rows and no more. A ground is not a layer: what Kart *means* is the
 // variant menu beside this, what LiDAR means is four controls, and folding
