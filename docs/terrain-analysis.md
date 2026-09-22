@@ -10,35 +10,83 @@ what `composeVat` follows is RVT's `blend.py` / `blend_func.py` as they run, not
 `settings/blender_VAT.json` as it reads — see below for where the two differ.
 
 Where it lives: `src/terrain/dem.ts` (fetch + TIFF reader), `shade.ts`
-(operators), `render.ts` (field → canvas, headless-capable), `window.ts` and
-`windowLayer.ts` (the rectangle being read, and its frame on the map).
+(operators), `render.ts` (field → canvas), `window.ts` and
+`windowLayer.ts` (the rectangle being read, and its frame on the map),
+`terrainLayer.ts` (the finished canvas on the map). The control surface is
+`src/terrainControls/`, mounted in the band's tool section — see below.
 
-There is no control surface: the old one went down with the rest of the
-interface (`docs/state-of-the-branch.md`). Everything above is headless and
-callable, which is the point — a new surface drives `render.ts`, it does not
-reimplement it.
+Terrain analysis — internal name `terreng` — is a read tool throughout: nothing
+is written. It is also the one picture the client computes rather than fetches,
+so it is the one bounded by a rectangle, and that rectangle is
+`terrainWindowAtom` (`src/terrain/window.ts`): a square, framed on the visible
+map at the moment the reader asked for it, drawn by `windowLayer.ts`, and null
+when there is no analysis running. Nothing else records the tool being on.
 
-Terrain analysis — internal name `terreng` — is a read tool throughout:
-nothing is written. It is also the one ground the client
-computes rather than fetches, so it is the one bounded by a rectangle, and
-there are two sources for that rectangle — never both at once:
+**The square is the largest one that fits inside the visible map, and at most
+`MAX_SIDE_M` (500 m) on a side** — `squareBboxWithin` in `src/map/bbox.ts`, over
+the inset viewport from `viewportBbox`. Three things are load-bearing there:
 
-- **An open lokalitet's bbox**, read off the record rather than copied, so
-  resizing the lokalitet refetches the DEM. This is the branch that can keep
-  what it renders, through `Behold`.
-- **The standalone window** (`src/terrain/window.ts`), framed on the visible
-  map when the ground is entered with nothing open, clamped into the same
-  50–1000 m band, and drawn on the map by `windowLayer.ts`. It is held, not
-  recomputed: the analysis does not follow the map, because a DEM in the band
-  is 64 MB and 16 Mpx of arithmetic per visualization and a render that
-  followed would refetch all of it on every pan. `Analyser her` on the settings
-  strip moves it. Nothing keeps a standalone render — a lokalitet is what
-  keeping is for, and opening one under the window takes the rectangle over.
+- *Square*, because the ceiling is: clamping each axis on its own keeps the
+  screen's aspect and hands a reader who asked for the cap a 500 × 280 m
+  analysis on a wide window.
+- *Inside*, because an analysis is a rectangle held still while the reader pans,
+  and one that started off the edges of the screen is one whose edges they never
+  saw. There is no minimum side for the same reason — a floor is the one rule
+  that could push the square back out past the edge.
+- *Held, not recomputed*: the analysis does not follow the map, because a DEM at
+  the ceiling is 19 MB and 4.8 Mpx of arithmetic per visualization and a render
+  that followed would refetch all of it on every pan. `Analyser her` in the
+  menu moves it; the off switch drops it, and with it the grid.
 
-The band is the containment, and it is exact rather than approximate:
-`MAX_DEM_PX_PER_SIDE` is derived as `MAX_SIDE_M / FINEST_M_PER_PX`, so a
-rectangle inside the band asks for precisely what the grid cap holds and is
-never resampled.
+500 m is also exact rather than approximate. It is a whole number of cells at
+every resolution the per-project mosaics publish — 2000 px at 0.25 m, 1000 at
+0.5, 500 at 1 — and `MAX_DEM_PX_PER_SIDE` is derived as
+`(MAX_SIDE_M + 2 × DEM_MARGIN_M) / FINEST_M_PER_PX`, so a square at the ceiling
+asks for precisely what the grid cap holds and is never resampled.
+
+Nothing keeps a render. What the reader's own records turn out to be is an open
+question on this branch (`docs/state-of-the-branch.md`), and until there is
+somewhere to put one, the analysis is something you look at and then take down.
+
+## The control surface
+
+`src/terrainControls/` — a `ControlButton` and, only while the analysis is
+running, a `ControlChip` joined to it in a `ControlUnit`, the same two shapes
+the Kulturminner overlay wears and for the same reason. It sits in the band's
+tool section because it applies whichever ground is up, and it is mounted
+exactly once: a second `useTerrainControls` is a second DEM, a second horizon
+scan and a second canvas over the same ground.
+
+- **The button** frames the square, fetches and paints. Off is not a blind, as
+  it is on Kulturminner — it drops the grid, which is the 19 MB and most of the
+  reason the control exists. What survives in component state is the reading:
+  visualization, sun, exaggeration, both radii, transparency.
+- **The chip** reads out the visualization and carries the fetch as its hint —
+  `henter høydedata …`, then the square's side and the grid resolution, or what
+  went wrong. A DEM is megabytes over the slowest origin in the stack, so
+  "nothing has appeared yet" has to be answerable without opening anything.
+- **The menu** is a Popover, not a Menu: everything in it is a setting the
+  reader leaves set, and a Menu closing on the first click would make lighting a
+  hillshade one trip per degree. Rectangle first (the hint and `Analyser her`),
+  then the eight visualizations, the height model, and only the sliders the
+  current visualization reads — two for sky-view factor, five for a hillshade.
+- **The radius slider commits on release** for the horizon views and streams for
+  LRM. `useTerrainControls` memoizes `computeHorizonFields` separately from the
+  lit pass and keys it on neither `vis` nor the azimuth, which is what makes
+  switching between sky-view and the two opennesses instant and what keeps a
+  multi-second recompute off every frame of a drag.
+
+The render lands on the map through `terrainLayer.ts`: one `ImageLayer` over an
+`ImageCanvasSource` fixed to EPSG:25833 at zIndex 1, drawing the canvas
+`paintTerrainField` filled. Imperative and module-level, because the pixels
+change dozens of times a second and the element they change in does not — the
+controller repaints the same canvas, so there is no new identity for React or
+Jotai to notice, and `source.changed()` is the only way to invalidate the one
+image the source caches. Nearest-neighbour on the way up: smoothing blurs away
+the single-pixel step the picture exists to show.
+
+Like the Kulturminner tip and card, it is wired to the main map only — the
+right-hand pane of a split draws the ground but no analysis over it.
 
 ## The endpoint
 
@@ -120,12 +168,14 @@ arrives as one feature with `"BEST": null`, not as an empty `features` array.
 The response is under wmscache's 1000-byte store threshold, so `dem.ts`
 memoises it in-tab instead.
 
-`MAX_DEM_PX_PER_SIDE` (4192, derived as
+`MAX_DEM_PX_PER_SIDE` (2192, derived as
 `(MAX_SIDE_M + 2 × DEM_MARGIN_M) / FINEST_M_PER_PX`) caps the assembled grid;
 `planTiles` scales resolution down to fit, and `Dem.nativeMetresPerPx` records
 what the acquisition actually publishes so the plate can say the render was
-resampled. Inside the band the two are equal by construction, so the resampled
-wording is reserved for a rectangle that got past the clamp.
+resampled. The cap and the ceiling meet exactly — a 500 m square at 0.25 m is
+2192 px with its margin — so no rectangle the control can frame is ever
+resampled, and the coarsened wording is reserved for a caller that built a
+rectangle some other way.
 
 ### The margin
 
@@ -258,8 +308,11 @@ under it would make that a fiction.
 VAT does not share the horizon family's ray walk, its radius slider or its
 decimation rule. It imposes its own grid through `vatDecimation`, targeting
 `VAT_SCAN_M_PER_PX` (0.5 m, RVT's own calibration resolution) and falling back
-to coarser only to stay under a budget of 1.2 M cells, which is about three
-seconds for the pair of scans. Reading the same scene at 0.25 m instead bought
+to coarser only to stay under a budget of 1.25 M cells, which is about three
+seconds for the pair of scans. The budget sits just clear of a `MAX_SIDE_M`
+square, 1.20 M cells at the scan resolution, so the ceiling case reads at 0.5 m
+and the fallback is a guard rather than something the reader meets. Reading the
+same scene at 0.25 m instead bought
 5 % more contrast across a ditch and, with 3 cm of noise in the DEM, nearly
 doubled the speckle on featureless ground — grain, not signal. `vatDecimation`
 takes metres rather than a `Dem` so a figure caption can reach the same answer
@@ -274,7 +327,7 @@ slope layer twice as sensitive to DEM noise as RVT's is. Three centimetres of
 noise over a two-cell baseline is 3.4° of slope at 0.25 m against 1.7° at 0.5 m,
 and the flat preset's entire slope stretch is 15°. Doing it this way is also
 cheaper: the gradient walk now runs over the same 1.2 M cells as the scans
-instead of over the full 17 M a kilometre-wide rectangle holds at 0.25 m.
+instead of over the 4.8 M a square at the ceiling holds at 0.25 m.
 
 ## The horizon radius: reach is bought by decimating
 

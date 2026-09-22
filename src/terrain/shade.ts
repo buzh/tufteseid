@@ -636,11 +636,13 @@ export const VAT_Z_FACTOR = 1;
 // slope stretch is 15°.
 export const VAT_SCAN_M_PER_PX = 0.5;
 
-// Two scans over this many cells is around three seconds of walking, which is
-// what a kilometre-wide rectangle has to be coarsened to fit. Without a ceiling
-// the finest grid the rule above asks for would freeze the tab for half a
-// minute on one.
-const VAT_MAX_SCAN_CELLS = 1_200_000;
+// Two scans over this many cells is around three seconds of walking. Set just
+// clear of the largest rectangle the control can frame — a `MAX_SIDE_M` square
+// is 548 m with its margin, which is 1.20 M cells at the scan resolution — so
+// that the ceiling case scans at 0.5 m rather than being rounded to 0.75 m by a
+// budget it misses by a tenth of a percent. It is a guard against a caller that
+// builds a bigger rectangle some other way, not a rule the reader can hit.
+const VAT_MAX_SCAN_CELLS = 1_250_000;
 
 /**
  * How far VAT decimates before computing anything, given the grid's extent in

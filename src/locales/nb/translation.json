@@ -172,6 +172,56 @@
       "retry": "Prøv igjen"
     }
   },
+  "terrainControls": {
+    "label": "Terrenganalyse",
+    "show": "Analyser terrenget du ser nå — hent høydedata og belys dem selv",
+    "hide": "Avslutt terrenganalysen",
+    "windowHint": "Analysen leser det største kvadratet som får plass i utsnittet, høyst {{max}} × {{max}} m. Den følger ikke kartet av seg selv — et høydegrid er en stor nedlasting.",
+    "reframe": "Analyser her",
+    "visHead": "Visualisering",
+    "modelHead": "Høydemodell",
+    "vis": {
+      "hillshade": "Skyggerelieff",
+      "multiHillshade": "Flerretning",
+      "vat": "VAT (arkeologisk)",
+      "svf": "Himmelsyn",
+      "openPos": "Åpenhet, positiv",
+      "openNeg": "Åpenhet, negativ",
+      "lrm": "Lokalrelieff",
+      "slope": "Helning"
+    },
+    "visMeta": {
+      "hillshade": "én sol, du styrer den",
+      "multiHillshade": "seks soler, ingenting i mørke",
+      "vat": "fire lag, to oppskrifter",
+      "svf": "hvor mye himmel",
+      "openPos": "hauger, kanter og rygger",
+      "openNeg": "søkk, grøfter og hulveier",
+      "lrm": "småformer uten landskapet",
+      "slope": "bratthet"
+    },
+    "visGroup": {
+      "vat": "Flere mål blandet i ett bilde.",
+      "svf": "Uten lyskilde — samme bilde uansett hvor sola står."
+    },
+    "model": {
+      "dtm": "Terreng (DTM)",
+      "dom": "Overflate (DOM)"
+    },
+    "azimuth": "Lysretning",
+    "altitude": "Solhøyde",
+    "zFactor": "Overdrivelse",
+    "lrmRadius": "Utjevningsradius",
+    "svfRadius": "Søkeradius",
+    "transparency": "Transparens",
+    "loading": "henter høydedata …",
+    "resolution": "{{side}} m · {{m}} m/px",
+    "resolutionCapped": "{{side}} m · {{m}} m/px · kilde {{src}} m",
+    "failed": "Klarte ikke å hente høydedata.",
+    "failedShort": "høydedata svarer ikke",
+    "empty": "Ingen laserdata dekker dette rektangelet.",
+    "emptyShort": "ingen laserdata"
+  },
   "upstream": {
     "notAnswering": "svarer ikke",
     "severalDown": "{{count}} tjenester",

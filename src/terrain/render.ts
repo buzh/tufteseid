@@ -1,13 +1,14 @@
-// Terrenganalyse without a control surface: DEM → field → pixels, so a render
-// can be produced with nobody watching. Three steps rather than one `render()`
-// because the split between `terrainStaticField` and `terrainField` is
-// load-bearing: sky-view factor is ~800 ms on a 600² grid and `useTerrainAnalysis`
-// memoizes the two separately, so dragging the azimuth slider cannot queue a
-// multi-second recompute per frame. `radius` is the only knob on the expensive
-// side, which is why its slider commits on release.
+// Terrenganalyse below its control surface: DEM → field → pixels, none of it
+// knowing what is driving it.
+//
+// Steps rather than one `render()`, because the split between
+// `terrainStaticField` and `terrainField` is load-bearing: sky-view factor is
+// ~800 ms on a 600² grid and `useTerrainControls` memoizes the two separately,
+// so dragging the azimuth slider cannot queue a multi-second recompute per
+// frame. `radius` is the only knob on the expensive side, which is why its
+// slider commits on release.
 
-import type { Bbox } from '../map/bbox';
-import { fetchDem, type Dem, type DemModel } from './dem';
+import type { Dem } from './dem';
 import {
   computeHillshade,
   computeHorizonFields,
@@ -89,12 +90,6 @@ export type TerrainLight = {
   azimuth: number;
   altitude: number;
   zFactor: number;
-};
-
-export const DEFAULT_LIGHT: TerrainLight = {
-  azimuth: DEFAULT_AZIMUTH,
-  altitude: DEFAULT_ALTITUDE,
-  zFactor: DEFAULT_Z_FACTOR,
 };
 
 /**
@@ -243,53 +238,4 @@ export const demImageExtent = (dem: Dem): [number, number, number, number] => {
     west + width * dem.metresPerPx,
     north,
   ];
-};
-
-export type TerrainRenderOptions = {
-  vis: Visualization;
-  model?: DemModel;
-  light?: TerrainLight;
-  /** Metres; only `lrm` and the horizon views read it. */
-  radius?: number;
-  signal?: AbortSignal;
-};
-
-export type TerrainRender = {
-  canvas: HTMLCanvasElement;
-  dem: Dem;
-  /**
-   * The radius the pixels were actually computed with, or undefined for the
-   * views that have none: `clampRadius` needs the DEM, and the DEM is fetched
-   * in here. Whatever describes this render — a figure caption, a stored
-   * `meta` — must print this number and not the requested one.
-   */
-  radius?: number;
-};
-
-/**
- * The whole path, for callers with no panel: fetch the float DEM for a
- * rectangle and paint one visualization of it. `null` when the rectangle has no
- * laser data or the canvas could not be obtained; fetch failures throw, because
- * reporting "no coverage" for a network fault would be a lie.
- */
-export const renderTerrain = async (
-  bbox: Bbox,
-  {
-    vis,
-    model = 'dtm',
-    light = DEFAULT_LIGHT,
-    radius,
-    signal,
-  }: TerrainRenderOptions,
-): Promise<TerrainRender | null> => {
-  const dem = await fetchDem(bbox, { model, signal });
-  if (!dem) return null;
-  // Clamped against *this* grid, so a stored spec re-rendered over a rectangle
-  // that has since been resized is clamped again on the way in.
-  const effective = radius != null ? clampRadius(vis, dem, radius) : undefined;
-  const staticField = terrainStaticField(dem, vis, effective);
-  const field = terrainField(dem, vis, light, staticField);
-  if (!field) return null;
-  const canvas = paintTerrainField(field, dem, vis);
-  return canvas ? { canvas, dem, radius: effective } : null;
 };
