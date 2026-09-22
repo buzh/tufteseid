@@ -298,7 +298,9 @@ Whether a feature's `linkkulturminnesok` URL resolves is asked separately
 2. Merge it into `themeLayerConfig` in
    `src/map/layers/themeLayerConfigApi.ts`.
 3. Add the layer id(s) to `ThemeLayerName` in `src/map/layers/themeWMS.ts`;
-   they appear in the `Kulturminner` popover automatically.
+   they appear in the `Kulturminner` popover automatically, and as a source in
+   the overlay's own menu (`src/heritageControls/`), which lists whatever
+   `themeLayerConfig` holds.
 4. Route the requests through wmscache and use the same-origin
    `/wms/<host-slug>/…` prefix as `wmsUrl` — `docs/wms-proxy-and-tiles.md`.
 5. If GetFeatureInfo offers no JSON, set `infoFormat` to something the parser

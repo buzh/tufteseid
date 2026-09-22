@@ -29,6 +29,35 @@
       "hint": "Ortofoto fra Norge i bilder"
     }
   },
+  "heritageControls": {
+    "label": "Kulturminner",
+    "show": "Vis kulturminnene på kartet",
+    "hide": "Skjul kulturminnene på kartet",
+    "chipTitle": "{{sources}} — {{render}}",
+    "sourceCount": "{{count}} kilder",
+    "zoomedOut": "for langt ute",
+    "zoomedOutHint": "Kulturminnene tegnes først når du zoomer inn",
+    "sourcesHead": "Kilder",
+    "renderHead": "Visning",
+    "subsetHead": "Bare disse",
+    "omrissHint": "grenselinjer, ingen fyll",
+    "transparency": "Transparens {{percent}} %",
+    "transparencyAria": "Transparens",
+    "detail": {
+      "lokaliteter": "Lokaliteter",
+      "enkeltminner": "Enkeltminner",
+      "sikringssoner": "Sikringssoner"
+    },
+    "render": {
+      "omriss": "Omriss",
+      "flate": "Heldekkende",
+      "fredede": "Fredede",
+      "verneverdige": "Verneverdige",
+      "listefoerte": "Listeførte",
+      "utenVern": "Uten vern",
+      "uavklart": "Uavklart vernestatus"
+    }
+  },
   "kartControls": {
     "chipTitle": "{{variant}} — {{hint}}",
     "historicHint": "Eldre kartverk, tegnet før 1900-tallet endret landskapet.",

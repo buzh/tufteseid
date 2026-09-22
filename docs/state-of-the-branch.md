@@ -5,14 +5,15 @@ draws it. 290 files became 79. The point was not to make the app smaller — it
 was to make the next interface unconstrained by the last one, without
 re-deriving four years of Kartverket and Riksantikvaren service quirks.
 
-The rebuild has reached the background. `src/App.tsx` renders a ribbon above
-`MapComponent`: it says which ground is drawing — LiDAR relief, one of
-Kartverket's map series, or ortofoto — and which dataset within it, and
-switches both. At the far end of that row, and only when there is something to
-say, it names an external service that has stopped answering. There is still no
-search box, no lokaliteter, no funn, no drawing and no account, and no control
-over the Hybrid overlay, its contours or the compare curtain — those remain a
-`set()` away.
+The rebuild has reached the background and the record over it. `src/App.tsx`
+renders a ribbon above `MapComponent`: it says which ground is drawing — LiDAR
+relief, one of Kartverket's map series, or ortofoto — and which dataset within
+it, and switches both. At the other end of the row it puts Riksantikvaren's
+heritage layers over whatever that ground is, and says what of them; and only
+when there is something to say, it names an external service that has stopped
+answering. There is still no search box, no lokaliteter, no funn, no drawing
+and no account, and no control over the Hybrid overlay, its contours or the
+compare curtain — those remain a `set()` away.
 
 The band and the controls are separate things. `src/ribbon/` is the band, and it
 is laid out in three sections, each with its own subject and its own file:
@@ -21,7 +22,7 @@ is laid out in three sections, each with its own subject and its own file:
 | --- | --- | --- |
 | `GroundSection` | the ground switch and the arm belonging to it | what is drawn under everything |
 | `ViewSection` | the compare curtain, once it is built | how the map is being looked at |
-| `ToolSection` | the Kulturminner overlay, once it is built; the upstream fault chip | what applies whichever ground is up |
+| `ToolSection` | the Kulturminner overlay and the upstream fault chip | what applies whichever ground is up |
 
 The split is by subject, not by position. A control belongs to the left because
 it chooses the one picture the whole map is made of, to the middle because it
@@ -55,6 +56,21 @@ the fixed square holding one glyph that is the whole control — filled in papay
 for a mode that is on, or split across the middle for two states that are one
 picture. The metrics they share are `--control-height` and
 `--control-icon-width` in `src/index.css`.
+
+`ToolSection` mounts one surface the same way, on the same seam:
+`src/heritageControls/` is the Kulturminner overlay — `HeritageToggle`, the
+button that puts Riksantikvaren's registers over whatever ground is drawing,
+and beside it, only while they are up, `HeritageMenu`: the chip that reads out
+the render and opens the five sources, the three registers inside
+kulturminner2, the seven renders and the transparency. It is not an arm and
+belongs to no ground, which is what puts it at the other end of the band. Off
+is `heritageHiddenAtom`, a blind rather than a clearing, so the reader's
+selection survives taking the overlay off to look at the terrain; the button is
+the product of that atom and `activeThemeLayersAtom`, and with nothing ticked it
+arms kulturminner2 rather than raising a blind over an empty set. The one thing
+the chip says that is not a setting is that the map is too far out for any
+ticked source to draw — every RA service here is capped below city scale, and
+an overlay that is on and invisible otherwise reads as an empty register.
 
 **Mantine is the design system, and the app is dark.** `MantineProvider` and
 the theme (`src/ui/theme.ts`) are mounted at the root, and every surface is
@@ -166,8 +182,8 @@ change described at the top of `useLidarControls.ts`.
 | `lidarAutoDatasetAtom` | `…/lidarAuto.ts` | pick the dataset from the viewport | `useLidarControls` |
 | `activeCvatAcquisitionAtom` | `…/cvatGround.ts` | our own cached VAT render | `useLidarControls` |
 | `activeFlyfotoProjectAtom` | `…/flyfotoBackground.ts` | one NiB acquisition | `useFlyfotoControls` |
-| `activeThemeLayersAtom` | `layers/atoms.ts` | which Kulturminner layers | — |
-| `heritageDetailsAtom`, `heritageRenderAtom`, `heritageOpacityAtom`, `heritageHiddenAtom` | `layers/heritage.ts` | how they are drawn | — |
+| `activeThemeLayersAtom` | `layers/atoms.ts` | which Kulturminner layers | `useHeritageControls` |
+| `heritageDetailsAtom`, `heritageRenderAtom`, `heritageOpacityAtom`, `heritageHiddenAtom` | `layers/heritage.ts` | how they are drawn | `useHeritageControls` |
 | `terrainWindowAtom`, `frameTerrainWindowAtom` | `terrain/window.ts` | the rectangle under analysis | — |
 | `compareOnAtom`, `compareSplitAtom`, `enterCompareAtom` | `map/compare/atoms.ts` | the curtain | — |
 
@@ -201,13 +217,13 @@ the surfaces that wrote them.
   keeps the viewport list warm while the keyboard ring walks datasets, and the
   ring (`useBackgroundCyclingKeys`, W/S/A/D/E) went with the old shell. It costs
   nothing false today and comes back with those keys.
-- **Only the ground section of the ribbon is built**, plus the upstream fault
-  chip in the tool section. The view section is empty and the Kulturminner
-  themes have no toggle; no Hybrid overlay or contours, no compare curtain, no
-  search — the atoms for all of them are live and unwritten. The three sections
-  say where each of those goes when it is written; Hybrid is the next one in,
-  and the only question it raises is whether a modifier over the ground belongs
-  to the ground section or the tool section.
+- **The view section of the ribbon is empty.** The ground section is built, and
+  the tool section holds the Kulturminner overlay and the upstream fault chip;
+  no Hybrid overlay or contours, no compare curtain, no search — the atoms for
+  all of them are live and unwritten. The three sections say where each of those
+  goes when it is written; Hybrid is the next one in, and the only question it
+  raises is whether a modifier over the ground belongs to the ground section or
+  the tool section.
 - **Nothing walks the rings.** The arms list and pick; there is no W/S step
   through datasets, variants or acquisitions, because those keys went with the
   old shell (`lidarCyclingAtom` above).

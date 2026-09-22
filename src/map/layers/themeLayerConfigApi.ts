@@ -94,6 +94,22 @@ export const getParentCategory = (
   return getCategoryById(config, category.parentId);
 };
 
+/** The zoom a layer draws above, strictly — OpenLayers' `minZoom`, inherited
+ *  from the category exactly as `createThemeLayerFromConfig` inherits it.
+ *  Undefined where nobody sets one, i.e. the layer draws at every zoom. The
+ *  control row reads this to tell a reader that the overlay is on and the map
+ *  is too far out for it, rather than leaving them to conclude the register is
+ *  empty here. */
+export const themeLayerMinZoom = (id: string): number | undefined => {
+  const def = getThemeLayerById(themeLayerConfig, id);
+  if (!def) return undefined;
+  const category = getCategoryById(themeLayerConfig, def.categoryId);
+  const parent = category
+    ? getParentCategory(themeLayerConfig, category)
+    : undefined;
+  return def.minZoom ?? category?.minZoom ?? parent?.minZoom;
+};
+
 /** A layer's name in the user's language, shared by the picker and the figure
  *  captions so a saved image names its overlays as the UI does. */
 export const themeLayerName = (id: string, language: string): string => {

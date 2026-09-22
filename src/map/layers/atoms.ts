@@ -35,14 +35,19 @@ export const shownThemeLayersAtom = atom<ReadonlySet<ThemeLayerName>>((get) =>
 );
 
 // The one theme layer whose WMS request can be reshaped; the other four RA
-// services publish a single style each.
-const RESHAPEABLE: ThemeLayerName = 'heritageSites';
+// services publish a single style each. Exported because the surface that
+// offers the registers and the renders has to know which source they belong to,
+// and a second copy of the name is how the two would come apart.
+export const RESHAPEABLE_THEME_LAYER: ThemeLayerName = 'heritageSites';
 
 const paramsFor = (
   layerName: ThemeLayerName,
   details: ReadonlySet<HeritageDetail>,
   render: HeritageRender,
-) => (layerName === RESHAPEABLE ? heritageSitesParams(details, render) : null);
+) =>
+  layerName === RESHAPEABLE_THEME_LAYER
+    ? heritageSitesParams(details, render)
+    : null;
 
 export const themeLayerEffect = atomEffect((get) => {
   const themeLayers = get(activeThemeLayersAtom);
@@ -151,7 +156,7 @@ export const themeLayerEffect = atomEffect((get) => {
       // transparent tile, so hide rather than request one. Hidden, not removed:
       // the tile cache survives and featureInfoService's `isRendering`
       // (`Layer#isVisible`) stops a click asking RA about an unseen register.
-      const empty = layerName === RESHAPEABLE && params === null;
+      const empty = layerName === RESHAPEABLE_THEME_LAYER && params === null;
       layer.setVisible(!heritageHidden && !empty);
       if (!params) return;
 
