@@ -162,22 +162,42 @@ nginx rejects a duplicate `proxy_cache_valid`, `proxy_read_timeout` or
 - `timeout` goes in the WFS and `/kms-api/` `proxy_next_upstream` lists only.
   Those answer in ~0.25 s or hang forever; a WMS can take 5–14 s cold, where a
   read timeout means a live render and a retry queues a second for one tile.
-- `$skip_cache` (a map on `$upstream_http_content_length`) refuses to store
-  under 300 bytes, keeping the ~100-byte JSON error and the 238-byte rate-limit
-  notice out of a 180-day entry. Do not raise the floor to exclude no-coverage
-  tiles: deterministic per bbox, 0.3–6 s each at the origin, and most of a
+- **Two guards, because one of them is blind.** `$skip_cache` (a map on
+  `$upstream_http_content_length`) refuses to store under 300 bytes. It only
+  fires where the upstream declares a length, and measured on the wire
+  `wms.geonorge.no` and `kart.ra.no` never do — both answer chunked, with or
+  without the `Accept-Encoding ""` below. So on the two busiest hosts that map
+  is permanently 0, and only the per-project namespace, which answers a bare
+  `content-length: 0`, is caught by it. `$skip_cache_type` (a map on
+  `$upstream_http_content_type`, matching `se_xml`) is the one that catches the
+  238-byte rate-limit ServiceException, because Content-Type survives chunking.
+  Keep it narrow: `text/xml` would take RA's `vnd.ogc.gml` GetFeatureInfo
+  answers with it. Do not raise the length floor to exclude no-coverage tiles
+  either: deterministic per bbox, 0.3–6 s each at the origin, and most of a
   zoomed-out screen.
-- `Accept-Encoding ""` — Kartverket's per-project WMS otherwise answers gzipped
-  and chunked with no `Content-Length`, and `$skip_cache` cannot decide.
-- `proxy_ignore_headers Set-Cookie Cache-Control Expires`, or session cookies
-  disable caching; `proxy_cache_lock on`, one request per cold key; not
+- `Accept-Encoding ""` because gzipping a PNG buys nothing. It does *not*
+  restore `Content-Length` — that is what the Content-Type guard is for.
+- `proxy_ignore_headers Set-Cookie Cache-Control Expires Vary X-Accel-Expires`
+  — `wms.geonorge.no` really does send `Set-Cookie: JSESSIONID`, and `Vary` is
+  there because nginx stores a secondary hash per variant: `hoydedata.no` sends
+  `Vary: Origin` on the 4 MB float-DEM path, one CORS-mode `fetch` away from
+  doubling those entries. `proxy_cache_lock on` with `proxy_cache_lock_age 30s`
+  — the 5 s default breaks the lock mid-render on a 5–14 s cold tile and lets a
+  second request upstream, which is the split view's two `Map`s exactly. Not
   `proxy_cache_bypass $skip_cache`, evaluated before the length exists.
+- **Negative caching**: `404 10m`, `400 403 1m`. Without it only 200s are
+  stored, and `tileGuard` retries each failure twice more — 3 upstream requests
+  per bad tile per level per session. 5xx stays uncached; that is
+  `proxy_cache_use_stale`'s job.
 - `Cache-Control` to the browser is rewritten to `$tile_cache_control`
-  (`public, max-age=604800`; `no-store` on `$skip_cache`), since no upstream
-  sends a usable one or a validator. Hide the upstream's own header rather than
-  ignoring it — with two on the wire the browser takes the stricter — and leave
-  `always` off the `add_header`, so a 502/504 carries no freshness; the rate
-  limit arrives as a 200 and is caught on length instead.
+  (`public, max-age=604800, immutable`; `no-store` if either guard fired),
+  since no upstream sends a usable one or a validator. `immutable` is safe on
+  top of the week because these come out of a 180-day LRU here, so a browser
+  copy inside its max-age can never be staler than what this proxy would have
+  answered. Hide the upstream's own header rather than ignoring it — with two
+  on the wire the browser takes the stricter — and leave `always` off the
+  `add_header`, so a 502/504 carries no freshness, and so the negative-cached
+  400/403/404 go out with none either.
 - `X-Cache-Status: HIT|MISS|BYPASS` is added for debugging.
 
 ## The tile cache (mapproxy)
