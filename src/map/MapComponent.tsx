@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HeritageInfo } from '../heritageInfo';
 import { ErrorBoundary } from '../shared/ErrorBoundary.tsx';
+import { SpotSurface } from '../spotControls';
 import { terrainWindowLayerEffect } from '../terrain/windowLayer.ts';
 import { TerrainSurface } from '../terrainControls';
 import styles from './MapComponent.module.css';
@@ -75,6 +76,13 @@ export const MapComponent = () => {
           panel that throws takes only itself down. */}
       <ErrorBoundary fallback={null} name="terreng">
         <TerrainSurface />
+      </ErrorBoundary>
+      {/* The reader's own records: the saved pins, the short link that opens
+          one, and the box a new one is written in. Its own boundary, like the
+          two above — a draft that throws on some shape the server returned must
+          not take the map, the register or the analysis with it. */}
+      <ErrorBoundary fallback={null} name="lokaliteter">
+        <SpotSurface />
       </ErrorBoundary>
     </div>
   );

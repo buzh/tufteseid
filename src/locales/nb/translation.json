@@ -1,4 +1,14 @@
 {
+  "auth": {
+    "title": "Logg inn",
+    "blurb": "Du trenger en konto for å lagre egne lokaliteter. Lokalitetene dine er private til du gjør dem offentlige.",
+    "signIn": "Logg inn",
+    "signInWith": "Fortsett med {{provider}}",
+    "signOut": "Logg ut",
+    "account": "Kontoen din",
+    "providersError": "Fikk ikke kontakt med innloggingstjenesten.",
+    "noProviders": "Ingen innloggingsmåter er satt opp på denne installasjonen."
+  },
   "flyfotoControls": {
     "mosaic": "Beste mosaikk",
     "mosaicShort": "Mosaikk · nyeste",
@@ -177,6 +187,27 @@
       "title": "Noe gikk galt her",
       "retry": "Prøv igjen"
     }
+  },
+  "spots": {
+    "new": "Ny lokalitet",
+    "newNeedsAccount": "Logg inn for å lage en lokalitet",
+    "newTitle": "Ny lokalitet",
+    "editTitle": "Rediger lokalitet",
+    "name": "Navn",
+    "namePlaceholder": "Hva heter stedet?",
+    "namePlaceholderBusy": "Slår opp stedsnavn …",
+    "description": "Beskrivelse",
+    "descriptionPlaceholder": "Hva ser du i terrenget?",
+    "pinChange": "Endre",
+    "pinDone": "Ferdig",
+    "draw": "Tegn",
+    "drawStart": "Tegn over kartet",
+    "drawStop": "Legg fra deg pennen",
+    "sketchPresent": "Tegning lagt ved",
+    "sketchNone": "Ingen tegning",
+    "save": "Lagre",
+    "abort": "Avbryt",
+    "saveFailed": "Fikk ikke lagret lokaliteten. Prøv igjen."
   },
   "terrainControls": {
     "label": "Terrenganalyse",

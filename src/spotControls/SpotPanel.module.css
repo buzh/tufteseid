@@ -1,0 +1,86 @@
+/* The box that accompanies a draft. Top right, where the terrain analysis has
+   the top left: the two can be up at once — framing a relief analysis and then
+   marking what it showed is the whole workflow this app is for — and a box that
+   moved depending on what else was open would be a box the reader has to find.
+
+   Positioned against the map's own rectangle, so it sits under the band without
+   knowing the band's height. */
+.panel {
+  position: absolute;
+  top: var(--mantine-spacing-xs);
+  right: var(--mantine-spacing-xs);
+  width: 19rem;
+  max-width: calc(100% - 2 * var(--mantine-spacing-xs));
+  max-height: calc(100% - 2 * var(--mantine-spacing-xs));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  /* Opaque. A form over relief is small text on busy ground, and unlike the
+     terrain box there is nothing here the reader adjusts by watching the map
+     change underneath it. */
+  background: var(--mantine-color-body);
+  box-shadow: var(--mantine-shadow-md);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  padding: 6px var(--mantine-spacing-xs);
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 700;
+}
+
+/* Takes the slack and scrolls in it, so a short window folds the fields into a
+   scrollport rather than pushing the buttons off the bottom of the map. */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--mantine-spacing-xs);
+  scrollbar-width: thin;
+}
+
+/* The coordinate and the button that gives it back. The reading is the control:
+   there is no field to type a coordinate into, because the pin is on the map
+   and the map is the instrument. */
+.coords {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  margin-top: var(--mantine-spacing-xs);
+  padding: 4px 6px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.coordsLive {
+  border-color: var(--mantine-color-papaya-6);
+}
+
+.coordsText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--mantine-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Save and abort, kept together at the bottom of the box rather than in the
+   header, because they are the end of reading down it. */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--mantine-spacing-xs);
+  padding: var(--mantine-spacing-xs);
+  border-top: 1px solid var(--mantine-color-default-border);
+}
