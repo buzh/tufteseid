@@ -449,12 +449,27 @@ is fewer requests.
   blank-where-there-is-data tile at wmscache, which can see the upstream.
 
 The two-ground views (`src/map/compare/`) are the deliberate exception: a second
-full background stack, so a screenful costs about twice what it normally does.
-The curtain draws it out of the main map's queue and the split out of the second
-map's, which makes the split the faster of the two off a cold cache and the
-heavier per second against the rate limit. Hence both are modes you enter and
-leave, the B stack is torn down on exit, and neither is persisted to the URL — a
-shared link must not put every recipient into double spend on a shared budget.
+background stack on the same view. What that costs is not the flat doubling it
+looks like, and the two shapes differ.
+
+**Split** is two half-width maps, so the two panes between them cover one
+viewport: the *total* is about one screenful, plus a row or column of tile
+overlap where each pane rounds up to whole tiles at the seam. What it does have
+is a tile queue per `Map`, both sized 48, so up to 96 tiles in flight rather
+than 48 — heavier per second against a rate limit that meters a window, even
+though it is not heavier per screen.
+
+**Curtain** is one full-width A with B over the strip right of the divider. The
+`prerender` canvas clip does not cull anything on its own — it runs after the
+renderer has queued the layer's tiles for the whole viewport — so B also carries
+a layer `extent`, intersected with its own `coverageExtent`, recomputed on
+`moveend` and as the handle is dragged. Without that extent the curtain costs a
+full second screenful to show half of one, which is what it used to do. With it,
+about half a screenful over a single ground.
+
+Both are modes you enter and leave, the B stack is torn down on exit, and
+neither is persisted to the URL — a shared link must not put every recipient
+into two-ground spend on a shared budget.
 
 ## When an upstream stops answering
 

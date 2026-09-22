@@ -285,10 +285,12 @@ emptied before the build rather than after it (`clearCompareLayersExcept`) —
 every way a build can end without installing would otherwise leave the previous
 view still drawing.
 
-Neither two-ground view is persisted to the URL. Two live tile stacks are
-roughly twice the GetMap requests against a rate limit this deployment shares
-across every visitor, so a shared link opens on one ground and the reader asks
-for the second.
+Neither two-ground view is persisted to the URL: a shared link opens on one
+ground and the reader asks for the second, rather than every recipient landing
+in two-ground spend on a rate limit this deployment shares across every visitor.
+B is culled to what it actually shows in both shapes, so that spend is a second
+stack's worth of layers and queue pressure rather than a second viewport's worth
+of tiles — `docs/wms-proxy-and-tiles.md` has the per-shape numbers.
 
 Entering a two-ground view seeds every `.b` from its `.a` (`seedHalfB`, a
 registry rather than a list, so a pair added later cannot open B on a `null`),

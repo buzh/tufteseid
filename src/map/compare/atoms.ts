@@ -36,9 +36,11 @@ import { seedHalfB, type ViewMode, viewModeAtom } from './halves';
 // Two grounds at once — the same view read twice. The ordinary background stack
 // is the A half and keeps the left of the screen; a second stack built by the
 // same rules is the B half. Which shape that takes is `viewModeAtom`
-// (`halves.ts`); what it costs is why neither shape is persisted to the URL —
-// two live tile stacks are roughly twice the GetMap requests against a rate
-// limit this deployment shares across every visitor.
+// (`halves.ts`); what it costs is why neither shape is persisted to the URL, on
+// a rate limit this deployment shares across every visitor. Neither is the flat
+// doubling this comment used to claim: B is culled to what it shows in both
+// shapes, so the cost is a second stack's worth of layers and queue pressure
+// rather than a second viewport's worth of tiles.
 
 /** Where the curtain edge sits, as a fraction of the map width. */
 export const compareSplitAtom = atom(0.5);

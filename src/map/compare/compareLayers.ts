@@ -1,4 +1,5 @@
 import { getDefaultStore } from 'jotai';
+import { boundingExtent, getIntersection } from 'ol/extent';
 import type BaseLayer from 'ol/layer/Base';
 import type TileLayer from 'ol/layer/Tile';
 import type OlMap from 'ol/Map';
@@ -92,6 +93,73 @@ const clipToRightOfSplit = (e: RenderEvent) => {
 
 const unclip = (e: RenderEvent) => canvas2d(e)?.restore();
 
+// The clip above only hides pixels. It runs in `prerender`, by which point the
+// renderer has already worked out which tiles the layer needs for the whole
+// viewport and queued every one of them, so on its own the curtain costs a full
+// screen of B to show half a screen of it. The layer `extent` is the half that
+// actually saves anything: OL tests it before it asks for a tile.
+//
+// Intersected with whatever the layer was built with, never replacing it — that
+// is its `coverageExtent`, and dropping it would put the B stack back to
+// ordering renders over open ocean on every zoom out. The original is stashed
+// so unclipping can put it back.
+const BASE_EXTENT = 'cmpBaseExtent';
+
+// Taken off the method that consumes it rather than imported, so it cannot
+// drift from whatever OL's own signature says an extent is.
+type LayerExtent = ReturnType<TileLayer['getExtent']>;
+
+// Four corners rather than two: the view can be rotated, and a bounding box off
+// the diagonal would cut the revealed strip short.
+const curtainExtent = (): LayerExtent => {
+  const map = getMainMap();
+  const size = map.getSize();
+  if (!size) return undefined;
+  const [w, h] = size;
+  const corners = [
+    map.getCoordinateFromPixel([w * split, 0]),
+    map.getCoordinateFromPixel([w, 0]),
+    map.getCoordinateFromPixel([w, h]),
+    map.getCoordinateFromPixel([w * split, h]),
+  ];
+  // Null before the first render, when there is no frame state to project with.
+  if (corners.some((c) => !c)) return undefined;
+  return boundingExtent(corners);
+};
+
+const applyCurtainExtents = () => {
+  const curtain = curtainExtent();
+  for (const layer of getMainMap().getLayers().getArray()) {
+    if (!isCompareLayer(layer) || !layer.get('cmpClip')) continue;
+    const base = layer.get(BASE_EXTENT) as LayerExtent;
+    // An empty intersection is the honest answer where a flight's footprint
+    // lies entirely left of the divider: OL then draws and fetches nothing.
+    const next = curtain
+      ? base
+        ? getIntersection(base, curtain)
+        : curtain
+      : base;
+    (layer as TileLayer).setExtent(next);
+  }
+};
+
+// One listener for the whole curtain, not one per layer. Panning moves the
+// revealed strip over new ground, so the extent has to be recomputed or B stops
+// filling in beyond wherever it was when the curtain went up.
+let curtainMoveHandler: (() => void) | null = null;
+
+const trackCurtain = (on: boolean) => {
+  const map = getMainMap();
+  if (on === Boolean(curtainMoveHandler)) return;
+  if (on) {
+    curtainMoveHandler = applyCurtainExtents;
+    map.on('moveend', curtainMoveHandler);
+  } else if (curtainMoveHandler) {
+    map.un('moveend', curtainMoveHandler);
+    curtainMoveHandler = null;
+  }
+};
+
 // Both ways, and flagged so it is idempotent: layers survive installs, so a
 // second attach would clip twice a frame and a missing detach would carry the
 // curtain's geometry into a pane that draws the B ground whole.
@@ -99,11 +167,17 @@ const setClip = (layer: TileLayer, on: boolean) => {
   if (Boolean(layer.get('cmpClip')) === on) return;
   layer.set('cmpClip', on);
   if (on) {
+    layer.set(BASE_EXTENT, layer.getExtent());
     layer.on('prerender', clipToRightOfSplit);
     layer.on('postrender', unclip);
   } else {
     layer.un('prerender', clipToRightOfSplit);
     layer.un('postrender', unclip);
+    // Back to its coverage, or to unbounded if it never had one. A layer that
+    // kept a curtain extent into the split pane would draw a vertical slice of
+    // itself in a map that has no divider.
+    layer.setExtent(layer.get(BASE_EXTENT) as LayerExtent);
+    layer.set(BASE_EXTENT, undefined);
   }
 };
 
@@ -146,6 +220,11 @@ export const installCompareLayers = (
     collection.push(layer);
   }
 
+  // After setClip has stashed each layer's own extent, so the intersection has
+  // something to intersect with.
+  trackCurtain(clip);
+  if (clip) applyCurtainExtents();
+
   for (const layer of outgoing) layer.setOpacity(OUTGOING_OPACITY);
 
   const retire = () => {
@@ -164,6 +243,7 @@ export const installCompareLayers = (
 /** Take the B half off both hosts. */
 export const clearCompareLayers = () => {
   cancelPendingRetire?.();
+  trackCurtain(false);
   clearFrom(getMainMap());
   const pane = peekSplitMap();
   if (pane) clearFrom(pane);
@@ -191,5 +271,10 @@ export const clearCompareLayersExcept = (host: OlMap) => {
 
 export const setCurtainSplit = (fraction: number) => {
   split = fraction;
+  // Dragging the divider left reveals ground B was never asked for, so the
+  // extent has to follow the handle rather than wait for a moveend. It only
+  // ever requests what is about to be visible, which is still less than the
+  // whole viewport the curtain used to fetch up front.
+  applyCurtainExtents();
   getMainMap().render();
 };

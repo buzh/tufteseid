@@ -20,9 +20,13 @@ const BOTH_HALVES = ['a', 'b'] as const;
  * | `curtain` | two grounds in one viewport, B clipped right of a draggable edge |
  * | `split`   | two viewports side by side on one view, so each half is centred on the same point |
  *
- * Not persisted to the URL, because two live tile stacks are roughly twice the
- * GetMap requests against a shared rate limit: a shared link opens on one
- * ground and the reader asks for the second.
+ * Not persisted to the URL. A shared link opens on one ground and the reader
+ * asks for the second, rather than every recipient landing in two-ground spend
+ * on a budget the whole deployment shares. What that spend actually is differs
+ * by shape, and not the way it reads: `split` is two half-width maps, so its
+ * total is about one screenful, but it has a tile queue per map and so twice
+ * the tiles in flight; `curtain` is one full-width A plus B over the revealed
+ * strip, so about half a screenful more than a single ground.
  */
 export const VIEW_MODES = ['single', 'curtain', 'split'] as const;
 
