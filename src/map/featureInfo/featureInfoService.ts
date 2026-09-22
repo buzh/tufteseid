@@ -3,7 +3,9 @@ import BaseLayer from 'ol/layer/Base';
 import ImageLayer from 'ol/layer/Image';
 import Layer from 'ol/layer/Layer';
 import TileLayer from 'ol/layer/Tile';
-import Map from 'ol/Map';
+// Aliased: this module also keeps a plain `Map` memo, and OpenLayers' class
+// would shadow the global one.
+import type OLMap from 'ol/Map';
 import { ImageWMS, TileWMS } from 'ol/source';
 import { fetchWithin } from '../../shared/utils/deadline';
 import type { FieldConfig } from '../layers/themeLayerConfigApi';
@@ -20,7 +22,7 @@ export type QueryableWMSLayer = TileLayer | ImageLayer<ImageWMS>;
 // Not `getVisible()`, which is only the checkbox: the Kulturminner category
 // carries `minZoom: 8` and draws nothing below it while still reporting
 // visible. `isVisible` folds in the zoom, resolution and extent limits.
-const isRendering = (layer: BaseLayer, map: Map): boolean =>
+const isRendering = (layer: BaseLayer, map: OLMap): boolean =>
   layer instanceof Layer && layer.isVisible(map.getView());
 
 /** The WMS layers on the map that a click can be put to: queryable, drawing at
@@ -28,7 +30,7 @@ const isRendering = (layer: BaseLayer, map: Map): boolean =>
  *  than by `theme.` prefix, because who is asking decides which registers an
  *  answer may come from. */
 export const getQueryableWMSLayers = (
-  map: Map,
+  map: OLMap,
   ids: ReadonlySet<string>,
 ): QueryableWMSLayer[] => {
   return map
@@ -56,7 +58,7 @@ export const getQueryableWMSLayers = (
 export const buildFeatureInfoUrl = (
   layer: QueryableWMSLayer,
   coordinate: Coordinate,
-  map: Map,
+  map: OLMap,
   infoFormat: InfoFormat = DEFAULT_INFO_FORMAT,
 ): string | null => {
   const source = layer.getSource();
@@ -375,7 +377,7 @@ export const FEATURE_INFO_DEADLINE_MS = 12_000;
 export const fetchLayerFeatureInfo = async (
   layer: QueryableWMSLayer,
   coordinate: Coordinate,
-  map: Map,
+  map: OLMap,
   signal?: AbortSignal,
 ): Promise<LayerFeatureInfo> => {
   const layerId = layer.get('id') as string;

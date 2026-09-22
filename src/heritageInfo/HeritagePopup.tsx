@@ -15,7 +15,6 @@ import {
   Anchor,
   Badge,
   CloseButton,
-  Collapse,
   Paper,
   Spoiler,
   Tooltip,
@@ -82,7 +81,10 @@ const NestedEnkeltminner = ({
         <Icon icon={open ? 'keyboard_arrow_down' : 'chevron_right'} size={16} />
         {t('kulturminner.enkeltminner', { count: enkeltminner.length })}
       </UnstyledButton>
-      <Collapse in={open}>
+      {/* Rendered rather than animated shut: the card sizes itself to the
+          content, and a closed enkeltminne list is a dozen Tooltips the reader
+          cannot reach. */}
+      {open && (
         <div className={styles.nestedList}>
           {enkeltminner.map((em) => {
             const bucket = vernBucket(em.vernetype);
@@ -126,7 +128,7 @@ const NestedEnkeltminner = ({
             );
           })}
         </div>
-      </Collapse>
+      )}
     </div>
   );
 };
