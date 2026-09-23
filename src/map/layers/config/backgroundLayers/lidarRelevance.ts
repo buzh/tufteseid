@@ -1,7 +1,11 @@
 import { atom } from 'jotai';
 import { Geometry } from 'ol/geom';
 import { acrossHalves, halved } from '../../../compare/halves';
-import { LidarProject, sortProjectsByRelevance } from './lidarProjects';
+import {
+  densityValue,
+  LidarProject,
+  sortProjectsByRelevance,
+} from './lidarProjects';
 
 // Failing a bar demotes a project to `secondary`; nothing is excluded outright.
 export type LidarFilterSettings = {
@@ -19,12 +23,6 @@ export const DEFAULT_LIDAR_FILTERS: LidarFilterSettings = {
 };
 
 const GRANDFATHER_DENSITY_PKT = 5;
-
-const densityValue = (d: string | null): number => {
-  if (!d) return 0;
-  const m = d.match(/^(\d+)/);
-  return m ? parseInt(m[1], 10) : 0;
-};
 
 export const meetsYearBar = (
   project: LidarProject,

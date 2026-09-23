@@ -7,12 +7,12 @@ const PROJECTS_TIMEOUT_MS = 20_000;
 // Layer 4, "Prosjektomriss prosessert": one row per acquisition.
 const PROJECTS_URL = '/arcgis/nib/prosjekter/MapServer/4/query';
 
-// "Satellittbilde": nationwide 10 m Sentinel-2 mosaics, which cover everywhere
-// and would list under every rectangle.
+// "Satellittbilde": nationwide 10 m Sentinel-2 mosaics, which would list under
+// every rectangle.
 const SATELLITE_ORTOFOTOTYPE = 6;
 
 export type FlyfotoProject = {
-  // prosjektnavn, which is also the imagery selector in flyfoto.ts.
+  // prosjektnavn, which is also the ImageServer's mosaic-rule selector.
   id: string;
   projectName: string;
   year: number | null;
@@ -39,8 +39,8 @@ function toNumber(value: unknown): number | null {
   return typeof n === 'number' && Number.isFinite(n) ? n : null;
 }
 
-// Epoch milliseconds formatted in UTC: these are dates, not instants, and
-// local formatting can shift them a day.
+// Formatted in UTC: these are dates, not instants, and local formatting can
+// shift them a day.
 function toIsoDate(epochMs: number | null | undefined): string | null {
   if (typeof epochMs !== 'number' || !Number.isFinite(epochMs)) return null;
   const d = new Date(epochMs);
@@ -87,7 +87,7 @@ export async function fetchFlyfotoProjectsForBbox(
   bbox4326: Bbox,
   signal?: AbortSignal,
 ): Promise<FlyfotoProject[]> {
-  // The service wants a projected CRS, and 25833 is the flyfoto path's.
+  // The service wants a projected CRS.
   const bbox25833 = transformExtent(bbox4326, 'EPSG:4326', 'EPSG:25833');
 
   const params = new URLSearchParams({
@@ -99,7 +99,7 @@ export async function fetchFlyfotoProjectsForBbox(
     spatialRel: 'esriSpatialRelIntersects',
     outFields:
       'prosjektnavn,aar,fotodato_date,ortofototype,pixelstorrelse,x_min,y_min,x_max,y_max',
-    // The bounds come as plain attributes.
+    // The bounds are plain attributes, so the outlines need not come back.
     returnGeometry: 'false',
   });
 

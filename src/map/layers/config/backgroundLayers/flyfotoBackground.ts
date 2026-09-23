@@ -5,7 +5,7 @@ import { VIEW_MAX_ZOOM } from '../../wmsTileGrid';
 import type { ArcGISImageBackgroundLayer, XYZBackgroundLayer } from './types';
 
 // The <BoundingBox CRS="EPSG:25833"> the ortofoto WMS advertises; without it OL
-// asks for renders over open ocean on every zoom out.
+// asks for tiles over open ocean on every zoom out.
 const FLYFOTO_COVERAGE_EXTENT_25833: [number, number, number, number] = [
   -250025, 6299985, 1211155, 8985010,
 ];

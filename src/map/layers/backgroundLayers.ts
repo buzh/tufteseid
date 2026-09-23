@@ -15,7 +15,10 @@ export type EmptyLayerName = 'empty';
 
 // Each name is the WMTS identifier Kartverket's cache is asked for.
 export type WMTSLayerName =
-  'topo' | 'topograatone' | 'toporaster' | 'sjokartraster';
+  | 'topo'
+  | 'topograatone'
+  | 'toporaster'
+  | 'sjokartraster';
 
 export type BackgroundLayerName =
   | WMTSLayerName

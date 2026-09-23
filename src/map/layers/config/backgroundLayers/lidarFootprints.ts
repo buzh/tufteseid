@@ -15,8 +15,7 @@ export type LidarFootprint = {
 
 // By name, never by BBOX: the ArcGIS spatial filter silently under-returns for
 // narrow boxes, and wide ones are uncompressed GeoJSON (4.4 MB at 33 km, 504
-// past 65 km). URLSearchParams encodes the filter, so only the three
-// XML-significant characters need escaping here.
+// past 65 km). URLSearchParams handles the URL encoding.
 const buildNameFilter = (projectName: string): string => {
   const literal = projectName
     .replace(/&/g, '&amp;')
@@ -31,9 +30,9 @@ const buildNameFilter = (projectName: string): string => {
   );
 };
 
-// A few catalogue names differ from the WFS spelling only by the density
-// token, so a miss retries without it. Never the primary key: 81 name groups
-// differ by nothing else and would collapse onto one footprint.
+// A fallback only: a few catalogue names differ from the WFS spelling by the
+// density token alone, but 81 name groups differ by nothing else and would
+// collapse onto one footprint if this were the primary key.
 const stripDensity = (name: string): string =>
   name
     .replace(/\b\d+\s*(pkt|pnt)\b/gi, '')
@@ -42,8 +41,7 @@ const stripDensity = (name: string): string =>
 
 const YEAR_TOLERANCE = 2;
 
-// Per page, and six of these run at once: without a budget of its own a
-// stalled WFS parks the whole fan-out. A page takes 300-900 ms.
+// Per page; a page takes 300-900 ms, and six of these run at once.
 const PAGE_TIMEOUT_MS = 12000;
 
 type WfsProperties = {
@@ -66,8 +64,8 @@ const epsgFromCrsMember = (doc: unknown): string | undefined => {
   return m ? `EPSG:${m[1]}` : undefined;
 };
 
-// Never expired, since a boundary is static; negative results too. Bounded by
-// count: an entry is 10s-100s kB.
+// A boundary is static, so entries never expire; bounded by count instead, an
+// entry being 10s-100s kB.
 const MAX_CACHE_ENTRIES = 400;
 const cache = new Map<string, Promise<LidarFootprint | null>>();
 
@@ -98,7 +96,7 @@ const MAX_PAGES = 25;
 
 type NameQueryResult = {
   geometries: Geometry[];
-  // Set when the paging stopped short of exhausting the rows.
+  // The paging stopped short of exhausting the rows.
   truncated: boolean;
 };
 
@@ -141,7 +139,7 @@ const requestByName = async (
     if (features.length === 0) break;
 
     // The same row opening two consecutive pages means STARTINDEX was ignored
-    // and the rest are unreachable. Only where the service gives ids at all.
+    // and the rest are unreachable.
     const firstId = features[0].getId();
     if (firstId != null && firstId === previousFirstId) {
       truncated = true;
@@ -151,7 +149,7 @@ const requestByName = async (
 
     for (const feature of features) {
       const props = feature.getProperties() as WfsProperties;
-      // Further out than a rounding of the flying date is a different project.
+      // Beyond YEAR_TOLERANCE it is a different project under the same name.
       const wfsYear = props.AARSTALL != null ? Number(props.AARSTALL) : null;
       if (
         project.year != null &&
@@ -172,7 +170,7 @@ const requestByName = async (
   return geometries.length > 0 ? { geometries, truncated } : null;
 };
 
-// One project's boundary in the map's projection, or null if the WFS has none.
+// One project's boundary in `projection`, or null if the WFS has none.
 const fetchOne = (
   project: LidarProject,
   projection: string,
@@ -196,7 +194,7 @@ const fetchOne = (
   writeCache(key, promise);
 
   // Entries never expire, so anything short of the whole answer comes back out.
-  // Only this promise's entry: eviction may already have replaced the key.
+  // Only this promise's own entry: eviction may already have replaced the key.
   const forget = () => {
     if (cache.get(key) === promise) cache.delete(key);
   };
@@ -214,9 +212,8 @@ const CONCURRENCY = 6;
 export type LidarFootprintFetch = {
   /** Keyed by LidarProject.id; projects with no boundary are absent. */
   footprints: Map<string, LidarFootprint>;
-  /** Nothing was answered and something failed. Implies an empty `footprints`,
-   *  and distinguishes a service outage from a viewport no flight covers;
-   *  false for an empty candidate list, which is an answer. */
+  /** Nothing was answered and something failed — a service outage, as opposed
+   *  to a viewport no flight covers. False for an empty candidate list. */
   unanswered: boolean;
 };
 
@@ -227,8 +224,7 @@ export async function fetchLidarFootprints(
 ): Promise<LidarFootprintFetch> {
   const out = new Map<string, LidarFootprint>();
   const queue = [...projects];
-  // A null boundary is an answer — the WFS has no rows under that name — so
-  // this counts answers rather than hits.
+  // A null boundary is an answer: the WFS has no rows under that name.
   let answered = 0;
   let failed = 0;
   const worker = async () => {
@@ -241,13 +237,11 @@ export async function fetchLidarFootprints(
         if (footprint) out.set(project.id, footprint);
       } catch (err) {
         failed++;
-        // The breaker is open: every remaining project would fail the same
-        // way, instantly and without a request.
+        // Breaker open: every remaining project would fail the same way.
         if (isUpstreamDown(err)) {
           queue.length = 0;
           return;
         }
-        // One project's boundary failing shouldn't blank the whole list.
         console.warn('[lidarFootprints] %s failed', project.id, err);
       }
     }
@@ -258,10 +252,11 @@ export async function fetchLidarFootprints(
   return { footprints: out, unanswered: answered === 0 && failed > 0 };
 }
 
-// How much of the viewport a footprint paints, 0..1. Grid-sampled, since OL has
-// no polygon intersection; `extent` and `geometries` share a metric CRS.
+// Samples per axis. Grid-sampled because OL has no polygon intersection;
+// `extent` and `geometries` must share a metric CRS.
 const COVERAGE_GRID = 24;
 
+// How much of `extent` the footprint paints, 0..1.
 export const viewportCoverage = (
   geometries: Geometry[],
   extent: [number, number, number, number],
@@ -271,7 +266,8 @@ export const viewportCoverage = (
   const cellH = (extent[3] - extent[1]) / COVERAGE_GRID;
   if (cellW <= 0 || cellH <= 0) return 0;
 
-  // The sample sees no finer than a cell; the argument is a squared tolerance.
+  // The sample sees no finer than a cell; getSimplifiedGeometry wants the
+  // tolerance squared.
   const tolerance = Math.min(cellW, cellH);
   const simplified = geometries.map((g) =>
     g.getSimplifiedGeometry(tolerance * tolerance),

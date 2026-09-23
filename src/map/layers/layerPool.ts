@@ -2,8 +2,8 @@ import type BaseLayer from 'ol/layer/Base';
 import type TileLayer from 'ol/layer/Tile';
 import type OlMap from 'ol/Map';
 
-// The property a layer carries its reuse signature in; one without a key is
-// not pooled.
+// The property a layer carries its reuse signature in; one without a key is not
+// pooled.
 export const POOL_KEY = 'poolKey';
 
 // One background stack plus one B stack: the most a single toggle retires.
@@ -28,8 +28,8 @@ const keyOf = (layer: BaseLayer): string | null => {
   return typeof key === 'string' ? key : null;
 };
 
-// Only what actually came off a map is pooled: OL moves a still-attached layer
-// to whichever map takes it next, blanking the first.
+// Only what came off a map is pooled: OL moves a still-attached layer to
+// whichever map takes it next, blanking the first.
 export const retireLayer = (map: OlMap, layer: BaseLayer): void => {
   if (!map.removeLayer(layer)) return;
   const key = keyOf(layer);

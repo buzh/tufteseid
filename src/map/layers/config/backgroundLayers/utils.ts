@@ -66,17 +66,15 @@ export const getWMTSLayer = async (
       );
     }
 
-    // Untainted canvas, so the map can be read back into one;
-    // cache.kartverket.no sends ACAO:*.
+    // Untainted canvas, so the map can be read back into one.
     const source = new WMTS({ ...layerOptions, crossOrigin: 'anonymous' });
-    // The tile URL out of the capabilities, not the capabilities URL: the
-    // breaker should not assume they are the same host.
+    // The tile URL out of the capabilities, which need not be the same host.
     guardTileSource(source, layerOptions.urls?.[0] ?? url);
 
     const layer = new TileLayer({
       source,
       properties: { id: `bg.${layerConfig.layerName}` },
-      // Pre-rendered and ~130 ms a tile, so preloading coarser levels is cheap.
+      // Pre-rendered, ~130 ms a tile.
       preload: 2,
     });
 
@@ -110,17 +108,13 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
   const source = new TileWMS({
     url: layerConfig.url,
     params: { ...layerConfig.props },
-    // Capped at the source's own resolution where it has one: over the cap OL
-    // upsamples the deepest real level instead of ordering a render per tile.
     tileGrid: getWMSTileGrid(projection, 0, layerConfig.maxZoom),
     zDirection: WMS_Z_DIRECTION,
-    // Undefined is OL's own default, true (`types.ts`).
     interpolate: layerConfig.interpolate,
   });
   guardTileSource(source, layerConfig.url);
   const extent = toViewExtent(layerConfig.coverageExtent, projection);
-  // These render on the fly (3-12 s cold) and a preloaded tile holds a tile
-  // slot for that long.
+  // No preload: these render on the fly, 3-12 s cold, holding a tile slot.
   return new TileLayer({
     source,
     properties,
@@ -142,8 +136,8 @@ export const getArcGISImageLayer = (
     params: { ...layerConfig.params },
     tileGrid: getWMSTileGrid(projection, 0, layerConfig.maxZoom),
     zDirection: WMS_Z_DIRECTION,
-    // Off, so a tile is 512x512 at DPI 90 whatever the display; on, SIZE and
-    // DPI scale by pixel ratio and wmscache keys the same ground twice.
+    // On, SIZE and DPI would scale by pixel ratio and wmscache would key the
+    // same ground once per display.
     hidpi: false,
   });
   guardTileSource(source, layerConfig.url);
@@ -159,9 +153,7 @@ export const getArcGISImageLayer = (
 };
 
 // On the grid the tiles were written on rather than the view's; OL reprojects
-// if `?projection=` puts the view elsewhere. Guarded like the rest: the breaker
-// half of `guardTileSource` is a no-op for a URL no origin in `src/upstream/`
-// claims, and the retry half is what `sparse` turns off (`types.ts`).
+// if `?projection=` puts the view elsewhere.
 export const getXYZLayer = (
   layerConfig: XYZBackgroundLayer,
 ): TileLayer | null => {
@@ -174,8 +166,6 @@ export const getXYZLayer = (
     layerConfig.minZoom,
     layerConfig.maxZoom,
   );
-  // The grid carries the store's origin and levels; without it the tiles would
-  // be asked for on one nobody wrote them on.
   if (!tileGrid) return null;
 
   const source = new XYZ({
@@ -183,7 +173,6 @@ export const getXYZLayer = (
     projection: layerConfig.projection,
     tileGrid,
     zDirection: WMS_Z_DIRECTION,
-    // Undefined is OL's own default, true (`types.ts`).
     interpolate: layerConfig.interpolate,
   });
   guardTileSource(source, layerConfig.url, {
@@ -224,15 +213,16 @@ export const getLayerFromConfig = async (
   return null;
 };
 
-// `bg.` is swept by `swapBackgroundLayers`; `cmp.`, the curtain's B side, must
-// stay invisible to that sweep. It also namespaces the reuse signature: A and B
-// often resolve to one config and cannot share an instance.
+// `swapBackgroundLayers` sweeps `bg.` only, so the curtain's B side stays put.
+// Also namespaces the reuse signature: A and B often resolve to one config and
+// cannot share an instance.
 export type LayerNamespace = 'bg' | 'cmp';
 
 const isBackgroundLayer = (layer: BaseLayer): boolean =>
   String(layer.get('id') ?? '').startsWith('bg.');
 
-// Equal signatures mean equal pixels.
+// Equal signatures mean equal pixels. Per-layer settings fixed across datasets
+// — maxZoom, interpolate, heldUrl — are left out.
 const layerSignature = (
   config: BackgroundLayer,
   projection: string,
@@ -245,8 +235,7 @@ const layerSignature = (
     const params = JSON.stringify(config.params);
     return `arcgis|${config.url}|${params}|${projection}`;
   }
-  // Levels and extent join the url: they fence which of the store's tiles are
-  // ever asked for, where the url alone only names the store.
+  // Levels and extent join the url: the url alone only names the store.
   if (config.type === 'XYZ') {
     const extent = JSON.stringify(config.coverageExtent);
     const levels = `${config.minZoom}-${config.maxZoom}`;
@@ -255,12 +244,9 @@ const layerSignature = (
   return null;
 };
 
-// Reuses a layer that would render identically, so callers must set opacity
-// and z-index explicitly: it may carry an earlier swap's. `host` is which map
-// to search and defaults to the main one; an OL layer belongs to one map at a
-// time, so the split view's right pane must search its own collection. The pool
-// behind it (`layerPool.ts`) has no such restriction — nothing there is on a
-// map.
+// Reuses a layer that would render identically, so callers must set opacity and
+// z-index explicitly: it may carry an earlier swap's. An OL layer belongs to one
+// map at a time, so `host` must be the map the layer is destined for.
 export const buildOrReuseBackgroundLayer = async (
   config: BackgroundLayer,
   projection: string,
@@ -282,15 +268,15 @@ export const buildOrReuseBackgroundLayer = async (
   }
   const layer = await getLayerFromConfig(config, projection);
   if (layer) {
-    // The builders all stamp `bg.<name>`; anything else renames on the way out.
+    // The builders all stamp `bg.<name>`.
     if (ns !== 'bg') layer.set('id', `${ns}.${config.layerName}`);
     if (signature) layer.set(POOL_KEY, signature);
   }
   return layer;
 };
 
-// How long the outgoing stack waits for a render that never comes; a cold
-// LiDAR tile takes 3-12 s.
+// How long the outgoing stack waits for a render that never comes; a cold LiDAR
+// tile takes 3-12 s.
 export const SWAP_TIMEOUT_MS = 15000;
 
 export const OUTGOING_OPACITY = 0.35;
@@ -304,7 +290,6 @@ export const swapBackgroundLayers = (under: TileLayer[], over: TileLayer[]) => {
   const layers = [...under, ...over];
   if (layers.length === 0) return;
 
-  // Cancelled rather than run: those layers are in this swap's outgoing set.
   cancelPendingRetire?.();
 
   const collection = map.getLayers();
@@ -340,7 +325,6 @@ export const swapBackgroundLayers = (under: TileLayer[], over: TileLayer[]) => {
 export const clearBackgroundLayer = () => {
   const store = getDefaultStore();
   const map = store.get(mapAtom);
-  // Nothing is coming in to hide behind, so a deferred removal happens now.
   cancelPendingRetire?.();
   // Snapshot: getArray() is live, and removing while iterating skips entries.
   const allLayers = [...map.getLayers().getArray()];

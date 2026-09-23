@@ -1,11 +1,10 @@
 // The cached ground: RVT's combined VAT, precomputed per LiDAR acquisition into
 // one MBTiles database each by `vat-cache/makevat.py` and served by the
-// `cvat-tiles` sidecar. Same-origin, so no wmscache entry and no CSP host.
+// `cvat-tiles` sidecar.
 
 import { extend } from 'ol/extent';
 import { transformExtent } from 'ol/proj';
 import { halved } from '../../../compare/halves';
-import type { VatStackLayer } from '../../../../terrain/shade';
 import { getWMSTileGrid } from '../../wmsTileGrid';
 import {
   CVAT_STYLE,
@@ -23,19 +22,18 @@ export type CvatAcquisition = {
   // This acquisition's namespace in the store: one database on the server, one
   // path segment here. Overlapping flights cannot share a `<z>/<x>/<y>`.
   path: string;
-  // Levels written, on the app's own grid (`wmsTileGrid.ts`): z16 is
+  // Levels written, absolute z on the app's own grid (`wmsTileGrid.ts`): z16 is
   // 0.331 m/px, z12 5.289 m/px. Depth follows the DTM — z16 at 0.25 m, z15 at
-  // 0.5 m. Per acquisition: a half-built one is a normal state of the store.
+  // 0.5 m — and a half-built acquisition is a normal state of the store.
   minZoom: number;
   maxZoom: number;
-  // The store's own envelope in EPSG:25833, off the manifest's tile indices.
-  // Tighter than the catalogue bbox. Null against a sidecar too old to publish
-  // one.
+  // The store's own envelope in EPSG:25833, off the manifest's tile indices;
+  // null against a sidecar too old to publish one.
   extent25833: [number, number, number, number] | null;
 };
 
-// Written in lockstep with `activeLidarProjectHalves`, so the two can never
-// name different acquisitions. Null until Automatisk has named a flight.
+// Written in lockstep with `activeLidarProjectHalves`. Null until Automatisk
+// has named a flight.
 export const activeCvatAcquisitionHalves = halved<CvatAcquisition | null>(null);
 
 const CVAT_MANIFEST_URL = '/cvat/manifest.json';
@@ -43,9 +41,8 @@ const CVAT_MANIFEST_URL = '/cvat/manifest.json';
 const cvatTileUrl = (path: string) => `/cvat/${path}/{z}/{x}/{y}.webp`;
 
 // Inclusive tile indices on the app's own grid (`wmsTileGrid.ts`) at the
-// coarsest level held. An envelope, not a footprint: the holes inside it are
-// the 404s. `cvat-tiles/server.mjs` flips MBTiles' south-up row count to the
-// app's, so `y0` is the northern edge.
+// coarsest level held; an envelope, not a footprint. `cvat-tiles/server.mjs`
+// flips MBTiles' south-up row count to the app's, so `y0` is the northern edge.
 export type CvatBounds = {
   z: number;
   x0: number;
@@ -88,14 +85,10 @@ const parseStore = (body: unknown): CvatStore => {
     };
     if (!Array.isArray(levels)) continue;
     const zs = levels.filter((z): z is number => Number.isInteger(z));
-    // No path means a manifest from before the store was divided per
-    // acquisition.
     if (typeof path !== 'string' || path === '') {
       console.warn(`[cvat] ${name} has no path in the manifest`);
       continue;
     }
-    // A missing envelope is not fatal: an older sidecar publishes none, and
-    // such an acquisition still draws wherever the catalogue can place it.
     if (zs.length > 0) {
       store[name] = { levels: zs, path, bounds: parseBounds(bounds) };
     }
@@ -107,8 +100,6 @@ const parseStore = (body: unknown): CvatStore => {
 // server, which a reload picks up.
 let storePromise: Promise<CvatStore> | null = null;
 
-// An install with no store, or an unreachable sidecar, answers {} — no cached
-// rows offered anywhere in the app.
 export const fetchCvatStore = (): Promise<CvatStore> => {
   storePromise ??= fetch(CVAT_MANIFEST_URL)
     .then((res) => (res.ok ? res.json() : null))
@@ -120,7 +111,6 @@ export const fetchCvatStore = (): Promise<CvatStore> => {
   return storePromise;
 };
 
-// The manifest's tile indices as an extent in projected metres.
 const boundsExtent25833 = (
   bounds: CvatBounds,
 ): [number, number, number, number] | null => {
@@ -134,22 +124,15 @@ const boundsExtent25833 = (
   return [e[0], e[1], e[2], e[3]];
 };
 
-// A catalogue row synthesized from the store, for when the catalogue is down
-// or has dropped the flight. No WMS styles: only the service knows those, so a
-// flight placed this way offers the cached render and nothing else.
+// A catalogue row synthesized from the store, for when the catalogue is down or
+// has dropped the flight. No WMS styles: only the service knows those.
 const placeFromStore = (
   id: string,
   extent25833: [number, number, number, number] | null,
 ): LidarProject | null => {
   if (!extent25833) return null;
-  const lonLat = transformExtent(
-    extent25833,
-    'EPSG:25833',
-    'EPSG:4326',
-    // The edges bow under the transform; sampling keeps the lon/lat box
-    // around all of it rather than through it.
-    8,
-  );
+  // 8 stops per edge: the box bows under the transform.
+  const lonLat = transformExtent(extent25833, 'EPSG:25833', 'EPSG:4326', 8);
   return {
     id,
     projectName: id,
@@ -194,9 +177,8 @@ export const resolveCvatAcquisitions = (
     ];
   });
 
-// The catalogue is asked for but not depended on: a throw there is an empty
-// list of rows, not an empty list of acquisitions. Not memoised, so a list
-// built during a catalogue outage picks it back up afterwards.
+// Not memoised, so a list built during a catalogue outage picks the catalogue
+// back up afterwards.
 export const fetchCvatAcquisitions = async (): Promise<CvatAcquisition[]> => {
   const [store, projects] = await Promise.all([
     fetchCvatStore(),
@@ -216,9 +198,6 @@ export const stylesForFlight = (
   cached: CvatAcquisition | null,
 ): string[] => (cached ? [CVAT_STYLE, ...project.styles] : project.styles);
 
-// Unwritten tiles inside the extent answer 404, which OL leaves transparent:
-// that transparency is the coverage mask, so `sparse` turns off the retry that
-// would ask three times for each of them.
 export const buildCvatGroundConfig = (
   acquisition: CvatAcquisition,
 ): XYZBackgroundLayer => ({
@@ -230,47 +209,22 @@ export const buildCvatGroundConfig = (
   maxZoom: acquisition.maxZoom,
   // A miss is a SELECT against a bind-mounted database, so preloading is free.
   preload: 2,
+  // Unwritten tiles inside the extent answer 404; that transparency is the
+  // coverage mask.
   sparse: true,
-  // The store stops at z15 or z16 and the view goes to z20, so most levels are
-  // upsampled; smoothed, that seams at every tile edge (`types.ts`).
+  // The store stops at z15 or z16 and the view goes to z20 (`types.ts`).
   interpolate: false,
   coverageExtent: acquisition.extent25833
     ? { extent: acquisition.extent25833, crs: 'EPSG:25833' }
     : { extent: acquisition.project.bboxLonLat, crs: 'EPSG:4326' },
 });
 
-// The only acquisition in the store before the figure plate recorded which
-// one, so it is what a record written back then was taken over.
-export const CVAT_LEGACY_ACQUISITION_ID = 'Vestfold og Telemark 5pkt 2021';
-
-// The provenance plate. Transcribed from `vat-cache/cvat.py` rather than read
-// off the manifest: a downloaded figure travels off this host. One set for the
-// whole store — a run whose recipe disagrees with the manifest refuses to
-// write. Distinct from `VAT_STACK` in `terrain/shade.ts`, which describes the
-// client-side renderer and is free to diverge.
-
+// The provenance plate the render menu shows. Transcribed from
+// `vat-cache/cvat.py` rather than read off the manifest: a downloaded figure
+// travels off this host.
 export const CVAT_RENDERER = 'RVT';
 export const CVAT_TEMPLATE = 'VAT_Combined';
-
-// Bottom to top. Opacity is what each layer performs at, not what the template
-// names: `rvt.blend_func.blend_overlay` writes through its background, so the
-// manifest's 50 % on the openness layer behaves as 100 %.
-export const CVAT_STACK: readonly VatStackLayer[] = [
-  { vis: 'hillshade', blend: 'normal', opacity: 100 },
-  { vis: 'slope', blend: 'luminosity', opacity: 50 },
-  { vis: 'openPos', blend: 'overlay', opacity: 100 },
-  { vis: 'svf', blend: 'multiply', opacity: 25 },
-];
-
-// Degrees. Frozen: a moving sun makes two renders incomparable.
-export const CVAT_AZIMUTH = 315;
-
-// Sun height per preset, degrees.
-export const CVAT_SUN_ALTITUDE = { general: 35, flat: 15 } as const;
 
 // RVT's `max_rad`, in RVT's own pixels and the same at every level, so the
 // visualization's reach in metres grows as you zoom out.
 export const CVAT_RADIUS_PX = { general: 10, flat: 20 } as const;
-
-// Percent of the general preset laid over the flat one.
-export const CVAT_GENERAL_OPACITY = 50;

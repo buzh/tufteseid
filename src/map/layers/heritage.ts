@@ -6,8 +6,7 @@ import {
 } from '../../shared/utils/urlUtils';
 
 // The tables below are exhaustive rather than defaulted: a style a sublayer
-// does not publish is a ServiceException, i.e. a broken tile, while a published
-// style matching nothing is a transparent PNG.
+// does not publish is a ServiceException, i.e. a broken tile.
 
 // The three registers inside `/wms/ra/kulturminner2`.
 export const HERITAGE_DETAILS = [
@@ -18,8 +17,8 @@ export const HERITAGE_DETAILS = [
 
 export type HeritageDetail = (typeof HERITAGE_DETAILS)[number];
 
-// One axis: STYLES takes a single value per LAYERS entry, and RA publishes no
-// filled variant of any subset. The first two draw everything.
+// One axis: STYLES takes a single value per LAYERS entry. The first two draw
+// every record; the rest are `vernetype` subsets.
 export const HERITAGE_RENDERS = [
   'omriss',
   'flate',
@@ -32,7 +31,6 @@ export const HERITAGE_RENDERS = [
 
 export type HeritageRender = (typeof HERITAGE_RENDERS)[number];
 
-// The vern subsets: everything after the two whole-register renders.
 export const HERITAGE_VERN_RENDERS = HERITAGE_RENDERS.slice(
   2,
 ) as readonly HeritageRender[];
@@ -93,8 +91,8 @@ const PAINT_ORDER: readonly string[] = [
   'Enkeltminneikoner',
 ];
 
-// Null when the settings select nothing. The two lists are positional and of
-// equal length.
+// LAYERS and STYLES are positional and of equal length. Null when the settings
+// select nothing.
 export const heritageSitesParams = (
   details: ReadonlySet<HeritageDetail>,
   render: HeritageRender,
@@ -159,7 +157,7 @@ export const heritageOpacityAtom = atom<number>(readOpacity());
 export const heritageHiddenAtom = atom(false);
 
 // Called from the layer effect rather than the setters, so a link describes
-// what is on the map. Defaults are removed rather than written.
+// what is on the map.
 export const writeHeritageUrlParameters = (
   details: ReadonlySet<HeritageDetail>,
   render: HeritageRender,

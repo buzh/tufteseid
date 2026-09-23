@@ -99,7 +99,7 @@ export const createThemeLayerFromConfig = (
     source,
     properties: layerProperties,
     cacheSize: WMS_TILE_CACHE_SIZE,
-    // On-the-fly renders share one tile queue; coarse levels are not worth it.
+    // On-the-fly renders share one tile queue.
     preload: 0,
     ...(minZoom !== undefined ? { minZoom } : {}),
   });

@@ -23,8 +23,8 @@ export interface ThemeLayerCategory {
   featureInfoImageBaseUrl?: string;
   featureInfoFields?: FieldConfig[];
   extraWmsParams?: Record<string, string | number | boolean>;
-  // OpenLayers layer.minZoom: visible strictly above this zoom. Cascades to
-  // the category's layers unless one sets its own.
+  // OpenLayers layer.minZoom: visible strictly above this zoom. Cascades to the
+  // category's layers unless one sets its own.
   minZoom?: number;
 }
 
@@ -94,7 +94,7 @@ export const getParentCategory = (
   return getCategoryById(config, category.parentId);
 };
 
-// Undefined where nobody sets one, i.e. the layer draws at every zoom.
+// Undefined where nobody sets one: the layer draws at every zoom.
 export const themeLayerMinZoom = (id: string): number | undefined => {
   const def = getThemeLayerById(themeLayerConfig, id);
   if (!def) return undefined;

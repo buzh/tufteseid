@@ -25,8 +25,7 @@ import {
 } from './types';
 import { buildOrReuseBackgroundLayer, LayerNamespace } from './utils';
 
-// These answer transparent outside their coverage, so topo shows through. Not
-// the flyfoto mosaic: opaque JPEG.
+// These answer transparent outside their coverage, so topo shows through.
 const NEEDS_TOPO_BASE = new Set<BackgroundLayerName>([
   'lidarProject',
   'lidarHillshade',
@@ -36,7 +35,7 @@ const NEEDS_TOPO_BASE = new Set<BackgroundLayerName>([
 ]);
 
 // Which layers the LiDAR modifiers — hybrid overlay, contours, model — apply
-// to. Not NEEDS_TOPO_BASE, which also holds flyfotoProject.
+// to.
 export const LIDAR_LAYERS = new Set<BackgroundLayerName>([
   'lidarProject',
   'lidarHillshade',
@@ -60,7 +59,7 @@ const emptyBackgroundLayer: EmptyBackgroundLayer = {
   layerName: 'empty',
 };
 
-// Only the fixed layers; runtime choices are built by `pickLayerConfig` below.
+// Only the fixed layers; runtime choices are built by `pickLayerConfig`.
 export const allConfiguredBackgroundLayers = [
   emptyBackgroundLayer,
   ...KvCacheBackgroundLayers,
@@ -76,22 +75,20 @@ const buildLidarProjectConfig = (
   layerName: 'lidarProject',
   url: LIDAR_PROJECT_WMS_URL[model],
   props: {
-    // `wmsLidarStyle` guards the style: `cvat` is a render no service
-    // publishes, and the WMS answers an unknown one with a blank tile.
+    // The WMS answers an unknown style with a blank tile, and `cvat` is a
+    // render no service publishes.
     LAYERS: `${project.id}:${wmsLidarStyle(style)}`,
     VERSION: '1.3.0',
   },
   maxZoom: LIDAR_PROJECT_MAX_ZOOM,
-  // Capped below the view's depth, so deep views upsample; smoothed, that
-  // seams at every tile edge (`types.ts`).
+  // Capped below the view's depth, so deep views upsample (`types.ts`).
   interpolate: false,
   coverageExtent: { extent: project.bboxLonLat, crs: 'EPSG:4326' },
 });
 
 export type StackOptions = {
   lidarProject: LidarProject | null;
-  /** Null before the manifest and the catalogue have both landed, which is a
-      normal state at startup. */
+  /** Null until the manifest and the catalogue have both landed. */
   cvatAcquisition: CvatAcquisition | null;
   /** Already clamped for the model — see `effectiveLidarStyle`. */
   lidarStyle: string;
@@ -113,7 +110,8 @@ export type ResolvedStack = {
   under: StackEntry[];
   /** Bottom-first, and `over[0]` is always the featured dataset itself. */
   over: StackEntry[];
-  /** What the URL follows, rather than the atoms. */
+  /** What the URL follows, rather than the atoms: the modifiers only apply over
+   *  some grounds. */
   hybrid: boolean;
   contours: boolean;
 };
@@ -150,8 +148,8 @@ const pickLayerConfig = (
   }
 };
 
-// `null` means nothing to draw: an unknown name, or an archive layer with no
-// acquisition yet.
+// `null` means nothing to draw: an unknown name, or a per-acquisition ground
+// with no acquisition picked yet.
 export const resolveStack = (
   layerName: BackgroundLayerName,
   opts: StackOptions,
@@ -168,7 +166,7 @@ export const resolveStack = (
   }
 
   // The seamless product of the same kind, faded, under a dataset with holes.
-  // DTM under the cached ground, which has no model toggle to undo a held DOM.
+  // DTM under the cached ground: it has no model toggle to undo a held DOM.
   const fallback =
     layerName === 'lidarProject'
       ? buildNationalLidarConfig(DEFAULT_LIDAR_PROJECT_STYLE, opts.lidarModel)
@@ -208,9 +206,7 @@ export type BuiltStack = { under: BuiltLayer[]; over: BuiltLayer[] };
 
 /** Opacity and z-index come back alongside each layer rather than applied: a
  *  run found stale afterwards must not have faded or reordered a layer the
- *  current stack still uses. `null` if the featured layer failed. `host` is the
- *  map the layers are destined for; only the split view's right pane passes
- *  one. */
+ *  current stack still uses. `null` if the featured layer failed. */
 export const buildStack = async (
   stack: ResolvedStack,
   projection: string,

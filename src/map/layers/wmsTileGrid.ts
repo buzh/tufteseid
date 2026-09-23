@@ -5,8 +5,8 @@ import TileGrid from 'ol/tilegrid/TileGrid';
 // wms.geonorge.no rate-limits by source IP at roughly 120 GetMaps in a short
 // window; over it the answer is HTTP 200 with a 238-byte ServiceException,
 // which OpenLayers marks tile ERROR and never retries. 512 px quarters the
-// request count. TileWMS pins its pixel ratio to 1 unless `serverType` is set,
-// so this stays 512 on any display.
+// request count, and TileWMS pins its pixel ratio to 1 unless `serverType` is
+// set, so this stays 512 on any display.
 const WMS_TILE_SIZE = 512;
 
 // The View's zoom ladder divides the extent by 256 whatever tile size is in
@@ -25,7 +25,6 @@ const build = (
 ): TileGrid | null => {
   const projection = getProjection(projectionCode);
   const extent = projection?.getExtent();
-  // No extent means the View's whole-world fallback: a guessed grid misaligns.
   if (!extent) return null;
 
   // Mirrors View's createResolutionConstraint: max of the two spans, not width.
@@ -36,7 +35,7 @@ const build = (
     extent,
     origin: [extent[0], extent[3]],
     // Indexed by absolute z: a source holding only deep levels still gets the
-    // whole array and is fenced off by minZoom and the array's end.
+    // whole array, fenced off by minZoom and the array's end.
     resolutions: Array.from(
       { length: maxZoom + 1 },
       (_, z) => maxResolution / 2 ** z,

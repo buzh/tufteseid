@@ -28,8 +28,8 @@ export const activeLidarProjectHalves = halved<LidarProject | null>(null);
 
 export const liveLidarProjectsAtom = acrossHalves(activeLidarProjectHalves);
 
-// Holds the picked DTM style: `effectiveLidarStyle` overrides rather than
-// overwrites, so the DTM choice survives a trip through DOM.
+// The picked DTM style: `effectiveLidarStyle` overrides rather than overwrites,
+// so the DTM choice survives a trip through DOM.
 export const activeLidarStyleHalves = halved<string>('skyggerelieff');
 
 export const activeLidarModelHalves = halved<LidarModel>(
@@ -68,8 +68,8 @@ export const effectiveLidarStyle = (
   model: LidarModel,
 ): string => (model === 'dom' ? DOM_STYLES[0] : style);
 
-// The only namer of the two flight grounds: a surface that moved the style or
-// the model without it would put `cvat` in a GetMap.
+// The only namer of the two flight grounds; bypassing it can put `cvat` in a
+// GetMap.
 export const lidarFlightGround = (
   style: string,
   model: LidarModel,
@@ -102,9 +102,9 @@ export const resolveLidarStyle = (
       published[0] ??
       DEFAULT_LIDAR_PROJECT_STYLE);
 
-// The clamp above, plus one upgrade: the default hillshade becomes `cvat`
-// where the store holds the flight. Kept out of `resolveLidarStyle`, which
-// recreates a recorded render and must not substitute one.
+// The clamp above, plus one upgrade: the default hillshade becomes `cvat` where
+// the store holds the flight. Kept out of `resolveLidarStyle`, which recreates
+// a recorded render and must not substitute one.
 export const preferredLidarRender = (
   published: string[],
   preferred: string,
@@ -117,8 +117,8 @@ export const preferredLidarRender = (
 // `dynamisk_farget_hoyde` ramps per tile, so neighbouring tiles disagree.
 const EXCLUDED_STYLES = new Set<string>(['None', 'dynamisk_farget_hoyde']);
 
-// The published set is whatever GetCapabilities lists, so an untranslated
-// suffix is prettified rather than dropped.
+// GetCapabilities may list a style with no translation, so an unknown suffix is
+// prettified rather than dropped.
 export const lidarStyleLabel = (style: string): string => {
   const known = t(`lidar.style.${style}`, { defaultValue: '' });
   if (known) return known;
@@ -146,8 +146,7 @@ export function fetchLidarProjects(): Promise<LidarProject[]> {
       return projects;
     } catch (err) {
       // Flights are appended to this document, never revised, so an expired
-      // copy is only missing the newest. `ts` is left alone: the next call
-      // tries the network again.
+      // copy is only missing the newest.
       const stale = readCache(true);
       if (!stale) throw err;
       console.warn('[lidar] catalogue unavailable; using the stale copy', err);
@@ -275,12 +274,12 @@ function writeCache(projects: LidarProject[]) {
     const entry: CachedEntry = { ts: Date.now(), projects };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entry));
   } catch {
-    // Ignore quota / unavailable storage.
+    /* quota or unavailable storage */
   }
 }
 
-// pointDensity is a string like "10pkt"; the leading digits order it.
-export const densityOrder = (d: string | null): number => {
+// pointDensity is a string like "10pkt".
+export const densityValue = (d: string | null): number => {
   if (!d) return 0;
   const m = d.match(/^(\d+)/);
   return m ? parseInt(m[1], 10) : 0;
@@ -293,8 +292,8 @@ export const sortProjectsByRelevance = (
   const ay = a.year ?? -Infinity;
   const by = b.year ?? -Infinity;
   if (ay !== by) return by - ay;
-  const ad = densityOrder(a.pointDensity);
-  const bd = densityOrder(b.pointDensity);
+  const ad = densityValue(a.pointDensity);
+  const bd = densityValue(b.pointDensity);
   if (ad !== bd) return bd - ad;
   return a.projectName.localeCompare(b.projectName);
 };
@@ -397,6 +396,6 @@ function writeNationalCache(styles: string[]) {
       JSON.stringify({ ts: Date.now(), styles }),
     );
   } catch {
-    /* quota / unavailable */
+    /* quota or unavailable storage */
   }
 }

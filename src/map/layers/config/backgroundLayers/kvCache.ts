@@ -9,7 +9,6 @@ const KvCacheProvider: LayerProvider = {
     '/v1/service?Request=GetCapabilities&Service=WMTS',
 };
 
-// `layerName` is the WMTS identifier the cache is asked for.
 export const KvCacheBackgroundLayers: BackgroundLayer[] = [
   { type: 'WMTS', layerName: 'topo', provider: KvCacheProvider },
   { type: 'WMTS', layerName: 'topograatone', provider: KvCacheProvider },

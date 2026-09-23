@@ -19,7 +19,7 @@ const VARIANTS: ReadonlySet<string> = new Set(KART_VARIANTS);
 export const isKartVariant = (name: string): name is KartVariant =>
   VARIANTS.has(name);
 
-// Amtskartserien (1:200 000). Transparent and in NEEDS_TOPO_BASE: the series
+// Amtskartserien (1:200 000). Transparent, and in NEEDS_TOPO_BASE: the series
 // stopped around 1917 and never covered Nordland.
 export const AMTSKART_CONFIG: XYZBackgroundLayer = {
   type: 'XYZ',
@@ -30,7 +30,7 @@ export const AMTSKART_CONFIG: XYZBackgroundLayer = {
   maxZoom: VIEW_MAX_ZOOM,
   preload: 0,
   sparse: false,
-  // The layer's declared EPSG:25833 bounds; without it OL asks for open ocean.
+  // The layer's declared EPSG:25833 bounds.
   coverageExtent: {
     extent: [-127998, 6377920, 1145510, 7976800],
     crs: 'EPSG:25833',

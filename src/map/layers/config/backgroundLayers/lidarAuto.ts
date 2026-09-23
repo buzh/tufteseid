@@ -7,9 +7,9 @@ export const lidarAutoDatasetHalves = halved(true);
 export const liveLidarAutoAtom = acrossHalves(lidarAutoDatasetHalves);
 
 // View resolution in metres per pixel (EPSG:25833, so ground metres). The
-// mosaic is a 1 m grid.
+// national mosaic is a 1 m grid; release is one factor-2 zoom step of
+// hysteresis.
 export const AUTO_ENGAGE_M_PER_PX = 1;
-// Hysteresis of one factor-2 zoom step.
 export const AUTO_RELEASE_M_PER_PX = 2;
 
 // Screen fraction a project must paint to be given the background, and to keep
@@ -55,7 +55,7 @@ export const chooseAutoDataset = ({
   // Too wide for the footprint WFS: fall back to the layer that always covers.
   if (viewport.status === 'zoomedOut') return { kind: 'national' };
 
-  // Breaker open: the list is what the cVAT store holds, and the mosaic no
+  // Breaker open: the list is what the cVAT store holds and the mosaic no
   // longer covers everywhere, so rank without the incumbent rule below.
   if (viewport.status === 'held') {
     const best = viewport.primary[0];
@@ -66,8 +66,9 @@ export const chooseAutoDataset = ({
 
   if (viewport.status !== 'ready') return { kind: 'hold' };
 
-  // Keep the incumbent while it still owns a fair share of the screen, or
-  // panning along a seam reshuffles the ranking every few hundred metres.
+  // Keep the incumbent while it still owns a fair share of the screen;
+  // otherwise panning along a seam reshuffles the ranking every few hundred
+  // metres.
   if (current) {
     const held = viewport.primary.find((e) => e.project.id === current.id);
     if (held && held.areaRatio >= AUTO_RELEASE_COVERAGE) {

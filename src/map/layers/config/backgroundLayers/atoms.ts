@@ -21,7 +21,7 @@ import { clearBackgroundLayer, swapBackgroundLayers } from './utils';
 
 // Startup values the URL parameter may name. Not `lidarProject` or
 // `flyfotoProject`: their acquisition atom starts null and only the user can
-// fill it, so a cold load into either renders nothing, indefinitely.
+// fill it, so a cold load into either would render nothing indefinitely.
 // `lidarCvat` is in it because Automatisk derives its flight on every load.
 const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'topo',
@@ -65,8 +65,8 @@ export const hybridContoursHalves = halved<boolean>(
   getUrlParameter('contours') === 'true',
 );
 
-// Which run of the effect below is current: the build awaits and key-repeat
-// outruns it, so a stale run must not install a stack already cycled past.
+// The build awaits and key-repeat outruns it, so a stale run must not install a
+// stack already cycled past.
 let swapGeneration = 0;
 
 export const backgroundLayerAtomEffect = atomEffect((get) => {
@@ -124,8 +124,7 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
       if (generation !== swapGeneration) return;
       if (!built) return;
 
-      // Always explicit: a reused layer still carries an earlier swap's fade
-      // and z-index.
+      // A reused layer still carries an earlier swap's fade and z-index.
       for (const { layer, opacity, zIndex } of [
         ...built.under,
         ...built.over,
