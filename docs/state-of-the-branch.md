@@ -178,10 +178,11 @@ same code that moves it for a followed link. Their own and not every record the
 session may see: the map draws other people's public pins where they are, but
 an index is a list of what you are answerable for. It is a `Menu` rather than
 the overlay's `Popover` because every row in it is a transaction that ends the
-visit. Signed out it opens the sign-in dialog, like the `+`; while a draft is
-open it is dimmed and does nothing, for the reason the map's own click handler
-is deaf then — the pin is being placed, and a row would move the map off it and
-open a card the draft box is standing in front of. Neither state takes the box
+visit. Signed out it opens the sign-in dialog, like the `+`; while a spot of the
+reader's own is being made it is dimmed and does nothing, for the reason the
+map's own click handler is deaf then — with the pin still on the cursor a row
+would fly the map out from under the click about to place it, and with the pin
+down it would open a card the draft box is standing in front of. Neither state takes the box
 off the row: the tools are pinned to the right of the band, so a box that came
 and went would move the `+` beside it under the cursor about to press it.
 
@@ -193,10 +194,11 @@ point, an optional drawing, a visibility and a six-character code.
 field what it does differently. Pictures, scenes and the funn/bilde distinction
 are deliberately out.
 
-The workflow is four gestures and the box reads down them in that order: place
+The workflow is five gestures and the box reads down them in that order: place
 the pin, name it, say what you saw, draw over the terrain, save. `src/spots/` is
-the map half — the draft atoms, the draggable pin (`pinAdjust.ts`, modelled on
-the terrain window's handles), the list of records and the layer that draws them
+the map half — the draft atoms, the pin on the cursor (`pinPlace.ts`) and the
+draggable pin it becomes (`pinAdjust.ts`, modelled on the terrain window's
+handles), the list of records and the layer that draws them
 as pins, the place-name lookup that fills the name field in while the pin stands
 still (`spotName.ts`, whose ranking vocabulary came over from `main` unchanged),
 and the short link. `src/spotControls/` is the box: `SpotPanel` while it is being
@@ -204,6 +206,32 @@ written, `SpotCard` once it has been saved, sharing one stylesheet and one corne
 because only ever one of them is up. Both are a `Panel`, and the draft's way out is the
 close in its corner rather than a second button beside `Lagre` — guarded, so a
 draft with anything typed or drawn in it asks twice.
+
+**The `+` arms; the map places.** Pressing it puts the pin on the cursor and
+opens nothing — `spotPlacingAtom`, an atom beside the draft rather than a third
+`stage`, because there is no draft yet to hold a stage. The click that follows
+is what creates one, at the coordinate the reader aimed at, and the box opens
+with the pin already where it belongs. The earlier flow put a pin down at the
+centre of the screen and invited the reader to drag it, which made their first
+gesture a correction of the app's guess and left a box open over ground nobody
+had pointed at. While the `+` is armed the viewport's own cursor is taken away
+and the drawn pin stands in for it, every other click handler on the map stands
+down (`spotLayer.ts`, `useHeritageInfo.ts`), `Esc` and a second press of the `+`
+put it back, and a line at the top centre of the map says so for the reader who
+is not watching the pointer and for the touch screen that has none. Armed and
+drafting are exclusive: every writer of `spotDraftAtom` clears the flag.
+
+The pin itself is a physical pin — a papaya head on a leaning steel shaft, its
+point at the coordinate, cased in white and edged in black so it survives
+hillshade, autumn birch and snow (`pinStyle.ts`, one file for all three states:
+on the cursor, in the hand, saved). The lean is load-bearing: a symmetrical
+marker stands on top of the mound it is marking, where this one stands beside it
+and points at it. What a saved spot wears over its head is a small plate with
+its name on it, which replaced outlined text with no plate — a plate hides a
+little relief, and that is the price of a name that is still a name over
+ortofoto. Because the anchor is the tip and the head is fifteen pixels above it,
+what counts as taking hold of a pin is the silhouette rather than a radius
+around the point (`withinDraftPin`).
 
 Three draft atoms rather than one, split by who writes them at what rate.
 `spotDraftAtom` is written by the pin drag sixty times a second, `spotFormAtom`
@@ -434,7 +462,8 @@ The rows below without a writer still have none.
 | `heritageDetailsAtom`, `heritageRenderAtom`, `heritageOpacityAtom`, `heritageHiddenAtom` | `layers/heritage.ts` | how they are drawn | `useHeritageControls` |
 | `heritageTipAtom`, `heritagePopupAtom` | `map/featureInfo/atoms.ts` | what the pointer found, and what a click kept | `useHeritageInfo` |
 | `terrainWindowAtom`, `terrainAdjustingAtom` (+ the `open`/`adjust`/`close` writers) | `terrain/window.ts` | the rectangle under analysis, null for no analysis, and whether it is still being placed | `useTerrainToggle`, `useTerrainControls`, `windowAdjust.ts` |
-| `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom` (+ the `open`/`edit`/`close`/`setStage` writers) | `spots/atoms.ts` | the lokalitet being written: where its pin is and which gesture has the pointer, what has been typed, what has been drawn | `SpotToggle`, `useSpotDraft`, `pinAdjust.ts`, `SketchCanvas` |
+| `spotPlacingAtom` | `spots/atoms.ts` | the `+` is armed: the pin is on the cursor and the next click on the map places it | `SpotToggle`, `pinPlace.ts`, `SpotMenu`, `useSpotLayer`, `useHeritageInfo` |
+| `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom` (+ the `place`/`edit`/`close`/`setStage` writers) | same | the lokalitet being written: where its pin is and which gesture has the pointer, what has been typed, what has been drawn | `SpotToggle`, `useSpotDraft`, `pinAdjust.ts`, `SketchCanvas` |
 | `activeSpotAtom` | same | the lokalitet being read — opened by a click, by a row in the index, or by `?lok=` | `useSpotLayer`, `useSpotShareLink`, `SpotCard`, `SpotMenu`, `useSpotDraft` |
 | `spotRecordsAtom`, `spotsFailedAtom` (+ `mySpotsAtom`) | `spots/spotRecords.ts` | every lokalitet the session may see, null until the list lands, and whether it never did | `useSpotRecords` |
 | `sketchSessionAtom` | `sketch/session.ts` | the map is frozen and Excalidraw has it | `useSketchSession` |

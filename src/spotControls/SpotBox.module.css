@@ -1,7 +1,8 @@
-/* The spot box, in both its faces: the draft being written (`SpotPanel`) and
-   the spot being read (`SpotCard`). One stylesheet because they are one box as
-   far as a reader is concerned — the card is what the panel becomes once it has
-   been saved — and only one of them is ever up.
+/* What a spot puts over the map: the prompt while its pin is being placed
+   (`SpotPlacePrompt`), the box the draft is written in (`SpotPanel`) and the
+   box the saved record is read in (`SpotCard`). One stylesheet because they are
+   one thing as far as a reader is concerned — each is what the one before it
+   becomes — and never two of them at once.
 
    Top right, where the terrain analysis has the top left: the two can be up at
    once — framing a relief analysis and then marking what it showed is the whole
@@ -21,6 +22,33 @@
   width: 19rem;
   max-width: calc(100% - 2 * var(--mantine-spacing-xs));
   max-height: calc(100% - 2 * var(--mantine-spacing-xs));
+}
+
+/* The line that stands while the pin is on the cursor. Top centre, the one edge
+   of the map neither box claims, and deaf to the pointer: the click it is
+   asking for goes to the map under it, and a prompt that swallowed one where it
+   happens to lie would be the one place on the map a pin cannot go. */
+.prompt {
+  position: absolute;
+  top: var(--mantine-spacing-xs);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: var(--mantine-spacing-xs);
+  max-width: calc(100% - 2 * var(--mantine-spacing-xs));
+  padding: 4px var(--mantine-spacing-sm);
+  border: 1px solid var(--mantine-color-papaya-6);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-body);
+  box-shadow: var(--mantine-shadow-sm);
+  font-size: var(--mantine-font-size-xs);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.promptKey {
+  color: var(--mantine-color-dimmed);
 }
 
 /* The coordinate and the button that gives it back. The reading is the control:

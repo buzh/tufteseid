@@ -23,6 +23,7 @@ import {
   queryHeritageAt,
 } from '../map/featureInfo/heritageQuery';
 import type { FeatureInfoReading } from '../map/featureInfo/types';
+import { spotPlacingAtom } from '../spots/atoms';
 import { spotAtPixel } from '../spots/hitTest';
 import { terrainAdjustingAtom } from '../terrain/window';
 
@@ -83,7 +84,10 @@ export const useHeritageInfo = (): HeritageInfo => {
         // over the ground being framed answers a question nobody asked. Read
         // from the store rather than taken as a dependency so that turning it
         // on does not rebind every listener in here.
-        if (store.get(terrainAdjustingAtom)) {
+        // A pin on the cursor takes it the same way, and more completely: the
+        // cursor is the pin there, so a `pointer` glyph set from in here would
+        // be drawn over the thing being aimed.
+        if (store.get(terrainAdjustingAtom) || store.get(spotPlacingAtom)) {
           forget();
           return;
         }
@@ -120,6 +124,10 @@ export const useHeritageInfo = (): HeritageInfo => {
 
       map.on('singleclick', (e) => {
         if (!heritageIsQueryable(map)) return;
+        // The click that places a new pin is that pin's and nothing else's: a
+        // popup raised by it would stand where the reader is about to write
+        // (`spots/pinPlace.ts`).
+        if (store.get(spotPlacingAtom)) return;
         // A click on one of the reader's own pins is that pin's: it opens the
         // card, and the register answering the same click would raise a popup
         // over it (`spots/spotLayer.ts`).

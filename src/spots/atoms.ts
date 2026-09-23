@@ -1,8 +1,6 @@
 import { atom } from 'jotai';
 
 import type { SpotPoint, SpotRecord, SpotSketch } from '../api/spots';
-import { mapAtom } from '../map/atoms';
-import { viewportCentre4326 } from './geo';
 
 /**
  * A spot being authored, or null for none. Everything the surface does is a
@@ -18,8 +16,8 @@ import { viewportCentre4326 } from './geo';
  */
 export type SpotDraft = {
   /**
-   * A new value every time the `+` is pressed. Surfaces key off it, so opening
-   * a second draft remounts them rather than leaving the first one's component
+   * A new value every time a pin goes down. Surfaces key off it, so opening a
+   * second draft remounts them rather than leaving the first one's component
    * state behind.
    */
   id: string;
@@ -50,35 +48,50 @@ export const spotSketchAtom = atom<SpotSketch | null>(null);
  */
 export const activeSpotAtom = atom<SpotRecord | null>(null);
 
+/**
+ * The `+` is armed: the pin is on the cursor and the next click on the map is
+ * where it goes. There is no draft yet — nothing has been named, nothing can be
+ * abandoned — which is why this is an atom of its own rather than a third
+ * `stage`, the way `terrainAdjustingAtom` stands beside the terrain window.
+ *
+ * A pin the reader places is a pin they aimed. Putting one down for them at the
+ * centre of the screen and inviting them to drag it made the first gesture a
+ * correction of the app's guess, and left a draft open over ground nobody had
+ * pointed at.
+ *
+ * Armed and drafting are exclusive: every writer of `spotDraftAtom` below
+ * clears this, so there is never a pin on the cursor and a pin in the hand.
+ */
+export const spotPlacingAtom = atom(false);
+
 let draftCounter = 0;
 
 /**
- * Start a new spot at the centre of what is on the screen, with the pin live
- * so it can be dragged onto the thing it is about. False means the map has no
- * size yet — before first layout — which is not a state a reader can be in and
- * which the caller therefore passes over in silence.
+ * Put the pin down, and open the box beside it. The stage is `pin`, so the
+ * placement can still be nudged by dragging it.
  *
  * Nothing is written to the server here. A draft is free until `Lagre`, which
- * is what lets a reader open one, look at the relief, and abandon it.
+ * is what lets a reader place one, look at the relief, and abandon it.
  */
-export const openSpotDraftAtom = atom(null, (get, set): boolean => {
-  const centre = viewportCentre4326(get(mapAtom));
-  if (!centre) return false;
+export const placeSpotDraftAtom = atom(null, (_get, set, point: SpotPoint) => {
   draftCounter += 1;
+  set(spotPlacingAtom, false);
   set(spotDraftAtom, {
     id: `draft-${draftCounter}`,
     recordId: null,
-    point: centre,
+    point,
     stage: 'pin',
   });
   set(spotFormAtom, { name: '', description: '' });
   set(spotSketchAtom, null);
-  return true;
 });
 
-/** Open an existing spot for another edit, pin first, exactly as a new one. */
+/** Open an existing spot for another edit. It keeps the point it was saved at —
+ *  a spot that is already somewhere is not placed again, it is corrected — and
+ *  the pin is live, so dragging it is how that correction is made. */
 export const editSpotDraftAtom = atom(null, (_get, set, record: SpotRecord) => {
   draftCounter += 1;
+  set(spotPlacingAtom, false);
   set(spotDraftAtom, {
     id: `draft-${draftCounter}`,
     recordId: record.id,
@@ -92,8 +105,9 @@ export const editSpotDraftAtom = atom(null, (_get, set, record: SpotRecord) => {
   set(spotSketchAtom, record.sketch);
 });
 
-/** Put the draft down — saved, or abandoned. All three, so the next `+` starts clean. */
+/** Put the draft down — saved, or abandoned. All of it, so the next `+` starts clean. */
 export const closeSpotDraftAtom = atom(null, (_get, set) => {
+  set(spotPlacingAtom, false);
   set(spotDraftAtom, null);
   set(spotFormAtom, { name: '', description: '' });
   set(spotSketchAtom, null);

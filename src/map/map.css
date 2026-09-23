@@ -61,3 +61,12 @@
 #map {
   touch-action: none;
 }
+
+/* The map's cursor is written on the viewport (`map/cursorLease.ts`), and the
+   overlays pinned to the ground live inside it. While a spot's pin is being
+   placed that value is `none` — the pin is the cursor — and a card inheriting
+   it would be the one surface on the screen with no pointer to click its links
+   with. Overlays keep their own. */
+.ol-overlaycontainer-stopevent {
+  cursor: auto;
+}

@@ -16,8 +16,9 @@
 // terrain rectangle there is no second atom saying "not yet".
 //
 // The whole pin is the handle, not a corner of it. A reader dragging a marker
-// aims at the marker, and a hit test that only answered on the point would mean
-// grabbing the tip of a pin whose head is what is drawn.
+// aims at the head, which stands fifteen pixels above the coordinate the
+// feature is at, so what counts as taking hold is the silhouette rather than a
+// radius around the point (`withinDraftPin` in `pinStyle.ts`).
 
 import { useAtomValue, useStore } from 'jotai';
 import { Feature } from 'ol';
@@ -32,10 +33,7 @@ import { useEffect } from 'react';
 import { mapAtom } from '../map/atoms';
 import { cursorLease } from '../map/cursorLease';
 import { spotDraftAtom } from './atoms';
-import { PIN_Z_INDEX, draftPinStyle } from './pinStyle';
-
-/** How near the pin counts as taking hold of it, in pixels around its anchor. */
-const GRAB_PX = 18;
+import { PIN_Z_INDEX, draftPinStyle, withinDraftPin } from './pinStyle';
 
 type Store = ReturnType<typeof useStore>;
 
@@ -104,10 +102,7 @@ export const useSpotPinAdjust = () => {
       if (!position) return false;
       const pixel = map.getPixelFromCoordinate(position);
       if (!pixel) return false;
-      return (
-        Math.hypot(pixel[0] - event.pixel[0], pixel[1] - event.pixel[1]) <=
-        GRAB_PX
-      );
+      return withinDraftPin(event.pixel[0] - pixel[0], event.pixel[1] - pixel[1]);
     };
 
     let dragging = false;
@@ -121,10 +116,12 @@ export const useSpotPinAdjust = () => {
       if (!dragging) return;
       const current = store.get(spotDraftAtom);
       if (!current) return;
-      // The pin goes where the pointer is rather than following a grab offset:
+      // The tip goes where the pointer is rather than following a grab offset:
       // the point being placed is the one under the cursor, and a pin that kept
       // the offset it was grabbed with would settle a few metres off what the
-      // reader aimed at.
+      // reader aimed at. So a pin taken by the head snaps its tip under the
+      // hand, which is where placing one put it in the first place
+      // (`pinPlace.ts`).
       const [lon, lat] = transform(event.coordinate, view, 'EPSG:4326');
       store.set(spotDraftAtom, { ...current, point: [lon, lat] });
     };

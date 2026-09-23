@@ -23,7 +23,7 @@ import { useEffect, useMemo } from 'react';
 
 import type { SpotRecord } from '../api/spots';
 import { mapAtom } from '../map/atoms';
-import { activeSpotAtom, spotDraftAtom } from './atoms';
+import { activeSpotAtom, spotDraftAtom, spotPlacingAtom } from './atoms';
 import { SPOT_LAYER_ID, SPOT_RECORD_KEY, spotAtPixel } from './hitTest';
 import { PIN_Z_INDEX, spotStyle } from './pinStyle';
 import { spotRecordsAtom } from './spotRecords';
@@ -46,6 +46,7 @@ export const useSpotLayer = () => {
   const records = useAtomValue(spotRecordsAtom);
   const active = useAtomValue(activeSpotAtom);
   const draft = useAtomValue(spotDraftAtom);
+  const placing = useAtomValue(spotPlacingAtom);
   const setActive = useSetAtom(activeSpotAtom);
   const store = useStore();
 
@@ -108,10 +109,10 @@ export const useSpotLayer = () => {
   // Opening one.
   useEffect(() => {
     const onClick = (event: MapBrowserEvent) => {
-      // Deaf while a draft is open: the pin is being placed, and a click that
-      // opened somebody else's spot mid-placement would replace the box the
-      // reader is typing in.
-      if (draft) return;
+      // Deaf while a spot of the reader's own is being made: the same click is
+      // what puts the new pin down (`pinPlace.ts`), and once it is down a click
+      // that opened somebody else's spot would replace the box being typed in.
+      if (draft || placing) return;
       const hit = spotAtPixel(map, event.pixel);
       if (hit) setActive(hit);
     };
@@ -119,5 +120,5 @@ export const useSpotLayer = () => {
     return () => {
       map.un('singleclick', onClick);
     };
-  }, [map, setActive, draft]);
+  }, [map, setActive, draft, placing]);
 };

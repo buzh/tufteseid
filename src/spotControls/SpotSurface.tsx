@@ -19,14 +19,17 @@ import { useSketchSession } from '../sketch/useSketchSession';
 import {
   activeSpotAtom,
   spotDraftAtom,
+  spotPlacingAtom,
   spotSketchAtom,
 } from '../spots/atoms';
 import { useSpotPinAdjust } from '../spots/pinAdjust';
+import { useSpotPlacement } from '../spots/pinPlace';
 import { useSpotShareLink } from '../spots/shareLink';
 import { useSpotLayer } from '../spots/spotLayer';
 import { useSpotRecords } from '../spots/spotRecords';
 import { SpotCard } from './SpotCard';
 import { SpotPanel } from './SpotPanel';
+import { SpotPlacePrompt } from './SpotPlacePrompt';
 import { useSpotDraft } from './useSpotDraft';
 
 // Fetched when a pen is first picked up, not when the map loads. This surface
@@ -52,6 +55,7 @@ const SpotDraftBox = () => {
 
 export const SpotSurface = () => {
   const draft = useAtomValue(spotDraftAtom);
+  const placing = useAtomValue(spotPlacingAtom);
   const active = useAtomValue(activeSpotAtom);
   const session = useAtomValue(sketchSessionAtom);
   const drawn = useAtomValue(spotSketchAtom);
@@ -79,13 +83,14 @@ export const SpotSurface = () => {
     [session, editing, drawn, active?.id, active?.updated],
   );
 
-  // Warmed as soon as there is a draft: `Tegn` freezes the map before the
-  // canvas mounts, and waiting on the network with the map already stopped is
-  // the one moment the split above would be felt.
+  // Warmed from the press of the `+`, which is a second or two before there is
+  // even a draft: `Tegn` freezes the map before the canvas mounts, and waiting
+  // on the network with the map already stopped is the one moment the split
+  // above would be felt.
   useEffect(() => {
-    if (!editing) return;
+    if (!editing && !placing) return;
     void import('../sketch/SketchCanvas');
-  }, [editing]);
+  }, [editing, placing]);
 
   // The one fetch and the one subscription behind both readers of the list —
   // the pins here and the index in the band. Mounted with the map because that
@@ -93,6 +98,7 @@ export const SpotSurface = () => {
   useSpotRecords();
   useSpotLayer();
   useSpotShareLink();
+  useSpotPlacement();
   useSpotPinAdjust();
   useSketchSession(draft?.stage === 'sketch');
   useSketchOverlay(shown);
@@ -109,6 +115,9 @@ export const SpotSurface = () => {
           <SketchCanvas key={session.id} session={session} />
         </Suspense>
       )}
+      {/* The caption under the pin on the cursor. It stands in its own corner
+          of the map, so it does not displace whatever box is already up. */}
+      {placing && <SpotPlacePrompt />}
       {/* One box at a time, and the draft wins: they occupy the same corner,
           and a draft is the thing the reader is doing. Keyed on the spot so
           opening a second one does not inherit the first one's confirm. */}

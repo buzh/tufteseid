@@ -31,7 +31,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { SpotRecord } from '../api/spots';
 import { isAuthDialogOpenAtom, isSignedInAtom } from '../auth/atoms';
-import { activeSpotAtom, spotDraftAtom } from '../spots/atoms';
+import { activeSpotAtom, spotDraftAtom, spotPlacingAtom } from '../spots/atoms';
 import { mySpotsAtom, spotsFailedAtom } from '../spots/spotRecords';
 import { ControlChip } from '../ui/ControlChip';
 import { Icon } from '../ui/Icon';
@@ -64,6 +64,7 @@ export const SpotMenu = () => {
   const failed = useAtomValue(spotsFailedAtom);
   const active = useAtomValue(activeSpotAtom);
   const draft = useAtomValue(spotDraftAtom);
+  const placing = useAtomValue(spotPlacingAtom);
   const setActive = useSetAtom(activeSpotAtom);
   const openAuthDialog = useSetAtom(isAuthDialogOpenAtom);
 
@@ -79,12 +80,13 @@ export const SpotMenu = () => {
         ),
       ) ?? null);
 
-  // Deaf while a draft is open, for the reason the map's own click handler is:
-  // the pin is being placed, and a row in here would move the map off it and
-  // open a card the draft box is standing in front of. Dimmed and inert rather
-  // than gone — the boxes in this row must not move under a cursor that is
-  // about to press the `+` beside it.
-  const drafting = draft != null;
+  // Deaf for as long as a spot of the reader's own is being made, for the
+  // reason the map's own click handler is: with the pin on the cursor a row in
+  // here would fly the map out from under the click about to place it, and with
+  // the pin down it would open a card behind the box being typed in. Dimmed and
+  // inert rather than gone — the boxes in this row must not move under a cursor
+  // that is about to press the `+` beside it.
+  const drafting = draft != null || placing;
 
   const title = !signedIn
     ? t('spots.mine.needsAccount')

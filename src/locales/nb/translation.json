@@ -197,6 +197,9 @@
   "spots": {
     "new": "Ny lokalitet",
     "newNeedsAccount": "Logg inn for å lage en lokalitet",
+    "placeCancel": "Avbryt plasseringen",
+    "placeHint": "Klikk i kartet for å plassere nåla",
+    "placeEscape": "Esc avbryter",
     "newTitle": "Ny lokalitet",
     "editTitle": "Rediger lokalitet",
     "name": "Navn",
@@ -230,7 +233,7 @@
       "label": "Mine lokaliteter",
       "count": "Mine lokaliteter ({{total}})",
       "needsAccount": "Logg inn for å se lokalitetene dine",
-      "busy": "Legg fra deg utkastet for å bla i lokalitetene dine",
+      "busy": "Legg fra deg den nye lokaliteten for å bla i lokalitetene dine",
       "loading": "Henter …",
       "failed": "Fikk ikke hentet lokalitetene dine.",
       "empty": "Du har ingen lokaliteter ennå. Trykk + for å lage en.",

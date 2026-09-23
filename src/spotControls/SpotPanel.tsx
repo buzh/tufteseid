@@ -3,8 +3,9 @@
 //
 // Four things in a fixed order, and the order is the workflow: what it is
 // called, what you saw, where it is, what you drew. The coordinate is late
-// because it is the one field the reader does not type — it is already right
-// when the box opens, and `Endre` is there for the times it is not.
+// because it is the one field the reader does not type, and because by the time
+// this box exists they have already aimed it — the box opens on the click that
+// placed the pin. `Endre` is there for the nudge afterwards.
 //
 // The way out is the box's own close and not a second button beside `Lagre`:
 // one abandon verb, in the corner every other box has it in, and it asks twice
