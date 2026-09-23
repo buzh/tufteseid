@@ -5,6 +5,12 @@
   left: 10px;
   bottom: 52px;
   right: auto;
+  /* One shadow over the whole control — bar, ticks and labels alike, since
+     `drop-shadow` follows the alpha rather than the box — so a 10px strip
+     still lifts off broken ground. Anthracite 9 with alpha, which is a literal
+     because the theme carries the colour but not a translucent form of it. */
+  filter: drop-shadow(0 1px 2px rgba(24, 30, 32, 0.85))
+    drop-shadow(0 0 6px rgba(24, 30, 32, 0.5));
 }
 
 @media (max-width: 768px) {
