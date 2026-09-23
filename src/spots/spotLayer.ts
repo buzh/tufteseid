@@ -1,11 +1,15 @@
 // The saved spots on the map, and the click that opens one.
 //
 // What is drawn depends on who is looking, and that is deliberate. Signed in,
-// the layer lists: your own spots and every public one, which is the index the
-// record is for. Signed out, it lists nothing and draws only the single record
-// a short link resolved — a visitor who followed `/l/K7M2QX` came for that
-// spot, and turning the map into a gazetteer of everybody's public pins for
-// anyone who loads the page is a different product with different consent.
+// the layer draws the list: your own spots and every public one, which is the
+// index the record is for. Signed out, there is no list and it draws only the
+// single record a short link resolved — a visitor who followed `/l/K7M2QX`
+// came for that spot, and turning the map into a gazetteer of everybody's
+// public pins for anyone who loads the page is a different product with
+// different consent.
+//
+// The list itself is `spotRecords.ts`, which the band's index reads too. This
+// module draws what is there and asks for nothing.
 
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { Feature } from 'ol';
@@ -17,12 +21,12 @@ import { transform } from 'ol/proj';
 import VectorSource from 'ol/source/Vector';
 import { useEffect, useMemo } from 'react';
 
-import { listSpots, subscribeSpots, type SpotRecord } from '../api/spots';
-import { currentUserAtom } from '../auth/atoms';
+import type { SpotRecord } from '../api/spots';
 import { mapAtom } from '../map/atoms';
 import { activeSpotAtom, spotDraftAtom } from './atoms';
 import { SPOT_LAYER_ID, SPOT_RECORD_KEY, spotAtPixel } from './hitTest';
 import { PIN_Z_INDEX, spotStyle } from './pinStyle';
+import { spotRecordsAtom } from './spotRecords';
 
 const draw = (source: VectorSource, view: string, records: SpotRecord[]) => {
   source.clear();
@@ -39,7 +43,7 @@ const draw = (source: VectorSource, view: string, records: SpotRecord[]) => {
 
 export const useSpotLayer = () => {
   const map = useAtomValue(mapAtom);
-  const user = useAtomValue(currentUserAtom);
+  const records = useAtomValue(spotRecordsAtom);
   const active = useAtomValue(activeSpotAtom);
   const draft = useAtomValue(spotDraftAtom);
   const setActive = useSetAtom(activeSpotAtom);
@@ -90,43 +94,16 @@ export const useSpotLayer = () => {
     };
   }, [map, source, store]);
 
-  // Signed in: the list, and realtime on top of it. Deliberately not keyed on
-  // what is open — opening a spot is a read, and rebuilding this would drop the
-  // subscription, refetch the list and auto-cancel the request it superseded.
+  // The list while there is one, and the followed link until there is: a guest
+  // has no list at all, and a reader who arrived on `/l/K7M2QX` sees that pin
+  // rather than a bare map while theirs are still coming. Null once the list
+  // is up, so opening a spot does not rebuild every feature on the map —
+  // which one is open is a style question, and the subscription above has it.
+  const linkOnly = records ? null : active;
   useEffect(() => {
-    if (!user) return;
     const view = map.getView().getProjection().getCode();
-
-    let live = true;
-    const records = new Map<string, SpotRecord>();
-
-    listSpots()
-      .then((list) => {
-        if (!live) return;
-        for (const record of list) records.set(record.id, record);
-        draw(source, view, [...records.values()]);
-      })
-      .catch((err) => console.warn('[spots] list failed', err));
-
-    const unsubscribe = subscribeSpots((action, record) => {
-      if (!live) return;
-      if (action === 'delete') records.delete(record.id);
-      else records.set(record.id, record);
-      draw(source, view, [...records.values()]);
-    });
-
-    return () => {
-      live = false;
-      unsubscribe();
-    };
-  }, [map, source, user]);
-
-  // Signed out: the one record a short link resolved, and nothing else.
-  useEffect(() => {
-    if (user) return;
-    const view = map.getView().getProjection().getCode();
-    draw(source, view, active ? [active] : []);
-  }, [map, source, user, active]);
+    draw(source, view, records ?? (linkOnly ? [linkOnly] : []));
+  }, [map, source, records, linkOnly]);
 
   // Opening one.
   useEffect(() => {

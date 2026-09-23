@@ -11,8 +11,8 @@ the UI kit. What has been built back is the background — a ground switch
 (`src/grounds/`) and one arm per ground — in a top band that hosts them
 (`src/ribbon/`), the Kulturminner overlay and its card, the terrain analysis,
 and the reader's own lokaliteter: a pin, a box, a drawing over the ground, an
-account and a short link (`src/spots/`, `src/spotControls/`, `src/sketch/`,
-`src/auth/`). There is still no search box and no index of your own records.
+account, a short link and an index of them in the band (`src/spots/`,
+`src/spotControls/`, `src/sketch/`, `src/auth/`). There is still no search box.
 Read `docs/state-of-the-branch.md` before adding the next control: it lists what
 survived, what the atoms are called, and what is deliberately still broken.
 `main` holds the old app and is still deployable.

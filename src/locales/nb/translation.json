@@ -225,7 +225,18 @@
     "visibilityFailed": "Fikk ikke endret synligheten.",
     "save": "Lagre",
     "abort": "Avbryt",
-    "saveFailed": "Fikk ikke lagret lokaliteten. Prøv igjen."
+    "saveFailed": "Fikk ikke lagret lokaliteten. Prøv igjen.",
+    "mine": {
+      "label": "Mine lokaliteter",
+      "count": "Mine lokaliteter ({{total}})",
+      "needsAccount": "Logg inn for å se lokalitetene dine",
+      "busy": "Legg fra deg utkastet for å bla i lokalitetene dine",
+      "loading": "Henter …",
+      "failed": "Fikk ikke hentet lokalitetene dine.",
+      "empty": "Du har ingen lokaliteter ennå. Trykk + for å lage en.",
+      "filterPlaceholder": "Søk i navn og beskrivelse",
+      "noMatch": "Ingen treff på «{{query}}»"
+    }
   },
   "terrainControls": {
     "label": "Terrenganalyse",

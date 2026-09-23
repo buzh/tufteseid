@@ -6,8 +6,9 @@
 // and whatever the reader's own records turn out to need go here after them.
 //
 // What is here today is the Kulturminner overlay, the terrain analysis on/off
-// button, the `+` that starts a spot, the account, and — only while something
-// is down — the upstream fault chip.
+// button, the `+` that starts a spot with the index of the ones already
+// written joined to it, the account, and — only while something is down — the
+// upstream fault chip.
 //
 // Kulturminner leads because it is the reading the app is for and it is
 // switched constantly; the analysis follows because it is the expensive one and
@@ -26,7 +27,7 @@
 import { Group } from '@mantine/core';
 import { AuthButton } from '../auth';
 import { HeritageControlGroup, useHeritageControls } from '../heritageControls';
-import { SpotToggle } from '../spotControls';
+import { SpotControlGroup } from '../spotControls';
 import { TerrainToggle } from '../terrainControls';
 import styles from './Ribbon.module.css';
 import { UpstreamStatus } from './UpstreamStatus';
@@ -38,7 +39,7 @@ export const ToolSection = () => {
     <Group gap="xs" wrap="nowrap" className={styles.tools}>
       <HeritageControlGroup heritage={heritage} />
       <TerrainToggle />
-      <SpotToggle />
+      <SpotControlGroup />
       <AuthButton />
       <UpstreamStatus />
     </Group>

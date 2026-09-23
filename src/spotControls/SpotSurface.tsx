@@ -24,6 +24,7 @@ import {
 import { useSpotPinAdjust } from '../spots/pinAdjust';
 import { useSpotShareLink } from '../spots/shareLink';
 import { useSpotLayer } from '../spots/spotLayer';
+import { useSpotRecords } from '../spots/spotRecords';
 import { SpotCard } from './SpotCard';
 import { SpotPanel } from './SpotPanel';
 import { useSpotDraft } from './useSpotDraft';
@@ -86,6 +87,10 @@ export const SpotSurface = () => {
     void import('../sketch/SketchCanvas');
   }, [editing]);
 
+  // The one fetch and the one subscription behind both readers of the list —
+  // the pins here and the index in the band. Mounted with the map because that
+  // is what the pins are drawn on; the band reads the atom it fills.
+  useSpotRecords();
   useSpotLayer();
   useSpotShareLink();
   useSpotPinAdjust();

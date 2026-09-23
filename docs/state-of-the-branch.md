@@ -12,9 +12,10 @@ Kartverket's map series, or ortofoto — and which dataset within it, and switch
 both; in the middle it chooses the view, which is how many grounds are up and in
 what shape. At the other end of the row it puts Riksantikvaren's heritage layers
 over whatever that ground is, and says what of them; it starts a lokalitet of
-the reader's own and says whether there is an account behind the session; and
-only when there is something to say, it names an external service that has
-stopped answering. There is still no search box.
+the reader's own, lists the ones they have already written, and says whether
+there is an account behind the session; and only when there is something to
+say, it names an external service that has stopped answering. There is still no
+search box.
 
 The band and the controls are separate things. `src/ribbon/` is the band, and it
 is laid out in sections, each with its own subject and its own file:
@@ -23,7 +24,7 @@ is laid out in sections, each with its own subject and its own file:
 | --- | --- | --- |
 | `GroundSection` | the ground switch and the arm belonging to it | what is drawn under everything |
 | `ViewSection` | the view: one ground, the curtain, or the split | how the map is being looked at |
-| `ToolSection` | the Kulturminner overlay, the terrain analysis switch, the `+` that starts a lokalitet, the account button and the upstream fault chip | what applies whichever ground is up |
+| `ToolSection` | the Kulturminner overlay, the terrain analysis switch, the `+` that starts a lokalitet with the index of the written ones joined to it, the account button and the upstream fault chip | what applies whichever ground is up |
 
 The split is by subject, not by position. A control belongs to the left because
 it chooses the one picture the whole map is made of, to the middle because it
@@ -162,11 +163,27 @@ chosen in `src/heritageInfo/`.
 
 ## The reader's own lokaliteter
 
-The third and fourth subjects in the tool section are the `+` that starts a
-lokalitet (`src/spotControls/`) and the account button beside it (`src/auth/`).
-They are neighbours because one is the other's precondition: nothing here can be
-kept without an account, and pressing `+` signed out opens the sign-in dialog
-rather than a draft.
+The third and fourth subjects in the tool section are the reader's own
+lokaliteter (`src/spotControls/`) and the account button beside them
+(`src/auth/`). They are neighbours because one is the other's precondition:
+nothing here can be kept without an account, and pressing `+` signed out opens
+the sign-in dialog rather than a draft.
+
+The third subject is two boxes in one `ControlUnit`, the shape Kulturminner
+wears: the `+` that writes a record, and joined to it a bare chevron that reads
+them back. `SpotMenu` is that chevron — the reader's own spots, newest change
+first, with a filter over them once the list is longer than a glance, and a
+click on a row is `activeSpotAtom` and nothing else, so the map is moved by the
+same code that moves it for a followed link. Their own and not every record the
+session may see: the map draws other people's public pins where they are, but
+an index is a list of what you are answerable for. It is a `Menu` rather than
+the overlay's `Popover` because every row in it is a transaction that ends the
+visit. Signed out it opens the sign-in dialog, like the `+`; while a draft is
+open it is dimmed and does nothing, for the reason the map's own click handler
+is deaf then — the pin is being placed, and a row would move the map off it and
+open a card the draft box is standing in front of. Neither state takes the box
+off the row: the tools are pinned to the right of the band, so a box that came
+and went would move the `+` beside it under the cursor about to press it.
 
 **A lokalitet on this branch is one `spots` record and nothing else.** The old
 three-collection model — `localities`, `finds`, `attachments` — was deleted
@@ -179,12 +196,12 @@ are deliberately out.
 The workflow is four gestures and the box reads down them in that order: place
 the pin, name it, say what you saw, draw over the terrain, save. `src/spots/` is
 the map half — the draft atoms, the draggable pin (`pinAdjust.ts`, modelled on
-the terrain window's handles), the layer of saved pins, the place-name lookup
-that fills the name field in while the pin stands still (`spotName.ts`, whose
-ranking vocabulary came over from `main` unchanged), and the short link.
-`src/spotControls/` is the box: `SpotPanel` while it is being written,
-`SpotCard` once it has been saved, sharing one stylesheet and one corner because
-only ever one of them is up. Both are a `Panel`, and the draft's way out is the
+the terrain window's handles), the list of records and the layer that draws them
+as pins, the place-name lookup that fills the name field in while the pin stands
+still (`spotName.ts`, whose ranking vocabulary came over from `main` unchanged),
+and the short link. `src/spotControls/` is the box: `SpotPanel` while it is being
+written, `SpotCard` once it has been saved, sharing one stylesheet and one corner
+because only ever one of them is up. Both are a `Panel`, and the draft's way out is the
 close in its corner rather than a second button beside `Lagre` — guarded, so a
 draft with anything typed or drawn in it asks twice.
 
@@ -194,8 +211,12 @@ by a keystroke, `spotSketchAtom` by the canvas settling. Folded into one, a
 typed character would redraw the pin and a dragged pin would re-render two text
 inputs.
 
-**What the layer lists depends on who is looking.** Signed in, it is your own
-spots and every public one, which is the index the record is for. Signed out, it
+**What the session holds depends on who is looking.** Signed in, the list is
+your own spots and every public one, which is the index the record is for. It is
+fetched once and kept in step by realtime in `spotRecords.ts`, because there are
+two readers of it now — the pins on the map and the chevron in the band — and
+two fetches would be two subscriptions to the same collection and two copies to
+drift apart. Signed out there is no list at all, and the layer
 draws only the single record a short link resolved — a visitor who followed
 `/l/K7M2QX` came for that spot, and turning the map into a gazetteer of
 everybody's public pins for anyone who loads the page is a different product
@@ -403,7 +424,8 @@ The rows below without a writer still have none.
 | `heritageTipAtom`, `heritagePopupAtom` | `map/featureInfo/atoms.ts` | what the pointer found, and what a click kept | `useHeritageInfo` |
 | `terrainWindowAtom`, `terrainAdjustingAtom` (+ the `open`/`adjust`/`close` writers) | `terrain/window.ts` | the rectangle under analysis, null for no analysis, and whether it is still being placed | `useTerrainToggle`, `useTerrainControls`, `windowAdjust.ts` |
 | `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom` (+ the `open`/`edit`/`close`/`setStage` writers) | `spots/atoms.ts` | the lokalitet being written: where its pin is and which gesture has the pointer, what has been typed, what has been drawn | `SpotToggle`, `useSpotDraft`, `pinAdjust.ts`, `SketchCanvas` |
-| `activeSpotAtom` | same | the lokalitet being read — opened by a click or by `?lok=` | `useSpotLayer`, `useSpotShareLink`, `SpotCard`, `useSpotDraft` |
+| `activeSpotAtom` | same | the lokalitet being read — opened by a click, by a row in the index, or by `?lok=` | `useSpotLayer`, `useSpotShareLink`, `SpotCard`, `SpotMenu`, `useSpotDraft` |
+| `spotRecordsAtom`, `spotsFailedAtom` (+ `mySpotsAtom`) | `spots/spotRecords.ts` | every lokalitet the session may see, null until the list lands, and whether it never did | `useSpotRecords` |
 | `sketchSessionAtom` | `sketch/session.ts` | the map is frozen and Excalidraw has it | `useSketchSession` |
 | `currentUserAtom`, `isAuthDialogOpenAtom`, `authPromptAtom` | `auth/atoms.ts` | who is signed in, whether the dialog is up, and why — when the reader did not press anything | `pbAuthSyncEffect`, `AuthButton`, `AuthDialog`, `useSpotShareLink` |
 
@@ -495,10 +517,13 @@ analysis was framed over and not the analysis.
 - **No route but `/`.** Caddy has no SPA fallback, unchanged. `/l/<code>` is a
   `redir` to `/?lok=<code>` on one narrow pattern and not a route — a catch-all
   rewrite to `index.html` would turn every wrong path into a 200.
-- **A lokalitet has no index but the map.** Your spots are pins where they are;
-  there is no list, no ordering by date and no way to find one whose ground you
-  cannot remember. That is the next surface this subject wants, and it probably
-  arrives with the search box rather than before it.
+- **The index is your own records only, and it is a menu.** `SpotMenu` lists
+  what you have written, newest change first, and nothing else: other people's
+  public spots are on the map as pins and in no list. Nor is there any ordering
+  but by date, or any way in but the band — a row is found by name or by
+  reading down the dates, which is enough for a few dozen records and will not
+  be for a few hundred. Hovering a row does not light its pin, as the old
+  panel's did.
 - **Only `nb` is a moving target.** Strings still go through `t()` so the
   retrofit stays free, but `nn` and `en` carry only what survived the cut and
   are not expected to keep pace until the interface stops moving.
@@ -517,8 +542,10 @@ analysis was framed over and not the analysis.
   assumes one map except those callers.
 - **There is no search box.** The ground section is built, the view section is
   built, and the tool section holds the Kulturminner overlay, the terrain
-  analysis switch, the lokalitet `+` and the account. Search is the next surface
-  in, and the tool section is where it goes: it belongs to no ground.
+  analysis switch, the lokalitet `+` with its index, and the account. Search is
+  the next surface in, and the tool section is where it goes: it belongs to no
+  ground. The index's own filter is not it — that box searches the rows behind
+  one chevron and knows nothing of places, addresses or matrikkel.
 - **Hybrid is a LiDAR control, not a tool.** The overlay went into the LiDAR
   arm rather than the tool section because `resolveStack` draws it only over a
   LiDAR ground (`LIDAR_LAYERS`) — a switch in the tool section would be inert

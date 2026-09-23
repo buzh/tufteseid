@@ -1,0 +1,19 @@
+/* What the index needs that Mantine's `Menu` does not already carry. Two rules,
+   both about rows that are not ordinary rows. */
+
+/* Holds the width of a row's check, so the rows without one line up under it.
+   The LiDAR arm's menus have the same rule for the same reason — it is two
+   declarations, and a shared one would have to live in `src/ui/`, which takes
+   nothing on the strength of a second caller. */
+.gutter {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+/* A Menu.Item is one line; the empty state is a sentence saying what to press
+   instead. */
+.empty {
+  white-space: normal;
+  line-height: 1.4;
+}
