@@ -1,32 +1,29 @@
 # WMS proxying, caching and tile loading
 
-How map requests leave the browser, how they are cached, and how few of them we
-may spend. Read before touching `Caddyfile`, `nginx/`, `nib-proxy/`,
-`src/map/layers/wmsTileGrid.ts`, or before adding an external map source. What
-is drawn with them is `docs/map-layers.md`.
+Read before touching `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`,
+`src/upstream/`, `src/map/layers/wmsTileGrid.ts`, or before adding an external
+map source. What is drawn with these is `docs/map-layers.md`.
 
 ## Topology
 
-Browser → Caddy (`tufteseid` container, `:3000`; host `3030`) → wmscache
-(`nginx:1.27-alpine`, 25 GB disk cache, not exposed on the host) → upstream.
-Caddy puts each upstream under a same-origin prefix and rewrites it into an
-internal namespace; wmscache rewrites that into the upstream's own path and
-caches the answer. `nib-proxy` (`node:24-alpine`, zero deps) is a
-token-injecting sidecar for Norge i bilder, reachable only from wmscache on the
-compose network — the only internal upstream, and the only one resolved at
-request time (Docker DNS `127.0.0.11`), since a compose service's IP changes.
+Two independent chains plus two sidecars, all behind Caddy (`tufteseid`
+container, `:3000`; host `127.0.0.1:3030`):
 
-`mapproxy` is a second chain beside it, not a stage in it: Browser → Caddy →
-mapproxy → upstream, with wmscache nowhere in the path. It holds the handful of
-layers nobody ever asks a question of — same LAYERS, same STYLES, every request
-— as tiles on the app's own grid, and reaches the upstream itself. `/cache/*` is
-its prefix; the section below is the whole of it.
+- `Browser → Caddy → wmscache → upstream` — every WMS/WFS/ArcGIS service whose
+  parameters are chosen at request time, plus the Kulturminnesøk record API.
+- `Browser → Caddy → mapproxy → upstream` — the six layers whose request never
+  varies, meta-tiled onto the app's grid and held in MBTiles. wmscache is not
+  in this path.
+- `Browser → Caddy → cvat-tiles` — our own MBTiles, read off disk.
+- `nib-proxy` — token-injecting sidecar for Norge i bilder, reached only from
+  wmscache and mapproxy on the compose network. Never exposed.
 
-`cvat-tiles` is beside both rather than in either: Caddy proxies `/cvat/*`
-straight to it, and what it serves is ours, computed here and read off disk, so
-there is nothing upstream to cache.
+## Routes
 
-## Prefixes
+Caddy strips the same-origin prefix and rewrites into an internal namespace;
+wmscache rewrites that into the upstream's own path. The internal aliases differ
+so namespaces cannot collide inside nginx (WFS would want the WMS host's
+`/skwms1/`; both ArcGIS upstreams would want `/arcgis/`).
 
 | Same-origin prefix | Internal (nginx) | Upstream |
 |---|---|---|
@@ -38,389 +35,377 @@ there is nothing upstream to cache.
 | `/arcgis/nib/*` | `/nib-arcgis/` | nib-proxy → `services.norgeibilder.no/arcgis/rest/services/*` |
 | `/arcgis/hoydedata/*` | `/hoydedata-arcgis/` | `hoydedata.no/arcgis/rest/services/*` |
 
-The internal aliases differ so the namespaces cannot collide inside nginx: WFS
-would want the WMS host's `/skwms1/`, and both ArcGIS upstreams `/arcgis/`.
-`/pb/*` → `pocketbase:8090` is not a map route, nor is `/l/<code>`, a `redir`
-to `/?lok=<code>`; `file_server` has no SPA fallback, so any other unknown path
-still 404s.
+Non-map routes: `/pb/*` → `pocketbase:8090`; `/cvat/*` → `cvat-tiles:8080`;
+`/l/<code>` → `redir /?lok=<code>`. `file_server` has no SPA fallback, so any
+other unknown path 404s.
 
-`/cache/<layer>/<z>/<x>/<y>.<png|jpeg>` is the other half, and does not go
-through wmscache at all:
+## MapProxy (`/cache/*`)
 
-| Same-origin prefix | Internal | Upstream |
-|---|---|---|
-| `/cache/lidar-dtm/…` | `mapproxy:80/mapproxy/tiles/lidar-dtm/tufteseid25833/…` | `wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-topobathy-25833` |
-| `/cache/lidar-dom/…` | same, `lidar-dom` | `wms.geonorge.no/skwms1/wms.hoyde-dom-nhm-25833` |
-| `/cache/lidar-dtm-held/…`, `/cache/lidar-dom-held/…` | same | none — `sources: []` over the same two MBTiles files |
-| `/cache/topo-ref/…`, `/cache/topo-ref-contours/…` | same | `wms.geonorge.no/skwms1/wms.topo` |
-| `/cache/amtskart/…` | same | `wms.geonorge.no/skwms1/wms.historiskekart` |
-| `/cache/flyfoto/…` | same | nib-proxy → `services.norgeibilder.no/wms/ortofoto` |
+`/cache/<layer>/<z>/<x>/<y>.<png|jpeg>`. One Caddy block covers every layer: a
+`path_regexp` lifts the layer name out and substitutes it into
+`/mapproxy/tiles/<layer>/tufteseid25833/…`, so a new layer needs no Caddy
+change. A name MapProxy does not publish 404s from MapProxy.
 
-The two `-held` layers are the same caches without a source under them: same
-grid, same MBTiles file, `sources: []`, so MapProxy serves what it has stored
-and answers a miss with a transparent tile instead of a GetMap. They exist for
-the `hoyde` breaker — see *When an upstream stops answering* — and are never
-written to, never seeded, and never asked for while the origin is up.
+| `/cache/` layer | Format | `meta_size` / `meta_buffer` | Upstream |
+|---|---|---|---|
+| `lidar-dtm` | palette PNG | `[2,2]` / 0 | `wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-topobathy-25833` |
+| `lidar-dom` | palette PNG | `[2,2]` / 0 | `wms.geonorge.no/skwms1/wms.hoyde-dom-nhm-25833` |
+| `lidar-dtm-held`, `lidar-dom-held` | palette PNG, transparent | — | none (`sources: []`) |
+| `topo-ref`, `topo-ref-contours` | palette PNG, transparent | `[4,4]` / 80 | `wms.geonorge.no/skwms1/wms.topo` |
+| `amtskart` | RGBA PNG | `[4,4]` / 80 | `wms.geonorge.no/skwms1/wms.historiskekart` (`amt1`) |
+| `flyfoto` | JPEG | `[2,2]` / 0 | nib-proxy → `services.norgeibilder.no/wms/ortofoto` |
 
-One Caddy block covers them all: a `path_regexp` takes the layer name out of the
-path and substitutes it into MapProxy's TMS path, so the grid name and the
-service version are written once, and a new layer name needs no Caddy change. `:80` and the `/mapproxy` prefix are the
-`-alpine-nginx` image's own (nginx in front of uwsgi, `SCRIPT_NAME=/mapproxy`).
-A `/cache/` name MapProxy does not publish 404s from MapProxy, which is the
-same answer as refusing it at the edge and one less list to keep in step.
+- **Eligibility**: only a layer whose `LAYERS`/`STYLES` never vary. Everything
+  parameterized at request time stays on wmscache — per-project LiDAR flights,
+  the RA themes, the LiDAR extract's arbitrary bboxes, the float DEM, the
+  per-acquisition ortofoto `mosaicRule`.
+- **`-held` siblings**: the same two MBTiles files with no source behind them.
+  Never seeded, never written, only reached while the `hoyde` breaker is open
+  (see below). A miss answers a transparent tile.
+- **Grid** `tufteseid25833`: EPSG:25833, bbox `-2500000, 3500000, 3045984,
+  9045984`, `min_res: 21664.0`, `res_factor: 2`, 512 px tiles, `origin: nw`,
+  `num_levels: 21`. Mirrors `src/map/layers/wmsTileGrid.ts` level for level
+  (z12 = 5.289 m/px, z16 = 0.331), so no reprojection and no resampling. Same
+  grid describes the cVAT store.
+- **Sources**: `supported_srs: ['EPSG:25833']`, `concurrent_requests: 4`,
+  `http.client_timeout: 60`, a `coverage` bbox matching the layer config's
+  `coverageExtent`. **No `on_error` anywhere** — a shed or non-image response
+  must surface as a 500 so `src/upstream/` trips, rather than being stored as a
+  blank tile.
+- **No `max_size`**: it never evicts. The store grows until somebody prunes it.
+  Watch `du`.
+- **`X-Cache-Status` means nothing for these six layers** — they do not pass
+  through nginx.
+- **Store**: one MBTiles per cache under the bind mount
+  `/site/tufteseid/data/mapproxy`. MapProxy takes an init lock beside each file
+  at startup, so a directory it cannot write to is a hard startup failure, not a
+  degraded mode. Symptom: empty 502 on every `/cache/…` while the container
+  looks healthy. `7.0.0-alpine-nginx` runs as `uid=100 gid=101` (*not* the
+  `USER_UID=1000` its own Dockerfile defaults to):
 
-Both of those are properties of the pinned tag, not of MapProxy: the listener
-moved to 9090 after 7.0.0. Read `docker/nginx-default.conf` at the tag being
-pinned, not on `master`, when bumping the image. The symptom of getting it
-wrong is indistinguishable from MapProxy being down — Caddy cannot dial, so
-every `/cache/…` is an empty 502 while the container sits there healthy.
+  ```
+  docker compose run --rm --entrypoint sh mapproxy -c \
+    'id; touch /mapproxy/config/cache_data/probe && echo WRITABLE || echo DENIED'
+  sudo chown -R 100:101 /site/tufteseid/data/mapproxy
+  ```
 
-**`/tiles`, not `/tms/1.0.0`.** The two endpoints serve the same caches off the
-same grid and differ in one thing: which end of the world row 0 is at. Ours
-counts from the north, because the app's grid does and so does the cVAT store.
-TMS is specified to count from the south, so MapProxy hard-codes `origin = sw`
-on a TMS request and consults the `origin: nw` in `mapproxy.yaml` only for
-requests that left it unset — which is `/tiles` and nothing else. The setting
-is not ignored on `/tms`; it is overruled, silently.
+- **`/tiles`, not `/tms/1.0.0`.** A TMS request hard-codes `origin = sw` and
+  silently overrules the `origin: nw` in `mapproxy.yaml`; only `/tiles` consults
+  it. Getting it wrong is not a flipped map — the mirrored row falls outside
+  coverage, MapProxy culls it, and every tile comes back HTTP 200 as the same
+  2198-byte transparent PNG, on all six layers.
+- **Port 80 and the `/mapproxy` prefix** are the pinned `-alpine-nginx` image's
+  own; the listener moved to 9090 after 7.0.0. When bumping the image, read
+  `docker/nginx-default.conf` at that tag. Symptom of getting it wrong is
+  identical to MapProxy being down: Caddy cannot dial, empty 502 everywhere.
 
-What that looks like is worth knowing, because it is not a flipped map. The
-mirrored row lands outside the source's coverage, MapProxy culls it, and every
-tile comes back HTTP 200 as the same 2198-byte transparent PNG — the same
-bytes for all six layers, and for the JPEG one too. A blank map answering
-instantly and identically on every layer is this, not an outage.
+`mapproxy/seed.yaml` pre-fills levels 0–9 over each source's coverage. Run by
+hand, never scheduled. No `refresh_before`: MBTiles stores no per-tile
+timestamp, so any refresh time rebuilds every tile in the task.
 
-`/cvat/<acquisition>/<z>/<x>/<y>.webp` is not in the table because it never
-leaves the stack: `handle_path /cvat/*` hands it to the `cvat-tiles` sidecar
-(`node:24-alpine`, zero deps, `node:sqlite`), which turns it into one indexed
-`SELECT` against `<acquisition>.mbtiles` in the bind-mounted store. No wmscache
-entry and no CSP host. The path segment is the acquisition's own database,
-which the manifest hands the app as its tile template — overlapping flights are
-offered as separate rows and may not share a `<z>/<x>/<y>`. The 404 on a tile
-that was never written is load-bearing — it is the coverage mask
-(`docs/map-layers.md`) — so the sidecar answers a missing row with one rather
-than with a blank tile.
+```
+docker compose exec mapproxy mapproxy-seed -c 4 \
+  -f /mapproxy/config/mapproxy.yaml -s /mapproxy/config/seed.yaml --seed ALL
+```
 
-`/cvat/manifest.json` is not a file. The sidecar surveys the directory, reads
-each database's own `metadata` for the acquisition it names and the levels it
-holds, and answers that; a survey is at most one per ten seconds, and it
-releases a cached handle whose file has been replaced underneath it. So a
-database copied into the store needs no manifest edited, nothing imported and
-nothing restarted, and an install with no store answers an empty list rather
-than an error. The app fetches it once per page load, and `connect-src 'self'`
-already covers it.
+## wmscache (nginx)
 
-One database per acquisition rather than a tree of files: an acquisition is
-~83 000 WebP tiles, the store holds nine of them, and the inodes dwarfed the
-bytes. MBTiles is the container only — `tile_row` is the spec's, counted from
-the south, but the grid under it is the app's EPSG:25833 one, so a generic
-MBTiles reader would place these tiles in the Atlantic.
-
-## Cache rules (wmscache)
-
-`nginx/wms-cache.conf` holds the cache zone, the `$skip_cache` map and one
-`upstream` plus one `location` per host; `nginx/wms-proxy-common.conf` holds
-the host-independent half and is `include`d from each location.
+`nginx/wms-cache.conf` holds the cache zone, the two skip maps, and one
+`upstream` plus one `location` per host. `nginx/wms-proxy-common.conf` holds the
+host-independent half and is `include`d from the locations that want the
+defaults.
 
 | Location | `proxy_cache_valid 200` | `proxy_read_timeout` | Notes |
 |---|---|---|---|
-| `/skwms1/` (Kartverket WMS) | 180d | 30s (shared) | shared include |
-| `/wfs-skwms1/wfs.hoyde-hoydedata-metadata-prosjekt` | 180d | 8s | LiDAR footprints |
-| `/wfs-skwms1/` (rest of WFS) | not cached | 8s | register data should be fresh |
-| `/wms/` (Riksantikvaren) | 180d | 30s (shared) | slowest origin in the stack |
-| `/kms-api/` | 7d | 8s | a missing record is one RA reindex from existing |
-| `/hoydedata-arcgis/` | 180d | 30s (shared) | DEM for a fixed bbox never changes |
-| `/nib-arcgis/prosjekter/` | 7d | 15s | the acquisition catalogue *grows* |
-| `/nib-arcgis/` | 180d | 30s (shared) | a completed acquisition's pixels do not |
-| `/nib-wms/` | 180d | 30s (shared) | shared include |
+| `/skwms1/` (Kartverket WMS) | 180d | 30s | shared include |
+| `/wfs-skwms1/wfs.hoyde-hoydedata-metadata-prosjekt` | 180d | 8s | LiDAR footprints; spelled out |
+| `/wfs-skwms1/` (rest of WFS) | not cached | 8s | spelled out; no cache directives at all |
+| `/wms/` (Riksantikvaren) | 180d | 30s | shared include; slowest origin in the stack |
+| `/kms-api/` | 7d | 8s | spelled out |
+| `/hoydedata-arcgis/` | 180d | 30s | shared include |
+| `/nib-arcgis/prosjekter/` | 7d | 15s | spelled out; **no `proxy_next_upstream`** |
+| `/nib-arcgis/` | 180d | 30s | shared include |
+| `/nib-wms/` | 180d | 30s | shared include |
 
 Longest prefix wins, so the carve-outs take precedence whatever the file order.
 They spell their directives out rather than `include` the common file because
 nginx rejects a duplicate `proxy_cache_valid`, `proxy_read_timeout` or
 `proxy_next_upstream` outright, and a config error stops the whole server.
 
-- 25 GB LRU on `/var/cache/nginx/wms`, `inactive=180d`, `keys_zone=wms:100m`,
-  shared; the key is the request URI, whose prefix keeps upstreams apart.
-- Static `upstream` blocks, no `resolver` — a variable-based `proxy_pass` leaks
-  HTTP 426 to the browser. NiB is the exception, for Docker DNS.
-- Each host is listed three times: nginx takes the retry budget from the peer
-  count and `proxy_next_upstream_tries` can only lower it, so a one-server
-  group never retries, silently. `max_fails=0` on every peer, or a burst of
-  502s marks all three down (`no live upstreams`, a blank viewport).
-  `keepalive_timeout 20s`, under nginx's 60s default: a socket the far end
-  closed first 502s in ~60 ms, and every peer draws on one pool. 20 s is not the
-  number to reach for when a 502 shows up — wms.geonorge.no (istio-envoy) holds
-  an idle connection past 75 s, so ours closes first by a wide margin. Measure
-  before moving it.
-- Those three tries are all the retrying nginx can usefully do, and they do not
-  catch everything: about one cold GetMap in 200 against the per-project LiDAR
-  namespace comes back 502 from Kartverket's own front (`server: nginx/1.20.1`,
-  not ours) under a burst, and survives all three. They go out back to back,
-  with no directive to space them, so all three land in the same shed window.
-  Adding peers to buy more of them only hits a shedding origin harder. The lever
-  that works is a *delayed* retry, and that lives in the client
-  (`src/upstream/tileGuard.ts`).
-- `timeout` goes in the WFS and `/kms-api/` `proxy_next_upstream` lists only.
-  Those answer in ~0.25 s or hang forever; a WMS can take 5–14 s cold, where a
-  read timeout means a live render and a retry queues a second for one tile.
-- **Two guards, because one of them is blind.** `$skip_cache` (a map on
-  `$upstream_http_content_length`) refuses to store under 300 bytes. It only
-  fires where the upstream declares a length, and measured on the wire
-  `wms.geonorge.no` and `kart.ra.no` never do — both answer chunked, with or
-  without the `Accept-Encoding ""` below. So on the two busiest hosts that map
-  is permanently 0, and only the per-project namespace, which answers a bare
-  `content-length: 0`, is caught by it. `$skip_cache_type` (a map on
-  `$upstream_http_content_type`, matching `se_xml`) is the one that catches the
-  238-byte rate-limit ServiceException, because Content-Type survives chunking.
-  Keep it narrow: `text/xml` would take RA's `vnd.ogc.gml` GetFeatureInfo
-  answers with it. Do not raise the length floor to exclude no-coverage tiles
-  either: deterministic per bbox, 0.3–6 s each at the origin, and most of a
+### Cache zone
+
+`proxy_cache_path /var/cache/nginx/wms levels=1:2 keys_zone=wms:100m
+max_size=25g inactive=180d use_temp_path=off` — one 25 GB LRU shared by every
+location. The key is the default (the request URI), whose internal prefix keeps
+upstreams apart.
+
+### Upstream groups
+
+```nginx
+upstream geonorge_upstream {
+    server wms.geonorge.no:443 max_fails=0;   # three identical peers …
+    server wms.geonorge.no:443 max_fails=0;
+    server wms.geonorge.no:443 max_fails=0;
+    keepalive 32;                             # 8 on the WFS, KMS and hoydedata groups
+    keepalive_timeout 20s;
+}
+```
+
+- **Three peers because nginx caps the retry budget at the peer count.**
+  `proxy_next_upstream_tries` can only lower it, so a one-server group makes
+  `proxy_next_upstream` a silent no-op.
+- **`max_fails=0` on every peer**, or one burst of 502s marks all three down at
+  once (`no live upstreams`, a blank viewport).
+- **`keepalive_timeout 20s`, under nginx's 60 s default.** If the far end closes
+  first, the next request pulls a dead socket out of the pool and 502s in ~60 ms.
+  `wms.geonorge.no` (istio-envoy) holds an idle connection past 75 s, so 20 s
+  closes first by a wide margin. Measure before moving it.
+
+Static `upstream` blocks, no `resolver`: a variable-based `proxy_pass` leaks
+HTTP 426 to the browser. nib-proxy is the exception — a compose service's IP
+changes, so its three locations carry `resolver 127.0.0.11 valid=30s ipv6=off`
+and a variable backend. **`set $nib_backend` must precede the `rewrite … break`**:
+`break` halts the rewrite module, leaving the variable empty and producing
+"no host in upstream".
+
+The three tries do not catch everything. About one cold GetMap in 200 against
+the per-project LiDAR namespace comes back 502 from Kartverket's own front
+(`server: nginx/1.20.1`, not ours) under a burst and survives all three — they
+go out back to back with no directive to space them, so all three land in the
+same shed window. The working lever is a *delayed* retry, which lives in
+`src/upstream/tileGuard.ts`.
+
+### The two skip guards
+
+The gotcha: **Kartverket rate-limits with an HTTP 200.** Over budget,
+`wms.geonorge.no` answers 200 / `application/vnd.ogc.se_xml`, 238 bytes
+("Overforbruk på kort tid"). nginx's `proxy_next_upstream` reads status codes
+only, so it cannot fail that over; without a guard it is cached as a tile.
+
+```nginx
+# Guard 1: size. Under 300 bytes is an error body. Real no-data tiles
+# (479 bytes) must stay cacheable.
+map $upstream_http_content_length $skip_cache {
+    default           0;
+    "~^[0-9]{1,2}$"   1;
+    "~^[12][0-9]{2}$" 1;
+}
+
+# Guard 2: type. Content-Type survives chunking; Content-Length does not.
+map $upstream_http_content_type $skip_cache_type {
+    default    0;
+    "~*se_xml" 1;
+}
+
+map $skip_cache$skip_cache_type $tile_cache_control {
+    "00"    "public, max-age=604800, immutable";
+    default "no-store";
+}
+```
+
+Both feed `proxy_no_cache $skip_cache $skip_cache_type;`.
+
+- **Guard 1 is blind on the two busiest hosts.** `wms.geonorge.no` and
+  `kart.ra.no` both answer chunked, with or without the `Accept-Encoding ""`
+  below, so they never declare a length and the map is permanently 0 there. Only
+  the per-project namespace, which sends a bare `content-length: 0`, is caught.
+- **Guard 2 is the one that catches the shed response.** Keep it narrow:
+  `text/xml` would take RA's `vnd.ogc.gml` GetFeatureInfo answers out of the
+  cache too.
+- **Do not raise the length floor** to exclude no-coverage tiles: they are
+  deterministic per bbox, cost 0.3–6 s each at the origin, and are most of a
   zoomed-out screen.
-- `Accept-Encoding ""` because gzipping a PNG buys nothing. It does *not*
-  restore `Content-Length` — that is what the Content-Type guard is for.
-- `proxy_ignore_headers Set-Cookie Cache-Control Expires Vary X-Accel-Expires`
-  — `wms.geonorge.no` really does send `Set-Cookie: JSESSIONID`, and `Vary` is
-  there because nginx stores a secondary hash per variant: `hoydedata.no` sends
-  `Vary: Origin` on the 4 MB float-DEM path, one CORS-mode `fetch` away from
-  doubling those entries. `proxy_cache_lock on` with `proxy_cache_lock_age 30s`
-  — the 5 s default breaks the lock mid-render on a 5–14 s cold tile and lets a
-  second request upstream, which is the split view's two `Map`s exactly. Not
-  `proxy_cache_bypass $skip_cache`, evaluated before the length exists.
-- **Negative caching**: `404 10m`, `400 403 1m`. Without it only 200s are
-  stored, and `tileGuard` retries each failure twice more — 3 upstream requests
-  per bad tile per level per session. 5xx stays uncached; that is
-  `proxy_cache_use_stale`'s job.
-- `Cache-Control` to the browser is rewritten to `$tile_cache_control`
-  (`public, max-age=604800, immutable`; `no-store` if either guard fired),
-  since no upstream sends a usable one or a validator. `immutable` is safe on
-  top of the week because these come out of a 180-day LRU here, so a browser
-  copy inside its max-age can never be staler than what this proxy would have
-  answered. Hide the upstream's own header rather than ignoring it — with two
-  on the wire the browser takes the stricter — and leave `always` off the
-  `add_header`, so a 502/504 carries no freshness, and so the negative-cached
-  400/403/404 go out with none either.
-- `X-Cache-Status: HIT|MISS|BYPASS` is added for debugging.
+- **Do not add `proxy_cache_bypass $skip_cache`.** It is evaluated at request
+  time, when `$upstream_http_content_length` is still empty, so nothing would
+  ever be served from cache.
 
-## The tile cache (mapproxy)
+### The rest of `wms-proxy-common.conf`
 
-`mapproxy/mapproxy.yaml` is the whole configuration; `mapproxy/seed.yaml` is the
-pre-fill, run by hand and never on a schedule.
+```nginx
+proxy_set_header Accept-Encoding "";   # gzipping a PNG buys nothing;
+                                       # does NOT restore Content-Length
+proxy_cache_valid 200 180d;
+proxy_cache_valid 404 10m;             # negative caching: without it only 200s
+proxy_cache_valid 400 403 1m;          # are stored and tileGuard retries ×3
+proxy_cache_lock on;
+proxy_cache_lock_timeout 30s;
+proxy_cache_lock_age 30s;              # the 5s default breaks the lock mid-render
+                                       # on a 5-14 s cold tile — that is the split
+                                       # view's two Maps exactly
+proxy_cache_use_stale updating error timeout http_500 http_502 http_503 http_504;
 
-**What it takes.** Only a layer whose request never varies. Six caches over six
-sources: the DTM and DOM national mosaics' `skyggerelieff`, the hybrid overlay
-with and without contours, amtskart's `amt1`, and the NiB ortofoto mosaic. Every
-other WMS in the stack is parameterized at request time and stays on wmscache —
-the 1936 per-project LiDAR flights (`LAYERS=<project id>:<style>`), the
-Riksantikvaren themes whose `LAYERS`/`STYLES` come from the reader's register
-settings, the LiDAR extract's arbitrary-bbox GetMaps, the float DEM, the
-per-acquisition ortofoto picked by a `mosaicRule`. A cache block per combination
-is not a cache.
-
-**Why, twice over.** Meta-tiling is the point: `meta_size: [2,2]` or `[4,4]`
-turns 4 or 16 tile requests into one upstream GetMap, which is the lever left
-after 512 px tiles against `wms.geonorge.no`'s ~120-per-window budget. And
-MapProxy's WMS client validates the content type, so it sees the 238-byte
-`application/vnd.ogc.se_xml` shed response for what it is — the failure nginx
-structurally cannot catch, since `proxy_next_upstream` reads status codes only.
-
-**The grid is the app's, exactly.** `tufteseid25833` is EPSG:25833 over
-`-2500000, 3500000, 3045984, 9045984` with `min_res: 21664.0`, `res_factor: 2`,
-512 px tiles and a NW origin — `src/map/layers/wmsTileGrid.ts` level for level,
-because the projection extent is square and both derive the same ladder from it
-(z12 = 5.289 m/px, z16 = 0.331). So no reprojection and no resampling, and the
-same grid definition describes the cVAT store. It also means there is only the
-one grid: a `?projection=` that puts the view somewhere other than UTM33 leaves
-OpenLayers reprojecting these tiles client-side, as it already does for cVAT.
-
-**Sizing, measured rather than guessed.** `[4,4]` with `meta_buffer: 80` on the
-two overlays and amtskart — a 2208 px render, inside the `MaxWidth/MaxHeight
-8192` both advertise, and the buffer is there so a label or a sheet edge is
-never clipped at a seam. `[2,2]` with no buffer on the two reliefs and on
-flyfoto: the risk is the tail, not the mean, and the per-project service behind
-the same height backend takes 3–12 s cold. The measurements are in the config's
-comments; raise them there with evidence.
-
-**No `on_error`, deliberately.** A shed or non-image response surfaces as a 500,
-which trips the breaker below and puts the reason on the ribbon, rather than
-becoming a silent transparent tile that looks like missing coverage.
-
-**Formats.** The two reliefs and the two overlays are written as 256-colour
-palette PNG (`fastoctree`), which is most of the bytes for none of the visible
-difference on grey relief and on thin transparent linework. Amtskart is not:
-the numbers looked good (586 kB → 63 kB, RMSE 4.15) but the scanned paper tone
-mottles visibly, so it keeps RGBA. Flyfoto is JPEG, as it already was.
-
-**Two things it does not do.** It never evicts — there is no `max_size` — so the
-store grows until somebody prunes it, bounded only by each source's coverage and
-by where people look; watch `du`. And `X-Cache-Status` stops meaning anything
-for these six layers, because they no longer pass through nginx.
-
-**The store** is one MBTiles database per cache, under a host bind mount
-(`/site/tufteseid/data/mapproxy`) rather than a named volume: a cache nobody
-evicts should be on the filesystem that has room for it and where an operator
-will think to look, beside the cVAT store rather than under `/var/lib/docker`.
-
-The cost of that choice is ownership. A named volume would inherit the image's
-own, but a bind mount arrives with the host's, and MapProxy takes an init lock
-*beside* each MBTiles file before it will even build its layer list — so a cache
-directory it cannot write to is a startup failure, not a degraded mode. The
-symptom is an empty 502 on every `/cache/…`: uwsgi's master exits on the import
-error and Caddy never reaches anything. Ask the image which user it is rather
-than trusting a number here — `7.0.0-alpine-nginx` answers `uid=100 gid=101`,
-which is not the `USER_UID=1000` its own Dockerfile defaults to:
-
-```
-docker compose run --rm --entrypoint sh mapproxy -c \
-  'id; touch /mapproxy/config/cache_data/probe && echo WRITABLE || echo DENIED'
-sudo chown -R 100:101 /site/tufteseid/data/mapproxy
+proxy_ignore_headers Set-Cookie Cache-Control Expires Vary X-Accel-Expires;
+proxy_hide_header Set-Cookie;          # wms.geonorge.no sends JSESSIONID
+proxy_hide_header Cache-Control;       # hide, not just ignore: with two on the
+proxy_hide_header Expires;             # wire the browser takes the stricter
+proxy_hide_header Pragma;
+add_header Cache-Control $tile_cache_control;   # no `always`, so a 502/504 and
+                                                # the negative-cached 400/403/404
+                                                # carry no freshness
+proxy_connect_timeout 10s;
+proxy_read_timeout 30s;
+proxy_send_timeout 10s;
+proxy_next_upstream error http_502 http_503 http_504;   # no `timeout`
+proxy_next_upstream_tries 3;
+proxy_next_upstream_timeout 45s;
+add_header X-Cache-Status $upstream_cache_status always;
 ```
 
-One directory covers it: `lock_dir` and `tile_lock_dir` both default under
-`base_dir`, which is the mount.
+- **`Vary` is ignored on purpose**: nginx stores a secondary hash per variant,
+  and `hoydedata.no` sends `Vary: Origin` on the 4 MB float-DEM path — one
+  CORS-mode `fetch` from doubling those entries.
+- **`timeout` is out of the retry list here** and in the WFS/KMS lists: these
+  upstreams render on the fly, so a read timeout is a render still running and
+  retrying queues a second one for the same tile. The WFS and `/kms-api/`
+  locations *do* include `timeout`, because those do no rendering — they answer
+  in ~0.25 s or hang forever.
+- **`immutable` on top of a week is safe**: these come out of a 180-day LRU, so
+  a browser copy inside its `max-age` can never be staler than what this proxy
+  would answer. No upstream sends a usable `Cache-Control` or a validator.
+- **`log_format wmscache`** omits `$remote_addr` on purpose — `$request_uri`
+  holds a coordinate. `scripts/usage-report.sh` reads the first five fields
+  positionally.
 
-## The NiB token
+### Restart requirement
 
-- Anonymous: NiB's WMS wants a token even for imagery norgeibilder.no serves to
-  anonymous visitors, and the sidecar mints one from the site's public OAuth
-  client with a `Referer` header and no login. Re-minted on auth failure,
-  including the HTTP-200-with-JSON-error case.
-- Bound to the requesting IP and referer, so it must be minted and used in the
-  same place. A token never travels between workstation and server — mint a
-  fresh one wherever the call is made.
-- Injected as a header (`X-Esri-Authorization: Bearer`), never in the URL, so
-  cache keys stay stable as it rotates and it never reaches the browser. NiB
-  also accepts `&token=`.
-- Inside the sidecar, `/arcgis/` routes to the REST upstream and everything
-  else to the WMS base; after the rewrites a WMS request is a bare service name
-  like `/ortofoto`, so that marker is the only disambiguator.
-- The sidecar also fixes NiB's Content-Type.
-  `ortofoto_prosjekter/ImageServer` answers `format=jpgpng` — JPEG over
-  coverage, a ~1097-byte transparent PNG outside it — labelled
-  `application/octet-stream`, which an `<img>` refuses under Caddy's global
-  `X-Content-Type-Options: nosniff`, so the handler sniffs magic bytes and
-  re-labels ahead of wmscache. One format is not an option: `jpg` paints the
-  gaps opaque black, `png32` costs eight times the bytes (68 kB vs 555 kB on a
-  512 px tile over Oslo).
+`docker compose up -d` is not enough. The configs are bind-mounted but nginx
+reads them only at startup and the container is not recreated:
+`docker compose restart wmscache`. Same for `mapproxy/` and
+`docker compose restart mapproxy`.
 
-## GetFeatureInfo against Riksantikvaren
+## nib-proxy
 
-The only request in the app a *pointer* makes, and the one whose volume is set
-by how the interface behaves rather than by what is on screen. One
-GetFeatureInfo per ticked RA layer per question, over `/wms/ra/*` — the same
-location, the same 180-day cache and the same 30 s read timeout as the tiles,
-against the slowest origin in the stack.
+`nib-proxy/server.mjs`, `node:24-alpine`, zero dependencies, listens on `:8080`.
 
-The cache key is the request URI, and a GetFeatureInfo URI carries the tile
-bbox, the sublayers, the styles and the pixel inside it, so two questions are
-one entry only if they are the same question to the pixel. That is why
-`src/map/featureInfo/heritageQuery.ts` snaps the pixel to a 6 px grid before it
-becomes a coordinate, and why hover and click build the identical URL: it is
-what turns a hand holding still into one entry rather than thirty. Three things
-in front of that: a URL-keyed memo in `featureInfoService.ts` (400 entries,
-negative answers included, but never when an attempt failed — a dropped request
-must not cache a hole), the rest delay before a hover asks at all, and
-`fetchWithin`, which puts these on the `ra` breaker with a 12 s deadline so a
-dead origin refuses them instead of queueing one per pause.
+- **Anonymous mint**: `GET https://backend-api.klienter-prod-k8s2.norgeibilder.no/token/nib`
+  with `Referer: https://norgeibilder.no/`. No login.
+- **The token is bound to the requesting IP and referer**, so it must be minted
+  and used in the same place. A token never travels between workstation and
+  server — mint a fresh one wherever the call is made.
+- **Lifetime**: the JWT's own `exp` when present, otherwise a 20-minute
+  fallback; refreshed 60 s before expiry. Concurrent mints are coalesced.
+- **Re-mint and retry once** on auth failure: HTTP 401/403/498/499, *or* a JSON
+  body carrying `error.code` at any status — ArcGIS answers auth failures with
+  HTTP 200 as often as with a 4xx. After two attempts the sidecar answers 502,
+  so nginx does not cache the failure as a tile.
+- **Injected as `X-Esri-Authorization: Bearer …`**, never `&token=`, so cache
+  keys stay stable as it rotates and it never reaches the browser.
+- **Namespace routing**: a path starting `/arcgis/` goes to
+  `services.norgeibilder.no/arcgis/rest/services`; everything else to
+  `services.norgeibilder.no/wms`. After the upstream rewrites a WMS request is a
+  bare service name (`/ortofoto`), so that marker is the only disambiguator.
+- **Content-Type repair**: `ortofoto_prosjekter/ImageServer` answers
+  `format=jpgpng` as `application/octet-stream` (JPEG inside coverage, a
+  ~1097-byte transparent PNG outside). An `<img>` refuses that under Caddy's
+  global `X-Content-Type-Options: nosniff`, so the handler sniffs magic bytes
+  and re-labels ahead of wmscache. One format is not an option: `jpg` paints the
+  gaps opaque black, `png32` costs ~8× the bytes.
+- Requests upstream carry `Accept-Encoding: identity`, so Content-Length is
+  accurate for nginx's cache.
+- `/healthz` answers `200 ok`.
 
-Raising `FEATURE_COUNT`, adding a register, or asking on plain pointer movement
-each multiply this directly. Measure the request count in the network panel
-while sweeping a dense area before changing any of them.
+## cvat-tiles
 
-## Kulturminnesøk link checking
+`/cvat/<acquisition>/<z>/<x>/<y>.webp` → `cvat-tiles:8080`, one indexed `SELECT`
+against `<acquisition>.mbtiles` in `/site/tufteseid/data/cvat`. Never leaves the
+stack: no wmscache entry, no CSP host.
 
-`/kms/*` is the one upstream here that is not a map source: one JSON lookup per
-heritage card. Records in `kulturminner2` and `freda_bygninger` carry a
-`linkkulturminnesok` to `kulturminnesok.no/ra/lokalitet/<id>`, resolving an
-Askeladden id to a Kulturminnesøk uuid, and a large minority of the register is
-not in that index. A miss is a 200 echoing the raw number back, and the record
-API then answers 200 with an all-null shell;
+- **A 404 on a missing tile is load-bearing** — it is the coverage mask
+  (`docs/map-layers.md`). The sidecar answers a missing row with a 404, not a
+  blank tile.
+- **`/cvat/manifest.json` is synthesized**, not a file: the sidecar surveys the
+  directory at most once per 10 s (`SCAN_MS`), reads each database's `metadata`
+  for the acquisition name and level range, and releases a cached handle whose
+  file was replaced underneath it. A database copied into the store needs
+  nothing edited, imported or restarted; an empty store answers an empty list.
+- One database per acquisition; the path segment names it. Overlapping flights
+  are separate rows and may not share a `<z>/<x>/<y>`.
+- `tile_row` is the MBTiles spec's, counted from the south, but the grid under
+  it is the app's EPSG:25833 one — a generic MBTiles reader would place these
+  tiles in the Atlantic.
+
+## Kulturminnesøk (`/kms/*`)
+
+The one upstream here that is not a map source: one JSON lookup per heritage
+card, resolving an Askeladden id to a Kulturminnesøk uuid. Proxied because the
+API sends no CORS headers at all.
+
+A large minority of the register is not in that index. A miss is a 200 echoing
+the raw number back, and the record API then answers 200 with an all-null shell;
 `src/map/featureInfo/kulturminnesok.ts` reads a null `externalid` as the miss
-and marks the link rather than hiding it. Proxied because the API sends no CORS
-headers at all.
+and marks the link rather than hiding it. Cached 7 d (`/kms-api/`), because a
+missing record is one RA reindex from existing.
 
 ## CSP
 
 Everything above is same-origin, so none of those hosts appears in the
 Caddyfile CSP. It covers only what the browser contacts itself:
 
-- `img-src 'self' data: blob: cache.kartverket.no` — the WMTS tiles are the
-  only images not fetched same-origin.
+- `img-src 'self' data: blob: cache.kartverket.no` — the WMTS tiles are the only
+  images not fetched same-origin.
 - `connect-src 'self' data: blob: *.geonorge.no *.norgeskart.no
   cache.kartverket.no hoydedata.no` — `cache.kartverket.no` for its
   GetCapabilities `fetch()`, `*.geonorge.no` for the `ws.geonorge.no` point
-  registers, `*.norgeskart.no` for the matrikkel search API, `hoydedata.no` for
-  the ArcGIS identify in `src/search/searchApi.ts`.
+  registers, `*.norgeskart.no` for the matrikkel search API (`api.norgeskart.no`
+  in `src/env.ts`), `hoydedata.no` for the ArcGIS identify in
+  `src/search/searchApi.ts`.
 
-Routing a new upstream through wmscache is never a CSP change; calling one
-directly from the browser always is.
+**Routing a new upstream through wmscache is never a CSP change; calling one
+directly from the browser always is.**
 
-## Tile-loading constraints
+## Tile-loading limits (client)
 
-Kartverket rate-limits with an HTTP 200. `wms.geonorge.no` meters GetMap by
-source IP — the server's, so every visitor shares one budget — over a short
-window, roughly 120 GetMaps, not a concurrency limit. Over it the reply is a
-200, `application/vnd.ogc.se_xml`, 238 bytes ("Overforbruk på kort tid"), which
-the browser cannot decode as a PNG, so OpenLayers marks the tile `ERROR` and
-never retries it: a hole until something rebuilds the layer. nginx cannot catch
-it either, since `proxy_next_upstream` sees only status codes. The one defence
-is fewer requests.
+The budget: `wms.geonorge.no` meters GetMap by source IP — the *server's*, so
+every visitor shares one budget — at roughly 120 GetMaps over a short window.
+Over it comes the 200 / `se_xml` shed response, which the browser cannot decode,
+so OpenLayers marks the tile `ERROR` and never retries it. The only defence is
+fewer requests.
 
-- One tile queue per `Map`, shared by every layer: `maxTilesLoading: 48`
-  (`src/map/atoms.ts`) against OL's default 16, capped to 8 while animating. A
-  cold LiDAR WMS tile takes 3–12 s; the topo WMTS base answers in ~130 ms. The
-  split view is a second `Map` (`src/map/compare/splitMap.ts`) with a queue of
-  its own, sized the same, so it can have 96 tiles in flight rather than 48 —
-  the queue is a per-map scheduler and not a budget against the upstream.
-- `preload: 2` on the WMTS base and on the cached cVAT ground, `preload: 0`
-  everywhere else — free on a pre-rendered base or on a database of ours,
-  ruinous where a miss reaches an on-the-fly renderer. The `/cache/` layers are
-  in the second group despite being tiles: `XYZBackgroundLayer` carries
-  `preload` per store for exactly that split, because a MapProxy miss is a
-  GetMap and a preloaded tile would hold a slot for the length of it.
-- The cVAT coverage hint (`src/map/cvatHintLayer.ts`) puts one tile layer per
-  cached acquisition on the map at once, and is the only surface that does.
-  Nothing upstream sees any of it — a hit is a `SELECT` against a bind-mounted
-  database, a miss is the sidecar's 404 and is not retried — and each layer is
-  fenced to its own envelope, which at the scales the hint draws at is a tile or
-  two. The bound on it is the size of the store, tens, and not of the catalogue,
-  whose 450 flights never reach that module.
-- 512 px tiles for every layer, `TileWMS` and cached alike, from an explicit
-  `TileGrid` on the View's own resolution ladder
-  (`src/map/layers/wmsTileGrid.ts`), so tiles never resample and the two tile
-  stores are written on the same ladder they are read on. `getWMSTileGrid`
-  takes an optional level range for a store holding only some levels — a cVAT
-  acquisition passes z7–z15, the national relief z0–z16, since it is a 1 m
-  product and deeper than z16 upsamples either way — and still hands over the
-  whole resolution array, indexed by absolute z, fenced by `minZoom` and the
-  array's end. At 256 px a
-  1600×1000 viewport is ~35 tiles per layer per level, and LiDAR project mode
-  stacks two WMS layers: 70 requests a zoom step, two steps to the limiter.
-  Bytes are a wash, 146 060 for one 512 px hillshade tile against 4 × ~36 800.
-  It stays 512×512 on HiDPI: `TileWMS` pins its pixel ratio to 1 unless
-  `serverType` is set, and none of these sources sets one.
-- `interpolate: false` on the relief: the national mosaic's `/cache/` ground,
-  the same mosaic's WMS for its other styles, the per-project LiDAR WMS and the
-  cached cVAT ground. All four are capped below the view's own depth by the
-  bullet above, so the levels a reader spends most time on are drawn upsampled,
-  and OL's default smoothing resamples each tile on its own: the bilinear
-  kernel clamps at the tile's edge, so the last column of one tile and the
-  first of the next meet as a hard step through a field that is smooth
-  everywhere else. Measured on two adjacent `/cache/` tiles, an ×8 upsample
-  steps 1.75 grey levels at the seam against 0.00 either side of it — one
-  straight line the height of the tile. Nearest-neighbour has no kernel to
-  clamp and so nothing to break at the seam, and visible pixels are the honest
-  picture of a 1 m product read at z20's 0.021 m/px. The photographs, the
-  scanned sheets and the label overlay keep the default: there the blocks cost
-  more than the seam.
-- `WMS_TILE_CACHE_SIZE = 128`, ~10 screenfuls at 512 px, or OL has nothing to
-  borrow while a new level loads; `WMS_Z_DIRECTION = 1`, the coarser of two
-  bracketing levels, so the 250 ms zoom animation does not fetch a second ring.
-- Every background layer that can reach an upstream needs a `coverageExtent`
-  (`{ extent, crs }`, transformed into the layer's `extent`); without one OL
-  spans the whole EPSG:25833 projection extent and orders renders over the
-  Atlantic. Values are each service's GetCapabilities `<BoundingBox>`, and the
-  same numbers appear a second time as each source's `coverage` in
-  `mapproxy/mapproxy.yaml` — the app's copy stops the request, MapProxy's stops
-  a meta-tile that straddles the edge from asking for open ocean:
+| Setting | Value | Where |
+|---|---|---|
+| `maxTilesLoading` | 48 (OL default 16) | `src/map/atoms.ts`, `src/map/compare/splitMap.ts` |
+| Tile size | 512 px, every layer | `wmsTileGrid.ts` (`WMS_TILE_SIZE`) |
+| `WMS_TILE_CACHE_SIZE` | 128 (~10 screenfuls) | `wmsTileGrid.ts` |
+| `WMS_Z_DIRECTION` | 1 (the coarser bracketing level) | `wmsTileGrid.ts` |
+| `VIEW_MAX_ZOOM` | 20 | `wmsTileGrid.ts` |
+| `preload` | 2 on the WMTS base and the cVAT ground, 0 everywhere else | `backgroundLayers/` |
+| `hidpi` | `false` on `TileArcGISRest` | `backgroundLayers/utils.ts` |
+| `FEATURE_COUNT` | 10 | `featureInfoService.ts` |
+| `FEATURE_INFO_DEADLINE_MS` | 12 000 | `featureInfoService.ts` |
+| GetFeatureInfo memo | 400 entries, URL-keyed | `featureInfoService.ts` |
+| Pointer snap grid | 6 px | `heritageQuery.ts` |
+
+- **Split view is a second `Map` with its own queue**, also 48, so up to 96
+  tiles in flight. The queue is a per-map scheduler, not a budget against the
+  upstream; the two half-width panes still cover about one screenful.
+- **Curtain**: the `prerender` canvas clip culls nothing — the renderer has
+  already queued the whole viewport — so the B stack also carries a layer
+  `extent`, intersected with its `coverageExtent` and recomputed on `moveend`
+  and as the handle is dragged. Without it the curtain costs a full second
+  screenful to show half of one. Neither compare mode is persisted to the URL.
+- **`preload: 0` on the `/cache/` layers despite their being tiles**: a MapProxy
+  miss is a GetMap, and a preloaded tile would hold a slot for the length of it.
+  `XYZBackgroundLayer` carries `preload` per store for that split.
+- **512 px, not 256**: at 256 a 1600×1000 viewport is ~35 tiles per layer per
+  level, and LiDAR project mode stacks two WMS layers — 70 requests a zoom step.
+  Bytes are a wash. `TileWMS` pins its pixel ratio to 1 unless `serverType` is
+  set, and none of these sources sets one, so it stays 512 on HiDPI.
+- **`getWMSTileGrid(projection, minZoom, maxZoom)`** hands over the whole
+  resolution array indexed by absolute z, fenced by `minZoom` and the array's
+  end, so a store holding only some levels still aligns (a cVAT acquisition
+  passes z7–z15, the national relief z0–z16).
+- **`interpolate: false` on the relief** — the `/cache/` national mosaics, the
+  same mosaics' WMS, the per-project LiDAR WMS, and the cVAT ground. These are
+  read upsampled, and OL's bilinear kernel clamps at each tile's edge, leaving a
+  visible step at every seam. Photographs, scanned sheets and the label overlay
+  keep the default.
+- **Ortofoto asks for JPEG** (68 kB against 528 kB per 512 px tile over Oslo);
+  a single acquisition needs transparent gaps and uses `jpgpng`.
+- **Every background layer that can reach an upstream needs a `coverageExtent`**
+  (`{ extent, crs }`, transformed into the layer's `extent` with 8 stops per
+  edge). Without one OL spans the whole EPSG:25833 projection extent and orders
+  renders over the Atlantic. The same numbers appear as each source's `coverage`
+  in `mapproxy.yaml`.
 
   | Source | EPSG:25833 extent |
   |---|---|
@@ -429,168 +414,112 @@ is fewer requests.
   | NiB ortofoto mosaic | `-250025, 6299985, 1211155, 8985010` |
   | one LiDAR project, one ortofoto acquisition | its own `bboxLonLat` (EPSG:4326) |
 
-  The per-project cases must use their own box; the services advertise the
-  union of everything they hold, which culls almost nothing. The transform
-  samples 8 stops per edge — corners only clips the bulge a Norway-sized box
-  grows when reprojected out of UTM33. The cVAT ground is the one exception
-  that needs it for a different reason: there is no upstream to spare, but the
-  acquisition's footprint is what keeps the layer off ground it never covered.
-- `hidpi: false` on `TileArcGISRest`; the default scales `SIZE` and `DPI` by
-  pixel ratio, quadrupling resampled pixels and doubling the cache keys.
-- Ortofoto backgrounds ask for JPEG — 68 kB against 528 kB per 512 px tile over
-  Oslo, and the mosaic has no transparency to lose. A single acquisition needs
-  transparent gaps and uses `jpgpng`.
-- Tiles load through `guardTileSource` (`src/upstream/tileGuard.ts`): admission
-  control for the origins the breaker knows, and a bounded retry for every
-  source that reaches an upstream, including the ones no origin claims. Two
-  retries at 400 ms and 900 ms plus up to 300 ms of jitter, then the tile is left
-  `ERROR`. OpenLayers asks once and caches the `ERROR`, so without this the
-  ~1-in-200 upstream 502 above is a hole that lasts until the page is reloaded —
-  and only at the zoom level it happened on, each level being its own set of
-  tiles. That is what "works, but some tiles at some zoom levels are missing" is.
-  Every failed try still reports to the breaker, so an outage trips it in fewer
-  tiles than before, not more; a tile the breaker *refused* is not retried, the
-  answer being known, and comes back via `refresh()`. A layer carrying a
-  `heldUrl` is redirected to that store rather than refused — the two national
-  mosaics, and only them. `/cache/topo-ref*` and
-  `/cache/amtskart` need the retry most: in no origin, they have no probe and no
-  `refresh()` to fall back on.
-- The cVAT ground is the one source that opts out, with `sparse: true` on its
-  layer config. Its store holds tiles only where the flight does, so a 404 inside
-  the extent is the coverage mask rather than a dropped request — and an `<img>`
-  error carries no status, so the retry cannot tell the two apart. Left on, every
-  tile of the mask would be asked for three times over 1.3 s, which at a level
-  the acquisition only partly reaches is the whole screen. MapProxy's `/cache/`
-  needs no such flag: it culls to a coverage polygon and answers a blank image,
-  HTTP 200, inside it.
-- A former `retryBlankTileLoadFunction` retried anything under 800 bytes, and is
-  gone — a different thing from the retry above, which keys on a failed request
-  and not on the size of a successful one. The no-data PNG is deterministic, so
-  it only ever refetched real no-coverage tiles at 4 origin requests each. Fix a
-  blank-where-there-is-data tile at wmscache, which can see the upstream.
+  Per-project cases must use their own box; the services advertise the union of
+  everything they hold. The cVAT ground needs one for a different reason: not to
+  spare an upstream, but to keep the layer off ground the flight never covered.
 
-The two-ground views (`src/map/compare/`) are the deliberate exception: a second
-background stack on the same view. What that costs is not the flat doubling it
-looks like, and the two shapes differ.
+### `guardTileSource` (`src/upstream/tileGuard.ts`)
 
-**Split** is two half-width maps, so the two panes between them cover one
-viewport: the *total* is about one screenful, plus a row or column of tile
-overlap where each pane rounds up to whole tiles at the seam. What it does have
-is a tile queue per `Map`, both sized 48, so up to 96 tiles in flight rather
-than 48 — heavier per second against a rate limit that meters a window, even
-though it is not heavier per screen.
+Wraps a tile source in admission control (for origins the breaker knows) plus a
+bounded retry (for every source that reaches an upstream, including those no
+origin claims).
 
-**Curtain** is one full-width A with B over the strip right of the divider. The
-`prerender` canvas clip does not cull anything on its own — it runs after the
-renderer has queued the layer's tiles for the whole viewport — so B also carries
-a layer `extent`, intersected with its own `coverageExtent`, recomputed on
-`moveend` and as the handle is dragged. Without that extent the curtain costs a
-full second screenful to show half of one, which is what it used to do. With it,
-about half a screenful over a single ground.
+- Two retries at 400 ms and 900 ms, plus up to 300 ms jitter, then the tile is
+  left `ERROR`. Without it the ~1-in-200 upstream 502 is a hole that lasts until
+  reload, and only at the zoom level it happened on.
+- Every failed try reports to the breaker, so an outage trips it in fewer tiles,
+  not more.
+- A tile the breaker *refused* is not retried and not counted; it comes back via
+  `refresh()` on recovery.
+- `heldUrl` redirects a refused tile to a source-less store instead — the two
+  national mosaics only.
+- `sparse: true` opts out of the retry: the cVAT ground only. A 404 inside its
+  extent is the coverage mask, and an `<img>` error carries no status, so the
+  retry cannot tell a mask hole from a dropped request. `/cache/` needs no such
+  flag — MapProxy culls to a coverage polygon and answers a blank 200 inside it.
 
-Both are modes you enter and leave, the B stack is torn down on exit, and
-neither is persisted to the URL — a shared link must not put every recipient
-into two-ground spend on a shared budget.
+## Circuit breaker (`src/upstream/`)
 
-## When an upstream stops answering
+One breaker per origin, plus the ribbon chip that reports an open one. An origin
+is the set of requests that stop answering together, not a hostname.
 
-`src/upstream/` is a circuit breaker per external origin, and the ribbon chip
-that says one is open. It exists because of what an outage costs without it: on
-2026-09-21 every Kartverket height endpoint answered 504 after a flat 30 s —
-`proxy_read_timeout`, which does not fail over, because a slow render is
-usually a render — and the app kept asking. A screenful is a dozen tiles, each
-pan queued a dozen more, the footprint WFS fired up to sixty lookups a viewport
-at three tries each, and the reader was told none of it.
+| Origin | Prefixes | Probe |
+|---|---|---|
+| `hoyde` | `/wms/geonorge/wms.hoyde-`, `/wfs/geonorge/wfs.hoyde-`, `/arcgis/hoydedata/`, `/cache/lidar-dtm/`, `/cache/lidar-dom/` | 1×1 GetMap on `wms.hoyde-dtm-nhm-topobathy-25833` |
+| `kartverketCache` | `cache.kartverket.no` (direct from the browser) | coarsest WMTS tile |
+| `ra` | `/wms/ra/` | 1×1 GetMap on `kulturminner2` |
+| `nib` | `/wms/nib/`, `/arcgis/nib/`, `/cache/flyfoto` | 1×1 GetMap on `ortofoto`, JPEG |
 
-**Four origins**, grouped by what fails together rather than by hostname
-(`origins.ts`): `hoyde` (`/wms/geonorge/wms.hoyde-*`, `/wfs/geonorge/wfs.hoyde-*`,
-`/arcgis/hoydedata/*`, `/cache/lidar-dtm/` and `/cache/lidar-dom/` — one
-backend, and they went down as one), `kartverketCache` (cache.kartverket.no,
-direct from the browser), `ra` (`/wms/ra/*`), `nib` (`/wms/nib/*`,
-`/arcgis/nib/*`, `/cache/flyfoto`).
-Matched by URL prefix, so nothing has to be declared per layer.
-`/cache/topo-ref*`, `/cache/amtskart` and `/kms/` are deliberately in no origin:
-a different renderer, up through that outage, and one layer each.
+`/cache/topo-ref*`, `/cache/amtskart` and `/kms/` are in no origin by design: a
+different renderer and one layer each. They keep the retry, which is their only
+recourse — no probe, no `refresh()`.
 
-**The held siblings.** Putting a `/cache/` prefix under the breaker is a choice
-between two bad ends: refuse the request and blank a tile MapProxy already has
-on disk, or let it through and have a miss hold a 60 s `client_timeout` that
-ties up workers for every layer, including the ones whose upstream is fine. The
-two national LiDAR mosaics take neither. `mapproxy.yaml` publishes
-`lidar-dtm-held` and `lidar-dom-held` over the same MBTiles files with no source
-behind them, and `guardTileSource` rewrites a tile's URL to the sibling while
-the breaker is open — everything stored still draws, a miss is a transparent
-tile, and nothing reaches upstream either way. The prefixes are spelled out in
-full for that reason: `/cache/lidar-` would match `lidar-dtm-held` too and
-refuse the way out. `/cache/flyfoto` has no sibling and is still refused
-outright; the same recipe would give it one.
+The two `/cache/lidar-*` prefixes are spelled out in full rather than
+`/cache/lidar-`, which would also match the `-held` siblings and refuse the way
+out.
 
-**Tripping.** Three failures net of successes inside a minute. Net, not
-consecutive: `proxy_cache_use_stale` serves cached tiles straight through an
-upstream 504, so a pan over half-visited ground interleaves hits and failures,
-and a rule that zeroed on any success would hold the counter under the
-threshold while eleven twelfths of the map stayed blank.
+Constants (`health.ts`):
 
-**While open**, no request goes out at all. Tiles are marked `ERROR` without
-touching the network (the slot is freed — a tile left `LOADING` holds one of
-the 48); `fetchWithin` throws `UpstreamDownError` before fetching, which the
-retry loops in `dem.ts`, `flyfoto.ts`, `lidarExtract/run.ts` and the footprint
-fan-out short-circuit on rather than sleep between attempts that cost nothing.
+| | |
+|---|---|
+| `FAIL_THRESHOLD` | 3 failures **net of successes** |
+| `FAIL_WINDOW_MS` | 60 000 |
+| `PROBE_TIMEOUT_MS` | 8 000 (under the proxy's 30 s read timeout) |
+| `PROBE_BACKOFF_MS` | 20 000 → 40 000 → 80 000 → 120 000 |
+| `HEALTHY_RESET_MS` | 60 000 of continuous health before the backoff forgets |
 
-**Recovery is measured, not guessed.** A 1×1 GetMap (the coarsest WMTS tile for
-cache.kartverket.no) on a 20 → 40 → 80 → 120 s backoff. `status >= 500` is a
-failure and everything else, 4xx included, is the service being alive: the whole
-mechanism fails open, so a probe URL that goes stale reads as *up* rather than
-wedging an origin shut. On success the guarded sources on the map are
-`refresh()`ed — OpenLayers caches the `ERROR` state and will not re-request
-without it. The backoff only resets after a minute of continuous health, which
-is what stops a flapping service re-probing every 20 s forever.
-
-Two cache interactions are load-bearing. The probes are under the 300-byte
-`$skip_cache` floor, so they are neither stored in the 25 GB LRU nor answered
-from it; and `probeUrl()` puts a cache-buster on the proxied ones besides,
-because a probe served stale through `proxy_cache_use_stale … http_504` is the
-one failure the breaker cannot recover from. The WMTS probe goes direct to a CDN
-that sends `max-age`, so that one carries `cache: 'no-store'` instead.
+- **Net, not consecutive**: `proxy_cache_use_stale` serves cached tiles straight
+  through an upstream 504, so a pan over half-visited ground interleaves hits
+  and failures. A success pays the counter down by one rather than zeroing it.
+- **While open, no request goes out.** Tiles are marked `ERROR` without touching
+  the network (a tile left `LOADING` holds a slot); `fetchWithin` throws
+  `UpstreamDownError` before fetching, which the retry loops in `dem.ts`,
+  `flyfoto.ts`, `lidarExtract/run.ts` and the footprint fan-out short-circuit on.
+- **`status >= 500` is a failure; everything else, 4xx included, is alive.** The
+  mechanism fails open, so a probe URL that goes stale reads as *up* rather than
+  wedging an origin shut.
+- **On recovery, guarded sources are `refresh()`ed** — OpenLayers caches the
+  `ERROR` state and will not re-request without it.
+- **Two cache interactions are load-bearing.** The WMS probe answers are under
+  the 300-byte `$skip_cache` floor, so they never enter the LRU; and
+  `probeUrl()` appends `&_probe=<now>` to the proxied ones, because a probe
+  served stale through `proxy_cache_use_stale … http_504` is the one failure the
+  breaker cannot recover from. The WMTS probe goes direct to a CDN that sends
+  `max-age`, so it relies on `cache: 'no-store'` instead.
 
 ## Recipe: add an external map source
 
-First decide which chain it belongs on. If every request to it will carry the
-same `LAYERS` and `STYLES` — a background ground, an overlay, anything the
-reader cannot reconfigure — it is a MapProxy cache, and the recipe is short:
+**Same `LAYERS`/`STYLES` on every request** → MapProxy:
 
-1. In `mapproxy/mapproxy.yaml`, a `sources` entry (url, layers,
-   `supported_srs: ['EPSG:25833']`, `concurrent_requests`, `http.client_timeout`,
-   a `coverage` from its GetCapabilities, no `on_error`), a `caches` entry on
-   `tufteseid25833` with a `meta_size` and an mbtiles filename, and a `layers`
-   entry whose `name` is the `/cache/<name>/` segment.
-2. Nothing in `Caddyfile`: the one `@tileCache` regexp already routes any
-   `/cache/<name>/`.
+1. `mapproxy/mapproxy.yaml`: a `sources` entry (url, layers,
+   `supported_srs: ['EPSG:25833']`, `concurrent_requests`,
+   `http.client_timeout`, a `coverage` from its GetCapabilities, no `on_error`);
+   a `caches` entry on `tufteseid25833` with a `meta_size` and an mbtiles
+   filename; a `layers` entry whose `name` is the `/cache/<name>/` segment.
+2. Nothing in `Caddyfile` — the one `@tileCache` regexp already routes it.
 3. An `XYZBackgroundLayer` config on `/cache/<name>/{z}/{x}/{y}.<fmt>`, with
    `preload: 0` and a `coverageExtent`.
 4. A `seeds` task if the coarse levels are worth pre-filling.
-5. `docker compose restart mapproxy` — the config is bind-mounted and read at
-   startup only.
+5. `docker compose restart mapproxy`.
 
-Otherwise it is parameterized, and it goes on wmscache:
+**Parameterized at request time** → wmscache:
 
-1. In `Caddyfile`, a `handle_path /wms/<host-slug>/*` block that rewrites to a
-   unique internal prefix and `reverse_proxy http://wmscache`.
-2. In `nginx/wms-cache.conf`, an `upstream` block — the host three times,
+1. `Caddyfile`: a `handle_path /wms/<host-slug>/*` block rewriting to a unique
+   internal prefix, `reverse_proxy http://wmscache`.
+2. `nginx/wms-cache.conf`: an `upstream` block — the host three times,
    `max_fails=0`, `keepalive`, `keepalive_timeout 20s`.
 3. A `location` for that prefix which rewrites into the upstream's own path,
    sets `proxy_pass`, `Host` and `proxy_ssl_name`, and `include`s
-   `/etc/nginx/wms-proxy-common.conf` — directives spelled out instead only if
-   this upstream needs a different lifetime or timeout.
+   `/etc/nginx/wms-proxy-common.conf`. Spell directives out instead only if this
+   upstream needs a different lifetime or timeout.
 4. `/wms/<host-slug>/…` as `wmsUrl` in the layer config. No CSP entry.
 5. For a background layer, `coverageExtent` from its GetCapabilities.
 6. The layer-config half — name union, config file, `infoFormat` — is
    `docs/map-layers.md`.
-7. Nothing for the breaker unless the new source is a *fifth* thing that can
-   fail on its own: a layer under one of the four prefixes is covered already,
-   and one under none of them simply has no breaker, which is the right answer
-   for a single overlay. A `/cache/` prefix is a prefix like any other — add it
-   to the origin that owns the upstream behind it, or to none.
+7. Nothing for the breaker unless the source is a *fifth* thing that can fail on
+   its own. A layer under one of the four prefixes is covered; one under none
+   has no breaker, which is the right answer for a single overlay.
+8. `docker compose restart wmscache`.
 
 ## Verifying
 
@@ -601,25 +530,14 @@ paths.
 docker compose exec wmscache nginx -T | grep 'read_timeout\|max_fails\|next_upstream'
 curl -sI "http://localhost:3030/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=NHM_DTM_TOPOBATHY_25833:skyggerelieff&CRS=EPSG:25833&BBOX=200000,6500000,300000,6600000&WIDTH=512&HEIGHT=512&FORMAT=image/png" | grep -i 'x-cache\|cache-control'
 docker run --rm -v tufteseid_wmscache:/c alpine du -sh /c
-```
 
-The first prints what nginx loaded rather than what the file says; the second
-is MISS then HIT, both `max-age=604800`; the third is the cache on disk. After
-changing either file under `nginx/`, `docker compose up -d` is not enough — the
-configs are bind-mounted but read only at startup, and the container is not
-recreated. Run `docker compose restart wmscache`.
-
-For mapproxy, the same caveat and the same fix (`docker compose restart
-mapproxy`):
-
-```
 docker compose exec mapproxy mapproxy-util grids -f /mapproxy/config/mapproxy.yaml -g tufteseid25833
 curl -s "http://localhost:3030/cache/lidar-dtm/13/<x>/<y>.png" -o a.png
 sudo du -sh /site/tufteseid/data/mapproxy
 ```
 
-The grid dump printing 0.331 m/px at z16 and 5.289 at z12 is the alignment
-check against `wmsTileGrid.ts`; rendering the same bbox through
-`/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833` and comparing is the visual
-one. Then the map itself, watching the network panel: a cold pan should cost one
-upstream GetMap per 2×2 or 4×4 block, not one per tile.
+`nginx -T` prints what nginx loaded, not what the file says. The `curl -sI` is
+MISS then HIT, both `max-age=604800`. The grid dump printing 0.331 m/px at z16
+and 5.289 at z12 is the alignment check against `wmsTileGrid.ts`. Then the map
+itself, network panel open: a cold pan should cost one upstream GetMap per 2×2
+or 4×4 block, not one per tile.

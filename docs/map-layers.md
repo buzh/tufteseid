@@ -1,388 +1,342 @@
-# Map content — what is drawn, and where it comes from
+# Map layers
 
-The background grounds and the services behind them, and the Kulturminner theme
-layers from Riksantikvaren. Read before touching `src/map/layers/`. Proxying,
-caching, tile grids and the Kartverket rate limit are
-`docs/wms-proxy-and-tiles.md`; the float-elevation path behind terrain analysis
-is `docs/terrain-analysis.md`.
+What is drawn on the map: background grounds (`src/map/layers/config/backgroundLayers/`),
+Kulturminner theme layers (`src/map/layers/config/themeLayers/`), and the recipes
+for adding another.
 
-The ribbon drives all three grounds below: a ground switch (`src/grounds/`) and
-one arm per ground — `src/lidarControls/`, `src/kartControls/`,
-`src/flyfotoControls/` — in the band at `src/ribbon/`. The Hybrid overlay and
-its contours are the last two boxes of the LiDAR arm, because that is the only
-ground `resolveStack` draws them over;
-`docs/state-of-the-branch.md` has the rest of what the rebuild has reached.
+Related: `docs/wms-proxy-and-tiles.md` (proxying, caching, tile grids, rate
+limits, CSP), `docs/terrain-analysis.md` (float elevation, the client-side
+visualizations), `docs/state-of-the-branch.md` (what the rebuild has reached).
 
-All WMS requests are `VERSION=1.3.0`, same-origin through a `/wms/…` prefix.
-Nothing sets `SRS`/`CRS` by hand — OpenLayers writes it from the view
-projection, `EPSG:25833` by default (`DEFAULT_PROJECTION`, `src/map/atoms.ts`);
-`coverageExtent` declares its own CRS and is transformed to that projection.
+## Conventions
 
-A `/cache/…` prefix means the browser is not asking a WMS at all: those layers
-are `{z}/{x}/{y}` tiles out of MapProxy, which asks the WMS on our behalf and
-keeps the answer (`docs/wms-proxy-and-tiles.md`). The upstream and its `LAYERS`
-are named in the table below all the same, because that is still what the pixels
-are; where they are written down is `mapproxy/mapproxy.yaml`.
+- All WMS requests are `VERSION=1.3.0`, same-origin through a `/wms/…` prefix.
+- Nothing sets `SRS`/`CRS`. OpenLayers writes it from the view projection —
+  `DEFAULT_PROJECTION = 'EPSG:25833'` (`src/map/atoms.ts`). `coverageExtent`
+  declares its own CRS and is transformed to the view projection with 8 stops
+  per edge (`toViewExtent`, `utils.ts`).
+- A `/cache/…` prefix is not a WMS: those are `{z}/{x}/{y}` tiles out of
+  MapProxy, configured in `mapproxy/mapproxy.yaml`. Caddy rewrites
+  `/cache/<name>/{z}/{x}/{y}.(png|jpeg)` to
+  `/mapproxy/tiles/<name>/tufteseid25833/…`.
+- `/cvat/…` is our own tile store, served by the `cvat-tiles` sidecar. Nothing
+  upstream, so no wmscache entry and no CSP host.
 
-## The grounds
+### Tile grid
 
-The grounds the old interface grouped as `lidar`, `terreng`, `kart`, `hybrid`
-and `flyfoto`. `terreng` is not a background layer at all but a client-rendered
-overlay over whatever background is set (`docs/terrain-analysis.md`); the rest
-are entries in the stack below. A cold load with no `?backgroundLayer`
-arrives on `lidarHillshade`, the national relief mosaic
-(`getDefaultBackgroundLayer`, `config/backgroundLayers/atoms.ts`): reading
-relief is what the app is for, and Automatisk takes it to a per-project dataset
-from there.
+`src/map/layers/wmsTileGrid.ts`. One grid per projection, built off the
+projection extent.
 
-| Ground | Layer name(s) | Service / prefix | Dataset ring (W/S) |
-|---|---|---|---|
-| LiDAR | `lidarHillshade` (national mosaic) | `/cache/lidar-dtm`, DOM `/cache/lidar-dom`, to z16 — MapProxy over `wms.hoyde-dtm-nhm-topobathy-25833:skyggerelieff` and `wms.hoyde-dom-nhm-25833:skyggerelieff`; `…-held` siblings while the `hoyde` breaker is open. Any other style falls back to `/wms/geonorge/wms.hoyde-…` direct | Automatisk / national / per-project |
-| LiDAR | `lidarProject` (0.25 m per acquisition, rendered by the WMS) | `/wms/geonorge/wms.hoyde-dtm-prosjekt`, DOM: `wms.hoyde-dom-prosjekt`; `LAYERS=<project id>:<style>` | same ring |
-| LiDAR | `lidarCvat` (the same acquisition, rendered by us: **Arkeologisk relieff**) | `/cvat/<acquisition>/{z}/{x}/{y}.webp` — our own tile store, read out of MBTiles by the `cvat-tiles` sidecar, nothing upstream | not on it — it is the `cvat` entry of the style ring (A/D) |
-| Analyse | — | `/arcgis/hoydedata/*`, see `docs/terrain-analysis.md` | the visualization list |
-| Kart | `topo`, `topograatone`, `toporaster`, `sjokartraster` (WMTS) | `cache.kartverket.no/v1/service` GetCapabilities, one document for all four | the five `KART_VARIANTS` |
-| Kart → Amtskart | `amtskart` (1:200 000) | `/cache/amtskart` — MapProxy over `wms.historiskekart`, `LAYERS=amt1`, transparent | same ring |
-| Hybrid | `topoOverlay` (modifier, not a ground of its own) | `/cache/topo-ref`, or `/cache/topo-ref-contours` with contours on — MapProxy over `wms.topo`, transparent | the LiDAR ring underneath |
-| Flyfoto | `flyfoto` (seamless mosaic, JPEG) | `/cache/flyfoto` — MapProxy over `/wms/nib/ortofoto`'s `ortofoto`, through the same token sidecar | ortofoto acquisitions |
-| Flyfoto | `flyfotoProject` (one acquisition; `TileArcGISRest`, not WMS) | `/arcgis/nib/ortofoto_prosjekter/ImageServer` | same ring |
+| Constant | Value | Why |
+| --- | --- | --- |
+| `WMS_TILE_SIZE` | 512 | wms.geonorge.no rate-limits by source IP at ~120 GetMaps in a short window; over it the answer is HTTP 200 with a 238-byte ServiceException that OL marks ERROR and never retries. |
+| `VIEW_TILE_SIZE` | 256 | The View's zoom ladder divides the extent by 256 whatever tile size is used. |
+| `VIEW_MAX_ZOOM` | 20 | Deepest level any source is asked for. |
+| `WMS_Z_DIRECTION` | 1 | Between two resolutions, ask for the coarser level. |
+| `WMS_TILE_CACHE_SIZE` | 128 | ~10 screenfuls at 512 px. |
 
-Configs live in `src/map/layers/config/backgroundLayers/`: `kvCache.ts` (WMTS
-cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
-`elevation.ts` + `lidarProjects.ts`, `cvatGround.ts`, `topoOverlay.ts`,
-`flyfotoBackground.ts`. Name unions are in `src/map/layers/backgroundLayers.ts`.
+`maxResolution = max(extent width, height) / 256`; resolutions are indexed by
+absolute z, so a source holding only deep levels still gets the whole array and
+is fenced by `minZoom`.
 
-### Service facts
+MapProxy's `tufteseid25833` grid mirrors this level for level: `min_res 21664.0`,
+`res_factor 2`, `tile_size [512, 512]`, `num_levels 21`, `origin: nw`.
 
-- Amtskart: `amt1` is the seamless mosaic, `georefererte` wants the id of one
-  scanned sheet. The series ran 1826 to around 1917 and never covered Nordland,
-  hence `TRANSPARENT` and `NEEDS_TOPO_BASE`. GetMap probes want the EPSG:25833
-  bbox in E,N order, against the layer metadata's own sample URL.
-- The DTM and DOM per-project catalogues are identical (the same 1936 project
-  names), so `fetchLidarProjects()` is one fetch, model-independent.
-- DOM publishes one usable style, `skyggerelieff` (`DOM_STYLES`, clamped by
-  `stylesForModel` / `effectiveLidarStyle`). Asking it for a DTM-only style
-  (`helning_prosent`) fails silently: HTTP 200, `Content-Type: image/png`, a
-  ~100-byte JSON body, a blank map. `?lidarModel=dom` persists the choice,
-  absent means DTM, and the LiDAR extract is DTM-only.
-- **`lidarCvat` is a render of a flight, not a dataset beside one.** The
-  dataset is the acquisition; whether its relief is computed by Kartverket's
-  WMS or by us is the render chosen on it, so `cvat` is a member of the style
-  vocabulary (`CVAT_STYLE`, at the head of `TIER_A_STYLES`) offered by
-  `stylesForFlight()` wherever the store holds that flight, and the two layer
-  names are the two grounds one flight can be drawn under.
-  `lidarFlightGround(style, model)` is the only namer, called by
-  `useLidarControls` and by `compare/atoms.ts`; `wmsLidarStyle()` guards the
-  GetMap so a stray `cvat` can never reach the service. The name is kept as a
-  `BackgroundLayerName` rather than folded into `lidarProject` because the URL,
-  a screenshot's `meta.ground` and the figure plate all read it to say which
-  render made the picture.
-- `lidarCvat` has nothing upstream. `vat-cache/makevat.py` runs RVT over an
-  acquisition's DTM and writes the combined VAT — hillshade, slope, positive
-  openness, sky-view in one picture — as 512 px RGBA WebP on the app's own tile
-  grid, out to z7 (169 m/px), into one MBTiles database whose own `metadata`
-  table records the acquisition's name, the levels written for it, the presets,
-  the blend order, the per-level radii and the run's digest. How deep
-  the ladder goes is the acquisition's own: z16 (0.331 m/px) where hoydedata.no
-  publishes a 0.25 m DTM, z15 (0.661 m/px) where it publishes 0.5 m, because
-  below the DEM's cell the picture is of the interpolation. The coarse end is
-  the same z7 for every flight and is there for a different reason — the
-  coverage hint, below. What serves it is the `cvat-tiles` sidecar, turning the
-  URL into one indexed `SELECT` against the acquisition's MBTiles database in
-  the bind-mounted store; no upstream
-  means no wmscache entry, and same-origin means no CSP host. Radii are RVT
-  pixels at every level, so an acquisition's levels are related pictures of the
-  same terrain rather than one picture at several sizes: the reach of the
-  visualization grows as you zoom out, and the tooltip says so.
-- **Acquisitions may overlap, and two rows is the point.** Each owns a database
-  in the store, whose filename the manifest reports as that acquisition's `path`
-  and the app puts in the tile template — so a 5 pkt flight from 2021 and a
-  10 pkt one from 2025 over the same landscape are two readings of it, both
-  offered, neither overwriting the other.
-  They are two rows because they are two *flights*, ranked against each other by
-  coverage, year and density like any other pair; the store having rendered both
-  adds no row and breaks no tie. Ladder depth is not a tiebreak, because it is
-  not independent of the ranking — z16 exists only where hoydedata publishes a
-  0.25 m DTM, which is where the denser, newer flight already wins.
-- **The store is read at runtime, not compiled in.** `fetchCvatStore()` reads
-  `/cvat/manifest.json` once per page load and `resolveCvatAcquisitions()`
-  places its `acquisitions` block, so a database copied onto the server is in
-  the app on the next reload with no deploy and no code change. That manifest is
-  not a file: the sidecar surveys the store, reads each database's `metadata`
-  for the name and the levels it claims, and takes the envelope off the tiles
-  table — inclusive tile indices at z12, or at the coarsest level held where a
-  database stops short of it, flipped from MBTiles' south-origin rows to the
-  app's. Coarse, because that is four index lookups instead of a walk of the
-  whole table; but not the coarsest held, because a z7 tile is 86.7 km across
-  and an envelope measured there would round a county-sized flight up to a
-  region (`ENVELOPE_FLOOR_Z` in `cvat-tiles/server.mjs`). So there is no
-  inventory beside the tiles that can disagree with them, and copying a file in
-  is the whole delivery. An install without a store answers an empty
-  `acquisitions` block, which is no cached rows anywhere rather than a dataset
-  that is offered and draws nothing. Levels are per acquisition, so a
-  half-built one draws at the levels it has and nowhere else.
-- **The store stands on its own.** The LiDAR catalogue is asked for and not
-  depended on. Where it has a row for the acquisition that row wins, because it
-  carries the flight's WMS styles and the manifest cannot know them. Where it
-  has none — a flight Kartverket has dropped, or an outage — `placeFromStore()`
-  makes a row out of the manifest: the acquisition name is the id, the year and
-  point density come out of that name by the catalogue parser's own two
-  readers, and the envelope out of the tile indices. Such a flight offers the
-  cached render and no other, which is honest and is also all that can be drawn
-  while the service publishing the others is down. That matters because the
-  catalogue is an 8 MB GetCapabilities off the same høydedata backend as the
-  national mosaic: the hour our own tiles are the only relief left is exactly
-  the hour that document does not answer. `fetchLidarProjects()` also falls back
-  past its week-long TTL to whatever copy localStorage still holds.
-- It is the one ground whose relief nobody upstream computed, so it is the one
-  that has to say where it came from. The render menu prints the acquisition,
-  the renderer, the template and the radii at the head of its dropdown, where
-  the reader is choosing between pictures rather than hovering for a caption; a
-  kartutsnitt taken over it records which
-  acquisition was showing (`meta.cvatAcquisition`) and carries it on its
-  provenance plate, with the renderer, the template, the blend
-  stack, the combine and the pixel radii, and credits Kartverket under
-  `høydedata` rather than `skyggerelieff` — the height values are theirs, the
-  picture is not. The constants the plate prints live beside the layer config in
-  `cvatGround.ts` (`CVAT_RENDERER`, `CVAT_TEMPLATE`, `CVAT_STACK`,
-  `CVAT_AZIMUTH`, `CVAT_SUN_ALTITUDE`, `CVAT_RADIUS_PX`,
-  `CVAT_GENERAL_OPACITY`), transcribed from the recipe the databases carry
-  rather than fetched from it: a downloaded figure travels off this host.
-  Rebuilding the store under changed parameters — a new digest stamped into the
-  files — means editing that block too.
-- Its coverage needs no polygon. The layer's `extent` is the store's own
-  envelope out of the manifest — the catalogue's bbox only where the manifest
-  carries none, an older sidecar — and culls everything outside; inside it the ~94 %
-  that were never written answer 404, OpenLayers marks those tiles errored and
-  leaves them transparent, and the faded national mosaic underneath shows
-  through. `maxResolution` hides the layer one step coarser than the
-  acquisition's coarsest level rather than letting OL clamp and ask for four
-  screenfuls to upscale. Where two acquisitions' envelopes overlap the layer
-  still draws only the showing one's tiles — each has its own namespace, so
-  there is nothing of the neighbour's to answer with, and the envelope's own
-  ~94 % of unwritten ground stays transparent.
-- The manifest's acquisition names are byte-identical to the `LidarProject.id`
-  the per-project WMS publishes, which is what the whole wiring rests on:
-  `CvatAcquisition` carries the catalogue row itself, so `cvatFor()` joins a
-  chosen flight to its cached render by id alone, the envelope comes from the
-  same row, and `Behold` stitches that project's own WMS — DTM,
-  `skyggerelieff` — with no name mapping and no second coverage source. An
-  acquisition whose name does not appear verbatim in the per-project WMS
-  `GetCapabilities` cannot be wired in at all; `vat-cache/README.md` says so at
-  the point where the next one is chosen.
-- Which acquisition is drawing is `activeCvatAcquisitionHalves`
-  (`cvatGround.ts`), halved like the LiDAR project and seeded into the B half
-  with it. It is written only in lockstep with
-  `activeLidarProjectHalves`, by `selectProject` — the flight is the choice and
-  this follows it, so the two can never name different acquisitions. It starts
-  null, so a cold load into `?backgroundLayer=lidarCvat` draws nothing for a
-  tick — the URL names the render, not the flight it was of. Nothing extra
-  fills it in: Automatisk is on at every cold load, so the footprint ranking
-  names the flight as soon as it lands and `preferredLidarRender()` puts the
-  render back on the cache where the store holds it. Where it does not, the
-  link resolves to that flight's WMS.
-- **The store draws itself as its own coverage, out where nothing has selected
-  a flight.** `src/map/cvatHintLayer.ts` puts one layer per cached acquisition
-  on the map at zIndex 0.5, over whichever ground is up, and they draw from the
-  store's coarsest level to 1 m/px — `AUTO_ENGAGE_M_PER_PX`, the resolution at
-  which Automatisk starts handing the reader a flight of their own. So the
-  band is roughly z7 to z14, and it ends where the ground itself becomes
-  someone's choice rather than the mosaic. At full strength: the cached VAT and
-  MapProxy's national hillshade are close enough in colour that a faded patch
-  reads as an artefact of the mosaic rather than as a second picture. Nothing is
-  legible at that scale and nothing is meant to be — the patch is there to say
-  *this county has been rendered, come closer*, which is the one thing the app
-  otherwise only told a reader who had already arrived over a flight. It is off
-  in the two-ground views, where the reader has asked for a comparison, and on
-  the LiDAR grounds only; the extent culling and the sparse guard are the ground
-  layer's, since which tiles may be asked for is the same question here. What
-  the patch is shaped like is settled in the build, not here: below z12 a tile's
-  alpha is the acquisition's footprint rather than the DEM's no-data, because
-  hoydedata's coarse overviews fill each mosaic item's rectangle and would
-  otherwise promise a county where the flight is a ravine
-  (`vat-cache/WORK-ORDER.md` §2).
-- Hybrid's `LAYERS` is always the five reference groups
-  `kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,fkb_presentasjonsdata` —
-  the generalized `kd_*` groups stop around 1:25 000 and the `fkb_*` ones take
-  over — with `kd_hoydekurver,fkb_hoydekurver` appended to the same value for
-  contours rather than stacked as a second layer. The published `hoydekurver_1m`
-  / `_5m` are raw feature layers and render nothing at any scale. Both lists
-  now live in `mapproxy/mapproxy.yaml` as two sources, and the contour toggle
-  picks between two caches; `topoOverlay.ts` names the cache and nothing else.
-- NiB publishes no per-project WMS: `/wms/ortofoto` serves only the merged
-  `ortofoto` layer and `/wms/ortofoto_prosjekter` 403s. One acquisition comes
-  off the ImageServer's mosaic catalogue with
-  `mosaicRule={"mosaicMethod":"esriMosaicNone","where":"prosjektnavn='…'"}`;
-  the default method blends neighbouring projects back in, and the symptom is a
-  picked year that looks almost right.
-- Acquisitions are enumerated on `/arcgis/nib/prosjekter/MapServer/4/query`
-  (layer 4, "Prosjektomriss prosessert"), filtered server-side against real
-  footprint polygons, `ortofototype = 6` ("Satellittbilde", nationwide 10 m
-  Sentinel-2 mosaics) dropped. `prosjektnavn` is the same column there and in
-  the ImageServer catalogue, so index and renderer need no name matching. The
-  ImageServer's own `/query` is unusable: `returnDistinctValues=true` silently
-  returns zero features, undistinct one row per raster tile (~1000 rows / 24 MB
-  over Oslo, against ~121 projects in ~25 KB from the MapServer).
-- `wms.georef_nib` is a *planning* layer, not a coverage register:
-  GetFeatureInfo returns `prosjektfase` P/U, `r_pstart` in the future and
-  `prosjektna` / `nib_navn` empty. There is no NiB WFS on GeoNorge.
-- Old NiB WMS endpoints die September 2026; this uses
-  `services.norgeibilder.no/wms/*`. The imagery is free for private,
-  non-commercial use, publishing and commercial use being the user's
-  responsibility, so anything that grabs pixels rather than browsing them has
-  to say so at the point of the grab.
+## Background grounds
+
+`GROUND_MODES` is `['lidar', 'kart', 'flyfoto']` (`src/grounds/`); `groundOf()`
+derives the ground from the background layer name, never stores it. One ribbon
+arm per ground: `src/lidarControls/`, `src/kartControls/`,
+`src/flyfotoControls/`, in the band at `src/ribbon/`.
+
+Cold load with no usable `?backgroundLayer` lands on `lidarHillshade`
+(`getDefaultBackgroundLayer`, `config/backgroundLayers/atoms.ts`).
+
+| Layer name | Type | URL / upstream | Grid | Zoom | Config |
+| --- | --- | --- | --- | --- | --- |
+| `lidarHillshade` (`skyggerelieff`) | XYZ | `/cache/lidar-dtm/{z}/{x}/{y}.png`, `/cache/lidar-dom/…`; `…-held` siblings while the `hoyde` breaker is open | EPSG:25833 | 0–16 | `elevation.ts` |
+| `lidarHillshade` (any other style) | WMS | `/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833` (`NHM_DTM_TOPOBATHY_25833`) or `wms.hoyde-dom-nhm-25833` (`NHM_DOM_25833`) | view | max 16 | `elevation.ts`, `lidarProjects.ts` |
+| `lidarProject` | WMS | `/wms/geonorge/wms.hoyde-dtm-prosjekt` / `wms.hoyde-dom-prosjekt`, `LAYERS=<project id>:<style>` | view | max 17 | `stack.ts`, `lidarProjects.ts` |
+| `lidarCvat` | XYZ | `/cvat/<path>/{z}/{x}/{y}.webp` | EPSG:25833 | per acquisition | `cvatGround.ts` |
+| `topo`, `topograatone`, `toporaster`, `sjokartraster` | WMTS | `cache.kartverket.no/v1/service` GetCapabilities, one document for all four | from capabilities | — | `kvCache.ts` |
+| `amtskart` | XYZ | `/cache/amtskart/{z}/{x}/{y}.png` — MapProxy over `wms.historiskekart`, `LAYERS=amt1` | EPSG:25833 | 0–20 | `kartVariants.ts` |
+| `topoOverlay` | XYZ | `/cache/topo-ref` or `/cache/topo-ref-contours`, `.png` | EPSG:25833 | 0–20 | `topoOverlay.ts` |
+| `flyfoto` | XYZ | `/cache/flyfoto/{z}/{x}/{y}.jpeg` — MapProxy over `/wms/nib/ortofoto` | EPSG:25833 | 0–20 | `flyfotoBackground.ts` |
+| `flyfotoProject` | ArcGISImage (`TileArcGISRest`) | `/arcgis/nib/ortofoto_prosjekter/ImageServer` | view | max 18 | `flyfotoBackground.ts`, `flyfoto.ts` |
+| `empty` | Empty | — | — | — | `stack.ts` |
+
+Name unions: `src/map/layers/backgroundLayers.ts`. Type discriminants and per-type
+fields: `config/backgroundLayers/types.ts`.
+
+`KART_VARIANTS` (`kartVariants.ts`) is the Kart arm's ring: the four WMTS
+cartographies plus `amtskart`.
+
+### Coverage extents
+
+Set as the OL layer's `extent`, so tiles outside are culled rather than rendered
+upstream. Without one, OL takes the grid from the projection extent and asks for
+open ocean.
+
+| Extent (EPSG:25833) | Used by | Source |
+| --- | --- | --- |
+| `[-100275, 6399725, 1150255, 8000275]` | `lidarHillshade`, the same numbers in `mapproxy.yaml` source coverages | the høydedata services' `<BoundingBox CRS="EPSG:25833">` |
+| `[-127998, 6377920, 1145510, 7976800]` | `amtskart`, `topoOverlay` | `wms.topo` / `wms.historiskekart` declared bounds |
+| `[-250025, 6299985, 1211155, 8985010]` | `flyfoto` | the ortofoto WMS declared bounds |
+| per project `bboxLonLat` (EPSG:4326) | `lidarProject`, `flyfotoProject` | GetCapabilities / MapServer query |
+| per acquisition `extent25833`, falling back to the catalogue bbox | `lidarCvat` | the manifest's tile indices |
+
+### MapProxy caches
+
+`mapproxy/mapproxy.yaml`. Six upstream layers whose parameters never change,
+plus two read-only views.
+
+| `/cache/<name>` | Upstream | `LAYERS` |
+| --- | --- | --- |
+| `lidar-dtm` | `wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-topobathy-25833` | `NHM_DTM_TOPOBATHY_25833:skyggerelieff` |
+| `lidar-dom` | `wms.geonorge.no/skwms1/wms.hoyde-dom-nhm-25833` | `NHM_DOM_25833:skyggerelieff` |
+| `lidar-dtm-held`, `lidar-dom-held` | none (`sources: []`) — the same MBTiles files, so a miss is transparent rather than an upstream render | — |
+| `topo-ref` | `wms.geonorge.no/skwms1/wms.topo` | `kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,fkb_presentasjonsdata` |
+| `topo-ref-contours` | same | the five above plus `kd_hoydekurver,fkb_hoydekurver` |
+| `amtskart` | `wms.geonorge.no/skwms1/wms.historiskekart` | `amt1` |
+| `flyfoto` | `http://nib-proxy:8080/ortofoto` | `ortofoto` |
+
+No `on_error` anywhere: a shed response must reach the browser as a 500 so
+`src/upstream/` trips, rather than being cached as a blank tile.
+
+### Constraints that bite
+
+**LiDAR styles.** Each style is its own named WMS layer, `<prefix>:<style>`.
+DOM publishes one usable style, `skyggerelieff` (`DOM_STYLES`); asking a DOM
+layer or the national mosaic for a style it does not publish fails silently —
+HTTP 200, `Content-Type: image/png`, a ~100-byte JSON body, a blank map. Hence
+`stylesForModel`, `effectiveLidarStyle` and `resolveLidarStyle`. `None` and
+`dynamisk_farget_hoyde` are excluded: near-uniform, and ramped per tile so
+neighbouring tiles disagree. `?lidarModel=dom` persists the model; absent means
+DTM.
+
+**`cvat` is a style, not a dataset.** `CVAT_STYLE = 'cvat'` sits at the head of
+`TIER_A_STYLES` and is offered by `stylesForFlight()` wherever the store holds
+the flight. `lidarFlightGround(style, model)` is the only namer of
+`lidarProject` vs `lidarCvat`; `wmsLidarStyle()` guards the GetMap so a stray
+`cvat` can never reach a service.
+
+**The LiDAR catalogue** is an ~8 MB GetCapabilities off
+`wms.hoyde-dtm-prosjekt`. `fetchLidarProjects()` caches it in localStorage under
+`lidarProjects.v4` for a week and falls back past the TTL to whatever copy is
+still there. DTM and DOM publish identical project catalogues, so one fetch
+serves both. Project names starting `Bilde` are photogrammetry DTMs that
+advertise lidar styles and draw blank tiles; they are filtered out.
+
+**The cVAT store is read at runtime.** `fetchCvatStore()` fetches
+`/cvat/manifest.json` once per page load; `resolveCvatAcquisitions()` joins it
+to the catalogue. A manifest acquisition name is byte-identical to
+`LidarProject.id`, which is what the whole wiring rests on — an acquisition whose
+name is not verbatim in the per-project WMS GetCapabilities cannot be wired in.
+Where the catalogue has no row, `placeFromStore()` synthesizes one from the
+manifest envelope (year and density parsed out of the name, no WMS styles). The
+store's envelope is inclusive tile indices at `ENVELOPE_FLOOR_Z = 12`
+(`cvat-tiles/server.mjs`), or the coarsest level held.
+
+`lidarCvat` sets `sparse: true`: unwritten tiles inside the extent 404, OL leaves
+them transparent, and that transparency is the coverage mask — so the retry in
+`tileGuard.ts` is off. `preload: 2`, since a miss is a `SELECT` against a
+bind-mounted database. `getXYZLayer` sets `maxResolution` one step coarser than
+the store's coarsest level, or OL clamps there and asks for four screenfuls to
+upscale.
+
+**Provenance constants** for the cVAT plate live in `cvatGround.ts` —
+`CVAT_RENDERER`, `CVAT_TEMPLATE`, `CVAT_STACK`, `CVAT_AZIMUTH`,
+`CVAT_SUN_ALTITUDE`, `CVAT_RADIUS_PX`, `CVAT_GENERAL_OPACITY`. Transcribed from
+`vat-cache/cvat.py`, not fetched from the manifest. Rebuilding the store under
+changed parameters means editing that block too.
+`CVAT_LEGACY_ACQUISITION_ID = 'Vestfold og Telemark 5pkt 2021'` is what a record
+written before the plate existed was taken over.
+
+**Amtskart** is transparent and in `NEEDS_TOPO_BASE`: the series stopped around
+1917 and never covered Nordland.
+
+**Hybrid contours** ride the overlay's own GetMap — two MapProxy caches, not a
+second layer. The published `hoydekurver_1m` / `_5m` are raw feature layers and
+render nothing at any scale.
+
+**NiB publishes no per-project WMS** (`/wms/ortofoto_prosjekter` 403s). One
+acquisition comes off the ImageServer with
+`mosaicRule={"mosaicMethod":"esriMosaicNone","where":"prosjektnavn='…'"}`; the
+default method blends neighbouring projects back in, and the symptom is a picked
+year that looks almost right. `FORMAT: jpgpng` (JPEG inside coverage,
+transparent PNG outside; plain `jpg` paints the gaps black) arrives as
+`octet-stream`, which nib-proxy re-labels by magic bytes. `hidpi: false`, or
+`SIZE`/`DPI` scale by pixel ratio and wmscache keys the same ground twice.
+
+**Ortofoto acquisitions** are enumerated on
+`/arcgis/nib/prosjekter/MapServer/4/query` (layer 4, "Prosjektomriss
+prosessert"), with `ortofototype = 6` ("Satellittbilde", nationwide 10 m
+Sentinel-2 mosaics) dropped. `prosjektnavn` is the same column there and in the
+ImageServer catalogue. The ImageServer's own `/query` is unusable:
+`returnDistinctValues=true` silently returns zero features, undistinct one row
+per raster tile.
+
+**`interpolate: false`** on the LiDAR grounds and `lidarCvat`: above a source's
+deepest level the bilinear kernel clamps at each tile's own edge and draws a seam
+at every tile boundary.
 
 ## The background stack
 
-A ground is never one layer. `resolveStack` / `buildStack`
-(`config/backgroundLayers/stack.ts`) build one, bottom-first:
+`resolveStack` / `buildStack` (`config/backgroundLayers/stack.ts`) build a stack,
+bottom-first:
 
-1. a topo base for everything in `NEEDS_TOPO_BASE` (`lidarProject`,
-   `lidarHillshade`, `lidarCvat`, `flyfotoProject`, `amtskart` — all leave the
-   ground outside coverage transparent);
-2. a seamless fallback at `FALLBACK_OPACITY` when a per-project dataset is
-   active — the national mosaic under `lidarProject` and under `lidarCvat`, the
-   best-available ortofoto mosaic under `flyfotoProject`. The LiDAR fallback is
-   always `skyggerelieff`, and under the cached ground always DTM: that ground
-   has no model toggle, so a held DOM would fill its holes with a surface
-   mosaic nobody could turn off;
-3. the active dataset;
-4. the topo overlay, in hybrid — the one entry that carries a z-index of its
-   own (`HYBRID_OVERLAY_Z`, 0.75), so it clears the cached store's coverage hint
-   at 0.5 as well as the ground below it.
+1. A topo base for everything in `NEEDS_TOPO_BASE` — `lidarProject`,
+   `lidarHillshade`, `lidarCvat`, `flyfotoProject`, `amtskart`. Not `flyfoto`:
+   opaque JPEG.
+2. A seamless fallback at `FALLBACK_OPACITY` (0.6) under a per-project dataset:
+   the national mosaic under `lidarProject` and `lidarCvat`, the ortofoto mosaic
+   under `flyfotoProject`. Always `skyggerelieff`, and always DTM under
+   `lidarCvat`, which has no model toggle to undo a held DOM.
+3. The featured dataset.
+4. The topo overlay in hybrid, at `HYBRID_OVERLAY_Z` (0.75) — the only background
+   layer off z-index 0. `LIDAR_LAYERS` (`lidarProject`, `lidarHillshade`,
+   `lidarCvat`) is what the hybrid overlay, contours and model apply to.
 
-`swapBackgroundLayers(under, over)` (`config/backgroundLayers/utils.ts`)
-installs the result without a gap: 1–2 go *under* the outgoing layers, 3–4
-*over* them. Rules:
+`swapBackgroundLayers(under, over)` (`utils.ts`) installs the result: 1–2 go
+under the outgoing layers, 3–4 over them.
 
-- `resolveStack` is pure and `buildStack` awaits, so the two-ground views
-  (`src/map/compare/`) resolve a second stack by the same rules. `buildStack`
-  takes the host map, because in the split view that second stack is built into
-  the right pane's own map and an OL layer belongs to one map at a time.
-- The URL follows the *resolved* stack, not the atoms: `?hybrid=true` and
-  `?contours=true` are written only when the overlay ended up in it.
-- Outgoing layers are dimmed to `OUTGOING_OPACITY` and retired on the next
-  `rendercomplete` (`SWAP_TIMEOUT_MS`, 15 s, as a backstop); tearing down first
-  makes every W/S step flash topo.
-- `buildOrReuseBackgroundLayer` reuses a layer whose url + params + projection
-  match, so cycling rebuilds only what changed — and a reused layer may carry
-  an earlier fade and an earlier place in the z-order, so callers set both
-  explicitly on every layer they pass. The B half is the exception: it ignores
-  the stack's z-index and `installCompareLayers` puts every layer it takes at
-  `COMPARE_Z`, since B draws as one thing.
+- `resolveStack` is pure, `buildStack` awaits. The two-ground views
+  (`src/map/compare/`) resolve a second stack by the same rules; `buildStack`
+  takes a host map, because an OL layer belongs to one map at a time.
+- The URL follows the resolved stack, not the atoms: `?hybrid=true`,
+  `?contours=true` and `?lidarModel=dom` are written only when they ended up in
+  it.
+- Outgoing layers are dimmed to `OUTGOING_OPACITY` (0.35) and retired on the next
+  `rendercomplete`, with `SWAP_TIMEOUT_MS` (15 s) as a backstop.
+- `buildOrReuseBackgroundLayer` reuses a layer whose `layerSignature` (url +
+  params + projection, namespaced `bg`/`cmp`) matches. A reused layer carries an
+  earlier fade and z-index, so callers set both explicitly on every layer.
+  `installCompareLayers` overrides the stack's z-index with `COMPARE_Z`.
+- `VALID_STARTUP_LAYERS` (`atoms.ts`) is what `?backgroundLayer=` may name.
+  Excludes `lidarProject` and `flyfotoProject`: their acquisition atom starts
+  null and only the user can fill it.
 
 ### The layer pool
 
 `src/map/layers/layerPool.ts`. A tile cache lives on the layer's renderer, so a
-layer taken off a map loses everything it had loaded, and the next look at the
-same ground pays a full screenful of GetMap at a rate limit the whole
-deployment shares. The pool keeps retired layers for `POOL_TTL_MS` (5 minutes),
-up to `MAX_POOLED` (8, one background stack and one B stack), so going to a
-second ground and back, ticking a Kulturminner register off and on, or moving
-between the curtain and the split costs nothing.
+layer taken off a map loses everything it had loaded.
 
-- Every removal goes through `retireLayer(map, layer)` rather than
-  `map.removeLayer`, and only what actually came off a map is kept.
-- The key is `POOL_KEY`, the same value the in-collection lookups match on: for
-  a background that is `layerSignature` namespaced by `bg`/`cmp`, for a theme
-  layer `themeLayerPoolKey(id, projection)`. A layer without one is dropped.
-- The pool lookup may cross hosts where the in-collection one may not, because
-  nothing in the pool is on a map. That is what lets the split pane take back
-  the instance the curtain just retired.
-- A pooled layer carries whatever state it left with — fade, visibility,
-  curtain clip and extent. The installers set all of those on every incoming
-  layer, not only on new ones.
+- `MAX_POOLED` 8 (one background stack plus one B stack), `POOL_TTL_MS` 300000
+  (5 minutes).
+- Every removal goes through `retireLayer(map, layer)`, not `map.removeLayer` —
+  only what actually came off a map is kept.
+- Key is the `POOL_KEY` property: `layerSignature` namespaced `bg`/`cmp` for a
+  background, `themeLayerPoolKey(id, projection)` for a theme layer. A layer
+  without one is dropped.
+- The pool lookup may cross hosts where the in-collection lookup may not, since
+  nothing in the pool is on a map.
+- A pooled layer carries whatever state it left with (fade, visibility, curtain
+  clip, extent). Installers set all of those on every incoming layer.
 
-Map z-order, of what is left: backgrounds at zIndex 0 (ordered by collection
-position), the cached store's coverage hint at 0.5
-(`cvatHintLayer.ts` — over every ground, since it is drawn over whichever one is
-up, and under everything the app draws on top of a ground), hybrid's topo
-overlay at 0.75 (`HYBRID_OVERLAY_Z` in `stack.ts` — the only background layer
-off 0, because roads and place names have to clear the hint patches as well as
-the ground; a patch over the names of the county it is inviting the reader into
-is the symptom), the terrain-analysis
-render at 1 (`terrainLayer.ts` — over the background it is read against, under
-the B half so a curtain can still be drawn across it), the B half of a
-two-ground view at 1.5 (`COMPARE_Z`), an open
-lokalitet's drawing at 2 (`src/sketch/overlay.ts` — over the terrain it was
-drawn on, under everything drawn by the app), the LiDAR footprint outlines
-at 3 (`lidarFootprintsLayer.ts`, visible only while the ribbon's dataset menu is
-open), the terrain-analysis window frame at 4 — dashed from
-`windowLayer.ts` while the analysis is standing, solid with corner handles from
-`windowAdjust.ts` while it is being placed, never both — a lokalitet's pin and
-its label at 6 (`src/spots/pinStyle.ts`, under the register it is being checked
-against), and the Kulturminner theme layers
-on top at 10 — set by the caller that adds them (`src/map/layers/atoms.ts`), not
-by the factory in `themeWMS.ts`. 5 and 7–9 were the old interface's overlays
-and are free; a new one should write down what it puts there.
+### Map z-order
 
-## Kulturminner (theme layers, Riksantikvaren)
+| z | What | Where |
+| --- | --- | --- |
+| 0 | backgrounds, ordered by collection position | `stack.ts` (`GROUND_Z`) |
+| 0.5 | the cVAT store's coverage hint | `src/map/cvatHintLayer.ts` |
+| 0.75 | hybrid's topo overlay | `stack.ts` (`HYBRID_OVERLAY_Z`) |
+| 1 | terrain-analysis render | `src/terrain/terrainLayer.ts` |
+| 1.5 | the B half of a two-ground view | `src/map/compare/compareLayers.ts` (`COMPARE_Z`) |
+| 2 | an open spot's drawing | `src/sketch/overlay.ts` |
+| 3 | LiDAR footprint outlines | `src/map/lidarFootprintsLayer.ts` |
+| 4 | terrain-analysis window frame | `src/terrain/windowLayer.ts`, `src/terrain/windowAdjust.ts` |
+| 6 | a spot's pin and label | `src/spots/pinStyle.ts` (`PIN_Z_INDEX`) |
+| 10 | Kulturminner theme layers | set by the caller in `src/map/layers/atoms.ts`, not by `themeWMS.ts` |
 
-Config `src/map/layers/config/themeLayers/culturalHeritage.ts`, registered in
-`src/map/layers/themeLayerConfigApi.ts` and in `ThemeLayerName`
-(`src/map/layers/themeWMS.ts`). All five are `/wms/ra/<name>` → wmscache →
-`kart.ra.no/wms/<name>`.
+5 and 7–9 are free. A new overlay should be written down here.
 
-| Layer id | WMS | What it is |
-|---|---|---|
-| `heritageSites` | `/wms/ra/kulturminner2` | lokaliteter, enkeltminner, sikringssoner |
-| `culturalEnvironments` | `/wms/ra/kulturmiljoer` | kulturmiljøer |
-| `sefrakBuildings` | `/wms/ra/sefrak` | SEFRAK-registered buildings |
-| `protectedBuildings` | `/wms/ra/freda_bygninger` | fredede bygninger |
-| `userReportedHeritage` | `/wms/ra/brukerminner` | user-reported minner |
+The hint layer is why 0.75 exists: roads and place names have to clear the hint
+patches as well as the ground.
 
-The category sets `infoFormat: 'application/vnd.ogc.gml'` so
-`parseXmlFeatureInfo` (MapServer `msGMLOutput`) produces structured fields;
-left unset, the WMS returns HTML and the card shows a placeholder.
+### The coverage hint
 
-`themeLayerEffect` (`src/map/layers/atoms.ts`) puts them on the map, and in the
-split view on both maps: a ticked register belongs to the reading rather than to
-a half, so `syncThemeLayers` is called once per map and each gets its own layer
-instances off the same config. Only the main map's result writes
-`?themeLayers=` or drops a reading — the second pane is a mirror.
+`src/map/cvatHintLayer.ts` puts one layer per cached acquisition on the map at
+z-index 0.5, over whichever ground is up. Ids are `cvatHint.<path>`, outside the
+`bg.` namespace that `swapBackgroundLayers` sweeps. The band is the store's
+coarsest level down to `AUTO_ENGAGE_M_PER_PX` (1 m/px, `lidarAuto.ts`), where
+Automatisk starts handing the reader a flight. Off in the two-ground views, and
+on the LiDAR grounds only. Layers are added worst-ranked first, so the
+highest-ranked overlapping flight draws on top.
 
-These five are also the only layers on the map a pointer can question.
-`heritageQuery.ts` asks them by id rather than by the `theme.` prefix — who is
-asking decides which registers may answer — and `src/heritageInfo/` is what puts
-the question and draws the tip and the card. A sublayer that draws but does not
-answer is invisible to that surface, and `isRendering` means a register hidden
-behind the blind is never asked about.
+## Kulturminner theme layers
 
-### What `kulturminner2` exposes
+Config `src/map/layers/config/themeLayers/culturalHeritage.ts`, registered as
+`themeLayerConfig` in `src/map/layers/themeLayerConfigApi.ts` and in
+`ThemeLayerName` (`src/map/layers/themeWMS.ts`). All five go
+`/wms/ra/<name>` → wmscache → `kart.ra.no/wms/<name>`.
 
-`src/map/layers/heritage.ts` holds the WMS tables and the atoms; two
-independent settings, both URL-persisted:
+| Layer id | `wmsUrl` | `layers` | What it is |
+| --- | --- | --- | --- |
+| `heritageSites` | `/wms/ra/kulturminner2` | `Kulturminner` | lokaliteter, enkeltminner, sikringssoner |
+| `culturalEnvironments` | `/wms/ra/kulturmiljoer` | `Kulturmiljoer` | kulturmiljøer |
+| `sefrakBuildings` | `/wms/ra/sefrak` | `SEFRAK` | SEFRAK-registered buildings |
+| `protectedBuildings` | `/wms/ra/freda_bygninger` | `Freda_bygninger_WMS` | fredede bygninger |
+| `userReportedHeritage` | `/wms/ra/brukerminner` | `Brukerminner_WMS` | user-reported minner |
 
-- **Register** (`HERITAGE_DETAILS`): `lokaliteter`, `enkeltminner`,
-  `sikringssoner`. Each expands to a polygon sublayer and, except for
-  Sikringssoner, its icon twin. The pairing is load-bearing: polygon sublayers
-  stop at 1:25 000 (`MaxScaleDenominator`) while icons carry to 1:450 000.
-- **Render** (`HERITAGE_RENDERS`): `omriss`, `flate`, then the five vern
-  subsets `fredede`, `verneverdige`, `listefoerte`, `utenVern`, `uavklart`.
+Category defaults on `culturalHeritage`, cascading to all five:
 
-Rendering is one axis, not two: `STYLES` takes a single value per `LAYERS`
-entry and RA publishes no filled variant of any subset, so "filled *and*
-fredede only" is not a request that exists. The MapServer `FILTER` vendor
-parameter would compose it, but needs the `vernetype` vocabulary enumerated
-client-side, where a missed value under-reports silently.
+- `infoFormat: 'application/vnd.ogc.gml'` — so `parseXmlFeatureInfo` (MapServer
+  `msGMLOutput`) produces structured fields. Left unset, the WMS returns HTML
+  and the card shows a placeholder.
+- `extraWmsParams: { map_resolution: 192 }` — MapServer DPI hint scaling symbols
+  and line widths; the default is 96.
+- `minZoom: 8` — ~300k heritage records nationally is an unreadable wall of pins
+  below z8.
+
+`themeLayerEffect` (`src/map/layers/atoms.ts`) puts them on the map, and on both
+maps in the split view: `syncThemeLayers` is called once per map and each gets
+its own instances off the same config. Only the main map's result writes
+`?themeLayers=`.
+
+These five are the only layers a pointer can question. `heritageQuery.ts` asks
+them by id, not by the `theme.` prefix; `src/heritageInfo/` puts the question and
+draws the tip and the card. `isRendering` means a register hidden behind the
+blind (`heritageHiddenAtom`) is never asked about.
+
+### `kulturminner2` sublayers
+
+`src/map/layers/heritage.ts`. Two independent settings, both URL-persisted
+(`?heritageDetails=`, `?heritageRender=`; opacity is `?heritageOpacity=`,
+floor `MIN_HERITAGE_OPACITY` 0.2).
+
+`HERITAGE_DETAILS`: `lokaliteter`, `enkeltminner`, `sikringssoner`.
+`HERITAGE_RENDERS`: `omriss`, `flate`, then the five vern subsets `fredede`,
+`verneverdige`, `listefoerte`, `utenVern`, `uavklart`.
+
+| Sublayer | `omriss` | `flate` | vern subsets |
+| --- | --- | --- | --- |
+| `Lokaliteter` | `''` | `heldekkende` | `fredede`, `verneverdige`, `listefoerte`, `uten_vern`, `uavklart` |
+| `Lokalitetsikoner` | `''` | `''` | as above, but `Uavklart` capitalized |
+| `Enkeltminner` | `grenser` | `inspire_common:DEFAULT` | as `Lokaliteter` |
+| `Enkeltminneikoner` | `''` | `''` | as `Lokaliteter` |
+| `Sikringssoner` | `inspire_common:DEFAULT` | `heldekkende` | none — no `vernetype` column, so it drops out under any subset |
 
 Contracts:
 
 - Style names are not derivable from render names. `Enkeltminner`'s default
-  style is the *fill* and `grenser` its outline, the inverse of `Lokaliteter`;
-  `Lokalitetsikoner` spells its vern style `Uavklart` where every other
-  sublayer spells it `uavklart`. An unpublished style is a ServiceException (a
-  wall of broken tiles); a published but empty one is a valid transparent PNG.
-- `LAYERS` order is cartography — the WMS paints front to back, so the last
-  name wins the pixel — and `PAINT_ORDER` is that order bottom-to-top:
-  Sikringssoner, Lokaliteter, Enkeltminner, Lokalitetsikoner,
-  Enkeltminneikoner. Grouping the request by register instead puts each
-  register's icon under the next register's polygon; RA's own root layer
-  `Kulturminner` draws the clean version and is the check.
+  style is the fill and `grenser` its outline, the inverse of `Lokaliteter`;
+  `Lokalitetsikoner` spells `Uavklart` capitalized. An unpublished style is a
+  ServiceException (a wall of broken tiles); a published but empty one is a
+  valid transparent PNG.
+- Each register expands to a polygon sublayer and its icon twin. Polygon
+  sublayers stop at 1:25 000 (`MaxScaleDenominator`), icons carry to 1:450 000.
+- `LAYERS` order is cartography — the WMS paints front to back, last name wins
+  the pixel. `PAINT_ORDER` is bottom-to-top: `Sikringssoner`, `Lokaliteter`,
+  `Enkeltminner`, `Lokalitetsikoner`, `Enkeltminneikoner`. Grouping by register
+  instead puts each register's icon under the next register's polygon; RA's own
+  root layer `Kulturminner` draws the clean version and is the check.
 - `LAYERS` and `STYLES` are positional and must stay the same length.
 - `heritageSitesParams` returns null when the settings select nothing (every
-  register off, or only Sikringssoner under a vern subset) — hide the layer
-  rather than send a request that can only come back empty.
+  register off, or only Sikringssoner under a vern subset). Hide the layer rather
+  than send a request that can only come back empty.
+- Rendering is one axis: `STYLES` takes a single value per `LAYERS` entry and RA
+  publishes no filled variant of any subset, so "filled *and* fredede only" is
+  not a request that exists.
 
 Whether a feature's `linkkulturminnesok` URL resolves is asked separately
 (`src/map/featureInfo/kulturminnesok.ts`, `docs/wms-proxy-and-tiles.md`).
@@ -390,15 +344,13 @@ Whether a feature's `linkkulturminnesok` URL resolves is asked separately
 ## Recipe: add a theme layer
 
 1. A config in `src/map/layers/config/themeLayers/` exporting a
-   `ThemeLayerConfig` with `categories[]` and `layers[]`; category defaults
-   (`wmsUrl`, `infoFormat`, `featureInfoFields`, …) cascade through
-   `getEffectiveWmsUrl` and the fallback chain in `themeWMS.ts`.
-2. Merge it into `themeLayerConfig` in
-   `src/map/layers/themeLayerConfigApi.ts`.
-3. Add the layer id(s) to `ThemeLayerName` in `src/map/layers/themeWMS.ts`;
-   they appear in the `Kulturminner` popover automatically, and as a source in
-   the overlay's own menu (`src/heritageControls/`), which lists whatever
-   `themeLayerConfig` holds.
+   `ThemeLayerConfig` with `categories[]` and `layers[]`. Category defaults
+   (`wmsUrl`, `infoFormat`, `featureInfoFields`, `extraWmsParams`, `minZoom`)
+   cascade through `getEffectiveWmsUrl` and the fallback chain in `themeWMS.ts`.
+2. Merge it into `themeLayerConfig` in `src/map/layers/themeLayerConfigApi.ts`.
+3. Add the layer id(s) to `ThemeLayerName` in `src/map/layers/themeWMS.ts`. They
+   appear in the `Kulturminner` popover automatically, and as a source in
+   `src/heritageControls/`, which lists whatever `themeLayerConfig` holds.
 4. Route the requests through wmscache and use the same-origin
    `/wms/<host-slug>/…` prefix as `wmsUrl` — `docs/wms-proxy-and-tiles.md`.
 5. If GetFeatureInfo offers no JSON, set `infoFormat` to something the parser
@@ -407,30 +359,29 @@ Whether a feature's `linkkulturminnesok` URL resolves is asked separately
 ## Recipe: add a background layer
 
 1. Add the id to `WMTSLayerName`, `WMSLayerName`, `ArcGISImageLayerName` or
-   `XYZLayerName` (`src/map/layers/backgroundLayers.ts`); the matching
-   discriminant is the `type` field on `BackgroundLayer` in
-   `config/backgroundLayers/types.ts`. A fourth type also needs a builder and a
-   `layerSignature` arm in `utils.ts` — without the signature every dataset
-   cycle rebuilds the layer instead of reusing it, the pool never holds it, and
-   a ground already drawn flashes. A new builder also calls
-   `guardTileSource(source, url)` before
-   handing the source to the layer, or that ground goes on hammering a dead
-   upstream while everything else has stopped — with `{ retry: false }` where a
-   404 is the source's own coverage mask (`docs/wms-proxy-and-tiles.md`).
+   `XYZLayerName` (`src/map/layers/backgroundLayers.ts`). The matching
+   discriminant is the `type` field on `BackgroundLayer`
+   (`config/backgroundLayers/types.ts`). A new source type also needs a builder
+   in `utils.ts` and an arm in `layerSignature` — without the signature every
+   dataset cycle rebuilds the layer, the pool never holds it, and a ground
+   already drawn flashes. A new builder calls `guardTileSource(source, url)`
+   before handing the source to the layer, with `{ retry: false }` where a 404 is
+   the source's own coverage mask (`docs/wms-proxy-and-tiles.md`).
 2. Create or extend a config in `src/map/layers/config/backgroundLayers/` and
    spread it into `allConfiguredBackgroundLayers` in `stack.ts`.
    `coverageExtent` is mandatory for anything that can reach an upstream, XYZ
-   over `/cache/` included, and `XYZBackgroundLayer` also wants `preload` and
-   `sparse` — `docs/wms-proxy-and-tiles.md` for all three. If the source is a fixed
-   layer+style, it should be a MapProxy cache rather than a `TileWMS`; that
-   recipe is in the same doc.
+   over `/cache/` included; `XYZBackgroundLayer` also requires `projection`,
+   `minZoom`, `maxZoom`, `preload` (0 or 2) and `sparse`. If the source is a
+   fixed layer+style, it should be a MapProxy cache rather than a `TileWMS` —
+   that recipe is in `docs/wms-proxy-and-tiles.md`.
 3. A layer whose concrete source is a runtime choice gets a branch in
    `pickLayerConfig` rather than a static entry, and stays out of
-   `VALID_STARTUP_LAYERS`, since a cold load onto it would render nothing.
-4. Give it a control. A new member of an existing ground is a row in that arm's
-   menu; a ground of its own is a fourth arm plus an entry in `GROUND_MODES`
-   and `groundOf` (`src/grounds/`), which is what decides that the arm is the
-   one on screen. Until it has either, it is reachable by setting
-   `backgroundLayerHalves.a` and by `?backgroundLayer=` if it is safe to
+   `VALID_STARTUP_LAYERS`.
+4. Add it to `NEEDS_TOPO_BASE` if it answers transparent outside coverage, and to
+   `LIDAR_LAYERS` if the hybrid overlay, contours and model toggle apply.
+5. Give it a control. A new member of an existing ground is a row in that arm's
+   menu; a ground of its own is a fourth arm plus an entry in `GROUND_MODES` and
+   `groundOf` (`src/grounds/`). Until it has either, it is reachable by setting
+   `backgroundLayerHalves.a`, and by `?backgroundLayer=` if it is safe to
    cold-load onto.
-5. Translations in `src/locales/{nb,nn,en}/translation.json`.
+6. Translations in `src/locales/nb/translation.json`.
