@@ -28,22 +28,22 @@
     "tooltip": "{{ground}} — {{hint}}",
     "lidar": {
       "name": "LiDAR",
-      "hint": "Relieff regnet ut av laserskanning"
+      "hint": "Se terrenget"
     },
     "kart": {
       "name": "Kart",
-      "hint": "Kartverkets kartserier, og amtskart fra før 1917"
+      "hint": "Se kartet"
     },
     "flyfoto": {
       "name": "Flyfoto",
-      "hint": "Ortofoto fra Norge i bilder"
+      "hint": "Se flyfoto"
     }
   },
   "heritageControls": {
     "label": "Kulturminner",
-    "show": "Vis kulturminnene på kartet",
-    "hide": "Skjul kulturminnene på kartet",
-    "chipTitle": "Kulturminner: {{sources}} — {{render}}",
+    "show": "Lokaliteter og funn fra Kulturminnesøk",
+    "hide": "Skjul kulturminnesøk-data",
+    "chipTitle": "Kjente kulturminner: {{sources}} — {{render}}",
     "chipSourcesTitle": "Kulturminner: {{sources}}",
     "chipHiddenTitle": "Kulturminner er skjult — velg hva som skal tegnes",
     "zoomedOutHint": "Kulturminnene tegnes først når du zoomer inn",
@@ -119,26 +119,26 @@
   },
   "lidar": {
     "style": {
-      "cvat": "Arkeologisk relieff",
+      "cvat": "CVAT RVT-py",
       "skyggerelieff": "Skyggerelieff",
-      "multiskyggerelieff": "Multiskyggerelieff",
-      "helning_prosent": "Helning i prosent",
-      "helning_grader": "Helning i grader",
+      "multiskyggerelieff": "Multiskygge",
+      "helning_prosent": "Slope prosent",
+      "helning_grader": "Slop grader",
       "dynamisk_farget_hoyde": "Dynamisk fargelagt høyde"
     }
   },
   "lidarControls": {
     "auto": {
-      "label": "Automatisk",
-      "offHint": "La utsnittet velge datasett",
-      "onHint": "Følger utsnittet. Velg selv for å slå av."
+      "label": "Auto",
+      "offHint": "Velg automatisk",
+      "onHint": "Velg manuelt"
     },
     "dataset": {
-      "national": "Nasjonal mosaikk",
-      "nationalShort": "Nasjonal · 1 m",
-      "nationalHint": "1 m, sømløs over hele landet",
-      "nationalHeldHint": "1 m, men bare der vi allerede har fliser",
-      "held": "Høydedata svarer ikke — dette er det vi har lagret",
+      "national": "NHM DTM",
+      "nationalShort": "NHM 1m",
+      "nationalHint": "Nasjonal høydemodell fra Kartverket",
+      "nationalHeldHint": "Hvertfall mye av tiden",
+      "held": "Får ikke kontakt med Høydedata, viser cache",
       "heldInView": "Lagret for dette utsnittet",
       "inView": "Dekker utsnittet",
       "alsoHere": "Eldre eller delvis dekning",
@@ -151,37 +151,37 @@
     },
     "render": {
       "chipTitle": "{{render}} — {{source}}",
-      "more": "Flere gjengivelser",
-      "cvatHint": "Vår egen gjengivelse, fra disk",
-      "wmsHint": "Kartverkets skyggelegging",
-      "cvatMissing": "Ikke bygget for dette datasettet ennå",
-      "cvatProvenance": "Arkeologisk relieff over «{{acquisition}}»: {{renderer}} {{template}}, radius {{general}}/{{flat}} piksler. Høydene er Kartverkets, bildet er vårt.",
+      "more": "Flere",
+      "cvatHint": "Tufteseids hjemmerendrede RVT CVAT",
+      "wmsHint": "Kartverkets render",
+      "cvatMissing": "Venter på at disk blir billig igjen",
+      "cvatProvenance": "RVT_py Combined VAT av «{{acquisition}}»: {{renderer}} {{template}}, radius {{general}}/{{flat}} piksler.",
       "domLocked": "Overflatemodellen publiserer bare skyggerelieff"
     },
     "hybrid": {
       "label": "Referanselag",
-      "offHint": "Legg veier, jernbane og stedsnavn over relieffet",
-      "onHint": "Ta bort veier, jernbane og stedsnavn",
+      "offHint": "Legg på kartdetaljer",
+      "onHint": "Ta bort kartdetaljer",
       "contours": "Høydekurver",
-      "contoursOffHint": "Ta med høydekurver i referanselaget",
-      "contoursOnHint": "Ta bort høydekurvene"
+      "contoursOffHint": "Legg på høydekurver",
+      "contoursOnHint": "Fjern høydekurver"
     },
     "model": {
       "dtm": "Terreng",
       "dom": "Overflate",
       "aria": "Høydemodell: {{model}}",
-      "toDtm": "Bytt til terrengmodell (DTM) — bakken, uten vegetasjon og bygninger",
-      "toDom": "Bytt til overflatemodell (DOM) — trekroner og tak. Bare skyggerelieff, og ingen cache: den er regnet ut fra terrenget."
+      "toDtm": "Terreng (DTM)",
+      "toDom": "Overflate (DOM)"
     }
   },
   "map": {
-    "errorMessage": "Noe gikk veldig galt med kartet"
+    "errorMessage": "Å nei! Noe gikk veldig galt med kartet."
   },
   "panel": {
-    "collapse": "Fold sammen",
-    "expand": "Fold ut",
-    "close": "Lukk",
-    "closeUnsaved": "Lukk uten å lagre? Klikk en gang til."
+    "collapse": "Innattatt",
+    "expand": "Utatatt",
+    "close": "Vekk",
+    "closeUnsaved": "Lukk uten å lagre? Klikk igjen."
   },
   "ribbon": {
     "groundSection": {
@@ -200,7 +200,7 @@
     "new": "Ny lokalitet",
     "newNeedsAccount": "Logg inn for å lage en lokalitet",
     "placeCancel": "Avbryt plasseringen",
-    "placeHint": "Klikk i kartet for å plassere nåla",
+    "placeHint": "Plasser nåla der du vil registrere funnet",
     "placeEscape": "Esc avbryter",
     "newTitle": "Ny lokalitet",
     "editTitle": "Rediger lokalitet",
@@ -245,24 +245,24 @@
   },
   "terrainControls": {
     "label": "Terrenganalyse",
-    "show": "Marker et område å analysere — du henter høydedataene når rektangelet står der du vil",
+    "show": "Marker et område å analysere",
     "hide": "Avslutt terrenganalysen",
     "start": "Start analysen",
-    "startHint": "Hent høydedata for rektangelet slik det står nå, og belys dem her i nettleseren.",
+    "startHint": "Forskjellige visualiseringer rett i nettleseren. Hint: Ta et så lite område som mulig, dette kan være tungt å kjøre",
     "adjust": "Juster utsnittet",
-    "adjustHint": "Ta tak i rektangelet igjen: dra det for å flytte det, dra i et hjørne for å endre størrelsen. Høyst {{max}} × {{max}} m. Analysen følger ikke kartet av seg selv — et høydegrid er en stor nedlasting.",
+    "adjustHint": "Høyst {{max}} × {{max}} m. Velg et område for å laste ned punktdata og kjøre beregning",
     "placing": "{{side}} m · dra rektangelet, hjørnene endrer størrelsen",
     "visHead": "Visualisering",
     "modelHead": "Høydemodell",
     "vis": {
       "hillshade": "Skyggerelieff",
       "multiHillshade": "Flerretning",
-      "vat": "VAT (arkeologisk)",
-      "svf": "Himmelsyn",
+      "vat": "VAT",
+      "svf": "Skyview",
       "openPos": "Åpenhet, positiv",
       "openNeg": "Åpenhet, negativ",
       "lrm": "Lokalrelieff",
-      "slope": "Helning"
+      "slope": "Slope"
     },
     "visMeta": {
       "hillshade": "én sol, du styrer den",
