@@ -1,6 +1,3 @@
-/* Narrow on purpose: the tip follows a pointer that is reading terrain, and a
-   box wide enough to cover the mound it describes defeats itself. Names wrap
-   rather than truncate — a truncated gardsnamn is not a name. */
 .tip {
   box-sizing: border-box;
   display: flex;
@@ -31,8 +28,8 @@
   gap: 6px;
 }
 
-/* Baseline-aligned with the name beside it rather than with the row box, or a
-   two-line name pushes the glyph to the middle of nowhere. */
+/* Baselined against the name, not the row box: a two-line name would otherwise
+   push the glyph to the middle. */
 .rowIcon {
   flex: none;
   transform: translateY(2px);
@@ -49,8 +46,6 @@
   overflow-wrap: anywhere;
 }
 
-/* Trails the name on the same line: `art` is what the name means, not a second
-   fact about it. */
 .rowSubtitle {
   margin-left: 6px;
   color: var(--mantine-color-dimmed);

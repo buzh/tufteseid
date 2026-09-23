@@ -1,6 +1,5 @@
 import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-// Self-hosted, and only the four weights the UI kit asks for.
 import '@fontsource/mulish/latin-400.css';
 import '@fontsource/mulish/latin-500.css';
 import '@fontsource/mulish/latin-600.css';
@@ -17,14 +16,13 @@ import { projInit } from './map/projections/proj/projInit.ts';
 import { theme } from './ui/theme.ts';
 projInit();
 
-// Module scope: constructing it in the element tree would throw the whole
-// query cache away on any root re-render.
+// Module scope: constructing it in the element tree would throw the query
+// cache away on any root re-render.
 const queryClient = new QueryClient();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {/* `index.html` carries the same value on <html>, so the first paint is
-        already dark — see the comment there. */}
+    {/* `index.html` sets the same value on <html> so the first paint is dark. */}
     <MantineProvider theme={theme} defaultColorScheme="dark">
       <AtomWrapper>
         <QueryClientProvider client={queryClient}>

@@ -1,11 +1,5 @@
-// Signing in. One modal, mounted once at the top of the app, opened from the
-// button in the band and from any verb that turns out to need an account.
-//
-// OAuth2 only, and there is no password form and no sign-up. Which providers
-// exist is a property of the deployment — adding one is Collections → users →
-// Options → OAuth2 in PocketBase's admin UI and no code change at all — so
-// this lists whatever `listAuthMethods()` reports rather than carrying a menu
-// that has to be kept in step with the server.
+// OAuth2 only. Adding a provider is Collections -> users -> Options -> OAuth2
+// in PocketBase's admin UI; this lists whatever `listAuthMethods()` reports.
 
 import { Alert, Button, Loader, Modal, Stack, Text } from '@mantine/core';
 import { useAtom } from 'jotai';
@@ -14,8 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { authPromptAtom, isAuthDialogOpenAtom } from './atoms';
 import { useOAuthProviders, useSignIn } from './hooks';
 
-// PocketBase reports a provider's `displayName`, but its casing follows
-// whoever configured it; these are the spellings the vendors use.
+// PocketBase's `displayName` takes its casing from whoever configured the
+// provider; these are the vendors' own spellings.
 const PROVIDER_LABELS: Record<string, string> = {
   apple: 'Apple',
   github: 'GitHub',
@@ -42,8 +36,8 @@ export const AuthDialog = () => {
       await signIn(provider);
       close();
     } catch (err) {
-      // Blocked popup, cancelled window, misconfigured provider. Nothing here
-      // can tell them apart, and the reader can see the dialog is still up.
+      // Blocked popup, cancelled window and misconfigured provider are not
+      // distinguishable here; the dialog stays up either way.
       console.warn('[auth] sign-in failed', err);
     }
   };
@@ -57,8 +51,6 @@ export const AuthDialog = () => {
       size="sm"
     >
       <Stack gap="sm">
-        {/* Why it opened, when the reader did not press anything: a followed
-            link that resolved to nothing they are allowed to see. */}
         {prompt === 'spotLink' && (
           <Alert color="yellow">{t('spots.linkNeedsAccount')}</Alert>
         )}

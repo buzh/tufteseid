@@ -1,11 +1,4 @@
-/* The five vern subsets the Kulturminner pulldown filters by, as colours a chip
-   can wear — one file, imported by both surfaces, because a tip and a card
-   disagreeing about what "fredet" looks like would be worse than either choice.
-   Mantine's `-light` pairs are used rather than raw shades: they are the pair
-   the theme already guarantees readable against the anthracite ground.
-
-   `ukjent` has no rule. An unmapped label is not a sixth status, and giving it a
-   colour would make one up. */
+/* `ukjent` has no rule on purpose: `vernToneClass` returns undefined for it. */
 
 .fredede {
   background: var(--mantine-color-red-light);

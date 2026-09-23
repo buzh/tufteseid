@@ -1,24 +1,12 @@
 @import './map/map.css';
 
-/* The one metric the map controls share. A row of them — chips, toggles,
-   buttons — is a single band only as long as every one of them is the same
-   height, and they are declared in four stylesheets that cannot import each
-   other. Global rather than per-module for that reason, and not in the Mantine
-   theme because CSS is the only consumer.
-
-   30px is the height of a Mantine `size="xs"` Button, and the icon width what
-   an icon-only control needs at that height. The chevron width is a third of
-   that: a chip carrying nothing but the handle on the menu of the button it is
-   joined to, sized so it reads as that handle rather than as a second control.
-   */
+/* Shared by every map control, which are declared in modules that cannot import
+   each other. 30px is a Mantine `size="xs"` Button. */
 :root {
   --control-height: 30px;
   --control-icon-width: 34px;
   --control-chevron-width: 12px;
 }
-
-/* A small reset: each surface sets its own margins, sizes and list styling in
-   its own module, so what is here is what those assume. */
 
 *,
 *::before,
@@ -57,8 +45,6 @@ dd {
   margin: 0;
 }
 
-/* Headings drop the UA's size and weight with the margin: every heading in
-   the app is classed and sets both itself. */
 h1,
 h2,
 h3,
@@ -77,7 +63,6 @@ ol {
   list-style: none;
 }
 
-/* Controls do not inherit the page font on their own. */
 button,
 input,
 select,

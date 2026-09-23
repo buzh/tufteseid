@@ -1,13 +1,3 @@
-/* The seam. Every box in here keeps its own border, background and hover — the
-   join is made by dropping the radii that face the seam and lapping the borders
-   onto each other, so the line between two boxes is one pixel rather than two
-   and the outer silhouette is a single rounded box.
-
-   Child selectors rather than a class the boxes wear: the boxes are styled from
-   CSS modules of their own, a caller cannot name a class in either, and the
-   rules below have to apply to the first and last child of whatever is
-   currently standing here — which changes as a chip comes and goes. */
-
 .unit {
   display: flex;
   flex: none;
@@ -30,10 +20,7 @@
   border-end-end-radius: 0;
 }
 
-/* The focus ring is drawn outside the border box, in the pixels the neighbour
-   is lapped over — without this the neighbour paints it out on the seam side,
-   and a keyboard reader gets three sides of a ring. Hover needs no such thing:
-   it changes the fill, which the lap does not reach. */
+/* Without this the lapped neighbour paints out the ring on the seam side. */
 .unit > :focus-visible {
   z-index: 1;
 }

@@ -4,17 +4,13 @@ import { pb } from '../api/pocketbase';
 
 export type OAuthProvider = { name: string; displayName: string };
 
-// Which providers exist is a property of the deployment, not of the session:
-// adding one is an admin-UI change on the `users` collection. Cached in a
-// module variable so opening the dialog twice asks once.
+// A property of the deployment, not the session, so cached for the page's life.
 let cachedProviders: OAuthProvider[] | null = null;
 
 export const useOAuthProviders = () => {
   const [providers, setProviders] = useState<OAuthProvider[] | null>(
     cachedProviders,
   );
-  // A flag, not the error: the dialog says one fixed sentence either way, and
-  // what actually went wrong is worth more in the console than in the modal.
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -38,7 +34,7 @@ export const useOAuthProviders = () => {
   return { providers, failed };
 };
 
-/** The SDK's all-in-one popup flow, bouncing through /pb/api/oauth2-redirect. */
+// The SDK's all-in-one popup flow, bouncing through /pb/api/oauth2-redirect.
 export const useSignIn = () =>
   useCallback(async (providerName: string) => {
     await pb.collection('users').authWithOAuth2({ provider: providerName });

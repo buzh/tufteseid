@@ -70,9 +70,7 @@ export const removeFromUrlListParameter = (
 };
 
 export type UrlParameter =
-  // The open spot, as its six-character code, not its PocketBase id. The only
-  // parameter here that names a record, and so the only one that can fail to
-  // resolve — everything else describes a view, which is always drawable.
+  // The open spot's six-character code, not its PocketBase id.
   | 'lok'
   | 'projection'
   | 'backgroundLayer'

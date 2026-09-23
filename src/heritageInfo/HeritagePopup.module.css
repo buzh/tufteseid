@@ -1,11 +1,4 @@
-/* The overlay element is `pointer-events: none` so the map stays draggable
-   around the card; this box takes it back. Sized to the text rather than to the
-   screen: a card wider than a paragraph is hard to read, and one taller than
-   half the view hides the terrain it is about.
-
-   The shell around it — the border, the header with the fold and the close, the
-   scrolling body — is `Panel`, the same one the terrain box and the spot box
-   wear. What is left here is the size and the pointer. */
+/* The overlay element is `pointer-events: none`; this box takes it back. */
 .popup {
   box-sizing: border-box;
   width: 90vw;
@@ -64,8 +57,6 @@
   overflow-wrap: anywhere;
 }
 
-/* The register's own id, kept quiet but kept: it is what a reader quotes back
-   at Askeladden. Tabular so a column of them lines up. */
 .cardId {
   flex: none;
   color: var(--mantine-color-dimmed);
@@ -128,8 +119,6 @@
   margin-top: 4px;
 }
 
-/* A rule down the left rather than an indent alone: these are parts of the
-   record above them, not siblings of it. */
 .nestedItem {
   padding-left: var(--mantine-spacing-xs);
   border-left: 2px solid var(--mantine-color-default-border);
@@ -162,8 +151,6 @@
   font-size: inherit;
 }
 
-/* Kulturminnesøk has no entry behind this one: still a link, and still the
-   register's own, but it lands on an empty page. */
 .linkMissing {
   position: relative;
   display: inline-flex;

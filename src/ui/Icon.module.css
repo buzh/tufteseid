@@ -1,6 +1,5 @@
-/* Selectors are doubled to outrank `.material-symbols-rounded` from
-   material-symbols/rounded.css, which sets font-variation-settings on the same
-   element at equal specificity. */
+/* Doubled selectors outrank `.material-symbols-rounded` from
+   material-symbols/rounded.css, which sets font-variation-settings too. */
 .icon.icon {
   display: inline-flex;
   align-items: center;

@@ -1,7 +1,3 @@
-/* Mantine's `light` variant of a colour is the scheme-aware pair: a tinted
-   surface and a text colour that reads on it. That is the whole of what this
-   box needs, and it follows the colour scheme without a second set of tokens. */
-
 .fallback {
   pointer-events: auto;
   display: inline-flex;

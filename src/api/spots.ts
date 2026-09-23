@@ -4,14 +4,11 @@ const COLLECTION = 'spots';
 
 export type SpotVisibility = 'private' | 'public';
 
-/** [lon, lat] in EPSG:4326 — where the pin was dropped. */
+/** Lon/lat, EPSG:4326. */
 export type SpotPoint = [lon: number, lat: number];
 
-/**
- * An Excalidraw scene plus the georeference that puts it back over the ground
- * it was drawn on. `elements` is the editor's own array, kept opaque here: the
- * only module that knows its shape is `src/sketch/`.
- */
+/** An Excalidraw scene plus its georeference. `elements` is the editor's own
+ *  array; only `src/sketch/` knows its shape. */
 export type SpotSketch = {
   frame: {
     /** View projection at the moment of freezing, e.g. `EPSG:25833`. */
@@ -38,10 +35,8 @@ export type SpotRecord = {
   updated: string;
 };
 
-// The column widths from `pb_migrations/1700001100_spots.js`, mirrored so the
-// box can stop at them. The server rejects an over-long field with a 400 that
-// says only that the save failed, which is the wrong advice: retrying does the
-// same thing, and nothing in it names the field at fault.
+// Mirrors the column widths in `pb_migrations/1700001100_spots.js`; the
+// server's 400 for an over-long field does not name the field.
 export const SPOT_NAME_MAX = 200;
 export const SPOT_DESCRIPTION_MAX = 20000;
 
@@ -61,8 +56,7 @@ export type SpotPatch = Partial<{
   sketch: SpotSketch | null;
 }>;
 
-// Crockford base32, so a code can be read aloud; 32 divides 256, so `% 32` on
-// a random byte is unbiased.
+// Crockford base32; 32 divides 256, so `% 32` on a random byte is unbiased.
 const CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 const newSpotCode = (): string => {
@@ -72,23 +66,20 @@ const newSpotCode = (): string => {
   return code;
 };
 
-// PB reports a unique-index violation as a 400 with a per-field entry; the
+// PB reports a unique-index violation as a 400 with a per-field entry: the
 // outer `code` is our field, the inner is PB's name for the error kind.
 const isCodeTaken = (err: unknown): boolean =>
   (err as { response?: { data?: Record<string, { code?: string }> } })?.response
     ?.data?.code?.code === 'validation_not_unique';
 
-// 32^6 ≈ 1.07 billion; one redraw is more than enough at this scale.
+// 32^6 ≈ 1.07e9 codes, so one redraw suffices.
 const CODE_ATTEMPTS = 2;
 
 const accountName = (): string =>
   (pb.authStore.record as SiteUser | null)?.name?.trim() ?? '';
 
-/**
- * PocketBase parses a JSON field for us over REST but hands it back as a
- * string over realtime SSE, so anything that reaches a consumer goes through
- * here first.
- */
+// PocketBase parses a JSON field over REST but hands it back as a string over
+// realtime SSE.
 const asJson = <T>(value: unknown): T | null => {
   if (value == null || value === '') return null;
   if (typeof value !== 'string') return value as T;
@@ -148,12 +139,9 @@ export const listSpots = async (): Promise<SpotRecord[]> =>
     })
   ).map(hydrate);
 
-/**
- * The short link's resolver. Uppercased because SQLite's `=` does not
- * case-fold, and `requestKey: null` because a deep link asks twice — once as
- * whoever arrived, once again after they sign in — and the SDK's auto-cancel
- * would make the second look like a miss.
- */
+// Uppercased because SQLite's `=` does not case-fold. `requestKey: null`: a
+// deep link asks twice — before and after sign-in — and the SDK's auto-cancel
+// would make the second look like a miss.
 export const getSpotByCode = async (code: string): Promise<SpotRecord> =>
   hydrate(
     await pb

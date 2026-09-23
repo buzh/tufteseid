@@ -5,15 +5,13 @@ import {
   parseCoordinateInput,
 } from '../../../src/shared/utils/coordinateParser';
 
-// i18n returns the key as-is when not initialized; the parser uses this as a
-// fallback display name (which is fine) but crashes if t() returns undefined.
+// The parser crashes if `t()` returns undefined; uninitialized i18next returns
+// the key.
 vi.mock('i18next', () => ({
   default: { t: (key: string) => key },
 }));
 
 describe('parseCoordinateInput', () => {
-  // ─── Decimal degrees ──────────────────────────────────────────────────────
-
   describe('decimal degrees', () => {
     it('parses standard lat, lon with comma', () => {
       const result = parseCoordinateInput('59.91273, 10.74609');
@@ -89,8 +87,6 @@ describe('parseCoordinateInput', () => {
     });
   });
 
-  // ─── DMS (Degrees, Minutes, Seconds) ──────────────────────────────────────
-
   describe('DMS – direction after', () => {
     it('parses DMS with ASCII quotes and N/E suffix', () => {
       const result = parseCoordinateInput('59°54\'45.8"N 10°44\'45.9"E');
@@ -145,8 +141,6 @@ describe('parseCoordinateInput', () => {
       expect(result?.lon).toBeCloseTo(10.8361, 3);
     });
   });
-
-  // ─── DM (Degrees, decimal Minutes) ────────────────────────────────────────
 
   describe('DM – decimal minutes with direction after', () => {
     it('parses DM with N/E suffixes', () => {
@@ -312,8 +306,6 @@ describe('parseCoordinateInput', () => {
     });
   });
 
-  // ─── Explicit EPSG via @ ───────────────────────────────────────────────────
-
   describe('explicit EPSG via @', () => {
     it('parses UTM 33N with @25833', () => {
       const result = parseCoordinateInput('425917 7730314@25833');
@@ -360,8 +352,6 @@ describe('parseCoordinateInput', () => {
     });
   });
 
-  // ─── Norwegian direction words ─────────────────────────────────────────────
-
   describe('Norwegian direction words', () => {
     it('normalizes Nord/Øst to N/E (UTM)', () => {
       const result = parseCoordinateInput('60 Nord, 10 Øst');
@@ -382,12 +372,9 @@ describe('parseCoordinateInput', () => {
     });
   });
 
-  // ─── Arctic / high-latitude coordinates ──────────────────────────────────
-
   describe('arctic and high-latitude coordinates', () => {
     it('parses decimal degrees where both lat and lon are >= 80', () => {
-      // Regression test: previously failed when both values were >= 80 due to
-      // the old isLatLon heuristic. "80, 80" is a valid coordinate (near Svalbard).
+      // "80, 80" is a valid coordinate, near Svalbard.
       const result = parseCoordinateInput('80, 80');
       expect(result).not.toBeNull();
       expect(result?.lat).toBeCloseTo(80, 1);
@@ -404,7 +391,6 @@ describe('parseCoordinateInput', () => {
     });
 
     it('parses decimal degrees where lat >= 80 but lon < 80', () => {
-      // Sanity check: this already works — lon < 80 satisfies the OR condition
       const result = parseCoordinateInput('80.5, 20.0');
       expect(result).not.toBeNull();
       expect(result?.lat).toBeCloseTo(80.5, 1);
@@ -419,11 +405,8 @@ describe('parseCoordinateInput', () => {
     });
   });
 
-  // ─── DM – partial direction (S/W first) ───────────────────────────────────
-
   describe('DM – partial direction with S or W as first direction', () => {
     it('parses DM with S as the only direction (first coord is southern)', () => {
-      // Pattern 5: "deg° min' S, deg° min'" — lat should be negative
       const result = parseCoordinateInput("45° 30.0' S, 10° 15.0'");
       expect(result).not.toBeNull();
       expect(result?.lat).toBeCloseTo(-45.5, 3);
@@ -431,15 +414,12 @@ describe('parseCoordinateInput', () => {
     });
 
     it('parses DM with W as the only direction (first coord is western lon)', () => {
-      // Pattern 5: "deg° min' W, deg° min'" — lon should be negative, lat is second
       const result = parseCoordinateInput("10° 15.0' W, 45° 30.0'");
       expect(result).not.toBeNull();
       expect(result?.lon).toBeCloseTo(-10.25, 3);
       expect(result?.lat).toBeCloseTo(45.5, 3);
     });
   });
-
-  // ─── Decimal degree hard bounds ───────────────────────────────────────────
 
   describe('decimal degrees – boundary values', () => {
     it('parses exactly at North Pole latitude (90, 0)', () => {
@@ -472,8 +452,6 @@ describe('parseCoordinateInput', () => {
     });
   });
 
-  // ─── normalizeDecimalSeparators edge cases ────────────────────────────────
-
   describe('normalizeDecimalSeparators – comma disambiguation', () => {
     it('does NOT convert commas between two large numbers (UTM pair)', () => {
       // Both sides >= 1000 → treated as coordinate separator, not decimal
@@ -485,8 +463,8 @@ describe('parseCoordinateInput', () => {
     });
 
     it('does NOT convert comma in an ambiguous two-integer pair (60,10)', () => {
-      // Single short pattern with no following separator → not converted
-      // Parsed as two separate coords: lat=60, lon=10
+      // One short pattern with no separator following → not converted, so this
+      // parses as two coordinates.
       const result = parseCoordinateInput('60,10');
       expect(result).not.toBeNull();
       expect(result?.lat).toBeCloseTo(60, 1);
@@ -494,7 +472,7 @@ describe('parseCoordinateInput', () => {
     });
 
     it('converts commas when both sides have 1–2 digits and a separator follows', () => {
-      // "1,5 10,5" → two short patterns → hasMultipleShortPatterns → convert
+      // Two short patterns → both commas are decimal.
       const result = parseCoordinateInput('1,5 10,5');
       expect(result).not.toBeNull();
       expect(result?.lat).toBeCloseTo(1.5, 2);
@@ -502,7 +480,7 @@ describe('parseCoordinateInput', () => {
     });
 
     it('converts European decimal commas with trailing zeros (242366,00 6736146,01)', () => {
-      // Two short patterns → hasMultipleShortPatterns → convert both
+      // Two short patterns → both commas are decimal.
       const result = parseCoordinateInput('242366,00 6736146,01@EPSG:25833');
       expect(result).not.toBeNull();
       expect(result?.lon).toBeCloseTo(242366, 0);
@@ -517,8 +495,6 @@ describe('parseCoordinateInput', () => {
       expect(result?.lon).toBeCloseTo(10.5, 2);
     });
   });
-
-  // ─── DMS invalid boundary values ──────────────────────────────────────────
 
   describe('DMS – invalid minutes and seconds', () => {
     it('returns null when minutes = 60 (direction after)', () => {
@@ -552,8 +528,6 @@ describe('parseCoordinateInput', () => {
     });
   });
 
-  // ─── DMS direction before – S and W variants ──────────────────────────────
-
   describe('DMS – direction before with S/W', () => {
     it('parses DMS with S and W direction prefix', () => {
       const result = parseCoordinateInput("S 45° 30' 0'', W 10° 15' 0''");
@@ -569,8 +543,6 @@ describe('parseCoordinateInput', () => {
       expect(result?.lon).toBeCloseTo(-10.25, 3);
     });
   });
-
-  // ─── parseWithEPSG – extra variants ───────────────────────────────────────
 
   describe('explicit EPSG via @ – extra variants', () => {
     it('normalizes EPSG:4258 (ETRS89) to EPSG:4326', () => {
@@ -610,8 +582,6 @@ describe('parseCoordinateInput', () => {
     });
   });
 
-  // ─── Invalid input ─────────────────────────────────────────────────────────
-
   describe('invalid input', () => {
     it('returns null for empty string', () => {
       expect(parseCoordinateInput('')).toBeNull();
@@ -634,8 +604,6 @@ describe('parseCoordinateInput', () => {
     });
   });
 });
-
-// ─── isLikelyLonLatSwap ───────────────────────────────────────────────────────
 
 describe('isLikelyLonLatSwap', () => {
   const make = (

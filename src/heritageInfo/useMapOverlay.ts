@@ -1,13 +1,7 @@
-// An OpenLayers `Overlay` is what pins a surface to a place on the ground
-// rather than to a place on the screen: it moves with the map, so a card about a
-// gravhaug stays over the gravhaug while the reader pans to see what is around
-// it. This hands back the element it positions, for a portal — React must not
-// own a node OpenLayers is writing `style.transform` onto.
-//
-// The element is `pointer-events: none` throughout, and whatever is rendered
-// into it opts back in. Otherwise the overlay's own box — which is as wide as
-// the card at its widest — would swallow drags over map the card is not
-// covering.
+// Hands back the element the `Overlay` positions, for a portal: React must not
+// own a node OpenLayers writes `style.transform` onto. The element is
+// `pointer-events: none`; content opts back in, or the overlay's box swallows
+// drags over map it is not covering.
 
 import { useAtomValue } from 'jotai';
 import { Overlay } from 'ol';
@@ -22,8 +16,7 @@ export const useMapOverlay = (
 ): HTMLElement => {
   const map = useAtomValue(mapAtom);
   const overlayRef = useRef<Overlay | null>(null);
-  // Read once: these describe the shape of the overlay, not its state, and
-  // rebuilding one on every render would detach the portal under React.
+  // Read once: rebuilding the overlay would detach the portal under React.
   const optionsRef = useRef(options);
 
   const [element] = useState(() => {
@@ -42,8 +35,8 @@ export const useMapOverlay = (
     };
   }, [map, element]);
 
-  // `undefined` is how an Overlay is hidden; the element stays in the DOM and
-  // OpenLayers sets `display: none` on it.
+  // `undefined` hides an Overlay: OpenLayers sets `display: none` and leaves
+  // the element in the DOM.
   useEffect(() => {
     overlayRef.current?.setPosition(position);
   }, [position]);

@@ -4,9 +4,9 @@ import { activeThemeLayersAtom } from './map/layers/atoms.ts';
 import { ThemeLayerName } from './map/layers/themeWMS.ts';
 import { getListUrlParameter } from './shared/utils/urlUtils.ts';
 
-// backgroundLayerHalves is deliberately absent: its own default init already
-// validates the URL param against a whitelist, and hydrating again here
-// bypasses that, leaving an unrenderable value and a blank map on cold load.
+// Do not hydrate `backgroundLayerHalves` here: its own default init validates
+// the URL param against a whitelist, and hydrating bypasses that, leaving an
+// unrenderable value and a blank map on cold load.
 export const AtomWrapper = ({ children }: { children: ReactNode }) => {
   const initialThemeLayersList = getListUrlParameter('themeLayers') || [];
   const initialThemeLayers = new Set(

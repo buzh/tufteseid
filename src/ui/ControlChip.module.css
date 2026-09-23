@@ -1,13 +1,3 @@
-/* The chip's own box. Lives in `src/ui/` rather than beside any one control
-   row because two unrelated surfaces wear it — the LiDAR controls and the
-   upstream fault chip — and a CSS module cannot be reached across directories
-   any other way than by the component that owns it. Every variant is a prop
-   for the same reason: a caller passing `className` could not name a class in
-   here, and a hashed `.chipIcon` in the caller's own module would not match
-   the one below. */
-
-/* One line, and `--control-height` so a row of chips, toggles and buttons is a
-   single band rather than a tall chip with buttons floating in the middle. */
 .chip {
   display: flex;
   flex: none;
@@ -30,12 +20,6 @@
   outline-offset: 1px;
 }
 
-/* Nothing in the box but the chevron. A chip with no readout in it is not a
-   control standing beside the button it is joined to — it is the handle on that
-   button's menu, and at chip width it read as a second, empty box. A third of
-   the button, centred, with the side padding gone: still `--control-height`
-   tall, so the target is comfortable, but too narrow to be taken for a box of
-   its own. */
 .chipBare {
   justify-content: center;
   width: var(--control-chevron-width);
@@ -43,9 +27,6 @@
   overflow: hidden;
 }
 
-/* Something else is holding the pen. Dim at rest so the row says who chose, but
-   full strength under the cursor: these still open, and picking a row in one is
-   how the reader takes the choice back. */
 .chipDimmed {
   opacity: 0.5;
 }
@@ -55,7 +36,6 @@
   opacity: 1;
 }
 
-/* A readout rather than a target: no hover affordance, no pointer. */
 .chipReadout {
   cursor: default;
 }
@@ -77,7 +57,6 @@
   white-space: nowrap;
 }
 
-/* Trails the label on the same line, so it reads as the rest of the phrase. */
 .chipHint {
   overflow: hidden;
   color: var(--mantine-color-dimmed);
@@ -91,12 +70,6 @@
   color: var(--mantine-color-dimmed);
 }
 
-/* What was asked for is not on the map. Red rather than the papaya accent: the
-   accent means "this is where the controls are", and a fault has to read as the
-   other thing. Only the border and the glyphs carry it — a filled red chip in a
-   row this dense reads as an alarm, and the map underneath is still usable.
-   The chevron among them because a chip that carries no text has nothing else
-   inside the border to colour. */
 .chipWarn {
   border-color: var(--mantine-color-red-8);
 }

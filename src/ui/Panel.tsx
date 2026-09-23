@@ -1,24 +1,3 @@
-// The box the floating surfaces on the map are made of: a header saying what it
-// is, a fold and a close in the top right corner, the content, and an optional
-// row of verbs along the bottom.
-//
-// Three boxes wear it — the terrain analysis at the top left, the spot box at
-// the top right, and the heritage card pinned to the ground it is about — and
-// they had three headers between them, with three ideas of where the fold was
-// and whether there was a way out at all. The chrome is the same in all three
-// because it is the same gesture in all three: get this out of my way, or put
-// it down.
-//
-// Positioning is not in here. Where a box sits is a property of the box, not of
-// the chrome, so the caller passes a class and this one supplies the surface —
-// border, radius, opaque ground, shadow, and a body that takes the slack and
-// scrolls in it.
-//
-// `unsaved` is the one thing the content has to tell the box: with work in it
-// that closing would lose, the close asks twice (`useConfirm`) rather than
-// raising a dialog to ask once. What counts as unsaved is the content's
-// business — for a draft it is what the reader typed or drew.
-
 import { ActionIcon, Tooltip } from '@mantine/core';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,25 +8,16 @@ import styles from './Panel.module.css';
 import { useConfirm } from './useConfirm';
 
 export type PanelProps = {
-  /** Beside the title, for a box whose subject has a glyph. */
   icon?: MaterialSymbol;
-  /** What the box is. Also its accessible name. */
   title: string;
-  /**
-   * One dimmed line under the title. Survives the fold, so it is what a shut
-   * box still says — a fetch, a resolution, a count.
-   */
+  /** One dimmed line under the title. Survives the fold. */
   status?: ReactNode;
-  /** Off for a box that is nothing without its content. */
   collapsible?: boolean;
   defaultOpen?: boolean;
-  /** Absent: the box has no way out of its own, and something else takes it
-   *  down. */
+  /** Absent: the box has no close of its own. */
   onClose?: () => void;
-  /** There is work in here that closing would throw away, so the close asks
-   *  twice. */
+  /** Puts the close behind a two-press confirm. */
   unsaved?: boolean;
-  /** The row along the bottom. Folded away with the body. */
   footer?: ReactNode;
   className?: string;
   children: ReactNode;
@@ -74,10 +44,6 @@ export const Panel = ({
 
   return (
     <section className={cx(styles.panel, className)} aria-label={title}>
-      {/* The corner buttons are buttons, and the title is not one. A header
-          that folds on click as well would be two controls over one state,
-          which is a second thing for a screen reader to announce and a stray
-          click away from folding the box while reaching for its text. */}
       <div className={cx(styles.header, open && styles.headerOpen)}>
         {icon && <Icon icon={icon} size={16} className={styles.headerIcon} />}
         <span className={styles.headerText}>
@@ -95,8 +61,6 @@ export const Panel = ({
               aria-expanded={open}
               onClick={() => setOpen((o) => !o)}
             >
-              {/* One glyph both ways round, because a second name is a second
-                  thing that can fail to be in the `MaterialSymbol` union. */}
               <Icon
                 icon="keyboard_arrow_down"
                 size={18}
@@ -121,9 +85,6 @@ export const Panel = ({
         )}
       </div>
 
-      {/* Rendered rather than hidden: a folded box is a header, and the content
-          of these three is a grid of sliders, a form and a register's answer —
-          none of them cheap to keep laid out behind a `display: none`. */}
       {open && <div className={styles.body}>{children}</div>}
       {open && footer && <div className={styles.footer}>{footer}</div>}
     </section>

@@ -1,21 +1,6 @@
-/* The band and its three sections, and nothing that stands in them. Each arm
-   styles itself and the chip they all wear is a `src/ui/` primitive, so this
-   file describes only the strip the map is pushed down by and where along it
-   the three sections sit.
-
-   A band above the map, not a floating panel over it: the map is what is being
-   read, and a control that covers terrain competes with it. */
-
-/* One row, and it scrolls rather than wraps — a ribbon that grows a second line
-   moves the map down under the reader's cursor.
-
-   Three columns rather than a flex line, because the middle one has to be in
-   the middle of the band: the view is the hinge, and a hinge that slid sideways
-   every time a ground grew a control would be a moving target. Two equal side
-   tracks and an auto centre put the view on the band's centre line whatever the
-   sections beside it are carrying. The sides keep their content width, so on a
-   row too narrow to hold both the wider one wins the extra and the band scrolls
-   — off-centre beats clipped. */
+/* Three columns, so the view control keeps the band's centre line whatever the
+   sections beside it carry. Scrolls rather than wraps: a second line would push
+   the map down under the cursor. */
 .ribbon {
   flex: none;
   display: grid;
@@ -29,36 +14,19 @@
   scrollbar-width: thin;
 }
 
-/* A side track's contents. The left holds the A section alone; the right holds
-   the B section when there is one and then the tools, and what is in it is laid
-   out inside the track rather than against the band, which is what keeps the
-   centre column honest. */
 .side {
   display: flex;
   align-items: center;
   gap: var(--mantine-spacing-xs);
 }
 
-/* A ground section keeps its natural width. It is the widest section — four
-   controls on a LiDAR flight — and the one the reader aims at, so it is the
-   last thing that should move or shrink. Both halves use this class: the two
-   are the same control at the same size, and a right half that sat differently
-   from the left would read as a different thing. */
 .grounds {
   flex: none;
 }
 
-/* The far end of the right track — the margin below pushes it there, past the B
-   section when there is one. The tools are empty most of the time, and a chip
-   appearing in one must not move anything the reader was about to click; taking
-   the track's slack ahead of them means nothing left of it moves.
-
-   Stuck to the right edge of the scrollport, because on a narrow screen a
-   second ground section is what pushes the row past it. What is in here — the
-   Kulturminner overlay, the sign that an upstream has stopped answering — is
-   true of both grounds and is the one part of the band that must not go and
-   hide behind a horizontal scrollbar. It carries the band's own background so
-   the sections scrolling under it do not show through. */
+/* Pinned to the right edge of the scrollport so the tools stay reachable once
+   the row scrolls; carries the band's background so sections do not show
+   through it. */
 .tools {
   flex: none;
   margin-left: auto;
@@ -68,7 +36,6 @@
   background: var(--mantine-color-body);
 }
 
-/* One origin's row in the fault popover. */
 .outage + .outage {
   margin-top: var(--mantine-spacing-sm);
   padding-top: var(--mantine-spacing-sm);

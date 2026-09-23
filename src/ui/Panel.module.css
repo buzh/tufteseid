@@ -1,9 +1,3 @@
-/* The surface every floating box on the map wears. Where the box sits and how
-   wide it is belong to the caller — this is the shell around whatever is in it.
-
-   Opaque, all three of them. Small text and thin tracks over relief is exactly
-   the kind of busy ground that makes both unreadable, and the fold in the
-   header is how the reader sees what is beneath instead. */
 .panel {
   display: flex;
   flex-direction: column;
@@ -14,7 +8,6 @@
   box-shadow: var(--mantine-shadow-md);
 }
 
-/* The one part that is always there. */
 .header {
   display: flex;
   flex: none;
@@ -23,8 +16,6 @@
   padding: 4px 6px 4px var(--mantine-spacing-xs);
 }
 
-/* Only while there is something under it: a folded box is one bar, and a rule
-   along the bottom of it would be a line under nothing. */
 .headerOpen {
   border-bottom: 1px solid var(--mantine-color-default-border);
 }
@@ -49,8 +40,6 @@
   text-overflow: ellipsis;
 }
 
-/* Clipped rather than wrapped, so folding the box never changes the height of
-   what is left. */
 .status {
   display: block;
   overflow: hidden;
@@ -69,8 +58,6 @@
   transform: rotate(180deg);
 }
 
-/* Takes the slack and scrolls in it, so a short window folds the content into a
-   scrollport rather than pushing the box off the bottom of the map. */
 .body {
   flex: 1;
   min-height: 0;
@@ -80,9 +67,6 @@
   scrollbar-width: thin;
 }
 
-/* The verbs that end the box, kept at the bottom rather than in the header,
-   because they are the end of reading down it. Outside the scrollport: a save
-   button that scrolls away is a save button the reader has to go looking for. */
 .footer {
   display: flex;
   flex: none;

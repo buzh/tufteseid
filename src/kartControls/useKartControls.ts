@@ -1,11 +1,5 @@
-// The Kart arm's controller. One axis — which cartography — and two pieces of
-// state on purpose.
-//
-// The background half is what is on the map; the variant half is what Kart
-// *means*. They diverge the moment another ground is up, and that divergence is
-// the point: coming back to Kart from LiDAR returns to the map you left rather
-// than to topo. Both are per half, so the two panes of a two-ground view
-// remember their own cartography.
+// Two pieces of state: the background half is what is on the map, the variant
+// half is what Kart means while another ground is up.
 
 import { useAtom } from 'jotai';
 import type { CompareHalf } from '../map/compare/halves';
@@ -26,9 +20,7 @@ export const useKartControls = (half: CompareHalf) => {
   // The background where it is one of ours, the remembered pick otherwise.
   const active: KartVariant = isKartBackground ? backgroundLayer : variant;
 
-  // Picking a variant enters Kart as well as naming it: the menu is only on
-  // screen while Kart is the ground, but a pick made the instant the ground
-  // switch lands would otherwise write the name and not the map.
+  // Picking a variant enters Kart as well as naming it.
   const activate = (next: KartVariant) => {
     setVariant(next);
     setBackgroundLayer(next);

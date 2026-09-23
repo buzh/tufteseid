@@ -1,16 +1,6 @@
-// When the Kulturminner layers are asked, and what the two surfaces do with the
-// answer.
-//
-// The cost is the whole design here. Every question is one GetFeatureInfo per
-// ticked register against `kart.ra.no`, the slowest origin in the stack, so the
-// hover only fires from a pointer **at rest**: a sweep across the map costs
-// nothing, and a reader who stops on a mound has already said what they want to
-// know. `heritageQuery.ts` snaps the pixel and shares a memo between hover and
-// click, so a click on a spot just hovered is free, and a hand holding almost
-// still asks once.
-//
-// Touch is left out. A tap is a click there, and a tip with no pointer to leave
-// with would sit over the map until the next one.
+// One GetFeatureInfo per ticked register against `kart.ra.no`, so the hover
+// fires only from a pointer at rest. Touch is skipped: a tap is a click there,
+// and a tip with no pointer to leave with would never come down.
 
 import { getDefaultStore, useAtom, useAtomValue } from 'jotai';
 import { unByKey } from 'ol/Observable';
@@ -27,14 +17,13 @@ import { spotPlacingAtom } from '../spots/atoms';
 import { spotAtPixel } from '../spots/hitTest';
 import { terrainAdjustingAtom } from '../terrain/window';
 
-/** How long the pointer has to hold still. Long enough that crossing the map
- *  asks nothing, short enough that stopping to look feels answered. */
+/** How long the pointer has to hold still before a hover asks. */
 const REST_MS = 220;
 
 export interface HeritageInfo {
   tip: FeatureInfoReading | null;
   popup: FeatureInfoReading | null;
-  /** Where a click is waiting on an answer, so the wait has somewhere to show. */
+  /** Map coordinate of a click still waiting on an answer. */
   pending: [number, number] | null;
   closePopup: () => void;
 }
@@ -54,9 +43,7 @@ export const useHeritageInfo = (): HeritageInfo => {
     let hoverQuery: AbortController | null = null;
     let clickQuery: AbortController | null = null;
 
-    // The cursor is the only thing that says a feature is clickable before it is
-    // clicked, so it is set from the hover's answer rather than guessed. Held on
-    // a lease, because the pin and the terrain rectangle write it too.
+    // Leased, because the pin and the terrain rectangle write the cursor too.
     const cursor = cursorLease(viewport);
     const setHit = (hit: boolean) => {
       cursor.set(hit ? 'pointer' : null);
@@ -79,14 +66,9 @@ export const useHeritageInfo = (): HeritageInfo => {
       map.on('pointermove', (e) => {
         if (e.dragging) return;
         if ((e.originalEvent as PointerEvent).pointerType === 'touch') return;
-        // Placing the terrain rectangle takes the pointer. That drag owns the
-        // cursor — it says which corner is under the hand — and a tip raised
-        // over the ground being framed answers a question nobody asked. Read
-        // from the store rather than taken as a dependency so that turning it
-        // on does not rebind every listener in here.
-        // A pin on the cursor takes it the same way, and more completely: the
-        // cursor is the pin there, so a `pointer` glyph set from in here would
-        // be drawn over the thing being aimed.
+        // Placing the terrain rectangle or a pin owns the pointer. Read from
+        // the store, not as a dependency, so turning either on does not rebind
+        // these listeners.
         if (store.get(terrainAdjustingAtom) || store.get(spotPlacingAtom)) {
           forget();
           return;
@@ -105,8 +87,7 @@ export const useHeritageInfo = (): HeritageInfo => {
             .then((reading) => {
               if (query.signal.aborted) return;
               setHit(reading !== null);
-              // Nothing to say twice: while the card for this very spot is
-              // open, a tip repeating it only covers the ground beside it.
+              // No tip while the card for the same spot is open.
               const open = store.get(heritagePopupAtom);
               const sameSpot =
                 open !== null &&
@@ -116,7 +97,6 @@ export const useHeritageInfo = (): HeritageInfo => {
               setTip(sameSpot ? null : reading);
             })
             .catch(() => {
-              // An origin that will not answer is the upstream chip's to report.
               setHit(false);
             });
         }, REST_MS);
@@ -124,13 +104,8 @@ export const useHeritageInfo = (): HeritageInfo => {
 
       map.on('singleclick', (e) => {
         if (!heritageIsQueryable(map)) return;
-        // The click that places a new pin is that pin's and nothing else's: a
-        // popup raised by it would stand where the reader is about to write
-        // (`spots/pinPlace.ts`).
+        // A click placing a pin, or landing on one, belongs to the pin.
         if (store.get(spotPlacingAtom)) return;
-        // A click on one of the reader's own pins is that pin's: it opens the
-        // card, and the register answering the same click would raise a popup
-        // over it (`spots/spotLayer.ts`).
         if (spotAtPixel(map, e.pixel)) return;
         stopHovering();
         setTip(null);
@@ -143,8 +118,7 @@ export const useHeritageInfo = (): HeritageInfo => {
           .then((reading) => {
             if (query.signal.aborted) return;
             setPending(null);
-            // A null reading closes what was open: clicking bare ground beside
-            // a card is how a reader puts it down.
+            // A null reading closes what was open.
             setPopup(reading);
           })
           .catch(() => {
@@ -152,7 +126,6 @@ export const useHeritageInfo = (): HeritageInfo => {
           });
       }),
 
-      // Panning is reading the map, not pointing at it.
       map.on('movestart', forget),
     ];
 

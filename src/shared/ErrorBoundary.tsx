@@ -14,8 +14,6 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// Small, in-flow and dismissible, with a retry: what these boundaries wrap
-// is usually a panel over a map that is still usable underneath.
 const DefaultFallback = ({
   name,
   onRetry,

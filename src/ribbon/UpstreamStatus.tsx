@@ -1,13 +1,3 @@
-// What the breaker looks like from the reader's side.
-//
-// Absent while everything answers — a permanent green light is furniture, and
-// the ribbon has no room for furniture. When an origin goes down the chip
-// appears in `ToolSection`, at the far end of the row and away from the
-// controls the reader's cursor is already heading for, and says which part of
-// the map has stopped arriving rather than which company's server it came off.
-// "Flyfoto svarer ikke" is the fact a reader can act on; the hostname behind it
-// is not.
-
 import { Button, Group, Popover, Stack, Text } from '@mantine/core';
 import { useAtomValue } from 'jotai';
 import { useEffect, useState } from 'react';
@@ -22,10 +12,8 @@ import {
 import { ORIGIN_IDS, type OriginId } from '../upstream/origins';
 import styles from './Ribbon.module.css';
 
-// The one thing here that moves without any state changing, so it owns the
-// only timer — and it lives inside the dropdown, which Mantine mounts on open
-// and unmounts on close. That is what keeps the tick off a closed popover, and
-// what makes reading the clock at mount honest rather than an hour stale.
+// Inside the dropdown, which Mantine mounts on open and unmounts on close, so
+// the one-second tick does not run behind a closed popover.
 const RetryCountdown = ({ at }: { at: number }) => {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
@@ -42,8 +30,8 @@ const RetryCountdown = ({ at }: { at: number }) => {
   );
 };
 
-// Mounted only while something is down, so `opened` cannot survive an outage
-// and spring the popover open unprompted at the next one.
+// Mounted only while something is down, so `opened` cannot survive one outage
+// and spring the popover open at the next.
 const OutagePopover = ({
   down,
   health,
