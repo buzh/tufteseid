@@ -248,6 +248,17 @@ stays on its light theme against the app's dark chrome, because its dark theme
 is a filter over the canvas and the strokes would be kept in colours other than
 the ones they were drawn in.
 
+What the pen is holding when a canvas opens is `sketch/pen.ts`, and the two
+halves of it are remembered differently. The colour is a default and is set
+afresh every time: the app's orange, the pin's own, because a stroke over
+hillshade in Excalidraw's near-black is grey on grey. The tool is a memory,
+kept in `localStorage` with its lock — a reader who traced a mound freehand
+last visit is about to trace another, and only the tools that put something on
+the ground are remembered, so the fall back to `selection` after a finished
+shape does not erase the answer. Nothing is armed for a reader who has never
+drawn: a canvas that opens with a pen in hand marks the map on the first stray
+click.
+
 The editor is a chunk of its own on both paths into it — `React.lazy` in
 `SpotSurface` for the canvas, a cached dynamic `import()` in `sketch/render.ts`
 for the overlay's re-export. It is megabytes, this surface mounts with the map,

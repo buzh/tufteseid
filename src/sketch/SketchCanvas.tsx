@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next';
 
 import { mapAtom } from '../map/atoms';
 import { spotDraftAtom, spotSketchAtom } from '../spots/atoms';
+import { PEN_STROKE_COLOUR, rememberedPen, rememberPen } from './pen';
 import styles from './SketchCanvas.module.css';
 import { storableScene, type SceneElement } from './scene';
 import {
@@ -99,6 +100,12 @@ const buildInitialData = (
     // set of colours and kept in another. The chrome around it is restyled in
     // the CSS module instead.
     theme: 'light',
+    // The app's orange rather than Excalidraw's near-black, every time the
+    // canvas opens: what is drawn here is a reading of the relief underneath,
+    // and grey-on-grey is the one thing it must not be (`pen.ts`). Existing
+    // strokes keep whatever they were drawn in — this is the colour of the
+    // next one.
+    currentItemStrokeColor: PEN_STROKE_COLOUR,
     // Whatever puts the scene over the ground it belongs on with the map
     // untransformed (`initialSceneView`).
     zoom: { value: offset.zoom as NormalizedZoomValue },
@@ -163,6 +170,12 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
         frame: session.frame,
         read: () => api.getSceneElementsIncludingDeleted(),
       });
+      // The tool the reader last drew with, put back in their hand. Through the
+      // API rather than `initialData`, which restores an active tool only for
+      // the values its own restorer allows and says nothing about which those
+      // are; this is the documented way to arm one.
+      const pen = rememberedPen();
+      if (pen) api.setActiveTool({ type: pen.tool, locked: pen.locked });
     },
     [session.frame],
   );
@@ -212,6 +225,11 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
               lastView.current = key;
               slaveMapToScene(map, view);
             }
+            // Which tool is in hand, for the next canvas. Ignores the automatic
+            // fall back to selection after a shape is finished, and writes only
+            // when the answer changed — this fires on every pointer sample.
+            rememberPen(appState.activeTool.type, appState.activeTool.locked);
+
             if (settle.current != null) window.clearTimeout(settle.current);
             settle.current = window.setTimeout(() => {
               settle.current = null;
