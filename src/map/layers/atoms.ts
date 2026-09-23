@@ -33,21 +33,18 @@ export const activeThemeLayersAtom = atom<Set<ThemeLayerName>>(new Set([]));
 // every effect below.
 const NO_THEME_LAYERS: ReadonlySet<ThemeLayerName> = new Set();
 
-/** Which sources are on the map, as opposed to which are ticked; the eye
- *  (`heritageHiddenAtom`) is the difference. */
+// Which sources are on the map, as opposed to which are ticked; the eye
+// (`heritageHiddenAtom`) is the difference.
 export const shownThemeLayersAtom = atom<ReadonlySet<ThemeLayerName>>((get) =>
   get(heritageHiddenAtom) ? NO_THEME_LAYERS : get(activeThemeLayersAtom),
 );
 
 // The one theme layer whose WMS request can be reshaped; the other four RA
-// services publish a single style each. Exported because the surface that
-// offers the registers and the renders has to know which source they belong to,
-// and a second copy of the name is how the two would come apart.
+// services publish a single style each.
 export const RESHAPEABLE_THEME_LAYER: ThemeLayerName = 'heritageSites';
 
-// A reading is what a layer answered, so it cannot outlive the layer. Dropping
-// the source's own features rather than the whole reading is what keeps a card
-// standing when one of several ticked registers is turned off underneath it.
+// Drops one source's features rather than the whole reading, so a card stands
+// when one of several ticked registers is turned off underneath it.
 const forgetReadingsFrom = (layerId: string) => {
   const store = getDefaultStore();
   for (const readingAtom of [heritageTipAtom, heritagePopupAtom]) {
@@ -76,15 +73,9 @@ type ThemeLayerSettings = {
   heritageHidden: boolean;
 };
 
-/**
- * Bring one map's `theme.` layers in line with the settings, and say what
- * changed. Takes a map rather than reading `mapAtom` because the split view has
- * two of them and an OL layer belongs to one map at a time: each gets its own
- * instances, built from the same config.
- *
- * Nothing outside the map is touched in here — the URL and the open readings
- * follow the main map alone, and are the caller's to write.
- */
+// Takes a map rather than reading `mapAtom`: an OL layer belongs to one map at
+// a time, so the split view's two panes each get their own instances. Touches
+// nothing outside the map; the URL and the open readings are the caller's.
 const syncThemeLayers = (
   map: OlMap,
   {
@@ -114,10 +105,8 @@ const syncThemeLayers = (
     (layerName) => !themeLayers.has(layerName),
   );
 
-  // The ones that actually reached the map. A layer with no config, or none the
-  // map's projection can be served in, warns and is skipped — and must not be
-  // reported as added, or the caller would write a register that has never
-  // drawn into the URL, where it would survive every reload.
+  // Only the ones that actually reached the map: a skipped layer reported as
+  // added would go into the URL and survive every reload.
   const added: ThemeLayerName[] = [];
 
   themeLayersToAdd.forEach((layerName) => {
@@ -138,10 +127,8 @@ const syncThemeLayers = (
     }
 
     const params = paramsFor(layerName, heritageDetails, heritageRender);
-    // A register ticked off a moment ago still has its tiles: take that layer
-    // back rather than asking RA's MapServer — the slowest origin in the app —
-    // for the same screen again. The reshape below corrects its registers if
-    // they moved on while it was off the map.
+    // A pooled layer still holds its tiles; the reshape below corrects its
+    // registers if they moved on while it was off the map.
     const layerToAdd =
       takePooledLayer(themeLayerPoolKey(layerName, mapProjection)) ??
       createThemeLayerFromConfig(
@@ -181,10 +168,9 @@ const syncThemeLayers = (
 
       const layerName = id.substring(6) as ThemeLayerName;
       const params = paramsFor(layerName, heritageDetails, heritageRender);
-      // kulturminner2 with no register ticked can only answer with a
-      // transparent tile, so hide rather than request one. Hidden, not removed:
-      // the tile cache survives and featureInfoService's `isRendering`
-      // (`Layer#isVisible`) stops a click asking RA about an unseen register.
+      // With no register ticked the source can only answer a transparent tile.
+      // Hidden, not removed: the tile cache survives and featureInfoService's
+      // `isRendering` stops a click asking RA about an unseen register.
       const empty = layerName === RESHAPEABLE_THEME_LAYER && params === null;
       layer.setVisible(!heritageHidden && !empty);
       if (!params) return;
@@ -215,13 +201,9 @@ export const themeLayerEffect = atomEffect((get) => {
 
   const { added, removed } = syncThemeLayers(store.get(mapAtom), settings);
 
-  // The registers belong to the reading, not to a half: a ticked register draws
-  // over both panes of a split, so the second map gets the same set. Created
-  // here when the split is the view, because this effect is mounted ahead of
-  // the one that builds the B ground and would otherwise leave the new pane
-  // bare until the next change. Outside the split the pane is emptied rather
-  // than left holding a set that will have moved on by the time it is shown
-  // again.
+  // A ticked register draws over both panes of a split. Created here rather
+  // than waited for: this effect mounts ahead of the one that builds the B
+  // ground, and the new pane would stay bare until the next change.
   const pane = mode === 'split' ? getSplitMap() : peekSplitMap();
   if (pane) {
     syncThemeLayers(pane, {
@@ -230,8 +212,7 @@ export const themeLayerEffect = atomEffect((get) => {
     });
   }
 
-  // Off the main map's result alone. The URL says what the reader ticked, and a
-  // reading is what a layer answered — a mirror in the second pane is neither.
+  // Off the main map's result alone; the second pane is a mirror.
   for (const layerName of added) {
     addToUrlListParameter('themeLayers', layerName);
   }
@@ -240,11 +221,8 @@ export const themeLayerEffect = atomEffect((get) => {
     forgetReadingsFrom(`theme.${layerName}`);
   }
 
-  // The blind is over every source at once, and a card describing a register
-  // nobody can see is a reading of an empty map. Not the same for a reshape: the
-  // registers and the render change what is drawn, but what the reading named is
-  // still recorded there, and clearing it would punish a reader for adjusting
-  // the picture while reading a card.
+  // Only the blind clears the readings; a reshape leaves them, since what they
+  // named is still recorded.
   if (settings.heritageHidden) {
     store.set(heritageTipAtom, null);
     store.set(heritagePopupAtom, null);

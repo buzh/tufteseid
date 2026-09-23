@@ -1,21 +1,14 @@
-// The NiB ortofoto acquisitions ("prosjekter") over a bbox, from NiB's own
-// project index. Not Kartverket's wms.georef_nib, which looks like the obvious
-// index but is a planning layer: prosjektfase P/U, start years in the future,
-// empty project names.
-
 import { transformExtent } from 'ol/proj';
 import type { Bbox } from '../../../bbox';
 import { fetchWithin } from '../../../../shared/utils/deadline';
 
-// A ceiling on a stalled connection, not on the query.
 const PROJECTS_TIMEOUT_MS = 20_000;
 
-// Layer 4, "Prosjektomriss prosessert": one row per acquisition. 1 is the same
-// rows unprocessed; 2 and 3 are seam lines and per-photo frames.
+// Layer 4, "Prosjektomriss prosessert": one row per acquisition.
 const PROJECTS_URL = '/arcgis/nib/prosjekter/MapServer/4/query';
 
-// ortofototype 6 = "Satellittbilde": the nationwide 10 m Sentinel-2 mosaics,
-// which cover everywhere and would list under every rectangle.
+// "Satellittbilde": nationwide 10 m Sentinel-2 mosaics, which cover everywhere
+// and would list under every rectangle.
 const SATELLITE_ORTOFOTOTYPE = 6;
 
 export type FlyfotoProject = {
@@ -46,7 +39,7 @@ function toNumber(value: unknown): number | null {
   return typeof n === 'number' && Number.isFinite(n) ? n : null;
 }
 
-// Epoch milliseconds, formatted in UTC: these are dates, not instants, and
+// Epoch milliseconds formatted in UTC: these are dates, not instants, and
 // local formatting can shift them a day.
 function toIsoDate(epochMs: number | null | undefined): string | null {
   if (typeof epochMs !== 'number' || !Number.isFinite(epochMs)) return null;
@@ -82,7 +75,6 @@ function toProject(attrs: QueryAttributes): FlyfotoProject | null {
   };
 }
 
-// Newest first, then the year, then the name, so the list is stable.
 function byNewest(a: FlyfotoProject, b: FlyfotoProject): number {
   const da = a.photoDate ?? (a.year !== null ? `${a.year}-00-00` : '');
   const db = b.photoDate ?? (b.year !== null ? `${b.year}-00-00` : '');
@@ -107,7 +99,7 @@ export async function fetchFlyfotoProjectsForBbox(
     spatialRel: 'esriSpatialRelIntersects',
     outFields:
       'prosjektnavn,aar,fotodato_date,ortofototype,pixelstorrelse,x_min,y_min,x_max,y_max',
-    // The bounds come as plain attributes; the footprints would dominate.
+    // The bounds come as plain attributes.
     returnGeometry: 'false',
   });
 
@@ -129,8 +121,7 @@ export async function fetchFlyfotoProjectsForBbox(
   const projects: FlyfotoProject[] = [];
   for (const feature of features) {
     const project = toProject(feature.attributes ?? {});
-    // More than one outline row happens; the selector is the name, so extras
-    // would only be duplicate buttons.
+    // More than one outline row per acquisition happens.
     if (!project || seen.has(project.id)) continue;
     seen.add(project.id);
     projects.push(project);

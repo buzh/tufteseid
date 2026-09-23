@@ -1,6 +1,3 @@
-// Real coverage polygons from Kartverket's "Prosjektavgrensning" WFS, rather
-// than the catalogue's envelope. Same-origin via /wfs/geonorge/, only user.
-
 import GeoJSON from 'ol/format/GeoJSON';
 import { Geometry } from 'ol/geom';
 import { fetchWithin } from '../../../../shared/utils/deadline';
@@ -17,11 +14,9 @@ export type LidarFootprint = {
 };
 
 // By name, never by BBOX: the ArcGIS spatial filter silently under-returns for
-// narrow boxes, dropping the newest and densest acquisitions, and wide ones are
-// uncompressed GeoJSON (4.4 MB at 33 km, a 504 past 65 km).
-
-// The fes 2.0 predicate for one project; URLSearchParams encodes it, so only
-// the three XML-significant characters need escaping here.
+// narrow boxes, and wide ones are uncompressed GeoJSON (4.4 MB at 33 km, 504
+// past 65 km). URLSearchParams encodes the filter, so only the three
+// XML-significant characters need escaping here.
 const buildNameFilter = (projectName: string): string => {
   const literal = projectName
     .replace(/&/g, '&amp;')
@@ -36,8 +31,8 @@ const buildNameFilter = (projectName: string): string => {
   );
 };
 
-// A few catalogue names differ from the WFS spelling only by the density token,
-// so a miss retries without it — never as the primary key: 81 name groups
+// A few catalogue names differ from the WFS spelling only by the density
+// token, so a miss retries without it. Never the primary key: 81 name groups
 // differ by nothing else and would collapse onto one footprint.
 const stripDensity = (name: string): string =>
   name
@@ -47,9 +42,8 @@ const stripDensity = (name: string): string =>
 
 const YEAR_TOLERANCE = 2;
 
-// Per page, and six of these run at once over up to sixty projects: without a
-// budget of its own a stalled WFS parks the whole fan-out until the proxy gives
-// up at thirty seconds, once per project. Well over the 300-900 ms a page takes.
+// Per page, and six of these run at once: without a budget of its own a
+// stalled WFS parks the whole fan-out. A page takes 300-900 ms.
 const PAGE_TIMEOUT_MS = 12000;
 
 type WfsProperties = {
@@ -72,8 +66,8 @@ const epsgFromCrsMember = (doc: unknown): string | undefined => {
   return m ? `EPSG:${m[1]}` : undefined;
 };
 
-// Keyed by projection + project id, never expired since a boundary is static;
-// negative results too. Bounded by count: an entry is 10s-100s kB.
+// Never expired, since a boundary is static; negative results too. Bounded by
+// count: an entry is 10s-100s kB.
 const MAX_CACHE_ENTRIES = 400;
 const cache = new Map<string, Promise<LidarFootprint | null>>();
 
@@ -95,19 +89,16 @@ const writeCache = (key: string, value: Promise<LidarFootprint | null>) => {
   }
 };
 
-// Features per request. A boundary with more disjoint parts than this comes
-// back as a valid, short FeatureCollection — the truncation raises nothing, and
-// reads on the map as a hole in the coverage — so the query pages until a page
+// Features per request. Truncation raises nothing — an over-long boundary comes
+// back as a valid short FeatureCollection — so the query pages until a page
 // comes back short.
 const PAGE_SIZE = 100;
-// Far past any real boundary. The cap is there so a service that ignores
-// STARTINDEX cannot keep the loop asking for the same page.
+// Cap so a service that ignores STARTINDEX cannot loop on the same page.
 const MAX_PAGES = 25;
 
 type NameQueryResult = {
   geometries: Geometry[];
-  // Set when the paging stopped short of exhausting the rows. The parts in
-  // hand are still worth drawing; they are not worth remembering.
+  // Set when the paging stopped short of exhausting the rows.
   truncated: boolean;
 };
 
@@ -150,9 +141,7 @@ const requestByName = async (
     if (features.length === 0) break;
 
     // The same row opening two consecutive pages means STARTINDEX was ignored
-    // and the rest of the rows are unreachable. Only when the service gives
-    // ids at all — without them there is nothing to compare and paging on the
-    // page length is the best available.
+    // and the rest are unreachable. Only where the service gives ids at all.
     const firstId = features[0].getId();
     if (firstId != null && firstId === previousFirstId) {
       truncated = true;
@@ -206,10 +195,8 @@ const fetchOne = (
 
   writeCache(key, promise);
 
-  // Entries never expire, so anything that is not the whole answer has to be
-  // taken back out: a failure, or a boundary the paging could not exhaust.
-  // Only this promise's entry, though — eviction under pressure can already
-  // have put a fresh one behind the same key.
+  // Entries never expire, so anything short of the whole answer comes back out.
+  // Only this promise's entry: eviction may already have replaced the key.
   const forget = () => {
     if (cache.get(key) === promise) cache.delete(key);
   };
@@ -224,25 +211,12 @@ const fetchOne = (
 // ~0.2 s per answer, but roughly one request in five hangs outright.
 const CONCURRENCY = 6;
 
-/**
- * Every boundary that could be had, and whether the service said anything at
- * all.
- *
- * The second half is why this is not a bare Map. A failure is swallowed per
- * project below so one bad name cannot blank the list, and an origin the
- * breaker has closed fails every lookup instantly without a request — so a
- * whole-service outage and a viewport no flight covers both come back as an
- * empty map. Only the flag tells them apart, and the caller draws opposite
- * conclusions from them.
- */
 export type LidarFootprintFetch = {
   /** Keyed by LidarProject.id; projects with no boundary are absent. */
   footprints: Map<string, LidarFootprint>;
-  /**
-   * Nothing was answered and something failed — the breaker refused the
-   * fan-out, or every lookup in it went the way of the service. Implies an
-   * empty `footprints`; false for an empty candidate list, which is an answer.
-   */
+  /** Nothing was answered and something failed. Implies an empty `footprints`,
+   *  and distinguishes a service outage from a viewport no flight covers;
+   *  false for an empty candidate list, which is an answer. */
   unanswered: boolean;
 };
 
@@ -268,9 +242,7 @@ export async function fetchLidarFootprints(
       } catch (err) {
         failed++;
         // The breaker is open: every remaining project would fail the same
-        // way, instantly and without a request. Drop the queue rather than
-        // walk sixty of them, and say nothing — the ribbon is already saying
-        // it, once, for all of them.
+        // way, instantly and without a request.
         if (isUpstreamDown(err)) {
           queue.length = 0;
           return;
@@ -316,8 +288,7 @@ export const viewportCoverage = (
   return hits / (COVERAGE_GRID * COVERAGE_GRID);
 };
 
-// Stricter than the coverage sample: a project overlapping only by its envelope
-// does not belong in the list.
+// Stricter than the coverage sample: real geometry, not the envelope.
 export const touchesExtent = (
   geometries: Geometry[],
   extent: [number, number, number, number],

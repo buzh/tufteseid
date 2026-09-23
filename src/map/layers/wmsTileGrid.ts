@@ -2,21 +2,18 @@ import { getHeight, getWidth } from 'ol/extent';
 import { get as getProjection } from 'ol/proj';
 import TileGrid from 'ol/tilegrid/TileGrid';
 
-// wms.geonorge.no rate-limits by source IP — here the server, shared by every
-// visitor — at roughly 120 GetMaps in a short window; over it the answer is
-// HTTP 200 with a 238-byte ServiceException, which OpenLayers marks tile ERROR
-// and never retries. 512 px quarters the request count for the same bytes (one
-// 512 tile is 146 kB against 4x ~37 kB). It stays 512 on any display: TileWMS
-// pins its pixel ratio to 1 unless `serverType` is set, and none of these do.
+// wms.geonorge.no rate-limits by source IP at roughly 120 GetMaps in a short
+// window; over it the answer is HTTP 200 with a 238-byte ServiceException,
+// which OpenLayers marks tile ERROR and never retries. 512 px quarters the
+// request count. TileWMS pins its pixel ratio to 1 unless `serverType` is set,
+// so this stays 512 on any display.
 const WMS_TILE_SIZE = 512;
 
-// The view's own zoom ladder (its defaults divide the extent by 256 whatever
-// tile size is in use, so unrelated to WMS_TILE_SIZE); any other resamples.
+// The View's zoom ladder divides the extent by 256 whatever tile size is in
+// use; any other value resamples.
 const VIEW_TILE_SIZE = 256;
 
-// The View's maxZoom (20), and so the last level a source is ever asked for.
-// Exported for the cached layers whose store is built to the view's full depth,
-// so the floor for "as deep as it goes" is stated once.
+// The View's maxZoom, and so the last level a source is ever asked for.
 export const VIEW_MAX_ZOOM = 20;
 
 const cache = new Map<string, TileGrid | null>();
@@ -38,8 +35,8 @@ const build = (
   return new TileGrid({
     extent,
     origin: [extent[0], extent[3]],
-    // Indexed by absolute z, so a source holding only deep levels still gets
-    // the whole array and is fenced off by minZoom and the array's end.
+    // Indexed by absolute z: a source holding only deep levels still gets the
+    // whole array and is fenced off by minZoom and the array's end.
     resolutions: Array.from(
       { length: maxZoom + 1 },
       (_, z) => maxResolution / 2 ** z,
@@ -49,14 +46,7 @@ const build = (
   });
 };
 
-/**
- * The shared 512 px tile grid for a projection, or undefined for OpenLayers'
- * default. Memoised: every background swap builds new sources.
- *
- * The level range is for a store that holds only some of them — our own cached
- * ground. Clamping both ends means OL never asks for a level that was never
- * written: under the range it stops drawing, over it upsamples the deepest.
- */
+// undefined means OpenLayers' own default grid.
 export const getWMSTileGrid = (
   projectionCode: string,
   minZoom = 0,
@@ -70,7 +60,7 @@ export const getWMSTileGrid = (
 };
 
 // Which bracketing level a renderer asks for between two resolutions; 1 is the
-// coarser. During a zoom animation, nearest would also fetch the level left.
+// coarser.
 export const WMS_Z_DIRECTION = 1;
 
 // Tiles kept after they leave the viewport, ~10 screenfuls at 512 px. A level

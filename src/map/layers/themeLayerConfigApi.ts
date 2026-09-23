@@ -23,8 +23,8 @@ export interface ThemeLayerCategory {
   featureInfoImageBaseUrl?: string;
   featureInfoFields?: FieldConfig[];
   extraWmsParams?: Record<string, string | number | boolean>;
-  // OpenLayers layer.minZoom: visible only above this zoom, strictly.
-  // Cascades to the category's layers unless one sets its own.
+  // OpenLayers layer.minZoom: visible strictly above this zoom. Cascades to
+  // the category's layers unless one sets its own.
   minZoom?: number;
 }
 
@@ -94,12 +94,7 @@ export const getParentCategory = (
   return getCategoryById(config, category.parentId);
 };
 
-/** The zoom a layer draws above, strictly — OpenLayers' `minZoom`, inherited
- *  from the category exactly as `createThemeLayerFromConfig` inherits it.
- *  Undefined where nobody sets one, i.e. the layer draws at every zoom. The
- *  control row reads this to tell a reader that the overlay is on and the map
- *  is too far out for it, rather than leaving them to conclude the register is
- *  empty here. */
+// Undefined where nobody sets one, i.e. the layer draws at every zoom.
 export const themeLayerMinZoom = (id: string): number | undefined => {
   const def = getThemeLayerById(themeLayerConfig, id);
   if (!def) return undefined;
@@ -110,8 +105,6 @@ export const themeLayerMinZoom = (id: string): number | undefined => {
   return def.minZoom ?? category?.minZoom ?? parent?.minZoom;
 };
 
-/** A layer's name in the user's language, shared by the picker and the figure
- *  captions so a saved image names its overlays as the UI does. */
 export const themeLayerName = (id: string, language: string): string => {
   const def = getThemeLayerById(themeLayerConfig, id);
   if (!def) return id;

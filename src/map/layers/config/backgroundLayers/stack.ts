@@ -25,13 +25,8 @@ import {
 } from './types';
 import { buildOrReuseBackgroundLayer, LayerNamespace } from './utils';
 
-// What a background mode puts on the map: a mode is never one layer. Split so
-// `resolveStack` is pure and only `buildStack` awaits, so a caller can drop a
-// stale run before it mutates anything.
-
-// Layers with holes want topo showing through: the LiDAR WMS layers and a
-// single ortofoto acquisition answer transparent outside their coverage, and
-// amtskart has no sheets north of Nordland. Not the mosaic: opaque JPEG.
+// These answer transparent outside their coverage, so topo shows through. Not
+// the flyfoto mosaic: opaque JPEG.
 const NEEDS_TOPO_BASE = new Set<BackgroundLayerName>([
   'lidarProject',
   'lidarHillshade',
@@ -40,10 +35,8 @@ const NEEDS_TOPO_BASE = new Set<BackgroundLayerName>([
   'amtskart',
 ]);
 
-// Which layers the LiDAR modifiers mean anything for — not NEEDS_TOPO_BASE,
-// which also holds flyfotoProject. The cached ground is in it because the
-// hybrid overlay and its contours mean the same thing over relief however the
-// relief was computed.
+// Which layers the LiDAR modifiers — hybrid overlay, contours, model — apply
+// to. Not NEEDS_TOPO_BASE, which also holds flyfotoProject.
 export const LIDAR_LAYERS = new Set<BackgroundLayerName>([
   'lidarProject',
   'lidarHillshade',
@@ -53,24 +46,13 @@ export const LIDAR_LAYERS = new Set<BackgroundLayerName>([
 // How far the layer under a per-project dataset is dimmed.
 const FALLBACK_OPACITY = 0.6;
 
-// Where a background layer sits: the ground's own default, and the one place
-// the stack leaves it. The hybrid overlay is roads, railways and place names,
-// and it is over the ground *and* over anything the app paints onto the ground
-// as coverage — so it clears the cached store's hint patches at 0.5
-// (`cvatHintLayer.ts`), which otherwise bury the names of exactly the counties
-// the patches are inviting the reader into. Still under the terrain-analysis
-// render at 1, which is a reading and belongs on top of the reference.
-// `docs/map-layers.md` keeps the register.
+// The hybrid overlay has to clear the cached store's coverage hint at 0.5
+// (`cvatHintLayer.ts`). Full z-order register: `docs/map-layers.md`.
 const GROUND_Z = 0;
 const HYBRID_OVERLAY_Z = 0.75;
 
-// NDH project rasters are 0.25 m at their finest and 0.5 m for most flights,
-// so z17 (0.166 m/px) already asks the renderer for more than it holds. The
-// three levels above it are pure interpolation, and this is the most expensive
-// service in the stack to ask: 3-12 s a cold tile, parameterized per project so
-// MapProxy can never cache it, and on the shared wms.geonorge.no budget. One
-// level of magnification past native is kept deliberately — it is the
-// difference between a soft image and no image when reading a small feature.
+// NDH project rasters are 0.25 m at their finest, 0.5 m for most flights; z17
+// is 0.166 m/px, one level of magnification past native.
 const LIDAR_PROJECT_MAX_ZOOM = 17;
 
 const emptyBackgroundLayer: EmptyBackgroundLayer = {
@@ -78,8 +60,7 @@ const emptyBackgroundLayer: EmptyBackgroundLayer = {
   layerName: 'empty',
 };
 
-// Only the fixed layers; the five whose style or acquisition is a runtime
-// choice are built from atoms by `pickLayerConfig` below.
+// Only the fixed layers; runtime choices are built by `pickLayerConfig` below.
 export const allConfiguredBackgroundLayers = [
   emptyBackgroundLayer,
   ...KvCacheBackgroundLayers,
@@ -95,25 +76,22 @@ const buildLidarProjectConfig = (
   layerName: 'lidarProject',
   url: LIDAR_PROJECT_WMS_URL[model],
   props: {
-    // `wmsLidarStyle`, because `cvat` is a render of this flight that no
-    // service publishes: a stack that arrived here holding it would ask for a
-    // layer name the WMS answers with a JSON error body and a blank tile.
+    // `wmsLidarStyle` guards the style: `cvat` is a render no service
+    // publishes, and the WMS answers an unknown one with a blank tile.
     LAYERS: `${project.id}:${wmsLidarStyle(style)}`,
     VERSION: '1.3.0',
   },
   maxZoom: LIDAR_PROJECT_MAX_ZOOM,
-  // Relief, and capped three levels below the view's own depth, so every deep
-  // view of it is upsampled: smoothed, that seams at every tile edge
-  // (`types.ts`).
+  // Capped below the view's depth, so deep views upsample; smoothed, that
+  // seams at every tile edge (`types.ts`).
   interpolate: false,
-  // The acquisition's own footprint: the service advertises every project.
   coverageExtent: { extent: project.bboxLonLat, crs: 'EPSG:4326' },
 });
 
 export type StackOptions = {
   lidarProject: LidarProject | null;
-  /** Which acquisition the cached ground is showing. Null before the manifest
-      and the catalogue have both landed, and so a normal state at startup. */
+  /** Null before the manifest and the catalogue have both landed, which is a
+      normal state at startup. */
   cvatAcquisition: CvatAcquisition | null;
   /** Already clamped for the model — see `effectiveLidarStyle`. */
   lidarStyle: string;
@@ -135,8 +113,7 @@ export type ResolvedStack = {
   under: StackEntry[];
   /** Bottom-first, and `over[0]` is always the featured dataset itself. */
   over: StackEntry[];
-  /** What the URL follows, rather than the atoms, so a shared link reproduces
-      what is on screen. */
+  /** What the URL follows, rather than the atoms. */
   hybrid: boolean;
   contours: boolean;
 };
@@ -173,8 +150,8 @@ const pickLayerConfig = (
   }
 };
 
-/** The whole stack for one background mode, as configs. `null` means nothing
- *  to draw: an unknown name, or an archive layer with no acquisition yet. */
+// `null` means nothing to draw: an unknown name, or an archive layer with no
+// acquisition yet.
 export const resolveStack = (
   layerName: BackgroundLayerName,
   opts: StackOptions,
@@ -190,11 +167,8 @@ export const resolveStack = (
     if (topo) under.push({ config: topo, opacity: 1, zIndex: GROUND_Z });
   }
 
-  // The seamless product of the same kind goes under a dataset that has holes,
-  // faded. The LiDAR fallback is fixed to skyggerelieff, the mosaic's only one —
-  // and to DTM under the cached ground, which was computed from terrain and has
-  // no model toggle on the bar: a held DOM would put a surface mosaic in the
-  // holes with no way to say otherwise.
+  // The seamless product of the same kind, faded, under a dataset with holes.
+  // DTM under the cached ground, which has no model toggle to undo a held DOM.
   const fallback =
     layerName === 'lidarProject'
       ? buildNationalLidarConfig(DEFAULT_LIDAR_PROJECT_STYLE, opts.lidarModel)
@@ -232,11 +206,11 @@ export const resolveStack = (
 export type BuiltLayer = { layer: TileLayer; opacity: number; zIndex: number };
 export type BuiltStack = { under: BuiltLayer[]; over: BuiltLayer[] };
 
-/** The same stack as OL layers. Opacity and z-index come back alongside each
- *  layer rather than applied, since a run found stale afterwards must not have
- *  faded or reordered a layer the current stack still uses. `null` if the
- *  featured layer failed. `host` is the map the layers are destined for, and
- *  only the split view's right pane passes one. */
+/** Opacity and z-index come back alongside each layer rather than applied: a
+ *  run found stale afterwards must not have faded or reordered a layer the
+ *  current stack still uses. `null` if the featured layer failed. `host` is the
+ *  map the layers are destined for; only the split view's right pane passes
+ *  one. */
 export const buildStack = async (
   stack: ResolvedStack,
   projection: string,

@@ -24,22 +24,12 @@ export type ThemeLayerName =
   | 'protectedBuildings'
   | 'userReportedHeritage';
 
-/**
- * What makes two theme layers interchangeable, so one taken off a map can be
- * given back rather than rebuilt (`layerPool.ts`).
- *
- * Everything fixed at construction — the service URL, the feature-info wiring,
- * the minimum zoom, the grid — is derived from the definition and the
- * projection, so those two are the whole key. LAYERS and STYLES are not in it:
- * they are the one thing `updateParams` can change on a live layer, and the
- * caller reshapes whatever is on the map straight after adding it.
- */
+// LAYERS and STYLES are excluded: `updateParams` changes them on a live layer.
 export const themeLayerPoolKey = (layerId: string, projection: string) =>
   `theme|${layerId}|${projection}`;
 
-/** `overrides` pins LAYERS/STYLES at construction: kulturminner2's settings can
- *  differ from the config defaults on the first frame, and correcting
- *  afterwards costs a screenful of GetMap at RA's MapServer. */
+// `overrides` pins LAYERS/STYLES at construction; correcting them afterwards
+// costs a screenful of GetMap.
 export const createThemeLayerFromConfig = (
   config: ThemeLayerConfig,
   layerDef: ThemeLayerDefinition,
@@ -100,8 +90,6 @@ export const createThemeLayerFromConfig = (
     url: wmsUrl,
     params: { ...wmsParams, TILED: true },
     projection: projection,
-    // The same 512 px grid as the WMS backgrounds: RA's MapServer is the
-    // slowest origin, and there are half as many seams to clip a label.
     tileGrid: getWMSTileGrid(projection),
     zDirection: WMS_Z_DIRECTION,
   });
@@ -111,8 +99,7 @@ export const createThemeLayerFromConfig = (
     source,
     properties: layerProperties,
     cacheSize: WMS_TILE_CACHE_SIZE,
-    // preload 0 as on the WMS backgrounds: on-the-fly renders sharing the one
-    // tile queue, so coarse levels are not worth a slot.
+    // On-the-fly renders share one tile queue; coarse levels are not worth it.
     preload: 0,
     ...(minZoom !== undefined ? { minZoom } : {}),
   });

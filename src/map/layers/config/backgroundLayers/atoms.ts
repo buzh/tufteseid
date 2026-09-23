@@ -22,11 +22,7 @@ import { clearBackgroundLayer, swapBackgroundLayers } from './utils';
 // Startup values the URL parameter may name. Not `lidarProject` or
 // `flyfotoProject`: their acquisition atom starts null and only the user can
 // fill it, so a cold load into either renders nothing, indefinitely.
-// `lidarCvat` is in it because the flight under it is *derived*: Automatisk is
-// on at every cold load, so the footprint ranking names the flight the view is
-// over as soon as it lands, and `resolveLidarStyle` puts the render back on our
-// cache where the store holds it — so a shared link to a view read on the
-// cached ground opens on it.
+// `lidarCvat` is in it because Automatisk derives its flight on every load.
 const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'topo',
   'topograatone',
@@ -46,34 +42,25 @@ const getDefaultBackgroundLayer = (): BackgroundLayerName => {
   if (layerNameFromUrl && VALID_STARTUP_LAYERS.has(layerNameFromUrl)) {
     return layerNameFromUrl;
   }
-  // LiDAR relief is what this is for; Kart is a step away, not the arrival.
   return 'lidarHillshade';
 };
 
-// Fetched WMTS capabilities, keyed by URL rather than layer name: Kartverket's
-// cache publishes all four Kart variants in one 35 kB document.
+// Keyed by URL rather than layer name: Kartverket's cache publishes all four
+// Kart variants in one capabilities document.
 export const backgroundLayerCapabilitiesCacheAtom = atom<
   Record<string, string>
 >({});
 
-// Two halves (src/map/compare/halves.ts): `.a` is the left of the screen and
-// the whole of it while one ground is up, `.b` the right of a two-ground view.
-// A surface writes the half it belongs to; nothing writes "the current one".
 export const backgroundLayerHalves = halved<BackgroundLayerName>(
   getDefaultBackgroundLayer(),
 );
 
-/** Every ground on the screen — one, or both while two are up. What a surface
- *  belonging to the map rather than to a half asks. */
 export const liveBackgroundLayersAtom = acrossHalves(backgroundLayerHalves);
 
-// Kartverket's transparent roads/railways/place-names overlay over the relief.
-// A modifier, not a background, so toggling leaves the dataset underneath.
 export const hybridOverlayHalves = halved<boolean>(
   getUrlParameter('hybrid') === 'true',
 );
 
-// Contours are two more group layers in that overlay's own GetMap.
 export const hybridContoursHalves = halved<boolean>(
   getUrlParameter('contours') === 'true',
 );
@@ -84,17 +71,13 @@ let swapGeneration = 0;
 
 export const backgroundLayerAtomEffect = atomEffect((get) => {
   const generation = ++swapGeneration;
-  // The A half throughout: this is the left of the screen, and the whole of it
-  // while one ground is up. The B half is `compareLayerAtomEffect`'s.
+  // The A half throughout; the B half is `compareLayerAtomEffect`'s.
   const layerName = get(backgroundLayerHalves.a);
-  // Read so switching project, style or model rebuilds the LiDAR WMS layer.
+  // Read for the subscription: any of these changing rebuilds the stack.
   const activeLidarProject = get(activeLidarProjectHalves.a);
   const activeLidarStyle = get(activeLidarStyleHalves.a);
   const activeLidarModel = get(activeLidarModelHalves.a);
-  // Same for the cached ground: another acquisition is another envelope and
-  // another set of levels, so the XYZ layer is rebuilt rather than reused.
   const activeCvatAcquisition = get(activeCvatAcquisitionHalves.a);
-  // Same for the flyfoto acquisition: another year rebuilds its mosaicRule.
   const activeFlyfotoProject = get(activeFlyfotoProjectHalves.a);
   const hybridOverlay = get(hybridOverlayHalves.a);
   const hybridContours = get(hybridContoursHalves.a);
@@ -120,8 +103,6 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
     if (
       layerName === 'lidarProject' ||
       layerName === 'flyfotoProject' ||
-      // Waiting on the manifest and the footprint ranking, a tick after a cold
-      // load into the cached ground. Also not an error.
       layerName === 'lidarCvat'
     ) {
       // Nothing picked out of the archive yet: not an error.
@@ -143,9 +124,8 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
       if (generation !== swapGeneration) return;
       if (!built) return;
 
-      // Always explicit: a reused layer still carries an earlier swap's fade,
-      // and its place in the z-order (the hybrid overlay rides above the
-      // cached store's coverage hint; every other ground sits at 0).
+      // Always explicit: a reused layer still carries an earlier swap's fade
+      // and z-index.
       for (const { layer, opacity, zIndex } of [
         ...built.under,
         ...built.over,

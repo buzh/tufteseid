@@ -1,16 +1,11 @@
-// Kartverket's per-project LiDAR GetCapabilities, parsed into one entry per
-// acquisition; long-cached in wmscache plus a week of localStorage here.
-
 import { t } from 'i18next';
 import { fetchWithin } from '../../../../shared/utils/deadline';
 import { getUrlParameter } from '../../../../shared/utils/urlUtils';
 import { acrossHalves, halved } from '../../../compare/halves';
 
-// Roomy: the document is some 8 MB of XML the proxy may be fetching cold.
+// The document is some 8 MB of XML the proxy may be fetching cold.
 const CAPS_TIMEOUT_MS = 60_000;
 
-// The two services publish identical project sets, so a model is only another
-// URL and layer prefix.
 export type LidarModel = 'dtm' | 'dom';
 
 export type LidarProject = {
@@ -29,14 +24,12 @@ const CAPS_URL =
 const STORAGE_KEY = 'lidarProjects.v4';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-// What the background effect builds a WMS request from under 'lidarProject'.
 export const activeLidarProjectHalves = halved<LidarProject | null>(null);
 
-/** The flight each drawing half is on, for the footprint the map outlines. */
 export const liveLidarProjectsAtom = acrossHalves(activeLidarProjectHalves);
 
-// Holds the picked DTM style: DOM has one, so effectiveLidarStyle overrides
-// rather than overwrites and the DTM choice survives the trip.
+// Holds the picked DTM style: `effectiveLidarStyle` overrides rather than
+// overwrites, so the DTM choice survives a trip through DOM.
 export const activeLidarStyleHalves = halved<string>('skyggerelieff');
 
 export const activeLidarModelHalves = halved<LidarModel>(
@@ -55,14 +48,8 @@ export const LIDAR_COVERAGE_EXTENT_25833: [number, number, number, number] = [
 ];
 export const DEFAULT_LIDAR_PROJECT_STYLE = 'skyggerelieff';
 
-/**
- * Our own cached VAT, as a member of the style vocabulary.
- *
- * It is not a WMS style and no service publishes it — it is a rendering of a
- * flight, the same role `skyggerelieff` plays when Kartverket's WMS renders
- * one, and it belongs in the same tier. `cvatGround.ts` owns the pixels;
- * everything here is about where the choice sits.
- */
+// Our own cached VAT as a member of the style vocabulary; no service publishes
+// it. `cvatGround.ts` owns the pixels.
 export const CVAT_STYLE = 'cvat';
 
 // Every DOM layer publishes skyggerelieff and the excluded
@@ -74,23 +61,15 @@ export const stylesForModel = (
   model: LidarModel,
 ): string[] => (model === 'dom' ? DOM_STYLES : styles);
 
-// The style actually requested: asking a DOM layer for one it does not publish
-// fails silently (see resolveLidarStyle), so the model wins. The cache goes the
-// same way — it was computed from terrain, so DOM leaves it for the WMS.
+// Asking a DOM layer for a style it does not publish fails silently (see
+// `resolveLidarStyle`), so the model wins.
 export const effectiveLidarStyle = (
   style: string,
   model: LidarModel,
 ): string => (model === 'dom' ? DOM_STYLES[0] : style);
 
-/**
- * Which of the two flight grounds a render lands on.
- *
- * The flight is the dataset; whether its relief comes off our own disk or off
- * Kartverket's WMS is the render chosen on it, and the layer name is the only
- * thing that carries which — the URL, a saved screenshot's `meta.ground` and
- * the figure plate all read it. One namer, because a surface that moved the
- * style or the model without it would put `cvat` in a GetMap.
- */
+// The only namer of the two flight grounds: a surface that moved the style or
+// the model without it would put `cvat` in a GetMap.
 export const lidarFlightGround = (
   style: string,
   model: LidarModel,
@@ -99,17 +78,11 @@ export const lidarFlightGround = (
     ? 'lidarCvat'
     : 'lidarProject';
 
-/**
- * The style a WMS may be asked for. The cache has no service behind it, so a
- * stitch of that ground asks the flight's own WMS for the plain hillshade —
- * the nearest thing upstream has to what is on screen.
- */
+// The style a WMS may be asked for: `cvat` has no service behind it.
 export const wmsLidarStyle = (style: string): string =>
   style === CVAT_STYLE ? DEFAULT_LIDAR_PROJECT_STYLE : style;
 
 // Shown first in the style pulldown; anything else sits behind its overflow.
-// The cache leads it where the store has the flight: it is the best picture we
-// have of that ground.
 export const TIER_A_STYLES = [
   CVAT_STYLE,
   'skyggerelieff',
@@ -117,10 +90,8 @@ export const TIER_A_STYLES = [
   'helning_prosent',
 ];
 
-// The national mosaic publishes only skyggerelieff; asking it for a per-project
-// style answers HTTP 200 image/png with a ~100 byte JSON error body. `cvat` is
-// never in a mosaic's list and only in a flight's where the store holds it, so
-// the same clamp carries a render off the cache onto a ground that has none.
+// Asking the national mosaic for a per-project style answers HTTP 200
+// image/png with a ~100 byte JSON error body, so clamp to a published style.
 export const resolveLidarStyle = (
   published: string[],
   preferred: string,
@@ -131,16 +102,9 @@ export const resolveLidarStyle = (
       published[0] ??
       DEFAULT_LIDAR_PROJECT_STYLE);
 
-/**
- * The clamp above, plus the one upgrade: skyggerelieff is the default nobody
- * reached for and `cvat` is the same hillshade computed better, so a flight the
- * store holds is rendered from our own disk. A style the reader did reach for —
- * a slope, a multi-directional shade — is a different picture and is kept.
- *
- * Deliberately not inside `resolveLidarStyle`: recreating a saved View has to
- * give back the render it recorded, and a View that recorded the WMS hillshade
- * would come back off the cache instead.
- */
+// The clamp above, plus one upgrade: the default hillshade becomes `cvat`
+// where the store holds the flight. Kept out of `resolveLidarStyle`, which
+// recreates a recorded render and must not substitute one.
 export const preferredLidarRender = (
   published: string[],
   preferred: string,
@@ -153,15 +117,8 @@ export const preferredLidarRender = (
 // `dynamisk_farget_hoyde` ramps per tile, so neighbouring tiles disagree.
 const EXCLUDED_STYLES = new Set<string>(['None', 'dynamisk_farget_hoyde']);
 
-/**
- * The suffix in Norwegian prose, for wherever a reader is being told which
- * render they are looking at. The raw suffix stays the reproducibility
- * contract, so this never replaces it — it sits beside it.
- *
- * The list comes from GetCapabilities rather than from here, so an unadvertised
- * suffix is prettified instead of dropped: five is what the two services
- * publish today, not a closed set.
- */
+// The published set is whatever GetCapabilities lists, so an untranslated
+// suffix is prettified rather than dropped.
 export const lidarStyleLabel = (style: string): string => {
   const known = t(`lidar.style.${style}`, { defaultValue: '' });
   if (known) return known;
@@ -188,13 +145,9 @@ export function fetchLidarProjects(): Promise<LidarProject[]> {
       writeCache(projects);
       return projects;
     } catch (err) {
-      // Past the week, but still the catalogue. Acquisitions are added to this
-      // document, not revised, so an old copy names the same flights over the
-      // same ground and is only missing the newest — against which the
-      // alternative is a reader who can pick no dataset at all until Kartverket
-      // answers again. The TTL is there to pick up new flights, and that is
-      // worth nothing during an outage. The `ts` is deliberately left alone, so
-      // the next call tries the network again.
+      // Flights are appended to this document, never revised, so an expired
+      // copy is only missing the newest. `ts` is left alone: the next call
+      // tries the network again.
       const stale = readCache(true);
       if (!stale) throw err;
       console.warn('[lidar] catalogue unavailable; using the stale copy', err);
@@ -295,8 +248,6 @@ function unionBbox(
   return [minLon, minLat, maxLon, maxLat];
 }
 
-// Exported for the cached ground, which reads the same facts off the same
-// acquisition name when the catalogue has no row to read them from.
 export function parseYear(name: string): number | null {
   const m = name.match(/\b(19|20)\d{2}\b/);
   return m ? parseInt(m[0], 10) : null;
@@ -335,7 +286,6 @@ export const densityOrder = (d: string | null): number => {
   return m ? parseInt(m[1], 10) : 0;
 };
 
-// The display order for every LiDAR project list in the app.
 export const sortProjectsByRelevance = (
   a: LidarProject,
   b: LidarProject,
@@ -367,10 +317,7 @@ export const bboxOverlapRatio = (
   return area > 0 ? (w * h) / area : 0;
 };
 
-// ---- National mosaic styles ----
-
-// One service per model, styled variants under a single fixed layer prefix;
-// only the DTM one carries bathymetry.
+// One service per model under a fixed layer prefix; only DTM has bathymetry.
 export const NATIONAL_WMS: Record<LidarModel, { url: string; prefix: string }> =
   {
     dtm: {
@@ -389,7 +336,6 @@ const NATIONAL_CAPS_URL = `${NATIONAL_WMS.dtm.url}?SERVICE=WMS&REQUEST=GetCapabi
 const NATIONAL_STORAGE_KEY = 'lidarProjects.nationalStyles.v1';
 const NATIONAL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-// A floor, so the UI still has something to offer when caps is down.
 const NATIONAL_FALLBACK_STYLES = [DEFAULT_LIDAR_PROJECT_STYLE];
 
 let nationalInflight: Promise<string[]> | null = null;

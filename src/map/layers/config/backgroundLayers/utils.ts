@@ -27,9 +27,6 @@ import {
   XYZBackgroundLayer,
 } from './types';
 
-// One document describing a provider's whole catalogue, so it is bigger than a
-// tile but still small; the layer cannot be built without it, and waiting past
-// this for it is waiting for nothing.
 const CAPABILITIES_TIMEOUT_MS = 15000;
 
 export const getWMTSLayer = async (
@@ -69,10 +66,11 @@ export const getWMTSLayer = async (
       );
     }
 
-    // Untainted canvas, so the map can be read back into one; cache.kartverket.no sends ACAO:*.
+    // Untainted canvas, so the map can be read back into one;
+    // cache.kartverket.no sends ACAO:*.
     const source = new WMTS({ ...layerOptions, crossOrigin: 'anonymous' });
-    // The tile URL out of the capabilities, not the capabilities URL: the two
-    // are the same host today, and the breaker should not depend on that.
+    // The tile URL out of the capabilities, not the capabilities URL: the
+    // breaker should not assume they are the same host.
     guardTileSource(source, layerOptions.urls?.[0] ?? url);
 
     const layer = new TileLayer({
@@ -112,20 +110,17 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
   const source = new TileWMS({
     url: layerConfig.url,
     params: { ...layerConfig.props },
-    // 512 px on the view's ladder, a request-count decision (wmsTileGrid.ts).
     // Capped at the source's own resolution where it has one: over the cap OL
     // upsamples the deepest real level instead of ordering a render per tile.
     tileGrid: getWMSTileGrid(projection, 0, layerConfig.maxZoom),
     zDirection: WMS_Z_DIRECTION,
-    // Off on the relief, where the cap above means every deep view is drawn
-    // upsampled and per-tile smoothing seams (`types.ts`). Undefined is OL's
-    // own default, true.
+    // Undefined is OL's own default, true (`types.ts`).
     interpolate: layerConfig.interpolate,
   });
   guardTileSource(source, layerConfig.url);
   const extent = toViewExtent(layerConfig.coverageExtent, projection);
-  // preload 0, unlike the WMTS base: these render on the fly (3-12 s cold) and
-  // each preloaded tile holds a tile slot for that long.
+  // These render on the fly (3-12 s cold) and a preloaded tile holds a tile
+  // slot for that long.
   return new TileLayer({
     source,
     properties,
@@ -135,7 +130,6 @@ export const getWMSLayer = (layerConfig: WMSBackgroundLayer): TileLayer => {
   });
 };
 
-// ArcGIS ImageServer: same grid, culling and preload as the WMS layers.
 export const getArcGISImageLayer = (
   layerConfig: ArcGISImageBackgroundLayer,
 ): TileLayer => {
@@ -164,16 +158,10 @@ export const getArcGISImageLayer = (
   });
 };
 
-// A tile store, on the grid it was written on rather than the view's: OL
-// reprojects if a `?projection=` ever puts the view somewhere else.
-//
-// Guarded like the rest, even though some of these stores are ours and cannot
-// be down without the app being down with them: the breaker half of
-// `guardTileSource` does nothing for a URL no origin in `src/upstream/` claims,
-// so the cVAT ground is outside it and MapProxy's `/cache/` — where a miss
-// reaches through to Kartverket or NiB — is covered without a second code path.
-// The retry half is the one a sparse store has to be kept out of, which is what
-// `sparse` says (`types.ts`).
+// On the grid the tiles were written on rather than the view's; OL reprojects
+// if `?projection=` puts the view elsewhere. Guarded like the rest: the breaker
+// half of `guardTileSource` is a no-op for a URL no origin in `src/upstream/`
+// claims, and the retry half is what `sparse` turns off (`types.ts`).
 export const getXYZLayer = (
   layerConfig: XYZBackgroundLayer,
 ): TileLayer | null => {
@@ -187,7 +175,7 @@ export const getXYZLayer = (
     layerConfig.maxZoom,
   );
   // The grid carries the store's origin and levels; without it the tiles would
-  // be asked for on a grid nobody wrote them on.
+  // be asked for on one nobody wrote them on.
   if (!tileGrid) return null;
 
   const source = new XYZ({
@@ -195,9 +183,7 @@ export const getXYZLayer = (
     projection: layerConfig.projection,
     tileGrid,
     zDirection: WMS_Z_DIRECTION,
-    // Off on the relief stores, whose deepest level is well above the view's:
-    // smoothing each tile on its own seams at every tile edge (`types.ts`).
-    // Undefined is OL's own default, true.
+    // Undefined is OL's own default, true (`types.ts`).
     interpolate: layerConfig.interpolate,
   });
   guardTileSource(source, layerConfig.url, {
@@ -209,11 +195,9 @@ export const getXYZLayer = (
   return new TileLayer({
     source,
     properties: { id: `bg.${layerConfig.layerName}` },
-    // One zoom step coarser than the store's own coarsest level and the layer
-    // goes: OL would clamp to that level and ask for four screenfuls of tiles
-    // to upscale, and the faded mosaic underneath is the better picture there.
+    // Hidden one zoom step coarser than the store's own coarsest level; OL
+    // would otherwise clamp there and ask for four screenfuls to upscale.
     maxResolution: tileGrid.getResolution(layerConfig.minZoom) * 2,
-    // Per store, because what a miss costs differs: see the field in types.ts.
     preload: layerConfig.preload,
     cacheSize: WMS_TILE_CACHE_SIZE,
     ...(extent ? { extent } : {}),
@@ -240,18 +224,15 @@ export const getLayerFromConfig = async (
   return null;
 };
 
-/**
- * `bg.` is swept by `swapBackgroundLayers`; `cmp.`, the curtain's B side, must
- * stay invisible to that sweep. It also namespaces the reuse signature: A and B
- * often resolve to one config and cannot share an instance.
- */
+// `bg.` is swept by `swapBackgroundLayers`; `cmp.`, the curtain's B side, must
+// stay invisible to that sweep. It also namespaces the reuse signature: A and B
+// often resolve to one config and cannot share an instance.
 export type LayerNamespace = 'bg' | 'cmp';
 
 const isBackgroundLayer = (layer: BaseLayer): boolean =>
   String(layer.get('id') ?? '').startsWith('bg.');
 
-// Equal signatures mean equal pixels, so cycling datasets keeps the loaded
-// tiles of the base and fallback under them.
+// Equal signatures mean equal pixels.
 const layerSignature = (
   config: BackgroundLayer,
   projection: string,
@@ -264,10 +245,8 @@ const layerSignature = (
     const params = JSON.stringify(config.params);
     return `arcgis|${config.url}|${params}|${projection}`;
   }
-  // Without this arm every dataset cycle rebuilds the layer rather than
-  // reusing it, and a cached ground that is already drawn flashes. The levels
-  // and the extent join the url because they are what fences which of the
-  // store's tiles are ever asked for; the url alone names the store.
+  // Levels and extent join the url: they fence which of the store's tiles are
+  // ever asked for, where the url alone only names the store.
   if (config.type === 'XYZ') {
     const extent = JSON.stringify(config.coverageExtent);
     const levels = `${config.minZoom}-${config.maxZoom}`;
@@ -276,17 +255,12 @@ const layerSignature = (
   return null;
 };
 
-// Reuses the layer already on the map when it would render identically, so
-// callers must set opacity explicitly: it may carry an earlier swap's fade.
-//
-// `host` is which map to look in, and defaults to the one map there usually is.
-// An OL layer belongs to one map at a time, so the split view's right pane has
-// to search its own collection: a hit in the other one would be an instance the
-// install then has to steal, and the pane it was stolen from would go blank.
-//
-// The pool behind it (`layerPool.ts`) has no such restriction — nothing there is
-// on a map — so a ground that was swapped out a minute ago comes back with its
-// tiles, and a B stack retired from one host is what the other host installs.
+// Reuses a layer that would render identically, so callers must set opacity
+// and z-index explicitly: it may carry an earlier swap's. `host` is which map
+// to search and defaults to the main one; an OL layer belongs to one map at a
+// time, so the split view's right pane must search its own collection. The pool
+// behind it (`layerPool.ts`) has no such restriction — nothing there is on a
+// map.
 export const buildOrReuseBackgroundLayer = async (
   config: BackgroundLayer,
   projection: string,
@@ -315,15 +289,12 @@ export const buildOrReuseBackgroundLayer = async (
   return layer;
 };
 
-// How long the outgoing stack waits for a render that never comes; a cold LiDAR
-// tile takes 3-12 s. Also used by the compare curtain.
+// How long the outgoing stack waits for a render that never comes; a cold
+// LiDAR tile takes 3-12 s.
 export const SWAP_TIMEOUT_MS = 15000;
 
-// What an outgoing layer is dimmed to: at full opacity behind a part-screen
-// dataset it reads as real coverage.
 export const OUTGOING_OPACITY = 0.35;
 
-// Cancels the pending retirement of the previous swap, if any.
 let cancelPendingRetire: (() => void) | null = null;
 
 // Both lists are bottom-first, over outgoing layers that go on rendercomplete.
@@ -353,8 +324,6 @@ export const swapBackgroundLayers = (under: TileLayer[], over: TileLayer[]) => {
 
   for (const layer of outgoing) layer.setOpacity(OUTGOING_OPACITY);
 
-  // Retired rather than removed: the reader who just changed ground is the
-  // reader most likely to change back, and this is what they change back to.
   const retire = () => {
     cancelPendingRetire?.();
     for (const layer of outgoing) retireLayer(map, layer);

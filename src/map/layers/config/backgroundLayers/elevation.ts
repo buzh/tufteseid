@@ -6,41 +6,23 @@ import {
 } from './lidarProjects';
 import { CoverageExtent, WMSBackgroundLayer, XYZBackgroundLayer } from './types';
 
-// Our MapProxy caches of the two mosaics' skyggerelieff, on the app's own grid
-// (mapproxy/mapproxy.yaml). The same pixels the WMS below renders, but a cold
-// screenful costs one upstream GetMap per 2x2 block instead of one per tile,
-// and a second look at the same ground costs none.
 const NATIONAL_CACHE_URL: Record<LidarModel, string> = {
   dtm: '/cache/lidar-dtm/{z}/{x}/{y}.png',
   dom: '/cache/lidar-dom/{z}/{x}/{y}.png',
 };
 
-// The same two MBTiles files published a second time with no source behind
-// them, for the hours wms.geonorge is not answering: what the store already
-// holds still draws, and what it does not comes back transparent instead of
-// occupying a MapProxy worker until its 60 s timeout. `tileGuard.ts` swaps to
-// these while the `hoyde` breaker is open and back when the probe succeeds.
+// The same MBTiles published with no source behind them: a miss is transparent
+// rather than an upstream render. `tileGuard.ts` swaps to these while the
+// `hoyde` breaker is open.
 const NATIONAL_HELD_URL: Record<LidarModel, string> = {
   dtm: '/cache/lidar-dtm-held/{z}/{x}/{y}.png',
   dom: '/cache/lidar-dom-held/{z}/{x}/{y}.png',
 };
 
-// A 1 m product, so past z16 (0.33 m/px) the service is upsampling its own grid
-// and OL upsampling the z16 tile says the same thing — without four more levels
-// of upstream renders and cache growth. Reads as visible pixels when zoomed in,
-// which is what `interpolate: false` below is for: smoothed, the upsampling
-// would draw a seam at every tile edge (`types.ts`).
+// A 1 m product; z16 is 0.33 m/px, past which the service upsamples its own
+// grid. `interpolate: false` below: smoothed upsampling seams at tile edges.
 const NATIONAL_CACHE_MAX_ZOOM = 16;
 
-/**
- * The national mosaic shows any style the WMS publishes; on the DOM side that
- * is skyggerelieff and nothing else.
- *
- * Only skyggerelieff is cached, because only it is worth a cache block and only
- * it is known in advance. The style list is discovered at runtime
- * (`fetchNationalLidarStyles`), so a second one the service starts publishing
- * arrives here with nothing of ours to read and goes to the service itself.
- */
 export const buildNationalLidarConfig = (
   style: string,
   model: LidarModel,
@@ -60,8 +42,6 @@ export const buildNationalLidarConfig = (
       minZoom: 0,
       maxZoom: NATIONAL_CACHE_MAX_ZOOM,
       interpolate: false,
-      // A miss here is a GetMap upstream, so preloading would hold tile slots
-      // through a 3-12 s render; that a hit is instant does not change it.
       preload: 0,
       sparse: false,
       coverageExtent,
@@ -77,9 +57,6 @@ export const buildNationalLidarConfig = (
       LAYERS: `${NATIONAL_WMS[model].prefix}:${style}`,
       VERSION: '1.3.0',
     },
-    // The same 1 m product as the cached branch above, so the same ceiling —
-    // and it matters more here, because a level past it is an on-the-fly
-    // render per tile rather than a MapProxy hit.
     maxZoom: NATIONAL_CACHE_MAX_ZOOM,
     interpolate: false,
     coverageExtent,

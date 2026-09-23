@@ -1,8 +1,3 @@
-// Norge i bilder ortofoto over a bbox: the seamless mosaic or one acquisition,
-// one stitcher. Same-origin through /wms/nib/* and /arcgis/nib/*
-// → Caddy → wmscache → nib-proxy (which injects the anonymous token). Tiling
-// and concurrency are src/lidarExtract/stitch.ts.
-
 import { transformExtent } from 'ol/proj';
 import type { Bbox } from '../../../bbox';
 import {
@@ -13,41 +8,31 @@ import {
 import { isUpstreamDown } from '../../../../upstream/health';
 import type { FlyfotoProject } from './flyfotoProjects';
 
-// Only the stitcher's own GetMaps go here now: the mosaic ground is read out of
-// MapProxy's cache, which asks this same layer on its own (mapproxy.yaml).
 const FLYFOTO_WMS_URL = '/wms/nib/ortofoto';
 const FLYFOTO_LAYER = 'ortofoto';
 
-// One acquisition is not a WMS operation: /wms/ortofoto publishes only the
-// merged layer. It is an ArcGIS ImageServer whose catalogue carries a
-// prosjektnavn column, picked with a mosaicRule `where`. Exported without the
-// operation: the background layer hands the root to OL, which appends it.
+// The service root, without the operation: OL appends that itself.
 export const FLYFOTO_PROJECT_IMAGESERVER =
   '/arcgis/nib/ortofoto_prosjekter/ImageServer';
 const FLYFOTO_PROJECT_URL = `${FLYFOTO_PROJECT_IMAGESERVER}/exportImage`;
 
-// SQL apostrophe escape; a few project names have one. Shared with the
-// background layer so the two cannot disagree about quoting.
+// SQL apostrophe escape; a few project names have one.
 export const flyfotoProjectWhere = (projectId: string): string =>
   `prosjektnavn='${projectId.replace(/'/g, "''")}'`;
 
-// `esriMosaicNone`: exactly what the where clause selects, with no by-date
-// preference mixing other projects back in.
+// `esriMosaicNone`: the default by-date method blends neighbouring projects in.
 export const flyfotoMosaicRule = (projectId: string): string =>
   JSON.stringify({
     mosaicMethod: 'esriMosaicNone',
     where: flyfotoProjectWhere(projectId),
   });
 
-// A target, not a floor: planTiles scales down past its canvas cap and the
-// actual value is what gets reported.
+// A target, not a floor: planTiles scales down past its canvas cap.
 const TARGET_M_PER_PX = 0.2;
-// NiB is behind the same shed-and-retry public edge as Kartverket.
 const MAX_CONCURRENT = 4;
 const TILE_RETRIES = 3;
 
 export type FlyfotoResult = {
-  // Pixels, not bytes: src/figure needs a canvas to draw a caption under.
   canvas: HTMLCanvasElement;
   widthPx: number;
   heightPx: number;
@@ -113,8 +98,7 @@ export async function fetchFlyfoto(
     number,
   ];
 
-  // Never finer than the acquisition holds — a 1937 flight upsampled is four
-  // times the tiles for the same detail. The mosaic keeps the target.
+  // Never finer than the acquisition holds; the mosaic keeps the target.
   const metresPerPx = Math.max(TARGET_M_PER_PX, project?.metresPerPx ?? 0);
   const plan = planTiles(bbox25833, metresPerPx);
   const canvas = document.createElement('canvas');
@@ -147,8 +131,7 @@ export async function fetchFlyfoto(
         return;
       } catch (err) {
         if (signal?.aborted) return;
-        // Refused by the breaker, so nothing was asked of the network and
-        // sleeping before asking again only spends the user's time.
+        // Refused by the breaker: nothing reached the network, so no backoff.
         if (isUpstreamDown(err)) {
           failed++;
           return;
@@ -163,8 +146,6 @@ export async function fetchFlyfoto(
   });
 
   if (signal?.aborted) throw new Error('flyfoto grab cancelled');
-  // "Nothing came back" is not "nothing is there": null reaches the pin queue
-  // as `empty`, which offers no retry. Same rule as `fetchDem`.
   if (painted === 0 && failed > 0) {
     throw new Error('every flyfoto tile request failed');
   }

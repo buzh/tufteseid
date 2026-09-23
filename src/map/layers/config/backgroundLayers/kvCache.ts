@@ -9,9 +9,7 @@ const KvCacheProvider: LayerProvider = {
     '/v1/service?Request=GetCapabilities&Service=WMTS',
 };
 
-// One service, one capabilities document, one tile grid; only the drawing
-// differs (vector, grey, scanned paper series, nautical chart). `layerName` is
-// the WMTS identifier the cache is asked for, not a name of ours.
+// `layerName` is the WMTS identifier the cache is asked for.
 export const KvCacheBackgroundLayers: BackgroundLayer[] = [
   { type: 'WMTS', layerName: 'topo', provider: KvCacheProvider },
   { type: 'WMTS', layerName: 'topograatone', provider: KvCacheProvider },

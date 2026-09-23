@@ -1,17 +1,14 @@
-// Relevance tiering for the LiDAR picker and footprint overlay: primary shows
-// immediately, secondary behind the overflow. Nothing is excluded outright.
-
 import { atom } from 'jotai';
 import { Geometry } from 'ol/geom';
 import { acrossHalves, halved } from '../../../compare/halves';
 import { LidarProject, sortProjectsByRelevance } from './lidarProjects';
 
+// Failing a bar demotes a project to `secondary`; nothing is excluded outright.
 export type LidarFilterSettings = {
-  // Projects older than this are demoted, unless grandfathered below.
   minYear: number;
   // A project at >= 5 pkt/m² meets the year bar even when older than minYear.
   grandfatherDense: boolean;
-  // Projects painting less than this fraction of the viewport are demoted.
+  // Fraction of the viewport a project must paint.
   minAreaRatio: number;
 };
 
@@ -46,8 +43,7 @@ export const meetsSizeBar = (
   filters: LidarFilterSettings,
 ): boolean => areaRatio >= filters.minAreaRatio;
 
-// How many entries ever get a list row. Applied after the WFS response, so
-// download cost is the extent guard's job.
+// How many entries ever get a list row, primary and secondary together.
 export const RENDER_CAP = 25;
 
 type RelevanceInput = {
@@ -78,13 +74,11 @@ export const lidarFilterSettingsAtom = atom<LidarFilterSettings>(
   DEFAULT_LIDAR_FILTERS,
 );
 
-// One entry per viewport candidate; the picker and the footprint layer share
-// one fetch and classify pass.
 export type LidarViewportEntry = {
   project: LidarProject;
   // WFS polygon parts, at least one of which touches the viewport.
   geometries: Geometry[];
-  // Fraction of the viewport those polygons paint, 0..1 (viewportCoverage).
+  // Fraction of the viewport those polygons paint, 0..1.
   areaRatio: number;
 };
 
@@ -110,11 +104,9 @@ export type LidarViewportStatus =
   | 'ready'
   // Viewport too wide to ask the WFS about.
   | 'zoomedOut'
-  // Kartverket is not answering, and the entries are what the cVAT store holds
-  // over this viewport instead. A shorter list and a poorer one — envelopes
-  // rather than footprints, so `areaRatio` is an upper bound and `geometries`
-  // is empty — but every row in it can actually be drawn, which during an
-  // outage none of the others can.
+  // Kartverket not answering; the entries are what the cVAT store holds here.
+  // Envelopes, not footprints: `areaRatio` is an upper bound, `geometries` is
+  // empty.
   | 'held'
   | 'error';
 
@@ -132,18 +124,12 @@ export const lidarViewportAtom = atom<LidarViewportState>(
   emptyLidarViewport('idle'),
 );
 
-// The footprint polygons are a picking aid, so they hang off the pulldown.
-// Halved: with a ground section per half there are two dataset pulldowns, and
-// one atom between them would open both at once.
 export const lidarPickerOpenHalves = halved(false);
 
-/** Whether any drawing half has its dataset pulldown open. */
 export const livePickerOpenAtom = acrossHalves(lidarPickerOpenHalves);
 
 // Set while datasets are cycled from the keyboard: same WFS fetch, no polygons.
 // Cleared by useLidarControls after an idle period.
 export const lidarCyclingAtom = atom(false);
 
-// The focused pulldown row: only its footprint is drawn, alongside the active
-// dataset's, since all of them at once is an unreadable stack of outlines.
 export const hoveredLidarProjectIdAtom = atom<string | null>(null);
