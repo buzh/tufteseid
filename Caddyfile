@@ -23,6 +23,20 @@ log {
 }
 
 route {
+        # First in the route so the app's CSP below never reaches it: GoAccess
+        # writes one self-contained HTML whose script and style are inline.
+        # Served open, hence noindex. Empty bind mount before the first
+        # usage-report.sh run, so 404 here means "no report yet".
+        redir /stats /stats/
+        handle_path /stats/* {
+                header X-Robots-Tag noindex
+                header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:"
+                root * /srv/stats
+                file_server {
+                        index index.html
+                }
+        }
+
         header Strict-Transport-Security max-age=31536000
         header X-Content-Type-Options nosniff
         header Referrer-Policy strict-origin

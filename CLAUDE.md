@@ -91,7 +91,7 @@ scripts/live-check.sh https://<host> [spot-code]
 `scripts/live-check.sh` runs from the workstation too — the live origin is
 public.
 
-First run on a new host wants `sudo mkdir -p /site/tufteseid/data/logs`
+First run on a new host wants `sudo mkdir -p /site/tufteseid/data/{logs,stats}`
 alongside the cVAT and MapProxy store directories (`README.md`,
 `docs/monitoring.md`).
 
@@ -108,7 +108,7 @@ alongside the cVAT and MapProxy store directories (`README.md`,
 
 | Service | What it is |
 | --- | --- |
-| `tufteseid` | `node:24-alpine` builds the SPA, `caddy:2.10.0-alpine` serves `/var/www`. `config.js` bind-mounted at runtime. |
+| `tufteseid` | `node:24-alpine` builds the SPA, `caddy:2.10.0-alpine` serves `/var/www`, plus the GoAccess report at `/stats/` out of a read-only mount. `config.js` bind-mounted at runtime. |
 | `pocketbase` | Backend for spots (OAuth2 + user content), pinned to 0.40.2. Serves `/pb/*`. SQLite on the `pbdata` volume. |
 | `nib-proxy` | Token-injecting sidecar for Norge i bilder ortofoto. Reachable only from wmscache and mapproxy. |
 | `cvat-tiles` | `node:24-alpine`, zero deps. Serves `/cvat/*` out of one MBTiles database per LiDAR acquisition in the bind-mounted store. Built out of band by `vat-cache/`. |

@@ -8,8 +8,11 @@ services:
       - "127.0.0.1:3030:3000"
     volumes:
       - ./config.js:/var/www/config.js:ro
-      # First run: sudo mkdir -p /site/tufteseid/data/logs
+      # First run: sudo mkdir -p /site/tufteseid/data/{logs,stats}
       - /site/tufteseid/data/logs:/var/log/caddy
+      # Outside /var/www: under it the SPA's file_server would serve the
+      # report with the app's CSP, which blocks GoAccess's inline script.
+      - /site/tufteseid/data/stats:/srv/stats:ro
     depends_on:
       - wmscache
       - mapproxy

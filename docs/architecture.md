@@ -14,7 +14,7 @@ One row per directory under `src/`.
 | Directory | Owns |
 | --- | --- |
 | `api/` | PocketBase singleton (`pocketbase.ts`) and the `spots` collection client. |
-| `auth/` | OAuth2 dialog, the sign-in button, and `currentUserAtom` mirrored off the SDK's `authStore`. |
+| `auth/` | OAuth2 dialog, the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
 | `grounds/` | The ground switch. Which ground is up is derived from the half's background layer, never stored. |
 | `heritageControls/` | The Kulturminner tool: which theme layers are ticked and how they are drawn. |

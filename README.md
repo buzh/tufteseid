@@ -84,7 +84,12 @@ scripts/usage-report.sh
 
 That writes a GoAccess report to the stats directory and prints what the traffic
 was made of and how much of it reached Kartverket, Riksantikvaren or Norge i
-bilder rather than being answered from cache here. Its companion
+bilder rather than being answered from cache here. Caddy serves the report at
+`/stats/`, which the account menu links to for an app admin — **unauthenticated,
+so treat it as public**: it is `noindex` and the addresses in it are anonymized
+to a /24, but nothing stops a visitor who guesses the path. Put a password in
+front of it in your own reverse proxy, or leave the stats directory out of
+`docker-compose.yml` and read the report on the host. Its companion
 `scripts/health-check.sh` is the same data with thresholds on it, silent unless
 something is wrong, meant for cron.
 

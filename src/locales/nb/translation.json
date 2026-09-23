@@ -6,6 +6,8 @@
     "signInWith": "Fortsett med {{provider}}",
     "signOut": "Logg ut",
     "account": "Kontoen din",
+    "stats": "Bruksstatistikk",
+    "pocketbase": "PocketBase",
     "providersError": "Fikk ikke kontakt med innloggingstjenesten.",
     "noProviders": "Ingen innloggingsmåter er satt opp på denne installasjonen."
   },

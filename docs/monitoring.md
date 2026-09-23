@@ -62,6 +62,13 @@ and every visitor is counted as one; fix it in the TLS terminator.
   so no status tally shows it, and `$skip_cache_type` keeps it out of the cache,
   so each one is a tile the visitor did not get. See
   `docs/wms-proxy-and-tiles.md`.
+- **Where it lands** — the report directory is bind-mounted read-only into the
+  `tufteseid` container and served at **`/stats/`**, which the account menu
+  links to when `role = admin`. The link is the only thing the role gates:
+  Caddy asks for no credentials, so the report is public to anyone who types
+  the path. It carries its own CSP (GoAccess inlines its script) and an
+  `X-Robots-Tag: noindex`. Gate it in the TLS terminator if that is not
+  acceptable, or drop the mount and read `index.html` on the host.
 - **Stores** — `du` over `cvat`, `mapproxy`, `logs` and the wmscache volume,
   with the delta since the last run (stamped in `<report-dir>/.sizes`). MapProxy
   fetches `wms.geonorge.no` directly, not through wmscache, and never evicts, so
