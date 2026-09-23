@@ -44,7 +44,7 @@ Everything inside `GroundSection` is a surface mounted from its own directory:
 | Directory | Is |
 | --- | --- |
 | `src/grounds/` | the ground switch — `GroundSwitch`, three buttons in a `ControlUnit` with the live one lit, and `useGroundControls` which derives which ground is up from the half's background atom rather than storing it |
-| `src/lidarControls/` | the LiDAR arm — `LidarControlGroup`, five elements whose design is settled, the last of them the Hybrid overlay and its contours |
+| `src/lidarControls/` | the LiDAR arm — `LidarControlGroup`, five controls whose design is settled, joined into one `ControlUnit`, the last of them the Hybrid overlay and its contours |
 | `src/kartControls/` | the Kart arm — one chip over `KART_VARIANTS`, and the memory of which variant Kart means while another ground is up |
 | `src/flyfotoControls/` | the Flyfoto arm — the NiB mosaic or one acquisition over the viewport, with the period filter inside its own dropdown |
 
@@ -69,30 +69,42 @@ for a mode that is on, or split across the middle for two states that are one
 picture. The metrics they share are `--control-height` and
 `--control-icon-width` in `src/index.css`.
 
-Where several of those boxes are one control rather than neighbours, they stand
+Where several of those boxes are one subject rather than neighbours, they stand
 in `ControlUnit`: a third primitive that draws them as a single shape — shared
-edge, outer radius only, no gap. It styles its children by position rather than
+edges, outer radius only, no gaps. It styles its children by position rather than
 by a class they wear, because the boxes arrive already wrapped in a `Tooltip` or
 a `Popover.Target` and because the set changes as a chip comes and goes; the
 survivor of a departure is rounded on all four corners again without anything
-being told. Kulturminner is the only control wearing it today.
+being told. The ground switch, the view control, the whole LiDAR arm and
+Kulturminner wear it. Boxes only, not units: a unit nested in a unit laps a bare
+div while the boxes inside it keep their corners, so a component contributing
+more than one box to somebody else's unit hands them up in a Fragment
+(`HybridToggle`). What that leaves as the only gap inside a ground section is
+the one between the switch and the arm, which is where the subject changes.
 
 `ToolSection` mounts four subjects, and they are not the same shape.
 `src/heritageControls/` is the Kulturminner overlay — `HeritageToggle`, the
 button that puts Riksantikvaren's registers over whatever ground is drawing,
-and joined to it, only while they are up, `HeritageMenu`: the chip that reads
-out the render and opens the five sources, the three registers inside
+and joined to it, only while they are up, `HeritageMenu`: a chip carrying
+nothing but a chevron, which opens the five sources, the three registers inside
 kulturminner2, the seven renders and the transparency. The two share one box —
-the chip is a readout of what the button turned on, not a control standing next
-to it — which is why the chip carries no glyph of its own. It is not an arm and
-belongs to no ground, which is what puts it at the other end of the band. Off
+the chip belongs to what the button turned on, not a control standing next to
+it — which is why the chip carries no glyph of its own. It reads nothing out
+either: what this menu sets is the overlay, and the overlay is already on the
+terrain, so naming it would say a second time what the reader is looking at and
+do it at a width that changed with every setting. The ticked sources and the
+render are in the chip's `title`, and the box stays as wide as the castle. It is
+not an arm and belongs to no ground, which is what puts it at the other end of
+the band. Off
 is `heritageHiddenAtom`, a blind rather than a clearing, so the reader's
 selection survives taking the overlay off to look at the terrain; the button is
 the product of that atom and `activeThemeLayersAtom`, and with nothing ticked it
 arms kulturminner2 rather than raising a blind over an empty set. The one thing
-the chip says that is not a setting is that the map is too far out for any
-ticked source to draw — every RA service here is capped below city scale, and
-an overlay that is on and invisible otherwise reads as an empty register.
+the chip shows that is not behind a hover is that the map is too far out for any
+ticked source to draw — every RA service here is capped below city scale, and an
+overlay that is on and invisible otherwise reads as an empty register. That
+state paints the chip in the `warn` variant the upstream fault chip wears: red
+border, red chevron.
 
 `src/terrainControls/` is the second, and only its switch is in the band.
 `TerrainToggle` is one `ControlButton` and nothing else — no chip beside it,

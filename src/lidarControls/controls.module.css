@@ -1,19 +1,9 @@
-/* What the four controls need that `ui/ControlChip` and `ui/ControlButton` do
-   not already carry. Deliberately says nothing about the band they sit in — the
-   ribbon's own stylesheet does that, and a second host (a pane in a split view)
-   has to be able to mount the group without inheriting a border-bottom. */
-
-/* --- the group --- */
-
-/* One row that never compresses. Whether a narrow window scrolls or clips is
-   the host's call — the ribbon scrolls — but the group must not answer it by
-   squeezing four controls into three controls' worth of space. Emphatically not
-   a scroll container itself: nested inside the ribbon's, the inner one would
-   take the overflow and the wordmark would stay put while the controls slid
-   under it. */
-.group {
-  flex: none;
-}
+/* What the arm's menus need that `ui/ControlChip` and `ui/ControlButton` do not
+   already carry. The row itself is a `ui/ControlUnit` and the boxes in it style
+   themselves, so nothing in here is about the shape of the arm — and nothing is
+   about the band it stands in either, which is the ribbon's own stylesheet's
+   business: a second host (a pane in a split view) has to be able to mount the
+   group without inheriting a border-bottom. */
 
 /* --- inside the menus --- */
 

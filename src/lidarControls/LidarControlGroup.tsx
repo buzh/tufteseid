@@ -1,4 +1,13 @@
-// The LiDAR arm: five elements in one row.
+// The LiDAR arm: five controls drawn as one box.
+//
+// Joined rather than spaced. The five are one subject — which relief is on the
+// screen — and set a gap apart they read as five neighbours that happen to be
+// adjacent, which in a band where the sections themselves are gaps is the wrong
+// thing to say. The one gap the ground section keeps is the one before this,
+// between the switch and the arm, and that is where the subject actually
+// changes: from which ground to what of it. Hybrid stays inside the join even
+// though it is written over the relief rather than being it — it exists only on
+// this ground, and a second gap would promise a second section.
 //
 // This is the whole surface, not a convenience wrapper — a host renders this
 // and gets the controls and their order rather than reassembling them. It
@@ -16,10 +25,9 @@
 // is what lets a two-ground view mount one of these per pane: the controller
 // knows which half it writes and nothing in the five controls does.
 
-import { Group } from '@mantine/core';
 import { useEffect } from 'react';
+import { ControlUnit } from '../ui/ControlUnit';
 import { AutoToggle } from './AutoToggle';
-import styles from './controls.module.css';
 import { DatasetMenu } from './DatasetMenu';
 import { HybridToggle } from './HybridToggle';
 import { ModelToggle } from './ModelToggle';
@@ -43,12 +51,12 @@ export const LidarControlGroup = ({ lidar }: { lidar: LidarControls }) => {
   );
 
   return (
-    <Group gap="xs" wrap="nowrap" className={styles.group}>
+    <ControlUnit>
       <AutoToggle lidar={lidar} />
       <DatasetMenu lidar={lidar} />
       <RenderMenu lidar={lidar} />
       <ModelToggle lidar={lidar} />
       <HybridToggle lidar={lidar} />
-    </Group>
+    </ControlUnit>
   );
 };
