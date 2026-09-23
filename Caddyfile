@@ -2,47 +2,18 @@
         servers {
                 metrics
 
-                # Caddy is not the edge: the host's TLS terminator reaches it
-                # over the Docker bridge, so `$remote_addr` is the bridge and
-                # every request in the access log would come from the same
-                # address — one visitor, forever. `private_ranges` trusts the
-                # bridge to have set X-Forwarded-For (the default value of
-                # `client_ip_headers`), which is what fills the log's
-                # `client_ip` field and what GoAccess counts.
-                #
-                # This is a statement about the deployment, not about Caddy: it
-                # is only true while nothing reaches :3000 except a proxy on a
-                # private address. Publishing the port beyond 127.0.0.1 in
-                # docker-compose.yml would make it a spoofable header.
+                # Trusts X-Forwarded-For; do not publish :3000 beyond 127.0.0.1.
                 trusted_proxies static private_ranges
         }
 
-        # Loopback inside the container, not its network address. The admin API
-        # rewrites Caddy's running config and has no authentication of its own,
-        # so on :2019 it is reachable from every other service on the compose
-        # network. The Prometheus metrics that `servers { metrics }` collects
-        # ride on this same listener — reach them with
-        #   docker compose exec tufteseid wget -qO- localhost:2019/metrics
-        # and see docs/monitoring.md before opening a listener for a scraper.
+        # Admin API has no authentication: keep it off the compose network.
         admin localhost:2019
 }
 
 :3000
 
-# The request log. Caddy logs errors unasked but never requests, so this block
-# is the whole of the record that anybody visited. JSON rather than a console
-# format because the one plaintext format GoAccess reads out of the box —
-# Common Log Format — comes from a plugin, and a plugin means building Caddy
-# with xcaddy instead of pulling the official image.
-#
-# A host path, like the cVAT and MapProxy stores and unlike the wmscache
-# volume: scripts/usage-report.sh reads this from outside the stack, and it
-# should survive the stack being rebuilt. First run wants
-#   sudo mkdir -p /site/tufteseid/data/logs
-#
-# Rolled files are gzipped, and 10 × 20 MB is the whole of the retention. The
-# report is rebuilt from the whole set on every run rather than accumulated
-# into a database, so running it twice in an hour counts nothing twice.
+# /var/log/caddy is a host bind mount (mkdir -p on first run); JSON is the
+# format scripts/usage-report.sh parses.
 log {
         output file /var/log/caddy/access.log {
                 roll_size 20mb
@@ -55,16 +26,8 @@ route {
         header Strict-Transport-Security max-age=31536000
         header X-Content-Type-Options nosniff
         header Referrer-Policy strict-origin
-        # The two style directives are split because they are two different
-        # risks. `style-src-elem` allows inline <style> *elements*: MantineProvider
-        # writes the theme's CSS variables into one at runtime, and it is not
-        # optional — turning it off (`withCssVariables={false}`) means
-        # transcribing Mantine's whole variable set into a stylesheet here and
-        # re-transcribing it on every upgrade. A nonce is the stricter answer and
-        # is not available: this is a static `file_server`, so there is no
-        # per-request value to mint. `style-src-attr` allows inline style
-        # *attributes*, which was already the case — React sets positions, sizes
-        # and picked colours that way.
+        # style-src-elem 'unsafe-inline' is required by MantineProvider's
+        # runtime <style>; a nonce is impossible behind a static file_server.
         header Content-Security-Policy "
                 default-src 'self';
                 script-src 'self';
@@ -78,150 +41,59 @@ route {
         "
         header Permissions-Policy "geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), accelerometer=(), camera=()"
 
-        # /l/K7M2QX — the short URL for a lokalitet. A redirect to
-        # /?lok=K7M2QX and nothing more: the code is the key, so there is
-        # nothing to look up and no reason for this to be a service.
-        #
-        # Must stay a `redir` on this one narrow pattern, not an SPA fallback
-        # over `file_server`: a catch-all rewrite to /index.html would turn
-        # every wrong path in the app into a 200.
-        #
-        # One alphanumeric segment, not exactly six characters. A `{6}`
-        # quantifier in a Caddyfile is a brace in a config format that reads
-        # braces as structure, and the length check buys nothing anyway: the
-        # app has to answer "no such lokalitet" for a well-formed code that
-        # names nothing, which is the same message a malformed one gets.
+        # Must stay a narrow redir: an SPA fallback here would answer every
+        # wrong path with a 200.
         @shortLink path_regexp shortLink ^/l/([0-9A-Za-z]+)$
         redir @shortLink /?lok={re.shortLink.1}
 
-        # Proxies to wmscache. One handler per upstream host — the second
-        # path segment picks the host, the rest is passed through to that
-        # host's WMS namespace. Layer configs use these same-origin paths
-        # so no CSP whitelist entry is needed for the upstream and the
-        # response can be cached by nginx.
-
-        # wms.geonorge.no/skwms1/* — main Kartverket WMS namespace (theme
-        # layers + national LiDAR + per-project LiDAR). handle_path strips
-        # /wms/geonorge from the URI; the post-strip path already starts
-        # with '/' so we prepend /skwms1 without another slash.
         handle_path /wms/geonorge/* {
                 rewrite * /skwms1{http.request.uri.path}
                 reverse_proxy http://wmscache
         }
 
-        # wfs.geonorge.no/skwms1/* — Kartverket WFS namespace. One live
-        # caller: the LiDAR project footprints (lidarFootprints.ts).
-        # Distinct internal prefix so it can't be confused with
-        # wms.geonorge.no's /skwms1/ in wmscache; nginx rewrites it back
-        # to /skwms1/ before forwarding.
         handle_path /wfs/geonorge/* {
                 rewrite * /wfs-skwms1{http.request.uri.path}
                 reverse_proxy http://wmscache
         }
 
-        # kart.ra.no/wms/* — Riksantikvaren Kulturminner WMS.
         handle_path /wms/ra/* {
                 rewrite * /wms{http.request.uri.path}
                 reverse_proxy http://wmscache
         }
 
-        # kms-api.kulturminnesok.no/api/* — Kulturminnesøk's own record API.
-        # Not a map source: the only thing asked of it is whether the
-        # `linkkulturminnesok` URL Riksantikvaren serves on a feature will
-        # actually resolve. Roughly a fifth to a third of the lokaliteter in
-        # kart.ra.no's WMS are absent from Kulturminnesøk's index, and its
-        # resolver answers a miss with a 200 and an all-null record rather
-        # than a 404 — so the link looks fine and lands on a blank page.
-        # Same-origin through wmscache because the API sends no CORS headers.
         handle_path /kms/* {
                 rewrite * /kms-api{http.request.uri.path}
                 reverse_proxy http://wmscache
         }
 
-        # Norge i bilder ortofoto — same-origin via wmscache, which proxies
-        # to the nib-proxy sidecar that injects NiB's anonymous access
-        # token (see nginx/wms-cache.conf location /nib-wms/). No CSP entry
-        # needed: the browser only ever talks to this origin.
         handle_path /wms/nib/* {
                 rewrite * /nib-wms{http.request.uri.path}
                 reverse_proxy http://wmscache
         }
 
-        # Norge i bilder ArcGIS REST — the same sidecar and the same token,
-        # but a different upstream namespace (/arcgis/rest/services). This
-        # is how per-project ortofoto works: NiB exposes no WMS for single
-        # acquisitions, so the lokalitet "Flyfoto" action enumerates them
-        # via prosjekter/MapServer/4/query and renders one at a time via
-        # ortofoto_prosjekter/ImageServer/exportImage. Same-origin as
-        # everything else, so still no CSP entry.
         handle_path /arcgis/nib/* {
                 rewrite * /nib-arcgis{http.request.uri.path}
                 reverse_proxy http://wmscache
         }
 
-        # hoydedata.no ArcGIS REST — Kartverket's elevation ImageServers.
-        # Unlike /wms/geonorge/* (which serves Kartverket's *pre-shaded*
-        # hillshade PNGs) this is where the raw float elevation grid comes
-        # from: exportImage with renderingRule {"rasterFunction":"None"}
-        # returns a 32-bit float GeoTIFF, which is what the lokalitet
-        # terrain tool needs to compute its own relief visualizations.
-        # See docs/terrain-analysis.md. Anonymous — no token sidecar, so
-        # this goes straight to the host via wmscache.
         handle_path /arcgis/hoydedata/* {
                 rewrite * /hoydedata-arcgis{http.request.uri.path}
                 reverse_proxy http://wmscache
         }
 
-        # The MapProxy caches: the six upstream layers whose parameters never
-        # change, held as tiles on the app's own grid. `/cache/<layer>/z/x/y.png`
-        # rather than MapProxy's own path, so the app asks for plain XYZ tiles
-        # and the grid name and the endpoint live in exactly one place.
-        #
-        # One regexp rather than six blocks, unlike the wmscache handlers above:
-        # those pick between hosts, this is one service and one rewrite with the
-        # layer name substituted. A `/cache/` name MapProxy does not publish
-        # comes back 404 from MapProxy rather than being refused here, which is
-        # the same answer and one less list to keep in step.
-        #
-        # `/tiles`, not `/tms/1.0.0`, and that is load-bearing. Our rows count
-        # from the north, like the app's grid and the cVAT store; TMS is
-        # specified to count from the south, so MapProxy hard-codes
-        # `origin = 'sw'` on a TMS request and the `origin: 'nw'` in
-        # mapproxy.yaml is only consulted when the request left it unset. Ask
-        # /tms and every tile is mirrored about the equator of the grid — which
-        # reads as a blank map, not as a wrong one, because the flipped row
-        # lands outside each source's coverage and gets culled to a
-        # transparent tile.
-        #
-        # :80 and the /mapproxy prefix are the -nginx image's own: uwsgi behind
-        # nginx, SCRIPT_NAME /mapproxy. The port is pinned to the image tag —
-        # mapproxy moved it to 9090 after 7.0.0 — so check the tag's own
-        # docker/nginx-default.conf when bumping, not the one on master.
+        # /tiles, not /tms: a TMS request forces origin 'sw', flipping every
+        # row, which renders as a blank map rather than a wrong one.
+        # Port 80 is the 7.0.0 -nginx image's own; later tags moved it to 9090.
         @tileCache path_regexp tileCache ^/cache/([a-z0-9-]+)/(\d{1,2}/\d{1,7}/\d{1,7}\.(?:png|jpeg))$
         handle @tileCache {
                 rewrite * /mapproxy/tiles/{re.tileCache.1}/tufteseid25833/{re.tileCache.2}
                 reverse_proxy http://mapproxy:80
         }
 
-        # The cached combined-VAT ground. One MBTiles database per LiDAR
-        # acquisition, served a tile at a time by the cvat-tiles sidecar —
-        # /cvat/<acquisition>/<z>/<x>/<y>.webp, and /cvat/manifest.json
-        # beside it saying which acquisitions the store holds. Same URLs
-        # the store answered when it was a bind-mounted tree of files under
-        # Caddy's own root, which is why the app needs to know nothing
-        # about the change. Inside the route block so it is matched before
-        # `file_server`, which would otherwise answer /cvat/* out of
-        # /var/www.
         handle_path /cvat/* {
                 reverse_proxy http://cvat-tiles:8080
         }
 
-        # PocketBase — backend for lokaliteter (auth + user content).
-        # Kept same-origin so browser auth cookies "just work" and there's
-        # no CORS to configure. The full OAuth2 redirect flow bounces
-        # through /pb/api/oauth2-redirect on the SPA origin. Realtime
-        # (Server-Sent Events) is a plain long-lived GET, no upgrade
-        # needed — Caddy proxies it as-is.
         handle_path /pb/* {
                 reverse_proxy http://pocketbase:8090 {
                         flush_interval -1

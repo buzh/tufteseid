@@ -1,31 +1,13 @@
-# Pre-filling the caches, by hand and never on a schedule.
-#
-# The coarse levels are what every cold visitor lands on and what a pan across
-# Norway burns the shared GetMap budget on fastest, so they are the levels
-# worth paying for once instead of on demand. Deeper than z9 is a judgement
-# about disk: z10 is four times the tiles of z9, and nobody reads relief at
-# 42 m/px for long, so the levels people actually work at are better left to
-# fill themselves where they are looked at.
-#
-# Run it, from the server:
+# Run by hand, never on a schedule:
 #
 #   docker compose exec mapproxy mapproxy-seed -c 4 \
 #     -f /mapproxy/config/mapproxy.yaml -s /mapproxy/config/seed.yaml \
 #     --seed ALL
 #
-# No `refresh_before` anywhere below, and that is not an omission: MBTiles
-# stores no per-tile timestamp, so any refresh time at all makes MapProxy
-# rebuild every tile in the task rather than the stale ones. Without one a run
-# fills the gaps and leaves what is already there, which makes it safe to
-# re-run and safe to interrupt.
-
-# `lidar-dtm-held` and `lidar-dom-held` are deliberately in no seed below. They
-# are the same two MBTiles files with no source behind them, so there is nothing
-# for a seeder to fetch; what fills them is the live caches they read.
+# No `refresh_before` anywhere: MBTiles stores no per-tile timestamp, so any
+# refresh time rebuilds every tile in the task rather than the stale ones.
 
 coverages:
-  # The same three boxes the sources are clipped to — each service's own
-  # declared EPSG:25833 bounds.
   lidar:
     bbox: [-100275, 6399725, 1150255, 8000275]
     srs: 'EPSG:25833'
