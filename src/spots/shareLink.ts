@@ -1,10 +1,4 @@
-// The short link, both directions.
-//
-// `/l/K7M2QX` is a Caddy `redir` to `/?lok=K7M2QX` and nothing more — the code
-// is the key, so there is nothing to look up and no reason for the short form
-// to be a service. This module is the client half: resolve the code on a cold
-// load, move the map to what it named, and keep the parameter in step with
-// whatever is open afterwards.
+// `/l/<code>` is a Caddy `redir` to `/?lok=<code>`; this is the client half.
 
 import { useAtomValue, useSetAtom } from 'jotai';
 import { transform } from 'ol/proj';
@@ -24,19 +18,13 @@ import {
 } from '../shared/utils/urlUtils';
 import { activeSpotAtom } from './atoms';
 
-/**
- * Captured at module import, not read in the effect. The writer below removes
- * `lok` whenever nothing is open, and on a cold load that runs before the
- * reader has resolved anything — so a read at first render would race the
- * parameter out of existence.
- */
+// Read at import: the writer effect below deletes `lok` on first render, so a
+// read at that point would race the parameter out of existence.
 const bootCode = getUrlParameter('lok');
 
 export const shareUrlOf = (code: string): string =>
   `${window.location.origin}/l/${code}`;
 
-/** How close a followed link lands. Close enough to see the relief the spot is
- *  about, not so close that a mis-set pin is off the screen. */
 const LINK_ZOOM = 16;
 
 export const useSpotShareLink = () => {
@@ -47,18 +35,14 @@ export const useSpotShareLink = () => {
   const setAuthDialogOpen = useSetAtom(isAuthDialogOpenAtom);
   const setAuthPrompt = useSetAtom(authPromptAtom);
 
-  /** Whether the boot code has had its answer. Until it has, the writer stays
-   *  out of the way — it must not delete the parameter it is about to read. */
+  /** Whether the boot code has had its answer; until then the writer effect
+   *  must not delete the parameter. */
   const settled = useRef(bootCode == null);
-
-  /** The code still waiting on one. Held here rather than re-read off the URL,
-   *  which the writer below owns from the moment this settles — a guest who was
-   *  turned away keeps their retry either way. */
   const unresolved = useRef(bootCode);
 
-  // Runs immediately (pb.authStore rehydrates at import, so the first request
-  // already carries any stored token) and again whenever the user changes, so
-  // signing in retries a code that a guest could not see.
+  // Re-runs on a change of user, so signing in retries a code a guest could
+  // not see. pb.authStore rehydrates at import, so the first run carries any
+  // stored token.
   useEffect(() => {
     const code = unresolved.current;
     if (!code) return;
@@ -73,9 +57,6 @@ export const useSpotShareLink = () => {
       })
       .catch(() => {
         if (!live) return;
-        // Settled either way, so the writer below stops standing aside: a
-        // reader who never gets an answer to this code should still have the
-        // parameter follow whatever they open next.
         settled.current = true;
         if (user) {
           unresolved.current = null;
@@ -83,11 +64,9 @@ export const useSpotShareLink = () => {
           console.warn('[spots] no spot for code', code);
           return;
         }
-        // Signed out, and the server does not say which of the two this is: a
-        // private spot the visitor may well own, or no spot at all. The sign-in
-        // is the one useful answer to both, and it is also the retry — this
-        // effect runs again with an account behind it. The parameter stays on
-        // the URL for the same reason: a reload is the other way to retry.
+        // The server answers a private spot and a missing one with the same
+        // 404, so signed out the sign-in is both the answer and the retry.
+        // `lok` stays on the URL so a reload retries too.
         setAuthPrompt('spotLink');
         setAuthDialogOpen(true);
       });
@@ -97,8 +76,8 @@ export const useSpotShareLink = () => {
     };
   }, [user, setActive, setAuthDialogOpen, setAuthPrompt]);
 
-  // Move the map to whatever is open, keyed on the id: re-centring on every
-  // field change would fight a reader who is panning around their own spot.
+  // Keyed on the id: re-centring on every field change would fight a reader
+  // panning around their own spot.
   const activeId = active?.id ?? null;
   const activePoint = active?.point;
   useEffect(() => {
@@ -113,12 +92,11 @@ export const useSpotShareLink = () => {
       zoom: Math.max(view.getZoom() ?? 0, LINK_ZOOM),
       duration: 400,
     });
-    // `activePoint` is an array literal off a fresh record, so naming it here
-    // would re-animate on every realtime update of an unrelated field.
+    // `activePoint` is a fresh array literal per record: naming it would
+    // re-animate on every realtime update of an unrelated field.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, activeId]);
 
-  // The parameter follows what is open, once the boot code has had its answer.
   const activeCode = active?.code ?? null;
   useEffect(() => {
     if (!settled.current) return;
@@ -127,7 +105,7 @@ export const useSpotShareLink = () => {
   }, [activeCode]);
 };
 
-/** Copy a spot's link. Returns whether the clipboard took it. */
+/** Returns whether the clipboard took it. */
 export const copyShareLink = async (spot: SpotRecord): Promise<boolean> => {
   try {
     await navigator.clipboard.writeText(shareUrlOf(spot.code));

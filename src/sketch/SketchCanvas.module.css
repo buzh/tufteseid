@@ -1,17 +1,10 @@
-/*
- * Excalidraw re-pointed at the Mantine theme. `:global(...)` throughout because
- * the class names are the library's own internals and can move in a version
- * bump; each block says what it is for, so a broken selector can be recognised
- * as broken rather than deleted.
- */
+/* Excalidraw re-pointed at the Mantine theme. Every `:global(...)` selector
+ * below is a library-internal class name that can move in a version bump. */
 
-/*
- * The map's own rectangle, which is what `MapComponent` positions its overlays
- * against: Excalidraw's islands place themselves inside this box, so they land
- * clear of the band with no height measured anywhere, and the scene is scrolled
- * to compensate (`initialSceneView`). `isolation` contains Excalidraw's
- * internal z-ladder, which climbs past 1000 and would otherwise paint its
- * popovers over the band and over the draft box beside it.
+/* The map's own rectangle: Excalidraw's islands place themselves inside this
+ * box, so they land clear of the band, and the scene is scrolled to compensate
+ * (`initialSceneView`). `isolation` contains Excalidraw's internal z-ladder,
+ * which climbs past 1000 and would otherwise paint its popovers over the band.
  */
 .surface {
   position: absolute;
@@ -21,7 +14,7 @@
 }
 
 .surface :global(.excalidraw) {
-  /* Surfaces and text. Anthracite, like every other panel over the map. */
+  /* Surfaces and text. */
   --island-bg-color: var(--mantine-color-body);
   --default-bg-color: var(--mantine-color-body);
   --popup-bg-color: var(--mantine-color-body);
@@ -31,7 +24,7 @@
   --icon-fill-color: var(--mantine-color-text);
   --dialog-border-color: var(--mantine-color-default-border);
 
-  /* Accent. Excalidraw's own is indigo; ours is papaya. */
+  /* Accent. */
   --color-primary: var(--mantine-color-papaya-5);
   --color-primary-hover: var(--mantine-color-papaya-4);
   --color-primary-darker: var(--mantine-color-papaya-6);
@@ -60,12 +53,9 @@
   --shadow-island: var(--mantine-shadow-md);
 }
 
-/*
- * Hidden: the hamburger, whose document verbs `UIOptions.canvasActions` empties
- * while still rendering the button; the shape library, which is excalidraw.com
- * content that `connect-src` would have to be widened for; and help, a shortcut
- * sheet for features that are mostly turned off.
- */
+/* Hidden: the hamburger, whose verbs `UIOptions.canvasActions` empties while
+ * still rendering the button; the shape library, which is excalidraw.com
+ * content `connect-src` would have to be widened for; and help. */
 .surface :global(.main-menu-trigger),
 .surface :global(.sidebar-triggers),
 .surface :global(.help-icon) {

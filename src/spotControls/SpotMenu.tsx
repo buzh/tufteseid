@@ -1,28 +1,5 @@
-// Mine lokaliteter: the index the map could not give.
-//
-// A pin is where it is, which is the one way of finding a spot that requires
-// already knowing the ground it is on. This is the other way — every record the
-// reader has written, newest change first, and one click flies the map to it
-// and opens its card. That last part is nothing this component does: it writes
-// `activeSpotAtom`, and the mover behind the short link (`shareLink.ts`) is
-// what animates the view, so a spot opened from here, from a click on its pin
-// and from a followed link all arrive the same way.
-//
-// Their own, not everything the session may see. The map draws other people's
-// public pins as well, and they are worth looking at where they are — but an
-// index is a list of what you are answerable for, and a gazetteer of strangers'
-// records under the heading "mine" is a different surface.
-//
-// A `Menu` rather than the `Popover` the Kulturminner chevron opens: every row
-// in here is a transaction that ends the visit, where every row in that one is
-// a setting the reader leaves set. Closing on the first click is exactly right
-// for the first and exactly wrong for the second.
-//
-// Nothing on the chip but the chevron, same as that one and for the same
-// reason: it shares a box with the `+`, a glyph an eighth of an inch from
-// another glyph reads as a second subject, and a count in it would change the
-// width of the band every time a spot was saved. The heading inside names it
-// and the `title` carries the count.
+// The reader's own spots. A row writes `activeSpotAtom` and nothing else; the
+// mover behind the short link (`shareLink.ts`) animates the view.
 
 import { Badge, Group, Menu, ScrollArea, Text, TextInput } from '@mantine/core';
 import { useAtomValue, useSetAtom } from 'jotai';
@@ -37,19 +14,11 @@ import { ControlChip } from '../ui/ControlChip';
 import { Icon } from '../ui/Icon';
 import styles from './SpotMenu.module.css';
 
-/**
- * How many rows before the list gets a filter over it. A box above five rows
- * is furniture; above twenty it is the only way through. The threshold is where
- * a reader stops being able to see the whole list at once.
- */
+/** How many rows before the list gets a filter over it. */
 const FILTER_FROM = 8;
 
-/** As tall as the dataset menu's list, for the same reason: past this the
- *  dropdown is taller than the map it is standing on. */
 const LIST_MAX_HEIGHT = 340;
 
-/** The day it last changed. No clock: what this separates is one field trip
- *  from another, and two spots written an hour apart are the same visit. */
 const changedOn = (iso: string, language: string): string =>
   new Date(iso).toLocaleDateString(language, {
     day: 'numeric',
@@ -80,12 +49,6 @@ export const SpotMenu = () => {
         ),
       ) ?? null);
 
-  // Deaf for as long as a spot of the reader's own is being made, for the
-  // reason the map's own click handler is: with the pin on the cursor a row in
-  // here would fly the map out from under the click about to place it, and with
-  // the pin down it would open a card behind the box being typed in. Dimmed and
-  // inert rather than gone — the boxes in this row must not move under a cursor
-  // that is about to press the `+` beside it.
   const drafting = draft != null || placing;
 
   const title = !signedIn
@@ -93,8 +56,8 @@ export const SpotMenu = () => {
     : drafting
       ? t('spots.mine.busy')
       : spots
-        ? // `total` rather than `count`, which i18next reads as a request for
-          // plural forms this key has none of.
+        ? // `total`, not `count`: i18next reads `count` as a request for plural
+          // forms this key has none of.
           t('spots.mine.count', { total: spots.length })
         : t('spots.mine.label');
 
@@ -113,15 +76,11 @@ export const SpotMenu = () => {
         }
       >
         <Group gap="xs" wrap="nowrap" justify="space-between">
-          {/* `miw` so the name can be ellipsised: a flex item is as wide as
-              its content unless it is told it may be narrower, and a name is
-              allowed 200 characters. */}
+          {/* `miw={0}` so the name can be ellipsised: a flex item is as wide
+              as its content unless told it may be narrower. */}
           <Text size="sm" truncate miw={0}>
             {spot.name}
           </Text>
-          {/* Only the public ones carry a badge: private is what a spot is
-              unless it was given away, so saying it on every row would be
-              saying nothing on every row. */}
           {spot.visibility === 'public' && (
             <Badge size="xs" variant="light">
               {t('spots.public')}
@@ -139,17 +98,11 @@ export const SpotMenu = () => {
     <Menu
       opened={opened}
       onChange={(next) => {
-        // Signed out the chevron is honest about what is behind it: there is no
-        // list without an account, and the dialog is both the answer and the
-        // way to get one — the same thing the `+` beside it does.
         if (next && !signedIn) {
           openAuthDialog(true);
           return;
         }
         if (next && drafting) return;
-        // A filter left behind is a list that opens short for no visible
-        // reason — the field only stands while there are rows enough to need
-        // it, and a deletion can take that away with the text still in it.
         if (!next) setQuery('');
         setOpened(next);
       }}
@@ -166,10 +119,6 @@ export const SpotMenu = () => {
       <Menu.Dropdown>
         <Menu.Label>{t('spots.mine.label')}</Menu.Label>
 
-        {/* Only once the list is longer than a glance. The field is inside the
-            dropdown rather than in the band: what it filters is in here, and a
-            search box in the row would be the app's search box, which this is
-            not. */}
         {(spots?.length ?? 0) > FILTER_FROM && (
           <TextInput
             size="xs"

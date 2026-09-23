@@ -1,9 +1,3 @@
-// The controller behind the box: everything a draft can do, and the name
-// lookup that fills it in.
-//
-// Mounted by `SpotSurface` and by nothing else, so the churn of typing a
-// description stays inside the box rather than re-rendering the map panes.
-
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -21,12 +15,7 @@ import {
 } from '../spots/atoms';
 import { suggestSpotName } from '../spots/spotName';
 
-/**
- * How long the pin has to stand still before the register is asked what the
- * place is called. Long enough that dragging across a valley asks once rather
- * than at every frame, short enough that the field fills in while the reader is
- * still looking at the pin.
- */
+/** How long the pin stands still before the name register is asked. */
 const SUGGEST_SETTLE_MS = 500;
 
 export type SpotDraftController = {
@@ -39,11 +28,10 @@ export type SpotDraftController = {
   suggesting: boolean;
   stage: SpotDraft['stage'];
   setStage: (stage: SpotDraft['stage']) => void;
-  /** Something has been drawn. */
   hasSketch: boolean;
   saving: boolean;
   saveError: boolean;
-  /** The drawing is past what the column will hold; nothing was sent. */
+  /** The drawing is past the column's 5 MB cap; nothing was sent. */
   sketchTooBig: boolean;
   /** There is something in the box that closing it would throw away. */
   dirty: boolean;
@@ -65,22 +53,13 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
   const [saveError, setSaveError] = useState(false);
   const [sketchTooBig, setSketchTooBig] = useState(false);
 
-  /**
-   * Whether the author has had the field. Once they have, the register never
-   * writes into it again — a suggestion that overwrote a typed name would lose
-   * work every time the pin was nudged.
-   */
+  /** Once the author has typed a name, the register never writes it again. */
   const nameTouched = useRef(draft.recordId != null);
 
   /**
-   * What is in the box that the reader did not put there — the baseline `dirty`
-   * is measured against. `SpotSurface` keys the draft box on `draft.id`, so
-   * this hook mounts once per draft and the initial value is the state before
-   * the first keystroke: empty for a new spot, the stored record for an edit.
-   * The register moves it when it fills the name field in by itself.
-   *
-   * State rather than a ref because `dirty` is read while rendering, and a ref
-   * read there is a value the box can be out of step with.
+   * The baseline `dirty` is measured against. `SpotSurface` keys the draft box
+   * on `draft.id`, so this hook mounts once per draft. State rather than a ref
+   * because `dirty` is read while rendering.
    */
   const [opened, setOpened] = useState({
     name: form.name,
@@ -101,8 +80,7 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
     [setForm],
   );
 
-  // Ask what the place is called, once the pin has stood still. Keyed on the
-  // coordinate, so this covers both opening the draft and every drag after it.
+  // Keyed on the coordinate, so this covers opening the draft and every drag.
   const [lon, lat] = draft.point;
   useEffect(() => {
     if (nameTouched.current) return;
@@ -110,17 +88,15 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
     setSuggesting(true);
 
     const timer = setTimeout(() => {
-      // Asked in degrees — `ost`/`nord` with `koordsys=4326` — because that is
-      // what the draft holds. The view's own projection would save a transform
-      // the register does anyway.
+      // Degrees — `ost`/`nord` with `koordsys=4326` — which is what the draft
+      // holds.
       void suggestSpotName(lon, lat, 'EPSG:4326').then((suggestion) => {
         if (!live) return;
         setSuggesting(false);
         if (suggestion && !nameTouched.current) {
           setForm((current) => ({ ...current, name: suggestion }));
-          // The register wrote it, not the reader, so it is not work to lose:
-          // closing a draft whose only content is a looked-up place name asks
-          // no question.
+          // The register wrote it, not the reader: move the baseline so it is
+          // not counted as work to lose.
           setOpened((current) => ({ ...current, name: suggestion }));
         }
       });
@@ -136,13 +112,8 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
   const name = form.name.trim();
   const canSave = user != null && name.length > 0 && !saving;
 
-  // What closing the box would throw away: what the author wrote, and what they
-  // drew. Not the pin — placing it is one gesture and so is placing it again,
-  // and a draft with nothing written in it cannot be saved at all.
-  //
-  // The drawing is compared by identity, so putting the pen down having changed
-  // nothing counts as a change. That errs towards asking twice, which is the
-  // side to err on.
+  // The drawing is compared by identity, so putting the pen down having
+  // changed nothing still counts as dirty.
   const dirty =
     form.name !== opened.name ||
     form.description !== opened.description ||
@@ -151,12 +122,11 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
   const save = useCallback(() => {
     if (!user || !name) return;
 
-    // Not the settled drawing: `Lagre` pressed on the tail of a stroke reads
-    // the canvas directly, so the last stroke is in what is kept.
+    // Reads the live canvas, not the settled scene, so a `Lagre` on the tail
+    // of a stroke keeps that stroke.
     const drawing = sketchNow(sketch);
-    // Measured here rather than on every settle, which would mean stringifying
-    // the whole scene between pointer samples. The column is capped server
-    // side, so the alternative to this is a 400 after the work is done.
+    // The `sketch` column is capped at 5 MB server side; checked here so the
+    // failure is not a 400 after the work is done.
     if (sketchBytes(drawing) > SKETCH_BUDGET_BYTES) {
       setSketchTooBig(true);
       return;
@@ -183,11 +153,8 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
         closeDraft();
       })
       .catch((err: unknown) => {
-        // The message on a PocketBase validation error is always the same
-        // sentence — "Failed to create record." — and the field at fault is
-        // only in `response.data`. Logged alongside the error rather than
-        // instead of it: the error carries the stack, the data carries the
-        // reason.
+        // A PocketBase validation error always reads "Failed to create
+        // record."; the field at fault is only in `response.data`.
         console.warn(
           '[spots] save failed',
           err,

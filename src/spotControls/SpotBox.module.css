@@ -1,20 +1,6 @@
-/* What a spot puts over the map: the prompt while its pin is being placed
-   (`SpotPlacePrompt`), the box the draft is written in (`SpotPanel`) and the
-   box the saved record is read in (`SpotCard`). One stylesheet because they are
-   one thing as far as a reader is concerned — each is what the one before it
-   becomes — and never two of them at once.
-
-   Top right, where the terrain analysis has the top left: the two can be up at
-   once — framing a relief analysis and then marking what it showed is the whole
-   workflow this app is for — and a box that moved depending on what else was
-   open would be a box the reader has to find.
-
-   Where it sits and how wide it is, and nothing else: the shell — the opaque
-   ground, the header with the fold and the close, the scrolling body, the row
-   of verbs along the bottom — is `Panel`, which all three floating boxes wear.
-
-   Positioned against the map's own rectangle, so it sits under the band without
-   knowing the band's height. */
+/* Shared by `SpotPlacePrompt`, `SpotPanel` and `SpotCard`; never two at once.
+   Placement and width only — the shell is `Panel`. Positioned against the
+   map's own rectangle, so it needs no knowledge of the band's height. */
 .panel {
   position: absolute;
   top: var(--mantine-spacing-xs);
@@ -24,10 +10,8 @@
   max-height: calc(100% - 2 * var(--mantine-spacing-xs));
 }
 
-/* The line that stands while the pin is on the cursor. Top centre, the one edge
-   of the map neither box claims, and deaf to the pointer: the click it is
-   asking for goes to the map under it, and a prompt that swallowed one where it
-   happens to lie would be the one place on the map a pin cannot go. */
+/* `pointer-events: none`, or the prompt would be the one place on the map a
+   pin cannot be placed. */
 .prompt {
   position: absolute;
   top: var(--mantine-spacing-xs);
@@ -51,9 +35,6 @@
   color: var(--mantine-color-dimmed);
 }
 
-/* The coordinate and the button that gives it back. The reading is the control:
-   there is no field to type a coordinate into, because the pin is on the map
-   and the map is the instrument. */
 .coords {
   display: flex;
   align-items: center;
@@ -78,9 +59,7 @@
   text-overflow: ellipsis;
 }
 
-/* Card only. What the author wrote, kept as they wrote it: a description is
-   prose with paragraphs in it, and collapsing them would make a field note
-   read as one block. */
+/* Card only. `pre-wrap` keeps the author's own paragraph breaks. */
 .prose {
   font-size: var(--mantine-font-size-sm);
   line-height: 1.45;
@@ -88,8 +67,7 @@
   overflow-wrap: anywhere;
 }
 
-/* Card only. The line under the prose: who wrote it, and where it is. Dimmed,
-   because it is provenance rather than content. */
+/* Card only. */
 .meta {
   margin-top: var(--mantine-spacing-xs);
   font-size: var(--mantine-font-size-xs);

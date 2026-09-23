@@ -2,24 +2,10 @@ import type { PlaceNamePoint } from '../types/searchTypes';
 import { getPlaceNamesByLocation } from '../search/searchApi';
 import type { ProjectionIdentifier } from '../map/projections/types';
 
-// What to call a spot before its author has said. One anonymous lookup against
-// ws.geonorge.no's stedsnavn register for the nearest name to the pin, ranked
-// so that the answer is the kind of name an amateur would use for a place in
-// the terrain rather than the nearest bus stop.
-//
-// Pre-fill only. Nothing re-derives the name afterwards: once the box is on
-// the screen the field belongs to whoever is typing in it, and moving the pin
-// must not overwrite what they wrote.
-//
-// This is the whole of what the old three-call locality context has become.
-// Municipality and matrikkel went with the fields that held them — a flat spot
-// has a name and a description, and a reader who wants the gårdsnummer has the
-// property search for it.
-
-
-// A name is ranked by `navneobjekttype` first and distance second; the three
-// sets are drawn from the register's own 291-type vocabulary and anything
-// unlisted is the neutral middle. Denied: administrative geography.
+// A name suggestion for a new pin, off ws.geonorge.no's stedsnavn register.
+// Ranked by `navneobjekttype` first, distance second; the three sets below are
+// drawn from the register's own 291-type vocabulary and anything unlisted is
+// the neutral middle. Denied: administrative geography.
 const NAME_TYPE_DENY = new Set([
   'Administrativ bydel',
   'Annen administrativ inndeling',
@@ -191,20 +177,12 @@ const SETTLED_SPELLING = new Set([
   'vedteke',
 ]);
 
-// Reach around the pin. Wide enough that a name almost always comes back, near
-// enough that the name is about this hillside and not the next valley.
 const SEARCH_RADIUS_M = 600;
 
-// The box opens on the pin and fills in when this returns; it is never waited
-// for. A lookup slower than this is one the author has already started typing
-// over.
 const TIMEOUT_MS = 6000;
 
-/**
- * The spelling to show for one register entry: its `hovednavn` if it has one,
- * otherwise the first spelling with a settled status, otherwise whatever came
- * first.
- */
+/** `hovednavn` if the entry has one, else the first settled spelling, else
+ *  whatever came first. */
 const spellingOf = (point: PlaceNamePoint): string => {
   const names = point.stedsnavn;
   const chosen =
@@ -242,12 +220,8 @@ const pickPlaceName = (points: PlaceNamePoint[]): string => {
   return bestName;
 };
 
-/**
- * The suggested name for a pin, or '' when the register has nothing to say.
- * Never throws and never hangs: every failure is an empty string, because a
- * spot the author names themselves is a working spot and a create button that
- * waits on a third party is not.
- */
+/** The suggested name for a pin. Never throws and never hangs: every failure,
+ *  including the timeout, is ''. */
 export const suggestSpotName = async (
   x: number,
   y: number,

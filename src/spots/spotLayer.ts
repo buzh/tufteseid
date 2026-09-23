@@ -1,16 +1,3 @@
-// The saved spots on the map, and the click that opens one.
-//
-// What is drawn depends on who is looking, and that is deliberate. Signed in,
-// the layer draws the list: your own spots and every public one, which is the
-// index the record is for. Signed out, there is no list and it draws only the
-// single record a short link resolved — a visitor who followed `/l/K7M2QX`
-// came for that spot, and turning the map into a gazetteer of everybody's
-// public pins for anyone who loads the page is a different product with
-// different consent.
-//
-// The list itself is `spotRecords.ts`, which the band's index reads too. This
-// module draws what is there and asks for nothing.
-
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { Feature } from 'ol';
 import type { FeatureLike } from 'ol/Feature';
@@ -52,12 +39,8 @@ export const useSpotLayer = () => {
 
   const source = useMemo(() => new VectorSource({ wrapX: false }), []);
 
-  // The layer outlives every list: rebuilding it on a sign-in would take the
-  // pins off the map and put them back.
   useEffect(() => {
-    /** The record being edited, whose pin `pinAdjust.ts` is drawing instead —
-     *  otherwise it stands at its saved point while the draft's stands where
-     *  the reader has dragged it, and the spot has two pins. */
+    /** The record being edited, whose pin `pinAdjust.ts` draws instead. */
     let hidden = store.get(spotDraftAtom)?.recordId ?? null;
 
     const layer = new VectorLayer({
@@ -73,15 +56,12 @@ export const useSpotLayer = () => {
     });
     map.addLayer(layer);
 
-    // Read out of the store and redrawn from a subscription rather than taken
-    // as dependencies: the layer is built once and the style function is the
-    // same object for its whole life, so a value closed over here would be the
-    // one it was built with — null, at first render, for both of these.
+    // The style function is built once and lives as long as the layer, so
+    // anything closed over here would stay at its first-render value. Read
+    // from the store and redraw off a subscription instead.
     const unsubscribe = [
       store.sub(activeSpotAtom, () => layer.changed()),
       store.sub(spotDraftAtom, () => {
-        // Only on the record, not on the draft: the pin drag writes that atom
-        // on every frame and none of those frames change what is drawn here.
         const next = store.get(spotDraftAtom)?.recordId ?? null;
         if (next === hidden) return;
         hidden = next;
@@ -95,23 +75,17 @@ export const useSpotLayer = () => {
     };
   }, [map, source, store]);
 
-  // The list while there is one, and the followed link until there is: a guest
-  // has no list at all, and a reader who arrived on `/l/K7M2QX` sees that pin
-  // rather than a bare map while theirs are still coming. Null once the list
-  // is up, so opening a spot does not rebuild every feature on the map —
-  // which one is open is a style question, and the subscription above has it.
+  // The list where there is one, the followed link until then. Null once the
+  // list is up, so opening a spot does not rebuild every feature.
   const linkOnly = records ? null : active;
   useEffect(() => {
     const view = map.getView().getProjection().getCode();
     draw(source, view, records ?? (linkOnly ? [linkOnly] : []));
   }, [map, source, records, linkOnly]);
 
-  // Opening one.
   useEffect(() => {
     const onClick = (event: MapBrowserEvent) => {
-      // Deaf while a spot of the reader's own is being made: the same click is
-      // what puts the new pin down (`pinPlace.ts`), and once it is down a click
-      // that opened somebody else's spot would replace the box being typed in.
+      // Deaf while drafting: the same click places the new pin (`pinPlace.ts`).
       if (draft || placing) return;
       const hit = spotAtPixel(map, event.pixel);
       if (hit) setActive(hit);

@@ -1,17 +1,3 @@
-// The box a draft is written in: the name the register guessed, a description,
-// where the pin is, and the verb that ends the draft.
-//
-// Four things in a fixed order, and the order is the workflow: what it is
-// called, what you saw, where it is, what you drew. The coordinate is late
-// because it is the one field the reader does not type, and because by the time
-// this box exists they have already aimed it — the box opens on the click that
-// placed the pin. `Endre` is there for the nudge afterwards.
-//
-// The way out is the box's own close and not a second button beside `Lagre`:
-// one abandon verb, in the corner every other box has it in, and it asks twice
-// while there is anything written in here to lose (`dirty` in the controller,
-// `unsaved` on the `Panel`).
-
 import { Alert, Button, Group, Textarea, TextInput, Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 
@@ -47,8 +33,6 @@ export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {
         </Button>
       }
     >
-      {/* Capped at the column's own width, like the drawing is: the reader
-          finds out while they are typing rather than from a failed save. */}
       <TextInput
         size="xs"
         maxLength={SPOT_NAME_MAX}
@@ -73,8 +57,6 @@ export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {
         onChange={(event) => spot.setDescription(event.currentTarget.value)}
       />
 
-      {/* The coordinate reads live while the pin is in hand, which is what
-          makes the map and the box one instrument rather than two. */}
       <div className={cx(styles.coords, placing && styles.coordsLive)}>
         <Icon icon="my_location" size={14} />
         <span className={styles.coordsText}>

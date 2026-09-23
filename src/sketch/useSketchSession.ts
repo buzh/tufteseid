@@ -1,14 +1,8 @@
-// Owns the freeze. Mounted unconditionally by the spot surface and told
-// whether the draft is in its draw stage; everything that has to be undone
-// when it is not is in the effect's cleanup, so it runs whichever way the
-// stage ends — the pen put down, the draft saved, the draft abandoned.
-//
-// Freeze first, then frame: `freezeMap` cancels any easing view animation too,
-// so the extent read afterwards is one the map will still be showing. A draft
-// that already has strokes keeps their frame instead of capturing a fresh one
-// — capturing again would re-register old strokes to a new viewport — and is
-// flown back to it first, with `bindFrameToMap` absorbing the difference
-// between the rectangle asked for and the one `constrainResolution` lands on.
+// Freeze first, then frame: `freezeMap` also cancels an easing view animation,
+// so the extent read afterwards is one the map will still show. A draft with
+// strokes already keeps their frame rather than capturing a fresh one, and is
+// flown back to it first; `bindFrameToMap` absorbs the difference between the
+// rectangle asked for and the one `constrainResolution` lands on.
 
 import { useAtomValue, useStore } from 'jotai';
 import { useEffect } from 'react';
@@ -34,13 +28,11 @@ export const useSketchSession = (wanted: boolean) => {
     const view = map.getView();
     const projection = view.getProjection().getCode();
 
-    // Read through the store rather than subscribed: the canvas writes this
-    // atom on every settle, and a dependency on it here would tear the session
-    // down and rebuild it mid-stroke.
+    // Read through the store, not subscribed: the canvas writes this atom on
+    // every settle, and a dependency would rebuild the session mid-stroke.
     const resume = sketchOf(store.get(spotSketchAtom));
     const size = map.getSize();
-    // No duration: the freeze below cancels animations, and a pen that waits
-    // for a flight is a pen that can be pressed twice.
+    // No duration: the freeze below cancels animations.
     if (resume && size) {
       view.fit(frameExtentIn(resume.frame, projection), { size });
     }
@@ -48,8 +40,7 @@ export const useSketchSession = (wanted: boolean) => {
     freezeMap(map);
     const frame = resume?.frame ?? captureFrame(map);
     if (!frame) {
-      // No size, so no scene↔ground mapping: better to stay out of the draw
-      // stage than to hand over a canvas not registered to the ground.
+      // No size, so no scene↔ground mapping; stay out of the draw stage.
       thawMap(map);
       store.set(setSpotStageAtom, 'pin');
       return;

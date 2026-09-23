@@ -1,11 +1,5 @@
-// A saved drawing on the map: one transparent layer, re-exporting its scene at
-// the resolution the view is showing rather than magnifying a stored image.
-//
-// One at a time, and that is the whole product for now: the drawing shown is
-// the open spot's. Several at once would mean an Excalidraw export per pin in
-// the list, which is the wrong trade for a map whose subject is the terrain
-// under them.
-
+// One saved drawing on the map: a transparent layer re-exporting its scene at
+// the resolution the view is showing.
 import { useAtomValue } from 'jotai';
 import type { Extent } from 'ol/extent';
 import ImageLayer from 'ol/layer/Image';
@@ -18,13 +12,11 @@ import { metresPerScenePx } from './frame';
 import { renderScene, type SceneRender } from './render';
 import type { Sketch } from './scene';
 
-// The drawing takes z-index 2: over the terrain analysis it was traced from
-// (1), under that analysis's frame (4) and under the pin it belongs to (6),
-// because it is what is being annotated rather than an annotation of its own.
-// The inventory is in docs/map-layers.md.
+// Over the terrain analysis (1), under its frame (4) and under the pin (6).
+// Inventory in docs/map-layers.md.
 const Z_INDEX = 2;
 
-// How far the view may drift from the export's resolution before it is redrawn.
+// How far the view may drift from the export's resolution before a redraw.
 // `canvasFunction` runs on every frame of a pinch, so a tolerance near 1 queues
 // an Excalidraw render per frame; past half a zoom level the strokes soften.
 const RESCALE_TOLERANCE = 1.4;
@@ -42,10 +34,9 @@ type Entry = {
   redraw: () => void;
 };
 
-// Re-export if the view has moved far enough to matter. Called from inside
-// `canvasFunction`, which cannot wait, so the first frame draws nothing and the
-// export asks for a redraw when it lands. A failed export records the scale
-// anyway, so it is not retried every frame.
+// Called from inside `canvasFunction`, which cannot wait: the first frame
+// draws nothing and the export asks for a redraw when it lands. A failed
+// export records the scale anyway, so it is not retried every frame.
 const ensureRender = (entry: Entry, scale: number) => {
   if (entry.pending !== null) return;
   const have = entry.renderedScale;
@@ -67,10 +58,8 @@ const ensureRender = (entry: Entry, scale: number) => {
       entry.redraw();
     })
     .catch((e) => {
-      // `renderScene` says it never throws, and this is what makes a broken
-      // promise there cost one export rather than the layer: `pending` left set
-      // is a guard nothing clears again, and the drawing would stay blank for
-      // the rest of the session.
+      // `renderScene` promises not to throw; if it ever does, `pending` left
+      // set is a guard nothing clears and the drawing stays blank for good.
       console.warn('[sketch] overlay render failed', e);
       if (!entry.live) return;
       entry.pending = null;
@@ -109,8 +98,6 @@ const drawEntry =
     const w = (maxX - minX) * scale;
     const h = (maxY - minY) * scale;
     if (!(w > 0) || !(h > 0)) return out;
-    // Smoothing stays on both ways: the source is line art, so the only step to
-    // preserve would be its own aliasing.
     ctx.drawImage(
       render.canvas,
       0,
@@ -138,8 +125,7 @@ export const useSketchOverlay = (sketch: Sketch | null) => {
       renderedScale: null,
       pending: null,
       live: true,
-      // Assigned below: the source needs the entry and the entry needs the
-      // source.
+      // Assigned below: the source needs the entry and vice versa.
       redraw: () => {},
     };
     const source = new ImageCanvasSource({
