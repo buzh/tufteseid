@@ -275,6 +275,21 @@ export const useLidarFootprintsLayer = () => {
 
       setViewport((prev) => ({ ...prev, status: 'loading' }));
 
+      // Kartverket is not answering — the catalogue, the footprint WFS or
+      // both, since one backend renders the lot. The cVAT store needs neither,
+      // so what it holds over this viewport is offered in place of an empty
+      // list. Only then `error`, which now means what it says: nothing
+      // upstream and nothing of our own.
+      const fallBackToStore = async () => {
+        const held = await heldInView(extentLonLat, filters);
+        if (isStale()) return;
+        setViewport(
+          held.primary.length + held.secondary.length > 0
+            ? { status: 'held', ...held }
+            : emptyLidarViewport('error'),
+        );
+      };
+
       fetchLidarProjects()
         .then((allProjects) => {
           // The catalogue's bounding boxes are true envelopes, so this can only
@@ -312,11 +327,20 @@ export const useLidarFootprintsLayer = () => {
             .map(({ project }) => project);
 
           return fetchLidarFootprints(candidates, projection).then(
-            (matches) => {
+            ({ footprints, unanswered }) => {
               if (isStale()) return;
+              // The one failure that does not arrive as a rejection. The
+              // catalogue is a week of localStorage with a stale copy behind
+              // it, so during an outage it answers off disk and only the
+              // boundary lookups fail — quietly, one per project, since a bad
+              // name must not blank the list. What they hand back is an empty
+              // map, which is also what a viewport no flight covers hands
+              // back: `ready` with no rows, Automatisk resolving to a mosaic
+              // with nothing to draw either, and the store never asked.
+              if (unanswered) return fallBackToStore();
               const entries: LidarViewportEntry[] = [];
               for (const project of candidates) {
-                const geometries = matches.get(project.id)?.geometries;
+                const geometries = footprints.get(project.id)?.geometries;
                 // No boundary in the WFS, or one whose only overlap with the
                 // viewport was its envelope's: nothing on this screen.
                 if (!geometries || !touchesExtent(geometries, extent)) continue;
@@ -332,20 +356,9 @@ export const useLidarFootprintsLayer = () => {
             },
           );
         })
-        .catch(async (err) => {
+        .catch((err) => {
           console.warn('[lidarFootprintsLayer] refresh failed', err);
-          // Kartverket is not answering — the catalogue, the footprint WFS or
-          // both, since one backend renders the lot. The cVAT store needs
-          // neither, so what it holds over this viewport is offered in place of
-          // an empty list. Only then `error`, which now means what it says:
-          // nothing upstream and nothing of our own.
-          const held = await heldInView(extentLonLat, filters);
-          if (isStale()) return;
-          setViewport(
-            held.primary.length + held.secondary.length > 0
-              ? { status: 'held', ...held }
-              : emptyLidarViewport('error'),
-          );
+          return fallBackToStore();
         });
     };
 

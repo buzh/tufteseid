@@ -224,22 +224,49 @@ const fetchOne = (
 // ~0.2 s per answer, but roughly one request in five hangs outright.
 const CONCURRENCY = 6;
 
-// Keyed by LidarProject.id; projects with no boundary are absent. `projects`
-// order is the fetch order, so pass the best candidates first.
+/**
+ * Every boundary that could be had, and whether the service said anything at
+ * all.
+ *
+ * The second half is why this is not a bare Map. A failure is swallowed per
+ * project below so one bad name cannot blank the list, and an origin the
+ * breaker has closed fails every lookup instantly without a request — so a
+ * whole-service outage and a viewport no flight covers both come back as an
+ * empty map. Only the flag tells them apart, and the caller draws opposite
+ * conclusions from them.
+ */
+export type LidarFootprintFetch = {
+  /** Keyed by LidarProject.id; projects with no boundary are absent. */
+  footprints: Map<string, LidarFootprint>;
+  /**
+   * Nothing was answered and something failed — the breaker refused the
+   * fan-out, or every lookup in it went the way of the service. Implies an
+   * empty `footprints`; false for an empty candidate list, which is an answer.
+   */
+  unanswered: boolean;
+};
+
+// `projects` order is the fetch order, so pass the best candidates first.
 export async function fetchLidarFootprints(
   projects: LidarProject[],
   projection: string,
-): Promise<Map<string, LidarFootprint>> {
+): Promise<LidarFootprintFetch> {
   const out = new Map<string, LidarFootprint>();
   const queue = [...projects];
+  // A null boundary is an answer — the WFS has no rows under that name — so
+  // this counts answers rather than hits.
+  let answered = 0;
+  let failed = 0;
   const worker = async () => {
     for (;;) {
       const project = queue.shift();
       if (!project) return;
       try {
         const footprint = await fetchOne(project, projection);
+        answered++;
         if (footprint) out.set(project.id, footprint);
       } catch (err) {
+        failed++;
         // The breaker is open: every remaining project would fail the same
         // way, instantly and without a request. Drop the queue rather than
         // walk sixty of them, and say nothing — the ribbon is already saying
@@ -256,7 +283,7 @@ export async function fetchLidarFootprints(
   await Promise.all(
     Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker),
   );
-  return out;
+  return { footprints: out, unanswered: answered === 0 && failed > 0 };
 }
 
 // How much of the viewport a footprint paints, 0..1. Grid-sampled, since OL has
