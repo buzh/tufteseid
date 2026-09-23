@@ -155,10 +155,6 @@ its own grid and the reach changes with zoom.
 | `acquisitions.py` | Acquisition identity: queue, published cell sizes, the catalogue and WMS name sets |
 | `acquisitions.json` | The build queue, committed, in the order `vatcache.py -l` indexes |
 | `report.py` | Formatting and the shared audit, used by both front ends |
-| `compare.py` | Benchmark: cVAT over one patch at every candidate grid under both radius rules; PNGs to `/tmp` |
-| `render.py` | numpy port of `src/terrain/shade.ts`. Not used for building; `measure.py` and `sizing.py` read against it |
-| `measure.py` | Bytes per pixel per product, measured. Reads `coverage.npz` |
-| `sizing.py` | Measured bytes per pixel + coverage → disk cost per zoom |
 
 ## Gotchas
 
