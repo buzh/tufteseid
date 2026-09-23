@@ -1,29 +1,13 @@
 """One acquisition's tiles: the geometry, how a level is built, and how it is
 verified afterwards. `makevat.py` builds over this and `vatcache.py` audits.
 
-An acquisition is one database, `<slug>.mbtiles`, and it is the whole of itself:
-it carries its own name, levels and recipe in its `metadata` table, so nothing
-beside it has to be kept in step. A store is then simply a directory of them,
-which is what docker-compose bind-mounts into the cvat-tiles sidecar — and the
-sidecar builds `/cvat/manifest.json` by reading the files rather than being told
-about them, which is what makes copying one in the whole of a deploy.
+One acquisition is one database, `<slug>.mbtiles`, carrying its own name, levels
+and recipe in `metadata`; a store is a directory of them and the cvat-tiles
+sidecar derives `/cvat/manifest.json` by reading the files.
 
-Overlap is the reason there is one database per acquisition. Two flights over
-one landscape are two pictures of it — a 5pkt from 2015 and a 10pkt from 2025
-are not the same ground twice — and the app offers both as rows, so their tiles
-cannot be allowed to contend for one name.
-
-Resumable: every work unit records itself when it finishes, and a re-run skips
-the recorded ones. A unit that writes no tiles still records, because "the
-footprint turned out not to reach here" and "never ran" are different states.
-That is also why a check reads the `units` table rather than counting tiles:
-only it can tell an edge unit that legitimately holds nothing from one that
-never ran.
-
-Each level is an independent job — its own fetch, its own scan, its own tiles —
-so levels can be built in any order, or one rebuilt without the others. See
-WORK-ORDER.md for why the radii are RVT's pixels rather than fixed metres, which
-is what makes the levels independent in the first place.
+Resumable: every work unit records itself in `units` when it finishes, including
+units that wrote no tiles, so a check can tell an edge unit that legitimately
+holds nothing from one that never ran. Each level is an independent job.
 """
 
 import hashlib
@@ -44,39 +28,27 @@ import cvat
 import fetch_dem
 from acquisitions import slug
 
-# The app's shared tile grid, from src/map/layers/wmsTileGrid.ts: resolutions are
-# max(EPSG:25833 extent span) / 256 / 2**z and the origin is the extent's
-# top-left corner. Tiles are 512 px there and have to be 512 px here.
+# The app's shared tile grid, from src/map/layers/wmsTileGrid.ts: resolution is
+# max(EPSG:25833 extent span) / 256 / 2**z, origin the extent's top-left corner,
+# tiles 512 px.
 GRID_ORIGIN = (-2500000.0, 9045984.0)
 MAX_RESOLUTION = 21664.0
 TILE_PX = 512
 
-# Enough for the largest max_rad RVT asks for (flat, 20 px) plus the 3x3 window
-# the gradients read. In pixels, so it scales with the level the same way the
-# radii do.
+# RVT's largest max_rad (flat, 20 px) plus the gradients' 3x3 window.
 OVERLAP_PX = 24
 
-# 4 x 512 + 2 x 24 = 2096 px, about 18 MB of float32 per call. exportImage caps
-# at 15000, so the only reason not to go bigger is that a unit the footprint
-# merely clips is fetched whole.
+# 4 x 512 + 2 x 24 = 2096 px, ~18 MB of float32 per call; exportImage caps at 15000.
 DEFAULT_UNIT_TILES = 4
-# Every level the store can hold, deepest first. What one acquisition is built
-# to is `levels_for` its own DTM, not this: z16 on a 0.5 m flight would render
-# the interpolation between cells.
+# Every level the store can hold, deepest first; one acquisition builds
+# `levels_for` its own DTM, not all of these.
 DEFAULT_LEVELS = (16, 15, 14, 13, 12, 11, 10, 9, 8, 7)
 COARSEST_LEVEL = 7
 WEBP_QUALITY = 90
 
-# Below this level a tile's alpha is the acquisition's footprint rather than the
-# DEM's own no-data. The two agree at the deep end and part company badly at the
-# coarse end: ImageServer answers a coarse request out of overviews built per
-# mosaic item, and an item's overview fills the item's rectangle, so a request
-# the flight barely touches comes back with ground in it. Measured over NHM
-# Supplering Østfold, whose footprint is 0.17 km²: half of a 21 km window at z8
-# and a quarter of a 2.7 km one at z11 came back as data, against nothing at
-# z13. Read as coverage that is a patch a thousand times the flight, pointing a
-# reader at relief the store does not hold. The footprint is the authority, and
-# this is where it takes over.
+# Below this level a tile's alpha is the footprint, not the DEM's no-data:
+# ImageServer answers coarse requests out of per-mosaic-item overviews that fill
+# the item's whole rectangle, so a coarse window returns ground never flown.
 MASK_ALPHA_BELOW_Z = 12
 
 
@@ -85,24 +57,11 @@ def resolution(z):
 
 
 def levels_for(native_cell):
-    """The ladder for a DTM of this cell size: as deep as the grid the data is
-    published on supports, and never deeper.
+    """The ladder for a DTM of this cell size, deepest level first.
 
-    A level is worth building while its pixel is no finer than the DEM's own
-    cell — z16 (0.331 m/px) on Kartverket's 0.25 m grid, z15 (0.661 m/px) on the
-    0.5 m one. Below that the fetch resamples one height value into four pixels
-    and RVT reads the interpolation as terrain.
-
-    The coarse end is a question about the app instead. z7 (169 m/px) shows no
-    archaeology and is not meant to: the app paints every acquisition in the
-    store over the national mosaic out there, so the coarse levels are what
-    tells a reader looking at a county that this ground has been rendered
-    (`src/map/cvatHintLayer.ts`). They are cheap but not free: a level holds a
-    quarter of the units of the one below it only while the footprint is wider
-    than a unit, and a unit is 347 km across at z7, so each of the coarse levels
-    costs the one or two its envelope happens to straddle. Over the 1 106 km²
-    fixture, z11 down to z7 is 21 / 11 / 5 / 3 / 2 units against z12's 46 —
-    another z12, call it ten minutes."""
+    A level is worth building while its pixel is no finer than the DEM's cell:
+    z16 (0.331 m/px) on a 0.25 m grid, z15 (0.661 m/px) on a 0.5 m one. The
+    coarse end is fixed at z7, which feeds `src/map/cvatHintLayer.ts`."""
     z = COARSEST_LEVEL
     while z < DEFAULT_LEVELS[0] and resolution(z + 1) >= native_cell:
         z += 1
@@ -130,11 +89,8 @@ class Coverage:
         self.mask = data["mask"]
         self.x0, self.x1, self.y0, self.y1 = (float(v) for v in data["bounds"])
         self.cell = float(data["cell"])
-        # Which acquisition this mask is of. coverage.py stamps it so that a run
-        # cannot pair one acquisition's footprint with another's DEM: that pins
-        # the fetch to a project which never flew the ground the mask points at,
-        # so every unit comes back all-NaN, writes nothing, and marks itself
-        # done. Files written before the stamp existed carry None.
+        # Which acquisition the mask is of; None in files written before the
+        # stamp existed.
         self.project = str(data["project"]) if "project" in data.files else None
 
     def reaches(self, west, south, east, north):
@@ -151,12 +107,9 @@ class Coverage:
     def sample(self, west, south, east, north, px):
         """The footprint over one square, as a north-up (px, px) boolean.
 
-        Two rules, because the 25 m cell the footprint was rasterised at can
-        fall either side of the pixel. Pixel the coarser: every set cell claims
-        the pixel it lands in, so a flight narrower than a pixel survives as one
-        pixel instead of being stepped over by a sample point. Pixel the finer:
-        read the cell the pixel's centre is in, which gives a 25 m staircase at
-        the edge rather than a lattice of holes through the middle."""
+        Pixel coarser than the 25 m mask cell: every set cell claims the pixel it
+        lands in, so a flight narrower than a pixel survives. Pixel finer: read
+        the cell the pixel's centre is in."""
         out = np.zeros((px, px), bool)
         pixel = (east - west) / px
         if pixel >= self.cell:
@@ -206,17 +159,14 @@ def fetch_unit(z, ux, uy, unit_tiles, project, attempts=5, delay=2.0):
             if attempt == attempts - 1:
                 raise
             # The service answers a burst with a text body rather than a status,
-            # which arrives here as RuntimeError; backing off is the only cure.
+            # which arrives here as RuntimeError.
             time.sleep(delay * 2**attempt)
 
 
 def encode_tile(field, footprint=None):
     """One 512 px tile of the 0..1 composite -> WebP bytes, or None if no ground.
 
-    Grey is RVT's own quantisation; alpha is coverage. byte_scale paints NaN
-    white, which is a constant under a transparent alpha and so costs nothing —
-    as is the grey under ground the `footprint` cuts away.
-    """
+    Grey is RVT's byte_scale (NaN -> white); alpha is coverage."""
     covered = ~np.isnan(field)
     if footprint is not None:
         covered &= footprint
@@ -230,10 +180,6 @@ def encode_tile(field, footprint=None):
     image.save(buf, "WEBP", quality=WEBP_QUALITY)
     return buf.getvalue()
 
-
-# ---------------------------------------------------------------------------
-# The store
-# ---------------------------------------------------------------------------
 
 STORE_SUFFIX = ".mbtiles"
 
@@ -250,32 +196,27 @@ CREATE TABLE IF NOT EXISTS units (
 
 
 def store_path(out, project):
-    """The acquisition's own database. Its stem is the `path` the sidecar hands
-    the app, so the slug rule lives in one place and the app's tile template
-    needs to know nothing about the container."""
+    """The acquisition's own database; its stem is the `path` the sidecar
+    publishes to the app."""
     return Path(out) / f"{slug(project)}{STORE_SUFFIX}"
 
 
 def tiles_per_side(z):
-    """How many tiles the grid holds across at this level.
-
-    The EPSG:25833 extent is square and 256 tiles of 512 px wide at z9, so it
-    is 2**(z-1) — which is the figure the row flip below needs and the one
-    thing the grid's own module does not spell out."""
+    """Tiles across the grid at this level. The EPSG:25833 extent is square and
+    256 tiles of 512 px wide at z9, so 2**(z-1)."""
     return 2 ** (z - 1)
 
 
 def tms_row(z, y):
-    """The store's row for the app's y, and back again — MBTiles counts rows
-    from the south, the app's grid from the north. Its own inverse, which is
-    why the reader (`cvat-tiles/server.mjs`) can apply the same formula."""
+    """The store's row for the app's y, and back — MBTiles counts rows from the
+    south, the app's grid from the north. Its own inverse, as in
+    `cvat-tiles/server.mjs`."""
     return tiles_per_side(z) - 1 - y
 
 
 def unit_rect(z, ux, uy, unit_tiles):
-    """The (column, row) rectangle one work unit owns, in the store's own
-    coordinates: first and last column, first and last row. The rows come out
-    the other way up from the y range, hence the swap."""
+    """The (first column, last column, first row, last row) one work unit owns,
+    in store coordinates. Rows come out the other way up from y, hence the swap."""
     x0, y0 = ux * unit_tiles, uy * unit_tiles
     return (x0, x0 + unit_tiles - 1,
             tms_row(z, y0 + unit_tiles - 1), tms_row(z, y0))
@@ -284,15 +225,10 @@ def unit_rect(z, ux, uy, unit_tiles):
 class Store:
     """One acquisition's tiles, in one SQLite database.
 
-    MBTiles as a container, not as a tileset a stranger can read: the rows are
-    the spec's, but the grid under them is EPSG:25833 (`wmsTileGrid.ts`), so a
-    generic reader would hang these tiles somewhere in the Atlantic.
-    `cvat-tiles/server.mjs` is the reader, and it knows the grid.
-
-    Left in the default journal mode on purpose. WAL wants to write two files
-    beside the database, which a read-only opener cannot do — and the sidecar
-    holds these open read-only while a batch run appends to them. A unit is one
-    transaction every eleven seconds, so there is nothing here to tune.
+    MBTiles as a container only: the rows follow the spec but the grid under them
+    is EPSG:25833 (`wmsTileGrid.ts`), so only `cvat-tiles/server.mjs` can place
+    them. Keep the default journal mode — WAL writes two files beside the
+    database, which the sidecar's read-only opener cannot do.
     """
 
     def __init__(self, path, write=False):
@@ -315,32 +251,22 @@ class Store:
         self.db.close()
 
     def levels(self):
-        """Which levels this database holds, deepest first. Read from the tiles
-        rather than from the stamp, because this is what the stamp records."""
+        """Which levels this database holds, deepest first, read from the tiles."""
         return [z for (z,) in self.db.execute(
             "SELECT DISTINCT zoom_level FROM tiles ORDER BY zoom_level DESC")]
 
     def meta(self, key):
-        """One row of the stamp, or None. For asking a file what it is before
-        writing to it."""
+        """One row of the stamp, or None."""
         row = self.db.execute(
             "SELECT value FROM metadata WHERE name = ?", (key,)).fetchone()
         return row[0] if row else None
 
     def stamp(self, project, recipe=None):
-        """What the file is — for whoever opens it with sqlite3, and for the
-        sidecar, which derives `/cvat/manifest.json` from these rows rather
-        than from anything written beside them.
+        """Write the metadata rows the sidecar derives `/cvat/manifest.json` from.
 
-        That is what makes a database the whole of a delivery: `name` is the
-        acquisition, byte-identical to hoydedata's catalogue and to the
-        `LidarProject.id` the per-project WMS publishes, which is what the app
-        joins on; `levels` is what it draws at. Copying the file into a store is
-        then the entire deploy, because there is nothing else to tell.
-
-        The recipe is provenance and no code reads it. It is here rather than in
-        a file beside it for the same reason: a database that travels between
-        hosts has to be able to say what its pixels are made of."""
+        `name` must be byte-identical to hoydedata's catalogue and to the
+        `LidarProject.id` the per-project WMS publishes; that is what the app
+        joins on. `recipe` is provenance and no code reads it."""
         span = self.db.execute(
             "SELECT min(zoom_level), max(zoom_level) FROM tiles").fetchone()
         levels = self.levels()
@@ -361,8 +287,7 @@ class Store:
             rows["minzoom"], rows["maxzoom"] = str(span[0]), str(span[1])
         if recipe is not None:
             # The digested body, so `digest` is sha256 of `recipe` and a reader
-            # can check one against the other. The per-level entries are left
-            # out because they are derived from z and the rest of the recipe.
+            # can check one against the other.
             rows["recipe"] = json.dumps(
                 {k: v for k, v in recipe.items() if k != "levels"},
                 sort_keys=True)
@@ -408,12 +333,8 @@ class Store:
 
     def write_unit(self, z, ux, uy, tiles):
         """One work unit's tiles and its record of being finished, in one
-        transaction.
-
-        Together, because the record is what declares the unit done: a kill
-        between the two would leave a unit that reads as built and is not. That
-        is the whole of what the old write-to-`.part`-and-rename dance bought,
-        and the transaction buys it for the unit rather than for one tile."""
+        transaction: the record is what declares the unit done, so a kill between
+        the two would leave a unit that reads as built and is not."""
         with self.db:
             self._put(z, tiles)
             self.db.execute(
@@ -435,9 +356,8 @@ class Store:
 
 
 def read_store(out, project):
-    """This acquisition's database open read-only, or None where the store
-    holds none of it. Read-only so that asking a question of a store — how far
-    a build got, what a level holds — cannot create one."""
+    """This acquisition's database open read-only, or None if it does not exist.
+    Read-only so that asking a question of a store cannot create one."""
     path = store_path(out, project)
     return Store(path) if path.exists() else None
 
@@ -446,20 +366,15 @@ _MASKS = {}
 
 
 def worker_coverage(path):
-    """The footprint, read once per worker process rather than sent per unit.
-    A county's mask at 25 m is megabytes, and the pipe carries a unit's work
-    order hundreds of times over a build."""
+    """The footprint, read once per worker process rather than sent per unit."""
     if path not in _MASKS:
         _MASKS[path] = Coverage(path)
     return _MASKS[path]
 
 
 def build_unit(args):
-    """Fetch and render one work unit. Runs in a worker process.
-
-    Returns its tiles rather than writing them: the store is one database per
-    acquisition, and the parent is its only writer. A few megabytes back over
-    the pipe per eleven seconds of render."""
+    """Fetch and render one work unit. Runs in a worker process, and returns its
+    tiles rather than writing them: the parent is the database's only writer."""
     z, ux, uy, unit_tiles, project, coverage_path = args
     res = resolution(z)
     dem = fetch_unit(z, ux, uy, unit_tiles, project)
@@ -467,7 +382,6 @@ def build_unit(args):
     # combined VAT of its own grid.
     composite = cvat.cvat(dem, res, radius_in_metres=False)
     inner = composite[OVERLAP_PX:-OVERLAP_PX, OVERLAP_PX:-OVERLAP_PX]
-    # The unit without its overlap is exactly what `inner` covers.
     footprint = (
         worker_coverage(coverage_path).sample(
             *unit_bbox(z, ux, uy, unit_tiles), unit_tiles * TILE_PX)
@@ -488,11 +402,7 @@ def build_unit(args):
 
 
 def settings(levels, unit_tiles):
-    """The recipe: everything that decides what a pixel is, given ground to read.
-    The digest of this, minus the per-level entries, is stamped into each
-    database beside the recipe itself, and is what makes tiles built under
-    changed settings declare themselves a different picture — see
-    `recipe_digest`."""
+    """The recipe: everything that decides what a pixel is, given ground to read."""
     from importlib.metadata import version
 
     return {
@@ -520,10 +430,6 @@ def settings(levels, unit_tiles):
             "note": "src/map/layers/wmsTileGrid.ts; resolution = max_resolution / 2**z",
         },
         "encoding": f"RGBA WebP q{WEBP_QUALITY}, alpha is coverage",
-        # In the digest, though it decides nothing about a pixel: a tree of
-        # loose files and a database are not the same delivery, and the digest
-        # is the only thing that would have noticed a build writing the one
-        # where the other was meant.
         "container": ("MBTiles (SQLite) per acquisition, <path>.mbtiles; "
                       "tile_row is TMS, 2**(z-1) - 1 - y"),
         "overlap_px": OVERLAP_PX,
@@ -534,10 +440,6 @@ def settings(levels, unit_tiles):
                 "tile_m": round(tile_span(z), 3),
                 "overlap_m": round(OVERLAP_PX * resolution(z), 3),
                 "radii": cvat.radii_for(resolution(z), radius_in_metres=False),
-                # Per level, and so outside the digest, because it is: the two
-                # rules agree where the DEM's no-data is the flight's edge and
-                # part company where ImageServer answers out of overviews
-                # (`MASK_ALPHA_BELOW_Z`).
                 "alpha": ("footprint mask" if z < MASK_ALPHA_BELOW_Z
                           else "DEM no-data"),
             }
@@ -547,27 +449,17 @@ def settings(levels, unit_tiles):
 
 
 def recipe_digest(recipe):
-    """Digest of the recipe, over everything except `levels`. Which levels one
-    invocation builds is not a property of the cache: a level's entry is derived
-    from z and the settings above it, and levels arrive one run at a time, so a
-    database holding z15 has to accept the run that adds z14.
+    """Digest of the recipe, over everything except `levels` — levels arrive one
+    run at a time, so a database holding z15 has to accept the run that adds z14.
 
-    Stamped into each database as `digest`, beside the `recipe` it is of, so a
-    build that means to extend a file can tell whether the pixels already in it
-    were made the same way.""" 
+    Stamped into each database as `digest`, so a build extending a file can tell
+    whether the pixels already in it were made the same way."""
     body = {k: v for k, v in recipe.items() if k != "levels"}
     return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()[:16]
 
 
 def marked_units(out, project, z):
-    """The units this acquisition has finished at this level.
-
-    Per acquisition, for the same reason the tiles are: overlap is expected and
-    wanted, so two acquisitions can own the same work unit and the same tile
-    coordinates inside it. Vestfold 10pkt 2025 lies almost wholly on top of
-    Vestfold og Telemark 5pkt 2021, and one's record must not tell the other
-    that its tiles are written. Cheap enough to ask for a progress figure
-    without a mask at hand."""
+    """The units this acquisition has finished at this level."""
     store = read_store(out, project)
     if store is None:
         return set()
@@ -580,17 +472,10 @@ def run_levels(store, project, coverage, levels, unit_tiles=DEFAULT_UNIT_TILES,
     """Build the named levels for one acquisition into an open store, skipping
     units already recorded there.
 
-    The loop that does the work, with nothing said about where the database sits
-    or what else is beside it: `build()` below drives it over a whole store,
-    makevat.py drives it over one file. `store` is None for a dry run, and
-    `done` then has to say what a real run would skip.
-
-    The mask and the DEM have to be of the same ground. Pairing them wrongly is
-    not loud: the fetch is pinned to a project that never flew there, every unit
-    comes back all-NaN, nothing is written, and every unit marks itself done — a
-    database that looks built and is empty. Both callers derive the mask from
-    the acquisition so the two cannot drift, but a mask written by hand still
-    reaches here."""
+    `store` is None for a dry run, and `done` then has to say what a real run
+    would skip. A mask paired with another acquisition's DEM fails silently —
+    every unit all-NaN, nothing written, every unit marked done — hence the
+    check below."""
     if coverage.project != project:
         sys.exit(
             f"the mask is the footprint of {coverage.project!r}, but the "
@@ -640,20 +525,10 @@ def report(done, total, tiles, started):
           f"{(total - done) * rate / 3600:.1f} h left", end="", flush=True)
 
 
-# ---------------------------------------------------------------------------
-# Verifying what is there
-# ---------------------------------------------------------------------------
-
-
 @dataclass
 class LevelCheck:
     """What one level of one acquisition holds, against what the mask says it
-    should.
-
-    `todo` and `broken` are repaired the same way — hand the unit back to the
-    build — and are counted apart only because they say different things about
-    the run that produced them: one never finished, the other stored bytes the
-    app cannot draw."""
+    should. `todo` never finished; `broken` stored bytes the app cannot draw."""
 
     z: int
     unit_tiles: int = DEFAULT_UNIT_TILES
@@ -679,8 +554,7 @@ class LevelCheck:
 
 
 def unit_of(tile, unit_tiles):
-    """Which work unit a tile belongs to. The inverse of the division
-    `build_unit` makes."""
+    """Which work unit a tile belongs to."""
     x, y = tile
     return x // unit_tiles, y // unit_tiles
 
@@ -688,19 +562,14 @@ def unit_of(tile, unit_tiles):
 def readable_tile(blob):
     """Does this decode to a tile a browser will draw?
 
-    A full decode rather than a header read, because the failure worth finding
-    is truncation and a truncated WebP carries an intact header. A unit's tiles
-    land in one transaction, so a half-written tile is no longer reachable —
-    which is what makes this worth asking: what it can still find is a blob
-    that rotted under the filesystem, not a run that was killed. ~5 ms a tile,
-    so a whole level is a minute or two."""
+    A full decode, not a header read: a truncated WebP carries an intact header.
+    ~5 ms a tile."""
     try:
         with Image.open(BytesIO(blob)) as image:
             image.load()
             return image.size == (TILE_PX, TILE_PX)
     except Exception:
-        # Anything Pillow raises on is an image the app cannot draw. Which of
-        # its half-dozen exception types it was does not change the repair.
+        # Anything Pillow raises on is an image the app cannot draw.
         return False
 
 
@@ -709,9 +578,8 @@ def check_level(out, project, coverage, z, unit_tiles=DEFAULT_UNIT_TILES,
     """Read one level of one acquisition out of the store and tally it against
     the mask.
 
-    The `units` table is the authority on what should be there, not the mask
-    alone: a unit the footprint merely clips can legitimately hold no tile at
-    all, and only its record separates that from a unit that never ran."""
+    The `units` table, not the mask alone, is the authority on what should be
+    there: a unit the footprint merely clips can legitimately hold no tile."""
     result = LevelCheck(z=z, unit_tiles=unit_tiles)
     units = coverage.units(z, unit_tiles)
     result.units = len(units)
@@ -719,9 +587,8 @@ def check_level(out, project, coverage, z, unit_tiles=DEFAULT_UNIT_TILES,
     store = read_store(out, project)
     try:
         marked = store.units(z) if store else set()
-        # A unit the footprint does not reach: the mask was rebuilt, or
-        # --unit-tiles changed between runs. Harmless in itself, but it means
-        # the store and the mask no longer describe the same division.
+        # Marked units the footprint does not reach: the mask was rebuilt, or
+        # --unit-tiles changed between runs.
         result.stray = sorted(marked - set(units))
 
         for seen, (ux, uy) in enumerate(units, 1):
@@ -737,9 +604,6 @@ def check_level(out, project, coverage, z, unit_tiles=DEFAULT_UNIT_TILES,
                 if not readable_tile(blob):
                     result.broken.append((x, y))
             result.tiles += here
-            # A finished unit holding nothing is the footprint clipping its
-            # corner, normal at the edge. Every unit empty is the wrong-project
-            # trap.
             if here == 0:
                 result.empty += 1
     finally:
@@ -751,8 +615,8 @@ def check_level(out, project, coverage, z, unit_tiles=DEFAULT_UNIT_TILES,
 
 def unmark(out, project, z, units, unit_tiles=DEFAULT_UNIT_TILES):
     """Hand these units back to the build. Their tiles go with them: a rebuild
-    that decides a tile is all-NaN writes nothing there, so a broken tile left
-    in place would outlive the repair meant to clear it."""
+    that finds a tile all-NaN writes nothing, so a broken tile left in place
+    would outlive the repair."""
     path = store_path(out, project)
     if not path.exists():
         return
@@ -761,9 +625,8 @@ def unmark(out, project, z, units, unit_tiles=DEFAULT_UNIT_TILES):
 
 
 def store_tiles(out, project, z):
-    """Every tile in the store at this level of this acquisition — including
-    the ones no finished unit claims, which is what makes it worth reading from
-    the tiles table rather than deriving from the units one."""
+    """Every tile at this level of this acquisition, including ones no finished
+    unit claims."""
     store = read_store(out, project)
     if store is None:
         return set()

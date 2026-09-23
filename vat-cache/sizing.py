@@ -1,12 +1,8 @@
 """Measured bytes per pixel + coverage -> what a cache costs on disk.
 
-The zoom ladder is the app's own: `src/map/layers/wmsTileGrid.ts` builds
-resolutions as max(extent span) / 256 / 2**z over the EPSG:25833 extent set in
-`src/map/projections/proj/euref89.ts`, with 512 px WMS tiles. So z is this
-app's z, not a web-mercator z, and the resolutions are not round metres.
-
-Run:
-    python sizing.py          # uses the measured defaults below
+The ladder is the app's own (wmsTileGrid.ts): max(EPSG:25833 extent span) / 256
+/ 2**z, 512 px WMS tiles. z is this app's z, not web-mercator, and the
+resolutions are not round metres.
 """
 
 import math
@@ -22,14 +18,9 @@ def resolution(z):
     return MAX_RESOLUTION / 2**z
 
 
-# Measured by measure.py over six sites in Vestfold og Telemark 5pkt 2021,
-# fully covered 256 px tiles only. (PNG, WebP q90) bytes per pixel.
-#
-# The 0.5 and 1.0 m rows are measure.py's own output, so the 1 m horizon fields
-# are decimated from a 0.5 m fetch the way `horizonDecimation` does. The 2 and
-# 4 m rows come from the same harness run against DEM fetched at those
-# resolutions directly, for the multi-scale study; averaging makes the decimated
-# grids marginally smoother, so the two families are not quite interchangeable.
+# (PNG, WebP q90) bytes per pixel, measured by measure.py over six sites in
+# Vestfold og Telemark 5pkt 2021, fully covered 256 px tiles only. The 0.5 and
+# 1.0 m rows are decimated from a 0.5 m fetch; 2 and 4 m were fetched natively.
 BPP = {
     "vat": {0.5: (0.607, 0.257)},
     "svf": {1.0: (0.613, 0.269), 2.0: (0.651, 0.298), 4.0: (0.617, 0.276)},
@@ -62,8 +53,8 @@ def level_cost(product, res, fill, area_m2=COVERAGE_M2):
     return px, px * png / fill, px * webp / fill
 
 
-# Mean covered fraction of a 512 px tile, from coverage.tile_fill over the
-# Vestfold og Telemark footprint. Keyed by tile side in metres.
+# Mean covered fraction, from coverage.tile_fill over the Vestfold og Telemark
+# footprint, keyed by tile side in metres.
 FILL = {169: 0.95, 338: 0.89, 677: 0.79, 1354: 0.65, 2708: 0.48, 5416: 0.33, 256: 0.92}
 
 
@@ -108,10 +99,8 @@ def stack(product, base_z, levels, label):
 
 def fetch_bytes(base_z, unit_z, margin_m=24.0, bytes_per_px=4):
     """What the DEM fetch costs, fetching once at `base_z` and decimating for the
-    coarser levels. Two overheads the naive area/res**2 leaves out, and they pull
-    against each other: a work unit is grown by the margin on every side, which
-    favours large units, and a unit the footprint only clips is fetched whole,
-    which favours small ones."""
+    coarser levels. Counts the margin grown onto each unit and the whole-unit
+    fetch a clipped unit still pays."""
     res = resolution(base_z)
     side_px = WMS_TILE_SIZE * 2 ** (base_z - unit_z)
     margin_px = math.ceil(margin_m / res)

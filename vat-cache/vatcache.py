@@ -44,25 +44,17 @@ import coverage as coverage_mod
 import report
 from report import level_range, plural, spaced
 
-# Where the store is on the server that serves it. README.md and
-# docker-compose.yml both name this path; --out is for a copy somewhere else.
+# Where the store is on the server that serves it; also named by README.md and
+# docker-compose.yml.
 DEFAULT_STORE = "/site/tufteseid/data/cvat"
 
-# -c takes an optional index, and "given without one" has to be told apart from
-# "not given at all" — argparse spends None on the latter.
+# -c's sentinel for "given without an index"; argparse spends None on "not given".
 BARE = -1
 
 
-# ---------------------------------------------------------------------------
-# The list
-# ---------------------------------------------------------------------------
-
-
 def catalogue(out):
-    """The numbered list. The build queue in its committed order, then whatever
-    else the store holds — an acquisition built off-list, or copied in from
-    another machine, still has to be reachable by index or it can never be
-    checked."""
+    """The numbered list: the build queue in its committed order, then whatever
+    else the store holds."""
     rows = [dict(row, listed=True) for row in acquisitions.build_queue()]
     known = {row["name"] for row in rows}
     for name in sorted(report.held(out)):
@@ -83,12 +75,8 @@ def pick(rows, index):
 
 def parse_levels(text):
     """`-z 14`, `-z 16,14,12`, `-z 16-14`: one level, a list, or an inclusive
-    range. A range may be written either way up, because which end is "first"
-    depends on whether you are thinking in zoom or in metres.
-
-    Deepest first whatever the order asked in, and bounded by the ladder
-    `build_tiles` defines: a level outside it is one no flight in the country
-    holds, so there is nothing in any store to read there."""
+    range either way up. Returns them deepest first, bounded by the ladder
+    `build_tiles` defines."""
     deepest, coarsest = build_tiles.DEFAULT_LEVELS[0], build_tiles.COARSEST_LEVEL
     found = set()
     for piece in (p.strip() for p in text.split(",")):
@@ -133,9 +121,8 @@ def do_list(out, rows, verbose, pattern):
             continue
 
         print(f" {row['index']:2}  {name}")
-        # The committed cell is what the queue was ordered on; the catalogue's
-        # is what a build will actually ask the ladder for. They should agree,
-        # and a reflight that changed the answer is worth seeing.
+        # The committed cell ordered the queue; the catalogue's is what a build
+        # asks the ladder for. Drift between them is worth seeing.
         cell = cells.get(name)
         listed_cell = row.get("cell_m")
         drift = "" if cell is None or listed_cell in (None, cell) else \
@@ -152,9 +139,8 @@ def do_list(out, rows, verbose, pattern):
         if not row.get("listed"):
             print("     where    not in acquisitions.json; found in the store")
         print(f"     store    {level_range(levels)}")
-        # Off the units table, so there is no total to divide by: deriving a
-        # mask to get one would turn listing the acquisitions into building
-        # them.
+        # Off the units table, so there is no total to divide by: getting one
+        # would mean deriving a mask per acquisition.
         counts = {
             z: len(build_tiles.marked_units(out, name, z))
             for z in build_tiles.DEFAULT_LEVELS
@@ -164,9 +150,9 @@ def do_list(out, rows, verbose, pattern):
         mask = coverage_mod.mask_file(name)
         print(f"     mask     "
               f"{mask.name if mask.exists() else '— (derived on a build)'}")
-        # Both name sets have to carry the acquisition verbatim, and they fail
-        # differently: missing from hoydedata is nothing to render, missing from
-        # the WMS is tiles the app never asks for.
+        # Both name sets must carry the acquisition verbatim: missing from
+        # hoydedata is nothing to render, missing from the WMS is tiles the app
+        # never asks for.
         print(f"     names    hoydedata {'ok' if name in names_cat else 'MISSING'}"
               f"  ·  wms {'ok' if name in names_wms else 'MISSING'}")
         if row.get("note"):
@@ -187,11 +173,6 @@ def do_list(out, rows, verbose, pattern):
           "acquisitions.json only puts it on\nthe queue this list shows.")
 
 
-# ---------------------------------------------------------------------------
-# Checking
-# ---------------------------------------------------------------------------
-
-
 def do_check(out, row, args):
     """Audit one acquisition, or the whole store when none is named."""
     built = report.held(out)
@@ -206,9 +187,8 @@ def do_check(out, row, args):
 
     faults = {}
     for project in projects:
-        # What the database says it holds, because that is what it claims:
-        # checking against every level the tool can build would report a 0.5 m
-        # flight as missing the z16 it was never owed.
+        # What the database says it holds, not every level the tool can build: a
+        # 0.5 m flight is not owed a z16.
         levels = args.levels or built.get(project) or list(build_tiles.DEFAULT_LEVELS)
         reports = report.check(out, project, levels, args.unit_tiles,
                                args.verbose)
@@ -223,9 +203,8 @@ def do_check(out, row, args):
     total = sum(len(u) for levels in hurt.values() for u in levels.values())
     print(f"{plural(total, 'work unit')} to (re)build. makevat.py repairs "
           "in place:\n")
-    # Named rather than numbered, because makevat.py numbers hoydedata.no's
-    # whole catalogue and this list is the queue: the two are not the same list
-    # and an index from one means something else in the other.
+    # Named, not numbered: makevat.py numbers the whole catalogue and this list
+    # is the queue, so an index from one means something else in the other.
     for project in hurt:
         print(f"    makevat.py -l {project!r}")
     print(f"\nthen, with the number that prints: makevat.py -o {out} -c <n> -g")
@@ -244,9 +223,6 @@ def check_names(projects):
     if all(p in cat and p in wms for p in projects):
         print("  every acquisition is published by both the catalogue and the WMS")
     print()
-
-
-# ---------------------------------------------------------------------------
 
 
 def main():

@@ -53,34 +53,25 @@ import acquisitions
 import build_tiles
 import coverage as coverage_mod
 import report
-from report import level_range, plural, size, spaced
+from report import level_range, plural, size
 
 HERE = Path(__file__).resolve().parent
 
-# The numbered catalogue, as this machine last saw it. A build artefact like the
-# masks, not a committed file: it is a snapshot of an upstream service, and two
-# people building on two machines have no reason to agree about it. The numbers
-# only have to hold still here, where they are typed.
+# The numbered catalogue as this machine last saw it; a build artefact like the
+# masks, not a committed file.
 SNAPSHOT = HERE / "catalogue.json"
 
 # Where a tufteseid install keeps its store, for the copy line at the end. This
-# script has no business writing there and does not default to it.
+# script never writes there.
 SERVED_STORE = "/site/tufteseid/data/cvat"
-
-
-# ---------------------------------------------------------------------------
-# The numbered catalogue
-# ---------------------------------------------------------------------------
 
 
 def snapshot(refresh=False):
     """The catalogue, numbered by position and pinned to this machine.
 
-    Refreshing appends rather than re-sorting. Sorting the whole list again
-    would be tidier and would renumber it, and the numbers are the interface:
-    they go into shell history, into notes, into a message telling somebody else
-    which acquisition to build. An acquisition that hoydedata.no has withdrawn
-    keeps its number too, and simply stops being buildable."""
+    Refreshing appends rather than re-sorting, so a number keeps meaning the same
+    acquisition; a withdrawn acquisition keeps its number and stops being
+    buildable."""
     have = json.loads(SNAPSHOT.read_text()) if SNAPSHOT.exists() else None
     if have and not refresh:
         return have
@@ -120,9 +111,8 @@ def pick(snap, index):
 
 
 def cell_of(snap, name):
-    """The finest cell the catalogue publishes this acquisition on, which is
-    what decides the ladder. Read from the snapshot rather than asked again: the
-    snapshot is dated and `--refresh` is how you argue with it."""
+    """The finest cell the catalogue publishes this acquisition on, which decides
+    the ladder. Read from the snapshot; `--refresh` re-asks."""
     cell = snap["cells"].get(name)
     if cell is None:
         sys.exit(
@@ -133,17 +123,9 @@ def cell_of(snap, name):
     return cell
 
 
-# ---------------------------------------------------------------------------
-# What this directory already holds
-# ---------------------------------------------------------------------------
-
-
 def in_hand(out):
-    """Acquisition name to the levels the databases in this directory hold.
-
-    Read out of each file's own stamp, which is the same row the sidecar will
-    read once the file is copied over — so what this prints is what the app will
-    be offered, not an inventory kept somewhere alongside."""
+    """Acquisition name to the levels the databases in this directory hold, read
+    out of each file's own stamp."""
     held = {}
     for path in sorted(Path(out).glob(f"*{build_tiles.STORE_SUFFIX}")):
         try:
@@ -157,13 +139,8 @@ def in_hand(out):
 
 
 def guard(target, name, recipe, force):
-    """Whether it is safe to add levels to a database that is already there.
-
-    Two ways it is not. The file may be a different acquisition under a colliding
-    slug, which no amount of building fixes. Or it may have been built under a
-    different recipe, and filling in its missing levels now would leave one
-    acquisition made of two kinds of pixel — the thing the digest exists to
-    catch."""
+    """Refuse to add levels to a database holding another acquisition, or one
+    built under a different recipe (which would mix two kinds of pixel)."""
     if not target.exists():
         return
     with build_tiles.Store(target) as store:
@@ -189,11 +166,6 @@ def guard(target, name, recipe, force):
                 "tiles."
             )
         print(f"  Recipe {digest} ≠ {want}, forced.")
-
-
-# ---------------------------------------------------------------------------
-# Listing
-# ---------------------------------------------------------------------------
 
 
 def do_list(snap, pattern, out, verbose):
@@ -232,9 +204,8 @@ def do_list(snap, pattern, out, verbose):
         else:
             print("      grid    withdrawn from the catalogue — nothing left "
                   "to fetch")
-        # Built and correct is not the same as reachable: the app joins the
-        # manifest onto the per-project WMS's layer prefixes, and drops an
-        # acquisition the WMS does not publish rather than asking for its tiles.
+        # The app joins the manifest onto the per-project WMS's layer prefixes
+        # and drops an acquisition the WMS does not publish.
         known = "ok" if name in wms else "MISSING — the app would drop this"
         print(f"      wms     {known}")
         mask = coverage_mod.mask_file(name)
@@ -249,24 +220,10 @@ def do_list(snap, pattern, out, verbose):
         print(f"\n`here` is what {out} already holds. -g <number> builds one.")
 
 
-# ---------------------------------------------------------------------------
-# Building
-# ---------------------------------------------------------------------------
-
-
 def parse_levels(text):
     """`-z 14`, `-z 16,14,12`, `-z 16-14`: one level, a list, or an inclusive
-    range. A range may be written either way up, because which end is "first"
-    depends on whether you are thinking in zoom or in metres.
-
-    Deepest first whatever the order asked in — that is the order a build wants
-    and the order the stamp records, so a level set cannot arrive meaning one
-    thing and be stored meaning another.
-
-    Bounded by the ladder `build_tiles` defines. A level outside it has nowhere
-    to go: the app takes its `minZoom`/`maxZoom` from what the file holds, so a
-    z17 in there is a level the reader asks for and no flight in the country can
-    answer."""
+    range either way up. Returns them deepest first, bounded by the ladder
+    `build_tiles` defines."""
     deepest, coarsest = build_tiles.DEFAULT_LEVELS[0], build_tiles.COARSEST_LEVEL
     found = set()
     for piece in (p.strip() for p in text.split(",")):
@@ -288,12 +245,8 @@ def parse_levels(text):
 
 
 def wanted_levels(name, cell, asked):
-    """Which levels to build.
-
-    `-z` is measured against the cell rather than replacing it. Naming levels is
-    for building part of a ladder — one level again, or a pilot before the rest
-    — and the one thing it must not become is a way past the rule the ladder is.
-    So the cell decides whether or not levels were asked for."""
+    """Which levels to build. `-z` selects within the ladder the cell earns; it
+    cannot reach past it."""
     earned = list(build_tiles.levels_for(cell))
     if not asked:
         print(f"{name}\n{cell} m cells → {level_range(earned)}\n")
@@ -314,9 +267,8 @@ def wanted_levels(name, cell, asked):
 
 def do_get(args, snap, name):
     out = Path(args.out)
-    # Levels first, then the file, then the footprint: deriving a mask takes
-    # minutes, and both of the things that can refuse this run are answerable
-    # before any of them are spent.
+    # Levels and the file first: both can refuse the run, and deriving a mask
+    # takes minutes.
     levels = wanted_levels(name, cell_of(snap, name), args.levels)
     target = build_tiles.store_path(out, name)
     recipe = build_tiles.settings(levels, args.unit_tiles)
@@ -336,8 +288,8 @@ def do_get(args, snap, name):
         build_tiles.run_levels(store, name, mask, levels, args.unit_tiles,
                                args.jobs, args.limit)
     finally:
-        # Again at the end, for the level span: the first stamp was written
-        # before this run's tiles were.
+        # Again at the end, for the level span: the first stamp predates this
+        # run's tiles.
         store.stamp(name, recipe)
         store.close()
     delivered(target, name)
@@ -356,11 +308,6 @@ def delivered(target, name):
     print(f"    scp {target} <server>:{SERVED_STORE}/")
 
 
-# ---------------------------------------------------------------------------
-# Checking
-# ---------------------------------------------------------------------------
-
-
 def do_check(args, name):
     out = Path(args.out)
     target = build_tiles.store_path(out, name)
@@ -369,9 +316,8 @@ def do_check(args, name):
                  "-g builds it.")
     with build_tiles.Store(target) as store:
         held = store.levels()
-    # What the file holds, because that is what it claims: checking against
-    # every level the tool can build would report a 0.5 m flight as missing the
-    # z16 it was never owed.
+    # What the file holds, not every level the tool can build: a 0.5 m flight is
+    # not owed a z16.
     levels = args.levels or held
     if not levels:
         sys.exit(f"{target.name} holds no tiles at all.")
@@ -390,8 +336,8 @@ def do_check(args, name):
     if not args.fix:
         print(f"\n{plural(total, 'work unit')} to (re)build. Add -g to fix.")
         return
-    # A repair clears the unit before rebuilding it, so a dry run would be all
-    # of the destruction and none of the repair.
+    # A repair clears the unit before rebuilding it, so a dry run would destroy
+    # and not repair.
     if args.dry_run:
         print(f"\n{plural(total, 'work unit')} to (re)build. Drop --dry-run "
               "to fix.")
@@ -408,9 +354,6 @@ def do_check(args, name):
     finally:
         store.stamp(name, recipe)
         store.close()
-
-
-# ---------------------------------------------------------------------------
 
 
 def main():
@@ -467,8 +410,7 @@ def main():
     if args.get is None and args.check is None:
         return  # -l or --refresh on its own
 
-    # One number between them. -c 3 -g and -g 3 -c 3 are the same request;
-    # naming two different ones is not a request at all.
+    # One number between them: -c 3 -g and -g 3 -c 3 are the same request.
     if args.get not in (None, -1) and args.check is not None \
             and args.get != args.check:
         sys.exit(f"-g {args.get} and -c {args.check} name different "

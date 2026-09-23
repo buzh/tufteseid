@@ -1,16 +1,8 @@
 """What ground a LiDAR acquisition actually covers, and where to sample it.
 
-Do not take `sum(SHAPE.AREA)` for the answer. The mosaic catalogue carries one
-row per raster *plus* a row per overview level, and every level re-covers the
-whole project: for Vestfold og Telemark 5pkt 2021 the sum is 8846 km2 across
-270 rows while the ground is 1106 km2. Splitting by CATEGORY shows it - each
-LOWPS group sums to the same 1106 km2 - and rasterising the union confirms it.
-
-`vatcache.py` drives this: a mask is named after the acquisition it is of and
-derived on first use, so nothing ever chooses a mask separately from a project.
-That pairing was the one silent mistake in the batch — a fetch pinned to a
-project that never flew the ground the mask points at returns all-NaN for every
-unit, writes no tile, and marks each one done.
+`sum(SHAPE.AREA)` is not the coverage: the mosaic catalogue carries one row per
+raster plus a row per overview level, and every level re-covers the whole
+project. Rasterise the union of the footprints instead.
 """
 
 from pathlib import Path
@@ -25,12 +17,6 @@ CELL = 25.0  # rasterisation cell, metres
 HERE = Path(__file__).resolve().parent
 
 
-def _shoelace(ring):
-    a = np.asarray(ring)
-    x, y = a[:, 0], a[:, 1]
-    return 0.5 * np.sum(x[:-1] * y[1:] - x[1:] * y[:-1])
-
-
 def footprints(project):
     """Catalogue rows with geometry, for one LAS_PROJECT_NAME."""
     return catalogue(
@@ -41,11 +27,7 @@ def footprints(project):
 
 
 def rasterise(features, cell=CELL):
-    """Even-odd scanline fill of the union. Returns (mask, (x0, x1, y0, y1), cell).
-
-    Validated against a known footprint: a 879.17 km2 polygon rasterises to
-    879.2 km2 at cell=25.
-    """
+    """Even-odd scanline fill of the union. Returns (mask, (x0, x1, y0, y1), cell)."""
     rings = [np.asarray(r) for f in features for r in f["geometry"]["rings"]]
     xs = np.concatenate([r[:, 0] for r in rings])
     ys = np.concatenate([r[:, 1] for r in rings])
@@ -112,10 +94,8 @@ def sample_sites(mask, bounds, cell, count=6, side_m=1024.0, seed=7):
         if len(candidates) > 4000:
             break
     if not candidates:
-        # No square of this size fits inside the footprint. Supplementary
-        # acquisitions are a few hundred metres across, so this is ordinary
-        # rather than a fault — and the sites are only somewhere for measure.py
-        # to render a comparison. Nothing the build needs is affected.
+        # No square of this size fits inside the footprint; ordinary for small
+        # supplementary acquisitions, and the build needs no sites.
         return np.empty((0, 2))
     candidates = np.array(candidates)
 
@@ -154,17 +134,12 @@ def tile_fill(mask, cell, tile_m, grid_origin=(-2500000.0, 9045984.0), mask_orig
 
 
 def mask_file(project, directory=None):
-    """Where this acquisition's mask lives. Named after the acquisition rather
-    than overwriting one `coverage.npz`, because a store holds several."""
+    """Where this acquisition's mask lives."""
     return Path(directory or HERE) / f"coverage-{slug(project)}.npz"
 
 
 def load_or_build(project, directory=None):
-    """The acquisition's mask, derived on first use. Returns its path.
-
-    Deriving costs one catalogue query with geometry and a scanline fill over
-    the envelope — minutes, once per acquisition, against the hours the tiles
-    themselves take."""
+    """The acquisition's mask, derived on first use. Returns its path."""
     path = mask_file(project, directory)
     if not path.exists():
         print(f"no mask for {project!r} yet; deriving {path.name}\n")
@@ -199,10 +174,8 @@ def build_mask(project, out):
         bounds=np.array(bounds),
         cell=cell,
         sites=sample_sites(mask, bounds, cell),
-        # build_tiles.py refuses to pair this mask with another acquisition's
-        # DEM. Without the stamp that mistake is silent: every unit fetches
-        # ground the project never flew, comes back all-NaN, writes no tile and
-        # marks itself done.
+        # build_tiles.py checks this stamp: a mask paired with another
+        # acquisition's DEM fails silently, writing no tiles but marking done.
         project=project,
     )
     print(f"\n  wrote {Path(out).name} (mask, bounds, cell, sites, project)")

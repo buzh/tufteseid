@@ -1,26 +1,7 @@
 """Which acquisitions exist, which are worth building, and what names they go by.
 
-Three name sets have to agree before a cached ground reaches a reader, and an
-acquisition missing from any one of them fails differently:
-
-- **`acquisitions.json`** — the build queue, ordered by point density and then
-  by what it joins onto, because the cache exists to be read at the resolution
-  the flight actually holds. README.md records the rule. Absent here just means
-  nobody has queued it; `--all` lists the rest.
-- **hoydedata.no's mosaic catalogue** — `LAS_PROJECT_NAME`, which `fetch_dem`
-  pins the DEM request to. Absent here, every fetch comes back empty and a run
-  writes a store that looks built and holds nothing.
-- **Kartverket's per-project WMS** — the layer-name prefix, which is the
-  `LidarProject.id` the app publishes and the key `resolveCvatAcquisitions`
-  joins the manifest on. Absent here, the tiles are still offered: the sidecar
-  publishes each database's envelope, so the app places the acquisition off its
-  own store and reads the year and density out of the name. What is lost is the
-  flight's WMS styles, so it is the cached render or nothing — which is the
-  right outcome anyway for a flight the service does not publish.
-
-The names are compared verbatim. They differ by region, density and year and
-carry Norwegian letters and hyphens, so there is no normalisation to be had —
-either the string matches or the acquisition is the wrong one.
+Names are compared verbatim across acquisitions.json, hoydedata.no's mosaic
+catalogue and Kartverket's per-project WMS.
 """
 
 import json
@@ -34,42 +15,31 @@ from fetch_dem import QUERY
 HERE = Path(__file__).resolve().parent
 QUEUE_FILE = HERE / "acquisitions.json"
 
-# Kartverket's per-project DTM WMS, the same document lidarProjects.ts parses —
-# reached directly rather than through the app's /wms/geonorge proxy, which only
-# exists inside the compose stack. ~8 MB, and it answers in about a second.
+# Reached directly: the app's /wms/geonorge proxy only exists in the compose stack.
 CAPS_URL = (
     "https://wms.geonorge.no/skwms1/wms.hoyde-dtm-prosjekt"
     "?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0"
 )
 
-# The catalogue answers at most 1000 distinct values per call and says so with
+# The catalogue answers at most 1000 distinct values per call, flagged with
 # exceededTransferLimit; there are ~1540 acquisitions.
 _PAGE = 1000
 
 
 def slug(project):
-    """A directory name for an acquisition. Readable rather than opaque, so the
-    marker tree and the mask files can be read with ls; the acquisition names
-    differ by region, density and year, so this cannot collide in practice."""
+    """A directory name for an acquisition."""
     return re.sub(r"[^0-9a-zæøå]+", "-", project.lower()).strip("-")
 
 
 def build_queue():
-    """The build queue, in the order the file lists them. That order is what
-    `--get <i>` indexes, so it is deliberately a committed file rather than
-    anything recomputed per run: an index that moves between two invocations
-    would point at a different acquisition each time."""
+    """The build queue in file order; `--get <i>` indexes that order."""
     return json.loads(QUEUE_FILE.read_text())["acquisitions"]
 
 
 def native_cells(names, timeout=180):
     """Each acquisition's finest published DTM cell, in metres, off the mosaic
-    catalogue's own `LOWPS` — which is what decides how deep the ladder goes.
-
-    The service publishes three values and they track point density: 1 m for
-    1–3 pkt, 0.5 m for 2–4 pkt, 0.25 m for 5 pkt and up. Nothing is finer than
-    0.25 m anywhere in the country, so the name's `10pkt` buys detail inside
-    that grid rather than a smaller one."""
+    catalogue's `LOWPS`. Only 1 m (1–3 pkt), 0.5 m (2–4 pkt) and 0.25 m (5 pkt
+    and up) occur; nothing finer exists anywhere in the country."""
     if not names:
         return {}
     quoted = ",".join("'" + n.replace("'", "''") + "'" for n in names)
@@ -84,14 +54,12 @@ def native_cells(names, timeout=180):
             "outStatisticFieldName": "cell",
         }]),
     }
-    # POST, because the acquisition names are long and asking about a queue's
-    # worth of them at once overruns what the service accepts in a URL — it
-    # answers 404 rather than 414, so the failure does not name itself.
+    # POST: a long name list overruns the URL length the service accepts, and it
+    # answers 404 rather than 414.
     data = urllib.parse.urlencode(query).encode()
     with urllib.request.urlopen(QUERY, data=data, timeout=timeout) as response:
         body = json.load(response)
-    # The service answers statistics fields in upper case whatever they were
-    # asked for in, so read the name back rather than assuming either spelling.
+    # The service may upper-case statistics field names whatever they were asked in.
     return {
         a["LAS_PROJECT_NAME"]: a.get("CELL", a.get("cell"))
         for a in (f["attributes"] for f in body.get("features", []))
@@ -99,20 +67,15 @@ def native_cells(names, timeout=180):
     }
 
 
-# How many acquisitions to ask about cells in one POST. The whole catalogue in
-# one request would be a 46 kB WHERE clause; this is eleven requests and two
-# seconds for all of it.
+# Acquisitions per POST; the whole catalogue at once would be a 46 kB WHERE clause.
 _CELL_CHUNK = 150
 
 
 def catalogue_cells(names, timeout=180):
     """`native_cells` for a list too long to ask about at once.
 
-    Asking with `groupByFieldsForStatistics` over the whole mosaic instead looks
-    like it would answer this in one request, and does — for the first thousand
-    groups. Statistics queries ignore `resultOffset`, and the service sets no
-    `exceededTransferLimit` on them, so that shape silently returns two thirds of
-    the catalogue and nothing says which third is missing."""
+    Statistics queries ignore `resultOffset` and carry no `exceededTransferLimit`,
+    so one grouped query over the whole mosaic truncates at 1000 groups silently."""
     cells = {}
     for i in range(0, len(names), _CELL_CHUNK):
         cells.update(native_cells(names[i:i + _CELL_CHUNK], timeout))
@@ -139,8 +102,7 @@ def catalogue_names(timeout=180):
         features = body.get("features", [])
         for f in features:
             name = f["attributes"].get("LAS_PROJECT_NAME")
-            # The catalogue carries rows with no project name; they are not
-            # acquisitions anyone can pin a fetch to.
+            # The catalogue carries rows with no project name.
             if name:
                 names.add(name)
         if not features or not body.get("exceededTransferLimit"):
@@ -151,11 +113,8 @@ def catalogue_names(timeout=180):
 def wms_names(timeout=180):
     """Every project prefix the per-project DTM WMS publishes.
 
-    The same split lidarProjects.ts makes: a layer is named `<project>:<style>`
-    and the part before the first colon is the id. The app additionally drops
-    `Bilde*` (photogrammetry DTMs advertising lidar styles over blank tiles);
-    that filter is not applied here, because the question this answers is
-    whether a name exists at all."""
+    Layers are named `<project>:<style>`; the part before the first colon is the id.
+    Unlike lidarProjects.ts this does not drop `Bilde*` photogrammetry DTMs."""
     with urllib.request.urlopen(CAPS_URL, timeout=timeout) as response:
         body = response.read()
     return {

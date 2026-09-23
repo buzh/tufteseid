@@ -1,27 +1,14 @@
-"""numpy port of the operators in `src/terrain/shade.ts`.
+"""numpy port of the operators in `src/terrain/shade.ts`, constant for constant,
+so a cached tile and the client's own render of the same ground match.
+`docs/terrain-analysis.md` is the authority on the numbers.
 
-Parity with the browser is the whole point: a cached tile and the client's own
-Analyse render of the same ground have to be the same picture, or the app is
-showing a reader two products that look alike and are not. Every constant here
-is copied from `shade.ts` rather than rederived, and the functions follow its
-arithmetic step for step — including the details that look like accidents:
-
-- `scanHorizon` seeds maxTan/minTan from the first readable cell rather than
-  from +-Infinity, so a direction with nothing readable reads as level ground.
-  Vectorised that is fmax/fmin over NaN, then NaN -> 0.
-- `composeVat` collapses two of RVT's three blend modes, because over
-  single-band data a luminosity blend is the active layer and an opacity is a
-  linear mix. Only overlay keeps its arithmetic, driving off the background.
-
-`docs/terrain-analysis.md` is the authority on why any of these numbers are
-what they are. If it and this file disagree, this file is wrong.
+compose_vat collapses two of RVT's three blend modes: over single-band data a
+luminosity blend is the active layer and an opacity is a linear mix.
 """
 
 import math
 
 import numpy as np
-
-# --- constants, copied from src/terrain/shade.ts -------------------------
 
 SVF_DIRECTIONS = 16
 SVF_MAX_RADIUS_PX = 24
@@ -30,7 +17,6 @@ HORIZON_MIN_M_PER_PX = 1.0
 VAT_AZIMUTH = 315
 VAT_Z_FACTOR = 1
 VAT_SCAN_M_PER_PX = 0.5
-VAT_MAX_SCAN_CELLS = 1_250_000
 VAT_GENERAL_OPACITY = 0.5
 
 VAT_PRESETS = {
@@ -54,16 +40,6 @@ VAT_PRESETS = {
     ),
 }
 
-# VAT_STACK, as data, for a manifest to record. The compositor does not consume
-# it -- see composeVat in shade.ts for why the two are written out separately.
-VAT_STACK = (
-    dict(vis="hillshade", blend="normal", opacity=100),
-    dict(vis="slope", blend="luminosity", opacity=50),
-    dict(vis="openPos", blend="overlay", opacity=100),
-    dict(vis="svf", blend="multiply", opacity=25),
-)
-
-
 def max_decimation(metres_per_px: float) -> int:
     return max(1, int(HORIZON_MIN_M_PER_PX // metres_per_px))
 
@@ -71,15 +47,6 @@ def max_decimation(metres_per_px: float) -> int:
 def horizon_max_radius_metres(metres_per_px: float) -> float:
     """The longest horizon this grid can deliver. 24 m at 1 m or finer."""
     return SVF_MAX_RADIUS_PX * metres_per_px * max_decimation(metres_per_px)
-
-
-def vat_decimation(width_m: float, height_m: float, metres_per_px: float) -> int:
-    finest = max(1, round(VAT_SCAN_M_PER_PX / metres_per_px))
-    affordable = math.sqrt((width_m * height_m) / VAT_MAX_SCAN_CELLS)
-    return max(finest, math.ceil(affordable / metres_per_px), 1)
-
-
-# --- operators -----------------------------------------------------------
 
 
 def decimate(z: np.ndarray, factor: int) -> np.ndarray:
@@ -153,6 +120,8 @@ def scan_horizon(z: np.ndarray, metres_per_px: float, radius_m: float, inner_m: 
             max_t[d] = np.fmax(max_t[d], tan)
             min_t[d] = np.fmin(min_t[d], tan)
 
+    # shade.ts seeds from the first readable cell, not +-Infinity: a direction
+    # with nothing readable reads as level ground.
     max_t = np.nan_to_num(max_t, nan=0.0)
     min_t = np.nan_to_num(min_t, nan=0.0)
     above = np.maximum(max_t, 0.0)
@@ -197,9 +166,7 @@ def compose_vat(hs, slope_radians, open_pos_deg, svf, preset):
 def vat(z: np.ndarray, metres_per_px: float) -> np.ndarray:
     """RVT's combined VAT: the general stack over the flat one, i.e. their mean.
 
-    Result is 0..1 on absolute stretches, which is the property that makes VAT
-    tile without a global stretch pass. Neither preset alone is offered.
-    """
+    0..1 on absolute stretches, so it tiles without a global stretch pass."""
     dzdx, dzdy = gradients(z, metres_per_px)
     slope = np.arctan(np.hypot(dzdx, dzdy))
     stacks = []

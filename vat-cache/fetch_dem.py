@@ -1,13 +1,8 @@
-"""Float DEM patches out of hoydedata.no's Prosjekt_DTM ImageServer.
+"""Float DEM patches out of hoydedata.no's Prosjekt_DTM ImageServer; quirks are
+documented in `docs/terrain-analysis.md`.
 
-The endpoint and its quirks are documented in `docs/terrain-analysis.md`; this
-is the same request `src/terrain/dem.ts` makes, with one addition: a `where` on
-the mosaicRule pinning the answer to a single LAS_PROJECT_NAME, so a cache run
-reads one acquisition rather than whatever the catalogue resolves to.
-
-The TIFF reader is a port of the one in `dem.ts` and relies on the same shape:
-little-endian, uncompressed, single band, 32-bit float, tiled, never striped.
-Absent tiles (TileOffsets 0) become NaN, which is how no-coverage arrives.
+The TIFF reader assumes what the endpoint answers: uncompressed, single band,
+32-bit float, tiled, never striped. Absent tiles (TileOffsets 0) are no coverage.
 """
 
 import json
@@ -20,7 +15,6 @@ import numpy as np
 BASE = "https://hoydedata.no/arcgis/rest/services/Prosjekt_DTM/ImageServer/exportImage"
 QUERY = "https://hoydedata.no/arcgis/rest/services/Prosjekt_DTM/ImageServer/query"
 
-# The acquisition this prototype was measured against.
 DEFAULT_PROJECT = "Vestfold og Telemark 5pkt 2021"
 
 _TYPE_FMT = {1: "B", 3: "H", 4: "I", 11: "f", 12: "d"}
@@ -51,8 +45,8 @@ def read_tiff_f32(buf: bytes) -> np.ndarray:
         else:
             (off,) = struct.unpack(en + "I", buf[p + 8 : p + 12])
             raw = buf[off : off + size]
-        # A no-coverage answer is a ~1.6 kB stub whose string tags point past
-        # the end of the body; those tags are not ones we read.
+        # A no-coverage answer is a ~1.6 kB stub whose string tags point past the
+        # end of the body.
         if len(raw) < size:
             continue
         tags[tag] = struct.unpack(en + fmt * cnt, raw)

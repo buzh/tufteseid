@@ -1,22 +1,10 @@
-"""How many bytes a rendered tile costs, measured rather than guessed.
+"""Bytes per rendered tile, measured: fetch DEM at each sample site, run the
+render.py operators, quantise to 8-bit as `paintTerrainField` does, cut 256 px
+tiles and encode. Feeds the byte-per-pixel figures `sizing.py` needs.
 
-Fetches DEM at each sample site, runs the operators in render.py, quantises to
-8-bit the way `paintTerrainField` does, cuts 256 px tiles and encodes them.
-Reports bytes per pixel per product, which is the only input `sizing.py` needs
-that cannot be derived.
-
-Two rules the measurement follows, both of which matter:
-
-- Only *fully covered* tiles are counted. A tile with NaN in it encodes small
-  because the NaN fill is flat, which would flatter the estimate.
-- The stretch is pooled across every site, not taken per tile. A per-tile
-  percentile is not available to a tiled layer at all: neighbouring tiles would
-  disagree, which is the same fault that got `dynamisk_farget_hoyde` excluded
-  in `src/map/layers/config/backgroundLayers/lidarProjects.ts`. VAT alone needs
-  no pooling -- it composites to 0..1 on absolute stretches.
-
-Run (after coverage.py):
-    python measure.py
+Only fully covered tiles count (NaN fill encodes small), and the stretch is
+pooled across sites, since neighbouring tiles cannot disagree on one. Run after
+coverage.py.
 """
 
 import io
@@ -31,8 +19,6 @@ TILE = 256
 SIDE_M = 1024.0  # ground per sample, before the margin
 MARGIN_M = 24.0  # DEM_MARGIN_M: the longest reach horizon can ask for
 
-# The grid each product is computed on. VAT's is pinned by VAT_SCAN_M_PER_PX;
-# the horizon family's by HORIZON_MIN_M_PER_PX, below which reach shrinks.
 VAT_M_PER_PX = render.VAT_SCAN_M_PER_PX
 HORIZON_M_PER_PX = render.HORIZON_MIN_M_PER_PX
 

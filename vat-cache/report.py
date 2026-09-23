@@ -1,13 +1,7 @@
 """Reading a built acquisition back, and saying what is there.
 
-Shared by the two front ends, because an audit is the same question wherever the
-database sits: `vatcache.py` asks it of the store the server serves, `makevat.py`
-of a file that has not been copied anywhere yet. Neither of them knows anything
-the other does not about what makes a level whole.
-
-Everything here takes a directory and an acquisition name, which together are
-the database (`build_tiles.store_path`). That is the only coupling: there is no
-manifest, no queue and no store in any of it.
+Shared by `vatcache.py` and `makevat.py`. Everything here takes a directory and
+an acquisition name, which together are the database (`build_tiles.store_path`).
 """
 
 import sqlite3
@@ -17,11 +11,6 @@ from pathlib import Path
 
 import build_tiles
 import coverage as coverage_mod
-
-
-# ---------------------------------------------------------------------------
-# Figures, written the way the README and the docs write them
-# ---------------------------------------------------------------------------
 
 
 def spaced(n):
@@ -34,8 +23,6 @@ def plural(n, one, many=None):
 
 
 def size(nbytes):
-    """A store runs to hundreds of megabytes per level; a pilot to a handful,
-    and a two-unit trial to nothing at all."""
     if nbytes >= 1e9:
         return f"{nbytes / 1e9:.2f} GB"
     if nbytes >= 1e6:
@@ -44,9 +31,7 @@ def size(nbytes):
 
 
 def level_range(levels):
-    """z16–z7 when the ladder is unbroken, the levels one by one when it is not
-    — a gap in the middle is the thing worth seeing. How deep whole *is* depends
-    on the acquisition, so this reads the run rather than assuming a base."""
+    """z16–z7 when the ladder is unbroken, the levels one by one when it is not."""
     if not levels:
         return "—"
     if len(levels) == 1:
@@ -56,19 +41,11 @@ def level_range(levels):
     return ", ".join(f"z{z}" for z in sorted(levels, reverse=True))
 
 
-# ---------------------------------------------------------------------------
-# What a directory of databases holds
-# ---------------------------------------------------------------------------
-
-
 def held(out):
     """Acquisition name to the levels the databases in this directory hold.
 
-    Read out of each file's own stamp, which is the same row the sidecar reads
-    when it builds `/cvat/manifest.json` — so this is what the app will be
-    offered, rather than an inventory kept alongside and capable of disagreeing
-    with the files. It is also why an acquisition can arrive by being copied in:
-    nothing here has to be told about it."""
+    Read out of each file's own stamp, the same row the sidecar reads to build
+    `/cvat/manifest.json`."""
     found = {}
     for path in sorted(Path(out).glob(f"*{build_tiles.STORE_SUFFIX}")):
         try:
@@ -85,18 +62,10 @@ def held(out):
     return found
 
 
-# ---------------------------------------------------------------------------
-# The footprint
-# ---------------------------------------------------------------------------
-
-
 def mask_for(project):
     """The acquisition's footprint, derived on first use."""
     path = coverage_mod.load_or_build(project)
     mask = build_tiles.Coverage(path)
-    # Masks written before the stamp existed name no acquisition, so nothing
-    # can tell whether this one is of the right ground. Deriving it again is
-    # minutes, and the alternative is a run that fetches somewhere else.
     if mask.project is None:
         sys.exit(
             f"{path.name} carries no acquisition name, so it cannot be checked "
@@ -106,14 +75,8 @@ def mask_for(project):
     return mask
 
 
-# ---------------------------------------------------------------------------
-# The audit
-# ---------------------------------------------------------------------------
-
-
 def ticker(z):
-    """A progress line for the scan. A level is tens of thousands of decodes,
-    which is long enough that silence reads as a hang."""
+    """A progress line for the scan."""
     last = [0.0]
 
     def tick(seen, total):
@@ -148,8 +111,8 @@ def check(out, project, levels, unit_tiles, verbose, mask=None):
         if result.stray:
             print(f"        {plural(len(result.stray), 'finished unit')} outside "
                   "the footprint (mask or --unit-tiles changed since)")
-        # Some empty units are the footprint clipping a corner. All of them is
-        # the fetch having been pinned to ground the acquisition never flew.
+        # Every unit empty means the fetch was pinned to ground the acquisition
+        # never flew; a few are the footprint clipping a corner.
         if result.empty and result.empty == result.done:
             print("        every finished unit is empty — the mask and the DEM "
                   "are of different ground")
@@ -165,11 +128,7 @@ def check(out, project, levels, unit_tiles, verbose, mask=None):
 
 
 def orphans(out, project, levels, unit_tiles):
-    """Tiles under this acquisition that no finished unit of it claims.
-
-    An acquisition owns its own database, so this is answerable one at a time
-    and the answer is unambiguous — which it was not while the store was one
-    namespace and a stray tile might have been the neighbour's."""
+    """Tiles under this acquisition that no finished unit of it claims."""
     for z in levels:
         on_disk = build_tiles.store_tiles(out, project, z)
         if not on_disk:
