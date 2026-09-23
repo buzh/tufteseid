@@ -148,8 +148,17 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
         setActive(record);
         closeDraft();
       })
-      .catch((err) => {
-        console.warn('[spots] save failed', err);
+      .catch((err: unknown) => {
+        // The message on a PocketBase validation error is always the same
+        // sentence — "Failed to create record." — and the field at fault is
+        // only in `response.data`. Logged alongside the error rather than
+        // instead of it: the error carries the stack, the data carries the
+        // reason.
+        console.warn(
+          '[spots] save failed',
+          err,
+          (err as { response?: { data?: unknown } })?.response?.data,
+        );
         setSaving(false);
         setSaveError(true);
       });

@@ -6,7 +6,8 @@ import { pb, Role, SiteUser } from '../api/pocketbase';
 // Mirrors the PB SDK's authStore, which is the source of truth, so components
 // can subscribe through jotai instead of through onChange. Seeded rather than
 // left null: the store rehydrates from localStorage when the module is
-// imported, so a returning reader is already signed in at first paint.
+// imported, so a returning reader is already signed in at first paint. The
+// seed is optimistic, and `pbAuthSyncEffect` is what settles it.
 export const currentUserAtom = atom<SiteUser | null>(
   (pb.authStore.record as SiteUser | null) ?? null,
 );
@@ -17,6 +18,28 @@ export const pbAuthSyncEffect = atomEffect((_get, set) => {
   const unsubscribe = pb.authStore.onChange(() => {
     set(currentUserAtom, (pb.authStore.record as SiteUser | null) ?? null);
   });
+
+  // A rehydrated session is a claim, not a fact: an expired token and one the
+  // server has stopped honouring both look exactly like a live one on this
+  // side, and the SDK goes on sending either. PocketBase then answers as a
+  // guest, and the reader finds out at `Lagre` — a create-rule failure on a
+  // record they appear to be signed in to write. Asked once on mount, because
+  // the server's answer is the only one that settles it.
+  if (!pb.authStore.isValid) {
+    pb.authStore.clear();
+  } else {
+    void pb
+      .collection('users')
+      .authRefresh()
+      .catch((err: unknown) => {
+        // Only a refusal signs the reader out. A cold load with no network
+        // yet is not evidence that the session is gone, and clearing on it
+        // would throw away a token that still works.
+        const status = (err as { status?: number })?.status;
+        if (status === 401 || status === 403) pb.authStore.clear();
+      });
+  }
+
   return unsubscribe;
 });
 
