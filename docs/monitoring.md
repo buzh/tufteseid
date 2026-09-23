@@ -66,9 +66,13 @@ and every visitor is counted as one; fix it in the TLS terminator.
   `tufteseid` container and served at **`/stats/`**, which the account menu
   links to when `role = admin`. The link is the only thing the role gates:
   Caddy asks for no credentials, so the report is public to anyone who types
-  the path. It carries its own CSP (GoAccess inlines its script) and an
-  `X-Robots-Tag: noindex`. Gate it in the TLS terminator if that is not
-  acceptable, or drop the mount and read `index.html` on the host.
+  the path. It carries an `X-Robots-Tag: noindex` and a CSP of its own, which
+  has to allow `'unsafe-inline'` and `'unsafe-eval'`: GoAccess inlines its
+  script and compiles its templates with `new Function`. Under the app's CSP
+  the report stops at its loading screen reading "No authentication provided.",
+  which is its own wording for a static report and not the failure. Gate it in
+  the TLS terminator if public is not acceptable, or drop the mount and read
+  `index.html` on the host.
 - **Stores** — `du` over `cvat`, `mapproxy`, `logs` and the wmscache volume,
   with the delta since the last run (stamped in `<report-dir>/.sizes`). MapProxy
   fetches `wms.geonorge.no` directly, not through wmscache, and never evicts, so
