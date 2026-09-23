@@ -60,7 +60,10 @@ const getInitialMapView = () => {
 export const mapAtom = atom<Map>(() => {
   const map = new Map({
     controls: defaultControls({ zoom: false, rotate: false }).extend([
-      new ScaleLine({ minWidth: 100 }),
+      // A stepped bar rather than a bare line: alternating segments are what
+      // let you carry a distance across the screen by eye, which is the whole
+      // use of a scale on relief. Coloured off black and white in `map.css`.
+      new ScaleLine({ bar: true, steps: 4, minWidth: 140, maxWidth: 240 }),
     ]),
     // No rotation UI, so a stray gesture would leave a rotation nothing clears.
     interactions: defaultInteractions({

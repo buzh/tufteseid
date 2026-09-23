@@ -1,30 +1,55 @@
-/* --- OL ScaleLine control (kept; added to the map in map/atoms.ts) --- */
-.ol-scale-line {
+/* --- OL ScaleLine control, in bar mode (added to the map in map/atoms.ts).
+   The step labels hang below the bar, so the offsets leave room under it. --- */
+.ol-scale-bar {
   position: absolute;
   left: 10px;
-  bottom: 46px;
+  bottom: 52px;
   right: auto;
 }
 
 @media (max-width: 768px) {
-  .ol-scale-line {
+  .ol-scale-bar {
     right: auto;
     left: 50%;
     transform: translateX(-50%);
-    bottom: 10px;
+    bottom: 26px;
   }
 }
 
-/* Anthracite and translucent, so it belongs to the app rather than to the map,
-   and still reads over hillshade — which is the light thing underneath it. */
-.ol-scale-line-inner {
-  border: 2px solid rgba(215, 221, 224, 0.85);
-  border-top: none;
-  color: rgba(215, 221, 224, 0.95);
-  font-size: 12px;
-  text-align: center;
-  background: rgba(41, 49, 51, 0.72);
-  padding: 2px 5px;
+/* The alternation is the classic black-and-white one, read in the app's own
+   ramp: anthracite against its lightest step. Each segment keeps a dark
+   hairline so the light ones hold their edge over hillshade, and the bar as a
+   whole a light one so the dark ones hold theirs over ortofoto. */
+.ol-scale-bar-inner {
+  outline: 1px solid rgba(215, 221, 224, 0.6);
+}
+
+.ol-scale-singlebar {
+  border: 1px solid var(--mantine-color-anthracite-8);
+}
+
+.ol-scale-singlebar-odd {
+  background-color: var(--mantine-color-anthracite-7);
+}
+
+.ol-scale-singlebar-even {
+  background-color: var(--mantine-color-anthracite-0);
+}
+
+/* The ticks stand on the map rather than on the bar, and papaya is the one
+   colour in the theme picked to be found against terrain. */
+.ol-scale-step-marker {
+  background-color: var(--mantine-color-papaya-5);
+}
+
+.ol-scale-step-text {
+  color: var(--mantine-color-anthracite-0);
+  font-size: var(--mantine-font-size-xs);
+  text-shadow:
+    -1.5px 0 var(--mantine-color-anthracite-9),
+    0 1.5px var(--mantine-color-anthracite-9),
+    1.5px 0 var(--mantine-color-anthracite-9),
+    0 -1.5px var(--mantine-color-anthracite-9);
 }
 
 #map {
