@@ -21,7 +21,6 @@ export type LidarSource = {
   label: string;
   year: number | null;
   pointDensity: string | null;
-  // Every kept extract records this as `meta.model` and is redrawn from it.
   model: LidarModel;
   wmsUrl: string;
   layerPrefix: string; // 'NHM_DTM_TOPOBATHY_25833' or the project name
@@ -62,7 +61,7 @@ export const projectLidarSource = (
   styles: stylesForModel(p.styles, model),
 });
 
-// bbox in EPSG:4326. National mosaic first, then every intersecting project.
+// bbox in EPSG:4326.
 export async function enumerateLidarSources(
   bboxLonLat: [number, number, number, number],
   model: LidarModel,
@@ -80,9 +79,8 @@ export async function enumerateLidarSources(
   return [nationalLidarSource(nationalStyles, model), ...overlapping];
 }
 
-// 0.25 m is the data's floor, not a budget: the per-project models are
-// published on a 0.25 m grid and 10 pkt/m² is 0.32 m mean spacing, so asking
-// for finer buys pixels and no detail.
+// 0.25 m is the data's floor: the per-project models are published on a 0.25 m
+// grid and 10 pkt/m² is 0.32 m mean spacing.
 export function nativeResolutionMetersPerPx(source: LidarSource): number {
   if (source.kind === 'national') return 1;
   const d = source.pointDensity;

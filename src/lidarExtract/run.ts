@@ -1,5 +1,4 @@
 // One (source × style) stitched at that source's native ground resolution.
-// Zero painted tiles means the rectangle is outside its coverage.
 
 import { isUpstreamDown } from '../upstream/health';
 import { LidarSource, nativeResolutionMetersPerPx } from './sources';
@@ -50,8 +49,8 @@ async function paintTile(
     } catch (err) {
       lastErr = err;
       if (signal.aborted) return { kind: 'aborted' };
-      // Refused by the breaker: no request went out, so the backoff has
-      // nothing to back off from. Fail the tile and let the ribbon say why.
+      // Refused by the breaker: no request went out, so there is nothing to
+      // back off from.
       if (isUpstreamDown(err)) break;
       if (attempt < TILE_MAX_RETRIES) {
         await sleep(TILE_RETRY_BASE_MS * 2 ** attempt, signal);
@@ -74,8 +73,7 @@ export type ExtractedCanvas = {
 
 /**
  * `null` when nothing painted and nothing failed — no coverage; a run where
- * every tile errored throws instead. Cancellation is the caller's `signal`,
- * never a module-level one, so a background grab cannot cancel a foreground.
+ * every tile errored throws instead.
  */
 export async function extractCanvas(
   bbox25833: [number, number, number, number],
@@ -122,8 +120,7 @@ export async function extractCanvas(
   // Throwing, not null: null means "no coverage" and is acted on below.
   if (signal?.aborted) throw new Error('extract cancelled');
 
-  // `null` reaches the pin queue as `empty`, the one state whose card offers
-  // no retry, so a network blip must not produce it.
+  // A network blip must not be reported as no coverage.
   if (painted === 0 && failed > 0) {
     throw new Error(`every tile failed: ${source.label} / ${style}`);
   }
@@ -138,7 +135,6 @@ export async function extractCanvas(
   };
 }
 
-// Abortable sleep, so the retry loop can bail on cancel.
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) return reject(new Error('aborted'));

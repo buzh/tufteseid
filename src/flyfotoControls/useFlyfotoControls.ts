@@ -1,14 +1,5 @@
-// The Flyfoto arm's controller: the seamless NiB mosaic, or one acquisition
-// out of the archive over the viewport.
-//
-// One per half, and the half is the only thing that differs between them. The
-// list is one cached ArcGIS query per moveend rather than LiDAR's WFS fan-out,
-// so two panes both on Flyfoto cost one duplicate query — answered out of
-// wmscache, since the two ask the same viewport the same question.
-//
-// Only queried while Flyfoto is that half's ground. The archive index is an
-// upstream call on every pan, and an arm that is not on screen has nobody to
-// answer.
+// The archive index is one ArcGIS query per moveend, so it is only asked while
+// Flyfoto is that half's ground.
 
 import { useAtom, useAtomValue } from 'jotai';
 import { transformExtent } from 'ol/proj';
@@ -23,8 +14,8 @@ import {
 } from '../map/layers/config/backgroundLayers/flyfotoProjects';
 import { countByEra, filterByEra, type FlyfotoEra } from './eras';
 
-// Furthest out the acquisition list is worth answering: a flight covers a town,
-// so a regional view already intersects several hundred of them.
+// Furthest out the list is worth answering: a flight covers a town, so a
+// regional view already intersects several hundred of them.
 const MIN_FLYFOTO_ZOOM = 8;
 
 // Matches REFRESH_DEBOUNCE_MS in lidarFootprintsLayer.ts; the two viewport
@@ -65,8 +56,7 @@ export const useFlyfotoControls = (half: CompareHalf) => {
   useEffect(() => {
     if (!isFlyfotoBackground) return;
     let cancelled = false;
-    // Panning fires refreshes faster than the service answers, so only the
-    // newest may write.
+    // Panning refreshes faster than the service answers; only the newest writes.
     let latestRequest = 0;
     let inFlight: AbortController | null = null;
 
@@ -113,10 +103,6 @@ export const useFlyfotoControls = (half: CompareHalf) => {
     };
 
     refresh();
-    // Same 250 ms as the LiDAR footprint pass, for the same reason: a pan that
-    // ends in two or three quick moveends should cost one archive query rather
-    // than three. Aborting the superseded ones cuts our wait, not the work the
-    // ImageServer has already started.
     let debounce: number | undefined;
     const onMoveEnd = () => {
       window.clearTimeout(debounce);
@@ -128,15 +114,12 @@ export const useFlyfotoControls = (half: CompareHalf) => {
       window.clearTimeout(debounce);
       inFlight?.abort();
       map.un('moveend', onMoveEnd);
-      // Emptied on the way out, not on the way in: the rows belong to a
-      // viewport read while Flyfoto was the ground, and a reader who leaves,
-      // pans across the country and comes back must not be shown the last
-      // place's flights while the next query lands.
+      // Emptied on the way out, not on the way in: the rows belong to the
+      // viewport they were read over.
       setViewport(EMPTY_VIEWPORT);
     };
   }, [map, isFlyfotoBackground]);
 
-  // The period-filtered list, which is what the rows walk.
   const projects = useMemo(
     () => filterByEra(viewport.projects, era),
     [viewport.projects, era],
@@ -147,8 +130,6 @@ export const useFlyfotoControls = (half: CompareHalf) => {
   );
 
   const activateMosaic = () => setBackgroundLayer('flyfoto');
-  // The acquisition travels with the ground, as the LiDAR flight does, so the
-  // stack never has to ask whether the two agree.
   const activateProject = (p: FlyfotoProject) => {
     setActiveProject(p);
     setBackgroundLayer('flyfotoProject');
@@ -158,8 +139,7 @@ export const useFlyfotoControls = (half: CompareHalf) => {
     isMosaic,
     isProject,
     activeProject,
-    // `viewport` is the raw query — its status is what the menu reports on;
-    // `projects` is the same list after the period chips, and is what it lists.
+    /** The raw query; `projects` is the same list after the period filter. */
     viewport,
     projects,
     era,
@@ -167,8 +147,7 @@ export const useFlyfotoControls = (half: CompareHalf) => {
     eraCounts,
     activateMosaic,
     activateProject,
-    // The mosaic, always: it is the only member that renders everywhere, and
-    // the acquisition the reader left is kept, so the menu still opens on it.
+    // The mosaic always: it is the only member that renders everywhere.
     enterFlyfoto: () => {
       if (!isFlyfotoBackground) setBackgroundLayer('flyfoto');
     },

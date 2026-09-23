@@ -1,19 +1,5 @@
-// The Kulturminner overlay's controller: whether the heritage record is drawn
-// over the ground, and what of it.
-//
-// Not an arm. The registers go over LiDAR relief, Kartverket's cartography and
-// ortofoto alike, so this belongs to the tool end of the band and is mounted
-// once — and unlike every ground atom, none of the four it drives is a
-// `halved()` pair, so a split view would draw the same overlay on both sides
-// until they are.
-//
-// Four axes, and the band's button is not one of them. `activeThemeLayersAtom`
-// is which of the five RA services are ticked and `heritageHiddenAtom` a blind
-// over all of them at once; on/off is the product of the two, which is what
-// lets the blind keep the ticks across an off and back on. The other two
-// reshape the one service whose WMS request can be reshaped — the registers
-// inside kulturminner2 and the style its sublayers are drawn in, both resolved
-// against RA's tables in `map/layers/heritage.ts`.
+// On/off is the product of `activeThemeLayersAtom` (the ticked RA services) and
+// `heritageHiddenAtom` (a blind over all of them), so the ticks survive an off.
 
 import { useAtom, useAtomValue } from 'jotai';
 import { useEffect, useState } from 'react';
@@ -40,14 +26,12 @@ export const useHeritageControls = () => {
   const [render, setRender] = useAtom(heritageRenderAtom);
   const [opacity, setOpacity] = useAtom(heritageOpacityAtom);
 
-  // On the map, as against ticked: the blind is the difference.
   const shown = !hidden && sources.size > 0;
   const sitesShown = sources.has(RESHAPEABLE_THEME_LAYER);
 
   const toggleShown = () => {
-    // With nothing ticked the button arms the overlay rather than raising a
-    // blind over an empty selection, so reaching the heritage record is one
-    // press on the control named after it.
+    // With nothing ticked, arm the overlay rather than raise a blind over an
+    // empty selection.
     if (sources.size === 0) {
       setSources(new Set([RESHAPEABLE_THEME_LAYER]));
       setHidden(false);
@@ -63,9 +47,7 @@ export const useHeritageControls = () => {
       else next.add(id);
       return next;
     });
-    // The blind is over every source at once, so ticking one has to raise it or
-    // the checkbox answers with nothing on the map. Outside the updater: a
-    // setter is not a place for a side effect.
+    // The blind covers every source at once, so ticking one has to raise it.
     if (!sources.has(id)) setHidden(false);
   };
 
@@ -77,8 +59,6 @@ export const useHeritageControls = () => {
       return next;
     });
 
-  // Fractional, and a pan leaves it alone, so this settles after a zoom rather
-  // than re-rendering the row behind every drag.
   const [zoom, setZoom] = useState<number | null>(
     () => map.getView().getZoom() ?? null,
   );
@@ -91,10 +71,8 @@ export const useHeritageControls = () => {
     };
   }, [map]);
 
-  // Every RA service here is capped below city scale — 300 000 records is an
-  // unreadable wall of pins — so the overlay can be on and drawing nothing at
-  // all. The floor is the lowest of the ticked sources': one that draws is
-  // enough for the map not to be blank.
+  // Every RA service is capped below city scale, so the overlay can be on and
+  // drawing nothing. The floor is the lowest of the ticked sources'.
   const floor = Math.min(
     ...Array.from(sources, (id) => themeLayerMinZoom(id) ?? -Infinity),
   );
@@ -103,7 +81,6 @@ export const useHeritageControls = () => {
   return {
     shown,
     toggleShown,
-    /** The ticked services, blind or no blind. */
     sources,
     toggleSource,
     /** kulturminner2 is ticked, so its registers and renders are on offer. */

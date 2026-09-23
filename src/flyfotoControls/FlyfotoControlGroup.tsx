@@ -1,12 +1,3 @@
-// The Flyfoto arm: one chip, the same shape as the LiDAR dataset menu, because
-// it answers the same question — the seamless product, or one flight over this
-// place.
-//
-// The period filter is inside the dropdown rather than beside the chip. It is
-// not a thing that is showing: it narrows the list the reader is already
-// looking at, and a chip in the band for it would say something about the map
-// that is not true of the map. It appears only once there is a list to narrow.
-//
 // No hover-to-preview footprint as LiDAR has: the archive index is queried with
 // `returnGeometry=false`, so there is no outline to paint.
 
@@ -18,7 +9,6 @@ import { Icon } from '../ui/Icon';
 import { eraLabel, FLYFOTO_ERAS, type FlyfotoEra } from './eras';
 import type { FlyfotoControls } from './useFlyfotoControls';
 
-/** "2023 · 0.1 m/px", the two facts that rank one flight against another. */
 const projectFacts = (p: FlyfotoProject): string =>
   [
     p.year != null ? String(p.year) : null,
@@ -27,8 +17,8 @@ const projectFacts = (p: FlyfotoProject): string =>
     .filter(Boolean)
     .join(' · ');
 
-// The exact date where the archive has one: the project name carries only the
-// year, so two flights over the same town in one year look identical without it.
+// The project name carries only the year, so two flights over one town in one
+// year are told apart by `photoDate`.
 const projectMeta = (p: FlyfotoProject): string =>
   [
     p.photoDate ?? (p.year != null ? String(p.year) : null),
@@ -56,9 +46,6 @@ export const FlyfotoControlGroup = ({
     activateProject,
   } = flyfoto;
 
-  // The year and the resolution, not the project name: the name is where the
-  // reader already is, and the two facts that rank one flight against another
-  // are what the chip is being read for. The name is a hover away in `title`.
   const flight = isProject ? activeProject : null;
   const label = flight
     ? projectFacts(flight) || flight.projectName
@@ -90,8 +77,6 @@ export const FlyfotoControlGroup = ({
     if (projects.length === 0) {
       return (
         <Menu.Item disabled>
-          {/* Never flown here, or not in the chosen period — the second is one
-              click from being undone, so say which. */}
           {viewport.projects.length === 0
             ? t('flyfotoControls.empty')
             : t('flyfotoControls.emptyEra')}
@@ -104,9 +89,6 @@ export const FlyfotoControlGroup = ({
   return (
     <Menu width={360}>
       <Menu.Target>
-        {/* The mosaic is not a flight: it is every flight cut together and kept
-            current, so it keeps the mosaic glyph while an acquisition gets the
-            camera. */}
         <ControlChip
           icon={flight ? 'photo_camera' : 'auto_awesome_mosaic'}
           label={label}
@@ -129,8 +111,6 @@ export const FlyfotoControlGroup = ({
         <Menu.Divider />
         <Menu.Label>{t('flyfotoControls.projectsLabel')}</Menu.Label>
 
-        {/* Only once the viewport has something to narrow: a row of dead
-            periods over an empty list says nothing the empty list does not. */}
         {viewport.projects.length > 0 && (
           <SegmentedControl
             fullWidth

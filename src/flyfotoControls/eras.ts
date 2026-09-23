@@ -1,9 +1,8 @@
 import type { FlyfotoProject } from '../map/layers/config/backgroundLayers/flyfotoProjects';
 
-// Breaks in the Norwegian aerial archive, not round numbers: digital omløp at
-// 0.1–0.25 m from 2010, colour at 0.25–0.5 m from 1990, the systematic national
-// coverage from 1960, and the early flights before that. The labels are year
-// ranges, so they are not translated.
+// Breaks in the Norwegian aerial archive: digital omløp from 2010, colour from
+// 1990, systematic national coverage from 1960. Labels are year ranges, so they
+// are not translated.
 export const FLYFOTO_ERAS = [
   { id: 'e2010', from: 2010, to: null },
   { id: 'e1990', from: 1990, to: 2009 },
@@ -20,8 +19,6 @@ export const eraLabel = (era: (typeof FLYFOTO_ERAS)[number]): string =>
       ? `${era.from}–`
       : `${era.from}–${era.to}`;
 
-// The project year the archive orders by, falling back to the photo date for
-// the rows that carry only that.
 const projectYear = (p: FlyfotoProject): number | null => {
   if (p.year != null) return p.year;
   const fromDate = p.photoDate ? Number(p.photoDate.slice(0, 4)) : NaN;
@@ -46,8 +43,6 @@ export const filterByEra = (
 ): FlyfotoProject[] =>
   era === 'all' ? projects : projects.filter((p) => inEra(p, era));
 
-/** How many of these the viewport has to offer per period, so a period with
- *  nothing in it can be shown as unavailable rather than as an empty list. */
 export const countByEra = (
   projects: FlyfotoProject[],
 ): Record<FlyfotoEra, number> => {

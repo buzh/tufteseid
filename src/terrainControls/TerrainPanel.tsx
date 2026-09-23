@@ -1,25 +1,3 @@
-// What the analysis is made of, in a box floating on the map.
-//
-// Not a dropdown off the band. Every control in here changes a picture the
-// reader is looking at while they turn it — a sun moves across relief, a radius
-// opens or closes a hollow, a transparency lets the ground back through — and a
-// menu that covers the map and closes on the first click makes each of those a
-// round trip. The box costs a corner of the view; the fold in the header gives
-// it back without dropping the grid.
-//
-// The eight visualizations are a pulldown rather than eight rows, because they
-// are the tallest thing in here and the one setting a reader picks once. The
-// list they are in is a taxonomy, not an order of preference: lit views, then
-// the composite, then the views that need no light source at all. The meaning
-// of whichever one is chosen is the line under it.
-//
-// The top of the box is one button that is either `Start` or `Juster`, never
-// both, because they are the two ends of one thing: the rectangle is being
-// placed, or it is being read. `Start` is the only control in the app that
-// begins a download of this size, so it is filled and it is the first thing in
-// the box; `Juster` is quiet, because getting back to the rectangle is cheap
-// and frequent.
-
 import { Button, Divider, Select, Slider, Stack, Text, Tooltip } from '@mantine/core';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,10 +9,6 @@ import { Panel } from '../ui/Panel';
 import styles from './TerrainPanel.module.css';
 import type { TerrainControls } from './useTerrainControls';
 
-// Grouped rather than flat, and the grouping is the whole argument for the
-// order: what a lit view shows depends on where you put the sun, what an unlit
-// one shows does not, and VAT sits between them because it holds both and
-// freezes the sun so two VAT renders stay comparable.
 const VIS_GROUPS: readonly {
   key: 'lit' | 'blend' | 'unlit';
   items: readonly Visualization[];
@@ -61,13 +35,7 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
     setOpacity,
   } = terrain;
 
-  // Four states in one line, in the order they happen: the rectangle being
-  // placed, the fetch, what it found, and — the usual case — what is on the
-  // map. While it is being placed the line is a live readout of the drag, which
-  // is the only number saying how much ground is under the hand. The capped
-  // wording is the only one of the two resolutions that is actionable, and on a
-  // rectangle inside the cap it can never appear, since the grid is exact there
-  // by construction.
+  // The capped wording needs 5 % slack: inside `MAX_SIDE_M` the grid is exact.
   const status = adjusting
     ? t('terrainControls.placing', { side: sideMetres })
     : loading
@@ -87,10 +55,8 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
             )
           : undefined;
 
-  // VAT is in neither list although it holds a hillshade and a slope: its sun
-  // and its exaggeration are frozen (`VAT_PRESETS`) so that two VAT renders of
-  // different places stay comparable, and a knob here would break that without
-  // saying so.
+  // VAT holds a hillshade and a slope but takes no knobs: its sun and
+  // exaggeration are frozen (`VAT_PRESETS`) so two renders stay comparable.
   const sunDependent = vis === 'hillshade';
   const usesZFactor =
     vis === 'hillshade' || vis === 'multiHillshade' || vis === 'slope';
@@ -98,11 +64,6 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
   const isDom = model === 'dom';
 
   return (
-    // The close drops the grid, which is 19 MB, and is the same verb as the
-    // switch in the band — the reading survives it (`useTerrainControls` is
-    // mounted either way), the fetch does not. The fold is for looking under
-    // the box, which is the cheap half of that and the one wanted far more
-    // often.
     <Panel
       className={styles.panel}
       title={t('terrainControls.label')}
@@ -110,11 +71,6 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
       onClose={terrain.close}
     >
       <Stack gap="xs">
-        {/* The rectangle first: it is what everything under it is a
-            picture of, and the one thing in here the reader has to move
-            rather than set. The why is in the tooltip — it is a paragraph,
-            and a paragraph pinned open in a box this size is the paragraph
-            you stop reading. */}
         {adjusting ? (
           <Tooltip label={t('terrainControls.startHint')}>
             <Button
@@ -151,8 +107,6 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
           description={t(`terrainControls.visMeta.${vis}`)}
           inputWrapperOrder={['label', 'input', 'description']}
           value={vis}
-          // Deselecting would leave the box with a render on the map and
-          // nothing naming it.
           allowDeselect={false}
           onChange={(value) => value && setVis(value as Visualization)}
           data={VIS_GROUPS.map(({ key, items }) => ({
@@ -164,10 +118,6 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
           }))}
         />
 
-        {/* Bare earth against first return — the same ground with and
-            without what grows on it and what is built on it. The same
-            split box the LiDAR ground wears in the band, because it is the
-            same choice over the same two models; here it also refetches. */}
         <div className={styles.row}>
           <span className={styles.rowLabel}>
             {t('terrainControls.modelHead')}
@@ -193,16 +143,6 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
           </Tooltip>
         </div>
 
-        {/* Only the sliders this visualization reads, absent rather than
-            disabled: two tracks for sky-view factor, four for a
-            hillshade, one for VAT.
-
-            And none at all while the rectangle is being placed. There is
-            nothing on the map for a sun to move across, and the box is
-            standing over the ground the reader is in the middle of
-            choosing — the shortest it can be is the most useful it can be.
-            The two above stay because both of them change what gets
-            fetched. */}
         {!adjusting && <Divider />}
         {!adjusting && sunDependent && (
           <SliderRow
@@ -237,12 +177,8 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
             onChange={terrain.setZFactor}
           />
         )}
-        {/* One control over two quantities: LRM's smoothing distance and
-            the horizon search distance. Keyed on the visualization and the
-            ceiling — the only two ways the value moves without the slider
-            moving — but never on the value, which would remount it on
-            every commit and drop focus mid arrow-key. Deferred for the
-            horizon views, whose scan is some 800 ms a pass. */}
+        {/* Keyed on the visualization and the ceiling, never on the value:
+            that would remount the slider on every commit and drop focus. */}
         {!adjusting && radiusLimits && (
           <SliderRow
             key={`${vis}-${radiusLimits.max}`}
@@ -260,8 +196,8 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
             onChange={terrain.setRadius}
           />
         )}
-        {/* Counted as transparency — 0 % is fully covering — while the
-            controller holds opacity, which is what OpenLayers wants. */}
+        {/* Transparency here — 0 % is fully covering — opacity in the
+            controller, which is what OpenLayers takes. */}
         {!adjusting && (
           <SliderRow
             label={t('terrainControls.transparency')}
@@ -278,9 +214,8 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
   );
 };
 
-// Heading, readout and track. With `deferred` the thumb and the heading still
-// track the drag but the caller only hears about it on release, which is what
-// keeps a multi-second recompute off every frame of one.
+// With `deferred` the thumb tracks the drag but the caller hears only on
+// release, which keeps a multi-second recompute off every frame of it.
 const SliderRow = ({
   label,
   value,
@@ -300,8 +235,8 @@ const SliderRow = ({
   deferred?: boolean;
   onChange: (value: number) => void;
 }) => {
-  // Only read while deferred; the caller keys this on whatever the value
-  // belongs to, so there is no outside change for the draft to miss.
+  // Read only while deferred: the caller keys this component on whatever the
+  // value belongs to, so there is no outside change for the draft to miss.
   const [draft, setDraft] = useState(value);
   const shown = deferred ? draft : value;
 

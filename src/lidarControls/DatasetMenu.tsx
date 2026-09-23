@@ -1,12 +1,3 @@
-// Which LiDAR dataset the map is reading: the national mosaic, or one
-// acquisition. Rows come off `lidarViewportAtom`, which the footprint layer
-// fills from the same WFS pass that draws the outlines — so hovering a row
-// paints where it lies.
-//
-// Automatisk is not a row here; it is the button beside the chip. While it is
-// on this menu is dimmed and every row in it still works — clicking one is how
-// the reader takes the choice back.
-
 import { Badge, Group, Menu, ScrollArea, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import type { LidarProject } from '../map/layers/config/backgroundLayers/lidarProjects';
@@ -16,7 +7,6 @@ import { Icon } from '../ui/Icon';
 import styles from './controls.module.css';
 import type { LidarControls } from './useLidarControls';
 
-/** "2025 · 10pkt", the two things that rank one flight against another. */
 const flightFacts = (p: LidarProject): string =>
   [p.year, p.pointDensity].filter(Boolean).join(' · ');
 
@@ -36,10 +26,6 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
     setHoveredProjectId,
   } = lidar;
 
-  // The year and the density, not the project name: "Vestfold" is where the
-  // reader already is, while the two facts that rank one flight against another
-  // are what the chip is being read for. The name is a hover away in `title`,
-  // and spelled out on the checked row of the menu this opens.
   const flight = isLidarFlight ? activeLidarProject : null;
   const shown = flight
     ? flightFacts(flight) || flight.projectName
@@ -48,8 +34,7 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
     ? `${flight.projectName} · ${flightFacts(flight)}`
     : `${t('lidarControls.dataset.national')} · ${t('lidarControls.dataset.nationalHint')}`;
 
-  // Kartverket is not answering and the rows are the cVAT store's own. They are
-  // described differently for it: see the two places below.
+  // Kartverket is not answering; the rows are the cVAT store's own.
   const held = viewport.status === 'held';
 
   const row = (entry: LidarViewportEntry) => {
@@ -68,9 +53,8 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
         <Group gap="xs" wrap="nowrap" justify="space-between">
           <div>
             <Text size="sm">{project.projectName}</Text>
-            {/* No percentage on a held row: that list is ranked on the store's
-                envelopes, so the number would be an upper bound printed as a
-                measurement. The facts off the acquisition's name still hold. */}
+            {/* Held rows are ranked on the store's envelopes, so a coverage
+                percentage would be an upper bound rather than a measurement. */}
             <Text size="xs" c="dimmed">
               {held
                 ? flightFacts(project)
@@ -79,10 +63,6 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
                   })}`}
             </Text>
           </div>
-          {/* The store having rendered a flight is not a tiebreak — it does not
-              make the flight a better reading of the ground. It is said here
-              because it is the difference between the two pictures the reader
-              can ask for of it. */}
           {cachedFlightIds.has(project.id) && (
             <Badge size="xs" variant="light" leftSection={<Icon icon="database" size={12} />}>
               {t('lidarControls.dataset.cached')}
@@ -106,9 +86,6 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
         </Menu.Item>
       );
     }
-    // Not an error line: the rows below it are real and every one of them
-    // draws. What it says is why the list is short and why the mosaic under it
-    // has holes today.
     if (viewport.status === 'held') {
       return (
         <Menu.Item disabled leftSection={<Icon icon="cloud_off" size={18} />}>
@@ -139,10 +116,6 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
       width={360}
     >
       <Menu.Target>
-        {/* A flight is one aircraft over one county on one day, and the chip's
-            own facts — the year and the density — are facts about that flight.
-            The mosaic is not a flight: it keeps `layers`, because what it is is
-            every flight stacked and levelled to 1 m. */}
         <ControlChip
           icon={flight ? 'flight' : 'layers'}
           label={shown}
@@ -163,9 +136,6 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
           }
         >
           <Text size="sm">{t('lidarControls.dataset.national')}</Text>
-          {/* Still offered during an outage, and still the right row for ground
-              no flight in the store reaches — but it is no longer seamless, so
-              it must not go on saying it is. */}
           <Text size="xs" c="dimmed">
             {held
               ? t('lidarControls.dataset.nationalHeldHint')

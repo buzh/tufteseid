@@ -1,29 +1,3 @@
-// What the overlay is made of, behind the chip joined to the button. It stands
-// whether the overlay is on or off — off, what it sets is what will draw when
-// the reader presses the castle again (`HeritageControlGroup`).
-//
-// Nothing on the chip but the chevron, which makes it a third the width of the
-// castle beside it. The other chips in the band are readouts
-// of a choice the map cannot show — which of five kart variants is drawing, or
-// which flight — but what this menu sets is the overlay itself, and the overlay
-// is right there on the terrain. A chip that named it would be saying a second
-// time what the reader is already looking at, and saying it at a width that
-// changed from "Omriss" to "3 kilder" as they went, pushing everything to its
-// right along the band. No glyph either: it shares a box with the castle, and a
-// second subject an eighth of an inch away is what that would read as.
-//
-// A Popover rather than a Menu. Every row in here is a setting the reader
-// leaves set — five sources, three registers inside one of them, one render out
-// of seven, and a transparency — and a Menu closes on the first click, which
-// would make ticking two sources two trips.
-//
-// The readout the chip no longer carries is in its `title`: the ticked sources
-// and the render, one hover away. What cannot wait for a hover is that the map
-// is too far out for any of them (`useHeritageControls`) — the overlay is on,
-// the register is not empty, and nothing is drawn — so that state turns the
-// chip red, which is what this row's other boxes do when what was asked for is
-// not on the map.
-
 import {
   Checkbox,
   Divider,
@@ -53,9 +27,8 @@ import type { HeritageControls } from './useHeritageControls';
 
 const SOURCES = themeLayerConfig.layers.map((l) => l.id as ThemeLayerName);
 
-// The atom holds opacity, which is what the WMS layers and `?heritageOpacity`
-// take; the slider is counted as transparency, where 0 % is full strength and
-// the floor under the opacity becomes the ceiling over the track.
+// The atom holds opacity, as the WMS layers and `?heritageOpacity` do; the
+// slider is transparency, so the opacity floor is the track's ceiling.
 const MAX_TRANSPARENCY = Math.round(100 - MIN_HERITAGE_OPACITY * 100);
 
 export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
@@ -78,10 +51,7 @@ export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
   const names = SOURCES.filter((id) => sources.has(id)).map((id) =>
     themeLayerName(id, i18n.language),
   );
-  // The render is a property of kulturminner2 alone, so with that source off it
-  // would name something nobody can see. Say what is drawing instead — and with
-  // the overlay off nothing is drawing at all, so the hover says what the menu
-  // is for rather than reading out a selection the reader cannot see.
+  // The render is a property of kulturminner2 alone.
   const title = [
     !shown
       ? t('heritageControls.chipHiddenTitle')
@@ -130,9 +100,8 @@ export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
                   checked={sources.has(id)}
                   onChange={() => toggleSource(id)}
                 />
-                {/* kulturminner2's three registers, only while it is on: they
-                    are sublayers of one request, and ticking one does not put
-                    the source on the map. */}
+                {/* kulturminner2's three registers are sublayers of one
+                    request, so ticking one does not put the source on the map. */}
                 {id === RESHAPEABLE_THEME_LAYER && sitesShown && (
                   <Stack gap={6} ml="lg">
                     {HERITAGE_DETAILS.map((detail) => (
@@ -152,15 +121,14 @@ export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
             {sitesShown && (
               <>
                 <Divider />
-                {/* One axis, not two: WMS takes a single STYLES value per
-                    LAYERS entry, so "heldekkende" and "bare de fredede" are
-                    seven radio rows rather than a render and a filter. */}
+                {/* WMS takes a single STYLES value per LAYERS entry, so render
+                    and subset are seven radio rows rather than two axes. */}
                 <Radio.Group
                   value={render}
                   onChange={(value) => setRender(value as HeritageRender)}
                   label={t('heritageControls.renderHead')}
-                  // The heads in here are all one size, and the group's own is
-                  // an `Input.Label` — md and semibold unless it is told.
+                  // The group's label is an `Input.Label`: md and semibold
+                  // unless it is told otherwise.
                   labelProps={{ size: 'xs', c: 'dimmed', fw: 400 }}
                 >
                   <Stack gap={6} mt={6}>
