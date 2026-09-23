@@ -1,8 +1,8 @@
 /** The theme's papaya, the same orange the pin is drawn in. */
 export const PEN_STROKE_COLOUR = '#ff6a00';
 
-/** Only the tools that put something on the ground are remembered: Excalidraw
- *  reverts to `selection` by itself once a shape is finished. */
+/** Only the tools that put something on the ground: Excalidraw reverts to
+ *  `selection` by itself once a shape is finished. */
 const PEN_TOOLS = [
   'freedraw',
   'line',
@@ -38,7 +38,7 @@ const stored = (): Pen | null => {
   }
 };
 
-/** The stored value once it has been read. `undefined` means not yet. */
+/** `undefined` until localStorage has been read. */
 let known: Pen | null | undefined;
 
 /** What the reader last reached for, or null if they have not drawn yet. */
@@ -57,6 +57,6 @@ export const rememberPen = (tool: string, locked: boolean) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(known));
   } catch {
-    // Ignore quota / unavailable storage: a forgotten tool costs one click.
+    // Quota or unavailable storage: a forgotten tool costs one click.
   }
 };

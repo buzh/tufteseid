@@ -19,10 +19,10 @@ import {
 import { activeSpotAtom } from './atoms';
 
 // Read at import: the writer effect below deletes `lok` on first render, so a
-// read at that point would race the parameter out of existence.
+// later read would race the parameter out of existence.
 const bootCode = getUrlParameter('lok');
 
-export const shareUrlOf = (code: string): string =>
+const shareUrlOf = (code: string): string =>
   `${window.location.origin}/l/${code}`;
 
 const LINK_ZOOM = 16;
@@ -35,14 +35,13 @@ export const useSpotShareLink = () => {
   const setAuthDialogOpen = useSetAtom(isAuthDialogOpenAtom);
   const setAuthPrompt = useSetAtom(authPromptAtom);
 
-  /** Whether the boot code has had its answer; until then the writer effect
-   *  must not delete the parameter. */
+  /** Until the boot code has its answer the writer effect below must not
+   *  delete the parameter. */
   const settled = useRef(bootCode == null);
   const unresolved = useRef(bootCode);
 
   // Re-runs on a change of user, so signing in retries a code a guest could
-  // not see. pb.authStore rehydrates at import, so the first run carries any
-  // stored token.
+  // not see.
   useEffect(() => {
     const code = unresolved.current;
     if (!code) return;
@@ -64,9 +63,9 @@ export const useSpotShareLink = () => {
           console.warn('[spots] no spot for code', code);
           return;
         }
-        // The server answers a private spot and a missing one with the same
-        // 404, so signed out the sign-in is both the answer and the retry.
-        // `lok` stays on the URL so a reload retries too.
+        // A private spot and a missing one are the same 404, so signed out the
+        // sign-in is both answer and retry. `lok` stays on the URL to survive a
+        // reload.
         setAuthPrompt('spotLink');
         setAuthDialogOpen(true);
       });

@@ -15,8 +15,8 @@ import { PIN_Z_INDEX, draftPinStyle, withinDraftPin } from './pinStyle';
 
 type Store = ReturnType<typeof useStore>;
 
-/** Where the pin stands, in view coordinates. Null with no draft: an
- *  interaction can outlive the draft it was mounted for. */
+/** The pin's position in view coordinates, or null: an interaction can
+ *  outlive the draft it was mounted for. */
 const positionIn = (store: Store, view: string) => {
   const current = store.get(spotDraftAtom);
   if (!current) return null;
@@ -30,8 +30,8 @@ export const useSpotPinAdjust = () => {
   const open = draft !== null;
   const placing = draft?.stage === 'pin';
 
-  // The pin, drawn for the whole draft; the interaction below only while the
-  // stage is `pin`, since the sketch canvas covers the map.
+  // The pin is drawn for the whole draft; the drag interaction below runs only
+  // in the `pin` stage, since the sketch canvas covers the map.
   useEffect(() => {
     if (!open) return;
     const view = map.getView().getProjection().getCode();
@@ -87,7 +87,6 @@ export const useSpotPinAdjust = () => {
       if (!dragging) return;
       const current = store.get(spotDraftAtom);
       if (!current) return;
-      // The tip snaps to the pointer rather than keeping a grab offset.
       const [lon, lat] = transform(event.coordinate, view, 'EPSG:4326');
       store.set(spotDraftAtom, { ...current, point: [lon, lat] });
     };

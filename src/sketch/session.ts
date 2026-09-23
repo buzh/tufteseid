@@ -1,6 +1,6 @@
 // The map element follows the Excalidraw canvas with a CSS transform while the
-// OpenLayers view holds still, which is what keeps the frame the strokes are
-// registered to valid for the whole session.
+// OpenLayers view holds still, which keeps the frame the strokes are registered
+// to valid for the whole session.
 
 import { atom } from 'jotai';
 // Type-only: a value import would pull OpenLayers into the entry graph.
@@ -21,20 +21,18 @@ export type SketchSession = {
 
 export const sketchSessionAtom = atom<SketchSession | null>(null);
 
-// An identity for the canvas to be keyed on: leaving and re-entering the draw
-// stage can happen inside one callback, so React never renders the gap and an
-// unkeyed canvas would keep the previous session's view.
+// Keys the canvas: the draw stage can be left and re-entered inside one
+// callback, and an unkeyed canvas would keep the old session's view.
 let sessions = 0;
 export const nextSessionId = () => (sessions += 1);
 
+type LiveScene = { frame: SketchFrame; read: () => readonly SceneElement[] };
+
 // `spotSketchAtom` lags the pen by a settle (`SketchCanvas`), so anything that
 // reads the drawing in order to keep it goes through `sketchNow`.
-let live: { frame: SketchFrame; read: () => readonly SceneElement[] } | null =
-  null;
+let live: LiveScene | null = null;
 
-export const setLiveScene = (
-  next: { frame: SketchFrame; read: () => readonly SceneElement[] } | null,
-) => {
+export const setLiveScene = (next: LiveScene | null) => {
   live = next;
 };
 
@@ -45,20 +43,18 @@ export const sketchNow = (settled: SpotSketch | null): SpotSketch | null => {
   return elements.length > 0 ? { frame: live.frame, elements } : null;
 };
 
-// Every interaction that was live, switched off and remembered. All of them,
-// not just the panning ones: nothing may move the view. Module-level so the
-// thaw can run from an effect cleanup after its component has gone.
+// Every interaction that was active, not just the panning ones: nothing may
+// move the view. Module-level so the thaw can run from an effect cleanup.
 let frozen: Interaction[] | null = null;
 
-// Client pixels, read while the map element is still untransformed —
-// afterwards `getBoundingClientRect` would measure the transformed rect.
+// Client pixels, read while the map element is still untransformed: afterwards
+// `getBoundingClientRect` would measure the transformed rect.
 let mapOrigin = { x: 0, y: 0 };
 
 // Map pixels per scene unit, and the map pixel the frame's north-west corner
-// sits at. Both degenerate for a freshly captured frame. A resumed drawing
-// needs them: flying back to its rectangle is not flying back to its viewport,
-// since the window may have resized and `constrainResolution` snaps to a zoom
-// level. The transform absorbs the difference.
+// sits at. Degenerate for a freshly captured frame; a resumed one is flown back
+// to a rectangle `constrainResolution` and a resized window have shifted, and
+// the transform absorbs the difference.
 let sceneToMap = { unit: 1, origin: { x: 0, y: 0 } };
 
 /** Where the Excalidraw scene is looking, in its own terms. */
@@ -78,8 +74,8 @@ export type SceneView = {
  * `S = zoom / unit` and the translation below.
  *
  * A CSS transform, not a view change: the view must not move or the frame goes
- * stale, and the transform is invisible to OpenLayers — `getSize()` reads
- * layout and its ResizeObserver watches the content box.
+ * stale, and the transform is invisible to OpenLayers, whose `getSize()` reads
+ * layout and whose ResizeObserver watches the content box.
  */
 export const slaveMapToScene = (map: Map, view: SceneView | null) => {
   const target = map.getTargetElement();

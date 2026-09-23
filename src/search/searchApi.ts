@@ -59,18 +59,7 @@ export const getAddresses = async (
     return res.json();
   } catch (error) {
     console.error(error);
-    return {
-      adresser: [],
-      metadata: {
-        side: 1,
-        totaltAntallTreff: 0,
-        treffPerSide: 100,
-        viserFra: 0,
-        viserTil: 0,
-        sokeStreng: query,
-        utkoordsys: 4258,
-      },
-    };
+    return emptyAddressResult(query);
   }
 };
 

@@ -15,7 +15,7 @@ export const GROUND_MODES = ['lidar', 'kart', 'flyfoto'] as const;
 export type GroundMode = (typeof GROUND_MODES)[number];
 
 /** Null for `empty`, the one background that belongs to no ground. */
-export const groundOf = (name: BackgroundLayerName): GroundMode | null => {
+const groundOf = (name: BackgroundLayerName): GroundMode | null => {
   if (LIDAR_LAYERS.has(name)) return 'lidar';
   if (isKartVariant(name)) return 'kart';
   if (name === 'flyfoto' || name === 'flyfotoProject') return 'flyfoto';

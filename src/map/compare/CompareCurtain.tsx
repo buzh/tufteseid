@@ -1,6 +1,6 @@
-// The grab target and the visible seam only — `compareLayers.ts` does the clip,
+// The grab target and the visible seam only; `compareLayers.ts` does the clip,
 // and the two agree because this shell and the map viewport are the same
-// rectangle. Mounted only while the curtain is the view, so no mode check here.
+// rectangle.
 
 import { useAtom } from 'jotai';
 import { useRef, useState } from 'react';
@@ -22,9 +22,9 @@ export const CompareCurtain = () => {
   const rootRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  // Both writes stay in the handler, not an effect: OL renders on the next
-  // animation frame and React commits before that frame's paint, so seam and
-  // imagery move together. From an effect the clip lags a frame behind the drag.
+  // Both writes stay in the handler, not an effect: React commits before the
+  // next animation frame, so seam and imagery move together. From an effect the
+  // clip lags a frame behind the drag.
   const applySplit = (fraction: number) => {
     const next = clamp(fraction);
     setCurtainSplit(next);

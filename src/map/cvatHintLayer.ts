@@ -19,8 +19,8 @@ import { getXYZLayer } from './layers/config/backgroundLayers/utils';
  *  `bg.` layer that is not in the stack it is installing. */
 const CVAT_HINT_ID_PREFIX = 'cvatHint.';
 
-// Over every ground (0), under hybrid's topo overlay (0.75) and everything
-// above it. See the z-order table in `docs/map-layers.md`.
+// Over every ground (0), under hybrid's topo overlay (0.75). See the z-order
+// table in `docs/map-layers.md`.
 const CVAT_HINT_Z_INDEX = 0.5;
 
 const hintLayers = (map: OlMap): BaseLayer[] =>
@@ -29,11 +29,8 @@ const hintLayers = (map: OlMap): BaseLayer[] =>
     .getArray()
     .filter((l) => String(l.get('id') ?? '').startsWith(CVAT_HINT_ID_PREFIX));
 
-/**
- * One acquisition's layer. `getXYZLayer` supplies the extent culling, without
- * which every acquisition asks for the whole screen and takes hundreds of 404s
- * per pan.
- */
+/** One acquisition's layer. `getXYZLayer` supplies the extent culling, without
+ *  which every acquisition takes hundreds of 404s per pan. */
 const buildHintLayer = (acquisition: CvatAcquisition) => {
   const layer = getXYZLayer(buildCvatGroundConfig(acquisition));
   if (!layer) return null;
@@ -65,8 +62,7 @@ export const useCvatHintLayer = () => {
   }, []);
 
   useEffect(() => {
-    // Worst first: layers sharing a z-index draw in the order they were added,
-    // so the highest-ranked overlapping flight ends up on top.
+    // Worst first: layers sharing a z-index draw in the order they were added.
     const ordered = [...cached]
       .sort((a, b) => sortProjectsByRelevance(a.project, b.project))
       .reverse();

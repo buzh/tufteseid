@@ -56,11 +56,8 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
   /** Once the author has typed a name, the register never writes it again. */
   const nameTouched = useRef(draft.recordId != null);
 
-  /**
-   * The baseline `dirty` is measured against. `SpotSurface` keys the draft box
-   * on `draft.id`, so this hook mounts once per draft. State rather than a ref
-   * because `dirty` is read while rendering.
-   */
+  /** The baseline `dirty` is measured against. State rather than a ref because
+   *  `dirty` is read while rendering. */
   const [opened, setOpened] = useState({
     name: form.name,
     description: form.description,
@@ -88,15 +85,13 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
     setSuggesting(true);
 
     const timer = setTimeout(() => {
-      // Degrees — `ost`/`nord` with `koordsys=4326` — which is what the draft
-      // holds.
+      // Degrees: the draft's point is EPSG:4326.
       void suggestSpotName(lon, lat, 'EPSG:4326').then((suggestion) => {
         if (!live) return;
         setSuggesting(false);
         if (suggestion && !nameTouched.current) {
           setForm((current) => ({ ...current, name: suggestion }));
-          // The register wrote it, not the reader: move the baseline so it is
-          // not counted as work to lose.
+          // The register wrote it, not the reader, so move the baseline too.
           setOpened((current) => ({ ...current, name: suggestion }));
         }
       });
@@ -112,8 +107,8 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
   const name = form.name.trim();
   const canSave = user != null && name.length > 0 && !saving;
 
-  // The drawing is compared by identity, so putting the pen down having
-  // changed nothing still counts as dirty.
+  // The drawing is compared by identity, so putting the pen down having changed
+  // nothing still counts as dirty.
   const dirty =
     form.name !== opened.name ||
     form.description !== opened.description ||
@@ -122,11 +117,10 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
   const save = useCallback(() => {
     if (!user || !name) return;
 
-    // Reads the live canvas, not the settled scene, so a `Lagre` on the tail
-    // of a stroke keeps that stroke.
+    // The live canvas, not the settled scene, so saving on the tail of a stroke
+    // keeps that stroke.
     const drawing = sketchNow(sketch);
-    // The `sketch` column is capped at 5 MB server side; checked here so the
-    // failure is not a 400 after the work is done.
+    // Checked here so the 5 MB column cap is not a 400 after the work is done.
     if (sketchBytes(drawing) > SKETCH_BUDGET_BYTES) {
       setSketchTooBig(true);
       return;
@@ -153,8 +147,8 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
         closeDraft();
       })
       .catch((err: unknown) => {
-        // A PocketBase validation error always reads "Failed to create
-        // record."; the field at fault is only in `response.data`.
+        // A PocketBase validation message names no field; the one at fault is
+        // only in `response.data`.
         console.warn(
           '[spots] save failed',
           err,

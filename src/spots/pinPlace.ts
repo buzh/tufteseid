@@ -36,26 +36,25 @@ export const useSpotPlacement = () => {
     const cursor = cursorLease(viewport);
     cursor.set('crosshair');
 
-    /** Where the pointer last was, in pixels. */
-    let at: number[] | null = null;
+    let lastPixel: number[] | null = null;
 
     const onMove = (event: MapBrowserEvent) => {
       if (event.dragging) return;
       cursor.set('none');
-      at = event.pixel;
+      lastPixel = event.pixel;
       pin.setGeometry(new Point(event.coordinate));
     };
 
-    // The pin is drawn on the ground: a wheel zoom is no pointer move, so
-    // re-place it from the last pixel once the movement ends.
+    // A wheel zoom is no pointer move, so re-place the pin from the last pixel
+    // once the movement ends.
     const onMoveEnd = () => {
-      if (!at) return;
-      const coordinate = map.getCoordinateFromPixel(at);
+      if (!lastPixel) return;
+      const coordinate = map.getCoordinateFromPixel(lastPixel);
       if (coordinate) pin.setGeometry(new Point(coordinate));
     };
 
     const onLeave = () => {
-      at = null;
+      lastPixel = null;
       pin.setGeometry(undefined);
       cursor.set('crosshair');
     };

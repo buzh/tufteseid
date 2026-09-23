@@ -3,7 +3,7 @@ import { atom } from 'jotai';
 import type { SpotPoint, SpotRecord, SpotSketch } from '../api/spots';
 
 export type SpotDraft = {
-  /** New every time a pin goes down; surfaces key off it to remount. */
+  /** New per draft; surfaces key off it to remount. */
   id: string;
   recordId: string | null;
   point: SpotPoint;

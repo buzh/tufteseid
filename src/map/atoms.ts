@@ -9,9 +9,9 @@ import { validateProjectionIdString } from '../shared/utils/enumUtils';
 import { getUrlParameter, setUrlParameter } from '../shared/utils/urlUtils';
 import { ProjectionIdentifier } from './projections/types';
 
-export const DEFAULT_PROJECTION: ProjectionIdentifier = 'EPSG:25833';
-export const DEFAULT_ZOOM_LEVEL = 3;
-export const DEFAULT_CENTER = [396722, 7197860]; // Center in EPSG:25833
+const DEFAULT_PROJECTION: ProjectionIdentifier = 'EPSG:25833';
+const DEFAULT_ZOOM_LEVEL = 3;
+const DEFAULT_CENTER = [396722, 7197860]; // EPSG:25833
 
 const getInitialMapView = () => {
   const projectionIdFromUrl = validateProjectionIdString(
@@ -32,7 +32,7 @@ const getInitialMapView = () => {
     const parsedLon = parseFloat(lon);
     const parsedLat = parseFloat(lat);
     if (!Number.isNaN(parsedLon) && !Number.isNaN(parsedLat)) {
-      // `lon`/`lat` are the raw centre in the `projection` parameter's CRS.
+      // Despite the names, these are in the `projection` parameter's CRS.
       initialCenter = [parsedLon, parsedLat];
     }
   }
@@ -66,14 +66,12 @@ export const mapAtom = atom<Map>(() => {
       pinchRotate: false,
     }),
     keyboardEventTarget: document,
-    // Default 16 starves the ~130 ms topo base: a cold LiDAR tile takes 3-12 s
-    // and a screenful of them pins every slot.
+    // The default 16 starves the topo base: a cold LiDAR tile takes 3-12 s and
+    // a screenful of them pins every slot.
     maxTilesLoading: 48,
   });
 
-  const intialView = getInitialMapView();
-
-  map.setView(intialView);
+  map.setView(getInitialMapView());
   map.on('moveend', (e) => {
     const view = e.map.getView();
     const center = view.getCenter();

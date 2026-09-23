@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useReducer } from 'react';
 
 // RA serves `linkkulturminnesok` on every record, but part of the register is
-// not in Kulturminnesøk's index and the miss is silent: HTTP 200 with an
+// not in Kulturminnesøk's index and a miss comes back as HTTP 200 with an
 // all-null body, so a null `externalid` is the miss. Same-origin through
 // wmscache (`/kms/*`) because the API sends no CORS headers.
 
@@ -42,33 +42,22 @@ const probe = (id: string): Promise<KulturminnesokStatus> => {
   return request;
 };
 
-/** Status of one `linkkulturminnesok` URL. `unknown` on the first render, so a
- * slow or broken probe costs the mark and never the link. */
+/** Status of one `linkkulturminnesok` URL. `unknown` until the probe answers,
+ *  so a slow or broken one costs the mark and never the link. */
 export const useKulturminnesokStatus = (link: string): KulturminnesokStatus => {
   const id = kulturminnesokId(link);
-  const [status, setStatus] = useState<KulturminnesokStatus>(() =>
-    id ? (answers.get(id) ?? 'unknown') : 'unknown',
-  );
+  const [, rerender] = useReducer((n: number) => n + 1, 0);
 
   useEffect(() => {
-    if (!id) {
-      setStatus('unknown');
-      return;
-    }
-    const known = answers.get(id);
-    if (known) {
-      setStatus(known);
-      return;
-    }
+    if (!id || answers.has(id)) return;
     let live = true;
-    setStatus('unknown');
-    void probe(id).then((next) => {
-      if (live) setStatus(next);
+    void probe(id).then(() => {
+      if (live) rerender();
     });
     return () => {
       live = false;
     };
   }, [id]);
 
-  return status;
+  return (id && answers.get(id)) || 'unknown';
 };

@@ -34,7 +34,7 @@ export const storableScene = (
 // (`pb_migrations/1700001100_spots.js`).
 export const SKETCH_BUDGET_BYTES = 4000000;
 
-// UTF-8 bytes, not `String.length`: the server cap is in bytes, and æ/ø/å cost
+// UTF-8 bytes, not `String.length`: the server cap is in bytes and æ/ø/å cost
 // two apiece.
 export const sketchBytes = (sketch: SpotSketch | null): number =>
   sketch ? new TextEncoder().encode(JSON.stringify(sketch)).length : 0;

@@ -2,14 +2,14 @@ import PocketBase from 'pocketbase';
 
 import { getEnv } from '../env';
 
-// LocalAuthStore rehydrates the session on construction, so the first request
-// of a cold load already carries whatever token localStorage held.
+// LocalAuthStore rehydrates from localStorage on construction, so the first
+// request of a cold load already carries any stored token.
 export const pb = new PocketBase(getEnv().pocketbaseUrl);
 
 export type Role = 'guest' | 'user' | 'admin';
 
-// `role` is optional: PocketBase populates only its own fields when it
-// auto-provisions an OAuth signup, so a missing one reads as 'user'.
+// `role` is absent on an OAuth auto-provisioned account; missing reads as
+// 'user'.
 export type SiteUser = {
   id: string;
   email: string;

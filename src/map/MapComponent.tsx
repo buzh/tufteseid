@@ -26,8 +26,7 @@ export const MapComponent = () => {
   const viewMode = useAtomValue(viewModeAtom);
   useAtom(themeLayerEffect);
   useAtom(backgroundLayerAtomEffect);
-  // Also runs the WFS pass that fills `lidarViewportAtom`, whether or not the
-  // ribbon's dataset menu is open.
+  // Also runs the WFS pass that fills `lidarViewportAtom`.
   useLidarFootprintsLayer();
   useCvatHintLayer();
   useAtom(compareLayerAtomEffect);

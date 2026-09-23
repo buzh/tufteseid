@@ -57,7 +57,7 @@ export const useSpotLayer = () => {
     map.addLayer(layer);
 
     // The style function is built once and lives as long as the layer, so
-    // anything closed over here would stay at its first-render value. Read
+    // anything closed over here would stick at its first-render value: read
     // from the store and redraw off a subscription instead.
     const unsubscribe = [
       store.sub(activeSpotAtom, () => layer.changed()),
@@ -75,8 +75,8 @@ export const useSpotLayer = () => {
     };
   }, [map, source, store]);
 
-  // The list where there is one, the followed link until then. Null once the
-  // list is up, so opening a spot does not rebuild every feature.
+  // The followed link only until the list lands; null afterwards, so opening a
+  // spot does not rebuild every feature.
   const linkOnly = records ? null : active;
   useEffect(() => {
     const view = map.getView().getProjection().getCode();

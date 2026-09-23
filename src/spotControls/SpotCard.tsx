@@ -15,7 +15,7 @@ import styles from './SpotBox.module.css';
 
 type Failure = 'visibility' | 'delete' | 'copy';
 
-// Spelled out rather than interpolated into `t()`, so the keys are greppable.
+// Spelled out so the `t()` keys stay greppable.
 const FAILURE_TEXT: Record<Failure, string> = {
   visibility: 'spots.visibilityFailed',
   delete: 'spots.deleteFailed',

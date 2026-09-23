@@ -18,15 +18,14 @@ import { DEFAULT_INFO_FORMAT } from './types';
 
 export type QueryableWMSLayer = TileLayer | ImageLayer<ImageWMS>;
 
-// Not `getVisible()`, which is only the checkbox: the Kulturminner category
-// carries `minZoom: 8` and draws nothing below it while still reporting
-// visible. `isVisible` folds in the zoom, resolution and extent limits.
+// Not `getVisible()`, which is only the checkbox: a layer with `minZoom: 8`
+// still reports visible below it. `isVisible` folds in the zoom, resolution and
+// extent limits.
 const isRendering = (layer: BaseLayer, map: OLMap): boolean =>
   layer instanceof Layer && layer.isVisible(map.getView());
 
 /** The WMS layers a click can be put to: queryable, drawing at this zoom, and
- *  among `ids` — scoped by id rather than by the `theme.` prefix, so the caller
- *  decides which registers may answer. */
+ *  among `ids`. */
 export const getQueryableWMSLayers = (
   map: OLMap,
   ids: ReadonlySet<string>,
@@ -53,7 +52,7 @@ export const getQueryableWMSLayers = (
     });
 };
 
-export const buildFeatureInfoUrl = (
+const buildFeatureInfoUrl = (
   layer: QueryableWMSLayer,
   coordinate: Coordinate,
   map: OLMap,
@@ -310,7 +309,7 @@ const parseHtmlFeatureInfo = (html: string): FeatureInfoFeature[] => {
   ];
 };
 
-export const parseFeatureInfo = (
+const parseFeatureInfo = (
   data: string | object,
   contentType: string,
 ): FeatureInfoFeature[] => {
@@ -346,9 +345,8 @@ export const parseFeatureInfo = (
 };
 
 // Keyed by the GetFeatureInfo URL, which carries the sublayers, styles, tile
-// bbox and pixel, so a reshaped register or a panned map is a different key and
-// nothing needs invalidating. Eviction is by age, not use: a `Map` iterates in
-// insertion order.
+// bbox and pixel, so nothing needs invalidating. Eviction is by age, not use: a
+// `Map` iterates in insertion order.
 const MEMO_LIMIT = 400;
 const memo = new Map<string, FeatureInfoFeature[]>();
 
@@ -360,9 +358,8 @@ const remember = (key: string, features: FeatureInfoFeature[]) => {
   memo.set(key, features);
 };
 
-/** Well under wmscache's 30 s read timeout, so a hung request is dropped here
- *  rather than held open. */
-export const FEATURE_INFO_DEADLINE_MS = 12_000;
+/** Well under wmscache's 30 s read timeout. */
+const FEATURE_INFO_DEADLINE_MS = 12_000;
 
 export const fetchLayerFeatureInfo = async (
   layer: QueryableWMSLayer,
@@ -406,8 +403,7 @@ export const fetchLayerFeatureInfo = async (
   if (remembered) return answer(remembered);
 
   // An empty answer is worth remembering, but only when every format was
-  // actually asked: a failed or dropped request looks the same here and would
-  // cache a hole.
+  // actually asked: a failed request would otherwise cache a hole.
   let failed = false;
 
   for (const format of formatsToTry) {
@@ -415,8 +411,8 @@ export const fetchLayerFeatureInfo = async (
     if (!url) return answer([], 'Could not build GetFeatureInfo URL');
 
     try {
-      // Through `fetchWithin`, not `fetch`: a non-tile request to an external
-      // origin is the breaker's to admit or refuse.
+      // `fetchWithin`, not `fetch`: a non-tile request to an external origin is
+      // the breaker's to admit or refuse.
       const { contentType, data } = await fetchWithin(
         url,
         {

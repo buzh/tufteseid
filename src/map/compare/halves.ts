@@ -1,7 +1,7 @@
 import { atom, type Getter, type PrimitiveAtom, type Setter } from 'jotai';
 
 // `a` is the left of the screen, and the whole of it while one ground is up;
-// `b` is the right. Must import nothing but jotai — half the background config
+// `b` is the right. Must import nothing but jotai: half the background config
 // imports this, so anything else is a cycle.
 
 export type CompareHalf = 'a' | 'b';
@@ -17,10 +17,7 @@ export const viewModeAtom = atom<ViewMode>('single');
 
 export const compareOnAtom = atom((get) => get(viewModeAtom) !== 'single');
 
-/**
- * The halves that are drawing, in screen order. Every array produced by
- * `acrossHalves` is indexed the same way, so a caller can zip two of them.
- */
+/** The halves that are drawing, in screen order. */
 const liveHalvesAtom = atom<readonly CompareHalf[]>((get) =>
   get(compareOnAtom) ? BOTH_HALVES : ['a'],
 );
@@ -41,15 +38,14 @@ export const halved = <T>(initial: T): Halved<T> => {
 
 /**
  * One pair read across every half that is drawing: one value while a single
- * ground is up, two while both are, in `liveHalvesAtom` order.
+ * ground is up, two while both are. Every array this produces is indexed the
+ * same way, so a caller can zip two of them.
  */
 export const acrossHalves = <T>(pair: Halved<T>) =>
   atom<T[]>((get) => get(liveHalvesAtom).map((half) => get(pair[half])));
 
-/**
- * Copy every pair's A value into its B value, so a two-ground view opens on two
- * identical halves. Registered by `halved`, so a new pair cannot be forgotten.
- */
+/** Copy every pair's A value into its B value, so a two-ground view opens on
+ *  two identical halves. Registered by `halved`. */
 export const seedHalfB = (get: Getter, set: Setter): void => {
   for (const seed of SEEDERS) seed(get, set);
 };

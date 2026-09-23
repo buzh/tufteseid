@@ -52,8 +52,8 @@ export const frameExtentIn = (
 };
 
 /** Metres one scene unit covers, at the frame's centre. Via
- *  `getPointResolution`: the frame's projection may be EPSG:4326 (degrees) or
- *  EPSG:3857 (metres inflated by latitude). */
+ *  `getPointResolution`, because the frame's projection may be EPSG:4326
+ *  (degrees) or EPSG:3857 (metres inflated by latitude). */
 export const metresPerScenePx = (frame: SketchFrame): number => {
   const [minX, minY, maxX, maxY] = frame.extent;
   const unitsPerPx = (maxX - minX) / frame.widthPx;

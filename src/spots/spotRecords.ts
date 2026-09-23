@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { listSpots, subscribeSpots, type SpotRecord } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
 
-/** Their own and every public one. Null until the list lands, and while
+/** The reader's own and every public one. Null until the list lands and while
  *  signed out; an empty array means none. */
 export const spotRecordsAtom = atom<SpotRecord[] | null>(null);
 

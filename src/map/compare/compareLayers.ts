@@ -20,7 +20,7 @@ import { getSplitMap, peekSplitMap } from './splitMap';
 // stack in the new host rather than moving it.
 
 // Above the backgrounds (0), below everything the app draws on top of them.
-export const COMPARE_Z = 1.5;
+const COMPARE_Z = 1.5;
 
 const CMP_PREFIX = 'cmp.';
 
@@ -32,8 +32,7 @@ const isCompareLayer = (layer: BaseLayer): boolean =>
 
 const getMainMap = () => getDefaultStore().get(mapAtom);
 
-/** Strips one map of the B half; says whether it was holding any. Retired
- *  rather than dropped, so the other host can take the instances back. */
+/** Strips one map of the B half; says whether it was holding any. */
 const clearFrom = (map: OlMap): boolean => {
   let removed = false;
   for (const layer of map.getLayers().getArray().slice()) {
@@ -51,7 +50,7 @@ const clearFrom = (map: OlMap): boolean => {
 export const compareHostFor = (mode: ViewMode): OlMap =>
   mode === 'split' ? getSplitMap() : getMainMap();
 
-// Nothing here is WebGL, so narrow OL's context union once.
+// Nothing here is WebGL, so OL's context union narrows to the 2D half.
 const canvas2d = (
   e: RenderEvent,
 ): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null => {
@@ -59,9 +58,9 @@ const canvas2d = (
   return ctx && 'clip' in ctx ? ctx : null;
 };
 
-// `getRenderPixel` rather than raw canvas coordinates: the context is in device
-// pixels and carries OL's mid-frame transform, non-identity during an animated
-// zoom, so a raw clip lands off the CSS divider.
+// `getRenderPixel`, not raw canvas coordinates: the context is in device pixels
+// and carries OL's mid-frame transform, so a raw clip lands off the divider
+// during an animated zoom.
 const clipToRightOfSplit = (e: RenderEvent) => {
   const ctx = canvas2d(e);
   if (!ctx) return;
@@ -86,11 +85,10 @@ const clipToRightOfSplit = (e: RenderEvent) => {
 
 const unclip = (e: RenderEvent) => canvas2d(e)?.restore();
 
-// The clip only hides pixels: it runs in `prerender`, after the renderer has
-// queued a whole viewport of tiles. The layer `extent` is what saves requests,
-// since OL tests it before asking for a tile. It is intersected with the
-// layer's own `coverageExtent`, never replacing it, and the original is stashed
-// here so unclipping can put it back.
+// The clip only hides pixels; it runs in `prerender`, after the renderer has
+// queued a whole viewport of tiles. What saves requests is the layer `extent`,
+// which OL tests before asking for a tile. The curtain is intersected into it
+// and the layer's own extent stashed here, so unclipping can put it back.
 const BASE_EXTENT = 'cmpBaseExtent';
 
 type LayerExtent = ReturnType<TileLayer['getExtent']>;
@@ -128,8 +126,8 @@ const applyCurtainExtents = () => {
   }
 };
 
-// One listener for the whole curtain. Panning moves the revealed strip over new
-// ground, so the extents have to be recomputed or B stops filling in.
+// Panning moves the revealed strip over new ground, so the extents have to be
+// recomputed or B stops filling in. One listener for the whole curtain.
 let curtainMoveHandler: (() => void) | null = null;
 
 const trackCurtain = (on: boolean) => {
@@ -144,9 +142,9 @@ const trackCurtain = (on: boolean) => {
   }
 };
 
-// Flagged so it is idempotent: layers survive installs and the pool with flag,
-// stashed extent and handlers on them, so this must run for every incoming
-// layer, not only new ones — a second attach clips twice a frame.
+// Flagged so it is idempotent: layers come back from the pool with the flag,
+// stashed extent and handlers still on them, and a second attach would clip
+// twice a frame.
 const setClip = (layer: TileLayer, on: boolean) => {
   if (Boolean(layer.get('cmpClip')) === on) return;
   layer.set('cmpClip', on);
@@ -157,7 +155,6 @@ const setClip = (layer: TileLayer, on: boolean) => {
   } else {
     layer.un('prerender', clipToRightOfSplit);
     layer.un('postrender', unclip);
-    // Back to its coverage, or unbounded if it never had one.
     layer.setExtent(layer.get(BASE_EXTENT) as LayerExtent);
     layer.set(BASE_EXTENT, undefined);
   }
@@ -167,8 +164,8 @@ const setClip = (layer: TileLayer, on: boolean) => {
 let cancelPendingRetire: (() => void) | null = null;
 
 /** Put this stack up as the B half and take down the previous one. `under` and
- * `over` mean what they do in `swapBackgroundLayers`. Every layer takes
- * `COMPARE_Z`, so within B only collection order decides what covers what. */
+ * `over` mean what they do in `swapBackgroundLayers`. Every layer shares one
+ * z-index, so within B only collection order decides what covers what. */
 export const installCompareLayers = (
   under: TileLayer[],
   over: TileLayer[],
@@ -178,8 +175,8 @@ export const installCompareLayers = (
   const layers = [...under, ...over];
   if (layers.length === 0) return;
 
-  // They are this install's outgoing set anyway; retiring them now would open
-  // the gap the deferral avoids.
+  // The previous install's outgoing set is this one's too; retiring it now
+  // would open the gap the deferral avoids.
   cancelPendingRetire?.();
 
   const outgoing = collection
@@ -228,10 +225,8 @@ export const clearCompareLayers = () => {
   if (pane) clearFrom(pane);
 };
 
-/**
- * Take the B half off every host but this one. Nothing in the new host retires
- * what the old one is still holding, so this runs before the build, not after.
- */
+/** Take the B half off every host but this one. Must run before the build:
+ *  nothing in the new host retires what the old one is still holding. */
 export const clearCompareLayersExcept = (host: OlMap) => {
   for (const other of [getMainMap(), peekSplitMap()]) {
     if (!other || other === host) continue;

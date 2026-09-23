@@ -39,23 +39,21 @@ export const compareSplitAtom = atom(0.5);
 const contrastingGround = (a: BackgroundLayerName): 'kart' | 'lidar' =>
   isKartVariant(a) ? 'lidar' : 'kart';
 
-// Repeats the arms' entry rules: seeding B happens before React re-renders with
-// the second ground section mounted.
+// Repeats the arms' entry rules: B is seeded before React re-renders with the
+// second ground section mounted.
 const enterGroundB = (ground: 'kart' | 'lidar', get: Getter, set: Setter) => {
   if (ground === 'kart') {
     set(backgroundLayerHalves.b, get(kartVariantHalves.b));
     return;
   }
   // `enterLidar` with Automatisk off: the national mosaic, not the held flight,
-  // which need not cover this screen and would not be re-ranked.
+  // which need not cover this screen.
   set(activeLidarStyleHalves.b, DEFAULT_LIDAR_PROJECT_STYLE);
   set(backgroundLayerHalves.b, 'lidarHillshade');
 };
 
-/**
- * B is seeded from A only on the way out of `single`; moving between the
- * curtain and the split keeps B where the reader put it.
- */
+/** B is seeded from A only on the way out of `single`; moving between the
+ *  curtain and the split keeps B where the reader put it. */
 export const selectViewModeAtom = atom(
   null,
   (get, set, mode: ViewMode) => {
@@ -70,8 +68,7 @@ export const selectViewModeAtom = atom(
   },
 );
 
-// The build awaits: an earlier run resolving last would install a superseded
-// stack.
+// The build awaits, so an earlier run resolving last must not install.
 let compareGeneration = 0;
 
 export const compareLayerAtomEffect = atomEffect((get) => {
@@ -93,8 +90,8 @@ export const compareLayerAtomEffect = atomEffect((get) => {
     return;
   }
 
-  // Sweep the host this stack is not going into here, not in the install: the
-  // build below can end without installing and leave it drawing.
+  // Swept here and not in the install: the build below can end without
+  // installing and leave the other host drawing.
   const host = compareHostFor(mode);
   clearCompareLayersExcept(host);
   const clip = mode === 'curtain';
@@ -121,7 +118,7 @@ export const compareLayerAtomEffect = atomEffect((get) => {
       if (generation !== compareGeneration) return;
       if (!built) return;
 
-      // Opacity only: `installCompareLayers` puts every layer at `COMPARE_Z`.
+      // Opacity only: `installCompareLayers` sets the z-index itself.
       for (const { layer, opacity } of [...built.under, ...built.over]) {
         layer.setOpacity(opacity);
       }

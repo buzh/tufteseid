@@ -1,8 +1,7 @@
 // Classify, group and summarize a GetFeatureInfo over the Kulturminner layers.
 // `parseXmlFeatureInfo` loses the sublayer element name each feature came back
 // under, so the kind is re-derived from the property fingerprint. The field
-// names below were read off live GetFeatureInfo, not off a specification, and
-// nothing defaults: a field the register does not serve comes back empty.
+// names below were read off live GetFeatureInfo, not off a specification.
 
 import type { LayerFeatureInfo } from './types';
 import { vernBucket, type VernBucket } from './heritageVocabulary';
@@ -51,7 +50,6 @@ export interface HeritageSummary {
   layerTitle: string;
   /** The register's own id, never ours. */
   id: string;
-  /** Empty when genuinely unnamed — the surface falls back to `art`. */
   navn: string;
   /** The 159-value `art`. */
   art: string;
@@ -157,7 +155,7 @@ const getParentId = (
     if (lokalid) return lokalid.split('-')[0];
   }
   if (feature.kind === 'lokalitet') {
-    // Some ids are suffixed ("300651-0") and the lokalitetid enkeltminner name
+    // Some ids are suffixed ("300651-0"); the `lokalitetid` enkeltminner carry
     // is the numeric prefix.
     const raw =
       stringify(p['kulturminneid']) ||
@@ -197,7 +195,7 @@ const groupFeatures = (layers: LayerFeatureInfo[]): HeritageGroup[] => {
 
   // Dedupe the *ikoner twins — one record drawn as both polygon and pin —
   // keeping whichever copy carries more fields. A record with no identity gets
-  // a key of its own rather than colliding with the next one.
+  // a key of its own.
   let anonymous = 0;
   const seen = new Map<string, HeritageFeature>();
   for (const f of features) {
@@ -228,7 +226,7 @@ const groupFeatures = (layers: LayerFeatureInfo[]): HeritageGroup[] => {
 
   const all = Array.from(groups.values());
 
-  // A sikringssone is metadata for a lokalitet: dropped wherever a real record
+  // A sikringssone is metadata for a lokalitet: dropped where a real record
   // came back with it, kept where it is all there was.
   const hasReal = all.some((g) => g.lokalitet || g.enkeltminner.length > 0);
   return hasReal
@@ -282,8 +280,7 @@ const summarizeGroup = (group: HeritageGroup): HeritageSummary => {
     memberProps.map((p) => formatDate(p['vernedato'])),
   );
 
-  // Only the synthesized Askeladden URL needs the guard: a sikringssone's id is
-  // from another space and a `kid=` built out of it 404s.
+  // A sikringssone's id is from another space, so a synthesized `kid=` 404s.
   const askeladden =
     stringify(props['linkaskeladden']) ||
     (hasReal && props['lokalid']
@@ -308,8 +305,8 @@ const summarizeGroup = (group: HeritageGroup): HeritageSummary => {
     vernedato:
       vernetyper.length === 1 && vernedatoer.length === 1 ? vernedatoer[0] : '',
     dateringer: distinct(memberProps.map((p) => firstOf(p, DATERING_FIELDS))),
-    // kulturminner2 serves no `fylke` and brukerminner do; a kommune name on
-    // its own is ambiguous nationally.
+    // Brukerminner serve a `fylke` and kulturminner2 does not; a kommune name
+    // on its own is ambiguous nationally.
     kommune: [stringify(props['kommune']), stringify(props['fylke'])]
       .filter(Boolean)
       .join(', '),

@@ -1,6 +1,3 @@
-// The reader's own spots. A row writes `activeSpotAtom` and nothing else; the
-// mover behind the short link (`shareLink.ts`) animates the view.
-
 import { Badge, Group, Menu, ScrollArea, Text, TextInput } from '@mantine/core';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useState } from 'react';
@@ -56,8 +53,8 @@ export const SpotMenu = () => {
     : drafting
       ? t('spots.mine.busy')
       : spots
-        ? // `total`, not `count`: i18next reads `count` as a request for plural
-          // forms this key has none of.
+        ? // `total`, not `count`: i18next reads `count` as a request for
+          // plural forms this key has none of.
           t('spots.mine.count', { total: spots.length })
         : t('spots.mine.label');
 

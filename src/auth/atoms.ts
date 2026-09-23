@@ -3,22 +3,19 @@ import { atomEffect } from 'jotai-effect';
 
 import { pb, Role, SiteUser } from '../api/pocketbase';
 
-// Mirrors the SDK's authStore, which stays the source of truth. Seeded from the
-// localStorage rehydration so a returning reader is signed in at first paint;
-// `pbAuthSyncEffect` settles that optimistic seed.
+// Mirrors the SDK's authStore, which stays the source of truth. Do not set
+// this directly — go through the SDK's auth calls, which `pbAuthSyncEffect`
+// listens to.
 export const currentUserAtom = atom<SiteUser | null>(
   (pb.authStore.record as SiteUser | null) ?? null,
 );
 
-// Do not set `currentUserAtom` directly — go through the SDK's auth calls,
-// whose authStore events this effect catches.
 export const pbAuthSyncEffect = atomEffect((_get, set) => {
   const unsubscribe = pb.authStore.onChange(() => {
     set(currentUserAtom, (pb.authStore.record as SiteUser | null) ?? null);
   });
 
-  // A rehydrated token that the server has stopped honouring looks live on this
-  // side, so ask once on mount.
+  // A rehydrated token the server has stopped honouring still looks valid here.
   if (!pb.authStore.isValid) {
     pb.authStore.clear();
   } else {
@@ -26,8 +23,8 @@ export const pbAuthSyncEffect = atomEffect((_get, set) => {
       .collection('users')
       .authRefresh()
       .catch((err: unknown) => {
-        // Only a refusal signs the reader out: a cold load with no network yet
-        // is not evidence that the session is gone.
+        // Only a refusal signs the reader out; a cold load with no network
+        // is not evidence the session is gone.
         const status = (err as { status?: number })?.status;
         if (status === 401 || status === 403) pb.authStore.clear();
       });

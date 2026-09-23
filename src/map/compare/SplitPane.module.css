@@ -1,5 +1,5 @@
-/* Half the row, to the pixel: the two viewports must be the same size. Nothing
-   here may take width off the pane — the seam is the row's gap. */
+/* Half the row, to the pixel: the two viewports must be the same size, so
+   nothing here may take width off the pane. */
 .pane {
   flex: 1 1 0;
   min-width: 0;

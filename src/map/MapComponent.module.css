@@ -4,8 +4,8 @@
   height: 100%;
 }
 
-/* The split's seam is this row's `gap`, not a border on either pane: a border
-   comes out of the pane's box and leaves the two viewports different widths. */
+/* The split's seam is this row's `gap`: a border on a pane would come out of
+   its box and leave the two viewports different widths. */
 .panes {
   display: flex;
   gap: 2px;

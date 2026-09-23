@@ -2,7 +2,7 @@ import { useAtomValue } from 'jotai';
 import { useCallback } from 'react';
 import { mapAtom } from './atoms';
 
-const useMap = () => {
+export const useMap = () => {
   const map = useAtomValue(mapAtom);
 
   const setTargetElement = useCallback(
@@ -16,8 +16,5 @@ const useMap = () => {
     [map],
   );
 
-  const mapElement = map.getTarget() as HTMLElement | undefined;
-  return { mapElement, setTargetElement };
+  return { setTargetElement };
 };
-
-export { useMap };

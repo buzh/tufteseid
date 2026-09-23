@@ -22,14 +22,14 @@ const MIN_FLYFOTO_ZOOM = 8;
 // passes answer the same shape of question and should cost the same.
 const REFRESH_DEBOUNCE_MS = 250;
 
-export type FlyfotoViewportStatus =
+type FlyfotoViewportStatus =
   | 'idle'
   | 'loading'
   | 'ready'
   | 'zoomedOut'
   | 'error';
 
-export type FlyfotoViewport = {
+type FlyfotoViewport = {
   status: FlyfotoViewportStatus;
   projects: FlyfotoProject[];
 };

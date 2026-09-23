@@ -2,10 +2,9 @@
  * below is a library-internal class name that can move in a version bump. */
 
 /* The map's own rectangle: Excalidraw's islands place themselves inside this
- * box, so they land clear of the band, and the scene is scrolled to compensate
- * (`initialSceneView`). `isolation` contains Excalidraw's internal z-ladder,
- * which climbs past 1000 and would otherwise paint its popovers over the band.
- */
+ * box, and the scene is scrolled to compensate (`initialSceneView`).
+ * `isolation` contains Excalidraw's z-ladder, which climbs past 1000 and would
+ * otherwise paint its popovers over the band. */
 .surface {
   position: absolute;
   inset: 0;

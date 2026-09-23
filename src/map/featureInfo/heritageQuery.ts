@@ -1,6 +1,6 @@
 // One GetFeatureInfo per ticked RA service. Hover and click put the same
-// snapped question with the same `FEATURE_COUNT`, so they share one URL and one
-// memo in `featureInfoService.ts`. When to ask is `src/heritageInfo/`.
+// snapped question, so they share one memo in `featureInfoService.ts`. When to
+// ask is `src/heritageInfo/`.
 
 import type Map from 'ol/Map';
 import { CULTURAL_HERITAGE_LAYER_IDS } from '../layers/config/themeLayers/culturalHeritage';
@@ -14,7 +14,7 @@ import type { FeatureInfoReading } from './types';
  *  never moves the answer. */
 const SNAP_PX = 6;
 
-/** Cheap gate: is any queryable register drawing. */
+/** Is any queryable register drawing. */
 export const heritageIsQueryable = (map: Map): boolean =>
   getQueryableWMSLayers(map, CULTURAL_HERITAGE_LAYER_IDS).length > 0;
 

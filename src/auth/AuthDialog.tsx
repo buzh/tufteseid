@@ -1,5 +1,5 @@
-// OAuth2 only. Adding a provider is Collections -> users -> Options -> OAuth2
-// in PocketBase's admin UI; this lists whatever `listAuthMethods()` reports.
+// OAuth2 only: this lists whatever `listAuthMethods()` reports. A provider is
+// added in PocketBase's admin UI (Collections -> users -> Options -> OAuth2).
 
 import { Alert, Button, Loader, Modal, Stack, Text } from '@mantine/core';
 import { useAtom } from 'jotai';
@@ -36,8 +36,6 @@ export const AuthDialog = () => {
       await signIn(provider);
       close();
     } catch (err) {
-      // Blocked popup, cancelled window and misconfigured provider are not
-      // distinguishable here; the dialog stays up either way.
       console.warn('[auth] sign-in failed', err);
     }
   };

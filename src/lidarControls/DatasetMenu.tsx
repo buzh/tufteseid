@@ -47,7 +47,11 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
         onMouseEnter={() => setHoveredProjectId(project.id)}
         onMouseLeave={() => setHoveredProjectId(null)}
         leftSection={
-          active ? <Icon icon="check" size={18} /> : <span className={styles.gutter} />
+          active ? (
+            <Icon icon="check" size={18} />
+          ) : (
+            <span className={styles.gutter} />
+          )
         }
       >
         <Group gap="xs" wrap="nowrap" justify="space-between">
@@ -64,7 +68,11 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
             </Text>
           </div>
           {cachedFlightIds.has(project.id) && (
-            <Badge size="xs" variant="light" leftSection={<Icon icon="database" size={12} />}>
+            <Badge
+              size="xs"
+              variant="light"
+              leftSection={<Icon icon="database" size={12} />}
+            >
               {t('lidarControls.dataset.cached')}
             </Badge>
           )}

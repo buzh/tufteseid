@@ -7,13 +7,13 @@ export type SpotVisibility = 'private' | 'public';
 /** Lon/lat, EPSG:4326. */
 export type SpotPoint = [lon: number, lat: number];
 
-/** An Excalidraw scene plus its georeference. `elements` is the editor's own
- *  array; only `src/sketch/` knows its shape. */
+/** An Excalidraw scene plus its georeference; only `src/sketch/` reads
+ *  `elements`. */
 export type SpotSketch = {
   frame: {
-    /** View projection at the moment of freezing, e.g. `EPSG:25833`. */
+    /** View projection at freeze, e.g. `EPSG:25833`. */
     projection: string;
-    /** The ground the frozen viewport covered, in that projection. */
+    /** The frozen viewport's ground, in that projection. */
     extent: [number, number, number, number];
     widthPx: number;
     heightPx: number;
@@ -35,8 +35,7 @@ export type SpotRecord = {
   updated: string;
 };
 
-// Mirrors the column widths in `pb_migrations/1700001100_spots.js`; the
-// server's 400 for an over-long field does not name the field.
+// Mirrors the column widths in `pb_migrations/1700001100_spots.js`.
 export const SPOT_NAME_MAX = 200;
 export const SPOT_DESCRIPTION_MAX = 20000;
 
@@ -66,8 +65,8 @@ const newSpotCode = (): string => {
   return code;
 };
 
-// PB reports a unique-index violation as a 400 with a per-field entry: the
-// outer `code` is our field, the inner is PB's name for the error kind.
+// PocketBase reports a unique-index violation as a 400 with a per-field entry:
+// the outer `code` is our field, the inner is its name for the error kind.
 const isCodeTaken = (err: unknown): boolean =>
   (err as { response?: { data?: Record<string, { code?: string }> } })?.response
     ?.data?.code?.code === 'validation_not_unique';
@@ -139,9 +138,9 @@ export const listSpots = async (): Promise<SpotRecord[]> =>
     })
   ).map(hydrate);
 
-// Uppercased because SQLite's `=` does not case-fold. `requestKey: null`: a
-// deep link asks twice — before and after sign-in — and the SDK's auto-cancel
-// would make the second look like a miss.
+// Uppercased because SQLite's `=` does not case-fold. `requestKey: null`
+// opts out of the SDK's auto-cancel: a deep link asks twice, before and after
+// sign-in.
 export const getSpotByCode = async (code: string): Promise<SpotRecord> =>
   hydrate(
     await pb

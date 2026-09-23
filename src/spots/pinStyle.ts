@@ -13,11 +13,11 @@ export const PIN_Z_INDEX = 6;
 
 const ACCENT = '#ff6a00';
 
-// SVG user units. The anchor, the label offset and the grab box all derive
-// from these.
+// SVG user units; the anchor, the label offset and the grab box derive from
+// these.
 const W = 22;
 const H = 27;
-/** The point it is stuck through, and the anchor. */
+/** The point the pin is stuck through, and the icon anchor. */
 const TIP_X = 5.2;
 const TIP_Y = 25.2;
 /** The head, up and to the right of the tip. */
@@ -38,15 +38,15 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W * 2}" height="${
 
 const src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
-// The SVG rasterizes at its `width`/`height`, twice the worn size, for retina;
-// every scale below is halved on its way into `Icon`.
+// The SVG rasterizes at twice the worn size for retina, so every scale below
+// is halved on its way into `Icon`.
 const HIDPI = 2;
 
 /** Multiples of the SVG units above: `saved` is 19 css px wide, 23 tall. */
 const SIZE = { saved: 0.85, active: 1, hand: 1.08 };
 
-// Hoisted: an `Icon` carries its decoded image, and the style function runs
-// per pin per redraw.
+// Hoisted: an `Icon` carries its decoded image and the style function runs per
+// pin per redraw.
 const pinIcon = (scale: number, opacity = 1) =>
   new Icon({
     src,
@@ -119,8 +119,8 @@ export const placingPinStyle = [ring(7), new Style({ image: cursorPin })];
 const GRAB_PAD = 5;
 
 /** Whether a pixel offset *from the tip* takes hold of the pin. The anchor is
- *  the tip but the head stands ~15 px above it, so the box covers the whole
- *  silhouette rather than a radius around the coordinate. */
+ *  the tip but the head stands ~15 px above it, so this is a box over the whole
+ *  silhouette, not a radius around the coordinate. */
 export const withinDraftPin = (dx: number, dy: number): boolean =>
   dx >= -GRAB_PAD &&
   dx <= (HEAD_X - TIP_X + HEAD_R) * SIZE.hand + GRAB_PAD &&

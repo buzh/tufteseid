@@ -32,7 +32,7 @@ const SketchCanvas = lazy(() =>
 /** Split out so the draft controller mounts and unmounts with the draft. */
 const SpotDraftBox = () => {
   const draft = useAtomValue(spotDraftAtom);
-  // The parent guards: this is never rendered without a draft.
+  // The parent renders this only when there is a draft.
   const spot = useSpotDraft(draft!);
   return <SpotPanel spot={spot} />;
 };
@@ -45,11 +45,8 @@ export const SpotSurface = () => {
   const drawn = useAtomValue(spotSketchAtom);
 
   // Nothing while a canvas is up (it already shows the scene), the draft's own
-  // while one is open, otherwise the open spot's.
-  //
-  // Keyed on `active.id`/`updated`, not `active.sketch`: PocketBase re-parses
-  // the json field on every read, so it is a new object each time and naming
-  // it would re-export the scene on any unrelated field change.
+  // while one is open, otherwise the open spot's. Keyed on `active.id`/
+  // `updated` rather than `active.sketch`, which is a fresh object per read.
   const editing = draft !== null;
   const shown = useMemo(
     () => (session ? null : sketchOf(editing ? drawn : active?.sketch)),
@@ -57,8 +54,8 @@ export const SpotSurface = () => {
     [session, editing, drawn, active?.id, active?.updated],
   );
 
-  // Warm the chunk from the press of the `+`: `Tegn` freezes the map before the
-  // canvas mounts, so the load must not still be in flight then.
+  // Warm the chunk from the press of the `+`: the draw stage freezes the map
+  // before the canvas mounts, so the load must not still be in flight then.
   useEffect(() => {
     if (!editing && !placing) return;
     void import('../sketch/SketchCanvas');

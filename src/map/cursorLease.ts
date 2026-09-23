@@ -1,6 +1,5 @@
-// Several pointer handlers write the viewport cursor at once. A lease only
-// clears the viewport if it set it, so one handler's "nothing here" cannot
-// erase another's glyph.
+// Several pointer handlers write the viewport cursor at once; a lease only
+// clears it if it set it.
 
 export type CursorLease = {
   /** Show `cursor`, or release the viewport when it is null. */

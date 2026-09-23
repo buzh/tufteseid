@@ -1,12 +1,11 @@
 // A stored drawing re-exported to pixels at the view's resolution.
 // `exportToCanvas` frames on the drawing's common bounds grown by
-// `exportPadding`, not on the viewport, so the placement below is computed from
-// those same bounds.
+// `exportPadding`, not on the viewport, so the placement below uses those same
+// bounds.
 
-// Must stay first, above the imports below: the dynamic import in
-// `excalidraw()` is the second way into the editor bundle, which reads the font
-// path off the global as it evaluates. A spot opened from a short link renders
-// here without `SketchCanvas` ever mounting.
+// Must stay above the imports below: `excalidraw()` is a second way into the
+// editor bundle, which reads the font path off the global as it evaluates, and
+// a short link renders here without `SketchCanvas` ever mounting.
 import './excalidrawAssets';
 import { transformExtent } from 'ol/proj';
 
@@ -36,11 +35,9 @@ const excalidraw = (): Promise<ExcalidrawModule> => {
   return modulePromise;
 };
 
-/**
- * Drawing → canvas, placed on the ground. Never throws; null when there is
- * nothing to draw or the export failed. `scale` is device pixels per scene
- * unit, 1 being the resolution the drawing was made at.
- */
+/** Drawing → canvas, placed on the ground. Never throws; null when there is
+ *  nothing to draw or the export failed. `scale` is device pixels per scene
+ *  unit, 1 being the resolution the drawing was made at. */
 export const renderScene = async (
   frame: SketchFrame,
   elements: readonly SceneElement[],
@@ -56,11 +53,10 @@ export const renderScene = async (
     return null;
   }
 
-  // Restored before the bounds are read: `exportToCanvas` restores again on
-  // the way in and reads its bounds off that, so restoring only on its side
-  // would put the placement and the pixels on two different rectangles.
-  // Guarded because `sketchOf` checks the frame, not the elements, and one
-  // malformed element throws out of Excalidraw's own code.
+  // Restored before the bounds are read: `exportToCanvas` restores again and
+  // frames on that, so leaving it to do both would put the placement and the
+  // pixels on two different rectangles. Guarded because `sketchOf` checks the
+  // frame, not the elements.
   let restored: ReturnType<ExcalidrawModule['restoreElements']>;
   let bounds: ReturnType<ExcalidrawModule['getCommonBounds']>;
   try {

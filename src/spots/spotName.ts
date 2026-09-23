@@ -2,10 +2,11 @@ import type { PlaceNamePoint } from '../types/searchTypes';
 import { getPlaceNamesByLocation } from '../search/searchApi';
 import type { ProjectionIdentifier } from '../map/projections/types';
 
-// A name suggestion for a new pin, off ws.geonorge.no's stedsnavn register.
-// Ranked by `navneobjekttype` first, distance second; the three sets below are
-// drawn from the register's own 291-type vocabulary and anything unlisted is
-// the neutral middle. Denied: administrative geography.
+// A name suggestion for a new pin, off ws.geonorge.no's stedsnavn register,
+// ranked by `navneobjekttype` first and distance second. The three sets below
+// are `navneobjekttype` values; anything unlisted is the neutral middle.
+//
+// Denied: administrative geography.
 const NAME_TYPE_DENY = new Set([
   'Administrativ bydel',
   'Annen administrativ inndeling',
@@ -46,7 +47,7 @@ const NAME_TYPE_PROMOTE = new Set([
   'Varde',
 ]);
 
-// Demoted, not denied: downtown it may be all there is.
+// Demoted, not denied: in a town it may be all there is.
 const NAME_TYPE_DEMOTE = new Set([
   'Adressenavn',
   'Adressetilleggsnavn',
@@ -169,7 +170,8 @@ const PROMOTE_BONUS_M = 400;
 // Bigger than any reachable meterFraPunkt: the demoted tier sorts strictly last.
 const DEMOTE_PENALTY_M = 1000000;
 
-// Ties on places with no `hovednavn`, where the first entry is often rejected.
+// Breaks ties on places with no `hovednavn`, where the first entry is often a
+// rejected spelling.
 const SETTLED_SPELLING = new Set([
   'godkjent',
   'godkjent og prioritert',
@@ -220,8 +222,7 @@ const pickPlaceName = (points: PlaceNamePoint[]): string => {
   return bestName;
 };
 
-/** The suggested name for a pin. Never throws and never hangs: every failure,
- *  including the timeout, is ''. */
+/** Never throws and never hangs: every failure, timeout included, is ''. */
 export const suggestSpotName = async (
   x: number,
   y: number,

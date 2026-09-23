@@ -35,8 +35,7 @@ export const kategoriIcon = (kategori: string): MaterialSymbol =>
 
 /**
  * Vernetype, bucketed into `HERITAGE_RENDERS`' five vern subsets. `ukjent` is a
- * sixth, for an unmapped label: the register saying `uavklart` is a claim, not
- * an absence.
+ * sixth, for an unmapped label: `uavklart` is a claim, not an absence.
  */
 export type VernBucket =
   | 'fredede'

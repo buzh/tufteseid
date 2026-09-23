@@ -11,15 +11,13 @@ export type Bbox = [
 ];
 
 // A whole number of DEM cells at every per-project resolution (2000 px at
-// 0.25 m, 1000 at 0.5, 500 at 1). `MAX_DEM_PX_PER_SIDE` in `src/terrain/dem.ts`
-// is derived from this plus its horizon margin.
+// 0.25 m, 1000 at 0.5, 500 at 1).
 export const MAX_SIDE_M = 500;
 
-// Floor for a hand-dragged square; `squareBboxWithin` has none.
+// Floor for a hand-dragged square.
 export const MIN_SIDE_M = 50;
 
-// EPSG:25833 metres, like every producer. EPSG:3857 is out by a factor of two
-// at 60° N, silently.
+// EPSG:25833 metres. EPSG:3857 metres are out by a factor of two at 60° N.
 export const bboxToMetric = (bbox: Bbox): [number, number, number, number] =>
   transformExtent(bbox, 'EPSG:4326', 'EPSG:25833') as [
     number,
@@ -33,9 +31,8 @@ export const bboxFromMetric = (
 ): Bbox => transformExtent(extent, 'EPSG:25833', 'EPSG:4326') as Bbox;
 
 /**
- * Ground width in metres. Width and not the mean of the two sides: a square
- * built in EPSG:25833 and carried back as a lon/lat extent measures a metre or
- * two taller than it went out.
+ * Ground width in metres. The x extent, not the mean of the two sides: a square
+ * built in EPSG:25833 measures a metre or two taller once carried to lon/lat.
  */
 export const bboxWidthMetres = (bbox: Bbox): number => {
   const [minX, , maxX] = bboxToMetric(bbox);
@@ -46,9 +43,8 @@ export const bboxOverlaps = (a: Bbox, b: Bbox): boolean =>
   a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
 
 /**
- * The largest square inside `bbox`: the shorter of its two sides, capped at
- * `MAX_SIDE_M`, held about the centre. No floor — a minimum side could push the
- * square back out past the edge of the caller's viewport.
+ * The largest square inside `bbox`, capped at `MAX_SIDE_M`, about its centre.
+ * No floor: a minimum side could push the square outside the caller's viewport.
  */
 export const squareBboxWithin = (bbox: Bbox): Bbox => {
   const [minX, minY, maxX, maxY] = bboxToMetric(bbox);
@@ -63,14 +59,14 @@ export const squareBboxWithin = (bbox: Bbox): Bbox => {
   ]);
 };
 
-// At ≥8%, enough that transformExtent's corner-only reprojection cannot clip.
+// ≥8%, enough that transformExtent's corner-only reprojection cannot clip.
 const INSET_FRACTION = 0.08;
 const INSET_MIN_PX = 48;
 const MIN_SIDE_PX = 64;
 
 /**
- * The visible map, inset from its own edges. Assumes no rotation: two pixel
- * corners describe the rectangle. No ceiling — callers cap the result.
+ * The visible map, inset from its own edges and uncapped. Assumes no rotation:
+ * two pixel corners describe the rectangle.
  */
 export const viewportBbox = (map: Map): Bbox | null => {
   const size = map.getSize();

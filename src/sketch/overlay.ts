@@ -34,9 +34,9 @@ type Entry = {
   redraw: () => void;
 };
 
-// Called from inside `canvasFunction`, which cannot wait: the first frame
-// draws nothing and the export asks for a redraw when it lands. A failed
-// export records the scale anyway, so it is not retried every frame.
+// Called from inside `canvasFunction`, which cannot wait: the first frame draws
+// nothing and the export asks for a redraw when it lands. A failed export
+// records the scale anyway, so it is not retried every frame.
 const ensureRender = (entry: Entry, scale: number) => {
   if (entry.pending !== null) return;
   const have = entry.renderedScale;
@@ -58,8 +58,8 @@ const ensureRender = (entry: Entry, scale: number) => {
       entry.redraw();
     })
     .catch((e) => {
-      // `renderScene` promises not to throw; if it ever does, `pending` left
-      // set is a guard nothing clears and the drawing stays blank for good.
+      // `renderScene` promises not to throw; were it to, a `pending` left set
+      // would be a guard nothing clears and the drawing would stay blank.
       console.warn('[sketch] overlay render failed', e);
       if (!entry.live) return;
       entry.pending = null;
