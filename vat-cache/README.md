@@ -1,323 +1,190 @@
-# vat-cache — building the cached cVAT ground
+# vat-cache
 
-Out-of-band tooling, not part of the SPA build. Nothing in `src/` imports it,
-the docker build does not see it, and `package.json` is untouched. It runs on
-whatever machine can reach `hoydedata.no` directly and has python — which need
-not be the machine that serves the tiles, and for a 0.25 m acquisition had
-better not be.
+Precomputes RVT's combined VAT over one Norwegian LiDAR acquisition into one
+`<slug>.mbtiles`, which the `cvat-tiles` sidecar serves at `/cvat/*`. Out of
+band — nothing in `src/` imports it and the docker build does not see it. Needs
+python, disk and a direct route to `hoydedata.no`, not the machine that serves
+the tiles. Deploy is a copy into `/site/tufteseid/data/cvat`.
 
-RVT computes the pixels. `rvt.vis` makes the four layers and `rvt.blend_func`
-blends them; nothing here reimplements a visualization. `WORK-ORDER.md` is the
-brief and records why the parameters are what they are.
-
-There are two command lines, and the split is where the work happens:
-
-| | |
-| --- | --- |
-| `makevat.py` | Renders one acquisition into one `<slug>.mbtiles`. Knows about hoydedata.no and nothing else — no store, no queue, no server. This is the build |
-| `vatcache.py` | Keeps a store: which acquisitions are worth having and in what order, which ones are in it, and whether their tiles read back |
-
-## Running
+## Install
 
 ```
 python -m venv .venv
-.venv/bin/pip install -r requirements.txt --no-deps    # see requirements.txt
+.venv/bin/pip install -r requirements.txt --no-deps
 .venv/bin/pip install "numpy<2.1" "scipy<1.15" pillow matplotlib
 ```
 
-`--no-deps` is not optional: rvt-py declares gdal, rasterio, geopandas and
-jupyter for an IO layer none of this uses.
+- `--no-deps` is required: rvt-py declares gdal, rasterio, geopandas and jupyter
+  for an IO layer none of this uses. The second line installs the four real
+  dependencies *with* their own deps (matplotlib will not import without).
+- `scipy<1.15`: `rvt.vis` imports `scipy.ndimage.morphology`, removed in 1.15.
+- `numpy<2.1` is the last line supporting python 3.9; drop it on a newer one.
+- `cvat.py` avoids `rvt.blend.BlenderCombination`, which pulls `rvt.default` →
+  `rvt.tile` → `osgeo.gdal`.
 
 ## Building an acquisition
 
 ```
-.venv/bin/python makevat.py -l                 everything hoydedata.no carries
-.venv/bin/python makevat.py -l vestfold        the ones whose name says so
-.venv/bin/python makevat.py -l -v vestfold     with the ladder and the names
-.venv/bin/python makevat.py -g 1421 --dry-run  unit counts, nothing written
-.venv/bin/python makevat.py -g 1421 -z 15 --limit 20        pilot
-.venv/bin/python makevat.py -g 1421 --jobs 4   the run
-.venv/bin/python makevat.py -c 1421            read back what came out
-.venv/bin/python makevat.py -c 1421 -g         read it back, then repair it
+.venv/bin/python makevat.py -l                  numbered catalogue
+.venv/bin/python makevat.py -l vestfold         filtered by substring
+.venv/bin/python makevat.py -l -v vestfold      + ladder, WMS name check, mask
+.venv/bin/python makevat.py -l --refresh        re-ask hoydedata.no
+.venv/bin/python makevat.py -g 1421 --dry-run   unit counts, nothing written
+.venv/bin/python makevat.py -g 1421 -z 15 --limit 20     pilot
+.venv/bin/python makevat.py -g 1421 --jobs 4    the run
+.venv/bin/python makevat.py -c 1421             read every tile back
+.venv/bin/python makevat.py -c 1421 -g          read it back, then repair
 ```
 
-`-o` is where the file goes and defaults to the working directory. One
-acquisition is one file and files do not overlap, so a build needs to know
-nothing about the store it is destined for — or whether there is one.
+Also `-o DIR` (output, default `.`), `--unit-tiles N` (default 4), `--force`.
 
-**An acquisition is named by number, never by name.** The catalogue spells them
-with spaces, æøå and parentheses, which a shell takes apart if you let it. `-l`
-prints them numbered; `-g` and `-c` take the number. Those numbers come off a
-local snapshot of hoydedata.no's catalogue, written as `catalogue.json` on first
-use — a build artefact like the masks, uncommitted, because it is a copy of an
-upstream service and two people on two machines have no reason to agree about
-it. `--refresh` re-asks and puts what is new on the *end* rather than
-re-sorting, so a number written down today still means the same acquisition next
-month; a withdrawn acquisition keeps its number and stops being buildable.
+- **Numbers, not names** — names carry spaces, æøå and parentheses. Numbers
+  index `catalogue.json`, an uncommitted local snapshot written on first use.
+  `--refresh` appends rather than re-sorts, so a number keeps its meaning.
+- **Depth is not asked for.** `levels_for` reads the published cell size
+  (`LOWPS`; only 1 / 0.5 / 0.25 m occur nationally) and builds down to the last
+  level whose pixel is no finer — z16 on 0.25 m, z15 on 0.5 m, z14 on 1 m. `-z`
+  selects within that ladder — `-z 15`, `-z 16,14,12`, `-z 16-14`, deepest first
+  — and is refused past it. `-c` takes the same spec with no such limit.
+- **Resumable.** Each finished work unit is a row in the same database,
+  including units that wrote no tile, so a killed run continues and `--limit`
+  takes the *next* batch on a re-run.
+- **Masks** are rasterised footprints, derived on first `-g` into
+  `coverage-<slug>.npz`. They carry the acquisition name, so a mask paired with
+  another acquisition's DEM aborts instead of writing an empty file.
+- **Guards.** A file naming a different acquisition is refused outright; one
+  built under a different recipe digest needs `--force`. The digest covers
+  everything that decides a pixel — editing `cvat.py` changes it, adding a level
+  does not.
 
-**How deep needs no asking.** `-g` reads the cell size hoydedata.no publishes
-the acquisition on and builds down to the last level whose pixel is no finer:
-z16 on a 0.25 m DTM, z15 on 0.5 m, z14 on 1 m. Below the cell the service
-resamples one height value into four pixels and RVT renders the interpolation as
-if it were terrain.
-
-**`-z` picks levels out of that ladder.** One (`-z 15`), a list (`-z 16,14,12`)
-or an inclusive range written either way up (`-z 16-14`), always applied deepest
-first. Levels are independent jobs, so this is how a pilot is run before the
-rest and how one level is rebuilt without touching its neighbours. It builds
-less, never deeper: a level finer than the acquisition's own DTM cell is refused
-with the ladder that flight does earn, because that is the whole of what the
-cell rule is for. Under `-c` there is no such limit — reading a level a file
-holds is fair whatever it was built from.
-
-**One number picks everything.** The footprint mask, the DEM request and the
-database's name all come off it, which is what retires the one mistake the batch
-could make silently: a mask paired with a project that never flew the ground it
-points at returns all-NaN for every unit, writes no tile, and marks each one
-done, leaving a file that looks built and is empty. Masks are derived on first
-`-g` and cached beside the script as `coverage-<slug>.npz`; they, the snapshot
-and `.venv/` are build artefacts, none committed.
-
-A build resumes. The finished work units are a table in the same file, so a run
-interrupted anywhere picks up where it stopped, and `--limit` is a pilot rather
-than a prefix that has to be redone.
-
-Building into a file that is already there adds levels to it, and two things
-stop that. A file naming a *different* acquisition under a colliding slug is
-refused outright — no amount of building fixes two acquisitions in one file. A
-file built under a different **recipe** is refused unless `--force`, because
-filling in its missing levels would leave one acquisition made of two kinds of
-pixel. The recipe is every setting that decides a pixel, hashed; adding another
-acquisition to a store does not change it, and editing `cvat.py` does.
-
-## Copying it in
+## Deploying
 
 ```
 scp vestfold-10pkt-2025.mbtiles server:/site/tufteseid/data/cvat/
 ```
 
-That is the deploy. No manifest to edit, no import step, nothing stopped and
-nothing restarted: the acquisition is a row in the LiDAR dataset pulldown on the
-next page load.
+No manifest, no import, nothing restarted. Each database's `metadata` carries
+its acquisition name, levels and recipe; `cvat-tiles/server.mjs` surveys the
+directory and synthesizes `/cvat/manifest.json`. Deleting the file removes the
+acquisition. The sidecar re-surveys at most once per 10 s and drops handles on
+size/mtime change, so replacing a file in place costs ≤10 s of stale tiles.
 
-It works because the file says what it is. `metadata` carries the acquisition
-name — byte-identical to the `LidarProject.id` the per-project WMS publishes,
-which is what the app joins on — the levels written, and the recipe they were
-written under. `cvat-tiles/server.mjs` surveys the store directory, reads that
-out of each database, and answers `/cvat/manifest.json` with it. There is no
-inventory beside the tiles that can disagree with them, and none to forget to
-update. An acquisition departs the same way, by having its file deleted.
+`name` must be **byte-identical** to hoydedata.no's `LAS_PROJECT_NAME` and to
+the `LidarProject.id` the per-project WMS publishes — that is what the app joins
+on; `-l -v` and both tools' `-c` check it. Audit with `makevat.py -c <n>` before
+copying: a unit that never ran is cheaper to find here than after an rsync.
 
-The sidecar keeps database handles open and re-surveys at most once every ten
-seconds, dropping any handle whose file changed size or mtime underneath it — so
-replacing a file in place is as safe as adding one, at the cost of up to ten
-seconds of the old one.
-
-**Audit before you ship.** `makevat.py -c <n>` reads every tile back and a copy
-does not: a unit that never ran is the build host's problem, and far cheaper to
-find there than after a night of rsync.
-
-## What the store holds
+## Auditing a store
 
 ```
 .venv/bin/python vatcache.py -l                 the queue, and what is built
-.venv/bin/python vatcache.py -l -v              the figures behind it
-.venv/bin/python vatcache.py -l --all østfold   everything Kartverket flew
-.venv/bin/python vatcache.py -c 7               audit one acquisition
-.venv/bin/python vatcache.py -c                 audit the whole store
+.venv/bin/python vatcache.py -l -v              + cells, units, names, masks
+.venv/bin/python vatcache.py -l --all østfold   everything in the catalogue
+.venv/bin/python vatcache.py -c 7               one acquisition
+.venv/bin/python vatcache.py -c                 the whole store
 ```
 
-`--out` is the store and defaults to `/site/tufteseid/data/cvat`, the directory
-`docker-compose.yml` bind-mounts read-only into the `cvat-tiles` sidecar.
+`-o` defaults to the served store. `-l` reads the committed queue in
+`acquisitions.json` and annotates it from the databases present; anything in the
+store but off the queue is appended. **The two tools number differently** —
+`makevat.py` numbers the whole catalogue (~1 540), `vatcache.py` the queue (a
+couple of dozen) — so `vatcache.py` hands faults over by name. `-c` takes the
+`units` table as the authority on what should be there, then fully decodes every
+tile those units own (~5 ms each; narrow with `-z`).
 
-`-l` reads the queue in `acquisitions.json` — the acquisitions judged worth
-having, in the order they are worth having them — and annotates each row from
-the databases actually present. Anything the store holds that is not on the
-queue is appended, so an acquisition built off-list, or copied in from another
-machine, can still be checked. `-v` additionally asks hoydedata.no and the
-per-project WMS whether they still publish each name — the two ways an
-acquisition fails are nothing to render and tiles nobody asks for, and both are
-invisible from the store alone — and prints the ladder each one's cell size
-earns.
-
-**The two tools number differently and neither is wrong.** `makevat.py -l`
-numbers the whole catalogue, 1 536 acquisitions in a snapshot of what Kartverket
-flew; `vatcache.py -l` numbers the queue, which is a dozen. An index from one
-means something else in the other, which is why `vatcache.py` hands a fault over
-by *name* and tells you to look the number up.
-
-## Checking a store
-
-`-c` reads the `units` table, not the tiles, for what *should* be there: a work
-unit the footprint merely clips can legitimately hold no tile, and only its
-record separates that from a unit that never ran. It then decodes every tile
-those units own — a full decode rather than a header read, because the failure
-worth finding is truncation and a truncated WebP carries an intact header.
-Around 5 ms a tile, so narrow it with `-z` when you only want one level. Without
-`-z` each acquisition is read at the levels its own database says it holds, so a
-0.5 m flight is not reported as missing the z16 it was never owed.
-
-Both tools ask this same question of the same databases; `report.py` is the
-answer, shared. `vatcache.py` asks it of the store the server serves,
-`makevat.py` of a file that has not been copied anywhere yet.
-
-What it reports, and what each means:
-
-| Line | What happened |
+| Reported | Meaning |
 | --- | --- |
 | *n* units never built | the run stopped, or `--limit` cut it |
-| *n* tiles do not decode | a blob that rotted; the app draws a broken image |
+| *n* tiles do not decode | a rotted blob; the app draws a broken image |
 | *n* finished units outside the footprint | the mask or `--unit-tiles` changed since the run |
-| *n* finished units hold no tile | the footprint edge — normal, unless it is *every* unit, which is the mask and the DEM being of different ground |
-| *n* tiles belong to no finished unit | tiles in this acquisition's database that none of its finished units claims |
+| *n* finished units hold no tile | footprint edge; normal unless it is *every* unit |
+| *n* tiles belong to no finished unit | orphans — reported, never deleted |
 
-**Repair is `makevat.py -c <n> -g`**, wherever the file is — the store on the
-server or a copy on the build host. `vatcache.py` reports and does not write,
-because repairing means fetching DEM and rendering, which is the other tool's
-whole job. Both kinds of damage are repaired the same way: delete the unit's
-tiles, drop its record, let the build take it again. They go in one transaction,
-and the tiles have to go at all because a rebuild that decides a tile is all-NaN
-writes nothing there, so a broken tile left in place would outlive the repair
-meant to clear it.
+Repair is `makevat.py -c <n> -g`, against the store or a copy: it drops the
+unit's tiles and record in one transaction and rebuilds.
 
-Orphan tiles are reported and never deleted. Reporting them is unambiguous now
-that each acquisition owns a database; deleting them still is not, because the
-reason one is there is usually a `--unit-tiles` that changed between runs.
+## Grid and output
 
-There is no half-written tile to find. A unit's tiles and its record land in one
-transaction, so the state the old `.part`-and-rename dance was guarding against
-is not reachable.
+| | |
+| --- | --- |
+| Projection | EPSG:25833, the app's grid (`src/map/layers/wmsTileGrid.ts`) |
+| Origin | `(-2500000, 9045984)`, north-west |
+| Resolution | `21664 / 2**z` m/px — z16 = 0.331 m, z15 = 0.661 m |
+| Tile | 512 px; `tile_row` is TMS, `2**(z-1) - 1 - y` |
+| Levels | z16 down to z7; z11–z7 feed `src/map/cvatHintLayer.ts` |
+| Work unit | 4×4 tiles + 24 px overlap = 2096 px, ~18 MB float32, one fetch |
+| Overlap | 24 px = flat's `max_rad` 20 px + the 3×3 gradient window |
+| Encoding | RGBA WebP q90; grey is RVT's `byte_scale`, alpha is coverage |
+| Alpha below z12 | the footprint mask, not DEM no-data (`MASK_ALPHA_BELOW_Z`) |
+| Container | one `<slug>.mbtiles` per acquisition. MBTiles rows, app-specific grid — a generic reader misplaces them |
 
-## Several acquisitions in one store
+Overlapping acquisitions each get their own database and appear as separate rows
+in the LiDAR pulldown.
 
-Each owns a database, `<acquisition-slug>.mbtiles`. The slug is the filename and
-nothing else: the sidecar reports it as that acquisition's `path` and the app
-puts it in the tile template, so there is one copy of the slug rule and nowhere
-for a second to drift from.
+### The blend
 
-MBTiles as a container, not as a tileset a stranger can read: `tile_row` is the
-spec's, counted from the south, but the grid under it is the app's own
-EPSG:25833 one (`src/map/layers/wmsTileGrid.ts`), so a generic MBTiles reader
-would hang these tiles somewhere in the Atlantic. `metadata` says as much.
+Authoritative definition: `VAT_Combined.rft.xml` in
+`EarthObservation/rvt-arcgis-pro` — **not** rvt-py's
+`default_blender_combinations.json`, whose VAT combined entry has an empty layer
+list. Transcribed into `cvat.py`:
 
-**Overlap is the reason, and it is wanted.** Two flights over one landscape are
-two readings of it — Vestfold og Telemark 5pkt 2021 and Vestfold 10pkt 2025 are
-not the same ground twice — so the app offers both as rows in the LiDAR ring and
-a reader can put one against the other. One namespace would have had them
-overwrite each other's pixels, and a tile carries nothing that says who made it.
+| Layer, bottom first | general | flat |
+| --- | --- | --- |
+| Hillshade, normal 100 | 315° / 35° | 315° / 15° |
+| Slope, luminosity 50 | 0–50° | 0–15° |
+| Openness +, overlay 50 | 68–93° | 85–93° |
+| Sky-view, multiply 25 | 0.7–1.0 | 0.9–1.0 |
+| `svf_r_max` / `svf_noise` | 10 px / 0 | 20 px / 3 |
+
+Combined is general over flat, normal, opacity 50; 16 directions, ve_factor 1.
+`svf_noise` is a level 0–3 that `rvt.vis` maps to `r_min` = (0, 10, 20, 40) % of
+`r_max`, so flat's inner radius is 8 px. Radii are RVT's **pixels**, verbatim at
+every level (`radius_in_metres=False`), so each level is RVT's combined VAT of
+its own grid and the reach changes with zoom.
 
 ## The files
 
-| File | What it does |
+| File | What it is |
 | --- | --- |
-| `makevat.py` | The build: the numbered catalogue, one acquisition into one MBTiles file, and the repair of one. Runs anywhere, knows nothing about a store |
-| `vatcache.py` | The store: the queue, what is in it, and the audit. Reports faults and hands them to `makevat.py` |
-| `report.py` | Reading a built acquisition back — the figures, the levels a directory of databases holds, the audit and the orphan scan. Shared by both front ends |
-| `acquisitions.py` | Acquisition identity: the queue, the published cell size that sets the ladder, and the two name sets — hoydedata's catalogue and the per-project WMS — that have to carry a name verbatim before its tiles reach a reader |
-| `acquisitions.json` | The queue itself, in the order `vatcache.py -l` indexes. Committed, so it is a shared judgement about what is worth building rather than one machine's |
-| `cvat.py` | RVT's combined VAT: the parameters out of `VAT_Combined.rft.xml`, and the layer walk out of `render_all_images`. The one module that decides what a pixel is |
-| `build_tiles.py` | The store's geometry, the MBTiles container, a level built into it, and the audit that reads it back |
-| `fetch_dem.py` | `exportImage` against `Prosjekt_DTM`, pinned to one `LAS_PROJECT_NAME`, plus the minimal tiled-float32 TIFF reader `dem.ts` also carries |
-| `coverage.py` | What ground an acquisition covers: catalogue rows, union rasterisation, sample-site picker, tile fill against the app's tile grid |
-| `compare.py` | The candidate grids and radius rules, rendered side by side on one real patch — what decided §1 and §2 of the work order, including the z16-against-z15 pair |
-| `render.py` | The numpy port of `shade.ts` the sizing study was done with. Superseded by `cvat.py` for anything that renders; kept because `measure.py` and `sizing.py` read against it |
-| `measure.py` | Renders samples, quantises, tiles, encodes — bytes per pixel per product |
-| `sizing.py` | Measured bytes per pixel + coverage → disk cost per zoom on the app's real ladder |
+| `makevat.py` | Build front end: catalogue, one acquisition into one file, repair. Knows nothing about a store |
+| `vatcache.py` | Store front end: the queue, what is in it, the audit. Never writes |
+| `build_tiles.py` | Grid geometry, the MBTiles container, a level built into it, the read-back |
+| `cvat.py` | The combined VAT itself — presets, layer walk, `radii_for`. The only module that decides what a pixel is |
+| `fetch_dem.py` | `exportImage` against `Prosjekt_DTM` pinned to one `LAS_PROJECT_NAME`, plus a minimal tiled-float32 TIFF reader |
+| `coverage.py` | Footprint union rasterisation, sample-site picker, tile fill |
+| `acquisitions.py` | Acquisition identity: queue, published cell sizes, the catalogue and WMS name sets |
+| `acquisitions.json` | The build queue, committed, in the order `vatcache.py -l` indexes |
+| `report.py` | Formatting and the shared audit, used by both front ends |
+| `compare.py` | Benchmark: cVAT over one patch at every candidate grid under both radius rules; PNGs to `/tmp` |
+| `render.py` | numpy port of `src/terrain/shade.ts`. Not used for building; `measure.py` and `sizing.py` read against it |
+| `measure.py` | Bytes per pixel per product, measured. Reads `coverage.npz` |
+| `sizing.py` | Measured bytes per pixel + coverage → disk cost per zoom |
 
-## What is established
+## Gotchas
 
-For **Vestfold og Telemark 5pkt 2021**:
-
-- **Coverage is 1,106 km²**, not the 8,846 km² that summing `SHAPE.AREA` over
-  the 270 catalogue rows suggests — the catalogue carries a row per overview
-  level and each level re-covers the project. Envelope 185.6 × 102.9 km, 6 %
-  filled. The rasteriser validates against a known 879.17 km² footprint to
-  879.2 km². Native DTM is 0.25 m, with overviews doubling from there.
-- **RVT's radii are pixels.** `max_rad` 10 px (general) and 20 px (flat) come to
-  5 m and 10 m only on the 0.5 m DEM the templates were calibrated on. The cache
-  holds the pixels, so every level is RVT's combined VAT of its own grid.
-- **The ladder is z16 → z7** on the app's shared grid — the DTM is published at
-  0.25 m, and z16 is 0.331 m/px. z16 to z12 is 3 764 / 941 / 313 / 116 / 46 work
-  units of 4×4 tiles, z11 to z7 another 21 / 11 / 5 / 3 / 2. The quartering
-  stops once a unit is wider than the flight — 347 km at z7 — after which a
-  level costs only the one or two units its envelope straddles.
-- **Compute is the constraint at z16 and nowhere else.** A work unit is the same
-  2096 px square at every level, so it costs the same 11–13 s wherever it is,
-  fetch included: ~12.5 core-hours for z16 against ~4.5 for z15 to z12 and
-  minutes for everything below them.
-- **Tiles are RGBA WebP q90.** An opaque alpha channel is free (0.339 B/px
-  either way) and a half-covered tile is cheaper (0.153), so alpha is how
-  no-data is stored rather than a grey that would look like ground. Below z12
-  it is the acquisition's footprint mask instead: ImageServer answers a coarse
-  request out of per-item overviews that fill the item's rectangle, so the DEM
-  claims ground the flight never touched — half of a 21 km window at z8 for a
-  0.17 km² ravine survey.
-- **z15 → z7 is under a gigabyte; z16 is three times the rest together.**
-  Measured over 40 z15 units: 0.280 B/px on fully covered tiles, 0.259 over
-  covered ground, which puts z15 at 0.66 GB and z15 to z12 at ~0.9 GB against
-  ~25 GB fetched; the same quartering five more times puts z11 to z7 in the
-  single-digit megabytes. z16 quadruples the pixels at ~0.89 of the bytes each
-  (0.288 and 0.324 B/px against z15's 0.320 and 0.364 on `compare.py`'s two
-  sites), so ~2.4 GB more, ~3.3 GB in all, against ~90 GB fetched.
-- **Halving the grid resolves structure, not noise.** That falling bytes-per-
-  pixel is the evidence: encode cost rises with entropy, and the metre-locked
-  rule that *does* degrade sampling goes the other way (0.329 → 0.503 as it
-  coarsens). Against the 0.25 m data, z16 separates tracks, ditches and low
-  mounds that z15 renders as one smear.
-- **Seams do not appear** at work-unit boundaries with a 24 px overlap: the step
-  across a unit join measures the same as the step between any two adjacent
-  columns inside one.
-
-## Choosing the next acquisition
-
-The goal is the whole map, browsable without noticing where one flight stops. So
-the question is not which ground is worth having — all of it is — but which
-order fills it, and the answer is resolution first.
-
-**Only the 0.25 m flights.** That is what the z16 base is built to read, and
-it is the deepest grid published anywhere in the country. `LOWPS` on the mosaic
-catalogue says which: exactly three values nationally, 1 m for 1–3 pkt, 0.5 m
-for 2–4 pkt, 0.25 m for 5 pkt and up — 639 of the 1 536 acquisitions.
-`acquisitions.native_cells` asks it, `makevat.py` keeps the answer in its
-snapshot, and the ladder comes off it whatever any list says.
-
-**Then density, then geography.** Above 5 pkt the cell stops shrinking and the
-extra returns buy detail inside the 0.25 m grid instead, so the 10, 30 and
-50 pkt flights come first; after that the queue fills outward from ground the
-store already holds, because a map fills as a region and not as scattered
-patches. Not blindly, though — the densest rows in the catalogue are a 1 km²
-glacier at Oppdal and a lake-bottom survey at Hovsvatn, which are not landscapes
-anyone browses.
-
-**Overlap is not a reason to skip one.** Vestfold 10pkt 2025 lies on top of the
-fixture acquisition at twice the density; Larvik 10pkt 2010 lies under both,
-fifteen years earlier. All three belong in the store — each is a row, and a
-reader can put one against the other. The app picks the deepest ladder that
-covers the view and leaves the rest in the pulldown.
-
-**Archaeology does not enter into it**, and an earlier version of this file said
-otherwise: it ranked candidates by `L-ARK` lokaliteter per km² off geonorge's
-Kulturminner WFS. Two things were wrong with that. The lesser one is factual —
-it explained Oslo's inflated raw count as "SEFRAK and bygningsmasse", but SEFRAK
-is not in that WFS at all; the 10 407 non-`L-ARK` records over Oslo are 10 289
-`L-BVF` (buildings) and 118 `L-KRK` (churches). The greater one is that the
-count measures where somebody has already looked. Two thirds of the `L-ARK`
-records in the eastern counties are Funnsted, Bosetning/aktivitetsområde,
-Bergkunst and Kokegrop — categories with no relief signature at all — so the
-ranking was partly a map of excavation history. An amateur reading relief for
-something nobody has registered yet wants the sharpest ground available, not the
-best-surveyed.
-
-The acquisition name must appear verbatim in the per-project WMS
-`GetCapabilities` as well as in the catalogue. That is what the app joins the
-store to: without the catalogue row there is no footprint to rank the cache by
-and no envelope to cull with, so `resolveCvatAcquisitions` drops the acquisition
-with a console warning and its tiles are never asked for. `makevat.py -l -v` and
-both tools' `-c` check it.
-
-To extend the queue, find candidates with `vatcache.py -l --all <substring>` or
-`makevat.py -l <substring>` and write a row for each: `name` exactly as both
-services spell it, plus `pkt`, `cell_m` and `where` for the reader. Only the
-name has to be right — the ladder comes off the catalogue, not off the file, and
-a row in `acquisitions.json` is a note about intent rather than anything a build
-reads.
+- **Fetch goes direct to hoydedata.no**, never through wmscache: ~90 GB of float
+  TIFF would evict its 25 GB LRU several times over.
+- **`exportImage` caps at 15 000 px a side** — hence one call per work unit. It
+  answers a burst with a *text body under a 200 status*, surfacing as
+  `RuntimeError`; `fetch_unit` retries 5× with backoff. This is the step that
+  fails overnight.
+- **Coarse requests return ground that was never flown**: ImageServer serves
+  them from per-mosaic-item overviews that fill the item's whole rectangle. Over
+  a 0.17 km² survey, half of a 21 km window at z8 came back as data. Hence the
+  footprint alpha below z12.
+- **Costs**, over 1 106 km² of 0.25 m ground: a work unit is the same 2096 px
+  square at every level and takes 11–13 s wherever it is, fetch included. Full
+  z16–z7 is ~16.5 core-hours, ~90 GB fetched, ~3.3 GB written, three quarters of
+  it z16. z15–z12 (all a 0.5 m flight is owed) is ~4.5 core-hours, ~0.9 GB.
+- **A half-built store is not a broken one.** Missing levels are simply not
+  served; the sidecar publishes what `metadata.levels` says. There is no
+  half-written tile — tiles and the unit record land in one transaction.
+- **RVT's overlay opacity does nothing**, reproduced deliberately:
+  `blend_overlay` writes through its `background`, so the openness layer's 50 %
+  performs as 100 %. Every published VAT came out of that path.
+- **Keep SQLite's default journal mode.** WAL writes two files beside the
+  database, which the sidecar's read-only opener cannot create.
+- **Never render a figure plate from cached pixels** — `src/figure/` goes
+  through `paintTerrainField` on the float field.
+- Kartverket elevation is NLOD/CC BY, so caching derived rasters is fine. NiB
+  imagery is not, and none goes near this.

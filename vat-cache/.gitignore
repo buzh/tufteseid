@@ -2,9 +2,6 @@
 __pycache__/
 coverage.npz
 coverage-*.npz
-# makevat.py's numbering of hoydedata.no's catalogue. A snapshot of an upstream
-# service, like the masks: the numbers only have to hold still on the machine
-# they are typed on, and two people building on two machines have no reason to
-# agree about them.
+# per-machine snapshot of hoydedata.no's catalogue
 catalogue.json
 *.mbtiles
