@@ -13,29 +13,6 @@ export class DeadlineError extends Error {
   }
 }
 
-// Settles on time whether or not `run` honours the signal.
-export const withDeadline = async <T>(
-  ms: number,
-  label: string,
-  run: (signal: AbortSignal) => Promise<T>,
-): Promise<T> => {
-  const ac = new AbortController();
-  let expire!: (e: unknown) => void;
-  const expired = new Promise<never>((_, reject) => {
-    expire = reject;
-  });
-  const timer = setTimeout(() => {
-    const err = new DeadlineError(label, ms);
-    ac.abort(err);
-    expire(err);
-  }, ms);
-  try {
-    return await Promise.race([run(ac.signal), expired]);
-  } finally {
-    clearTimeout(timer);
-  }
-};
-
 // The body is read through `read` inside the deadline: `fetch` resolves on the
 // headers, so ending there would leave the transfer unbounded. Also the
 // admission point for the upstream breaker (`src/upstream/`).

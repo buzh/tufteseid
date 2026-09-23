@@ -1,13 +1,8 @@
-// Relief visualizations over a float DEM. Each compute* returns a Float32Array
-// in the DEM's own grid, NaN where the DEM has no coverage, and is separate
-// from rendering so the expensive pass (the horizon scan) can be cached while
-// a cheap one (hillshade azimuth) is scrubbed.
+// Each compute* returns a Float32Array in the grid it was handed, NaN where the
+// DEM has no coverage.
 
 import type { Dem } from './dem';
 
-// All any compute* here needs of a `Dem`: a float raster and the ground
-// distance between its cells. A decimated copy is one of these too, so the same
-// code walks the DEM's own grid and a coarsened one.
 type Grid = {
   width: number;
   height: number;
@@ -25,11 +20,8 @@ export type Visualization =
   | 'lrm'
   | 'slope';
 
-// Six azimuths over three quadrants only, weighted to peak at 315° for a net
-// light from the north-west. Spanning the full circle at equal weight cancels
-// the directional term by symmetry and collapses the blend to
-// cos(zenith)·cos(slope) — a slope map, whose tell is a maximum of exactly
-// 0.7071 at altitude 45°, i.e. nothing brighter than flat ground.
+// Three quadrants only, peaking at 315°: spanning the full circle at equal
+// weight cancels the directional term and collapses the blend to a slope map.
 export const MULTI_AZIMUTHS = [
   { azimuth: 225, weight: 3 },
   { azimuth: 270, weight: 4 },
@@ -39,29 +31,22 @@ export const MULTI_AZIMUTHS = [
   { azimuth: 90, weight: 2 },
 ];
 
-// Directions the horizon scan walks; the scan costs width × height ×
-// directions × steps. 8 bands visibly, 32 doubles the cost for little gain.
+// Directions the horizon scan walks; it costs width × height × directions ×
+// steps.
 export const SVF_DIRECTIONS = 16;
 
-// Hard ceiling on the horizon search radius in *steps*: reach is bought by
-// decimating, not by walking further.
+// Ceiling on the horizon search radius in *steps*, not metres: reach is bought
+// by decimating, not by walking further.
 export const SVF_MAX_RADIUS_PX = 24;
 
-// Coarsest grid the scan will decimate down to, in metres per pixel, so with
-// the step budget the reach is a flat 24 m on any grid at 1 m or finer; past a
-// metre the surface stops resolving the features whose horizon is measured.
+// Coarsest grid the scan decimates down to, so with the step budget the reach
+// is a flat 24 m on any grid at 1 m or finer.
 export const HORIZON_MIN_M_PER_PX = 1;
 
-// 1 on anything at or coarser than HORIZON_MIN_M_PER_PX, i.e. inert there.
 const maxDecimation = (metresPerPx: number): number =>
   Math.max(1, Math.floor(HORIZON_MIN_M_PER_PX / metresPerPx));
 
-/**
- * The decimation this radius needs on this grid, and 1 when it needs none: only
- * as much as the radius asks for, so the fine end of the slider keeps every
- * pixel the DEM has. A figure caption prints it, since the horizon views are
- * then read off a coarser surface than the hillshade beside them.
- */
+// Only as much decimation as the radius asks for, and 1 when it asks for none.
 export const horizonDecimation = (
   metresPerPx: number,
   radiusMetres: number,
@@ -71,22 +56,13 @@ export const horizonDecimation = (
     Math.max(1, Math.ceil(radiusMetres / (metresPerPx * SVF_MAX_RADIUS_PX))),
   );
 
-/**
- * The longest horizon search this grid can deliver, in metres. Integer
- * decimation makes it grid-dependent (21.6 m on a 0.3 m grid); `radiusRange` in
- * render.ts takes the slider's ceiling from here, so the control cannot offer a
- * position the scan would then quietly clamp.
- */
+// Longest horizon search this grid can deliver, in metres. Integer decimation
+// makes it grid-dependent: 21.6 m on a 0.3 m grid.
 export const horizonMaxRadiusMetres = (metresPerPx: number): number =>
   SVF_MAX_RADIUS_PX * metresPerPx * maxDecimation(metresPerPx);
 
-// ---------------------------------------------------------------------------
-// Gradients
-// ---------------------------------------------------------------------------
-
 // Horn's 3×3 method, as in GDAL and Esri. Partial derivatives in metres per
-// metre; NaN anywhere in the neighbourhood poisons the cell rather than
-// inventing a slope at a coverage edge.
+// metre; NaN anywhere in the neighbourhood poisons the cell.
 function gradients(grid: Grid): { dzdx: Float32Array; dzdy: Float32Array } {
   const { width: w, height: h, data, metresPerPx } = grid;
   const dzdx = new Float32Array(w * h).fill(NaN);
@@ -96,9 +72,7 @@ function gradients(grid: Grid): { dzdx: Float32Array; dzdy: Float32Array } {
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const i = y * w + x;
-      // a b c  (north)
-      // d e f
-      // g h i  (south)
+      // Neighbourhood a b c / d e f / g h i, north at the top.
       const a = data[i - w - 1];
       const b = data[i - w];
       const c = data[i - w + 1];
@@ -145,10 +119,6 @@ function slopeFromGradients(
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// Hillshade
-// ---------------------------------------------------------------------------
-
 // Illumination in 0..1. `azimuth` is compass degrees the light comes *from*
 // (315 = north-west); `altitude` is degrees above the horizon.
 export function computeHillshade(
@@ -161,7 +131,6 @@ export function computeHillshade(
   return shadeFromGradients(dzdx, dzdy, azimuth, altitude, zFactor);
 }
 
-// Weighted blend of six hillshades off one gradient pass.
 export function computeMultiHillshade(
   dem: Dem,
   altitude: number,
@@ -214,13 +183,9 @@ function shadeFromGradients(
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// Local relief model
-// ---------------------------------------------------------------------------
-
 // Hesse's local relief model: the DEM minus a smoothed copy of itself, in
-// signed metres. `radiusMetres` sets what counts as landform scale and must be
-// comfortably larger than the features hunted, or the smoothing eats them too.
+// signed metres. `radiusMetres` must be comfortably larger than the features
+// hunted, or the smoothing eats them too.
 export function computeLrm(dem: Dem, radiusMetres: number): Float32Array {
   const radiusPx = Math.max(1, Math.round(radiusMetres / dem.metresPerPx));
   const smooth = boxBlurNaNAware(dem.data, dem.width, dem.height, radiusPx);
@@ -232,9 +197,8 @@ export function computeLrm(dem: Dem, radiusMetres: number): Float32Array {
   return out;
 }
 
-// Three box passes approximate a Gaussian, O(n) each via a running sum.
-// NaN-aware: no-data cells contribute nothing rather than dragging their
-// neighbours toward zero.
+// Three box passes approximate a Gaussian, O(n) each via a running sum. No-data
+// cells contribute nothing rather than dragging their neighbours toward zero.
 function boxBlurNaNAware(
   src: Float32Array,
   w: number,
@@ -275,7 +239,6 @@ function blurAxis(
     }
     for (let i = 0; i < inner; i++) {
       if (count > 0) out[base + i * step] = sum / count;
-      // Slide: drop the cell leaving the window, add the one entering.
       const leaving = i - radius;
       const entering = i + radius + 1;
       if (leaving >= 0) {
@@ -297,37 +260,19 @@ function blurAxis(
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// The horizon scan: sky-view factor and openness, from one pass
-// ---------------------------------------------------------------------------
-
 export type HorizonFields = {
   /** Proportion of the sky hemisphere visible, 0..1. */
   svf: Float32Array;
   /** Yokoyama positive openness, degrees. Banks and mounds run high. */
   openPos: Float32Array;
-  /**
-   * Yokoyama negative openness, degrees. Positive openness of the inverted
-   * surface, so it runs *high* in a hollow and low on a ridge — the raw field
-   * paints ditches white, which is why every reader of it inverts the ramp.
-   */
+  /** Yokoyama negative openness, degrees. Runs high in a hollow. */
   openNeg: Float32Array;
 };
 
-// Sky-view factor (Zakšek, Oštir & Kokalj 2011) and Yokoyama's positive and
-// negative openness: one ray walk read three ways, and returned as a set so the
-// caller caches one result and rings between the views for free. Independent of
-// light direction. Scans a decimated copy when the radius asks for more reach
-// than the step budget allows, then interpolates back (`horizonDecimation`).
-// The rays start at the first cell: the three views this serves offer the
-// reader a radius, that radius is the one number on the legend, and a second
-// hidden one under it would make it a fiction. VAT, which does start its rays
-// out from the centre, calls `scanHorizon` on a grid it has imposed itself.
-// The clamping rules differ, and that difference is the measurement: sky-view
-// caps the horizon at the horizontal, since a cell sees at most a hemisphere;
-// openness must not clamp, or every convexity flattens to the same value.
-// Negative openness is positive openness of the inverted surface, so the second
-// extremum is all the bookkeeping it needs: max(-tan) = -min(tan).
+// Sky-view factor (Zakšek, Oštir & Kokalj 2011) and Yokoyama's two opennesses:
+// one ray walk read three ways. Scans a decimated copy when the radius asks for
+// more reach than the step budget allows, then interpolates back. Rays start at
+// the first cell, so the radius on the legend is the whole of the reading.
 export function computeHorizonFields(
   dem: Dem,
   radiusMetres: number,
@@ -335,8 +280,6 @@ export function computeHorizonFields(
   const factor = horizonDecimation(dem.metresPerPx, radiusMetres);
   if (factor === 1) return scanHorizon(dem, radiusMetres, 0);
 
-  // Averaged down, scanned, and interpolated back: buys the reach the step
-  // budget would otherwise cost, and is factor² cheaper besides.
   const coarse = decimate(dem, factor);
   const scanned = scanHorizon(coarse, radiusMetres, 0);
   const back = (field: Float32Array) =>
@@ -348,9 +291,9 @@ export function computeHorizonFields(
   };
 }
 
-// Block mean rather than a subsample: point-sampling a 0.25 m DTM every fourth
-// cell hands the scan that grid's interpolation noise as if it were relief. A
-// block with no readable cell stays NaN, so a coverage hole survives.
+// Block mean rather than a subsample: point-sampling a 0.25 m DTM hands the
+// scan that grid's interpolation noise as relief. A block with no readable cell
+// stays NaN.
 function decimate(grid: Grid, factor: number): Grid {
   const w = Math.max(1, Math.ceil(grid.width / factor));
   const h = Math.max(1, Math.ceil(grid.height / factor));
@@ -380,11 +323,10 @@ function decimate(grid: Grid, factor: number): Grid {
   return { width: w, height: h, data, metresPerPx: grid.metresPerPx * factor };
 }
 
-// Bilinear back to the DEM's own grid; nearest at factor 4 is a field of 4×4
-// squares the eye reads as structure. Corners with no value drop out of the
-// weighted mean rather than poisoning it, and `mask` — the DEM's own data —
-// cuts the result back to cells that have an elevation, since the averaged grid
-// otherwise bleeds up to `factor` pixels into unmeasured ground.
+// Bilinear back to the DEM's own grid. Corners with no value drop out of the
+// weighted mean; `mask` is the DEM's own data, cutting the result back to cells
+// that have an elevation — the averaged grid otherwise bleeds up to `factor`
+// pixels into unmeasured ground.
 function upsample(
   field: Float32Array,
   src: Grid,
@@ -398,8 +340,8 @@ function upsample(
   const clampX = (v: number) => (v < 0 ? 0 : v >= sw ? sw - 1 : v);
 
   for (let y = 0; y < height; y++) {
-    // Pixel centres, not corners: half a coarse cell of offset is a visible
-    // shift of the whole field at factor 4.
+    // Pixel centres, not corners: half a coarse cell of offset shifts the whole
+    // field visibly at factor 4.
     const fy = (y + 0.5) / factor - 0.5;
     const yf = Math.floor(fy);
     const ty = fy - yf;
@@ -450,29 +392,25 @@ function upsample(
   return out;
 }
 
-// The walk itself, over the DEM's own grid or a decimated copy of it.
 function scanHorizon(
   grid: Grid,
   radiusMetres: number,
   innerMetres: number,
 ): HorizonFields {
   const { width: w, height: h, data, metresPerPx } = grid;
-  // Still clamped: `clampRadius` in render.ts caps the request first, but a
-  // headless caller can reach this with any number at all.
+  // Clamped again here: `clampRadius` caps the request, but a headless caller
+  // can reach this with any number.
   const radiusPx = Math.min(
     SVF_MAX_RADIUS_PX,
     Math.max(1, Math.round(radiusMetres / metresPerPx)),
   );
-  // RVT's `svf_noise`, which is a search radius to *start* at rather than a
-  // filter: the innermost cells of a 0.25 m laser surface are mostly the
-  // interpolation between returns, and a horizon read off them is a reading of
-  // the grid. Never past the outer radius, or a direction would have no steps.
+  // RVT's `svf_noise` is a radius to *start* at, not a filter. Never past the
+  // outer radius, or a direction would have no steps.
   const innerPx = Math.min(
     radiusPx,
     Math.max(1, Math.round(innerMetres / metresPerPx)),
   );
 
-  // Precompute the ray offsets once rather than per pixel.
   const rays: Array<
     Array<{ off: number; dx: number; dy: number; dist: number }>
   > = [];
@@ -531,7 +469,9 @@ function scanHorizon(
           if (tan > maxTan) maxTan = tan;
           if (tan < minTan) minTan = tan;
         }
-        // 1 - sin(horizon angle), the horizon floored at level ground.
+        // 1 - sin(horizon angle). Floored at level ground for sky-view, since a
+        // cell sees at most a hemisphere; openness must not floor, or every
+        // convexity flattens to the same value.
         const above = maxTan > 0 ? maxTan : 0;
         sky += 1 - above / Math.hypot(1, above);
         zenith += 90 - Math.atan(maxTan) * toDeg;
@@ -545,25 +485,11 @@ function scanHorizon(
   return { svf, openPos, openNeg };
 }
 
-// ---------------------------------------------------------------------------
-// VAT — the archaeology default blend
-// ---------------------------------------------------------------------------
-
-// Visualization for Archaeological Topography, as the Relief Visualization
-// Toolbox defines it (`rvt/blend.py`, "VAT - Archaeological"; Kokalj & Somrak
-// 2019, Remote Sensing 11(7):747). Four layers, bottom first, and printed on
-// every figure because changing a number here changes what an old render means.
-// The stretches are absolute, not this rectangle's percentiles as the other
-// physical views use: the blend is calibrated on 0.7 sky-view meaning the same
-// thing on two hillsides, which is what makes two VAT renders comparable.
-//
-// Absolute stretches are also why there has to be more than one set of them. On
-// gentle ground the general numbers leave the whole image inside the middle
-// third of the ramp — measured on a synthetic 0.5° hillside carrying a 12 m
-// gravhaug and a 2 m ditch, the general stack spans 0.52–0.87 and a 0.25 m bank
-// moves four grey levels. RVT answers that with a second parameter set for flat
-// terrain (`settings/default_terrains_settings.json`), and combines the two.
-
+// Visualization for Archaeological Topography (Kokalj & Somrak 2019), as RVT's
+// `rvt/blend.py` defines it. The stretches below are absolute rather than this
+// rectangle's percentiles, which is what makes two VAT renders comparable; RVT
+// ships one parameter set per terrain class because a single absolute set
+// leaves gentle ground inside the middle third of the ramp.
 export type VatTerrain = 'general' | 'flat';
 
 export type VatPreset = {
@@ -571,17 +497,12 @@ export type VatPreset = {
   sunAltitude: number;
   /** Degrees; the slope layer's stretch runs 0 to this, inverted. */
   slopeMax: number;
+  /** Degrees. */
   opennessMin: number;
   opennessMax: number;
   /** The sky-view stretch runs this to 1. */
   svfMin: number;
-  /**
-   * Metres. RVT states these in pixels — 10 and 20 — against the 0.5 m laser
-   * data it was written for. Metres is the faithful reading: a horizon angle
-   * over a fixed distance is a fact about the ground, while over a fixed
-   * pixel count it is a fact about the grid, and the stretches above are
-   * calibrated against the angle.
-   */
+  /** Metres. RVT states these in pixels — 10 and 20 — against 0.5 m data. */
   radiusMetres: number;
   innerMetres: number;
 };
@@ -607,49 +528,26 @@ export const VAT_PRESETS: Record<VatTerrain, VatPreset> = {
   },
 };
 
-// What the view is: RVT's combined VAT (`VAT_combined.py`), the general stack
-// laid over the flat one at half opacity, which over single-band data is their
-// mean. Neither alone is offered. General goes flat on gentle ground and flat
-// oversaturates on steep, and a reader choosing between them is being asked to
-// classify the terrain before looking at it — which is the thing they came to
-// the picture to do.
+// RVT's combined VAT (`VAT_combined.py`): the general stack over the flat one
+// at half opacity, which over single-band data is their mean.
 export const VAT_GENERAL_OPACITY = 0.5;
 
-// VAT's sun is frozen and the exaggeration is 1×, against this app's own
-// z-factor 2 default: the slope layer is normalised against a fixed 0–50° and
-// the hillshade against 0–1, so exaggerating first pushes both off the range
-// the blend was tuned on, and a moving sun makes two VAT renders incomparable.
+// Frozen, and 1× against the app's own z-factor 2 default: the stretches are
+// calibrated against an unexaggerated surface and a fixed sun.
 export const VAT_AZIMUTH = 315;
 export const VAT_Z_FACTOR = 1;
 
-// The surface VAT is computed on — all four layers, not just the horizon scan.
-// RVT reads every layer of the stack off one grid, and the stretches are
-// calibrated together on that one grid: hand the slope layer a surface twice as
-// fine as the openness layer and the composite is a sharp hillshade with a
-// blurred wash over it, which is not what 68–93° was tuned against. 0.5 m is
-// the resolution RVT used, and the point past which a 0.25 m laser surface
-// contributes grain rather than ground: scanning the same scene at 0.25 m
-// instead bought 5 % more contrast across a ditch and, with 3 cm of noise in
-// the DEM, nearly doubled the speckle on featureless ground. A 0.5 m cell also
-// halves the slope layer's sensitivity to that noise — 3 cm over a two-cell
-// baseline is 3.4° at 0.25 m against 1.7° at 0.5 m, and the flat preset's whole
-// slope stretch is 15°.
+// RVT's own calibration resolution, and the surface all four VAT layers are
+// computed on — mixing resolutions between layers breaks the stretches.
 export const VAT_SCAN_M_PER_PX = 0.5;
 
-// Two scans over this many cells is around three seconds of walking. Set just
-// clear of the largest rectangle the control can frame — a `MAX_SIDE_M` square
-// is 548 m with its margin, which is 1.20 M cells at the scan resolution — so
-// that the ceiling case scans at 0.5 m rather than being rounded to 0.75 m by a
-// budget it misses by a tenth of a percent. It is a guard against a caller that
-// builds a bigger rectangle some other way, not a rule the reader can hit.
+// ~3 s for the two scans. Set just clear of the largest rectangle the control
+// can frame (a MAX_SIDE_M square with its margin is 1.20 M cells at the scan
+// resolution), so the ceiling case still reads at 0.5 m.
 const VAT_MAX_SCAN_CELLS = 1_250_000;
 
-/**
- * How far VAT decimates before computing anything, given the grid's extent in
- * metres. Takes metres rather than a `Dem` so a figure caption can reach the
- * same answer from a stored bbox, and so the number on the legend is the number
- * the pixels were read at.
- */
+// Takes metres rather than a `Dem` so a caption can reach the same answer from
+// a stored bbox.
 export const vatDecimation = (
   widthMetres: number,
   heightMetres: number,
@@ -661,36 +559,18 @@ export const vatDecimation = (
   return Math.max(finest, Math.ceil(affordable / metresPerPx), 1);
 };
 
-/**
- * One layer of a VAT blend. Named because the cached ground (`cvatGround.ts`)
- * describes its own stack in the same vocabulary, and the legend prints both
- * through `figure.set.vatLayer`.
- */
 export type VatStackLayer = {
   vis: Visualization;
   blend: 'normal' | 'luminosity' | 'overlay' | 'multiply';
   opacity: number;
 };
 
-/**
- * What `composeVat` blends, as data, for the figure legend to read. The
- * compositor does not consume it — four lines of arithmetic read better written
- * out than driven off a table — so the two have to move together, and this
- * table exists to make a legend that has drifted from the blend obvious. The
- * stretches are not here because they are the half that differs per preset.
- *
- * Openness reads 100 % where `settings/blender_VAT.json` says 50, because 100 %
- * is what RVT performs. `rvt.blend_func.blend_overlay` writes its result into
- * the background array it was handed and returns that same array, so the
- * caller's `render_images(top, background, opacity)` in `rvt/blend.py` mixes
- * the blended layer with itself and the opacity does nothing. Multiply and
- * screen allocate, so the sky-view layer's 25 % survives; only overlay and soft
- * light are eaten. Every published VAT image and every RVT plugin output an
- * archaeologist has calibrated an eye against came out of that path, so the
- * settings file is the wrong half of RVT to copy: honouring its 50 % cost about
- * 40 % of the composite's local contrast, which is most of what makes a low
- * bank visible at all.
- */
+// What `composeVat` blends, as data for the legend to print; the compositor
+// does not read it, so the two must be kept in step by hand. Openness is 100 %
+// where RVT's `blender_VAT.json` says 50, matching what RVT performs:
+// `blend_overlay` returns the background array it wrote into, so the caller's
+// opacity mix is a no-op for overlay (multiply allocates, so sky-view's 25 %
+// does apply).
 export const VAT_STACK: readonly VatStackLayer[] = [
   { vis: 'hillshade', blend: 'normal', opacity: 100 },
   { vis: 'slope', blend: 'luminosity', opacity: 50 },
@@ -710,15 +590,10 @@ const overlay = (active: number, background: number): number =>
     ? 1 - (1 - 2 * (background - 0.5)) * (1 - active)
     : 2 * background * active;
 
-/**
- * Composite one preset's four VAT layers. Inputs are the raw fields in their
- * own units — hillshade 0..1, slope in radians, positive openness in degrees,
- * sky-view 0..1 — and the result is 0..1, so it paints through the plain grey
- * ramp with no stretch. Two of RVT's three blend modes collapse over
- * single-band data: a luminosity blend is the active layer, and opacity is a
- * plain linear mix (`active·o + background·(1−o)`). Only overlay keeps its
- * arithmetic, and it carries no mix at all — see VAT_STACK for why.
- */
+// Inputs in their own units — hillshade 0..1, slope radians, positive openness
+// degrees, sky-view 0..1 — and the result is 0..1, painted with no stretch.
+// Over single-band data a luminosity blend is the active layer and an opacity
+// is a linear mix, so only overlay keeps its own arithmetic.
 export function composeVat(
   hillshade: Float32Array,
   slopeRadians: Float32Array,
@@ -755,15 +630,8 @@ export function composeVat(
   return out;
 }
 
-/**
- * Combined VAT: one gradient walk, one slope, two suns and two horizon scans,
- * every one of them on the grid `vatDecimation` imposes. Only the finished
- * composite is interpolated back to the DEM's own resolution, so no layer is
- * blended against a sharper or blurrier version of the same ground than RVT
- * would have blended it against, and the legend can name one resolution for
- * the whole picture. The two presets differ only in their stretches, their sun
- * and how far along the ray they look.
- */
+// Both presets on the one grid `vatDecimation` imposes; only the finished
+// composite is interpolated back to the DEM's own resolution.
 export function computeVat(dem: Dem): Float32Array {
   const factor = vatDecimation(
     dem.width * dem.metresPerPx,
@@ -804,19 +672,15 @@ export function computeVat(dem: Dem): Float32Array {
   return upsample(combined, grid, dem.width, dem.height, factor, dem.data);
 }
 
-// ---------------------------------------------------------------------------
-// Rendering
-// ---------------------------------------------------------------------------
-
-// Robust range for a stretch. Min/max is useless here: one no-data-adjacent
-// spike flattens everything else into a couple of grey levels.
+// Robust range for a stretch: min/max lets one spike flatten everything else
+// into a couple of grey levels.
 export function percentileRange(
   values: Float32Array,
   lowPct: number,
   highPct: number,
 ): [number, number] {
   const finite: number[] = [];
-  // Percentiles of a 1-in-N sample are indistinguishable at this precision.
+  // Sampled: percentiles of a 1-in-N sample are indistinguishable here.
   const stride = Math.max(1, Math.floor(values.length / 200000));
   for (let i = 0; i < values.length; i += stride) {
     const v = values[i];
@@ -838,8 +702,8 @@ export function percentileRange(
 
 export type Ramp = 'grey' | 'greyInverted' | 'diverging';
 
-// Paint a computed field into RGBA. No-data goes fully transparent, so a
-// coverage edge reads as a hole rather than as black ground.
+// No-data goes fully transparent, so a coverage edge reads as a hole rather
+// than as black ground.
 export function toImageData(
   values: Float32Array,
   width: number,
@@ -863,8 +727,8 @@ export function toImageData(
     t = t < 0 ? 0 : t > 1 ? 1 : t;
 
     if (ramp === 'diverging') {
-      // Centre the neutral tone on zero, not on the midpoint of the range, so
-      // "no local relief" is the same colour across renders.
+      // Neutral tone on zero, not on the midpoint of the range, so "no local
+      // relief" is the same colour across renders.
       const mid = (0 - lo) / span;
       const [r, g, b] = divergingColor(t, mid < 0 ? 0 : mid > 1 ? 1 : mid);
       px[o] = r;
@@ -881,8 +745,8 @@ export function toImageData(
   return img;
 }
 
-// Brown (below) → near-white (at zero) → blue-green (above), rather than the
-// usual red/blue, so it stays legible for the red-green colour blind.
+// Brown (below) → near-white (at zero) → blue-green (above): legible for the
+// red-green colour blind where the usual red/blue is not.
 function divergingColor(t: number, mid: number): [number, number, number] {
   if (t < mid) {
     const k = mid > 0 ? t / mid : 0;

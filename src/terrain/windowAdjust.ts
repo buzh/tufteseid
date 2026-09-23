@@ -1,24 +1,6 @@
-// Placing the rectangle by hand: drag the square to move it, drag a corner to
-// resize it. Live only while `terrainAdjustingAtom` is set, which is the state
-// the analysis opens in and the one `Juster` returns it to.
-//
-// The reason the control has this step at all is that the fetch is the
-// expensive part. Framing the screen and downloading 19 MB of float in the same
-// press means a reader who wanted the next valley over pays for this one first,
-// and the only way back is to pan and press again. Here the square is free
-// until `Start`, so it can be dragged onto the mound, pulled in to the 200 m
-// that actually matters, and only then read.
-//
-// It writes `terrainWindowAtom` on every frame of a drag rather than on
-// release. That is what makes the atom the only copy of the rectangle: the
-// geometry on the map is redrawn from it through the store subscription below,
-// the side length in the box reads out of it, and there is no second position
-// held in a ref to disagree with either. Nothing expensive listens — the fetch
-// is held off by `terrainAdjustingAtom` for exactly this reason.
-//
-// The square is square in EPSG:25833, like everything the producers are asked
-// for, not in whatever the view is projected to. Held as a lon/lat extent
-// between edits because that is what `Bbox` is.
+// Placing the rectangle by hand, live only while `terrainAdjustingAtom` is set.
+// The square is kept square in EPSG:25833, not in the view's projection, and
+// written back to `terrainWindowAtom` as lon/lat on every frame of a drag.
 
 import { useAtomValue, useStore } from 'jotai';
 import { Feature } from 'ol';
@@ -44,19 +26,14 @@ import {
 } from '../map/bbox';
 import { terrainAdjustingAtom, terrainWindowAtom } from './window';
 
-/** How near a corner counts as taking hold of it. Generous, because the
- *  alternative to grabbing the corner is moving the whole square, and one is
- *  easy to undo by eye. */
+/** How near a corner counts as taking hold of it. */
 const HANDLE_HIT_PX = 14;
 
 const FRAME = 'rgba(255, 106, 0, 0.95)';
 const CASING = 'rgba(255, 255, 255, 0.55)';
 
-// Solid rather than the dashed frame a standing analysis wears: dashes say
-// "this is a note about the map", a solid edge with corners on it says "this is
-// a thing you can take hold of". The fill is barely there and exists only so
-// that the inside of the square is a hit target — the reader is choosing ground
-// by looking at it, and tinting it would be choosing it blind.
+// The fill is near-invisible on purpose: it is there to make the inside of the
+// square a hit target, not to tint the ground being chosen.
 const adjustStyle = [
   new Style({
     stroke: new Stroke({ color: CASING, width: 4 }),
@@ -77,8 +54,8 @@ const handleStyle = [
 
 type Metric = [number, number, number, number];
 
-/** South-west, south-east, north-east, north-west — so corner `i` is anchored
- *  by corner `i + 2`, and the two diagonals are the even and the odd pairs. */
+/** South-west, south-east, north-east, north-west: corner `i` is anchored by
+ *  corner `i + 2`. */
 const cornersOf = (e: Metric): Coordinate[] => [
   [e[0], e[1]],
   [e[2], e[1]],
@@ -86,7 +63,7 @@ const cornersOf = (e: Metric): Coordinate[] => [
   [e[0], e[3]],
 ];
 
-// Both diagonals of an axis-aligned square, named the way a browser names them.
+// Indexed by corner, in `cornersOf` order.
 const RESIZE_CURSORS = [
   'nesw-resize',
   'nwse-resize',
@@ -98,11 +75,7 @@ type Drag =
   | { kind: 'move'; from: Coordinate; start: Metric }
   | { kind: 'resize'; anchor: Coordinate; sx: number; sy: number };
 
-/**
- * Mount once, from the terrain controller. Adds nothing to the map while the
- * rectangle is standing still, so a running analysis carries no interaction and
- * the dashed frame (`windowLayer.ts`) is the only thing drawn.
- */
+/** Mount once. Adds nothing to the map while the rectangle stands still. */
 export const useTerrainWindowAdjust = () => {
   const map = useAtomValue(mapAtom);
   const adjusting = useAtomValue(terrainAdjustingAtom);
@@ -111,8 +84,8 @@ export const useTerrainWindowAdjust = () => {
   useEffect(() => {
     if (!adjusting) return;
     const view = map.getView().getProjection().getCode();
-    // Leased, not written: the spot pin and the Kulturminner hover point at the
-    // same property and may be live at the same time (`map/cursorLease.ts`).
+    // Leased, not written: other surfaces set the same cursor property and may
+    // be live at the same time (`map/cursorLease.ts`).
     const cursor = cursorLease(map.getViewport());
 
     const toMetric = (c: Coordinate): Coordinate =>
@@ -120,8 +93,8 @@ export const useTerrainWindowAdjust = () => {
     const toView = (c: Coordinate): Coordinate =>
       transform(c, 'EPSG:25833', view);
 
-    /** The rectangle as it stands, in metres. Null once the reader has taken
-     *  the analysis down — the interaction can outlive one pointer event. */
+    /** The rectangle as it stands, in metres; null once it has been taken
+     *  down, which can happen mid-interaction. */
     const extentNow = (): Metric | null => {
       const bbox = store.get(terrainWindowAtom);
       return bbox ? bboxToMetric(bbox) : null;
@@ -153,9 +126,7 @@ export const useTerrainWindowAdjust = () => {
       );
     };
 
-    /** Which corner the pointer is over, or -1. Measured in pixels, because
-     *  what the hand is aiming at is on the screen and a metre is a different
-     *  distance at every zoom. */
+    /** Which corner the pointer is over, or -1. Measured in screen pixels. */
     const cornerUnder = (event: MapBrowserEvent): number => {
       const extent = extentNow();
       if (!extent) return -1;
@@ -185,9 +156,8 @@ export const useTerrainWindowAdjust = () => {
       if (corner >= 0) {
         const [ax, ay] = cornersOf(extent)[(corner + 2) % 4];
         const [cx, cy] = cornersOf(extent)[corner];
-        // The direction is fixed at grab time, not recomputed per frame: a
-        // hand dragged through the anchor should collapse the square to
-        // `MIN_SIDE_M` and stop, not flip it inside out and grow it again.
+        // Direction fixed at grab time, not per frame: a hand dragged through
+        // the anchor collapses the square rather than flipping it inside out.
         drag = {
           kind: 'resize',
           anchor: [ax, ay],
@@ -207,17 +177,16 @@ export const useTerrainWindowAdjust = () => {
       const here = toMetric(event.coordinate);
       let next: Metric;
       if (drag.kind === 'move') {
-        // Against the rectangle as it was when the drag started rather than
-        // against the last frame, so a long drag does not accumulate the
-        // reprojection's rounding into a visible crawl.
+        // Against the rectangle as it was when the drag started, so a long drag
+        // does not accumulate the reprojection's rounding into a crawl.
         const dx = here[0] - drag.from[0];
         const dy = here[1] - drag.from[1];
         const [minX, minY, maxX, maxY] = drag.start;
         next = [minX + dx, minY + dy, maxX + dx, maxY + dy];
       } else {
         const [ax, ay] = drag.anchor;
-        // The longer of the two reaches, so the square follows whichever way
-        // the hand is really going and the corner stays under it on one axis.
+        // The longer of the two reaches, so the corner stays under the hand on
+        // one axis.
         const reach = Math.max(Math.abs(here[0] - ax), Math.abs(here[1] - ay));
         const side = Math.min(Math.max(reach, MIN_SIDE_M), MAX_SIDE_M);
         const bx = ax + drag.sx * side;
@@ -260,9 +229,8 @@ export const useTerrainWindowAdjust = () => {
     redraw();
     map.addLayer(layer);
     map.addInteraction(interaction);
-    // Imperative rather than a React dependency: the drag writes this atom on
-    // every frame, and rebuilding the layer and the interaction sixty times a
-    // second to follow it would be the one expensive thing in here.
+    // Subscribed rather than made a React dependency: the drag writes this atom
+    // on every frame, and rebuilding the layer to follow it would be expensive.
     const unsubscribe = store.sub(terrainWindowAtom, redraw);
 
     return () => {

@@ -1,13 +1,3 @@
-// Terrenganalyse below its control surface: DEM → field → pixels, none of it
-// knowing what is driving it.
-//
-// Steps rather than one `render()`, because the split between
-// `terrainStaticField` and `terrainField` is load-bearing: sky-view factor is
-// ~800 ms on a 600² grid and `useTerrainControls` memoizes the two separately,
-// so dragging the azimuth slider cannot queue a multi-second recompute per
-// frame. `radius` is the only knob on the expensive side, which is why its
-// slider commits on release.
-
 import type { Dem } from './dem';
 import {
   computeHillshade,
@@ -24,38 +14,27 @@ import {
   type Visualization,
 } from './shade';
 
-// Only the sun-dependent views react to these three.
+// Degrees, degrees, dimensionless vertical exaggeration.
 export const DEFAULT_AZIMUTH = 315;
 export const DEFAULT_ALTITUDE = 35;
 export const DEFAULT_Z_FACTOR = 2;
 
-// Metres. The LRM smoothing radius has to be comfortably larger than the
-// features being hunted; 15 m suits mounds and ditches.
+// Metres.
 export const DEFAULT_LRM_RADIUS = 15;
 export const DEFAULT_SVF_RADIUS = 20;
 
-// The views read off the horizon scan (`computeHorizonFields`) and offer the
-// reader a radius for it. They share one radius and one result, so the first
-// one asked for pays the whole cost and the rest are a selection. VAT is not
-// among them although it walks the same rays twice: its two radii are pinned by
-// the presets, the way its sun is, so it has neither a slider to answer nor a
-// scan to share.
+// The views read off one horizon scan: they share a radius and a result, so
+// the first one asked for pays the whole cost. VAT is not among them — its
+// radii are pinned by its presets, so it shares no scan.
 const HORIZON_VIS: readonly Visualization[] = ['svf', 'openPos', 'openNeg'];
 
 export const usesHorizon = (vis: Visualization): boolean =>
   HORIZON_VIS.includes(vis);
 
-/** Where the radius starts for the views that have one. */
 export const defaultRadius = (vis: Visualization): number =>
   usesHorizon(vis) ? DEFAULT_SVF_RADIUS : DEFAULT_LRM_RADIUS;
 
-/**
- * What a radius control may offer for this visualization over this grid, in
- * metres, or `null` for the views that have no radius. The horizon ceiling is
- * `horizonMaxRadiusMetres` — 24 m on any grid at 1 m or finer, 24 × the cell
- * size on a coarser one. LRM's box blur is O(n) per pass at any radius, so 60 m
- * is a judgement about scale: past it the smoothed copy is a plane.
- */
+// Metres, or null for the views with no radius.
 export const radiusRange = (
   vis: Visualization,
   dem: Dem,
@@ -71,11 +50,8 @@ export const radiusRange = (
   return null;
 };
 
-/**
- * The radius that will actually be used. Everything that renders *or describes*
- * a render goes through this, or a caption reads "SVF-radius 40 m" over a 24 m
- * render.
- */
+// The radius actually used. Everything that renders or describes a render goes
+// through this, or a caption names a radius the render did not use.
 export const clampRadius = (
   vis: Visualization,
   dem: Dem,
@@ -92,16 +68,9 @@ export type TerrainLight = {
   zFactor: number;
 };
 
-/**
- * The expensive, sun-independent pass; `null` for the visualizations that have
- * none. `radiusMetres` is the one knob on this side, so a control for it must
- * not fire per drag frame: the horizon scan is ~800 ms on a 600² grid. Pass
- * `horizon` to reuse a walk already made at this radius — that is what makes
- * switching between sky-view and the two opennesses instant — or omit it and
- * this recomputes. VAT is on this side despite containing a hillshade, because
- * its sun is frozen (VAT_AZIMUTH); it walks its own two rays and takes no
- * radius, so nothing it computes can be shared with the three above.
- */
+// The expensive, sun-independent pass; null for the views that have none. The
+// horizon scan is ~800 ms on a 600² grid, so a radius control must not fire per
+// drag frame. Pass `horizon` to reuse a walk already made at this radius.
 export const terrainStaticField = (
   dem: Dem,
   vis: Visualization,
@@ -124,11 +93,8 @@ export const terrainStaticField = (
   }
 };
 
-/**
- * The pass that reacts to the light. `staticField` is handed back unchanged for
- * the sun-independent views — VAT among them, since its own hillshade was lit
- * by the frozen sun on the static side and must not be re-lit here.
- */
+// The pass that reacts to the light. VAT falls through to `staticField`: its
+// hillshade was lit by the frozen VAT sun and must not be re-lit here.
 export const terrainField = (
   dem: Dem,
   vis: Visualization,
@@ -152,11 +118,8 @@ export const terrainField = (
   }
 };
 
-/**
- * Cut a field computed over the whole grid back to the rectangle that was asked
- * for. Every field is computed on the margin too — that is the point of having
- * one — and none of it is shown.
- */
+// Cut a field computed over the whole grid, margin included, back to the
+// rectangle that was asked for.
 const cropToWindow = (field: Float32Array, dem: Dem): Float32Array => {
   const { x, y, width, height } = dem.window;
   if (width === dem.width && height === dem.height) return field;
@@ -170,12 +133,7 @@ const cropToWindow = (field: Float32Array, dem: Dem): Float32Array => {
   return out;
 };
 
-/**
- * Field → pixels, onto `canvas` when one is passed (the panel reuses the
- * element the map's image layer draws from) or a fresh one otherwise. The
- * shaded views are already normalised to 0..1; the physical ones need a robust
- * stretch, or a single spike swallows the whole ramp.
- */
+// Field → pixels, onto `canvas` when one is passed or a fresh one otherwise.
 export const paintTerrainField = (
   rawField: Float32Array,
   dem: Dem,
@@ -193,9 +151,8 @@ export const paintTerrainField = (
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
 
-  // VAT needs no case: its layers are mixed on the absolute stretches in
-  // VAT_PRESETS and it composites to 0..1, so re-stretching the composite to
-  // this hillside's percentiles would undo the calibration.
+  // VAT needs no case: it composites to 0..1 on the absolute stretches in
+  // VAT_PRESETS, and a percentile stretch would undo that calibration.
   let ramp: Ramp = 'grey';
   let range: [number, number] = [0, 1];
   if (vis === 'slope') {
@@ -204,9 +161,8 @@ export const paintTerrainField = (
   } else if (vis === 'svf' || vis === 'openPos') {
     range = percentileRange(field, 0.02, 0.98);
   } else if (vis === 'openNeg') {
-    // Inverted so a hollow is dark here as in sky-view and slope: negative
-    // openness is high in a depression, so the raw field paints ditches white.
-    // RVT inverts it in the same place (`normalize_image`).
+    // Negative openness is high in a depression, so painted straight it would
+    // put hollows in white where sky-view and slope put them in black.
     ramp = 'greyInverted';
     range = percentileRange(field, 0.02, 0.98);
   } else if (vis === 'lrm') {
@@ -220,13 +176,9 @@ export const paintTerrainField = (
   return canvas;
 };
 
-/**
- * Where a painted canvas actually lands. The grid is sized from the bbox width,
- * so the last row falls a fraction of a pixel short of the southern edge, and
- * the margin is cropped off in whole pixels; deriving the extent from the
- * window's pixel offsets rather than reusing `dem.bbox25833` keeps the image
- * registered against both.
- */
+// Derived from the window's pixel offsets rather than `dem.bbox25833`: the grid
+// is sized from the bbox width and the margin cropped in whole pixels, so the
+// two differ by up to half a pixel.
 export const demImageExtent = (dem: Dem): [number, number, number, number] => {
   const [minX, , , maxY] = dem.grid25833;
   const { x, y, width, height } = dem.window;

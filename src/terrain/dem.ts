@@ -1,10 +1,3 @@
-// Raw float elevation for a bbox, so the client can compute its own relief
-// rather than re-style a pre-shaded hillshade. hoydedata.no's ArcGIS
-// ImageServer via exportImage with renderingRule {"rasterFunction":"None"} —
-// its other raster function, `skyggerelieff`, is the shaded PNG the WMS serves
-// — same-origin through /arcgis/hoydedata/*. Endpoint facts:
-// docs/terrain-analysis.md.
-
 import { transformExtent } from 'ol/proj';
 import { planTiles, runWithConcurrency } from '../lidarExtract/stitch';
 import { MAX_SIDE_M, type Bbox } from '../map/bbox';
@@ -13,81 +6,58 @@ import { isUpstreamDown } from '../upstream/health';
 
 const IMAGE_SERVER_BASE = '/arcgis/hoydedata';
 
-// Terrain (bare earth) vs surface (first return — canopy and buildings).
-// Mirrors the LiDAR model on the map background (`activeLidarModelHalves`).
+// dtm = bare earth, dom = first return (canopy and buildings).
 export type DemModel = 'dtm' | 'dom';
 
-// The per-acquisition mosaics at 0.25 m, not the national NHM_* ones at 1 m:
-// where NHM never flew, the national catalogue falls through to DTM10 rows
-// carrying MINPS 0, so the service serves 10 m data upsampled and says nothing
-// about it. The per-project DTM10 rows carry MINPS 27 instead, so below 27 m/px
-// they drop out and an uncovered pixel comes back as no-data. Probing 120
-// random land points found no place with LiDAR nationally but not per-project.
+// Per-acquisition mosaics, not the national NHM_* ones: where NHM never flew
+// the national catalogue silently serves 10 m contour-derived rows upsampled,
+// while the per-project ones report no coverage.
 const SERVICE: Record<DemModel, string> = {
   dtm: 'Prosjekt_DTM',
   dom: 'Prosjekt_DOM',
 };
 
-// Where acquisitions overlap, take the finest. Already Prosjekt_DTM's service
-// default, but Prosjekt_DOM defaults to a Northwest mosaic method, so the rule
-// is stated explicitly to keep the two models alike.
+// Finest acquisition wins where they overlap. Stated explicitly because
+// Prosjekt_DOM defaults to a Northwest mosaic method and Prosjekt_DTM does not.
 const MOSAIC_RULE = JSON.stringify({
   mosaicMethod: 'esriMosaicAttribute',
   sortField: 'lowps',
   sortValue: 0,
 });
 
-// The finest the per-project services publish, and the target when the coverage
-// probe below can't say better. Acquisitions come in 0.25, 0.5 and 1 m, and
-// asking for more than a project holds only buys interpolation.
+// Finest resolution the per-project services publish; acquisitions are 0.25,
+// 0.5 or 1 m.
 const FINEST_M_PER_PX = 0.25;
 
-// Ground fetched outside the rectangle on every side, and cropped off before
-// anything is painted. The horizon scan reads up to this far from a cell, so
-// without it a frame this wide around every render has its rays walking off the
-// edge of the grid — which reads as nothing there to block the sky, i.e. too
-// open, too bright, too convex. RVT pads the array by the search radius for the
-// same reason; real ground is the honest version of that padding. 24 m is the
-// longest reach any view here can ask for (`horizonMaxRadiusMetres`).
+// Ground fetched outside the rectangle on every side and cropped off before
+// painting, so horizon rays near the edge do not walk off the grid. 24 m is the
+// longest reach any view can ask for (`horizonMaxRadiusMetres`).
 export const DEM_MARGIN_M = 24;
 
-// Cap the assembled grid. Derived rather than chosen, so the numbers cannot
-// drift: a rectangle is bounded by MAX_SIDE_M, carries a margin on both sides,
-// and the finest elevation data is FINEST_M_PER_PX, so this is exactly what an
-// in-band rectangle asks for at native resolution and nothing in the band is
-// ever resampled. planTiles still scales down if one arrives out of band.
 const MAX_DEM_PX_PER_SIDE = (MAX_SIDE_M + 2 * DEM_MARGIN_M) / FINEST_M_PER_PX;
 
 const MAX_CONCURRENT = 3;
 const TILE_RETRIES = 3;
-
-// Ceilings on a stall, not budgets: the catalogue query answers in well under a
-// second, while a tile is a 2048² float TIFF rendered on demand.
 const CATALOGUE_TIMEOUT_MS = 20_000;
 const TILE_TIMEOUT_MS = 60_000;
 
 export type Dem = {
-  // The whole assembled grid, margin included. Every compute* runs over all of
-  // it; `window` is what survives to a canvas.
+  // The assembled grid, margin included.
   width: number;
   height: number;
   // Row-major, north-up (row 0 is the northern edge), metres above the vertical
   // datum; NaN marks no coverage.
   data: Float32Array;
-  // The rectangle that was asked for. Unchanged by the margin, because it is
-  // what every caller means by "this DEM's extent".
+  // The rectangle that was asked for.
   bbox25833: [number, number, number, number];
-  // What the grid actually spans: `bbox25833` grown by DEM_MARGIN_M.
+  // `bbox25833` grown by DEM_MARGIN_M — what `width × height` spans.
   grid25833: [number, number, number, number];
   // Where `bbox25833` sits inside the grid, in pixels. Rendering, the
-  // percentile stretches and the stored extent all read this and never the
-  // margin — a stretch taken over ground the reader cannot see is a stretch
-  // they cannot check.
+  // percentile stretches and the stored extent read this, never the margin.
   window: { x: number; y: number; width: number; height: number };
   metresPerPx: number;
-  // What the finest acquisition covering the rectangle publishes: equal to
-  // metresPerPx when the grid fits under MAX_DEM_PX_PER_SIDE, finer than it
-  // when the rectangle was too large and had to be sampled down.
+  // What the finest covering acquisition publishes: equal to metresPerPx unless
+  // the grid exceeded MAX_DEM_PX_PER_SIDE and was sampled down.
   nativeMetresPerPx: number;
   model: DemModel;
 };
@@ -106,32 +76,26 @@ function buildUrl(
     size: `${widthPx},${heightPx}`,
     format: 'tiff',
     pixelType: 'F32',
-    // Explicit though it is the service default: nearest-neighbour resampling
-    // puts stair-steps into the derivatives, which a hillshade amplifies.
     interpolation: 'RSP_BilinearInterpolation',
+    // rasterFunction 'None' returns values; the service's other function,
+    // `skyggerelieff`, returns a shaded image.
     renderingRule: JSON.stringify({ rasterFunction: 'None' }),
     mosaicRule: MOSAIC_RULE,
   });
   return `${IMAGE_SERVER_BASE}/${SERVICE[model]}/ImageServer/exportImage?${params.toString()}`;
 }
 
-// ---------------------------------------------------------------------------
-// Coverage probe
-// ---------------------------------------------------------------------------
-// One catalogue query before any pixels: the finest OPPLOSNING among the
-// acquisitions intersecting the rectangle, which also answers whether there is
-// any laser data here at all. It reads the *envelope*, so an acquisition
-// clipping one corner sets the target for the whole grid.
-
 // 'none' is the catalogue answering that nothing covers this; 'unknown' is the
 // probe itself failing, which must not be reported as an absence.
 type Coverage = { metresPerPx: number } | 'none' | 'unknown';
 
 // wmscache declines to store responses under 1000 bytes and this one is far
-// under, so memoise in-tab: "Juster området" refetches the DEM on every resize
-// and the catalogue does not change between two of them.
+// under, so memoise in-tab.
 const coverageCache = new Map<string, Promise<Coverage>>();
 
+// Finest OPPLOSNING among the acquisitions intersecting the rectangle. Read off
+// the envelope, so an acquisition clipping one corner sets the target for the
+// whole grid.
 function probeCoverage(
   model: DemModel,
   bbox25833: [number, number, number, number],
@@ -153,8 +117,8 @@ function probeCoverage(
     geometryType: 'esriGeometryEnvelope',
     inSR: '25833',
     spatialRel: 'esriSpatialRelIntersects',
-    // The 10 m fallback rows have no OPPLOSNING, and excluding them is what
-    // makes a null answer mean "no laser data".
+    // The 10 m fallback rows have no OPPLOSNING, so excluding them makes a null
+    // answer mean "no laser data".
     where: 'OPPLOSNING IS NOT NULL',
     outStatistics: JSON.stringify([
       {
@@ -174,16 +138,14 @@ function probeCoverage(
       (res) => res.json(),
     );
     if (body?.error) throw new Error('catalogue query rejected');
-    // The service upper-cases outStatisticFieldName, and "nothing covers this"
-    // arrives as one feature with a null statistic, not an empty features array.
+    // The service upper-cases outStatisticFieldName, and no coverage arrives as
+    // one feature with a null statistic, not an empty features array.
     const attrs = body?.features?.[0]?.attributes;
     const best = attrs ? (attrs.BEST ?? attrs.best) : null;
     if (typeof best !== 'number' || !(best > 0)) return 'none';
     return { metresPerPx: best };
   })();
 
-  // A failed probe must not be remembered; a successful one is a fact about the
-  // catalogue and keeps.
   const guarded = pending.catch((): Coverage => {
     coverageCache.delete(key);
     return 'unknown';
@@ -198,7 +160,7 @@ export type FetchDemOptions = {
 };
 
 // Null when the bbox is entirely outside LiDAR coverage; throws when every tile
-// request failed. Same contract as fetchFlyfoto.
+// request failed.
 export async function fetchDem(
   bbox4326: Bbox,
   { model = 'dtm', signal }: FetchDemOptions = {},
@@ -211,12 +173,9 @@ export async function fetchDem(
   ];
 
   // Probed on the rectangle, fetched on the rectangle plus its margin: the
-  // margin must not be able to pull a finer neighbouring acquisition in and
-  // resample the whole grid to a resolution the rectangle itself has no data
-  // for, and "no laser data here" has to stay an answer about the rectangle.
+  // margin must not pull a finer neighbouring acquisition in and resample the
+  // whole grid to a resolution the rectangle has no data for.
   const coverage = await probeCoverage(model, bbox25833, signal);
-  // Same answer as an all-sparse stitch, for one small request instead of a
-  // screenful of multi-megabyte ones.
   if (coverage === 'none') return null;
   const nativeMetresPerPx =
     coverage === 'unknown' ? FINEST_M_PER_PX : coverage.metresPerPx;
@@ -229,8 +188,7 @@ export async function fetchDem(
   ];
   const plan = planTiles(grid25833, nativeMetresPerPx, MAX_DEM_PX_PER_SIDE);
   const data = new Float32Array(plan.widthPx * plan.heightPx);
-  // Absent tiles must read as no-data, not sea level: a tile left at 0 is a
-  // cliff edge in every derivative.
+  // Absent tiles must read as no-data, not sea level.
   data.fill(NaN);
 
   let covered = 0;
@@ -250,8 +208,7 @@ export async function fetchDem(
         return;
       } catch (err) {
         if (signal?.aborted) return;
-        // Nothing was asked of the network, so backing off before asking again
-        // only spends the user's time; the breaker is the thing waiting now.
+        // The breaker is already waiting; a local backoff would only add to it.
         if (isUpstreamDown(err)) {
           failed++;
           return;
@@ -265,17 +222,16 @@ export async function fetchDem(
     }
   });
 
-  // "Nothing came back" and "nothing is there" are different answers: a bbox
-  // outside coverage returns good, entirely sparse TIFFs, while an all-errored
-  // fetch must not reach the user as an absence of LiDAR.
+  // An all-errored fetch must not reach the reader as an absence of LiDAR;
+  // real absence arrives as valid but entirely sparse TIFFs.
   if (covered === 0 && failed > 0) {
     throw new Error('every DEM tile request failed');
   }
   if (covered === 0) return null;
 
   const metresPerPx = (grid25833[2] - grid25833[0]) / plan.widthPx;
-  // Rounded inward and clamped, so the window can never name a pixel the grid
-  // does not have — planTiles is free to have scaled the whole thing down.
+  // Clamped so the window can never name a pixel the grid does not have:
+  // planTiles is free to have scaled the whole thing down.
   const inset = Math.min(
     Math.round(DEM_MARGIN_M / metresPerPx),
     Math.floor((plan.widthPx - 1) / 2),
@@ -299,8 +255,8 @@ export async function fetchDem(
   };
 }
 
-// Copy a decoded tile into the assembled grid, returning whether it carried any
-// real values: a tile outside coverage decodes fine but is all NaN.
+// Returns whether the tile carried any real values: a tile outside coverage
+// decodes fine but is all NaN.
 function blitTile(
   raster: FloatRaster,
   dest: Float32Array,
@@ -321,16 +277,6 @@ function blitTile(
   return any;
 }
 
-// ---------------------------------------------------------------------------
-// Minimal TIFF reader
-// ---------------------------------------------------------------------------
-// Deliberately not geotiff.js: this endpoint emits exactly one shape —
-// uncompressed, single-band, 32-bit IEEE float, tiled 128×128, planar config 1
-// — and a dependency would mean regenerating package-lock.json, which this
-// workstation cannot do. Georeferencing is ignored: ModelTiepoint is always the
-// north-west corner of the bbox asked for at the pixel size asked for, so the
-// request *is* the georeferencing.
-
 type FloatRaster = { width: number; height: number; data: Float32Array };
 
 const TAG = {
@@ -347,6 +293,9 @@ const TAG = {
   sampleFormat: 339,
 } as const;
 
+// The endpoint emits one shape only: uncompressed, single-band, 32-bit IEEE
+// float, tiled, planar config 1. Georeferencing is ignored — ModelTiepoint is
+// always the requested bbox's north-west corner at the requested pixel size.
 function readFloatTiff(buffer: ArrayBuffer): FloatRaster {
   const dv = new DataView(buffer);
   const byteOrder = dv.getUint16(0, false);
@@ -366,8 +315,6 @@ function readFloatTiff(buffer: ArrayBuffer): FloatRaster {
     return readValues(dv, le, e)[0];
   };
 
-  // Guard the assumptions rather than silently mis-decoding a field of garbage
-  // elevations if the service ever changes shape.
   if (scalar(TAG.compression, 1) !== 1) {
     throw new Error('compressed TIFF not supported');
   }
@@ -398,16 +345,14 @@ function readFloatTiff(buffer: ArrayBuffer): FloatRaster {
   const tilesAcross = Math.ceil(width / tileW);
   for (let i = 0; i < offsets.length; i++) {
     // A sparse tile — offset 0, byte count 0 — is how the service says "no
-    // LiDAR here", not an error: a bbox on the coverage edge legitimately mixes
-    // present and absent tiles, and those pixels stay NaN.
+    // LiDAR here", not an error; those pixels stay NaN.
     if (offsets[i] === 0 || byteCounts[i] === 0) continue;
 
     const originX = (i % tilesAcross) * tileW;
     const originY = Math.floor(i / tilesAcross) * tileH;
     for (let ty = 0; ty < tileH; ty++) {
       const y = originY + ty;
-      // Tiles are padded out to full size at the right and bottom edges, and
-      // the padding lies outside the image.
+      // Tiles are padded out to full size at the right and bottom edges.
       if (y >= height) break;
       let src = offsets[i] + ty * tileW * 4;
       let dst = y * width + originX;
@@ -444,13 +389,12 @@ function readIfd(
 
 function requireEntry(entries: Map<number, IfdEntry>, tag: number): IfdEntry {
   const e = entries.get(tag);
-  // Only reachable if the service switches to a strip layout.
   if (!e) throw new Error(`TIFF missing tag ${tag} (expected a tiled image)`);
   return e;
 }
 
-// SHORT (3) and LONG (4) are the only types these tags use; values totalling
-// four bytes or fewer are stored inline, anything larger puts a file offset.
+// SHORT (3) and LONG (4) only. Values totalling four bytes or fewer are stored
+// inline in the entry; anything larger stores a file offset.
 function readValues(dv: DataView, le: boolean, e: IfdEntry): number[] {
   const size = e.type === 3 ? 2 : 4;
   if (e.type !== 3 && e.type !== 4) {

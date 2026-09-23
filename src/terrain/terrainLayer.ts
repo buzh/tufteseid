@@ -1,18 +1,3 @@
-// The terrain render on the map: one georeferenced canvas over the background,
-// declared by `useTerrainControls` and drawn until it is withdrawn.
-//
-// Module-level and imperative rather than an atom effect, because the pixels
-// change dozens of times a second and the element they change in does not: the
-// controller paints every slider frame into the same canvas, so there is no new
-// identity for React or Jotai to notice. `setTerrainRender` is therefore the
-// repaint call as much as the placement call — `ImageCanvasSource` caches one
-// image, and `changed()` is the only way to invalidate it.
-//
-// One member, not a stack. The old interface composited a lokalitet's kept
-// renders and pinned images into the same layer; nothing on this branch keeps
-// anything, and a registry for a single member would be a shape with no second
-// case to justify it.
-
 import { getDefaultStore } from 'jotai';
 import type { Extent } from 'ol/extent';
 import ImageLayer from 'ol/layer/Image';
@@ -22,15 +7,11 @@ import { mapAtom } from '../map/atoms';
 
 const LAYER_ID = 'terrain.render';
 
-// Over the backgrounds (zIndex 0) and under everything above them: the B half
-// of a two-ground view at 1.5 covers it, which is right — the analysis belongs
-// to the A ground and is read off the main map — the LiDAR footprint outlines
-// at 3 and this rectangle's own frame at 4 draw over it. `docs/map-layers.md`
-// keeps the register.
+// Over the backgrounds (0) and under the B half of a split (1.5), the LiDAR
+// footprints (3) and this rectangle's frame (4). Register: docs/map-layers.md.
 const Z_INDEX = 1;
 
 export type TerrainPlacement = {
-  /** Painted by `paintTerrainField`, and reused across frames. */
   canvas: HTMLCanvasElement;
   /** EPSG:25833, the ground `canvas` covers edge to edge (`demImageExtent`). */
   extent25833: [number, number, number, number];
@@ -38,12 +19,10 @@ export type TerrainPlacement = {
 
 let placed: TerrainPlacement | null = null;
 let layer: ImageLayer<ImageCanvasSource> | null = null;
-// Held outside the layer: the transparency slider moves while nothing is up
-// (a DTM→DOM swap withdraws the render and declares a new one), and the value
-// has to survive to whatever comes back.
+// Held outside the layer: the transparency slider moves while nothing is up,
+// and the value has to survive to whatever comes back.
 let opacity = 1;
-// One output canvas, reused. It is viewport-sized — some 30 MB — and a slider
-// drag would otherwise reallocate it every frame.
+// One viewport-sized output canvas — some 30 MB — reused across frames.
 let out: HTMLCanvasElement | null = null;
 
 const drawFrame = (
@@ -68,8 +47,8 @@ const drawFrame = (
   const [minX, minY, maxX, maxY] = placed.extent25833;
   const w = (maxX - minX) * scale;
   const h = (maxY - minY) * scale;
-  // Nearest-neighbour on the way up — smoothing blurs away the single-pixel
-  // step the picture exists to show — and averaging on the way down.
+  // Nearest-neighbour on the way up: smoothing blurs away the single-pixel step
+  // the picture exists to show.
   ctx.imageSmoothingEnabled = w < placed.canvas.width;
   ctx.drawImage(
     placed.canvas,
@@ -81,10 +60,9 @@ const drawFrame = (
   return out;
 };
 
-/**
- * Put the render up, move it, announce that its pixels changed, or — with
- * `null` — take it down and free the output canvas with it.
- */
+// Put the render up, move it, or announce that its pixels changed; `null` takes
+// it down. ImageCanvasSource caches one image, so `changed()` is the only way
+// to invalidate a repaint of the same canvas.
 export const setTerrainRender = (next: TerrainPlacement | null) => {
   placed = next;
   const map = getDefaultStore().get(mapAtom);
@@ -96,7 +74,7 @@ export const setTerrainRender = (next: TerrainPlacement | null) => {
   }
   if (!layer) {
     layer = new ImageLayer({
-      // Fixed, so a view in another projection reprojects.
+      // Fixed projection, so a view in another one reprojects.
       source: new ImageCanvasSource({
         projection: 'EPSG:25833',
         canvasFunction: drawFrame,
