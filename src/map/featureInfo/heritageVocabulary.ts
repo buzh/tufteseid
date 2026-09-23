@@ -1,15 +1,13 @@
 import type { MaterialSymbol } from '../../ui/Icon';
 
-// The two closed vocabularies the Kulturminner popup draws as icons, keyed on
-// the labels kart.ra.no puts on the wire rather than Geonorge's SOSI register
-// spellings, which differ; the register's own are kept as aliases. Both tables
-// are complete against ~1300 features from a 14-area sweep.
+// Keyed on the labels kart.ra.no puts on the wire, which differ from Geonorge's
+// SOSI register spellings; the register's own are kept as aliases.
 
 const normalize = (value: string): string =>
   value.trim().toLowerCase().replace(/\s+/g, ' ');
 
-/** `lokaliteteskategori` / `enkeltminnekategori` → the card's leading glyph:
- * the 12-value bucket, not the 159-value `art`. */
+/** `lokaliteteskategori` / `enkeltminnekategori` — the 12-value bucket, not the
+ * 159-value `art`. */
 const KATEGORI_ICONS: Record<string, MaterialSymbol> = {
   // Served by the WMS.
   'arkeologisk minne': 'history_edu',
@@ -32,15 +30,13 @@ const KATEGORI_ICONS: Record<string, MaterialSymbol> = {
   'ruiner fra middelalderen': 'foundation',
 };
 
-/** `castle` is the app's noun for the whole register, so it is the fallback. */
 export const kategoriIcon = (kategori: string): MaterialSymbol =>
   KATEGORI_ICONS[normalize(kategori)] ?? 'castle';
 
 /**
- * Vernetype, bucketed into `HERITAGE_RENDERS`' five vern subsets so a chip's
- * colour means what the pulldown's filter means. `ukjent` is a sixth: what an
- * unmapped label gets, kept apart from `uavklart` because the register saying
- * unclear is a different claim.
+ * Vernetype, bucketed into `HERITAGE_RENDERS`' five vern subsets. `ukjent` is a
+ * sixth, for an unmapped label: the register saying `uavklart` is a claim, not
+ * an absence.
  */
 export type VernBucket =
   | 'fredede'

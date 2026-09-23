@@ -3,8 +3,7 @@ import BaseLayer from 'ol/layer/Base';
 import ImageLayer from 'ol/layer/Image';
 import Layer from 'ol/layer/Layer';
 import TileLayer from 'ol/layer/Tile';
-// Aliased: this module also keeps a plain `Map` memo, and OpenLayers' class
-// would shadow the global one.
+// Aliased: OpenLayers' `Map` would shadow the global one the memo below uses.
 import type OLMap from 'ol/Map';
 import { ImageWMS, TileWMS } from 'ol/source';
 import { fetchWithin } from '../../shared/utils/deadline';
@@ -25,10 +24,9 @@ export type QueryableWMSLayer = TileLayer | ImageLayer<ImageWMS>;
 const isRendering = (layer: BaseLayer, map: OLMap): boolean =>
   layer instanceof Layer && layer.isVisible(map.getView());
 
-/** The WMS layers on the map that a click can be put to: queryable, drawing at
- *  this zoom, and among the ids the caller is asking about. Scoped by id rather
- *  than by `theme.` prefix, because who is asking decides which registers an
- *  answer may come from. */
+/** The WMS layers a click can be put to: queryable, drawing at this zoom, and
+ *  among `ids` — scoped by id rather than by the `theme.` prefix, so the caller
+ *  decides which registers may answer. */
 export const getQueryableWMSLayers = (
   map: OLMap,
   ids: ReadonlySet<string>,
@@ -347,17 +345,10 @@ export const parseFeatureInfo = (
   return parseJsonFeatureInfo(data);
 };
 
-// What one layer answered about one point, keyed by the GetFeatureInfo URL —
-// which carries the sublayers, the styles, the tile bbox and the pixel in it, so
-// a reshaped register or a panned map is a different key and needs no
-// invalidating. The hover and the click ask the same question of the same
-// snapped point (`heritageQuery.ts`), so this is also what makes a click on a
-// spot whose tip is up open instantly rather than asking RA twice.
-//
-// Bounded and oldest-first: a `Map` iterates in insertion order, so the eviction
-// is by age rather than by use. Approximate, and enough — what the reader is
-// about to ask again is what they just asked, not what they asked fifty points
-// ago.
+// Keyed by the GetFeatureInfo URL, which carries the sublayers, styles, tile
+// bbox and pixel, so a reshaped register or a panned map is a different key and
+// nothing needs invalidating. Eviction is by age, not use: a `Map` iterates in
+// insertion order.
 const MEMO_LIMIT = 400;
 const memo = new Map<string, FeatureInfoFeature[]>();
 
@@ -369,9 +360,8 @@ const remember = (key: string, features: FeatureInfoFeature[]) => {
   memo.set(key, features);
 };
 
-/** RA is the slowest origin in the stack and a GetFeatureInfo is a query, not a
- *  render; past this the reader has moved on. Well under wmscache's 30 s read
- *  timeout, so a hung request is dropped here rather than held open. */
+/** Well under wmscache's 30 s read timeout, so a hung request is dropped here
+ *  rather than held open. */
 export const FEATURE_INFO_DEADLINE_MS = 12_000;
 
 export const fetchLayerFeatureInfo = async (
@@ -408,17 +398,16 @@ export const fetchLayerFeatureInfo = async (
     ? [preferredFormat]
     : ['application/json', 'application/vnd.ogc.gml', 'text/xml', 'text/plain'];
 
-  // The first format's URL is the memo key whichever format ends up answering:
-  // the formats differ only in `INFO_FORMAT`, and the rest of the URL is the
-  // question.
+  // The first format's URL is the memo key whichever format answers: they
+  // differ only in `INFO_FORMAT`.
   const key = buildFeatureInfoUrl(layer, coordinate, map, formatsToTry[0]);
   if (!key) return answer([], 'Could not build GetFeatureInfo URL');
   const remembered = memo.get(key);
   if (remembered) return answer(remembered);
 
-  // An empty answer is worth remembering — most of the map has nothing on it —
-  // but only when every format was actually asked. A request that failed or was
-  // dropped looks identical here and would cache a hole.
+  // An empty answer is worth remembering, but only when every format was
+  // actually asked: a failed or dropped request looks the same here and would
+  // cache a hole.
   let failed = false;
 
   for (const format of formatsToTry) {
@@ -426,9 +415,8 @@ export const fetchLayerFeatureInfo = async (
     if (!url) return answer([], 'Could not build GetFeatureInfo URL');
 
     try {
-      // Through `fetchWithin` rather than `fetch`: this is a non-tile request to
-      // an external origin, so it is the breaker's to admit or refuse, and a
-      // reader sweeping a dead RA must not queue a lookup per pause.
+      // Through `fetchWithin`, not `fetch`: a non-tile request to an external
+      // origin is the breaker's to admit or refuse.
       const { contentType, data } = await fetchWithin(
         url,
         {

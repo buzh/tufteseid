@@ -1,7 +1,3 @@
-/* DOM rather than canvas, so the seam stays crisp at any device pixel ratio
-   and the grip is a real focus target. Cased so it reads over both a grey
-   hillshade and a bright ortofoto — the casing is white against the theme's own
-   dark furniture on purpose: it is drawn over terrain, not over a surface. */
 .root {
   position: absolute;
   inset: 0;

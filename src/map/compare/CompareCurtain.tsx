@@ -1,10 +1,6 @@
-// The curtain's draggable edge: the grab target and the visible seam only —
-// `compareLayers.ts` does the clip. The two agree because the shell and the map
-// viewport are the same rectangle.
-//
-// Mounted only while the curtain is the view, by `MapComponent`, so there is no
-// mode check in here: the clip handlers are attached with the B stack and a
-// seam over a map that is not clipped would be a line drawn across one ground.
+// The grab target and the visible seam only — `compareLayers.ts` does the clip,
+// and the two agree because this shell and the map viewport are the same
+// rectangle. Mounted only while the curtain is the view, so no mode check here.
 
 import { useAtom } from 'jotai';
 import { useRef, useState } from 'react';
@@ -26,12 +22,9 @@ export const CompareCurtain = () => {
   const rootRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  // React draws the seam from the atom; the clip reads a module-level copy.
-  // Both written in the handler, in this order: OL renders on the next
-  // animation frame and React commits before the same frame's paint, so the
-  // line and the edge of the imagery move together. Through an effect the
-  // render would be scheduled only after the browser had painted the handle,
-  // and a drag would show a strip of A to the right of the seam the whole way.
+  // Both writes stay in the handler, not an effect: OL renders on the next
+  // animation frame and React commits before that frame's paint, so seam and
+  // imagery move together. From an effect the clip lags a frame behind the drag.
   const applySplit = (fraction: number) => {
     const next = clamp(fraction);
     setCurtainSplit(next);
@@ -57,9 +50,8 @@ export const CompareCurtain = () => {
         className={styles.handle}
         style={{ left: `${split * 100}%` }}
         onPointerDown={(e) => {
-          // The primary button only. A right-click's `pointerup` is swallowed
-          // by the context menu, so a drag started on one would never end and
-          // the seam would follow the cursor across the map.
+          // Primary button only: the context menu swallows a right-click's
+          // `pointerup`, so that drag would never end.
           if (!e.isPrimary || e.button !== 0) return;
           e.currentTarget.setPointerCapture(e.pointerId);
           setDragging(true);

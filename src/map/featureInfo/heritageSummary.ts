@@ -1,20 +1,8 @@
-// What a GetFeatureInfo over the Kulturminner layers actually means, turned into
-// something a surface can render without knowing anything about Riksantikvaren.
-//
-// Three jobs, in order. **Classify**: `parseXmlFeatureInfo` loses the sublayer
-// element name each feature came back under, so the kind is re-derived from the
-// property fingerprint. **Group**: a click lands on a lokalitet, its
-// enkeltminner, its sikringssone and the icon twins of all of them at once —
-// five features that are one thing — so they are folded onto the parent id.
-// **Summarize**: the five registers say the same things under different field
-// names, and the surfaces should not each have to know which.
-//
-// The field names below were read off live GetFeatureInfo rather than off a
-// specification: sefrak serves objektnavn / bygningstypetekst /
-// tidsangivelsetekst / askeladdenid, brukerminner tittel / beskrivelse /
-// opprettet_av / opprettet and no id at all, the rest navn / informasjon /
-// datering. That is also why nothing here defaults: a field the register does
-// not serve comes back empty and the surface leaves the line out.
+// Classify, group and summarize a GetFeatureInfo over the Kulturminner layers.
+// `parseXmlFeatureInfo` loses the sublayer element name each feature came back
+// under, so the kind is re-derived from the property fingerprint. The field
+// names below were read off live GetFeatureInfo, not off a specification, and
+// nothing defaults: a field the register does not serve comes back empty.
 
 import type { LayerFeatureInfo } from './types';
 import { vernBucket, type VernBucket } from './heritageVocabulary';
@@ -41,7 +29,6 @@ interface HeritageGroup {
   others: HeritageFeature[];
 }
 
-/** One enkeltminne under a lokalitet, as the popup lists them. */
 export interface EnkeltminneSummary {
   key: string;
   /** The register's own id, empty where it serves none; the key may be ours. */
@@ -54,25 +41,21 @@ export interface EnkeltminneSummary {
 }
 
 /**
- * One thing on the map, whatever number of WMS features said so.
- *
- * Every string field is empty rather than absent when the register serves
- * nothing, and the two plural ones are the values rolled up across a lokalitet
- * and its enkeltminner — one entry where they agree, several where they do not,
- * which is a distinction the surface has to word and this module must not.
+ * One thing on the map, whatever number of WMS features said so. Every string
+ * field is empty rather than absent; the plural ones are rolled up across a
+ * lokalitet and its enkeltminner.
  */
 export interface HeritageSummary {
   key: string;
   kind: FeatureKind;
-  /** The name of the register it came out of, for a kind with no noun of ours. */
   layerTitle: string;
-  /** An id the register owns and a reader can quote back at it; never ours. */
+  /** The register's own id, never ours. */
   id: string;
   /** Empty when genuinely unnamed — the surface falls back to `art`. */
   navn: string;
-  /** The 159-value `art`: the subtitle. */
+  /** The 159-value `art`. */
   art: string;
-  /** The 12-value bucket `kategori`, which is what the glyph is chosen from. */
+  /** The 12-value bucket, which the glyph is chosen from. */
   kategori: string;
   vernetyper: string[];
   /** One bucket where they agree, `ukjent` where they do not. */
@@ -83,7 +66,7 @@ export interface HeritageSummary {
   kommune: string;
   antallEnkeltminner: string;
   informasjon: string;
-  /** Brukerminner: who reported it takes vernestatus' place. */
+  /** Brukerminner only. */
   registrertAv: string;
   registrert: string;
   askeladden: string;
@@ -212,9 +195,9 @@ const toHeritageFeatures = (layers: LayerFeatureInfo[]): HeritageFeature[] => {
 const groupFeatures = (layers: LayerFeatureInfo[]): HeritageGroup[] => {
   const features = toHeritageFeatures(layers);
 
-  // Dedupe the *ikoner twins — one record drawn twice, as a polygon and as a
-  // pin — keeping whichever copy carries more fields. A record with no identity
-  // gets a key of its own rather than colliding with the next one.
+  // Dedupe the *ikoner twins — one record drawn as both polygon and pin —
+  // keeping whichever copy carries more fields. A record with no identity gets
+  // a key of its own rather than colliding with the next one.
   let anonymous = 0;
   const seen = new Map<string, HeritageFeature>();
   for (const f of features) {
@@ -245,9 +228,8 @@ const groupFeatures = (layers: LayerFeatureInfo[]): HeritageGroup[] => {
 
   const all = Array.from(groups.values());
 
-  // A sikringssone is metadata for a lokalitet, not a result of its own — so it
-  // is dropped as a card wherever a real record came back with it, and kept
-  // where it is all there was.
+  // A sikringssone is metadata for a lokalitet: dropped wherever a real record
+  // came back with it, kept where it is all there was.
   const hasReal = all.some((g) => g.lokalitet || g.enkeltminner.length > 0);
   return hasReal
     ? all.filter(
@@ -279,8 +261,6 @@ const summarizeGroup = (group: HeritageGroup): HeritageSummary => {
         ? 'enkeltminne'
         : (group.others[0]?.kind ?? 'enkeltminne');
 
-  // The lokalitet names the group; an unnamed one borrows its first
-  // enkeltminne's name, and only then falls through to the other registers.
   const navn =
     stringify(group.lokalitet?.properties['navn']) ||
     stringify(group.enkeltminner[0]?.properties['navn']) ||
@@ -353,8 +333,7 @@ const summarizeGroup = (group: HeritageGroup): HeritageSummary => {
   };
 };
 
-/** Everything one point on the map has to say, one entry per thing rather than
- *  one per WMS feature. */
+/** One entry per thing, not one per WMS feature. */
 export const summarizeHeritage = (
   layers: LayerFeatureInfo[],
 ): HeritageSummary[] => groupFeatures(layers).map(summarizeGroup);

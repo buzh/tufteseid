@@ -13,7 +13,6 @@ export const projInit = () => {
   registerWGS84Projections();
   registerED50Projections();
 
-  // eslint-disable-next-line
   register(proj4 as any);
 
   setEUREF89Extents();

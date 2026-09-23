@@ -1,7 +1,5 @@
-/* Half the row, to the pixel. The seam is the row's gap
-   (`MapComponent.module.css`), so nothing here may take width off the pane: the
-   two viewports have to be the same size for the shared `View` to mean what the
-   split view says it means. */
+/* Half the row, to the pixel: the two viewports must be the same size. Nothing
+   here may take width off the pane — the seam is the row's gap. */
 .pane {
   flex: 1 1 0;
   min-width: 0;

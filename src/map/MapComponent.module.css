@@ -4,14 +4,8 @@
   height: 100%;
 }
 
-/* One or two viewports side by side. A row rather than a fraction the map is
-   given: the split's two halves are the same width, and OL resizes each map off
-   its own target element.
-
-   The seam is this row's own gap showing through, not a border on either pane.
-   A border would come out of the pane's box — `box-sizing` is global — and the
-   two viewports would differ by its width, which is exactly the measurement the
-   split view exists to let a reader make across it. */
+/* The split's seam is this row's `gap`, not a border on either pane: a border
+   comes out of the pane's box and leaves the two viewports different widths. */
 .panes {
   display: flex;
   gap: 2px;

@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 
-// Does the Kulturminnesøk link on a heritage feature go anywhere? Riksantikvaren
-// serves `linkkulturminnesok` on every record, but a fair share of the register
-// is not in its index (measured: 3 of 7 around Gimsø, 4 of 18 around Borre) and
-// the miss is silent — HTTP 200 and an all-null shell — so we ask the API the
-// way the destination page does and read a null `externalid` as the miss.
-// Same-origin through wmscache (`/kms/*`): the API sends no CORS headers.
+// RA serves `linkkulturminnesok` on every record, but part of the register is
+// not in Kulturminnesøk's index and the miss is silent: HTTP 200 with an
+// all-null body, so a null `externalid` is the miss. Same-origin through
+// wmscache (`/kms/*`) because the API sends no CORS headers.
 
 /** `unknown` covers "not asked yet", "not a resolver URL" and "ask failed". */
 export type KulturminnesokStatus = 'unknown' | 'indexed' | 'missing';
@@ -44,7 +42,7 @@ const probe = (id: string): Promise<KulturminnesokStatus> => {
   return request;
 };
 
-/** Status of one `linkkulturminnesok` URL: `unknown` on the first render, so a
+/** Status of one `linkkulturminnesok` URL. `unknown` on the first render, so a
  * slow or broken probe costs the mark and never the link. */
 export const useKulturminnesokStatus = (link: string): KulturminnesokStatus => {
   const id = kulturminnesokId(link);

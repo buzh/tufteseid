@@ -1,14 +1,11 @@
-/* --- OL ScaleLine control, in bar mode (added to the map in map/atoms.ts).
-   The step labels hang below the bar, so the offsets leave room under it. --- */
+/* OpenLayers ScaleLine in bar mode (added in map/atoms.ts). Step labels hang
+   below the bar, so the offsets leave room under it. */
 .ol-scale-bar {
   position: absolute;
   left: 10px;
   bottom: 52px;
   right: auto;
-  /* One shadow over the whole control — bar, ticks and labels alike, since
-     `drop-shadow` follows the alpha rather than the box — so a 10px strip
-     still lifts off broken ground. Anthracite 9 with alpha, which is a literal
-     because the theme carries the colour but not a translucent form of it. */
+  /* Anthracite 9 as a literal: the theme has no translucent form of it. */
   filter: drop-shadow(0 1px 2px rgba(24, 30, 32, 0.85))
     drop-shadow(0 0 6px rgba(24, 30, 32, 0.5));
 }
@@ -22,10 +19,6 @@
   }
 }
 
-/* The alternation is the classic black-and-white one, read in the app's own
-   ramp: anthracite against its lightest step. Each segment keeps a dark
-   hairline so the light ones hold their edge over hillshade, and the bar as a
-   whole a light one so the dark ones hold theirs over ortofoto. */
 .ol-scale-bar-inner {
   outline: 1px solid rgba(215, 221, 224, 0.6);
 }
@@ -42,8 +35,6 @@
   background-color: var(--mantine-color-anthracite-0);
 }
 
-/* The ticks stand on the map rather than on the bar, and papaya is the one
-   colour in the theme picked to be found against terrain. */
 .ol-scale-step-marker {
   background-color: var(--mantine-color-papaya-5);
 }
@@ -62,11 +53,8 @@
   touch-action: none;
 }
 
-/* The map's cursor is written on the viewport (`map/cursorLease.ts`), and the
-   overlays pinned to the ground live inside it. While a spot's pin is being
-   placed that value is `none` — the pin is the cursor — and a card inheriting
-   it would be the one surface on the screen with no pointer to click its links
-   with. Overlays keep their own. */
+/* Overlays live inside the viewport, whose cursor `map/cursorLease.ts` may set
+   to `none` while a pin is being placed. They must not inherit that. */
 .ol-overlaycontainer-stopevent {
   cursor: auto;
 }

@@ -1,20 +1,7 @@
-// Draws where a LiDAR project lies while the dataset pulldown is open. The
-// fetch and the relevance classification also happen here, into
-// lidarViewportAtom, so one WFS pass serves both the shapes and the list.
-//
-// Belongs to the map rather than to a half, so it reads the `live…` atoms:
-// arrays holding one value per half that is drawing, all indexed the same way
-// (`acrossHalves` in `compare/halves.ts`). A two-ground view has two dataset
-// pulldowns and two active flights, and one viewport query between them: both
-// halves look at the same extent through the same view, so what covers the
-// screen is asked once.
-//
-// Where the outlines go is a different question, and the answer is the pane
-// that is showing the flight they describe. The curtain is one viewport, so its
-// two halves share one layer on the main map. The split is two, so each pane
-// gets its own layer carrying its own half's dataset — drawing B's flight over
-// A's ground would point at the wrong picture, and the pulldown that opened is
-// itself a half's.
+// Draws where a LiDAR project lies while the dataset pulldown is open, and runs
+// the one WFS pass that fills `lidarViewportAtom` for both the shapes and the
+// pulldown's rows. Reads the `live…` atoms: one entry per drawing half, every
+// array indexed the same way (`acrossHalves`, `compare/halves.ts`).
 
 import { useAtomValue, useSetAtom } from 'jotai';
 import { Feature } from 'ol';
@@ -63,30 +50,22 @@ import { LIDAR_LAYERS } from './layers/config/backgroundLayers/stack';
 
 export const LIDAR_FOOTPRINTS_LAYER_ID = 'lidarFootprintsLayer';
 
-// Furthest out the pulldown will answer "what covers this view". Not a cost
-// bound but a usefulness one: a whole-country view intersects some 450
-// acquisitions and the list shows 25.
+// Furthest out the pulldown will answer "what covers this view": a
+// whole-country view intersects some 450 acquisitions and the list shows 25.
 const MIN_FOOTPRINT_ZOOM = 7;
 
-// How many candidates get a real footprint fetched. Ordered by bboxOverlapRatio
-// first, an upper bound on real coverage, so this only drops ones that could
-// not have reached the top of a 25-row list.
+// How many candidates get a real footprint fetched. Ordered by
+// `bboxOverlapRatio`, an upper bound on real coverage.
 const FOOTPRINT_FETCH_CAP = 60;
 
-// Auto keeps this refreshing for a whole LiDAR session, so a pan ending in
-// three quick moveends should cost one pass rather than three.
 const REFRESH_DEBOUNCE_MS = 250;
 
 type Tier = 'hover' | 'active';
 
 /**
- * The cached acquisitions covering a viewport, tiered the same way the WFS list
- * is, for when the WFS list cannot be had.
- *
- * `geometries: []` is the answer and not a gap: the store publishes an envelope
- * per acquisition, so there is no outline to draw and `areaRatio` is an upper
- * bound rather than what the flight paints. The pulldown reads the viewport's
- * status rather than the ratio when this is the list it is showing.
+ * The cached acquisitions covering a viewport, tiered like the WFS list, for
+ * when the WFS list cannot be had. `geometries: []` is deliberate: the store
+ * publishes only an envelope, so `areaRatio` is an upper bound.
  */
 const heldInView = async (
   extentLonLat: [number, number, number, number],
@@ -104,8 +83,8 @@ const heldInView = async (
     filters,
   );
 
-// A white casing under a saturated core: the base is either green topo or
-// grey-brown hillshade, and a plain coloured outline vanishes into one of them.
+// A white casing under the coloured core, so the outline holds over both green
+// topo and grey-brown hillshade.
 const casing = (width: number) =>
   new Stroke({ color: 'rgba(255, 255, 255, 0.85)', width });
 
@@ -118,8 +97,6 @@ const HOVER_STYLE = [
   }),
 ];
 
-// No fill: the active dataset is the one being read, and tinting the terrain
-// it covers defeats the purpose.
 const ACTIVE_STYLE = [
   new Style({ stroke: casing(5), zIndex: 0 }),
   new Style({
@@ -153,9 +130,8 @@ const getOrCreateLayer = (map: OlMap): VectorLayer => {
 };
 
 /**
- * The maps drawing footprints, and which halves' active flights each one is to
- * outline. One entry outside the split, carrying every live half; two in it,
- * one per pane, because each pane draws a ground of its own.
+ * The maps drawing footprints and which halves' active flights each is to
+ * outline: one entry outside the split, two in it, one per pane.
  */
 const footprintTargets = (
   main: OlMap,
@@ -171,16 +147,15 @@ const footprintTargets = (
 };
 
 /** The right pane's layer while the right pane is not a target, so what it was
- *  last showing does not come back with it. Never creates one: the pane may
- *  have no map yet, and this must not conjure a second map on an install that
- *  has never opened the split. */
+ *  last showing does not come back with it. Must never create a map: the split
+ *  may never have been opened. */
 const strandedLayer = (mode: ViewMode): VectorLayer | undefined => {
   if (mode === 'split') return undefined;
   const pane = peekSplitMap();
   return pane ? findLayer(pane) : undefined;
 };
 
-/** Mount once, from whatever owns the map's side effects. */
+/** Mount once. */
 export const useLidarFootprintsLayer = () => {
   const map = useAtomValue(mapAtom);
   const mode = useAtomValue(viewModeAtom);
@@ -195,13 +170,11 @@ export const useLidarFootprintsLayer = () => {
   const hoveredProjectId = useAtomValue(hoveredLidarProjectIdAtom);
   const setHoveredProjectId = useSetAtom(hoveredLidarProjectIdAtom);
 
-  // Which halves are on LiDAR at all. Every other array here is indexed the
-  // same way, so the conditions below can be read off pairwise.
+  // Indexed like every other array here, so the conditions below read pairwise.
   const onLidar = backgroundLayers.map((name) => LIDAR_LAYERS.has(name));
   const anyLidar = onLidar.some(Boolean);
-  // A half's own ground and its own pulldown, because the picker atom can be
-  // left true if the popover unmounts without closing itself (which is why
-  // `LidarControlGroup` stands it down).
+  // A half's own ground and its own pulldown: the picker atom can be left true
+  // when a popover unmounts without closing itself.
   const picking = onLidar.some((lidar, i) => lidar && pickersOpen[i]);
   // Cycling and auto both want the fetch and neither wants the drawing.
   const wantsViewport =
@@ -249,8 +222,8 @@ export const useLidarFootprintsLayer = () => {
       const request = ++latestRequest;
       const isStale = () => cancelled || request !== latestRequest;
 
-      // Out where auto would resolve to the national mosaic regardless it does
-      // not need the list, which is what keeps always-on auto affordable.
+      // Out where auto resolves to the national mosaic regardless, the list is
+      // not needed.
       const resolution = map.getView().getResolution();
       if (
         !picking &&
@@ -275,11 +248,8 @@ export const useLidarFootprintsLayer = () => {
 
       setViewport((prev) => ({ ...prev, status: 'loading' }));
 
-      // Kartverket is not answering — the catalogue, the footprint WFS or
-      // both, since one backend renders the lot. The cVAT store needs neither,
-      // so what it holds over this viewport is offered in place of an empty
-      // list. Only then `error`, which now means what it says: nothing
-      // upstream and nothing of our own.
+      // Kartverket is not answering. The cVAT store needs neither the catalogue
+      // nor the WFS, so it answers instead; `error` only if it holds nothing.
       const fallBackToStore = async () => {
         const held = await heldInView(extentLonLat, filters);
         if (isStale()) return;
@@ -293,8 +263,8 @@ export const useLidarFootprintsLayer = () => {
       fetchLidarProjects()
         .then((allProjects) => {
           // The catalogue's bounding boxes are true envelopes, so this can only
-          // over-include — which is what lets the footprint fetch be a per-name
-          // lookup rather than a spatial query (see lidarFootprints.ts).
+          // over-include — hence the per-name footprint lookup in
+          // `lidarFootprints.ts` rather than a spatial query.
           const candidates = allProjects
             .filter((p) => bboxIntersects(p.bboxLonLat, extentLonLat))
             .map((project) => ({
@@ -306,19 +276,11 @@ export const useLidarFootprintsLayer = () => {
                 b.maxRatio - a.maxRatio ||
                 sortProjectsByRelevance(a.project, b.project),
             )
-            // With the pulldown closed and no cycling, the only reader of this
-            // list is `chooseAutoDataset`, whose two gates are areaRatio >=
-            // AUTO_ENGAGE_COVERAGE to take a flight and >=
-            // AUTO_RELEASE_COVERAGE to keep the incumbent. maxRatio is an upper
-            // bound on areaRatio, so a candidate under the lower of the two
-            // cannot satisfy either gate and its boundary fetch can only
-            // confirm that. Automatisk is on by default and refreshes for a
-            // whole LiDAR session, so without this cut a first pan into
-            // well-flown ground spends up to 60 WFS lookups — each one a page,
-            // two when the name misses — to answer a question three of them
-            // settle. Opening the pulldown re-runs this effect (`picking` is a
-            // dep) and refetches at the full cap, so the rows the reader
-            // actually sees are never the narrowed list.
+            // With the pulldown closed and no cycling the only reader is
+            // `chooseAutoDataset`, whose lowest gate is AUTO_RELEASE_COVERAGE;
+            // `maxRatio` bounds `areaRatio` from above, so anything under it
+            // cannot pass. `picking` is a dep, so opening the pulldown refetches
+            // at the full cap.
             .filter(
               (e) =>
                 picking || cycling || e.maxRatio >= AUTO_RELEASE_COVERAGE,
@@ -329,14 +291,10 @@ export const useLidarFootprintsLayer = () => {
           return fetchLidarFootprints(candidates, projection).then(
             ({ footprints, unanswered }) => {
               if (isStale()) return;
-              // The one failure that does not arrive as a rejection. The
-              // catalogue is a week of localStorage with a stale copy behind
-              // it, so during an outage it answers off disk and only the
-              // boundary lookups fail — quietly, one per project, since a bad
-              // name must not blank the list. What they hand back is an empty
-              // map, which is also what a viewport no flight covers hands
-              // back: `ready` with no rows, Automatisk resolving to a mosaic
-              // with nothing to draw either, and the store never asked.
+              // The one failure that does not arrive as a rejection: during an
+              // outage the catalogue answers off localStorage and only the
+              // boundary lookups fail, which otherwise looks like a viewport no
+              // flight covers.
               if (unanswered) return fallBackToStore();
               const entries: LidarViewportEntry[] = [];
               for (const project of candidates) {
@@ -376,8 +334,6 @@ export const useLidarFootprintsLayer = () => {
     };
   }, [map, wantsViewport, picking, cycling, filters, setViewport]);
 
-  // The hovered row's footprint and the active dataset of whichever halves the
-  // host is showing, off the same lists.
   useEffect(() => {
     strandedLayer(mode)?.getSource()?.clear();
 
@@ -406,8 +362,8 @@ export const useLidarFootprintsLayer = () => {
       source.clear();
       if (!picking) continue;
 
-      // A set, not one per half: in the curtain two halves reading the same
-      // acquisition would otherwise stack two identical outlines and thicken it.
+      // A set: two halves on the same acquisition would otherwise stack two
+      // identical outlines and thicken it.
       const activeIds = new Set(
         halves.flatMap((i) => {
           const project = liveProjects[i];

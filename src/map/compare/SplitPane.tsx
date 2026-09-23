@@ -1,10 +1,5 @@
-// The right half of the split view: a viewport for the second OL map.
-//
-// Nothing but a target. The map is a module singleton (`splitMap.ts`) sharing
-// the main map's `View` object, so the two are centred on the same coordinate
-// at the same resolution by construction, and dragging either one moves both.
-// Mounted only while the split is the view; unmounting releases the target, and
-// an OL map with no target renders nothing but keeps its layers.
+// A viewport for the second OL map, nothing more. Releasing the target on
+// unmount stops it rendering but keeps its layers.
 
 import { useEffect, useRef } from 'react';
 import styles from './SplitPane.module.css';

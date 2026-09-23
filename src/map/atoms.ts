@@ -32,8 +32,7 @@ const getInitialMapView = () => {
     const parsedLon = parseFloat(lon);
     const parsedLat = parseFloat(lat);
     if (!Number.isNaN(parsedLon) && !Number.isNaN(parsedLat)) {
-      // `lat`/`lon` are the raw centre in whatever `projection` says, which is
-      // what the app writes back.
+      // `lon`/`lat` are the raw centre in the `projection` parameter's CRS.
       initialCenter = [parsedLon, parsedLat];
     }
   }
@@ -60,20 +59,15 @@ const getInitialMapView = () => {
 export const mapAtom = atom<Map>(() => {
   const map = new Map({
     controls: defaultControls({ zoom: false, rotate: false }).extend([
-      // A stepped bar rather than a bare line: alternating segments are what
-      // let you carry a distance across the screen by eye, which is the whole
-      // use of a scale on relief. Coloured off black and white in `map.css`.
       new ScaleLine({ bar: true, steps: 4, minWidth: 140, maxWidth: 240 }),
     ]),
-    // No rotation UI, so a stray gesture would leave a rotation nothing clears.
     interactions: defaultInteractions({
       altShiftDragRotate: false,
       pinchRotate: false,
     }),
     keyboardEventTarget: document,
-    // One queue for the whole map. The default 16 assumes millisecond
-    // responses; a cold LiDAR tile is 3-12 s, so a screenful of them pins every
-    // slot and the ~130 ms topo base never gets scheduled.
+    // Default 16 starves the ~130 ms topo base: a cold LiDAR tile takes 3-12 s
+    // and a screenful of them pins every slot.
     maxTilesLoading: 48,
   });
 
