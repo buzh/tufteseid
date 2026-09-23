@@ -2,23 +2,27 @@
 // only while the overlay is on: a filter over nothing is a control the reader
 // has to turn something else on before it means anything.
 //
-// No glyph on the chip. Every other chip in the band leads with one because it
-// is the whole of what the control is about, but this one shares a box with the
-// castle and a second glyph an eighth of an inch from it would be read as a
-// second subject. The chevron already says the chip opens.
+// Nothing on the chip but the chevron, which makes it the width of the castle
+// beside it and the unit a fixed box. The other chips in the band are readouts
+// of a choice the map cannot show — which of five kart variants is drawing, or
+// which flight — but what this menu sets is the overlay itself, and the overlay
+// is right there on the terrain. A chip that named it would be saying a second
+// time what the reader is already looking at, and saying it at a width that
+// changed from "Omriss" to "3 kilder" as they went, pushing everything to its
+// right along the band. No glyph either: it shares a box with the castle, and a
+// second subject an eighth of an inch away is what that would read as.
 //
 // A Popover rather than a Menu. Every row in here is a setting the reader
 // leaves set — five sources, three registers inside one of them, one render out
 // of seven, and a transparency — and a Menu closes on the first click, which
 // would make ticking two sources two trips.
 //
-// The chip reads out the render, because that is the thing in here that changes
-// what the map looks like at a glance, and falls back to naming the sources
-// when the one service the render applies to is not among them. The one thing
-// it says that is not a setting is that the map is too far out for any of them
-// (`useHeritageControls`): the overlay is on, the register is not empty, and
-// nothing is drawn — that sentence has to be somewhere the reader sees without
-// opening anything.
+// The readout the chip no longer carries is in its `title`: the ticked sources
+// and the render, one hover away. What cannot wait for a hover is that the map
+// is too far out for any of them (`useHeritageControls`) — the overlay is on,
+// the register is not empty, and nothing is drawn — so that state turns the
+// chip red, which is what this row's other boxes do when what was asked for is
+// not on the map.
 
 import {
   Checkbox,
@@ -73,22 +77,15 @@ export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
   const names = SOURCES.filter((id) => sources.has(id)).map((id) =>
     themeLayerName(id, i18n.language),
   );
-  const renderLabel = t(`heritageControls.render.${render}`);
   // The render is a property of kulturminner2 alone, so with that source off it
-  // would be a readout of something nobody can see. Name what is drawing
-  // instead.
-  const label = sitesShown
-    ? renderLabel
-    : names.length === 1
-      ? names[0]
-      : t('heritageControls.sourceCount', { count: names.length });
+  // would name something nobody can see. Say what is drawing instead.
   const title = [
     sitesShown
       ? t('heritageControls.chipTitle', {
           sources: names.join(', '),
-          render: renderLabel,
+          render: t(`heritageControls.render.${render}`),
         })
-      : names.join(', '),
+      : t('heritageControls.chipSourcesTitle', { sources: names.join(', ') }),
     tooFarOut ? t('heritageControls.zoomedOutHint') : null,
   ]
     .filter(Boolean)
@@ -107,8 +104,7 @@ export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
     >
       <Popover.Target>
         <ControlChip
-          label={label}
-          hint={tooFarOut ? t('heritageControls.zoomedOut') : undefined}
+          warn={tooFarOut}
           title={title}
           aria-label={title}
           onClick={() => setOpened((o) => !o)}

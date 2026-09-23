@@ -78,14 +78,17 @@
   color: var(--mantine-color-dimmed);
 }
 
-/* An upstream is not answering. Red rather than the papaya accent: the accent
-   means "this is where the controls are", and a fault has to read as the other
-   thing. Only the border and the icon carry it — a filled red chip in a row
-   this dense reads as an alarm, and the map underneath is still usable. */
+/* What was asked for is not on the map. Red rather than the papaya accent: the
+   accent means "this is where the controls are", and a fault has to read as the
+   other thing. Only the border and the glyphs carry it — a filled red chip in a
+   row this dense reads as an alarm, and the map underneath is still usable.
+   The chevron among them because a chip that carries no text has nothing else
+   inside the border to colour. */
 .chipWarn {
   border-color: var(--mantine-color-red-8);
 }
 
-.chipWarn .chipIcon {
+.chipWarn .chipIcon,
+.chipWarn .chipChevron {
   color: var(--mantine-color-red-4);
 }

@@ -20,7 +20,12 @@ import { Icon, type MaterialSymbol } from './Icon';
 
 type ControlChipProps = ComponentPropsWithoutRef<'button'> & {
   icon?: MaterialSymbol;
-  /** Left off where the icon is the whole readout. */
+  /**
+   * Left off where the icon is the whole readout, or where nothing but the
+   * chevron is — a chip with neither is a fixed box the width of a
+   * `ControlButton`, which is what a menu target next to one should be when the
+   * thing it would report is already on the map.
+   */
   label?: ReactNode;
   /** Trails the label in the dimmed colour, on the same line. */
   hint?: ReactNode;
@@ -34,7 +39,11 @@ type ControlChipProps = ComponentPropsWithoutRef<'button'> & {
   dimmed?: boolean;
   /** Says what is showing and does not open. Drops the hover affordance. */
   readout?: boolean;
-  /** An upstream is down. Red border and icon, nothing else. */
+  /**
+   * What the reader asked for is not on the map — an upstream is down, or the
+   * view is outside where the layer draws. Red border, icon and chevron,
+   * nothing else.
+   */
   warn?: boolean;
   ref?: Ref<HTMLButtonElement>;
 };
