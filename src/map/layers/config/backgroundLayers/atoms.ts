@@ -143,9 +143,15 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
       if (generation !== swapGeneration) return;
       if (!built) return;
 
-      // Always explicit: a reused layer still carries an earlier swap's fade.
-      for (const { layer, opacity } of [...built.under, ...built.over]) {
+      // Always explicit: a reused layer still carries an earlier swap's fade,
+      // and its place in the z-order (the hybrid overlay rides above the
+      // cached store's coverage hint; every other ground sits at 0).
+      for (const { layer, opacity, zIndex } of [
+        ...built.under,
+        ...built.over,
+      ]) {
         layer.setOpacity(opacity);
+        layer.setZIndex(zIndex);
       }
 
       swapBackgroundLayers(

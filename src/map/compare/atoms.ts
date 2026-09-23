@@ -145,6 +145,9 @@ export const compareLayerAtomEffect = atomEffect((get) => {
       if (generation !== compareGeneration) return;
       if (!built) return;
 
+      // Opacity only: the stack's own z-index is the A half's ladder, and the
+      // B half draws as one thing at `COMPARE_Z` — `installCompareLayers` sets
+      // that on every layer it takes.
       for (const { layer, opacity } of [...built.under, ...built.over]) {
         layer.setOpacity(opacity);
       }

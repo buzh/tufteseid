@@ -247,7 +247,9 @@ A ground is never one layer. `resolveStack` / `buildStack`
    has no model toggle, so a held DOM would fill its holes with a surface
    mosaic nobody could turn off;
 3. the active dataset;
-4. the topo overlay, in hybrid.
+4. the topo overlay, in hybrid — the one entry that carries a z-index of its
+   own (`HYBRID_OVERLAY_Z`, 0.75), so it clears the cached store's coverage hint
+   at 0.5 as well as the ground below it.
 
 `swapBackgroundLayers(under, over)` (`config/backgroundLayers/utils.ts`)
 installs the result without a gap: 1–2 go *under* the outgoing layers, 3–4
@@ -264,7 +266,10 @@ installs the result without a gap: 1–2 go *under* the outgoing layers, 3–4
   makes every W/S step flash topo.
 - `buildOrReuseBackgroundLayer` reuses a layer whose url + params + projection
   match, so cycling rebuilds only what changed — and a reused layer may carry
-  an earlier fade, so callers set opacity explicitly on every layer they pass.
+  an earlier fade and an earlier place in the z-order, so callers set both
+  explicitly on every layer they pass. The B half is the exception: it ignores
+  the stack's z-index and `installCompareLayers` puts every layer it takes at
+  `COMPARE_Z`, since B draws as one thing.
 
 ### The layer pool
 
@@ -288,10 +293,14 @@ between the curtain and the split costs nothing.
   curtain clip and extent. The installers set all of those on every incoming
   layer, not only on new ones.
 
-Map z-order, of what is left: backgrounds at the default zIndex 0 (ordered by
-collection position), the cached store's coverage hint at 0.5
+Map z-order, of what is left: backgrounds at zIndex 0 (ordered by collection
+position), the cached store's coverage hint at 0.5
 (`cvatHintLayer.ts` — over every ground, since it is drawn over whichever one is
-up, and under everything the app draws on top of a ground), the terrain-analysis
+up, and under everything the app draws on top of a ground), hybrid's topo
+overlay at 0.75 (`HYBRID_OVERLAY_Z` in `stack.ts` — the only background layer
+off 0, because roads and place names have to clear the hint patches as well as
+the ground; a patch over the names of the county it is inviting the reader into
+is the symptom), the terrain-analysis
 render at 1 (`terrainLayer.ts` — over the background it is read against, under
 the B half so a curtain can still be drawn across it), the B half of a
 two-ground view at 1.5 (`COMPARE_Z`), an open

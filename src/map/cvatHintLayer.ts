@@ -44,8 +44,10 @@ import { getXYZLayer } from './layers/config/backgroundLayers/utils';
  *  the hint belongs to no stack — it is drawn over whichever one is up. */
 const CVAT_HINT_ID_PREFIX = 'cvatHint.';
 
-// Over every ground (0) and under everything drawn on top of one: the terrain
-// render at 1, the footprints at 3, the reader's own pins at 6.
+// Over every ground (0) and under everything drawn on top of one: hybrid's topo
+// overlay at 0.75 — the patch is relief, and burying the roads and place names
+// of the county it is inviting the reader into would be the wrong way round —
+// the terrain render at 1, the footprints at 3, the reader's own pins at 6.
 const CVAT_HINT_Z_INDEX = 0.5;
 
 const hintLayers = (map: OlMap): BaseLayer[] =>

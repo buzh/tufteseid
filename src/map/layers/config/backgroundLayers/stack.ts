@@ -53,6 +53,17 @@ export const LIDAR_LAYERS = new Set<BackgroundLayerName>([
 // How far the layer under a per-project dataset is dimmed.
 const FALLBACK_OPACITY = 0.6;
 
+// Where a background layer sits: the ground's own default, and the one place
+// the stack leaves it. The hybrid overlay is roads, railways and place names,
+// and it is over the ground *and* over anything the app paints onto the ground
+// as coverage — so it clears the cached store's hint patches at 0.5
+// (`cvatHintLayer.ts`), which otherwise bury the names of exactly the counties
+// the patches are inviting the reader into. Still under the terrain-analysis
+// render at 1, which is a reading and belongs on top of the reference.
+// `docs/map-layers.md` keeps the register.
+const GROUND_Z = 0;
+const HYBRID_OVERLAY_Z = 0.75;
+
 // NDH project rasters are 0.25 m at their finest and 0.5 m for most flights,
 // so z17 (0.166 m/px) already asks the renderer for more than it holds. The
 // three levels above it are pure interpolation, and this is the most expensive
@@ -113,7 +124,11 @@ export type StackOptions = {
   hybridContours: boolean;
 };
 
-export type StackEntry = { config: BackgroundLayer; opacity: number };
+export type StackEntry = {
+  config: BackgroundLayer;
+  opacity: number;
+  zIndex: number;
+};
 
 export type ResolvedStack = {
   /** Bottom-first, everything the featured dataset sits on top of. */
@@ -172,7 +187,7 @@ export const resolveStack = (
     const topo = allConfiguredBackgroundLayers.find(
       (l) => l.layerName === 'topo',
     );
-    if (topo) under.push({ config: topo, opacity: 1 });
+    if (topo) under.push({ config: topo, opacity: 1, zIndex: GROUND_Z });
   }
 
   // The seamless product of the same kind goes under a dataset that has holes,
@@ -188,28 +203,40 @@ export const resolveStack = (
         : layerName === 'flyfotoProject'
           ? FLYFOTO_MOSAIC_CONFIG
           : null;
-  if (fallback) under.push({ config: fallback, opacity: FALLBACK_OPACITY });
+  if (fallback) {
+    under.push({
+      config: fallback,
+      opacity: FALLBACK_OPACITY,
+      zIndex: GROUND_Z,
+    });
+  }
 
   // Only over terrain: on the topo map it redraws the base's roads and names.
   const hybrid = opts.hybridOverlay && LIDAR_LAYERS.has(layerName);
   // Contours ride the overlay's own GetMap, so without it there is nothing.
   const contours = hybrid && opts.hybridContours;
-  const over: StackEntry[] = [{ config: featured, opacity: 1 }];
+  const over: StackEntry[] = [
+    { config: featured, opacity: 1, zIndex: GROUND_Z },
+  ];
   if (hybrid) {
-    over.push({ config: buildTopoOverlayConfig(contours), opacity: 1 });
+    over.push({
+      config: buildTopoOverlayConfig(contours),
+      opacity: 1,
+      zIndex: HYBRID_OVERLAY_Z,
+    });
   }
 
   return { under, over, hybrid, contours };
 };
 
-export type BuiltLayer = { layer: TileLayer; opacity: number };
+export type BuiltLayer = { layer: TileLayer; opacity: number; zIndex: number };
 export type BuiltStack = { under: BuiltLayer[]; over: BuiltLayer[] };
 
-/** The same stack as OL layers. Opacity comes back alongside each layer rather
- *  than applied, since a run found stale afterwards must not have faded a layer
- *  the current stack still uses. `null` if the featured layer failed. `host` is
- *  the map the layers are destined for, and only the split view's right pane
- *  passes one. */
+/** The same stack as OL layers. Opacity and z-index come back alongside each
+ *  layer rather than applied, since a run found stale afterwards must not have
+ *  faded or reordered a layer the current stack still uses. `null` if the
+ *  featured layer failed. `host` is the map the layers are destined for, and
+ *  only the split view's right pane passes one. */
 export const buildStack = async (
   stack: ResolvedStack,
   projection: string,
@@ -221,6 +248,7 @@ export const buildStack = async (
       entries.map(async (e) => ({
         layer: await buildOrReuseBackgroundLayer(e.config, projection, ns, host),
         opacity: e.opacity,
+        zIndex: e.zIndex,
       })),
     );
 
@@ -233,6 +261,7 @@ export const buildStack = async (
   const present = (e: {
     layer: TileLayer | null;
     opacity: number;
+    zIndex: number;
   }): e is BuiltLayer => e.layer != null;
   return { under: under.filter(present), over: over.filter(present) };
 };
