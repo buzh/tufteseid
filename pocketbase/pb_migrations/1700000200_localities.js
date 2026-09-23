@@ -1,42 +1,13 @@
 /// <reference path="../pb_data/types.d.ts" />
 //
-// Lokaliteter schema — replaces the flat annotations MVP.
-// The old `finds` collection (one geometry blob per record) is dropped
-// WITH its data and rebuilt as a child of the new `localities`
-// collection.
-//
-// 1. `localities` — the top-level "area to explore": an authored
-//    rectangle (bbox), name, description, visibility. Same visibility
-//    model as the old finds (privat/begrenset/offentlig; begrenset
-//    still behaves as privat until groups exist).
-//
-// 2. `finds` — child records: one per funn the user marks inside a
-//    lokalitet. Carries its own title/note and a lifecycle status
-//    (mulig → sannsynlig → avkreftet → rapportert). Geometry is a
-//    GeoJSON FeatureCollection (EPSG:4326) so the draw tools round-trip
-//    verbatim; usually one shape, but a funn may be several strokes.
-//    Read access follows the parent lokalitet's visibility via
-//    relation traversal in the rules.
-//
-// 3. `attachments` — bilder: kept LiDAR extracts, map screenshots and
-//    uploads. `file` is a protected file field — private lokaliteter
-//    must not have world-readable image URLs, so the client fetches
-//    short-lived file tokens (see src/api/attachments.ts).
-//
-// Collection ids are deliberately *not* equal to the collection names:
-// PocketBase ≥0.23 rejects a collection whose name matches any existing
-// collection id, its own included.
-//
-// Written against the PocketBase v0.23+ JSVM API (App-based). No ES2021
-// numeric separators — Goja / PB jsvm rejects them.
+// Collection ids must not equal any collection name: PocketBase ≥0.23
+// rejects a collection whose name matches an existing id.
 
 migrate(
   (app) => {
     const users = app.findCollectionByNameOrId('users');
 
-    // --- 0. drop the MVP finds collection (data intentionally lost) --
-    // Only relevant to installs that ran the original MVP migration; a
-    // fresh install has nothing here.
+    // Drops the MVP finds collection with its data.
     try {
       const oldFinds = app.findCollectionByNameOrId('finds');
       app.delete(oldFinds);
@@ -44,12 +15,10 @@ migrate(
       /* fresh install — never existed */
     }
 
-    // --- 1. localities ----------------------------------------------
     const localities = new Collection({
       id: 'pbc_localities',
       name: 'localities',
       type: 'base',
-      // Everything is behind sign-in — no guest reads, even for public.
       listRule:
         '@request.auth.id != "" && (visibility = "public" || owner = @request.auth.id || @request.auth.role = "admin")',
       viewRule:
@@ -96,8 +65,7 @@ migrate(
         id: 'loc_bbox',
         name: 'bbox',
         required: true,
-        // [minLon, minLat, maxLon, maxLat] in EPSG:4326 — the authored
-        // rectangle, resizable/movable, not derived from content.
+        // [minLon, minLat, maxLon, maxLat], EPSG:4326.
         maxSize: 200,
       }),
       new AutodateField({ name: 'created', onCreate: true }),
@@ -105,9 +73,7 @@ migrate(
     );
     app.save(localities);
 
-    // --- 2. finds (child level) -------------------------------------
-    // Collection *name* stays `finds`; the id differs from the deleted
-    // MVP collection's so nothing can conflate the two schemas.
+    // Name stays `finds`; the id differs from the deleted MVP collection's.
     const finds = new Collection({
       id: 'finds2',
       name: 'finds',
@@ -116,8 +82,6 @@ migrate(
         '@request.auth.id != "" && (locality.visibility = "public" || owner = @request.auth.id || @request.auth.role = "admin")',
       viewRule:
         '@request.auth.id != "" && (locality.visibility = "public" || owner = @request.auth.id || @request.auth.role = "admin")',
-      // Only the lokalitet's owner adds funn to it (collaboration is a
-      // later, deliberate rule change).
       createRule:
         '@request.auth.id != "" && @request.auth.id = owner && locality.owner = @request.auth.id',
       updateRule: 'owner = @request.auth.id || @request.auth.role = "admin"',
@@ -177,7 +141,6 @@ migrate(
     );
     app.save(finds);
 
-    // --- 3. attachments ----------------------------------------------
     const attachments = new Collection({
       id: 'pbc_attachments',
       name: 'attachments',
@@ -226,7 +189,6 @@ migrate(
         name: 'file',
         required: true,
         maxSelect: 1,
-        // Stitched extracts of a big lokalitet can be hefty PNGs.
         maxSize: 20000000,
         mimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
         thumbs: ['200x200', '800x0'],
@@ -242,8 +204,6 @@ migrate(
         id: 'att_meta',
         name: 'meta',
         required: false,
-        // Extracts store {sourceKey, sourceLabel, style, metresPerPx,
-        // bbox25833} so the gallery can say what an image shows.
         maxSize: 10000,
       }),
       new AutodateField({ name: 'created', onCreate: true }),

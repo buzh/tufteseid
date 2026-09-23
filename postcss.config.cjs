@@ -1,7 +1,3 @@
-// Mantine's own stylesheet is precompiled; this is for ours. The preset gives
-// the CSS modules in `src/` the `light-dark()`, `rem()` and breakpoint mixins
-// Mantine's docs assume, so a module written against the theme behaves the same
-// way Mantine's own styles do.
 module.exports = {
   plugins: {
     'postcss-preset-mantine': {},

@@ -5,33 +5,14 @@ import path from 'path';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
-/*
- * Serve Excalidraw's fonts from this origin.
- *
- * `src/sketch/excalidrawAssets.ts` points Excalidraw at `/`, so it asks for
- * `/fonts/Excalifont/…` instead of a CDN — which is the only way to draw text
- * on a spot without widening `font-src` in the Caddyfile. This puts the files
- * where that path expects them.
- *
- * Not `public/`: the fonts are a build artefact of a dependency and would be
- * 12.5 MB of vendored binaries in the repo. Copied out of `node_modules` at
- * build time, and streamed straight from there in dev.
- *
- * All of them, Xiaolai included. Xiaolai is the CJK fallback and it is 209 of
- * the 234 files and 12 of the 12.5 MB, so leaving it out reads like free
- * weight — but Excalidraw names it in every font stack it hands to
- * `document.fonts.load`, and every FontFace it builds lists esm.sh after our
- * own URL as a last resort. A subset we do not serve is therefore not a quiet
- * fall back to a system font: it is a cross-origin request, one per subset,
- * that `font-src 'self'` blocks and logs. The files are static and each is
- * fetched only when a glyph in its range is drawn.
- */
+// Serves Excalidraw's fonts from this origin. Every subset, Xiaolai included:
+// Excalidraw lists esm.sh after our URL in each FontFace, so a subset we do not
+// serve becomes a cross-origin request that `font-src 'self'` blocks.
 function excalidrawFonts(): Plugin {
   const [devRoot, prodRoot] = ['dist/dev/fonts', 'dist/prod/fonts'].map((rel) =>
     path.resolve('node_modules/@excalidraw/excalidraw', rel),
   );
-  // Dev first when serving, production first when building — the package ships
-  // both, so a single order would put the dev font set in the deploy.
+  // The package ships both sets; production must come first when building.
   const serveRoots = [devRoot, prodRoot];
   const buildRoots = [prodRoot, devRoot];
   let outDir = 'dist';
@@ -48,8 +29,8 @@ function excalidrawFonts(): Plugin {
         const rel = path.normalize(
           decodeURIComponent(url.slice('/fonts/'.length)),
         );
-        // path.normalize collapses '..', so a leading one is the only way out
-        // of the font directory and the only thing left to reject.
+        // path.normalize collapses inner '..', so a leading one is the only
+        // remaining escape from the font directory.
         if (rel.startsWith('..')) return next();
         const root = serveRoots.find((dir) => existsSync(path.join(dir, rel)));
         if (!root) return next();
@@ -68,7 +49,6 @@ function excalidrawFonts(): Plugin {
   };
 }
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
@@ -84,7 +64,6 @@ export default defineConfig({
   preview: {
     port: 4173,
   },
-  // urlUtils reads and rewrites window.location, so the suite needs a DOM.
   test: {
     environment: 'jsdom',
     include: ['test/**/*.test.ts'],

@@ -1,20 +1,10 @@
 #!/usr/bin/env bash
 #
-# Cron's half of the monitoring. Silent when the deployment is fine and noisy
-# only when it is not, so a crontab line mails you exactly the problems:
-#
+#   scripts/health-check.sh [base-url] [lokalitet-code]
 #   */30 * * * * /site/tufteseid/scripts/health-check.sh
 #
-# Six questions, in the order that a failure in one explains the next: are the
-# containers up, is the disk filling, is Caddy answering 5xx, is Kartverket
-# shedding us, has nginx lost every peer, and does the app still work
-# end-to-end. The last is live-check.sh, run whole rather than reimplemented —
-# it already asks one question per service and its exit status is the verdict.
-#
-#   scripts/health-check.sh [base-url] [lokalitet-code]
-#
-# Runs on the server: everything but live-check.sh needs the host's log
-# directory and the compose project. Writes nothing.
+# Server-only: needs the host's log directory and the compose project. Silent
+# unless something is wrong, so cron mails only the problems.
 
 set -uo pipefail
 
@@ -23,18 +13,12 @@ ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 LOGDIR=${TUFTESEID_LOGS:-/site/tufteseid/data/logs}
 HOURS=${HOURS:-1}
 
-# Thresholds, not alarms — none of these is broken on its own, they are the
-# points past which somebody should look. A handful of 5xx an hour is a
-# Kartverket backend being restarted; fifty is a hole in the map. Any
-# rate-limited response at all is worth knowing about, because $skip_cache_type
-# keeps them out of the cache, so every one of them is a tile a visitor
-# genuinely did not get.
+# A rate-limited response counts from the first: $skip_cache_type keeps them
+# out of the cache, so each one is a tile a visitor did not get.
 DISK_PCT=${DISK_PCT:-90}
 MAX_5XX=${MAX_5XX:-50}
 MAX_SHED=${MAX_SHED:-1}
 
-# Quiet unless something is wrong. VERBOSE=1 prints the passing lines too,
-# which is what you want the first time you run it by hand.
 VERBOSE=${VERBOSE:-0}
 
 problems=0
@@ -53,8 +37,6 @@ read_caddy() {
   return 0
 }
 
-# ------------------------------------------------------------------ services --
-
 want=$(dc ps --services 2>/dev/null | sort)
 have=$(dc ps --services --filter status=running 2>/dev/null | sort)
 
@@ -69,11 +51,8 @@ else
   fi
 fi
 
-# ---------------------------------------------------------------------- disk --
-
-# The one that takes the site down rather than degrading it: the cVAT store and
-# the MapProxy caches share a filesystem, MapProxy never evicts, and a full
-# disk stops PocketBase writing.
+# The cVAT store and the MapProxy caches share this filesystem, MapProxy never
+# evicts, and a full disk stops PocketBase writing.
 used=$(df --output=pcent "$(dirname -- "$LOGDIR")" 2>/dev/null | tail -1 | tr -dc '0-9')
 if [ -z "$used" ]; then
   bad "cannot stat the filesystem holding $LOGDIR"
@@ -82,8 +61,6 @@ elif [ "$used" -ge "$DISK_PCT" ]; then
 else
   ok "disk ${used}% full"
 fi
-
-# --------------------------------------------------------------------- caddy --
 
 if [ -z "$(read_caddy | head -c1)" ]; then
   bad "no access log under $LOGDIR — the Caddyfile's log block or its bind mount is missing"
@@ -100,16 +77,13 @@ else
   fi
 fi
 
-# ------------------------------------------------------------------ wmscache --
-
 wlog=$(dc logs --no-log-prefix --since "${HOURS}h" wmscache 2>/dev/null)
 
 if [ -z "$wlog" ]; then
   ok 'no wmscache traffic in the window'
 else
-  # The 200 that is not a success: application/vnd.ogc.se_xml is the
-  # "Overforbruk på kort tid" ServiceException wms.geonorge.no answers with
-  # once we pass its per-IP budget. Invisible to any status-code count.
+  # application/vnd.ogc.se_xml is the ServiceException wms.geonorge.no answers
+  # with, at HTTP 200, past its per-IP budget. No status code shows it.
   shed=$(printf '%s\n' "$wlog" | grep -c 'ct=[^ ,]*se_xml')
   if [ "$shed" -ge "$MAX_SHED" ]; then
     bad "$shed × rate-limited by an upstream in ${HOURS}h — tiles were dropped"
@@ -117,10 +91,8 @@ else
     ok 'no rate-limited responses'
   fi
 
-  # nginx taking every peer in a group out at once. max_fails=0 in
-  # wms-cache.conf exists to make this impossible, so if it appears the config
-  # in the container is not the one in the repo. Found in the same capture:
-  # `docker compose logs` carries the error log as well as the access log.
+  # max_fails=0 in wms-cache.conf makes this impossible, so it appearing means
+  # the container is not running the repo's config.
   if printf '%s\n' "$wlog" | grep -q 'no live upstreams'; then
     bad 'nginx logged "no live upstreams" — max_fails=0 is not in effect'
   else
@@ -128,10 +100,7 @@ else
   fi
 fi
 
-# ----------------------------------------------------------------- end-to-end --
-
-# Captured rather than streamed: on a pass nobody wants 40 ok lines in a mail,
-# and on a failure the whole run is the useful part.
+# Captured rather than streamed, so a passing run mails nothing.
 if ! out=$("$ROOT/scripts/live-check.sh" "$@" 2>&1); then
   bad 'live-check.sh failed'
   printf '%s\n' "$out"
@@ -140,8 +109,6 @@ elif [ "$VERBOSE" = 1 ]; then
 else
   ok 'live-check.sh passed'
 fi
-
-# ------------------------------------------------------------------- verdict --
 
 [ "$problems" -eq 0 ] || printf '\n%d problem(s)\n' "$problems"
 [ "$problems" -eq 0 ]

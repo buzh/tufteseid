@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
 #
-# Liveness pass over a deployed Tufteseid. Every request below is one the app
-# itself makes; a red line names the service that is down, not a symptom.
-#
 #   scripts/live-check.sh [base-url] [lokalitet-code]
 #
-# Defaults are the reference deployment and its shared lokalitet. curl is the
-# only dependency. Safe against production: nothing here writes, and the one
-# POST exists to be refused.
+# Read-only against production: the one POST exists to be refused.
 
 set -uo pipefail
 
@@ -16,18 +11,13 @@ CODE=${2:-JYBNQC}
 BASE=${BASE%/}
 TIMEOUT=${TIMEOUT:-60}
 
-# A 250 m box over the fixture, EPSG:25833, easting first (WMS 1.3.0 takes the
-# CRS's own axis order, and for 25833 that is E,N — swapping them answers 200
-# with a blank tile rather than an error). Hardcoded rather than reprojected
-# from the lokalitet's bbox: a raster liveness check does not care where it
-# looks as long as the place has LiDAR and ortofoto coverage, and reprojecting
-# would cost a dependency.
+# EPSG:25833, easting first: WMS 1.3.0 takes the CRS's own axis order, and
+# swapping them answers 200 with a blank tile rather than an error.
 BBOX=187045,6536056,187291,6536224
 BBOX_WIDE=185000,6534000,189000,6538000
-# The acquisition covering that box. Names carry spaces and Norwegian letters.
+# The acquisition covering that box; the name needs URL-encoding.
 LIDAR_PROJECT='NDH Kragerø-Drangedal 2pkt 2016'
-# A Kulturminnesøk record that exists, so a 200 with an all-null body is a
-# failure rather than the usual answer for a miss.
+# A record that exists: a miss also answers 200, with a null body.
 KMS_ID=86050
 
 TMP=$(mktemp -d)
@@ -50,14 +40,12 @@ note() { printf '     %s%s%s\n' "$DIM" "$1" "$OFF"; }
 # check NAME URL WANT_STATUS CTYPE_SUBSTRING MIN_BYTES [BODY_REGEX] [HEADER_REGEX]
 #
 # CTYPE_SUBSTRING and the two regexes may be empty to skip that assertion.
-# Extra curl arguments come from OPTS, which is reset after every call so a
-# one-off -X POST cannot leak into the next check.
+# Extra curl arguments come from OPTS, which is reset after every call.
 check() {
   local name=$1 url=$2 want=$3 ctype=$4 min=$5 body_re=${6:-} hdr_re=${7:-}
   local out status ct size secs cache rc why=''
 
-  # A curl that never connects leaves no files behind, and the callers below
-  # read them whatever the verdict was.
+  # A curl that never connects leaves no files behind; these are read anyway.
   : >"$TMP/body"
   : >"$TMP/hdr"
 
@@ -97,16 +85,13 @@ check() {
   fi
 }
 
-# First "key":"value" out of a PocketBase response. PB does not order its JSON
-# keys, so match the key rather than a position.
+# PocketBase does not order its JSON keys, so match the key, not a position.
 json_str() { grep -o "\"$1\":\"[^\"]*\"" "$TMP/body" | head -1 | sed "s/^\"$1\":\"//;s/\"$//"; }
 json_num() { grep -o "\"$1\":[0-9]*" "$TMP/body" | head -1 | sed "s/^\"$1\"://"; }
 
 urlenc() { printf '%s' "$1" | od -An -tx1 -v | tr -d '\n ' | sed 's/\(..\)/%\1/g'; }
 
 printf '%sTufteseid live check%s  %s  lokalitet %s\n' "$BOLD" "$OFF" "$BASE" "$CODE"
-
-# ---------------------------------------------------------------- the shell --
 
 section 'Shell'
 
@@ -123,13 +108,9 @@ else
   printf '  %sFAIL%s %-26s index.html names no /assets/*.js\n' "$RED" "$OFF" entry-bundle
 fi
 check short-link "$BASE/l/$CODE" 302 '' 0 '' "location: /\?lok=$CODE"
-# 404 on purpose: `file_server` has no SPA fallback, so a wrong path stays
-# wrong. There is no client-side routing left to need one — `/` is the only
-# path the app answers on. A 200 here means somebody added a catch-all rewrite
-# and every typo now answers with the app.
+# 200 here means a catch-all rewrite was added and every typo answers with the
+# app. `/` is the only path the app needs.
 check unknown-path "$BASE/tufteseid-no-such-path" 404 '' 0
-
-# ----------------------------------------------------------------- pocketbase --
 
 section 'PocketBase'
 
@@ -137,9 +118,8 @@ check pb-health "$BASE/pb/api/health" 200 json 20 'API is healthy'
 check pb-auth-methods "$BASE/pb/api/collections/users/auth-methods" 200 json 20 '"password"'
 note "oauth2: $(grep -o '"name":"[a-z0-9]*"' "$TMP/body" | sed 's/.*:"//;s/"//' | sort -u | paste -sd, -)"
 
-# `fields` rather than the whole record: PocketBase does not order its JSON
-# keys, and an expanded relation would put a second "id" in the body for
-# json_str to pick up.
+# `fields` rather than the whole record, so json_str cannot pick up a second
+# "id" out of an expanded relation.
 check lokalitet \
   "$BASE/pb/api/collections/localities/records?filter=%28code%3D%27$CODE%27%29&fields=id,code,name,municipality,visibility" \
   200 json 20 '"totalItems":1'
@@ -165,10 +145,8 @@ if [ -n "$LOK_ID" ]; then
   fi
 fi
 
-# The rail and the funn list update live; without this they only fill in on a
-# reload, which reads as "my funn did not save". Read to a file rather than
-# through a pipe: the stream never ends, so curl always exits on --max-time and
-# under `pipefail` that would sink the whole pipeline.
+# To a file, not a pipe: the stream never ends, so curl always exits on
+# --max-time, which under `pipefail` would sink the pipeline.
 curl -sS -N --max-time 5 -o "$TMP/sse" "$BASE/pb/api/realtime" 2>/dev/null
 if grep -q PB_CONNECT "$TMP/sse" 2>/dev/null; then
   passed=$((passed + 1))
@@ -178,26 +156,18 @@ else
   printf '  %sFAIL%s %-26s no PB_CONNECT event (SSE buffered? flush_interval)\n' "$RED" "$OFF" pb-realtime
 fi
 
-# `users` was not opened to guests by migration 1700000900, so `expand=owner`
-# comes back empty and the surfaces that name an owner — the *Delt av* banner,
-# Detaljer's owner row, the report package's credit — have no name to print for
-# a signed-out reader. Asserted rather than wished away: a non-empty expand here
-# means the users collection has been opened up, which is a privacy decision.
+# `users` is closed to guests, so a non-empty expand here means somebody
+# opened it.
 check owner-not-expanded \
   "$BASE/pb/api/collections/localities/records?filter=%28code%3D%27$CODE%27%29&expand=owner&fields=expand.owner.name" \
   200 json 20 '"expand":\{\}'
 
-# The list rule is the whole privacy model: an anonymous reader may see public
-# records and nothing else.
 check no-private-leak \
   "$BASE/pb/api/collections/localities/records?filter=%28visibility%21%3D%27public%27%29&perPage=1&fields=id" \
   200 json 20 '"totalItems":0'
 
-# Refused by the create rule, not by the absence of a form.
 OPTS=(-s -X POST -H 'Content-Type: application/json' -d '{"title":"live-check"}')
 check anon-write-refused "$BASE/pb/api/collections/finds/records" 400 json 10
-
-# ------------------------------------------------------- same-origin upstreams --
 
 section 'Same-origin upstreams (Caddy → wmscache → origin)'
 
@@ -213,8 +183,7 @@ check wms-lidar-project \
   "$BASE/wms/geonorge/wms.hoyde-dtm-prosjekt?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=$(urlenc "$LIDAR_PROJECT")&STYLES=skyggerelieff&CRS=EPSG:25833&BBOX=$BBOX&WIDTH=256&HEIGHT=256&FORMAT=image/png" \
   200 image/png 5000
 
-# The dataset picker's whole catalogue, ~8 MB. The one check here that is
-# heavy, and the one whose absence empties the LiDAR pulldown.
+# The dataset picker's whole catalogue, ~8 MB.
 check wms-lidar-capabilities \
   "$BASE/wms/geonorge/wms.hoyde-dtm-prosjekt?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0" \
   200 xml 1000000 '<Name>NDH'
@@ -231,15 +200,14 @@ check wms-kulturminner \
 
 check kms-record "$BASE/kms/api/v2/search/$KMS_ID" 200 json 500 '"name":"[^"]'
 
-# Both NiB checks also test the token sidecar: an expired or IP-bound token
-# comes back as a small JSON error, which the size floor catches.
+# An expired or IP-bound token answers with a small JSON error, which the size
+# floor catches.
 check nib-ortofoto \
   "$BASE/wms/nib/ortofoto?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ortofoto&STYLES=&CRS=EPSG:25833&BBOX=$BBOX&WIDTH=256&HEIGHT=256&FORMAT=image/png" \
   200 image/png 10000
 
-# The acquisition catalogue over the probe box, in the shape flyfotoProjects.ts
-# asks for — a `returnCountOnly` answer would be under the 300-byte floor in
-# `$skip_cache` and so never cache, which reads as a permanent MISS.
+# Not `returnCountOnly`: that answer is under the 300-byte floor in
+# `$skip_cache`, so it never caches and reads as a permanent MISS.
 check nib-prosjekter \
   "$BASE/arcgis/nib/prosjekter/MapServer/4/query?f=json&where=1%3D1&geometry=$BBOX&geometryType=esriGeometryEnvelope&inSR=25833&spatialRel=esriSpatialRelIntersects&outFields=prosjektnavn,aar,fotodato_date,ortofototype,pixelstorrelse,x_min,y_min,x_max,y_max&returnGeometry=false" \
   200 json 500 '"prosjektnavn":"[^"]'
@@ -247,8 +215,6 @@ check nib-prosjekter \
 check hoydedata-dem \
   "$BASE/arcgis/hoydedata/Prosjekt_DTM/ImageServer/exportImage?f=image&format=tiff&bbox=$BBOX&bboxSR=25833&imageSR=25833&size=256,256&renderingRule=%7B%22rasterFunction%22%3A%22None%22%7D" \
   200 image/tiff 50000
-
-# ------------------------------------------------------------ direct upstreams --
 
 section 'Direct upstreams (browser → origin, no proxy)'
 
@@ -263,8 +229,6 @@ check norgeskart-matrikkel 'https://api.norgeskart.no/v1/matrikkel/veg/Karl%20Jo
 check hoydedata-identify \
   'https://hoydedata.no/arcgis/rest/services/NHM_DTM_TOPOBATHY_25833/ImageServer/identify?f=json&geometry=187168,6536140&geometryType=esriGeometryPoint&sr=25833&returnGeometry=false&returnCatalogItems=false' \
   200 json 100 '"value":"[0-9]'
-
-# --------------------------------------------------------------------- verdict --
 
 printf '\n%s%d passed, %d failed%s\n' "$BOLD" "$passed" "$failed" "$OFF"
 [ "$failed" -eq 0 ]

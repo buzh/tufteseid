@@ -1,42 +1,21 @@
 #!/usr/bin/env bash
 #
-# What the deployment has been asked for, in three parts, because there are
-# three different questions and no single log answers more than one of them:
-#
-#   Visitors   GoAccess over Caddy's access log — who came, from where, to
-#              what. Written as one self-contained HTML file.
-#   Traffic    the same log by path prefix — what the requests were actually
-#              made of, which at a map site is mostly not pages.
-#   Upstreams  wmscache's access log — how much of that reached Kartverket,
-#              Riksantikvaren, Kulturminnesøk or NiB rather than being
-#              answered from disk here. The cache verdict is recorded nowhere
-#              else, so this is the only honest answer to "are we being rude".
-#
 #   scripts/usage-report.sh [report-dir]
 #
-# Runs on the server, unlike live-check.sh: it reads the Caddy log off the host
-# filesystem and the wmscache log out of `docker compose logs`, and neither is
-# reachable from anywhere else. Read-only with respect to the app — it writes
-# one HTML file and a size stamp into the report directory and touches nothing
-# the stack reads. GoAccess arrives as a throwaway container, so docker is the
-# only dependency beyond what the stack already needs.
+# Server-only: reads the Caddy log off the host filesystem and the wmscache log
+# out of `docker compose logs`. Writes an HTML report and a size stamp.
 
 set -uo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 
-# Where the Caddyfile's `log` block writes, and where the report goes. Both
-# under the same data root as the cVAT and MapProxy stores.
 LOGDIR=${TUFTESEID_LOGS:-/site/tufteseid/data/logs}
 REPORT=${1:-${TUFTESEID_STATS:-/site/tufteseid/data/stats}}
 
-# The window for the printed sections. The HTML report deliberately ignores it
-# and covers every line Caddy still has — GoAccess is the thing you open to ask
-# "since when", so narrowing it there would be answering the question for you.
+# The printed sections only; the HTML report covers every line Caddy still has.
 HOURS=${HOURS:-168}
 
-# Pinned like every other image in the stack. Nothing here depends on the
-# version beyond --log-format=CADDY existing, which it has since 1.6.
+# Needs --log-format=CADDY, which GoAccess has had since 1.6.
 GOACCESS_IMAGE=${GOACCESS_IMAGE:-allinurl/goaccess:1.9.4}
 
 if [ -t 1 ]; then
@@ -51,8 +30,8 @@ warn() { printf '  %s%s%s\n' "$RED" "$1" "$OFF"; }
 
 CUTOFF=$(( $(date +%s) - HOURS * 3600 ))
 
-# Current log plus every rolled generation. Caddy gzips what it rolls, so both
-# shapes have to be read; an unmatched glob stays literal, which `-f` rejects.
+# Caddy gzips what it rolls, so both shapes are read; an unmatched glob stays
+# literal, which the `-f` tests reject.
 read_caddy() {
   local f
   for f in "$LOGDIR"/access.log "$LOGDIR"/access-*.log; do
@@ -75,23 +54,10 @@ fi
 
 mkdir -p -- "$REPORT" || exit 1
 
-# ------------------------------------------------------------------ visitors --
-
 section 'Visitors'
 
-# The proxy prefixes are dropped before GoAccess sees them. They are the great
-# majority of the lines and none of them is a visit: one pan of the map is a
-# screenful of /wms/ and /cache/, so leaving them in makes "top pages" a list
-# of tile endpoints and buries the one number worth having. /assets/ stays —
-# GoAccess sorts static requests into their own panel by extension, and
-# dropping them would make the bandwidth total a fiction.
-#
-# --ignore-crawlers matters more here than it would on a busy site: against a
-# handful of real visitors a week, an unfiltered count is mostly scanners.
-#
-# --anonymize-ip truncates the last octet. It costs the ability to tell two
-# visitors on one /24 apart, which at this scale is a rounding error, and it
-# means the report can be kept around without holding addresses.
+# The proxy prefixes are most of the lines and none of them is a visit.
+# /assets/ stays, or the bandwidth total is a fiction.
 read_caddy \
   | grep -v -e '"uri":"/wms/' -e '"uri":"/wfs/' -e '"uri":"/kms/' \
              -e '"uri":"/arcgis/' -e '"uri":"/cache/' -e '"uri":"/cvat/' \
@@ -103,9 +69,8 @@ read_caddy \
       --no-progress \
       --html-report-title='Tufteseid' \
       --output=/report/index.html
-# The docker element specifically, not the pipeline's: `grep -v` exits 1 when
-# it passes nothing through, which on a log that happens to hold only proxy
-# requests would be reported as GoAccess failing.
+# The docker element, not the pipeline's: `grep -v` exits 1 when it passes
+# nothing through.
 rc=${PIPESTATUS[2]}
 
 if [ "$rc" -ne 0 ]; then
@@ -116,8 +81,6 @@ else
   note "report $REPORT/index.html"
 fi
 
-# Headline numbers computed here rather than scraped back out of GoAccess, so
-# the window applies and so this still prints when the container fails.
 read_caddy | awk -v cutoff="$CUTOFF" '
   {
     if (!match($0, /"ts":[0-9.]+/)) next
@@ -125,8 +88,7 @@ read_caddy | awk -v cutoff="$CUTOFF" '
     uri = ""; ip = ""
     if (match($0, /"uri":"[^"]*"/))       uri = substr($0, RSTART + 7, RLENGTH - 8)
     if (match($0, /"client_ip":"[^"]*"/)) ip  = substr($0, RSTART + 13, RLENGTH - 14)
-    # A page view is the app being opened: "/" or a lokalitet short link.
-    # Everything else is the app doing its job, counted in Traffic below.
+    # A page view is "/" or a short link; the rest is counted under Traffic.
     if (uri == "/" || uri ~ /^\/l\//) { pages++; if (ip != "") seen[ip] = 1 }
     total++
   }
@@ -136,8 +98,6 @@ read_caddy | awk -v cutoff="$CUTOFF" '
       pages + 0, uniq + 0, total + 0
   }
 '
-
-# ------------------------------------------------------------------- traffic --
 
 section 'Traffic by prefix'
 
@@ -153,8 +113,7 @@ read_caddy | awk -v cutoff="$CUTOFF" '
     q = index(uri, "?"); if (q) uri = substr(uri, 1, q - 1)
     n = split(uri, p, "/")
     key = (n >= 2 && p[2] != "") ? "/" p[2] : "/"
-    # One more segment where the second one picks the upstream rather than
-    # just naming a file — /wms/ra and /wms/geonorge are different services.
+    # One more segment where it picks the upstream: /wms/ra is not /wms/geonorge.
     if (key == "/wms" || key == "/arcgis" || key == "/wfs")
       key = key "/" (n >= 3 ? p[3] : "")
 
@@ -167,8 +126,6 @@ read_caddy | awk -v cutoff="$CUTOFF" '
         (err[k] ? err[k] " × 5xx" : "")
   }
 ' | sort -k2 -nr
-
-# ----------------------------------------------------------------- upstreams --
 
 section 'Upstream load (wmscache)'
 
@@ -184,22 +141,17 @@ docker compose --project-directory "$ROOT" logs \
     if (u ~ /^\/hoydedata-arcgis\//) return "hoydedata.no"
     return "other"
   }
-  # Positional for the first five fields, which structurally cannot contain a
-  # space, and regex for everything after them: proxy_next_upstream turns
-  # $upstream_addr and $upstream_response_time into comma-and-space lists on a
-  # retry, which shifts every later field. The regexes take the first value,
-  # i.e. the first attempt.
+  # Positional only for the first five fields: on a retry proxy_next_upstream
+  # turns the upstream fields into comma-and-space lists and shifts the rest.
   NF >= 5 && $3 != "" {
     h = host($5)
     lines++
     tot[h]++
-    # HIT never leaves the container; UPDATING is a stale copy served while
-    # some other request does the fetching. Everything else — MISS, EXPIRED,
-    # REVALIDATED, STALE, BYPASS, and "-" on the uncached WFS location — means
-    # the origin was asked.
+    # HIT and UPDATING are answered from disk; every other verdict, "-"
+    # included, asked the origin.
     if ($3 != "HIT" && $3 != "UPDATING") origin[h]++
     if ($2 + 0 >= 500) err[h]++
-    # A 200 carrying a ServiceException: the rate limit, not an error code.
+    # A 200 carrying a ServiceException is the rate limit, not an error code.
     if ($0 ~ /ct=[^ ,]*se_xml/) shed[h]++
     if (match($0, /urt=[0-9.]+/)) { sum[h] += substr($0, RSTART + 4, RLENGTH - 4); n[h]++ }
   }
@@ -214,21 +166,14 @@ docker compose --project-directory "$ROOT" logs \
   }
 ' | sort -k2 -nr
 
-# -------------------------------------------------------------------- stores --
-
 section 'Stores'
 
-# MapProxy fetches from wms.geonorge.no directly, not through wmscache, so its
-# outbound traffic does not appear in the section above and cannot be counted
-# from any log we keep. Growth of its store is the proxy for it: MapProxy never
-# evicts, so bytes added since the last run are bytes fetched since the last
-# run. Same reading for the wmscache volume, which does evict at 25 GB and so
-# plateaus rather than growing.
+# MapProxy fetches directly rather than through wmscache and never evicts, so
+# growth of its store is the only measure of its outbound traffic.
 STAMP=$REPORT/.sizes
 : >"$STAMP.new"
 
-# KiB rather than bytes throughout: the wmscache figure comes from busybox du
-# inside the nginx image, which has -s and -k but no -b.
+# KiB throughout: the wmscache figure comes from busybox du, which has no -b.
 size_of() {
   local label=$1 kib=$2 prev delta=''
   if [ -z "$kib" ]; then

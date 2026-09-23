@@ -8,12 +8,36 @@ Tilpasset kartløsning for lenestolsarkeologi
 
 ## Install/Run:
 
+Three directories are bind-mounted from the host and have to exist before
+the stack starts, or Docker creates them root-owned and MapProxy answers
+every `/cache/…` with a 502:
+
+```sh
+sudo mkdir -p /site/tufteseid/data/{logs,stats,cvat,mapproxy}
+sudo chown -R 100:101 /site/tufteseid/data/mapproxy
+```
+
+`100:101` is the `mapproxy` user inside `mapproxy:7.0.0-alpine-nginx`;
+[`docs/wms-proxy-and-tiles.md`](docs/wms-proxy-and-tiles.md) has the
+one-liner that asks the image, for when that tag moves. Point the paths
+anywhere writable — they are set in `docker-compose.yml`. The `cvat`
+store may stay empty: an empty directory answers 404, which is what
+ground outside the LiDAR footprint looks like anyway.
+
 ```sh
 git clone https://github.com/buzh/tufteseid.git
 cd tufteseid
 docker compose build --pull
 docker compose up -d
 ```
+
+That listens on `127.0.0.1:3030`, expecting another reverse proxy in
+front. To let Caddy terminate TLS itself instead, change the `:3000`
+line in `Caddyfile` to your hostname and publish 80/443 rather than
+3030. Certificates are then provisioned automatically — but add
+`- caddydata:/data` to the `tufteseid` service and a `caddydata:` entry
+under `volumes:`, or every container recreate asks Let's Encrypt for
+fresh certificates and eventually trips their rate limit.
 
 ## Create admin user:
 
@@ -53,12 +77,9 @@ nothing, and it is safe to run against a live install.
 
 ## See who is using it
 
-Caddy writes an access log to a host path, which needs to exist before
-the stack starts:
+Caddy writes an access log to the `logs` directory created above:
 
 ```sh
-sudo mkdir -p /site/tufteseid/data/logs /site/tufteseid/data/stats
-docker compose up -d
 docker compose restart wmscache
 scripts/usage-report.sh
 ```

@@ -1,5 +1,3 @@
-# Pinned so the volume names below don't change if the checkout
-# directory is renamed. Volumes are prefixed with the project name.
 name: tufteseid
 
 services:
@@ -9,77 +7,24 @@ services:
     ports:
       - "127.0.0.1:3030:3000"
     volumes:
-      # Runtime config injected into the SPA. Edit in place; it is read
-      # on page load, so no rebuild or restart is needed.
       - ./config.js:/var/www/config.js:ro
-      # The access log, written by the `log` block in the Caddyfile and read
-      # from the host by scripts/usage-report.sh. A host path rather than a
-      # named volume for the same reason as the two stores below: something
-      # outside the stack reads it. First run wants
-      #   sudo mkdir -p /site/tufteseid/data/logs
-      # Third-party install: point it anywhere writable, or drop both this
-      # line and the Caddyfile's `log` block to keep no request log at all.
+      # First run: sudo mkdir -p /site/tufteseid/data/logs
       - /site/tufteseid/data/logs:/var/log/caddy
-      # Optional: override the baked-in Caddyfile without rebuilding.
-      # - ./Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
       - wmscache
       - mapproxy
       - pocketbase
       - cvat-tiles
 
-  # The cached combined-VAT ground: one MBTiles database per LiDAR
-  # acquisition, one indexed SELECT per tile. Caddy proxies /cvat/* here.
-  # Built out of band by vat-cache/makevat.py -g <n>, here or on a machine
-  # with more CPU; copying the file it writes into the host path below is
-  # the whole deploy, with nothing stopped and nothing restarted. Each
-  # database names its own acquisition and levels, and the sidecar builds
-  # /cvat/manifest.json by reading the files it finds — there is no manifest
-  # on disk to keep in step.
-  #
-  # A host path rather than a named volume: the store is written by a script
-  # on the host, is tens of GB, and survives the stack being rebuilt.
-  # Third-party install: point this at your own store, or leave it — an empty
-  # directory answers 404, which is what a tile outside the LiDAR footprint
-  # looks like anyway. Zero deps (node:sqlite is compiled into Node 24); see
-  # cvat-tiles/server.mjs. Not exposed on the host.
   cvat-tiles:
     build: ./cvat-tiles
     restart: unless-stopped
     volumes:
       - /site/tufteseid/data/cvat:/store:ro
 
-  # Tile cache in front of the upstreams whose layer and style never change:
-  # the two national LiDAR mosaics, the hybrid overlay with and without
-  # contours, amtskart and the ortofoto mosaic. Meta-tiling turns 4 or 16 tile
-  # requests into one GetMap, which is the lever left after 512 px tiles
-  # against wms.geonorge.no's ~120-per-window budget, and MapProxy's WMS client
-  # recognises the shed response that nginx structurally cannot see. Caddy
-  # proxies /cache/* here; recipes and grid are ./mapproxy/mapproxy.yaml.
-  #
-  # The -nginx flavour: nginx + uwsgi on :80, MapProxy mounted under
-  # /mapproxy/. Both are the tag's, not the project's: master moved the listener
-  # to 9090 after 7.0.0. Not exposed on the host.
-  #
-  # A host path for the caches rather than a named volume, like the cVAT store
-  # and unlike wmscache's 25 GB LRU: MapProxy never evicts, so this grows until
-  # somebody looks at it, and it should be somewhere they can.
-  #
-  # It has to be writable by the image's `mapproxy` user, which is uid 100 gid
-  # 101 in 7.0.0-alpine-nginx — not the 1000 the project's own Dockerfile
-  # defaults to, so check rather than assume when the tag moves. MapProxy locks
-  # beside each MBTiles file before it builds its layer list, so getting this
-  # wrong is not a slow cache, it is uwsgi exiting at import and every
-  # /cache/… answering 502. First run wants
-  #   sudo mkdir -p /site/tufteseid/data/mapproxy
-  #   sudo chown -R 100:101 /site/tufteseid/data/mapproxy
-  # and docs/wms-proxy-and-tiles.md has the one-liner that asks the image.
-  # Third-party install: point it anywhere writable — an empty directory fills
-  # itself on demand.
   mapproxy:
     image: ghcr.io/mapproxy/mapproxy/mapproxy:7.0.0-alpine-nginx
     restart: unless-stopped
-    # Same reason as wmscache: bounded, because nothing else bounds it.
     logging:
       options:
         max-size: "20m"
@@ -87,19 +32,12 @@ services:
     volumes:
       - ./mapproxy/mapproxy.yaml:/mapproxy/config/mapproxy.yaml:ro
       - ./mapproxy/seed.yaml:/mapproxy/config/seed.yaml:ro
+      # Must be writable by uid 100 gid 101 (the image's mapproxy user) or
+      # uwsgi exits at import and every /cache/… answers 502.
       - /site/tufteseid/data/mapproxy:/mapproxy/config/cache_data
     depends_on:
       - nib-proxy
 
-  # Backend for lokaliteter. Serves the SPA's /pb/* API (proxied by
-  # Caddy) for user auth (OAuth via Google/GitHub/OIDC/…) and the
-  # localities / finds / attachments collections. SQLite-backed; state
-  # lives on the pbdata volume, schema is versioned in
-  # ./pocketbase/pb_migrations. Only reachable from tufteseid over the
-  # compose network — Caddy is the only public entrypoint. To reach the
-  # PB admin UI directly during setup, temporarily add
-  #   ports: ["127.0.0.1:8090:8090"]
-  # here; normally it's at <site>/pb/_/.
   pocketbase:
     build: ./pocketbase
     restart: unless-stopped
@@ -107,22 +45,9 @@ services:
       - pbdata:/pb_data
       - ./pocketbase/pb_migrations:/pb_migrations:ro
 
-  # Caching reverse proxy for every external WMS whose parameters are chosen at
-  # request time (Kartverket theme + per-project LiDAR, Riksantikvaren
-  # Kulturminner, matrikkel), plus an uncached pass-through for the GeoNorge
-  # WFS. The half with fixed parameters is mapproxy's. Caddy forwards
-  # /wms/* and /wfs/* here; successful tile responses are cached on disk
-  # (25 GB LRU). Not exposed on the host — only reachable from the
-  # tufteseid container on the compose network.
   wmscache:
     image: nginx:1.27-alpine
     restart: unless-stopped
-    # The access log is the only record of what this proxy actually asked the
-    # upstreams for — scripts/usage-report.sh reads it back out of here with
-    # `docker compose logs` — and Docker's json-file driver keeps every line
-    # forever unless told not to. 200 MB of the `wmscache` log_format is on the
-    # order of a million requests, which is a long window at this site's
-    # traffic and a bounded one at any other.
     logging:
       options:
         max-size: "50m"
@@ -134,26 +59,11 @@ services:
     depends_on:
       - nib-proxy
 
-  # Token-injecting sidecar for Norge i bilder (NiB) ortofoto. NiB's WMS
-  # needs an access token even for the imagery norgeibilder.no shows
-  # anonymously; that token is minted anonymously (Referer only) and bound
-  # to the requesting IP + referer, so it has to be minted and used
-  # server-side. wmscache proxies /nib-wms/* here and mapproxy fetches the
-  # ortofoto mosaic through it; this mints/refreshes the token, injects it
-  # toward services.norgeibilder.no, and re-mints on auth failure. Zero deps
-  # (Node 24 global fetch); see nib-proxy/server.mjs. Not exposed on the host —
-  # only reachable from the two of them on the compose network.
+  # NiB tokens are bound to the minting IP and referer, so they are minted and
+  # used server-side only. Reachable from wmscache and mapproxy, not the host.
   nib-proxy:
     build: ./nib-proxy
     restart: unless-stopped
-
-  # If you want Caddy to terminate TLS itself instead of sitting behind
-  # another reverse proxy, change the ":3000" line in Caddyfile to your
-  # hostname (e.g. "maps.example.com") and expose 80/443 here instead of
-  # 3030. Caddy will provision Let's Encrypt certs automatically — but
-  # add a volume for them (`- caddydata:/data` on the tufteseid service,
-  # plus a `caddydata:` entry below), or every container recreate asks
-  # Let's Encrypt for fresh certs and eventually hits their rate limit.
 
 volumes:
   wmscache:
