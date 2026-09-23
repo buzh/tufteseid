@@ -44,9 +44,11 @@ Each owns its subject; this file keeps only what is true across all of them.
 - **No new dependencies without a server round trip.** `package-lock.json`
   cannot be regenerated here, so adding or removing one is an `npm install` the
   user runs on the server and pastes back. That is a cost, not a ban.
-- **Three checks run locally**: `npx oxlint@1.83.0 <paths>` (scope it to the
-  files you touched), a JSON parse of the three locale files, and grep. `src` is
-  currently oxlint-clean — a new finding is yours.
+- **Three checks run locally**: `npx oxlint@1.83.0` with no arguments, a JSON
+  parse of the three locale files, and grep. Bare is what `npm run lint` runs
+  and it covers the sidecars, the scripts and `pocketbase/pb_migrations/` as
+  well as `src`; scoping it to a path hides findings elsewhere. The repo is
+  currently clean — a new finding is yours.
 - **The app's own proxy paths are unreachable from here** (`/wms/…`,
   `/arcgis/…`). Public upstreams are reachable directly. NiB anonymous tokens
   are bound to the IP that minted them, so mint a fresh one wherever the call is
