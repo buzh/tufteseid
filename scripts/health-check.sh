@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
-#   scripts/health-check.sh [base-url] [lokalitet-code]
+#   scripts/health-check.sh [base-url] [spot-code]
 #   */30 * * * * /site/tufteseid/scripts/health-check.sh
 #
+# Both arguments are passed through to live-check.sh and are optional.
 # Server-only: needs the host's log directory and the compose project. Silent
 # unless something is wrong, so cron mails only the problems.
 
@@ -13,8 +14,8 @@ ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 LOGDIR=${TUFTESEID_LOGS:-/site/tufteseid/data/logs}
 HOURS=${HOURS:-1}
 
-# A rate-limited response counts from the first: $skip_cache_type keeps them
-# out of the cache, so each one is a tile a visitor did not get.
+# MAX_SHED=1: $skip_cache_type keeps rate-limited answers out of the cache, so
+# each one is a tile a visitor did not get.
 DISK_PCT=${DISK_PCT:-90}
 MAX_5XX=${MAX_5XX:-50}
 MAX_SHED=${MAX_SHED:-1}
@@ -51,8 +52,8 @@ else
   fi
 fi
 
-# The cVAT store and the MapProxy caches share this filesystem, MapProxy never
-# evicts, and a full disk stops PocketBase writing.
+# MapProxy never evicts onto this filesystem and a full disk stops PocketBase
+# writing.
 used=$(df --output=pcent "$(dirname -- "$LOGDIR")" 2>/dev/null | tail -1 | tr -dc '0-9')
 if [ -z "$used" ]; then
   bad "cannot stat the filesystem holding $LOGDIR"

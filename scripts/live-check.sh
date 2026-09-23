@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 #
-#   scripts/live-check.sh [base-url] [lokalitet-code]
+#   scripts/live-check.sh [base-url] [spot-code]
+#
+# The spot code is optional: given one, the PocketBase half fetches that public
+# spot by code; without one it only asserts that the spots collection answers.
+# Runs unauthenticated, so it sees what a guest sees.
 #
 # Read-only against production: the one POST exists to be refused.
 
 set -uo pipefail
 
 BASE=${1:-https://kart.scheen.no}
-CODE=${2:-JYBNQC}
+CODE=${2:-}
 BASE=${BASE%/}
 TIMEOUT=${TIMEOUT:-60}
 
@@ -19,6 +23,9 @@ BBOX_WIDE=185000,6534000,189000,6538000
 LIDAR_PROJECT='NDH Kragerø-Drangedal 2pkt 2016'
 # A record that exists: a miss also answers 200, with a null body.
 KMS_ID=86050
+# The short link is a Caddy rewrite, so any code-shaped string exercises it.
+# /l/<code> is a pure Caddy redir, so any code-shaped string exercises it.
+SHORT_CODE=${CODE:-ABCDEF}
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -36,6 +43,17 @@ OPTS=(-s)
 section() { printf '\n%s%s%s\n' "$BOLD" "$1" "$OFF"; }
 
 note() { printf '     %s%s%s\n' "$DIM" "$1" "$OFF"; }
+
+# For assertions made without a request of their own.
+pass() {
+  passed=$((passed + 1))
+  printf '  %sok%s   %-26s %s%s%s\n' "$GREEN" "$OFF" "$1" "$DIM" "${2:-}" "$OFF"
+}
+
+fail() {
+  failed=$((failed + 1))
+  printf '  %sFAIL%s %-26s %s\n' "$RED" "$OFF" "$1" "${2:-}"
+}
 
 # check NAME URL WANT_STATUS CTYPE_SUBSTRING MIN_BYTES [BODY_REGEX] [HEADER_REGEX]
 #
@@ -75,8 +93,7 @@ check() {
   fi
 
   if [ -n "$why" ]; then
-    failed=$((failed + 1))
-    printf '  %sFAIL%s %-26s %s\n' "$RED" "$OFF" "$name" "$why"
+    fail "$name" "$why"
     printf '       %s%s%s\n' "$DIM" "$url" "$OFF"
   else
     passed=$((passed + 1))
@@ -91,7 +108,7 @@ json_num() { grep -o "\"$1\":[0-9]*" "$TMP/body" | head -1 | sed "s/^\"$1\"://";
 
 urlenc() { printf '%s' "$1" | od -An -tx1 -v | tr -d '\n ' | sed 's/\(..\)/%\1/g'; }
 
-printf '%sTufteseid live check%s  %s  lokalitet %s\n' "$BOLD" "$OFF" "$BASE" "$CODE"
+printf '%sTufteseid live check%s  %s%s\n' "$BOLD" "$OFF" "$BASE" "${CODE:+  spot $CODE}"
 
 section 'Shell'
 
@@ -104,12 +121,10 @@ check config-js "$BASE/config.js" 200 javascript 50 '__TUFTESEID_CONFIG__'
 if [ -n "$ENTRY" ]; then
   check entry-bundle "$BASE$ENTRY" 200 javascript 500
 else
-  failed=$((failed + 1))
-  printf '  %sFAIL%s %-26s index.html names no /assets/*.js\n' "$RED" "$OFF" entry-bundle
+  fail entry-bundle 'index.html names no /assets/*.js'
 fi
-check short-link "$BASE/l/$CODE" 302 '' 0 '' "location: /\?lok=$CODE"
-# 200 here means a catch-all rewrite was added and every typo answers with the
-# app. `/` is the only path the app needs.
+check short-link "$BASE/l/$SHORT_CODE" 302 '' 0 '' "location: /\?lok=$SHORT_CODE"
+# 200 means a catch-all rewrite: every typo would answer with the app.
 check unknown-path "$BASE/tufteseid-no-such-path" 404 '' 0
 
 section 'PocketBase'
@@ -118,30 +133,37 @@ check pb-health "$BASE/pb/api/health" 200 json 20 'API is healthy'
 check pb-auth-methods "$BASE/pb/api/collections/users/auth-methods" 200 json 20 '"password"'
 note "oauth2: $(grep -o '"name":"[a-z0-9]*"' "$TMP/body" | sed 's/.*:"//;s/"//' | sort -u | paste -sd, -)"
 
-# `fields` rather than the whole record, so json_str cannot pick up a second
-# "id" out of an expanded relation.
-check lokalitet \
-  "$BASE/pb/api/collections/localities/records?filter=%28code%3D%27$CODE%27%29&fields=id,code,name,municipality,visibility" \
-  200 json 20 '"totalItems":1'
-LOK_ID=$(json_str id)
+# Unauthenticated, so the list is what the listRule shows a guest: the public
+# spots. An empty one is a valid state, not a failure.
+check spots-list "$BASE/pb/api/collections/spots/records?perPage=1&fields=id" \
+  200 json 20 '"totalItems":'
+PUBLIC=$(json_num totalItems)
+note "${PUBLIC:-0} public spot(s) visible to a guest"
 
-if [ -n "$LOK_ID" ]; then
-  note "$(json_str name) · $(json_str municipality) · $(json_str visibility) · $LOK_ID"
-  FILTER=$(urlenc "(locality='$LOK_ID')")
+if [ -n "$CODE" ]; then
+  # `fields` rather than the whole record: it keeps the 5 MB sketch out of the
+  # response, and stops json_str picking up a second "id".
+  check spot \
+    "$BASE/pb/api/collections/spots/records?filter=$(urlenc "(code='$CODE')")&fields=id,code,name,credit,visibility,point" \
+    200 json 20 '"totalItems":1'
+  SPOT_ID=$(json_str id)
 
-  check funn "$BASE/pb/api/collections/finds/records?filter=$FILTER&perPage=1&fields=id" 200 json 20
-  note "$(json_num totalItems) funn"
+  if [ -n "$SPOT_ID" ]; then
+    CREDIT=$(json_str credit)
+    note "$(json_str name) · ${CREDIT:-no credit} · $(json_str visibility) · $SPOT_ID"
 
-  check bilder "$BASE/pb/api/collections/attachments/records?filter=$FILTER&perPage=1&fields=id,collectionId,file" \
-    200 json 20
-  note "$(json_num totalItems) bilder"
-  ATT_ID=$(json_str id)
-  ATT_COL=$(json_str collectionId)
-  ATT_FILE=$(json_str file)
+    # What the card and the pin read. `credit` and `description` may be empty.
+    MISSING=''
+    for FIELD in code name visibility; do
+      grep -q "\"$FIELD\":\"[^\"]" "$TMP/body" || MISSING="$MISSING $FIELD"
+    done
+    grep -qE '"point":\[-?[0-9.]+,-?[0-9.]+\]' "$TMP/body" || MISSING="$MISSING point"
 
-  if [ -n "$ATT_FILE" ]; then
-    check bilde-fil "$BASE/pb/api/files/$ATT_COL/$ATT_ID/$ATT_FILE" 200 image 10000
-    check bilde-thumb "$BASE/pb/api/files/$ATT_COL/$ATT_ID/$ATT_FILE?thumb=100x100" 200 image 500
+    if [ -n "$MISSING" ]; then
+      fail spot-fields "empty or absent:$MISSING"
+    else
+      pass spot-fields 'code name visibility point'
+    fi
   fi
 fi
 
@@ -149,25 +171,27 @@ fi
 # --max-time, which under `pipefail` would sink the pipeline.
 curl -sS -N --max-time 5 -o "$TMP/sse" "$BASE/pb/api/realtime" 2>/dev/null
 if grep -q PB_CONNECT "$TMP/sse" 2>/dev/null; then
-  passed=$((passed + 1))
-  printf '  %sok%s   %-26s %sPB_CONNECT%s\n' "$GREEN" "$OFF" pb-realtime "$DIM" "$OFF"
+  pass pb-realtime PB_CONNECT
 else
-  failed=$((failed + 1))
-  printf '  %sFAIL%s %-26s no PB_CONNECT event (SSE buffered? flush_interval)\n' "$RED" "$OFF" pb-realtime
+  fail pb-realtime 'no PB_CONNECT event (SSE buffered? flush_interval)'
 fi
 
 # `users` is closed to guests, so a non-empty expand here means somebody
-# opened it.
-check owner-not-expanded \
-  "$BASE/pb/api/collections/localities/records?filter=%28code%3D%27$CODE%27%29&expand=owner&fields=expand.owner.name" \
-  200 json 20 '"expand":\{\}'
+# opened it. Needs a readable record to expand from.
+if [ "${PUBLIC:-0}" -gt 0 ]; then
+  check owner-not-expanded \
+    "$BASE/pb/api/collections/spots/records?perPage=1&expand=owner&fields=expand.owner.name" \
+    200 json 20 '"expand":\{\}'
+fi
 
 check no-private-leak \
-  "$BASE/pb/api/collections/localities/records?filter=%28visibility%21%3D%27public%27%29&perPage=1&fields=id" \
+  "$BASE/pb/api/collections/spots/records?filter=%28visibility%21%3D%27public%27%29&perPage=1&fields=id" \
   200 json 20 '"totalItems":0'
 
-OPTS=(-s -X POST -H 'Content-Type: application/json' -d '{"title":"live-check"}')
-check anon-write-refused "$BASE/pb/api/collections/finds/records" 400 json 10
+# 400, not 403: createRule is set, so PocketBase validates the payload before
+# it refuses the guest.
+OPTS=(-s -X POST -H 'Content-Type: application/json' -d '{"name":"live-check"}')
+check anon-write-refused "$BASE/pb/api/collections/spots/records" 400 json 10
 
 section 'Same-origin upstreams (Caddy → wmscache → origin)'
 

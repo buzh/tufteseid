@@ -90,10 +90,6 @@ Also checks that every compose service is running, that nginx has not logged
 `max_fails=0` on every peer in `nginx/wms-cache.conf` makes `no live upstreams`
 impossible. If it appears, the container is not running the repo's config.
 
-`live-check.sh` still probes the old `localities`, `finds` and `attachments`
-collections, not `spots`, so its PocketBase section fails and takes the health
-check with it until it is rewritten.
-
 ## Metrics
 
 Caddy collects Prometheus metrics (`servers { metrics }`), served by the admin
