@@ -121,7 +121,8 @@ verb in the surface is a write to one of those two, which is why the toggle
 holds nothing. The settings are in a box rather than a dropdown because every
 one of them changes a picture the reader is looking at while they turn it; the
 fold in the box's header gives the corner of the view back without dropping the
-grid.
+grid, and the close beside it is the same write as the switch in the band —
+`terrainWindowAtom` off, the grid released, the reading kept.
 
 Three things are unlike the overlay. Off is not a blind: it drops the grid,
 which is 19 MB, and only the reading survives — visualization, sun,
@@ -183,7 +184,9 @@ that fills the name field in while the pin stands still (`spotName.ts`, whose
 ranking vocabulary came over from `main` unchanged), and the short link.
 `src/spotControls/` is the box: `SpotPanel` while it is being written,
 `SpotCard` once it has been saved, sharing one stylesheet and one corner because
-only ever one of them is up.
+only ever one of them is up. Both are a `Panel`, and the draft's way out is the
+close in its corner rather than a second button beside `Lagre` — guarded, so a
+draft with anything typed or drawn in it asks twice.
 
 Three draft atoms rather than one, split by who writes them at what rate.
 `spotDraftAtom` is written by the pin drag sixty times a second, `spotFormAtom`
@@ -295,12 +298,28 @@ from it (`docs/terrain-analysis.md`).
 kept its curtain and grew a split; what it lost is focus, which the ground
 section per half made unnecessary. See *Two grounds at once* below.
 
-**`src/ui/`, reduced to three files.** `Icon.tsx`, because `MaterialSymbol` is
-the union that keeps a plausible-but-absent icon name out of the build; `cx.ts`;
-and `theme.ts`. The rest of the kit went, `tokens.css` with it — the four
-stylesheets that still read its custom properties were rewritten onto
-`--mantine-*` when the app went dark, and a second set of tokens that has to be
-kept in step with the first is exactly the thing not worth maintaining.
+**`src/ui/` was emptied and has been refilled a piece at a time.** What survived
+the strip was `Icon.tsx`, because `MaterialSymbol` is the union that keeps a
+plausible-but-absent icon name out of the build; `cx.ts`; and `theme.ts`. The
+rest of the kit went, `tokens.css` with it — the four stylesheets that still
+read its custom properties were rewritten onto `--mantine-*` when the app went
+dark, and a second set of tokens that has to be kept in step with the first is
+exactly the thing not worth maintaining. What has been written back is the
+shapes a second surface needed: `ControlChip`, `ControlButton` and
+`ControlUnit` for the band, and — for the boxes that float on the map — `Panel`
+and `useConfirm`. Nothing goes in here on the strength of one caller.
+
+`Panel` is the chrome all three floating boxes wear: a header with the title, a
+dimmed status line that survives the fold, and in the top right corner the fold
+and the close. It supplies the surface — border, opaque ground, shadow, a body
+that takes the slack and scrolls in it, and an optional footer outside the
+scrollport — and takes no view on where the box sits, which is a class the
+caller passes. Two props are the whole contract beyond the content: `onClose`,
+absent for a box that something else takes down, and `unsaved`, which puts the
+close behind `useConfirm` — one click arms it red, the second closes. What
+counts as unsaved is the content's business; `useSpotDraft` reports `dirty`
+against what the box opened with, and a name the register filled in by itself
+moves that baseline rather than counting as work to lose.
 
 ## What was added
 

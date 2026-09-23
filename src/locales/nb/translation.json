@@ -86,7 +86,6 @@
   "kulturminner": {
     "title_one": "Kulturminne",
     "title_other": "{{count}} kulturminner",
-    "close": "Lukk",
     "linkNeedsAccount": "Lenken peker til en lokalitet du må være innlogget for å se — eller som ikke finnes.",
     "laster": "Henter …",
     "klikkForDetaljer": "Klikk for detaljer",
@@ -175,6 +174,12 @@
   "map": {
     "errorMessage": "Noe gikk veldig galt med kartet"
   },
+  "panel": {
+    "collapse": "Fold sammen",
+    "expand": "Fold ut",
+    "close": "Lukk",
+    "closeUnsaved": "Lukk uten å lagre? Klikk en gang til."
+  },
   "ribbon": {
     "groundSection": {
       "only": "Underlag",
@@ -206,7 +211,6 @@
     "sketchPresent": "Tegning lagt ved",
     "sketchNone": "Ingen tegning",
     "sketchTooBig": "Tegningen er for stor til å lagres. Fjern noen elementer og prøv igjen.",
-    "close": "Lukk",
     "credit": "Lagt inn av {{name}}",
     "public": "Offentlig",
     "publicHint": "Alle med lenken kan se lokaliteten.",

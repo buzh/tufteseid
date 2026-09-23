@@ -11,15 +11,7 @@
 // Unlike the tip this is a surface the reader owns — it takes the pointer, it
 // scrolls, its text selects, and it stays until it is put down.
 
-import {
-  Anchor,
-  Badge,
-  CloseButton,
-  Paper,
-  Spoiler,
-  Tooltip,
-  UnstyledButton,
-} from '@mantine/core';
+import { Anchor, Badge, Spoiler, Tooltip, UnstyledButton } from '@mantine/core';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -35,7 +27,7 @@ import {
 } from '../map/featureInfo/heritageVocabulary';
 import { useKulturminnesokStatus } from '../map/featureInfo/kulturminnesok';
 import type { FeatureInfoReading } from '../map/featureInfo/types';
-import { cx, Icon, type MaterialSymbol } from '../ui';
+import { cx, Icon, Panel, type MaterialSymbol } from '../ui';
 import { rollup, summaryIcon, vernToneClass } from './heritageLabels';
 import styles from './HeritagePopup.module.css';
 import { useMapOverlay } from './useMapOverlay';
@@ -322,13 +314,14 @@ export const HeritagePopup = ({
   if (summaries.length === 0) return null;
 
   return createPortal(
-    <Paper className={styles.popup} withBorder shadow="md">
-      <div className={styles.header}>
-        <span className={styles.headerTitle}>
-          {t('kulturminner.title', { count: summaries.length })}
-        </span>
-        <CloseButton onClick={onClose} aria-label={t('kulturminner.close')} />
-      </div>
+    // The fold is worth having on a card pinned to the ground: what the reader
+    // wants to see next is usually the relief immediately under it, and the
+    // card comes back without asking the register again.
+    <Panel
+      className={styles.popup}
+      title={t('kulturminner.title', { count: summaries.length })}
+      onClose={onClose}
+    >
       <div className={styles.cards}>
         {summaries.map((summary) => (
           <HeritageCard
@@ -338,7 +331,7 @@ export const HeritagePopup = ({
           />
         ))}
       </div>
-    </Paper>,
+    </Panel>,
     element,
   );
 };

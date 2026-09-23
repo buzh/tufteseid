@@ -4,6 +4,10 @@
    picture it changes, which a menu that covers the picture and closes on the
    first click is not.
 
+   Where it sits and how wide it is, and nothing else: the shell — the border,
+   the opaque ground, the header with the fold and the close in it, the
+   scrolling body — is `Panel`, which all three floating boxes wear.
+
    Top left. The zoom and rotate controls are off, so the corner is free; the
    right half belongs to the second pane of a split, which never carries the
    analysis; and the scale line has the bottom left. The box is positioned
@@ -18,75 +22,6 @@
   width: 17rem;
   max-width: calc(100% - 2 * var(--mantine-spacing-xs));
   max-height: calc(100% - 2 * var(--mantine-spacing-xs));
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--mantine-color-default-border);
-  border-radius: var(--mantine-radius-md);
-  /* Opaque, unlike the scale line. That one is a ruler and a few digits over
-     terrain; this is a column of small text and thin tracks, and relief under
-     it is exactly the kind of busy ground that makes both unreadable. The fold
-     is how the reader sees what is beneath. */
-  background: var(--mantine-color-body);
-  box-shadow: var(--mantine-shadow-md);
-}
-
-/* The one part that is always there. Clicking it folds the rest away: the box
-   covers terrain, and taking the analysis off to see under it would drop the
-   grid and cost the fetch again. */
-.header {
-  display: flex;
-  align-items: center;
-  gap: var(--mantine-spacing-xs);
-  width: 100%;
-  padding: 6px var(--mantine-spacing-xs);
-  text-align: left;
-}
-
-.headerText {
-  flex: 1;
-  min-width: 0;
-}
-
-.title {
-  display: block;
-  font-size: var(--mantine-font-size-xs);
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-/* The fetch, then what it found, then the rectangle and its resolution. One
-   line, clipped rather than wrapped, so folding the box never changes its
-   height. */
-.status {
-  display: block;
-  overflow: hidden;
-  color: var(--mantine-color-dimmed);
-  font-size: var(--mantine-font-size-xs);
-  line-height: 1.3;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-/* One glyph both ways round, because a second name is a second thing that can
-   fail to be in the `MaterialSymbol` union. */
-.chevron {
-  flex: none;
-  color: var(--mantine-color-dimmed);
-  transition: transform 120ms ease;
-}
-
-.chevronOpen {
-  transform: rotate(180deg);
-}
-
-/* Takes the slack and scrolls in it, so a short window folds the settings into
-   a scrollport rather than pushing the box off the bottom of the map. */
-.body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 0 var(--mantine-spacing-xs) var(--mantine-spacing-xs);
-  scrollbar-width: thin;
 }
 
 /* A label and its control on one line, for the height model — the only setting

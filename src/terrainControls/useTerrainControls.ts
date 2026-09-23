@@ -226,6 +226,13 @@ export const useTerrainControls = () => {
     /** Take hold of it again. */
     adjust: adjustWindow,
     /**
+     * Put the analysis down: the same write the switch in the band makes, so
+     * the box's own close and the button are one verb. The grid goes with the
+     * rectangle; the reading — sun, radii, transparency — is this hook's own
+     * state and survives, because this hook is mounted either way.
+     */
+    close: closeWindow,
+    /**
      * Metres on a side. Off the grid once there is one, because that is what
      * was actually read; off the rectangle before then, because while it is
      * being dragged the number in the box is the only thing saying how big the

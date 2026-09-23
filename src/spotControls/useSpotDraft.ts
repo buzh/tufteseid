@@ -45,6 +45,8 @@ export type SpotDraftController = {
   saveError: boolean;
   /** The drawing is past what the column will hold; nothing was sent. */
   sketchTooBig: boolean;
+  /** There is something in the box that closing it would throw away. */
+  dirty: boolean;
   canSave: boolean;
   save: () => void;
   abort: () => void;
@@ -69,6 +71,22 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
    * work every time the pin was nudged.
    */
   const nameTouched = useRef(draft.recordId != null);
+
+  /**
+   * What is in the box that the reader did not put there — the baseline `dirty`
+   * is measured against. `SpotSurface` keys the draft box on `draft.id`, so
+   * this hook mounts once per draft and the initial value is the state before
+   * the first keystroke: empty for a new spot, the stored record for an edit.
+   * The register moves it when it fills the name field in by itself.
+   *
+   * State rather than a ref because `dirty` is read while rendering, and a ref
+   * read there is a value the box can be out of step with.
+   */
+  const [opened, setOpened] = useState({
+    name: form.name,
+    description: form.description,
+    sketch,
+  });
 
   const setName = useCallback(
     (name: string) => {
@@ -100,6 +118,10 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
         setSuggesting(false);
         if (suggestion && !nameTouched.current) {
           setForm((current) => ({ ...current, name: suggestion }));
+          // The register wrote it, not the reader, so it is not work to lose:
+          // closing a draft whose only content is a looked-up place name asks
+          // no question.
+          setOpened((current) => ({ ...current, name: suggestion }));
         }
       });
     }, SUGGEST_SETTLE_MS);
@@ -113,6 +135,18 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
 
   const name = form.name.trim();
   const canSave = user != null && name.length > 0 && !saving;
+
+  // What closing the box would throw away: what the author wrote, and what they
+  // drew. Not the pin — placing it is one gesture and so is placing it again,
+  // and a draft with nothing written in it cannot be saved at all.
+  //
+  // The drawing is compared by identity, so putting the pen down having changed
+  // nothing counts as a change. That errs towards asking twice, which is the
+  // side to err on.
+  const dirty =
+    form.name !== opened.name ||
+    form.description !== opened.description ||
+    sketch !== opened.sketch;
 
   const save = useCallback(() => {
     if (!user || !name) return;
@@ -186,6 +220,7 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
     saving,
     saveError,
     sketchTooBig,
+    dirty,
     canSave,
     save,
     abort: closeDraft,

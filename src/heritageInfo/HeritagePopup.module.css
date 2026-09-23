@@ -1,34 +1,17 @@
 /* The overlay element is `pointer-events: none` so the map stays draggable
    around the card; this box takes it back. Sized to the text rather than to the
    screen: a card wider than a paragraph is hard to read, and one taller than
-   half the view hides the terrain it is about. */
+   half the view hides the terrain it is about.
+
+   The shell around it — the border, the header with the fold and the close, the
+   scrolling body — is `Panel`, the same one the terrain box and the spot box
+   wear. What is left here is the size and the pointer. */
 .popup {
   box-sizing: border-box;
   width: 90vw;
   max-width: 26rem;
   max-height: 60vh;
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding: var(--mantine-spacing-sm);
-  background: var(--mantine-color-body);
   pointer-events: auto;
-  scrollbar-width: thin;
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--mantine-spacing-sm);
-  margin-bottom: var(--mantine-spacing-xs);
-}
-
-.headerTitle {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--mantine-font-size-sm);
-  font-weight: 700;
-  overflow-wrap: anywhere;
 }
 
 .cards {

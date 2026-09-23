@@ -20,23 +20,14 @@
 // the box; `Juster` is quiet, because getting back to the rectangle is cheap
 // and frequent.
 
-import {
-  Button,
-  Divider,
-  Select,
-  Slider,
-  Stack,
-  Text,
-  Tooltip,
-  UnstyledButton,
-} from '@mantine/core';
+import { Button, Divider, Select, Slider, Stack, Text, Tooltip } from '@mantine/core';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MAX_SIDE_M } from '../map/bbox';
 import type { Visualization } from '../terrain/shade';
 import { ControlButton } from '../ui/ControlButton';
-import { cx } from '../ui/cx';
 import { Icon } from '../ui/Icon';
+import { Panel } from '../ui/Panel';
 import styles from './TerrainPanel.module.css';
 import type { TerrainControls } from './useTerrainControls';
 
@@ -69,7 +60,6 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
     opacity,
     setOpacity,
   } = terrain;
-  const [open, setOpen] = useState(true);
 
   // Four states in one line, in the order they happen: the rectangle being
   // placed, the fetch, what it found, and — the usual case — what is on the
@@ -108,195 +98,183 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
   const isDom = model === 'dom';
 
   return (
-    <section className={styles.panel} aria-label={t('terrainControls.label')}>
-      <UnstyledButton
-        className={styles.header}
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <span className={styles.headerText}>
-          <span className={styles.title}>{t('terrainControls.label')}</span>
-          {status && <span className={styles.status}>{status}</span>}
-        </span>
-        <Icon
-          icon="keyboard_arrow_down"
-          size={18}
-          className={cx(styles.chevron, open && styles.chevronOpen)}
-        />
-      </UnstyledButton>
-
-      {open && (
-        <div className={styles.body}>
-          <Stack gap="xs">
-            <Divider />
-
-            {/* The rectangle first: it is what everything under it is a
-                picture of, and the one thing in here the reader has to move
-                rather than set. The why is in the tooltip — it is a paragraph,
-                and a paragraph pinned open in a box this size is the paragraph
-                you stop reading. */}
-            {adjusting ? (
-              <Tooltip label={t('terrainControls.startHint')}>
-                <Button
-                  size="xs"
-                  leftSection={<Icon icon="play_arrow" size={16} />}
-                  onClick={terrain.start}
-                >
-                  {t('terrainControls.start')}
-                </Button>
-              </Tooltip>
-            ) : (
-              <Tooltip
-                label={t('terrainControls.adjustHint', { max: MAX_SIDE_M })}
-              >
-                <Button
-                  size="xs"
-                  variant="default"
-                  leftSection={<Icon icon="crop_free" size={16} />}
-                  onClick={() => terrain.adjust()}
-                >
-                  {t('terrainControls.adjust')}
-                </Button>
-              </Tooltip>
-            )}
-            {error && (
-              <Text size="xs" c="orange">
-                {t(`terrainControls.${error}`)}
-              </Text>
-            )}
-
-            <Select
+    // The close drops the grid, which is 19 MB, and is the same verb as the
+    // switch in the band — the reading survives it (`useTerrainControls` is
+    // mounted either way), the fetch does not. The fold is for looking under
+    // the box, which is the cheap half of that and the one wanted far more
+    // often.
+    <Panel
+      className={styles.panel}
+      title={t('terrainControls.label')}
+      status={status}
+      onClose={terrain.close}
+    >
+      <Stack gap="xs">
+        {/* The rectangle first: it is what everything under it is a
+            picture of, and the one thing in here the reader has to move
+            rather than set. The why is in the tooltip — it is a paragraph,
+            and a paragraph pinned open in a box this size is the paragraph
+            you stop reading. */}
+        {adjusting ? (
+          <Tooltip label={t('terrainControls.startHint')}>
+            <Button
               size="xs"
-              label={t('terrainControls.visHead')}
-              description={t(`terrainControls.visMeta.${vis}`)}
-              inputWrapperOrder={['label', 'input', 'description']}
-              value={vis}
-              // Deselecting would leave the box with a render on the map and
-              // nothing naming it.
-              allowDeselect={false}
-              onChange={(value) => value && setVis(value as Visualization)}
-              data={VIS_GROUPS.map(({ key, items }) => ({
-                group: t(`terrainControls.visGroup.${key}`),
-                items: items.map((candidate) => ({
-                  value: candidate,
-                  label: t(`terrainControls.vis.${candidate}`),
-                })),
-              }))}
+              leftSection={<Icon icon="play_arrow" size={16} />}
+              onClick={terrain.start}
+            >
+              {t('terrainControls.start')}
+            </Button>
+          </Tooltip>
+        ) : (
+          <Tooltip
+            label={t('terrainControls.adjustHint', { max: MAX_SIDE_M })}
+          >
+            <Button
+              size="xs"
+              variant="default"
+              leftSection={<Icon icon="crop_free" size={16} />}
+              onClick={() => terrain.adjust()}
+            >
+              {t('terrainControls.adjust')}
+            </Button>
+          </Tooltip>
+        )}
+        {error && (
+          <Text size="xs" c="orange">
+            {t(`terrainControls.${error}`)}
+          </Text>
+        )}
+
+        <Select
+          size="xs"
+          label={t('terrainControls.visHead')}
+          description={t(`terrainControls.visMeta.${vis}`)}
+          inputWrapperOrder={['label', 'input', 'description']}
+          value={vis}
+          // Deselecting would leave the box with a render on the map and
+          // nothing naming it.
+          allowDeselect={false}
+          onChange={(value) => value && setVis(value as Visualization)}
+          data={VIS_GROUPS.map(({ key, items }) => ({
+            group: t(`terrainControls.visGroup.${key}`),
+            items: items.map((candidate) => ({
+              value: candidate,
+              label: t(`terrainControls.vis.${candidate}`),
+            })),
+          }))}
+        />
+
+        {/* Bare earth against first return — the same ground with and
+            without what grows on it and what is built on it. The same
+            split box the LiDAR ground wears in the band, because it is the
+            same choice over the same two models; here it also refetches. */}
+        <div className={styles.row}>
+          <span className={styles.rowLabel}>
+            {t('terrainControls.modelHead')}
+          </span>
+          <Tooltip
+            label={
+              isDom
+                ? t('terrainControls.model.toDtm')
+                : t('terrainControls.model.toDom')
+            }
+          >
+            <ControlButton
+              split={['park', 'landscape']}
+              lit={isDom ? 'upper' : 'lower'}
+              aria-label={t('terrainControls.model.aria', {
+                model: isDom
+                  ? t('terrainControls.model.dom')
+                  : t('terrainControls.model.dtm'),
+              })}
+              aria-pressed={isDom}
+              onClick={() => setModel(isDom ? 'dtm' : 'dom')}
             />
-
-            {/* Bare earth against first return — the same ground with and
-                without what grows on it and what is built on it. The same
-                split box the LiDAR ground wears in the band, because it is the
-                same choice over the same two models; here it also refetches. */}
-            <div className={styles.row}>
-              <span className={styles.rowLabel}>
-                {t('terrainControls.modelHead')}
-              </span>
-              <Tooltip
-                label={
-                  isDom
-                    ? t('terrainControls.model.toDtm')
-                    : t('terrainControls.model.toDom')
-                }
-              >
-                <ControlButton
-                  split={['park', 'landscape']}
-                  lit={isDom ? 'upper' : 'lower'}
-                  aria-label={t('terrainControls.model.aria', {
-                    model: isDom
-                      ? t('terrainControls.model.dom')
-                      : t('terrainControls.model.dtm'),
-                  })}
-                  aria-pressed={isDom}
-                  onClick={() => setModel(isDom ? 'dtm' : 'dom')}
-                />
-              </Tooltip>
-            </div>
-
-            {/* Only the sliders this visualization reads, absent rather than
-                disabled: two tracks for sky-view factor, four for a
-                hillshade, one for VAT.
-
-                And none at all while the rectangle is being placed. There is
-                nothing on the map for a sun to move across, and the box is
-                standing over the ground the reader is in the middle of
-                choosing — the shortest it can be is the most useful it can be.
-                The two above stay because both of them change what gets
-                fetched. */}
-            {!adjusting && <Divider />}
-            {!adjusting && sunDependent && (
-              <SliderRow
-                label={t('terrainControls.azimuth')}
-                value={terrain.azimuth}
-                min={0}
-                max={359}
-                step={1}
-                suffix="°"
-                onChange={terrain.setAzimuth}
-              />
-            )}
-            {!adjusting && (sunDependent || vis === 'multiHillshade') && (
-              <SliderRow
-                label={t('terrainControls.altitude')}
-                value={terrain.altitude}
-                min={5}
-                max={85}
-                step={1}
-                suffix="°"
-                onChange={terrain.setAltitude}
-              />
-            )}
-            {!adjusting && usesZFactor && (
-              <SliderRow
-                label={t('terrainControls.zFactor')}
-                value={terrain.zFactor}
-                min={1}
-                max={8}
-                step={0.5}
-                suffix="×"
-                onChange={terrain.setZFactor}
-              />
-            )}
-            {/* One control over two quantities: LRM's smoothing distance and
-                the horizon search distance. Keyed on the visualization and the
-                ceiling — the only two ways the value moves without the slider
-                moving — but never on the value, which would remount it on
-                every commit and drop focus mid arrow-key. Deferred for the
-                horizon views, whose scan is some 800 ms a pass. */}
-            {!adjusting && radiusLimits && (
-              <SliderRow
-                key={`${vis}-${radiusLimits.max}`}
-                label={t(
-                  vis === 'lrm'
-                    ? 'terrainControls.lrmRadius'
-                    : 'terrainControls.svfRadius',
-                )}
-                value={terrain.radius}
-                min={radiusLimits.min}
-                max={radiusLimits.max}
-                step={radiusLimits.step}
-                suffix=" m"
-                deferred={vis !== 'lrm'}
-                onChange={terrain.setRadius}
-              />
-            )}
-            {/* Counted as transparency — 0 % is fully covering — while the
-                controller holds opacity, which is what OpenLayers wants. */}
-            {!adjusting && (
-              <SliderRow
-                label={t('terrainControls.transparency')}
-                value={transparency}
-                min={0}
-                max={100}
-                step={5}
-                suffix=" %"
-                onChange={(value) => setOpacity(100 - value)}
-              />
-            )}
-          </Stack>
+          </Tooltip>
         </div>
-      )}
-    </section>
+
+        {/* Only the sliders this visualization reads, absent rather than
+            disabled: two tracks for sky-view factor, four for a
+            hillshade, one for VAT.
+
+            And none at all while the rectangle is being placed. There is
+            nothing on the map for a sun to move across, and the box is
+            standing over the ground the reader is in the middle of
+            choosing — the shortest it can be is the most useful it can be.
+            The two above stay because both of them change what gets
+            fetched. */}
+        {!adjusting && <Divider />}
+        {!adjusting && sunDependent && (
+          <SliderRow
+            label={t('terrainControls.azimuth')}
+            value={terrain.azimuth}
+            min={0}
+            max={359}
+            step={1}
+            suffix="°"
+            onChange={terrain.setAzimuth}
+          />
+        )}
+        {!adjusting && (sunDependent || vis === 'multiHillshade') && (
+          <SliderRow
+            label={t('terrainControls.altitude')}
+            value={terrain.altitude}
+            min={5}
+            max={85}
+            step={1}
+            suffix="°"
+            onChange={terrain.setAltitude}
+          />
+        )}
+        {!adjusting && usesZFactor && (
+          <SliderRow
+            label={t('terrainControls.zFactor')}
+            value={terrain.zFactor}
+            min={1}
+            max={8}
+            step={0.5}
+            suffix="×"
+            onChange={terrain.setZFactor}
+          />
+        )}
+        {/* One control over two quantities: LRM's smoothing distance and
+            the horizon search distance. Keyed on the visualization and the
+            ceiling — the only two ways the value moves without the slider
+            moving — but never on the value, which would remount it on
+            every commit and drop focus mid arrow-key. Deferred for the
+            horizon views, whose scan is some 800 ms a pass. */}
+        {!adjusting && radiusLimits && (
+          <SliderRow
+            key={`${vis}-${radiusLimits.max}`}
+            label={t(
+              vis === 'lrm'
+                ? 'terrainControls.lrmRadius'
+                : 'terrainControls.svfRadius',
+            )}
+            value={terrain.radius}
+            min={radiusLimits.min}
+            max={radiusLimits.max}
+            step={radiusLimits.step}
+            suffix=" m"
+            deferred={vis !== 'lrm'}
+            onChange={terrain.setRadius}
+          />
+        )}
+        {/* Counted as transparency — 0 % is fully covering — while the
+            controller holds opacity, which is what OpenLayers wants. */}
+        {!adjusting && (
+          <SliderRow
+            label={t('terrainControls.transparency')}
+            value={transparency}
+            min={0}
+            max={100}
+            step={5}
+            suffix=" %"
+            onChange={(value) => setOpacity(100 - value)}
+          />
+        )}
+      </Stack>
+    </Panel>
   );
 };
 
