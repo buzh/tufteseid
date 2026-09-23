@@ -6,7 +6,8 @@ for adding another.
 
 Related: `docs/wms-proxy-and-tiles.md` (proxying, caching, tile grids, rate
 limits, CSP), `docs/terrain-analysis.md` (float elevation, the client-side
-visualizations), `docs/state-of-the-branch.md` (what the rebuild has reached).
+visualizations), `docs/architecture.md` (modules, atoms, the two-ground
+mechanism).
 
 ## Conventions
 

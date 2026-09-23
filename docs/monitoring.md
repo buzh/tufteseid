@@ -12,7 +12,8 @@ runs as a throwaway container. There is no client-side analytics.
 ## First run
 
 ```sh
-sudo mkdir -p /site/tufteseid/data/logs
+sudo mkdir -p /site/tufteseid/data/{logs,stats}
+sudo chown "$USER" /site/tufteseid/data/stats
 docker compose up -d             # picks up the bind mount
 docker compose restart wmscache  # picks up the log_format
 scripts/usage-report.sh
