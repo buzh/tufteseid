@@ -2,6 +2,19 @@ node_modules
 dist
 .git
 .github
+.claude
 .vite
 *.log
 .DS_Store
+
+# Not build inputs. vat-cache in particular carries multi-megabyte .npz
+# coverage masks that would otherwise ride along in every build context.
+vat-cache
+docs
+scripts
+nginx
+mapproxy
+nib-proxy
+cvat-tiles
+pocketbase
+*.md
