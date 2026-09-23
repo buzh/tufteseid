@@ -216,7 +216,12 @@ export const buildStack = async (
   const build = (entries: StackEntry[]) =>
     Promise.all(
       entries.map(async (e) => ({
-        layer: await buildOrReuseBackgroundLayer(e.config, projection, ns, host),
+        layer: await buildOrReuseBackgroundLayer(
+          e.config,
+          projection,
+          ns,
+          host,
+        ),
         opacity: e.opacity,
         zIndex: e.zIndex,
       })),

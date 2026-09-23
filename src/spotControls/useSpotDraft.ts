@@ -73,7 +73,8 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
   );
 
   const setDescription = useCallback(
-    (description: string) => setForm((current) => ({ ...current, description })),
+    (description: string) =>
+      setForm((current) => ({ ...current, description })),
     [setForm],
   );
 

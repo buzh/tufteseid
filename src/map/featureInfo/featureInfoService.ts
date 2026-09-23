@@ -373,11 +373,9 @@ export const fetchLayerFeatureInfo = async (
 
   const preferredFormat = layer.get('infoFormat') as InfoFormat | undefined;
   const imageBaseUrl = layer.get('featureInfoImageBaseUrl') as
-    | string
-    | undefined;
+    string | undefined;
   const fieldConfigs = layer.get('featureInfoFields') as
-    | FieldConfig[]
-    | undefined;
+    FieldConfig[] | undefined;
 
   const answer = (
     features: FeatureInfoFeature[],
@@ -447,7 +445,10 @@ export const fetchLayerFeatureInfo = async (
     } catch (error) {
       failed = true;
       if (signal?.aborted) throw error;
-      console.warn(`Failed to fetch feature info with format ${format}:`, error);
+      console.warn(
+        `Failed to fetch feature info with format ${format}:`,
+        error,
+      );
     }
   }
 

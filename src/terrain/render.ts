@@ -124,7 +124,10 @@ const cropToWindow = (field: Float32Array, dem: Dem): Float32Array => {
   const out = new Float32Array(width * height);
   for (let row = 0; row < height; row++) {
     out.set(
-      field.subarray((y + row) * dem.width + x, (y + row) * dem.width + x + width),
+      field.subarray(
+        (y + row) * dem.width + x,
+        (y + row) * dem.width + x + width,
+      ),
       row * width,
     );
   }

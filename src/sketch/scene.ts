@@ -41,7 +41,9 @@ export const sketchBytes = (sketch: SpotSketch | null): number =>
 
 /** A stored sketch, re-checked field by field: it is a free-form JSON column,
  *  and a bad frame draws the right strokes over the wrong ground. */
-export const sketchOf = (value: SpotSketch | null | undefined): Sketch | null => {
+export const sketchOf = (
+  value: SpotSketch | null | undefined,
+): Sketch | null => {
   if (!value || typeof value !== 'object') return null;
   const frame = value.frame as Partial<SketchFrame> | undefined;
   if (!frame || typeof frame !== 'object') return null;

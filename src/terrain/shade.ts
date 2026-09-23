@@ -535,7 +535,9 @@ export const vatDecimation = (
 ): number => {
   const finest = Math.max(1, Math.round(VAT_SCAN_M_PER_PX / metresPerPx));
   // The cell size that puts this rectangle exactly on the budget.
-  const affordable = Math.sqrt((widthMetres * heightMetres) / VAT_MAX_SCAN_CELLS);
+  const affordable = Math.sqrt(
+    (widthMetres * heightMetres) / VAT_MAX_SCAN_CELLS,
+  );
   return Math.max(finest, Math.ceil(affordable / metresPerPx), 1);
 };
 

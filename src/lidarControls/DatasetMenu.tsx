@@ -62,9 +62,12 @@ export const DatasetMenu = ({ lidar }: { lidar: LidarControls }) => {
             <Text size="xs" c="dimmed">
               {held
                 ? flightFacts(project)
-                : `${flightFacts(project)} · ${t('lidarControls.dataset.coverage', {
-                    percent: Math.round(areaRatio * 100),
-                  })}`}
+                : `${flightFacts(project)} · ${t(
+                    'lidarControls.dataset.coverage',
+                    {
+                      percent: Math.round(areaRatio * 100),
+                    },
+                  )}`}
             </Text>
           </div>
           {cachedFlightIds.has(project.id) && (

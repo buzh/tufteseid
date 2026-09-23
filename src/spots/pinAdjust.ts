@@ -73,7 +73,10 @@ export const useSpotPinAdjust = () => {
       if (!position) return false;
       const pixel = map.getPixelFromCoordinate(position);
       if (!pixel) return false;
-      return withinDraftPin(event.pixel[0] - pixel[0], event.pixel[1] - pixel[1]);
+      return withinDraftPin(
+        event.pixel[0] - pixel[0],
+        event.pixel[1] - pixel[1],
+      );
     };
 
     let dragging = false;

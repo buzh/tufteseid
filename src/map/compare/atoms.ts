@@ -54,19 +54,16 @@ const enterGroundB = (ground: 'kart' | 'lidar', get: Getter, set: Setter) => {
 
 /** B is seeded from A only on the way out of `single`; moving between the
  *  curtain and the split keeps B where the reader put it. */
-export const selectViewModeAtom = atom(
-  null,
-  (get, set, mode: ViewMode) => {
-    const previous = get(viewModeAtom);
-    if (mode === previous) return;
-    if (previous === 'single' && mode !== 'single') {
-      seedHalfB(get, set);
-      set(lidarAutoDatasetHalves.b, false);
-      enterGroundB(contrastingGround(get(backgroundLayerHalves.a)), get, set);
-    }
-    set(viewModeAtom, mode);
-  },
-);
+export const selectViewModeAtom = atom(null, (get, set, mode: ViewMode) => {
+  const previous = get(viewModeAtom);
+  if (mode === previous) return;
+  if (previous === 'single' && mode !== 'single') {
+    seedHalfB(get, set);
+    set(lidarAutoDatasetHalves.b, false);
+    enterGroundB(contrastingGround(get(backgroundLayerHalves.a)), get, set);
+  }
+  set(viewModeAtom, mode);
+});
 
 // The build awaits, so an earlier run resolving last must not install.
 let compareGeneration = 0;

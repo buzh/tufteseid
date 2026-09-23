@@ -4,7 +4,11 @@ import {
   LIDAR_COVERAGE_EXTENT_25833,
   NATIONAL_WMS,
 } from './lidarProjects';
-import { CoverageExtent, WMSBackgroundLayer, XYZBackgroundLayer } from './types';
+import {
+  CoverageExtent,
+  WMSBackgroundLayer,
+  XYZBackgroundLayer,
+} from './types';
 
 const NATIONAL_CACHE_URL: Record<LidarModel, string> = {
   dtm: '/cache/lidar-dtm/{z}/{x}/{y}.png',

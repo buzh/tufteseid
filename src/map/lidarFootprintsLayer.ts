@@ -68,7 +68,10 @@ type Tier = 'hover' | 'active';
 const heldInView = async (
   extentLonLat: [number, number, number, number],
   filters: LidarFilterSettings,
-): Promise<{ primary: LidarViewportEntry[]; secondary: LidarViewportEntry[] }> =>
+): Promise<{
+  primary: LidarViewportEntry[];
+  secondary: LidarViewportEntry[];
+}> =>
   classifyRelevance(
     (await fetchCvatAcquisitions())
       .map((a) => ({
@@ -111,8 +114,7 @@ const findLayer = (map: OlMap): VectorLayer | undefined =>
     .getLayers()
     .getArray()
     .find((l) => l.get('id') === LIDAR_FOOTPRINTS_LAYER_ID) as
-    | VectorLayer
-    | undefined;
+    VectorLayer | undefined;
 
 const getOrCreateLayer = (map: OlMap): VectorLayer => {
   const existing = findLayer(map);
@@ -271,8 +273,7 @@ export const useLidarFootprintsLayer = () => {
             // AUTO_RELEASE_COVERAGE, and `maxRatio` bounds `areaRatio` from
             // above, so anything under it cannot pass.
             .filter(
-              (e) =>
-                picking || cycling || e.maxRatio >= AUTO_RELEASE_COVERAGE,
+              (e) => picking || cycling || e.maxRatio >= AUTO_RELEASE_COVERAGE,
             )
             .slice(0, FOOTPRINT_FETCH_CAP)
             .map(({ project }) => project);

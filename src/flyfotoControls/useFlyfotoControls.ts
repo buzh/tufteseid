@@ -23,11 +23,7 @@ const MIN_FLYFOTO_ZOOM = 8;
 const REFRESH_DEBOUNCE_MS = 250;
 
 type FlyfotoViewportStatus =
-  | 'idle'
-  | 'loading'
-  | 'ready'
-  | 'zoomedOut'
-  | 'error';
+  'idle' | 'loading' | 'ready' | 'zoomedOut' | 'error';
 
 type FlyfotoViewport = {
   status: FlyfotoViewportStatus;
@@ -66,8 +62,7 @@ export const useFlyfotoControls = (half: CompareHalf) => {
       const extent = map.getView().calculateExtent(size);
       const projection = map.getView().getProjection().getCode();
       const extentLonLat = transformExtent(extent, projection, 'EPSG:4326') as
-        | [number, number, number, number]
-        | undefined;
+        [number, number, number, number] | undefined;
       if (!extentLonLat) return;
 
       // Claimed before the zoom check too, so a fetch started while zoomed in

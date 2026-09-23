@@ -1,4 +1,11 @@
-import { Alert, Button, Group, Textarea, TextInput, Tooltip } from '@mantine/core';
+import {
+  Alert,
+  Button,
+  Group,
+  Textarea,
+  TextInput,
+  Tooltip,
+} from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 
 import { SPOT_DESCRIPTION_MAX, SPOT_NAME_MAX } from '../api/spots';
@@ -38,7 +45,9 @@ export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {
         maxLength={SPOT_NAME_MAX}
         label={t('spots.name')}
         placeholder={
-          spot.suggesting ? t('spots.namePlaceholderBusy') : t('spots.namePlaceholder')
+          spot.suggesting
+            ? t('spots.namePlaceholderBusy')
+            : t('spots.namePlaceholder')
         }
         value={spot.name}
         onChange={(event) => spot.setName(event.currentTarget.value)}
@@ -72,9 +81,7 @@ export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {
       </div>
 
       <Group gap="xs" mt="xs" justify="space-between">
-        <Tooltip
-          label={drawing ? t('spots.drawStop') : t('spots.drawStart')}
-        >
+        <Tooltip label={drawing ? t('spots.drawStop') : t('spots.drawStart')}>
           <ControlButton
             icon="draw"
             on={drawing}

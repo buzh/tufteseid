@@ -31,7 +31,8 @@ const stored = (): Pen | null => {
     const parsed = JSON.parse(raw) as Partial<Pen>;
     // localStorage is reader-editable; an unknown tool would reach
     // `setActiveTool`.
-    if (typeof parsed?.tool !== 'string' || !isPenTool(parsed.tool)) return null;
+    if (typeof parsed?.tool !== 'string' || !isPenTool(parsed.tool))
+      return null;
     return { tool: parsed.tool, locked: parsed.locked === true };
   } catch {
     return null;

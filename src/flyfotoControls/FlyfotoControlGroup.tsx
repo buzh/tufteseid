@@ -56,9 +56,7 @@ export const FlyfotoControlGroup = ({
 
   const status = () => {
     if (viewport.status === 'loading' || viewport.status === 'idle') {
-      return (
-        <Menu.Item disabled>{t('flyfotoControls.loading')}</Menu.Item>
-      );
+      return <Menu.Item disabled>{t('flyfotoControls.loading')}</Menu.Item>;
     }
     if (viewport.status === 'zoomedOut') {
       return (

@@ -1,4 +1,12 @@
-import { Button, Divider, Select, Slider, Stack, Text, Tooltip } from '@mantine/core';
+import {
+  Button,
+  Divider,
+  Select,
+  Slider,
+  Stack,
+  Text,
+  Tooltip,
+} from '@mantine/core';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MAX_SIDE_M } from '../map/bbox';
@@ -82,9 +90,7 @@ export const TerrainPanel = ({ terrain }: { terrain: TerrainControls }) => {
             </Button>
           </Tooltip>
         ) : (
-          <Tooltip
-            label={t('terrainControls.adjustHint', { max: MAX_SIDE_M })}
-          >
+          <Tooltip label={t('terrainControls.adjustHint', { max: MAX_SIDE_M })}>
             <Button
               size="xs"
               variant="default"

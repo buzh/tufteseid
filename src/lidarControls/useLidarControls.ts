@@ -52,7 +52,9 @@ export const useLidarControls = (half: CompareHalf) => {
   const [activeLidarStyle, setActiveLidarStyle] = useAtom(
     activeLidarStyleHalves[half],
   );
-  const [activeCvat, setActiveCvat] = useAtom(activeCvatAcquisitionHalves[half]);
+  const [activeCvat, setActiveCvat] = useAtom(
+    activeCvatAcquisitionHalves[half],
+  );
   const [lidarModel, setLidarModel] = useAtom(activeLidarModelHalves[half]);
   const [autoDataset, setAutoDataset] = useAtom(lidarAutoDatasetHalves[half]);
   const [hybridOverlay, setHybridOverlay] = useAtom(hybridOverlayHalves[half]);
