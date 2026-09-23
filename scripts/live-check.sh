@@ -23,7 +23,6 @@ BBOX_WIDE=185000,6534000,189000,6538000
 LIDAR_PROJECT='NDH Kragerø-Drangedal 2pkt 2016'
 # A record that exists: a miss also answers 200, with a null body.
 KMS_ID=86050
-# The short link is a Caddy rewrite, so any code-shaped string exercises it.
 # /l/<code> is a pure Caddy redir, so any code-shaped string exercises it.
 SHORT_CODE=${CODE:-ABCDEF}
 
