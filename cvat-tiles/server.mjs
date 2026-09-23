@@ -216,25 +216,38 @@ function levelsOf(db, rows) {
     .map((r) => r.z);
 }
 
+/** The level an envelope is measured at, where the file reaches it. */
+const ENVELOPE_FLOOR_Z = 12;
+
 /**
  * Where the acquisition lies, as inclusive tile indices on the app's grid at
- * the coarsest level the file holds. An envelope, not a footprint: the holes
- * inside it are the 404s, and that is the only shape a flight's coverage ever
- * had here. Enough to place it on the map, rank it against the viewport and
- * cull requests outside it.
+ * one coarse level. An envelope, not a footprint: the holes inside it are the
+ * 404s, and that is the only shape a flight's coverage ever had here. Enough to
+ * place it on the map, rank it against the viewport and cull requests outside
+ * it.
  *
- * The coarsest level, for two reasons. Every level is cut from the same
- * coverage mask, so a deeper level's tiles lie inside the coarser tiles
- * covering the same ground, and the coarsest envelope contains them all. And it
- * is the level with the fewest rows, so this is four index lookups over a few
- * hundred entries rather than a walk of 80 000.
+ * Coarse, for two reasons. Every level is cut from the same coverage mask, so a
+ * deeper level's tiles lie inside the coarser tiles covering the same ground,
+ * and a coarse envelope contains them all. And it is the level with the fewest
+ * rows, so this is four index lookups over a few hundred entries rather than a
+ * walk of 80 000.
+ *
+ * But not the coarsest the file holds, because a tile is 2.7 km across at z12
+ * and 86.7 km at z7, and the envelope is only ever as tight as one tile. The
+ * levels below the floor exist to be drawn at country scale (`cvatHintLayer.ts`
+ * in the app), not to say where a flight is; measuring there would round a
+ * county-sized acquisition up to a region. So the floor is the level the
+ * envelope is taken at, and a file that stops short of it is measured at the
+ * coarsest it does hold.
  *
  * Rows come back flipped to the app's north-origin y, so nothing downstream has
  * to know that MBTiles counts from the south. Flipping reverses the order,
  * hence min and max changing places.
  */
 function boundsOf(db, levels) {
-  const z = Math.min(...levels);
+  const measurable = levels.filter((z) => z >= ENVELOPE_FLOOR_Z);
+  const z =
+    measurable.length > 0 ? Math.min(...measurable) : Math.max(...levels);
   if (!Number.isInteger(z)) return null;
   const at = db
     .prepare(

@@ -376,12 +376,19 @@ is fewer requests.
   in the second group despite being tiles: `XYZBackgroundLayer` carries
   `preload` per store for exactly that split, because a MapProxy miss is a
   GetMap and a preloaded tile would hold a slot for the length of it.
+- The cVAT coverage hint (`src/map/cvatHintLayer.ts`) puts one tile layer per
+  cached acquisition on the map at once, and is the only surface that does.
+  Nothing upstream sees any of it — a hit is a `SELECT` against a bind-mounted
+  database, a miss is the sidecar's 404 and is not retried — and each layer is
+  fenced to its own envelope, which at the scales the hint draws at is a tile or
+  two. The bound on it is the size of the store, tens, and not of the catalogue,
+  whose 450 flights never reach that module.
 - 512 px tiles for every layer, `TileWMS` and cached alike, from an explicit
   `TileGrid` on the View's own resolution ladder
   (`src/map/layers/wmsTileGrid.ts`), so tiles never resample and the two tile
   stores are written on the same ladder they are read on. `getWMSTileGrid`
   takes an optional level range for a store holding only some levels — a cVAT
-  acquisition passes z12–z15, the national relief z0–z16, since it is a 1 m
+  acquisition passes z7–z15, the national relief z0–z16, since it is a 1 m
   product and deeper than z16 upsamples either way — and still hands over the
   whole resolution array, indexed by absolute z, fenced by `minZoom` and the
   array's end. At 256 px a

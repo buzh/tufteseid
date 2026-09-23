@@ -83,8 +83,8 @@ The columns are a comparison of two rules on one rocky patch, not a budget. That
 patch runs dear: the z15 pilot came out at 0.280 B/px on fully covered tiles
 against the 0.320 above. §5 has the measured bytes.
 
-What this gives up is that the reach changes as you zoom, so the ladder is four
-related pictures rather than one picture at four sizes. That is what a
+What this gives up is that the reach changes as you zoom, so the ladder is a set
+of related pictures rather than one picture at several sizes. That is what a
 multi-scale relief pyramid is, and it is a different thing from the fault that
 excluded `dynamisk_farget_hoyde`: that one had neighbouring tiles *at the same
 level* disagreeing, which absolute stretches prevent here.
@@ -95,17 +95,45 @@ right for the Analyse tab, where the reader is handed one rectangle at one
 resolution and the legend names a radius. A pyramid is the case the argument
 does not cover.
 
-### 2. The ladder ends where the DTM does: z16 down to z12
+### 2. The deep end is where the DTM ends; the coarse end is the hint
 
-Pixel-locked radii make z12 a real visualization rather than a signed slope, so
-the ladder runs to the level the app's overview borrowing would otherwise have
-to fake. The base is not a fixed level but a property of the flight: build down
-to the last level whose pixel is no finer than the DEM's own cell, and no
+The deep end is not a fixed level but a property of the flight: build down to
+the last level whose pixel is no finer than the DEM's own cell, and no
 further. Kartverket publishes three cell sizes and they track point density, so
 in practice that is **z16 (0.331 m) on a 0.25 m DTM, z15 (0.661 m) on a 0.5 m
 one, z14 on 1 m**. Below the cell the service resamples one height value into
 four pixels and RVT reads the interpolation as terrain, which is the fault this
 rule exists to prevent. `levels_for` in `build_tiles.py` is the rule.
+
+The coarse end is a question about the app rather than about the data, and the
+answer is **z7** (169 m/px), the same for every flight. Pixel-locked radii keep
+a level down there a real visualization rather than a signed slope — §1's table
+runs out of rows well before the argument does — and the app paints the whole
+store over the national mosaic out where the mosaic is what the reader is being
+shown (`src/map/cvatHintLayer.ts`). Those levels are what tells someone looking
+at a county that this ground has been rendered; they show no archaeology and
+are not asked to. They are cheap but not free. A level holds a quarter of the
+units of the one below it only while the footprint is wider than a unit, and a
+unit is 347 km across at z7 — below that each level costs the one or two its
+envelope straddles, whatever the flight's area. Over the fixture that is
+21 / 11 / 5 / 3 / 2 units for z11 to z7 against z12's 46: another z12, about ten
+minutes. The bytes do quarter properly, since those follow covered ground rather
+than fetched windows, which puts the five levels together in single-digit
+megabytes.
+
+**Below z12 the alpha is the footprint, not the DEM's no-data.** The two agree
+at the deep end, where an absent TIFF tile is the edge of the flight, and part
+company badly at the coarse end: ImageServer answers a coarse request out of
+overviews built per mosaic item, and an item's overview fills the item's
+rectangle. Over NHM Supplering Østfold — 0.17 km² of ravine — half of a 21 km
+window came back as data at z8 and a quarter of a 2.7 km one at z11, against
+nothing at all at z13. Painted as coverage that is a patch a thousand times the
+flight, and a reader who zooms into it finds the national mosaic. The
+acquisition's own rasterised footprint is the authority, so `build_unit` cuts
+the alpha to it at these levels and the same flight comes out as the thread it
+is. `MASK_ALPHA_BELOW_Z` is the rule; it is recorded per level and so outside
+the recipe digest, which is what lets a built store take the coarse levels
+without its z16–z12 declaring themselves a different picture.
 
 Levels *are* asked for by hand — `-z`, since §3 makes each one an independent
 job and a pilot or a rebuild wants one at a time — but only downwards. The rule

@@ -63,9 +63,21 @@ DEFAULT_UNIT_TILES = 4
 # Every level the store can hold, deepest first. What one acquisition is built
 # to is `levels_for` its own DTM, not this: z16 on a 0.5 m flight would render
 # the interpolation between cells.
-DEFAULT_LEVELS = (16, 15, 14, 13, 12)
-COARSEST_LEVEL = 12
+DEFAULT_LEVELS = (16, 15, 14, 13, 12, 11, 10, 9, 8, 7)
+COARSEST_LEVEL = 7
 WEBP_QUALITY = 90
+
+# Below this level a tile's alpha is the acquisition's footprint rather than the
+# DEM's own no-data. The two agree at the deep end and part company badly at the
+# coarse end: ImageServer answers a coarse request out of overviews built per
+# mosaic item, and an item's overview fills the item's rectangle, so a request
+# the flight barely touches comes back with ground in it. Measured over NHM
+# Supplering Østfold, whose footprint is 0.17 km²: half of a 21 km window at z8
+# and a quarter of a 2.7 km one at z11 came back as data, against nothing at
+# z13. Read as coverage that is a patch a thousand times the flight, pointing a
+# reader at relief the store does not hold. The footprint is the authority, and
+# this is where it takes over.
+MASK_ALPHA_BELOW_Z = 12
 
 
 def resolution(z):
@@ -79,7 +91,18 @@ def levels_for(native_cell):
     A level is worth building while its pixel is no finer than the DEM's own
     cell — z16 (0.331 m/px) on Kartverket's 0.25 m grid, z15 (0.661 m/px) on the
     0.5 m one. Below that the fetch resamples one height value into four pixels
-    and RVT reads the interpolation as terrain."""
+    and RVT reads the interpolation as terrain.
+
+    The coarse end is a question about the app instead. z7 (169 m/px) shows no
+    archaeology and is not meant to: the app paints every acquisition in the
+    store over the national mosaic out there, so the coarse levels are what
+    tells a reader looking at a county that this ground has been rendered
+    (`src/map/cvatHintLayer.ts`). They are cheap but not free: a level holds a
+    quarter of the units of the one below it only while the footprint is wider
+    than a unit, and a unit is 347 km across at z7, so each of the coarse levels
+    costs the one or two its envelope happens to straddle. Over the 1 106 km²
+    fixture, z11 down to z7 is 21 / 11 / 5 / 3 / 2 units against z12's 46 —
+    another z12, call it ten minutes."""
     z = COARSEST_LEVEL
     while z < DEFAULT_LEVELS[0] and resolution(z + 1) >= native_cell:
         z += 1
@@ -102,6 +125,7 @@ class Coverage:
     """The acquisition's footprint union, as coverage.py rasterised it."""
 
     def __init__(self, path):
+        self.path = str(path)
         data = np.load(path)
         self.mask = data["mask"]
         self.x0, self.x1, self.y0, self.y1 = (float(v) for v in data["bounds"])
@@ -123,6 +147,34 @@ class Coverage:
         if i1 <= i0 or j1 <= j0:
             return False
         return bool(self.mask[j0:j1, i0:i1].any())
+
+    def sample(self, west, south, east, north, px):
+        """The footprint over one square, as a north-up (px, px) boolean.
+
+        Two rules, because the 25 m cell the footprint was rasterised at can
+        fall either side of the pixel. Pixel the coarser: every set cell claims
+        the pixel it lands in, so a flight narrower than a pixel survives as one
+        pixel instead of being stepped over by a sample point. Pixel the finer:
+        read the cell the pixel's centre is in, which gives a 25 m staircase at
+        the edge rather than a lattice of holes through the middle."""
+        out = np.zeros((px, px), bool)
+        pixel = (east - west) / px
+        if pixel >= self.cell:
+            jj, ii = np.nonzero(self.mask)
+            if jj.size == 0:
+                return out
+            cx = (self.x0 + (ii + 0.5) * self.cell - west) // pixel
+            cy = (north - self.y0 - (jj + 0.5) * self.cell) // pixel
+            keep = (cx >= 0) & (cx < px) & (cy >= 0) & (cy < px)
+            out[cy[keep].astype(int), cx[keep].astype(int)] = True
+            return out
+        step = (np.arange(px) + 0.5) * pixel
+        i = ((west + step - self.x0) // self.cell).astype(int)
+        j = ((north - step - self.y0) // self.cell).astype(int)
+        gi = (i >= 0) & (i < self.mask.shape[1])
+        gj = (j >= 0) & (j < self.mask.shape[0])
+        out[np.ix_(gj, gi)] = self.mask[np.ix_(j[gj], i[gi])]
+        return out
 
     def units(self, z, unit_tiles):
         """Every unit of this level the footprint reaches, in reading order."""
@@ -158,13 +210,16 @@ def fetch_unit(z, ux, uy, unit_tiles, project, attempts=5, delay=2.0):
             time.sleep(delay * 2**attempt)
 
 
-def encode_tile(field):
+def encode_tile(field, footprint=None):
     """One 512 px tile of the 0..1 composite -> WebP bytes, or None if no ground.
 
     Grey is RVT's own quantisation; alpha is coverage. byte_scale paints NaN
-    white, which is a constant under a transparent alpha and so costs nothing.
+    white, which is a constant under a transparent alpha and so costs nothing —
+    as is the grey under ground the `footprint` cuts away.
     """
     covered = ~np.isnan(field)
+    if footprint is not None:
+        covered &= footprint
     if not covered.any():
         return None
     grey = cvat.byte_scale(field, c_min=0, c_max=1)
@@ -387,25 +442,46 @@ def read_store(out, project):
     return Store(path) if path.exists() else None
 
 
+_MASKS = {}
+
+
+def worker_coverage(path):
+    """The footprint, read once per worker process rather than sent per unit.
+    A county's mask at 25 m is megabytes, and the pipe carries a unit's work
+    order hundreds of times over a build."""
+    if path not in _MASKS:
+        _MASKS[path] = Coverage(path)
+    return _MASKS[path]
+
+
 def build_unit(args):
     """Fetch and render one work unit. Runs in a worker process.
 
     Returns its tiles rather than writing them: the store is one database per
     acquisition, and the parent is its only writer. A few megabytes back over
     the pipe per eleven seconds of render."""
-    z, ux, uy, unit_tiles, project = args
+    z, ux, uy, unit_tiles, project, coverage_path = args
     res = resolution(z)
     dem = fetch_unit(z, ux, uy, unit_tiles, project)
     # radius_in_metres=False: RVT's max_rad as written, so this level is RVT's
     # combined VAT of its own grid.
     composite = cvat.cvat(dem, res, radius_in_metres=False)
     inner = composite[OVERLAP_PX:-OVERLAP_PX, OVERLAP_PX:-OVERLAP_PX]
+    # The unit without its overlap is exactly what `inner` covers.
+    footprint = (
+        worker_coverage(coverage_path).sample(
+            *unit_bbox(z, ux, uy, unit_tiles), unit_tiles * TILE_PX)
+        if z < MASK_ALPHA_BELOW_Z else None
+    )
 
     tiles = []
     for j in range(unit_tiles):
         for i in range(unit_tiles):
-            tile = inner[j * TILE_PX:(j + 1) * TILE_PX, i * TILE_PX:(i + 1) * TILE_PX]
-            blob = encode_tile(tile)
+            rows = slice(j * TILE_PX, (j + 1) * TILE_PX)
+            cols = slice(i * TILE_PX, (i + 1) * TILE_PX)
+            tile = inner[rows, cols]
+            blob = encode_tile(
+                tile, None if footprint is None else footprint[rows, cols])
             if blob is not None:
                 tiles.append((ux * unit_tiles + i, uy * unit_tiles + j, blob))
     return z, ux, uy, tiles
@@ -458,6 +534,12 @@ def settings(levels, unit_tiles):
                 "tile_m": round(tile_span(z), 3),
                 "overlap_m": round(OVERLAP_PX * resolution(z), 3),
                 "radii": cvat.radii_for(resolution(z), radius_in_metres=False),
+                # Per level, and so outside the digest, because it is: the two
+                # rules agree where the DEM's no-data is the flight's edge and
+                # part company where ImageServer answers out of overviews
+                # (`MASK_ALPHA_BELOW_Z`).
+                "alpha": ("footprint mask" if z < MASK_ALPHA_BELOW_Z
+                          else "DEM no-data"),
             }
             for z in levels
         },
@@ -532,7 +614,8 @@ def run_levels(store, project, coverage, levels, unit_tiles=DEFAULT_UNIT_TILES,
             continue
 
         started, tiles = time.perf_counter(), 0
-        work = [(z, ux, uy, unit_tiles, project) for ux, uy in pending]
+        work = [(z, ux, uy, unit_tiles, project, coverage.path)
+                for ux, uy in pending]
         if jobs > 1:
             with ProcessPoolExecutor(max_workers=jobs) as pool:
                 futures = {pool.submit(build_unit, w): w for w in work}

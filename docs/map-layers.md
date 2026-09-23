@@ -80,14 +80,16 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
 - `lidarCvat` has nothing upstream. `vat-cache/makevat.py` runs RVT over an
   acquisition's DTM and writes the combined VAT — hillshade, slope, positive
   openness, sky-view in one picture — as 512 px RGBA WebP on the app's own tile
-  grid, down to z12 (5.289 m/px), into one MBTiles database whose own `metadata`
+  grid, out to z7 (169 m/px), into one MBTiles database whose own `metadata`
   table records the acquisition's name, the levels written for it, the presets,
   the blend order, the per-level radii and the run's digest. How deep
   the ladder goes is the acquisition's own: z16 (0.331 m/px) where hoydedata.no
   publishes a 0.25 m DTM, z15 (0.661 m/px) where it publishes 0.5 m, because
-  below the DEM's cell the picture is of the interpolation. What serves it is
-  the `cvat-tiles` sidecar, turning the URL into one indexed `SELECT` against
-  the acquisition's MBTiles database in the bind-mounted store; no upstream
+  below the DEM's cell the picture is of the interpolation. The coarse end is
+  the same z7 for every flight and is there for a different reason — the
+  coverage hint, below. What serves it is the `cvat-tiles` sidecar, turning the
+  URL into one indexed `SELECT` against the acquisition's MBTiles database in
+  the bind-mounted store; no upstream
   means no wmscache entry, and same-origin means no CSP host. Radii are RVT
   pixels at every level, so an acquisition's levels are related pictures of the
   same terrain rather than one picture at several sizes: the reach of the
@@ -108,13 +110,17 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   the app on the next reload with no deploy and no code change. That manifest is
   not a file: the sidecar surveys the store, reads each database's `metadata`
   for the name and the levels it claims, and takes the envelope off the tiles
-  table — inclusive tile indices at the coarsest level held, flipped from
-  MBTiles' south-origin rows to the app's. So there is no inventory beside the
-  tiles that can disagree with them, and copying a file in is the whole
-  delivery. An install without a store answers an empty `acquisitions` block,
-  which is no cached rows anywhere rather than a dataset that is offered and
-  draws nothing. Levels are per acquisition, so a half-built one draws at the
-  levels it has and nowhere else.
+  table — inclusive tile indices at z12, or at the coarsest level held where a
+  database stops short of it, flipped from MBTiles' south-origin rows to the
+  app's. Coarse, because that is four index lookups instead of a walk of the
+  whole table; but not the coarsest held, because a z7 tile is 86.7 km across
+  and an envelope measured there would round a county-sized flight up to a
+  region (`ENVELOPE_FLOOR_Z` in `cvat-tiles/server.mjs`). So there is no
+  inventory beside the tiles that can disagree with them, and copying a file in
+  is the whole delivery. An install without a store answers an empty
+  `acquisitions` block, which is no cached rows anywhere rather than a dataset
+  that is offered and draws nothing. Levels are per acquisition, so a
+  half-built one draws at the levels it has and nowhere else.
 - **The store stands on its own.** The LiDAR catalogue is asked for and not
   depended on. Where it has a row for the acquisition that row wins, because it
   carries the flight's WMS styles and the manifest cannot know them. Where it
@@ -175,6 +181,26 @@ cartographies), `kartVariants.ts` (the ring, `AMTSKART_CONFIG`),
   names the flight as soon as it lands and `preferredLidarRender()` puts the
   render back on the cache where the store holds it. Where it does not, the
   link resolves to that flight's WMS.
+- **The store draws itself as its own coverage, out where nothing has selected
+  a flight.** `src/map/cvatHintLayer.ts` puts one layer per cached acquisition
+  on the map at zIndex 0.5, over whichever ground is up, and they draw from the
+  store's coarsest level to 1 m/px — `AUTO_ENGAGE_M_PER_PX`, the resolution at
+  which Automatisk starts handing the reader a flight of their own. So the
+  band is roughly z7 to z14, and it ends where the ground itself becomes
+  someone's choice rather than the mosaic. At full strength: the cached VAT and
+  MapProxy's national hillshade are close enough in colour that a faded patch
+  reads as an artefact of the mosaic rather than as a second picture. Nothing is
+  legible at that scale and nothing is meant to be — the patch is there to say
+  *this county has been rendered, come closer*, which is the one thing the app
+  otherwise only told a reader who had already arrived over a flight. It is off
+  in the two-ground views, where the reader has asked for a comparison, and on
+  the LiDAR grounds only; the extent culling and the sparse guard are the ground
+  layer's, since which tiles may be asked for is the same question here. What
+  the patch is shaped like is settled in the build, not here: below z12 a tile's
+  alpha is the acquisition's footprint rather than the DEM's no-data, because
+  hoydedata's coarse overviews fill each mosaic item's rectangle and would
+  otherwise promise a county where the flight is a ravine
+  (`vat-cache/WORK-ORDER.md` §2).
 - Hybrid's `LAYERS` is always the five reference groups
   `kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,fkb_presentasjonsdata` —
   the generalized `kd_*` groups stop around 1:25 000 and the `fkb_*` ones take
@@ -263,9 +289,12 @@ between the curtain and the split costs nothing.
   layer, not only on new ones.
 
 Map z-order, of what is left: backgrounds at the default zIndex 0 (ordered by
-collection position), the terrain-analysis render at 1 (`terrainLayer.ts` — over
-the background it is read against, under the B half so a curtain can still be
-drawn across it), the B half of a two-ground view at 1.5 (`COMPARE_Z`), an open
+collection position), the cached store's coverage hint at 0.5
+(`cvatHintLayer.ts` — over every ground, since it is drawn over whichever one is
+up, and under everything the app draws on top of a ground), the terrain-analysis
+render at 1 (`terrainLayer.ts` — over the background it is read against, under
+the B half so a curtain can still be drawn across it), the B half of a
+two-ground view at 1.5 (`COMPARE_Z`), an open
 lokalitet's drawing at 2 (`src/sketch/overlay.ts` — over the terrain it was
 drawn on, under everything drawn by the app), the LiDAR footprint outlines
 at 3 (`lidarFootprintsLayer.ts`, visible only while the ribbon's dataset menu is

@@ -236,20 +236,27 @@ For **Vestfold og Telemark 5pkt 2021**:
 - **RVT's radii are pixels.** `max_rad` 10 px (general) and 20 px (flat) come to
   5 m and 10 m only on the 0.5 m DEM the templates were calibrated on. The cache
   holds the pixels, so every level is RVT's combined VAT of its own grid.
-- **The ladder is z16 → z12** on the app's shared grid — the DTM is published at
-  0.25 m, and z16 is 0.331 m/px — which is 3 764 / 941 / 313 / 116 / 46 work
-  units of 4×4 tiles.
+- **The ladder is z16 → z7** on the app's shared grid — the DTM is published at
+  0.25 m, and z16 is 0.331 m/px. z16 to z12 is 3 764 / 941 / 313 / 116 / 46 work
+  units of 4×4 tiles, z11 to z7 another 21 / 11 / 5 / 3 / 2. The quartering
+  stops once a unit is wider than the flight — 347 km at z7 — after which a
+  level costs only the one or two units its envelope straddles.
 - **Compute is the constraint at z16 and nowhere else.** A work unit is the same
   2096 px square at every level, so it costs the same 11–13 s wherever it is,
-  fetch included: ~12.5 core-hours for z16 against ~4.5 for the four levels
-  below it.
+  fetch included: ~12.5 core-hours for z16 against ~4.5 for z15 to z12 and
+  minutes for everything below them.
 - **Tiles are RGBA WebP q90.** An opaque alpha channel is free (0.339 B/px
   either way) and a half-covered tile is cheaper (0.153), so alpha is how
-  no-data is stored rather than a grey that would look like ground.
-- **z15 → z12 is under a gigabyte; z16 is three times the rest together.**
+  no-data is stored rather than a grey that would look like ground. Below z12
+  it is the acquisition's footprint mask instead: ImageServer answers a coarse
+  request out of per-item overviews that fill the item's rectangle, so the DEM
+  claims ground the flight never touched — half of a 21 km window at z8 for a
+  0.17 km² ravine survey.
+- **z15 → z7 is under a gigabyte; z16 is three times the rest together.**
   Measured over 40 z15 units: 0.280 B/px on fully covered tiles, 0.259 over
-  covered ground, which puts z15 at 0.66 GB and the four levels at ~0.9 GB
-  against ~25 GB fetched. z16 quadruples the pixels at ~0.89 of the bytes each
+  covered ground, which puts z15 at 0.66 GB and z15 to z12 at ~0.9 GB against
+  ~25 GB fetched; the same quartering five more times puts z11 to z7 in the
+  single-digit megabytes. z16 quadruples the pixels at ~0.89 of the bytes each
   (0.288 and 0.324 B/px against z15's 0.320 and 0.364 on `compare.py`'s two
   sites), so ~2.4 GB more, ~3.3 GB in all, against ~90 GB fetched.
 - **Halving the grid resolves structure, not noise.** That falling bytes-per-

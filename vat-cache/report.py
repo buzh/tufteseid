@@ -44,7 +44,7 @@ def size(nbytes):
 
 
 def level_range(levels):
-    """z16–z12 when the ladder is unbroken, the levels one by one when it is not
+    """z16–z7 when the ladder is unbroken, the levels one by one when it is not
     — a gap in the middle is the thing worth seeing. How deep whole *is* depends
     on the acquisition, so this reads the run rather than assuming a base."""
     if not levels:

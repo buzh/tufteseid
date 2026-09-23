@@ -12,6 +12,7 @@ import { compareLayerAtomEffect } from './compare/atoms.ts';
 import { CompareCurtain } from './compare/CompareCurtain.tsx';
 import { viewModeAtom } from './compare/halves.ts';
 import { SplitPane } from './compare/SplitPane.tsx';
+import { useCvatHintLayer } from './cvatHintLayer.ts';
 import { themeLayerEffect } from './layers/atoms.ts';
 import { backgroundLayerAtomEffect } from './layers/config/backgroundLayers/atoms.ts';
 import { useLidarFootprintsLayer } from './lidarFootprintsLayer.ts';
@@ -29,6 +30,9 @@ export const MapComponent = () => {
   // open — and, whether or not it is, the WFS pass that fills
   // `lidarViewportAtom`, which is what Automatisk and the menu's rows both read.
   useLidarFootprintsLayer();
+  // Where the cached store has already rendered the relief, painted over the
+  // national mosaic out where the mosaic is what the reader is being shown.
+  useCvatHintLayer();
   // The second ground's stack, in a two-ground view: same resolveStack rules as
   // the background effect above, but into its own `cmp.` namespace, which the
   // background swap does not sweep, and into whichever map the view calls for.
