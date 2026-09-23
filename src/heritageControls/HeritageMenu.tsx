@@ -1,9 +1,9 @@
-// What the overlay is made of, behind the chip joined to the button. It appears
-// only while the overlay is on: a filter over nothing is a control the reader
-// has to turn something else on before it means anything.
+// What the overlay is made of, behind the chip joined to the button. It stands
+// whether the overlay is on or off — off, what it sets is what will draw when
+// the reader presses the castle again (`HeritageControlGroup`).
 //
-// Nothing on the chip but the chevron, which makes it the width of the castle
-// beside it and the unit a fixed box. The other chips in the band are readouts
+// Nothing on the chip but the chevron, which makes it a third the width of the
+// castle beside it. The other chips in the band are readouts
 // of a choice the map cannot show — which of five kart variants is drawing, or
 // which flight — but what this menu sets is the overlay itself, and the overlay
 // is right there on the terrain. A chip that named it would be saying a second
@@ -61,6 +61,7 @@ const MAX_TRANSPARENCY = Math.round(100 - MIN_HERITAGE_OPACITY * 100);
 export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
   const { t, i18n } = useTranslation();
   const {
+    shown,
     sources,
     toggleSource,
     sitesShown,
@@ -78,14 +79,18 @@ export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
     themeLayerName(id, i18n.language),
   );
   // The render is a property of kulturminner2 alone, so with that source off it
-  // would name something nobody can see. Say what is drawing instead.
+  // would name something nobody can see. Say what is drawing instead — and with
+  // the overlay off nothing is drawing at all, so the hover says what the menu
+  // is for rather than reading out a selection the reader cannot see.
   const title = [
-    sitesShown
-      ? t('heritageControls.chipTitle', {
-          sources: names.join(', '),
-          render: t(`heritageControls.render.${render}`),
-        })
-      : t('heritageControls.chipSourcesTitle', { sources: names.join(', ') }),
+    !shown
+      ? t('heritageControls.chipHiddenTitle')
+      : sitesShown
+        ? t('heritageControls.chipTitle', {
+            sources: names.join(', '),
+            render: t(`heritageControls.render.${render}`),
+          })
+        : t('heritageControls.chipSourcesTitle', { sources: names.join(', ') }),
     tooFarOut ? t('heritageControls.zoomedOutHint') : null,
   ]
     .filter(Boolean)

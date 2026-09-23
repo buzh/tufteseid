@@ -30,6 +30,19 @@
   outline-offset: 1px;
 }
 
+/* Nothing in the box but the chevron. A chip with no readout in it is not a
+   control standing beside the button it is joined to — it is the handle on that
+   button's menu, and at chip width it read as a second, empty box. A third of
+   the button, centred, with the side padding gone: still `--control-height`
+   tall, so the target is comfortable, but too narrow to be taken for a box of
+   its own. */
+.chipBare {
+  justify-content: center;
+  width: var(--control-chevron-width);
+  padding: 0;
+  overflow: hidden;
+}
+
 /* Something else is holding the pen. Dim at rest so the row says who chose, but
    full strength under the cursor: these still open, and picking a row in one is
    how the reader takes the choice back. */

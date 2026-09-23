@@ -22,9 +22,9 @@ type ControlChipProps = ComponentPropsWithoutRef<'button'> & {
   icon?: MaterialSymbol;
   /**
    * Left off where the icon is the whole readout, or where nothing but the
-   * chevron is — a chip with neither is a fixed box the width of a
-   * `ControlButton`, which is what a menu target next to one should be when the
-   * thing it would report is already on the map.
+   * chevron is. A chip with neither shrinks to a third of a `ControlButton`:
+   * with nothing to report it is not a box of its own but the handle on its
+   * neighbour's menu, and it is drawn at the width of one.
    */
   label?: ReactNode;
   /** Trails the label in the dimmed colour, on the same line. */
@@ -58,26 +58,36 @@ export const ControlChip = ({
   warn = false,
   className,
   ...rest
-}: ControlChipProps) => (
-  <UnstyledButton
-    className={cx(
-      styles.chip,
-      dimmed && styles.chipDimmed,
-      readout && styles.chipReadout,
-      warn && styles.chipWarn,
-      className,
-    )}
-    {...rest}
-  >
-    {icon && <Icon icon={icon} size={18} className={styles.chipIcon} />}
-    {label && <span className={styles.chipLabel}>{label}</span>}
-    {hint && <span className={styles.chipHint}>{hint}</span>}
-    {withChevron && (
-      <Icon
-        icon="keyboard_arrow_down"
-        size={16}
-        className={styles.chipChevron}
-      />
-    )}
-  </UnstyledButton>
-);
+}: ControlChipProps) => {
+  // Derived rather than a prop: it is a fact about what the caller put in the
+  // box, not a style it gets to choose, and a caller that passed the two apart
+  // would be a chevron-wide chip with a label in it.
+  const bare = !icon && !label && !hint;
+
+  return (
+    <UnstyledButton
+      className={cx(
+        styles.chip,
+        bare && styles.chipBare,
+        dimmed && styles.chipDimmed,
+        readout && styles.chipReadout,
+        warn && styles.chipWarn,
+        className,
+      )}
+      {...rest}
+    >
+      {icon && <Icon icon={icon} size={18} className={styles.chipIcon} />}
+      {label && <span className={styles.chipLabel}>{label}</span>}
+      {hint && <span className={styles.chipHint}>{hint}</span>}
+      {withChevron && (
+        // `Icon` writes its size inline, so the narrow box has to be told here
+        // rather than in the stylesheet, where the class would lose to it.
+        <Icon
+          icon="keyboard_arrow_down"
+          size={bare ? 12 : 16}
+          className={styles.chipChevron}
+        />
+      )}
+    </UnstyledButton>
+  );
+};

@@ -43,6 +43,7 @@
     "hide": "Skjul kulturminnene på kartet",
     "chipTitle": "Kulturminner: {{sources}} — {{render}}",
     "chipSourcesTitle": "Kulturminner: {{sources}}",
+    "chipHiddenTitle": "Kulturminner er skjult — velg hva som skal tegnes",
     "zoomedOutHint": "Kulturminnene tegnes først når du zoomer inn",
     "sourcesHead": "Kilder",
     "renderHead": "Visning",

@@ -6,11 +6,15 @@
    other. Global rather than per-module for that reason, and not in the Mantine
    theme because CSS is the only consumer.
 
-   30px is the height of a Mantine `size="xs"` Button; the width is what an
-   icon-only control needs at that height. */
+   30px is the height of a Mantine `size="xs"` Button, and the icon width what
+   an icon-only control needs at that height. The chevron width is a third of
+   that: a chip carrying nothing but the handle on the menu of the button it is
+   joined to, sized so it reads as that handle rather than as a second control.
+   */
 :root {
   --control-height: 30px;
   --control-icon-width: 34px;
+  --control-chevron-width: 12px;
 }
 
 /* A small reset: each surface sets its own margins, sizes and list styling in
