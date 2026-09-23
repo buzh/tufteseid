@@ -1,7 +1,5 @@
-// One circuit breaker per origin: count failures net of successes, and three
-// ahead, stop issuing requests to that origin until a probe says otherwise.
-// A tile this breaker refused is never retried by `tileGuard.ts`, so the way
-// back is `refresh()` on the sources from `onOriginRecovered`.
+// One circuit breaker per origin. A request the breaker refused is never
+// retried, so the way back up is `refresh()` from `onOriginRecovered`.
 
 import { atom, getDefaultStore } from 'jotai';
 import { ORIGIN_IDS, ORIGINS, type OriginId } from './origins';
@@ -14,14 +12,9 @@ const FAIL_WINDOW_MS = 60_000;
 const PROBE_TIMEOUT_MS = 8_000;
 /** Gap before each probe, indexed by `attempts`. */
 const PROBE_BACKOFF_MS = [20_000, 40_000, 80_000, 120_000];
-/**
- * How long an origin has to stay up before the backoff forgets the outage.
- * Damps a flapping service, whose probe can succeed while the screenful behind
- * it still fails.
- */
+/** How long an origin must stay up before the backoff forgets the outage. */
 const HEALTHY_RESET_MS = 60_000;
 
-/** Published only when one of these changes. */
 export type OriginStatus = {
   down: boolean;
   /** Epoch ms of the next automatic probe; null unless down. */
@@ -54,7 +47,7 @@ type Live = OriginStatus & {
   lastFailureAt: number;
   /** Outages and failed probes since the origin was last durably healthy. */
   attempts: number;
-  /** When the origin last became healthy, for the HEALTHY_RESET_MS rule. */
+  /** When the origin last became healthy. */
   okSince: number;
   timer: number | null;
 };
@@ -104,7 +97,6 @@ export const onOriginRecovered = (fn: RecoverListener): void => {
   recoverListeners.add(fn);
 };
 
-/** Whether a request to this origin should be issued at all. */
 export const mayRequest = (id: OriginId): boolean => !live[id].down;
 
 /** Thrown in place of a request that was never made. */
@@ -172,9 +164,8 @@ const recover = (id: OriginId) => {
 };
 
 /**
- * A request to this origin did not produce a picture. Timeouts, decode
- * failures and the WMS rate-limit exception (HTTP 200 with a ServiceException
- * body, see `wmsTileGrid.ts`) all count the same.
+ * Timeouts, decode failures and the WMS rate-limit exception (HTTP 200 with a
+ * ServiceException body, see `wmsTileGrid.ts`) all count the same.
  */
 export const reportFailure = (id: OriginId) => {
   const l = live[id];
@@ -185,10 +176,9 @@ export const reportFailure = (id: OriginId) => {
 };
 
 /**
- * A request to this origin produced something. Pays the failure counter down by
- * one rather than zeroing it: wmscache serves cached tiles straight through an
- * upstream 504, so during an outage hits and failures interleave and a zeroing
- * rule would never trip.
+ * Pays the failure counter down by one rather than zeroing it: wmscache serves
+ * cached tiles straight through an upstream 504, so hits and failures
+ * interleave and a zeroing rule would never trip.
  */
 export const reportSuccess = (id: OriginId) => {
   const l = live[id];
@@ -214,9 +204,8 @@ export const reportStatus = (id: OriginId, status: number) => {
 
 /**
  * A relative URL is answered by wmscache, which serves stale on 503/504, so a
- * probe that matched a stored entry would never see the outage — hence the
- * cache buster. An absolute one goes to the upstream CDN, where a unique key
- * would be a miss on their origin every twenty seconds; `no-store` covers it.
+ * probe matching a stored entry would never see the outage — hence the cache
+ * buster. An absolute one goes to a CDN, where `no-store` is enough.
  */
 const probeUrl = (id: OriginId): string => {
   const url = ORIGINS[id].probeUrl;
@@ -229,8 +218,7 @@ const probe = async (id: OriginId) => {
   l.nextProbeAt = null;
   publish();
   try {
-    // `AbortSignal.timeout` rather than `fetchWithin`: that module imports
-    // this one, and a cycle would buy nothing here.
+    // Not `fetchWithin`: that module imports this one.
     const signal = AbortSignal.timeout(PROBE_TIMEOUT_MS);
     const res = await fetch(probeUrl(id), { signal, cache: 'no-store' });
     // Drained under the same signal: `fetch` resolves on the headers, and an

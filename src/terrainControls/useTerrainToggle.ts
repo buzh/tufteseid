@@ -1,5 +1,4 @@
-// On frames a square to be placed and fetches nothing; the grid is read by
-// `Start` in the box and released by `useTerrainControls`' fetch cleanup.
+// On frames a square to be placed and fetches nothing; Start does the reading.
 
 import { useAtomValue, useSetAtom } from 'jotai';
 import {
@@ -18,5 +17,3 @@ export const useTerrainToggle = () => {
     toggle: () => (on ? closeWindow() : openWindow()),
   };
 };
-
-export type TerrainToggleControls = ReturnType<typeof useTerrainToggle>;

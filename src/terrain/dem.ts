@@ -52,8 +52,7 @@ export type Dem = {
   bbox25833: [number, number, number, number];
   // `bbox25833` grown by DEM_MARGIN_M — what `width × height` spans.
   grid25833: [number, number, number, number];
-  // Where `bbox25833` sits inside the grid, in pixels. Rendering, the
-  // percentile stretches and the stored extent read this, never the margin.
+  // Where `bbox25833` sits inside the grid, in pixels.
   window: { x: number; y: number; width: number; height: number };
   metresPerPx: number;
   // What the finest covering acquisition publishes: equal to metresPerPx unless
@@ -93,9 +92,8 @@ type Coverage = { metresPerPx: number } | 'none' | 'unknown';
 // under, so memoise in-tab.
 const coverageCache = new Map<string, Promise<Coverage>>();
 
-// Finest OPPLOSNING among the acquisitions intersecting the rectangle. Read off
-// the envelope, so an acquisition clipping one corner sets the target for the
-// whole grid.
+// Finest OPPLOSNING among the acquisitions intersecting the rectangle, read off
+// the envelope: one clipping a corner sets the target for the whole grid.
 function probeCoverage(
   model: DemModel,
   bbox25833: [number, number, number, number],
@@ -172,9 +170,8 @@ export async function fetchDem(
     number,
   ];
 
-  // Probed on the rectangle, fetched on the rectangle plus its margin: the
-  // margin must not pull a finer neighbouring acquisition in and resample the
-  // whole grid to a resolution the rectangle has no data for.
+  // Probed on the rectangle, not on the margin: the margin must not pull a
+  // finer neighbouring acquisition in and resample the whole grid.
   const coverage = await probeCoverage(model, bbox25833, signal);
   if (coverage === 'none') return null;
   const nativeMetresPerPx =

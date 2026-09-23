@@ -1,12 +1,7 @@
-// The breaker and the retry, applied to a tile source. Admission and reporting
-// are both here because they have to agree about which requests are real:
-// reading failures off `tileloaderror` would also count the tiles this file
-// refused, holding a quiet origin down on the evidence of its own outage.
-//
-// OpenLayers asks for a tile once, so a dropped request leaves a hole until the
-// page is reloaded; hence the retry. An `<img>` error carries no status, so a
-// 404 meaning "no tile here" is indistinguishable from a 502 — a sparse store
-// passes `retry: false`.
+// The breaker and the retry, applied to a tile source. OpenLayers asks for a
+// tile once, so a dropped request leaves a hole until reload; hence the retry.
+// An `<img>` error carries no status, so a 404 meaning "no tile here" is
+// indistinguishable from a 502 — a sparse store passes `retry: false`.
 
 import { getDefaultStore } from 'jotai';
 import type ImageTile from 'ol/ImageTile';
@@ -27,18 +22,14 @@ import { originForUrl, type OriginId } from './origins';
 /** Stamped on the source so recovery can find it again. */
 const GUARD_PROP = 'upstreamOrigin';
 
-/**
- * Gap before each retry, before jitter. Its length is the retry count: a tile
- * is tried once, then once more per entry here.
- */
+/** Gap before each retry, before jitter; its length is the retry count. */
 const RETRY_DELAY_MS = [400, 900];
 /** Up to this much again, so a failed screenful does not retry in lockstep. */
 const RETRY_JITTER_MS = 300;
 
 /**
- * Tries spent on a tile so far. Keyed by the tile, because `load()` re-enters
- * the loader below with the same tile and a fresh image; weak, because the
- * source disposes its tiles on `refresh()` and `clear()`.
+ * Keyed by the tile because `load()` re-enters the loader below with the same
+ * tile and a fresh image; weak because the source disposes its tiles.
  */
 const attempts = new WeakMap<Tile, number>();
 
@@ -61,8 +52,7 @@ const storePrefix = (template: string): string => {
 
 /**
  * Put `source` behind the retry, and behind the breaker for whichever origin
- * `url` belongs to. A source in no origin row still gets the retry, which is
- * its only recourse — it has no probe and no `refresh()` behind it.
+ * `url` belongs to. A source in no origin row gets the retry only.
  */
 export const guardTileSource = (
   source: TileImage,
@@ -80,8 +70,7 @@ export const guardTileSource = (
 
     if (origin && !mayRequest(origin)) {
       if (heldPrefix !== null && src.startsWith(livePrefix)) {
-        // Neither reported nor counted as an attempt: nothing upstream is being
-        // asked. `refreshSourcesFor` puts the layer back on the live store.
+        // Neither reported nor counted as an attempt: nothing is being asked.
         image.src = heldPrefix + src.slice(livePrefix.length);
         return;
       }
@@ -93,8 +82,7 @@ export const guardTileSource = (
     const attempt = (attempts.get(tile) ?? 0) + 1;
     attempts.set(tile, attempt);
 
-    // Additional to the listeners OpenLayers attaches after this returns; it
-    // still drives the tile's own state.
+    // Additional to the listeners OpenLayers attaches after this returns.
     image.addEventListener(
       'load',
       () => {

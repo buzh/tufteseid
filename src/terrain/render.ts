@@ -23,9 +23,8 @@ export const DEFAULT_Z_FACTOR = 2;
 export const DEFAULT_LRM_RADIUS = 15;
 export const DEFAULT_SVF_RADIUS = 20;
 
-// The views read off one horizon scan: they share a radius and a result, so
-// the first one asked for pays the whole cost. VAT is not among them — its
-// radii are pinned by its presets, so it shares no scan.
+// The views that share one horizon scan, so the first asked for pays the whole
+// cost. VAT is not among them: its radii are pinned by its presets.
 const HORIZON_VIS: readonly Visualization[] = ['svf', 'openPos', 'openNeg'];
 
 export const usesHorizon = (vis: Visualization): boolean =>
@@ -50,8 +49,8 @@ export const radiusRange = (
   return null;
 };
 
-// The radius actually used. Everything that renders or describes a render goes
-// through this, or a caption names a radius the render did not use.
+// The radius actually used; everything that renders or describes a render goes
+// through this.
 export const clampRadius = (
   vis: Visualization,
   dem: Dem,
@@ -118,8 +117,7 @@ export const terrainField = (
   }
 };
 
-// Cut a field computed over the whole grid, margin included, back to the
-// rectangle that was asked for.
+// Cut a field computed over the whole grid back to the rectangle asked for.
 const cropToWindow = (field: Float32Array, dem: Dem): Float32Array => {
   const { x, y, width, height } = dem.window;
   if (width === dem.width && height === dem.height) return field;
@@ -133,7 +131,6 @@ const cropToWindow = (field: Float32Array, dem: Dem): Float32Array => {
   return out;
 };
 
-// Field → pixels, onto `canvas` when one is passed or a fresh one otherwise.
 export const paintTerrainField = (
   rawField: Float32Array,
   dem: Dem,
@@ -161,8 +158,8 @@ export const paintTerrainField = (
   } else if (vis === 'svf' || vis === 'openPos') {
     range = percentileRange(field, 0.02, 0.98);
   } else if (vis === 'openNeg') {
-    // Negative openness is high in a depression, so painted straight it would
-    // put hollows in white where sky-view and slope put them in black.
+    // High in a depression, so painted straight it would put hollows in white
+    // where sky-view and slope put them in black.
     ramp = 'greyInverted';
     range = percentileRange(field, 0.02, 0.98);
   } else if (vis === 'lrm') {
@@ -176,9 +173,8 @@ export const paintTerrainField = (
   return canvas;
 };
 
-// Derived from the window's pixel offsets rather than `dem.bbox25833`: the grid
-// is sized from the bbox width and the margin cropped in whole pixels, so the
-// two differ by up to half a pixel.
+// Off the window's pixel offsets, not `dem.bbox25833`: the margin is cropped in
+// whole pixels, so the two differ by up to half a pixel.
 export const demImageExtent = (dem: Dem): [number, number, number, number] => {
   const [minX, , , maxY] = dem.grid25833;
   const { x, y, width, height } = dem.window;

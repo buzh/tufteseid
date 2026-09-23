@@ -31,12 +31,10 @@ export const MULTI_AZIMUTHS = [
   { azimuth: 90, weight: 2 },
 ];
 
-// Directions the horizon scan walks; it costs width × height × directions ×
-// steps.
+// The scan costs width × height × directions × steps.
 export const SVF_DIRECTIONS = 16;
 
-// Ceiling on the horizon search radius in *steps*, not metres: reach is bought
-// by decimating, not by walking further.
+// Step budget per ray: extra reach is bought by decimating, not walking further.
 export const SVF_MAX_RADIUS_PX = 24;
 
 // Coarsest grid the scan decimates down to, so with the step budget the reach
@@ -46,7 +44,6 @@ export const HORIZON_MIN_M_PER_PX = 1;
 const maxDecimation = (metresPerPx: number): number =>
   Math.max(1, Math.floor(HORIZON_MIN_M_PER_PX / metresPerPx));
 
-// Only as much decimation as the radius asks for, and 1 when it asks for none.
 export const horizonDecimation = (
   metresPerPx: number,
   radiusMetres: number,
@@ -56,8 +53,7 @@ export const horizonDecimation = (
     Math.max(1, Math.ceil(radiusMetres / (metresPerPx * SVF_MAX_RADIUS_PX))),
   );
 
-// Longest horizon search this grid can deliver, in metres. Integer decimation
-// makes it grid-dependent: 21.6 m on a 0.3 m grid.
+// Metres; integer decimation makes it grid-dependent — 21.6 m on a 0.3 m grid.
 export const horizonMaxRadiusMetres = (metresPerPx: number): number =>
   SVF_MAX_RADIUS_PX * metresPerPx * maxDecimation(metresPerPx);
 
@@ -183,9 +179,8 @@ function shadeFromGradients(
   return out;
 }
 
-// Hesse's local relief model: the DEM minus a smoothed copy of itself, in
-// signed metres. `radiusMetres` must be comfortably larger than the features
-// hunted, or the smoothing eats them too.
+// Hesse's local relief model: the DEM minus a smoothed copy, in signed metres.
+// `radiusMetres` must exceed the features hunted or the smoothing eats them.
 export function computeLrm(dem: Dem, radiusMetres: number): Float32Array {
   const radiusPx = Math.max(1, Math.round(radiusMetres / dem.metresPerPx));
   const smooth = boxBlurNaNAware(dem.data, dem.width, dem.height, radiusPx);
@@ -197,8 +192,7 @@ export function computeLrm(dem: Dem, radiusMetres: number): Float32Array {
   return out;
 }
 
-// Three box passes approximate a Gaussian, O(n) each via a running sum. No-data
-// cells contribute nothing rather than dragging their neighbours toward zero.
+// Three box passes approximate a Gaussian; no-data cells contribute nothing.
 function boxBlurNaNAware(
   src: Float32Array,
   w: number,
@@ -229,7 +223,6 @@ function blurAxis(
     const base = horizontal ? o * w : o;
     let sum = 0;
     let count = 0;
-    // Prime the window for position 0.
     for (let i = 0; i <= radius && i < inner; i++) {
       const v = src[base + i * step];
       if (!Number.isNaN(v)) {
@@ -270,9 +263,7 @@ export type HorizonFields = {
 };
 
 // Sky-view factor (Zakšek, Oštir & Kokalj 2011) and Yokoyama's two opennesses:
-// one ray walk read three ways. Scans a decimated copy when the radius asks for
-// more reach than the step budget allows, then interpolates back. Rays start at
-// the first cell, so the radius on the legend is the whole of the reading.
+// one ray walk read three ways.
 export function computeHorizonFields(
   dem: Dem,
   radiusMetres: number,
@@ -291,9 +282,8 @@ export function computeHorizonFields(
   };
 }
 
-// Block mean rather than a subsample: point-sampling a 0.25 m DTM hands the
-// scan that grid's interpolation noise as relief. A block with no readable cell
-// stays NaN.
+// Block mean, not a subsample: point-sampling a 0.25 m DTM hands the scan that
+// grid's interpolation noise as relief.
 function decimate(grid: Grid, factor: number): Grid {
   const w = Math.max(1, Math.ceil(grid.width / factor));
   const h = Math.max(1, Math.ceil(grid.height / factor));
@@ -323,10 +313,8 @@ function decimate(grid: Grid, factor: number): Grid {
   return { width: w, height: h, data, metresPerPx: grid.metresPerPx * factor };
 }
 
-// Bilinear back to the DEM's own grid. Corners with no value drop out of the
-// weighted mean; `mask` is the DEM's own data, cutting the result back to cells
-// that have an elevation — the averaged grid otherwise bleeds up to `factor`
-// pixels into unmeasured ground.
+// Bilinear back to the DEM's own grid. `mask` cuts the result to cells that
+// have an elevation, or the averaged grid bleeds into unmeasured ground.
 function upsample(
   field: Float32Array,
   src: Grid,
@@ -398,8 +386,6 @@ function scanHorizon(
   innerMetres: number,
 ): HorizonFields {
   const { width: w, height: h, data, metresPerPx } = grid;
-  // Clamped again here: `clampRadius` caps the request, but a headless caller
-  // can reach this with any number.
   const radiusPx = Math.min(
     SVF_MAX_RADIUS_PX,
     Math.max(1, Math.round(radiusMetres / metresPerPx)),
@@ -469,9 +455,8 @@ function scanHorizon(
           if (tan > maxTan) maxTan = tan;
           if (tan < minTan) minTan = tan;
         }
-        // 1 - sin(horizon angle). Floored at level ground for sky-view, since a
-        // cell sees at most a hemisphere; openness must not floor, or every
-        // convexity flattens to the same value.
+        // 1 − sin(horizon angle), floored at level ground for sky-view only:
+        // openness must not floor, or every convexity flattens to one value.
         const above = maxTan > 0 ? maxTan : 0;
         sky += 1 - above / Math.hypot(1, above);
         zenith += 90 - Math.atan(maxTan) * toDeg;
@@ -486,14 +471,12 @@ function scanHorizon(
 }
 
 // Visualization for Archaeological Topography (Kokalj & Somrak 2019), as RVT's
-// `rvt/blend.py` defines it. The stretches below are absolute rather than this
-// rectangle's percentiles, which is what makes two VAT renders comparable; RVT
-// ships one parameter set per terrain class because a single absolute set
-// leaves gentle ground inside the middle third of the ramp.
+// `rvt/blend.py` defines it. The stretches are absolute, not this rectangle's
+// percentiles, which is what makes two VAT renders comparable.
 export type VatTerrain = 'general' | 'flat';
 
 export type VatPreset = {
-  /** Degrees above the horizon. The azimuth is frozen for both. */
+  /** Degrees above the horizon. */
   sunAltitude: number;
   /** Degrees; the slope layer's stretch runs 0 to this, inverted. */
   slopeMax: number;
@@ -541,13 +524,10 @@ export const VAT_Z_FACTOR = 1;
 // computed on — mixing resolutions between layers breaks the stretches.
 export const VAT_SCAN_M_PER_PX = 0.5;
 
-// ~3 s for the two scans. Set just clear of the largest rectangle the control
-// can frame (a MAX_SIDE_M square with its margin is 1.20 M cells at the scan
-// resolution), so the ceiling case still reads at 0.5 m.
+// ~3 s for the two scans, and just clear of the largest rectangle the control
+// can frame (1.20 M cells at the scan resolution).
 const VAT_MAX_SCAN_CELLS = 1_250_000;
 
-// Takes metres rather than a `Dem` so a caption can reach the same answer from
-// a stored bbox.
 export const vatDecimation = (
   widthMetres: number,
   heightMetres: number,
@@ -565,12 +545,10 @@ export type VatStackLayer = {
   opacity: number;
 };
 
-// What `composeVat` blends, as data for the legend to print; the compositor
-// does not read it, so the two must be kept in step by hand. Openness is 100 %
-// where RVT's `blender_VAT.json` says 50, matching what RVT performs:
-// `blend_overlay` returns the background array it wrote into, so the caller's
-// opacity mix is a no-op for overlay (multiply allocates, so sky-view's 25 %
-// does apply).
+// What `composeVat` blends, as data to describe a render with; the compositor
+// does not read it, so the two are kept in step by hand. Openness is 100 %
+// where RVT's `blender_VAT.json` says 50, because RVT's `blend_overlay` returns
+// the background array it wrote into and the caller's opacity mix is a no-op.
 export const VAT_STACK: readonly VatStackLayer[] = [
   { vis: 'hillshade', blend: 'normal', opacity: 100 },
   { vis: 'slope', blend: 'luminosity', opacity: 50 },
@@ -630,8 +608,6 @@ export function composeVat(
   return out;
 }
 
-// Both presets on the one grid `vatDecimation` imposes; only the finished
-// composite is interpolated back to the DEM's own resolution.
 export function computeVat(dem: Dem): Float32Array {
   const factor = vatDecimation(
     dem.width * dem.metresPerPx,

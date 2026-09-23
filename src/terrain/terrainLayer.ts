@@ -19,8 +19,7 @@ export type TerrainPlacement = {
 
 let placed: TerrainPlacement | null = null;
 let layer: ImageLayer<ImageCanvasSource> | null = null;
-// Held outside the layer: the transparency slider moves while nothing is up,
-// and the value has to survive to whatever comes back.
+// Held outside the layer: the transparency slider moves while nothing is up.
 let opacity = 1;
 // One viewport-sized output canvas — some 30 MB — reused across frames.
 let out: HTMLCanvasElement | null = null;
@@ -60,9 +59,8 @@ const drawFrame = (
   return out;
 };
 
-// Put the render up, move it, or announce that its pixels changed; `null` takes
-// it down. ImageCanvasSource caches one image, so `changed()` is the only way
-// to invalidate a repaint of the same canvas.
+// `null` takes the render down. ImageCanvasSource caches one image, so
+// `changed()` is the only way to repaint the same canvas.
 export const setTerrainRender = (next: TerrainPlacement | null) => {
   placed = next;
   const map = getDefaultStore().get(mapAtom);

@@ -1,6 +1,5 @@
 // Placing the rectangle by hand, live only while `terrainAdjustingAtom` is set.
-// The square is kept square in EPSG:25833, not in the view's projection, and
-// written back to `terrainWindowAtom` as lon/lat on every frame of a drag.
+// The square is kept square in EPSG:25833, not in the view's projection.
 
 import { useAtomValue, useStore } from 'jotai';
 import { Feature } from 'ol';
@@ -32,8 +31,7 @@ const HANDLE_HIT_PX = 14;
 const FRAME = 'rgba(255, 106, 0, 0.95)';
 const CASING = 'rgba(255, 255, 255, 0.55)';
 
-// The fill is near-invisible on purpose: it is there to make the inside of the
-// square a hit target, not to tint the ground being chosen.
+// The near-invisible fill is a hit target, not a tint on the chosen ground.
 const adjustStyle = [
   new Style({
     stroke: new Stroke({ color: CASING, width: 4 }),
@@ -93,8 +91,7 @@ export const useTerrainWindowAdjust = () => {
     const toView = (c: Coordinate): Coordinate =>
       transform(c, 'EPSG:25833', view);
 
-    /** The rectangle as it stands, in metres; null once it has been taken
-     *  down, which can happen mid-interaction. */
+    /** The rectangle as it stands, in metres; null once it is taken down. */
     const extentNow = (): Metric | null => {
       const bbox = store.get(terrainWindowAtom);
       return bbox ? bboxToMetric(bbox) : null;

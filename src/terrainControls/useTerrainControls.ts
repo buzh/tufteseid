@@ -111,8 +111,6 @@ export const useTerrainControls = () => {
     [dem, horizonVis, horizonRadius],
   );
 
-  // The radius keys this and the horizon memo, so the radius slider commits on
-  // release for the horizon views and streams for LRM's 23 ms blur.
   const staticField = useMemo(
     () => (dem ? terrainStaticField(dem, vis, radius, horizon) : null),
     [dem, vis, radius, horizon],
