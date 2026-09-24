@@ -30,7 +30,7 @@
     "proj4": "^2.22.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-i18next": "^17.0.14",
+    "react-i18next": "^17.0.15",
     "uuid": "^14.0.2"
   },
   "devDependencies": {
