@@ -1,5 +1,10 @@
 import { ActionIcon, Tooltip } from '@mantine/core';
-import { useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
+import {
+  useState,
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { cx } from './cx';
@@ -31,6 +36,8 @@ export type PanelProps = {
   unsaved?: boolean;
   footer?: ReactNode;
   className?: string;
+  /** What a `Hint` or a `Popover.Target` anchors on. */
+  ref?: Ref<HTMLElement>;
   children: ReactNode;
 };
 
@@ -46,6 +53,7 @@ export const Panel = ({
   unsaved = false,
   footer,
   className,
+  ref,
   children,
 }: PanelProps) => {
   const { t } = useTranslation();
@@ -56,7 +64,11 @@ export const Panel = ({
   const closeLabel = t(close.armed ? 'panel.closeUnsaved' : 'panel.close');
 
   return (
-    <section className={cx(styles.panel, className)} aria-label={title}>
+    <section
+      ref={ref}
+      className={cx(styles.panel, className)}
+      aria-label={title}
+    >
       <div
         {...handle}
         className={cx(

@@ -34,7 +34,7 @@ One row per directory under `src/`.
 | `terrain/` | Client-side terrain analysis: DEM fetch, shading, the analysis window and its layers. |
 | `terrainControls/` | The terrain toggle and its panel. |
 | `types/` | Search response types. |
-| `ui/` | The kit: `ControlChip`, `ControlButton`, `ControlUnit`, `Panel`, `Icon`, the Mantine theme, `useConfirm`. |
+| `ui/` | The kit: `ControlChip`, `ControlButton`, `ControlUnit`, `Panel`, `Hint`, `Icon`, the Mantine theme, `useConfirm`. |
 | `upstream/` | Per-origin circuit breaker, the origin registry, and the tile guard that reports to it. |
 | `viewControls/` | The view-mode control: one ground, the curtain, or the split. |
 
@@ -303,6 +303,15 @@ belongs to an arm; one that applies to the reading belongs to the tools.
   `useConfirm`; `handle` makes the title row a drag handle and `actions` puts
   buttons in it, which is what a floating box needs of the shell and all of it
   — the frame itself belongs to the caller.
+- `Hint` floats a tip beside the surface it is about, on a Mantine `Popover`
+  anchored to whatever child takes a ref — `Panel` does. `tips` is a list of
+  lines the caller has already filtered to what applies there, and an empty one
+  means no tip; the wrapper stays in the tree either way, because
+  `Popover.Target` clones its child and dropping it would remount the surface.
+  Waving a tip off puts it away for the page load, ticking the box writes its id
+  to `hintsDismissed.v1` in localStorage. Ids live in the `HINT_IDS` list in
+  `src/ui/hints.ts`; one that leaves the list is dropped on read. The only one
+  so far is `spotKeys`, on `SpotCard`.
 
 ## Known gaps
 
