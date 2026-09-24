@@ -1,6 +1,11 @@
 # Build context is the repo root, for `vat-cache/fetch_dem.py`:
 #   docker compose build rendersvc
-FROM python:3.12-slim
+#
+# 3.11 and not newer: rvt-py 2.2.3 declares `Requires-Python: >=3.6, <3.12`, so
+# pip on 3.12 filters it out of the index entirely and reports it as a version
+# that does not exist. 2.2.1 is the newest that installs there, and the point of
+# reusing RVT is that this is the build `vat-cache/` runs.
+FROM python:3.11-slim
 
 # ffmpeg for libvpx-vp9, DejaVu for the burnt-in legend. The paths the fonts
 # land on are named in legend.py.

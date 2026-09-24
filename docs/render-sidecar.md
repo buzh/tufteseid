@@ -207,6 +207,13 @@ jupyter for an IO layer none of this touches. `requirements.txt` carries what
 `rvt.blend_func` imports at the top even though the sun loop never colours
 anything.
 
+**The base image is `python:3.11-slim` and must stay under 3.12.** rvt-py 2.2.3
+declares `Requires-Python: >=3.6, <3.12`, and pip does not report that as a
+conflict — it drops the release from the index and says no such version exists,
+listing 2.2.1 as the newest there is. Bumping the base image therefore looks
+like an upstream that deleted a release. The pin is 2.2.3 because that is what
+`vat-cache/` runs and what the shading was checked against.
+
 No CSP change: `media-src` falls back to `default-src 'self'`, and both the
 endpoint and the file are same-origin.
 
