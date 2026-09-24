@@ -346,10 +346,10 @@ quirks — `vat-cache/README.md` records the other end of the coupling.
 
 `rvt-py` is installed `--no-deps`: it declares gdal, rasterio, geopandas and
 jupyter for an IO layer none of this touches. `requirements.txt` carries what
-`rvt.vis` actually reaches for, including `scipy<1.15` (it imports
-`scipy.ndimage.morphology`, removed there) and matplotlib, which
-`rvt.blend_func` imports at the top even though the sun loop never colours
-anything.
+`rvt.vis` actually reaches for — numpy, pillow, pyproj and `scipy<1.15` (it
+imports `scipy.ndimage.morphology`, removed there). Not matplotlib: only
+`rvt.blend_func` wants that, `rvt/__init__.py` is a docstring, and the sidecar
+imports `rvt.vis` alone.
 
 **The base image is `python:3.11-slim` and must stay under 3.12.** rvt-py 2.2.3
 declares `Requires-Python: >=3.6, <3.12`, and pip does not report that as a

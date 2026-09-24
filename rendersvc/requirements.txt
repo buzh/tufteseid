@@ -1,11 +1,9 @@
 # rvt-py itself is installed separately, with --no-deps — see the Dockerfile.
-# Everything `rvt.vis` and `rvt.blend_func` actually reach for is here.
+# Everything `rvt.vis` actually reaches for is here — and nothing more: the rest
+# of the package is not imported, so its own dependencies stay out.
 numpy>=2.0
 pillow>=11.0
 # rvt.vis imports scipy.ndimage.morphology, removed in scipy 1.15.
 scipy<1.15
-# Only for rvt.blend_func's colormaps, which the sun loop does not use, but the
-# module imports it at the top.
-matplotlib>=3.7
 # EPSG:4326 -> EPSG:25833, the one thing the stdlib cannot do.
 pyproj>=3.6
