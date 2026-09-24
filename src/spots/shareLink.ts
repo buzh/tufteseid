@@ -22,7 +22,7 @@ import { activeSpotAtom, spotReadingAtom } from './atoms';
 // later read would race the parameter out of existence.
 const bootCode = getUrlParameter('lok');
 
-const shareUrlOf = (code: string): string =>
+export const shareUrlOf = (code: string): string =>
   `${window.location.origin}/l/${code}`;
 
 const LINK_ZOOM = 16;

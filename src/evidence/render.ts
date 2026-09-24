@@ -20,6 +20,7 @@ import {
   terrainField,
   terrainStaticField,
 } from '../terrain/render';
+import { sanitizeFilename } from './filename';
 import { fitImageBlob } from './fit';
 import { fetchFlyfotoRaster } from './flyfotoRaster';
 import { NIB_MOSAIC, type EvidenceSpec } from './spec';
@@ -31,11 +32,6 @@ export type Produced = {
   filename: string;
   meta: EvidenceMeta;
 };
-
-// Filenames end up in a download dialog, so keep them to something a filesystem
-// and a URL both accept.
-const sanitizeFilename = (s: string) =>
-  s.replace(/[^\p{L}\p{N}._-]+/gu, '_').slice(0, 80) || 'bilde';
 
 export const renderEvidence = async (
   spec: EvidenceSpec,

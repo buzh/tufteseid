@@ -15,7 +15,7 @@ One row per directory under `src/`.
 | --- | --- |
 | `api/` | PocketBase singleton (`pocketbase.ts`) and the `spots` and `evidence` collection clients. |
 | `auth/` | OAuth2 dialog, the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
-| `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue, the gallery, the strip that puts the kept renders in order, and the reader that lays them back on the map. |
+| `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue, the gallery, the strip that puts the kept renders in order, the reader that lays them back on the map, and the provenance legend stamped onto a download. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
 | `grounds/` | The ground switch. Which ground is up is derived from the half's background layer, never stored. |
 | `heritageControls/` | The Kulturminner tool: which theme layers are ticked and how they are drawn. |
@@ -256,6 +256,51 @@ opened.
   with it.
 - `Panel` grew `handle` and `actions` for this. Folding is off — moving,
   resizing, docking and closing are enough ways to stop covering something.
+
+## The provenance legend
+
+A stored render is bare pixels. The reader lays that same file back on the
+ground it was made over and the sketch draws on top of it, so a caption burned
+into the file would ride the map and be drawn over. The legend goes on **at the
+door instead** — `stampEvidence` (`src/evidence/stamp.ts`) sits between the
+stored bytes and the bytes that leave, so a downloaded figure comes out in the
+reader's language and the current wording rather than whatever was true when the
+queue ran.
+
+The download is the only door, and it is not behind `mayEdit`: a visitor reading
+somebody else's public spot is exactly who wants a citable figure.
+`useEvidenceDownload` (`download.ts`) is shared by the gallery's per-row button
+and the reader's, which downloads the picture on the ground. One at a time —
+decoding, stamping and re-encoding 2500 px is a second of main-thread work.
+
+`legend.ts` draws it: a band along the bottom edge, every dimension derived from
+the one font size, which is `clamp(11, width / 70, 26)`. A footprint is
+50–500 m and the producers publish between 1 and 0.2 m/px, so a render is
+anywhere from 50 to 2500 px across and the legend has to hold its proportions
+over the whole of that.
+
+- **Line one** is the title in weight 600 and `evidenceFacts` after it, the same
+  list the card and the reader print, with the rectangle's centre in it. Too
+  long for the width, it sheds facts from the end, so the render date goes
+  before the centre does: where the ground is beats when the picture was made.
+- **Below it, two columns.** Left carries the scale bar and, for a public spot,
+  its `/l/<code>`; right carries the rights lines. A left cell pairs with a
+  right one where both fit and goes alone where they do not, so the legend is
+  two lines usually and three where the credit is long. Norge i bilder's holder name
+  is sixty characters and its terms are not CC BY, which is exactly the case
+  that earns the third line.
+- **Rights lines are never shed** and wrap rather than being cut: they are the
+  only part of the legend the licences require. Each names the holder by the part
+  it plays *in this picture* — the same Kartverket is `høydedata` under a
+  terrain render and `skyggerelieff` under a LiDAR extract, and that difference
+  is the statement about who did the visualising. Terrain therefore also carries
+  an authored line, because that one the app made rather than fetched.
+- **A legend over a fifth of the image height is not drawn at all.** National
+  LiDAR over the smallest footprint is 50 px square; a caption covering it would
+  be worse than none.
+- Canvas text does not wait for webfonts, so `ensureLegendFont` loads Mulish 400
+  and 600 before measuring. Without it two figures stamped a second apart come
+  out in different faces.
 
 ## URL parameters
 

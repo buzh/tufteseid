@@ -80,6 +80,10 @@ const terrainFacts = (
 export const evidenceFacts = (
   rec: EvidenceRecord,
   language: string,
+  /** The rectangle's centre, for the surface that has room to say where the
+   *  ground is. Goes before the render date rather than after it because the
+   *  legend sheds from the end, and where beats when. */
+  centre?: string,
 ): string[] => {
   const spec = specOf(rec);
   const facts: string[] = [];
@@ -107,6 +111,8 @@ export const evidenceFacts = (
   if (metresPerPx != null) {
     facts.push(t('evidence.resolution', { m: metresPerPx.toFixed(2) }));
   }
+
+  if (centre) facts.push(centre);
 
   const renderedAt = rec.meta?.renderedAt;
   if (typeof renderedAt === 'string' && renderedAt) {

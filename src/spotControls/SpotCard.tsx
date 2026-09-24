@@ -147,7 +147,7 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
           />
         )}
 
-        <EvidenceGallery evidence={evidence} />
+        <EvidenceGallery spot={spot} evidence={evidence} />
 
         {failed && (
           <Alert color="red" mt="xs" p="xs">

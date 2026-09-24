@@ -22,6 +22,7 @@ import { ControlButton } from '../ui/ControlButton';
 import { Hint } from '../ui/Hint';
 import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
+import { useEvidenceDownload } from './download';
 import styles from './EvidenceReader.module.css';
 import { useEvidenceOverlay } from './evidenceOverlay';
 import { evidenceFacts, evidenceTitle, KIND_ICON } from './labels';
@@ -50,6 +51,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   const mayEdit = useMayEditSpot(spot);
   const { items } = useSpotEvidence(spot);
   const box = useReaderWindow();
+  const file = useEvidenceDownload(spot);
 
   // A row with no pixels or no rectangle cannot be laid on the ground, so it
   // is not part of the reading — the gallery on the card is where it is
@@ -193,6 +195,38 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
           handle={box.dragHandle}
           actions={
             <>
+              {/* Of the picture being read, not of the spot: the reading is one
+                  render at a time, and the one on the ground is the one worth
+                  citing. */}
+              {current && (
+                <Tooltip
+                  label={t(
+                    file.failedId === current.id
+                      ? 'evidence.downloadFailed'
+                      : file.busyId === current.id
+                        ? 'evidence.downloading'
+                        : 'evidence.download',
+                  )}
+                >
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    size="sm"
+                    aria-label={t('evidence.download')}
+                    disabled={file.busyId != null}
+                    onClick={() => file.download(current)}
+                  >
+                    <Icon
+                      icon={
+                        file.busyId === current.id
+                          ? 'hourglass_top'
+                          : 'download'
+                      }
+                      size={18}
+                    />
+                  </ActionIcon>
+                </Tooltip>
+              )}
               {/* The reading stands in for the card, so without this the
                   card's own edit button is behind a close that reads as
                   leaving the spot altogether. The draft returns here when it

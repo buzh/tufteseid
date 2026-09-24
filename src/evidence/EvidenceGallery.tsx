@@ -6,8 +6,10 @@ import { Alert, Button, Group, Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 
 import { evidenceFileUrl, type EvidenceRecord } from '../api/evidence';
+import type { SpotRecord } from '../api/spots';
 import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
+import { useEvidenceDownload } from './download';
 import styles from './EvidenceGallery.module.css';
 import { evidenceResolution, evidenceTitle, KIND_ICON } from './labels';
 import type { RenderState } from './queue';
@@ -18,12 +20,18 @@ const EvidenceItem = ({
   record,
   state,
   mayEdit,
+  downloading,
+  downloadFailed,
+  onDownload,
   onRetry,
   onRemove,
 }: {
   record: EvidenceRecord;
   state: RenderState | undefined;
   mayEdit: boolean;
+  downloading: boolean;
+  downloadFailed: boolean;
+  onDownload: () => void;
   onRetry: () => void;
   onRemove: () => void;
 }) => {
@@ -67,6 +75,26 @@ const EvidenceItem = ({
         </div>
         {note && <div className={styles.note}>{note}</div>}
       </div>
+      {/* Not behind `mayEdit`: a visitor reading somebody else's public spot is
+          exactly who wants a citable figure out of it. */}
+      {thumb && (
+        <Tooltip
+          label={translate(
+            downloadFailed
+              ? 'evidence.downloadFailed'
+              : downloading
+                ? 'evidence.downloading'
+                : 'evidence.download',
+          )}
+        >
+          <ControlButton
+            icon={downloading ? 'hourglass_top' : 'download'}
+            aria-label={translate('evidence.download')}
+            disabled={downloading}
+            onClick={onDownload}
+          />
+        </Tooltip>
+      )}
       {mayEdit && state === 'failed' && (
         <Tooltip label={translate('evidence.retry')}>
           <ControlButton
@@ -89,9 +117,16 @@ const EvidenceItem = ({
   );
 };
 
-export const EvidenceGallery = ({ evidence }: { evidence: SpotEvidence }) => {
+export const EvidenceGallery = ({
+  spot,
+  evidence,
+}: {
+  spot: SpotRecord;
+  evidence: SpotEvidence;
+}) => {
   const { t: translate } = useTranslation();
   const { items, offers, mayEdit, mayKeep } = evidence;
+  const file = useEvidenceDownload(spot);
 
   // Nothing kept, nothing to keep and no say in it: a heading over an empty box
   // tells a visitor only that the feature exists.
@@ -140,6 +175,9 @@ export const EvidenceGallery = ({ evidence }: { evidence: SpotEvidence }) => {
               record={record}
               state={evidence.stateOf(record.id)}
               mayEdit={mayEdit}
+              downloading={file.busyId === record.id}
+              downloadFailed={file.failedId === record.id}
+              onDownload={() => file.download(record)}
               onRetry={() => evidence.retry(record)}
               onRemove={() => evidence.remove(record.id)}
             />

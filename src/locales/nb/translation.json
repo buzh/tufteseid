@@ -49,6 +49,25 @@
       "zFactor": "{{z}}× overdrivelse",
       "radius": "Radius {{m}} m",
       "rendered": "Laget {{date}}"
+    },
+    "download": "Last ned med kildeopplysninger",
+    "downloading": "Lager fila …",
+    "downloadFailed": "Fikk ikke lastet ned bildet.",
+    "figure": {
+      "app": "Tufteseid",
+      "role": {
+        "hoydedata": "høydedata",
+        "ortofoto": "ortofoto",
+        "visualisering": "visualisering"
+      },
+      "terms": {
+        "ccby": "CC BY 4.0",
+        "nib": "fri bruk privat, ikke-kommersielt"
+      },
+      "rights": {
+        "line": "{{role}}: © {{holder}} ({{terms}})",
+        "authors": "{{author}} og {{app}}"
+      }
     }
   },
   "flyfotoControls": {
