@@ -16,6 +16,7 @@ import { Icon } from '../ui/Icon';
 import { draftGroundAtom } from './draftGround';
 import styles from './EvidenceStrip.module.css';
 import {
+  coverOf,
   evidenceLabel,
   isVideoEvidence,
   KIND_ICON,
@@ -119,9 +120,7 @@ export const EvidenceStrip = ({ spot }: { spot: SpotRecord }) => {
   if (items === null || items.length === 0) return null;
 
   const rows = drag ? moved(items, drag.from, drag.to) : items;
-  // The reading opens on a picture laid on the ground, so the cover is the
-  // first row that can be one — not simply the first.
-  const cover = rows.find(laysOnGround)?.id;
+  const cover = coverOf(rows)?.id;
 
   return (
     <div className={styles.strip}>

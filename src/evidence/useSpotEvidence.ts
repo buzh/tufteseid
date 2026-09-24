@@ -53,7 +53,7 @@ export type SpotEvidence = {
   retry: (rec: EvidenceRecord) => void;
   remove: (id: string) => void;
   /** Move a row to `to`, an index into `items` as it stands. The reading opens
-   *  on the first row with pixels, so this is also how a cover is chosen. */
+   *  on the cover (`coverOf`), so this is also how a cover is chosen. */
   reorder: (id: string, to: number) => void;
   /**
    * Where a row stands, by one rule. A row that has pixels has no state at

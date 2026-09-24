@@ -157,11 +157,13 @@ editor (`src/evidence/EvidenceStrip.tsx`) is where that order is changed.
 On the card the same rows are a gallery, because reading them is flipping
 through them and editing them is deciding what they are a sequence of.
 
-- **The cover is the first row with pixels.** Nothing marks one: the reading
-  opens on the first row it can lay on the ground, so dragging a picture to the
-  top is how a cover is chosen, and the star says which one is. `laysOnGround`
-  (`evidence/labels.ts`) is the test, and a sun loop fails it — the overlay is an
-  `ImageStatic` and a video is not one.
+- **The cover is the first readable row.** Nothing marks one: the reading opens
+  on it, so dragging a picture to the top is how a cover is chosen, and the star
+  says which one is. `coverOf` (`evidence/labels.ts`) is the single authority
+  both surfaces ask, and a sun loop passes — the reading plays a loop in its own
+  box rather than laying it on the ground. `laysOnGround`, in the same module,
+  answers the narrower question the sketch ground and the strip's picker ask,
+  and a video fails it: the overlay is an `ImageStatic` and a video is not one.
 - A drop writes one row. `sortForMove` (`evidence/order.ts`) takes the midpoint
   between the row's new neighbours, so nothing else moves; a row dropped last
   takes the current time instead, or a picture kept a moment later would sort

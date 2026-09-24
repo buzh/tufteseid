@@ -50,6 +50,13 @@ export const isVideoEvidence = (rec: EvidenceRecord): boolean =>
 export const laysOnGround = (rec: EvidenceRecord): boolean =>
   isReadable(rec) && !isVideoEvidence(rec);
 
+/** The row the reading opens on, and the one the strip stars. Readable is the
+ *  whole test, not `laysOnGround`: a loop plays in the reader's own box, so a
+ *  sun loop is as good a thing to open on as a still. */
+export const coverOf = (
+  rows: readonly EvidenceRecord[],
+): EvidenceRecord | null => rows.find(isReadable) ?? null;
+
 export const downloadLabel = (state: {
   downloading: boolean;
   failed: boolean;

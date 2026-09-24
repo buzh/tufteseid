@@ -21,6 +21,7 @@ import { useEvidenceDownload } from './download';
 import styles from './EvidenceReader.module.css';
 import { useEvidenceOverlay } from './evidenceOverlay';
 import {
+  coverOf,
   downloadLabel,
   evidenceFacts,
   evidenceLabel,
@@ -60,9 +61,12 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   // Held by id, not by index: a render landing or a row being deleted
   // reshuffles the list under the reader.
   const [shownId, setShownId] = useState<string | null>(null);
+  // Nothing flipped to yet, or the row that was is gone: the cover, which is
+  // the row the strip stars.
+  const shown = shownId ?? coverOf(readable)?.id;
   const index = Math.max(
     0,
-    readable.findIndex((rec) => rec.id === shownId),
+    readable.findIndex((rec) => rec.id === shown),
   );
   const current = readable[index] ?? null;
 
