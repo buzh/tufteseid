@@ -22,7 +22,7 @@ import { formatPoint } from '../spots/geo';
 import styles from './SpotBox.module.css';
 import type { SpotDraftController } from './useSpotDraft';
 
-export const SpotPanel = ({
+export const SpotEditor = ({
   spot,
   record,
 }: {

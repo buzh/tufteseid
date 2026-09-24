@@ -24,7 +24,7 @@ import { useSpotShareLink } from '../spots/shareLink';
 import { useSpotLayer } from '../spots/spotLayer';
 import { useSpotRecords } from '../spots/spotRecords';
 import { SpotCard } from './SpotCard';
-import { SpotPanel } from './SpotPanel';
+import { SpotEditor } from './SpotEditor';
 import { SpotPlacePrompt } from './SpotPlacePrompt';
 import { useSpotDraft } from './useSpotDraft';
 
@@ -45,7 +45,7 @@ const SpotDraftBox = () => {
   // Editing leaves the open spot where it was, and a draft is only ever opened
   // on the open one; the guard is against a record the draft is not about.
   const record = active?.id === draft?.recordId ? active : null;
-  return <SpotPanel spot={spot} record={record} />;
+  return <SpotEditor spot={spot} record={record} />;
 };
 
 export const SpotSurface = () => {
@@ -102,7 +102,7 @@ export const SpotSurface = () => {
         </Suspense>
       )}
       {placing && <SpotPlacePrompt />}
-      {/* One box at a time: the draft panel and the card share a corner, and
+      {/* One box at a time: the editor and the card share a corner, and
           the reader stands in for the card. Keyed on the spot so opening a
           second does not inherit the first's confirm. */}
       {draft ? (

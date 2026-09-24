@@ -1,4 +1,4 @@
-/* Shared by `SpotPlacePrompt`, `SpotPanel` and `SpotCard`; never two at once.
+/* Shared by `SpotPlacePrompt`, `SpotEditor` and `SpotCard`; never two at once.
    Placement and width only — the shell is `Panel`. */
 .panel {
   position: absolute;

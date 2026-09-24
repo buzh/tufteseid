@@ -29,7 +29,7 @@ One row per directory under `src/`.
 | `search/` | Kartverket place, address, road, property and elevation lookups. One function has a live caller. |
 | `shared/` | Error boundary, URL parameter access, coordinate parsing, enum and number helpers, and the request deadline that reports to the breaker. |
 | `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the pen, and the render onto the ground. |
-| `spotControls/` | The reader's records as surfaces: the `+`, the draft panel, the read card, the index menu. |
+| `spotControls/` | The reader's records as surfaces: the `+`, the editor, the read card, the index menu. |
 | `spots/` | Spot state and geometry: the pin layer and its style, the footprint frame, hit test, place and adjust, share link, name suggestion. |
 | `terrain/` | Client-side terrain analysis: DEM fetch, shading, the analysis window and its layers. |
 | `terrainControls/` | The terrain toggle and its panel. |
@@ -152,7 +152,7 @@ the tile guard and the theme-layer effect walk whatever maps exist.
 
 A spot's `evidence` rows are a sequence, not a set. `sort` is an ordering key in
 epoch milliseconds, so a row lands last by being created, and the strip in the
-draft box (`src/evidence/EvidenceStrip.tsx`) is where that order is changed.
+editor (`src/evidence/EvidenceStrip.tsx`) is where that order is changed.
 On the card the same rows are a gallery, because reading them is flipping
 through them and editing them is deciding what they are a sequence of.
 
