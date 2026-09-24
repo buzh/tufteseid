@@ -45,6 +45,10 @@ export const Hint = ({
       onChange={(next) => {
         if (!next) close(id, forever);
       }}
+      // A tip is put away on purpose, with the button. Mantine's click-outside
+      // fires on `mousedown`, so the first frame of a pan would otherwise take
+      // it off the screen before it had been read.
+      closeOnClickOutside={false}
       position={position}
       width={260}
       shadow="md"
