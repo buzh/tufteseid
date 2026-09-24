@@ -22,8 +22,9 @@ type Side = 'left' | 'right' | 'top' | 'bottom';
 
 type Size = { width: number; height: number };
 
-/** How big the box may get, never how big it is. */
-type Ceiling = { maxWidth: number; maxHeight: number };
+/** How big the box may get, never how big it is. Absent means the layout's own
+ *  ceiling stands: only the grip sets one of these. */
+type Ceiling = { maxWidth?: number; maxHeight?: number };
 
 type Placement = Ceiling & {
   /** The wall it is stuck to, or null for a box standing free. */
@@ -48,10 +49,10 @@ const MIN_HEIGHT = 140;
  *  A dock is flush with that gap, not with the pixel. */
 const GUTTER = 10;
 
-/** A side dock may be this much of the map across. Shoving the wide bar
- *  against a side wall would otherwise leave a column half the map. */
-const DOCK_SHARE = 1 / 3;
-
+/** A wall implies a shape: down the side is a column, along the top or the
+ *  bottom a bar. That shape is all a dock is besides the anchor — the layout's
+ *  own ceilings are what make a column narrow, so the dock keeps none of its
+ *  own and drops any the grip had set. */
 const LAYOUT_OF: Record<Side, ReaderLayout> = {
   left: 'tall',
   right: 'tall',
@@ -114,44 +115,14 @@ const wallCrossed = (
   return past[worst] > 0 ? worst : null;
 };
 
-/** Flush against one wall. The ceiling is the wall's length, so the box grows
- *  along it as far as it has content to grow and no further. */
-const dockedTo = (
-  side: Side,
-  at: { left: number; top: number },
-  ceiling: Ceiling,
-  within: Bounds,
-): Placement => {
-  const down = within.height - 2 * GUTTER;
-  const across = within.width - 2 * GUTTER;
-  if (side === 'left' || side === 'right') {
-    return {
-      side,
-      left: GUTTER,
-      top: GUTTER,
-      maxWidth: between(
-        Math.min(ceiling.maxWidth, within.width * DOCK_SHARE),
-        MIN_WIDTH,
-        across,
-      ),
-      maxHeight: Math.max(down, MIN_HEIGHT),
-    };
-  }
-  return {
-    side,
-    // A bar keeps the run it was dragged to; only the edge it sits on is the
-    // dock. Pinning it to a corner as well would move it sideways under the
-    // hand that put it there.
-    left: at.left,
-    top: GUTTER,
-    maxWidth: between(ceiling.maxWidth, MIN_WIDTH, across),
-    maxHeight: between(
-      Math.min(ceiling.maxHeight, within.height * DOCK_SHARE),
-      MIN_HEIGHT,
-      down,
-    ),
-  };
-};
+/** Flush against one wall, in the shape that wall asks for. A column is
+ *  pinned to the top of its side; a bar keeps the run it was dragged to,
+ *  because pinning that too would slide it out from under the hand that put
+ *  it there. */
+const dockedTo = (side: Side, at: { left: number; top: number }): Placement =>
+  side === 'left' || side === 'right'
+    ? { side, left: GUTTER, top: GUTTER }
+    : { side, left: at.left, top: GUTTER };
 
 /** A dock pins the axis it is a wall of; the other keeps its corner. */
 const styleOf = (placed: Placement): CSSProperties => ({
@@ -192,9 +163,10 @@ export const useReaderWindow = () => {
     [setLayoutAtom, setPlacement],
   );
 
-  // A window resized under the box leaves a free one off the map and a docked
-  // one short of its wall — as does one resized between two readings, hence
-  // the pass on mount too.
+  // A window resized under the box leaves it off the map — as does one resized
+  // between two readings, hence the pass on mount too. A dock survives it: the
+  // wall it names is an anchor, not a number, and the corner a bar keeps along
+  // its edge is clamped here with everything else.
   useEffect(() => {
     const onResize = () => {
       const box = boxRef.current;
@@ -202,11 +174,9 @@ export const useReaderWindow = () => {
       if (!box || !parent) return;
       const within = boundsOf(parent);
       const size = rectOf(box, parent);
-      setPlacement((was) => {
-        if (!was) return null;
-        if (was.side) return dockedTo(was.side, was, was, within);
-        return { ...was, ...inside(was.left, was.top, size, within) };
-      });
+      setPlacement((was) =>
+        was ? { ...was, ...inside(was.left, was.top, size, within) } : null,
+      );
     };
     onResize();
     window.addEventListener('resize', onResize);
@@ -231,11 +201,12 @@ export const useReaderWindow = () => {
         mode,
         at: { left: rect.left, top: rect.top },
         size: rect,
-        // A ceiling already set is kept: a box dragged about should not lose
-        // the room it was given because its content is not using all of it.
+        // A ceiling the grip has set is kept across a move; one it has not is
+        // not invented here, or a box would freeze at the size the reading it
+        // was dragged in happened to need.
         ceiling: {
-          maxWidth: placement?.maxWidth ?? rect.width,
-          maxHeight: placement?.maxHeight ?? rect.height,
+          maxWidth: placement?.maxWidth,
+          maxHeight: placement?.maxHeight,
         },
         within: boundsOf(parent),
         x: event.clientX,
@@ -280,11 +251,11 @@ export const useReaderWindow = () => {
       setPlacement({ side: null, ...pushed, ...ceiling });
       return;
     }
-    // A wall implies a shape: down the side is a column, along the top or the
-    // bottom a bar. Switching here rather than on release is the preview.
+    // The shape is the dock, as much as the anchor is: switching the layout
+    // here rather than on release is what makes the wall a preview of it. Any
+    // ceiling the grip had set goes with it — the layout brings its own.
     setLayoutAtom(LAYOUT_OF[side]);
-    const onMap = inside(pushed.left, pushed.top, size, within);
-    setPlacement(dockedTo(side, onMap, ceiling, within));
+    setPlacement(dockedTo(side, inside(pushed.left, pushed.top, size, within)));
   };
 
   const end = (event: ReactPointerEvent<HTMLElement>) => {

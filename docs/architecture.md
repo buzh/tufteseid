@@ -176,22 +176,24 @@ an edge, and `tall`, a column down one. Both live in atoms outside the
 component, because the reader is keyed on the spot and remounts when another is
 opened.
 
-- **Nothing gives the box a size.** It is `width: max-content` under a ceiling,
+- **Nothing gives the box a size.** It is `width: max-content` under ceilings,
   so it shrink-wraps its content in both axes: a reading of three pictures with
-  no prose gets a box that small, and a layout, a dock and the grip all set
-  ceilings rather than sizes. The grip therefore only ever makes the box
-  *smaller* than its content — which is what it is for, since the prose and the
+  no prose gets a box that small. The ceilings are the layout's own — 46rem by
+  60 % for the bar, 23rem by the full height for the column — and the grip is
+  the only thing that ever sets another. It therefore only ever makes the box
+  *smaller* than its content, which is what it is for, since the prose and the
   strip scroll.
-- Until the box has been moved or resized the layout's own CSS places it. The
-  first gesture takes over with an inline corner and ceiling, and `.placed`
-  switches the CSS anchors off; choosing a layout drops the placement again,
-  which is also the way back from a box left somewhere unhelpful.
-- **Pushing a box through a wall docks it there**: flush at the gutter, with
-  the wall's length for a ceiling and at most a third of the map across. A wall
-  implies a shape, so a dock sets the layout too — down the side is a column,
-  along the top or the bottom a bar. A side dock pins the top corner; a top or
-  bottom dock keeps the run it was dragged to, so it does not slide sideways
-  under the hand that put it there.
+- Until the box has been moved or resized the layout's own CSS places it too.
+  The first gesture takes over with an inline corner, and `.placed` switches
+  the CSS anchors off; choosing a layout drops the placement again, which is
+  also the way back from a box left somewhere unhelpful.
+- **Pushing a box through a wall docks it there**: flush at the gutter, in the
+  shape that wall asks for. The shape is as much of the dock as the anchor is —
+  down the side is a column, along the top or the bottom a bar — and the layout
+  is what makes a column narrow, so a dock carries no ceiling of its own and
+  drops any the grip had set. A side dock pins the top corner; a top or bottom
+  dock keeps the run it was dragged to, so it does not slide sideways under the
+  hand that put it there.
 - The dock is why a dragged box is *not* clamped: crossing a wall is the ask,
   and the dock puts the box back inside the map, so nothing ever ends up off
   it. Everything else is clamped — a resize, a window resized under the box,
