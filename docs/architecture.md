@@ -81,7 +81,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
 | `keepOffersAtom` | same | Derived: the ground's offer (off the A half) and the terrain's, ground first. |
-| `readerLayoutAtom` | `evidence/readerWindow.ts` | Which way round the reading box is laid out, and beside it the frame it was dragged or resized to. Outside the component, which remounts per spot. |
+| `readerLayoutAtom` | `evidence/readerWindow.ts` | Which way round the reading box is laid out, and beside it where it was dragged to and which wall it is docked against. Outside the component, which remounts per spot. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |
 | `isSignedInAtom`, `isAdminAtom` | same | Derived, so a component does not re-render on an unrelated user field. |
@@ -172,21 +172,28 @@ holds the ground still and changes only how it was seen.
 
 The box floats (`src/evidence/readerWindow.ts`). It is dragged by its title row
 and resized from the corner grip, and it has two layouts: `wide`, a bar along
-the bottom, and `tall`, a column down the right. Both live in atoms outside the
+an edge, and `tall`, a column down one. Both live in atoms outside the
 component, because the reader is keyed on the spot and remounts when another is
 opened.
 
 - Until the box has been moved or resized the layout's own CSS places it. The
   first gesture materialises a frame in map pixels and `.placed` switches the
   anchor off; choosing a layout drops the frame again, which is also the way
-  back from a box dragged somewhere unhelpful.
-- A frame is clamped wholly inside the map, on every move and whenever the
-  window is resized under it. There is no way to put the box out of reach.
+  back from a box left somewhere unhelpful.
+- **Pushing a box through a wall docks it there**: flush at the gutter, filling
+  that side, at most a third of the map thick. A wall implies a shape, so a
+  dock sets the layout too — down the side is a column, along the top or the
+  bottom a bar. Dragging back off the wall lets go; the box keeps the size the
+  dock gave it.
+- The dock is why a dragged frame is *not* clamped: crossing a wall is the ask,
+  and the dock puts the box back inside the map, so nothing ever ends up off
+  it. Everything else is clamped — a resize, a window resized under the box,
+  and the pass on mount that catches a window resized between two readings.
 - The fit on entering the reading pads for the layout the box opens in, and
   never runs again: a box moved out of the way afterwards must not move the map
   with it.
 - `Panel` grew `handle` and `actions` for this. Folding is off — moving,
-  resizing and closing are enough ways to stop covering something.
+  resizing, docking and closing are enough ways to stop covering something.
 
 ## URL parameters
 

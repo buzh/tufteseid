@@ -10,19 +10,43 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 
-/** `wide` is a bar along the bottom, `tall` a column down the side. */
+/** `wide` is a bar along an edge, `tall` a column down one. */
 export type ReaderLayout = 'wide' | 'tall';
 
+type Side = 'left' | 'right' | 'top' | 'bottom';
+
 type Frame = { left: number; top: number; width: number; height: number };
+
+type Placement = {
+  /** What the box is laid out at, in map pixels. */
+  frame: Frame;
+  /** The wall it is stuck to, or null for a box standing free. */
+  side: Side | null;
+};
 
 export const readerLayoutAtom = atom<ReaderLayout>('wide');
 
 /** Null until the box has been moved or resized: until then the layout's own
  *  CSS places it, so a reading opens where the layout says it should. */
-const readerFrameAtom = atom<Frame | null>(null);
+const readerPlacementAtom = atom<Placement | null>(null);
 
 const MIN_WIDTH = 260;
 const MIN_HEIGHT = 140;
+
+/** `--mantine-spacing-xs`, the gap every box on the map keeps from the edge.
+ *  A dock is flush with that gap, not with the pixel. */
+const GUTTER = 10;
+
+/** A docked box eats at most this much of the map across. Shoving the wide
+ *  bar against a side wall would otherwise leave a column half the map. */
+const DOCK_SHARE = 1 / 3;
+
+const LAYOUT_OF: Record<Side, ReaderLayout> = {
+  left: 'tall',
+  right: 'tall',
+  top: 'wide',
+  bottom: 'wide',
+};
 
 type Bounds = { width: number; height: number };
 
@@ -61,6 +85,68 @@ const clamped = (frame: Frame, within: Bounds): Frame => {
   };
 };
 
+/** How far past each wall a frame reaches. Nothing positive means it is still
+ *  inside the map. */
+const overshoot = (frame: Frame, within: Bounds): Record<Side, number> => ({
+  left: -frame.left,
+  top: -frame.top,
+  right: frame.left + frame.width - within.width,
+  bottom: frame.top + frame.height - within.height,
+});
+
+/** The wall a frame has been pushed hardest through, if any. Pushing through
+ *  is the whole gesture: a box at rest keeps the gutter, so no ordinary nudge
+ *  can reach a wall by accident. */
+const wallCrossed = (frame: Frame, within: Bounds): Side | null => {
+  const past = overshoot(frame, within);
+  const worst = (Object.keys(past) as Side[]).reduce((a, b) =>
+    past[b] > past[a] ? b : a,
+  );
+  return past[worst] > 0 ? worst : null;
+};
+
+/** What the box brought with it, but never more than its share of the map and
+ *  never less than the reading needs. */
+const thickness = (want: number, room: number, least: number): number =>
+  Math.min(
+    Math.max(Math.min(want, room * DOCK_SHARE), least),
+    room - 2 * GUTTER,
+  );
+
+/** Flush against one wall and filling it. */
+const dockedTo = (side: Side, from: Frame, within: Bounds): Frame => {
+  if (side === 'left' || side === 'right') {
+    const width = thickness(from.width, within.width, MIN_WIDTH);
+    return clamped(
+      {
+        width,
+        height: within.height - 2 * GUTTER,
+        top: GUTTER,
+        left: side === 'left' ? GUTTER : within.width - GUTTER - width,
+      },
+      within,
+    );
+  }
+  const height = thickness(from.height, within.height, MIN_HEIGHT);
+  return clamped(
+    {
+      height,
+      width: within.width - 2 * GUTTER,
+      left: GUTTER,
+      top: side === 'top' ? GUTTER : within.height - GUTTER - height,
+    },
+    within,
+  );
+};
+
+const settled = (placement: Placement, within: Bounds): Placement =>
+  placement.side
+    ? {
+        side: placement.side,
+        frame: dockedTo(placement.side, placement.frame, within),
+      }
+    : { side: null, frame: clamped(placement.frame, within) };
+
 type Gesture = {
   mode: 'move' | 'resize';
   from: Frame;
@@ -71,32 +157,33 @@ type Gesture = {
 
 export const useReaderWindow = () => {
   const [layout, setLayoutAtom] = useAtom(readerLayoutAtom);
-  const [frame, setFrame] = useAtom(readerFrameAtom);
+  const [placement, setPlacement] = useAtom(readerPlacementAtom);
   const boxRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
 
-  // Choosing a layout is also the way back: a box dragged somewhere unhelpful
-  // is put right by asking for the shape it should have had.
+  // Choosing a layout is also the way back: a box docked or dragged somewhere
+  // unhelpful is put right by asking for the shape it should have had.
   const setLayout = useCallback(
     (next: ReaderLayout) => {
       setLayoutAtom(next);
-      setFrame(null);
+      setPlacement(null);
     },
-    [setLayoutAtom, setFrame],
+    [setLayoutAtom, setPlacement],
   );
 
-  // A window narrowed under a placed box would leave it off the map — as
-  // would one narrowed between two readings, hence the pass on mount too.
+  // A window resized under the box leaves a free one off the map and a docked
+  // one short of its wall — as does one resized between two readings, hence
+  // the pass on mount too.
   useEffect(() => {
     const onResize = () => {
       const box = boxRef.current;
       const within = box && boundsOf(box);
-      if (within) setFrame((was) => (was ? clamped(was, within) : null));
+      if (within) setPlacement((was) => (was ? settled(was, within) : null));
     };
     onResize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, [setFrame]);
+  }, [setPlacement]);
 
   const start =
     (mode: Gesture['mode']) => (event: ReactPointerEvent<HTMLElement>) => {
@@ -120,8 +207,11 @@ export const useReaderWindow = () => {
         y: event.clientY,
       };
       // Take the placement over from the CSS now rather than on the first
-      // move, or the box jumps by whatever the two disagree about.
-      setFrame(clamped(from, within));
+      // move, or the box jumps by whatever the two disagree about. A press
+      // that never turns into a drag leaves an existing dock alone.
+      setPlacement(
+        (was) => was ?? { side: null, frame: clamped(from, within) },
+      );
     };
 
   const move = (event: ReactPointerEvent<HTMLElement>) => {
@@ -130,20 +220,37 @@ export const useReaderWindow = () => {
     const { from, within } = held;
     const dx = event.clientX - held.x;
     const dy = event.clientY - held.y;
-    setFrame(
-      clamped(
-        held.mode === 'move'
-          ? { ...from, left: from.left + dx, top: from.top + dy }
-          : {
-              ...from,
-              // Capped against the corner it is dragged from, not the map, or
-              // growing past the edge would shove the box sideways.
-              width: Math.min(from.width + dx, within.width - from.left),
-              height: Math.min(from.height + dy, within.height - from.top),
-            },
-        within,
-      ),
-    );
+
+    if (held.mode === 'resize') {
+      setPlacement({
+        side: null,
+        frame: clamped(
+          {
+            ...from,
+            // Capped against the corner it is dragged from, not the map, or
+            // growing past the edge would shove the box sideways.
+            width: Math.min(from.width + dx, within.width - from.left),
+            height: Math.min(from.height + dy, within.height - from.top),
+          },
+          within,
+        ),
+      });
+      return;
+    }
+
+    // Unclamped on purpose: a frame pushed through a wall is what asks for the
+    // dock, and a docked frame is inside the map again, so nothing ever ends
+    // up off it.
+    const pushed = { ...from, left: from.left + dx, top: from.top + dy };
+    const side = wallCrossed(pushed, within);
+    if (!side) {
+      setPlacement({ side: null, frame: pushed });
+      return;
+    }
+    // A wall implies a shape: down the side is a column, along the top or the
+    // bottom a bar. Switching here rather than on release is the preview.
+    setLayoutAtom(LAYOUT_OF[side]);
+    setPlacement({ side, frame: dockedTo(side, pushed, within) });
   };
 
   const end = (event: ReactPointerEvent<HTMLElement>) => {
@@ -165,9 +272,10 @@ export const useReaderWindow = () => {
     layout,
     setLayout,
     boxRef,
-    /** Moved or resized, so the layout's anchor no longer applies. */
-    placed: frame !== null,
-    frameStyle: frame ?? undefined,
+    /** Moved, resized or docked, so the layout's own anchor no longer
+     *  applies. */
+    placed: placement !== null,
+    frameStyle: placement?.frame,
     dragHandle: handlers('move'),
     resizeHandle: handlers('resize'),
   };

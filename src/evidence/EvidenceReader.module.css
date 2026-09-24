@@ -14,7 +14,8 @@
   min-height: 0;
 }
 
-/* A bar along the bottom, wide enough that the strip reads as a strip. */
+/* A bar, starting along the bottom, wide enough that the strip reads as a
+   strip. A bottom or top dock is this shape too. */
 .wide {
   left: 50%;
   bottom: var(--mantine-spacing-xs);
@@ -23,8 +24,8 @@
   max-height: 60%;
 }
 
-/* A column down the right, the corner the card it stands in for uses
-   (`spotControls/SpotBox.module.css`). */
+/* A column, starting down the right — the corner the card it stands in for
+   uses (`spotControls/SpotBox.module.css`). A side dock is this shape too. */
 .tall {
   top: var(--mantine-spacing-xs);
   right: var(--mantine-spacing-xs);
@@ -40,8 +41,9 @@
   }
 }
 
-/* Moved or resized, so the inline frame is the whole placement. Last, because
-   it has to beat both layouts and the query above at equal specificity. */
+/* Moved, resized or docked, so the inline frame is the whole placement. Last,
+   because it has to beat both layouts and the query above at equal
+   specificity. */
 .placed {
   right: auto;
   bottom: auto;
