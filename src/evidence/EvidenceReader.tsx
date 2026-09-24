@@ -14,8 +14,9 @@ import type { SpotRecord } from '../api/spots';
 import { mapAtom } from '../map/atoms';
 import { sketchOf } from '../sketch/scene';
 import { SketchFade } from '../sketch/SketchFade';
-import { spotReadingAtom } from '../spots/atoms';
+import { editSpotDraftAtom, spotReadingAtom } from '../spots/atoms';
 import { formatPoint } from '../spots/geo';
+import { useMayEditSpot } from '../spots/mayEdit';
 import { cx } from '../ui/cx';
 import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
@@ -42,6 +43,8 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   const { t, i18n } = useTranslation();
   const map = useAtomValue(mapAtom);
   const setReading = useSetAtom(spotReadingAtom);
+  const edit = useSetAtom(editSpotDraftAtom);
+  const mayEdit = useMayEditSpot(spot);
   const { items } = useSpotEvidence(spot);
   const box = useReaderWindow();
 
@@ -160,17 +163,35 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
         }
         handle={box.dragHandle}
         actions={
-          <Tooltip label={otherLabel}>
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              aria-label={otherLabel}
-              onClick={() => box.setLayout(other)}
-            >
-              <Icon icon={LAYOUT_ICON[other]} size={18} />
-            </ActionIcon>
-          </Tooltip>
+          <>
+            {/* The reading stands in for the card, so without this the card's
+                own edit button is behind a close that reads as leaving the
+                spot altogether. The draft returns here when it is put down. */}
+            {mayEdit && (
+              <Tooltip label={t('spots.edit')}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="sm"
+                  aria-label={t('spots.edit')}
+                  onClick={() => edit(spot)}
+                >
+                  <Icon icon="edit" size={18} />
+                </ActionIcon>
+              </Tooltip>
+            )}
+            <Tooltip label={otherLabel}>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="sm"
+                aria-label={otherLabel}
+                onClick={() => box.setLayout(other)}
+              >
+                <Icon icon={LAYOUT_ICON[other]} size={18} />
+              </ActionIcon>
+            </Tooltip>
+          </>
         }
         // The box moves, resizes and closes; folding it away as well would be
         // a fourth way to make it stop covering something.

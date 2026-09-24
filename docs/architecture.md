@@ -174,7 +174,14 @@ holds the ground still and changes only how it was seen.
   nothing left in it steps back to the card.
 - `/l/<code>` opens the reading rather than the card: a link is an invitation to
   read. The view move is the reader's then, and `shareLink.ts` keeps its hands
-  off.
+  off. The code goes back onto the URL for whatever spot is open, so a reload
+  lands in the reading too.
+- Because the reading stands in for the card, it carries the card's edit button
+  as well, on the same `mayEdit` (`src/spots/mayEdit.ts`). Otherwise the only
+  way to an owner's own edit is a close that reads as leaving the spot. A draft
+  opened from the reading returns to it: `editSpotDraftAtom` leaves
+  `readingSpotIdAtom` alone, and `spotReadingAtom` is false only for as long as
+  the draft is up.
 
 The box floats (`src/evidence/readerWindow.ts`). It is dragged by its title row
 and resized from the corner grip, and it has two layouts: `wide`, a bar along

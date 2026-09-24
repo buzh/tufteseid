@@ -1,10 +1,9 @@
 import { Alert, Button, Group, Switch, Tooltip } from '@mantine/core';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useSetAtom } from 'jotai';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { deleteSpot, updateSpot, type SpotRecord } from '../api/spots';
-import { currentUserAtom, isAdminAtom } from '../auth/atoms';
 import { EvidenceGallery } from '../evidence/EvidenceGallery';
 import { evidenceBbox } from '../evidence/spec';
 import { useSpotEvidence } from '../evidence/useSpotEvidence';
@@ -16,6 +15,7 @@ import {
   spotReadingAtom,
 } from '../spots/atoms';
 import { formatPoint } from '../spots/geo';
+import { useMayEditSpot } from '../spots/mayEdit';
 import { copyShareLink } from '../spots/shareLink';
 import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
@@ -36,8 +36,7 @@ const COPIED_MS = 2000;
 
 export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   const { t } = useTranslation();
-  const user = useAtomValue(currentUserAtom);
-  const isAdmin = useAtomValue(isAdminAtom);
+  const mayEdit = useMayEditSpot(spot);
   const setActive = useSetAtom(activeSpotAtom);
   const edit = useSetAtom(editSpotDraftAtom);
   const setReading = useSetAtom(spotReadingAtom);
@@ -53,9 +52,6 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   const [deleting, setDeleting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState<Failure | null>(null);
-
-  // Owner or admin, matching what the server enforces on update and delete.
-  const mayEdit = user != null && (user.id === spot.owner || isAdmin);
 
   useEffect(() => {
     if (!copied) return;
