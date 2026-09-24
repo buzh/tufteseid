@@ -3,6 +3,7 @@
 
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { terrainOfferAtom } from '../evidence/offer';
 import { bboxWidthMetres, type Bbox } from '../map/bbox';
 import { fetchDem, type Dem, type DemModel } from '../terrain/dem';
 import {
@@ -21,13 +22,14 @@ import {
 } from '../terrain/render';
 import { computeHorizonFields, type Visualization } from '../terrain/shade';
 import { setTerrainOpacity, setTerrainRender } from '../terrain/terrainLayer';
+import { releaseSpotFootprintAtom } from '../spots/atoms';
 import {
   adjustTerrainWindowAtom,
   closeTerrainWindowAtom,
   terrainAdjustingAtom,
   terrainWindowAtom,
 } from '../terrain/window';
-import { useTerrainWindowAdjust } from '../terrain/windowAdjust';
+import { useRectangleAdjust } from '../map/rectAdjust';
 
 // Stamped with what it was a fetch of: a cleanup runs after the render that
 // caused it, so one pass sees a new rectangle against the previous result.
@@ -44,8 +46,14 @@ export const useTerrainControls = () => {
   const setAdjusting = useSetAtom(terrainAdjustingAtom);
   const adjustWindow = useSetAtom(adjustTerrainWindowAtom);
   const closeWindow = useSetAtom(closeTerrainWindowAtom);
+  const releaseFootprint = useSetAtom(releaseSpotFootprintAtom);
+  const setTerrainOffer = useSetAtom(terrainOfferAtom);
 
-  useTerrainWindowAdjust();
+  useRectangleAdjust({
+    rectAtom: terrainWindowAtom,
+    activeAtom: terrainAdjustingAtom,
+    layerId: 'terrainAdjustLayer',
+  });
 
   const [model, setModel] = useState<DemModel>('dtm');
   const [result, setResult] = useState<DemResult | null>(null);
@@ -148,21 +156,46 @@ export const useTerrainControls = () => {
     setTerrainOpacity(opacity / 100);
   }, [opacity]);
 
+  // `radius` goes out clamped: that is the distance the reading on screen was
+  // made at.
+  useEffect(() => {
+    setTerrainOffer(
+      dem && field
+        ? { kind: 'terrain', vis, model, azimuth, altitude, zFactor, radius }
+        : null,
+    );
+  }, [
+    dem,
+    field,
+    vis,
+    model,
+    azimuth,
+    altitude,
+    zFactor,
+    radius,
+    setTerrainOffer,
+  ]);
+
   // The layer and the atoms outlive this hook, so an unmount would leave a
-  // render and a frame on the map with nothing to work them.
+  // render and a frame on the map with nothing to work them, and an offer to
+  // keep an analysis nobody is running.
   useEffect(
     () => () => {
       setTerrainRender(null);
+      setTerrainOffer(null);
       closeWindow();
     },
-    [closeWindow],
+    [closeWindow, setTerrainOffer],
   );
 
   return {
     on: bbox !== null,
     adjusting,
     start: useCallback(() => setAdjusting(false), [setAdjusting]),
-    adjust: adjustWindow,
+    adjust: useCallback(() => {
+      releaseFootprint();
+      adjustWindow();
+    }, [releaseFootprint, adjustWindow]),
     close: closeWindow,
     /** Metres on a side: off the grid where there is one, else the rectangle. */
     sideMetres: dem

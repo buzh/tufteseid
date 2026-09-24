@@ -1,0 +1,111 @@
+.strip {
+  margin-top: var(--mantine-spacing-sm);
+  border-top: 1px solid var(--mantine-color-default-border);
+  padding-top: var(--mantine-spacing-xs);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-dimmed);
+}
+
+.hint {
+  margin-top: 2px;
+  font-size: calc(var(--mantine-font-size-xs) - 1px);
+  line-height: 1.35;
+  color: var(--mantine-color-dimmed);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--mantine-spacing-xs);
+  padding: 0;
+  list-style: none;
+}
+
+/* Every row the same height, or the slots a drag measures at the press would
+   move under it. That is what keeps the thumbnail box fixed and the title on
+   one line. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lifted {
+  opacity: 0.45;
+}
+
+/* `touch-action: none`, or a drag down the list scrolls the box instead. */
+.handle {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--mantine-color-dimmed);
+  cursor: grab;
+  touch-action: none;
+}
+
+.handle:active {
+  cursor: grabbing;
+}
+
+.pick {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  padding: 4px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pick:disabled {
+  cursor: default;
+}
+
+.picked {
+  border-color: var(--mantine-color-papaya-6);
+}
+
+.thumb {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--mantine-radius-xs);
+  background: var(--mantine-color-anthracite-6);
+  object-fit: cover;
+}
+
+.pending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mantine-color-dimmed);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--mantine-font-size-xs);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cover {
+  display: flex;
+  color: var(--mantine-color-papaya-5);
+}

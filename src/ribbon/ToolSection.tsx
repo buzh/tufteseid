@@ -7,6 +7,7 @@ import { HeritageControlGroup, useHeritageControls } from '../heritageControls';
 import { SpotControlGroup } from '../spotControls';
 import { TerrainToggle } from '../terrainControls';
 import styles from './Ribbon.module.css';
+import { ShareButton } from './ShareButton';
 import { UpstreamStatus } from './UpstreamStatus';
 
 export const ToolSection = () => {
@@ -17,6 +18,7 @@ export const ToolSection = () => {
       <HeritageControlGroup heritage={heritage} />
       <TerrainToggle />
       <SpotControlGroup />
+      <ShareButton />
       <AuthButton />
       <UpstreamStatus />
     </Group>

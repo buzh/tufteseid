@@ -5,10 +5,13 @@ import { createSpot, updateSpot, type SpotRecord } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
 import { SKETCH_BUDGET_BYTES, sketchBytes } from '../sketch/scene';
 import { sketchNow } from '../sketch/session';
+import { bboxWidthMetres } from '../map/bbox';
 import {
   activeSpotAtom,
+  clearSpotFootprintAtom,
   closeSpotDraftAtom,
   setSpotStageAtom,
+  spotFootprintAtom,
   spotFormAtom,
   spotSketchAtom,
   type SpotDraft,
@@ -28,6 +31,8 @@ export type SpotDraftController = {
   suggesting: boolean;
   stage: SpotDraft['stage'];
   setStage: (stage: SpotDraft['stage']) => void;
+  footprintSideMetres: number | null;
+  clearFootprint: () => void;
   hasSketch: boolean;
   saving: boolean;
   saveError: boolean;
@@ -44,7 +49,9 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
   const user = useAtomValue(currentUserAtom);
   const [form, setForm] = useAtom(spotFormAtom);
   const sketch = useAtomValue(spotSketchAtom);
+  const footprint = useAtomValue(spotFootprintAtom);
   const setStage = useSetAtom(setSpotStageAtom);
+  const clearFootprint = useSetAtom(clearSpotFootprintAtom);
   const closeDraft = useSetAtom(closeSpotDraftAtom);
   const setActive = useSetAtom(activeSpotAtom);
 
@@ -61,6 +68,7 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
   const [opened, setOpened] = useState({
     name: form.name,
     description: form.description,
+    footprint,
     sketch,
   });
 
@@ -113,6 +121,7 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
   const dirty =
     form.name !== opened.name ||
     form.description !== opened.description ||
+    footprint !== opened.footprint ||
     sketch !== opened.sketch;
 
   const save = useCallback(() => {
@@ -135,6 +144,7 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
       name,
       description: form.description,
       point: draft.point,
+      footprint,
       sketch: drawing,
     };
 
@@ -164,6 +174,7 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
     form.description,
     draft.point,
     draft.recordId,
+    footprint,
     sketch,
     setActive,
     closeDraft,
@@ -178,6 +189,10 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
     suggesting,
     stage: draft.stage,
     setStage,
+    footprintSideMetres: footprint
+      ? Math.round(bboxWidthMetres(footprint))
+      : null,
+    clearFootprint,
     hasSketch: (sketch?.elements.length ?? 0) > 0,
     saving,
     saveError,

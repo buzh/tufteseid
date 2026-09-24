@@ -1,0 +1,64 @@
+.gallery {
+  margin-top: var(--mantine-spacing-sm);
+  border-top: 1px solid var(--mantine-color-default-border);
+  padding-top: var(--mantine-spacing-xs);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-dimmed);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--mantine-spacing-xs);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  padding: 4px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+}
+
+/* Fixed box so a row's height does not depend on whether its pixels have
+   landed. The thumbnail is square; a stitch of the footprint rarely is. */
+.thumb {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--mantine-radius-xs);
+  background: var(--mantine-color-anthracite-6);
+  object-fit: cover;
+}
+
+.pending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mantine-color-dimmed);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--mantine-font-size-xs);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.note {
+  font-size: calc(var(--mantine-font-size-xs) - 1px);
+  color: var(--mantine-color-dimmed);
+}

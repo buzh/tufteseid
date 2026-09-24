@@ -16,13 +16,13 @@ import {
   removeUrlParameter,
   setUrlParameter,
 } from '../shared/utils/urlUtils';
-import { activeSpotAtom } from './atoms';
+import { activeSpotAtom, spotReadingAtom } from './atoms';
 
 // Read at import: the writer effect below deletes `lok` on first render, so a
 // later read would race the parameter out of existence.
 const bootCode = getUrlParameter('lok');
 
-const shareUrlOf = (code: string): string =>
+export const shareUrlOf = (code: string): string =>
   `${window.location.origin}/l/${code}`;
 
 const LINK_ZOOM = 16;
@@ -32,6 +32,7 @@ export const useSpotShareLink = () => {
   const user = useAtomValue(currentUserAtom);
   const active = useAtomValue(activeSpotAtom);
   const setActive = useSetAtom(activeSpotAtom);
+  const setReading = useSetAtom(spotReadingAtom);
   const setAuthDialogOpen = useSetAtom(isAuthDialogOpenAtom);
   const setAuthPrompt = useSetAtom(authPromptAtom);
 
@@ -53,6 +54,9 @@ export const useSpotShareLink = () => {
         unresolved.current = null;
         settled.current = true;
         setActive(record);
+        // `EvidenceReader` steps back to the card for a spot with nothing to
+        // read.
+        setReading(true);
       })
       .catch(() => {
         if (!live) return;
@@ -73,14 +77,23 @@ export const useSpotShareLink = () => {
     return () => {
       live = false;
     };
-  }, [user, setActive, setAuthDialogOpen, setAuthPrompt]);
+  }, [user, setActive, setReading, setAuthDialogOpen, setAuthPrompt]);
+
+  // Read by the centring effect below without being one of its dependencies:
+  // `EvidenceReader` fits the footprint when a reading opens, and leaving one
+  // must not move the view at all.
+  const reading = useAtomValue(spotReadingAtom);
+  const readingNow = useRef(reading);
+  useEffect(() => {
+    readingNow.current = reading;
+  }, [reading]);
 
   // Keyed on the id: re-centring on every field change would fight a reader
   // panning around their own spot.
   const activeId = active?.id ?? null;
   const activePoint = active?.point;
   useEffect(() => {
-    if (!activeId || !activePoint) return;
+    if (!activeId || !activePoint || readingNow.current) return;
     const view = map.getView();
     view.animate({
       center: transform(
@@ -105,9 +118,13 @@ export const useSpotShareLink = () => {
 };
 
 /** Returns whether the clipboard took it. */
-export const copyShareLink = async (spot: SpotRecord): Promise<boolean> => {
+export const copyShareLink = async (
+  spot: SpotRecord | null,
+): Promise<boolean> => {
   try {
-    await navigator.clipboard.writeText(shareUrlOf(spot.code));
+    await navigator.clipboard.writeText(
+      spot ? shareUrlOf(spot.code) : window.location.href,
+    );
     return true;
   } catch {
     return false;

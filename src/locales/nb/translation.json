@@ -11,6 +11,65 @@
     "providersError": "Fikk ikke kontakt med innloggingstjenesten.",
     "noProviders": "Ingen innloggingsmåter er satt opp på denne installasjonen."
   },
+  "evidence": {
+    "label": "Bilder",
+    "read": "Les",
+    "loading": "Henter bilder …",
+    "needsFootprint": "Marker et utsnitt på lokaliteten for å kunne ta vare på bilder av den.",
+    "keep": "Ta vare på {{what}}",
+    "kept": "{{what}} er tatt vare på",
+    "rendering": "lager bildet …",
+    "renderFailed": "kilden svarte ikke",
+    "renderEmpty": "ingen dekning over utsnittet",
+    "resolution": "{{m}} m/px",
+    "unreadable": "Ukjent bilde",
+    "retry": "Prøv igjen",
+    "remove": "Slett bildet",
+    "open": "Åpne bildet i full oppløsning",
+    "failed": "Fikk ikke hentet eller lagret bildene.",
+    "position": "{{index}} av {{total}}",
+    "previous": "Forrige bilde (←)",
+    "next": "Neste bilde (→)",
+    "layout": {
+      "wide": "Legg boksen nederst",
+      "tall": "Legg boksen til høyre"
+    },
+    "order": {
+      "label": "Rekkefølge",
+      "hint": "Dra i håndtaket for å endre rekkefølgen. Det første bildet er forsiden. Trykk på et bilde for å legge det på kartet og tegne oppå det.",
+      "move": "Dra for å flytte bildet (↑↓)",
+      "cover": "Forsidebilde — lesingen åpner her",
+      "ground": "Legg bildet på kartet og tegn oppå det",
+      "groundOff": "Ta bildet av kartet"
+    },
+    "facts": {
+      "year": "Opptak {{year}}",
+      "sun": "Sol {{azimuth}}°/{{altitude}}°",
+      "altitude": "Solhøyde {{altitude}}°",
+      "zFactor": "{{z}}× overdrivelse",
+      "radius": "Radius {{m}} m",
+      "rendered": "Laget {{date}}"
+    },
+    "download": "Last ned med kildeopplysninger",
+    "downloading": "Lager fila …",
+    "downloadFailed": "Fikk ikke lastet ned bildet.",
+    "figure": {
+      "app": "Tufteseid",
+      "role": {
+        "hoydedata": "høydedata",
+        "ortofoto": "ortofoto",
+        "visualisering": "visualisering"
+      },
+      "terms": {
+        "ccby": "CC BY 4.0",
+        "nib": "fri bruk privat, ikke-kommersielt"
+      },
+      "rights": {
+        "line": "{{role}}: © {{holder}} ({{terms}})",
+        "authors": "{{author}} og {{app}}"
+      }
+    }
+  },
   "flyfotoControls": {
     "mosaic": "Beste mosaikk",
     "mosaicShort": "Mosaikk · nyeste",
@@ -68,6 +127,13 @@
       "uavklart": "Uavklart vernestatus"
     }
   },
+  "hints": {
+    "title": "Tips",
+    "never": "Ikke vis igjen",
+    "close": "Greit",
+    "sketch": "Trykk T for å vise eller skjule tegningen.",
+    "pictures": "Piltastene ← → blar i bildene."
+  },
   "kartControls": {
     "chipTitle": "{{variant}} — {{hint}}",
     "historicHint": "Eldre kartverk, tegnet før 1900-tallet endret landskapet.",
@@ -89,7 +155,6 @@
   "kulturminner": {
     "title_one": "Kulturminne",
     "title_other": "{{count}} kulturminner",
-    "linkNeedsAccount": "Lenken peker til en lokalitet du må være innlogget for å se — eller som ikke finnes.",
     "laster": "Henter …",
     "klikkForDetaljer": "Klikk for detaljer",
     "flereHer_one": "+ 1 til her",
@@ -188,7 +253,9 @@
       "only": "Underlag",
       "left": "Underlag, venstre halvdel",
       "right": "Underlag, høyre halvdel"
-    }
+    },
+    "shareSpot": "Kopier lenke til lokaliteten",
+    "shareView": "Kopier lenke til visningen"
   },
   "shared": {
     "errorBoundary": {
@@ -217,12 +284,14 @@
     "sketchPresent": "Tegning lagt ved",
     "sketchNone": "Ingen tegning",
     "sketchTooBig": "Tegningen er for stor til å lagres. Fjern noen elementer og prøv igjen.",
+    "sketchShow": "Vis tegningen (T)",
+    "sketchHide": "Skjul tegningen (T)",
+    "sketchFade": "Tegningens transparens",
     "credit": "Lagt inn av {{name}}",
     "public": "Offentlig",
     "publicHint": "Alle med lenken kan se lokaliteten.",
-    "copyLink": "Kopier lenke",
     "copied": "Lenke kopiert",
-    "copyFailed": "Fikk ikke kopiert lenken.",
+    "copyFailed": "Fikk ikke kopiert lenken",
     "edit": "Rediger",
     "delete": "Slett",
     "deleteConfirm": "Bekreft sletting",
@@ -241,7 +310,14 @@
       "empty": "Du har ingen lokaliteter ennå. Trykk + for å lage en.",
       "filterPlaceholder": "Søk i navn og beskrivelse",
       "noMatch": "Ingen treff på «{{query}}»"
-    }
+    },
+    "footprint": "Utsnitt",
+    "footprintStart": "Marker området lokaliteten dekker",
+    "footprintStop": "Ferdig med utsnittet",
+    "footprintNone": "Ingen utsnitt",
+    "footprintSide": "{{metres}} m · dra rektangelet, hjørnene endrer størrelsen",
+    "footprintClear": "Fjern",
+    "linkNeedsAccount": "Lenken peker til en lokalitet du må være innlogget for å se — eller som ikke finnes."
   },
   "terrainControls": {
     "label": "Terrenganalyse",

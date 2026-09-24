@@ -10,15 +10,20 @@ type Grid = {
   metresPerPx: number;
 };
 
-export type Visualization =
-  | 'hillshade'
-  | 'multiHillshade'
-  | 'vat'
-  | 'svf'
-  | 'openPos'
-  | 'openNeg'
-  | 'lrm'
-  | 'slope';
+// A list rather than a bare union so a stored row can be validated against it:
+// `evidence/spec.ts` reads a visualization back out of untyped JSON.
+export const VISUALIZATIONS = [
+  'hillshade',
+  'multiHillshade',
+  'vat',
+  'svf',
+  'openPos',
+  'openNeg',
+  'lrm',
+  'slope',
+] as const;
+
+export type Visualization = (typeof VISUALIZATIONS)[number];
 
 // Three quadrants only, peaking at 315°: spanning the full circle at equal
 // weight cancels the directional term and collapses the blend to a slope map.

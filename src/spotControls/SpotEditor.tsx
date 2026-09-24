@@ -8,7 +8,12 @@ import {
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 
-import { SPOT_DESCRIPTION_MAX, SPOT_NAME_MAX } from '../api/spots';
+import {
+  SPOT_DESCRIPTION_MAX,
+  SPOT_NAME_MAX,
+  type SpotRecord,
+} from '../api/spots';
+import { EvidenceStrip } from '../evidence/EvidenceStrip';
 import { cx } from '../ui/cx';
 import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
@@ -17,9 +22,18 @@ import { formatPoint } from '../spots/geo';
 import styles from './SpotBox.module.css';
 import type { SpotDraftController } from './useSpotDraft';
 
-export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {
+export const SpotEditor = ({
+  spot,
+  record,
+}: {
+  spot: SpotDraftController;
+  /** The saved spot the draft is editing, or null for one being made: what the
+   *  pictures and the link hang off. */
+  record: SpotRecord | null;
+}) => {
   const { t } = useTranslation();
   const placing = spot.stage === 'pin';
+  const framing = spot.stage === 'footprint';
   const drawing = spot.stage === 'sketch';
 
   return (
@@ -81,6 +95,34 @@ export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {
       </div>
 
       <Group gap="xs" mt="xs" justify="space-between">
+        <Tooltip
+          label={framing ? t('spots.footprintStop') : t('spots.footprintStart')}
+        >
+          <ControlButton
+            icon="crop_free"
+            on={framing}
+            aria-label={t('spots.footprint')}
+            aria-pressed={framing}
+            onClick={() => spot.setStage(framing ? 'pin' : 'footprint')}
+          />
+        </Tooltip>
+        <span className={styles.coordsText}>
+          {spot.footprintSideMetres == null
+            ? t('spots.footprintNone')
+            : t('spots.footprintSide', { metres: spot.footprintSideMetres })}
+        </span>
+        {spot.footprintSideMetres != null && (
+          <Button
+            size="compact-xs"
+            variant="default"
+            onClick={spot.clearFootprint}
+          >
+            {t('spots.footprintClear')}
+          </Button>
+        )}
+      </Group>
+
+      <Group gap="xs" mt="xs" justify="space-between">
         <Tooltip label={drawing ? t('spots.drawStop') : t('spots.drawStart')}>
           <ControlButton
             icon="draw"
@@ -94,6 +136,8 @@ export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {
           {spot.hasSketch ? t('spots.sketchPresent') : t('spots.sketchNone')}
         </span>
       </Group>
+
+      {record && <EvidenceStrip spot={record} />}
 
       {spot.sketchTooBig && (
         <Alert color="red" mt="xs" p="xs">

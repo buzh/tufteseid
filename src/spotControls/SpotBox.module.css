@@ -1,4 +1,4 @@
-/* Shared by `SpotPlacePrompt`, `SpotPanel` and `SpotCard`; never two at once.
+/* Shared by `SpotPlacePrompt`, `SpotEditor` and `SpotCard`; never two at once.
    Placement and width only — the shell is `Panel`. */
 .panel {
   position: absolute;
@@ -70,4 +70,8 @@
   margin-top: var(--mantine-spacing-xs);
   font-size: var(--mantine-font-size-xs);
   color: var(--mantine-color-dimmed);
+}
+
+.sketchFade {
+  margin-top: var(--mantine-spacing-xs);
 }

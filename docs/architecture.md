@@ -13,27 +13,28 @@ One row per directory under `src/`.
 
 | Directory | Owns |
 | --- | --- |
-| `api/` | PocketBase singleton (`pocketbase.ts`) and the `spots` collection client. |
+| `api/` | PocketBase singleton (`pocketbase.ts`) and the `spots` and `evidence` collection clients. |
 | `auth/` | OAuth2 dialog, the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
+| `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue, the gallery, the strip that puts the kept renders in order, the reader that lays them back on the map, and the provenance legend stamped onto a download. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
 | `grounds/` | The ground switch. Which ground is up is derived from the half's background layer, never stored. |
 | `heritageControls/` | The Kulturminner tool: which theme layers are ticked and how they are drawn. |
 | `heritageInfo/` | The pointer tip and the click-kept card over heritage features, plus the OL overlay they ride. |
 | `kartControls/` | The Kart arm: which cartography. |
 | `lidarControls/` | The LiDAR arm: dataset menu, render, DTM/DOM, Automatisk, hybrid overlay and contours. |
-| `lidarExtract/` | Headless LiDAR tile planning, fetching and stitching. Only `stitch.ts` has a live caller. |
+| `lidarExtract/` | LiDAR tile planning, fetching and stitching. `stitch.ts` serves the DEM fetch, `run.ts` and `sources.ts` the LiDAR evidence render. |
 | `locales/` | i18next JSON, one directory per language. |
-| `map/` | The OpenLayers map and everything attached to it: layer configuration and stacks, the compare halves and the split pane, feature info, projections, the footprint and pin and hint layers. |
+| `map/` | The OpenLayers map and everything attached to it: layer configuration and stacks, the compare halves and the split pane, feature info, projections, the rectangle-placing interaction, the footprint and pin and hint layers. |
 | `ribbon/` | The top band: its three sections and the upstream status light. Layout only. |
 | `search/` | Kartverket place, address, road, property and elevation lookups. One function has a live caller. |
 | `shared/` | Error boundary, URL parameter access, coordinate parsing, enum and number helpers, and the request deadline that reports to the breaker. |
 | `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the pen, and the render onto the ground. |
-| `spotControls/` | The reader's records as surfaces: the `+`, the draft panel, the read card, the index menu. |
-| `spots/` | Spot state and geometry: the pin layer and its style, hit test, place and adjust, share link, name suggestion. |
+| `spotControls/` | The reader's records as surfaces: the `+`, the editor, the read card, the index menu. |
+| `spots/` | Spot state and geometry: the pin layer and its style, the footprint frame, hit test, place and adjust, share link, name suggestion. |
 | `terrain/` | Client-side terrain analysis: DEM fetch, shading, the analysis window and its layers. |
 | `terrainControls/` | The terrain toggle and its panel. |
 | `types/` | Search response types. |
-| `ui/` | The kit: `ControlChip`, `ControlButton`, `ControlUnit`, `Panel`, `Icon`, the Mantine theme, `useConfirm`. |
+| `ui/` | The kit: `ControlChip`, `ControlButton`, `ControlUnit`, `Panel`, `Hint`, `Icon`, the Mantine theme, `useConfirm`. |
 | `upstream/` | Per-origin circuit breaker, the origin registry, and the tile guard that reports to it. |
 | `viewControls/` | The view-mode control: one ground, the curtain, or the split. |
 
@@ -70,12 +71,20 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `terrainAdjustingAtom` | same | It is still being placed, so nothing is fetched yet. |
 | `open`/`adjust`/`closeTerrainWindowAtom` | same | Write-only. |
 | `spotPlacingAtom` | `spots/atoms.ts` | The `+` is armed: the next map click places the pin. Exclusive with `spotDraftAtom`. |
-| `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom` | same | The record being written: where its pin is and which stage has the pointer, what has been typed, what has been drawn. |
+| `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom`, `spotFootprintAtom` | same | The record being written: where its pin is and which stage has the pointer, what has been typed, what has been drawn, and the ground it names. |
+| `spotFootprintAdjustingAtom`, `standingSpotFootprintAtom` | same | Derived: the draft is in its `footprint` stage, and which rectangle the standing frame draws. |
+| `clearSpotFootprintAtom` | same | Write-only. |
 | `place`/`edit`/`closeSpotDraftAtom`, `setSpotStageAtom` | same | Write-only. |
 | `activeSpotAtom` | same | The record being read — opened by a click, by an index row, or by `?lok=`. |
+| `spotReadingAtom` | same | The open spot's kept renders are being read on the map. Held as the id it was entered on; writing `activeSpotAtom` with a different spot — or none — clears it, and a draft suspends it. |
 | `spotRecordsAtom`, `spotsFailedAtom` | `spots/spotRecords.ts` | Every record the session may see, null until the list lands; and whether it never did. |
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
+| `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
+| `keepOffersAtom` | same | Derived: the ground's offer (off the A half) and the terrain's, ground first. |
+| `draftGroundAtom` | `evidence/draftGround.ts` | The kept render laid under an open draft: the picture being framed against and drawn over. Published by the strip, which is the only thing holding the rows. |
+| the reading box's layout and placement | `evidence/readerWindow.ts` | Which way round the box is laid out, where it was dragged to, how big it may get and which wall it is docked against. Module-private, reached through `useReaderWindow`: held outside the component, which remounts per spot. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
+| `sketchShownAtom`, `sketchFadeAtom` | `sketch/overlay.ts` | Whether the open spot's drawing is on the ground, and how far it is faded towards it. A reading setting, not the record's: they outlive the spot the box was opened on. |
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |
 | `isSignedInAtom`, `isAdminAtom` | same | Derived, so a component does not re-render on an unrelated user field. |
 | `isAuthDialogOpenAtom`, `authPromptAtom` | same | Whether the dialog is up, and why when the reader did not press anything. |
@@ -139,6 +148,166 @@ the tile guard and the theme-layer effect walk whatever maps exist.
 | Kulturminner theme layers (`syncThemeLayers`, called once per map) | The heritage tip and card |
 | LiDAR footprints, split rather than mirrored — one viewport query, a layer per pane drawing that pane's own flight (`footprintTargets`) | The terrain analysis, frame and render both |
 
+## The pictures of a spot
+
+A spot's `evidence` rows are a sequence, not a set. `sort` is an ordering key in
+epoch milliseconds, so a row lands last by being created, and the strip in the
+editor (`src/evidence/EvidenceStrip.tsx`) is where that order is changed.
+On the card the same rows are a gallery, because reading them is flipping
+through them and editing them is deciding what they are a sequence of.
+
+- **The cover is the first row with pixels.** Nothing marks one: the reading
+  opens on the first row it can lay on the ground, so dragging a picture to the
+  top is how a cover is chosen, and the star says which one is.
+- A drop writes one row. `sortForMove` (`evidence/order.ts`) takes the midpoint
+  between the row's new neighbours, so nothing else moves; a row dropped last
+  takes the current time instead, or a picture kept a moment later would sort
+  in front of it. The write is optimistic and puts the row back on a refusal.
+- The rows are one height, so a drag measures every slot's middle once at the
+  press and then takes the nearest one to the pointer: the preview moves rows
+  between slots, and the slots themselves do not move. The handle answers ↑ and
+  ↓ too, and stops the press reaching OpenLayers' keyboard pan.
+- Pictures are their own records, so reordering — like keeping and deleting —
+  is written when it happens, not by the draft's save button.
+- **Clicking a picture lays it on the map**, opaque, through `draftGroundAtom`
+  and the same `useEvidenceOverlay` the reader uses, driven from `SpotSurface`.
+  That is the ground the pen draws over, and it rides the map element, so a
+  sketch session's transform carries it along.
+- Entering the draw stage with a picture chosen fits the view to that picture's
+  own rectangle before `captureFrame`, so the frame holds the ground the
+  picture does and the strokes register to every other picture of the spot as
+  well. Strokes already made keep their own frame — nothing may move it.
+  Switching pictures inside a session swaps the overlay and leaves the frame
+  alone, which is the whole point: every row covers the same rectangle.
+
+## Reading a spot
+
+Every row of evidence covers the same rectangle — the spot's footprint, as
+`meta.bbox25833` records it — so a spot's kept renders are registered to one
+another. The reader (`src/evidence/EvidenceReader.tsx`) is what that buys: it
+stands in for the card, fits the map to the footprint, and lays one kept render
+at a time back on the ground it was made over (`evidenceOverlay.ts`). Flipping
+holds the ground still and changes only how it was seen.
+
+- The overlay is at z 1.25: over the terrain render, **under the B half**, so a
+  curtain reads a kept render against a live ground. The transparency slider
+  does the same against A.
+- The outgoing picture comes off only once the incoming one has pixels. A blink
+  between two readings of the same ground would make the comparison worthless.
+- Left and right flip. `keyboardEventTarget` is the document (`map/atoms.ts`),
+  so the listener is in the capture phase — OpenLayers' own keyboard pan would
+  otherwise answer the same press. Up and down are swallowed there too and do
+  nothing: half an arrow cluster flipping pictures while the other half slid
+  the ground out from under them read as a fault.
+- The drawing sits above the pictures at z 2, so `SketchFade` (`src/sketch/`)
+  takes it off the ground or part of the way off it, and **`t`** — tegning —
+  toggles it. The shortcut is bound by `useSketchOverlay`, not by a box, so it
+  answers from the card as well; it is inert while Excalidraw has the map, and
+  it keeps its hands off a press aimed at an input.
+- A row whose render has not landed, or that has no rectangle, is not part of
+  the reading; the gallery on the card is where it is waited on. A reading with
+  nothing left in it steps back to the card.
+- `/l/<code>` opens the reading rather than the card: a link is an invitation to
+  read. The view move is the reader's then, and `shareLink.ts` keeps its hands
+  off. The code goes back onto the URL for whatever spot is open, so a reload
+  lands in the reading too.
+- Because the reading stands in for the card, it carries the card's edit button
+  as well, on the same `mayEdit` (`src/spots/mayEdit.ts`). Otherwise the only
+  way to an owner's own edit is a close that reads as leaving the spot. A draft
+  opened from the reading returns to it: `editSpotDraftAtom` leaves
+  `readingSpotIdAtom` alone, and `spotReadingAtom` is false only for as long as
+  the draft is up.
+
+The box floats (`src/evidence/readerWindow.ts`). It is dragged by its title row
+and resized from the corner grip, and it has two layouts: `wide`, a bar along
+an edge, and `tall`, a column down one. Both live in atoms outside the
+component, because the reader is keyed on the spot and remounts when another is
+opened.
+
+- **Nothing gives the box a size.** It is `width: max-content` under ceilings,
+  so it shrink-wraps its content in both axes: a reading of three pictures with
+  no prose gets a box that small. The ceilings are the layout's own — 46rem by
+  60 % for the bar, 23rem by the full height for the column — and the grip is
+  the only thing that ever sets another. It therefore only ever makes the box
+  *smaller* than its content, which is what it is for, since the prose and the
+  strip scroll.
+- Until the box has been moved or resized the layout's own CSS places it too.
+  The first gesture takes over with an inline corner, and `.placed` switches
+  the CSS anchors off; choosing a layout drops the placement again, which is
+  also the way back from a box left somewhere unhelpful.
+- **Pushing a box through a wall docks it there**: flush at the gutter, in the
+  shape that wall asks for. The shape is as much of the dock as the anchor is —
+  down the side is a column, along the top or the bottom a bar — and the layout
+  is what makes a column narrow, so a dock carries no ceiling of its own and
+  drops any the grip had set. A side dock pins the top corner; a top or bottom
+  dock keeps the run it was dragged to, so it does not slide sideways under the
+  hand that put it there.
+- The dock is why a dragged box is *not* clamped: crossing a wall is the ask,
+  and the dock puts the box back inside the map, so nothing ever ends up off
+  it. Everything else is clamped — a resize, a window resized under the box,
+  and the pass on mount that catches a window resized between two readings.
+  What is measured for all of that is the box as drawn, not the ceiling, which
+  may be higher than the content needs.
+- The caption rides in the footer between the flip buttons and the transparency
+  slider rather than on a line of its own: in the bar layout that slack is the
+  only thing there was to put there.
+- The fit on entering the reading pads for the layout the box opens in, and
+  never runs again: a box moved out of the way afterwards must not move the map
+  with it.
+- `Panel` grew `handle` and `actions` for this. Folding is off — moving,
+  resizing, docking and closing are enough ways to stop covering something.
+
+## The provenance legend
+
+A stored render is bare pixels. The reader lays that same file back on the
+ground it was made over and the sketch draws on top of it, so a caption burned
+into the file would ride the map and be drawn over. The legend goes on **at the
+door instead** — `stampEvidence` (`src/evidence/stamp.ts`) sits between the
+stored bytes and the bytes that leave, so a downloaded figure comes out in the
+reader's language and the current wording rather than whatever was true when the
+queue ran.
+
+The download is the only door, and it is not behind `mayEdit`: a visitor reading
+somebody else's public spot is exactly who wants a citable figure.
+`useEvidenceDownload` (`download.ts`) is shared by the gallery's per-row button
+and the reader's, which downloads the picture on the ground. One at a time —
+decoding, stamping and re-encoding 2500 px is a second of main-thread work.
+
+`legend.ts` draws it: a band along the bottom edge, every dimension derived from
+the one font size, which is `clamp(11, width / 70, 26)`. A footprint is
+50–500 m and the producers publish between 1 and 0.2 m/px, so a render is
+anywhere from 50 to 2500 px across and the legend has to hold its proportions
+over the whole of that.
+
+- **Line one** is the title in weight 600 and `evidenceFacts` after it, the same
+  list the card and the reader print, with the rectangle's centre in it. Too
+  long for the width, it sheds facts from the end, so the render date is dropped
+  before the centre is: where the ground is beats when the picture was made. A
+  title too long for the width on its own is cut with an ellipsis.
+- **Below it, two columns.** Left carries the scale bar and, for a public spot,
+  its `/l/<code>`; right carries the rights lines. A left cell pairs with a
+  right one where both fit and goes alone where they do not, so the legend is
+  two lines usually and three where the credit is long. Norge i bilder's holder name
+  is sixty characters and its terms are not CC BY, which is exactly the case
+  that earns the third line.
+- **Rights lines are never shed** and wrap rather than being cut: they are the
+  only part of the legend the licences require. Each names the holder by the part
+  it plays *in this picture* — the same Kartverket is `høydedata` under a
+  terrain render and `skyggerelieff` under a LiDAR extract, and that difference
+  is the statement about who did the visualising. Terrain therefore also carries
+  an authored line, because that one the app made rather than fetched.
+- **The bar and the link are shed to keep the band under a fifth of the image
+  height**, in that order. The rights lines are not shed even when they take it
+  past the fifth, so a small render comes out with a heavy band rather than
+  uncredited. Nothing is drawn at all past half the height, or where the image
+  is narrower than eight ems — national LiDAR over the smallest footprint is
+  50 px square, and a caption covering it would be worse than none.
+- Canvas text does not wait for webfonts, so `drawLegend` loads Mulish 400 and
+  600 before measuring, which is why it is async. Without it two figures stamped
+  a second apart come out in different faces. It returns whether it drew, so
+  `stamp.ts` can hand back the bytes it was given rather than spend a JPEG
+  generation re-encoding an unchanged canvas.
+
 ## URL parameters
 
 `UrlParameter`, `src/shared/utils/urlUtils.ts`: `lok`, `projection`,
@@ -162,8 +331,13 @@ GroundSection half="a"  →  ViewSection  →  [GroundSection half="b"]  →  To
 
 The second ground section mounts only while two grounds are up. `ToolSection`
 holds the controls that apply whichever ground is up — Kulturminner, terrain,
-the spot `+` and its index, the account — with `UpstreamStatus` last, because it
-comes and goes on its own.
+the spot `+` and its index, the share link, the account — with `UpstreamStatus`
+last, because it comes and goes on its own.
+
+`ShareButton` hands over the open spot's short link, or, with no spot open, the
+address bar as it stands: every ground, overlay and the centre are already
+parameters on it. Same gesture and same two-second answer as the button in a
+spot's title row, both out of `src/spots/useShareCopy.ts`.
 
 **Which section a new control goes in is a question about the control, never
 about where there is room.** A control that means something different per ground
@@ -184,7 +358,24 @@ belongs to an arm; one that applies to the reading belongs to the tools.
   button exists only while the overlay is on.
 - `Panel`'s contract: `onClose` absent means the box has no close of its own
   because something else takes it down; `unsaved` puts the close behind
-  `useConfirm`.
+  `useConfirm`; `handle` makes the title row a drag handle and `actions` puts
+  buttons in it, which is what a floating box needs of the shell and all of it
+  — the frame itself belongs to the caller.
+- `Hint` floats a tip beside the surface it is about, on a Mantine `Popover`
+  anchored to whatever child takes a ref — `Panel` does. `tips` is a list of
+  lines the caller has already filtered to what applies there, and an empty one
+  means no tip; the wrapper stays in the tree either way, because
+  `Popover.Target` clones its child and dropping it would remount the surface.
+  `keys` names the `KeyboardEvent.key` values the tips are about, built beside
+  `tips` so the two cannot drift: pressing one takes the tip down, because the
+  reader has just shown they did not need telling. Click-outside is off — it
+  fires on `mousedown`, so a pan would take the tip with it.
+  Waving a tip off puts it away for the page load, ticking the box writes its id
+  to `hintsDismissed.v1` in localStorage. Ids live in the `HINT_IDS` list in
+  `src/ui/hints.ts`; one that leaves the list is dropped on read. One id per
+  surface, not per key: `spotKeys` on `SpotCard` says what `T` does, and
+  `readingKeys` on `EvidenceReader` says that and what the arrows do, because a
+  share link opens the reading and the card is never seen.
 
 ## Known gaps
 
@@ -198,12 +389,19 @@ belongs to an arm; one that applies to the reading belongs to the tools.
   `src/types/searchTypes.ts` are mostly the tail of a deleted surface; one
   function, `getPlaceNamesByLocation`, has a live caller (`spots/spotName.ts`).
   Kept as they are.
-- **`src/lidarExtract/`**: only `stitch.ts` is live, via `src/terrain/dem.ts`.
-  `run.ts` and most of `sources.ts` are headless computation behind no surface.
-  Kept on purpose.
 - **The spot index is your own records only.** `SpotMenu` is a Mantine `Menu`
   ordered by date with no hover-to-light-the-pin: enough for a few dozen
   records, not a few hundred.
+- **Evidence files are unprotected.** A public spot is readable with no
+  account and a guest can hold no PocketBase file token, so `evidence.file` is
+  served to anyone holding the URL. The same trade the old
+  `1700000900_public_guest_reads.js` recorded.
+- **A render is not a cache.** Upstreams re-fly and reprocess, so the same spec
+  re-rendered later may not be the picture its author read. `meta.renderedAt`
+  says when the file was made; nothing re-renders on its own.
+- **Evidence never meets the sketch.** Excalidraw's image tool stays off
+  (`sketch/SketchCanvas.tsx`): a PNG dropped into the scene would be stored
+  inside the drawing, against the 5 MB `sketch` cap, where nothing can see it.
 - **Only `nb` is a live locale.** `nn` and `en` are stubs.
 - **There is no SPA route but `/`.** `/l/<code>` is a narrow Caddy `redir` to
   `/?lok=<code>`; there is no `try_files` fallback, which would turn every wrong

@@ -5,8 +5,10 @@
 // the one `constrainResolution` lands on.
 
 import { useAtomValue, useStore } from 'jotai';
+import { transformExtent } from 'ol/proj';
 import { useEffect } from 'react';
 
+import { draftGroundAtom } from '../evidence/draftGround';
 import { mapAtom } from '../map/atoms';
 import { setSpotStageAtom, spotSketchAtom } from '../spots/atoms';
 import { captureFrame, frameExtentIn } from './frame';
@@ -31,10 +33,17 @@ export const useSketchSession = (wanted: boolean) => {
     // Read through the store, not subscribed: the canvas writes this atom on
     // every settle, and a dependency would rebuild the session mid-stroke.
     const resume = sketchOf(store.get(spotSketchAtom));
+    const ground = store.get(draftGroundAtom);
     const size = map.getSize();
     // No duration: the freeze below cancels animations.
     if (resume && size) {
       view.fit(frameExtentIn(resume.frame, projection), { size });
+    } else if (ground && size) {
+      // Only where there are no strokes yet: an existing frame is the one thing
+      // that must not move. `draftGround.extent` is EPSG:25833.
+      view.fit(transformExtent(ground.extent, 'EPSG:25833', projection), {
+        size,
+      });
     }
 
     freezeMap(map);

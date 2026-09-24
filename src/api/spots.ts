@@ -7,6 +7,15 @@ export type SpotVisibility = 'private' | 'public';
 /** Lon/lat, EPSG:4326. */
 export type SpotPoint = [lon: number, lat: number];
 
+/** The ground the spot's evidence covers, EPSG:4326. Structurally the `Bbox` of
+ *  `src/map/bbox.ts`, restated here so this module stays clear of OpenLayers. */
+export type SpotFootprint = [
+  minLon: number,
+  minLat: number,
+  maxLon: number,
+  maxLat: number,
+];
+
 /** An Excalidraw scene plus its georeference; only `src/sketch/` reads
  *  `elements`. */
 export type SpotSketch = {
@@ -30,6 +39,8 @@ export type SpotRecord = {
   credit: string;
   visibility: SpotVisibility;
   point: SpotPoint;
+  /** Null until the reader places one; only then can evidence be kept. */
+  footprint: SpotFootprint | null;
   sketch: SpotSketch | null;
   created: string;
   updated: string;
@@ -44,6 +55,7 @@ export type NewSpotInput = {
   description?: string;
   visibility?: SpotVisibility;
   point: SpotPoint;
+  footprint?: SpotFootprint | null;
   sketch?: SpotSketch | null;
 };
 
@@ -52,6 +64,7 @@ export type SpotPatch = Partial<{
   description: string;
   visibility: SpotVisibility;
   point: SpotPoint;
+  footprint: SpotFootprint | null;
   sketch: SpotSketch | null;
 }>;
 
@@ -92,6 +105,7 @@ const asJson = <T>(value: unknown): T | null => {
 const hydrate = (raw: SpotRecord): SpotRecord => ({
   ...raw,
   point: asJson<SpotPoint>(raw.point) ?? [0, 0],
+  footprint: asJson<SpotFootprint>(raw.footprint),
   sketch: asJson<SpotSketch>(raw.sketch),
 });
 
@@ -106,6 +120,7 @@ export const createSpot = async (
     credit: accountName(),
     visibility: input.visibility ?? 'private',
     point: input.point,
+    footprint: input.footprint ?? null,
     sketch: input.sketch ?? null,
   };
 

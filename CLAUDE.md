@@ -44,11 +44,27 @@ Each owns its subject; this file keeps only what is true across all of them.
 - **No new dependencies without a server round trip.** `package-lock.json`
   cannot be regenerated here, so adding or removing one is an `npm install` the
   user runs on the server and pastes back. That is a cost, not a ban.
-- **Three checks run locally**: `npx oxlint@1.83.0` with no arguments, a JSON
-  parse of the three locale files, and grep. Bare is what `npm run lint` runs
-  and it covers the sidecars, the scripts and `pocketbase/pb_migrations/` as
-  well as `src`; scoping it to a path hides findings elsewhere. The repo is
-  currently clean — a new finding is yours.
+- **Four checks run locally**: `npx oxlint@1.83.0` with no arguments, a JSON
+  parse of the three locale files, Prettier, and grep. Bare is what
+  `npm run lint` runs and it covers the sidecars, the scripts and
+  `pocketbase/pb_migrations/` as well as `src`; scoping it to a path hides
+  findings elsewhere. The repo is currently clean — a new finding is yours.
+- **Prettier needs a throwaway install and the plugin turned off.** Node is on
+  the workstation even though the toolchain is not, so install `prettier` and
+  `typescript` into a directory outside the repo and point it at `src`. Pass
+  the `.prettierrc` options on the command line rather than letting it find the
+  file, because `prettier-plugin-organize-imports` cannot resolve imports with
+  no `node_modules` here and reports whole files as unformatted that the server
+  is happy with. Plugin off, the result matches `npm run format-check`
+  exactly — verified against a server run. Import *order* is still only
+  checked there.
+
+  ```
+  d=$(mktemp -d) && npm --prefix "$d" install prettier@3.9.7 typescript@5.9.3
+  "$d"/node_modules/.bin/prettier --no-config --end-of-line auto \
+    --single-quote --semi --trailing-comma all --tab-width 2 \
+    --check "{src,test}/**/*.{js,jsx,ts,tsx,css,json}"
+  ```
 - **The app's own proxy paths are unreachable from here** (`/wms/…`,
   `/arcgis/…`). Public upstreams are reachable directly. NiB anonymous tokens
   are bound to the IP that minted them, so mint a fresh one wherever the call is
@@ -62,8 +78,8 @@ Each owns its subject; this file keeps only what is true across all of them.
   up for them, and do not add English or Nynorsk guesses to make the files
   match.
 - **Keep unused code out.** A helper with no live caller after a change gets
-  deleted, not kept "for later". Two exceptions are deliberate and recorded in
-  `docs/architecture.md`: `src/search/` and `src/lidarExtract/`.
+  deleted, not kept "for later". One exception is deliberate and recorded in
+  `docs/architecture.md`: `src/search/`.
 - **Minimal comments.** The code is the documentation. A comment earns its place
   by recording something the code cannot say — an upstream's quirk, a CRS or
   axis-order fact, a unit not in the identifier, a required call ordering, where
@@ -135,25 +151,38 @@ field classes), **not** the 0.22 `Dao` API.
 
 ### Collections
 
-One collection carries the reader's records:
+Two collections carry the reader's records:
 
 - **`spots`** (id `pbc_spots`) — `owner` (→ users, cascade), `code` (six
   characters of Crockford base32, unique, generated client-side and retried on
   the unique-index 400), `name`, `description`, `credit` (the author's name,
   denormalized because `users` is closed to guests), `visibility`
-  (private | public), `point` (json, `[lon, lat]` EPSG:4326), `sketch` (json
-  ≤5 MB: an Excalidraw scene plus the frame that georeferences it, or null).
+  (private | public), `point` (json, `[lon, lat]` EPSG:4326), `footprint` (json,
+  `[west, south, east, north]` EPSG:4326 or null — the square every piece of
+  evidence is rendered over, ≤500 m on a side), `sketch` (json ≤5 MB: an
+  Excalidraw scene plus the frame that georeferences it, or null).
+- **`evidence`** (id `pbc_evidence`) — `spot` (→ spots, cascade), `owner`
+  (→ users, cascade), `kind` (lidar | terrain | flyfoto), `file` (≤50 MB image,
+  **empty until the render lands** — test it rather than assuming a row has a
+  picture), `caption`, `meta` (json ≤10 kB: the parameters asked for, the
+  rectangle covered, the resolution achieved and `renderedAt`), `sort` (epoch
+  milliseconds at creation).
+
+A row is parameters first and pixels second: the client creates it, then a
+serial queue renders and PATCHes the file on. A render is not a cache — nothing
+re-renders a row by itself, and `meta.renderedAt` says when the picture was
+made.
 
 `localities`, `finds` and `attachments` are still on disk from the old model and
 are read by nothing. Leave them alone rather than adding a migration to drop
 them.
 
-Client side: `src/api/pocketbase.ts` (singleton, `pocketbaseUrl` defaults `/pb`)
-and `src/api/spots.ts`.
+Client side: `src/api/pocketbase.ts` (singleton, `pocketbaseUrl` defaults `/pb`),
+`src/api/spots.ts` and `src/api/evidence.ts`.
 
 ### Permissions
 
-Server-enforced:
+Server-enforced on `spots`:
 
 - **read** — the record is public, *no account needed*; or signed in and (owns
   it, or `@request.auth.role = "admin"`)
@@ -162,3 +191,10 @@ Server-enforced:
 
 So the UI carries one permission, `mayEdit` (owner *or* admin): an admin can
 rename, reshape and delete anybody's spot.
+
+`evidence` follows its spot and adds the spot's owner to every write rule, so an
+admin may keep a render against somebody else's spot and that spot's author can
+still caption and delete it. Its `file` field is **unprotected**: public spots
+are readable with no account and a guest can hold no file token, so the trade is
+that a file URL under a private spot works if it leaks. Same trade the old model
+recorded in `1700000900_public_guest_reads.js`.

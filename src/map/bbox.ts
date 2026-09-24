@@ -1,6 +1,6 @@
 import { boundingExtent } from 'ol/extent';
 import type Map from 'ol/Map';
-import { transformExtent } from 'ol/proj';
+import { transform, transformExtent } from 'ol/proj';
 
 /** EPSG:4326. */
 export type Bbox = [
@@ -57,6 +57,16 @@ export const squareBboxWithin = (bbox: Bbox): Bbox => {
     cx + side / 2,
     cy + side / 2,
   ]);
+};
+
+/** Square in EPSG:25833, clamped to `MIN_SIDE_M`…`MAX_SIDE_M`. */
+export const squareBboxAround = (
+  point: [lon: number, lat: number],
+  sideMetres: number,
+): Bbox => {
+  const [cx, cy] = transform(point, 'EPSG:4326', 'EPSG:25833');
+  const half = Math.min(Math.max(sideMetres, MIN_SIDE_M), MAX_SIDE_M) / 2;
+  return bboxFromMetric([cx - half, cy - half, cx + half, cy + half]);
 };
 
 // ≥8%, enough that transformExtent's corner-only reprojection cannot clip.

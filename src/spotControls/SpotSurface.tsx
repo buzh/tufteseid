@@ -1,6 +1,10 @@
 import { useAtomValue } from 'jotai';
 import { lazy, Suspense, useEffect, useMemo } from 'react';
 
+import { draftGroundAtom } from '../evidence/draftGround';
+import { EvidenceReader } from '../evidence/EvidenceReader';
+import { useEvidenceOverlay } from '../evidence/evidenceOverlay';
+import { useRectangleAdjust } from '../map/rectAdjust';
 import { useSketchOverlay } from '../sketch/overlay';
 import { sketchOf } from '../sketch/scene';
 import { sketchSessionAtom } from '../sketch/session';
@@ -8,7 +12,10 @@ import { useSketchSession } from '../sketch/useSketchSession';
 import {
   activeSpotAtom,
   spotDraftAtom,
+  spotFootprintAdjustingAtom,
+  spotFootprintAtom,
   spotPlacingAtom,
+  spotReadingAtom,
   spotSketchAtom,
 } from '../spots/atoms';
 import { useSpotPinAdjust } from '../spots/pinAdjust';
@@ -17,7 +24,7 @@ import { useSpotShareLink } from '../spots/shareLink';
 import { useSpotLayer } from '../spots/spotLayer';
 import { useSpotRecords } from '../spots/spotRecords';
 import { SpotCard } from './SpotCard';
-import { SpotPanel } from './SpotPanel';
+import { SpotEditor } from './SpotEditor';
 import { SpotPlacePrompt } from './SpotPlacePrompt';
 import { useSpotDraft } from './useSpotDraft';
 
@@ -32,17 +39,21 @@ const SketchCanvas = lazy(() =>
 /** Split out so the draft controller mounts and unmounts with the draft. */
 const SpotDraftBox = () => {
   const draft = useAtomValue(spotDraftAtom);
+  const active = useAtomValue(activeSpotAtom);
   // The parent renders this only when there is a draft.
   const spot = useSpotDraft(draft!);
-  return <SpotPanel spot={spot} />;
+  const record = active?.id === draft?.recordId ? active : null;
+  return <SpotEditor spot={spot} record={record} />;
 };
 
 export const SpotSurface = () => {
   const draft = useAtomValue(spotDraftAtom);
   const placing = useAtomValue(spotPlacingAtom);
   const active = useAtomValue(activeSpotAtom);
+  const reading = useAtomValue(spotReadingAtom);
   const session = useAtomValue(sketchSessionAtom);
   const drawn = useAtomValue(spotSketchAtom);
+  const ground = useAtomValue(draftGroundAtom);
 
   // Nothing while a canvas is up (it already shows the scene), the draft's own
   // while one is open, otherwise the open spot's. Keyed on `active.id`/
@@ -66,8 +77,15 @@ export const SpotSurface = () => {
   useSpotShareLink();
   useSpotPlacement();
   useSpotPinAdjust();
+  useRectangleAdjust({
+    rectAtom: spotFootprintAtom,
+    activeAtom: spotFootprintAdjustingAtom,
+    layerId: 'spotFootprintAdjustLayer',
+  });
   useSketchSession(draft?.stage === 'sketch');
   useSketchOverlay(shown);
+  // Rides the map element, so a sketch session's transform carries it along.
+  useEvidenceOverlay(ground?.url ?? '', ground?.extent ?? null, 1);
 
   return (
     <>
@@ -80,12 +98,17 @@ export const SpotSurface = () => {
         </Suspense>
       )}
       {placing && <SpotPlacePrompt />}
-      {/* One box at a time — they share a corner. Keyed on the spot so opening
-          a second does not inherit the first's confirm. */}
+      {/* Keyed on the spot so opening a second does not inherit the first's
+          confirm. */}
       {draft ? (
         <SpotDraftBox key={draft.id} />
       ) : (
-        active && <SpotCard key={active.id} spot={active} />
+        active &&
+        (reading ? (
+          <EvidenceReader key={active.id} spot={active} />
+        ) : (
+          <SpotCard key={active.id} spot={active} />
+        ))
       )}
     </>
   );
