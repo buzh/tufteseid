@@ -1,6 +1,6 @@
-import { Alert, Button, Group, Switch, Tooltip } from '@mantine/core';
+import { Alert, Button, Group, Switch } from '@mantine/core';
 import { useSetAtom } from 'jotai';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { deleteSpot, updateSpot, type SpotRecord } from '../api/spots';
@@ -16,23 +16,19 @@ import {
 } from '../spots/atoms';
 import { formatPoint } from '../spots/geo';
 import { useMayEditSpot } from '../spots/mayEdit';
-import { copyShareLink } from '../spots/shareLink';
-import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
 import { useConfirm } from '../ui/useConfirm';
 import styles from './SpotBox.module.css';
+import { SpotShareButton } from './SpotShareButton';
 
-type Failure = 'visibility' | 'delete' | 'copy';
+type Failure = 'visibility' | 'delete';
 
 // Spelled out so the `t()` keys stay greppable.
 const FAILURE_TEXT: Record<Failure, string> = {
   visibility: 'spots.visibilityFailed',
   delete: 'spots.deleteFailed',
-  copy: 'spots.copyFailed',
 };
-
-const COPIED_MS = 2000;
 
 export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   const { t } = useTranslation();
@@ -50,14 +46,7 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
 
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState<Failure | null>(null);
-
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), COPIED_MS);
-    return () => clearTimeout(timer);
-  }, [copied]);
 
   const setVisibility = (makePublic: boolean) => {
     setBusy(true);
@@ -89,52 +78,43 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
       icon="location_on"
       title={spot.name}
       onClose={() => setActive(null)}
+      actions={<SpotShareButton spot={spot} />}
+      // Nothing to put in it for a guest at a spot with nothing to read.
       footer={
-        <>
-          <Tooltip label={copied ? t('spots.copied') : t('spots.copyLink')}>
-            <ControlButton
-              icon={copied ? 'link' : 'content_copy'}
-              on={copied}
-              aria-label={t('spots.copyLink')}
-              onClick={() => {
-                void copyShareLink(spot).then((ok) => {
-                  setCopied(ok);
-                  if (!ok) setFailed('copy');
-                });
-              }}
-            />
-          </Tooltip>
-          {readable > 0 && (
-            <Button
-              size="xs"
-              variant="default"
-              leftSection={<Icon icon="menu_book" size={16} />}
-              onClick={() => setReading(true)}
-            >
-              {t('evidence.read')}
-            </Button>
-          )}
-          {mayEdit && (
-            <Group gap="xs" ml="auto">
+        (readable > 0 || mayEdit) && (
+          <>
+            {readable > 0 && (
               <Button
                 size="xs"
-                variant={remove.armed ? 'filled' : 'default'}
-                color={remove.armed ? 'red' : undefined}
-                loading={deleting}
-                onClick={remove.press}
+                variant="default"
+                leftSection={<Icon icon="menu_book" size={16} />}
+                onClick={() => setReading(true)}
               >
-                {remove.armed ? t('spots.deleteConfirm') : t('spots.delete')}
+                {t('evidence.read')}
               </Button>
-              <Button
-                size="xs"
-                disabled={busy || deleting}
-                onClick={() => edit(spot)}
-              >
-                {t('spots.edit')}
-              </Button>
-            </Group>
-          )}
-        </>
+            )}
+            {mayEdit && (
+              <Group gap="xs" ml="auto">
+                <Button
+                  size="xs"
+                  variant={remove.armed ? 'filled' : 'default'}
+                  color={remove.armed ? 'red' : undefined}
+                  loading={deleting}
+                  onClick={remove.press}
+                >
+                  {remove.armed ? t('spots.deleteConfirm') : t('spots.delete')}
+                </Button>
+                <Button
+                  size="xs"
+                  disabled={busy || deleting}
+                  onClick={() => edit(spot)}
+                >
+                  {t('spots.edit')}
+                </Button>
+              </Group>
+            )}
+          </>
+        )
       }
     >
       {spot.description && <p className={styles.prose}>{spot.description}</p>}

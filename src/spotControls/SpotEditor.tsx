@@ -20,6 +20,7 @@ import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
 import { formatPoint } from '../spots/geo';
 import styles from './SpotBox.module.css';
+import { SpotShareButton } from './SpotShareButton';
 import type { SpotDraftController } from './useSpotDraft';
 
 export const SpotEditor = ({
@@ -28,7 +29,7 @@ export const SpotEditor = ({
 }: {
   spot: SpotDraftController;
   /** The saved spot the draft is editing, or null for one being made: what the
-   *  pictures hang off. */
+   *  pictures and the link hang off. */
   record: SpotRecord | null;
 }) => {
   const { t } = useTranslation();
@@ -41,6 +42,8 @@ export const SpotEditor = ({
       className={styles.panel}
       icon="add_location"
       title={spot.draft.recordId ? t('spots.editTitle') : t('spots.newTitle')}
+      // A spot has no code until it is saved, so one being made has no link.
+      actions={record && <SpotShareButton spot={record} />}
       onClose={spot.abort}
       unsaved={spot.dirty}
       footer={
