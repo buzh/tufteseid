@@ -79,7 +79,7 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   const tips = hasSketch ? [t('hints.sketch')] : [];
 
   return (
-    <Hint id="spotKeys" tips={tips}>
+    <Hint id="spotKeys" tips={tips} keys={['t']}>
       <Panel
         className={styles.panel}
         icon="location_on"

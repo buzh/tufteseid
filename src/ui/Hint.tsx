@@ -10,7 +10,7 @@ import {
   type FloatingPosition,
 } from '@mantine/core';
 import { useSetAtom } from 'jotai';
-import { useState, type ReactElement } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import styles from './Hint.module.css';
@@ -21,6 +21,10 @@ export type HintProps = {
   id: HintId;
   /** One line each, already filtered to what applies here. Empty: no tip. */
   tips: string[];
+  /** `KeyboardEvent.key` values the tips are about. Pressing one takes the tip
+   *  down: the reader has just shown they did not need telling. Built beside
+   *  `tips` so the two cannot say different things. */
+  keys?: string[];
   position?: FloatingPosition;
   children: ReactElement;
 };
@@ -28,6 +32,7 @@ export type HintProps = {
 export const Hint = ({
   id,
   tips,
+  keys = [],
   position = 'left-start',
   children,
 }: HintProps) => {
@@ -36,12 +41,35 @@ export const Hint = ({
   const close = useSetAtom(closeHintAtom);
   const [forever, setForever] = useState(false);
 
+  const opened = open && tips.length > 0;
+
+  // Joined rather than passed as the array it is: a caller builds the list
+  // inline, so a fresh one every render would re-bind the listener every
+  // render.
+  const watched = keys.join(' ');
+  useEffect(() => {
+    if (!opened || !watched) return;
+    const wanted = watched.split(' ');
+    const onKey = (event: KeyboardEvent) => {
+      // Arrows walking a focused slider are not the reader flipping pictures,
+      // and a letter typed into a field is not a shortcut at all.
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, [role="slider"]')) return;
+      // A letter key arrives capitalised under shift; the named ones never do.
+      const pressed =
+        event.key.length === 1 ? event.key.toLowerCase() : event.key;
+      if (wanted.includes(pressed)) close(id, forever);
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [opened, watched, close, id, forever]);
+
   // Wrapped even when there is no tip to show: `Popover.Target` clones its
   // child, so taking the wrapper away would remount the surface underneath and
   // lose whatever state it holds.
   return (
     <Popover
-      opened={open && tips.length > 0}
+      opened={opened}
       onChange={(next) => {
         if (!next) close(id, forever);
       }}

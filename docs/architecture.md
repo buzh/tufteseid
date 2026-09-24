@@ -194,9 +194,11 @@ holds the ground still and changes only how it was seen.
   does the same against A.
 - The outgoing picture comes off only once the incoming one has pixels. A blink
   between two readings of the same ground would make the comparison worthless.
-- Arrow keys flip. `keyboardEventTarget` is the document (`map/atoms.ts`), so
-  the listener is in the capture phase — OpenLayers' own keyboard pan would
-  otherwise answer the same press.
+- Left and right flip. `keyboardEventTarget` is the document (`map/atoms.ts`),
+  so the listener is in the capture phase — OpenLayers' own keyboard pan would
+  otherwise answer the same press. Up and down are swallowed there too and do
+  nothing: half an arrow cluster flipping pictures while the other half slid
+  the ground out from under them read as a fault.
 - The drawing sits above the pictures at z 2, so `SketchFade` (`src/sketch/`)
   takes it off the ground or part of the way off it, and **`t`** — tegning —
   toggles it. The shortcut is bound by `useSketchOverlay`, not by a box, so it
@@ -308,6 +310,10 @@ belongs to an arm; one that applies to the reading belongs to the tools.
   lines the caller has already filtered to what applies there, and an empty one
   means no tip; the wrapper stays in the tree either way, because
   `Popover.Target` clones its child and dropping it would remount the surface.
+  `keys` names the `KeyboardEvent.key` values the tips are about, built beside
+  `tips` so the two cannot drift: pressing one takes the tip down, because the
+  reader has just shown they did not need telling. Click-outside is off — it
+  fires on `mousedown`, so a pan would take the tip with it.
   Waving a tip off puts it away for the page load, ticking the box writes its id
   to `hintsDismissed.v1` in localStorage. Ids live in the `HINT_IDS` list in
   `src/ui/hints.ts`; one that leaves the list is dropped on read. One id per

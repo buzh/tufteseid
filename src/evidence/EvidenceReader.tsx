@@ -40,6 +40,8 @@ const FIT_MS = 400;
 
 const LAYOUT_ICON = { wide: 'dock_to_bottom', tall: 'dock_to_right' } as const;
 
+const ARROWS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+
 export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   const { t, i18n } = useTranslation();
   const map = useAtomValue(mapAtom);
@@ -85,10 +87,12 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
 
   // Arrow keys flip rather than pan: `keyboardEventTarget` is the document, so
   // OpenLayers' own pan would otherwise answer the same press. Capture phase
-  // on the document is what gets in front of it.
+  // on the document is what gets in front of it. Up and down are taken too and
+  // do nothing — half an arrow cluster flipping pictures while the other half
+  // slides the ground out from under them is worse than a pad that rests.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      if (!ARROWS.includes(event.key)) return;
       const target = event.target as HTMLElement | null;
       if (
         target?.closest(
@@ -99,7 +103,8 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
       }
       event.preventDefault();
       event.stopPropagation();
-      step(event.key === 'ArrowLeft' ? -1 : 1);
+      if (event.key === 'ArrowLeft') step(-1);
+      else if (event.key === 'ArrowRight') step(1);
     };
     document.addEventListener('keydown', onKey, true);
     return () => document.removeEventListener('keydown', onKey, true);
@@ -145,10 +150,17 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
 
   // Both keys answer here, which the card's tip cannot say — a share link
   // opens the reading and the card is never seen. One picture has nothing to
-  // flip to.
+  // flip to. Each line names the keys that retire it.
   const tips: string[] = [];
-  if (hasSketch) tips.push(t('hints.sketch'));
-  if (readable.length > 1) tips.push(t('hints.pictures'));
+  const keys: string[] = [];
+  if (hasSketch) {
+    tips.push(t('hints.sketch'));
+    keys.push('t');
+  }
+  if (readable.length > 1) {
+    tips.push(t('hints.pictures'));
+    keys.push('ArrowLeft', 'ArrowRight');
+  }
 
   return (
     <div
@@ -163,7 +175,11 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
       <Hint
         id="readingKeys"
         tips={tips}
-        position={box.layout === 'wide' ? 'top' : 'left-start'}
+        keys={keys}
+        // Off the bar's near end rather than centred over it: the view is
+        // fitted to the footprint, which puts the thing being read in the
+        // middle of the open ground.
+        position={box.layout === 'wide' ? 'top-start' : 'left-start'}
       >
         <Panel
           className={styles.panel}
