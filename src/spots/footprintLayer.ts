@@ -6,7 +6,7 @@ import { transformExtent } from 'ol/proj';
 import VectorSource from 'ol/source/Vector';
 import { Stroke, Style } from 'ol/style';
 import { mapAtom } from '../map/atoms';
-import { shownSpotFootprintAtom } from './atoms';
+import { standingSpotFootprintAtom } from './atoms';
 import { PIN_Z_INDEX } from './pinStyle';
 
 // Solid on purpose, against the terrain window's dashed frame: the two say
@@ -20,7 +20,7 @@ const frameStyle = [
 ];
 
 export const spotFootprintLayerEffect = atomEffect((get) => {
-  const bbox = get(shownSpotFootprintAtom);
+  const bbox = get(standingSpotFootprintAtom);
   if (!bbox) return;
   const map = get(mapAtom);
 

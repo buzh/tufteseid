@@ -254,8 +254,11 @@ layer taken off a map loses everything it had loaded.
 
 7–9 are free. A new overlay should be written down here.
 
-Only one rectangle is ever in hand, so the two `rectAdjust` mounts share z 4
-without colliding; they are told apart by the layer id they are given
+Only one rectangle is ever in hand — entering a draft's `footprint` stage drops
+the terrain window's grip, and taking the terrain window back steps the draft to
+`pin` — so the two `rectAdjust` mounts share z 4 without colliding. Two live at
+once would put two frames and two pointer interactions on the map, and neither
+could be grabbed. They are told apart by the layer id they are given
 (`terrainAdjustLayer`, `spotFootprintAdjustLayer`). Each standing frame goes down
 while its own rectangle is being dragged. The footprint sits just under the pin
 so the pin it belongs to stays legible over it.

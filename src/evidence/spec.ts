@@ -36,9 +36,6 @@ export type EvidenceSpec =
       projectName: string | null;
       year: number | null;
       photoDate: string | null;
-      /** The acquisition's native resolution, which the grab needs to plan its
-       *  tile grid before the stitch exists. */
-      projectMetresPerPx: number | null;
     };
 
 const num = (v: unknown): number | null =>
@@ -83,7 +80,6 @@ export const metaOf = (spec: EvidenceSpec): EvidenceMeta => {
         projectName: spec.projectName,
         year: spec.year,
         photoDate: spec.photoDate,
-        projectMetresPerPx: spec.projectMetresPerPx,
       };
   }
 };
@@ -132,7 +128,6 @@ export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
         projectName: str(meta.projectName),
         year: num(meta.year),
         photoDate: str(meta.photoDate),
-        projectMetresPerPx: num(meta.projectMetresPerPx),
       };
     }
   }

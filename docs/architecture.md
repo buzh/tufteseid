@@ -72,11 +72,11 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `open`/`adjust`/`closeTerrainWindowAtom` | same | Write-only. |
 | `spotPlacingAtom` | `spots/atoms.ts` | The `+` is armed: the next map click places the pin. Exclusive with `spotDraftAtom`. |
 | `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom`, `spotFootprintAtom` | same | The record being written: where its pin is and which stage has the pointer, what has been typed, what has been drawn, and the ground it names. |
-| `spotFootprintAdjustingAtom`, `shownSpotFootprintAtom` | same | Derived: the draft is in its `footprint` stage, and which rectangle the standing frame draws. |
+| `spotFootprintAdjustingAtom`, `standingSpotFootprintAtom` | same | Derived: the draft is in its `footprint` stage, and which rectangle the standing frame draws. |
 | `clearSpotFootprintAtom` | same | Write-only. |
 | `place`/`edit`/`closeSpotDraftAtom`, `setSpotStageAtom` | same | Write-only. |
 | `activeSpotAtom` | same | The record being read — opened by a click, by an index row, or by `?lok=`. |
-| `spotReadingAtom` | same | The open spot's kept renders are being read on the map. Held as the id it was entered on, so closing the spot, opening another or starting a draft ends it. |
+| `spotReadingAtom` | same | The open spot's kept renders are being read on the map. Held as the id it was entered on; writing `activeSpotAtom` with a different spot — or none — clears it, and a draft suspends it. |
 | `spotRecordsAtom`, `spotsFailedAtom` | `spots/spotRecords.ts` | Every record the session may see, null until the list lands; and whether it never did. |
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |

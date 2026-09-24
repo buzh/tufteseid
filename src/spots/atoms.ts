@@ -2,6 +2,7 @@ import { atom } from 'jotai';
 
 import type { SpotPoint, SpotRecord, SpotSketch } from '../api/spots';
 import { squareBboxAround, type Bbox } from '../map/bbox';
+import { terrainAdjustingAtom } from '../terrain/window';
 
 export type SpotDraft = {
   /** New per draft; surfaces key off it to remount. */
@@ -21,10 +22,9 @@ export const spotSketchAtom = atom<SpotSketch | null>(null);
 
 /** What a square gets when the reader has not sized one: wide enough to hold a
  *  farmstead, well inside `MAX_SIDE_M`. */
-export const DEFAULT_FOOTPRINT_SIDE_M = 200;
+const DEFAULT_FOOTPRINT_SIDE_M = 200;
 
-/** The draft's footprint. Null is a spot naming no ground, and a spot nothing
- *  can be kept against. Same shape as `SpotFootprint`. */
+/** The draft's footprint, same shape as `SpotFootprint`. */
 export const spotFootprintAtom = atom<Bbox | null>(null);
 
 /** Read by `useRectangleAdjust`: the stage is the only record of who has hold
@@ -33,16 +33,22 @@ export const spotFootprintAdjustingAtom = atom(
   (get) => get(spotDraftAtom)?.stage === 'footprint',
 );
 
-export const activeSpotAtom = atom<SpotRecord | null>(null);
-
 const readingSpotIdAtom = atom<string | null>(null);
 
-/**
- * The open spot's evidence is being read on the map. Held as the id it was
- * entered on and compared against the open record, so closing the spot,
- * opening another or starting a draft ends the reading without any of them
- * having to remember to.
- */
+const openSpotAtom = atom<SpotRecord | null>(null);
+
+/** The open spot. Opening a different one — or none — ends the reading of the
+ *  last, so no caller has to remember to. */
+export const activeSpotAtom = atom(
+  (get) => get(openSpotAtom),
+  (get, set, next: SpotRecord | null) => {
+    if (get(openSpotAtom)?.id !== next?.id) set(readingSpotIdAtom, null);
+    set(openSpotAtom, next);
+  },
+);
+
+/** The open spot's evidence is being read on the map. A draft only suspends the
+ *  reading — closing one returns to it. */
 export const spotReadingAtom = atom(
   (get) => {
     const active = get(activeSpotAtom);
@@ -54,13 +60,9 @@ export const spotReadingAtom = atom(
   },
 );
 
-/**
- * The footprint a standing frame should draw, or null. A draft's own wins over
- * the open spot's: while one is being edited it is the only rectangle that
- * means anything. Derived rather than read apart, so a pin drag — which writes
- * the draft every frame — does not rebuild the layer behind it.
- */
-export const shownSpotFootprintAtom = atom((get): Bbox | null => {
+/** Derived rather than read apart: a pin drag writes the draft every frame, and
+ *  a subscriber on the draft would rebuild the layer behind it. */
+export const standingSpotFootprintAtom = atom((get): Bbox | null => {
   if (get(spotFootprintAdjustingAtom)) return null;
   return get(spotDraftAtom)
     ? get(spotFootprintAtom)
@@ -117,18 +119,29 @@ export const setSpotStageAtom = atom(
   (get, set, stage: SpotDraft['stage']) => {
     const draft = get(spotDraftAtom);
     if (!draft || draft.stage === stage) return;
-    // Seeded on the pin rather than on the viewport, so the ground a keep will
-    // cover is the ground the spot is about however far the map has been
-    // scrolled since.
-    if (stage === 'footprint' && !get(spotFootprintAtom)) {
-      set(
-        spotFootprintAtom,
-        squareBboxAround(draft.point, DEFAULT_FOOTPRINT_SIDE_M),
-      );
+    if (stage === 'footprint') {
+      // Only one `useRectangleAdjust` may be live: two would put two frames and
+      // two pointer interactions on the map, and neither could be grabbed.
+      set(terrainAdjustingAtom, false);
+      if (!get(spotFootprintAtom)) {
+        set(
+          spotFootprintAtom,
+          squareBboxAround(draft.point, DEFAULT_FOOTPRINT_SIDE_M),
+        );
+      }
     }
     set(spotDraftAtom, { ...draft, stage });
   },
 );
+
+/** Let go of the map without losing the rectangle — the other side of the
+ *  one-at-a-time rule `setSpotStageAtom` keeps. */
+export const releaseSpotFootprintAtom = atom(null, (get, set) => {
+  const draft = get(spotDraftAtom);
+  if (draft?.stage === 'footprint') {
+    set(spotDraftAtom, { ...draft, stage: 'pin' });
+  }
+});
 
 export const clearSpotFootprintAtom = atom(null, (get, set) => {
   set(spotFootprintAtom, null);

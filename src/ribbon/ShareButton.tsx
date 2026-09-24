@@ -18,7 +18,7 @@ export const ShareButton = () => {
     <Tooltip label={label}>
       <ControlButton
         icon={icon}
-        on={answer === 'copied'}
+        on={answer != null}
         aria-label={label}
         onClick={copy}
       />

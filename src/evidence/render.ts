@@ -36,13 +36,11 @@ export const renderEvidence = async (
 ): Promise<Produced | null> => {
   switch (spec.kind) {
     case 'lidar': {
-      // The catalogue rather than the stored key alone: the key is a name, and
-      // what the stitch needs is the URL, the layer prefix and the published
-      // style list.
       const sources = await enumerateLidarSources(bbox4326, spec.model);
       const source = sources.find((s) => s.key === spec.sourceKey);
-      // Retired upstream, or no longer covering this rectangle.
-      if (!source) return null;
+      // Retired upstream, no longer covering this rectangle, or no longer
+      // publishing this style — asking anyway answers 200 with a JSON body.
+      if (!source?.styles.includes(spec.style)) return null;
       const raster = await extractCanvas(
         bboxToMetric(bbox4326),
         source,
@@ -58,9 +56,6 @@ export const renderEvidence = async (
         meta: {
           metresPerPx: fitted.metresPerPx,
           bbox25833: raster.bbox25833,
-          // Resolved here and gone by the time anyone reads the card; a row
-          // kept before the catalogue knew them gets them filled in by its
-          // first render.
           year: source.year,
           pointDensity: source.pointDensity,
         },
@@ -95,13 +90,7 @@ export const renderEvidence = async (
         meta: {
           // The file's, not the grid's: the store fit may have coarsened it.
           metresPerPx: fitted.metresPerPx,
-          // Off the window's pixel offsets, so the rectangle named is the one
-          // the pixels cover to within nothing.
           bbox25833: demImageExtent(dem),
-          // What the finest covering acquisition publishes. The gap between
-          // this and `metresPerPx` is the difference between a reading of the
-          // ground and a reading of an average of it.
-          nativeMetresPerPx: dem.nativeMetresPerPx,
           radius,
         },
       };
@@ -118,7 +107,7 @@ export const renderEvidence = async (
       if (spec.projectId !== NIB_MOSAIC && !project) return null;
       const raster = await fetchFlyfotoRaster(bbox4326, { project, signal });
       if (!raster) return null;
-      // JPEG all the way through, like the stitch itself: a lossless copy of a
+      // JPEG all the way through, like the stitch: a lossless copy of a
       // lossy-sourced photograph is several times the bytes for nothing.
       const fitted = await fitImageBlob(
         raster.canvas,
@@ -138,7 +127,6 @@ export const renderEvidence = async (
                 projectName: project.projectName,
                 year: project.year,
                 photoDate: project.photoDate,
-                projectMetresPerPx: project.metresPerPx,
               }
             : {}),
         },

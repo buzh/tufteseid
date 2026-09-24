@@ -22,6 +22,7 @@ import {
 } from '../terrain/render';
 import { computeHorizonFields, type Visualization } from '../terrain/shade';
 import { setTerrainOpacity, setTerrainRender } from '../terrain/terrainLayer';
+import { releaseSpotFootprintAtom } from '../spots/atoms';
 import {
   adjustTerrainWindowAtom,
   closeTerrainWindowAtom,
@@ -45,6 +46,7 @@ export const useTerrainControls = () => {
   const setAdjusting = useSetAtom(terrainAdjustingAtom);
   const adjustWindow = useSetAtom(adjustTerrainWindowAtom);
   const closeWindow = useSetAtom(closeTerrainWindowAtom);
+  const releaseFootprint = useSetAtom(releaseSpotFootprintAtom);
   const setTerrainOffer = useSetAtom(terrainOfferAtom);
 
   useRectangleAdjust({
@@ -154,10 +156,8 @@ export const useTerrainControls = () => {
     setTerrainOpacity(opacity / 100);
   }, [opacity]);
 
-  // What a keep would re-run over the spot's footprint. These settings are
-  // component state, so unlike the ground's offer it cannot be derived — it has
-  // to be published. `radius` goes out clamped, because that is the distance
-  // the reading on screen was made at.
+  // `radius` goes out clamped: that is the distance the reading on screen was
+  // made at.
   useEffect(() => {
     setTerrainOffer(
       dem && field
@@ -192,7 +192,10 @@ export const useTerrainControls = () => {
     on: bbox !== null,
     adjusting,
     start: useCallback(() => setAdjusting(false), [setAdjusting]),
-    adjust: adjustWindow,
+    adjust: useCallback(() => {
+      releaseFootprint();
+      adjustWindow();
+    }, [releaseFootprint, adjustWindow]),
     close: closeWindow,
     /** Metres on a side: off the grid where there is one, else the rectangle. */
     sideMetres: dem

@@ -13,12 +13,23 @@ import {
   queryHeritageAt,
 } from '../map/featureInfo/heritageQuery';
 import type { FeatureInfoReading } from '../map/featureInfo/types';
-import { spotPlacingAtom } from '../spots/atoms';
+import { spotFootprintAdjustingAtom, spotPlacingAtom } from '../spots/atoms';
 import { spotAtPixel } from '../spots/hitTest';
 import { terrainAdjustingAtom } from '../terrain/window';
 
 /** How long the pointer has to hold still before a hover asks. */
 const REST_MS = 220;
+
+/** Any gesture that has taken the map: the terrain rectangle, a spot's
+ *  footprint, or an armed pin. */
+const placingOnMap = (): boolean => {
+  const store = getDefaultStore();
+  return (
+    store.get(terrainAdjustingAtom) ||
+    store.get(spotFootprintAdjustingAtom) ||
+    store.get(spotPlacingAtom)
+  );
+};
 
 export interface HeritageInfo {
   tip: FeatureInfoReading | null;
@@ -66,10 +77,10 @@ export const useHeritageInfo = (): HeritageInfo => {
       map.on('pointermove', (e) => {
         if (e.dragging) return;
         if ((e.originalEvent as PointerEvent).pointerType === 'touch') return;
-        // Placing the terrain rectangle or a pin owns the pointer. Read from
-        // the store, not as a dependency, so turning either on does not rebind
-        // these listeners.
-        if (store.get(terrainAdjustingAtom) || store.get(spotPlacingAtom)) {
+        // Placing a rectangle or a pin owns the pointer. Read from the store,
+        // not as a dependency, so turning one on does not rebind these
+        // listeners.
+        if (placingOnMap()) {
           forget();
           return;
         }
@@ -104,8 +115,9 @@ export const useHeritageInfo = (): HeritageInfo => {
 
       map.on('singleclick', (e) => {
         if (!heritageIsQueryable(map)) return;
-        // A click placing a pin, or landing on one, belongs to the pin.
-        if (store.get(spotPlacingAtom)) return;
+        // A click placing a pin or a rectangle, or landing on a pin, belongs to
+        // whatever is being placed.
+        if (placingOnMap()) return;
         if (spotAtPixel(map, e.pixel)) return;
         stopHovering();
         setTip(null);

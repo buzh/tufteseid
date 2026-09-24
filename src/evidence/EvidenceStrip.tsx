@@ -1,8 +1,3 @@
-// A spot's pictures as a sequence: the order they are read in, which one is
-// therefore its cover, and which one is laid on the map to draw over. The
-// draft's surface. On the card the same rows are a gallery, because reading is
-// flipping through them and editing is deciding what they are a sequence of.
-
 import { Tooltip } from '@mantine/core';
 import { useAtom } from 'jotai';
 import {
@@ -94,17 +89,19 @@ export const EvidenceStrip = ({ spot }: { spot: SpotRecord }) => {
   };
 
   // The handle answers the arrows too: a drag is the only other way to reorder,
-  // and there is no reaching one without a pointer. `stopPropagation`, or
-  // OpenLayers' keyboard pan answers the same press off the document.
+  // and there is no reaching one without a pointer. Stopped before the bounds
+  // check, or OpenLayers' keyboard pan answers the press that runs off the end.
   const nudge =
     (id: string, index: number, total: number) =>
     (event: ReactKeyboardEvent<HTMLElement>) => {
       const delta =
         event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
-      if (delta === 0 || index + delta < 0 || index + delta >= total) return;
+      if (delta === 0) return;
       event.preventDefault();
       event.stopPropagation();
-      reorder(id, index + delta);
+      const to = index + delta;
+      if (to < 0 || to >= total) return;
+      reorder(id, to);
     };
 
   const pick = (rec: EvidenceRecord) => {

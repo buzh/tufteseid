@@ -51,7 +51,6 @@ const groundOfferAtom = atom<EvidenceSpec | null>((get) => {
           projectName: project.projectName,
           year: project.year,
           photoDate: project.photoDate,
-          projectMetresPerPx: project.metresPerPx,
         }
       : {
           kind: 'flyfoto',
@@ -59,7 +58,6 @@ const groundOfferAtom = atom<EvidenceSpec | null>((get) => {
           projectName: null,
           year: null,
           photoDate: null,
-          projectMetresPerPx: null,
         };
   }
 

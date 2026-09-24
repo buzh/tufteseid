@@ -22,23 +22,28 @@ const ANSWER_TEXT: Record<Answer, string> = {
 
 export const useShareCopy = (spot: SpotRecord | null) => {
   const { t } = useTranslation();
-  const [answer, setAnswer] = useState<Answer | null>(null);
+  const subject = spot?.id ?? null;
+  // Carries the subject it is about: the ribbon's button does not remount
+  // between spots, and "copied" against another spot's link would be a lie.
+  const [last, setLast] = useState<{ subject: string | null; answer: Answer }>();
+  const answer = last?.subject === subject ? last.answer : null;
 
   useEffect(() => {
-    if (!answer) return;
-    const timer = setTimeout(() => setAnswer(null), ANSWER_MS);
+    if (!last) return;
+    const timer = setTimeout(() => setLast(undefined), ANSWER_MS);
     return () => clearTimeout(timer);
-  }, [answer]);
+  }, [last]);
 
   const icon: MaterialSymbol = answer ? ANSWER_ICON[answer] : 'share';
 
   return {
     answer,
     icon,
-    /** Null while idle: the caller names what the link points at. */
     answerLabel: answer ? t(ANSWER_TEXT[answer]) : null,
     copy: () => {
-      void copyShareLink(spot).then((ok) => setAnswer(ok ? 'copied' : 'failed'));
+      void copyShareLink(spot).then((ok) =>
+        setLast({ subject, answer: ok ? 'copied' : 'failed' }),
+      );
     },
   };
 };
