@@ -28,11 +28,11 @@ RVT's other visualizations come along.
 POST /render/sunloop        Authorization: <the caller's PocketBase token>
 { "evidence": "<record id>", "legend": { … } }
 
-202  queued                     409  already queued or running for that row
-400  no body, or not JSON       422  the row is not a renderable sunloop
-401  no token                   429  queue full, or this owner has one in flight
-403  may not write that row     502  PocketBase or the producer fell over
-404  no such row
+202  queued                     408  the body stalled on the way in
+400  no body, or not JSON       409  already queued or running for that row
+401  no token                   422  the row is not a renderable sunloop
+403  may not write that row     429  queue full, or this caller has one in flight
+404  no such row                502  PocketBase or the producer fell over
 ```
 
 `GET /render/health` answers `{ok, pending, capacity}`, which is what
@@ -70,16 +70,39 @@ Signed-in-only falls out of the token check. On top of it:
 | --- | --- |
 | One worker thread, serial | `server.py` |
 | Queue of 8, counted as `len(pending)` rather than `jobs.full()` so a request thread can never block on the put | `QUEUE_MAX` |
-| One job per owner, queued or running | `PER_OWNER_MAX` |
+| One job per caller, queued or running | `PER_CALLER_MAX` |
 | Footprint ≤ 505 m a side (`MAX_SIDE_M` in `src/map/bbox.ts` plus round-trip slack) | `bbox_of` |
 | 1600 px a side, whatever the ground publishes | `sunloop.MAX_FRAME_PX` |
 | Step must divide 360, ≤ 45°; fps 1–60 | `spec_of` |
 | 900 s an encode, the feed included, then the child is killed | `sunloop.ENCODE_TIMEOUT_S` |
 | 64 kB request body | `MAX_BODY_BYTES` |
+| 10 s a request, headers and body together | `REQUEST_TIMEOUT_S` |
 | `cpus: 2.0`, `mem_limit: 2g` | `docker-compose.yml` |
 
 The compose limits are the ones that matter for the stack: a render must not be
 able to starve Caddy or PocketBase.
+
+**The caller, not the row's owner.** `PER_CALLER_MAX` buckets by whoever holds
+the token, because the collection rules let an admin and a spot's author write
+somebody else's evidence: counting the row's owner would let one admin fill the
+queue across eight readers' spots, and would refuse a reader who has queued
+nothing. The id comes out of the PocketBase JWT's payload, base64url-decoded and
+**not verified** — `pb.claim` is still the only thing deciding whether a token
+may write a row, and a payload edited to name somebody else no longer verifies
+there, so the slot it took is given straight back on the 403. A token whose
+payload will not read shares one bucket rather than escaping the count. What a
+forged claim buys is a different bucket, and `QUEUE_MAX` bounds the total either
+way.
+
+**The request timeout is a thread bound, not a courtesy.** `/render/*` is public
+through a plain Caddy `reverse_proxy`, which streams rather than buffers, and the
+token is not looked at until the body is read. So the handler carries a
+`timeout`, which `socketserver` puts on the connection, and the body is read
+`read1` at a time against one deadline rather than in a single blocking `read` —
+a `read` that has asked for 64 kB does not come back until it has them, and the
+socket timeout is renewed by every byte. A body that stalls is answered 408 and
+the connection closed. `protocol_version` stays HTTP/1.0: with no keep-alive a
+connection carries one request, so the deadline bounds the whole thread.
 
 ## The render
 

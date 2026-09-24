@@ -9,11 +9,13 @@ Progress goes back into the row's `meta.job`, which the app is already
 subscribed to, so a render survives a reload or a closed tab.
 """
 
+import base64
 import json
 import logging
 import os
 import queue
 import threading
+import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -24,15 +26,26 @@ import sunloop
 PORT = int(os.environ.get("PORT", "8080"))
 
 QUEUE_MAX = 8
-# Per owner, in flight or waiting. A reader who wants a second loop can have it
+# Per caller, in flight or waiting. A reader who wants a second loop can have it
 # when the first one lands.
-PER_OWNER_MAX = 1
+PER_CALLER_MAX = 1
 
 # `MAX_SIDE_M` in `src/map/bbox.ts`, plus room for the metre or two a square
 # built in EPSG:25833 gains on the way out to lon/lat and back.
 MAX_SIDE_M = 505
 
 MAX_BODY_BYTES = 64 * 1024
+
+# A whole request, headers and body, from a browser posting well under 64 kB of
+# JSON: a second is generous and ten survives a stalled radio. `/render/*` is
+# public through a Caddy `reverse_proxy`, which streams rather than buffers, so
+# without this a client that announces a body and then dribbles parks a thread
+# per connection until the container's 2 GB is gone.
+REQUEST_TIMEOUT_S = 10
+
+# Handed to a caller whose token carries no readable id. One bucket for all of
+# them, because a bucket per unreadable token is no bucket at all.
+UNKNOWN_CALLER = "?"
 
 # `meta` is capped at 10 kB by the collection, and a failure detail is the one
 # thing here that can run long.
@@ -41,7 +54,10 @@ MAX_DETAIL_CHARS = 300
 log = logging.getLogger("rendersvc")
 
 jobs = queue.Queue(maxsize=QUEUE_MAX)
-# Evidence id -> owner id, for both the duplicate guard and the per-owner count.
+# Evidence id -> the caller who asked, for both the duplicate guard and the
+# per-caller count. Who asked and not whose row it is: an admin and a spot's
+# author may both write somebody else's evidence, so the row's owner names
+# neither the reader to hold to one at a time nor the one to refuse.
 pending = {}
 lock = threading.Lock()
 
@@ -55,6 +71,27 @@ class Refused(Exception):
         super().__init__(reason)
         self.status = status
         self.reason = reason
+
+
+def caller_of(token):
+    """The `id` claim out of the caller's PocketBase JWT, **unverified**. It is a
+    fairness bucket and nothing else: `pb.claim` is still the only thing that
+    decides whether this token may write the row, and a payload edited to name
+    somebody else no longer verifies there. A token that cannot be read at all
+    shares `UNKNOWN_CALLER` rather than escaping the count."""
+    words = token.split()
+    parts = words[-1].split(".") if words else []
+    if len(parts) == 3:
+        try:
+            payload = base64.urlsafe_b64decode(parts[1] + "=" * (-len(parts[1]) % 4))
+            claims = json.loads(payload)
+        except (ValueError, TypeError):
+            return UNKNOWN_CALLER
+        if isinstance(claims, dict):
+            claimed = claims.get("id")
+            if isinstance(claimed, str) and claimed:
+                return claimed[:64]
+    return UNKNOWN_CALLER
 
 
 def _number(value, low, high):
@@ -146,7 +183,7 @@ def accept(token, body):
     meta = record.get("meta")
     spec = spec_of(meta)
     bbox = bbox_of(record)
-    owner = record.get("owner") or ""
+    caller = caller_of(token)
     # A retry reads back the marker the failed attempt left. Every write below
     # is built from this, so drop it here or a successful second run lands a row
     # whose meta still says it failed.
@@ -155,17 +192,17 @@ def accept(token, body):
     with lock:
         if record_id in pending:
             raise Refused(409, "already queued")
-        if sum(1 for o in pending.values() if o == owner) >= PER_OWNER_MAX:
+        if sum(1 for c in pending.values() if c == caller) >= PER_CALLER_MAX:
             raise Refused(429, "one render at a time")
         # `pending` and not `jobs.full()`: it counts the running job too, so the
         # queue can never be full when the put below happens and a request
         # thread can never block on it.
         if len(pending) >= QUEUE_MAX:
             raise Refused(429, "the queue is full")
-        pending[record_id] = owner
+        pending[record_id] = caller
 
     # Anything that goes wrong before the put has to give the slot back, or the
-    # owner is refused 429 for the life of the container.
+    # caller is refused 429 for the life of the container.
     queued = False
     try:
         try:
@@ -240,6 +277,12 @@ worker_thread = threading.Thread(target=worker, daemon=True)
 class Handler(BaseHTTPRequestHandler):
     server_version = "rendersvc"
     sys_version = ""
+    # `StreamRequestHandler.setup` puts this on the connection, so it bounds the
+    # request line and the headers too. HTTP/1.0 and no keep-alive — the default
+    # `protocol_version` — is what makes it bound the whole connection: a
+    # connection carries one request and is closed, so no thread can be held
+    # open between requests.
+    timeout = REQUEST_TIMEOUT_S
 
     def log_message(self, fmt, *args):
         log.info("%s %s", self.address_string(), fmt % args)
@@ -251,6 +294,35 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def read_body(self, length):
+        """The body under one deadline, or `None`. `read1` and not `read`: the
+        socket timeout is per recv and `read` does not come back until it has
+        every byte it asked for, so a client sending one byte at a time renews
+        the timeout forever and parks the thread. One raw read at a time is what
+        lets the deadline be checked."""
+        deadline = time.monotonic() + self.timeout
+        chunks = []
+        remaining = length
+        try:
+            while remaining:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    return None
+                self.connection.settimeout(left)
+                try:
+                    chunk = self.rfile.read1(remaining)
+                except OSError:
+                    return None
+                if not chunk:
+                    return None
+                chunks.append(chunk)
+                remaining -= len(chunk)
+        finally:
+            # The refusal still has to be written, and the last budget left on
+            # the socket may be all but spent.
+            self.connection.settimeout(self.timeout)
+        return b"".join(chunks)
 
     def do_GET(self):
         if self.path != "/health":
@@ -281,8 +353,15 @@ class Handler(BaseHTTPRequestHandler):
         if length <= 0 or length > MAX_BODY_BYTES:
             self.reply(400, {"error": "no body, or too much of one"})
             return
+        raw = self.read_body(length)
+        if raw is None:
+            # Whatever the client is still dribbling is not a request, and the
+            # bytes already sent are not the start of the next one.
+            self.close_connection = True
+            self.reply(408, {"error": "the body did not arrive"})
+            return
         try:
-            body = json.loads(self.rfile.read(length))
+            body = json.loads(raw)
             if not isinstance(body, dict):
                 raise ValueError("not an object")
         except ValueError:
