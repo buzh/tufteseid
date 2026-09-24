@@ -164,16 +164,25 @@ def accept(token, body):
             raise Refused(429, "the queue is full")
         pending[record_id] = owner
 
+    # Anything that goes wrong before the put has to give the slot back, or the
+    # owner is refused 429 for the life of the container.
+    queued = False
     try:
-        # The claim is the write-permission gate: the view rule lets a guest
-        # read a public spot's evidence, so reading it proved nothing.
-        pb.claim(record_id, token, {**meta, "job": {"state": "queued", "at": now()}})
-    except pb.PbError as e:
-        with lock:
-            pending.pop(record_id, None)
-        raise Refused(403 if e.status in (401, 403, 404) else 502, e.detail) from e
+        try:
+            # The claim is the write-permission gate: the view rule lets a guest
+            # read a public spot's evidence, so reading it proved nothing.
+            pb.claim(
+                record_id, token, {**meta, "job": {"state": "queued", "at": now()}}
+            )
+        except pb.PbError as e:
+            raise Refused(403 if e.status in (401, 403, 404) else 502, e.detail) from e
+        jobs.put((record_id, token, spec, bbox, meta, legend_of(body)))
+        queued = True
+    finally:
+        if not queued:
+            with lock:
+                pending.pop(record_id, None)
 
-    jobs.put((record_id, token, spec, bbox, meta, legend_of(body)))
     log.info("queued %s (%s, %s m)", record_id, spec["model"], round(bbox[2] - bbox[0]))
     return {"state": "queued", "pending": len(pending)}
 
@@ -215,12 +224,17 @@ def worker():
                         },
                     },
                 )
-            except pb.PbError as write_failed:
+            # Anything at all: an exception out of here unwinds past `while True`
+            # and there is no second worker to take the next job.
+            except Exception as write_failed:
                 log.warning("%s could not record the failure: %s", record_id, write_failed)
         finally:
             with lock:
                 pending.pop(record_id, None)
             jobs.task_done()
+
+
+worker_thread = threading.Thread(target=worker, daemon=True)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -244,7 +258,13 @@ class Handler(BaseHTTPRequestHandler):
             return
         with lock:
             depth = len(pending)
-        self.reply(200, {"ok": True, "pending": depth, "capacity": QUEUE_MAX})
+        # A dead worker leaves the service answering every other request
+        # normally while nothing renders, so it is what `ok` means.
+        alive = worker_thread.is_alive()
+        self.reply(
+            200 if alive else 503,
+            {"ok": alive, "pending": depth, "capacity": QUEUE_MAX},
+        )
 
     def do_POST(self):
         if self.path != "/sunloop":
@@ -281,7 +301,7 @@ def main():
     logging.basicConfig(
         level=logging.INFO, format="[rendersvc] %(asctime)s %(message)s"
     )
-    threading.Thread(target=worker, daemon=True).start()
+    worker_thread.start()
     log.info("listening on %s, queue %s, pocketbase %s", PORT, QUEUE_MAX, pb.BASE)
     ThreadingHTTPServer(("", PORT), Handler).serve_forever()
 

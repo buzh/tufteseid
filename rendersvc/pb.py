@@ -3,6 +3,7 @@ token. The collection rules decide what a job may read and write, so the service
 holds no credentials and does not restate the permission model.
 """
 
+import http.client
 import json
 import os
 import urllib.error
@@ -28,7 +29,16 @@ class PbError(Exception):
         self.detail = detail
 
 
+def _error_body(e):
+    try:
+        return e.read(2000).decode("utf-8", "replace")
+    except Exception:
+        return ""
+
+
 def _call(method, path, token, body=None, content_type=None, timeout=READ_TIMEOUT_S):
+    """Raises `PbError` and nothing else, so a caller that handles it handles
+    every way the call can go wrong."""
     headers = {"Authorization": token}
     if content_type:
         headers["Content-Type"] = content_type
@@ -39,9 +49,13 @@ def _call(method, path, token, body=None, content_type=None, timeout=READ_TIMEOU
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.load(response)
     except urllib.error.HTTPError as e:
-        raise PbError(e.code, e.read(2000).decode("utf-8", "replace")) from e
+        raise PbError(e.code, _error_body(e)) from e
     except OSError as e:
         raise PbError(502, str(e)) from e
+    # A truncated or non-JSON body arrives as `http.client.IncompleteRead` or
+    # `json.JSONDecodeError`, neither of which is an `OSError`.
+    except (http.client.HTTPException, ValueError) as e:
+        raise PbError(502, f"{type(e).__name__}: {e}") from e
 
 
 def _record_path(record_id, expand=False):

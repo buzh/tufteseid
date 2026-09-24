@@ -36,7 +36,10 @@ POST /render/sunloop        Authorization: <the caller's PocketBase token>
 ```
 
 `GET /render/health` answers `{ok, pending, capacity}`, which is what
-`scripts/live-check.sh` asserts.
+`scripts/live-check.sh` asserts. `ok` is the worker thread's liveness and the
+status follows it: 503 when the thread is gone, 200 while it is running. A queue
+depth is not health — every other route keeps answering normally when the only
+worker has stopped, so that is the one thing the probe has to see.
 
 **The client names a row, not a rectangle.** The sidecar reads
 `/api/collections/evidence/records/{id}?expand=spot` with the caller's own token;
@@ -177,15 +180,24 @@ bar and no words at all.
 
 ## Failure modes
 
+There is one worker and it is never replaced, so nothing thrown inside the loop
+body is allowed to leave it: a job that fails is logged and marked, and a
+failure write that itself fails is logged and dropped. `pb._call` raises
+`PbError` and nothing else — a truncated or non-JSON answer from PocketBase is
+converted there rather than escaping as a `JSONDecodeError` — and both call
+sites catch broadly anyway, because a thread that unwinds takes every later
+render with it. If the thread stops all the same, `/health` answers 503 and
+`live-check.sh` fails, rather than reporting a sidecar that renders nothing.
+
 | What happens | What the row says |
 | --- | --- |
 | No laser data over the footprint, or a grid that decodes entirely sparse | `job.state = empty` — not a failure, and nothing a retry would change |
 | `exportImage` sheds (a text body under a 200 status) | five retries with backoff inside `fetch_grid`, then `failed` |
 | The coverage probe itself errors | logged, render continues at 0.25 m |
 | ffmpeg fails, or the file will not fit after three encodes | `failed`, with ffmpeg's stderr in `job.detail` (300 chars) |
-| The worker dies mid-job | the `running` marker goes stale after 15 minutes and reads as `failed` |
-| PocketBase refuses the claim | 403 to the caller, nothing queued, no marker written |
-| The failure write itself fails | logged and dropped; the stale rule catches the row |
+| The container is restarted mid-job | the `running` marker goes stale after 15 minutes and reads as `failed`; the queue is not persisted |
+| PocketBase refuses the claim | 403 to the caller, the queue slot is given back, no marker written |
+| The failure write itself fails | logged and dropped; the loop takes the next job and the stale rule catches the row |
 
 ## Deploy
 
