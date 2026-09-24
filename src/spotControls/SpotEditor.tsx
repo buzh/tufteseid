@@ -20,7 +20,6 @@ import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
 import { formatPoint } from '../spots/geo';
 import styles from './SpotBox.module.css';
-import { SpotShareButton } from './SpotShareButton';
 import type { SpotDraftController } from './useSpotDraft';
 
 export const SpotEditor = ({
@@ -42,7 +41,6 @@ export const SpotEditor = ({
       className={styles.panel}
       icon="add_location"
       title={spot.draft.recordId ? t('spots.editTitle') : t('spots.newTitle')}
-      actions={record && <SpotShareButton spot={record} />}
       onClose={spot.abort}
       unsaved={spot.dirty}
       footer={

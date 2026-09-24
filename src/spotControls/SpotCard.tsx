@@ -21,7 +21,6 @@ import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
 import { useConfirm } from '../ui/useConfirm';
 import styles from './SpotBox.module.css';
-import { SpotShareButton } from './SpotShareButton';
 
 type Failure = 'visibility' | 'delete';
 
@@ -79,7 +78,6 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
         icon="location_on"
         title={spot.name}
         onClose={() => setActive(null)}
-        actions={<SpotShareButton spot={spot} />}
         footer={
           (readable > 0 || mayEdit) && (
             <>
