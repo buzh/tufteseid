@@ -44,8 +44,8 @@ export const ORIGINS: Record<OriginId, Origin> = {
   // where a MapProxy hit would report a dead service as up.
   hoyde: {
     probeUrl: wmsProbe(
-      '/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833',
-      'NHM_DTM_TOPOBATHY_25833:skyggerelieff',
+      '/wms/geonorge/wms.hoyde-dtm-nhm-25833',
+      'NHM_DTM_25833:skyggerelieff',
     ),
     prefixes: [
       '/wms/geonorge/wms.hoyde-',

@@ -77,8 +77,8 @@ tiled 128×128, never striped.
 ### Mosaic choice — no fallback to the national one
 
 The app uses per-project `Prosjekt_DTM` / `Prosjekt_DOM` (down to 0.25 m), never
-national `NHM_DTM_TOPOBATHY_25833` / `NHM_DOM_25833` (1 m, which the LiDAR
-background and `searchApi.ts` do use).
+national `NHM_DTM_25833` / `NHM_DOM_25833` (1 m, which the LiDAR background does
+use).
 
 The national mosaic is a blend: its DTM10 rows carry `MINPS: 0`, so where NHM
 never flew it silently serves 10 m contour-derived elevation upsampled — HTTP

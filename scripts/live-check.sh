@@ -199,7 +199,7 @@ check wms-topo \
   200 image/png 1000
 
 check wms-lidar-national \
-  "$BASE/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=NHM_DTM_TopoBathy_25833:skyggerelieff&STYLES=&CRS=EPSG:25833&BBOX=$BBOX&WIDTH=256&HEIGHT=256&FORMAT=image/png" \
+  "$BASE/wms/geonorge/wms.hoyde-dtm-nhm-25833?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=NHM_DTM_25833:skyggerelieff&STYLES=&CRS=EPSG:25833&BBOX=$BBOX&WIDTH=256&HEIGHT=256&FORMAT=image/png" \
   200 image/png 5000
 
 check wms-lidar-project \

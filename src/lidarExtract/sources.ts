@@ -26,7 +26,7 @@ export type LidarSource = {
   pointDensity: string | null;
   model: LidarModel;
   wmsUrl: string;
-  layerPrefix: string; // 'NHM_DTM_TOPOBATHY_25833' or the project name
+  layerPrefix: string; // 'NHM_DTM_25833' or the project name
   styles: string[];
 };
 

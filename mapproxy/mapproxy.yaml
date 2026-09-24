@@ -99,11 +99,15 @@ caches:
 sources:
   # No `on_error` anywhere: a shed response must reach the browser as a 500 so
   # src/upstream/ trips, rather than being stored as a blank tile.
+  # The land-only DTM, not the topobathy sibling: that one folds seabed rasters
+  # into its overviews from ~80 m/px out, so z8 and coarser came back with the
+  # sea hillshaded as if it were terrain. The two are pixel-identical on land at
+  # 10 m/px and finer.
   lidar_dtm_wms:
     type: wms
     req:
-      url: https://wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-topobathy-25833?
-      layers: NHM_DTM_TOPOBATHY_25833:skyggerelieff
+      url: https://wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-25833?
+      layers: NHM_DTM_25833:skyggerelieff
     supported_srs: ['EPSG:25833']
     concurrent_requests: 4
     http:

@@ -56,7 +56,7 @@ Cold load with no usable `?backgroundLayer` lands on `lidarHillshade`
 | Layer name | Type | URL / upstream | Grid | Zoom | Config |
 | --- | --- | --- | --- | --- | --- |
 | `lidarHillshade` (`skyggerelieff`) | XYZ | `/cache/lidar-dtm/{z}/{x}/{y}.png`, `/cache/lidar-dom/…`; `…-held` siblings while the `hoyde` breaker is open | EPSG:25833 | 0–16 | `elevation.ts` |
-| `lidarHillshade` (any other style) | WMS | `/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833` (`NHM_DTM_TOPOBATHY_25833`) or `wms.hoyde-dom-nhm-25833` (`NHM_DOM_25833`) | view | max 16 | `elevation.ts`, `lidarProjects.ts` |
+| `lidarHillshade` (any other style) | WMS | `/wms/geonorge/wms.hoyde-dtm-nhm-25833` (`NHM_DTM_25833`) or `wms.hoyde-dom-nhm-25833` (`NHM_DOM_25833`) | view | max 16 | `elevation.ts`, `lidarProjects.ts` |
 | `lidarProject` | WMS | `/wms/geonorge/wms.hoyde-dtm-prosjekt` / `wms.hoyde-dom-prosjekt`, `LAYERS=<project id>:<style>` | view | max 17 | `stack.ts`, `lidarProjects.ts` |
 | `lidarCvat` | XYZ | `/cvat/<path>/{z}/{x}/{y}.webp` | EPSG:25833 | per acquisition | `cvatGround.ts` |
 | `topo`, `topograatone`, `toporaster`, `sjokartraster` | WMTS | `cache.kartverket.no/v1/service` GetCapabilities, one document for all four | from capabilities | — | `kvCache.ts` |
@@ -93,7 +93,7 @@ plus two read-only views.
 
 | `/cache/<name>` | Upstream | `LAYERS` |
 | --- | --- | --- |
-| `lidar-dtm` | `wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-topobathy-25833` | `NHM_DTM_TOPOBATHY_25833:skyggerelieff` |
+| `lidar-dtm` | `wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-25833` | `NHM_DTM_25833:skyggerelieff` |
 | `lidar-dom` | `wms.geonorge.no/skwms1/wms.hoyde-dom-nhm-25833` | `NHM_DOM_25833:skyggerelieff` |
 | `lidar-dtm-held`, `lidar-dom-held` | none (`sources: []`) — the same MBTiles files, so a miss is transparent rather than an upstream render | — |
 | `topo-ref` | `wms.geonorge.no/skwms1/wms.topo` | `kd_veger,kd_jernbane,kd_stedsnavn,fkb_samferdsel,fkb_presentasjonsdata` |

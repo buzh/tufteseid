@@ -48,7 +48,7 @@ change. A name MapProxy does not publish 404s from MapProxy.
 
 | `/cache/` layer | Format | `meta_size` / `meta_buffer` | Upstream |
 |---|---|---|---|
-| `lidar-dtm` | palette PNG | `[2,2]` / 0 | `wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-topobathy-25833` |
+| `lidar-dtm` | palette PNG | `[2,2]` / 0 | `wms.geonorge.no/skwms1/wms.hoyde-dtm-nhm-25833` |
 | `lidar-dom` | palette PNG | `[2,2]` / 0 | `wms.geonorge.no/skwms1/wms.hoyde-dom-nhm-25833` |
 | `lidar-dtm-held`, `lidar-dom-held` | palette PNG, transparent | — | none (`sources: []`) |
 | `topo-ref`, `topo-ref-contours` | palette PNG, transparent | `[4,4]` / 80 | `wms.geonorge.no/skwms1/wms.topo` |
@@ -472,7 +472,7 @@ is the set of requests that stop answering together, not a hostname.
 
 | Origin | Prefixes | Probe |
 |---|---|---|
-| `hoyde` | `/wms/geonorge/wms.hoyde-`, `/wfs/geonorge/wfs.hoyde-`, `/arcgis/hoydedata/`, `/cache/lidar-dtm/`, `/cache/lidar-dom/` | 1×1 GetMap on `wms.hoyde-dtm-nhm-topobathy-25833` |
+| `hoyde` | `/wms/geonorge/wms.hoyde-`, `/wfs/geonorge/wfs.hoyde-`, `/arcgis/hoydedata/`, `/cache/lidar-dtm/`, `/cache/lidar-dom/` | 1×1 GetMap on `wms.hoyde-dtm-nhm-25833` |
 | `kartverketCache` | `cache.kartverket.no` (direct from the browser) | coarsest WMTS tile |
 | `ra` | `/wms/ra/` | 1×1 GetMap on `kulturminner2` |
 | `nib` | `/wms/nib/`, `/arcgis/nib/`, `/cache/flyfoto` | 1×1 GetMap on `ortofoto`, JPEG |
@@ -556,7 +556,7 @@ paths.
 
 ```
 docker compose exec wmscache nginx -T | grep 'read_timeout\|max_fails\|next_upstream'
-curl -sI "http://localhost:3030/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=NHM_DTM_TOPOBATHY_25833:skyggerelieff&CRS=EPSG:25833&BBOX=200000,6500000,300000,6600000&WIDTH=512&HEIGHT=512&FORMAT=image/png" | grep -i 'x-cache\|cache-control'
+curl -sI "http://localhost:3030/wms/geonorge/wms.hoyde-dtm-nhm-25833?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=NHM_DTM_25833:skyggerelieff&CRS=EPSG:25833&BBOX=200000,6500000,300000,6600000&WIDTH=512&HEIGHT=512&FORMAT=image/png" | grep -i 'x-cache\|cache-control'
 docker run --rm -v tufteseid_wmscache:/c alpine du -sh /c
 
 docker compose exec mapproxy mapproxy-util grids -f /mapproxy/config/mapproxy.yaml -g tufteseid25833

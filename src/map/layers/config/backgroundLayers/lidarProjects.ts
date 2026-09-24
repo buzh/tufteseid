@@ -316,12 +316,13 @@ export const bboxOverlapRatio = (
   return area > 0 ? (w * h) / area : 0;
 };
 
-// One service per model under a fixed layer prefix; only DTM has bathymetry.
+// One service per model under a fixed layer prefix. The DTM is the land-only
+// mosaic, not `-topobathy-`: that one shades the seabed from ~80 m/px out.
 export const NATIONAL_WMS: Record<LidarModel, { url: string; prefix: string }> =
   {
     dtm: {
-      url: '/wms/geonorge/wms.hoyde-dtm-nhm-topobathy-25833',
-      prefix: 'NHM_DTM_TOPOBATHY_25833',
+      url: '/wms/geonorge/wms.hoyde-dtm-nhm-25833',
+      prefix: 'NHM_DTM_25833',
     },
     dom: {
       url: '/wms/geonorge/wms.hoyde-dom-nhm-25833',
