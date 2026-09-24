@@ -164,11 +164,12 @@ export type LegendOptions = {
   fontSize: number;
 };
 
-type Cell =
-  | { kind: 'bar'; bar: ScaleBar; width: number }
-  | { kind: 'text'; text: string; width: number };
+type TextCell = { kind: 'text'; text: string; width: number };
 
-type Row = { left?: Cell; right?: Cell };
+type Cell = { kind: 'bar'; bar: ScaleBar; width: number } | TextCell;
+
+// The right column is rights lines and nothing else, so it never holds a bar.
+type Row = { left?: Cell; right?: TextCell };
 
 const SEP = ' · ';
 
@@ -245,7 +246,7 @@ export const drawLegend = (
   if (link) {
     left.push({ kind: 'text', text: link, width: ctx.measureText(link).width });
   }
-  const right: Cell[] = rights.filter(Boolean).map((text) => ({
+  const right: TextCell[] = rights.filter(Boolean).map((text) => ({
     kind: 'text' as const,
     text,
     width: ctx.measureText(text).width,
