@@ -8,6 +8,8 @@ import { currentUserAtom, isAdminAtom } from '../auth/atoms';
 import { EvidenceGallery } from '../evidence/EvidenceGallery';
 import { evidenceBbox } from '../evidence/spec';
 import { useSpotEvidence } from '../evidence/useSpotEvidence';
+import { sketchOf } from '../sketch/scene';
+import { SketchFade } from '../sketch/SketchFade';
 import {
   activeSpotAtom,
   editSpotDraftAtom,
@@ -145,6 +147,8 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
         {spot.credit && <div>{t('spots.credit', { name: spot.credit })}</div>}
         <div>{formatPoint(spot.point)}</div>
       </div>
+
+      {sketchOf(spot.sketch) && <SketchFade className={styles.sketchFade} />}
 
       {mayEdit && (
         <Switch

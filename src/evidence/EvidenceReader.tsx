@@ -12,6 +12,8 @@ import { useTranslation } from 'react-i18next';
 import { evidenceFileUrl } from '../api/evidence';
 import type { SpotRecord } from '../api/spots';
 import { mapAtom } from '../map/atoms';
+import { sketchOf } from '../sketch/scene';
+import { SketchFade } from '../sketch/SketchFade';
 import { spotReadingAtom } from '../spots/atoms';
 import { formatPoint } from '../spots/geo';
 import { cx } from '../ui/cx';
@@ -131,6 +133,8 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
       : '';
   const facts = current ? evidenceFacts(current, i18n.language) : [];
 
+  const hasSketch = sketchOf(spot.sketch) !== null;
+
   // The switch offers the other shape, and says so.
   const other: ReaderLayout = box.layout === 'wide' ? 'tall' : 'wide';
   const otherLabel = t(`evidence.layout.${other}`);
@@ -208,6 +212,10 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
                 )}
               </div>
             )}
+
+            {/* The drawing is over the pictures, and is an argument about
+                them rather than part of them. */}
+            {hasSketch && <SketchFade className={styles.sketch} />}
 
             <div className={styles.fade}>
               <Tooltip label={t('terrainControls.transparency')}>

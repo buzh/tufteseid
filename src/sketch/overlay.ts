@@ -1,11 +1,11 @@
 // One saved drawing on the map: a transparent layer re-exporting its scene at
 // the resolution the view is showing.
-import { useAtomValue } from 'jotai';
+import { atom, useAtom, useAtomValue } from 'jotai';
 import type { Extent } from 'ol/extent';
 import ImageLayer from 'ol/layer/Image';
 import type { Size } from 'ol/size';
 import ImageCanvasSource from 'ol/source/ImageCanvas';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { mapAtom } from '../map/atoms';
 import { metresPerScenePx } from './frame';
@@ -15,6 +15,18 @@ import type { Sketch } from './scene';
 // Over the terrain analysis (1), under its frame (4) and under the pin (6).
 // Inventory in docs/map-layers.md.
 const Z_INDEX = 2;
+
+/** Whether the drawing is on the ground at all. A reading lays pictures under
+ *  it, and the drawing is an argument about them, not part of them. */
+export const sketchShownAtom = atom(true);
+
+/** 0–100, as the reader's own slider is: how far the drawing is faded towards
+ *  the ground it annotates. */
+export const sketchFadeAtom = atom(0);
+
+/** `t` for tegning. Bound whenever a drawing is on the map, so it works from
+ *  the card and from the reading alike. */
+const TOGGLE_KEY = 't';
 
 // How far the view may drift from the export's resolution before a redraw.
 // `canvasFunction` runs on every frame of a pinch, so a tolerance near 1 queues
@@ -115,6 +127,10 @@ const drawEntry =
 /** Draws `sketch` over the ground it was made on, or nothing for null. */
 export const useSketchOverlay = (sketch: Sketch | null) => {
   const map = useAtomValue(mapAtom);
+  const [shown, setShown] = useAtom(sketchShownAtom);
+  const fade = useAtomValue(sketchFadeAtom);
+  const opacity = 1 - fade / 100;
+  const layerRef = useRef<ImageLayer<ImageCanvasSource> | null>(null);
 
   useEffect(() => {
     if (!sketch) return;
@@ -137,14 +153,42 @@ export const useSketchOverlay = (sketch: Sketch | null) => {
 
     const layer = new ImageLayer({
       source,
+      opacity,
+      visible: shown,
       zIndex: Z_INDEX,
       properties: { id: 'spotSketchOverlay' },
     });
+    layerRef.current = layer;
     map.addLayer(layer);
 
     return () => {
       entry.live = false;
+      layerRef.current = null;
       map.removeLayer(layer);
     };
+    // How it is shown is seeded here and kept in step by the effect below.
+    // Naming either would re-export the scene on every drag of the slider.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, sketch]);
+
+  useEffect(() => {
+    layerRef.current?.setOpacity(opacity);
+    layerRef.current?.setVisible(shown);
+  }, [opacity, shown]);
+
+  // A hidden layer is never asked for a canvas, so taking the drawing off also
+  // stops the scene being re-exported behind whatever is being read. The guard
+  // is for the draft form: `t` is a letter someone may be typing into a name.
+  useEffect(() => {
+    if (!sketch) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== TOGGLE_KEY) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+      setShown((was) => !was);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [sketch, setShown]);
 };

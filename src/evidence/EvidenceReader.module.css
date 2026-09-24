@@ -196,6 +196,13 @@
   min-width: 5rem;
 }
 
+/* `SketchFade` brings its own insides; what the footer says is how much of the
+   row it gets — the same as the picture's fade, two things over one ground. */
+.sketch {
+  flex: 0 1 10rem;
+  min-width: 5rem;
+}
+
 .fadeIcon {
   display: flex;
   color: var(--mantine-color-dimmed);
@@ -233,6 +240,7 @@
 }
 
 /* Stacked, the row's flex basis would be read as a height. */
+.tall .sketch,
 .tall .fade {
   flex: none;
 }

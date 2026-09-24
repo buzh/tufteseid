@@ -83,6 +83,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `keepOffersAtom` | same | Derived: the ground's offer (off the A half) and the terrain's, ground first. |
 | `readerLayoutAtom` | `evidence/readerWindow.ts` | Which way round the reading box is laid out, and beside it where it was dragged to, how big it may get and which wall it is docked against. Outside the component, which remounts per spot. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
+| `sketchShownAtom`, `sketchFadeAtom` | `sketch/overlay.ts` | Whether the open spot's drawing is on the ground, and how far it is faded towards it. A reading setting, not the record's: they outlive the spot the box was opened on. |
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |
 | `isSignedInAtom`, `isAdminAtom` | same | Derived, so a component does not re-render on an unrelated user field. |
 | `isAuthDialogOpenAtom`, `authPromptAtom` | same | Whether the dialog is up, and why when the reader did not press anything. |
@@ -163,6 +164,11 @@ holds the ground still and changes only how it was seen.
 - Arrow keys flip. `keyboardEventTarget` is the document (`map/atoms.ts`), so
   the listener is in the capture phase — OpenLayers' own keyboard pan would
   otherwise answer the same press.
+- The drawing sits above the pictures at z 2, so `SketchFade` (`src/sketch/`)
+  takes it off the ground or part of the way off it, and **`t`** — tegning —
+  toggles it. The shortcut is bound by `useSketchOverlay`, not by a box, so it
+  answers from the card as well; it is inert while Excalidraw has the map, and
+  it keeps its hands off a press aimed at an input.
 - A row whose render has not landed, or that has no rectangle, is not part of
   the reading; the gallery on the card is where it is waited on. A reading with
   nothing left in it steps back to the card.
