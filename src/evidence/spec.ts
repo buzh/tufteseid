@@ -1,18 +1,7 @@
-// A kept render is its parameters first and its pixels second. This is the
-// round trip: what the queue needs in order to make the image, flattened into
-// the record's JSON column and read back field by field afterwards.
-//
-// Identity and provenance are not the same set. Only the identifying fields
-// decide whether two rows are the same picture (`evidenceMatches`); the rest —
-// the acquisition's year, its point density, the photo date — ride along
-// because the catalogue that knew them is gone by the time anyone reads the
-// card, and "opptaksår 2016" is the difference between two readings of the
-// same field.
-
 import type { EvidenceMeta, EvidenceRecord } from '../api/evidence';
 import type { LidarModel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import type { DemModel } from '../terrain/dem';
-import type { Visualization } from '../terrain/shade';
+import { VISUALIZATIONS, type Visualization } from '../terrain/shade';
 
 /** The seamless best-available mosaic, as against one acquisition. */
 export const NIB_MOSAIC = 'mosaic';
@@ -58,19 +47,8 @@ const num = (v: unknown): number | null =>
 const str = (v: unknown): string | null =>
   typeof v === 'string' && v !== '' ? v : null;
 
-const VISUALIZATIONS: readonly string[] = [
-  'hillshade',
-  'multiHillshade',
-  'vat',
-  'svf',
-  'openPos',
-  'openNeg',
-  'lrm',
-  'slope',
-];
-
 const asVis = (v: unknown): Visualization | null =>
-  typeof v === 'string' && VISUALIZATIONS.includes(v)
+  typeof v === 'string' && (VISUALIZATIONS as readonly string[]).includes(v)
     ? (v as Visualization)
     : null;
 
@@ -198,8 +176,10 @@ const sameNumber = (a: number, b: number) => Math.abs(a - b) <= PARAM_TOLERANCE;
 
 /**
  * Whether this row is already the picture `spec` would produce over
- * `bbox25833`. Strict about the rectangle: a row kept before the footprint
- * moved covers different ground and must not read as kept.
+ * `bbox25833`. Only the identifying fields count — an acquisition's year and
+ * point density are stored for provenance, not identity. Strict about the
+ * rectangle: a row kept before the footprint moved covers different ground and
+ * must not read as kept.
  */
 export const evidenceMatches = (
   rec: EvidenceRecord,

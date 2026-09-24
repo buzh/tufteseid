@@ -1,11 +1,3 @@
-// Where the reading box sits, how big it may get and which way round it is
-// laid out. Held outside the component because the reader is keyed on the
-// spot: a box arranged around one reading must survive opening the next.
-//
-// The box always hugs its content. Nothing here ever sets a size, only a
-// corner to hang from and a ceiling to stop at, so a reading with three
-// pictures and no prose gets a box that small.
-
 import { atom, useAtom } from 'jotai';
 import {
   useCallback,
@@ -188,7 +180,7 @@ export const useReaderWindow = () => {
       // Primary button only: the context menu swallows a right-click's
       // `pointerup`, so that drag would never end.
       if (!event.isPrimary || event.button !== 0) return;
-      // The fold, the close and the layout switch share the title row.
+      // The close and the layout switch share the title row with the handle.
       if (mode === 'move' && (event.target as HTMLElement).closest('button')) {
         return;
       }
@@ -212,10 +204,8 @@ export const useReaderWindow = () => {
         x: event.clientX,
         y: event.clientY,
       };
-      // Nothing is written until the pointer actually moves, so a press on the
-      // title that turns out to be a click leaves the box as it was. The
-      // handover from the layout's CSS costs no jump whenever it happens: what
-      // the first move writes is this measurement plus the distance travelled.
+      // Deliberately writes no placement: a press that turns out to be a click
+      // must leave the box on the layout's own CSS anchor.
     };
 
   const move = (event: ReactPointerEvent<HTMLElement>) => {

@@ -1,12 +1,9 @@
-// Norge i bilder ortofoto over a rectangle: the seamless mosaic or one
-// acquisition, one stitcher. Same-origin through /wms/nib/* and /arcgis/nib/*
-// → Caddy → wmscache → nib-proxy, which injects the anonymous token. Tiling and
-// concurrency are `src/lidarExtract/stitch.ts`, the same as the LiDAR extract.
+// Same-origin through /wms/nib/* and /arcgis/nib/* → Caddy → wmscache →
+// nib-proxy, which injects the anonymous token.
 //
-// The ground layer reads the mosaic through mapproxy (`/cache/flyfoto`), which
-// is meta-tiled onto the app's own grid; a kept render asks the WMS directly,
-// because the point of keeping is the acquisition's own resolution rather than
-// the zoom level that happened to be up.
+// Not mapproxy's /cache/flyfoto, which is what the ground layer reads: that is
+// meta-tiled onto the app's own grid, and a kept render wants the acquisition's
+// own resolution rather than whatever zoom level happened to be up.
 
 import { transformExtent } from 'ol/proj';
 
