@@ -21,7 +21,7 @@ import { currentUserAtom } from '../auth/atoms';
 import { bboxToMetric } from '../map/bbox';
 import { useMayEditSpot } from '../spots/mayEdit';
 import { keepOffersAtom } from './offer';
-import { sortForMove } from './order';
+import { sortsForMove } from './order';
 import {
   enqueueRender,
   renderStates,
@@ -163,17 +163,21 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
   const reorder = useCallback(
     (id: string, to: number) => {
       if (!items) return;
-      const was = byId.current.get(id);
-      if (!was) return;
-      const sort = sortForMove(items, id, to);
-      if (sort == null) return;
+      const writes = sortsForMove(items, id, to);
+      const before = writes
+        .map((write) => byId.current.get(write.id))
+        .filter((rec) => rec !== undefined);
+      if (before.length !== writes.length) return;
+
       setFailed(false);
       // Written here first: `publish` re-sorts, so the row stays where the hand
       // left it rather than snapping back for the length of the round trip.
-      upsert({ ...was, sort });
-      setEvidenceSort(id, sort).catch((err) => {
+      writes.forEach((write, i) => upsert({ ...before[i], sort: write.sort }));
+      Promise.all(
+        writes.map((write) => setEvidenceSort(write.id, write.sort)),
+      ).catch((err) => {
         console.warn('[evidence] reorder failed', err);
-        upsert(was);
+        before.forEach((rec) => upsert(rec));
         setFailed(true);
       });
     },
