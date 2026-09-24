@@ -4,8 +4,10 @@
 
 import { atom, useAtomValue } from 'jotai';
 
-/** Spelled out so a tip's stored entry stays greppable. */
-const HINT_IDS = ['spotKeys'] as const;
+/** Spelled out so a tip's stored entry stays greppable. One id per surface,
+ *  not per key: the card and the reading answer to different keys, and a tip
+ *  waved off on one must not take the other's with it. */
+const HINT_IDS = ['spotKeys', 'readingKeys'] as const;
 
 export type HintId = (typeof HINT_IDS)[number];
 

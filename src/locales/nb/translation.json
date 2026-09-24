@@ -112,10 +112,8 @@
     "title": "Tips",
     "never": "Ikke vis igjen",
     "close": "Greit",
-    "spot": {
-      "sketch": "Trykk T for å vise eller skjule tegningen.",
-      "pictures": "Piltastene ← → blar i bildene når du leser lokaliteten."
-    }
+    "sketch": "Trykk T for å vise eller skjule tegningen.",
+    "pictures": "Piltastene ← → blar i bildene."
   },
   "kartControls": {
     "chipTitle": "{{variant}} — {{hint}}",

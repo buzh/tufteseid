@@ -19,6 +19,7 @@ import { formatPoint } from '../spots/geo';
 import { useMayEditSpot } from '../spots/mayEdit';
 import { cx } from '../ui/cx';
 import { ControlButton } from '../ui/ControlButton';
+import { Hint } from '../ui/Hint';
 import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
 import styles from './EvidenceReader.module.css';
@@ -142,6 +143,13 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   const other: ReaderLayout = box.layout === 'wide' ? 'tall' : 'wide';
   const otherLabel = t(`evidence.layout.${other}`);
 
+  // Both keys answer here, which the card's tip cannot say — a share link
+  // opens the reading and the card is never seen. One picture has nothing to
+  // flip to.
+  const tips: string[] = [];
+  if (hasSketch) tips.push(t('hints.sketch'));
+  if (readable.length > 1) tips.push(t('hints.pictures'));
+
   return (
     <div
       ref={box.boxRef}
@@ -152,153 +160,162 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
       )}
       style={box.placementStyle}
     >
-      <Panel
-        className={styles.panel}
-        icon="menu_book"
-        title={spot.name}
-        status={
-          spot.credit
-            ? `${t('spots.credit', { name: spot.credit })} · ${formatPoint(spot.point)}`
-            : formatPoint(spot.point)
-        }
-        handle={box.dragHandle}
-        actions={
-          <>
-            {/* The reading stands in for the card, so without this the card's
-                own edit button is behind a close that reads as leaving the
-                spot altogether. The draft returns here when it is put down. */}
-            {mayEdit && (
-              <Tooltip label={t('spots.edit')}>
+      <Hint
+        id="readingKeys"
+        tips={tips}
+        position={box.layout === 'wide' ? 'top' : 'left-start'}
+      >
+        <Panel
+          className={styles.panel}
+          icon="menu_book"
+          title={spot.name}
+          status={
+            spot.credit
+              ? `${t('spots.credit', { name: spot.credit })} · ${formatPoint(spot.point)}`
+              : formatPoint(spot.point)
+          }
+          handle={box.dragHandle}
+          actions={
+            <>
+              {/* The reading stands in for the card, so without this the
+                  card's own edit button is behind a close that reads as
+                  leaving the spot altogether. The draft returns here when it
+                  is put down. */}
+              {mayEdit && (
+                <Tooltip label={t('spots.edit')}>
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    size="sm"
+                    aria-label={t('spots.edit')}
+                    onClick={() => edit(spot)}
+                  >
+                    <Icon icon="edit" size={18} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+              <Tooltip label={otherLabel}>
                 <ActionIcon
                   variant="subtle"
                   color="gray"
                   size="sm"
-                  aria-label={t('spots.edit')}
-                  onClick={() => edit(spot)}
+                  aria-label={otherLabel}
+                  onClick={() => box.setLayout(other)}
                 >
-                  <Icon icon="edit" size={18} />
+                  <Icon icon={LAYOUT_ICON[other]} size={18} />
                 </ActionIcon>
               </Tooltip>
-            )}
-            <Tooltip label={otherLabel}>
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                size="sm"
-                aria-label={otherLabel}
-                onClick={() => box.setLayout(other)}
-              >
-                <Icon icon={LAYOUT_ICON[other]} size={18} />
-              </ActionIcon>
-            </Tooltip>
-          </>
-        }
-        // The box moves, resizes and closes; folding it away as well would be
-        // a fourth way to make it stop covering something.
-        collapsible={false}
-        onClose={() => setReading(false)}
-        footer={
-          <div className={styles.controls}>
-            <div className={styles.nav}>
-              <Tooltip label={t('evidence.previous')}>
-                <ControlButton
-                  icon="chevron_left"
-                  aria-label={t('evidence.previous')}
-                  onClick={() => step(-1)}
-                />
-              </Tooltip>
-              <span className={styles.count}>
-                {t('evidence.position', {
-                  index: index + 1,
-                  total: readable.length,
-                })}
-              </span>
-              <Tooltip label={t('evidence.next')}>
-                <ControlButton
-                  icon="chevron_right"
-                  aria-label={t('evidence.next')}
-                  onClick={() => step(1)}
-                />
-              </Tooltip>
-            </div>
-
-            {/* In the slack between the buttons and the slider rather than on
-                a line of its own: in the bar layout there is nothing else to
-                put there. */}
-            {current && (
-              <div className={styles.caption}>
-                <span className={styles.captionTitle}>{title}</span>
-                {facts.length > 0 && (
-                  <span className={styles.facts}>{facts.join(' · ')}</span>
-                )}
-              </div>
-            )}
-
-            {/* The drawing is over the pictures, and is an argument about
-                them rather than part of them. */}
-            {hasSketch && <SketchFade className={styles.sketch} />}
-
-            <div className={styles.fade}>
-              <Tooltip label={t('terrainControls.transparency')}>
-                <span className={styles.fadeIcon}>
-                  <Icon icon="opacity" size={16} />
-                </span>
-              </Tooltip>
-              <Slider
-                className={styles.slider}
-                size="xs"
-                min={0}
-                max={100}
-                step={5}
-                label={(value) => `${value} %`}
-                aria-label={t('terrainControls.transparency')}
-                value={transparency}
-                onChange={setTransparency}
-              />
-            </div>
-          </div>
-        }
-      >
-        {spot.description && <p className={styles.prose}>{spot.description}</p>}
-
-        {items === null ? (
-          <div className={styles.note}>{t('evidence.loading')}</div>
-        ) : (
-          <div className={styles.strip}>
-            {readable.map((rec) => {
-              const recSpec = specOf(rec);
-              const label = recSpec
-                ? evidenceTitle(recSpec)
-                : t('evidence.unreadable');
-              return (
-                <Tooltip key={rec.id} label={label}>
-                  <button
-                    type="button"
-                    className={cx(
-                      styles.frame,
-                      rec.id === current?.id && styles.frameOn,
-                    )}
-                    aria-label={label}
-                    aria-pressed={rec.id === current?.id}
-                    onClick={() => setShownId(rec.id)}
-                  >
-                    <img
-                      className={styles.thumb}
-                      src={evidenceFileUrl(rec, '200x200')}
-                      alt={label}
-                    />
-                    <Icon
-                      icon={KIND_ICON[rec.kind]}
-                      size={12}
-                      className={styles.frameKind}
-                    />
-                  </button>
+            </>
+          }
+          // The box moves, resizes and closes; folding it away as well would be
+          // a fourth way to make it stop covering something.
+          collapsible={false}
+          onClose={() => setReading(false)}
+          footer={
+            <div className={styles.controls}>
+              <div className={styles.nav}>
+                <Tooltip label={t('evidence.previous')}>
+                  <ControlButton
+                    icon="chevron_left"
+                    aria-label={t('evidence.previous')}
+                    onClick={() => step(-1)}
+                  />
                 </Tooltip>
-              );
-            })}
-          </div>
-        )}
-      </Panel>
+                <span className={styles.count}>
+                  {t('evidence.position', {
+                    index: index + 1,
+                    total: readable.length,
+                  })}
+                </span>
+                <Tooltip label={t('evidence.next')}>
+                  <ControlButton
+                    icon="chevron_right"
+                    aria-label={t('evidence.next')}
+                    onClick={() => step(1)}
+                  />
+                </Tooltip>
+              </div>
+
+              {/* In the slack between the buttons and the slider rather than on
+                  a line of its own: in the bar layout there is nothing else to
+                  put there. */}
+              {current && (
+                <div className={styles.caption}>
+                  <span className={styles.captionTitle}>{title}</span>
+                  {facts.length > 0 && (
+                    <span className={styles.facts}>{facts.join(' · ')}</span>
+                  )}
+                </div>
+              )}
+
+              {/* The drawing is over the pictures, and is an argument about
+                  them rather than part of them. */}
+              {hasSketch && <SketchFade className={styles.sketch} />}
+
+              <div className={styles.fade}>
+                <Tooltip label={t('terrainControls.transparency')}>
+                  <span className={styles.fadeIcon}>
+                    <Icon icon="opacity" size={16} />
+                  </span>
+                </Tooltip>
+                <Slider
+                  className={styles.slider}
+                  size="xs"
+                  min={0}
+                  max={100}
+                  step={5}
+                  label={(value) => `${value} %`}
+                  aria-label={t('terrainControls.transparency')}
+                  value={transparency}
+                  onChange={setTransparency}
+                />
+              </div>
+            </div>
+          }
+        >
+          {spot.description && (
+            <p className={styles.prose}>{spot.description}</p>
+          )}
+
+          {items === null ? (
+            <div className={styles.note}>{t('evidence.loading')}</div>
+          ) : (
+            <div className={styles.strip}>
+              {readable.map((rec) => {
+                const recSpec = specOf(rec);
+                const label = recSpec
+                  ? evidenceTitle(recSpec)
+                  : t('evidence.unreadable');
+                return (
+                  <Tooltip key={rec.id} label={label}>
+                    <button
+                      type="button"
+                      className={cx(
+                        styles.frame,
+                        rec.id === current?.id && styles.frameOn,
+                      )}
+                      aria-label={label}
+                      aria-pressed={rec.id === current?.id}
+                      onClick={() => setShownId(rec.id)}
+                    >
+                      <img
+                        className={styles.thumb}
+                        src={evidenceFileUrl(rec, '200x200')}
+                        alt={label}
+                      />
+                      <Icon
+                        icon={KIND_ICON[rec.kind]}
+                        size={12}
+                        className={styles.frameKind}
+                      />
+                    </button>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          )}
+        </Panel>
+      </Hint>
 
       {/* Pointer-only, and nothing a reader without one is missing: the box
           opens at a size its layout already thought about. */}

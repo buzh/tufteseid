@@ -310,8 +310,10 @@ belongs to an arm; one that applies to the reading belongs to the tools.
   `Popover.Target` clones its child and dropping it would remount the surface.
   Waving a tip off puts it away for the page load, ticking the box writes its id
   to `hintsDismissed.v1` in localStorage. Ids live in the `HINT_IDS` list in
-  `src/ui/hints.ts`; one that leaves the list is dropped on read. The only one
-  so far is `spotKeys`, on `SpotCard`.
+  `src/ui/hints.ts`; one that leaves the list is dropped on read. One id per
+  surface, not per key: `spotKeys` on `SpotCard` says what `T` does, and
+  `readingKeys` on `EvidenceReader` says that and what the arrows do, because a
+  share link opens the reading and the card is never seen.
 
 ## Known gaps
 

@@ -73,12 +73,10 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
       });
   });
 
-  // Only the keys that answer: the T key is bound for as long as a drawing is
-  // on the map, the arrows only once the reading is open.
+  // Only the key that answers here. The arrows flip pictures in the reading,
+  // and belong to the tip `EvidenceReader` puts up once the reader is there.
   const hasSketch = sketchOf(spot.sketch) !== null;
-  const tips: string[] = [];
-  if (hasSketch) tips.push(t('hints.spot.sketch'));
-  if (readable > 0) tips.push(t('hints.spot.pictures'));
+  const tips = hasSketch ? [t('hints.sketch')] : [];
 
   return (
     <Hint id="spotKeys" tips={tips}>
