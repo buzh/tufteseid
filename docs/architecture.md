@@ -15,7 +15,7 @@ One row per directory under `src/`.
 | --- | --- |
 | `api/` | PocketBase singleton (`pocketbase.ts`) and the `spots` and `evidence` collection clients. |
 | `auth/` | OAuth2 dialog, the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
-| `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue, the gallery, and the reader that lays the kept renders back on the map. |
+| `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue, the gallery, the strip that puts the kept renders in order, and the reader that lays them back on the map. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
 | `grounds/` | The ground switch. Which ground is up is derived from the half's background layer, never stored. |
 | `heritageControls/` | The Kulturminner tool: which theme layers are ticked and how they are drawn. |
@@ -81,6 +81,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
 | `keepOffersAtom` | same | Derived: the ground's offer (off the A half) and the terrain's, ground first. |
+| `draftGroundAtom` | `evidence/draftGround.ts` | The kept render laid under an open draft: the picture being framed against and drawn over. Published by the strip, which is the only thing holding the rows. |
 | `readerLayoutAtom` | `evidence/readerWindow.ts` | Which way round the reading box is laid out, and beside it where it was dragged to, how big it may get and which wall it is docked against. Outside the component, which remounts per spot. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
 | `sketchShownAtom`, `sketchFadeAtom` | `sketch/overlay.ts` | Whether the open spot's drawing is on the ground, and how far it is faded towards it. A reading setting, not the record's: they outlive the spot the box was opened on. |
@@ -146,6 +147,38 @@ the tile guard and the theme-layer effect walk whatever maps exist.
 | --- | --- |
 | Kulturminner theme layers (`syncThemeLayers`, called once per map) | The heritage tip and card |
 | LiDAR footprints, split rather than mirrored — one viewport query, a layer per pane drawing that pane's own flight (`footprintTargets`) | The terrain analysis, frame and render both |
+
+## The pictures of a spot
+
+A spot's `evidence` rows are a sequence, not a set. `sort` is an ordering key in
+epoch milliseconds, so a row lands last by being created, and the strip in the
+draft box (`src/evidence/EvidenceStrip.tsx`) is where that order is changed.
+On the card the same rows are a gallery, because reading them is flipping
+through them and editing them is deciding what they are a sequence of.
+
+- **The cover is the first row with pixels.** Nothing marks one: the reading
+  opens on the first row it can lay on the ground, so dragging a picture to the
+  top is how a cover is chosen, and the star says which one is.
+- A drop writes one row. `sortForMove` (`evidence/order.ts`) takes the midpoint
+  between the row's new neighbours, so nothing else moves; a row dropped last
+  takes the current time instead, or a picture kept a moment later would sort
+  in front of it. The write is optimistic and puts the row back on a refusal.
+- The rows are one height, so a drag measures every slot's middle once at the
+  press and then takes the nearest one to the pointer: the preview moves rows
+  between slots, and the slots themselves do not move. The handle answers ↑ and
+  ↓ too, and stops the press reaching OpenLayers' keyboard pan.
+- Pictures are their own records, so reordering — like keeping and deleting —
+  is written when it happens, not by the draft's save button.
+- **Clicking a picture lays it on the map**, opaque, through `draftGroundAtom`
+  and the same `useEvidenceOverlay` the reader uses, driven from `SpotSurface`.
+  That is the ground the pen draws over, and it rides the map element, so a
+  sketch session's transform carries it along.
+- Entering the draw stage with a picture chosen fits the view to that picture's
+  own rectangle before `captureFrame`, so the frame holds the ground the
+  picture does and the strokes register to every other picture of the spot as
+  well. Strokes already made keep their own frame — nothing may move it.
+  Switching pictures inside a session swaps the overlay and leaves the frame
+  alone, which is the whole point: every row covers the same rectangle.
 
 ## Reading a spot
 

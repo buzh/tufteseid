@@ -93,6 +93,14 @@ export const attachEvidenceFile = async (
   );
 };
 
+/** Where the row sits in the reading. See `src/evidence/order.ts` for the key
+ *  itself: only the moved row is written, whatever the list is doing. */
+export const setEvidenceSort = async (
+  id: string,
+  sort: number,
+): Promise<EvidenceRecord> =>
+  hydrate(await pb.collection(COLLECTION).update<EvidenceRecord>(id, { sort }));
+
 export const deleteEvidence = async (id: string): Promise<void> => {
   await pb.collection(COLLECTION).delete(id);
 };

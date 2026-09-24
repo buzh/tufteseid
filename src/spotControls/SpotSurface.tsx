@@ -1,7 +1,9 @@
 import { useAtomValue } from 'jotai';
 import { lazy, Suspense, useEffect, useMemo } from 'react';
 
+import { draftGroundAtom } from '../evidence/draftGround';
 import { EvidenceReader } from '../evidence/EvidenceReader';
+import { useEvidenceOverlay } from '../evidence/evidenceOverlay';
 import { useRectangleAdjust } from '../map/rectAdjust';
 import { useSketchOverlay } from '../sketch/overlay';
 import { sketchOf } from '../sketch/scene';
@@ -37,9 +39,13 @@ const SketchCanvas = lazy(() =>
 /** Split out so the draft controller mounts and unmounts with the draft. */
 const SpotDraftBox = () => {
   const draft = useAtomValue(spotDraftAtom);
+  const active = useAtomValue(activeSpotAtom);
   // The parent renders this only when there is a draft.
   const spot = useSpotDraft(draft!);
-  return <SpotPanel spot={spot} />;
+  // Editing leaves the open spot where it was, and a draft is only ever opened
+  // on the open one; the guard is against a record the draft is not about.
+  const record = active?.id === draft?.recordId ? active : null;
+  return <SpotPanel spot={spot} record={record} />;
 };
 
 export const SpotSurface = () => {
@@ -49,6 +55,7 @@ export const SpotSurface = () => {
   const reading = useAtomValue(spotReadingAtom);
   const session = useAtomValue(sketchSessionAtom);
   const drawn = useAtomValue(spotSketchAtom);
+  const ground = useAtomValue(draftGroundAtom);
 
   // Nothing while a canvas is up (it already shows the scene), the draft's own
   // while one is open, otherwise the open spot's. Keyed on `active.id`/
@@ -79,6 +86,10 @@ export const SpotSurface = () => {
   });
   useSketchSession(draft?.stage === 'sketch');
   useSketchOverlay(shown);
+  // The picture the draft is working over. Opaque: it stands in for the ground
+  // rather than being compared with it, which is the reading's job. It rides
+  // the map element, so a sketch session's transform carries it along.
+  useEvidenceOverlay(ground?.url ?? '', ground?.extent ?? null, 1);
 
   return (
     <>

@@ -8,7 +8,12 @@ import {
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 
-import { SPOT_DESCRIPTION_MAX, SPOT_NAME_MAX } from '../api/spots';
+import {
+  SPOT_DESCRIPTION_MAX,
+  SPOT_NAME_MAX,
+  type SpotRecord,
+} from '../api/spots';
+import { EvidenceStrip } from '../evidence/EvidenceStrip';
 import { cx } from '../ui/cx';
 import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
@@ -17,7 +22,15 @@ import { formatPoint } from '../spots/geo';
 import styles from './SpotBox.module.css';
 import type { SpotDraftController } from './useSpotDraft';
 
-export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {
+export const SpotPanel = ({
+  spot,
+  record,
+}: {
+  spot: SpotDraftController;
+  /** The saved spot the draft is editing, or null for one being made: what the
+   *  pictures hang off. */
+  record: SpotRecord | null;
+}) => {
   const { t } = useTranslation();
   const placing = spot.stage === 'pin';
   const framing = spot.stage === 'footprint';
@@ -123,6 +136,8 @@ export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {
           {spot.hasSketch ? t('spots.sketchPresent') : t('spots.sketchNone')}
         </span>
       </Group>
+
+      {record && <EvidenceStrip spot={record} />}
 
       {spot.sketchTooBig && (
         <Alert color="red" mt="xs" p="xs">

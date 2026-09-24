@@ -16,6 +16,7 @@ import {
   createEvidence,
   deleteEvidence,
   listSpotEvidence,
+  setEvidenceSort,
   subscribeEvidence,
   type EvidenceRecord,
 } from '../api/evidence';
@@ -23,6 +24,7 @@ import type { SpotRecord } from '../api/spots';
 import { currentUserAtom, isAdminAtom } from '../auth/atoms';
 import { bboxToMetric } from '../map/bbox';
 import { keepOffersAtom } from './offer';
+import { sortForMove } from './order';
 import {
   enqueueRender,
   renderStates,
@@ -50,6 +52,9 @@ export type SpotEvidence = {
   keep: (spec: EvidenceSpec) => void;
   retry: (rec: EvidenceRecord) => void;
   remove: (id: string) => void;
+  /** Move a row to `to`, an index into `items` as it stands. The reading opens
+   *  on the first row with pixels, so this is also how a cover is chosen. */
+  reorder: (id: string, to: number) => void;
   stateOf: (id: string) => RenderState | undefined;
 };
 
@@ -159,6 +164,26 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     [user, footprint, spotId, upsert, render],
   );
 
+  const reorder = useCallback(
+    (id: string, to: number) => {
+      if (!items) return;
+      const was = byId.current.get(id);
+      if (!was) return;
+      const sort = sortForMove(items, id, to);
+      if (sort == null) return;
+      setFailed(false);
+      // Written here first: `publish` re-sorts, so the row stays where the hand
+      // left it rather than snapping back for the length of the round trip.
+      upsert({ ...was, sort });
+      setEvidenceSort(id, sort).catch((err) => {
+        console.warn('[evidence] reorder failed', err);
+        upsert(was);
+        setFailed(true);
+      });
+    },
+    [items, upsert],
+  );
+
   const remove = useCallback(
     (id: string) => {
       setFailed(false);
@@ -183,6 +208,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     keep,
     retry: render,
     remove,
+    reorder,
     stateOf: useCallback((id: string) => states.get(id), [states]),
   };
 };

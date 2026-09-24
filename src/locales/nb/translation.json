@@ -34,6 +34,14 @@
       "wide": "Legg boksen nederst",
       "tall": "Legg boksen til høyre"
     },
+    "order": {
+      "label": "Rekkefølge",
+      "hint": "Dra i håndtaket for å endre rekkefølgen. Det første bildet er forsiden. Trykk på et bilde for å legge det på kartet og tegne oppå det.",
+      "move": "Dra for å flytte bildet (↑↓)",
+      "cover": "Forsidebilde — lesingen åpner her",
+      "ground": "Legg bildet på kartet og tegn oppå det",
+      "groundOff": "Ta bildet av kartet"
+    },
     "facts": {
       "year": "Opptak {{year}}",
       "sun": "Sol {{azimuth}}°/{{altitude}}°",
