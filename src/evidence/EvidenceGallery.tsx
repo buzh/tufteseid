@@ -3,47 +3,16 @@
 // stands.
 
 import { Alert, Button, Group, Tooltip } from '@mantine/core';
-import { t } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
-import {
-  evidenceFileUrl,
-  type EvidenceKind,
-  type EvidenceRecord,
-} from '../api/evidence';
-import type { SpotRecord } from '../api/spots';
-import { lidarStyleLabel } from '../map/layers/config/backgroundLayers/lidarProjects';
+import { evidenceFileUrl, type EvidenceRecord } from '../api/evidence';
 import { ControlButton } from '../ui/ControlButton';
-import { Icon, type MaterialSymbol } from '../ui/Icon';
+import { Icon } from '../ui/Icon';
 import styles from './EvidenceGallery.module.css';
+import { evidenceResolution, evidenceTitle, KIND_ICON } from './labels';
 import type { RenderState } from './queue';
-import { NIB_MOSAIC, specOf, type EvidenceSpec } from './spec';
-import { useSpotEvidence } from './useSpotEvidence';
-
-const KIND_ICON: Record<EvidenceKind, MaterialSymbol> = {
-  lidar: 'landscape',
-  terrain: 'elevation',
-  flyfoto: 'photo_camera',
-};
-
-// The module-level `t`, as `lidarStyleLabel` uses: this is also a React key.
-const titleOf = (spec: EvidenceSpec): string => {
-  switch (spec.kind) {
-    case 'lidar':
-      return `${spec.sourceLabel} · ${lidarStyleLabel(spec.style)}`;
-    case 'terrain':
-      return t(`terrainControls.vis.${spec.vis}`);
-    case 'flyfoto':
-      return spec.projectId === NIB_MOSAIC
-        ? t('flyfotoControls.mosaic')
-        : (spec.projectName ?? spec.projectId);
-  }
-};
-
-const metresPerPxOf = (record: EvidenceRecord): number | null => {
-  const value = record.meta?.metresPerPx;
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-};
+import { specOf } from './spec';
+import type { SpotEvidence } from './useSpotEvidence';
 
 const EvidenceItem = ({
   record,
@@ -60,9 +29,9 @@ const EvidenceItem = ({
 }) => {
   const { t: translate } = useTranslation();
   const spec = specOf(record);
-  const title = spec ? titleOf(spec) : translate('evidence.unreadable');
+  const title = spec ? evidenceTitle(spec) : translate('evidence.unreadable');
   const thumb = evidenceFileUrl(record, '200x200');
-  const metresPerPx = metresPerPxOf(record);
+  const metresPerPx = evidenceResolution(record);
   const note =
     state === 'queued' || state === 'running'
       ? translate('evidence.rendering')
@@ -120,9 +89,8 @@ const EvidenceItem = ({
   );
 };
 
-export const EvidenceGallery = ({ spot }: { spot: SpotRecord }) => {
+export const EvidenceGallery = ({ evidence }: { evidence: SpotEvidence }) => {
   const { t: translate } = useTranslation();
-  const evidence = useSpotEvidence(spot);
   const { items, offers, mayEdit, mayKeep } = evidence;
 
   // Nothing kept, nothing to keep and no say in it: a heading over an empty box
@@ -142,22 +110,25 @@ export const EvidenceGallery = ({ spot }: { spot: SpotRecord }) => {
 
       {mayKeep && offers.length > 0 && (
         <Group gap="xs" mt="xs">
-          {offers.map((offer) => (
-            <Button
-              key={titleOf(offer.spec)}
-              size="compact-xs"
-              variant="default"
-              disabled={offer.kept}
-              leftSection={
-                <Icon icon={KIND_ICON[offer.spec.kind]} size={14} />
-              }
-              onClick={() => evidence.keep(offer.spec)}
-            >
-              {offer.kept
-                ? translate('evidence.kept', { what: titleOf(offer.spec) })
-                : translate('evidence.keep', { what: titleOf(offer.spec) })}
-            </Button>
-          ))}
+          {offers.map((offer) => {
+            const what = evidenceTitle(offer.spec);
+            return (
+              <Button
+                key={what}
+                size="compact-xs"
+                variant="default"
+                disabled={offer.kept}
+                leftSection={
+                  <Icon icon={KIND_ICON[offer.spec.kind]} size={14} />
+                }
+                onClick={() => evidence.keep(offer.spec)}
+              >
+                {offer.kept
+                  ? translate('evidence.kept', { what })
+                  : translate('evidence.keep', { what })}
+              </Button>
+            );
+          })}
         </Group>
       )}
 

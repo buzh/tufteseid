@@ -15,7 +15,7 @@ One row per directory under `src/`.
 | --- | --- |
 | `api/` | PocketBase singleton (`pocketbase.ts`) and the `spots` and `evidence` collection clients. |
 | `auth/` | OAuth2 dialog, the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
-| `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue, and the gallery. |
+| `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue, the gallery, and the reader that lays the kept renders back on the map. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
 | `grounds/` | The ground switch. Which ground is up is derived from the half's background layer, never stored. |
 | `heritageControls/` | The Kulturminner tool: which theme layers are ticked and how they are drawn. |
@@ -76,6 +76,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `clearSpotFootprintAtom` | same | Write-only. |
 | `place`/`edit`/`closeSpotDraftAtom`, `setSpotStageAtom` | same | Write-only. |
 | `activeSpotAtom` | same | The record being read — opened by a click, by an index row, or by `?lok=`. |
+| `spotReadingAtom` | same | The open spot's kept renders are being read on the map. Held as the id it was entered on, so closing the spot, opening another or starting a draft ends it. |
 | `spotRecordsAtom`, `spotsFailedAtom` | `spots/spotRecords.ts` | Every record the session may see, null until the list lands; and whether it never did. |
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
@@ -143,6 +144,30 @@ the tile guard and the theme-layer effect walk whatever maps exist.
 | --- | --- |
 | Kulturminner theme layers (`syncThemeLayers`, called once per map) | The heritage tip and card |
 | LiDAR footprints, split rather than mirrored — one viewport query, a layer per pane drawing that pane's own flight (`footprintTargets`) | The terrain analysis, frame and render both |
+
+## Reading a spot
+
+Every row of evidence covers the same rectangle — the spot's footprint, as
+`meta.bbox25833` records it — so a spot's kept renders are registered to one
+another. The reader (`src/evidence/EvidenceReader.tsx`) is what that buys: it
+stands in for the card, fits the map to the footprint, and lays one kept render
+at a time back on the ground it was made over (`evidenceOverlay.ts`). Flipping
+holds the ground still and changes only how it was seen.
+
+- The overlay is at z 1.25: over the terrain render, **under the B half**, so a
+  curtain reads a kept render against a live ground. The transparency slider
+  does the same against A.
+- The outgoing picture comes off only once the incoming one has pixels. A blink
+  between two readings of the same ground would make the comparison worthless.
+- Arrow keys flip. `keyboardEventTarget` is the document (`map/atoms.ts`), so
+  the listener is in the capture phase — OpenLayers' own keyboard pan would
+  otherwise answer the same press.
+- A row whose render has not landed, or that has no rectangle, is not part of
+  the reading; the gallery on the card is where it is waited on. A reading with
+  nothing left in it steps back to the card.
+- `/l/<code>` opens the reading rather than the card: a link is an invitation to
+  read. The view move is the reader's then, and `shareLink.ts` keeps its hands
+  off.
 
 ## URL parameters
 

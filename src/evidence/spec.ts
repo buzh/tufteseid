@@ -160,6 +160,22 @@ export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
   }
 };
 
+/**
+ * The ground the pixels cover, EPSG:25833, as the render wrote it — not the
+ * spot's footprint, which may have moved since. Null for a row that has no
+ * rectangle, and so cannot be laid back on the map.
+ */
+export const evidenceBbox = (
+  rec: EvidenceRecord,
+): [number, number, number, number] | null => {
+  const raw = rec.meta?.bbox25833;
+  if (!Array.isArray(raw) || raw.length !== 4) return null;
+  const out = raw.map(num);
+  return out.every((v) => v != null)
+    ? (out as [number, number, number, number])
+    : null;
+};
+
 // Metres; absorbs a JSON round trip, and a sub-metre nudge is the same ground.
 const BBOX_TOLERANCE_M = 1;
 

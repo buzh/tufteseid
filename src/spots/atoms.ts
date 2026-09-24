@@ -35,6 +35,25 @@ export const spotFootprintAdjustingAtom = atom(
 
 export const activeSpotAtom = atom<SpotRecord | null>(null);
 
+const readingSpotIdAtom = atom<string | null>(null);
+
+/**
+ * The open spot's evidence is being read on the map. Held as the id it was
+ * entered on and compared against the open record, so closing the spot,
+ * opening another or starting a draft ends the reading without any of them
+ * having to remember to.
+ */
+export const spotReadingAtom = atom(
+  (get) => {
+    const active = get(activeSpotAtom);
+    if (!active || get(spotDraftAtom)) return false;
+    return get(readingSpotIdAtom) === active.id;
+  },
+  (get, set, reading: boolean) => {
+    set(readingSpotIdAtom, reading ? (get(activeSpotAtom)?.id ?? null) : null);
+  },
+);
+
 /**
  * The footprint a standing frame should draw, or null. A draft's own wins over
  * the open spot's: while one is being edited it is the only rectangle that

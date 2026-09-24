@@ -1,6 +1,7 @@
 import { useAtomValue } from 'jotai';
 import { lazy, Suspense, useEffect, useMemo } from 'react';
 
+import { EvidenceReader } from '../evidence/EvidenceReader';
 import { useRectangleAdjust } from '../map/rectAdjust';
 import { useSketchOverlay } from '../sketch/overlay';
 import { sketchOf } from '../sketch/scene';
@@ -12,6 +13,7 @@ import {
   spotFootprintAdjustingAtom,
   spotFootprintAtom,
   spotPlacingAtom,
+  spotReadingAtom,
   spotSketchAtom,
 } from '../spots/atoms';
 import { useSpotPinAdjust } from '../spots/pinAdjust';
@@ -44,6 +46,7 @@ export const SpotSurface = () => {
   const draft = useAtomValue(spotDraftAtom);
   const placing = useAtomValue(spotPlacingAtom);
   const active = useAtomValue(activeSpotAtom);
+  const reading = useAtomValue(spotReadingAtom);
   const session = useAtomValue(sketchSessionAtom);
   const drawn = useAtomValue(spotSketchAtom);
 
@@ -88,12 +91,18 @@ export const SpotSurface = () => {
         </Suspense>
       )}
       {placing && <SpotPlacePrompt />}
-      {/* One box at a time — they share a corner. Keyed on the spot so opening
-          a second does not inherit the first's confirm. */}
+      {/* One box at a time: the draft panel and the card share a corner, and
+          the reader stands in for the card. Keyed on the spot so opening a
+          second does not inherit the first's confirm. */}
       {draft ? (
         <SpotDraftBox key={draft.id} />
       ) : (
-        active && <SpotCard key={active.id} spot={active} />
+        active &&
+        (reading ? (
+          <EvidenceReader key={active.id} spot={active} />
+        ) : (
+          <SpotCard key={active.id} spot={active} />
+        ))
       )}
     </>
   );

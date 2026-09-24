@@ -16,7 +16,7 @@ import {
   removeUrlParameter,
   setUrlParameter,
 } from '../shared/utils/urlUtils';
-import { activeSpotAtom } from './atoms';
+import { activeSpotAtom, spotReadingAtom } from './atoms';
 
 // Read at import: the writer effect below deletes `lok` on first render, so a
 // later read would race the parameter out of existence.
@@ -32,6 +32,7 @@ export const useSpotShareLink = () => {
   const user = useAtomValue(currentUserAtom);
   const active = useAtomValue(activeSpotAtom);
   const setActive = useSetAtom(activeSpotAtom);
+  const setReading = useSetAtom(spotReadingAtom);
   const setAuthDialogOpen = useSetAtom(isAuthDialogOpenAtom);
   const setAuthPrompt = useSetAtom(authPromptAtom);
 
@@ -53,6 +54,10 @@ export const useSpotShareLink = () => {
         unresolved.current = null;
         settled.current = true;
         setActive(record);
+        // A link is an invitation to read, not to edit: it opens the reading
+        // rather than the card. `EvidenceReader` steps back to the card for a
+        // spot with nothing to read.
+        setReading(true);
       })
       .catch(() => {
         if (!live) return;
@@ -73,14 +78,23 @@ export const useSpotShareLink = () => {
     return () => {
       live = false;
     };
-  }, [user, setActive, setAuthDialogOpen, setAuthPrompt]);
+  }, [user, setActive, setReading, setAuthDialogOpen, setAuthPrompt]);
+
+  // Read by the centring effect below without being one of its dependencies:
+  // `EvidenceReader` fits the footprint when a reading opens, and leaving one
+  // must not move the view at all.
+  const reading = useAtomValue(spotReadingAtom);
+  const readingNow = useRef(reading);
+  useEffect(() => {
+    readingNow.current = reading;
+  }, [reading]);
 
   // Keyed on the id: re-centring on every field change would fight a reader
   // panning around their own spot.
   const activeId = active?.id ?? null;
   const activePoint = active?.point;
   useEffect(() => {
-    if (!activeId || !activePoint) return;
+    if (!activeId || !activePoint || readingNow.current) return;
     const view = map.getView();
     view.animate({
       center: transform(

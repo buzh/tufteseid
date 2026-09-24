@@ -1,0 +1,136 @@
+/* The reading bar. Bottom-centre and wide, where the card it stands in for is
+   the narrow top-right box (`spotControls/SpotBox.module.css`): the strip only
+   works as a strip. */
+.reader {
+  position: absolute;
+  left: 50%;
+  bottom: var(--mantine-spacing-xs);
+  transform: translateX(-50%);
+  width: min(46rem, calc(100% - 2 * var(--mantine-spacing-xs)));
+  max-height: 60%;
+}
+
+/* The scale bar moves to the centre on a narrow window (`map/map.css`), where
+   this box would otherwise cover it. */
+@media (max-width: 768px) {
+  .reader {
+    bottom: 44px;
+  }
+}
+
+/* `pre-wrap` keeps the author's own paragraph breaks, as on the card. */
+.prose {
+  max-height: 6.5em;
+  overflow-y: auto;
+  font-size: var(--mantine-font-size-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  scrollbar-width: thin;
+}
+
+.note {
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-dimmed);
+}
+
+.strip {
+  display: flex;
+  gap: 6px;
+  margin-top: var(--mantine-spacing-xs);
+  padding-bottom: 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.frame {
+  position: relative;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-xs);
+  background: var(--mantine-color-dark-6);
+  cursor: pointer;
+}
+
+.frameOn {
+  border-color: var(--mantine-color-papaya-5);
+  box-shadow: 0 0 0 1px var(--mantine-color-papaya-5);
+}
+
+.thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+/* Which producer made it, legible over whatever the corner of the picture
+   happens to be. */
+.frameKind {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  color: var(--mantine-color-anthracite-0);
+  text-shadow: 0 0 3px var(--mantine-color-anthracite-9);
+}
+
+.caption {
+  margin-top: var(--mantine-spacing-xs);
+}
+
+.captionTitle {
+  font-size: var(--mantine-font-size-sm);
+}
+
+.facts {
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-dimmed);
+  font-variant-numeric: tabular-nums;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-sm);
+  width: 100%;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.count {
+  min-width: 4.5em;
+  text-align: center;
+  font-size: var(--mantine-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.hint {
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-dimmed);
+}
+
+.fade {
+  display: flex;
+  flex: 0 1 12rem;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  min-width: 6rem;
+  margin-left: auto;
+}
+
+.fadeIcon {
+  display: flex;
+  color: var(--mantine-color-dimmed);
+}
+
+.slider {
+  flex: 1;
+}

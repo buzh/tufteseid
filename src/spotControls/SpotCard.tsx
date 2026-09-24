@@ -6,10 +6,17 @@ import { useTranslation } from 'react-i18next';
 import { deleteSpot, updateSpot, type SpotRecord } from '../api/spots';
 import { currentUserAtom, isAdminAtom } from '../auth/atoms';
 import { EvidenceGallery } from '../evidence/EvidenceGallery';
-import { activeSpotAtom, editSpotDraftAtom } from '../spots/atoms';
+import { evidenceBbox } from '../evidence/spec';
+import { useSpotEvidence } from '../evidence/useSpotEvidence';
+import {
+  activeSpotAtom,
+  editSpotDraftAtom,
+  spotReadingAtom,
+} from '../spots/atoms';
 import { formatPoint } from '../spots/geo';
 import { copyShareLink } from '../spots/shareLink';
 import { ControlButton } from '../ui/ControlButton';
+import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
 import { useConfirm } from '../ui/useConfirm';
 import styles from './SpotBox.module.css';
@@ -31,6 +38,14 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   const isAdmin = useAtomValue(isAdminAtom);
   const setActive = useSetAtom(activeSpotAtom);
   const edit = useSetAtom(editSpotDraftAtom);
+  const setReading = useSetAtom(spotReadingAtom);
+
+  // Held here rather than in the gallery: the read button is in the footer,
+  // and it is the rows that say whether there is anything to read.
+  const evidence = useSpotEvidence(spot);
+  const readable = (evidence.items ?? []).filter(
+    (rec) => rec.file && evidenceBbox(rec),
+  ).length;
 
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -91,6 +106,16 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
               }}
             />
           </Tooltip>
+          {readable > 0 && (
+            <Button
+              size="xs"
+              variant="default"
+              leftSection={<Icon icon="menu_book" size={16} />}
+              onClick={() => setReading(true)}
+            >
+              {t('evidence.read')}
+            </Button>
+          )}
           {mayEdit && (
             <Group gap="xs" ml="auto">
               <Button
@@ -133,7 +158,7 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
         />
       )}
 
-      <EvidenceGallery spot={spot} />
+      <EvidenceGallery evidence={evidence} />
 
       {failed && (
         <Alert color="red" mt="xs" p="xs">

@@ -13,6 +13,8 @@
   },
   "evidence": {
     "label": "Bilder",
+    "read": "Les",
+    "loading": "Henter bilder …",
     "needsFootprint": "Marker et utsnitt på lokaliteten for å kunne ta vare på bilder av den.",
     "keep": "Ta vare på {{what}}",
     "kept": "{{what}} er tatt vare på",
@@ -24,7 +26,19 @@
     "retry": "Prøv igjen",
     "remove": "Slett bildet",
     "open": "Åpne bildet i full oppløsning",
-    "failed": "Fikk ikke hentet eller lagret bildene."
+    "failed": "Fikk ikke hentet eller lagret bildene.",
+    "position": "{{index}} av {{total}}",
+    "previous": "Forrige bilde",
+    "next": "Neste bilde",
+    "keyHint": "← → blar",
+    "facts": {
+      "year": "Opptak {{year}}",
+      "sun": "Sol {{azimuth}}°/{{altitude}}°",
+      "altitude": "Solhøyde {{altitude}}°",
+      "zFactor": "{{z}}× overdrivelse",
+      "radius": "Radius {{m}} m",
+      "rendered": "Laget {{date}}"
+    }
   },
   "flyfotoControls": {
     "mosaic": "Beste mosaikk",
