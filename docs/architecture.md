@@ -280,8 +280,13 @@ GroundSection half="a"  →  ViewSection  →  [GroundSection half="b"]  →  To
 
 The second ground section mounts only while two grounds are up. `ToolSection`
 holds the controls that apply whichever ground is up — Kulturminner, terrain,
-the spot `+` and its index, the account — with `UpstreamStatus` last, because it
-comes and goes on its own.
+the spot `+` and its index, the share link, the account — with `UpstreamStatus`
+last, because it comes and goes on its own.
+
+`ShareButton` hands over the open spot's short link, or, with no spot open, the
+address bar as it stands: every ground, overlay and the centre are already
+parameters on it. Same gesture and same two-second answer as the button in a
+spot's title row, both out of `src/spots/useShareCopy.ts`.
 
 **Which section a new control goes in is a question about the control, never
 about where there is room.** A control that means something different per ground

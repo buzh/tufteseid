@@ -235,7 +235,9 @@
       "only": "Underlag",
       "left": "Underlag, venstre halvdel",
       "right": "Underlag, høyre halvdel"
-    }
+    },
+    "shareSpot": "Kopier lenke til lokaliteten",
+    "shareView": "Kopier lenke til visningen"
   },
   "shared": {
     "errorBoundary": {

@@ -118,10 +118,16 @@ export const useSpotShareLink = () => {
   }, [activeCode]);
 };
 
-/** Returns whether the clipboard took it. */
-export const copyShareLink = async (spot: SpotRecord): Promise<boolean> => {
+/** A spot's short link, or — with no spot open — the address bar as it stands:
+ *  grounds, overlays and the centre are all already parameters on it. Returns
+ *  whether the clipboard took it. */
+export const copyShareLink = async (
+  spot: SpotRecord | null,
+): Promise<boolean> => {
   try {
-    await navigator.clipboard.writeText(shareUrlOf(spot.code));
+    await navigator.clipboard.writeText(
+      spot ? shareUrlOf(spot.code) : window.location.href,
+    );
     return true;
   } catch {
     return false;
