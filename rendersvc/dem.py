@@ -13,7 +13,6 @@ import time
 import urllib.parse
 import urllib.request
 
-import numpy as np
 from pyproj import Transformer
 
 # The float TIFF reader is shared with `vat-cache/`, copied into the image by
@@ -143,8 +142,3 @@ def fetch_grid(model, bbox25833, width, height):
             if attempt < FETCH_RETRIES - 1:
                 time.sleep(2 * (attempt + 1))
     raise RuntimeError(f"exportImage failed {FETCH_RETRIES} times: {last}")
-
-
-def has_values(grid: np.ndarray) -> bool:
-    """A rectangle the catalogue claims can still decode entirely sparse."""
-    return bool(np.isfinite(grid).any())

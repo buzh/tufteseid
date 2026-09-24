@@ -8,6 +8,10 @@ slope and aspect, `hillshade` never touches the DEM again and its own
 
 `byte_scale` is given a fixed 0..1 rather than its default per-array stretch, or
 every frame would be scaled to its own extremes and the loop would pump.
+
+Absence is stamped on afterwards. `byte_scale` turns a NaN into 255, which is
+pure white and reads as fully lit ground, so the holes are painted over the
+finished frame instead.
 """
 
 import subprocess
@@ -18,6 +22,7 @@ from datetime import datetime, timezone
 
 import numpy as np
 from rvt.vis import byte_scale, hillshade, slope_aspect
+from scipy.ndimage import binary_dilation
 
 import dem as dem_source
 import legend
@@ -33,6 +38,20 @@ MARGIN_PX = 4
 FPS_DEFAULT = 24
 STEP_DEG_DEFAULT = 5
 
+# What a pixel with no laser data is painted. A WebM in yuv420p carries no alpha
+# channel, so the browser producers' "no-data is transparent" is not available
+# here and absence has to be a grey a reader cannot read as terrain. Not 0 and
+# not 255: hillshade saturates at both ends, so whole slopes come out black and
+# fully lit faces come out white in any honest frame. Mid grey appears only as a
+# gradient value, never as a flat field, and it stays put while the sun turns.
+NO_DATA_VALUE = 128
+
+# Of the rectangle, after the rim around each hole is written off. Below half the
+# square the loop is a picture of its own holes, and the reader is better served
+# by `empty` — which says the ground has no laser data and offers no retry — than
+# by a frame of mid grey with terrain in one corner.
+MIN_COVERAGE = 0.5
+
 # The evidence file field's ceiling. Over it PocketBase answers 400, and it
 # answers the same to every retry of the same bytes.
 MAX_FILE_BYTES = 50000000
@@ -46,8 +65,9 @@ def _even(n):
 
 
 def render(spec, bbox25833, legend_content, log):
-    """(blob, filename, content_type, meta), or None where the ground has no
-    laser data — which is not a failure and nothing a retry would change."""
+    """(blob, filename, content_type, meta), or None where the ground has too
+    little laser data to be worth a picture — which is not a failure and nothing
+    a retry would change."""
     model = spec["model"]
     width_m = bbox25833[2] - bbox25833[0]
     height_m = bbox25833[3] - bbox25833[1]
@@ -64,11 +84,27 @@ def render(spec, bbox25833, legend_content, log):
 
     metres_per_px = max(native, max(width_m, height_m) / MAX_FRAME_PX)
     width = _even(round(width_m / metres_per_px))
-    height = _even(round(height_m / metres_per_px))
-    if width < 2 or height < 2:
+    if width < 2:
         return None
-    # What the pixels actually are, after the rounding to an even count.
+    # What the pixels actually are, after the rounding to an even count. The
+    # height follows from that one figure rather than from its own rounding,
+    # because `slope_aspect` is told resolution_x == resolution_y and the scale
+    # bar is drawn from it: square pixels have to be a fact, not an assumption.
     metres_per_px = width_m / width
+    height = _even(round(height_m / metres_per_px))
+    if height < 2:
+        return None
+    # So the rectangle is trimmed to the pixel grid about its centre, sub-pixel
+    # and well inside the slack MAX_SIDE_M already allows, and what is fetched is
+    # what `meta` reports.
+    centre_y = (bbox25833[1] + bbox25833[3]) / 2
+    half_m = height * metres_per_px / 2
+    bbox25833 = [
+        round(bbox25833[0], 3),
+        round(centre_y - half_m, 3),
+        round(bbox25833[2], 3),
+        round(centre_y + half_m, 3),
+    ]
 
     margin_m = MARGIN_PX * metres_per_px
     grid = dem_source.fetch_grid(
@@ -82,9 +118,20 @@ def render(spec, bbox25833, legend_content, log):
         width + 2 * MARGIN_PX,
         height + 2 * MARGIN_PX,
     )
-    if not dem_source.has_values(grid):
+    crop = slice(MARGIN_PX, -MARGIN_PX) if MARGIN_PX else slice(None)
+    # rvt 2.2.3 restores the input's NaN mask onto its output, so a hole is never
+    # drawn larger than it is — but its derivative substitutes a pixel's own value
+    # for a NaN neighbour (`roll_fill_nans`), which halves the gradient all round
+    # the rim. Dilating by that four-neighbour stencil writes the invented ring
+    # off with the hole. The mask is the ground's, so it serves every azimuth.
+    absent = binary_dilation(~np.isfinite(grid))[crop, crop]
+    coverage = 1 - float(absent.mean())
+    if coverage < MIN_COVERAGE:
         return None
-    log(f"dem {grid.shape[1]}x{grid.shape[0]} at {metres_per_px:.3f} m/px")
+    log(
+        f"dem {grid.shape[1]}x{grid.shape[0]} at {metres_per_px:.3f} m/px, "
+        f"{coverage:.1%} covered"
+    )
 
     step = int(spec.get("stepDeg") or STEP_DEG_DEFAULT)
     fps = int(spec.get("fps") or FPS_DEFAULT)
@@ -99,7 +146,6 @@ def render(spec, bbox25833, legend_content, log):
         output_units="radian",
         ve_factor=spec["zFactor"],
     )
-    crop = slice(MARGIN_PX, -MARGIN_PX) if MARGIN_PX else slice(None)
     band = legend.compose(width, height, legend_content, metres_per_px)
 
     frames = []
@@ -115,6 +161,7 @@ def render(spec, bbox25833, legend_content, log):
         )
         frame = byte_scale(shaded[crop, crop], c_min=0, c_max=1)
         frame = np.ascontiguousarray(frame)
+        frame[absent] = NO_DATA_VALUE
         if band:
             legend.apply(frame, band)
         frames.append(frame)
@@ -133,6 +180,7 @@ def render(spec, bbox25833, legend_content, log):
     meta = {
         "metresPerPx": round(metres_per_px, 4),
         "bbox25833": bbox25833,
+        "coverage": round(coverage, 3),
         "frames": len(frames),
         "durationMs": round(len(frames) * 1000 / fps),
         "renderedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),

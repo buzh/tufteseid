@@ -175,7 +175,10 @@ Radius ranges: horizon views 2 m … `horizonMaxRadiusMetres`, LRM 5–60 m step
 others none (`radiusRange`).
 
 No-data pixels are written fully transparent, so a coverage edge reads as a hole
-rather than as black ground.
+rather than as black ground. That is the browser's convention and not a
+universal one: the sun loop is a `yuv420p` WebM with no alpha channel, so the
+sidecar paints absence mid grey and gates the whole render on how much of the
+square had data (`docs/render-sidecar.md`).
 
 ## Constraints that look like bugs
 

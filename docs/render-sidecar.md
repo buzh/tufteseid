@@ -94,10 +94,34 @@ able to starve Caddy or PocketBase.
    `mosaicRule`. No tiling: the per-project services cap at 15 000 px and a
    footprint is 500 m. Four pixels of margin are fetched and cropped off after
    the gradient, so the edge is shaded against real ground.
+
+   The pixel size is settled before the fetch and is **square by construction**:
+   the width's even pixel count fixes `metres_per_px`, the height follows from
+   that same figure, and the rectangle is then trimmed to the pixel grid about
+   its centre. Otherwise `slope_aspect`, which is told
+   `resolution_x == resolution_y`, and the burnt-in scale bar, which is drawn
+   from one number, would both be wrong down the frame for a footprint whose two
+   sides round differently — reachable, because the EPSG:4326 round trip is
+   allowed its metre or two. The trim is sub-pixel, and the rectangle that is
+   fetched is the `bbox25833` that `meta` reports.
 3. **Decode** with `read_tiff_f32` from `vat-cache/fetch_dem.py`, copied into the
    image by the Dockerfile. Its treatment of absent tiles is load-bearing:
    `TileOffsets: 0` inside a valid TIFF must become NaN, where a generic reader
    hands back zeros — and sea level already reads exactly 0.0.
+
+   **The hole mask is taken here, once, and the coverage gate is here too.** The
+   catalogue answers for the rectangle as a whole, so a footprint over the edge
+   of an acquisition or a lake the DTM is sparse over passes the probe and
+   decodes mostly NaN. `binary_dilation` of the non-finite pixels, cropped to the
+   rendered rectangle, is both the mask every azimuth reuses and the measure:
+   under `MIN_COVERAGE` (half the square) the row is marked **empty** rather than
+   given a picture of its own holes, and what is left is stored as
+   `meta.coverage`.
+
+   Dilation, because rvt's derivative substitutes a pixel's own value for a NaN
+   neighbour (`roll_fill_nans`) and so halves the gradient right around a hole.
+   rvt restores the input's NaN mask onto its output, so the hole itself is *not*
+   drawn larger than it is; the invented rim is the reason for the extra pixel.
 4. **`slope_aspect` once**, then `hillshade(…, slope=, aspect=)` per azimuth.
    That is RVT's own reuse parameter, so the gradient is computed once without
    reimplementing anything. Two things follow from it and are easy to get wrong:
@@ -107,8 +131,14 @@ able to starve Caddy or PocketBase.
      internally and crops `[1:-1, 1:-1]` off the result whether it computed the
      gradient or was handed one.
 5. **`byte_scale(…, c_min=0, c_max=1)`**, not its default per-array stretch, or
-   every frame is scaled to its own extremes and the loop pumps.
-6. **The band is composed once** (`legend.py`) and blended into every frame.
+   every frame is scaled to its own extremes and the loop pumps. Then the mask is
+   stamped on at `NO_DATA_VALUE`, mid grey. `byte_scale` writes a NaN as **255**,
+   which is pure white and indistinguishable from fully lit ground, so absence
+   has to be painted over the finished frame. Mid grey and not either end,
+   because a real frame saturates at both: whole slopes come out 0 and lit faces
+   come out 255.
+6. **The band is composed once** (`legend.py`) and blended into every frame,
+   over the stamped holes as well.
 7. **Raw grey straight into ffmpeg**: `-f rawvideo -pix_fmt gray … -c:v libvpx-vp9
    -pix_fmt yuv420p -crf 32 -b:v 0 -row-mt 1 -g <frames>`. No PNG round trip and
    no frame files. Dimensions are forced even for `yuv420p`. One GOP, because the
@@ -140,9 +170,10 @@ the same rule `vat-cache/` follows.
 
 The sidecar writes `meta.job = {state, at, detail}` when it takes a job and when
 it fails; success replaces the whole marker with the file and the usual
-`metresPerPx`, `bbox25833`, `frames`, `durationMs`, `renderedAt`. The app is
-already subscribed (`subscribeEvidence`), so progress arrives over the existing
-feed and **survives a reload or a closed tab**, which a browser render does not.
+`metresPerPx`, `bbox25833`, `coverage`, `frames`, `durationMs`, `renderedAt`.
+The app is already subscribed (`subscribeEvidence`), so progress arrives over the
+existing feed and **survives a reload or a closed tab**, which a browser render
+does not.
 
 `jobState` (`src/evidence/queue.ts`) reads the marker, and `stateOf` prefers the
 local queue's opinion over it. A `running` marker older than 15 minutes reads as
@@ -199,7 +230,7 @@ render with it. If the thread stops all the same, `/health` answers 503 and
 
 | What happens | What the row says |
 | --- | --- |
-| No laser data over the footprint, or a grid that decodes entirely sparse | `job.state = empty` — not a failure, and nothing a retry would change |
+| No laser data over the footprint, or a grid under half covered once decoded | `job.state = empty` — not a failure, and nothing a retry would change |
 | `exportImage` sheds (a text body under a 200 status) | five retries with backoff inside `fetch_grid`, then `failed` |
 | The coverage probe itself errors | logged, render continues at 0.25 m |
 | ffmpeg fails, or the file will not fit after three encodes | `failed`, with ffmpeg's stderr in `job.detail` (300 chars) |
