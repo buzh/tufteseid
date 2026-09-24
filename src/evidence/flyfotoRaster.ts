@@ -37,7 +37,7 @@ const MAX_CONCURRENT = 4;
 const TILE_RETRIES = 3;
 const RETRY_BASE_MS = 400;
 
-export type FlyfotoRaster = {
+type FlyfotoRaster = {
   canvas: HTMLCanvasElement;
   metresPerPx: number;
   bbox25833: [number, number, number, number];

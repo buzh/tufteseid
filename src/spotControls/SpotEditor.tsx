@@ -42,7 +42,6 @@ export const SpotEditor = ({
       className={styles.panel}
       icon="add_location"
       title={spot.draft.recordId ? t('spots.editTitle') : t('spots.newTitle')}
-      // A spot has no code until it is saved, so one being made has no link.
       actions={record && <SpotShareButton spot={record} />}
       onClose={spot.abort}
       unsaved={spot.dirty}
@@ -110,11 +109,11 @@ export const SpotEditor = ({
           />
         </Tooltip>
         <span className={styles.coordsText}>
-          {spot.footprintSide == null
+          {spot.footprintSideMetres == null
             ? t('spots.footprintNone')
-            : t('spots.footprintSide', { metres: spot.footprintSide })}
+            : t('spots.footprintSide', { metres: spot.footprintSideMetres })}
         </span>
-        {spot.footprintSide != null && (
+        {spot.footprintSideMetres != null && (
           <Button
             size="compact-xs"
             variant="default"

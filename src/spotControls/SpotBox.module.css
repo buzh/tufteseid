@@ -72,8 +72,6 @@
   color: var(--mantine-color-dimmed);
 }
 
-/* A line of its own: the card has the width for it, and the drawing is the
-   record's own rather than something the map is doing. */
 .sketchFade {
   margin-top: var(--mantine-spacing-xs);
 }

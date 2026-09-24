@@ -39,7 +39,10 @@ export type PanelProps = {
   /** What a `Hint` or a `Popover.Target` anchors on. */
   ref?: Ref<HTMLElement>;
   children: ReactNode;
-};
+} & Omit<
+  ComponentPropsWithoutRef<'section'>,
+  'title' | 'onClose' | 'className' | 'children'
+>;
 
 export const Panel = ({
   icon,
@@ -55,6 +58,7 @@ export const Panel = ({
   className,
   ref,
   children,
+  ...rest
 }: PanelProps) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(defaultOpen);
@@ -65,6 +69,10 @@ export const Panel = ({
 
   return (
     <section
+      // Mantine's `Popover.Target` clones its child with `id` and the
+      // `aria-haspopup`/`aria-expanded`/`aria-controls` wiring; dropped, the
+      // tip is not announced as belonging to the box.
+      {...rest}
       ref={ref}
       className={cx(styles.panel, className)}
       aria-label={title}

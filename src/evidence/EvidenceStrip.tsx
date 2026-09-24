@@ -15,9 +15,9 @@ import { cx } from '../ui/cx';
 import { Icon } from '../ui/Icon';
 import { draftGroundAtom } from './draftGround';
 import styles from './EvidenceStrip.module.css';
-import { evidenceTitle, KIND_ICON } from './labels';
+import { evidenceLabel, isReadable, KIND_ICON } from './labels';
 import { moved } from './order';
-import { evidenceBbox, specOf } from './spec';
+import { evidenceBbox } from './spec';
 import { useSpotEvidence } from './useSpotEvidence';
 
 type Drag = {
@@ -116,7 +116,7 @@ export const EvidenceStrip = ({ spot }: { spot: SpotRecord }) => {
   const rows = drag ? moved(items, drag.from, drag.to) : items;
   // The reading skips a row with no pixels, so the cover is the first that has
   // any — not simply the first.
-  const cover = rows.find((rec) => rec.file && evidenceBbox(rec))?.id;
+  const cover = rows.find(isReadable)?.id;
 
   return (
     <div className={styles.strip}>
@@ -128,11 +128,10 @@ export const EvidenceStrip = ({ spot }: { spot: SpotRecord }) => {
 
       <ul className={styles.list} ref={listRef}>
         {rows.map((rec, index) => {
-          const spec = specOf(rec);
-          const title = spec ? evidenceTitle(spec) : t('evidence.unreadable');
+          const title = evidenceLabel(rec);
           const thumb = evidenceFileUrl(rec, '200x200');
           const onMap = ground?.id === rec.id;
-          const ready = thumb !== '' && evidenceBbox(rec) !== null;
+          const ready = isReadable(rec);
 
           return (
             <li

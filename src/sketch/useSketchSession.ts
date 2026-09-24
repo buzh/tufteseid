@@ -39,10 +39,8 @@ export const useSketchSession = (wanted: boolean) => {
     if (resume && size) {
       view.fit(frameExtentIn(resume.frame, projection), { size });
     } else if (ground && size) {
-      // Onto the picture being drawn over, so the frame holds the same ground
-      // it does and the strokes register to every other picture of the spot as
-      // well. Strokes already made rule it out: their frame is the one thing
-      // that must not move.
+      // Only where there are no strokes yet: an existing frame is the one thing
+      // that must not move. `draftGround.extent` is EPSG:25833.
       view.fit(transformExtent(ground.extent, 'EPSG:25833', projection), {
         size,
       });

@@ -30,7 +30,7 @@ import {
 } from './queue';
 import { evidenceMatches, metaOf, type EvidenceSpec } from './spec';
 
-export type KeepOffer = {
+type KeepOffer = {
   spec: EvidenceSpec;
   /** A row already covers this ground with these parameters, so keeping again
    *  would only make the same picture twice. */

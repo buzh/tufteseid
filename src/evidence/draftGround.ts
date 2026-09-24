@@ -1,6 +1,6 @@
 import { atom } from 'jotai';
 
-export type DraftGround = {
+type DraftGround = {
   /** The row it came off, so the strip can drop it when that row goes. */
   id: string;
   url: string;

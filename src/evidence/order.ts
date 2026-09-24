@@ -1,7 +1,6 @@
 import type { EvidenceRecord } from '../api/evidence';
 
-// Epoch milliseconds. Keys are set at creation seconds apart, so a gap this
-// wide is one no amount of halving between the same two neighbours exhausts.
+// Epoch milliseconds, the same units `nextEvidenceSort` writes.
 const STEP_MS = 60_000;
 
 /** `list` with the row at `from` displayed at `to` instead, both indices into

@@ -54,9 +54,8 @@ export const useSpotShareLink = () => {
         unresolved.current = null;
         settled.current = true;
         setActive(record);
-        // A link is an invitation to read, not to edit: it opens the reading
-        // rather than the card. `EvidenceReader` steps back to the card for a
-        // spot with nothing to read.
+        // `EvidenceReader` steps back to the card for a spot with nothing to
+        // read.
         setReading(true);
       })
       .catch(() => {
@@ -118,9 +117,7 @@ export const useSpotShareLink = () => {
   }, [activeCode]);
 };
 
-/** A spot's short link, or — with no spot open — the address bar as it stands:
- *  grounds, overlays and the centre are all already parameters on it. Returns
- *  whether the clipboard took it. */
+/** Returns whether the clipboard took it. */
 export const copyShareLink = async (
   spot: SpotRecord | null,
 ): Promise<boolean> => {

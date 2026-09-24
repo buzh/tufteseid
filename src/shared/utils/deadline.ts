@@ -6,8 +6,6 @@ import {
 } from '../../upstream/health';
 import { originForUrl } from '../../upstream/origins';
 
-// Passed as the abort reason too, so a console says which budget was blown
-// rather than "signal is aborted without reason".
 export class DeadlineError extends Error {
   constructor(label: string, ms: number) {
     super(`${label} exceeded its ${Math.round(ms / 1000)} s deadline`);
@@ -15,11 +13,7 @@ export class DeadlineError extends Error {
   }
 }
 
-/**
- * A whole piece of work bounded, however it is made up — `fetchWithin` bounds
- * one request, this bounds a stitch of hundreds. Settles on time whether or not
- * `run` honours the signal.
- */
+/** Settles on time whether or not `run` honours the signal. */
 export const withDeadline = async <T>(
   ms: number,
   label: string,

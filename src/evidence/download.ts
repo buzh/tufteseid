@@ -19,13 +19,12 @@ const save = (blob: Blob, filename: string) => {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 };
 
-export type EvidenceDownload = {
+type EvidenceDownload = {
   download: (rec: EvidenceRecord) => void;
   /** The row being stamped, or null. */
   busyId: string | null;
-  /** The row whose last attempt failed. Sticky until the next one: the button
-   *  is the only thing that can say so, since a download that never arrives
-   *  looks the same as one that was never asked for. */
+  /** The row whose last attempt failed. Sticky until the next one: a download
+   *  that never arrives looks the same as one that was never asked for. */
   failedId: string | null;
 };
 

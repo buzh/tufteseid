@@ -1,6 +1,3 @@
-/* The two controls and the gap between them. How much room the pair gets is
-   the host's business: the reader's footer gives it a share of a row, the card
-   a line of its own. */
 .row {
   display: flex;
   align-items: center;

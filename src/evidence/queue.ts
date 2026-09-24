@@ -1,5 +1,5 @@
-// Module-level and React-free so that a render outlives the surface that
-// started it: closing a spot must not abandon pixels the reader asked to keep.
+// Module-level: a render outlives the surface that started it, so closing a
+// spot does not abandon pixels the reader decided to keep.
 //
 // One job at a time. Every producer is either a burst of tile requests against
 // a shared public edge or an 800 ms horizon scan on the main thread, so two at
@@ -19,7 +19,7 @@ import { specOf } from './spec';
  */
 export type RenderState = 'queued' | 'running' | 'empty' | 'failed';
 
-export type RenderJob = {
+type RenderJob = {
   rec: EvidenceRecord;
   /** The spot's footprint, EPSG:4326. */
   bbox4326: Bbox;
@@ -65,7 +65,6 @@ const failureDetail = (e: unknown): string => {
   return data && typeof data === 'object' ? JSON.stringify(data) : '';
 };
 
-/** One job, start to finish. Resolves to the finished record, or null. */
 const runJob = async (job: RenderJob): Promise<EvidenceRecord | null> => {
   const spec = specOf(job.rec);
   // A row whose meta no longer parses: `failed` would offer a retry against
@@ -126,9 +125,8 @@ const drain = async () => {
 };
 
 /**
- * Ask for a row's pixels. Returns at once; the work happens behind. Idempotent
- * while a job is in flight — the guard is on the live state rather than on
- * having been asked, so a `failed` or `empty` row can still be retried.
+ * Idempotent while a job is in flight — the guard is on the live state rather
+ * than on having been asked, so a `failed` or `empty` row can still be retried.
  */
 export const enqueueRender = (job: RenderJob): void => {
   const state = states.get(job.rec.id);

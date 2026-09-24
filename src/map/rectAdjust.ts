@@ -1,5 +1,4 @@
-// Placing a rectangle by hand. The square is kept square in EPSG:25833, not in
-// the view's projection.
+// The square is kept square in EPSG:25833, not in the view's projection.
 
 import { useAtomValue, useStore, type Atom, type PrimitiveAtom } from 'jotai';
 import { Feature } from 'ol';
@@ -73,7 +72,7 @@ type Drag =
   | { kind: 'move'; from: Coordinate; start: Metric }
   | { kind: 'resize'; anchor: Coordinate; sx: number; sy: number };
 
-export type RectAdjust = {
+type RectAdjustOptions = {
   /** Written on every drag frame. */
   rectAtom: PrimitiveAtom<Bbox | null>;
   /** The reader has hold of it; false takes the interaction back down. */
@@ -87,7 +86,7 @@ export const useRectangleAdjust = ({
   rectAtom,
   activeAtom,
   layerId,
-}: RectAdjust) => {
+}: RectAdjustOptions) => {
   const map = useAtomValue(mapAtom);
   const adjusting = useAtomValue(activeAtom);
   const store = useStore();

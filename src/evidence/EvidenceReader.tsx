@@ -1,8 +1,3 @@
-// Reading a spot: its kept renders laid back on the ground they were made
-// over, one at a time. Every row covers the same rectangle, so flipping
-// through them holds the ground still and changes only how it was seen —
-// which is the whole argument a spot makes.
-
 import { ActionIcon, Slider, Tooltip } from '@mantine/core';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { transformExtent } from 'ol/proj';
@@ -25,9 +20,15 @@ import { Panel } from '../ui/Panel';
 import { useEvidenceDownload } from './download';
 import styles from './EvidenceReader.module.css';
 import { useEvidenceOverlay } from './evidenceOverlay';
-import { evidenceFacts, evidenceTitle, KIND_ICON } from './labels';
+import {
+  downloadLabel,
+  evidenceFacts,
+  evidenceLabel,
+  isReadable,
+  KIND_ICON,
+} from './labels';
 import { useReaderWindow, type ReaderLayout } from './readerWindow';
-import { evidenceBbox, specOf } from './spec';
+import { evidenceBbox } from './spec';
 import { useSpotEvidence } from './useSpotEvidence';
 
 // Room for the band above and for wherever the box starts out, so the
@@ -53,13 +54,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   const box = useReaderWindow();
   const file = useEvidenceDownload(spot);
 
-  // A row with no pixels or no rectangle cannot be laid on the ground, so it
-  // is not part of the reading — the gallery on the card is where it is
-  // waited on.
-  const readable = useMemo(
-    () => (items ?? []).filter((rec) => rec.file && evidenceBbox(rec)),
-    [items],
-  );
+  const readable = useMemo(() => (items ?? []).filter(isReadable), [items]);
 
   // Held by id, not by index: a render landing or a row being deleted
   // reshuffles the list under the reader.
@@ -136,23 +131,15 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
 
-  const spec = current ? specOf(current) : null;
-  const title = spec
-    ? evidenceTitle(spec)
-    : current
-      ? t('evidence.unreadable')
-      : '';
+  const title = current ? evidenceLabel(current) : '';
   const facts = current ? evidenceFacts(current, i18n.language) : [];
 
   const hasSketch = sketchOf(spot.sketch) !== null;
 
-  // The switch offers the other shape, and says so.
   const other: ReaderLayout = box.layout === 'wide' ? 'tall' : 'wide';
   const otherLabel = t(`evidence.layout.${other}`);
 
-  // Both keys answer here, which the card's tip cannot say — a share link
-  // opens the reading and the card is never seen. One picture has nothing to
-  // flip to. Each line names the keys that retire it.
+  // Each line names the keys that retire it.
   const tips: string[] = [];
   const keys: string[] = [];
   if (hasSketch) {
@@ -178,9 +165,6 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
         id="readingKeys"
         tips={tips}
         keys={keys}
-        // Off the bar's near end rather than centred over it: the view is
-        // fitted to the footprint, which puts the thing being read in the
-        // middle of the open ground.
         position={box.layout === 'wide' ? 'top-start' : 'left-start'}
       >
         <Panel
@@ -195,25 +179,19 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
           handle={box.dragHandle}
           actions={
             <>
-              {/* Of the picture being read, not of the spot: the reading is one
-                  render at a time, and the one on the ground is the one worth
-                  citing. */}
               {current && (
                 <Tooltip
-                  label={t(
-                    file.failedId === current.id
-                      ? 'evidence.downloadFailed'
-                      : file.busyId === current.id
-                        ? 'evidence.downloading'
-                        : 'evidence.download',
-                  )}
+                  label={downloadLabel({
+                    downloading: file.busyId === current.id,
+                    failed: file.failedId === current.id,
+                  })}
                 >
                   <ActionIcon
                     variant="subtle"
                     color="gray"
                     size="sm"
                     aria-label={t('evidence.download')}
-                    disabled={file.busyId != null}
+                    disabled={file.busyId === current.id}
                     onClick={() => file.download(current)}
                   >
                     <Icon
@@ -227,10 +205,6 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
                   </ActionIcon>
                 </Tooltip>
               )}
-              {/* The reading stands in for the card, so without this the
-                  card's own edit button is behind a close that reads as
-                  leaving the spot altogether. The draft returns here when it
-                  is put down. */}
               {mayEdit && (
                 <Tooltip label={t('spots.edit')}>
                   <ActionIcon
@@ -257,8 +231,6 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
               </Tooltip>
             </>
           }
-          // The box moves, resizes and closes; folding it away as well would be
-          // a fourth way to make it stop covering something.
           collapsible={false}
           onClose={() => setReading(false)}
           footer={
@@ -286,9 +258,6 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
                 </Tooltip>
               </div>
 
-              {/* In the slack between the buttons and the slider rather than on
-                  a line of its own: in the bar layout there is nothing else to
-                  put there. */}
               {current && (
                 <div className={styles.caption}>
                   <span className={styles.captionTitle}>{title}</span>
@@ -298,8 +267,6 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
                 </div>
               )}
 
-              {/* The drawing is over the pictures, and is an argument about
-                  them rather than part of them. */}
               {hasSketch && <SketchFade className={styles.sketch} />}
 
               <div className={styles.fade}>
@@ -332,10 +299,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
           ) : (
             <div className={styles.strip}>
               {readable.map((rec) => {
-                const recSpec = specOf(rec);
-                const label = recSpec
-                  ? evidenceTitle(recSpec)
-                  : t('evidence.unreadable');
+                const label = evidenceLabel(rec);
                 return (
                   <Tooltip key={rec.id} label={label}>
                     <button

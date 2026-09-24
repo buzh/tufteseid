@@ -59,8 +59,7 @@ export const squareBboxWithin = (bbox: Bbox): Bbox => {
   ]);
 };
 
-/** A square of `sideMetres` about a lon/lat point, clamped to the same limits a
- *  hand-dragged one is held to. */
+/** Square in EPSG:25833, clamped to `MIN_SIDE_M`…`MAX_SIDE_M`. */
 export const squareBboxAround = (
   point: [lon: number, lat: number],
   sideMetres: number,

@@ -42,8 +42,6 @@ const SpotDraftBox = () => {
   const active = useAtomValue(activeSpotAtom);
   // The parent renders this only when there is a draft.
   const spot = useSpotDraft(draft!);
-  // Editing leaves the open spot where it was, and a draft is only ever opened
-  // on the open one; the guard is against a record the draft is not about.
   const record = active?.id === draft?.recordId ? active : null;
   return <SpotEditor spot={spot} record={record} />;
 };
@@ -86,9 +84,7 @@ export const SpotSurface = () => {
   });
   useSketchSession(draft?.stage === 'sketch');
   useSketchOverlay(shown);
-  // The picture the draft is working over. Opaque: it stands in for the ground
-  // rather than being compared with it, which is the reading's job. It rides
-  // the map element, so a sketch session's transform carries it along.
+  // Rides the map element, so a sketch session's transform carries it along.
   useEvidenceOverlay(ground?.url ?? '', ground?.extent ?? null, 1);
 
   return (
@@ -102,9 +98,8 @@ export const SpotSurface = () => {
         </Suspense>
       )}
       {placing && <SpotPlacePrompt />}
-      {/* One box at a time: the editor and the card share a corner, and
-          the reader stands in for the card. Keyed on the spot so opening a
-          second does not inherit the first's confirm. */}
+      {/* Keyed on the spot so opening a second does not inherit the first's
+          confirm. */}
       {draft ? (
         <SpotDraftBox key={draft.id} />
       ) : (

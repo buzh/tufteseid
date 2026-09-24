@@ -27,7 +27,7 @@ type Placement = Ceiling & {
   top: number;
 };
 
-export const readerLayoutAtom = atom<ReaderLayout>('wide');
+const readerLayoutAtom = atom<ReaderLayout>('wide');
 
 /** Null until the box has been moved, resized or docked: until then the
  *  layout's own CSS places it, so a reading opens where the layout says. */
@@ -52,14 +52,12 @@ const LAYOUT_OF: Record<Side, ReaderLayout> = {
   bottom: 'wide',
 };
 
-type Bounds = Size;
-
 /** The map rectangle the box floats over. `.reader` is absolute, so its
  *  offset parent is the one positioned element around the map. */
 const parentOf = (box: HTMLElement): HTMLElement | null =>
   box.offsetParent instanceof HTMLElement ? box.offsetParent : null;
 
-const boundsOf = (parent: HTMLElement): Bounds => ({
+const boundsOf = (parent: HTMLElement): Size => ({
   width: parent.clientWidth,
   height: parent.clientHeight,
 });
@@ -82,7 +80,7 @@ const between = (value: number, least: number, most: number) =>
 
 /** A corner the box can be grabbed back from: wholly inside the map, given
  *  what it currently measures. */
-const inside = (left: number, top: number, size: Size, within: Bounds) => ({
+const inside = (left: number, top: number, size: Size, within: Size) => ({
   left: between(left, 0, within.width - size.width),
   top: between(top, 0, within.height - size.height),
 });
@@ -93,7 +91,7 @@ const inside = (left: number, top: number, size: Size, within: Bounds) => ({
 const wallCrossed = (
   at: { left: number; top: number },
   size: Size,
-  within: Bounds,
+  within: Size,
 ): Side | null => {
   const past: Record<Side, number> = {
     left: -at.left,
@@ -134,7 +132,7 @@ type Gesture = {
    *  is dragged from. */
   size: Size;
   ceiling: Ceiling;
-  within: Bounds;
+  within: Size;
   x: number;
   y: number;
 };

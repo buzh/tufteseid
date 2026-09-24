@@ -7,8 +7,7 @@ const COLLECTION = 'evidence';
 export type EvidenceKind = 'lidar' | 'terrain' | 'flyfoto';
 
 /** Free-form per kind, and read back through `src/evidence/spec.ts` rather than
- *  trusted: it is a JSON column, and a render is only citable if the row that
- *  describes it can be checked. Server-side ceiling is 10 kB. */
+ *  trusted. Server-side ceiling is 10 kB. */
 export type EvidenceMeta = Record<string, unknown>;
 
 export type EvidenceRecord = {
@@ -29,7 +28,7 @@ export type EvidenceRecord = {
   collectionName?: string;
 };
 
-export type NewEvidenceInput = {
+type NewEvidenceInput = {
   spot: string;
   kind: EvidenceKind;
   caption?: string;
@@ -57,8 +56,6 @@ const hydrate = (raw: EvidenceRecord): EvidenceRecord => ({
   meta: asJson<EvidenceMeta>(raw.meta),
 });
 
-/** The row before its pixels: the parameters are written first so a render that
- *  fails has a record to retry against. */
 export const createEvidence = async (
   input: NewEvidenceInput,
   ownerId: string,
@@ -75,9 +72,9 @@ export const createEvidence = async (
   );
 
 /**
- * The pixels for an existing row. `meta` goes up in the same request so a
- * record can never hold a file its meta does not describe; pass the whole of
- * it, since PocketBase replaces a JSON field wholesale.
+ * `meta` goes up in the same request so a record can never hold a file its meta
+ * does not describe. Pass the whole of it: PocketBase replaces a JSON field
+ * wholesale.
  */
 export const attachEvidenceFile = async (
   id: string,
@@ -93,8 +90,8 @@ export const attachEvidenceFile = async (
   );
 };
 
-/** Where the row sits in the reading. See `src/evidence/order.ts` for the key
- *  itself: only the moved row is written, whatever the list is doing. */
+/** See `src/evidence/order.ts` for the key itself: only the moved row is
+ *  written, whatever the list is doing. */
 export const setEvidenceSort = async (
   id: string,
   sort: number,

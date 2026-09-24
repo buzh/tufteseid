@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { deleteSpot, updateSpot, type SpotRecord } from '../api/spots';
 import { EvidenceGallery } from '../evidence/EvidenceGallery';
-import { evidenceBbox } from '../evidence/spec';
+import { isReadable } from '../evidence/labels';
 import { useSpotEvidence } from '../evidence/useSpotEvidence';
 import { sketchOf } from '../sketch/scene';
 import { SketchFade } from '../sketch/SketchFade';
@@ -38,12 +38,8 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   const edit = useSetAtom(editSpotDraftAtom);
   const setReading = useSetAtom(spotReadingAtom);
 
-  // Held here rather than in the gallery: the read button is in the footer,
-  // and it is the rows that say whether there is anything to read.
   const evidence = useSpotEvidence(spot);
-  const readable = (evidence.items ?? []).filter(
-    (rec) => rec.file && evidenceBbox(rec),
-  ).length;
+  const readable = (evidence.items ?? []).filter(isReadable).length;
 
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -73,8 +69,6 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
       });
   });
 
-  // Only the key that answers here. The arrows flip pictures in the reading,
-  // and belong to the tip `EvidenceReader` puts up once the reader is there.
   const hasSketch = sketchOf(spot.sketch) !== null;
   const tips = hasSketch ? [t('hints.sketch')] : [];
 
@@ -86,7 +80,6 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
         title={spot.name}
         onClose={() => setActive(null)}
         actions={<SpotShareButton spot={spot} />}
-        // Nothing to put in it for a guest at a spot with nothing to read.
         footer={
           (readable > 0 || mayEdit) && (
             <>

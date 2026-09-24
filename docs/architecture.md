@@ -82,7 +82,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
 | `keepOffersAtom` | same | Derived: the ground's offer (off the A half) and the terrain's, ground first. |
 | `draftGroundAtom` | `evidence/draftGround.ts` | The kept render laid under an open draft: the picture being framed against and drawn over. Published by the strip, which is the only thing holding the rows. |
-| `readerLayoutAtom` | `evidence/readerWindow.ts` | Which way round the reading box is laid out, and beside it where it was dragged to, how big it may get and which wall it is docked against. Outside the component, which remounts per spot. |
+| the reading box's layout and placement | `evidence/readerWindow.ts` | Which way round the box is laid out, where it was dragged to, how big it may get and which wall it is docked against. Module-private, reached through `useReaderWindow`: held outside the component, which remounts per spot. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
 | `sketchShownAtom`, `sketchFadeAtom` | `sketch/overlay.ts` | Whether the open spot's drawing is on the ground, and how far it is faded towards it. A reading setting, not the record's: they outlive the spot the box was opened on. |
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |

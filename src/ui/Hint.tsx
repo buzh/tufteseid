@@ -10,16 +10,22 @@ import { useEffect, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import styles from './Hint.module.css';
-import { closeHintAtom, useHintOpen, type HintId } from './hints';
+import {
+  closeHintAtom,
+  TYPING_SURFACE,
+  useHintOpen,
+  type HintId,
+} from './hints';
 import { Icon } from './Icon';
+
+// Arrows walking a focused slider are not the reader pressing a watched key.
+const EXEMPT = `${TYPING_SURFACE}, [role="slider"]`;
 
 export type HintProps = {
   id: HintId;
   /** One line each, already filtered to what applies here. Empty: no tip. */
   tips: string[];
-  /** `KeyboardEvent.key` values the tips are about. Pressing one takes the tip
-   *  down: the reader has just shown they did not need telling. Built beside
-   *  `tips` so the two cannot say different things. */
+  /** `KeyboardEvent.key` values. Pressing one takes the tip down. */
   keys?: string[];
   position?: FloatingPosition;
   children: ReactElement;
@@ -47,10 +53,8 @@ export const Hint = ({
     if (!opened || !watched) return;
     const wanted = watched.split(' ');
     const onKey = (event: KeyboardEvent) => {
-      // Arrows walking a focused slider are not the reader flipping pictures,
-      // and a letter typed into a field is not a shortcut at all.
       const target = event.target as HTMLElement | null;
-      if (target?.closest('input, textarea, [role="slider"]')) return;
+      if (target?.closest(EXEMPT)) return;
       // A letter key arrives capitalised under shift; the named ones never do.
       const pressed =
         event.key.length === 1 ? event.key.toLowerCase() : event.key;
@@ -69,9 +73,8 @@ export const Hint = ({
       onChange={(next) => {
         if (!next) close(id, forever);
       }}
-      // A tip is put away on purpose, with the button. Mantine's click-outside
-      // fires on `mousedown`, so the first frame of a pan would otherwise take
-      // it off the screen before it had been read.
+      // Mantine's click-outside fires on `mousedown`, so the first frame of a
+      // pan would otherwise take the tip off the screen before it was read.
       closeOnClickOutside={false}
       position={position}
       width={260}

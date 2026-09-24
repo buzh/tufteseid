@@ -8,6 +8,7 @@ import ImageCanvasSource from 'ol/source/ImageCanvas';
 import { useEffect, useRef } from 'react';
 
 import { mapAtom } from '../map/atoms';
+import { TYPING_SURFACE } from '../ui/hints';
 import { metresPerScenePx } from './frame';
 import { renderScene, type SceneRender } from './render';
 import type { Sketch } from './scene';
@@ -16,16 +17,13 @@ import type { Sketch } from './scene';
 // Inventory in docs/map-layers.md.
 const Z_INDEX = 2;
 
-/** Whether the drawing is on the ground at all. A reading lays pictures under
- *  it, and the drawing is an argument about them, not part of them. */
+/** Whether the drawing is on the ground at all. */
 export const sketchShownAtom = atom(true);
 
-/** 0–100, as the reader's own slider is: how far the drawing is faded towards
- *  the ground it annotates. */
+/** 0–100, as the reader's slider is. */
 export const sketchFadeAtom = atom(0);
 
-/** `t` for tegning. Bound whenever a drawing is on the map, so it works from
- *  the card and from the reading alike. */
+/** `t` for tegning. */
 const TOGGLE_KEY = 't';
 
 // How far the view may drift from the export's resolution before a redraw.
@@ -177,15 +175,14 @@ export const useSketchOverlay = (sketch: Sketch | null) => {
   }, [opacity, shown]);
 
   // A hidden layer is never asked for a canvas, so taking the drawing off also
-  // stops the scene being re-exported behind whatever is being read. The guard
-  // is for the draft form: `t` is a letter someone may be typing into a name.
+  // stops the scene being re-exported.
   useEffect(() => {
     if (!sketch) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== TOGGLE_KEY) return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
-      if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+      if (target?.closest(TYPING_SURFACE)) return;
       setShown((was) => !was);
     };
     document.addEventListener('keydown', onKey);

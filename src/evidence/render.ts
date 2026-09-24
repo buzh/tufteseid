@@ -16,9 +16,8 @@ import { fitImageBlob } from './fit';
 import { fetchFlyfotoRaster } from './flyfotoRaster';
 import { NIB_MOSAIC, type EvidenceSpec } from './spec';
 
-/** The figure, and what making it revealed. `meta` is merged over the spec's
- *  own — never replacing it. */
-export type Produced = {
+/** `meta` is merged over the spec's own — never replacing it. */
+type Produced = {
   blob: Blob;
   filename: string;
   meta: EvidenceMeta;

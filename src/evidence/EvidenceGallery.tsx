@@ -1,7 +1,3 @@
-// The evidence kept on a spot, and the buttons that keep more. Thin on
-// purpose: a row is a thumbnail, what it is a picture of, and where its render
-// stands.
-
 import { Alert, Button, Group, Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 
@@ -11,9 +7,14 @@ import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
 import { useEvidenceDownload } from './download';
 import styles from './EvidenceGallery.module.css';
-import { evidenceResolution, evidenceTitle, KIND_ICON } from './labels';
+import {
+  downloadLabel,
+  evidenceLabel,
+  evidenceResolution,
+  evidenceTitle,
+  KIND_ICON,
+} from './labels';
 import type { RenderState } from './queue';
-import { specOf } from './spec';
 import type { SpotEvidence } from './useSpotEvidence';
 
 const EvidenceItem = ({
@@ -35,20 +36,19 @@ const EvidenceItem = ({
   onRetry: () => void;
   onRemove: () => void;
 }) => {
-  const { t: translate } = useTranslation();
-  const spec = specOf(record);
-  const title = spec ? evidenceTitle(spec) : translate('evidence.unreadable');
+  const { t } = useTranslation();
+  const title = evidenceLabel(record);
   const thumb = evidenceFileUrl(record, '200x200');
   const metresPerPx = evidenceResolution(record);
   const note =
     state === 'queued' || state === 'running'
-      ? translate('evidence.rendering')
+      ? t('evidence.rendering')
       : state === 'failed'
-        ? translate('evidence.renderFailed')
+        ? t('evidence.renderFailed')
         : state === 'empty'
-          ? translate('evidence.renderEmpty')
+          ? t('evidence.renderEmpty')
           : metresPerPx != null
-            ? translate('evidence.resolution', { m: metresPerPx.toFixed(2) })
+            ? t('evidence.resolution', { m: metresPerPx.toFixed(2) })
             : '';
 
   return (
@@ -56,7 +56,7 @@ const EvidenceItem = ({
       {thumb ? (
         // To the file itself: the thumbnail is a handle, the render at the
         // source's own resolution is the artifact.
-        <Tooltip label={translate('evidence.open')}>
+        <Tooltip label={t('evidence.open')}>
           <a href={evidenceFileUrl(record)} target="_blank" rel="noreferrer">
             <img className={styles.thumb} src={thumb} alt={title} />
           </a>
@@ -78,37 +78,29 @@ const EvidenceItem = ({
       {/* Not behind `mayEdit`: a visitor reading somebody else's public spot is
           exactly who wants a citable figure out of it. */}
       {thumb && (
-        <Tooltip
-          label={translate(
-            downloadFailed
-              ? 'evidence.downloadFailed'
-              : downloading
-                ? 'evidence.downloading'
-                : 'evidence.download',
-          )}
-        >
+        <Tooltip label={downloadLabel({ downloading, failed: downloadFailed })}>
           <ControlButton
             icon={downloading ? 'hourglass_top' : 'download'}
-            aria-label={translate('evidence.download')}
+            aria-label={t('evidence.download')}
             disabled={downloading}
             onClick={onDownload}
           />
         </Tooltip>
       )}
       {mayEdit && state === 'failed' && (
-        <Tooltip label={translate('evidence.retry')}>
+        <Tooltip label={t('evidence.retry')}>
           <ControlButton
             icon="refresh"
-            aria-label={translate('evidence.retry')}
+            aria-label={t('evidence.retry')}
             onClick={onRetry}
           />
         </Tooltip>
       )}
       {mayEdit && (
-        <Tooltip label={translate('evidence.remove')}>
+        <Tooltip label={t('evidence.remove')}>
           <ControlButton
             icon="delete"
-            aria-label={translate('evidence.remove')}
+            aria-label={t('evidence.remove')}
             onClick={onRemove}
           />
         </Tooltip>
@@ -124,23 +116,21 @@ export const EvidenceGallery = ({
   spot: SpotRecord;
   evidence: SpotEvidence;
 }) => {
-  const { t: translate } = useTranslation();
+  const { t } = useTranslation();
   const { items, offers, mayEdit, mayKeep } = evidence;
   const file = useEvidenceDownload(spot);
 
-  // Nothing kept, nothing to keep and no say in it: a heading over an empty box
-  // tells a visitor only that the feature exists.
   if (!mayEdit && (items === null || items.length === 0)) return null;
 
   return (
     <div className={styles.gallery}>
       <div className={styles.head}>
         <Icon icon="photo_library" size={14} />
-        <span>{translate('evidence.label')}</span>
+        <span>{t('evidence.label')}</span>
       </div>
 
       {mayEdit && !mayKeep && (
-        <div className={styles.note}>{translate('evidence.needsFootprint')}</div>
+        <div className={styles.note}>{t('evidence.needsFootprint')}</div>
       )}
 
       {mayKeep && offers.length > 0 && (
@@ -149,7 +139,7 @@ export const EvidenceGallery = ({
             const what = evidenceTitle(offer.spec);
             return (
               <Button
-                key={what}
+                key={offer.spec.kind}
                 size="compact-xs"
                 variant="default"
                 disabled={offer.kept}
@@ -159,8 +149,8 @@ export const EvidenceGallery = ({
                 onClick={() => evidence.keep(offer.spec)}
               >
                 {offer.kept
-                  ? translate('evidence.kept', { what })
-                  : translate('evidence.keep', { what })}
+                  ? t('evidence.kept', { what })
+                  : t('evidence.keep', { what })}
               </Button>
             );
           })}
@@ -187,7 +177,7 @@ export const EvidenceGallery = ({
 
       {evidence.failed && (
         <Alert color="red" mt="xs" p="xs">
-          {translate('evidence.failed')}
+          {t('evidence.failed')}
         </Alert>
       )}
     </div>

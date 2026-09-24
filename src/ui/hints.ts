@@ -1,8 +1,9 @@
 import { atom, useAtomValue } from 'jotai';
 
-/** Spelled out so a tip's stored entry stays greppable. One id per surface,
- *  not per key: the card and the reading answer to different keys, and a tip
- *  waved off on one must not take the other's with it. */
+/** A key pressed on one of these is text being typed, not a shortcut. */
+export const TYPING_SURFACE = 'input, textarea, [contenteditable="true"]';
+
+/** Spelled out so a tip's stored entry stays greppable. */
 const HINT_IDS = ['spotKeys', 'readingKeys'] as const;
 
 export type HintId = (typeof HINT_IDS)[number];
@@ -27,8 +28,7 @@ const stored = (): HintId[] => {
 
 const dismissedAtom = atom<HintId[]>(stored());
 
-/** Put away for this page load only: a tip waved off at one record should not
- *  come back at the next one, but should come back on another visit. */
+/** Put away for this page load only. */
 const closedAtom = atom<HintId[]>([]);
 
 export const useHintOpen = (id: HintId) => {
@@ -37,12 +37,10 @@ export const useHintOpen = (id: HintId) => {
   return !dismissed.includes(id) && !closed.includes(id);
 };
 
-/** `forever` is the reader's own tick in the box, not something a caller
- *  decides for them. */
 export const closeHintAtom = atom(
   null,
   (get, set, id: HintId, forever: boolean) => {
-    set(closedAtom, [...get(closedAtom), id]);
+    set(closedAtom, [...new Set([...get(closedAtom), id])]);
     if (!forever) return;
     const kept = [...new Set([...get(dismissedAtom), id])];
     set(dismissedAtom, kept);

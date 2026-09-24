@@ -1,12 +1,11 @@
-// The module-level `t` is deliberate: these are strings rather than
-// components, and one of them is used as a React key.
+// The module-level `t` is deliberate: these are strings rather than components.
 import { t } from 'i18next';
 
 import type { EvidenceKind, EvidenceRecord } from '../api/evidence';
 import { lidarStyleLabel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { usesHorizon } from '../terrain/render';
 import type { MaterialSymbol } from '../ui/Icon';
-import { NIB_MOSAIC, specOf, type EvidenceSpec } from './spec';
+import { evidenceBbox, NIB_MOSAIC, specOf, type EvidenceSpec } from './spec';
 
 export const KIND_ICON: Record<EvidenceKind, MaterialSymbol> = {
   lidar: 'landscape',
@@ -26,6 +25,28 @@ export const evidenceTitle = (spec: EvidenceSpec): string => {
         : (spec.projectName ?? spec.projectId);
   }
 };
+
+export const evidenceLabel = (rec: EvidenceRecord): string => {
+  const spec = specOf(rec);
+  return spec ? evidenceTitle(spec) : t('evidence.unreadable');
+};
+
+/** Pixels and the ground to lay them over: a row missing either cannot be
+ *  shown on the map, whatever else it says. */
+export const isReadable = (rec: EvidenceRecord): boolean =>
+  rec.file !== '' && evidenceBbox(rec) !== null;
+
+export const downloadLabel = (state: {
+  downloading: boolean;
+  failed: boolean;
+}): string =>
+  t(
+    state.failed
+      ? 'evidence.downloadFailed'
+      : state.downloading
+        ? 'evidence.downloading'
+        : 'evidence.download',
+  );
 
 export const evidenceResolution = (rec: EvidenceRecord): number | null => {
   const value = rec.meta?.metresPerPx;

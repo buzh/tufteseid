@@ -31,8 +31,7 @@ export type SpotDraftController = {
   suggesting: boolean;
   stage: SpotDraft['stage'];
   setStage: (stage: SpotDraft['stage']) => void;
-  /** Metres on a side, or null where no footprint is named. */
-  footprintSide: number | null;
+  footprintSideMetres: number | null;
   clearFootprint: () => void;
   hasSketch: boolean;
   saving: boolean;
@@ -190,7 +189,9 @@ export const useSpotDraft = (draft: SpotDraft): SpotDraftController => {
     suggesting,
     stage: draft.stage,
     setStage,
-    footprintSide: footprint ? Math.round(bboxWidthMetres(footprint)) : null,
+    footprintSideMetres: footprint
+      ? Math.round(bboxWidthMetres(footprint))
+      : null,
     clearFootprint,
     hasSketch: (sketch?.elements.length ?? 0) > 0,
     saving,
