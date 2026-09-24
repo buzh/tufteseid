@@ -281,8 +281,9 @@ over the whole of that.
 
 - **Line one** is the title in weight 600 and `evidenceFacts` after it, the same
   list the card and the reader print, with the rectangle's centre in it. Too
-  long for the width, it sheds facts from the end, so the render date goes
-  before the centre does: where the ground is beats when the picture was made.
+  long for the width, it sheds facts from the end, so the render date is dropped
+  before the centre is: where the ground is beats when the picture was made. A
+  title too long for the width on its own is cut with an ellipsis.
 - **Below it, two columns.** Left carries the scale bar and, for a public spot,
   its `/l/<code>`; right carries the rights lines. A left cell pairs with a
   right one where both fit and goes alone where they do not, so the legend is
@@ -295,12 +296,17 @@ over the whole of that.
   terrain render and `skyggerelieff` under a LiDAR extract, and that difference
   is the statement about who did the visualising. Terrain therefore also carries
   an authored line, because that one the app made rather than fetched.
-- **A legend over a fifth of the image height is not drawn at all.** National
-  LiDAR over the smallest footprint is 50 px square; a caption covering it would
-  be worse than none.
-- Canvas text does not wait for webfonts, so `ensureLegendFont` loads Mulish 400
-  and 600 before measuring. Without it two figures stamped a second apart come
-  out in different faces.
+- **The bar and the link are shed to keep the band under a fifth of the image
+  height**, in that order. The rights lines are not shed even when they take it
+  past the fifth, so a small render comes out with a heavy band rather than
+  uncredited. Nothing is drawn at all past half the height, or where the image
+  is narrower than eight ems — national LiDAR over the smallest footprint is
+  50 px square, and a caption covering it would be worse than none.
+- Canvas text does not wait for webfonts, so `drawLegend` loads Mulish 400 and
+  600 before measuring, which is why it is async. Without it two figures stamped
+  a second apart come out in different faces. It returns whether it drew, so
+  `stamp.ts` can hand back the bytes it was given rather than spend a JPEG
+  generation re-encoding an unchanged canvas.
 
 ## URL parameters
 

@@ -1,16 +1,7 @@
-// Stored bytes → the bytes that leave the app.
-//
-// A kept render is stored bare. The reader lays that same file back on the
-// ground it was made over and the sketch draws on top of it, so a band burned
-// into the pixels would ride the map and be drawn over. The provenance goes on
-// at the door instead — which is also why it comes out in the reader's language
-// and the current wording rather than whatever was true when the queue ran.
-//
-// Every upstream is credited by the part it plays in *this* picture. The same
-// holder is `høydedata` under a terrain render and `skyggerelieff` under a
-// LiDAR extract, and that difference is precisely the statement about who did
-// the visualising; where the app made the picture rather than fetched it whole,
-// the author and the app are named as its co-authors.
+// The stored file is bare: the reader lays it back on the ground it was made
+// over and the sketch draws on top of it, so a band burned into the pixels
+// would ride the map and be drawn over. The provenance goes on at the door
+// instead, which is why it comes out in the reader's current language.
 
 import { t } from 'i18next';
 import { transform } from 'ol/proj';
@@ -21,8 +12,9 @@ import { lidarStyleLabel } from '../map/layers/config/backgroundLayers/lidarProj
 import { formatPoint } from '../spots/geo';
 import { shareUrlOf } from '../spots/shareLink';
 import { evidenceFacts, evidenceResolution, evidenceTitle } from './labels';
+import { canvasBlob } from './fit';
+import { drawLegend } from './legend';
 import { evidenceBbox, specOf, type EvidenceSpec } from './spec';
-import { drawLegend, ensureLegendFont, legendFontSize } from './legend';
 
 /** A rights holder named on the legend. The holder is a proper name and is never
  *  translated; the terms key resolves to the licence, which is. */
@@ -37,17 +29,13 @@ const NORGE_I_BILDER = {
 const rightsLine = (role: string, holder: string, terms: string): string =>
   t('evidence.figure.rights.line', { role, holder, terms: t(terms) });
 
-/**
- * Who to credit, and for what. One line per holder rather than one joined line:
- * Norge i bilder's name alone is sixty characters, and a list that wraps into
- * itself is unreadable.
- */
+/** One line per holder rather than one joined line: Norge i bilder's name
+ *  alone is sixty characters. */
 const rightsOf = (spec: EvidenceSpec, credit: string): string[] => {
   switch (spec.kind) {
     case 'lidar':
       // The WMS serves the shading, not the heights, so what Kartverket
-      // published here is the picture itself and none of it is ours. The style
-      // names which picture.
+      // published here is the picture itself and none of it is ours.
       return [
         rightsLine(
           lidarStyleLabel(spec.style).toLowerCase(),
@@ -63,7 +51,7 @@ const rightsOf = (spec: EvidenceSpec, credit: string): string[] => {
           KARTVERKET.terms,
         ),
         // Float elevation in, pixels out, in the browser: the one kind whose
-        // picture the app made rather than fetched.
+        // picture the app made rather than fetched, so it names co-authors.
         rightsLine(
           t('evidence.figure.role.visualisering'),
           credit
@@ -117,13 +105,6 @@ const decodeToCanvas = async (
   }
 };
 
-const canvasBlob = (
-  canvas: HTMLCanvasElement,
-  type: 'image/png' | 'image/jpeg',
-  quality?: number,
-): Promise<Blob | null> =>
-  new Promise((resolve) => canvas.toBlob(resolve, type, quality));
-
 /**
  * The stored raster with its provenance on it. Failure is never fatal: an
  * unstamped file is worse than a stamped one and far better than none, so every
@@ -151,10 +132,7 @@ export const stampEvidence = async (
     const bbox = evidenceBbox(rec);
     const facts = evidenceFacts(rec, language, bbox ? centreOf(bbox) : '');
 
-    const fontSize = legendFontSize(canvas.width);
-    await ensureLegendFont(fontSize);
-
-    drawLegend(ctx, {
+    const drawn = await drawLegend(ctx, {
       width: canvas.width,
       height: canvas.height,
       title: evidenceTitle(spec),
@@ -172,8 +150,9 @@ export const stampEvidence = async (
       metresPerPx: bbox
         ? (bbox[2] - bbox[0]) / canvas.width
         : (evidenceResolution(rec) ?? 0),
-      fontSize,
     });
+    // Nothing was painted, so re-encoding would only cost a JPEG generation.
+    if (!drawn) return blob;
 
     const jpeg = blob.type === 'image/jpeg';
     const out = await canvasBlob(

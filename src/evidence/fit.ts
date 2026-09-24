@@ -25,7 +25,7 @@ const scaleCanvas = (
   return out;
 };
 
-const canvasBlob = (
+export const canvasBlob = (
   canvas: HTMLCanvasElement,
   type: 'image/png' | 'image/jpeg',
   quality?: number,
@@ -53,11 +53,14 @@ export const fitImageBlob = async (
   for (let pass = 0; ; pass++) {
     const blob = await canvasBlob(source, type, quality);
     if (!blob) return null;
-    if (blob.size <= MAX_STORED_BYTES || pass === MAX_FIT_PASSES) {
+    if (blob.size <= MAX_STORED_BYTES) {
       // Ratio of widths rather than the factor applied, so the rounding
       // `scaleCanvas` did is included instead of being asserted away.
       return { blob, metresPerPx: (metresPerPx * image.width) / source.width };
     }
+    // Fails closed: an oversized blob is a 400 from PocketBase on every retry,
+    // where null records the row as empty and stops asking.
+    if (pass === MAX_FIT_PASSES) return null;
     // Bytes do not fall as fast as pixels, so the step takes a margin.
     source = scaleCanvas(source, Math.sqrt(MAX_STORED_BYTES / blob.size) * 0.95);
   }
