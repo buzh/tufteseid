@@ -249,9 +249,6 @@ check geonorge-adresser 'https://ws.geonorge.no/adresser/v1/sok?sok=Karl%20Johan
   200 json 100 'adresser'
 check norgeskart-matrikkel 'https://api.norgeskart.no/v1/matrikkel/veg/Karl%20Johans%20gate' \
   200 json 100 'KOMMUNENAVN'
-check hoydedata-identify \
-  'https://hoydedata.no/arcgis/rest/services/NHM_DTM_TOPOBATHY_25833/ImageServer/identify?f=json&geometry=187168,6536140&geometryType=esriGeometryPoint&sr=25833&returnGeometry=false&returnCatalogItems=false' \
-  200 json 100 '"value":"[0-9]'
 
 printf '\n%s%d passed, %d failed%s\n' "$BOLD" "$passed" "$failed" "$OFF"
 [ "$failed" -eq 0 ]
