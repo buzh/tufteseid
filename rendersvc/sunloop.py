@@ -12,6 +12,7 @@ every frame would be scaled to its own extremes and the loop would pump.
 
 import subprocess
 import tempfile
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -144,7 +145,7 @@ def _encode(frames, fps, crf):
     output goes to a real file because a WebM written to a pipe cannot be
     seeked back to for its cues."""
     height, width = frames[0].shape
-    with tempfile.NamedTemporaryFile(suffix=".webm") as out:
+    with tempfile.NamedTemporaryFile(suffix=".webm") as out, tempfile.TemporaryFile() as err:
         command = [
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
             "-f", "rawvideo", "-pix_fmt", "gray",
@@ -156,17 +157,46 @@ def _encode(frames, fps, crf):
             "-g", str(len(frames)),
             "-an", "-f", "webm", out.name,
         ]
-        process = subprocess.Popen(
-            command, stdin=subprocess.PIPE, stderr=subprocess.PIPE
-        )
+        # stderr to a file, never a pipe: ~180 MB of raw frames takes minutes to
+        # feed and nothing here can drain a pipe meanwhile, so an ffmpeg blocked
+        # on a full stderr would stop reading stdin and wedge both ends.
+        process = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=err)
+        # The deadline covers the feed as well as the wait, so it is a timer that
+        # kills the child rather than a timeout on the wait at the end.
+        expired = threading.Event()
+
+        def give_up():
+            expired.set()
+            process.kill()
+
+        watchdog = threading.Timer(ENCODE_TIMEOUT_S, give_up)
+        watchdog.start()
         try:
-            for frame in frames:
-                process.stdin.write(frame.tobytes())
-            process.stdin.close()
-        except BrokenPipeError:
-            pass
-        _, err = process.communicate(timeout=ENCODE_TIMEOUT_S)
+            try:
+                for frame in frames:
+                    process.stdin.write(frame.tobytes())
+            except BrokenPipeError:
+                # ffmpeg leaving early is not itself the error; the code is.
+                pass
+            finally:
+                try:
+                    process.stdin.close()
+                except OSError:
+                    pass
+            process.wait()
+        finally:
+            watchdog.cancel()
+            process.kill()
+            process.wait()
+
+        # The return code as well as the flag: a timer that fires between a
+        # finished wait and the cancel below has killed nothing.
+        if expired.is_set() and process.returncode != 0:
+            raise RuntimeError(f"ffmpeg killed after {ENCODE_TIMEOUT_S} s")
         if process.returncode != 0:
-            raise RuntimeError(f"ffmpeg: {err.decode('utf-8', 'replace')[:500]}")
+            # The child wrote through its own dup of this descriptor, so the
+            # offset shared with it is at the end of what it logged.
+            err.seek(0)
+            raise RuntimeError(f"ffmpeg: {err.read().decode('utf-8', 'replace')[:500]}")
         out.seek(0)
         return out.read()

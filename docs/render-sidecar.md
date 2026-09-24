@@ -74,6 +74,7 @@ Signed-in-only falls out of the token check. On top of it:
 | Footprint ≤ 505 m a side (`MAX_SIDE_M` in `src/map/bbox.ts` plus round-trip slack) | `bbox_of` |
 | 1600 px a side, whatever the ground publishes | `sunloop.MAX_FRAME_PX` |
 | Step must divide 360, ≤ 45°; fps 1–60 | `spec_of` |
+| 900 s an encode, the feed included, then the child is killed | `sunloop.ENCODE_TIMEOUT_S` |
 | 64 kB request body | `MAX_BODY_BYTES` |
 | `cpus: 2.0`, `mem_limit: 2g` | `docker-compose.yml` |
 
@@ -112,7 +113,14 @@ able to starve Caddy or PocketBase.
    -pix_fmt yuv420p -crf 32 -b:v 0 -row-mt 1 -g <frames>`. No PNG round trip and
    no frame files. Dimensions are forced even for `yuv420p`. One GOP, because the
    loop is played whole and never seeked into. The output goes to a real file:
-   a WebM written to a pipe cannot be seeked back to for its cues.
+   a WebM written to a pipe cannot be seeked back to for its cues. So does
+   **stderr**: 72 frames of up to 1600 px is ~180 MB fed down stdin over minutes
+   during which nothing here can drain a pipe, and an ffmpeg blocked on a full
+   stderr would stop reading stdin and wedge both ends for good. A timer kills
+   the child at `ENCODE_TIMEOUT_S`, so the deadline covers the feed and not only
+   the wait at the end, and the child is killed and reaped on every path out —
+   an abandoned ffmpeg would go on burning both cores against an output file the
+   temporary-file block has already unlinked.
 8. **Measured, not predicted**, the way `fitImageBlob` is: over the field's 50 MB
    the encode is redone at crf 40 then 48, and a third failure is a failure.
    PocketBase answers 400 to an oversized file and answers it again to every
@@ -195,6 +203,7 @@ render with it. If the thread stops all the same, `/health` answers 503 and
 | `exportImage` sheds (a text body under a 200 status) | five retries with backoff inside `fetch_grid`, then `failed` |
 | The coverage probe itself errors | logged, render continues at 0.25 m |
 | ffmpeg fails, or the file will not fit after three encodes | `failed`, with ffmpeg's stderr in `job.detail` (300 chars) |
+| An encode passes 900 s | the child is killed and reaped, `failed`, and the worker takes the next job with nothing left running |
 | The container is restarted mid-job | the `running` marker goes stale after 15 minutes and reads as `failed`; the queue is not persisted |
 | PocketBase refuses the claim | 403 to the caller, the queue slot is given back, no marker written |
 | The failure write itself fails | logged and dropped; the loop takes the next job and the stale rule catches the row |
