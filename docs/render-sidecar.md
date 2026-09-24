@@ -373,7 +373,11 @@ What is per-producer: the `spec_of` validation, the `kind` the row must carry,
 and the migration that adds that kind to `evi_kind`.
 
 On the client it is a variant in `src/evidence/spec.ts`, an arm in `labels.ts`,
-an offer atom, and a branch in `queue.ts` that POSTs instead of rendering.
+somewhere to ask for it, and a branch in `queue.ts` that POSTs instead of
+rendering. Where to ask follows what the producer reads: a reading of the map as
+it stands is an offer atom feeding `keepOffersAtom` and the gallery, the way the
+three browser kinds are. A sun loop reads nothing on screen, so it is the
+constant `SUN_LOOP_SPEC` and the spot editor offers it beside the footprint.
 `BrowserSpec` in `render.ts` is `Exclude<EvidenceSpec, {kind: 'sunloop'}>` — a
 server-side kind is excluded there so the browser producers' switch stays
 exhaustive, and a second one joins that exclusion.

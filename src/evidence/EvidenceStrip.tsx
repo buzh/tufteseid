@@ -10,7 +10,6 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { evidenceFileUrl, type EvidenceRecord } from '../api/evidence';
-import type { SpotRecord } from '../api/spots';
 import { cx } from '../ui/cx';
 import { Icon } from '../ui/Icon';
 import { draftGroundAtom } from './draftGround';
@@ -24,7 +23,7 @@ import {
 } from './labels';
 import { moved } from './order';
 import { evidenceBbox } from './spec';
-import { useSpotEvidence } from './useSpotEvidence';
+import type { SpotEvidence } from './useSpotEvidence';
 
 type Drag = {
   id: string;
@@ -36,9 +35,9 @@ type Drag = {
   slots: number[];
 };
 
-export const EvidenceStrip = ({ spot }: { spot: SpotRecord }) => {
+export const EvidenceStrip = ({ evidence }: { evidence: SpotEvidence }) => {
   const { t } = useTranslation();
-  const { items, reorder } = useSpotEvidence(spot);
+  const { items, reorder } = evidence;
   const [ground, setGround] = useAtom(draftGroundAtom);
   const listRef = useRef<HTMLUListElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);

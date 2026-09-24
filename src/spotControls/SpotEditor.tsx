@@ -14,6 +14,8 @@ import {
   type SpotRecord,
 } from '../api/spots';
 import { EvidenceStrip } from '../evidence/EvidenceStrip';
+import { KIND_ICON } from '../evidence/labels';
+import { useSpotEvidence } from '../evidence/useSpotEvidence';
 import { cx } from '../ui/cx';
 import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
@@ -21,6 +23,41 @@ import { Panel } from '../ui/Panel';
 import { formatPoint } from '../spots/geo';
 import styles from './SpotBox.module.css';
 import type { SpotDraftController } from './useSpotDraft';
+
+/** One `useSpotEvidence` for both the ask and the ordering: a second would be a
+ *  second list fetch and a second realtime subscription over the same rows. */
+const SpotEvidenceEdit = ({ spot }: { spot: SpotRecord }) => {
+  const { t } = useTranslation();
+  const evidence = useSpotEvidence(spot);
+  const loop = evidence.sunLoop;
+
+  return (
+    <>
+      {evidence.mayKeep && loop && (
+        <Tooltip label={t('evidence.sunLoopHint')}>
+          <Button
+            mt="xs"
+            size="compact-xs"
+            variant="default"
+            disabled={loop.kept}
+            leftSection={<Icon icon={KIND_ICON.sunloop} size={14} />}
+            onClick={() => evidence.keep(loop.spec)}
+          >
+            {t(loop.kept ? 'evidence.sunLoopKept' : 'evidence.sunLoopKeep')}
+          </Button>
+        </Tooltip>
+      )}
+
+      <EvidenceStrip evidence={evidence} />
+
+      {evidence.failed && (
+        <Alert color="red" mt="xs" p="xs">
+          {t('evidence.failed')}
+        </Alert>
+      )}
+    </>
+  );
+};
 
 export const SpotEditor = ({
   spot,
@@ -137,7 +174,7 @@ export const SpotEditor = ({
         </span>
       </Group>
 
-      {record && <EvidenceStrip spot={record} />}
+      {record && <SpotEvidenceEdit spot={record} />}
 
       {spot.sketchTooBig && (
         <Alert color="red" mt="xs" p="xs">

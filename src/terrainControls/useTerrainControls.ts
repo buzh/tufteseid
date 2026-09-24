@@ -3,8 +3,7 @@
 
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { sunLoopOfferAtom, terrainOfferAtom } from '../evidence/offer';
-import { SUNLOOP_FPS, SUNLOOP_STEP_DEG } from '../evidence/spec';
+import { terrainOfferAtom } from '../evidence/offer';
 import { bboxWidthMetres, type Bbox } from '../map/bbox';
 import { fetchDem, type Dem, type DemModel } from '../terrain/dem';
 import {
@@ -49,7 +48,6 @@ export const useTerrainControls = () => {
   const closeWindow = useSetAtom(closeTerrainWindowAtom);
   const releaseFootprint = useSetAtom(releaseSpotFootprintAtom);
   const setTerrainOffer = useSetAtom(terrainOfferAtom);
-  const setSunLoopOffer = useSetAtom(sunLoopOfferAtom);
 
   useRectangleAdjust({
     rectAtom: terrainWindowAtom,
@@ -178,23 +176,6 @@ export const useTerrainControls = () => {
     setTerrainOffer,
   ]);
 
-  // Only under a hillshade: the loop walks the azimuth, and the other
-  // visualizations either have no sun or already average every one of them.
-  useEffect(() => {
-    setSunLoopOffer(
-      dem && field && vis === 'hillshade'
-        ? {
-            kind: 'sunloop',
-            model,
-            altitude,
-            zFactor,
-            stepDeg: SUNLOOP_STEP_DEG,
-            fps: SUNLOOP_FPS,
-          }
-        : null,
-    );
-  }, [dem, field, vis, model, altitude, zFactor, setSunLoopOffer]);
-
   // The layer and the atoms outlive this hook, so an unmount would leave a
   // render and a frame on the map with nothing to work them, and an offer to
   // keep an analysis nobody is running.
@@ -202,10 +183,9 @@ export const useTerrainControls = () => {
     () => () => {
       setTerrainRender(null);
       setTerrainOffer(null);
-      setSunLoopOffer(null);
       closeWindow();
     },
-    [closeWindow, setTerrainOffer, setSunLoopOffer],
+    [closeWindow, setTerrainOffer],
   );
 
   return {

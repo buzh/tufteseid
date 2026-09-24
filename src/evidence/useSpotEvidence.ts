@@ -31,7 +31,12 @@ import {
   subscribeRenderQueue,
   type RenderState,
 } from './queue';
-import { evidenceMatches, metaOf, type EvidenceSpec } from './spec';
+import {
+  evidenceMatches,
+  metaOf,
+  SUN_LOOP_SPEC,
+  type EvidenceSpec,
+} from './spec';
 
 type KeepOffer = {
   spec: EvidenceSpec;
@@ -46,6 +51,9 @@ export type SpotEvidence = {
   failed: boolean;
   /** Empty while the spot names no ground: nothing can be rendered. */
   offers: KeepOffer[];
+  /** The sun loop, which reads nothing on screen and so stands whenever the
+   *  spot has a footprint. Null when it has none. */
+  sunLoop: KeepOffer | null;
   mayEdit: boolean;
   /** Owner or admin, and the spot has a footprint. */
   mayKeep: boolean;
@@ -133,14 +141,34 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
   const footprint = spot.footprint;
   const mayKeep = mayEdit && footprint != null;
 
-  const offers = useMemo(() => {
-    if (!footprint || !items) return [];
-    const metric = bboxToMetric(footprint);
-    return offered.map((spec) => ({
-      spec,
-      kept: items.some((rec) => evidenceMatches(rec, spec, metric)),
-    }));
-  }, [offered, items, footprint]);
+  const metric = useMemo(
+    () => (footprint ? bboxToMetric(footprint) : null),
+    [footprint],
+  );
+
+  const offers = useMemo(
+    () =>
+      metric && items
+        ? offered.map((spec) => ({
+            spec,
+            kept: items.some((rec) => evidenceMatches(rec, spec, metric)),
+          }))
+        : [],
+    [offered, items, metric],
+  );
+
+  const sunLoop = useMemo(
+    () =>
+      metric && items
+        ? {
+            spec: SUN_LOOP_SPEC,
+            kept: items.some((rec) =>
+              evidenceMatches(rec, SUN_LOOP_SPEC, metric),
+            ),
+          }
+        : null,
+    [items, metric],
+  );
 
   const render = useCallback(
     (rec: EvidenceRecord) => {
@@ -232,6 +260,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     items,
     failed,
     offers,
+    sunLoop,
     mayEdit,
     mayKeep,
     keep,

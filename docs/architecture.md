@@ -80,8 +80,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `spotRecordsAtom`, `spotsFailedAtom` | `spots/spotRecords.ts` | Every record the session may see, null until the list lands; and whether it never did. |
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
-| `sunLoopOfferAtom` | same | The sun loop the terrain analysis would keep, published by the same hook and only over a hillshade. |
-| `keepOffersAtom` | same | Derived: the ground's offer (off the A half), the terrain's and the loop's, ground first. |
+| `keepOffersAtom` | same | Derived: the ground's offer (off the A half) and the terrain's, ground first. Only what is on screen — the sun loop is not, so it is `SUN_LOOP_SPEC` in `evidence/spec.ts` and the editor offers it directly. |
 | `draftGroundAtom` | `evidence/draftGround.ts` | The kept render laid under an open draft: the picture being framed against and drawn over. Published by the strip, which is the only thing holding the rows. |
 | the reading box's layout and placement | `evidence/readerWindow.ts` | Which way round the box is laid out, where it was dragged to, how big it may get and which wall it is docked against. Module-private, reached through `useReaderWindow`: held outside the component, which remounts per spot. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
@@ -174,6 +173,13 @@ through them and editing them is deciding what they are a sequence of.
   ↓ too, and stops the press reaching OpenLayers' keyboard pan.
 - Pictures are their own records, so reordering — like keeping and deleting —
   is written when it happens, not by the draft's save button.
+- **Where a row is asked for says what it reads.** The three offers in the
+  gallery are readings of the map as it stands, so they come and go with the
+  ground and the analysis under them. A sun loop reads nothing on screen — it is
+  every azimuth, which leaves only the sun's height and the exaggeration, and
+  `SUN_LOOP_SPEC` answers both from the terrain panel's defaults. So the loop is
+  asked for in the editor, beside the footprint that bounds it, and stands
+  whenever the spot has one.
 - **Not every row is made here.** Three kinds are rendered in the tab that asked
   for them; `sunloop` is created the same way and then handed to the render
   sidecar, which writes the file back itself (`docs/render-sidecar.md`). The row,
