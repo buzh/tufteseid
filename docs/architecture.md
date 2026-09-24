@@ -13,9 +13,9 @@ One row per directory under `src/`.
 
 | Directory | Owns |
 | --- | --- |
-| `api/` | PocketBase singleton (`pocketbase.ts`) and the `spots` and `evidence` collection clients. |
+| `api/` | PocketBase singleton (`pocketbase.ts`), the `spots` and `evidence` collection clients, and the one call into the render sidecar (`render.ts`). |
 | `auth/` | OAuth2 dialog, the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
-| `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue, the gallery, the strip that puts the kept renders in order, the reader that lays them back on the map, and the provenance legend stamped onto a download. |
+| `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue and the handover to the render sidecar, the gallery, the strip that puts the kept renders in order, the reader that lays them back on the map, and the provenance legend stamped onto a download. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
 | `grounds/` | The ground switch. Which ground is up is derived from the half's background layer, never stored. |
 | `heritageControls/` | The Kulturminner tool: which theme layers are ticked and how they are drawn. |
@@ -80,7 +80,8 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `spotRecordsAtom`, `spotsFailedAtom` | `spots/spotRecords.ts` | Every record the session may see, null until the list lands; and whether it never did. |
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
-| `keepOffersAtom` | same | Derived: the ground's offer (off the A half) and the terrain's, ground first. |
+| `sunLoopOfferAtom` | same | The sun loop the terrain analysis would keep, published by the same hook and only over a hillshade. |
+| `keepOffersAtom` | same | Derived: the ground's offer (off the A half), the terrain's and the loop's, ground first. |
 | `draftGroundAtom` | `evidence/draftGround.ts` | The kept render laid under an open draft: the picture being framed against and drawn over. Published by the strip, which is the only thing holding the rows. |
 | the reading box's layout and placement | `evidence/readerWindow.ts` | Which way round the box is laid out, where it was dragged to, how big it may get and which wall it is docked against. Module-private, reached through `useReaderWindow`: held outside the component, which remounts per spot. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
@@ -158,7 +159,9 @@ through them and editing them is deciding what they are a sequence of.
 
 - **The cover is the first row with pixels.** Nothing marks one: the reading
   opens on the first row it can lay on the ground, so dragging a picture to the
-  top is how a cover is chosen, and the star says which one is.
+  top is how a cover is chosen, and the star says which one is. `laysOnGround`
+  (`evidence/labels.ts`) is the test, and a sun loop fails it — the overlay is an
+  `ImageStatic` and a video is not one.
 - A drop writes one row. `sortForMove` (`evidence/order.ts`) takes the midpoint
   between the row's new neighbours, so nothing else moves; a row dropped last
   takes the current time instead, or a picture kept a moment later would sort
@@ -169,6 +172,16 @@ through them and editing them is deciding what they are a sequence of.
   ↓ too, and stops the press reaching OpenLayers' keyboard pan.
 - Pictures are their own records, so reordering — like keeping and deleting —
   is written when it happens, not by the draft's save button.
+- **Not every row is made here.** Three kinds are rendered in the tab that asked
+  for them; `sunloop` is created the same way and then handed to the render
+  sidecar, which writes the file back itself (`docs/render-sidecar.md`). The row,
+  the gallery, the ordering and the reading are the same either way — the
+  difference is who makes the pixels, and that a sidecar render survives the tab
+  being closed. `stateOf` (`useSpotEvidence.ts`) reads the local queue first and
+  falls back to `jobState`, the sidecar's own `meta.job` marker.
+- PocketBase makes no thumbnail for a video, so a loop is its own handle
+  everywhere a `200x200` thumb would be: a `<video preload="metadata">` at
+  `#t=0.1`, which is what gets a frame painted rather than a black box.
 - **Clicking a picture lays it on the map**, opaque, through `draftGroundAtom`
   and the same `useEvidenceOverlay` the reader uses, driven from `SpotSurface`.
   That is the ground the pen draws over, and it rides the map element, so a
@@ -207,6 +220,11 @@ holds the ground still and changes only how it was seen.
 - A row whose render has not landed, or that has no rectangle, is not part of
   the reading; the gallery on the card is where it is waited on. A reading with
   nothing left in it steps back to the card.
+- **A sun loop is read in the box, not on the ground.** It keeps its place in the
+  sequence and flipping reaches it, but the overlay URL goes empty, the
+  transparency slider is not drawn — there is nothing on the ground to fade —
+  and the panel shows a `<video controls loop autoplay muted>` instead. The
+  element is keyed on the row, or switching loops keeps the old frame.
 - `/l/<code>` opens the reading rather than the card: a link is an invitation to
   read. The view move is the reader's then, and `shareLink.ts` keeps its hands
   off. The code goes back onto the URL for whatever spot is open, so a reload
@@ -302,6 +320,14 @@ over the whole of that.
   uncredited. Nothing is drawn at all past half the height, or where the image
   is narrower than eight ems — national LiDAR over the smallest footprint is
   50 px square, and a caption covering it would be worse than none.
+- **A loop cannot be stamped at the door**: `decodeToCanvas` is
+  `createImageBitmap`, which throws on a WebM, so `stampEvidence` hands a video
+  back untouched and the band is burnt in at render time instead. The content is
+  still the client's — `legendContentFor` (`evidence/legendContent.ts`) composes
+  the same object for both, and the sun loop request carries it to the sidecar,
+  which only typesets. `docs/render-sidecar.md` records what burning early
+  costs: a credit edited afterwards, and a resolution the client has to send as
+  a hole in a pre-localized string.
 - Canvas text does not wait for webfonts, so `drawLegend` loads Mulish 400 and
   600 before measuring, which is why it is async. Without it two figures stamped
   a second apart come out in different faces. It returns whether it drew, so
@@ -396,6 +422,10 @@ belongs to an arm; one that applies to the reading belongs to the tools.
   account and a guest can hold no PocketBase file token, so `evidence.file` is
   served to anyone holding the URL. The same trade the old
   `1700000900_public_guest_reads.js` recorded.
+- **A sun loop never reaches the ground.** `useEvidenceOverlay` builds an
+  OpenLayers `ImageStatic`, which takes a URL to a still and nothing else, so an
+  animation can only be read inside the box. Laying one on the map would want a
+  second overlay type driving a `<canvas>` off `requestVideoFrameCallback`.
 - **A render is not a cache.** Upstreams re-fly and reprocess, so the same spec
   re-rendered later may not be the picture its author read. `meta.renderedAt`
   says when the file was made; nothing re-renders on its own.

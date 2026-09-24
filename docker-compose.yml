@@ -18,6 +18,7 @@ services:
       - mapproxy
       - pocketbase
       - cvat-tiles
+      - rendersvc
 
   cvat-tiles:
     build: ./cvat-tiles
@@ -47,6 +48,25 @@ services:
     volumes:
       - pbdata:/pb_data
       - ./pocketbase/pb_migrations:/pb_migrations:ro
+
+  # Server-side renders. Holds no credentials: every PocketBase call carries the
+  # requesting reader's own token, so the collection rules decide what a job may
+  # touch. Capped so a render cannot starve Caddy or PocketBase.
+  rendersvc:
+    build:
+      context: .
+      dockerfile: rendersvc/Dockerfile
+    restart: unless-stopped
+    cpus: 2.0
+    mem_limit: 2g
+    logging:
+      options:
+        max-size: "20m"
+        max-file: "3"
+    environment:
+      - POCKETBASE_URL=http://pocketbase:8090
+    depends_on:
+      - pocketbase
 
   wmscache:
     image: nginx:1.27-alpine

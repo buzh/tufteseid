@@ -7,6 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
   createEvidence,
@@ -20,10 +21,12 @@ import type { SpotRecord } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
 import { bboxToMetric } from '../map/bbox';
 import { useMayEditSpot } from '../spots/mayEdit';
+import { sunLoopLegend } from './legendContent';
 import { keepOffersAtom } from './offer';
 import { sortsForMove } from './order';
 import {
   enqueueRender,
+  jobState,
   renderStates,
   subscribeRenderQueue,
   type RenderState,
@@ -52,13 +55,17 @@ export type SpotEvidence = {
   /** Move a row to `to`, an index into `items` as it stands. The reading opens
    *  on the first row with pixels, so this is also how a cover is chosen. */
   reorder: (id: string, to: number) => void;
-  stateOf: (id: string) => RenderState | undefined;
+  /** This browser's queue first, then the sidecar's own marker: a server-side
+   *  render is reported the same whether or not this tab started it. */
+  stateOf: (rec: EvidenceRecord) => RenderState | undefined;
 };
 
 const byOrder = (a: EvidenceRecord, b: EvidenceRecord) =>
   a.sort - b.sort || a.created.localeCompare(b.created);
 
 export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
+  const { i18n } = useTranslation();
+  const language = i18n.language;
   const user = useAtomValue(currentUserAtom);
   const mayEdit = useMayEditSpot(spot);
   const offered = useAtomValue(keepOffersAtom);
@@ -131,9 +138,17 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
   const render = useCallback(
     (rec: EvidenceRecord) => {
       if (!footprint) return;
-      enqueueRender({ rec, bbox4326: footprint, onDone: upsert });
+      enqueueRender({
+        rec,
+        bbox4326: footprint,
+        // Composed here and sent with the job, because only a sun loop needs
+        // it and only the client knows the reader's language. No centre and no
+        // render date: neither is known before the pixels exist.
+        legend: sunLoopLegend(rec, spot, language),
+        onDone: upsert,
+      });
     },
-    [footprint, upsert],
+    [footprint, spot, language, upsert],
   );
 
   const keep = useCallback(
@@ -212,6 +227,9 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     retry: render,
     remove,
     reorder,
-    stateOf: useCallback((id: string) => states.get(id), [states]),
+    stateOf: useCallback(
+      (rec: EvidenceRecord) => states.get(rec.id) ?? jobState(rec),
+      [states],
+    ),
   };
 };

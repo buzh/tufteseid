@@ -73,6 +73,23 @@ the verdict. curl is all it needs, it writes nothing, and it is safe to run
 against a live install. The spot code is optional; without one the PocketBase
 half only asserts that the `spots` collection answers.
 
+## Renders that cost you CPU
+
+Most of what a reader keeps is rendered in their own browser. One kind — a 360°
+sun rotation over a spot, stored as a WebM loop — is rendered on the server by
+the `rendersvc` container, which is a minute of two cores per job.
+
+It is capped for you: signed-in readers only, one job at a time per reader, a
+queue of eight, `cpus: 2.0` and `mem_limit: 2g` in `docker-compose.yml`, and a
+frame count and rectangle taken from the stored record rather than from the
+request. The sidecar holds no credentials of its own — every call it makes to
+PocketBase carries the requesting reader's token, so it can touch exactly what
+that reader can. To switch the feature off, remove the `rendersvc` service and
+its `/render/*` route from the `Caddyfile`. Nothing else breaks: the button is
+still offered and reports a failed render when pressed, and `live-check.sh`
+fails its two render assertions.
+[`docs/render-sidecar.md`](docs/render-sidecar.md) has the details.
+
 ## See who is using it
 
 Caddy writes an access log to the `logs` directory created above:

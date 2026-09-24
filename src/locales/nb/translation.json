@@ -22,6 +22,7 @@
     "renderFailed": "kilden svarte ikke",
     "renderEmpty": "ingen dekning over utsnittet",
     "resolution": "{{m}} m/px",
+    "sunLoop": "Solrunde",
     "unreadable": "Ukjent bilde",
     "retry": "Prøv igjen",
     "remove": "Slett bildet",
@@ -48,7 +49,8 @@
       "altitude": "Solhøyde {{altitude}}°",
       "zFactor": "{{z}}× overdrivelse",
       "radius": "Radius {{m}} m",
-      "rendered": "Laget {{date}}"
+      "rendered": "Laget {{date}}",
+      "frames": "{{n}} bilder"
     },
     "download": "Last ned med kildeopplysninger",
     "downloading": "Lager fila …",

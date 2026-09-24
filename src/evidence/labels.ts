@@ -11,6 +11,7 @@ export const KIND_ICON: Record<EvidenceKind, MaterialSymbol> = {
   lidar: 'landscape',
   terrain: 'elevation',
   flyfoto: 'photo_camera',
+  sunloop: 'motion_photos_on',
 };
 
 export const evidenceTitle = (spec: EvidenceSpec): string => {
@@ -23,6 +24,8 @@ export const evidenceTitle = (spec: EvidenceSpec): string => {
       return spec.projectId === NIB_MOSAIC
         ? t('flyfotoControls.mosaic')
         : (spec.projectName ?? spec.projectId);
+    case 'sunloop':
+      return t('evidence.sunLoop');
   }
 };
 
@@ -35,6 +38,17 @@ export const evidenceLabel = (rec: EvidenceRecord): string => {
  *  shown on the map, whatever else it says. */
 export const isReadable = (rec: EvidenceRecord): boolean =>
   rec.file !== '' && evidenceBbox(rec) !== null;
+
+/** A WebM loop rather than a raster. Off the kind rather than the filename:
+ *  the kind is what the producer promised, and it is known before the file
+ *  lands. */
+export const isVideoEvidence = (rec: EvidenceRecord): boolean =>
+  rec.kind === 'sunloop';
+
+/** Readable, and a still. The ground overlay is an OpenLayers `ImageStatic`
+ *  and the sketch is drawn over a picture, so neither can take a video. */
+export const laysOnGround = (rec: EvidenceRecord): boolean =>
+  isReadable(rec) && !isVideoEvidence(rec);
 
 export const downloadLabel = (state: {
   downloading: boolean;
@@ -118,6 +132,15 @@ export const evidenceFacts = (
       case 'flyfoto':
         if (spec.photoDate) facts.push(dayOf(spec.photoDate, language));
         else if (spec.year != null) facts.push(String(spec.year));
+        break;
+      case 'sunloop':
+        // No azimuth: it is every azimuth, which is what the frame count says.
+        facts.push(
+          spec.model.toUpperCase(),
+          t('evidence.facts.altitude', { altitude: spec.altitude }),
+          t('evidence.facts.zFactor', { z: spec.zFactor }),
+          t('evidence.facts.frames', { n: Math.round(360 / spec.stepDeg) }),
+        );
         break;
     }
   }

@@ -94,6 +94,18 @@
   color: var(--mantine-color-dimmed);
 }
 
+/* A loop is read in the box rather than on the ground: the map overlay is an
+   `ImageStatic` and cannot take a video. */
+.player {
+  display: block;
+  width: 100%;
+  max-height: 46vh;
+  margin-bottom: var(--mantine-spacing-xs);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-anthracite-7);
+  object-fit: contain;
+}
+
 .strip {
   display: flex;
   gap: 6px;

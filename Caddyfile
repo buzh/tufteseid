@@ -115,6 +115,13 @@ route {
                         flush_interval -1
                 }
         }
+
+        # The render sidecar answers 202 and works in the background, so no
+        # long timeout is needed here. The result lands on the evidence row and
+        # reaches the app over PocketBase's realtime feed.
+        handle_path /render/* {
+                reverse_proxy http://rendersvc:8080
+        }
 }
 
 root * /var/www

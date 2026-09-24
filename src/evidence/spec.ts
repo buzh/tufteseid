@@ -6,6 +6,11 @@ import { VISUALIZATIONS, type Visualization } from '../terrain/shade';
 /** The seamless best-available mosaic, as against one acquisition. */
 export const NIB_MOSAIC = 'mosaic';
 
+/** Degrees between frames. Must divide 360, or the loop jumps where it closes;
+ *  the sidecar refuses one that does not. */
+export const SUNLOOP_STEP_DEG = 5;
+export const SUNLOOP_FPS = 24;
+
 export type EvidenceSpec =
   | {
       kind: 'lidar';
@@ -36,6 +41,17 @@ export type EvidenceSpec =
       projectName: string | null;
       year: number | null;
       photoDate: string | null;
+    }
+  | {
+      /** Shaded relief with the sun walked all the way round, as a WebM loop.
+       *  Rendered by the sidecar, never in the browser. No azimuth: the loop is
+       *  every azimuth. */
+      kind: 'sunloop';
+      model: DemModel;
+      altitude: number;
+      zFactor: number;
+      stepDeg: number;
+      fps: number;
     };
 
 const num = (v: unknown): number | null =>
@@ -80,6 +96,14 @@ export const metaOf = (spec: EvidenceSpec): EvidenceMeta => {
         projectName: spec.projectName,
         year: spec.year,
         photoDate: spec.photoDate,
+      };
+    case 'sunloop':
+      return {
+        model: spec.model,
+        altitude: spec.altitude,
+        zFactor: spec.zFactor,
+        stepDeg: spec.stepDeg,
+        fps: spec.fps,
       };
   }
 };
@@ -128,6 +152,18 @@ export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
         projectName: str(meta.projectName),
         year: num(meta.year),
         photoDate: str(meta.photoDate),
+      };
+    }
+    case 'sunloop': {
+      const model = asModel(meta.model);
+      if (!model) return null;
+      return {
+        kind: 'sunloop',
+        model,
+        altitude: num(meta.altitude) ?? 0,
+        zFactor: num(meta.zFactor) ?? 1,
+        stepDeg: num(meta.stepDeg) ?? SUNLOOP_STEP_DEG,
+        fps: num(meta.fps) ?? SUNLOOP_FPS,
       };
     }
   }
@@ -203,5 +239,14 @@ export const evidenceMatches = (
       );
     case 'flyfoto':
       return stored.kind === 'flyfoto' && stored.projectId === spec.projectId;
+    case 'sunloop':
+      return (
+        stored.kind === 'sunloop' &&
+        stored.model === spec.model &&
+        sameNumber(stored.altitude, spec.altitude) &&
+        sameNumber(stored.zFactor, spec.zFactor) &&
+        stored.stepDeg === spec.stepDeg &&
+        stored.fps === spec.fps
+      );
   }
 };

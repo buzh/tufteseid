@@ -31,6 +31,7 @@ Each owns its subject; this file keeps only what is true across all of them.
 | `docs/map-layers.md` | Background grounds, theme layers, and the recipes for adding another | `src/map/layers/`, any new map source |
 | `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream and Caddy → mapproxy → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
+| `docs/render-sidecar.md` | The server-side render service: the contract, the token trade, the queue's limits, the RVT and ffmpeg recipe, the burnt-in legend, the failure modes | `rendersvc/`, `src/api/render.ts`, the `sunloop` arms in `src/evidence/` |
 | `docs/monitoring.md` | The access logs, the usage report, the cron health check, retention | `scripts/usage-report.sh`, `scripts/health-check.sh`, any log format or `logging:` cap |
 | `vat-cache/README.md` | The out-of-band Python pipeline that precomputes the cached VAT ground | `vat-cache/`, `cvat-tiles/` |
 | `README.md` | Third-party install and admin guide | any change to install, first-run or licensing |
@@ -98,9 +99,9 @@ the container; compose maps host `127.0.0.1:3030 → 3000`.
 
 ```
 git pull
-docker compose build --pull tufteseid cvat-tiles
+docker compose build --pull tufteseid cvat-tiles rendersvc
 docker compose up -d
-docker compose logs -f tufteseid wmscache mapproxy
+docker compose logs -f tufteseid wmscache mapproxy rendersvc
 scripts/live-check.sh https://<host> [spot-code]
 ```
 
@@ -127,6 +128,7 @@ alongside the cVAT and MapProxy store directories (`README.md`,
 | `tufteseid` | `node:24-alpine` builds the SPA, `caddy:2.10.0-alpine` serves `/var/www`, plus the GoAccess report at `/stats/` out of a read-only mount. `config.js` bind-mounted at runtime. |
 | `pocketbase` | Backend for spots (OAuth2 + user content), pinned to 0.40.2. Serves `/pb/*`. SQLite on the `pbdata` volume. |
 | `nib-proxy` | Token-injecting sidecar for Norge i bilder ortofoto. Reachable only from wmscache and mapproxy. |
+| `rendersvc` | `python:3.12-slim` + ffmpeg + RVT-py. Serves `/render/*`: renders an evidence row server-side and PATCHes the file back with the caller's own token. One worker, a queue of 8, CPU and memory capped. |
 | `cvat-tiles` | `node:24-alpine`, zero deps. Serves `/cvat/*` out of one MBTiles database per LiDAR acquisition in the bind-mounted store. Built out of band by `vat-cache/`. |
 | `mapproxy` | `mapproxy:7.0.0-alpine-nginx`. Serves `/cache/*`: the six upstream layers whose parameters never change, meta-tiled onto the app's own grid and held in MBTiles. Config in `mapproxy/`, store bind-mounted. |
 | `wmscache` | `nginx:1.27-alpine` reverse proxy + 25 GB disk cache in front of every external WMS/WFS/ArcGIS service whose parameters are chosen at request time, plus Kulturminnesøk's record API. |
@@ -162,7 +164,8 @@ Two collections carry the reader's records:
   evidence is rendered over, ≤500 m on a side), `sketch` (json ≤5 MB: an
   Excalidraw scene plus the frame that georeferences it, or null).
 - **`evidence`** (id `pbc_evidence`) — `spot` (→ spots, cascade), `owner`
-  (→ users, cascade), `kind` (lidar | terrain | flyfoto), `file` (≤50 MB image,
+  (→ users, cascade), `kind` (lidar | terrain | flyfoto | sunloop), `file`
+  (≤50 MB image or `video/webm`,
   **empty until the render lands** — test it rather than assuming a row has a
   picture), `caption`, `meta` (json ≤10 kB: the parameters asked for, the
   rectangle covered, the resolution achieved and `renderedAt`), `sort` (epoch
@@ -172,6 +175,11 @@ A row is parameters first and pixels second: the client creates it, then a
 serial queue renders and PATCHes the file on. A render is not a cache — nothing
 re-renders a row by itself, and `meta.renderedAt` says when the picture was
 made.
+
+Which queue depends on the kind. Three kinds are rendered in the tab that asked
+(`src/evidence/queue.ts`); `sunloop` is handed to the `rendersvc` sidecar, which
+writes `meta.job` as it goes and the file when it is done
+(`docs/render-sidecar.md`).
 
 `localities`, `finds` and `attachments` are still on disk from the old model and
 are read by nothing. Leave them alone rather than adding a migration to drop

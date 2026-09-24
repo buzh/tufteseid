@@ -25,6 +25,7 @@ import {
   evidenceFacts,
   evidenceLabel,
   isReadable,
+  isVideoEvidence,
   KIND_ICON,
 } from './labels';
 import { useReaderWindow, type ReaderLayout } from './readerWindow';
@@ -67,9 +68,13 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
 
   const [transparency, setTransparency] = useState(0);
 
+  // A loop plays in the box instead, so the ground under it is bare and the
+  // slider has nothing to fade.
+  const onGround = current && !isVideoEvidence(current) ? current : null;
+
   useEvidenceOverlay(
-    current ? evidenceFileUrl(current) : '',
-    current ? evidenceBbox(current) : null,
+    onGround ? evidenceFileUrl(onGround) : '',
+    onGround ? evidenceBbox(onGround) : null,
     1 - transparency / 100,
   );
 
@@ -269,29 +274,46 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
 
               {hasSketch && <SketchFade className={styles.sketch} />}
 
-              <div className={styles.fade}>
-                <Tooltip label={t('terrainControls.transparency')}>
-                  <span className={styles.fadeIcon}>
-                    <Icon icon="opacity" size={16} />
-                  </span>
-                </Tooltip>
-                <Slider
-                  className={styles.slider}
-                  size="xs"
-                  min={0}
-                  max={100}
-                  step={5}
-                  label={(value) => `${value} %`}
-                  aria-label={t('terrainControls.transparency')}
-                  value={transparency}
-                  onChange={setTransparency}
-                />
-              </div>
+              {onGround && (
+                <div className={styles.fade}>
+                  <Tooltip label={t('terrainControls.transparency')}>
+                    <span className={styles.fadeIcon}>
+                      <Icon icon="opacity" size={16} />
+                    </span>
+                  </Tooltip>
+                  <Slider
+                    className={styles.slider}
+                    size="xs"
+                    min={0}
+                    max={100}
+                    step={5}
+                    label={(value) => `${value} %`}
+                    aria-label={t('terrainControls.transparency')}
+                    value={transparency}
+                    onChange={setTransparency}
+                  />
+                </div>
+              )}
             </div>
           }
         >
           {spot.description && (
             <p className={styles.prose}>{spot.description}</p>
+          )}
+
+          {current && isVideoEvidence(current) && (
+            <video
+              // Keyed, or switching loops keeps the element and its old frame.
+              key={current.id}
+              className={styles.player}
+              src={evidenceFileUrl(current)}
+              controls
+              loop
+              autoPlay
+              muted
+              playsInline
+              aria-label={title}
+            />
           )}
 
           {items === null ? (
@@ -312,11 +334,24 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
                       aria-pressed={rec.id === current?.id}
                       onClick={() => setShownId(rec.id)}
                     >
-                      <img
-                        className={styles.thumb}
-                        src={evidenceFileUrl(rec, '200x200')}
-                        alt={label}
-                      />
+                      {isVideoEvidence(rec) ? (
+                        // `#t=0.1` so a frame is painted rather than a black
+                        // box; PocketBase makes no thumbnail for a video.
+                        <video
+                          className={styles.thumb}
+                          src={`${evidenceFileUrl(rec)}#t=0.1`}
+                          preload="metadata"
+                          muted
+                          playsInline
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <img
+                          className={styles.thumb}
+                          src={evidenceFileUrl(rec, '200x200')}
+                          alt={label}
+                        />
+                      )}
                       <Icon
                         icon={KIND_ICON[rec.kind]}
                         size={12}

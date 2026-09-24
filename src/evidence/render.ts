@@ -23,13 +23,17 @@ type Produced = {
   meta: EvidenceMeta;
 };
 
+/** Everything but `sunloop`, which the sidecar renders. Stated as a type so the
+ *  switch below stays exhaustive and the compiler refuses a loop here. */
+type BrowserSpec = Exclude<EvidenceSpec, { kind: 'sunloop' }>;
+
 /**
  * Null means the source has nothing over this rectangle: not a failure, and
  * nothing a retry would change. A throw is a fault. `queue.ts` tells the two
  * apart on exactly that.
  */
 export const renderEvidence = async (
-  spec: EvidenceSpec,
+  spec: BrowserSpec,
   bbox4326: Bbox,
   signal: AbortSignal,
 ): Promise<Produced | null> => {

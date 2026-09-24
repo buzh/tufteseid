@@ -71,6 +71,10 @@ const groundOfferAtom = atom<EvidenceSpec | null>((get) => {
  *  because its settings are component state rather than atoms. */
 export const terrainOfferAtom = atom<EvidenceSpec | null>(null);
 
+/** Likewise, and only under a hillshade: the loop is a walk round the one knob
+ *  the other visualizations do not have. */
+export const sunLoopOfferAtom = atom<EvidenceSpec | null>(null);
+
 /**
  * The offers standing, ground first — the order they are stacked in. An offer
  * is parameters, not pixels: keeping one re-renders it over the spot's
@@ -78,7 +82,7 @@ export const terrainOfferAtom = atom<EvidenceSpec | null>(null);
  * resolution on screen.
  */
 export const keepOffersAtom = atom<EvidenceSpec[]>((get) =>
-  [get(groundOfferAtom), get(terrainOfferAtom)].filter(
+  [get(groundOfferAtom), get(terrainOfferAtom), get(sunLoopOfferAtom)].filter(
     (spec): spec is EvidenceSpec => spec !== null,
   ),
 );

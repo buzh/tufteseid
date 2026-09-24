@@ -17,6 +17,8 @@ container, `:3000`; host `127.0.0.1:3030`):
 - `Browser → Caddy → cvat-tiles` — our own MBTiles, read off disk.
 - `nib-proxy` — token-injecting sidecar for Norge i bilder, reached only from
   wmscache and mapproxy on the compose network. Never exposed.
+- `Browser → Caddy → rendersvc → hoydedata.no` — the one path that leaves the
+  stack *without* wmscache in front of it, on purpose (below).
 
 ## Routes
 
@@ -36,8 +38,8 @@ so namespaces cannot collide inside nginx (WFS would want the WMS host's
 | `/arcgis/hoydedata/*` | `/hoydedata-arcgis/` | `hoydedata.no/arcgis/rest/services/*` |
 
 Non-map routes: `/pb/*` → `pocketbase:8090`; `/cvat/*` → `cvat-tiles:8080`;
-`/l/<code>` → `redir /?lok=<code>`. `file_server` has no SPA fallback, so any
-other unknown path 404s.
+`/render/*` → `rendersvc:8080`; `/l/<code>` → `redir /?lok=<code>`.
+`file_server` has no SPA fallback, so any other unknown path 404s.
 
 ## MapProxy (`/cache/*`)
 
@@ -324,6 +326,21 @@ stack: no wmscache entry, no CSP host.
   it is the app's EPSG:25833 one — a generic MBTiles reader would place these
   tiles in the Atlantic.
 
+## rendersvc (`/render/*`)
+
+`handle_path /render/* { reverse_proxy http://rendersvc:8080 }`, and that is the
+whole Caddy side of it: the sidecar answers 202 and works in the background, so
+there is no long timeout to set and no response to buffer. The result reaches the
+browser over PocketBase's realtime feed, not over this connection.
+`docs/render-sidecar.md` owns the rest.
+
+The part that belongs here is the upstream rule. **`rendersvc` fetches float DEM
+straight from hoydedata.no, never through wmscache** — the same exemption
+`vat-cache/` has, for the same reason: every job is a rectangle nobody will ask
+for again, so caching one only evicts tiles that are re-read. Per job it is two
+requests, one of them large. It is not a CSP entry either: the browser never
+contacts hoydedata.no for this, the sidecar does.
+
 ## Kulturminnesøk (`/kms/*`)
 
 The one upstream here that is not a map source: one JSON lookup per heritage
@@ -349,6 +366,9 @@ Caddyfile CSP. It covers only what the browser contacts itself:
   registers, `*.norgeskart.no` for the matrikkel search API (`api.norgeskart.no`
   in `src/env.ts`), `hoydedata.no` for the ArcGIS identify in
   `src/search/searchApi.ts`.
+
+There is no `media-src`: a sun loop is a same-origin PocketBase file and
+`default-src 'self'` already covers it, as it covers `/render/*`.
 
 **Routing a new upstream through wmscache is never a CSP change; calling one
 directly from the browser always is.**

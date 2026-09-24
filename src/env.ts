@@ -9,6 +9,8 @@ type Env = {
   geoNorgeApiBaseUrl: string;
   // Same-origin path proxied by Caddy to the pocketbase container.
   pocketbaseUrl: string;
+  // Likewise, to the render sidecar.
+  renderUrl: string;
   layerProviderParameters: layerProviderParameters;
 };
 
@@ -17,6 +19,7 @@ const DEFAULT_ENV: Env = {
   apiUrl: 'https://api.norgeskart.no',
   geoNorgeApiBaseUrl: 'https://ws.geonorge.no',
   pocketbaseUrl: '/pb',
+  renderUrl: '/render',
   layerProviderParameters: {
     kartverketCache: {
       baseUrl: 'https://cache.kartverket.no',

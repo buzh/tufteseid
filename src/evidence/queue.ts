@@ -6,8 +6,10 @@
 // once finish no sooner and invite shed responses.
 
 import { attachEvidenceFile, type EvidenceRecord } from '../api/evidence';
+import { requestSunLoop } from '../api/render';
 import type { Bbox } from '../map/bbox';
 import { withDeadline } from '../shared/utils/deadline';
+import type { SunLoopLegend } from './legendContent';
 import { renderEvidence } from './render';
 import { specOf } from './spec';
 
@@ -19,10 +21,37 @@ import { specOf } from './spec';
  */
 export type RenderState = 'queued' | 'running' | 'empty' | 'failed';
 
+const STATES: readonly RenderState[] = ['queued', 'running', 'empty', 'failed'];
+
+// A sidecar render that never settled. Read as failed so a crashed worker
+// offers a retry rather than an eternal hourglass.
+const STALE_JOB_MS = 900000;
+
+/**
+ * The same four states, as the render sidecar left them in `meta.job` — for a
+ * job this browser did not start, or was not open for. Absent once the file
+ * lands: the sidecar writes the pixels and the meta in one request, and the
+ * meta it writes has no marker.
+ */
+export const jobState = (rec: EvidenceRecord): RenderState | undefined => {
+  const job = rec.meta?.job;
+  if (!job || typeof job !== 'object') return undefined;
+  const { state, at } = job as { state?: unknown; at?: unknown };
+  if (!STATES.includes(state as RenderState)) return undefined;
+  if (state === 'empty' || state === 'failed') return state;
+  const since = typeof at === 'string' ? Date.parse(at) : NaN;
+  return Number.isFinite(since) && Date.now() - since > STALE_JOB_MS
+    ? 'failed'
+    : (state as RenderState);
+};
+
 type RenderJob = {
   rec: EvidenceRecord;
   /** The spot's footprint, EPSG:4326. */
   bbox4326: Bbox;
+  /** The band the sidecar burns in. Only a `sunloop` reads it; null where the
+   *  row's meta no longer describes a render. */
+  legend: SunLoopLegend | null;
   /** The finished record, handed back to whoever is showing it. */
   onDone?: (rec: EvidenceRecord) => void;
 };
@@ -33,6 +62,9 @@ type RenderJob = {
 // about 1.5 Mbit/s up.
 const RENDER_DEADLINE_MS = 300000;
 const UPLOAD_DEADLINE_MS = 300000;
+// The sidecar answers as soon as it has claimed the row; the render itself is
+// not on this clock.
+const HANDOVER_DEADLINE_MS = 30000;
 
 const queue: RenderJob[] = [];
 const states = new Map<string, RenderState>();
@@ -71,6 +103,23 @@ const runJob = async (job: RenderJob): Promise<EvidenceRecord | null> => {
   // nothing.
   if (!spec) {
     states.set(job.rec.id, 'empty');
+    return null;
+  }
+
+  // Handed to the sidecar, which renders it and PATCHes the file on itself. The
+  // row is then realtime's to report on, and this queue drops it — a loop that
+  // takes minutes must not park every other job behind it, and it outlives the
+  // tab either way.
+  if (spec.kind === 'sunloop') {
+    if (!job.legend) {
+      states.set(job.rec.id, 'empty');
+      return null;
+    }
+    const legend = job.legend;
+    await withDeadline(HANDOVER_DEADLINE_MS, 'sun loop handover', () =>
+      requestSunLoop(job.rec.id, legend),
+    );
+    states.delete(job.rec.id);
     return null;
   }
 

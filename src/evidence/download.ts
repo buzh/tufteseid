@@ -8,6 +8,16 @@ import { evidenceTitle } from './labels';
 import { specOf } from './spec';
 import { stampEvidence } from './stamp';
 
+// Off the blob rather than the row: `stampEvidence` re-encodes in the type it
+// was handed, so the type in hand is the one the bytes are in.
+const EXTENSIONS: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'video/webm': 'webm',
+};
+
+const extensionOf = (type: string): string => EXTENSIONS[type] ?? 'png';
+
 const save = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -55,8 +65,7 @@ export const useEvidenceDownload = (spot: SpotRecord): EvidenceDownload => {
           const name = sanitizeFilename(
             [spot.name, spec && evidenceTitle(spec)].filter(Boolean).join(' '),
           );
-          const ext = stamped.type === 'image/jpeg' ? 'jpg' : 'png';
-          save(stamped, `${name}.${ext}`);
+          save(stamped, `${name}.${extensionOf(stamped.type)}`);
         } catch (e) {
           console.warn('[evidence] download failed', e);
           setFailedId(rec.id);

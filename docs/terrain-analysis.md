@@ -24,6 +24,12 @@ Read-only: nothing here is written or persisted. Internal name `terreng`.
 Precomputed VAT served as tiles (`/cvat/*`) is a separate path: `vat-cache/`
 and `vat-cache/README.md`, registered in `docs/map-layers.md`.
 
+Two other readers of the same endpoint carry their own copies of the quirks
+below, because neither runs in the browser: `vat-cache/fetch_dem.py` and
+`rendersvc/dem.py` (`docs/render-sidecar.md`). A fact learned here is learned in
+three places; the probe's upper-cased `BEST`, the explicit `mosaicRule` and the
+absent-tile NaN are the three that have caught all of them.
+
 ## The endpoint
 
 ```
