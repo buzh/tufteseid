@@ -322,10 +322,12 @@ over the whole of that.
   50 px square, and a caption covering it would be worse than none.
 - **A loop cannot be stamped at the door**: `decodeToCanvas` is
   `createImageBitmap`, which throws on a WebM, so `stampEvidence` hands a video
-  back untouched and the band is burnt in at render time instead. The content is
-  still the client's — `legendContentFor` (`evidence/legendContent.ts`) composes
-  the same object for both, and the sun loop request carries it to the sidecar,
-  which only typesets. `docs/render-sidecar.md` records what burning early
+  back untouched and the band is burnt in at render time instead. The wording is
+  still the client's — `sunLoopLegend` composes it beside `legendContentFor` in
+  `evidence/legendContent.ts` — but what the wording asserts is not: the credit
+  travels as a hole and the link is composed by the sidecar out of the record,
+  because a band in the pixels is a claim nobody downstream can check.
+  `docs/render-sidecar.md` records the whole split, and what burning early
   costs: a credit edited afterwards, and a resolution the client has to send as
   a hole in a pre-localized string.
 - Canvas text does not wait for webfonts, so `drawLegend` loads Mulish 400 and

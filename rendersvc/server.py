@@ -3,7 +3,9 @@
 A job names an evidence row and nothing else. The row is read and claimed with
 the caller's own token, so PocketBase decides who may start a render and the
 parameters and the ground come out of the record rather than out of the request
-— a job's cost is bounded by what is stored, not by what was posted.
+— a job's cost is bounded by what is stored, not by what was posted. The legend
+is worded by the request and filled from the record, for the same reason: what a
+burnt-in band asserts has to be true of the row it is burnt into.
 
 Progress goes back into the row's `meta.job`, which the app is already
 subscribed to, so a render survives a reload or a closed tab.
@@ -14,16 +16,31 @@ import json
 import logging
 import os
 import queue
+import re
 import threading
 import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import dem
+import legend
 import pb
 import sunloop
 
 PORT = int(os.environ.get("PORT", "8080"))
+
+# The host the burnt-in share link names, `PUBLIC_ORIGIN` with its scheme taken
+# off the way `legendContentFor` takes it off client-side. Configured rather than
+# read off the request: `Host` is the caller's to set, and a link nobody can edit
+# out of the pixels afterwards is worth more to an attacker than the render is.
+# Unset, the band prints no link at all.
+SHARE_HOST = re.sub(
+    r"^https?://", "", os.environ.get("PUBLIC_ORIGIN", "").strip()
+).rstrip("/")
+
+# What Caddy's `/l/…` redirect matches. A code outside it resolves nowhere here,
+# and would be free path and query in a line the reader is invited to trust.
+SPOT_CODE = re.compile(r"[0-9A-Za-z]{1,32}")
 
 QUEUE_MAX = 8
 # Per caller, in flight or waiting. A reader who wants a second loop can have it
@@ -50,6 +67,9 @@ UNKNOWN_CALLER = "?"
 # `meta` is capped at 10 kB by the collection, and a failure detail is the one
 # thing here that can run long.
 MAX_DETAIL_CHARS = 300
+
+# A rights line, before and after the credit is substituted into it.
+MAX_RIGHTS_CHARS = 300
 
 log = logging.getLogger("rendersvc")
 
@@ -135,26 +155,54 @@ def _strings(value, count, chars):
     return [v[:chars] for v in value[:count] if isinstance(v, str) and v]
 
 
-def legend_of(body):
-    """What the band will say. The client composes it, because which facts a
-    visualization answered to is its rule and belongs in one place."""
+def share_link(spot):
+    """The short link to the spot, composed here rather than accepted: a forged
+    link burnt into the frames is a phishing primitive, and nothing downstream
+    can tell it from the real one. A private spot's code resolves for nobody but
+    its owner, so it prints none — the same rule `legendContentFor` follows."""
+    code = spot.get("code")
+    if not SHARE_HOST or spot.get("visibility") != "public":
+        return ""
+    if not isinstance(code, str) or not SPOT_CODE.fullmatch(code):
+        return ""
+    return f"{SHARE_HOST}/l/{code}"
+
+
+def legend_of(body, spot):
+    """What the band will say. The client words it, because which facts a
+    visualization answered to is its rule and belongs in one place — but the
+    band ends up in pixels no one can edit, so everything it asserts about the
+    record comes from the record: the author's name replaces `CREDIT_TOKEN` and
+    the link is composed above. A `link` in the body is ignored.
+
+    `title`, `facts` and the two format fields stay the client's: they describe
+    the parameters it already stored and are bounded, not trusted."""
     raw = body.get("legend")
     if not isinstance(raw, dict):
-        return {}
+        raw = {}
+    credit = spot.get("credit")
+    credit = credit.strip() if isinstance(credit, str) else ""
     return {
         "title": str(raw.get("title") or "")[:200],
         "facts": _strings(raw.get("facts"), 12, 200),
-        "rights": _strings(raw.get("rights"), 6, 300),
-        "link": str(raw.get("link") or "")[:200],
+        "rights": [
+            line.replace(legend.CREDIT_TOKEN, credit)[:MAX_RIGHTS_CHARS]
+            for line in _strings(raw.get("rights"), 6, MAX_RIGHTS_CHARS)
+        ],
+        "link": share_link(spot),
         "resolutionFormat": str(raw.get("resolutionFormat") or "")[:80],
         "decimal": str(raw.get("decimal") or ".")[:1],
     }
 
 
-def bbox_of(record):
+def spot_of(record):
     spot = (record.get("expand") or {}).get("spot")
     if not isinstance(spot, dict):
         raise Refused(422, "the row names no spot")
+    return spot
+
+
+def bbox_of(spot):
     footprint = spot.get("footprint")
     if not (isinstance(footprint, list) and len(footprint) == 4):
         raise Refused(422, "the spot has no footprint")
@@ -182,7 +230,8 @@ def accept(token, body):
         raise Refused(422, "the row is not a sunloop")
     meta = record.get("meta")
     spec = spec_of(meta)
-    bbox = bbox_of(record)
+    spot = spot_of(record)
+    bbox = bbox_of(spot)
     caller = caller_of(token)
     # A retry reads back the marker the failed attempt left. Every write below
     # is built from this, so drop it here or a successful second run lands a row
@@ -213,7 +262,7 @@ def accept(token, body):
             )
         except pb.PbError as e:
             raise Refused(403 if e.status in (401, 403, 404) else 502, e.detail) from e
-        jobs.put((record_id, token, spec, bbox, meta, legend_of(body)))
+        jobs.put((record_id, token, spec, bbox, meta, legend_of(body, spot)))
         queued = True
     finally:
         if not queued:

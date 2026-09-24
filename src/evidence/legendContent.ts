@@ -12,7 +12,7 @@ import type { SpotRecord } from '../api/spots';
 import { lidarStyleLabel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { formatPoint } from '../spots/geo';
 import { shareUrlOf } from '../spots/shareLink';
-import { evidenceFacts, evidenceTitle } from './labels';
+import { evidenceFacts, evidenceTitle, specFacts } from './labels';
 import { specOf, type EvidenceSpec } from './spec';
 
 export type LegendContent = {
@@ -22,8 +22,10 @@ export type LegendContent = {
   link: string;
 };
 
-/** What the sidecar is sent. Mirrors `legend_of` in `rendersvc/server.py`. */
-export type SunLoopLegend = LegendContent & {
+/** What the sidecar is sent: wording, with holes where the facts it reads off
+ *  the record go. No `link` — it composes that itself. Mirrors `legend_of` in
+ *  `rendersvc/server.py`. */
+export type SunLoopLegend = Omit<LegendContent, 'link'> & {
   resolutionFormat: string;
   decimal: string;
 };
@@ -31,6 +33,13 @@ export type SunLoopLegend = LegendContent & {
 // The hole the sidecar fills once it knows what it managed to fetch. Matches
 // `RESOLUTION_TOKEN` in `rendersvc/legend.py`.
 const RESOLUTION_TOKEN = '{res}';
+
+// The hole the sidecar fills with the credit off the record it is rendering.
+// The wording around it is ours, but who the author is is not: the band is
+// burnt into pixels nobody can edit afterwards, so it may not name whoever
+// happened to ask for the render. Matches `CREDIT_TOKEN` in
+// `rendersvc/legend.py`.
+const CREDIT_TOKEN = '{credit}';
 
 /** A rights holder named on the legend. The holder is a proper name and is
  *  never translated; the terms key resolves to the licence, which is. */
@@ -154,20 +163,29 @@ const decimalSeparator = (language: string): string => {
 };
 
 /**
- * The same content, plus the two things the sidecar cannot work out for itself.
- * No centre and no render date: a row is asked for before it has either.
+ * The same band, composed for a server that typesets it. What the client still
+ * chooses is the wording; what it may not choose is what the wording asserts,
+ * so the credit travels as a hole and the link is left to the sidecar
+ * altogether.
+ *
+ * No centre, and neither the resolution nor the render date: the first is not
+ * known before the ground is fetched, and the other two are stale on a row that
+ * has been rendered once already — the sidecar substitutes the resolution it
+ * achieves.
  */
 export const sunLoopLegend = (
   rec: EvidenceRecord,
   spot: SpotRecord,
   language: string,
 ): SunLoopLegend | null => {
-  const content = legendContentFor(rec, spot, language);
-  return content
-    ? {
-        ...content,
-        resolutionFormat: t('evidence.resolution', { m: RESOLUTION_TOKEN }),
-        decimal: decimalSeparator(language),
-      }
-    : null;
+  const spec = specOf(rec);
+  if (!spec) return null;
+  return {
+    title: evidenceTitle(spec),
+    facts: specFacts(spec, language),
+    // Whether there is an author to name is wording; which author it is is not.
+    rights: rightsOf(spec, spot.credit ? CREDIT_TOKEN : ''),
+    resolutionFormat: t('evidence.resolution', { m: RESOLUTION_TOKEN }),
+    decimal: decimalSeparator(language),
+  };
 };

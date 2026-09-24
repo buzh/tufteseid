@@ -3,7 +3,9 @@
 A still is stamped in the browser at download time (`src/evidence/stamp.ts`),
 but `createImageBitmap` throws on a WebM, so a loop is cited on the way out
 instead. The client sends the lines — which facts a visualization answered to is
-its rule and stays in one place — and this only typesets them.
+its rule and stays in one place — and this only typesets them. The lines arrive
+with holes in them where a fact has to come off the record instead of out of the
+request; `server.py`'s `legend_of` fills those, this one the resolution.
 
 Two deliberate differences from `src/evidence/legend.ts`: the face is DejaVu
 rather than Mulish, which the image has no npm build to take Mulish from; and
@@ -30,6 +32,14 @@ SEP = " · "
 # with it, because the rest of the band is already in the reader's language and
 # `0.50` next to `z 1,5` reads as a typo.
 RESOLUTION_TOKEN = "{res}"
+
+# Where the spot's author goes in the rights line the client worded. Filled from
+# the record in `server.py`, never from the request: the band cannot be edited
+# once it is in the pixels, so the name in it may not be the caller's to choose.
+# Braced like the other hole for the same reason — nothing the app translates
+# carries a literal brace, i18next's own placeholders are interpolated away
+# before a line is sent, and substitution is one pass over the text.
+CREDIT_TOKEN = "{credit}"
 
 # Of the frame. Past it the link, then the scale bar, are dropped. The rights
 # lines never are — they are the only part a licence actually requires.

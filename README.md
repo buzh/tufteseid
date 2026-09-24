@@ -84,10 +84,18 @@ queue of eight, `cpus: 2.0` and `mem_limit: 2g` in `docker-compose.yml`, and a
 frame count and rectangle taken from the stored record rather than from the
 request. The sidecar holds no credentials of its own — every call it makes to
 PocketBase carries the requesting reader's token, so it can touch exactly what
-that reader can. To switch the feature off, remove the `rendersvc` service and
-its `/render/*` route from the `Caddyfile`. Nothing else breaks: the button is
-still offered and reports a failed render when pressed, and `live-check.sh`
-fails its two render assertions.
+that reader can.
+
+Set `PUBLIC_ORIGIN` on that service to the address your own readers visit. A sun
+loop is cited in its own pixels, and the short link in that band is composed
+from the stored record and this origin rather than taken from the request, so
+that nobody can forge one — which means it has to be your address and there is
+no sensible default. Left unset, a loop is rendered with no link in its band.
+
+To switch the feature off, remove the `rendersvc` service and its `/render/*`
+route from the `Caddyfile`. Nothing else breaks: the button is still offered and
+reports a failed render when pressed, and `live-check.sh` fails its two render
+assertions.
 [`docs/render-sidecar.md`](docs/render-sidecar.md) has the details.
 
 ## See who is using it

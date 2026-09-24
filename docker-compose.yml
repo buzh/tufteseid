@@ -65,6 +65,11 @@ services:
         max-file: "3"
     environment:
       - POCKETBASE_URL=http://pocketbase:8090
+      # The origin printed in the provenance band burnt into a loop. Set it to
+      # the address readers visit: a spot's short link is composed here, out of
+      # the record, rather than taken from the request. Unset, a loop carries no
+      # link.
+      - PUBLIC_ORIGIN=${PUBLIC_ORIGIN:-}
     depends_on:
       - pocketbase
 

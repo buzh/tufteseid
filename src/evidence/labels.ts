@@ -104,6 +104,35 @@ const terrainFacts = (
   return facts;
 };
 
+/** What the catalogue knew about the source: everything that is true of a row
+ *  before any pixel of it exists. Separate from `evidenceFacts` because a row
+ *  that is about to be rendered still holds the previous render's figures. */
+export const specFacts = (spec: EvidenceSpec, language: string): string[] => {
+  switch (spec.kind) {
+    case 'lidar': {
+      const facts = [spec.model.toUpperCase()];
+      if (spec.year != null) {
+        facts.push(t('evidence.facts.year', { year: spec.year }));
+      }
+      if (spec.pointDensity) facts.push(spec.pointDensity);
+      return facts;
+    }
+    case 'terrain':
+      return terrainFacts(spec);
+    case 'flyfoto':
+      if (spec.photoDate) return [dayOf(spec.photoDate, language)];
+      return spec.year != null ? [String(spec.year)] : [];
+    case 'sunloop':
+      // No azimuth: it is every azimuth, which is what the frame count says.
+      return [
+        spec.model.toUpperCase(),
+        t('evidence.facts.altitude', { altitude: spec.altitude }),
+        t('evidence.facts.zFactor', { z: spec.zFactor }),
+        t('evidence.facts.frames', { n: Math.round(360 / spec.stepDeg) }),
+      ];
+  }
+};
+
 /** What the catalogue knew about the source, what the render achieved and when
  *  it was made, in the order it would be cited. */
 export const evidenceFacts = (
@@ -115,35 +144,7 @@ export const evidenceFacts = (
   centre?: string,
 ): string[] => {
   const spec = specOf(rec);
-  const facts: string[] = [];
-
-  if (spec) {
-    switch (spec.kind) {
-      case 'lidar':
-        facts.push(spec.model.toUpperCase());
-        if (spec.year != null) {
-          facts.push(t('evidence.facts.year', { year: spec.year }));
-        }
-        if (spec.pointDensity) facts.push(spec.pointDensity);
-        break;
-      case 'terrain':
-        facts.push(...terrainFacts(spec));
-        break;
-      case 'flyfoto':
-        if (spec.photoDate) facts.push(dayOf(spec.photoDate, language));
-        else if (spec.year != null) facts.push(String(spec.year));
-        break;
-      case 'sunloop':
-        // No azimuth: it is every azimuth, which is what the frame count says.
-        facts.push(
-          spec.model.toUpperCase(),
-          t('evidence.facts.altitude', { altitude: spec.altitude }),
-          t('evidence.facts.zFactor', { z: spec.zFactor }),
-          t('evidence.facts.frames', { n: Math.round(360 / spec.stepDeg) }),
-        );
-        break;
-    }
-  }
+  const facts: string[] = spec ? specFacts(spec, language) : [];
 
   const metresPerPx = evidenceResolution(rec);
   if (metresPerPx != null) {

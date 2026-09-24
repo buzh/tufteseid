@@ -212,22 +212,56 @@ The loop leaves the server already cited, because `stampEvidence` cannot help it
 `decodeToCanvas` is `createImageBitmap`, which throws on a WebM. So a still is
 stamped at the door and a loop is burnt at render time.
 
-The *content* is the client's either way — `legendContentFor` in
-`src/evidence/legendContent.ts` composes the same `{title, facts, rights, link}`
-`drawLegend` takes, and `sunLoopLegend` adds two fields for the sidecar. Which
-facts a visualization answered to is the client's rule and stays in one place;
-`legend.py` only typesets.
+The *wording* is the client's either way — `legendContentFor` in
+`src/evidence/legendContent.ts` composes the `{title, facts, rights, link}`
+`drawLegend` takes, and `sunLoopLegend` composes the sidecar's variant of it.
+Which facts a visualization answered to is the client's rule and stays in one
+place, and the client is the only side that knows the reader's language.
 
-Two honest differences from a stamped still, both of them consequences of
+**What the wording asserts is not the client's.** A stamped still is drawn in the
+reader's own tab out of a record they just read; a loop's band is drawn by a
+server for a file a public spot then serves to anyone with the URL, and nothing
+downstream can tell a true band from a false one — it is in the pixels. So the
+sidecar substitutes rather than trusts: what the band says about the record is
+taken off the record it is already holding (`?expand=spot`) and put into the
+lines it was sent.
+
+| Field | Whose |
+| --- | --- |
+| `title`, `facts`, `decimal` | the client's, bounded and otherwise untouched |
+| `resolutionFormat` | the client's wording, with `{res}` filled in by `legend.py` |
+| the credit inside `rights` | `CREDIT_TOKEN` (`{credit}`), filled from `expand.spot.credit` by `legend_of` |
+| `link` | composed by `share_link` from the spot's `code` and `visibility`; a `link` in the body is ignored |
+
+The rest of a rights line — the role, the holder, the licence — is still wording
+the client chose, so a caller who may PATCH the row can still put a wrong licence
+on a band. What they cannot do is put somebody else's name on their own render,
+or point the link somewhere else.
+
+`PUBLIC_ORIGIN` is how the sidecar knows what to link to: the origin readers
+visit, set in `docker-compose.yml`, with the scheme stripped off the way the
+client strips it so the two bands read the same. Unset, a loop prints no link,
+and so does a spot that is private — its code resolves for nobody but its owner,
+which is the rule a stamped still follows too. Not the request's `Host`: that is
+the caller's to set, and a link burnt into a frame is a phishing primitive.
+
+Three honest differences from a stamped still, all of them consequences of
 burning early:
 
 - **The band is fixed at render time.** A credit edited afterwards is not
   reflected in the loop, though it is in the caption and in a downloaded still.
-- **The resolution is the one fact the client cannot know in advance**, so it
-  travels as `{res}` inside a pre-localized format string that the sidecar
-  substitutes and draws its scale bar from. The decimal separator travels with
-  it: the rest of the band is already in the reader's language, and `0.50 m/px`
-  next to `z 1,5` reads as a typo.
+- **The resolution is the one fact nobody can know in advance**, so it travels as
+  `{res}` inside a pre-localized format string that the sidecar substitutes and
+  draws its scale bar from. The decimal separator travels with it: the rest of
+  the band is already in the reader's language, and `0.50 m/px` next to `z 1,5`
+  reads as a typo.
+- **No render date, and no stored resolution.** `sunLoopLegend` builds its facts
+  from `specFacts` — what the catalogue knew before any pixel existed — rather
+  than from `evidenceFacts`, which adds `meta.metresPerPx` and `meta.renderedAt`.
+  On a first render those are absent; on a re-render they are the *previous*
+  attempt's, and would print an old resolution beside the substituted one and a
+  date older than the pixels under it. `evidenceFacts` keeps both for the three
+  browser-rendered kinds, where they describe the file in hand.
 
 The face is DejaVu, not Mulish — the image has no npm build to take Mulish from —
 and the layout is a stacked band rather than `legend.ts`'s two shedding columns.
@@ -269,6 +303,11 @@ docker compose build --pull rendersvc
 docker compose up -d
 docker compose logs -f rendersvc
 ```
+
+`PUBLIC_ORIGIN` is read at startup, so a host that is not the compose default
+exports it — or edits the default — and recreates the container. Nothing else
+depends on it, and getting it wrong costs a wrong link in the band of every loop
+rendered since.
 
 The build context is the **repo root** (`dockerfile: rendersvc/Dockerfile`), so
 the image can copy `vat-cache/fetch_dem.py`; `.dockerignore` still excludes
