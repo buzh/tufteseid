@@ -1,9 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
 //
-// Evidence: a ground render kept against a spot's footprint. The row is the
-// parameters first and the pixels second — `file` is empty between the ask and
-// the render landing, so test it rather than assuming a row has an image.
-//
 // Collection ids must not equal any collection name (PocketBase ≥0.23 rejects
 // that), hence `pbc_evidence`.
 
