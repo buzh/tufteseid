@@ -193,7 +193,8 @@ the same rule `vat-cache/` follows.
 
 The sidecar writes `meta.job = {state, at, detail}` when it takes a job and when
 it fails; success replaces the whole marker with the file and the usual
-`metresPerPx`, `bbox25833`, `coverage`, `frames`, `durationMs`, `renderedAt`.
+`metresPerPx`, `bbox25833`, `coverage`, `frames`, `durationMs`, `renderedAt`,
+`bandTop`.
 The app is already subscribed (`subscribeEvidence`), so progress arrives over the
 existing feed and **survives a reload or a closed tab**, which a browser render
 does not.
@@ -299,6 +300,16 @@ What matches is what has to: the band sits over the bottom edge and never resize
 the frame, so the pixels stay registered to `bbox25833` everywhere the band is
 not. Past 40 % of the frame height the link is dropped, then the scale bar. The
 rights lines never are.
+
+Where the band starts travels back as `meta.bandTop`, a fraction of the frame's
+height. The reading lays a loop on the map over its own rectangle, and the band
+is a caption rather than ground: `useEvidenceLoopOverlay` draws the rows above
+`bandTop` into the matching top part of the rectangle and leaves the rest of the
+footprint alone. The file keeps its citation; the map does not wear it. A still
+needs no such figure — it is stamped in the reader's own tab at download time and
+the kept pixels are clean. **A loop rendered before `bandTop` existed has none**,
+and the fallback of 1 lays its band on the ground; re-asking for the loop is the
+fix, since nothing re-renders a row by itself.
 
 `ImageDraw` on an `L`-mode image defaults its ink to **1**, not 255, so every
 text call passes `fill=INK` explicitly. Getting that wrong draws the band and the

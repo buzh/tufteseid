@@ -180,6 +180,11 @@ def render(spec, bbox25833, legend_content, log):
     meta = {
         "metresPerPx": round(metres_per_px, 4),
         "bbox25833": bbox25833,
+        # Where the terrain stops, as a fraction of the frame's height: the band
+        # is burnt in, so the ground overlay has to know how much of the picture
+        # is not registered to the bbox. A fraction rather than the row, because
+        # what the client measures is the decoded frame, not this array.
+        "bandTop": round(band[0] / height, 5) if band else 1,
         "coverage": round(coverage, 3),
         "frames": len(frames),
         "durationMs": round(len(frames) * 1000 / fps),

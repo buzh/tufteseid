@@ -202,6 +202,19 @@ export const evidenceBbox = (
     : null;
 };
 
+/**
+ * Where the burnt-in provenance band starts, as a fraction of the picture's
+ * height; 1 for anything without one, which is everything but a sun loop. A
+ * still is stamped in the reader's own tab at download time and the kept
+ * pixels are clean, but `createImageBitmap` throws on a WebM, so a loop is
+ * cited on the way out of the sidecar instead (`docs/render-sidecar.md`). Only
+ * the part above the band is registered to `bbox25833`.
+ */
+export const evidenceBandTop = (rec: EvidenceRecord): number => {
+  const value = num(rec.meta?.bandTop);
+  return value != null && value > 0 && value <= 1 ? value : 1;
+};
+
 // Metres; absorbs a JSON round trip, and a sub-metre nudge is the same ground.
 const BBOX_TOLERANCE_M = 1;
 

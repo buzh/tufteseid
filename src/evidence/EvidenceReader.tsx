@@ -19,7 +19,7 @@ import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
 import { useEvidenceDownload } from './download';
 import styles from './EvidenceReader.module.css';
-import { useEvidenceOverlay } from './evidenceOverlay';
+import { useEvidenceLoopOverlay, useEvidenceOverlay } from './evidenceOverlay';
 import {
   coverOf,
   downloadLabel,
@@ -30,7 +30,7 @@ import {
   KIND_ICON,
 } from './labels';
 import { useReaderWindow, type ReaderLayout } from './readerWindow';
-import { evidenceBbox } from './spec';
+import { evidenceBandTop, evidenceBbox } from './spec';
 import { useSpotEvidence } from './useSpotEvidence';
 
 // Room for the band above and for wherever the box starts out, so the
@@ -72,14 +72,21 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
 
   const [transparency, setTransparency] = useState(0);
 
-  // A loop plays in the box instead, so the ground under it is bare and the
-  // slider has nothing to fade.
-  const onGround = current && !isVideoEvidence(current) ? current : null;
+  // Every readable row reaches the ground; which overlay carries it is the
+  // only difference a loop makes, and the slider fades either.
+  const still = current && !isVideoEvidence(current) ? current : null;
+  const loop = current && isVideoEvidence(current) ? current : null;
 
   useEvidenceOverlay(
-    onGround ? evidenceFileUrl(onGround) : '',
-    onGround ? evidenceBbox(onGround) : null,
+    still ? evidenceFileUrl(still) : '',
+    still ? evidenceBbox(still) : null,
     1 - transparency / 100,
+  );
+  useEvidenceLoopOverlay(
+    loop ? evidenceFileUrl(loop) : '',
+    loop ? evidenceBbox(loop) : null,
+    1 - transparency / 100,
+    loop ? evidenceBandTop(loop) : 1,
   );
 
   const step = useCallback(
@@ -278,7 +285,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
 
               {hasSketch && <SketchFade className={styles.sketch} />}
 
-              {onGround && (
+              {current && (
                 <div className={styles.fade}>
                   <Tooltip label={t('terrainControls.transparency')}>
                     <span className={styles.fadeIcon}>
@@ -303,21 +310,6 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
         >
           {spot.description && (
             <p className={styles.prose}>{spot.description}</p>
-          )}
-
-          {current && isVideoEvidence(current) && (
-            <video
-              // Keyed, or switching loops keeps the element and its old frame.
-              key={current.id}
-              className={styles.player}
-              src={evidenceFileUrl(current)}
-              controls
-              loop
-              autoPlay
-              muted
-              playsInline
-              aria-label={title}
-            />
           )}
 
           {items === null ? (

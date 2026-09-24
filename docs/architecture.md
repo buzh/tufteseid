@@ -159,10 +159,11 @@ through them and editing them is deciding what they are a sequence of.
 - **The cover is the first readable row.** Nothing marks one: the reading opens
   on it, so dragging a picture to the top is how a cover is chosen, and the star
   says which one is. `coverOf` (`evidence/labels.ts`) is the single authority
-  both surfaces ask, and a sun loop passes — the reading plays a loop in its own
-  box rather than laying it on the ground. `laysOnGround`, in the same module,
-  answers the narrower question the sketch ground and the strip's picker ask,
-  and a video fails it: the overlay is an `ImageStatic` and a video is not one.
+  both surfaces ask, and a sun loop passes — the reading grounds a loop as
+  readily as a still. `laysOnGround`, in the same module, answers the narrower
+  question the draft's ground and the strip's picker ask, and a video fails it:
+  that picture is the one a sketch is traced over, and a shadow that has moved
+  since the strokes were drawn is not something to trace.
 - A drop writes one row. `sortForMove` (`evidence/order.ts`) takes the midpoint
   between the row's new neighbours, so nothing else moves; a row dropped last
   takes the current time instead, or a picture kept a moment later would sort
@@ -232,11 +233,29 @@ holds the ground still and changes only how it was seen.
 - A row whose render has not landed, or that has no rectangle, is not part of
   the reading; the gallery on the card is where it is waited on. A reading with
   nothing left in it steps back to the card.
-- **A sun loop is read in the box, not on the ground.** It keeps its place in the
-  sequence and flipping reaches it, but the overlay URL goes empty, the
-  transparency slider is not drawn — there is nothing on the ground to fade —
-  and the panel shows a `<video controls loop autoplay muted>` instead. The
-  element is keyed on the row, or switching loops keeps the old frame.
+- **A sun loop is read on the ground, like everything else.** It plays over its
+  own `bbox25833`, looping, and the transparency slider fades it the way it
+  fades a still, so the sun can be walked round a mound against the map under
+  it. What differs is only which overlay carries it: `useEvidenceOverlay` is an
+  `ImageStatic` and takes a URL to a still, so a loop goes to
+  `useEvidenceLoopOverlay` in the same module — one `<video>`, drawn frame by
+  frame into an `ImageCanvas` the way `terrain/terrainLayer.ts` draws its own
+  canvas. The two never stand together. The box holds no player: a second
+  element would be a second decode of the same file.
+  - The element is a pixel wide and all but transparent in the corner of the
+    document rather than detached or `display: none`, because a browser is
+    entitled to stop decoding what nobody can see, and the frames are wanted
+    even though the element is not.
+  - `ImageCanvas` caches one image, so a repaint is `source.changed()`. It is
+    called off `requestAnimationFrame`, gated on the element's own
+    `currentTime` having moved: `requestVideoFrameCallback` is tied to frames
+    reaching the compositor, which is exactly what this element is hidden from,
+    and an ungated rAF would repaint the whole map 60 times a second to show a
+    24 fps loop.
+  - The sidecar burns a provenance band over the bottom of every frame, because
+    a WebM cannot be stamped in the browser the way a still is. `meta.bandTop`
+    says where it starts and the overlay draws only the rows above it, so the
+    band stays in the file and off the map (`docs/render-sidecar.md`).
 - `/l/<code>` opens the reading rather than the card: a link is an invitation to
   read. The view move is the reader's then, and `shareLink.ts` keeps its hands
   off. The code goes back onto the URL for whatever spot is open, so a reload
@@ -436,10 +455,14 @@ belongs to an arm; one that applies to the reading belongs to the tools.
   account and a guest can hold no PocketBase file token, so `evidence.file` is
   served to anyone holding the URL. The same trade the old
   `1700000900_public_guest_reads.js` recorded.
-- **A sun loop never reaches the ground.** `useEvidenceOverlay` builds an
-  OpenLayers `ImageStatic`, which takes a URL to a still and nothing else, so an
-  animation can only be read inside the box. Laying one on the map would want a
-  second overlay type driving a `<canvas>` off `requestVideoFrameCallback`.
+- **A grounded sun loop repaints the whole map.** Every decoded frame is a
+  `source.changed()`, and OpenLayers has no way to redraw one layer, so reading
+  a loop costs a map render 24 times a second for as long as it is up. Cheap
+  enough against cached tiles; a view carrying the `projection` URL parameter
+  reprojects each of those frames on top, which nothing has measured.
+- **A loop has no transport.** It plays and repeats, and that is all: no pause,
+  no scrub, no single azimuth to stop on. Flipping to another row is the only
+  way to stop it. The transparency slider is the one control it answers.
 - **A render is not a cache.** Upstreams re-fly and reprocess, so the same spec
   re-rendered later may not be the picture its author read. `meta.renderedAt`
   says when the file was made; nothing re-renders on its own.

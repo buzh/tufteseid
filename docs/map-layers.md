@@ -242,7 +242,7 @@ layer taken off a map loses everything it had loaded.
 | 0.5 | the cVAT store's coverage hint | `src/map/cvatHintLayer.ts` |
 | 0.75 | hybrid's topo overlay | `stack.ts` (`HYBRID_OVERLAY_Z`) |
 | 1 | terrain-analysis render | `src/terrain/terrainLayer.ts` |
-| 1.25 | the kept render being read on a spot | `src/evidence/evidenceOverlay.ts` |
+| 1.25 | the kept render being read on a spot — `spotEvidenceOverlay` for a still, `spotEvidenceLoop` for a sun loop, never both | `src/evidence/evidenceOverlay.ts` |
 | 1.5 | the B half of a two-ground view | `src/map/compare/compareLayers.ts` (`COMPARE_Z`) |
 | 2 | an open spot's drawing, hidden and faded from the box that opened it (`t`) | `src/sketch/overlay.ts` |
 | 3 | LiDAR footprint outlines | `src/map/lidarFootprintsLayer.ts` |

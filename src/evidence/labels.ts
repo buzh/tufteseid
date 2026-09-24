@@ -45,14 +45,17 @@ export const isReadable = (rec: EvidenceRecord): boolean =>
 export const isVideoEvidence = (rec: EvidenceRecord): boolean =>
   rec.kind === 'sunloop';
 
-/** Readable, and a still. The ground overlay is an OpenLayers `ImageStatic`
- *  and the sketch is drawn over a picture, so neither can take a video. */
+/** Readable, and a still. The narrow question the draft's ground asks, which
+ *  is the picture a sketch is traced over: strokes register to a rectangle,
+ *  and a shadow that has moved since they were drawn is not something to
+ *  trace. The reading has no such trouble and lays a loop on the ground too
+ *  (`useEvidenceLoopOverlay`). */
 export const laysOnGround = (rec: EvidenceRecord): boolean =>
   isReadable(rec) && !isVideoEvidence(rec);
 
 /** The row the reading opens on, and the one the strip stars. Readable is the
- *  whole test, not `laysOnGround`: a loop plays in the reader's own box, so a
- *  sun loop is as good a thing to open on as a still. */
+ *  whole test, not `laysOnGround`: the reading grounds a loop as readily as a
+ *  still. */
 export const coverOf = (
   rows: readonly EvidenceRecord[],
 ): EvidenceRecord | null => rows.find(isReadable) ?? null;
