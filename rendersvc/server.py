@@ -8,7 +8,9 @@ is worded by the request and filled from the record, for the same reason: what a
 burnt-in band asserts has to be true of the row it is burnt into.
 
 Progress goes back into the row's `meta.job`, which the app is already
-subscribed to, so a render survives a reload or a closed tab.
+subscribed to, so a render survives a reload or a closed tab. The marker is
+beaten for as long as the job is alive, so one nobody has refreshed means nobody
+is working on the row.
 """
 
 import base64
@@ -47,6 +49,15 @@ QUEUE_MAX = 8
 # when the first one lands.
 PER_CALLER_MAX = 1
 
+# How often `job.at` is rewritten on every row that is queued or running, so
+# that a marker nobody has refreshed means nobody is working on the row. Each
+# beat is a PATCH and therefore a realtime event on a row an open gallery is
+# subscribed to, so it has to stay cheap: a minute is three orders below the
+# render it reports on and at most an hour's worth of events for a job that runs
+# an hour, while still letting the client call a dead container within
+# `STALE_JOB_MS` (five beats, `src/evidence/queue.ts`).
+BEAT_S = 60
+
 # `MAX_SIDE_M` in `src/map/bbox.ts`, plus room for the metre or two a square
 # built in EPSG:25833 gains on the way out to lon/lat and back.
 MAX_SIDE_M = 505
@@ -74,10 +85,10 @@ MAX_RIGHTS_CHARS = 300
 log = logging.getLogger("rendersvc")
 
 jobs = queue.Queue(maxsize=QUEUE_MAX)
-# Evidence id -> the caller who asked, for both the duplicate guard and the
-# per-caller count. Who asked and not whose row it is: an admin and a spot's
-# author may both write somebody else's evidence, so the row's owner names
-# neither the reader to hold to one at a time nor the one to refuse.
+# Evidence id -> {caller, token, meta}, for the duplicate guard, the per-caller
+# count and the heartbeat. Who asked and not whose row it is: an admin and a
+# spot's author may both write somebody else's evidence, so the row's owner
+# names neither the reader to hold to one at a time nor the one to refuse.
 pending = {}
 lock = threading.Lock()
 
@@ -241,14 +252,14 @@ def accept(token, body):
     with lock:
         if record_id in pending:
             raise Refused(409, "already queued")
-        if sum(1 for c in pending.values() if c == caller) >= PER_CALLER_MAX:
+        if sum(1 for p in pending.values() if p["caller"] == caller) >= PER_CALLER_MAX:
             raise Refused(429, "one render at a time")
         # `pending` and not `jobs.full()`: it counts the running job too, so the
         # queue can never be full when the put below happens and a request
         # thread can never block on it.
         if len(pending) >= QUEUE_MAX:
             raise Refused(429, "the queue is full")
-        pending[record_id] = caller
+        pending[record_id] = {"caller": caller, "token": token, "meta": meta}
 
     # Anything that goes wrong before the put has to give the slot back, or the
     # caller is refused 429 for the life of the container.
@@ -273,15 +284,71 @@ def accept(token, body):
     return {"state": "queued", "pending": len(pending)}
 
 
+class Heartbeat:
+    """Rewrites `job.at` on every pending row while a job runs, each with the
+    token its own caller handed over. Independent of the render, because the
+    stretches with nothing to report are the ones that matter: `fetch_grid` can
+    hold five 180 s attempts and the encode ladder three 900 s ones, and neither
+    says a word meanwhile.
+
+    It beats the queue as well as the running row. Nothing is queued unless
+    something is running — the worker takes the next job the moment it is free —
+    so one beat per job covers every marker the sidecar has written.
+
+    The worker is the only other writer of these markers, and its own writes are
+    all outside `start`/`stop`.
+    """
+
+    def __init__(self, record_id):
+        self.record_id = record_id
+        self.done = threading.Event()
+        self.thread = threading.Thread(target=self._run, daemon=True)
+
+    def start(self):
+        self.thread.start()
+
+    def stop(self):
+        self.done.set()
+        # Joined and not merely signalled: a beat still in flight when `attach`
+        # runs would put the pre-render meta back over the meta that describes
+        # the file. Bounded by one PocketBase call — `READ_TIMEOUT_S`, 30 s —
+        # onto a render that has already taken minutes.
+        self.thread.join()
+
+    def _run(self):
+        while not self.done.wait(BEAT_S):
+            with lock:
+                rows = [(k, v["token"], v["meta"]) for k, v in pending.items()]
+            for record_id, token, meta in rows:
+                if self.done.is_set():
+                    return
+                state = "running" if record_id == self.record_id else "queued"
+                try:
+                    pb.claim(
+                        record_id, token, {**meta, "job": {"state": state, "at": now()}}
+                    )
+                except Exception as e:
+                    # A beat that fails is not a job that failed. The next one
+                    # tries again, and a row nothing can refresh is exactly what
+                    # the client's stale rule is for.
+                    log.info("%s heartbeat failed: %s", record_id, e)
+
+
 def run_job(record_id, token, spec, bbox, meta, legend_content):
     def trace(message):
         log.info("%s %s", record_id, message)
 
     pb.claim(record_id, token, {**meta, "job": {"state": "running", "at": now()}})
-    produced = sunloop.render(spec, bbox, legend_content, trace)
+    beat = Heartbeat(record_id)
+    beat.start()
+    try:
+        produced = sunloop.render(spec, bbox, legend_content, trace)
+    finally:
+        beat.stop()
     if produced is None:
-        # No laser data over this ground: not a failure, and nothing a retry
-        # would change.
+        # Too little laser data over this ground to be worth a picture. Recorded
+        # so a reload still explains the empty row, but not a verdict: the
+        # catalogue can be wrong for a morning, and the reader may ask again.
         pb.claim(record_id, token, {**meta, "job": {"state": "empty", "at": now()}})
         trace("no coverage")
         return

@@ -15,7 +15,7 @@ import {
   isVideoEvidence,
   KIND_ICON,
 } from './labels';
-import type { RenderState } from './queue';
+import { mayRetry, type RenderState } from './queue';
 import type { SpotEvidence } from './useSpotEvidence';
 
 const EvidenceItem = ({
@@ -105,7 +105,7 @@ const EvidenceItem = ({
           />
         </Tooltip>
       )}
-      {mayEdit && state === 'failed' && (
+      {mayEdit && mayRetry(state) && (
         <Tooltip label={t('evidence.retry')}>
           <ControlButton
             icon="refresh"

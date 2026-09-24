@@ -177,8 +177,12 @@ through them and editing them is deciding what they are a sequence of.
   sidecar, which writes the file back itself (`docs/render-sidecar.md`). The row,
   the gallery, the ordering and the reading are the same either way — the
   difference is who makes the pixels, and that a sidecar render survives the tab
-  being closed. `stateOf` (`useSpotEvidence.ts`) reads the local queue first and
-  falls back to `jobState`, the sidecar's own `meta.job` marker.
+  being closed. `stateOf` (`useSpotEvidence.ts`) states the one precedence rule:
+  a row with pixels has no state, a job this browser is still holding comes
+  next, and past that the sidecar's own `meta.job` marker — which the sidecar
+  beats while the job lives — outranks whatever the local queue concluded.
+  Neither settled state is terminal; `mayRetry` (`queue.ts`) is the question the
+  gallery asks.
 - PocketBase makes no thumbnail for a video, so a loop is its own handle
   everywhere a `200x200` thumb would be: a `<video preload="metadata">` at
   `#t=0.1`, which is what gets a frame painted rather than a black box.

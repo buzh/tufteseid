@@ -198,9 +198,39 @@ The app is already subscribed (`subscribeEvidence`), so progress arrives over th
 existing feed and **survives a reload or a closed tab**, which a browser render
 does not.
 
-`jobState` (`src/evidence/queue.ts`) reads the marker, and `stateOf` prefers the
-local queue's opinion over it. A `running` marker older than 15 minutes reads as
-`failed`, so a crashed worker offers a retry rather than an eternal hourglass.
+**The marker is beaten.** `Heartbeat` rewrites `job.at` every `BEAT_S` (60 s) on
+every row in `pending` — the running one and whatever is waiting behind it — each
+with the token its own caller handed over. It is a thread and not a call out of
+the `trace` callback, because the stretches with nothing to report are exactly
+the ones that matter: `fetch_grid` can hold five 180 s attempts with backoff and
+the encode ladder three 900 s ones, so a job is silent for tens of minutes while
+perfectly healthy. It beats the queue as well, because nothing is queued unless
+something is running.
+
+The worker is the only other writer of these markers and all of its own writes
+sit outside `start`/`stop`; `stop` **joins** rather than merely signalling,
+because a beat still in flight when `attach` runs would put the pre-render meta
+back over the meta that describes the file. It is stopped in a `finally`, so a
+render that throws does not leave a thread beating a row nobody is rendering.
+
+So an unrefreshed marker means nobody is working on the row, and
+`STALE_JOB_MS` (`src/evidence/queue.ts`) is five beats — 5 minutes. A `queued` or
+`running` marker older than that reads as `failed`, so a container restarted
+mid-job offers a retry within minutes rather than after a quarter of an hour, and
+a slow job is never condemned for being slow.
+
+**Precedence, stated once** in `stateOf` (`src/evidence/useSpotEvidence.ts`):
+a row that has pixels has no state at all; otherwise a job this browser is still
+holding wins, being the only account of an ask the sidecar has not marked yet;
+otherwise the marker, which outranks anything the local queue concluded. That is
+what stops a handover that timed out — the POST is not aborted, so the sidecar
+may well have taken the job — from captioning a finished loop "the render
+failed" until the page is reloaded.
+
+`empty` is persisted and is **not terminal**: a reload still explains why the row
+has no picture, and `mayRetry` (`queue.ts`) offers it the same retry a `failed`
+row gets. A probe that answered for the rectangle as a whole, or a coverage
+measurement taken one morning, is not a verdict on the ground.
 
 A retry drops the stale marker in `accept()` before anything is written from it.
 Without that, a second run that succeeds lands a row whose meta still says the
@@ -287,12 +317,12 @@ render with it. If the thread stops all the same, `/health` answers 503 and
 
 | What happens | What the row says |
 | --- | --- |
-| No laser data over the footprint, or a grid under half covered once decoded | `job.state = empty` — not a failure, and nothing a retry would change |
+| No laser data over the footprint, or a grid under half covered once decoded | `job.state = empty` — an answer about the ground rather than a fault, and still worth asking again |
 | `exportImage` sheds (a text body under a 200 status) | five retries with backoff inside `fetch_grid`, then `failed` |
 | The coverage probe itself errors | logged, render continues at 0.25 m |
 | ffmpeg fails, or the file will not fit after three encodes | `failed`, with ffmpeg's stderr in `job.detail` (300 chars) |
 | An encode passes 900 s | the child is killed and reaped, `failed`, and the worker takes the next job with nothing left running |
-| The container is restarted mid-job | the `running` marker goes stale after 15 minutes and reads as `failed`; the queue is not persisted |
+| The container is restarted mid-job | nothing beats the markers any more, so they go stale after five minutes and read as `failed`; the queue is not persisted, so the rows that were waiting go with it |
 | PocketBase refuses the claim | 403 to the caller, the queue slot is given back, no marker written |
 | The failure write itself fails | logged and dropped; the loop takes the next job and the stale rule catches the row |
 

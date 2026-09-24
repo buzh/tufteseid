@@ -48,8 +48,8 @@ NO_DATA_VALUE = 128
 
 # Of the rectangle, after the rim around each hole is written off. Below half the
 # square the loop is a picture of its own holes, and the reader is better served
-# by `empty` — which says the ground has no laser data and offers no retry — than
-# by a frame of mid grey with terrain in one corner.
+# by `empty` — which says the ground has too little laser data, and can be asked
+# again — than by a frame of mid grey with terrain in one corner.
 MIN_COVERAGE = 0.5
 
 # The evidence file field's ceiling. Over it PocketBase answers 400, and it
@@ -66,8 +66,8 @@ def _even(n):
 
 def render(spec, bbox25833, legend_content, log):
     """(blob, filename, content_type, meta), or None where the ground has too
-    little laser data to be worth a picture — which is not a failure and nothing
-    a retry would change."""
+    little laser data to be worth a picture — which is an answer about the
+    ground rather than a fault, though not one that settles the question."""
     model = spec["model"]
     width_m = bbox25833[2] - bbox25833[0]
     height_m = bbox25833[3] - bbox25833[1]

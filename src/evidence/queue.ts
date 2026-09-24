@@ -15,23 +15,33 @@ import { specOf } from './spec';
 
 /**
  * Where a row stands with the queue. Absent means "not the queue's business" —
- * either the pixels are there or nobody has asked. `failed` is a fault and
- * worth retrying; `empty` means the source has nothing over this rectangle and
- * retrying is pointless.
+ * either the pixels are there or nobody has asked. `failed` is a fault;
+ * `empty` says the source had nothing over this rectangle. Both are worth
+ * asking again: a probe that errored, an upstream that shed, or a coverage
+ * measurement taken one morning are not verdicts on the ground.
  */
 export type RenderState = 'queued' | 'running' | 'empty' | 'failed';
 
 const STATES: readonly RenderState[] = ['queued', 'running', 'empty', 'failed'];
 
-// A sidecar render that never settled. Read as failed so a crashed worker
-// offers a retry rather than an eternal hourglass.
-const STALE_JOB_MS = 900000;
+/** Whether the row can be asked for again. Neither settled state is terminal,
+ *  and no surface should be spelling the set out for itself. */
+export const mayRetry = (state: RenderState | undefined): boolean =>
+  state === 'failed' || state === 'empty';
+
+// A sidecar marker nobody is refreshing. The sidecar beats `job.at` every
+// minute for as long as a job is queued or running (`BEAT_S` in
+// `rendersvc/server.py`), so five beats' silence is a worker that is gone, not
+// a slow one — a fetch with its retries and three encode attempts can hold one
+// job for the better part of an hour.
+const STALE_JOB_MS = 300000;
 
 /**
- * The same four states, as the render sidecar left them in `meta.job` — for a
- * job this browser did not start, or was not open for. Absent once the file
- * lands: the sidecar writes the pixels and the meta in one request, and the
- * meta it writes has no marker.
+ * The same four states, as the render sidecar left them in `meta.job`. Absent
+ * once the file lands: the sidecar writes the pixels and the meta in one
+ * request, and the meta it writes has no marker. Only a `sunloop` ever carries
+ * one — the three browser-rendered kinds are never handed to the sidecar and
+ * write nothing but their own achieved meta.
  */
 export const jobState = (rec: EvidenceRecord): RenderState | undefined => {
   const job = rec.meta?.job;
@@ -49,8 +59,9 @@ type RenderJob = {
   rec: EvidenceRecord;
   /** The spot's footprint, EPSG:4326. */
   bbox4326: Bbox;
-  /** The band the sidecar burns in. Only a `sunloop` reads it; null where the
-   *  row's meta no longer describes a render. */
+  /** The band the sidecar burns in. Only a `sunloop` carries one; null for the
+   *  browser-rendered kinds, and for a row whose meta no longer describes a
+   *  render. */
   legend: SunLoopLegend | null;
   /** The finished record, handed back to whoever is showing it. */
   onDone?: (rec: EvidenceRecord) => void;

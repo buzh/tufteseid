@@ -55,8 +55,15 @@ export type SpotEvidence = {
   /** Move a row to `to`, an index into `items` as it stands. The reading opens
    *  on the first row with pixels, so this is also how a cover is chosen. */
   reorder: (id: string, to: number) => void;
-  /** This browser's queue first, then the sidecar's own marker: a server-side
-   *  render is reported the same whether or not this tab started it. */
+  /**
+   * Where a row stands, by one rule. A row that has pixels has no state at
+   * all. Otherwise a job this browser is still holding wins, because it is the
+   * only account there is of an ask the sidecar has not marked yet — and past
+   * that the sidecar's own `meta.job` outranks whatever the local queue
+   * concluded, since it is the side doing the work. A handover that timed out
+   * or was refused as a duplicate therefore stops saying so the moment the
+   * sidecar says otherwise.
+   */
   stateOf: (rec: EvidenceRecord) => RenderState | undefined;
 };
 
@@ -141,10 +148,14 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       enqueueRender({
         rec,
         bbox4326: footprint,
-        // Composed here and sent with the job, because only a sun loop needs
-        // it and only the client knows the reader's language. No centre and no
-        // render date: neither is known before the pixels exist.
-        legend: sunLoopLegend(rec, spot, language),
+        // Composed here and sent with the job, because only a sun loop's band
+        // is typeset by the sidecar and only the client knows the reader's
+        // language. No centre, which nothing knows before the ground is
+        // fetched, and neither the resolution nor the render date: the sidecar
+        // substitutes the resolution it achieves, and on a second attempt the
+        // stored pair describes the first one.
+        legend:
+          rec.kind === 'sunloop' ? sunLoopLegend(rec, spot, language) : null,
         onDone: upsert,
       });
     },
@@ -228,7 +239,12 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     remove,
     reorder,
     stateOf: useCallback(
-      (rec: EvidenceRecord) => states.get(rec.id) ?? jobState(rec),
+      (rec: EvidenceRecord) => {
+        if (rec.file) return undefined;
+        const local = states.get(rec.id);
+        if (local === 'queued' || local === 'running') return local;
+        return jobState(rec) ?? local;
+      },
       [states],
     ),
   };

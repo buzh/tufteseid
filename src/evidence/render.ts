@@ -28,9 +28,9 @@ type Produced = {
 type BrowserSpec = Exclude<EvidenceSpec, { kind: 'sunloop' }>;
 
 /**
- * Null means the source has nothing over this rectangle: not a failure, and
- * nothing a retry would change. A throw is a fault. `queue.ts` tells the two
- * apart on exactly that.
+ * Null means the source has nothing over this rectangle: an answer about the
+ * ground rather than a fault. A throw is a fault. `queue.ts` tells the two
+ * apart on exactly that, and offers a retry either way.
  */
 export const renderEvidence = async (
   spec: BrowserSpec,
