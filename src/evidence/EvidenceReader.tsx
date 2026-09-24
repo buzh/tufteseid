@@ -28,8 +28,8 @@ import { useSpotEvidence } from './useSpotEvidence';
 // Room for the band above and for wherever the box starts out, so the
 // footprint lands in the open ground rather than under either.
 const FIT_PADDING: Record<ReaderLayout, number[]> = {
-  wide: [80, 40, 260, 40],
-  tall: [80, 400, 40, 40],
+  wide: [80, 40, 200, 40],
+  tall: [80, 360, 40, 40],
 };
 
 const FIT_MS = 400;
@@ -143,7 +143,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
         styles[box.layout],
         box.placed && styles.placed,
       )}
-      style={box.frameStyle}
+      style={box.placementStyle}
     >
       <Panel
         className={styles.panel}
@@ -175,24 +175,40 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
         footer={
           <div className={styles.controls}>
             <div className={styles.nav}>
-              <ControlButton
-                icon="chevron_left"
-                aria-label={t('evidence.previous')}
-                onClick={() => step(-1)}
-              />
+              <Tooltip label={t('evidence.previous')}>
+                <ControlButton
+                  icon="chevron_left"
+                  aria-label={t('evidence.previous')}
+                  onClick={() => step(-1)}
+                />
+              </Tooltip>
               <span className={styles.count}>
                 {t('evidence.position', {
                   index: index + 1,
                   total: readable.length,
                 })}
               </span>
-              <ControlButton
-                icon="chevron_right"
-                aria-label={t('evidence.next')}
-                onClick={() => step(1)}
-              />
-              <span className={styles.hint}>{t('evidence.keyHint')}</span>
+              <Tooltip label={t('evidence.next')}>
+                <ControlButton
+                  icon="chevron_right"
+                  aria-label={t('evidence.next')}
+                  onClick={() => step(1)}
+                />
+              </Tooltip>
             </div>
+
+            {/* In the slack between the buttons and the slider rather than on
+                a line of its own: in the bar layout there is nothing else to
+                put there. */}
+            {current && (
+              <div className={styles.caption}>
+                <span className={styles.captionTitle}>{title}</span>
+                {facts.length > 0 && (
+                  <span className={styles.facts}>{facts.join(' · ')}</span>
+                )}
+              </div>
+            )}
+
             <div className={styles.fade}>
               <Tooltip label={t('terrainControls.transparency')}>
                 <span className={styles.fadeIcon}>
@@ -251,15 +267,6 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
                 </Tooltip>
               );
             })}
-          </div>
-        )}
-
-        {current && (
-          <div className={styles.caption}>
-            <div className={styles.captionTitle}>{title}</div>
-            {facts.length > 0 && (
-              <div className={styles.facts}>{facts.join(' · ')}</div>
-            )}
           </div>
         )}
       </Panel>

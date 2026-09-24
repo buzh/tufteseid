@@ -81,7 +81,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
 | `keepOffersAtom` | same | Derived: the ground's offer (off the A half) and the terrain's, ground first. |
-| `readerLayoutAtom` | `evidence/readerWindow.ts` | Which way round the reading box is laid out, and beside it where it was dragged to and which wall it is docked against. Outside the component, which remounts per spot. |
+| `readerLayoutAtom` | `evidence/readerWindow.ts` | Which way round the reading box is laid out, and beside it where it was dragged to, how big it may get and which wall it is docked against. Outside the component, which remounts per spot. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |
 | `isSignedInAtom`, `isAdminAtom` | same | Derived, so a component does not re-render on an unrelated user field. |
@@ -176,19 +176,31 @@ an edge, and `tall`, a column down one. Both live in atoms outside the
 component, because the reader is keyed on the spot and remounts when another is
 opened.
 
+- **Nothing gives the box a size.** It is `width: max-content` under a ceiling,
+  so it shrink-wraps its content in both axes: a reading of three pictures with
+  no prose gets a box that small, and a layout, a dock and the grip all set
+  ceilings rather than sizes. The grip therefore only ever makes the box
+  *smaller* than its content — which is what it is for, since the prose and the
+  strip scroll.
 - Until the box has been moved or resized the layout's own CSS places it. The
-  first gesture materialises a frame in map pixels and `.placed` switches the
-  anchor off; choosing a layout drops the frame again, which is also the way
-  back from a box left somewhere unhelpful.
-- **Pushing a box through a wall docks it there**: flush at the gutter, filling
-  that side, at most a third of the map thick. A wall implies a shape, so a
-  dock sets the layout too — down the side is a column, along the top or the
-  bottom a bar. Dragging back off the wall lets go; the box keeps the size the
-  dock gave it.
-- The dock is why a dragged frame is *not* clamped: crossing a wall is the ask,
+  first gesture takes over with an inline corner and ceiling, and `.placed`
+  switches the CSS anchors off; choosing a layout drops the placement again,
+  which is also the way back from a box left somewhere unhelpful.
+- **Pushing a box through a wall docks it there**: flush at the gutter, with
+  the wall's length for a ceiling and at most a third of the map across. A wall
+  implies a shape, so a dock sets the layout too — down the side is a column,
+  along the top or the bottom a bar. A side dock pins the top corner; a top or
+  bottom dock keeps the run it was dragged to, so it does not slide sideways
+  under the hand that put it there.
+- The dock is why a dragged box is *not* clamped: crossing a wall is the ask,
   and the dock puts the box back inside the map, so nothing ever ends up off
   it. Everything else is clamped — a resize, a window resized under the box,
   and the pass on mount that catches a window resized between two readings.
+  What is measured for all of that is the box as drawn, not the ceiling, which
+  may be higher than the content needs.
+- The caption rides in the footer between the flip buttons and the transparency
+  slider rather than on a line of its own: in the bar layout that slack is the
+  only thing there was to put there.
 - The fit on entering the reading pads for the layout the box opens in, and
   never runs again: a box moved out of the way afterwards must not move the map
   with it.

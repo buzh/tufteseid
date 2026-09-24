@@ -28,9 +28,8 @@
     "open": "Åpne bildet i full oppløsning",
     "failed": "Fikk ikke hentet eller lagret bildene.",
     "position": "{{index}} av {{total}}",
-    "previous": "Forrige bilde",
-    "next": "Neste bilde",
-    "keyHint": "← → blar",
+    "previous": "Forrige bilde (←)",
+    "next": "Neste bilde (→)",
     "layout": {
       "wide": "Legg boksen nederst",
       "tall": "Legg boksen til høyre"

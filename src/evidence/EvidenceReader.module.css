@@ -1,27 +1,36 @@
-/* The reading window. It floats: `readerWindow.ts` drags and resizes it, and
-   the two layout classes are only where each shape starts from. The wrapper
-   holds the frame so the resize grip has a corner to sit in. */
+/* The reading window. It floats: `readerWindow.ts` moves and resizes it, and
+   the two layout classes are only where each shape starts from. Nothing here
+   or there gives the box a size — it shrink-wraps its content in both axes and
+   every rule below is a ceiling, so a reading with three pictures and no prose
+   gets a box that small. The wrapper is what the resize grip sits in the
+   corner of. */
 .reader {
   position: absolute;
   display: flex;
   flex-direction: column;
+  /* `max-content`, not `fit-content`: shrink-to-fit is bounded by the room
+     left of the edge the box hangs from, so a box dragged to the right would
+     reflow narrower under the hand holding it. */
+  width: max-content;
 }
 
-/* Shrinks inside a capped or a resized frame rather than overflowing it;
-   `Panel` scrolls its own body from there. */
+/* Shrinks inside the ceiling rather than overflowing it; `Panel` scrolls its
+   own body from there. */
 .panel {
   flex: 1 1 auto;
   min-height: 0;
 }
 
-/* A bar, starting along the bottom, wide enough that the strip reads as a
-   strip. A bottom or top dock is this shape too. */
+/* A bar, starting along the bottom. Centred by the auto margins between two
+   zero offsets, the one way to centre a box of unknown width. A bottom or top
+   dock is this shape too. */
 .wide {
-  left: 50%;
+  right: 0;
   bottom: var(--mantine-spacing-xs);
-  transform: translateX(-50%);
-  width: min(46rem, calc(100% - 2 * var(--mantine-spacing-xs)));
+  left: 0;
+  max-width: min(46rem, calc(100% - 2 * var(--mantine-spacing-xs)));
   max-height: 60%;
+  margin-inline: auto;
 }
 
 /* A column, starting down the right — the corner the card it stands in for
@@ -29,7 +38,7 @@
 .tall {
   top: var(--mantine-spacing-xs);
   right: var(--mantine-spacing-xs);
-  width: min(23rem, calc(100% - 2 * var(--mantine-spacing-xs)));
+  max-width: min(23rem, calc(100% - 2 * var(--mantine-spacing-xs)));
   max-height: calc(100% - 2 * var(--mantine-spacing-xs));
 }
 
@@ -41,14 +50,13 @@
   }
 }
 
-/* Moved, resized or docked, so the inline frame is the whole placement. Last,
-   because it has to beat both layouts and the query above at equal
-   specificity. */
+/* Moved, resized or docked, so the inline style is the whole placement: the
+   corner it hangs from and the ceiling it stops at. Last, because it has to
+   beat both layouts and the query above at equal specificity. */
 .placed {
-  right: auto;
-  bottom: auto;
+  inset: auto;
+  margin-inline: 0;
   transform: none;
-  max-height: none;
 }
 
 .grip {
@@ -72,6 +80,7 @@
 /* `pre-wrap` keeps the author's own paragraph breaks, as on the card. */
 .prose {
   max-height: 6.5em;
+  margin: 0 0 var(--mantine-spacing-xs);
   overflow-y: auto;
   font-size: var(--mantine-font-size-sm);
   line-height: 1.45;
@@ -88,7 +97,6 @@
 .strip {
   display: flex;
   gap: 6px;
-  margin-top: var(--mantine-spacing-xs);
   padding-bottom: 4px;
   overflow-x: auto;
   scrollbar-width: thin;
@@ -129,20 +137,6 @@
   text-shadow: 0 0 3px var(--mantine-color-anthracite-9);
 }
 
-.caption {
-  margin-top: var(--mantine-spacing-xs);
-}
-
-.captionTitle {
-  font-size: var(--mantine-font-size-sm);
-}
-
-.facts {
-  font-size: var(--mantine-font-size-xs);
-  color: var(--mantine-color-dimmed);
-  font-variant-numeric: tabular-nums;
-}
-
 /* The right padding is the resize grip's corner: without it the slider's own
    end would take presses meant for the grip. */
 .controls {
@@ -155,6 +149,7 @@
 
 .nav {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 6px;
 }
@@ -166,18 +161,39 @@
   font-variant-numeric: tabular-nums;
 }
 
-.hint {
+/* Takes the slack in the footer row, and gives it back by ellipsis rather than
+   by pushing the box wider. */
+.caption {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.captionTitle,
+.facts {
+  overflow: hidden;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.captionTitle {
+  font-size: var(--mantine-font-size-sm);
+}
+
+.facts {
   font-size: var(--mantine-font-size-xs);
   color: var(--mantine-color-dimmed);
+  font-variant-numeric: tabular-nums;
 }
 
 .fade {
   display: flex;
-  flex: 0 1 12rem;
+  flex: 0 1 10rem;
   align-items: center;
   gap: var(--mantine-spacing-xs);
-  min-width: 6rem;
-  margin-left: auto;
+  min-width: 5rem;
 }
 
 .fadeIcon {
@@ -206,11 +222,17 @@
   gap: 6px;
 }
 
+/* Stacked, the caption reads as a heading over the controls rather than as
+   something wedged between them. */
+.tall .caption {
+  order: -1;
+}
+
 .tall .nav {
   justify-content: center;
 }
 
+/* Stacked, the row's flex basis would be read as a height. */
 .tall .fade {
-  flex: 1 1 auto;
-  margin-left: 0;
+  flex: none;
 }

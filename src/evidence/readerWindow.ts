@@ -1,12 +1,17 @@
-// Where the reading box sits, how big it is and which way round it is laid
-// out. Held outside the component because the reader is keyed on the spot: a
-// box arranged around one reading must survive opening the next.
+// Where the reading box sits, how big it may get and which way round it is
+// laid out. Held outside the component because the reader is keyed on the
+// spot: a box arranged around one reading must survive opening the next.
+//
+// The box always hugs its content. Nothing here ever sets a size, only a
+// corner to hang from and a ceiling to stop at, so a reading with three
+// pictures and no prose gets a box that small.
 
 import { atom, useAtom } from 'jotai';
 import {
   useCallback,
   useEffect,
   useRef,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 
@@ -15,21 +20,27 @@ export type ReaderLayout = 'wide' | 'tall';
 
 type Side = 'left' | 'right' | 'top' | 'bottom';
 
-type Frame = { left: number; top: number; width: number; height: number };
+type Size = { width: number; height: number };
 
-type Placement = {
-  /** What the box is laid out at, in map pixels. */
-  frame: Frame;
+/** How big the box may get, never how big it is. */
+type Ceiling = { maxWidth: number; maxHeight: number };
+
+type Placement = Ceiling & {
   /** The wall it is stuck to, or null for a box standing free. */
   side: Side | null;
+  /** The corner it hangs from. The axis a dock pins is read off `side`
+   *  instead, so one of these is ignored while docked. */
+  left: number;
+  top: number;
 };
 
 export const readerLayoutAtom = atom<ReaderLayout>('wide');
 
-/** Null until the box has been moved or resized: until then the layout's own
- *  CSS places it, so a reading opens where the layout says it should. */
+/** Null until the box has been moved, resized or docked: until then the
+ *  layout's own CSS places it, so a reading opens where the layout says. */
 const readerPlacementAtom = atom<Placement | null>(null);
 
+/** Floors for the ceiling: under these the strip has nothing to show. */
 const MIN_WIDTH = 260;
 const MIN_HEIGHT = 140;
 
@@ -37,8 +48,8 @@ const MIN_HEIGHT = 140;
  *  A dock is flush with that gap, not with the pixel. */
 const GUTTER = 10;
 
-/** A docked box eats at most this much of the map across. Shoving the wide
- *  bar against a side wall would otherwise leave a column half the map. */
+/** A side dock may be this much of the map across. Shoving the wide bar
+ *  against a side wall would otherwise leave a column half the map. */
 const DOCK_SHARE = 1 / 3;
 
 const LAYOUT_OF: Record<Side, ReaderLayout> = {
@@ -48,20 +59,21 @@ const LAYOUT_OF: Record<Side, ReaderLayout> = {
   bottom: 'wide',
 };
 
-type Bounds = { width: number; height: number };
+type Bounds = Size;
 
 /** The map rectangle the box floats over. `.reader` is absolute, so its
  *  offset parent is the one positioned element around the map. */
-const boundsOf = (box: HTMLElement): Bounds | null => {
-  const parent = box.offsetParent;
-  return parent instanceof HTMLElement
-    ? { width: parent.clientWidth, height: parent.clientHeight }
-    : null;
-};
+const parentOf = (box: HTMLElement): HTMLElement | null =>
+  box.offsetParent instanceof HTMLElement ? box.offsetParent : null;
 
-const frameOf = (box: HTMLElement): Frame | null => {
-  const parent = box.offsetParent;
-  if (!(parent instanceof HTMLElement)) return null;
+const boundsOf = (parent: HTMLElement): Bounds => ({
+  width: parent.clientWidth,
+  height: parent.clientHeight,
+});
+
+/** What the box came out at, which under a ceiling is its content and no
+ *  more. Both gestures measure rather than trust the stored ceiling. */
+const rectOf = (box: HTMLElement, parent: HTMLElement) => {
   const mine = box.getBoundingClientRect();
   const theirs = parent.getBoundingClientRect();
   return {
@@ -72,84 +84,93 @@ const frameOf = (box: HTMLElement): Frame | null => {
   };
 };
 
-/** Wholly inside the map, so the box can never be put somewhere it cannot be
- *  grabbed back from. */
-const clamped = (frame: Frame, within: Bounds): Frame => {
-  const width = Math.min(Math.max(frame.width, MIN_WIDTH), within.width);
-  const height = Math.min(Math.max(frame.height, MIN_HEIGHT), within.height);
-  return {
-    width,
-    height,
-    left: Math.min(Math.max(frame.left, 0), within.width - width),
-    top: Math.min(Math.max(frame.top, 0), within.height - height),
-  };
-};
+const between = (value: number, least: number, most: number) =>
+  Math.min(Math.max(value, least), Math.max(least, most));
 
-/** How far past each wall a frame reaches. Nothing positive means it is still
- *  inside the map. */
-const overshoot = (frame: Frame, within: Bounds): Record<Side, number> => ({
-  left: -frame.left,
-  top: -frame.top,
-  right: frame.left + frame.width - within.width,
-  bottom: frame.top + frame.height - within.height,
+/** A corner the box can be grabbed back from: wholly inside the map, given
+ *  what it currently measures. */
+const inside = (left: number, top: number, size: Size, within: Bounds) => ({
+  left: between(left, 0, within.width - size.width),
+  top: between(top, 0, within.height - size.height),
 });
 
-/** The wall a frame has been pushed hardest through, if any. Pushing through
- *  is the whole gesture: a box at rest keeps the gutter, so no ordinary nudge
- *  can reach a wall by accident. */
-const wallCrossed = (frame: Frame, within: Bounds): Side | null => {
-  const past = overshoot(frame, within);
+/** The wall a box has been pushed through, if any, and the hardest one when
+ *  it is a corner. Pushing through is the whole gesture: a box at rest keeps
+ *  the gutter, so no ordinary nudge can reach a wall by accident. */
+const wallCrossed = (
+  at: { left: number; top: number },
+  size: Size,
+  within: Bounds,
+): Side | null => {
+  const past: Record<Side, number> = {
+    left: -at.left,
+    top: -at.top,
+    right: at.left + size.width - within.width,
+    bottom: at.top + size.height - within.height,
+  };
   const worst = (Object.keys(past) as Side[]).reduce((a, b) =>
     past[b] > past[a] ? b : a,
   );
   return past[worst] > 0 ? worst : null;
 };
 
-/** What the box brought with it, but never more than its share of the map and
- *  never less than the reading needs. */
-const thickness = (want: number, room: number, least: number): number =>
-  Math.min(
-    Math.max(Math.min(want, room * DOCK_SHARE), least),
-    room - 2 * GUTTER,
-  );
-
-/** Flush against one wall and filling it. */
-const dockedTo = (side: Side, from: Frame, within: Bounds): Frame => {
+/** Flush against one wall. The ceiling is the wall's length, so the box grows
+ *  along it as far as it has content to grow and no further. */
+const dockedTo = (
+  side: Side,
+  at: { left: number; top: number },
+  ceiling: Ceiling,
+  within: Bounds,
+): Placement => {
+  const down = within.height - 2 * GUTTER;
+  const across = within.width - 2 * GUTTER;
   if (side === 'left' || side === 'right') {
-    const width = thickness(from.width, within.width, MIN_WIDTH);
-    return clamped(
-      {
-        width,
-        height: within.height - 2 * GUTTER,
-        top: GUTTER,
-        left: side === 'left' ? GUTTER : within.width - GUTTER - width,
-      },
-      within,
-    );
-  }
-  const height = thickness(from.height, within.height, MIN_HEIGHT);
-  return clamped(
-    {
-      height,
-      width: within.width - 2 * GUTTER,
+    return {
+      side,
       left: GUTTER,
-      top: side === 'top' ? GUTTER : within.height - GUTTER - height,
-    },
-    within,
-  );
+      top: GUTTER,
+      maxWidth: between(
+        Math.min(ceiling.maxWidth, within.width * DOCK_SHARE),
+        MIN_WIDTH,
+        across,
+      ),
+      maxHeight: Math.max(down, MIN_HEIGHT),
+    };
+  }
+  return {
+    side,
+    // A bar keeps the run it was dragged to; only the edge it sits on is the
+    // dock. Pinning it to a corner as well would move it sideways under the
+    // hand that put it there.
+    left: at.left,
+    top: GUTTER,
+    maxWidth: between(ceiling.maxWidth, MIN_WIDTH, across),
+    maxHeight: between(
+      Math.min(ceiling.maxHeight, within.height * DOCK_SHARE),
+      MIN_HEIGHT,
+      down,
+    ),
+  };
 };
 
-const settled = (placement: Placement, within: Bounds): Placement =>
-  placement.side
-    ? {
-        side: placement.side,
-        frame: dockedTo(placement.side, placement.frame, within),
-      }
-    : { side: null, frame: clamped(placement.frame, within) };
+/** A dock pins the axis it is a wall of; the other keeps its corner. */
+const styleOf = (placed: Placement): CSSProperties => ({
+  left: placed.side === 'right' ? undefined : placed.left,
+  right: placed.side === 'right' ? GUTTER : undefined,
+  top: placed.side === 'bottom' ? undefined : placed.top,
+  bottom: placed.side === 'bottom' ? GUTTER : undefined,
+  maxWidth: placed.maxWidth,
+  maxHeight: placed.maxHeight,
+});
 
 type Gesture = {
   mode: 'move' | 'resize';
-  from: Frame;
+  at: { left: number; top: number };
+  /** What the box measured when the press landed. The ceiling may be higher;
+   *  it is the pixels on screen that a wall is crossed by and that the grip
+   *  is dragged from. */
+  size: Size;
+  ceiling: Ceiling;
   within: Bounds;
   x: number;
   y: number;
@@ -177,8 +198,15 @@ export const useReaderWindow = () => {
   useEffect(() => {
     const onResize = () => {
       const box = boxRef.current;
-      const within = box && boundsOf(box);
-      if (within) setPlacement((was) => (was ? settled(was, within) : null));
+      const parent = box && parentOf(box);
+      if (!box || !parent) return;
+      const within = boundsOf(parent);
+      const size = rectOf(box, parent);
+      setPlacement((was) => {
+        if (!was) return null;
+        if (was.side) return dockedTo(was.side, was, was, within);
+        return { ...was, ...inside(was.left, was.top, size, within) };
+      });
     };
     onResize();
     window.addEventListener('resize', onResize);
@@ -195,62 +223,68 @@ export const useReaderWindow = () => {
         return;
       }
       const box = boxRef.current;
-      const from = box && frameOf(box);
-      const within = box && boundsOf(box);
-      if (!from || !within) return;
+      const parent = box && parentOf(box);
+      if (!box || !parent) return;
+      const rect = rectOf(box, parent);
       event.currentTarget.setPointerCapture(event.pointerId);
       gesture.current = {
         mode,
-        from,
-        within,
+        at: { left: rect.left, top: rect.top },
+        size: rect,
+        // A ceiling already set is kept: a box dragged about should not lose
+        // the room it was given because its content is not using all of it.
+        ceiling: {
+          maxWidth: placement?.maxWidth ?? rect.width,
+          maxHeight: placement?.maxHeight ?? rect.height,
+        },
+        within: boundsOf(parent),
         x: event.clientX,
         y: event.clientY,
       };
-      // Take the placement over from the CSS now rather than on the first
-      // move, or the box jumps by whatever the two disagree about. A press
-      // that never turns into a drag leaves an existing dock alone.
-      setPlacement(
-        (was) => was ?? { side: null, frame: clamped(from, within) },
-      );
+      // Nothing is written until the pointer actually moves, so a press on the
+      // title that turns out to be a click leaves the box as it was. The
+      // handover from the layout's CSS costs no jump whenever it happens: what
+      // the first move writes is this measurement plus the distance travelled.
     };
 
   const move = (event: ReactPointerEvent<HTMLElement>) => {
     const held = gesture.current;
     if (!held) return;
-    const { from, within } = held;
+    const { at, size, ceiling, within } = held;
     const dx = event.clientX - held.x;
     const dy = event.clientY - held.y;
 
     if (held.mode === 'resize') {
+      // Off the corner the box is actually drawn at, not off the ceiling: the
+      // grip is where the hand is, and a ceiling above the content is not.
       setPlacement({
         side: null,
-        frame: clamped(
-          {
-            ...from,
-            // Capped against the corner it is dragged from, not the map, or
-            // growing past the edge would shove the box sideways.
-            width: Math.min(from.width + dx, within.width - from.left),
-            height: Math.min(from.height + dy, within.height - from.top),
-          },
-          within,
+        left: at.left,
+        top: at.top,
+        maxWidth: between(size.width + dx, MIN_WIDTH, within.width - at.left),
+        maxHeight: between(
+          size.height + dy,
+          MIN_HEIGHT,
+          within.height - at.top,
         ),
       });
       return;
     }
 
     // Unclamped on purpose: a frame pushed through a wall is what asks for the
-    // dock, and a docked frame is inside the map again, so nothing ever ends
-    // up off it.
-    const pushed = { ...from, left: from.left + dx, top: from.top + dy };
-    const side = wallCrossed(pushed, within);
+    // dock, and a docked box is inside the map again, so nothing ever ends up
+    // off it.
+    const pushed = { left: at.left + dx, top: at.top + dy };
+    const side = wallCrossed(pushed, size, within);
     if (!side) {
-      setPlacement({ side: null, frame: pushed });
+      setPlacement({ side: null, ...pushed, ...ceiling });
       return;
     }
     // A wall implies a shape: down the side is a column, along the top or the
     // bottom a bar. Switching here rather than on release is the preview.
     setLayoutAtom(LAYOUT_OF[side]);
-    setPlacement({ side, frame: dockedTo(side, pushed, within) });
+    const onMap = inside(pushed.left, pushed.top, size, within);
+    setPlacement(dockedTo(side, onMap, ceiling, within));
   };
 
   const end = (event: ReactPointerEvent<HTMLElement>) => {
@@ -275,7 +309,7 @@ export const useReaderWindow = () => {
     /** Moved, resized or docked, so the layout's own anchor no longer
      *  applies. */
     placed: placement !== null,
-    frameStyle: placement?.frame,
+    placementStyle: placement ? styleOf(placement) : undefined,
     dragHandle: handlers('move'),
     resizeHandle: handlers('resize'),
   };
