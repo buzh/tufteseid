@@ -418,6 +418,33 @@ fewer requests.
   everything they hold. The cVAT ground needs one for a different reason: not to
   spare an upstream, but to keep the layer off ground the flight never covered.
 
+### Off-screen grabs
+
+Four producers fetch outside OpenLayers' tile queue, so none of the settings
+above applies to them. Each plans its own tiles with `planTiles`
+(`src/lidarExtract/stitch.ts`, canvas capped at `MAX_CANVAS_PX_PER_SIDE` =
+12 000 px a side) and runs them through `runWithConcurrency` with its own
+ceiling and its own bounded retry.
+
+| Producer | Upstream | Concurrent | Retries |
+|---|---|---|---|
+| LiDAR extract / evidence (`lidarExtract/run.ts`) | `/wms/…` per-project or national relief | 4 | 3 |
+| Float DEM (`terrain/dem.ts`) | `/wms/hoydedata/…` | 3 | 3 |
+| Flyfoto evidence, mosaic (`evidence/flyfotoRaster.ts`) | `/wms/nib/ortofoto` GetMap, EPSG:25833, JPEG | 4 | 3 |
+| Flyfoto evidence, one acquisition (same file) | `/arcgis/nib/…/exportImage` with a `mosaicRule` | 4 | 3 |
+
+- **A kept render goes past mapproxy on purpose.** The flyfoto *ground* reads
+  `/cache/flyfoto`, meta-tiled onto the app's own grid at whatever level is up; a
+  kept render asks the WMS for an arbitrary bbox at the acquisition's own
+  resolution, because that resolution is the point of keeping. So it is a
+  wmscache path, and it is a cache miss nearly every time — no two footprints
+  share a bbox.
+- **The render queue is serial** (`src/evidence/queue.ts`): one job at a time,
+  whatever the reader clicks. Two 4-wide fan-outs at once finish no sooner and
+  invite the shed response.
+- **A 500 m footprint is the cap** (`MAX_SIDE_M`, `src/map/bbox.ts`), which at
+  0.2 m/px is 2500 px a side — a handful of tiles, not a screenful.
+
 ### `guardTileSource` (`src/upstream/tileGuard.ts`)
 
 Wraps a tile source in admission control (for origins the breaker knows) plus a
@@ -474,7 +501,8 @@ Constants (`health.ts`):
 - **While open, no request goes out.** Tiles are marked `ERROR` without touching
   the network (a tile left `LOADING` holds a slot); `fetchWithin` throws
   `UpstreamDownError` before fetching, which the retry loops in `dem.ts`,
-  `flyfoto.ts`, `lidarExtract/run.ts` and the footprint fan-out short-circuit on.
+  `flyfoto.ts`, `lidarExtract/run.ts`, `evidence/flyfotoRaster.ts` and the
+  footprint fan-out short-circuit on.
 - **`status >= 500` is a failure; everything else, 4xx included, is alive.** The
   mechanism fails open, so a probe URL that goes stale reads as *up* rather than
   wedging an origin shut.

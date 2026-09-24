@@ -20,6 +20,7 @@ import type { SpotDraftController } from './useSpotDraft';
 export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {
   const { t } = useTranslation();
   const placing = spot.stage === 'pin';
+  const framing = spot.stage === 'footprint';
   const drawing = spot.stage === 'sketch';
 
   return (
@@ -79,6 +80,34 @@ export const SpotPanel = ({ spot }: { spot: SpotDraftController }) => {
           {placing ? t('spots.pinDone') : t('spots.pinChange')}
         </Button>
       </div>
+
+      <Group gap="xs" mt="xs" justify="space-between">
+        <Tooltip
+          label={framing ? t('spots.footprintStop') : t('spots.footprintStart')}
+        >
+          <ControlButton
+            icon="crop_free"
+            on={framing}
+            aria-label={t('spots.footprint')}
+            aria-pressed={framing}
+            onClick={() => spot.setStage(framing ? 'pin' : 'footprint')}
+          />
+        </Tooltip>
+        <span className={styles.coordsText}>
+          {spot.footprintSide == null
+            ? t('spots.footprintNone')
+            : t('spots.footprintSide', { metres: spot.footprintSide })}
+        </span>
+        {spot.footprintSide != null && (
+          <Button
+            size="compact-xs"
+            variant="default"
+            onClick={spot.clearFootprint}
+          >
+            {t('spots.footprintClear')}
+          </Button>
+        )}
+      </Group>
 
       <Group gap="xs" mt="xs" justify="space-between">
         <Tooltip label={drawing ? t('spots.drawStop') : t('spots.drawStart')}>

@@ -13,7 +13,10 @@ import {
   stylesForModel,
 } from '../map/layers/config/backgroundLayers/lidarProjects';
 
-export { fetchNationalLidarStyles };
+// The catalogue's own name for the seamless best-available ground, not a
+// user-visible string: it is written into a kept render's provenance and has to
+// read the same years later, in any locale.
+export const NATIONAL_LIDAR_LABEL = 'Nasjonal mosaikk';
 
 export type LidarSource = {
   key: string;
@@ -36,7 +39,7 @@ export const nationalLidarSource = (
 ): LidarSource => ({
   key: 'national',
   kind: 'national',
-  label: 'Nasjonal mosaikk',
+  label: NATIONAL_LIDAR_LABEL,
   year: null,
   pointDensity: null,
   model,

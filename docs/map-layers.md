@@ -245,11 +245,19 @@ layer taken off a map loses everything it had loaded.
 | 1.5 | the B half of a two-ground view | `src/map/compare/compareLayers.ts` (`COMPARE_Z`) |
 | 2 | an open spot's drawing | `src/sketch/overlay.ts` |
 | 3 | LiDAR footprint outlines | `src/map/lidarFootprintsLayer.ts` |
-| 4 | terrain-analysis window frame | `src/terrain/windowLayer.ts`, `src/terrain/windowAdjust.ts` |
+| 4 | a rectangle in hand — the terrain window or a spot's footprint | `src/map/rectAdjust.ts` |
+| 4 | terrain-analysis window frame, standing | `src/terrain/windowLayer.ts` |
+| 5 | a spot's footprint frame, standing | `src/spots/footprintLayer.ts` (`PIN_Z_INDEX - 1`) |
 | 6 | a spot's pin and label | `src/spots/pinStyle.ts` (`PIN_Z_INDEX`) |
 | 10 | Kulturminner theme layers | set by the caller in `src/map/layers/atoms.ts`, not by `themeWMS.ts` |
 
-5 and 7–9 are free. A new overlay should be written down here.
+7–9 are free. A new overlay should be written down here.
+
+Only one rectangle is ever in hand, so the two `rectAdjust` mounts share z 4
+without colliding; they are told apart by the layer id they are given
+(`terrainAdjustLayer`, `spotFootprintAdjustLayer`). Each standing frame goes down
+while its own rectangle is being dragged. The footprint sits just under the pin
+so the pin it belongs to stays legible over it.
 
 The hint layer is why 0.75 exists: roads and place names have to clear the hint
 patches as well as the ground.

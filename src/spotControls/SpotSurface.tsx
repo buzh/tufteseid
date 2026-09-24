@@ -1,6 +1,7 @@
 import { useAtomValue } from 'jotai';
 import { lazy, Suspense, useEffect, useMemo } from 'react';
 
+import { useRectangleAdjust } from '../map/rectAdjust';
 import { useSketchOverlay } from '../sketch/overlay';
 import { sketchOf } from '../sketch/scene';
 import { sketchSessionAtom } from '../sketch/session';
@@ -8,6 +9,8 @@ import { useSketchSession } from '../sketch/useSketchSession';
 import {
   activeSpotAtom,
   spotDraftAtom,
+  spotFootprintAdjustingAtom,
+  spotFootprintAtom,
   spotPlacingAtom,
   spotSketchAtom,
 } from '../spots/atoms';
@@ -66,6 +69,11 @@ export const SpotSurface = () => {
   useSpotShareLink();
   useSpotPlacement();
   useSpotPinAdjust();
+  useRectangleAdjust({
+    rectAtom: spotFootprintAtom,
+    activeAtom: spotFootprintAdjustingAtom,
+    layerId: 'spotFootprintAdjustLayer',
+  });
   useSketchSession(draft?.stage === 'sketch');
   useSketchOverlay(shown);
 

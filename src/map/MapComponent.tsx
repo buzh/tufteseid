@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { HeritageInfo } from '../heritageInfo';
 import { ErrorBoundary } from '../shared/ErrorBoundary.tsx';
 import { SpotSurface } from '../spotControls';
+import { spotFootprintLayerEffect } from '../spots/footprintLayer.ts';
 import { terrainWindowLayerEffect } from '../terrain/windowLayer.ts';
 import { TerrainSurface } from '../terrainControls';
 import styles from './MapComponent.module.css';
@@ -31,6 +32,7 @@ export const MapComponent = () => {
   useCvatHintLayer();
   useAtom(compareLayerAtomEffect);
   useAtom(terrainWindowLayerEffect);
+  useAtom(spotFootprintLayerEffect);
 
   useEffect(() => {
     if (mapRef.current) {

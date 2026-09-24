@@ -1,3 +1,6 @@
+// The frame of a spot's footprint: the ground its evidence covers. Standing
+// only — `map/rectAdjust.ts` draws the rectangle while it is in hand.
+
 import { atomEffect } from 'jotai-effect';
 import { Feature } from 'ol';
 import { fromExtent as polygonFromExtent } from 'ol/geom/Polygon';
@@ -6,25 +9,22 @@ import { transformExtent } from 'ol/proj';
 import VectorSource from 'ol/source/Vector';
 import { Stroke, Style } from 'ol/style';
 import { mapAtom } from '../map/atoms';
-import { terrainAdjustingAtom, terrainWindowAtom } from './window';
+import { shownSpotFootprintAtom } from './atoms';
+import { PIN_Z_INDEX } from './pinStyle';
 
-// The frame of a standing analysis. `map/rectAdjust.ts` draws the same
-// rectangle while it is being placed; only ever one of the two is up.
+// Solid where the terrain window's frame is dashed: one says "being read", the
+// other says "this is the spot's ground".
 const CASING = 'rgba(255, 255, 255, 0.4)';
-const FRAME = 'rgba(255, 106, 0, 0.55)';
+const FRAME = 'rgba(255, 106, 0, 0.7)';
 
 const frameStyle = [
-  new Style({
-    stroke: new Stroke({ color: CASING, width: 3, lineDash: [6, 6] }),
-  }),
-  new Style({
-    stroke: new Stroke({ color: FRAME, width: 1, lineDash: [6, 6] }),
-  }),
+  new Style({ stroke: new Stroke({ color: CASING, width: 3 }) }),
+  new Style({ stroke: new Stroke({ color: FRAME, width: 1 }) }),
 ];
 
-export const terrainWindowLayerEffect = atomEffect((get) => {
-  const bbox = get(terrainWindowAtom);
-  if (!bbox || get(terrainAdjustingAtom)) return;
+export const spotFootprintLayerEffect = atomEffect((get) => {
+  const bbox = get(shownSpotFootprintAtom);
+  if (!bbox) return;
   const map = get(mapAtom);
 
   const projection = map.getView().getProjection().getCode();
@@ -38,12 +38,12 @@ export const terrainWindowLayerEffect = atomEffect((get) => {
       }),
     ],
   });
-  // Over the render, which is at zIndex 1.
+  // Just under the pin, so the pin it belongs to stays legible over it.
   const layer = new VectorLayer({
-    zIndex: 4,
+    zIndex: PIN_Z_INDEX - 1,
     source,
     style: frameStyle,
-    properties: { id: 'terrainWindowLayer' },
+    properties: { id: 'spotFootprintLayer' },
   });
   map.addLayer(layer);
 

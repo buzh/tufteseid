@@ -16,7 +16,7 @@ Read-only: nothing here is written or persisted. Internal name `terreng`.
 | `src/terrain/shade.ts` | every operator, every visualization constant, `composeVat` |
 | `src/terrain/render.ts` | field → canvas, ramps and stretches, `clampRadius`, `demImageExtent`, defaults |
 | `src/terrain/window.ts` | `terrainWindowAtom`, `terrainAdjustingAtom` and the three write atoms |
-| `src/terrain/windowAdjust.ts` | the placement drag (frame + four corner handles, one `ol/interaction/Pointer`) |
+| `src/map/rectAdjust.ts` | the placement drag (frame + four corner handles, one `ol/interaction/Pointer`). Shared: a spot's footprint is placed the same way |
 | `src/terrain/windowLayer.ts` | the dashed frame once the rectangle is fixed (zIndex 4) |
 | `src/terrain/terrainLayer.ts` | `ImageLayer` over `ImageCanvasSource`, EPSG:25833, zIndex 1 |
 | `src/terrainControls/` | `TerrainToggle` (band), `TerrainSurface` + `TerrainPanel` (floating box), `useTerrainControls` |
@@ -267,7 +267,7 @@ Every verb — on, off, `Start`, `Juster` — is a write to one of them.
 - `closeTerrainWindowAtom` drops both.
 - The analysis does **not** follow the map — the grid is held, not refetched on
   pan.
-- The drag (`windowAdjust.ts`) stays square in EPSG:25833, clamps to
+- The drag (`map/rectAdjust.ts`) stays square in EPSG:25833, clamps to
   `MIN_SIDE_M`…`MAX_SIDE_M`, fixes the resize direction when a corner is
   grabbed, and writes the atom on every frame; the fetch is held off by
   `terrainAdjustingAtom`, which is a **key** on the fetch effect, not a guard
@@ -283,3 +283,8 @@ Every verb — on, off, `Start`, `Juster` — is a write to one of them.
   separately from the lit pass and keys it on neither `vis` nor azimuth.
 - The render is wired to the main map only — the right-hand pane of a split
   draws ground but no analysis.
+- While an analysis has something to show, `useTerrainControls` publishes its
+  settings to `terrainOfferAtom` (`src/evidence/offer.ts`), which is what lets a
+  spot keep the same reading over its own footprint. The offer carries the
+  *clamped* radius, because that is the distance the reading on screen was made
+  at. Unlike the ground's offer it cannot be derived — these are component state.

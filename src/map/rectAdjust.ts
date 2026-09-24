@@ -1,7 +1,9 @@
-// Placing the rectangle by hand, live only while `terrainAdjustingAtom` is set.
-// The square is kept square in EPSG:25833, not in the view's projection.
+// Placing a rectangle by hand. Two surfaces read a square off the map — the
+// terrain analysis and a spot's footprint — so the atoms come in as arguments
+// and the same grammar serves both. The square is kept square in EPSG:25833,
+// not in the view's projection.
 
-import { useAtomValue, useStore } from 'jotai';
+import { useAtomValue, useStore, type Atom, type PrimitiveAtom } from 'jotai';
 import { Feature } from 'ol';
 import type { Coordinate } from 'ol/coordinate';
 import type { FeatureLike } from 'ol/Feature';
@@ -15,15 +17,15 @@ import { transform } from 'ol/proj';
 import VectorSource from 'ol/source/Vector';
 import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
 import { useEffect } from 'react';
-import { mapAtom } from '../map/atoms';
-import { cursorLease } from '../map/cursorLease';
+import { mapAtom } from './atoms';
 import {
   bboxFromMetric,
   bboxToMetric,
   MAX_SIDE_M,
   MIN_SIDE_M,
-} from '../map/bbox';
-import { terrainAdjustingAtom, terrainWindowAtom } from './window';
+  type Bbox,
+} from './bbox';
+import { cursorLease } from './cursorLease';
 
 /** How near a corner counts as taking hold of it. */
 const HANDLE_HIT_PX = 14;
@@ -73,10 +75,23 @@ type Drag =
   | { kind: 'move'; from: Coordinate; start: Metric }
   | { kind: 'resize'; anchor: Coordinate; sx: number; sy: number };
 
-/** Mount once. Adds nothing to the map while the rectangle stands still. */
-export const useTerrainWindowAdjust = () => {
+export type RectAdjust = {
+  /** Written on every drag frame. */
+  rectAtom: PrimitiveAtom<Bbox | null>;
+  /** The reader has hold of it; false takes the interaction back down. */
+  activeAtom: Atom<boolean>;
+  /** Names the layer for the debug inspector. */
+  layerId: string;
+};
+
+/** Mount once per rectangle. Adds nothing to the map while it stands still. */
+export const useRectangleAdjust = ({
+  rectAtom,
+  activeAtom,
+  layerId,
+}: RectAdjust) => {
   const map = useAtomValue(mapAtom);
-  const adjusting = useAtomValue(terrainAdjustingAtom);
+  const adjusting = useAtomValue(activeAtom);
   const store = useStore();
 
   useEffect(() => {
@@ -93,7 +108,7 @@ export const useTerrainWindowAdjust = () => {
 
     /** The rectangle as it stands, in metres; null once it is taken down. */
     const extentNow = (): Metric | null => {
-      const bbox = store.get(terrainWindowAtom);
+      const bbox = store.get(rectAtom);
       return bbox ? bboxToMetric(bbox) : null;
     };
 
@@ -103,13 +118,14 @@ export const useTerrainWindowAdjust = () => {
       wrapX: false,
       features: [frame, ...handles],
     });
-    // The same level the standing frame draws at; the two are never both up.
+    // The same level a standing frame draws at; a rectangle is never both
+    // standing and in hand.
     const layer = new VectorLayer({
       zIndex: 4,
       source,
       style: (feature: FeatureLike): Style[] =>
         feature === frame ? adjustStyle : handleStyle,
-      properties: { id: 'terrainAdjustLayer' },
+      properties: { id: layerId },
     });
 
     const redraw = () => {
@@ -195,7 +211,7 @@ export const useTerrainWindowAdjust = () => {
           Math.max(ay, by),
         ];
       }
-      store.set(terrainWindowAtom, bboxFromMetric(next));
+      store.set(rectAtom, bboxFromMetric(next));
     };
 
     const handleUpEvent = (): boolean => {
@@ -228,7 +244,7 @@ export const useTerrainWindowAdjust = () => {
     map.addInteraction(interaction);
     // Subscribed rather than made a React dependency: the drag writes this atom
     // on every frame, and rebuilding the layer to follow it would be expensive.
-    const unsubscribe = store.sub(terrainWindowAtom, redraw);
+    const unsubscribe = store.sub(rectAtom, redraw);
 
     return () => {
       unsubscribe();
@@ -237,5 +253,5 @@ export const useTerrainWindowAdjust = () => {
       source.dispose();
       cursor.release();
     };
-  }, [map, adjusting, store]);
+  }, [map, adjusting, store, rectAtom, layerId]);
 };

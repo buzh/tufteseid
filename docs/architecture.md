@@ -13,23 +13,24 @@ One row per directory under `src/`.
 
 | Directory | Owns |
 | --- | --- |
-| `api/` | PocketBase singleton (`pocketbase.ts`) and the `spots` collection client. |
+| `api/` | PocketBase singleton (`pocketbase.ts`) and the `spots` and `evidence` collection clients. |
 | `auth/` | OAuth2 dialog, the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
+| `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue, and the gallery. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
 | `grounds/` | The ground switch. Which ground is up is derived from the half's background layer, never stored. |
 | `heritageControls/` | The Kulturminner tool: which theme layers are ticked and how they are drawn. |
 | `heritageInfo/` | The pointer tip and the click-kept card over heritage features, plus the OL overlay they ride. |
 | `kartControls/` | The Kart arm: which cartography. |
 | `lidarControls/` | The LiDAR arm: dataset menu, render, DTM/DOM, Automatisk, hybrid overlay and contours. |
-| `lidarExtract/` | Headless LiDAR tile planning, fetching and stitching. Only `stitch.ts` has a live caller. |
+| `lidarExtract/` | LiDAR tile planning, fetching and stitching. `stitch.ts` serves the DEM fetch, `run.ts` and `sources.ts` the LiDAR evidence render. |
 | `locales/` | i18next JSON, one directory per language. |
-| `map/` | The OpenLayers map and everything attached to it: layer configuration and stacks, the compare halves and the split pane, feature info, projections, the footprint and pin and hint layers. |
+| `map/` | The OpenLayers map and everything attached to it: layer configuration and stacks, the compare halves and the split pane, feature info, projections, the rectangle-placing interaction, the footprint and pin and hint layers. |
 | `ribbon/` | The top band: its three sections and the upstream status light. Layout only. |
 | `search/` | Kartverket place, address, road, property and elevation lookups. One function has a live caller. |
 | `shared/` | Error boundary, URL parameter access, coordinate parsing, enum and number helpers, and the request deadline that reports to the breaker. |
 | `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the pen, and the render onto the ground. |
 | `spotControls/` | The reader's records as surfaces: the `+`, the draft panel, the read card, the index menu. |
-| `spots/` | Spot state and geometry: the pin layer and its style, hit test, place and adjust, share link, name suggestion. |
+| `spots/` | Spot state and geometry: the pin layer and its style, the footprint frame, hit test, place and adjust, share link, name suggestion. |
 | `terrain/` | Client-side terrain analysis: DEM fetch, shading, the analysis window and its layers. |
 | `terrainControls/` | The terrain toggle and its panel. |
 | `types/` | Search response types. |
@@ -70,11 +71,15 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `terrainAdjustingAtom` | same | It is still being placed, so nothing is fetched yet. |
 | `open`/`adjust`/`closeTerrainWindowAtom` | same | Write-only. |
 | `spotPlacingAtom` | `spots/atoms.ts` | The `+` is armed: the next map click places the pin. Exclusive with `spotDraftAtom`. |
-| `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom` | same | The record being written: where its pin is and which stage has the pointer, what has been typed, what has been drawn. |
+| `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom`, `spotFootprintAtom` | same | The record being written: where its pin is and which stage has the pointer, what has been typed, what has been drawn, and the ground it names. |
+| `spotFootprintAdjustingAtom`, `shownSpotFootprintAtom` | same | Derived: the draft is in its `footprint` stage, and which rectangle the standing frame draws. |
+| `clearSpotFootprintAtom` | same | Write-only. |
 | `place`/`edit`/`closeSpotDraftAtom`, `setSpotStageAtom` | same | Write-only. |
 | `activeSpotAtom` | same | The record being read — opened by a click, by an index row, or by `?lok=`. |
 | `spotRecordsAtom`, `spotsFailedAtom` | `spots/spotRecords.ts` | Every record the session may see, null until the list lands; and whether it never did. |
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
+| `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
+| `keepOffersAtom` | same | Derived: the ground's offer (off the A half) and the terrain's, ground first. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |
 | `isSignedInAtom`, `isAdminAtom` | same | Derived, so a component does not re-render on an unrelated user field. |
@@ -198,12 +203,19 @@ belongs to an arm; one that applies to the reading belongs to the tools.
   `src/types/searchTypes.ts` are mostly the tail of a deleted surface; one
   function, `getPlaceNamesByLocation`, has a live caller (`spots/spotName.ts`).
   Kept as they are.
-- **`src/lidarExtract/`**: only `stitch.ts` is live, via `src/terrain/dem.ts`.
-  `run.ts` and most of `sources.ts` are headless computation behind no surface.
-  Kept on purpose.
 - **The spot index is your own records only.** `SpotMenu` is a Mantine `Menu`
   ordered by date with no hover-to-light-the-pin: enough for a few dozen
   records, not a few hundred.
+- **Evidence files are unprotected.** A public spot is readable with no
+  account and a guest can hold no PocketBase file token, so `evidence.file` is
+  served to anyone holding the URL. The same trade the old
+  `1700000900_public_guest_reads.js` recorded.
+- **A render is not a cache.** Upstreams re-fly and reprocess, so the same spec
+  re-rendered later may not be the picture its author read. `meta.renderedAt`
+  says when the file was made; nothing re-renders on its own.
+- **Evidence never meets the sketch.** Excalidraw's image tool stays off
+  (`sketch/SketchCanvas.tsx`): a PNG dropped into the scene would be stored
+  inside the drawing, against the 5 MB `sketch` cap, where nothing can see it.
 - **Only `nb` is a live locale.** `nn` and `en` are stubs.
 - **There is no SPA route but `/`.** `/l/<code>` is a narrow Caddy `redir` to
   `/?lok=<code>`; there is no `try_files` fallback, which would turn every wrong

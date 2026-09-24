@@ -11,6 +11,21 @@
     "providersError": "Fikk ikke kontakt med innloggingstjenesten.",
     "noProviders": "Ingen innloggingsmåter er satt opp på denne installasjonen."
   },
+  "evidence": {
+    "label": "Bilder",
+    "needsFootprint": "Marker et utsnitt på lokaliteten for å kunne ta vare på bilder av den.",
+    "keep": "Ta vare på {{what}}",
+    "kept": "{{what}} er tatt vare på",
+    "rendering": "lager bildet …",
+    "renderFailed": "kilden svarte ikke",
+    "renderEmpty": "ingen dekning over utsnittet",
+    "resolution": "{{m}} m/px",
+    "unreadable": "Ukjent bilde",
+    "retry": "Prøv igjen",
+    "remove": "Slett bildet",
+    "open": "Åpne bildet i full oppløsning",
+    "failed": "Fikk ikke hentet eller lagret bildene."
+  },
   "flyfotoControls": {
     "mosaic": "Beste mosaikk",
     "mosaicShort": "Mosaikk · nyeste",
@@ -241,7 +256,13 @@
       "empty": "Du har ingen lokaliteter ennå. Trykk + for å lage en.",
       "filterPlaceholder": "Søk i navn og beskrivelse",
       "noMatch": "Ingen treff på «{{query}}»"
-    }
+    },
+    "footprint": "Utsnitt",
+    "footprintStart": "Marker området lokaliteten dekker",
+    "footprintStop": "Ferdig med utsnittet",
+    "footprintNone": "Ingen utsnitt",
+    "footprintSide": "{{metres}} m · dra rektangelet, hjørnene endrer størrelsen",
+    "footprintClear": "Fjern"
   },
   "terrainControls": {
     "label": "Terrenganalyse",

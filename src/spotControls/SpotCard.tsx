@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { deleteSpot, updateSpot, type SpotRecord } from '../api/spots';
 import { currentUserAtom, isAdminAtom } from '../auth/atoms';
+import { EvidenceGallery } from '../evidence/EvidenceGallery';
 import { activeSpotAtom, editSpotDraftAtom } from '../spots/atoms';
 import { formatPoint } from '../spots/geo';
 import { copyShareLink } from '../spots/shareLink';
@@ -131,6 +132,8 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
           onChange={(event) => setVisibility(event.currentTarget.checked)}
         />
       )}
+
+      <EvidenceGallery spot={spot} />
 
       {failed && (
         <Alert color="red" mt="xs" p="xs">
