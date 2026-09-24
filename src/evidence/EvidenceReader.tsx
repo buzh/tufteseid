@@ -3,7 +3,7 @@
 // through them holds the ground still and changes only how it was seen —
 // which is the whole argument a spot makes.
 
-import { Slider, Tooltip } from '@mantine/core';
+import { ActionIcon, Slider, Tooltip } from '@mantine/core';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { transformExtent } from 'ol/proj';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -21,20 +21,27 @@ import { Panel } from '../ui/Panel';
 import styles from './EvidenceReader.module.css';
 import { useEvidenceOverlay } from './evidenceOverlay';
 import { evidenceFacts, evidenceTitle, KIND_ICON } from './labels';
+import { useReaderWindow, type ReaderLayout } from './readerWindow';
 import { evidenceBbox, specOf } from './spec';
 import { useSpotEvidence } from './useSpotEvidence';
 
-// Room for the ribbon above and this box below, so the footprint lands in the
-// open ground between them.
-const FIT_PADDING = [80, 40, 260, 40];
+// Room for the band above and for wherever the box starts out, so the
+// footprint lands in the open ground rather than under either.
+const FIT_PADDING: Record<ReaderLayout, number[]> = {
+  wide: [80, 40, 260, 40],
+  tall: [80, 400, 40, 40],
+};
 
 const FIT_MS = 400;
+
+const LAYOUT_ICON = { wide: 'dock_to_bottom', tall: 'dock_to_right' } as const;
 
 export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   const { t, i18n } = useTranslation();
   const map = useAtomValue(mapAtom);
   const setReading = useSetAtom(spotReadingAtom);
   const { items } = useSpotEvidence(spot);
+  const box = useReaderWindow();
 
   // A row with no pixels or no rectangle cannot be laid on the ground, so it
   // is not part of the reading — the gallery on the card is where it is
@@ -107,11 +114,12 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
     view.cancelAnimations();
     view.fit(
       transformExtent(footprint, 'EPSG:4326', view.getProjection().getCode()),
-      { padding: FIT_PADDING, duration: FIT_MS },
+      { padding: FIT_PADDING[box.layout], duration: FIT_MS },
     );
-    // Once, on entering the reading. The reader mounts with it, and a realtime
-    // update of an unrelated field must not yank back a reader who has zoomed
-    // in to look at something.
+    // Once, on entering the reading, against the layout the box opens in. The
+    // reader mounts with it, and neither a realtime update of an unrelated
+    // field nor a box moved out of the way afterwards may yank back a reader
+    // who has zoomed in to look at something.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
 
@@ -123,107 +131,142 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
       : '';
   const facts = current ? evidenceFacts(current, i18n.language) : [];
 
+  // The switch offers the other shape, and says so.
+  const other: ReaderLayout = box.layout === 'wide' ? 'tall' : 'wide';
+  const otherLabel = t(`evidence.layout.${other}`);
+
   return (
-    <Panel
-      className={styles.reader}
-      icon="menu_book"
-      title={spot.name}
-      status={
-        spot.credit
-          ? `${t('spots.credit', { name: spot.credit })} · ${formatPoint(spot.point)}`
-          : formatPoint(spot.point)
-      }
-      onClose={() => setReading(false)}
-      footer={
-        <div className={styles.controls}>
-          <div className={styles.nav}>
-            <ControlButton
-              icon="chevron_left"
-              aria-label={t('evidence.previous')}
-              onClick={() => step(-1)}
-            />
-            <span className={styles.count}>
-              {t('evidence.position', {
-                index: index + 1,
-                total: readable.length,
-              })}
-            </span>
-            <ControlButton
-              icon="chevron_right"
-              aria-label={t('evidence.next')}
-              onClick={() => step(1)}
-            />
-            <span className={styles.hint}>{t('evidence.keyHint')}</span>
-          </div>
-          <div className={styles.fade}>
-            <Tooltip label={t('terrainControls.transparency')}>
-              <span className={styles.fadeIcon}>
-                <Icon icon="opacity" size={16} />
-              </span>
-            </Tooltip>
-            <Slider
-              className={styles.slider}
-              size="xs"
-              min={0}
-              max={100}
-              step={5}
-              label={(value) => `${value} %`}
-              aria-label={t('terrainControls.transparency')}
-              value={transparency}
-              onChange={setTransparency}
-            />
-          </div>
-        </div>
-      }
+    <div
+      ref={box.boxRef}
+      className={cx(
+        styles.reader,
+        styles[box.layout],
+        box.placed && styles.placed,
+      )}
+      style={box.frameStyle}
     >
-      {spot.description && <p className={styles.prose}>{spot.description}</p>}
-
-      {items === null ? (
-        <div className={styles.note}>{t('evidence.loading')}</div>
-      ) : (
-        <div className={styles.strip}>
-          {readable.map((rec) => {
-            const recSpec = specOf(rec);
-            const label = recSpec
-              ? evidenceTitle(recSpec)
-              : t('evidence.unreadable');
-            return (
-              <Tooltip key={rec.id} label={label}>
-                <button
-                  type="button"
-                  className={cx(
-                    styles.frame,
-                    rec.id === current?.id && styles.frameOn,
-                  )}
-                  aria-label={label}
-                  aria-pressed={rec.id === current?.id}
-                  onClick={() => setShownId(rec.id)}
-                >
-                  <img
-                    className={styles.thumb}
-                    src={evidenceFileUrl(rec, '200x200')}
-                    alt={label}
-                  />
-                  <Icon
-                    icon={KIND_ICON[rec.kind]}
-                    size={12}
-                    className={styles.frameKind}
-                  />
-                </button>
+      <Panel
+        className={styles.panel}
+        icon="menu_book"
+        title={spot.name}
+        status={
+          spot.credit
+            ? `${t('spots.credit', { name: spot.credit })} · ${formatPoint(spot.point)}`
+            : formatPoint(spot.point)
+        }
+        handle={box.dragHandle}
+        actions={
+          <Tooltip label={otherLabel}>
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="sm"
+              aria-label={otherLabel}
+              onClick={() => box.setLayout(other)}
+            >
+              <Icon icon={LAYOUT_ICON[other]} size={18} />
+            </ActionIcon>
+          </Tooltip>
+        }
+        // The box moves, resizes and closes; folding it away as well would be
+        // a fourth way to make it stop covering something.
+        collapsible={false}
+        onClose={() => setReading(false)}
+        footer={
+          <div className={styles.controls}>
+            <div className={styles.nav}>
+              <ControlButton
+                icon="chevron_left"
+                aria-label={t('evidence.previous')}
+                onClick={() => step(-1)}
+              />
+              <span className={styles.count}>
+                {t('evidence.position', {
+                  index: index + 1,
+                  total: readable.length,
+                })}
+              </span>
+              <ControlButton
+                icon="chevron_right"
+                aria-label={t('evidence.next')}
+                onClick={() => step(1)}
+              />
+              <span className={styles.hint}>{t('evidence.keyHint')}</span>
+            </div>
+            <div className={styles.fade}>
+              <Tooltip label={t('terrainControls.transparency')}>
+                <span className={styles.fadeIcon}>
+                  <Icon icon="opacity" size={16} />
+                </span>
               </Tooltip>
-            );
-          })}
-        </div>
-      )}
+              <Slider
+                className={styles.slider}
+                size="xs"
+                min={0}
+                max={100}
+                step={5}
+                label={(value) => `${value} %`}
+                aria-label={t('terrainControls.transparency')}
+                value={transparency}
+                onChange={setTransparency}
+              />
+            </div>
+          </div>
+        }
+      >
+        {spot.description && <p className={styles.prose}>{spot.description}</p>}
 
-      {current && (
-        <div className={styles.caption}>
-          <div className={styles.captionTitle}>{title}</div>
-          {facts.length > 0 && (
-            <div className={styles.facts}>{facts.join(' · ')}</div>
-          )}
-        </div>
-      )}
-    </Panel>
+        {items === null ? (
+          <div className={styles.note}>{t('evidence.loading')}</div>
+        ) : (
+          <div className={styles.strip}>
+            {readable.map((rec) => {
+              const recSpec = specOf(rec);
+              const label = recSpec
+                ? evidenceTitle(recSpec)
+                : t('evidence.unreadable');
+              return (
+                <Tooltip key={rec.id} label={label}>
+                  <button
+                    type="button"
+                    className={cx(
+                      styles.frame,
+                      rec.id === current?.id && styles.frameOn,
+                    )}
+                    aria-label={label}
+                    aria-pressed={rec.id === current?.id}
+                    onClick={() => setShownId(rec.id)}
+                  >
+                    <img
+                      className={styles.thumb}
+                      src={evidenceFileUrl(rec, '200x200')}
+                      alt={label}
+                    />
+                    <Icon
+                      icon={KIND_ICON[rec.kind]}
+                      size={12}
+                      className={styles.frameKind}
+                    />
+                  </button>
+                </Tooltip>
+              );
+            })}
+          </div>
+        )}
+
+        {current && (
+          <div className={styles.caption}>
+            <div className={styles.captionTitle}>{title}</div>
+            {facts.length > 0 && (
+              <div className={styles.facts}>{facts.join(' · ')}</div>
+            )}
+          </div>
+        )}
+      </Panel>
+
+      {/* Pointer-only, and nothing a reader without one is missing: the box
+          opens at a size its layout already thought about. */}
+      <div aria-hidden="true" className={styles.grip} {...box.resizeHandle} />
+    </div>
   );
 };

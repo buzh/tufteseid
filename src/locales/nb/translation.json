@@ -31,6 +31,10 @@
     "previous": "Forrige bilde",
     "next": "Neste bilde",
     "keyHint": "← → blar",
+    "layout": {
+      "wide": "Legg boksen nederst",
+      "tall": "Legg boksen til høyre"
+    },
     "facts": {
       "year": "Opptak {{year}}",
       "sun": "Sol {{azimuth}}°/{{altitude}}°",

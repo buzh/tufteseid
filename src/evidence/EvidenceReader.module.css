@@ -1,8 +1,21 @@
-/* The reading bar. Bottom-centre and wide, where the card it stands in for is
-   the narrow top-right box (`spotControls/SpotBox.module.css`): the strip only
-   works as a strip. */
+/* The reading window. It floats: `readerWindow.ts` drags and resizes it, and
+   the two layout classes are only where each shape starts from. The wrapper
+   holds the frame so the resize grip has a corner to sit in. */
 .reader {
   position: absolute;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Shrinks inside a capped or a resized frame rather than overflowing it;
+   `Panel` scrolls its own body from there. */
+.panel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* A bar along the bottom, wide enough that the strip reads as a strip. */
+.wide {
   left: 50%;
   bottom: var(--mantine-spacing-xs);
   transform: translateX(-50%);
@@ -10,12 +23,48 @@
   max-height: 60%;
 }
 
+/* A column down the right, the corner the card it stands in for uses
+   (`spotControls/SpotBox.module.css`). */
+.tall {
+  top: var(--mantine-spacing-xs);
+  right: var(--mantine-spacing-xs);
+  width: min(23rem, calc(100% - 2 * var(--mantine-spacing-xs)));
+  max-height: calc(100% - 2 * var(--mantine-spacing-xs));
+}
+
 /* The scale bar moves to the centre on a narrow window (`map/map.css`), where
-   this box would otherwise cover it. */
+   the bar layout would otherwise cover it. */
 @media (max-width: 768px) {
-  .reader {
+  .wide {
     bottom: 44px;
   }
+}
+
+/* Moved or resized, so the inline frame is the whole placement. Last, because
+   it has to beat both layouts and the query above at equal specificity. */
+.placed {
+  right: auto;
+  bottom: auto;
+  transform: none;
+  max-height: none;
+}
+
+.grip {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(
+    135deg,
+    transparent 0 58%,
+    var(--mantine-color-dimmed) 58% 66%,
+    transparent 66% 78%,
+    var(--mantine-color-dimmed) 78% 86%,
+    transparent 86%
+  );
+  cursor: nwse-resize;
+  touch-action: none;
 }
 
 /* `pre-wrap` keeps the author's own paragraph breaks, as on the card. */
@@ -92,11 +141,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The right padding is the resize grip's corner: without it the slider's own
+   end would take presses meant for the grip. */
 .controls {
   display: flex;
   align-items: center;
   gap: var(--mantine-spacing-sm);
   width: 100%;
+  padding-right: 12px;
 }
 
 .nav {
@@ -133,4 +185,30 @@
 
 .slider {
   flex: 1;
+}
+
+/* Down a column there is no width to put a row of thumbnails in, and no
+   shortage of height: the strip wraps and the panel body scrolls it. */
+.tall .strip {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+
+.tall .prose {
+  max-height: 14em;
+}
+
+.tall .controls {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.tall .nav {
+  justify-content: center;
+}
+
+.tall .fade {
+  flex: 1 1 auto;
+  margin-left: 0;
 }

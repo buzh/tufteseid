@@ -20,6 +20,18 @@
   border-bottom: 1px solid var(--mantine-color-default-border);
 }
 
+/* The title row of a floating box: what it is dragged by. `touch-action` so a
+   touch drag moves the box rather than scrolling the page under it. */
+.headerHandle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.headerHandle:active {
+  cursor: grabbing;
+}
+
 .headerIcon {
   flex: none;
   color: var(--mantine-color-dimmed);
