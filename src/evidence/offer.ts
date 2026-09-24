@@ -1,16 +1,3 @@
-// What the reading on screen offers to keep. Two of them, because two things
-// can be worth keeping at once: the ground the A half is drawing, and the
-// terrain analysis laid over it.
-//
-// The ground's offer is derived — every parameter it needs is already an atom,
-// and a second copy could disagree with the map. The terrain analysis keeps its
-// settings in component state, so `useTerrainControls` publishes its offer
-// instead.
-//
-// An offer is parameters, not pixels: keeping re-renders them over the spot's
-// footprint at the source's own resolution, which is not the rectangle or the
-// resolution on screen.
-
 import { atom } from 'jotai';
 
 import { NATIONAL_LIDAR_LABEL } from '../lidarExtract/sources';
@@ -76,16 +63,22 @@ const groundOfferAtom = atom<EvidenceSpec | null>((get) => {
         };
   }
 
-  // Cartography and the empty ground offer nothing to re-render, and
   // `lidarCvat` is our own store: no service publishes that render, so a
-  // native-resolution copy of it cannot be asked for.
+  // native-resolution copy of it cannot be asked for. Cartography and the
+  // empty ground have nothing to re-render either.
   return null;
 });
 
-/** Written by `useTerrainControls` while the analysis has something to show. */
+/** Written by `useTerrainControls` while the analysis has something to show,
+ *  because its settings are component state rather than atoms. */
 export const terrainOfferAtom = atom<EvidenceSpec | null>(null);
 
-/** The offers standing, ground first — the order they are stacked in. */
+/**
+ * The offers standing, ground first — the order they are stacked in. An offer
+ * is parameters, not pixels: keeping one re-renders it over the spot's
+ * footprint at the source's own resolution, not the rectangle or the
+ * resolution on screen.
+ */
 export const keepOffersAtom = atom<EvidenceSpec[]>((get) =>
   [get(groundOfferAtom), get(terrainOfferAtom)].filter(
     (spec): spec is EvidenceSpec => spec !== null,

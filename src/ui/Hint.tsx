@@ -1,7 +1,3 @@
-// A tip floating beside the surface it is about, with the reader's way of
-// never seeing it again. Mantine's `Popover` does the anchoring, so the target
-// need only be something that takes a ref.
-
 import {
   Button,
   Checkbox,

@@ -1,7 +1,3 @@
-// One spot's evidence: the rows, what the map is offering to keep, and the
-// render queue's opinion of each row. The list is held here rather than in an
-// atom because it is only ever read by the one card that is open.
-
 import { useAtomValue } from 'jotai';
 import {
   useCallback,
@@ -21,8 +17,9 @@ import {
   type EvidenceRecord,
 } from '../api/evidence';
 import type { SpotRecord } from '../api/spots';
-import { currentUserAtom, isAdminAtom } from '../auth/atoms';
+import { currentUserAtom } from '../auth/atoms';
 import { bboxToMetric } from '../map/bbox';
+import { useMayEditSpot } from '../spots/mayEdit';
 import { keepOffersAtom } from './offer';
 import { sortForMove } from './order';
 import {
@@ -63,7 +60,7 @@ const byOrder = (a: EvidenceRecord, b: EvidenceRecord) =>
 
 export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
   const user = useAtomValue(currentUserAtom);
-  const isAdmin = useAtomValue(isAdminAtom);
+  const mayEdit = useMayEditSpot(spot);
   const offered = useAtomValue(keepOffersAtom);
 
   const [items, setItems] = useState<EvidenceRecord[] | null>(null);
@@ -119,7 +116,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
 
   const states = useSyncExternalStore(subscribeRenderQueue, renderStates);
 
-  const mayEdit = user != null && (user.id === spot.owner || isAdmin);
   const footprint = spot.footprint;
   const mayKeep = mayEdit && footprint != null;
 
@@ -186,6 +182,8 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
 
   const remove = useCallback(
     (id: string) => {
+      const was = byId.current.get(id);
+      if (!was) return;
       setFailed(false);
       // Dropped first: the realtime delete may never arrive for a row only this
       // reader could see.
@@ -193,10 +191,11 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       publish();
       deleteEvidence(id).catch((err) => {
         console.warn('[evidence] delete failed', err);
+        upsert(was);
         setFailed(true);
       });
     },
-    [publish],
+    [publish, upsert],
   );
 
   return {

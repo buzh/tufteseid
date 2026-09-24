@@ -1,12 +1,3 @@
-// Spec → pixels. The one place a kept row becomes an image.
-//
-// A render is not a cache. Upstreams re-fly and reprocess, so the same spec
-// re-rendered in three years may not be the picture its author read; the file
-// is the citable artifact and `meta.renderedAt` says when it was made.
-//
-// Null means the source has nothing over this rectangle, which is not a
-// failure and offers nothing to retry. A throw is a fault.
-
 import type { EvidenceMeta } from '../api/evidence';
 import { extractCanvas } from '../lidarExtract/run';
 import { enumerateLidarSources } from '../lidarExtract/sources';
@@ -33,6 +24,11 @@ export type Produced = {
   meta: EvidenceMeta;
 };
 
+/**
+ * Null means the source has nothing over this rectangle: not a failure, and
+ * nothing a retry would change. A throw is a fault. `queue.ts` tells the two
+ * apart on exactly that.
+ */
 export const renderEvidence = async (
   spec: EvidenceSpec,
   bbox4326: Bbox,

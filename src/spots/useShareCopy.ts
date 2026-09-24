@@ -1,6 +1,3 @@
-// The copy gesture and its answer, shared by the button in a spot's title row
-// and the one in the ribbon.
-
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

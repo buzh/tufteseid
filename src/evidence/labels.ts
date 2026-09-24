@@ -1,8 +1,5 @@
-// What a kept render is called on screen, and the facts that go under the
-// name. Shared by the gallery and the reader. The module-level `t` is
-// deliberate — these are strings, not components, and one of them is a React
-// key.
-
+// The module-level `t` is deliberate: these are strings rather than
+// components, and one of them is used as a React key.
 import { t } from 'i18next';
 
 import type { EvidenceKind, EvidenceRecord } from '../api/evidence';
@@ -72,11 +69,8 @@ const terrainFacts = (
   return facts;
 };
 
-/**
- * The provenance line: what the catalogue knew about the source, what the
- * render achieved, and when it was made. What the reader is citing, in the
- * order it would be said aloud.
- */
+/** What the catalogue knew about the source, what the render achieved and when
+ *  it was made, in the order it would be cited. */
 export const evidenceFacts = (
   rec: EvidenceRecord,
   language: string,

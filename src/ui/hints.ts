@@ -1,7 +1,3 @@
-// Which tips exist and which the reader has put away. localStorage rather than
-// the account: a tip is about this browser, and a guest has no account to hold
-// one.
-
 import { atom, useAtomValue } from 'jotai';
 
 /** Spelled out so a tip's stored entry stays greppable. One id per surface,
@@ -16,8 +12,8 @@ const STORAGE_KEY = 'hintsDismissed.v1';
 const isHintId = (value: unknown): value is HintId =>
   typeof value === 'string' && (HINT_IDS as readonly string[]).includes(value);
 
-// localStorage is reader-editable, and a retired id would otherwise keep a tip
-// that no longer exists in the list forever.
+// Filtered against the list because the store is reader-editable, and because
+// an id retired from `HINT_IDS` would otherwise sit there for ever.
 const stored = (): HintId[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);

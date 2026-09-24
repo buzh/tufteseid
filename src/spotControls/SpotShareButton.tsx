@@ -1,6 +1,3 @@
-// The share link, in the title row of whichever box has the spot open. Its own
-// state: copying is a gesture with an answer, not something the box saves.
-
 import { ActionIcon, Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 

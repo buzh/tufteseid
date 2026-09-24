@@ -1,6 +1,3 @@
-// Hands over whatever the reader is looking at: the open spot's short link, or
-// the view itself when no spot is open.
-
 import { Tooltip } from '@mantine/core';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';

@@ -1,6 +1,3 @@
-// The frame of a spot's footprint: the ground its evidence covers. Standing
-// only — `map/rectAdjust.ts` draws the rectangle while it is in hand.
-
 import { atomEffect } from 'jotai-effect';
 import { Feature } from 'ol';
 import { fromExtent as polygonFromExtent } from 'ol/geom/Polygon';
@@ -12,8 +9,8 @@ import { mapAtom } from '../map/atoms';
 import { shownSpotFootprintAtom } from './atoms';
 import { PIN_Z_INDEX } from './pinStyle';
 
-// Solid where the terrain window's frame is dashed: one says "being read", the
-// other says "this is the spot's ground".
+// Solid on purpose, against the terrain window's dashed frame: the two say
+// different things and must not be unified.
 const CASING = 'rgba(255, 255, 255, 0.4)';
 const FRAME = 'rgba(255, 106, 0, 0.7)';
 

@@ -1,8 +1,3 @@
-// The kept render laid under an open draft: the picture the author is framing
-// against, and the one the pen draws over. Published by the strip, because only
-// the strip holds the rows, and read by `SpotSurface`, where the overlay and
-// the sketch session live.
-
 import { atom } from 'jotai';
 
 export type DraftGround = {

@@ -1,7 +1,3 @@
-// Taking the drawing off the ground, or part of the way off it. Wherever a
-// spot is open the drawing is over something the reader may want to see: the
-// live map from the card, a kept render from the reading.
-
 import { Slider, Tooltip } from '@mantine/core';
 import { useAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';

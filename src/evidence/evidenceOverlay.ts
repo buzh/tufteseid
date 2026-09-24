@@ -1,8 +1,3 @@
-// One kept render laid back on the ground it was made over. Every row of a
-// spot covers the same rectangle, so flipping between them is a comparison
-// rather than a slideshow — which only holds if nothing blinks between two
-// pictures, hence the swap below.
-
 import { useAtomValue } from 'jotai';
 import ImageLayer from 'ol/layer/Image';
 import Static from 'ol/source/ImageStatic';
@@ -29,9 +24,9 @@ export const useEvidenceOverlay = (
   const map = useAtomValue(mapAtom);
   const [minX, minY, maxX, maxY] = extent ?? [NaN, NaN, NaN, NaN];
 
-  // The layers on the map right now, oldest first. They outlive the effect
-  // that made them on purpose: the outgoing picture comes off only once the
-  // incoming one has pixels.
+  // Oldest first. These outlive the effect that made them on purpose: the
+  // outgoing picture comes off only once the incoming one has pixels, so that
+  // flipping between two renders of one ground never blinks.
   const shown = useRef<ImageLayer<Static>[]>([]);
 
   useEffect(() => {
@@ -65,16 +60,16 @@ export const useEvidenceOverlay = (
       for (const old of outgoing) map.removeLayer(old);
       shown.current = shown.current.filter((l) => !outgoing.includes(l));
     };
-    // An image that never arrives must not leave the previous one up for ever.
     source.once('imageloadend', retireOutgoing);
+    // Or an image that never arrives leaves the previous one up for ever.
     source.once('imageloaderror', retireOutgoing);
 
     // No cleanup: taking this layer off is the next one's job, and the unmount
     // effect below sweeps whatever is left.
 
-    // `opacity` is seeded here and kept in step by the effect below; naming it
-    // would rebuild the layer, and the flash it exists to avoid, on every drag
-    // of the slider.
+    // `opacity` is seeded here and kept in step by the effect below. Naming it
+    // would rebuild the layer on every drag of the slider, and with it the
+    // flash this swap exists to avoid.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, url, minX, minY, maxX, maxY]);
 

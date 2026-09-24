@@ -1,18 +1,11 @@
-// The render queue: a kept row is parameters, and this is what turns it into
-// the image and PATCHes it onto the record afterwards.
+// Module-level and React-free so that a render outlives the surface that
+// started it: closing a spot must not abandon pixels the reader asked to keep.
 //
-// Module-level and React-free so it outlives the surface that started it —
-// closing a spot must not abandon pixels the reader decided to keep — and each
-// render is one atomic update. React reads it through `useRenderQueue`.
-//
-// One job at a time: every producer is a burst of tile requests against a
-// shared public edge, or an 800 ms horizon scan on the main thread. Two at once
-// finish no sooner and invite shed responses.
+// One job at a time. Every producer is either a burst of tile requests against
+// a shared public edge or an 800 ms horizon scan on the main thread, so two at
+// once finish no sooner and invite shed responses.
 
-import {
-  attachEvidenceFile,
-  type EvidenceRecord,
-} from '../api/evidence';
+import { attachEvidenceFile, type EvidenceRecord } from '../api/evidence';
 import type { Bbox } from '../map/bbox';
 import { withDeadline } from '../shared/utils/deadline';
 import { renderEvidence } from './render';

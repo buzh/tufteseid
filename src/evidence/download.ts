@@ -1,8 +1,3 @@
-// A download is the only door a picture leaves the app by, so it is also the
-// only place the provenance strip goes on. One at a time: a 2500 px raster
-// decoded, stamped and re-encoded is a second of main-thread work, and two of
-// them at once would only make both slower.
-
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -42,6 +37,8 @@ export const useEvidenceDownload = (spot: SpotRecord): EvidenceDownload => {
   const download = useCallback(
     (rec: EvidenceRecord) => {
       const url = evidenceFileUrl(rec);
+      // One at a time: decoding, stamping and re-encoding a 2500 px raster is
+      // about a second of main-thread work, and two at once only slows both.
       if (!url || busyId) return;
       setBusyId(rec.id);
       setFailedId(null);
@@ -57,7 +54,7 @@ export const useEvidenceDownload = (spot: SpotRecord): EvidenceDownload => {
           );
           const spec = specOf(rec);
           const name = sanitizeFilename(
-            `${spot.name} ${spec ? evidenceTitle(spec) : ''}`,
+            [spot.name, spec && evidenceTitle(spec)].filter(Boolean).join(' '),
           );
           const ext = stamped.type === 'image/jpeg' ? 'jpg' : 'png';
           save(stamped, `${name}.${ext}`);

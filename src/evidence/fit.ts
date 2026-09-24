@@ -1,11 +1,7 @@
-// Canvas → the bytes the store will take. `evidence.file` caps a raster at
-// 50 MB, and one that does not fit is no image at all: PocketBase answers 400
-// and every retry fails the same way. The fit lives here rather than in each
-// producer so no producer can record a resolution it did not write —
-// `fitImageBlob` reports the one it achieved.
-
-// The pixel budget is the rule, the byte budget the backstop: encoded size
-// spreads some 250× across content, so it is measured rather than predicted.
+// Encoded size spreads some 250× across content, so the pixel budget is the
+// rule and the byte budget a backstop that is measured rather than predicted.
+// The byte cap is `evidence.file`'s: PocketBase answers 400 over it, and every
+// retry of the same blob fails the same way.
 const MAX_STORED_PIXELS = 40000000;
 const MAX_STORED_BYTES = 50000000;
 
@@ -37,10 +33,9 @@ const canvasBlob = (
   new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 
 /**
- * Bare pixels, fitted to the store: the raster edge to edge, registered to the
- * rectangle it was rendered over, with no furniture on it at all.
- * `metresPerPx` comes back because it may not be the one that went in — the fit
- * can downscale, and the record has to say what is actually in the file.
+ * Bare pixels fitted to the store, edge to edge over the rectangle they were
+ * rendered for. The returned `metresPerPx` is the one achieved, which is not
+ * the one passed in when the fit had to downscale.
  */
 export const fitImageBlob = async (
   image: HTMLCanvasElement,

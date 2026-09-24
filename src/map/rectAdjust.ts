@@ -1,7 +1,5 @@
-// Placing a rectangle by hand. Two surfaces read a square off the map — the
-// terrain analysis and a spot's footprint — so the atoms come in as arguments
-// and the same grammar serves both. The square is kept square in EPSG:25833,
-// not in the view's projection.
+// Placing a rectangle by hand. The square is kept square in EPSG:25833, not in
+// the view's projection.
 
 import { useAtomValue, useStore, type Atom, type PrimitiveAtom } from 'jotai';
 import { Feature } from 'ol';
