@@ -129,7 +129,9 @@ export const subscribeEvidence = (
 ): (() => void) => {
   const pending = pb
     .collection(COLLECTION)
-    .subscribe<EvidenceRecord>('*', (e) => handler(e.action, hydrate(e.record)));
+    .subscribe<EvidenceRecord>('*', (e) =>
+      handler(e.action, hydrate(e.record)),
+    );
   return () => {
     void pending.then((unsubscribe) => unsubscribe()).catch(() => {});
   };

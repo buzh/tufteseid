@@ -16,9 +16,12 @@ import { canvasBlob } from './fit';
 import { drawLegend } from './legend';
 import { evidenceBbox, specOf, type EvidenceSpec } from './spec';
 
-/** A rights holder named on the legend. The holder is a proper name and is never
- *  translated; the terms key resolves to the licence, which is. */
-const KARTVERKET = { holder: 'Kartverket', terms: 'evidence.figure.terms.ccby' };
+/** A rights holder named on the legend. The holder is a proper name and is
+ *  never translated; the terms key resolves to the licence, which is. */
+const KARTVERKET = {
+  holder: 'Kartverket',
+  terms: 'evidence.figure.terms.ccby',
+};
 
 // Not open data; the notice follows the image out.
 const NORGE_I_BILDER = {

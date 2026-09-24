@@ -156,10 +156,7 @@ const BBOX_TOLERANCE_M = 1;
 // apart are deliberately two pictures.
 const PARAM_TOLERANCE = 1e-6;
 
-const sameBbox = (
-  a: [number, number, number, number],
-  b: unknown,
-): boolean =>
+const sameBbox = (a: [number, number, number, number], b: unknown): boolean =>
   Array.isArray(b) &&
   b.length === 4 &&
   a.every((v, i) => {

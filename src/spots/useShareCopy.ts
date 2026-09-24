@@ -25,7 +25,10 @@ export const useShareCopy = (spot: SpotRecord | null) => {
   const subject = spot?.id ?? null;
   // Carries the subject it is about: the ribbon's button does not remount
   // between spots, and "copied" against another spot's link would be a lie.
-  const [last, setLast] = useState<{ subject: string | null; answer: Answer }>();
+  const [last, setLast] = useState<{
+    subject: string | null;
+    answer: Answer;
+  }>();
   const answer = last?.subject === subject ? last.answer : null;
 
   useEffect(() => {

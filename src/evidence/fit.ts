@@ -62,6 +62,9 @@ export const fitImageBlob = async (
     // where null records the row as empty and stops asking.
     if (pass === MAX_FIT_PASSES) return null;
     // Bytes do not fall as fast as pixels, so the step takes a margin.
-    source = scaleCanvas(source, Math.sqrt(MAX_STORED_BYTES / blob.size) * 0.95);
+    source = scaleCanvas(
+      source,
+      Math.sqrt(MAX_STORED_BYTES / blob.size) * 0.95,
+    );
   }
 };
