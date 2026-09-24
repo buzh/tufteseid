@@ -44,11 +44,27 @@ Each owns its subject; this file keeps only what is true across all of them.
 - **No new dependencies without a server round trip.** `package-lock.json`
   cannot be regenerated here, so adding or removing one is an `npm install` the
   user runs on the server and pastes back. That is a cost, not a ban.
-- **Three checks run locally**: `npx oxlint@1.83.0` with no arguments, a JSON
-  parse of the three locale files, and grep. Bare is what `npm run lint` runs
-  and it covers the sidecars, the scripts and `pocketbase/pb_migrations/` as
-  well as `src`; scoping it to a path hides findings elsewhere. The repo is
-  currently clean — a new finding is yours.
+- **Four checks run locally**: `npx oxlint@1.83.0` with no arguments, a JSON
+  parse of the three locale files, Prettier, and grep. Bare is what
+  `npm run lint` runs and it covers the sidecars, the scripts and
+  `pocketbase/pb_migrations/` as well as `src`; scoping it to a path hides
+  findings elsewhere. The repo is currently clean — a new finding is yours.
+- **Prettier needs a throwaway install and the plugin turned off.** Node is on
+  the workstation even though the toolchain is not, so install `prettier` and
+  `typescript` into a directory outside the repo and point it at `src`. Pass
+  the `.prettierrc` options on the command line rather than letting it find the
+  file, because `prettier-plugin-organize-imports` cannot resolve imports with
+  no `node_modules` here and reports whole files as unformatted that the server
+  is happy with. Plugin off, the result matches `npm run format-check`
+  exactly — verified against a server run. Import *order* is still only
+  checked there.
+
+  ```
+  d=$(mktemp -d) && npm --prefix "$d" install prettier@3.9.7 typescript@5.9.3
+  "$d"/node_modules/.bin/prettier --no-config --end-of-line auto \
+    --single-quote --semi --trailing-comma all --tab-width 2 \
+    --check "{src,test}/**/*.{js,jsx,ts,tsx,css,json}"
+  ```
 - **The app's own proxy paths are unreachable from here** (`/wms/…`,
   `/arcgis/…`). Public upstreams are reachable directly. NiB anonymous tokens
   are bound to the IP that minted them, so mint a fresh one wherever the call is
