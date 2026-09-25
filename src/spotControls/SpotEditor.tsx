@@ -16,11 +16,11 @@ import {
 import { EvidenceStrip } from '../evidence/EvidenceStrip';
 import { KIND_ICON } from '../evidence/labels';
 import { useSpotEvidence } from '../evidence/useSpotEvidence';
+import { formatPoint } from '../spots/geo';
 import { cx } from '../ui/cx';
-import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
-import { formatPoint } from '../spots/geo';
+import { useConfirm } from '../ui/useConfirm';
 import styles from './SpotBox.module.css';
 import type { SpotDraftController } from './useSpotDraft';
 
@@ -59,36 +59,39 @@ const SpotEvidenceEdit = ({ spot }: { spot: SpotRecord }) => {
   );
 };
 
-export const SpotEditor = ({
-  spot,
-  record,
-}: {
-  spot: SpotDraftController;
-  /** The saved spot the draft is editing, or null for one being made: what the
-   *  pictures and the link hang off. */
-  record: SpotRecord | null;
-}) => {
+export const SpotEditor = ({ spot }: { spot: SpotDraftController }) => {
   const { t } = useTranslation();
   const placing = spot.stage === 'pin';
-  const framing = spot.stage === 'footprint';
   const drawing = spot.stage === 'sketch';
+  const framing = spot.stage === 'footprint';
+  const sided = spot.footprintSideMetres != null;
+
+  const remove = useConfirm(spot.remove);
 
   return (
     <Panel
       className={styles.panel}
       icon="add_location"
-      title={spot.draft.recordId ? t('spots.editTitle') : t('spots.newTitle')}
-      onClose={spot.abort}
-      unsaved={spot.dirty}
+      title={spot.isNew ? t('spots.newTitle') : t('spots.editTitle')}
+      status={spot.busy ? t('spots.saving') : undefined}
+      onClose={spot.close}
+      unsaved={spot.textDirty}
       footer={
-        <Button
-          size="xs"
-          loading={spot.saving}
-          disabled={!spot.canSave}
-          onClick={spot.save}
-        >
-          {t('spots.save')}
-        </Button>
+        <>
+          <Button
+            size="xs"
+            mr="auto"
+            variant={remove.armed ? 'filled' : 'default'}
+            color={remove.armed ? 'red' : undefined}
+            loading={spot.deleting}
+            onClick={remove.press}
+          >
+            {remove.armed ? t('spots.deleteConfirm') : t('spots.delete')}
+          </Button>
+          <Button size="xs" disabled={spot.deleting} onClick={spot.close}>
+            {t('spots.done')}
+          </Button>
+        </>
       }
     >
       <TextInput
@@ -104,77 +107,111 @@ export const SpotEditor = ({
         onChange={(event) => spot.setName(event.currentTarget.value)}
       />
 
-      <Textarea
-        size="xs"
-        mt="xs"
-        maxLength={SPOT_DESCRIPTION_MAX}
-        label={t('spots.description')}
-        placeholder={t('spots.descriptionPlaceholder')}
-        autosize
-        minRows={3}
-        maxRows={8}
-        value={spot.description}
-        onChange={(event) => spot.setDescription(event.currentTarget.value)}
-      />
+      <div
+        className={cx(
+          styles.unit,
+          styles.unitPlain,
+          spot.step === 'description' && styles.unitStep,
+        )}
+      >
+        <Textarea
+          size="xs"
+          maxLength={SPOT_DESCRIPTION_MAX}
+          label={t('spots.description')}
+          placeholder={t('spots.descriptionPlaceholder')}
+          autosize
+          minRows={3}
+          maxRows={8}
+          value={spot.description}
+          onChange={(event) => spot.setDescription(event.currentTarget.value)}
+        />
+        <Group gap="xs" mt={6} justify="flex-end">
+          <Button
+            size="compact-xs"
+            variant="subtle"
+            color="gray"
+            disabled={!spot.textDirty}
+            onClick={spot.revertText}
+          >
+            {t('spots.abort')}
+          </Button>
+          <Button
+            size="compact-xs"
+            disabled={!spot.canSaveText}
+            onClick={spot.saveText}
+          >
+            {t('spots.save')}
+          </Button>
+        </Group>
+      </div>
 
-      <div className={cx(styles.coords, placing && styles.coordsLive)}>
+      <div className={cx(styles.unit, placing && styles.unitStep)}>
         <Icon icon="my_location" size={14} />
-        <span className={styles.coordsText}>
-          {formatPoint(spot.draft.point)}
-        </span>
+        <span className={styles.unitText}>{formatPoint(spot.draft.point)}</span>
         <Button
           size="compact-xs"
           variant={placing ? 'filled' : 'default'}
-          onClick={() => spot.setStage(placing ? 'sketch' : 'pin')}
+          onClick={() => spot.setStage(placing ? 'idle' : 'pin')}
         >
           {placing ? t('spots.pinDone') : t('spots.pinChange')}
         </Button>
       </div>
 
-      <Group gap="xs" mt="xs" justify="space-between">
-        <Tooltip
-          label={framing ? t('spots.footprintStop') : t('spots.footprintStart')}
+      <div
+        className={cx(styles.unit, spot.step === 'sketch' && styles.unitStep)}
+      >
+        <Button
+          size="compact-xs"
+          variant={drawing ? 'filled' : 'default'}
+          leftSection={<Icon icon="draw" size={14} />}
+          onClick={() => spot.setStage(drawing ? 'idle' : 'sketch')}
         >
-          <ControlButton
-            icon="crop_free"
-            on={framing}
-            aria-label={t('spots.footprint')}
-            aria-pressed={framing}
-            onClick={() => spot.setStage(framing ? 'pin' : 'footprint')}
-          />
-        </Tooltip>
-        <span className={styles.coordsText}>
-          {spot.footprintSideMetres == null
-            ? t('spots.footprintNone')
-            : t('spots.footprintSide', { metres: spot.footprintSideMetres })}
+          {drawing
+            ? t('spots.drawStop')
+            : spot.hasSketch
+              ? t('spots.sketchChange')
+              : t('spots.sketchAdd')}
+        </Button>
+      </div>
+
+      <div
+        className={cx(
+          styles.unit,
+          spot.step === 'footprint' && styles.unitStep,
+        )}
+      >
+        <Button
+          size="compact-xs"
+          variant={framing ? 'filled' : 'default'}
+          leftSection={<Icon icon="crop_free" size={14} />}
+          onClick={() => spot.setStage(framing ? 'idle' : 'footprint')}
+        >
+          {framing
+            ? t('spots.footprintStop')
+            : sided
+              ? t('spots.footprintChange')
+              : t('spots.footprintPick')}
+        </Button>
+        <span className={styles.unitText}>
+          {framing
+            ? t('spots.footprintHint')
+            : sided
+              ? t('spots.footprintSide', { metres: spot.footprintSideMetres })
+              : ''}
         </span>
-        {spot.footprintSideMetres != null && (
+        {sided && (
           <Button
             size="compact-xs"
-            variant="default"
+            variant="subtle"
+            color="gray"
             onClick={spot.clearFootprint}
           >
             {t('spots.footprintClear')}
           </Button>
         )}
-      </Group>
+      </div>
 
-      <Group gap="xs" mt="xs" justify="space-between">
-        <Tooltip label={drawing ? t('spots.drawStop') : t('spots.drawStart')}>
-          <ControlButton
-            icon="draw"
-            on={drawing}
-            aria-label={t('spots.draw')}
-            aria-pressed={drawing}
-            onClick={() => spot.setStage(drawing ? 'pin' : 'sketch')}
-          />
-        </Tooltip>
-        <span className={styles.coordsText}>
-          {spot.hasSketch ? t('spots.sketchPresent') : t('spots.sketchNone')}
-        </span>
-      </Group>
-
-      {record && <SpotEvidenceEdit spot={record} />}
+      {spot.record && <SpotEvidenceEdit spot={spot.record} />}
 
       {spot.sketchTooBig && (
         <Alert color="red" mt="xs" p="xs">
@@ -182,9 +219,11 @@ export const SpotEditor = ({
         </Alert>
       )}
 
-      {spot.saveError && (
+      {spot.error && (
         <Alert color="red" mt="xs" p="xs">
-          {t('spots.saveFailed')}
+          {t(
+            spot.error === 'delete' ? 'spots.deleteFailed' : 'spots.saveFailed',
+          )}
         </Alert>
       )}
     </Panel>

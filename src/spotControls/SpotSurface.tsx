@@ -41,9 +41,11 @@ const SpotDraftBox = () => {
   const draft = useAtomValue(spotDraftAtom);
   const active = useAtomValue(activeSpotAtom);
   // The parent renders this only when there is a draft.
-  const spot = useSpotDraft(draft!);
-  const record = active?.id === draft?.recordId ? active : null;
-  return <SpotEditor spot={spot} record={record} />;
+  const spot = useSpotDraft(
+    draft!,
+    active?.id === draft?.recordId ? active : null,
+  );
+  return <SpotEditor spot={spot} />;
 };
 
 export const SpotSurface = () => {

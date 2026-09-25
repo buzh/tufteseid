@@ -51,7 +51,7 @@ export const useSketchSession = (wanted: boolean) => {
     if (!frame) {
       // No size, so no scene↔ground mapping; stay out of the draw stage.
       thawMap(map);
-      store.set(setSpotStageAtom, 'pin');
+      store.set(setSpotStageAtom, 'idle');
       return;
     }
 

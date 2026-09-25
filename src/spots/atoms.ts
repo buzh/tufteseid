@@ -1,7 +1,19 @@
 import { atom } from 'jotai';
+import type Map from 'ol/Map';
 
 import type { SpotPoint, SpotRecord, SpotSketch } from '../api/spots';
-import { squareBboxAround, type Bbox } from '../map/bbox';
+import { mapAtom } from '../map/atoms';
+import {
+  bboxOverlaps,
+  bringBboxIntoView,
+  middleCellSquare,
+  squareBboxAround,
+  squareBboxCovering,
+  viewportBbox,
+  type Bbox,
+} from '../map/bbox';
+import { sketchBbox } from '../sketch/bounds';
+import { sketchOf } from '../sketch/scene';
 import { terrainAdjustingAtom } from '../terrain/window';
 import { mayEditSpotAtom } from './mayEdit';
 
@@ -10,7 +22,8 @@ export type SpotDraft = {
   id: string;
   recordId: string | null;
   point: SpotPoint;
-  stage: 'pin' | 'footprint' | 'sketch';
+  /** `idle` is the box resting: nothing on the map is in the reader's hand. */
+  stage: 'idle' | 'pin' | 'footprint' | 'sketch';
 };
 
 export const spotDraftAtom = atom<SpotDraft | null>(null);
@@ -21,9 +34,31 @@ export const spotFormAtom = atom<SpotForm>({ name: '', description: '' });
 
 export const spotSketchAtom = atom<SpotSketch | null>(null);
 
-/** What a square gets when the reader has not sized one: wide enough to hold a
- *  farmstead, well inside `MAX_SIDE_M`. */
+/** What a square gets before the map has a size to measure against: wide enough
+ *  to hold a farmstead, well inside `MAX_SIDE_M`. */
 const DEFAULT_FOOTPRINT_SIDE_M = 200;
+
+/**
+ * Where a rectangle starts when the reader asks for one: around the drawing if
+ * there is one on screen, and otherwise the middle of the view. A drawing
+ * nowhere near the viewport is not what the reader is looking at, so it is
+ * passed over rather than the map being dragged off to it.
+ */
+const seedFootprint = (
+  map: Map,
+  drawing: SpotSketch | null,
+  point: SpotPoint,
+): Bbox => {
+  const drawn = sketchOf(drawing);
+  const bounds = drawn ? sketchBbox(drawn) : null;
+  const visible = viewportBbox(map);
+  if (bounds && visible && bboxOverlaps(bounds, visible)) {
+    return squareBboxCovering(bounds);
+  }
+  return (
+    middleCellSquare(map) ?? squareBboxAround(point, DEFAULT_FOOTPRINT_SIDE_M)
+  );
+};
 
 /** The draft's footprint, same shape as `SpotFootprint`. */
 export const spotFootprintAtom = atom<Bbox | null>(null);
@@ -93,7 +128,7 @@ export const placeSpotDraftAtom = atom(null, (_get, set, point: SpotPoint) => {
     id: `draft-${draftCounter}`,
     recordId: null,
     point,
-    stage: 'pin',
+    stage: 'idle',
   });
   set(spotFormAtom, { name: '', description: '' });
   set(spotFootprintAtom, null);
@@ -107,7 +142,7 @@ export const editSpotDraftAtom = atom(null, (_get, set, record: SpotRecord) => {
     id: `draft-${draftCounter}`,
     recordId: record.id,
     point: record.point,
-    stage: 'pin',
+    stage: 'idle',
   });
   set(spotFormAtom, {
     name: record.name,
@@ -134,12 +169,13 @@ export const setSpotStageAtom = atom(
       // Only one `useRectangleAdjust` may be live: two would put two frames and
       // two pointer interactions on the map, and neither could be grabbed.
       set(terrainAdjustingAtom, false);
-      if (!get(spotFootprintAtom)) {
-        set(
-          spotFootprintAtom,
-          squareBboxAround(draft.point, DEFAULT_FOOTPRINT_SIDE_M),
-        );
-      }
+      const map = get(mapAtom);
+      const rect =
+        get(spotFootprintAtom) ??
+        seedFootprint(map, get(spotSketchAtom), draft.point);
+      set(spotFootprintAtom, rect);
+      // A rectangle nobody can see is a rectangle nobody can drag.
+      bringBboxIntoView(map, rect);
     }
     set(spotDraftAtom, { ...draft, stage });
   },
@@ -150,7 +186,7 @@ export const setSpotStageAtom = atom(
 export const releaseSpotFootprintAtom = atom(null, (get, set) => {
   const draft = get(spotDraftAtom);
   if (draft?.stage === 'footprint') {
-    set(spotDraftAtom, { ...draft, stage: 'pin' });
+    set(spotDraftAtom, { ...draft, stage: 'idle' });
   }
 });
 
@@ -160,6 +196,6 @@ export const clearSpotFootprintAtom = atom(null, (get, set) => {
   // Otherwise the stage would stand with no rectangle to place, and
   // `setSpotStageAtom` would not seed a new one without a round trip.
   if (draft?.stage === 'footprint') {
-    set(spotDraftAtom, { ...draft, stage: 'pin' });
+    set(spotDraftAtom, { ...draft, stage: 'idle' });
   }
 });

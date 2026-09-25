@@ -72,7 +72,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `terrainAdjustingAtom` | same | It is still being placed, so nothing is fetched yet. |
 | `open`/`adjust`/`closeTerrainWindowAtom` | same | Write-only. |
 | `spotPlacingAtom` | `spots/atoms.ts` | The `+` is armed: the next map click places the pin. Exclusive with `spotDraftAtom`. |
-| `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom`, `spotFootprintAtom` | same | The record being written: where its pin is and which stage has the pointer, what has been typed, what has been drawn, and the ground it names. |
+| `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom`, `spotFootprintAtom` | same | The spot being edited: where its pin is and which of the four stages has hold of the map (`idle` is none of them), what is typed, what is drawn, and the ground it names. The record itself is not here — `useSpotDraft` holds it. |
 | `spotFootprintAdjustingAtom`, `standingSpotFootprintAtom` | same | Derived: the draft is in its `footprint` stage, and which rectangle the standing frame draws. |
 | `clearSpotFootprintAtom` | same | Write-only. |
 | `place`/`edit`/`closeSpotDraftAtom`, `setSpotStageAtom` | same | Write-only. |
@@ -149,6 +149,50 @@ the tile guard and the theme-layer effect walk whatever maps exist.
 | Kulturminner theme layers (`syncThemeLayers`, called once per map) | The heritage tip and card |
 | LiDAR footprints, split rather than mirrored — one viewport query, a layer per pane drawing that pane's own flight (`footprintTargets`) | The terrain analysis, frame and render both |
 
+## Making a spot
+
+A spot is written as it is made. `createSpot` runs the moment the pin lands —
+under the pin's own coordinate as a provisional name, because the column is
+required and the place-name register has not answered yet — and every unit of
+the editor after that is a write of its own: the register's answer when it
+arrives, the typed text behind its own Avbryt/Lagre pair, the point, the
+drawing, the rectangle. So the box carries no save button over the whole of it,
+closing one throws nothing away, and evidence can hang off the record while the
+rest is still being filled in.
+
+`useSpotDraft` (`src/spotControls/`) owns that. Every write goes through one
+serial promise chain: two PATCHes in flight together would leave whichever
+landed second's copy of the spot on screen, and the create has to be first of
+all. A failed create settles the chain on null and every later write is then a
+no-op — as is every write queued behind a delete, which is what keeps the card
+from reopening on a spot that is no longer there. The controller holds the
+record itself and publishes it to `activeSpotAtom` only on the way out, so
+nothing centres the map on a spot the reader is still placing.
+
+The point, the drawing and the rectangle are held on the map rather than in a
+field, so they are written when their stage is left — `setStage` commits before
+it hands the map over — and on the way out, whoever took it. The point and the
+rectangle are compared by value; the drawing only off the stage that owns it,
+because `sketchNow` builds a fresh object and anything wider would resend five
+megabytes on every press.
+
+- **The accent walks the reader through it.** `step` is whichever stage has
+  hold of the map and, failing that, the first thing the record is still
+  missing: description, then drawing, then rectangle. `idle` is the fourth
+  stage — the box resting, nothing on the map in the reader's hand — and it is
+  what a draft opens in.
+- **A rectangle starts somewhere useful.** Asking for one with no footprint yet
+  seeds it (`seedFootprint`, `src/spots/atoms.ts`): the smallest square holding
+  the drawing if there is a drawing overlapping the viewport, otherwise the
+  centre cell of a 3×3 over what is on screen. A drawing nowhere near the
+  viewport is not what the reader is looking at, so it is passed over rather
+  than the map being dragged off to it. `bringBboxIntoView` then pans or zooms
+  *out* until the square is on screen, never in, so a reader who can already
+  see it keeps the view they chose; `MAX_SIDE_M` caps a footprint at 500 m,
+  which bounds how far out that ever goes.
+- **A misplaced pin is a real record**, so the editor carries its own Slett,
+  behind the same two-press confirm as the card's.
+
 ## The pictures of a spot
 
 A spot's `evidence` rows are a sequence, not a set. `sort` is an ordering key in
@@ -174,7 +218,8 @@ through them and editing them is deciding what they are a sequence of.
   between slots, and the slots themselves do not move. The handle answers ↑ and
   ↓ too, and stops the press reaching OpenLayers' keyboard pan.
 - Pictures are their own records, so reordering — like keeping and deleting —
-  is written when it happens, not by the draft's save button.
+  is written when it happens, as is every other unit of the editor
+  (*Making a spot*).
 - **Where a row is asked for says what it reads.** The three offers in the
   gallery are readings of the map as it stands, so they come and go with the
   ground and the analysis under them. A sun loop reads nothing on screen — it is

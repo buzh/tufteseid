@@ -23,7 +23,7 @@ export const SpotToggle = () => {
   const label = !signedIn
     ? t('spots.newNeedsAccount')
     : draft
-      ? t('spots.abort')
+      ? t('spots.done')
       : placing
         ? t('spots.placeCancel')
         : t('spots.new');

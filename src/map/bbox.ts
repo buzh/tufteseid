@@ -1,4 +1,4 @@
-import { boundingExtent } from 'ol/extent';
+import { boundingExtent, containsExtent } from 'ol/extent';
 import type Map from 'ol/Map';
 import { transform, transformExtent } from 'ol/proj';
 
@@ -59,14 +59,56 @@ export const squareBboxWithin = (bbox: Bbox): Bbox => {
   ]);
 };
 
+const metricSquare = (cx: number, cy: number, sideMetres: number): Bbox => {
+  const half = Math.min(Math.max(sideMetres, MIN_SIDE_M), MAX_SIDE_M) / 2;
+  return bboxFromMetric([cx - half, cy - half, cx + half, cy + half]);
+};
+
 /** Square in EPSG:25833, clamped to `MIN_SIDE_M`…`MAX_SIDE_M`. */
 export const squareBboxAround = (
   point: [lon: number, lat: number],
   sideMetres: number,
 ): Bbox => {
   const [cx, cy] = transform(point, 'EPSG:4326', 'EPSG:25833');
-  const half = Math.min(Math.max(sideMetres, MIN_SIDE_M), MAX_SIDE_M) / 2;
-  return bboxFromMetric([cx - half, cy - half, cx + half, cy + half]);
+  return metricSquare(cx, cy, sideMetres);
+};
+
+/**
+ * The smallest square holding `bbox`, about its centre. Past `MAX_SIDE_M` the
+ * cap wins and the square holds the middle of it instead.
+ */
+export const squareBboxCovering = (bbox: Bbox): Bbox => {
+  const [minX, minY, maxX, maxY] = bboxToMetric(bbox);
+  return metricSquare(
+    (minX + maxX) / 2,
+    (minY + maxY) / 2,
+    Math.max(maxX - minX, maxY - minY),
+  );
+};
+
+// The centre cell of a 3×3 over the viewport: a square the reader reads as a
+// piece of what is on screen rather than as the whole of it.
+const VIEW_CELLS = 3;
+
+/**
+ * A square on the middle of what the map shows, a third of its shorter side
+ * across. Null before first layout.
+ */
+export const middleCellSquare = (map: Map): Bbox | null => {
+  const size = map.getSize();
+  if (!size) return null;
+  const view = map.getView();
+  const extent = transformExtent(
+    view.calculateExtent(size),
+    view.getProjection(),
+    'EPSG:4326',
+  ) as Bbox;
+  const [minX, minY, maxX, maxY] = bboxToMetric(extent);
+  return metricSquare(
+    (minX + maxX) / 2,
+    (minY + maxY) / 2,
+    Math.min(maxX - minX, maxY - minY) / VIEW_CELLS,
+  );
 };
 
 // ≥8%, enough that transformExtent's corner-only reprojection cannot clip.
@@ -99,4 +141,26 @@ export const viewportBbox = (map: Map): Bbox | null => {
   const projection = map.getView().getProjection();
   const extent = boundingExtent([topLeft, bottomRight]);
   return transformExtent(extent, projection, 'EPSG:4326') as Bbox;
+};
+
+// Room left around a rectangle the view had to be moved for.
+const FIT_PADDING_PX = 48;
+
+/**
+ * Pan or zoom out until the rectangle is on screen — never in, so a reader who
+ * can already see it keeps the view they chose. A footprint is capped at
+ * `MAX_SIDE_M`, so the furthest this ever goes out is a level or two.
+ */
+export const bringBboxIntoView = (map: Map, bbox: Bbox) => {
+  const size = map.getSize();
+  if (!size) return;
+  const visible = viewportBbox(map);
+  if (visible && containsExtent(visible, bbox)) return;
+  const view = map.getView();
+  view.fit(transformExtent(bbox, 'EPSG:4326', view.getProjection()), {
+    size,
+    padding: [FIT_PADDING_PX, FIT_PADDING_PX, FIT_PADDING_PX, FIT_PADDING_PX],
+    maxZoom: view.getZoom(),
+    duration: 300,
+  });
 };

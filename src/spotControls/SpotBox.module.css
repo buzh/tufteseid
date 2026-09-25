@@ -34,7 +34,8 @@
   color: var(--mantine-color-dimmed);
 }
 
-.coords {
+/* One row of the editor: the point, the drawing, the rectangle. */
+.unit {
   display: flex;
   align-items: center;
   gap: var(--mantine-spacing-xs);
@@ -44,11 +45,23 @@
   border-radius: var(--mantine-radius-sm);
 }
 
-.coordsLive {
-  border-color: var(--mantine-color-papaya-6);
+/* The typed text is two fields and their buttons, not a row, and it carries
+   Mantine's own frames. */
+.unitPlain {
+  display: block;
+  padding: 0;
+  border: none;
 }
 
-.coordsText {
+/* The unit the box is nudging the reader towards next. An outline rather than
+   a border, so nothing on the row moves when the accent leaves it. */
+.unitStep {
+  outline: 1px solid var(--mantine-color-papaya-6);
+  outline-offset: 3px;
+  border-radius: var(--mantine-radius-sm);
+}
+
+.unitText {
   flex: 1;
   min-width: 0;
   overflow: hidden;
