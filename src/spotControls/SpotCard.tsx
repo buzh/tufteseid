@@ -16,7 +16,6 @@ import {
 } from '../spots/atoms';
 import { formatPoint } from '../spots/geo';
 import { useMayEditSpot } from '../spots/mayEdit';
-import { Hint } from '../ui/Hint';
 import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
 import { useConfirm } from '../ui/useConfirm';
@@ -69,83 +68,78 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   });
 
   const hasSketch = sketchOf(spot.sketch) !== null;
-  const tips = hasSketch ? [t('hints.sketch')] : [];
 
   return (
-    <Hint id="spotKeys" tips={tips} keys={['t']}>
-      <Panel
-        className={styles.panel}
-        icon="location_on"
-        title={spot.name}
-        onClose={() => setActive(null)}
-        footer={
-          (readable > 0 || mayEdit) && (
-            <>
-              {readable > 0 && (
+    <Panel
+      className={styles.panel}
+      icon="location_on"
+      title={spot.name}
+      onClose={() => setActive(null)}
+      footer={
+        (readable > 0 || mayEdit) && (
+          <>
+            {readable > 0 && (
+              <Button
+                size="xs"
+                variant="default"
+                leftSection={<Icon icon="menu_book" size={16} />}
+                onClick={() => setReading(true)}
+              >
+                {t('evidence.read')}
+              </Button>
+            )}
+            {mayEdit && (
+              <Group gap="xs" ml="auto">
                 <Button
                   size="xs"
-                  variant="default"
-                  leftSection={<Icon icon="menu_book" size={16} />}
-                  onClick={() => setReading(true)}
+                  variant={remove.armed ? 'filled' : 'default'}
+                  color={remove.armed ? 'red' : undefined}
+                  loading={deleting}
+                  onClick={remove.press}
                 >
-                  {t('evidence.read')}
+                  {remove.armed ? t('spots.deleteConfirm') : t('spots.delete')}
                 </Button>
-              )}
-              {mayEdit && (
-                <Group gap="xs" ml="auto">
-                  <Button
-                    size="xs"
-                    variant={remove.armed ? 'filled' : 'default'}
-                    color={remove.armed ? 'red' : undefined}
-                    loading={deleting}
-                    onClick={remove.press}
-                  >
-                    {remove.armed
-                      ? t('spots.deleteConfirm')
-                      : t('spots.delete')}
-                  </Button>
-                  <Button
-                    size="xs"
-                    disabled={busy || deleting}
-                    onClick={() => edit(spot)}
-                  >
-                    {t('spots.edit')}
-                  </Button>
-                </Group>
-              )}
-            </>
-          )
-        }
-      >
-        {spot.description && <p className={styles.prose}>{spot.description}</p>}
+                <Button
+                  size="xs"
+                  disabled={busy || deleting}
+                  onClick={() => edit(spot)}
+                >
+                  {t('spots.edit')}
+                </Button>
+              </Group>
+            )}
+          </>
+        )
+      }
+    >
+      {spot.description && <p className={styles.prose}>{spot.description}</p>}
 
-        <div className={styles.meta}>
-          {spot.credit && <div>{t('spots.credit', { name: spot.credit })}</div>}
-          <div>{formatPoint(spot.point)}</div>
-        </div>
+      <div className={styles.meta}>
+        {spot.credit && <div>{t('spots.credit', { name: spot.credit })}</div>}
+        <div>{formatPoint(spot.point)}</div>
+      </div>
 
-        {hasSketch && <SketchFade className={styles.sketchFade} />}
+      {hasSketch && <SketchFade className={styles.sketchFade} />}
 
-        {mayEdit && (
-          <Switch
-            mt="xs"
-            size="xs"
-            disabled={busy || deleting}
-            checked={spot.visibility === 'public'}
-            label={t('spots.public')}
-            description={t('spots.publicHint')}
-            onChange={(event) => setVisibility(event.currentTarget.checked)}
-          />
-        )}
+      {mayEdit && (
+        <Switch
+          mt="xs"
+          size="xs"
+          disabled={busy || deleting}
+          checked={spot.visibility === 'public'}
+          label={t('spots.public')}
+          description={t('spots.publicHint')}
+          onChange={(event) => setVisibility(event.currentTarget.checked)}
+        />
+      )}
 
-        <EvidenceGallery spot={spot} evidence={evidence} />
+      <EvidenceGallery spot={spot} evidence={evidence} />
 
-        {failed && (
-          <Alert color="red" mt="xs" p="xs">
-            {t(FAILURE_TEXT[failed])}
-          </Alert>
-        )}
-      </Panel>
-    </Hint>
+      {failed && (
+        <Alert color="red" mt="xs" p="xs">
+          {t(FAILURE_TEXT[failed])}
+        </Alert>
+      )}
+    </Panel>
   );
 };

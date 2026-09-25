@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { sketchOnGroundAtom, sketchShownAtom } from '../sketch/overlay';
 import { ControlButton } from '../ui/ControlButton';
+import { Hint } from '../ui/Hint';
 
 export const SketchToggle = () => {
   const { t } = useTranslation();
@@ -18,15 +19,22 @@ export const SketchToggle = () => {
       : t('spots.sketchShow');
 
   return (
-    <Tooltip label={label}>
-      <ControlButton
-        icon="gesture"
-        on={on}
-        disabled={!onGround}
-        aria-label={t('spots.sketchLabel')}
-        aria-pressed={on}
-        onClick={() => setShown(!shown)}
-      />
-    </Tooltip>
+    <Hint
+      id="sketchKey"
+      tips={onGround ? [t('hints.sketch')] : []}
+      keys={['t']}
+      position="bottom"
+    >
+      <Tooltip label={label}>
+        <ControlButton
+          icon="gesture"
+          on={on}
+          disabled={!onGround}
+          aria-label={t('spots.sketchLabel')}
+          aria-pressed={on}
+          onClick={() => setShown(!shown)}
+        />
+      </Tooltip>
+    </Hint>
   );
 };

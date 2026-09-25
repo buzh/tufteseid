@@ -136,7 +136,7 @@
     "title": "Tips",
     "never": "Ikke vis igjen",
     "close": "Greit",
-    "sketch": "Trykk T for å vise eller skjule tegningen.",
+    "sketch": "Vis/Skjul skisser",
     "pictures": "Piltastene ← → blar i bildene."
   },
   "kartControls": {
@@ -270,7 +270,7 @@
   },
   "spots": {
     "new": "Ny lokalitet",
-    "newNeedsAccount": "Logg inn for å lage en lokalitet",
+    "newNeedsAccount": "Logg inn for å lage ny",
     "placeCancel": "Avbryt plasseringen",
     "placeHint": "Plasser nåla der du vil registrere funnet",
     "placeEscape": "Esc avbryter",

@@ -155,18 +155,6 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   const other: ReaderLayout = box.layout === 'wide' ? 'tall' : 'wide';
   const otherLabel = t(`evidence.layout.${other}`);
 
-  // Each line names the keys that retire it.
-  const tips: string[] = [];
-  const keys: string[] = [];
-  if (hasSketch) {
-    tips.push(t('hints.sketch'));
-    keys.push('t');
-  }
-  if (readable.length > 1) {
-    tips.push(t('hints.pictures'));
-    keys.push('ArrowLeft', 'ArrowRight');
-  }
-
   return (
     <div
       ref={box.boxRef}
@@ -177,144 +165,140 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
       )}
       style={box.placementStyle}
     >
-      <Hint
-        id="readingKeys"
-        tips={tips}
-        keys={keys}
-        position={box.layout === 'wide' ? 'top-start' : 'left-start'}
-      >
-        <Panel
-          className={styles.panel}
-          icon="menu_book"
-          title={spot.name}
-          status={
-            spot.credit
-              ? `${t('spots.credit', { name: spot.credit })} · ${formatPoint(spot.point)}`
-              : formatPoint(spot.point)
-          }
-          handle={box.dragHandle}
-          actions={
-            <>
-              {current && (
-                <Tooltip
-                  label={downloadLabel({
-                    downloading: file.busyId === current.id,
-                    failed: file.failedId === current.id,
-                  })}
-                >
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    size="sm"
-                    aria-label={t('evidence.download')}
-                    disabled={file.busyId === current.id}
-                    onClick={() => file.download(current)}
-                  >
-                    <Icon
-                      icon={
-                        file.busyId === current.id
-                          ? 'hourglass_top'
-                          : 'download'
-                      }
-                      size={18}
-                    />
-                  </ActionIcon>
-                </Tooltip>
-              )}
-              {mayEdit && (
-                <Tooltip label={t('spots.edit')}>
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    size="sm"
-                    aria-label={t('spots.edit')}
-                    onClick={() => edit(spot)}
-                  >
-                    <Icon icon="edit" size={18} />
-                  </ActionIcon>
-                </Tooltip>
-              )}
-              <Tooltip label={otherLabel}>
+      <Panel
+        className={styles.panel}
+        icon="menu_book"
+        title={spot.name}
+        status={
+          spot.credit
+            ? `${t('spots.credit', { name: spot.credit })} · ${formatPoint(spot.point)}`
+            : formatPoint(spot.point)
+        }
+        handle={box.dragHandle}
+        actions={
+          <>
+            {current && (
+              <Tooltip
+                label={downloadLabel({
+                  downloading: file.busyId === current.id,
+                  failed: file.failedId === current.id,
+                })}
+              >
                 <ActionIcon
                   variant="subtle"
                   color="gray"
                   size="sm"
-                  aria-label={otherLabel}
-                  onClick={() => box.setLayout(other)}
+                  aria-label={t('evidence.download')}
+                  disabled={file.busyId === current.id}
+                  onClick={() => file.download(current)}
                 >
-                  <Icon icon={LAYOUT_ICON[other]} size={18} />
+                  <Icon
+                    icon={
+                      file.busyId === current.id ? 'hourglass_top' : 'download'
+                    }
+                    size={18}
+                  />
                 </ActionIcon>
               </Tooltip>
-            </>
-          }
-          collapsible={false}
-          onClose={() => setReading(false)}
-          footer={
-            <div className={styles.controls}>
-              <div className={styles.nav}>
-                <Tooltip label={t('evidence.previous')}>
-                  <ControlButton
-                    icon="chevron_left"
-                    aria-label={t('evidence.previous')}
-                    onClick={() => step(-1)}
-                  />
-                </Tooltip>
-                <span className={styles.count}>
-                  {t('evidence.position', {
-                    index: index + 1,
-                    total: readable.length,
-                  })}
-                </span>
-                <Tooltip label={t('evidence.next')}>
-                  <ControlButton
-                    icon="chevron_right"
-                    aria-label={t('evidence.next')}
-                    onClick={() => step(1)}
-                  />
-                </Tooltip>
-              </div>
-
-              {current && (
-                <div className={styles.caption}>
-                  <span className={styles.captionTitle}>{title}</span>
-                  {facts.length > 0 && (
-                    <span className={styles.facts}>{facts.join(' · ')}</span>
-                  )}
-                </div>
-              )}
-
-              {hasSketch && <SketchFade className={styles.sketch} />}
-
-              {current && (
-                <div className={styles.fade}>
-                  <Tooltip label={t('terrainControls.transparency')}>
-                    <span className={styles.fadeIcon}>
-                      <Icon icon="opacity" size={16} />
-                    </span>
-                  </Tooltip>
-                  <Slider
-                    className={styles.slider}
-                    size="xs"
-                    min={0}
-                    max={100}
-                    step={5}
-                    label={(value) => `${value} %`}
-                    aria-label={t('terrainControls.transparency')}
-                    value={transparency}
-                    onChange={setTransparency}
-                  />
-                </div>
-              )}
+            )}
+            {mayEdit && (
+              <Tooltip label={t('spots.edit')}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="sm"
+                  aria-label={t('spots.edit')}
+                  onClick={() => edit(spot)}
+                >
+                  <Icon icon="edit" size={18} />
+                </ActionIcon>
+              </Tooltip>
+            )}
+            <Tooltip label={otherLabel}>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="sm"
+                aria-label={otherLabel}
+                onClick={() => box.setLayout(other)}
+              >
+                <Icon icon={LAYOUT_ICON[other]} size={18} />
+              </ActionIcon>
+            </Tooltip>
+          </>
+        }
+        collapsible={false}
+        onClose={() => setReading(false)}
+        footer={
+          <div className={styles.controls}>
+            <div className={styles.nav}>
+              <Tooltip label={t('evidence.previous')}>
+                <ControlButton
+                  icon="chevron_left"
+                  aria-label={t('evidence.previous')}
+                  onClick={() => step(-1)}
+                />
+              </Tooltip>
+              <span className={styles.count}>
+                {t('evidence.position', {
+                  index: index + 1,
+                  total: readable.length,
+                })}
+              </span>
+              <Tooltip label={t('evidence.next')}>
+                <ControlButton
+                  icon="chevron_right"
+                  aria-label={t('evidence.next')}
+                  onClick={() => step(1)}
+                />
+              </Tooltip>
             </div>
-          }
-        >
-          {spot.description && (
-            <p className={styles.prose}>{spot.description}</p>
-          )}
 
-          {items === null ? (
-            <div className={styles.note}>{t('evidence.loading')}</div>
-          ) : (
+            {current && (
+              <div className={styles.caption}>
+                <span className={styles.captionTitle}>{title}</span>
+                {facts.length > 0 && (
+                  <span className={styles.facts}>{facts.join(' · ')}</span>
+                )}
+              </div>
+            )}
+
+            {hasSketch && <SketchFade className={styles.sketch} />}
+
+            {current && (
+              <div className={styles.fade}>
+                <Tooltip label={t('terrainControls.transparency')}>
+                  <span className={styles.fadeIcon}>
+                    <Icon icon="opacity" size={16} />
+                  </span>
+                </Tooltip>
+                <Slider
+                  className={styles.slider}
+                  size="xs"
+                  min={0}
+                  max={100}
+                  step={5}
+                  label={(value) => `${value} %`}
+                  aria-label={t('terrainControls.transparency')}
+                  value={transparency}
+                  onChange={setTransparency}
+                />
+              </div>
+            )}
+          </div>
+        }
+      >
+        {spot.description && <p className={styles.prose}>{spot.description}</p>}
+
+        {items === null ? (
+          <div className={styles.note}>{t('evidence.loading')}</div>
+        ) : (
+          <Hint
+            id="pictureKeys"
+            tips={readable.length > 1 ? [t('hints.pictures')] : []}
+            keys={['ArrowLeft', 'ArrowRight']}
+            position={box.layout === 'wide' ? 'top-start' : 'left-start'}
+          >
             <div className={styles.strip}>
               {readable.map((rec) => {
                 const label = evidenceLabel(rec);
@@ -358,9 +342,9 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
                 );
               })}
             </div>
-          )}
-        </Panel>
-      </Hint>
+          </Hint>
+        )}
+      </Panel>
 
       {/* Pointer-only, and nothing a reader without one is missing: the box
           opens at a size its layout already thought about. */}

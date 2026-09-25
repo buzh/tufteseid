@@ -425,8 +425,9 @@ show group; anything else that applies to the reading belongs to the tools.
   `useConfirm`; `handle` makes the title row a drag handle and `actions` puts
   buttons in it, which is what a floating box needs of the shell and all of it
   — the frame itself belongs to the caller.
-- `Hint` floats a tip beside the surface it is about, on a Mantine `Popover`
-  anchored to whatever child takes a ref — `Panel` does. `tips` is a list of
+- `Hint` floats a tip beside the control it is about, on a Mantine `Popover`
+  anchored to whatever child takes a ref — a `Panel`, a Mantine `Tooltip` or a
+  plain box all do. `tips` is a list of
   lines the caller has already filtered to what applies there, and an empty one
   means no tip; the wrapper stays in the tree either way, because
   `Popover.Target` clones its child and dropping it would remount the surface.
@@ -437,9 +438,9 @@ show group; anything else that applies to the reading belongs to the tools.
   Waving a tip off puts it away for the page load, ticking the box writes its id
   to `hintsDismissed.v1` in localStorage. Ids live in the `HINT_IDS` list in
   `src/ui/hints.ts`; one that leaves the list is dropped on read. One id per
-  surface, not per key: `spotKeys` on `SpotCard` says what `T` does, and
-  `readingKeys` on `EvidenceReader` says that and what the arrows do, because a
-  share link opens the reading and the card is never seen.
+  key, hung on the thing that key works: `sketchKey` on the band's
+  `SketchToggle` and `pictureKeys` on the reader's roll of thumbnails. A tip
+  that has to name the control it is about is pointing at the wrong one.
 
 ## Known gaps
 
