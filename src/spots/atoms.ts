@@ -3,6 +3,7 @@ import { atom } from 'jotai';
 import type { SpotPoint, SpotRecord, SpotSketch } from '../api/spots';
 import { squareBboxAround, type Bbox } from '../map/bbox';
 import { terrainAdjustingAtom } from '../terrain/window';
+import { mayEditSpotAtom } from './mayEdit';
 
 export type SpotDraft = {
   /** New per draft; surfaces key off it to remount. */
@@ -48,15 +49,25 @@ export const activeSpotAtom = atom(
 );
 
 /** The open spot's evidence is being read on the map. A draft only suspends the
- *  reading — closing one returns to it. */
+ *  reading — closing one returns to it.
+ *
+ *  A reader who may not edit the spot gets the reading and nothing else: there
+ *  is no card behind it to step back to, so opening such a spot is a reading
+ *  and ending one closes the spot. */
 export const spotReadingAtom = atom(
   (get) => {
     const active = get(activeSpotAtom);
     if (!active || get(spotDraftAtom)) return false;
+    if (!get(mayEditSpotAtom)(active)) return true;
     return get(readingSpotIdAtom) === active.id;
   },
   (get, set, reading: boolean) => {
-    set(readingSpotIdAtom, reading ? (get(activeSpotAtom)?.id ?? null) : null);
+    const active = get(activeSpotAtom);
+    if (!reading && !get(mayEditSpotAtom)(active)) {
+      set(activeSpotAtom, null);
+      return;
+    }
+    set(readingSpotIdAtom, reading ? (active?.id ?? null) : null);
   },
 );
 

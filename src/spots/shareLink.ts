@@ -54,8 +54,9 @@ export const useSpotShareLink = () => {
         unresolved.current = null;
         settled.current = true;
         setActive(record);
-        // `EvidenceReader` steps back to the card for a spot with nothing to
-        // read.
+        // No-op for a reader who may not edit — the reading is the only thing
+        // they get. An owner following their own link lands in it too, and
+        // `EvidenceReader` steps back to their card if there is nothing to read.
         setReading(true);
       })
       .catch(() => {
@@ -80,20 +81,23 @@ export const useSpotShareLink = () => {
   }, [user, setActive, setReading, setAuthDialogOpen, setAuthPrompt]);
 
   // Read by the centring effect below without being one of its dependencies:
-  // `EvidenceReader` fits the footprint when a reading opens, and leaving one
-  // must not move the view at all.
+  // `EvidenceReader` fits the footprint when a reading opens, so centring on
+  // the point as well would be two animations on one view, and leaving a
+  // reading must not move the view at all. A spot with no footprint has
+  // nothing to fit and is centred here like any other.
   const reading = useAtomValue(spotReadingAtom);
-  const readingNow = useRef(reading);
+  const readerFits = reading && active?.footprint != null;
+  const readerFitsNow = useRef(readerFits);
   useEffect(() => {
-    readingNow.current = reading;
-  }, [reading]);
+    readerFitsNow.current = readerFits;
+  }, [readerFits]);
 
   // Keyed on the id: re-centring on every field change would fight a reader
   // panning around their own spot.
   const activeId = active?.id ?? null;
   const activePoint = active?.point;
   useEffect(() => {
-    if (!activeId || !activePoint || readingNow.current) return;
+    if (!activeId || !activePoint || readerFitsNow.current) return;
     const view = map.getView();
     view.animate({
       center: transform(

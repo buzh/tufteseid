@@ -123,11 +123,12 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
     return () => document.removeEventListener('keydown', onKey, true);
   }, [step]);
 
-  // A reading with nothing to read is not a reading: a share link to a spot
-  // whose renders were deleted falls back to the card.
+  // A reading with nothing to read is not a reading — but only an editor has a
+  // card to fall back to. For anybody else this box is the spot's whole UI, and
+  // stepping out of it would close a spot they just opened.
   useEffect(() => {
-    if (items !== null && readable.length === 0) setReading(false);
-  }, [items, readable.length, setReading]);
+    if (mayEdit && items !== null && readable.length === 0) setReading(false);
+  }, [mayEdit, items, readable.length, setReading]);
 
   useEffect(() => {
     const footprint = spot.footprint;
@@ -230,68 +231,74 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
         collapsible={false}
         onClose={() => setReading(false)}
         footer={
-          <div className={styles.controls}>
-            <div className={styles.nav}>
-              <Tooltip label={t('evidence.previous')}>
-                <ControlButton
-                  icon="chevron_left"
-                  aria-label={t('evidence.previous')}
-                  onClick={() => step(-1)}
-                />
-              </Tooltip>
-              <span className={styles.count}>
-                {t('evidence.position', {
-                  index: index + 1,
-                  total: readable.length,
-                })}
-              </span>
-              <Tooltip label={t('evidence.next')}>
-                <ControlButton
-                  icon="chevron_right"
-                  aria-label={t('evidence.next')}
-                  onClick={() => step(1)}
-                />
-              </Tooltip>
-            </div>
-
-            {current && (
-              <div className={styles.caption}>
-                <span className={styles.captionTitle}>{title}</span>
-                {facts.length > 0 && (
-                  <span className={styles.facts}>{facts.join(' · ')}</span>
-                )}
-              </div>
-            )}
-
-            {hasSketch && <SketchFade className={styles.sketch} />}
-
-            {current && (
-              <div className={styles.fade}>
-                <Tooltip label={t('terrainControls.transparency')}>
-                  <span className={styles.fadeIcon}>
-                    <Icon icon="opacity" size={16} />
+          (readable.length > 0 || hasSketch) && (
+            <div className={styles.controls}>
+              {readable.length > 0 && (
+                <div className={styles.nav}>
+                  <Tooltip label={t('evidence.previous')}>
+                    <ControlButton
+                      icon="chevron_left"
+                      aria-label={t('evidence.previous')}
+                      onClick={() => step(-1)}
+                    />
+                  </Tooltip>
+                  <span className={styles.count}>
+                    {t('evidence.position', {
+                      index: index + 1,
+                      total: readable.length,
+                    })}
                   </span>
-                </Tooltip>
-                <Slider
-                  className={styles.slider}
-                  size="xs"
-                  min={0}
-                  max={100}
-                  step={5}
-                  label={(value) => `${value} %`}
-                  aria-label={t('terrainControls.transparency')}
-                  value={transparency}
-                  onChange={setTransparency}
-                />
-              </div>
-            )}
-          </div>
+                  <Tooltip label={t('evidence.next')}>
+                    <ControlButton
+                      icon="chevron_right"
+                      aria-label={t('evidence.next')}
+                      onClick={() => step(1)}
+                    />
+                  </Tooltip>
+                </div>
+              )}
+
+              {current && (
+                <div className={styles.caption}>
+                  <span className={styles.captionTitle}>{title}</span>
+                  {facts.length > 0 && (
+                    <span className={styles.facts}>{facts.join(' · ')}</span>
+                  )}
+                </div>
+              )}
+
+              {hasSketch && <SketchFade className={styles.sketch} />}
+
+              {current && (
+                <div className={styles.fade}>
+                  <Tooltip label={t('terrainControls.transparency')}>
+                    <span className={styles.fadeIcon}>
+                      <Icon icon="opacity" size={16} />
+                    </span>
+                  </Tooltip>
+                  <Slider
+                    className={styles.slider}
+                    size="xs"
+                    min={0}
+                    max={100}
+                    step={5}
+                    label={(value) => `${value} %`}
+                    aria-label={t('terrainControls.transparency')}
+                    value={transparency}
+                    onChange={setTransparency}
+                  />
+                </div>
+              )}
+            </div>
+          )
         }
       >
         {spot.description && <p className={styles.prose}>{spot.description}</p>}
 
         {items === null ? (
           <div className={styles.note}>{t('evidence.loading')}</div>
+        ) : readable.length === 0 ? (
+          <div className={styles.note}>{t('evidence.none')}</div>
         ) : (
           <Hint
             id="pictureKeys"

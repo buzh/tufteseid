@@ -77,7 +77,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `clearSpotFootprintAtom` | same | Write-only. |
 | `place`/`edit`/`closeSpotDraftAtom`, `setSpotStageAtom` | same | Write-only. |
 | `activeSpotAtom` | same | The record being read — opened by a click, by an index row, or by `?lok=`. |
-| `spotReadingAtom` | same | The open spot's kept renders are being read on the map. Held as the id it was entered on; writing `activeSpotAtom` with a different spot — or none — clears it, and a draft suspends it. |
+| `spotReadingAtom` | same | The open spot's kept renders are being read on the map. Held as the id it was entered on; writing `activeSpotAtom` with a different spot — or none — clears it, and a draft suspends it. True regardless for a spot the reader may not edit, and writing it false there closes the spot. |
 | `spotRecordsAtom`, `spotsFailedAtom` | `spots/spotRecords.ts` | Every record the session may see, null until the list lands; and whether it never did. |
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
@@ -234,7 +234,9 @@ holds the ground still and changes only how it was seen.
   off a press aimed at an input.
 - A row whose render has not landed, or that has no rectangle, is not part of
   the reading; the gallery on the card is where it is waited on. A reading with
-  nothing left in it steps back to the card.
+  nothing left in it steps back to the card — where there is one. For a reader
+  who may not edit the spot there is not, so the box stays and says the spot has
+  no pictures yet; stepping back would close a spot they had just opened.
 - **A sun loop is read on the ground, like everything else.** It plays over its
   own `bbox25833`, looping, and the transparency slider fades it the way it
   fades a still, so the sun can be walked round a mound against the map under
@@ -258,10 +260,19 @@ holds the ground still and changes only how it was seen.
     a WebM cannot be stamped in the browser the way a still is. `meta.bandTop`
     says where it starts and the overlay draws only the rows above it, so the
     band stays in the file and off the map (`docs/render-sidecar.md`).
-- `/l/<code>` opens the reading rather than the card: a link is an invitation to
+- **The card is an owner's surface.** Somebody else's spot opens straight into
+  the reading, however it was opened — a click on the pin, an index row, `?lok=`
+  — and the close button ends the whole thing: `spotReadingAtom` reads true for
+  a spot outside `mayEdit` and writing it false clears `activeSpotAtom`. So a
+  visitor sees one box, and closing it leaves the map as it was. The card holds
+  the visibility switch, the delete and the gallery's offers, none of which a
+  visitor may press; keeping it behind the reading would be a panel of disabled
+  controls and one button that works.
+- `/l/<code>` opens the reading for an owner too: a link is an invitation to
   read. The view move is the reader's then, and `shareLink.ts` keeps its hands
-  off. The code goes back onto the URL for whatever spot is open, so a reload
-  lands in the reading too.
+  off — unless the spot has no footprint to fit, which is the only case the
+  reading has no view move of its own. The code goes back onto the URL for
+  whatever spot is open, so a reload lands in the reading too.
 - Because the reading stands in for the card, it carries the card's edit button
   as well, on the same `mayEdit` (`src/spots/mayEdit.ts`). Otherwise the only
   way to an owner's own edit is a close that reads as leaving the spot. A draft

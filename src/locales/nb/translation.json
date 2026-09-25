@@ -15,6 +15,7 @@
     "label": "Bilder",
     "read": "Les",
     "loading": "Henter bilder …",
+    "none": "Ingen bilder på denne lokaliteten ennå.",
     "needsFootprint": "Marker et utsnitt på lokaliteten for å kunne ta vare på bilder av den.",
     "keep": "Ta vare på {{what}}",
     "kept": "{{what}} er tatt vare på",
