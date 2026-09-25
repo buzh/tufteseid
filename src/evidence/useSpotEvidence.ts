@@ -49,14 +49,10 @@ export type SpotEvidence = {
   /** Null until the list lands; an empty array means none. */
   items: EvidenceRecord[] | null;
   failed: boolean;
-  /** Empty while the spot names no ground: nothing can be rendered. */
+  /** What the reader could keep a picture of right now: whatever is on the
+   *  ground under the rectangle, plus the sun loop. */
   offers: KeepOffer[];
-  /** The sun loop, which reads nothing on screen and so stands whenever the
-   *  spot has a footprint. Null when it has none. */
-  sunLoop: KeepOffer | null;
   mayEdit: boolean;
-  /** Owner or admin, and the spot has a footprint. */
-  mayKeep: boolean;
   keep: (spec: EvidenceSpec) => void;
   retry: (rec: EvidenceRecord) => void;
   remove: (id: string) => void;
@@ -139,7 +135,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
   const states = useSyncExternalStore(subscribeRenderQueue, renderStates);
 
   const footprint = spot.footprint;
-  const mayKeep = mayEdit && footprint != null;
 
   const metric = useMemo(
     () => (footprint ? bboxToMetric(footprint) : null),
@@ -148,26 +143,15 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
 
   const offers = useMemo(
     () =>
-      metric && items
-        ? offered.map((spec) => ({
+      mayEdit && metric && items
+        ? // The sun loop last: it reads nothing on screen, so unlike the others
+          // it is the same ask whatever the reader is looking at.
+          [...offered, SUN_LOOP_SPEC].map((spec) => ({
             spec,
             kept: items.some((rec) => evidenceMatches(rec, spec, metric)),
           }))
         : [],
-    [offered, items, metric],
-  );
-
-  const sunLoop = useMemo(
-    () =>
-      metric && items
-        ? {
-            spec: SUN_LOOP_SPEC,
-            kept: items.some((rec) =>
-              evidenceMatches(rec, SUN_LOOP_SPEC, metric),
-            ),
-          }
-        : null,
-    [items, metric],
+    [mayEdit, offered, items, metric],
   );
 
   const render = useCallback(
@@ -260,9 +244,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     items,
     failed,
     offers,
-    sunLoop,
     mayEdit,
-    mayKeep,
     keep,
     retry: render,
     remove,

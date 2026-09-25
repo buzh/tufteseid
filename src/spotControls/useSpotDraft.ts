@@ -19,7 +19,6 @@ import { SKETCH_BUDGET_BYTES, sketchBytes, sketchOf } from '../sketch/scene';
 import { sketchNow } from '../sketch/session';
 import {
   activeSpotAtom,
-  clearSpotFootprintAtom,
   closeSpotDraftAtom,
   setSpotStageAtom,
   spotDraftAtom,
@@ -28,6 +27,7 @@ import {
   spotSketchAtom,
   type SpotDraft,
 } from '../spots/atoms';
+import { derivedFootprint } from '../spots/footprint';
 import { formatPoint } from '../spots/geo';
 import { suggestSpotName } from '../spots/spotName';
 
@@ -68,7 +68,9 @@ export type SpotDraftController = {
   /** Put the pen down and go back to the stored drawing. */
   cancelSketch: () => void;
   footprintSideMetres: number | null;
-  clearFootprint: () => void;
+  /** The drawing the rectangle was derived from was smaller than `MIN_SIDE_M`
+   *  or larger than `MAX_SIDE_M`, so the square is not what was drawn. */
+  footprintClamped: 'min' | 'max' | null;
   hasSketch: boolean;
   /** A write is in flight. */
   busy: boolean;
@@ -78,6 +80,13 @@ export type SpotDraftController = {
   sketchTooBig: boolean;
   remove: () => void;
   close: () => void;
+  /** Write what the stage in hand changed and let the draft go. The card closes
+   *  itself from a button on the stage, so unlike the editor it cannot leave
+   *  the write to the unmount, which cannot tell a kept drawing from a
+   *  discarded one. */
+  finish: () => void;
+  /** Let the draft go and keep nothing the stage did. */
+  abort: () => void;
 };
 
 // A PocketBase validation message names no field; the one at fault is only in
@@ -110,7 +119,6 @@ export const useSpotDraft = (
   const sketch = useAtomValue(spotSketchAtom);
   const footprint = useAtomValue(spotFootprintAtom);
   const stageTo = useSetAtom(setSpotStageAtom);
-  const dropFootprint = useSetAtom(clearSpotFootprintAtom);
   const closeDraft = useSetAtom(closeSpotDraftAtom);
   const setActive = useSetAtom(activeSpotAtom);
 
@@ -121,6 +129,9 @@ export const useSpotDraft = (
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<SpotWriteError>(null);
   const [sketchTooBig, setSketchTooBig] = useState(false);
+  const [footprintClamped, setFootprintClamped] = useState<
+    'min' | 'max' | null
+  >(null);
   const [isNew] = useState(saved == null);
 
   /** Once the author has typed a name, the register never writes it again. */
@@ -296,6 +307,8 @@ export const useSpotDraft = (
     if (!sameNumbers(point, current.point)) fields.point = point;
     if (!sameNumbers(rect, current.footprint)) fields.footprint = rect;
 
+    let kept = drawn;
+
     // Only off the stage that owns it: the drawing is compared by identity and
     // `sketchNow` builds a fresh object, so anything wider would resend five
     // megabytes on every press.
@@ -310,6 +323,7 @@ export const useSpotDraft = (
         else {
           setSketchTooBig(false);
           fields.sketch = drawing;
+          kept = drawing;
         }
       }
       // The canvas goes as soon as the stage is left and Excalidraw's scene
@@ -317,6 +331,18 @@ export const useSpotDraft = (
       // afterwards. Not on the way out of the box, where the atoms are already
       // cleared and the draft is gone.
       if (store.get(spotDraftAtom)) store.set(spotSketchAtom, drawing);
+    }
+
+    // A spot always has a rectangle, and the reader is never asked for one: the
+    // first write that finds the record without one gives it the square around
+    // whatever has been drawn, or the default around the pin.
+    if (rect == null && current.footprint == null) {
+      const derived = derivedFootprint(point, kept);
+      fields.footprint = derived.bbox;
+      setFootprintClamped(derived.clamped);
+      // So the box shows the square it just gave the spot, and asking to adjust
+      // it grabs that one rather than seeding another.
+      if (store.get(spotDraftAtom)) store.set(spotFootprintAtom, derived.bbox);
     }
 
     if (Object.keys(fields).length > 0) patch(fields);
@@ -339,10 +365,22 @@ export const useSpotDraft = (
     stageTo('idle');
   }, [store, stageTo]);
 
-  const clearFootprint = useCallback(() => {
-    dropFootprint();
-    patch({ footprint: null });
-  }, [dropFootprint, patch]);
+  /** Set by whoever closed the draft from inside the box, so the unmount below
+   *  does not write a second time. */
+  const left = useRef(false);
+
+  const leave = useCallback(
+    (keep: boolean) => {
+      if (keep) commit();
+      left.current = true;
+      closeDraft();
+      void chain.current.then(setActive);
+    },
+    [commit, closeDraft, setActive],
+  );
+
+  const finish = useCallback(() => leave(true), [leave]);
+  const abort = useCallback(() => leave(false), [leave]);
 
   const remove = useCallback(() => {
     setDeleting(true);
@@ -372,7 +410,7 @@ export const useSpotDraft = (
   // below is skipped and the card does not reopen on a spot that is not there.
   useEffect(
     () => () => {
-      if (store.get(spotDraftAtom)) return;
+      if (left.current || store.get(spotDraftAtom)) return;
       commit();
       void chain.current.then(setActive);
     },
@@ -388,9 +426,7 @@ export const useSpotDraft = (
           ? 'description'
           : sketchOf(record.sketch) === null
             ? 'sketch'
-            : record.footprint === null
-              ? 'footprint'
-              : null;
+            : null;
 
   return {
     draft,
@@ -413,7 +449,7 @@ export const useSpotDraft = (
     footprintSideMetres: footprint
       ? Math.round(bboxWidthMetres(footprint))
       : null,
-    clearFootprint,
+    footprintClamped,
     hasSketch: (sketch?.elements.length ?? 0) > 0,
     busy: writes > 0,
     deleting,
@@ -421,5 +457,7 @@ export const useSpotDraft = (
     sketchTooBig,
     remove,
     close: closeDraft,
+    finish,
+    abort,
   };
 };

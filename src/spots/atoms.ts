@@ -1,4 +1,4 @@
-import { atom } from 'jotai';
+import { atom, type Setter } from 'jotai';
 import type Map from 'ol/Map';
 
 import type { SpotPoint, SpotRecord, SpotSketch } from '../api/spots';
@@ -15,6 +15,7 @@ import {
 import { sketchBbox } from '../sketch/bounds';
 import { sketchOf } from '../sketch/scene';
 import { terrainAdjustingAtom } from '../terrain/window';
+import { DEFAULT_FOOTPRINT_SIDE_M } from './footprint';
 import { mayEditSpotAtom } from './mayEdit';
 
 export type SpotDraft = {
@@ -24,6 +25,10 @@ export type SpotDraft = {
   point: SpotPoint;
   /** `idle` is the box resting: nothing on the map is in the reader's hand. */
   stage: 'idle' | 'pin' | 'footprint' | 'sketch';
+  /** Which box the reader is looking at. A `card` draft exists only to hold the
+   *  map while the rectangle is dragged or the drawing is edited, so it opens
+   *  in a stage and is let go rather than resting at `idle`. */
+  box: 'card' | 'editor';
 };
 
 export const spotDraftAtom = atom<SpotDraft | null>(null);
@@ -33,10 +38,6 @@ export type SpotForm = { name: string; description: string };
 export const spotFormAtom = atom<SpotForm>({ name: '', description: '' });
 
 export const spotSketchAtom = atom<SpotSketch | null>(null);
-
-/** What a square gets before the map has a size to measure against: wide enough
- *  to hold a farmstead, well inside `MAX_SIDE_M`. */
-const DEFAULT_FOOTPRINT_SIDE_M = 200;
 
 /**
  * Where a rectangle starts when the reader asks for one: around the drawing if
@@ -129,13 +130,14 @@ export const placeSpotDraftAtom = atom(null, (_get, set, point: SpotPoint) => {
     recordId: null,
     point,
     stage: 'idle',
+    box: 'editor',
   });
   set(spotFormAtom, { name: '', description: '' });
   set(spotFootprintAtom, null);
   set(spotSketchAtom, null);
 });
 
-export const editSpotDraftAtom = atom(null, (_get, set, record: SpotRecord) => {
+const openOn = (set: Setter, record: SpotRecord, box: SpotDraft['box']) => {
   draftCounter += 1;
   set(spotPlacingAtom, false);
   set(spotDraftAtom, {
@@ -143,6 +145,7 @@ export const editSpotDraftAtom = atom(null, (_get, set, record: SpotRecord) => {
     recordId: record.id,
     point: record.point,
     stage: 'idle',
+    box,
   });
   set(spotFormAtom, {
     name: record.name,
@@ -150,6 +153,10 @@ export const editSpotDraftAtom = atom(null, (_get, set, record: SpotRecord) => {
   });
   set(spotFootprintAtom, record.footprint);
   set(spotSketchAtom, record.sketch);
+};
+
+export const editSpotDraftAtom = atom(null, (_get, set, record: SpotRecord) => {
+  openOn(set, record, 'editor');
 });
 
 export const closeSpotDraftAtom = atom(null, (_get, set) => {
@@ -182,20 +189,23 @@ export const setSpotStageAtom = atom(
 );
 
 /** Let go of the map without losing the rectangle — the other side of the
- *  one-at-a-time rule `setSpotStageAtom` keeps. */
+ *  one-at-a-time rule `setSpotStageAtom` keeps. The editor keeps its box and
+ *  rests; a card draft is nothing but the hold, so it goes, and its unmount
+ *  writes what was dragged. */
 export const releaseSpotFootprintAtom = atom(null, (get, set) => {
   const draft = get(spotDraftAtom);
-  if (draft?.stage === 'footprint') {
-    set(spotDraftAtom, { ...draft, stage: 'idle' });
-  }
+  if (draft?.stage !== 'footprint') return;
+  if (draft.box === 'card') set(closeSpotDraftAtom);
+  else set(spotDraftAtom, { ...draft, stage: 'idle' });
 });
 
-export const clearSpotFootprintAtom = atom(null, (get, set) => {
-  set(spotFootprintAtom, null);
-  const draft = get(spotDraftAtom);
-  // Otherwise the stage would stand with no rectangle to place, and
-  // `setSpotStageAtom` would not seed a new one without a round trip.
-  if (draft?.stage === 'footprint') {
-    set(spotDraftAtom, { ...draft, stage: 'idle' });
-  }
-});
+/** Take hold of the map from the card, which stays on screen: the rectangle and
+ *  the drawing are adjusted against the ground rather than filled into a form,
+ *  so they are the two units the card owns outright. */
+export const adjustSpotDraftAtom = atom(
+  null,
+  (_get, set, record: SpotRecord, stage: 'footprint' | 'sketch') => {
+    openOn(set, record, 'card');
+    set(setSpotStageAtom, stage);
+  },
+);

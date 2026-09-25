@@ -16,17 +16,14 @@
     "read": "Les",
     "loading": "Henter bilder …",
     "none": "Ingen bilder på denne lokaliteten ennå.",
-    "needsFootprint": "Marker et utsnitt på lokaliteten for å kunne ta vare på bilder av den.",
-    "keep": "Ta vare på {{what}}",
-    "kept": "{{what}} er tatt vare på",
+    "keepLabel": "Ta vare på det du ser",
+    "keep": "Ta vare på",
+    "kept": "Tatt vare på",
     "rendering": "lager bildet …",
     "renderFailed": "kilden svarte ikke",
     "renderEmpty": "ingen dekning over utsnittet",
     "resolution": "{{m}} m/px",
     "sunLoop": "Solrunde",
-    "sunLoopKeep": "Lag animasjon",
-    "sunLoopKept": "Animasjon lagret",
-    "sunLoopHint": "Sola går hele runden rundt utsnittet. Animasjonen lages på serveren og dukker opp her når den er ferdig.",
     "unreadable": "Ukjent bilde",
     "retry": "Prøv igjen",
     "remove": "Slett bildet",
@@ -43,7 +40,6 @@
       "tall": "Legg boksen til høyre"
     },
     "order": {
-      "label": "Rekkefølge",
       "hint": "Dra i håndtaket for å endre rekkefølgen. Det første bildet er forsiden. Trykk på et bilde for å legge det på kartet og tegne oppå det.",
       "move": "Dra for å flytte bildet (↑↓)",
       "cover": "Forsidebilde — lesingen åpner her",
@@ -286,8 +282,6 @@
     "namePlaceholderBusy": "Slår opp stedsnavn …",
     "description": "Beskrivelse",
     "descriptionPlaceholder": "Hva ser du i terrenget?",
-    "pinChange": "Endre",
-    "pinDone": "Ferdig",
     "sketchAdd": "Legg til skisse",
     "sketchChange": "Endre skissen",
     "sketchNone": "Ingen tegning",
@@ -308,6 +302,7 @@
     "visibilityFailed": "Fikk ikke endret synligheten.",
     "save": "Lagre",
     "abort": "Avbryt",
+    "change": "Endre",
     "done": "Ferdig",
     "saving": "Lagrer …",
     "saveFailed": "Fikk ikke lagret lokaliteten. Prøv igjen.",
@@ -322,12 +317,12 @@
       "filterPlaceholder": "Søk i navn og beskrivelse",
       "noMatch": "Ingen treff på «{{query}}»"
     },
-    "footprintPick": "Velg utsnitt",
-    "footprintChange": "Endre utsnitt",
-    "footprintStop": "Ferdig med utsnittet",
     "footprintHint": "Dra rektangelet, hjørnene endrer størrelsen",
     "footprintSide": "{{metres}} m",
-    "footprintClear": "Fjern",
+    "footprintClamped": {
+      "min": "Tegningen var mindre enn 50 m på tvers, så utsnittet er satt til 50 m. Endre det om du vil ha mer med.",
+      "max": "Tegningen var større enn 500 m på tvers, så utsnittet er satt til 500 m og dekker ikke alt du tegnet."
+    },
     "linkNeedsAccount": "Lenken peker til en lokalitet du må være innlogget for å se — eller som ikke finnes."
   },
   "terrainControls": {

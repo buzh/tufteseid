@@ -1,21 +1,11 @@
-import {
-  Alert,
-  Button,
-  Group,
-  Textarea,
-  TextInput,
-  Tooltip,
-} from '@mantine/core';
+// Everything about a spot that is typed rather than dragged, plus the delete.
+// The pictures are not here: they belong to `SpotCard`, which is the surface
+// the reader works from and the one this box is reached from.
+
+import { Alert, Button, Group, Textarea, TextInput } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 
-import {
-  SPOT_DESCRIPTION_MAX,
-  SPOT_NAME_MAX,
-  type SpotRecord,
-} from '../api/spots';
-import { EvidenceStrip } from '../evidence/EvidenceStrip';
-import { KIND_ICON } from '../evidence/labels';
-import { useSpotEvidence } from '../evidence/useSpotEvidence';
+import { SPOT_DESCRIPTION_MAX, SPOT_NAME_MAX } from '../api/spots';
 import { formatPoint } from '../spots/geo';
 import { cx } from '../ui/cx';
 import { Icon } from '../ui/Icon';
@@ -23,41 +13,6 @@ import { Panel } from '../ui/Panel';
 import { useConfirm } from '../ui/useConfirm';
 import styles from './SpotBox.module.css';
 import type { SpotDraftController } from './useSpotDraft';
-
-/** One `useSpotEvidence` for both the ask and the ordering: a second would be a
- *  second list fetch and a second realtime subscription over the same rows. */
-const SpotEvidenceEdit = ({ spot }: { spot: SpotRecord }) => {
-  const { t } = useTranslation();
-  const evidence = useSpotEvidence(spot);
-  const loop = evidence.sunLoop;
-
-  return (
-    <>
-      {evidence.mayKeep && loop && (
-        <Tooltip label={t('evidence.sunLoopHint')}>
-          <Button
-            mt="xs"
-            size="compact-xs"
-            variant="default"
-            disabled={loop.kept}
-            leftSection={<Icon icon={KIND_ICON.sunloop} size={14} />}
-            onClick={() => evidence.keep(loop.spec)}
-          >
-            {t(loop.kept ? 'evidence.sunLoopKept' : 'evidence.sunLoopKeep')}
-          </Button>
-        </Tooltip>
-      )}
-
-      <EvidenceStrip evidence={evidence} />
-
-      {evidence.failed && (
-        <Alert color="red" mt="xs" p="xs">
-          {t('evidence.failed')}
-        </Alert>
-      )}
-    </>
-  );
-};
 
 export const SpotEditor = ({ spot }: { spot: SpotDraftController }) => {
   const { t } = useTranslation();
@@ -154,7 +109,7 @@ export const SpotEditor = ({ spot }: { spot: SpotDraftController }) => {
           variant={placing ? 'filled' : 'default'}
           onClick={() => spot.setStage(placing ? 'idle' : 'pin')}
         >
-          {placing ? t('spots.pinDone') : t('spots.pinChange')}
+          {placing ? t('spots.done') : t('spots.change')}
         </Button>
       </div>
 
@@ -187,24 +142,8 @@ export const SpotEditor = ({ spot }: { spot: SpotDraftController }) => {
         )}
       </div>
 
-      <div
-        className={cx(
-          styles.unit,
-          spot.step === 'footprint' && styles.unitStep,
-        )}
-      >
-        <Button
-          size="compact-xs"
-          variant={framing ? 'filled' : 'default'}
-          leftSection={<Icon icon="crop_free" size={14} />}
-          onClick={() => spot.setStage(framing ? 'idle' : 'footprint')}
-        >
-          {framing
-            ? t('spots.footprintStop')
-            : sided
-              ? t('spots.footprintChange')
-              : t('spots.footprintPick')}
-        </Button>
+      <div className={styles.unit}>
+        <Icon icon="crop_free" size={14} />
         <span className={styles.unitText}>
           {framing
             ? t('spots.footprintHint')
@@ -212,19 +151,20 @@ export const SpotEditor = ({ spot }: { spot: SpotDraftController }) => {
               ? t('spots.footprintSide', { metres: spot.footprintSideMetres })
               : ''}
         </span>
-        {sided && (
-          <Button
-            size="compact-xs"
-            variant="subtle"
-            color="gray"
-            onClick={spot.clearFootprint}
-          >
-            {t('spots.footprintClear')}
-          </Button>
-        )}
+        <Button
+          size="compact-xs"
+          variant={framing ? 'filled' : 'default'}
+          onClick={() => spot.setStage(framing ? 'idle' : 'footprint')}
+        >
+          {framing ? t('spots.done') : t('spots.change')}
+        </Button>
       </div>
 
-      {spot.record && <SpotEvidenceEdit spot={spot.record} />}
+      {spot.footprintClamped && (
+        <Alert color="yellow" mt="xs" p="xs">
+          {t(`spots.footprintClamped.${spot.footprintClamped}`)}
+        </Alert>
+      )}
 
       {spot.sketchTooBig && (
         <Alert color="red" mt="xs" p="xs">

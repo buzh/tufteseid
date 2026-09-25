@@ -15,7 +15,7 @@ One row per directory under `src/`.
 | --- | --- |
 | `api/` | PocketBase singleton (`pocketbase.ts`), the `spots` and `evidence` collection clients, and the one call into the render sidecar (`render.ts`). |
 | `auth/` | OAuth2 dialog, the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
-| `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue and the handover to the render sidecar, the gallery, the strip that puts the kept renders in order, the reader that lays them back on the map, and the provenance legend stamped onto a download. |
+| `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue and the handover to the render sidecar, the gallery that offers and orders them, the reader that lays them back on the map, and the provenance legend stamped onto a download. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
 | `grounds/` | The ground switch. Which ground is up is derived from the half's background layer, never stored. |
 | `heritageControls/` | The Kulturminner control: which theme layers are ticked and how they are drawn. |
@@ -72,17 +72,16 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `terrainAdjustingAtom` | same | It is still being placed, so nothing is fetched yet. |
 | `open`/`adjust`/`closeTerrainWindowAtom` | same | Write-only. |
 | `spotPlacingAtom` | `spots/atoms.ts` | The `+` is armed: the next map click places the pin. Exclusive with `spotDraftAtom`. |
-| `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom`, `spotFootprintAtom` | same | The spot being edited: where its pin is and which of the four stages has hold of the map (`idle` is none of them), what is typed, what is drawn, and the ground it names. The record itself is not here — `useSpotDraft` holds it. |
+| `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom`, `spotFootprintAtom` | same | The spot being edited: where its pin is, which of the four stages has hold of the map (`idle` is none of them), which box is on screen (`box`), what is typed, what is drawn, and the ground it names. The record itself is not here — `useSpotDraft` holds it. |
 | `spotFootprintAdjustingAtom`, `standingSpotFootprintAtom` | same | Derived: the draft is in its `footprint` stage, and which rectangle the standing frame draws. |
-| `clearSpotFootprintAtom` | same | Write-only. |
-| `place`/`edit`/`closeSpotDraftAtom`, `setSpotStageAtom` | same | Write-only. |
+| `place`/`edit`/`adjust`/`closeSpotDraftAtom`, `setSpotStageAtom` | same | Write-only. `adjustSpotDraftAtom` is the card's: it opens a draft straight into a stage with `box: 'card'`. |
 | `activeSpotAtom` | same | The record being read — opened by a click, by an index row, or by `?lok=`. |
 | `spotReadingAtom` | same | The open spot's kept renders are being read on the map. Held as the id it was entered on; writing `activeSpotAtom` with a different spot — or none — clears it, and a draft suspends it. True regardless for a spot the reader may not edit, and writing it false there closes the spot. |
 | `spotRecordsAtom`, `spotsFailedAtom` | `spots/spotRecords.ts` | Every record the session may see, null until the list lands; and whether it never did. |
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
-| `keepOffersAtom` | same | Derived: the ground's offer (off the A half) and the terrain's, ground first. Only what is on screen — the sun loop is not, so it is `SUN_LOOP_SPEC` in `evidence/spec.ts` and the editor offers it directly. |
-| `draftGroundAtom` | `evidence/draftGround.ts` | The kept render laid under an open draft: the picture being framed against and drawn over. Published by the strip, which is the only thing holding the rows. |
+| `keepOffersAtom` | same | Derived: the ground's offer (off the A half) and the terrain's, ground first. Only what is on screen — the sun loop is not, so `useSpotEvidence` appends `SUN_LOOP_SPEC` (`evidence/spec.ts`) to the list. |
+| `draftGroundAtom` | `evidence/draftGround.ts` | One of the spot's own pictures laid back on the map at the extent it was rendered over, to trace a drawing onto. Published by `EvidenceGallery`, which is the only thing holding the rows. |
 | the reading box's layout and placement | `evidence/readerWindow.ts` | Which way round the box is laid out, where it was dragged to, how big it may get and which wall it is docked against. Module-private, reached through `useReaderWindow`: held outside the component, which remounts per spot. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
 | `sketchShownAtom`, `sketchFadeAtom` | `sketch/overlay.ts` | Whether the open spot's drawing is on the ground, and how far it is faded towards it. A reading setting, not the record's: they outlive the spot the box was opened on. |
@@ -151,15 +150,21 @@ the tile guard and the theme-layer effect walk whatever maps exist.
 
 ## Making a spot
 
+Two boxes stand over one record. `SpotEditor` is what a spot is *called* — name,
+description, the pin, and the delete — reached from the card's cogwheel and from
+the `+` that makes a new one. `SpotCard` is where the reader then spends their
+time: the rectangle and the drawing in a row each, and the pictures. Reading
+terrain against a place is the ongoing act and naming it a one-off, so the card
+is the workbench and the editor is behind a button.
+
 A spot is written as it is made. `createSpot` runs the moment the pin lands —
 under the pin's own coordinate as a provisional name, because the column is
-required and the place-name register has not answered yet — and every unit of
-the editor after that is a write of its own: the register's answer when it
-arrives, the typed text behind an Avbryt/Lagre pair that is there only while
-what is typed differs from what is stored, the point, the
-drawing, the rectangle. So the box carries no save button over the whole of it,
-closing one throws nothing away, and evidence can hang off the record while the
-rest is still being filled in.
+required and the place-name register has not answered yet — and every unit after
+that is a write of its own: the register's answer when it arrives, the typed
+text behind an Avbryt/Lagre pair that is there only while what is typed differs
+from what is stored, the point, the drawing, the rectangle. So neither box
+carries a save button over the whole of it, closing one throws nothing away, and
+evidence can hang off the record while the rest is still being filled in.
 
 `useSpotDraft` (`src/spotControls/`) owns that. Every write goes through one
 serial promise chain: two PATCHes in flight together would leave whichever
@@ -185,37 +190,54 @@ megabytes on every press.
   and the pen's Avbryt puts it back to what is stored.
 - **The accent walks the reader through it.** `step` is whichever stage has
   hold of the map and, failing that, the first thing the record is still
-  missing: description, then drawing, then rectangle. `idle` is the fourth
-  stage — the box resting, nothing on the map in the reader's hand — and it is
-  what a draft opens in.
-- **A rectangle starts somewhere useful.** Asking for one with no footprint yet
-  seeds it (`seedFootprint`, `src/spots/atoms.ts`): the smallest square holding
-  the drawing if there is a drawing overlapping the viewport, otherwise the
-  centre cell of a 3×3 over what is on screen. A drawing nowhere near the
-  viewport is not what the reader is looking at, so it is passed over rather
-  than the map being dragged off to it. `bringBboxIntoView` then pans or zooms
-  *out* until the square is on screen, never in, so a reader who can already
-  see it keeps the view they chose; `MAX_SIDE_M` caps a footprint at 500 m,
-  which bounds how far out that ever goes.
+  missing: description, then drawing. `idle` is the fourth stage — the box
+  resting, nothing on the map in the reader's hand — and it is what an editor
+  draft opens in.
+- **Every spot has a rectangle, and nobody is asked for one.** The first write
+  that finds the record without one derives it (`derivedFootprint`,
+  `src/spots/footprint.ts`): the smallest square covering the drawing if there
+  is a drawing, otherwise `DEFAULT_FOOTPRINT_SIDE_M` — 50 m — around the pin.
+  `squareBboxCovering` clamps to `MIN_SIDE_M`…`MAX_SIDE_M` (50…500 m), so a
+  drawing outside that range gets a square that is not what was drawn and the
+  editor says so. Old rows predate the rule and are still nullable in
+  `SpotRecord`; `SpotCard` repairs one on sight with a single write rather than
+  a migration, because deriving the square wants a projection PocketBase's JSVM
+  has not got.
+- **A rectangle being *changed* starts from what is there.** `seedFootprint`
+  (`src/spots/atoms.ts`) only runs for a draft with no footprint in hand, and
+  `bringBboxIntoView` then pans or zooms *out* until the square is on screen,
+  never in, so a reader who can already see it keeps the view they chose;
+  `MAX_SIDE_M` bounds how far out that ever goes.
+- **The card can take the map without becoming the editor.** `adjustSpotDraftAtom`
+  opens a draft on the open record straight into its `footprint` or `sketch`
+  stage with `box: 'card'`, and `SpotSurface` keeps showing the card. The
+  controller is mounted *inside* the card (`SpotUnitsHeld`) rather than around
+  it, so the picture list and the traced ground survive the draft — remounting
+  them would take the traced picture off the map exactly when the reader opens
+  the pen to draw on it. A card draft has no resting state: the stage's own
+  Ferdig or Avbryt writes and closes it in one act, which is why the controller
+  carries `finish`/`abort` alongside `close`.
 - **A misplaced pin is a real record**, so the editor carries its own Slett,
-  behind the same two-press confirm as the card's.
+  behind a two-press confirm. It is not on the card: a destructive button on a
+  surface pressed constantly buys nothing.
 
 ## The pictures of a spot
 
 A spot's `evidence` rows are a sequence, not a set. `sort` is an ordering key in
-epoch milliseconds, so a row lands last by being created, and the strip in the
-editor (`src/evidence/EvidenceStrip.tsx`) is where that order is changed.
-On the card the same rows are a gallery, because reading them is flipping
-through them and editing them is deciding what they are a sequence of.
+epoch milliseconds, so a row lands last by being created. There is one list over
+them — `EvidenceGallery` on the card — and it does everything: the offers above
+it, the kept rows below, the drag that sets the order, and the press that lays a
+picture back on the map to trace over. `EvidenceReader` flips through the same
+rows full size and changes none of them.
 
 - **The cover is the first readable row.** Nothing marks one: the reading opens
   on it, so dragging a picture to the top is how a cover is chosen, and the star
   says which one is. `coverOf` (`evidence/labels.ts`) is the single authority
   both surfaces ask, and a sun loop passes — the reading grounds a loop as
   readily as a still. `laysOnGround`, in the same module, answers the narrower
-  question the draft's ground and the strip's picker ask, and a video fails it:
-  that picture is the one a sketch is traced over, and a shadow that has moved
-  since the strokes were drawn is not something to trace.
+  question the traced ground asks, and a video fails it: that picture is the one
+  a sketch is traced over, and a shadow that has moved since the strokes were
+  drawn is not something to trace.
 - A drop writes one row. `sortForMove` (`evidence/order.ts`) takes the midpoint
   between the row's new neighbours, so nothing else moves; a row dropped last
   takes the current time instead, or a picture kept a moment later would sort
@@ -225,15 +247,18 @@ through them and editing them is deciding what they are a sequence of.
   between slots, and the slots themselves do not move. The handle answers ↑ and
   ↓ too, and stops the press reaching OpenLayers' keyboard pan.
 - Pictures are their own records, so reordering — like keeping and deleting —
-  is written when it happens, as is every other unit of the editor
+  is written when it happens, as is every other unit of a spot
   (*Making a spot*).
-- **Where a row is asked for says what it reads.** The three offers in the
-  gallery are readings of the map as it stands, so they come and go with the
-  ground and the analysis under them. A sun loop reads nothing on screen — it is
-  every azimuth, which leaves only the sun's height and the exaggeration, and
-  `SUN_LOOP_SPEC` answers both from the terrain panel's defaults. So the loop is
-  asked for in the editor, beside the footprint that bounds it, and stands
-  whenever the spot has one.
+- **An offer is a row, not a button.** Its title is a full source name — a
+  dataset and a visualization — which no button in a 19 rem panel can carry, so
+  the row shows the title ellipsized with the whole of it in a tooltip and puts
+  one compact `+` on the right.
+- **What is offered follows the map.** `keepOffersAtom` publishes readings of
+  the ground and the analysis as they stand, so those offers come and go with
+  what is under them. A sun loop reads nothing on screen — it is every azimuth,
+  which leaves only the sun's height and the exaggeration, and `SUN_LOOP_SPEC`
+  answers both from the terrain panel's defaults — so `useSpotEvidence` appends
+  it last, where it stands whatever the reader is looking at.
 - **Not every row is made here.** Three kinds are rendered in the tab that asked
   for them; `sunloop` is created the same way and then handed to the render
   sidecar, which writes the file back itself (`docs/render-sidecar.md`). The row,
@@ -321,14 +346,14 @@ holds the ground still and changes only how it was seen.
   — and the close button ends the whole thing: `spotReadingAtom` reads true for
   a spot outside `mayEdit` and writing it false clears `activeSpotAtom`. So a
   visitor sees one box, and closing it leaves the map as it was. The card holds
-  the visibility switch, the delete and the gallery's offers, none of which a
+  the rectangle, the pen, the visibility switch and the offers, none of which a
   visitor may press; keeping it behind the reading would be a panel of disabled
   controls and one button that works.
 - `/l/<code>` opens the reading for an owner too: a link is an invitation to
-  read. The view move is the reader's then, and `shareLink.ts` keeps its hands
-  off — unless the spot has no footprint to fit, which is the only case the
-  reading has no view move of its own. The code goes back onto the URL for
-  whatever spot is open, so a reload lands in the reading too.
+  read. The reading fits the footprint itself, so `shareLink.ts` keeps its hands
+  off the view whenever one is open rather than putting two animations on it.
+  The code goes back onto the URL for whatever spot is open, so a reload lands
+  in the reading too.
 - Because the reading stands in for the card, it carries the card's edit button
   as well, on the same `mayEdit` (`src/spots/mayEdit.ts`). Otherwise the only
   way to an owner's own edit is a close that reads as leaving the spot. A draft

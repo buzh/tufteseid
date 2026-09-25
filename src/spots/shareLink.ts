@@ -83,21 +83,19 @@ export const useSpotShareLink = () => {
   // Read by the centring effect below without being one of its dependencies:
   // `EvidenceReader` fits the footprint when a reading opens, so centring on
   // the point as well would be two animations on one view, and leaving a
-  // reading must not move the view at all. A spot with no footprint has
-  // nothing to fit and is centred here like any other.
+  // reading must not move the view at all.
   const reading = useAtomValue(spotReadingAtom);
-  const readerFits = reading && active?.footprint != null;
-  const readerFitsNow = useRef(readerFits);
+  const readingNow = useRef(reading);
   useEffect(() => {
-    readerFitsNow.current = readerFits;
-  }, [readerFits]);
+    readingNow.current = reading;
+  }, [reading]);
 
   // Keyed on the id: re-centring on every field change would fight a reader
   // panning around their own spot.
   const activeId = active?.id ?? null;
   const activePoint = active?.point;
   useEffect(() => {
-    if (!activeId || !activePoint || readerFitsNow.current) return;
+    if (!activeId || !activePoint || readingNow.current) return;
     const view = map.getView();
     view.animate({
       center: transform(

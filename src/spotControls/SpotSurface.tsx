@@ -36,8 +36,10 @@ const SketchCanvas = lazy(() =>
   })),
 );
 
-/** Split out so the draft controller mounts and unmounts with the draft. */
-const SpotDraftBox = () => {
+/** Split out so the draft controller mounts and unmounts with the draft. Only
+ *  for an editor draft: a card draft's controller belongs inside the card,
+ *  which stays on screen for the whole of it. */
+const SpotEditorBox = () => {
   const draft = useAtomValue(spotDraftAtom);
   const active = useAtomValue(activeSpotAtom);
   // The parent renders this only when there is a draft.
@@ -101,9 +103,11 @@ export const SpotSurface = () => {
       )}
       {placing && <SpotPlacePrompt />}
       {/* Keyed on the spot so opening a second does not inherit the first's
-          confirm. */}
-      {draft ? (
-        <SpotDraftBox key={draft.id} />
+          confirm — and so the card survives a card draft opening under it,
+          which is what keeps the picture list and the traced ground in place
+          while the reader reaches for the rectangle. */}
+      {draft?.box === 'editor' ? (
+        <SpotEditorBox key={draft.id} />
       ) : (
         active &&
         (reading ? (

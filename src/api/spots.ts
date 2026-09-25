@@ -39,7 +39,10 @@ export type SpotRecord = {
   credit: string;
   visibility: SpotVisibility;
   point: SpotPoint;
-  /** Null until the reader places one; only then can evidence be kept. */
+  /** The square every picture is rendered over. Every spot has one — the client
+   *  derives it from the drawing or the pin (`spots/footprint.ts`) rather than
+   *  asking. Still nullable for rows written before that rule, which `SpotCard`
+   *  repairs on sight. */
   footprint: SpotFootprint | null;
   sketch: SpotSketch | null;
   created: string;
