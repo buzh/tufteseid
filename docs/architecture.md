@@ -155,7 +155,8 @@ A spot is written as it is made. `createSpot` runs the moment the pin lands —
 under the pin's own coordinate as a provisional name, because the column is
 required and the place-name register has not answered yet — and every unit of
 the editor after that is a write of its own: the register's answer when it
-arrives, the typed text behind its own Avbryt/Lagre pair, the point, the
+arrives, the typed text behind an Avbryt/Lagre pair that is there only while
+what is typed differs from what is stored, the point, the
 drawing, the rectangle. So the box carries no save button over the whole of it,
 closing one throws nothing away, and evidence can hang off the record while the
 rest is still being filled in.

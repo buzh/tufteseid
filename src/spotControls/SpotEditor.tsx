@@ -125,24 +125,25 @@ export const SpotEditor = ({ spot }: { spot: SpotDraftController }) => {
           value={spot.description}
           onChange={(event) => spot.setDescription(event.currentTarget.value)}
         />
-        <Group gap="xs" mt={6} justify="flex-end">
-          <Button
-            size="compact-xs"
-            variant="subtle"
-            color="gray"
-            disabled={!spot.textDirty}
-            onClick={spot.revertText}
-          >
-            {t('spots.abort')}
-          </Button>
-          <Button
-            size="compact-xs"
-            disabled={!spot.canSaveText}
-            onClick={spot.saveText}
-          >
-            {t('spots.save')}
-          </Button>
-        </Group>
+        {spot.textDirty && (
+          <Group gap="xs" mt={6} justify="flex-end">
+            <Button
+              size="compact-xs"
+              variant="subtle"
+              color="gray"
+              onClick={spot.revertText}
+            >
+              {t('spots.abort')}
+            </Button>
+            <Button
+              size="compact-xs"
+              disabled={!spot.canSaveText}
+              onClick={spot.saveText}
+            >
+              {t('spots.save')}
+            </Button>
+          </Group>
+        )}
       </div>
 
       <div className={cx(styles.unit, placing && styles.unitStep)}>
