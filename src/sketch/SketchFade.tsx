@@ -16,7 +16,7 @@ export const SketchFade = ({ className }: { className?: string }) => {
     <div className={cx(styles.row, className)}>
       <Tooltip label={t('spots.sketchFade')}>
         <span className={styles.icon}>
-          <Icon icon="draw" size={16} />
+          <Icon icon="gesture" size={16} />
         </span>
       </Tooltip>
       <Slider

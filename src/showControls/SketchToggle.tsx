@@ -20,7 +20,7 @@ export const SketchToggle = () => {
   return (
     <Tooltip label={label}>
       <ControlButton
-        icon="draw"
+        icon="gesture"
         on={on}
         disabled={!onGround}
         aria-label={t('spots.sketchLabel')}
