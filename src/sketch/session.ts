@@ -43,22 +43,6 @@ export const sketchNow = (settled: SpotSketch | null): SpotSketch | null => {
   return elements.length > 0 ? { frame: live.frame, elements } : null;
 };
 
-// A cancel leaves the draw stage while the canvas is still up, and the canvas
-// writes its scene out on the way (`SketchCanvas`). This is how it is told the
-// strokes are being thrown away.
-let discarded = false;
-
-export const discardSketch = () => {
-  discarded = true;
-};
-
-/** Read once, by the canvas as it goes. */
-export const sketchDiscarded = (): boolean => {
-  const was = discarded;
-  discarded = false;
-  return was;
-};
-
 // Every interaction that was active, not just the panning ones: nothing may
 // move the view. Module-level so the thaw can run from an effect cleanup.
 let frozen: Interaction[] | null = null;

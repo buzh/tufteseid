@@ -19,14 +19,13 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { mapAtom } from '../map/atoms';
-import { spotDraftAtom, spotSketchAtom } from '../spots/atoms';
+import { spotSketchAtom } from '../spots/atoms';
 import { PEN_STROKE_COLOUR, rememberedPen, rememberPen } from './pen';
 import styles from './SketchCanvas.module.css';
 import { storableScene, type SceneElement } from './scene';
 import {
   initialSceneView,
   setLiveScene,
-  sketchDiscarded,
   slaveMapToScene,
   type SketchSession,
 } from './session';
@@ -173,21 +172,16 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
     [session.frame],
   );
 
-  // Up to a settle can be unwritten at unmount, so the atom is flushed from the
-  // scene itself — but only while the draft is still open, since closing one
-  // clears its atoms and then unmounts this, and not when the reader has just
-  // said to throw these strokes away.
+  // Nothing is read off the scene here on the way out: by the time this runs
+  // Excalidraw is being torn down and answers with an empty scene, which would
+  // go over the atom as a drawing with no strokes. Whoever ends the session
+  // takes the scene first, through `sketchNow` while the canvas is still up.
   useEffect(
     () => () => {
       if (settle.current != null) window.clearTimeout(settle.current);
-      const api = apiRef.current;
-      const thrownAway = sketchDiscarded();
-      if (api && !thrownAway && store.get(spotDraftAtom)) {
-        keepScene(store, session.frame, api.getSceneElementsIncludingDeleted());
-      }
       setLiveScene(null);
     },
-    [session.frame, store],
+    [],
   );
 
   return (

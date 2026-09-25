@@ -177,10 +177,12 @@ rectangle are compared by value; the drawing only off the stage that owns it,
 because `sketchNow` builds a fresh object and anything wider would resend five
 megabytes on every press.
 
-- **The pen has its own Avbryt.** Leaving the draw stage keeps the strokes; the
-  cancel puts `spotSketchAtom` back to what is stored and sets `discardSketch`
-  (`src/sketch/session.ts`), which is how the canvas is told not to write its
-  scene out over that on the way down — it flushes at unmount, a commit later.
+- **Whoever ends a draw session takes the scene first**, through `sketchNow`
+  while the canvas is still up. `SketchCanvas` reads nothing off Excalidraw on
+  its way out: by the time an unmount cleanup runs the editor is being torn
+  down and answers with an empty scene, which went over `spotSketchAtom` as a
+  drawing with no strokes. So `commit` writes that atom as well as the record,
+  and the pen's Avbryt puts it back to what is stored.
 - **The accent walks the reader through it.** `step` is whichever stage has
   hold of the map and, failing that, the first thing the record is still
   missing: description, then drawing, then rectangle. `idle` is the fourth

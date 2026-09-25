@@ -16,7 +16,7 @@ import {
 import { currentUserAtom } from '../auth/atoms';
 import { bboxWidthMetres } from '../map/bbox';
 import { SKETCH_BUDGET_BYTES, sketchBytes, sketchOf } from '../sketch/scene';
-import { discardSketch, sketchNow } from '../sketch/session';
+import { sketchNow } from '../sketch/session';
 import {
   activeSpotAtom,
   clearSpotFootprintAtom,
@@ -312,10 +312,15 @@ export const useSpotDraft = (
           fields.sketch = drawing;
         }
       }
+      // The canvas goes as soon as the stage is left and Excalidraw's scene
+      // with it, so this is the only copy the row and the overlay have to read
+      // afterwards. Not on the way out of the box, where the atoms are already
+      // cleared and the draft is gone.
+      if (store.get(spotDraftAtom)) store.set(spotSketchAtom, drawing);
     }
 
     if (Object.keys(fields).length > 0) patch(fields);
-  }, [patch]);
+  }, [patch, store]);
 
   const setStage = useCallback(
     (next: SpotDraft['stage']) => {
@@ -328,10 +333,7 @@ export const useSpotDraft = (
 
   const saveSketch = useCallback(() => setStage('idle'), [setStage]);
 
-  // The atom is put back before the stage is left, and the canvas is told not
-  // to write its scene out over it on the way.
   const cancelSketch = useCallback(() => {
-    discardSketch();
     setSketchTooBig(false);
     store.set(spotSketchAtom, held.current.record?.sketch ?? null);
     stageTo('idle');
