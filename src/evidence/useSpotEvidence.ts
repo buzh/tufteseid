@@ -7,6 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
   createEvidence,
@@ -20,15 +21,22 @@ import type { SpotRecord } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
 import { bboxToMetric } from '../map/bbox';
 import { useMayEditSpot } from '../spots/mayEdit';
+import { sunLoopLegend } from './legendContent';
 import { keepOffersAtom } from './offer';
 import { sortsForMove } from './order';
 import {
   enqueueRender,
+  jobState,
   renderStates,
   subscribeRenderQueue,
   type RenderState,
 } from './queue';
-import { evidenceMatches, metaOf, type EvidenceSpec } from './spec';
+import {
+  evidenceMatches,
+  metaOf,
+  SUN_LOOP_SPEC,
+  type EvidenceSpec,
+} from './spec';
 
 type KeepOffer = {
   spec: EvidenceSpec;
@@ -43,6 +51,9 @@ export type SpotEvidence = {
   failed: boolean;
   /** Empty while the spot names no ground: nothing can be rendered. */
   offers: KeepOffer[];
+  /** The sun loop, which reads nothing on screen and so stands whenever the
+   *  spot has a footprint. Null when it has none. */
+  sunLoop: KeepOffer | null;
   mayEdit: boolean;
   /** Owner or admin, and the spot has a footprint. */
   mayKeep: boolean;
@@ -50,15 +61,26 @@ export type SpotEvidence = {
   retry: (rec: EvidenceRecord) => void;
   remove: (id: string) => void;
   /** Move a row to `to`, an index into `items` as it stands. The reading opens
-   *  on the first row with pixels, so this is also how a cover is chosen. */
+   *  on the cover (`coverOf`), so this is also how a cover is chosen. */
   reorder: (id: string, to: number) => void;
-  stateOf: (id: string) => RenderState | undefined;
+  /**
+   * Where a row stands, by one rule. A row that has pixels has no state at
+   * all. Otherwise a job this browser is still holding wins, because it is the
+   * only account there is of an ask the sidecar has not marked yet — and past
+   * that the sidecar's own `meta.job` outranks whatever the local queue
+   * concluded, since it is the side doing the work. A handover that timed out
+   * or was refused as a duplicate therefore stops saying so the moment the
+   * sidecar says otherwise.
+   */
+  stateOf: (rec: EvidenceRecord) => RenderState | undefined;
 };
 
 const byOrder = (a: EvidenceRecord, b: EvidenceRecord) =>
   a.sort - b.sort || a.created.localeCompare(b.created);
 
 export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
+  const { i18n } = useTranslation();
+  const language = i18n.language;
   const user = useAtomValue(currentUserAtom);
   const mayEdit = useMayEditSpot(spot);
   const offered = useAtomValue(keepOffersAtom);
@@ -119,21 +141,53 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
   const footprint = spot.footprint;
   const mayKeep = mayEdit && footprint != null;
 
-  const offers = useMemo(() => {
-    if (!footprint || !items) return [];
-    const metric = bboxToMetric(footprint);
-    return offered.map((spec) => ({
-      spec,
-      kept: items.some((rec) => evidenceMatches(rec, spec, metric)),
-    }));
-  }, [offered, items, footprint]);
+  const metric = useMemo(
+    () => (footprint ? bboxToMetric(footprint) : null),
+    [footprint],
+  );
+
+  const offers = useMemo(
+    () =>
+      metric && items
+        ? offered.map((spec) => ({
+            spec,
+            kept: items.some((rec) => evidenceMatches(rec, spec, metric)),
+          }))
+        : [],
+    [offered, items, metric],
+  );
+
+  const sunLoop = useMemo(
+    () =>
+      metric && items
+        ? {
+            spec: SUN_LOOP_SPEC,
+            kept: items.some((rec) =>
+              evidenceMatches(rec, SUN_LOOP_SPEC, metric),
+            ),
+          }
+        : null,
+    [items, metric],
+  );
 
   const render = useCallback(
     (rec: EvidenceRecord) => {
       if (!footprint) return;
-      enqueueRender({ rec, bbox4326: footprint, onDone: upsert });
+      enqueueRender({
+        rec,
+        bbox4326: footprint,
+        // Composed here and sent with the job, because only a sun loop's band
+        // is typeset by the sidecar and only the client knows the reader's
+        // language. No centre, which nothing knows before the ground is
+        // fetched, and neither the resolution nor the render date: the sidecar
+        // substitutes the resolution it achieves, and on a second attempt the
+        // stored pair describes the first one.
+        legend:
+          rec.kind === 'sunloop' ? sunLoopLegend(rec, spot, language) : null,
+        onDone: upsert,
+      });
     },
-    [footprint, upsert],
+    [footprint, spot, language, upsert],
   );
 
   const keep = useCallback(
@@ -206,12 +260,21 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     items,
     failed,
     offers,
+    sunLoop,
     mayEdit,
     mayKeep,
     keep,
     retry: render,
     remove,
     reorder,
-    stateOf: useCallback((id: string) => states.get(id), [states]),
+    stateOf: useCallback(
+      (rec: EvidenceRecord) => {
+        if (rec.file) return undefined;
+        const local = states.get(rec.id);
+        if (local === 'queued' || local === 'running') return local;
+        return jobState(rec) ?? local;
+      },
+      [states],
+    ),
   };
 };

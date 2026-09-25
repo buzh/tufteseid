@@ -11,6 +11,7 @@ export const KIND_ICON: Record<EvidenceKind, MaterialSymbol> = {
   lidar: 'landscape',
   terrain: 'elevation',
   flyfoto: 'photo_camera',
+  sunloop: 'motion_photos_on',
 };
 
 export const evidenceTitle = (spec: EvidenceSpec): string => {
@@ -23,6 +24,8 @@ export const evidenceTitle = (spec: EvidenceSpec): string => {
       return spec.projectId === NIB_MOSAIC
         ? t('flyfotoControls.mosaic')
         : (spec.projectName ?? spec.projectId);
+    case 'sunloop':
+      return t('evidence.sunLoop');
   }
 };
 
@@ -35,6 +38,27 @@ export const evidenceLabel = (rec: EvidenceRecord): string => {
  *  shown on the map, whatever else it says. */
 export const isReadable = (rec: EvidenceRecord): boolean =>
   rec.file !== '' && evidenceBbox(rec) !== null;
+
+/** A WebM loop rather than a raster. Off the kind rather than the filename:
+ *  the kind is what the producer promised, and it is known before the file
+ *  lands. */
+export const isVideoEvidence = (rec: EvidenceRecord): boolean =>
+  rec.kind === 'sunloop';
+
+/** Readable, and a still. The narrow question the draft's ground asks, which
+ *  is the picture a sketch is traced over: strokes register to a rectangle,
+ *  and a shadow that has moved since they were drawn is not something to
+ *  trace. The reading has no such trouble and lays a loop on the ground too
+ *  (`useEvidenceLoopOverlay`). */
+export const laysOnGround = (rec: EvidenceRecord): boolean =>
+  isReadable(rec) && !isVideoEvidence(rec);
+
+/** The row the reading opens on, and the one the strip stars. Readable is the
+ *  whole test, not `laysOnGround`: the reading grounds a loop as readily as a
+ *  still. */
+export const coverOf = (
+  rows: readonly EvidenceRecord[],
+): EvidenceRecord | null => rows.find(isReadable) ?? null;
 
 export const downloadLabel = (state: {
   downloading: boolean;
@@ -90,6 +114,35 @@ const terrainFacts = (
   return facts;
 };
 
+/** What the catalogue knew about the source: everything that is true of a row
+ *  before any pixel of it exists. Separate from `evidenceFacts` because a row
+ *  that is about to be rendered still holds the previous render's figures. */
+export const specFacts = (spec: EvidenceSpec, language: string): string[] => {
+  switch (spec.kind) {
+    case 'lidar': {
+      const facts = [spec.model.toUpperCase()];
+      if (spec.year != null) {
+        facts.push(t('evidence.facts.year', { year: spec.year }));
+      }
+      if (spec.pointDensity) facts.push(spec.pointDensity);
+      return facts;
+    }
+    case 'terrain':
+      return terrainFacts(spec);
+    case 'flyfoto':
+      if (spec.photoDate) return [dayOf(spec.photoDate, language)];
+      return spec.year != null ? [String(spec.year)] : [];
+    case 'sunloop':
+      // No azimuth: it is every azimuth, which is what the frame count says.
+      return [
+        spec.model.toUpperCase(),
+        t('evidence.facts.altitude', { altitude: spec.altitude }),
+        t('evidence.facts.zFactor', { z: spec.zFactor }),
+        t('evidence.facts.frames', { n: Math.round(360 / spec.stepDeg) }),
+      ];
+  }
+};
+
 /** What the catalogue knew about the source, what the render achieved and when
  *  it was made, in the order it would be cited. */
 export const evidenceFacts = (
@@ -101,26 +154,7 @@ export const evidenceFacts = (
   centre?: string,
 ): string[] => {
   const spec = specOf(rec);
-  const facts: string[] = [];
-
-  if (spec) {
-    switch (spec.kind) {
-      case 'lidar':
-        facts.push(spec.model.toUpperCase());
-        if (spec.year != null) {
-          facts.push(t('evidence.facts.year', { year: spec.year }));
-        }
-        if (spec.pointDensity) facts.push(spec.pointDensity);
-        break;
-      case 'terrain':
-        facts.push(...terrainFacts(spec));
-        break;
-      case 'flyfoto':
-        if (spec.photoDate) facts.push(dayOf(spec.photoDate, language));
-        else if (spec.year != null) facts.push(String(spec.year));
-        break;
-    }
-  }
+  const facts: string[] = spec ? specFacts(spec, language) : [];
 
   const metresPerPx = evidenceResolution(rec);
   if (metresPerPx != null) {

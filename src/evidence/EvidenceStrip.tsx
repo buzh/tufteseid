@@ -10,15 +10,20 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { evidenceFileUrl, type EvidenceRecord } from '../api/evidence';
-import type { SpotRecord } from '../api/spots';
 import { cx } from '../ui/cx';
 import { Icon } from '../ui/Icon';
 import { draftGroundAtom } from './draftGround';
 import styles from './EvidenceStrip.module.css';
-import { evidenceLabel, isReadable, KIND_ICON } from './labels';
+import {
+  coverOf,
+  evidenceLabel,
+  isVideoEvidence,
+  KIND_ICON,
+  laysOnGround,
+} from './labels';
 import { moved } from './order';
 import { evidenceBbox } from './spec';
-import { useSpotEvidence } from './useSpotEvidence';
+import type { SpotEvidence } from './useSpotEvidence';
 
 type Drag = {
   id: string;
@@ -30,9 +35,9 @@ type Drag = {
   slots: number[];
 };
 
-export const EvidenceStrip = ({ spot }: { spot: SpotRecord }) => {
+export const EvidenceStrip = ({ evidence }: { evidence: SpotEvidence }) => {
   const { t } = useTranslation();
-  const { items, reorder } = useSpotEvidence(spot);
+  const { items, reorder } = evidence;
   const [ground, setGround] = useAtom(draftGroundAtom);
   const listRef = useRef<HTMLUListElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -114,9 +119,7 @@ export const EvidenceStrip = ({ spot }: { spot: SpotRecord }) => {
   if (items === null || items.length === 0) return null;
 
   const rows = drag ? moved(items, drag.from, drag.to) : items;
-  // The reading skips a row with no pixels, so the cover is the first that has
-  // any — not simply the first.
-  const cover = rows.find(isReadable)?.id;
+  const cover = coverOf(rows)?.id;
 
   return (
     <div className={styles.strip}>
@@ -129,9 +132,13 @@ export const EvidenceStrip = ({ spot }: { spot: SpotRecord }) => {
       <ul className={styles.list} ref={listRef}>
         {rows.map((rec, index) => {
           const title = evidenceLabel(rec);
-          const thumb = evidenceFileUrl(rec, '200x200');
+          const video = isVideoEvidence(rec);
+          const thumb = video
+            ? evidenceFileUrl(rec)
+            : evidenceFileUrl(rec, '200x200');
           const onMap = ground?.id === rec.id;
-          const ready = isReadable(rec);
+          // A loop cannot be a sketch ground: the overlay is an `ImageStatic`.
+          const ready = laysOnGround(rec);
 
           return (
             <li
@@ -165,7 +172,17 @@ export const EvidenceStrip = ({ spot }: { spot: SpotRecord }) => {
                   disabled={!ready}
                   onClick={() => pick(rec)}
                 >
-                  {thumb ? (
+                  {thumb && video ? (
+                    // `#t=0.1` so a frame is painted rather than a black box.
+                    <video
+                      className={styles.thumb}
+                      src={`${thumb}#t=0.1`}
+                      preload="metadata"
+                      muted
+                      playsInline
+                      aria-hidden="true"
+                    />
+                  ) : thumb ? (
                     <img className={styles.thumb} src={thumb} alt="" />
                   ) : (
                     <span className={cx(styles.thumb, styles.pending)}>

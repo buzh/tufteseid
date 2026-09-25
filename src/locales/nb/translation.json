@@ -22,6 +22,10 @@
     "renderFailed": "kilden svarte ikke",
     "renderEmpty": "ingen dekning over utsnittet",
     "resolution": "{{m}} m/px",
+    "sunLoop": "Solrunde",
+    "sunLoopKeep": "Lag animasjon",
+    "sunLoopKept": "Animasjon lagret",
+    "sunLoopHint": "Sola går hele runden rundt utsnittet. Animasjonen lages på serveren og dukker opp her når den er ferdig.",
     "unreadable": "Ukjent bilde",
     "retry": "Prøv igjen",
     "remove": "Slett bildet",
@@ -48,7 +52,8 @@
       "altitude": "Solhøyde {{altitude}}°",
       "zFactor": "{{z}}× overdrivelse",
       "radius": "Radius {{m}} m",
-      "rendered": "Laget {{date}}"
+      "rendered": "Laget {{date}}",
+      "frames": "{{n}} bilder"
     },
     "download": "Last ned med kildeopplysninger",
     "downloading": "Lager fila …",

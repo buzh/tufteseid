@@ -12,9 +12,10 @@ import {
   evidenceLabel,
   evidenceResolution,
   evidenceTitle,
+  isVideoEvidence,
   KIND_ICON,
 } from './labels';
-import type { RenderState } from './queue';
+import { mayRetry, type RenderState } from './queue';
 import type { SpotEvidence } from './useSpotEvidence';
 
 const EvidenceItem = ({
@@ -38,7 +39,11 @@ const EvidenceItem = ({
 }) => {
   const { t } = useTranslation();
   const title = evidenceLabel(record);
-  const thumb = evidenceFileUrl(record, '200x200');
+  const video = isVideoEvidence(record);
+  // PocketBase makes no thumbnail for a video, so a loop is its own handle.
+  const thumb = video
+    ? evidenceFileUrl(record)
+    : evidenceFileUrl(record, '200x200');
   const metresPerPx = evidenceResolution(record);
   const note =
     state === 'queued' || state === 'running'
@@ -58,7 +63,20 @@ const EvidenceItem = ({
         // source's own resolution is the artifact.
         <Tooltip label={t('evidence.open')}>
           <a href={evidenceFileUrl(record)} target="_blank" rel="noreferrer">
-            <img className={styles.thumb} src={thumb} alt={title} />
+            {video ? (
+              // `#t=0.1` so a frame is painted rather than a black box: with
+              // `preload="metadata"` alone, nothing is decoded until play.
+              <video
+                className={styles.thumb}
+                src={`${thumb}#t=0.1`}
+                preload="metadata"
+                muted
+                playsInline
+                aria-label={title}
+              />
+            ) : (
+              <img className={styles.thumb} src={thumb} alt={title} />
+            )}
           </a>
         </Tooltip>
       ) : (
@@ -87,7 +105,7 @@ const EvidenceItem = ({
           />
         </Tooltip>
       )}
-      {mayEdit && state === 'failed' && (
+      {mayEdit && mayRetry(state) && (
         <Tooltip label={t('evidence.retry')}>
           <ControlButton
             icon="refresh"
@@ -163,7 +181,7 @@ export const EvidenceGallery = ({
             <EvidenceItem
               key={record.id}
               record={record}
-              state={evidence.stateOf(record.id)}
+              state={evidence.stateOf(record)}
               mayEdit={mayEdit}
               downloading={file.busyId === record.id}
               downloadFailed={file.failedId === record.id}

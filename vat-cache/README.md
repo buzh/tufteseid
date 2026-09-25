@@ -150,7 +150,7 @@ its own grid and the reach changes with zoom.
 | `vatcache.py` | Store front end: the queue, what is in it, the audit. Never writes |
 | `build_tiles.py` | Grid geometry, the MBTiles container, a level built into it, the read-back |
 | `cvat.py` | The combined VAT itself — presets, layer walk, `radii_for`. The only module that decides what a pixel is |
-| `fetch_dem.py` | `exportImage` against `Prosjekt_DTM` pinned to one `LAS_PROJECT_NAME`, plus a minimal tiled-float32 TIFF reader |
+| `fetch_dem.py` | `exportImage` against `Prosjekt_DTM` pinned to one `LAS_PROJECT_NAME`, plus a minimal tiled-float32 TIFF reader. **Also an input to `rendersvc`'s image**, which copies it in for `read_tiff_f32` — one reader, one set of quirks. `.dockerignore` excludes `vat-cache` and re-admits this one file; a rename or a signature change wants `docs/render-sidecar.md` read first |
 | `coverage.py` | Footprint union rasterisation, sample-site picker, tile fill |
 | `acquisitions.py` | Acquisition identity: queue, published cell sizes, the catalogue and WMS name sets |
 | `acquisitions.json` | The build queue, committed, in the order `vatcache.py -l` indexes |
@@ -180,7 +180,8 @@ its own grid and the reach changes with zoom.
   performs as 100 %. Every published VAT came out of that path.
 - **Keep SQLite's default journal mode.** WAL writes two files beside the
   database, which the sidecar's read-only opener cannot create.
-- **Never render a figure plate from cached pixels** — `src/figure/` goes
-  through `paintTerrainField` on the float field.
+- **Never keep a render off cached pixels** — `src/evidence/render.ts` goes
+  through `paintTerrainField` on the float field, and `rendersvc` fetches its
+  own.
 - Kartverket elevation is NLOD/CC BY, so caching derived rasters is fine. NiB
   imagery is not, and none goes near this.

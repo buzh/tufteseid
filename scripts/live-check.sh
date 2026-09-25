@@ -6,7 +6,7 @@
 # spot by code; without one it only asserts that the spots collection answers.
 # Runs unauthenticated, so it sees what a guest sees.
 #
-# Read-only against production: the one POST exists to be refused.
+# Read-only against production: the two POSTs exist to be refused.
 
 set -uo pipefail
 
@@ -191,6 +191,16 @@ check no-private-leak \
 # it refuses the guest.
 OPTS=(-s -X POST -H 'Content-Type: application/json' -d '{"name":"live-check"}')
 check anon-write-refused "$BASE/pb/api/collections/spots/records" 400 json 10
+
+section 'Render sidecar'
+
+check render-health "$BASE/render/health" 200 json 10 '"ok":true'
+note "queue $(json_num pending) of $(json_num capacity)"
+
+# Refused before PocketBase is ever reached: the sidecar has no credentials of
+# its own, so a job without a token has nothing to act as.
+OPTS=(-s -X POST -H 'Content-Type: application/json' -d '{"evidence":"livecheck"}')
+check render-anon-refused "$BASE/render/sunloop" 401 json 10
 
 section 'Same-origin upstreams (Caddy → wmscache → origin)'
 

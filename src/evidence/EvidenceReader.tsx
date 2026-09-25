@@ -19,16 +19,18 @@ import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
 import { useEvidenceDownload } from './download';
 import styles from './EvidenceReader.module.css';
-import { useEvidenceOverlay } from './evidenceOverlay';
+import { useEvidenceLoopOverlay, useEvidenceOverlay } from './evidenceOverlay';
 import {
+  coverOf,
   downloadLabel,
   evidenceFacts,
   evidenceLabel,
   isReadable,
+  isVideoEvidence,
   KIND_ICON,
 } from './labels';
 import { useReaderWindow, type ReaderLayout } from './readerWindow';
-import { evidenceBbox } from './spec';
+import { evidenceBandTop, evidenceBbox } from './spec';
 import { useSpotEvidence } from './useSpotEvidence';
 
 // Room for the band above and for wherever the box starts out, so the
@@ -59,18 +61,32 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   // Held by id, not by index: a render landing or a row being deleted
   // reshuffles the list under the reader.
   const [shownId, setShownId] = useState<string | null>(null);
+  // Nothing flipped to yet, or the row that was is gone: the cover, which is
+  // the row the strip stars.
+  const shown = shownId ?? coverOf(readable)?.id;
   const index = Math.max(
     0,
-    readable.findIndex((rec) => rec.id === shownId),
+    readable.findIndex((rec) => rec.id === shown),
   );
   const current = readable[index] ?? null;
 
   const [transparency, setTransparency] = useState(0);
 
+  // Every readable row reaches the ground; which overlay carries it is the
+  // only difference a loop makes, and the slider fades either.
+  const still = current && !isVideoEvidence(current) ? current : null;
+  const loop = current && isVideoEvidence(current) ? current : null;
+
   useEvidenceOverlay(
-    current ? evidenceFileUrl(current) : '',
-    current ? evidenceBbox(current) : null,
+    still ? evidenceFileUrl(still) : '',
+    still ? evidenceBbox(still) : null,
     1 - transparency / 100,
+  );
+  useEvidenceLoopOverlay(
+    loop ? evidenceFileUrl(loop) : '',
+    loop ? evidenceBbox(loop) : null,
+    1 - transparency / 100,
+    loop ? evidenceBandTop(loop) : 1,
   );
 
   const step = useCallback(
@@ -269,24 +285,26 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
 
               {hasSketch && <SketchFade className={styles.sketch} />}
 
-              <div className={styles.fade}>
-                <Tooltip label={t('terrainControls.transparency')}>
-                  <span className={styles.fadeIcon}>
-                    <Icon icon="opacity" size={16} />
-                  </span>
-                </Tooltip>
-                <Slider
-                  className={styles.slider}
-                  size="xs"
-                  min={0}
-                  max={100}
-                  step={5}
-                  label={(value) => `${value} %`}
-                  aria-label={t('terrainControls.transparency')}
-                  value={transparency}
-                  onChange={setTransparency}
-                />
-              </div>
+              {current && (
+                <div className={styles.fade}>
+                  <Tooltip label={t('terrainControls.transparency')}>
+                    <span className={styles.fadeIcon}>
+                      <Icon icon="opacity" size={16} />
+                    </span>
+                  </Tooltip>
+                  <Slider
+                    className={styles.slider}
+                    size="xs"
+                    min={0}
+                    max={100}
+                    step={5}
+                    label={(value) => `${value} %`}
+                    aria-label={t('terrainControls.transparency')}
+                    value={transparency}
+                    onChange={setTransparency}
+                  />
+                </div>
+              )}
             </div>
           }
         >
@@ -312,11 +330,24 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
                       aria-pressed={rec.id === current?.id}
                       onClick={() => setShownId(rec.id)}
                     >
-                      <img
-                        className={styles.thumb}
-                        src={evidenceFileUrl(rec, '200x200')}
-                        alt={label}
-                      />
+                      {isVideoEvidence(rec) ? (
+                        // `#t=0.1` so a frame is painted rather than a black
+                        // box; PocketBase makes no thumbnail for a video.
+                        <video
+                          className={styles.thumb}
+                          src={`${evidenceFileUrl(rec)}#t=0.1`}
+                          preload="metadata"
+                          muted
+                          playsInline
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <img
+                          className={styles.thumb}
+                          src={evidenceFileUrl(rec, '200x200')}
+                          alt={label}
+                        />
+                      )}
                       <Icon
                         icon={KIND_ICON[rec.kind]}
                         size={12}

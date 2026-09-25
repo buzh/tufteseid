@@ -136,10 +136,14 @@ version bump drifts it, substitute this for the `--log-format` line in
 | Caddy access log | 10 rolled generations of 20 MB, gzipped | `Caddyfile`, `log` block (`roll_size`, `roll_keep`) |
 | wmscache access log | 4 × 50 MB | `docker-compose.yml`, `logging:` |
 | mapproxy log | 3 × 20 MB | `docker-compose.yml`, `logging:` |
+| rendersvc log | 3 × 20 MB | `docker-compose.yml`, `logging:` |
 | GoAccess report | rebuilt from the whole log set every run | — |
 
 Docker's json-file driver keeps every line forever unless capped, hence the
-`logging:` blocks on the two noisiest services.
+`logging:` blocks on the noisy services. rendersvc is capped for a different
+reason: it writes a handful of lines per job, but each one is the trace of a
+render nobody is watching, and the cap is what stops a stuck retry loop filling
+the disk.
 
 Longer history is `roll_keep`. For no request log at all, delete the `log`
 block from the `Caddyfile` and the `/var/log/caddy` bind mount; both scripts

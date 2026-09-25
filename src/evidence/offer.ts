@@ -76,6 +76,9 @@ export const terrainOfferAtom = atom<EvidenceSpec | null>(null);
  * is parameters, not pixels: keeping one re-renders it over the spot's
  * footprint at the source's own resolution, not the rectangle or the
  * resolution on screen.
+ *
+ * Every one of them is a reading of what is on screen. The sun loop is not, so
+ * it is `SUN_LOOP_SPEC` and is offered by the editor instead.
  */
 export const keepOffersAtom = atom<EvidenceSpec[]>((get) =>
   [get(groundOfferAtom), get(terrainOfferAtom)].filter(

@@ -3,8 +3,9 @@ import { pb } from './pocketbase';
 const COLLECTION = 'evidence';
 
 /** Which producer made the pixels. Mirrors the `kind` select values in
- *  `pb_migrations/1700001300_evidence.js`. */
-export type EvidenceKind = 'lidar' | 'terrain' | 'flyfoto';
+ *  `pb_migrations/1700001300_evidence.js`, plus `sunloop` from
+ *  `1700001400_evidence_sunloop.js` — the one kind rendered on the server. */
+export type EvidenceKind = 'lidar' | 'terrain' | 'flyfoto' | 'sunloop';
 
 /** Free-form per kind, and read back through `src/evidence/spec.ts` rather than
  *  trusted. Server-side ceiling is 10 kB. */

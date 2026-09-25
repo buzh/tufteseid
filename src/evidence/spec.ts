@@ -1,10 +1,16 @@
 import type { EvidenceMeta, EvidenceRecord } from '../api/evidence';
 import type { LidarModel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import type { DemModel } from '../terrain/dem';
+import { DEFAULT_ALTITUDE, DEFAULT_Z_FACTOR } from '../terrain/render';
 import { VISUALIZATIONS, type Visualization } from '../terrain/shade';
 
 /** The seamless best-available mosaic, as against one acquisition. */
 export const NIB_MOSAIC = 'mosaic';
+
+/** Degrees between frames. Must divide 360, or the loop jumps where it closes;
+ *  the sidecar refuses one that does not. */
+export const SUNLOOP_STEP_DEG = 5;
+export const SUNLOOP_FPS = 24;
 
 export type EvidenceSpec =
   | {
@@ -36,7 +42,34 @@ export type EvidenceSpec =
       projectName: string | null;
       year: number | null;
       photoDate: string | null;
+    }
+  | {
+      /** Shaded relief with the sun walked all the way round, as a WebM loop.
+       *  Rendered by the sidecar, never in the browser. No azimuth: the loop is
+       *  every azimuth. */
+      kind: 'sunloop';
+      model: DemModel;
+      altitude: number;
+      zFactor: number;
+      stepDeg: number;
+      fps: number;
     };
+
+/**
+ * The one ask a spot's own footprint is enough for, so it is a constant rather
+ * than a reading of anything on screen: the loop walks every azimuth, which
+ * leaves only the sun's height and the exaggeration under it, and the terrain
+ * panel's own defaults answer both. Module-level, because `evidenceMatches`
+ * against it decides whether the button is spent.
+ */
+export const SUN_LOOP_SPEC: EvidenceSpec = {
+  kind: 'sunloop',
+  model: 'dtm',
+  altitude: DEFAULT_ALTITUDE,
+  zFactor: DEFAULT_Z_FACTOR,
+  stepDeg: SUNLOOP_STEP_DEG,
+  fps: SUNLOOP_FPS,
+};
 
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null;
@@ -80,6 +113,14 @@ export const metaOf = (spec: EvidenceSpec): EvidenceMeta => {
         projectName: spec.projectName,
         year: spec.year,
         photoDate: spec.photoDate,
+      };
+    case 'sunloop':
+      return {
+        model: spec.model,
+        altitude: spec.altitude,
+        zFactor: spec.zFactor,
+        stepDeg: spec.stepDeg,
+        fps: spec.fps,
       };
   }
 };
@@ -130,6 +171,18 @@ export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
         photoDate: str(meta.photoDate),
       };
     }
+    case 'sunloop': {
+      const model = asModel(meta.model);
+      if (!model) return null;
+      return {
+        kind: 'sunloop',
+        model,
+        altitude: num(meta.altitude) ?? 0,
+        zFactor: num(meta.zFactor) ?? 1,
+        stepDeg: num(meta.stepDeg) ?? SUNLOOP_STEP_DEG,
+        fps: num(meta.fps) ?? SUNLOOP_FPS,
+      };
+    }
   }
 };
 
@@ -147,6 +200,19 @@ export const evidenceBbox = (
   return out.every((v) => v != null)
     ? (out as [number, number, number, number])
     : null;
+};
+
+/**
+ * Where the burnt-in provenance band starts, as a fraction of the picture's
+ * height; 1 for anything without one, which is everything but a sun loop. A
+ * still is stamped in the reader's own tab at download time and the kept
+ * pixels are clean, but `createImageBitmap` throws on a WebM, so a loop is
+ * cited on the way out of the sidecar instead (`docs/render-sidecar.md`). Only
+ * the part above the band is registered to `bbox25833`.
+ */
+export const evidenceBandTop = (rec: EvidenceRecord): number => {
+  const value = num(rec.meta?.bandTop);
+  return value != null && value > 0 && value <= 1 ? value : 1;
 };
 
 // Metres; absorbs a JSON round trip, and a sub-metre nudge is the same ground.
@@ -203,5 +269,14 @@ export const evidenceMatches = (
       );
     case 'flyfoto':
       return stored.kind === 'flyfoto' && stored.projectId === spec.projectId;
+    case 'sunloop':
+      return (
+        stored.kind === 'sunloop' &&
+        stored.model === spec.model &&
+        sameNumber(stored.altitude, spec.altitude) &&
+        sameNumber(stored.zFactor, spec.zFactor) &&
+        stored.stepDeg === spec.stepDeg &&
+        stored.fps === spec.fps
+      );
   }
 };
