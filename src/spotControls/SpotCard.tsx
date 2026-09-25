@@ -16,7 +16,10 @@ import { useTranslation } from 'react-i18next';
 import { updateSpot, type SpotRecord } from '../api/spots';
 import { EvidenceGallery } from '../evidence/EvidenceGallery';
 import { isReadable } from '../evidence/labels';
-import { useSpotEvidence } from '../evidence/useSpotEvidence';
+import {
+  useSpotEvidence,
+  type SpotEvidence,
+} from '../evidence/useSpotEvidence';
 import { sketchOf } from '../sketch/scene';
 import { SketchFade } from '../sketch/SketchFade';
 import {
@@ -30,28 +33,38 @@ import {
 import { derivedFootprint } from '../spots/footprint';
 import { ControlButton } from '../ui/ControlButton';
 import { cx } from '../ui/cx';
+import { Hint } from '../ui/Hint';
 import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
 import styles from './SpotBox.module.css';
 import { useSpotDraft, type SpotDraftController } from './useSpotDraft';
 
 /**
- * The rectangle and the drawing: the two things adjusted against the ground
- * rather than filled into a form, so the card does them itself. `hold` is
- * present exactly while a draft has the map, and is then the only current
- * account of either — the record lags it by a round trip.
+ * The camera, the rectangle and the drawing: the three things done against the
+ * ground rather than filled into a form, so the card does them itself. `hold`
+ * is present exactly while a draft has the map, and is then the only current
+ * account of the rectangle and the drawing — the record lags it by a round
+ * trip.
  */
 const SpotUnits = ({
   spot,
+  evidence,
   hold,
 }: {
   spot: SpotRecord;
+  evidence: SpotEvidence;
   hold?: SpotDraftController;
 }) => {
   const { t } = useTranslation();
   const adjust = useSetAtom(adjustSpotDraftAtom);
   const framing = hold?.stage === 'footprint';
   const drawing = hold?.stage === 'sketch';
+
+  // A stage has the map: the rectangle being dragged is not the one the record
+  // carries and a draw session has the map frozen, so a picture kept now would
+  // not be of what the offer says.
+  const offer = hold ? null : evidence.offer;
+  const keepLabel = t(offer?.kept ? 'evidence.kept' : 'evidence.keep');
 
   const hasSketch = hold ? hold.hasSketch : sketchOf(spot.sketch) !== null;
 
@@ -83,6 +96,19 @@ const SpotUnits = ({
         </div>
       ) : (
         <div className={styles.tools}>
+          <Hint
+            id="keepPicture"
+            tips={offer && !offer.kept ? [t('hints.keepPicture')] : []}
+          >
+            <Tooltip label={keepLabel}>
+              <ControlButton
+                icon={offer?.kept ? 'check' : 'photo_camera'}
+                aria-label={keepLabel}
+                disabled={!offer || offer.kept}
+                onClick={() => offer && evidence.keep(offer.spec)}
+              />
+            </Tooltip>
+          </Hint>
           <Tooltip label={t('spots.footprintChange')}>
             <ControlButton
               icon="crop_free"
@@ -119,13 +145,15 @@ const SpotUnits = ({
  *  more to the point — flushes with it, while the card around it stands. */
 const SpotUnitsHeld = ({
   spot,
+  evidence,
   draft,
 }: {
   spot: SpotRecord;
+  evidence: SpotEvidence;
   draft: SpotDraft;
 }) => {
   const hold = useSpotDraft(draft, spot);
-  return <SpotUnits spot={spot} hold={hold} />;
+  return <SpotUnits spot={spot} evidence={evidence} hold={hold} />;
 };
 
 export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
@@ -206,9 +234,14 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
       }
     >
       {draft ? (
-        <SpotUnitsHeld key={draft.id} spot={spot} draft={draft} />
+        <SpotUnitsHeld
+          key={draft.id}
+          spot={spot}
+          evidence={evidence}
+          draft={draft}
+        />
       ) : (
-        <SpotUnits spot={spot} />
+        <SpotUnits spot={spot} evidence={evidence} />
       )}
 
       {spot.description && <p className={styles.prose}>{spot.description}</p>}
@@ -223,7 +256,7 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
         onChange={(event) => setVisibility(event.currentTarget.checked)}
       />
 
-      <EvidenceGallery spot={spot} evidence={evidence} held={draft != null} />
+      <EvidenceGallery spot={spot} evidence={evidence} />
 
       {failed && (
         <Alert color="red" mt="xs" p="xs">

@@ -15,7 +15,7 @@ One row per directory under `src/`.
 | --- | --- |
 | `api/` | PocketBase singleton (`pocketbase.ts`), the `spots` and `evidence` collection clients, and the one call into the render sidecar (`render.ts`). |
 | `auth/` | OAuth2 dialog, the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
-| `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue and the handover to the render sidecar, the gallery that offers and orders them, the reader that lays them back on the map, and the provenance legend stamped onto a download. |
+| `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue and the handover to the render sidecar, the gallery that lists and orders what was kept, the reader that lays them back on the map, and the provenance legend stamped onto a download. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
 | `grounds/` | The ground switch. Which ground is up is derived from the half's background layer, never stored. |
 | `heritageControls/` | The Kulturminner control: which theme layers are ticked and how they are drawn. |
@@ -80,7 +80,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `spotRecordsAtom`, `spotsFailedAtom` | `spots/spotRecords.ts` | Every record the session may see, null until the list lands; and whether it never did. |
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
-| `keepOffersAtom` | same | Derived: the ground's offer (off the A half) and the terrain's, ground first. Only what is on screen — the sun loop is not, so `useSpotEvidence` appends `SUN_LOOP_SPEC` (`evidence/spec.ts`) to the list. |
+| `keepOfferAtom` | same | Derived: the terrain's offer when an analysis is running, otherwise the ground's (off the A half). Null where the view cannot be re-rendered. |
 | `draftGroundAtom` | `evidence/draftGround.ts` | One of the spot's own pictures laid back on the map at the extent it was rendered over, to trace a drawing onto. Published by `EvidenceGallery`, which is the only thing holding the rows. |
 | the reading box's layout and placement | `evidence/readerWindow.ts` | Which way round the box is laid out, where it was dragged to, how big it may get and which wall it is docked against. Module-private, reached through `useReaderWindow`: held outside the component, which remounts per spot. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
@@ -227,10 +227,11 @@ megabytes on every press.
 
 A spot's `evidence` rows are a sequence, not a set. `sort` is an ordering key in
 epoch milliseconds, so a row lands last by being created. There is one list over
-them — `EvidenceGallery` on the card — and it does everything: the offers above
-it, the kept rows below, the drag that sets the order, and the press that lays a
-picture back on the map to trace over. `EvidenceReader` flips through the same
-rows full size and changes none of them.
+them — `EvidenceGallery` on the card — and it does everything but the asking:
+the kept rows, the drag that sets the order, and the press that lays a picture
+back on the map to trace over. Asking for another is the camera in the card's
+tools row, beside the rectangle and the pen. `EvidenceReader` flips through the
+same rows full size and changes none of them.
 
 - **The cover is the first readable row.** Nothing marks one: the reading opens
   on it, so dragging a picture to the top is how a cover is chosen, and the star
@@ -251,16 +252,21 @@ rows full size and changes none of them.
 - Pictures are their own records, so reordering — like keeping and deleting —
   is written when it happens, as is every other unit of a spot
   (*Making a spot*).
-- **An offer is a row, not a button.** Its title is a full source name — a
-  dataset and a visualization — which no button in a 19 rem panel can carry, so
-  the row shows the title ellipsized with the whole of it in a tooltip and puts
-  one compact `+` on the right.
-- **What is offered follows the map.** `keepOffersAtom` publishes readings of
-  the ground and the analysis as they stand, so those offers come and go with
-  what is under them. A sun loop reads nothing on screen — it is every azimuth,
-  which leaves only the sun's height and the exaggeration, and `SUN_LOOP_SPEC`
-  answers both from the terrain panel's defaults — so `useSpotEvidence` appends
-  it last, where it stands whatever the reader is looking at.
+- **One offer, and it is a button.** The camera in the card's tools row keeps
+  the view as it stands, so the gallery lists only what is already kept. Asking
+  is one press with no source name attached: the row it makes carries the title
+  (`evidenceTitle`), and the reader chose the view by looking at it.
+- **What is offered follows the map.** `keepOfferAtom` publishes a reading of
+  the ground as it stands, or of the analysis when one is running — the
+  analysis wins, because it is then what is on screen and the ground it was
+  computed from is underneath it. Where neither can be re-rendered (cartography,
+  the empty ground, `lidarCvat`) the offer is null and the camera is dead.
+- **Nothing asks for a `sunloop`.** The kind, `rendersvc` and the queue's
+  handover arm are all live and an existing row still reads and retries, but no
+  surface offers a new one: a sun loop reads nothing on screen, so it did not
+  belong on a camera that keeps the view, and it has not been given another
+  home yet. The offer atom is the hook a future one hangs off
+  (`docs/render-sidecar.md`).
 - **Not every row is made here.** Three kinds are rendered in the tab that asked
   for them; `sunloop` is created the same way and then handed to the render
   sidecar, which writes the file back itself (`docs/render-sidecar.md`). The row,
@@ -348,7 +354,7 @@ holds the ground still and changes only how it was seen.
   — and stays there: `spotReadingAtom` reads true for a spot outside `mayEdit`
   whatever is written to it, so there is nothing for the reading to step back
   to. A visitor sees one box, and closing it leaves the map as it was. The card
-  holds the rectangle, the pen, the visibility switch and the offers, none of
+  holds the camera, the rectangle, the pen and the visibility switch, none of
   which a visitor may press; keeping it behind the reading would be a panel of
   disabled controls and one button that works. So neither the card nor
   `EvidenceGallery`, which only the card mounts, branches on `mayEdit` at all —

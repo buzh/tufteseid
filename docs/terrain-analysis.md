@@ -294,6 +294,9 @@ Every verb — on, off, `Start`, `Juster` — is a write to one of them.
   draws ground but no analysis.
 - While an analysis has something to show, `useTerrainControls` publishes its
   settings to `terrainOfferAtom` (`src/evidence/offer.ts`), which is what lets a
-  spot keep the same reading over its own footprint. The offer carries the
-  *clamped* radius, because that is the distance the reading on screen was made
-  at. Unlike the ground's offer it cannot be derived — these are component state.
+  spot keep the same reading over its own footprint. While it stands it is what
+  the spot card's camera keeps, ahead of the ground's own offer: the analysis is
+  drawn over that ground, so it is what the reader is looking at. The offer
+  carries the *clamped* radius, because that is the distance the reading on
+  screen was made at. Unlike the ground's offer it cannot be derived — these are
+  component state.

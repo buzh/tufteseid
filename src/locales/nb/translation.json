@@ -16,8 +16,7 @@
     "read": "Les",
     "loading": "Henter bilder …",
     "none": "Ingen bilder på denne lokaliteten ennå.",
-    "keepLabel": "Ta vare på det du ser",
-    "keep": "Ta vare på",
+    "keep": "Lagre denne visningen som et bilde",
     "kept": "Tatt vare på",
     "rendering": "lager bildet …",
     "renderFailed": "kilden svarte ikke",
@@ -138,7 +137,8 @@
     "never": "Ikke vis igjen",
     "close": "Greit",
     "sketch": "Vis/Skjul skisser (t)",
-    "pictures": "Piltastene ← → blar i bildene."
+    "pictures": "Piltastene ← → blar i bildene.",
+    "keepPicture": "Klikk her for å lagre visningen som vedlegg"
   },
   "kartControls": {
     "chipTitle": "{{variant}} — {{hint}}",

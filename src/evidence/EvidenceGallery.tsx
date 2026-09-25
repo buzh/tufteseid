@@ -1,7 +1,7 @@
-// One list over the spot's pictures: what the reader could keep of the ground
-// in front of them, and what they have kept. The kept rows are also where the
-// order is set and where a picture is laid back on the map to trace over, so
-// there is no second list of the same rows anywhere.
+// The spot's kept pictures, one list. Asking for another one is the camera in
+// `SpotCard`, not here. This list is also where the order is set and where a
+// picture is laid back on the map to trace over, so there is no second list of
+// the same rows anywhere.
 
 import { Alert, Tooltip } from '@mantine/core';
 import { useAtom } from 'jotai';
@@ -27,7 +27,6 @@ import {
   downloadLabel,
   evidenceLabel,
   evidenceResolution,
-  evidenceTitle,
   isVideoEvidence,
   KIND_ICON,
   laysOnGround,
@@ -218,17 +217,12 @@ const EvidenceItem = ({
 export const EvidenceGallery = ({
   spot,
   evidence,
-  held,
 }: {
   spot: SpotRecord;
   evidence: SpotEvidence;
-  /** A stage has hold of the map: the rectangle being dragged is not the one
-   *  the record still carries, and a draw session has the map frozen. Either
-   *  way an offer would keep a picture of something other than what it says. */
-  held: boolean;
 }) => {
   const { t } = useTranslation();
-  const { items, offers, reorder } = evidence;
+  const { items, reorder } = evidence;
   const file = useEvidenceDownload(spot);
   const [ground, setGround] = useAtom(draftGroundAtom);
   const listRef = useRef<HTMLUListElement>(null);
@@ -313,37 +307,6 @@ export const EvidenceGallery = ({
 
   return (
     <div className={styles.gallery}>
-      {offers.length > 0 && (
-        <>
-          <div className={styles.head}>
-            <Icon icon="add_photo_alternate" size={14} />
-            <span>{t('evidence.keepLabel')}</span>
-          </div>
-          <ul className={styles.list}>
-            {offers.map((offer) => {
-              const what = evidenceTitle(offer.spec);
-              const label = t(offer.kept ? 'evidence.kept' : 'evidence.keep');
-              return (
-                <li key={offer.spec.kind} className={styles.offer}>
-                  <Icon icon={KIND_ICON[offer.spec.kind]} size={14} />
-                  <Tooltip label={what}>
-                    <span className={styles.title}>{what}</span>
-                  </Tooltip>
-                  <Tooltip label={label}>
-                    <ControlButton
-                      icon={offer.kept ? 'check' : 'add'}
-                      aria-label={label}
-                      disabled={offer.kept || held}
-                      onClick={() => evidence.keep(offer.spec)}
-                    />
-                  </Tooltip>
-                </li>
-              );
-            })}
-          </ul>
-        </>
-      )}
-
       {rows.length > 0 && (
         <>
           <div className={styles.head}>

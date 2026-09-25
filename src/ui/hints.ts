@@ -4,7 +4,7 @@ import { atom, useAtomValue } from 'jotai';
 export const TYPING_SURFACE = 'input, textarea, [contenteditable="true"]';
 
 /** Spelled out so a tip's stored entry stays greppable. */
-const HINT_IDS = ['sketchKey', 'pictureKeys'] as const;
+const HINT_IDS = ['sketchKey', 'pictureKeys', 'keepPicture'] as const;
 
 export type HintId = (typeof HINT_IDS)[number];
 

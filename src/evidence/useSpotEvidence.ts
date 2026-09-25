@@ -21,7 +21,7 @@ import type { SpotRecord } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
 import { bboxToMetric } from '../map/bbox';
 import { sunLoopLegend } from './legendContent';
-import { keepOffersAtom } from './offer';
+import { keepOfferAtom } from './offer';
 import { sortsForMove } from './order';
 import {
   enqueueRender,
@@ -30,12 +30,7 @@ import {
   subscribeRenderQueue,
   type RenderState,
 } from './queue';
-import {
-  evidenceMatches,
-  metaOf,
-  SUN_LOOP_SPEC,
-  type EvidenceSpec,
-} from './spec';
+import { evidenceMatches, metaOf, type EvidenceSpec } from './spec';
 
 type KeepOffer = {
   spec: EvidenceSpec;
@@ -48,9 +43,9 @@ export type SpotEvidence = {
   /** Null until the list lands; an empty array means none. */
   items: EvidenceRecord[] | null;
   failed: boolean;
-  /** What the reader could keep a picture of right now: whatever is on the
-   *  ground under the rectangle, plus the sun loop. */
-  offers: KeepOffer[];
+  /** What the reader could keep a picture of right now — the view as it
+   *  stands — or null where nothing on screen can be re-rendered. */
+  offer: KeepOffer | null;
   keep: (spec: EvidenceSpec) => void;
   retry: (rec: EvidenceRecord) => void;
   remove: (id: string) => void;
@@ -76,7 +71,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
   const { i18n } = useTranslation();
   const language = i18n.language;
   const user = useAtomValue(currentUserAtom);
-  const offered = useAtomValue(keepOffersAtom);
+  const offered = useAtomValue(keepOfferAtom);
 
   const [items, setItems] = useState<EvidenceRecord[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -138,16 +133,14 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     [footprint],
   );
 
-  const offers = useMemo(
+  const offer = useMemo(
     () =>
-      metric && items
-        ? // The sun loop last: it reads nothing on screen, so unlike the others
-          // it is the same ask whatever the reader is looking at.
-          [...offered, SUN_LOOP_SPEC].map((spec) => ({
-            spec,
-            kept: items.some((rec) => evidenceMatches(rec, spec, metric)),
-          }))
-        : [],
+      metric && items && offered
+        ? {
+            spec: offered,
+            kept: items.some((rec) => evidenceMatches(rec, offered, metric)),
+          }
+        : null,
     [offered, items, metric],
   );
 
@@ -240,7 +233,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
   return {
     items,
     failed,
-    offers,
+    offer,
     keep,
     retry: render,
     remove,

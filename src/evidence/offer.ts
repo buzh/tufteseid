@@ -72,16 +72,14 @@ const groundOfferAtom = atom<EvidenceSpec | null>((get) => {
 export const terrainOfferAtom = atom<EvidenceSpec | null>(null);
 
 /**
- * The offers standing, ground first — the order they are stacked in. An offer
- * is parameters, not pixels: keeping one re-renders it over the spot's
- * footprint at the source's own resolution, not the rectangle or the
- * resolution on screen.
+ * The one offer standing: what the camera in the spot card would keep of the
+ * view as it is. The analysis wins when one is running, because it is then what
+ * the reader is looking at — the ground it was computed from is underneath it.
  *
- * Every one of them is a reading of what is on screen. The sun loop is not, so
- * it is `SUN_LOOP_SPEC` and is offered by the editor instead.
+ * An offer is parameters, not pixels: keeping it re-renders over the spot's
+ * footprint at the source's own resolution, not the rectangle or the resolution
+ * on screen.
  */
-export const keepOffersAtom = atom<EvidenceSpec[]>((get) =>
-  [get(groundOfferAtom), get(terrainOfferAtom)].filter(
-    (spec): spec is EvidenceSpec => spec !== null,
-  ),
+export const keepOfferAtom = atom<EvidenceSpec | null>(
+  (get) => get(terrainOfferAtom) ?? get(groundOfferAtom),
 );

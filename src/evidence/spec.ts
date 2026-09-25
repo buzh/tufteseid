@@ -1,7 +1,6 @@
 import type { EvidenceMeta, EvidenceRecord } from '../api/evidence';
 import type { LidarModel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import type { DemModel } from '../terrain/dem';
-import { DEFAULT_ALTITUDE, DEFAULT_Z_FACTOR } from '../terrain/render';
 import { VISUALIZATIONS, type Visualization } from '../terrain/shade';
 
 /** The seamless best-available mosaic, as against one acquisition. */
@@ -54,22 +53,6 @@ export type EvidenceSpec =
       stepDeg: number;
       fps: number;
     };
-
-/**
- * The one ask a spot's own footprint is enough for, so it is a constant rather
- * than a reading of anything on screen: the loop walks every azimuth, which
- * leaves only the sun's height and the exaggeration under it, and the terrain
- * panel's own defaults answer both. Module-level, because `evidenceMatches`
- * against it decides whether the button is spent.
- */
-export const SUN_LOOP_SPEC: EvidenceSpec = {
-  kind: 'sunloop',
-  model: 'dtm',
-  altitude: DEFAULT_ALTITUDE,
-  zFactor: DEFAULT_Z_FACTOR,
-  stepDeg: SUNLOOP_STEP_DEG,
-  fps: SUNLOOP_FPS,
-};
 
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null;

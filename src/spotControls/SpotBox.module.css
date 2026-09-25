@@ -34,8 +34,9 @@
   color: var(--mantine-color-dimmed);
 }
 
-/* The rectangle and the drawing at rest: two buttons on a line, not two framed
-   rows. The row below is what either of them becomes once it has the map. */
+/* The camera, the rectangle and the drawing at rest: three buttons on a line,
+   not three framed rows. The row below is what the last two become once one of
+   them has the map. */
 .tools {
   display: flex;
   flex-wrap: wrap;
