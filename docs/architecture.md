@@ -361,7 +361,11 @@ over the whole of that.
   it plays *in this picture* — the same Kartverket is `høydedata` under a
   terrain render and `skyggerelieff` under a LiDAR extract, and that difference
   is the statement about who did the visualising. Terrain therefore also carries
-  an authored line, because that one the app made rather than fetched.
+  an authored line, because that one the app made rather than fetched. One line
+  is not a rights holder at all: relief that came out of the Relief
+  Visualization Toolbox — terrain, the sun loop, the cached VAT — adds a
+  short-form citation of RVT's authors, who ask for one. The full references are
+  in `README.md`, and a figure cannot carry them.
 - **The bar and the link are shed to keep the band under a fifth of the image
   height**, in that order. The rights lines are not shed even when they take it
   past the fifth, so a small render comes out with a heavy band rather than

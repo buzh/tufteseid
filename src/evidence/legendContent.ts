@@ -9,7 +9,10 @@ import { transform } from 'ol/proj';
 
 import type { EvidenceRecord } from '../api/evidence';
 import type { SpotRecord } from '../api/spots';
-import { lidarStyleLabel } from '../map/layers/config/backgroundLayers/lidarProjects';
+import {
+  CVAT_STYLE,
+  lidarStyleLabel,
+} from '../map/layers/config/backgroundLayers/lidarProjects';
 import { formatPoint } from '../spots/geo';
 import { shareUrlOf } from '../spots/shareLink';
 import { evidenceFacts, evidenceTitle, specFacts } from './labels';
@@ -50,7 +53,7 @@ const KARTVERKET = {
 
 // Not open data; the notice follows the image out.
 const NORGE_I_BILDER = {
-  holder: 'Norge i bilder — Kartverket, Geovekst, NIBIO og kommunene',
+  holder: 'Statens kartverk, Geovekst og kommunene',
   terms: 'evidence.figure.terms.nib',
 };
 
@@ -78,24 +81,31 @@ const heightData = (): string =>
     KARTVERKET.terms,
   );
 
+/** Not a rights holder: RVT's authors ask that work using the tools cite them,
+ *  and a figure travels away from the README that holds the full references.
+ *  Short-form on purpose — rights lines are never shed, so every one of them
+ *  makes the band taller. */
+const rvtMethod = (): string => t('evidence.figure.rights.method');
+
 /** One line per holder rather than one joined line: Norge i bilder's name
  *  alone is sixty characters. */
 const rightsOf = (spec: EvidenceSpec, credit: string): string[] => {
   switch (spec.kind) {
-    case 'lidar':
+    case 'lidar': {
       // The WMS serves the shading, not the heights, so what Kartverket
-      // published here is the picture itself and none of it is ours.
-      return [
-        rightsLine(
-          lidarStyleLabel(spec.style).toLowerCase(),
-          KARTVERKET.holder,
-          KARTVERKET.terms,
-        ),
-      ];
+      // published here is the picture itself and none of it is ours. The one
+      // exception is the cached VAT, which `vat-cache/` computed with RVT.
+      const line = rightsLine(
+        lidarStyleLabel(spec.style).toLowerCase(),
+        KARTVERKET.holder,
+        KARTVERKET.terms,
+      );
+      return spec.style === CVAT_STYLE ? [line, rvtMethod()] : [line];
+    }
     // The sidecar shades the same heights the browser does, only more of them.
     case 'terrain':
     case 'sunloop':
-      return [heightData(), ourVisualisation(credit)];
+      return [heightData(), ourVisualisation(credit), rvtMethod()];
     case 'flyfoto':
       return [
         rightsLine(

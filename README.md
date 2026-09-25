@@ -142,6 +142,20 @@ need not be computed here either — `vat-cache/makevat.py` renders one
 acquisition into one self-contained file on whatever machine has the cores, and
 copying that file into the store is the whole of the deploy.
 
+The Toolbox is ZRC SAZU's, and its authors ask that work using the tools cite
+them. A figure whose relief came from it carries a short *metode:* line in its
+legend, pointing here:
+
+> Zakšek, K., Oštir, K., Kokalj, Ž. 2011. Sky-View Factor as a Relief
+> Visualization Technique. *Remote Sensing* 3: 398–415.
+>
+> Kokalj, Ž., Zakšek, K., Oštir, K. 2011. Application of Sky-View Factor for the
+> Visualization of Historic Landscape Features in Lidar-Derived Relief Models.
+> *Antiquity* 85, 327: 263–273.
+>
+> Kokalj, Ž., Somrak, M. 2019. Why Not a Single Image? Combining Visualizations
+> to Facilitate Fieldwork and On-Screen Mapping. *Remote Sensing* 11(7): 747.
+
 MIT — see [`LICENCE`](LICENCE). Upstream copyright by Statens Kartverk (The
 Norwegian Mapping Authority) is preserved as required. Web services from
 Kartverket and Riksantikvaren are subject to their own licences (mostly CC-BY

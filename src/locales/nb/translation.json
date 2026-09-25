@@ -75,7 +75,8 @@
       },
       "rights": {
         "line": "{{role}}: © {{holder}} ({{terms}})",
-        "authors": "{{author}} og {{app}}"
+        "authors": "{{author}} og {{app}}",
+        "method": "RVT-py 2.2.3 (Zakšek et al. 2011; Kokalj et al. 2011; Kokalj & Somrak 2019)"
       }
     }
   },
