@@ -30,7 +30,7 @@ One row per directory under `src/`.
 | `shared/` | Error boundary, URL parameter access, coordinate parsing, enum and number helpers, and the request deadline that reports to the breaker. |
 | `showControls/` | The band's what-is-drawn-over-the-ground group: the Kulturminner control and the drawing's toggle. |
 | `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the pen, and the render onto the ground. |
-| `spotControls/` | The reader's records as surfaces: the `+`, the editor, the read card, the index menu. |
+| `spotControls/` | The reader's records as surfaces: the `+`, the properties box, the read card, the index menu. |
 | `spots/` | Spot state and geometry: the pin layer and its style, the footprint frame, hit test, place and adjust, share link, name suggestion. |
 | `terrain/` | Client-side terrain analysis: DEM fetch, shading, the analysis window and its layers. |
 | `terrainControls/` | The terrain toggle and its panel. |
@@ -150,14 +150,14 @@ the tile guard and the theme-layer effect walk whatever maps exist.
 
 ## Making a spot
 
-Two boxes stand over one record. `SpotEditor` is what a spot is *called* — name,
-description, the pin, and the delete — reached from the card's cogwheel and from
-the `+` that makes a new one. `SpotCard` is where the reader then spends their
-time: the rectangle and the drawing as a button each, and the pictures. Reading
-terrain against a place is the ongoing act and naming it a one-off, so the card
-is the workbench and the editor is behind a button. A button becomes a row —
-the hint and its Ferdig, or the pen's Avbryt/Lagre — for as long as it has the
-map, and only one of the two can.
+Two boxes stand over one record. `SpotProperties` is what a spot is *called* —
+name, description, the pin, and the delete — reached from the card's cogwheel
+and from the `+` that makes a new one. `SpotCard` is where the reader then
+spends their time: the rectangle and the drawing as an icon button each, and
+the pictures. Reading terrain against a place is the ongoing act and naming it
+a one-off, so the card is the workbench and the properties box is behind a
+button. A button becomes a row — the hint and its Ferdig, or the pen's
+Avbryt/Lagre — for as long as it has the map, and only one of the two can.
 
 A spot is written as it is made. `createSpot` runs the moment the pin lands —
 under the pin's own coordinate as a provisional name, because the column is
@@ -201,7 +201,7 @@ megabytes on every press.
   is a drawing, otherwise `DEFAULT_FOOTPRINT_SIDE_M` — 50 m — around the pin.
   `squareBboxCovering` clamps to `MIN_SIDE_M`…`MAX_SIDE_M` (50…500 m), so a
   drawing outside that range gets a square that is not what was drawn and the
-  editor says so. Old rows predate the rule and are still nullable in
+  properties box says so. Old rows predate the rule and are still nullable in
   `SpotRecord`; `SpotCard` repairs one on sight with a single write rather than
   a migration, because deriving the square wants a projection PocketBase's JSVM
   has not got.
@@ -210,18 +210,18 @@ megabytes on every press.
   `bringBboxIntoView` then pans or zooms *out* until the square is on screen,
   never in, so a reader who can already see it keeps the view they chose;
   `MAX_SIDE_M` bounds how far out that ever goes.
-- **The card can take the map without becoming the editor.** `adjustSpotDraftAtom`
-  opens a draft on the open record straight into its `footprint` or `sketch`
-  stage with `box: 'card'`, and `SpotSurface` keeps showing the card. The
-  controller is mounted *inside* the card (`SpotUnitsHeld`) rather than around
-  it, so the picture list and the traced ground survive the draft — remounting
-  them would take the traced picture off the map exactly when the reader opens
-  the pen to draw on it. A card draft has no resting state: the stage's own
-  Ferdig or Avbryt writes and closes it in one act, which is why the controller
-  carries `finish`/`abort` alongside `close`.
-- **A misplaced pin is a real record**, so the editor carries its own Slett,
-  behind a two-press confirm. It is not on the card: a destructive button on a
-  surface pressed constantly buys nothing.
+- **The card can take the map without becoming the properties box.**
+  `adjustSpotDraftAtom` opens a draft on the open record straight into its
+  `footprint` or `sketch` stage with `box: 'card'`, and `SpotSurface` keeps
+  showing the card. The controller is mounted *inside* the card
+  (`SpotUnitsHeld`) rather than around it, so the picture list and the traced
+  ground survive the draft — remounting them would take the traced picture off
+  the map exactly when the reader opens the pen to draw on it. A card draft has
+  no resting state: the stage's own Ferdig or Avbryt writes and closes it in one
+  act, which is why the controller carries `finish`/`abort` alongside `close`.
+- **A misplaced pin is a real record**, so the properties box carries its own
+  Slett, behind a two-press confirm. It is not on the card: a destructive button
+  on a surface pressed constantly buys nothing.
 
 ## The pictures of a spot
 

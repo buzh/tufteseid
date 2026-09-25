@@ -14,7 +14,7 @@ import { useConfirm } from '../ui/useConfirm';
 import styles from './SpotBox.module.css';
 import type { SpotDraftController } from './useSpotDraft';
 
-export const SpotEditor = ({ spot }: { spot: SpotDraftController }) => {
+export const SpotProperties = ({ spot }: { spot: SpotDraftController }) => {
   const { t } = useTranslation();
   const placing = spot.stage === 'pin';
   const drawing = spot.stage === 'sketch';

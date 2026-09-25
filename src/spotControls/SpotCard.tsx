@@ -1,7 +1,8 @@
 // The spot's own workbench. Reading terrain against a place is the ongoing act
 // and naming it a one-off, so this box — not the editor — is where the reader
 // spends their time: what the spot is in two terse lines, the rectangle and the
-// drawing to reach for, and the pictures. The editor is behind the cogwheel.
+// drawing to reach for, and the pictures. `SpotProperties` is behind the
+// cogwheel.
 //
 // Only ever the author's own, or an admin's: `spotReadingAtom` sends anybody
 // else straight to `EvidenceReader` and keeps them there, so nothing in here —
@@ -16,7 +17,6 @@ import { updateSpot, type SpotRecord } from '../api/spots';
 import { EvidenceGallery } from '../evidence/EvidenceGallery';
 import { isReadable } from '../evidence/labels';
 import { useSpotEvidence } from '../evidence/useSpotEvidence';
-import { bboxWidthMetres } from '../map/bbox';
 import { sketchOf } from '../sketch/scene';
 import { SketchFade } from '../sketch/SketchFade';
 import {
@@ -28,6 +28,7 @@ import {
   type SpotDraft,
 } from '../spots/atoms';
 import { derivedFootprint } from '../spots/footprint';
+import { ControlButton } from '../ui/ControlButton';
 import { cx } from '../ui/cx';
 import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
@@ -52,9 +53,6 @@ const SpotUnits = ({
   const framing = hold?.stage === 'footprint';
   const drawing = hold?.stage === 'sketch';
 
-  const metres =
-    hold?.footprintSideMetres ??
-    (spot.footprint ? Math.round(bboxWidthMetres(spot.footprint)) : null);
   const hasSketch = hold ? hold.hasSketch : sketchOf(spot.sketch) !== null;
 
   return (
@@ -86,26 +84,23 @@ const SpotUnits = ({
       ) : (
         <div className={styles.tools}>
           <Tooltip label={t('spots.footprintChange')}>
-            <Button
-              size="compact-xs"
-              variant="default"
-              leftSection={<Icon icon="crop_free" size={14} />}
+            <ControlButton
+              icon="crop_free"
               aria-label={t('spots.footprintChange')}
               onClick={() => adjust(spot, 'footprint')}
-            >
-              {metres != null
-                ? t('spots.footprintSide', { metres })
-                : t('spots.footprintLabel')}
-            </Button>
+            />
           </Tooltip>
-          <Button
-            size="compact-xs"
-            variant="default"
-            leftSection={<Icon icon="draw" size={14} />}
-            onClick={() => adjust(spot, 'sketch')}
+          <Tooltip
+            label={hasSketch ? t('spots.sketchChange') : t('spots.sketchAdd')}
           >
-            {hasSketch ? t('spots.sketchChange') : t('spots.sketchAdd')}
-          </Button>
+            <ControlButton
+              icon="draw"
+              aria-label={
+                hasSketch ? t('spots.sketchChange') : t('spots.sketchAdd')
+              }
+              onClick={() => adjust(spot, 'sketch')}
+            />
+          </Tooltip>
         </div>
       )}
 
@@ -138,7 +133,7 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   const setActive = useSetAtom(activeSpotAtom);
   const edit = useSetAtom(editSpotDraftAtom);
   const setReading = useSetAtom(spotReadingAtom);
-  // Only ever a card draft: an editor draft puts `SpotEditor` here instead.
+  // Only ever a card draft: an editor draft puts `SpotProperties` here instead.
   const draft = useAtomValue(spotDraftAtom);
 
   const evidence = useSpotEvidence(spot);

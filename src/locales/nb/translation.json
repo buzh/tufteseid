@@ -319,7 +319,6 @@
     },
     "footprintHint": "Dra rektangelet, hjørnene endrer størrelsen",
     "footprintSide": "{{metres}} m",
-    "footprintLabel": "Utsnitt",
     "footprintChange": "Endre utsnittet",
     "footprintClamped": {
       "min": "Tegningen var mindre enn 50 m på tvers, så utsnittet er satt til 50 m. Endre det om du vil ha mer med.",

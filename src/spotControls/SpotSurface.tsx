@@ -24,8 +24,8 @@ import { useSpotShareLink } from '../spots/shareLink';
 import { useSpotLayer } from '../spots/spotLayer';
 import { useSpotRecords } from '../spots/spotRecords';
 import { SpotCard } from './SpotCard';
-import { SpotEditor } from './SpotEditor';
 import { SpotPlacePrompt } from './SpotPlacePrompt';
+import { SpotProperties } from './SpotProperties';
 import { useSpotDraft } from './useSpotDraft';
 
 // Lazy: this surface mounts with the map, and a plain import would put
@@ -39,7 +39,7 @@ const SketchCanvas = lazy(() =>
 /** Split out so the draft controller mounts and unmounts with the draft. Only
  *  for an editor draft: a card draft's controller belongs inside the card,
  *  which stays on screen for the whole of it. */
-const SpotEditorBox = () => {
+const SpotPropertiesBox = () => {
   const draft = useAtomValue(spotDraftAtom);
   const active = useAtomValue(activeSpotAtom);
   // The parent renders this only when there is a draft.
@@ -47,7 +47,7 @@ const SpotEditorBox = () => {
     draft!,
     active?.id === draft?.recordId ? active : null,
   );
-  return <SpotEditor spot={spot} />;
+  return <SpotProperties spot={spot} />;
 };
 
 export const SpotSurface = () => {
@@ -107,7 +107,7 @@ export const SpotSurface = () => {
           which is what keeps the picture list and the traced ground in place
           while the reader reaches for the rectangle. */}
       {draft?.box === 'editor' ? (
-        <SpotEditorBox key={draft.id} />
+        <SpotPropertiesBox key={draft.id} />
       ) : (
         active &&
         (reading ? (
