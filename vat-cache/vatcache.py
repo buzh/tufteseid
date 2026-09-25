@@ -11,8 +11,10 @@ Building is `makevat.py`'s. It renders one self-contained `<slug>.mbtiles` from
 upstream DEM, numbered off hoydedata.no's whole catalogue rather than off the
 queue here, and it does not have to run on this machine: point it at this store
 with `-o` and it builds in place, or leave it somewhere with more CPU and copy
-the file in afterwards. It repairs too — `makevat.py -c <n> -g` — so a fault
-this tool reports has one place to be fixed.
+the file in afterwards. It repairs too — `makevat.py -c <name> -g` — so a fault
+this tool reports has one place to be fixed. Hand it the name and not the
+number: the two tools number different lists, and `makevat.py` takes a name, a
+`.mbtiles` stem or a piece of either wherever it takes a number.
 
 What is left here is the store's own side of that. Which acquisitions
 `acquisitions.json` says are worth having and in what order; which ones the
@@ -206,8 +208,7 @@ def do_check(out, row, args):
     # Named, not numbered: makevat.py numbers the whole catalogue and this list
     # is the queue, so an index from one means something else in the other.
     for project in hurt:
-        print(f"    makevat.py -l {project!r}")
-    print(f"\nthen, with the number that prints: makevat.py -o {out} -c <n> -g")
+        print(f"    makevat.py -o {out} -c {project!r} -g")
 
 
 def check_names(projects):

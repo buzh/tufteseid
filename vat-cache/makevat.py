@@ -5,6 +5,9 @@
     .venv/bin/python makevat.py -l -v vestfold    with the ladder and the names checked
     .venv/bin/python makevat.py -g 1421           build number 1421
     .venv/bin/python makevat.py -g 1421 -z 15     build only its z15
+    .venv/bin/python makevat.py -g vestfold-10pkt-2025      the same, by the file
+    .venv/bin/python makevat.py -g vestfold-10pkt-2025 -z 14-12   add three levels
+    .venv/bin/python makevat.py -g vestfold-10pkt-2025 -z 16 --redo   fetch it again
     .venv/bin/python makevat.py -c 1421           read back what came out
     .venv/bin/python makevat.py -l --refresh      re-ask the catalogue
 
@@ -26,13 +29,24 @@ unit, which is why it is worth being able to run it somewhere with more of it.
 A build here knows nothing about what the destination already holds, and does
 not need to: an acquisition is a file, and files do not overlap.
 
-**An acquisition is named by number, never by name.** The names carry spaces,
-æøå and parentheses, which a shell takes apart if you let it; `-l` prints the
+**An acquisition is a number, a name, or a file.** The names carry spaces, æøå
+and parentheses, which a shell takes apart if you let it, so `-l` prints the
 catalogue numbered and `-g` takes the number. The numbers come off a local
 snapshot (`catalogue.json`, written on first use) and stay put — `--refresh`
 re-asks hoydedata.no and puts what is new on the end rather than renumbering
 around it, so a number written down today still means the same acquisition next
-month.
+month. They number *this* catalogue, though, and `vatcache.py`'s number the
+build queue, so one carried across from there means another flight entirely:
+`-g` and `-c` also take the acquisition's name, the stem of the `.mbtiles`
+already holding it, or enough of either to be unambiguous, and those mean the
+same acquisition in both tools.
+
+A file already on disk is continued, not started over: levels it does not hold
+are added and units it has finished are skipped, so `-g` on it is how a tileset
+grows. `--redo` is the other half — it hands the finished units of the levels
+this run covers back to the build, so ground fetched badly or rendered under an
+older recipe is fetched and rendered again in place. `--limit` cuts that
+hand-back as it cuts the build, so a pilot re-render leaves no hole.
 
 How deep the ladder goes needs no asking. It comes off the cell size the
 catalogue publishes the acquisition on — z16 for the 0.25 m flights, z15 for the
@@ -53,7 +67,7 @@ import acquisitions
 import build_tiles
 import coverage as coverage_mod
 import report
-from report import level_range, plural, size
+from report import level_range, plural, size, spaced
 
 HERE = Path(__file__).resolve().parent
 
@@ -110,6 +124,56 @@ def pick(snap, index):
     return names[index - 1]
 
 
+def resolve(snap, out, token):
+    """The acquisition a -g or -c argument means.
+
+    A number indexes the catalogue as -l prints it. Anything else is matched
+    against the acquisition names and against the files already built, so the
+    name, `vestfold-10pkt-2025`, `vestfold-10pkt-2025.mbtiles` and a piece of
+    any of them all reach the same flight. That is the currency to carry
+    between the two tools: `vatcache.py` numbers the queue and this numbers the
+    catalogue, so its number means another acquisition here."""
+    token = token.strip()
+    if token.isdigit():
+        return pick(snap, int(token))
+
+    held = in_hand(out)
+    names = list(snap["names"])
+    names += sorted(n for n in held if n not in set(names))
+
+    stem = Path(token).name
+    if stem.endswith(build_tiles.STORE_SUFFIX):
+        stem = stem[: -len(build_tiles.STORE_SUFFIX)]
+    key = acquisitions.slug(stem)
+    hits = [n for n in names if n == token or acquisitions.slug(n) == key]
+    if not hits:
+        hits = [n for n in names if token.casefold() in n.casefold()]
+    if len(hits) == 1:
+        return hits[0]
+    if not hits:
+        sys.exit(
+            f"no acquisition here answers to {token!r}. -l lists the catalogue "
+            "and -l <piece>\nfilters it; a name has to be spelled the way "
+            "hoydedata.no spells it."
+        )
+
+    # One of them is already a file here, which is the one a re-fetch or an
+    # extension means; anything else has to be said exactly.
+    built = [n for n in hits if n in held]
+    if len(built) == 1:
+        print(f"{token!r} fits {len(hits)} acquisitions; {built[0]!r} is the "
+              "one already built here.\n")
+        return built[0]
+    numbered = {n: i for i, n in enumerate(snap["names"], 1)}
+    print(f"{token!r} fits {len(hits)} acquisitions:", file=sys.stderr)
+    for name in hits[:20]:
+        print(f" {str(numbered.get(name, '—')).rjust(5)}  {name}"
+              f"{'   ← built here' if name in held else ''}", file=sys.stderr)
+    if len(hits) > 20:
+        print(f"    …and {len(hits) - 20} more", file=sys.stderr)
+    sys.exit("Name one of them in full, or give its number.")
+
+
 def cell_of(snap, name):
     """The finest cell the catalogue publishes this acquisition on, which decides
     the ladder. Read from the snapshot; `--refresh` re-asks."""
@@ -138,7 +202,7 @@ def in_hand(out):
     return held
 
 
-def guard(target, name, recipe, force):
+def guard(target, name, recipe, building, force, redo):
     """Refuse to add levels to a database holding another acquisition, or one
     built under a different recipe (which would mix two kinds of pixel)."""
     if not target.exists():
@@ -157,15 +221,20 @@ def guard(target, name, recipe, force):
         print("  It carries no recipe, so there is no telling whether it was "
               "built like this one.")
     elif digest != want:
-        if not force:
+        # --redo over every level the file holds leaves none of the old pixels
+        # behind, so the two recipes never meet in it.
+        replacing = redo and not set(levels) - set(building)
+        if not (force or replacing):
             sys.exit(
                 f"  It was built under recipe {digest}, and this run is "
                 f"{want}.\n  Adding to it would leave one acquisition made of "
-                "two kinds of pixel. Build it\n  again from nothing, or "
-                "--force if you know the difference does not reach\n  the "
+                "two kinds of pixel. Rebuild\n  what it holds with --redo, or "
+                "--force if you know the difference does not\n  reach the "
                 "tiles."
             )
-        print(f"  Recipe {digest} ≠ {want}, forced.")
+        print(f"  Recipe {digest} ≠ {want}, "
+              + ("and --redo rebuilds every level it holds." if replacing
+                 else "forced."))
 
 
 def do_list(snap, pattern, out, verbose):
@@ -273,15 +342,18 @@ def do_get(args, snap, name):
     target = build_tiles.store_path(out, name)
     recipe = build_tiles.settings(levels, args.unit_tiles)
     if not args.dry_run:
-        guard(target, name, recipe, args.force)
+        guard(target, name, recipe, levels, args.force, args.redo)
     mask = report.mask_for(name)
 
     if args.dry_run:
         build_tiles.run_levels(
             None, name, mask, levels, args.unit_tiles,
-            done=lambda z: build_tiles.marked_units(out, name, z))
+            done=(lambda z: set()) if args.redo
+            else (lambda z: build_tiles.marked_units(out, name, z)))
         return
 
+    if args.redo:
+        forget(out, name, mask, levels, args.unit_tiles, args.limit)
     store = build_tiles.Store(target, write=True)
     store.stamp(name, recipe)
     try:
@@ -293,6 +365,32 @@ def do_get(args, snap, name):
         store.stamp(name, recipe)
         store.close()
     delivered(target, name)
+
+
+def forget(out, name, mask, levels, unit_tiles, limit=None):
+    """Hand the finished units of these levels back to the build, tiles and
+    record together, so the run fetches the ground again instead of skipping
+    it. Levels the run does not cover keep theirs.
+
+    In the footprint's own order and cut by `--limit` like the build is, so a
+    pilot hands back the units it is about to make and no more."""
+    dropped = {}
+    for z in levels:
+        done = build_tiles.marked_units(out, name, z)
+        units = [u for u in mask.units(z, unit_tiles) if u in done]
+        if limit:
+            units = units[:limit]
+        if not units:
+            continue
+        build_tiles.unmark(out, name, z, units, unit_tiles)
+        dropped[z] = len(units)
+    if not dropped:
+        print("--redo: nothing was finished at these levels, so there is "
+              "nothing to redo.\n")
+        return
+    made = ", ".join(f"z{z} {spaced(n)}" for z, n in dropped.items())
+    print(f"--redo: {plural(sum(dropped.values()), 'finished unit')} handed "
+          f"back to the build ({made}).\n")
 
 
 def delivered(target, name):
@@ -370,12 +468,15 @@ def main():
                         "get new numbers; the ones already numbered keep theirs")
     p.add_argument("-v", "--verbose", action="store_true",
                    help="the figures behind the list; for -c, name every unit")
-    p.add_argument("-g", "--get", nargs="?", type=int, const=-1, metavar="N",
-                   help="build acquisition N into one .mbtiles file. Bare, "
-                        "alongside -c, it repairs whatever the check found")
-    p.add_argument("-c", "--check", type=int, metavar="N",
-                   help="read the tiles of acquisition N back and tally them "
-                        "against the footprint")
+    p.add_argument("-g", "--get", nargs="?", const="", metavar="ACQ",
+                   help="build an acquisition into one .mbtiles file, named by "
+                        "its number in -l, by its name, or by the file already "
+                        "holding it. Bare, alongside -c, it repairs whatever "
+                        "the check found")
+    p.add_argument("-c", "--check", nargs="?", const="", metavar="ACQ",
+                   help="read an acquisition's tiles back and tally them "
+                        "against the footprint; takes the same number, name or "
+                        "file as -g")
     p.add_argument("-o", "--out", default=".", metavar="DIR",
                    help="where the file goes (default: here)")
     p.add_argument("-z", "--levels", metavar="SPEC",
@@ -392,6 +493,10 @@ def main():
                    help="stop after this many unbuilt units, for a pilot; run "
                         "it twice and it does the next batch, not the same one")
     p.add_argument("--dry-run", action="store_true", help="count units and stop")
+    p.add_argument("--redo", action="store_true",
+                   help="fetch and render the units already finished rather "
+                        "than skipping them, over the levels this run covers. "
+                        "Narrow it with -z")
     p.add_argument("--force", action="store_true",
                    help="add levels to a file built under a different recipe")
     args = p.parse_args()
@@ -410,19 +515,28 @@ def main():
     if args.get is None and args.check is None:
         return  # -l or --refresh on its own
 
-    # One number between them: -c 3 -g and -g 3 -c 3 are the same request.
-    if args.get not in (None, -1) and args.check is not None \
-            and args.get != args.check:
-        sys.exit(f"-g {args.get} and -c {args.check} name different "
-                 "acquisitions; there is only one to act on.")
+    if args.redo and args.check is not None:
+        sys.exit("--redo rebuilds whatever is there, and -c reads it back to "
+                 "find what needs\nrebuilding; ask for one or the other.")
+
+    # One acquisition between them: -c vestfold -g and -g 3 -c 3 are both a
+    # single request.
+    asked = list(dict.fromkeys(t for t in (args.get, args.check) if t))
+    named = {resolve(snap, args.out, token) for token in asked}
+    if len(named) > 1:
+        sys.exit(f"-g and -c name different acquisitions "
+                 f"({' and '.join(repr(n) for n in sorted(named))}); there is "
+                 "only one to act on.")
+    if not named:
+        sys.exit("-g and -c want an acquisition: its number in -l, its name, "
+                 "or the file already\nholding it. Try -l")
     args.fix = args.get is not None
+    name = named.pop()
 
     if args.check is not None:
-        do_check(args, pick(snap, args.check))
-    elif args.get == -1:
-        sys.exit("-g needs the number of an acquisition. Try -l")
+        do_check(args, name)
     else:
-        do_get(args, snap, pick(snap, args.get))
+        do_get(args, snap, name)
 
 
 if __name__ == "__main__":

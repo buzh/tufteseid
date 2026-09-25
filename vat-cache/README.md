@@ -36,11 +36,31 @@ python -m venv .venv
 .venv/bin/python makevat.py -c 1421 -g          read it back, then repair
 ```
 
+Anywhere a number goes, so does the acquisition's name, the stem of the
+`.mbtiles` holding it, or a piece of either:
+
+```
+.venv/bin/python makevat.py -g vestfold-10pkt-2025 -z 14-12   add three levels
+.venv/bin/python makevat.py -g vestfold-10pkt-2025 -z 16 --redo   fetch again
+.venv/bin/python makevat.py -c 'Vestfold 10pkt 2025' -g       check, then repair
+```
+
 Also `-o DIR` (output, default `.`), `--unit-tiles N` (default 4), `--force`.
 
-- **Numbers, not names** — names carry spaces, æøå and parentheses. Numbers
-  index `catalogue.json`, an uncommitted local snapshot written on first use.
-  `--refresh` appends rather than re-sorts, so a number keeps its meaning.
+- **Numbers, names or files.** Names carry spaces, æøå and parentheses, so the
+  numbers are the shell-safe handle; they index `catalogue.json`, an
+  uncommitted local snapshot written on first use, and `--refresh` appends
+  rather than re-sorts so a number keeps its meaning. A name or a file stem is
+  what to use across tools, since `vatcache.py` numbers something else. An
+  ambiguous piece of a name is refused, listing what it fits — unless exactly
+  one of those is already built in `-o`, which is then the one meant.
+- **A file on disk is continued, not restarted.** Levels it lacks are added,
+  units it has finished are skipped. `--redo` hands the finished units of the
+  levels the run covers back to the build, so ground fetched badly or rendered
+  under an older recipe is made again in place. `--limit` cuts the hand-back
+  the same way it cuts the build, so `--redo -z 16 --limit 20` is a pilot
+  re-render and not a hole. `--redo` over every level a file holds settles a
+  recipe mismatch on its own, since nothing old survives it.
 - **Depth is not asked for.** `levels_for` reads the published cell size
   (`LOWPS`; only 1 / 0.5 / 0.25 m occur nationally) and builds down to the last
   level whose pixel is no finer — z16 on 0.25 m, z15 on 0.5 m, z14 on 1 m. `-z`
@@ -53,9 +73,9 @@ Also `-o DIR` (output, default `.`), `--unit-tiles N` (default 4), `--force`.
   `coverage-<slug>.npz`. They carry the acquisition name, so a mask paired with
   another acquisition's DEM aborts instead of writing an empty file.
 - **Guards.** A file naming a different acquisition is refused outright; one
-  built under a different recipe digest needs `--force`. The digest covers
-  everything that decides a pixel — editing `cvat.py` changes it, adding a level
-  does not.
+  built under a different recipe digest needs `--redo` over everything it holds,
+  or `--force`. The digest covers everything that decides a pixel — editing
+  `cvat.py` changes it, adding a level does not.
 
 ## Deploying
 
@@ -71,8 +91,9 @@ size/mtime change, so replacing a file in place costs ≤10 s of stale tiles.
 
 `name` must be **byte-identical** to hoydedata.no's `LAS_PROJECT_NAME` and to
 the `LidarProject.id` the per-project WMS publishes — that is what the app joins
-on; `-l -v` and both tools' `-c` check it. Audit with `makevat.py -c <n>` before
-copying: a unit that never ran is cheaper to find here than after an rsync.
+on; `-l -v` and both tools' `-c` check it. Audit with `makevat.py -c <name>`
+before copying: a unit that never ran is cheaper to find here than after an
+rsync.
 
 ## Auditing a store
 
@@ -88,7 +109,8 @@ copying: a unit that never ran is cheaper to find here than after an rsync.
 `acquisitions.json` and annotates it from the databases present; anything in the
 store but off the queue is appended. **The two tools number differently** —
 `makevat.py` numbers the whole catalogue (~1 540), `vatcache.py` the queue (a
-couple of dozen) — so `vatcache.py` hands faults over by name. `-c` takes the
+couple of dozen) — so `vatcache.py` hands faults over by name, which is what
+`makevat.py -g` and `-c` take alongside a number. `-c` takes the
 `units` table as the authority on what should be there, then fully decodes every
 tile those units own (~5 ms each; narrow with `-z`).
 
@@ -100,8 +122,10 @@ tile those units own (~5 ms each; narrow with `-z`).
 | *n* finished units hold no tile | footprint edge; normal unless it is *every* unit |
 | *n* tiles belong to no finished unit | orphans — reported, never deleted |
 
-Repair is `makevat.py -c <n> -g`, against the store or a copy: it drops the
-unit's tiles and record in one transaction and rebuilds.
+Repair is `makevat.py -c <name> -g`, against the store or a copy: it drops the
+unit's tiles and record in one transaction and rebuilds. Sound tiles you want
+made again — a level rendered under an older `cvat.py` — are `-g <name> --redo`
+instead, which asks nothing and rebuilds everything the levels cover.
 
 ## Grid and output
 
