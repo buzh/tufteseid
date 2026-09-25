@@ -1,28 +1,23 @@
 import { Slider, Tooltip } from '@mantine/core';
-import { useAtom } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
-import { ControlButton } from '../ui/ControlButton';
 import { cx } from '../ui/cx';
+import { Icon } from '../ui/Icon';
 import { sketchFadeAtom, sketchShownAtom } from './overlay';
 import styles from './SketchFade.module.css';
 
 export const SketchFade = ({ className }: { className?: string }) => {
   const { t } = useTranslation();
-  const [shown, setShown] = useAtom(sketchShownAtom);
+  const shown = useAtomValue(sketchShownAtom);
   const [fade, setFade] = useAtom(sketchFadeAtom);
-
-  const label = shown ? t('spots.sketchHide') : t('spots.sketchShow');
 
   return (
     <div className={cx(styles.row, className)}>
-      <Tooltip label={label}>
-        <ControlButton
-          icon="draw"
-          on={shown}
-          aria-label={label}
-          onClick={() => setShown(!shown)}
-        />
+      <Tooltip label={t('spots.sketchFade')}>
+        <span className={styles.icon}>
+          <Icon icon="draw" size={16} />
+        </span>
       </Tooltip>
       <Slider
         className={styles.slider}

@@ -1,6 +1,6 @@
-/* Three columns, so the view control keeps the band's centre line whatever the
-   sections beside it carry. Scrolls rather than wraps: a second line would push
-   the map down under the cursor. */
+/* Three columns, so the view and show controls keep the band's centre line
+   whatever the sections beside them carry. Scrolls rather than wraps: a second
+   line would push the map down under the cursor. */
 .ribbon {
   flex: none;
   display: grid;

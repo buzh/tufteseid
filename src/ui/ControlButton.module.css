@@ -32,6 +32,15 @@
   background: var(--mantine-primary-color-filled-hover);
 }
 
+/* Same rule, same reason: after the hovers, or the seat it takes is painted
+   over the moment the pointer crosses it. */
+.button:disabled,
+.button:disabled:hover {
+  background: var(--mantine-color-default);
+  color: var(--mantine-color-dimmed);
+  cursor: not-allowed;
+}
+
 /* Stretch rather than the box's own centring, or the halves would be
    glyph-wide and the divider would stop short of the edge. */
 .split {

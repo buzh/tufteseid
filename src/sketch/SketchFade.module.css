@@ -4,6 +4,11 @@
   gap: var(--mantine-spacing-xs);
 }
 
+.icon {
+  display: flex;
+  color: var(--mantine-color-dimmed);
+}
+
 .slider {
   flex: 1;
   min-width: 4rem;

@@ -18,7 +18,7 @@ One row per directory under `src/`.
 | `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue and the handover to the render sidecar, the gallery, the strip that puts the kept renders in order, the reader that lays them back on the map, and the provenance legend stamped onto a download. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
 | `grounds/` | The ground switch. Which ground is up is derived from the half's background layer, never stored. |
-| `heritageControls/` | The Kulturminner tool: which theme layers are ticked and how they are drawn. |
+| `heritageControls/` | The Kulturminner control: which theme layers are ticked and how they are drawn. |
 | `heritageInfo/` | The pointer tip and the click-kept card over heritage features, plus the OL overlay they ride. |
 | `kartControls/` | The Kart arm: which cartography. |
 | `lidarControls/` | The LiDAR arm: dataset menu, render, DTM/DOM, Automatisk, hybrid overlay and contours. |
@@ -28,6 +28,7 @@ One row per directory under `src/`.
 | `ribbon/` | The top band: its three sections and the upstream status light. Layout only. |
 | `search/` | Kartverket place, address, road, property and elevation lookups. One function has a live caller. |
 | `shared/` | Error boundary, URL parameter access, coordinate parsing, enum and number helpers, and the request deadline that reports to the breaker. |
+| `showControls/` | The band's what-is-drawn-over-the-ground group: the Kulturminner control and the drawing's toggle. |
 | `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the pen, and the render onto the ground. |
 | `spotControls/` | The reader's records as surfaces: the `+`, the editor, the read card, the index menu. |
 | `spots/` | Spot state and geometry: the pin layer and its style, the footprint frame, hit test, place and adjust, share link, name suggestion. |
@@ -226,10 +227,11 @@ holds the ground still and changes only how it was seen.
   nothing: half an arrow cluster flipping pictures while the other half slid
   the ground out from under them read as a fault.
 - The drawing sits above the pictures at z 2, so `SketchFade` (`src/sketch/`)
-  takes it off the ground or part of the way off it, and **`t`** — tegning —
-  toggles it. The shortcut is bound by `useSketchOverlay`, not by a box, so it
-  answers from the card as well; it is inert while Excalidraw has the map, and
-  it keeps its hands off a press aimed at an input.
+  takes it part of the way off the ground, `SketchToggle` in the band takes it
+  off altogether, and **`t`** — tegning — does the same from the keyboard. The
+  shortcut is bound by `useSketchOverlay`, not by a box, so it answers from the
+  card as well; it is inert while Excalidraw has the map, and it keeps its hands
+  off a press aimed at an input.
 - A row whose render has not landed, or that has no rectangle, is not part of
   the reading; the gallery on the card is where it is waited on. A reading with
   nothing left in it steps back to the card.
@@ -388,10 +390,12 @@ session state, so a shared link opens on one ground.
 GroundSection half="a"  →  ViewSection  →  [GroundSection half="b"]  →  ToolSection
 ```
 
-The second ground section mounts only while two grounds are up. `ToolSection`
-holds the controls that apply whichever ground is up — Kulturminner, terrain,
-the spot `+` and its index, the share link, the account — with `UpstreamStatus`
-last, because it comes and goes on its own.
+The second ground section mounts only while two grounds are up. `ViewSection`
+carries two units: `ViewControlGroup`, the one/curtain/split switch, and beside
+it `ShowControlGroup` — Kulturminner and the drawing, what is laid over the
+ground whichever ground is up. `ToolSection` holds the rest of the controls that
+apply to the reading — terrain, the spot `+` and its index, the share link, the
+account — with `UpstreamStatus` last, because it comes and goes on its own.
 
 `ShareButton` hands over the open spot's short link, or, with no spot open, the
 address bar as it stands: every ground, overlay and the centre are already
@@ -400,7 +404,8 @@ spot's title row, both out of `src/spots/useShareCopy.ts`.
 
 **Which section a new control goes in is a question about the control, never
 about where there is room.** A control that means something different per ground
-belongs to an arm; one that applies to the reading belongs to the tools.
+belongs to an arm; one that turns something on over the ground belongs to the
+show group; anything else that applies to the reading belongs to the tools.
 
 - Every arm takes a controller object (`useLidarControls(half)` and friends) and
   owns no atoms of its own. All three controllers mount whichever arm is

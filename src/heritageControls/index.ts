@@ -1,4 +1,5 @@
-export { HeritageControlGroup } from './HeritageControlGroup';
+export { HeritageMenu } from './HeritageMenu';
+export { HeritageToggle } from './HeritageToggle';
 export {
   type HeritageControls,
   useHeritageControls,

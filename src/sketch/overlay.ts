@@ -1,6 +1,6 @@
 // One saved drawing on the map: a transparent layer re-exporting its scene at
 // the resolution the view is showing.
-import { atom, useAtom, useAtomValue } from 'jotai';
+import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import type { Extent } from 'ol/extent';
 import ImageLayer from 'ol/layer/Image';
 import type { Size } from 'ol/size';
@@ -22,6 +22,10 @@ export const sketchShownAtom = atom(true);
 
 /** 0–100, as the reader's slider is. */
 export const sketchFadeAtom = atom(0);
+
+/** There is a drawing for the toggle to act on. Written by the overlay rather
+ *  than derived from the open spot: only the overlay knows what it mounted. */
+export const sketchOnGroundAtom = atom(false);
 
 /** `t` for tegning. */
 const TOGGLE_KEY = 't';
@@ -127,8 +131,14 @@ export const useSketchOverlay = (sketch: Sketch | null) => {
   const map = useAtomValue(mapAtom);
   const [shown, setShown] = useAtom(sketchShownAtom);
   const fade = useAtomValue(sketchFadeAtom);
+  const setOnGround = useSetAtom(sketchOnGroundAtom);
   const opacity = 1 - fade / 100;
   const layerRef = useRef<ImageLayer<ImageCanvasSource> | null>(null);
+
+  useEffect(() => {
+    setOnGround(sketch !== null);
+    return () => setOnGround(false);
+  }, [sketch, setOnGround]);
 
   useEffect(() => {
     if (!sketch) return;
