@@ -48,11 +48,17 @@ export const nationalLidarSource = (
   styles: stylesForModel(nationalStyles, model),
 });
 
+// The only namer of a flight's `LidarSource.key`, which is also what a kept
+// render stores as `sourceKey` and is found again by — including the cached
+// VAT, whose pixels come from our own store rather than from a source here.
+export const projectSourceKey = (projectName: string): string =>
+  `project:${projectName}`;
+
 export const projectLidarSource = (
   p: LidarProject,
   model: LidarModel,
 ): LidarSource => ({
-  key: `project:${p.projectName}`,
+  key: projectSourceKey(p.projectName),
   kind: 'project',
   label: p.projectName,
   year: p.year,

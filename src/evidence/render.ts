@@ -1,8 +1,13 @@
 import type { EvidenceMeta } from '../api/evidence';
 import { extractCanvas } from '../lidarExtract/run';
-import { enumerateLidarSources } from '../lidarExtract/sources';
+import {
+  enumerateLidarSources,
+  projectSourceKey,
+} from '../lidarExtract/sources';
 import { bboxToMetric, type Bbox } from '../map/bbox';
+import { fetchCvatAcquisitions } from '../map/layers/config/backgroundLayers/cvatGround';
 import { fetchFlyfotoProjectsForBbox } from '../map/layers/config/backgroundLayers/flyfotoProjects';
+import { CVAT_STYLE } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { fetchDem } from '../terrain/dem';
 import {
   clampRadius,
@@ -11,6 +16,7 @@ import {
   terrainField,
   terrainStaticField,
 } from '../terrain/render';
+import { fetchCvatRaster } from './cvatRaster';
 import { sanitizeFilename } from './filename';
 import { fitImageBlob } from './fit';
 import { fetchFlyfotoRaster } from './flyfotoRaster';
@@ -39,6 +45,30 @@ export const renderEvidence = async (
 ): Promise<Produced | null> => {
   switch (spec.kind) {
     case 'lidar': {
+      // The cached VAT is the one style with no service behind it: the pixels
+      // are in our own store, keyed by the same flight the WMS publishes.
+      if (spec.style === CVAT_STYLE) {
+        const acquisition = (await fetchCvatAcquisitions()).find(
+          (a) => projectSourceKey(a.project.projectName) === spec.sourceKey,
+        );
+        // Dropped from the store since, or never in it.
+        if (!acquisition) return null;
+        const raster = await fetchCvatRaster(bbox4326, acquisition, signal);
+        if (!raster) return null;
+        const fitted = await fitImageBlob(raster.canvas, raster.metresPerPx);
+        if (!fitted) return null;
+        return {
+          blob: fitted.blob,
+          filename: `${sanitizeFilename(acquisition.project.projectName)}_${CVAT_STYLE}.png`,
+          meta: {
+            metresPerPx: fitted.metresPerPx,
+            bbox25833: raster.bbox25833,
+            year: acquisition.project.year,
+            pointDensity: acquisition.project.pointDensity,
+          },
+        };
+      }
+
       const sources = await enumerateLidarSources(bbox4326, spec.model);
       const source = sources.find((s) => s.key === spec.sourceKey);
       // Retired upstream, no longer covering this rectangle, or no longer

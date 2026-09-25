@@ -260,7 +260,15 @@ same rows full size and changes none of them.
   the ground as it stands, or of the analysis when one is running — the
   analysis wins, because it is then what is on screen and the ground it was
   computed from is underneath it. Where neither can be re-rendered (cartography,
-  the empty ground, `lidarCvat`) the offer is null and the camera is dead.
+  the empty ground) the offer is null and the camera is dead.
+- **A cached VAT is kept like any other flight.** `lidarCvat` offers a `lidar`
+  spec keyed by the flight it was computed from, told apart from that flight's
+  WMS grounds by `style: 'cvat'`, so the duplicate guard, the title and the
+  legend's RVT credit all follow from what is already there. Only the producer
+  differs: `cvatRaster.ts` stitches whole tiles off `/cvat/*` at the deepest
+  level the store holds and crops them, where the WMS grounds ask for the
+  rectangle at the source's own resolution. A tile the pipeline has not written
+  is a 404, so a rectangle off the flight reads as `empty` rather than failed.
 - **Nothing asks for a `sunloop`.** The kind, `rendersvc` and the queue's
   handover arm are all live and an existing row still reads and retries, but no
   surface offers a new one: a sun loop reads nothing on screen, so it did not

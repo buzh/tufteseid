@@ -1,12 +1,17 @@
 import { atom } from 'jotai';
 
-import { NATIONAL_LIDAR_LABEL } from '../lidarExtract/sources';
+import {
+  NATIONAL_LIDAR_LABEL,
+  projectSourceKey,
+} from '../lidarExtract/sources';
 import { backgroundLayerHalves } from '../map/layers/config/backgroundLayers/atoms';
+import { activeCvatAcquisitionHalves } from '../map/layers/config/backgroundLayers/cvatGround';
 import { activeFlyfotoProjectHalves } from '../map/layers/config/backgroundLayers/flyfotoBackground';
 import {
   activeLidarModelHalves,
   activeLidarProjectHalves,
   activeLidarStyleHalves,
+  CVAT_STYLE,
   effectiveLidarStyle,
 } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { NIB_MOSAIC, type EvidenceSpec } from './spec';
@@ -22,8 +27,7 @@ const groundOfferAtom = atom<EvidenceSpec | null>((get) => {
     return project
       ? {
           kind: 'lidar',
-          // The key `enumerateLidarSources` will be searched by.
-          sourceKey: `project:${project.projectName}`,
+          sourceKey: projectSourceKey(project.projectName),
           sourceLabel: project.projectName,
           style,
           model,
@@ -39,6 +43,25 @@ const groundOfferAtom = atom<EvidenceSpec | null>((get) => {
           year: null,
           pointDensity: null,
         };
+  }
+
+  // A flight rendered once by `vat-cache/` and held on disk, which is a
+  // provenance like any other: the same key as the WMS ground of that flight,
+  // told apart by the style. `vat-cache/` runs against Prosjekt_DTM, so the
+  // store carries no surface model and the ground being up settles the model.
+  if (layer === 'lidarCvat') {
+    const acquisition = get(activeCvatAcquisitionHalves.a);
+    return acquisition
+      ? {
+          kind: 'lidar',
+          sourceKey: projectSourceKey(acquisition.project.projectName),
+          sourceLabel: acquisition.project.projectName,
+          style: CVAT_STYLE,
+          model: 'dtm',
+          year: acquisition.project.year,
+          pointDensity: acquisition.project.pointDensity,
+        }
+      : null;
   }
 
   if (layer === 'flyfoto' || layer === 'flyfotoProject') {
@@ -61,9 +84,7 @@ const groundOfferAtom = atom<EvidenceSpec | null>((get) => {
         };
   }
 
-  // `lidarCvat` is our own store: no service publishes that render, so a
-  // native-resolution copy of it cannot be asked for. Cartography and the
-  // empty ground have nothing to re-render either.
+  // Cartography and the empty ground have nothing to re-render.
   return null;
 });
 
