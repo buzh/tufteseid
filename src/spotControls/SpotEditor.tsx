@@ -160,18 +160,30 @@ export const SpotEditor = ({ spot }: { spot: SpotDraftController }) => {
       <div
         className={cx(styles.unit, spot.step === 'sketch' && styles.unitStep)}
       >
-        <Button
-          size="compact-xs"
-          variant={drawing ? 'filled' : 'default'}
-          leftSection={<Icon icon="draw" size={14} />}
-          onClick={() => spot.setStage(drawing ? 'idle' : 'sketch')}
-        >
-          {drawing
-            ? t('spots.drawStop')
-            : spot.hasSketch
-              ? t('spots.sketchChange')
-              : t('spots.sketchAdd')}
-        </Button>
+        {drawing ? (
+          <>
+            <Button
+              size="compact-xs"
+              variant="subtle"
+              color="gray"
+              onClick={spot.cancelSketch}
+            >
+              {t('spots.abort')}
+            </Button>
+            <Button size="compact-xs" onClick={spot.saveSketch}>
+              {t('spots.save')}
+            </Button>
+          </>
+        ) : (
+          <Button
+            size="compact-xs"
+            variant="default"
+            leftSection={<Icon icon="draw" size={14} />}
+            onClick={() => spot.setStage('sketch')}
+          >
+            {spot.hasSketch ? t('spots.sketchChange') : t('spots.sketchAdd')}
+          </Button>
+        )}
       </div>
 
       <div

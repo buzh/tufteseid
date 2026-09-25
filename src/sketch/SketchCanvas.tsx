@@ -26,6 +26,7 @@ import { storableScene, type SceneElement } from './scene';
 import {
   initialSceneView,
   setLiveScene,
+  sketchDiscarded,
   slaveMapToScene,
   type SketchSession,
 } from './session';
@@ -174,12 +175,14 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
 
   // Up to a settle can be unwritten at unmount, so the atom is flushed from the
   // scene itself — but only while the draft is still open, since closing one
-  // clears its atoms and then unmounts this.
+  // clears its atoms and then unmounts this, and not when the reader has just
+  // said to throw these strokes away.
   useEffect(
     () => () => {
       if (settle.current != null) window.clearTimeout(settle.current);
       const api = apiRef.current;
-      if (api && store.get(spotDraftAtom)) {
+      const thrownAway = sketchDiscarded();
+      if (api && !thrownAway && store.get(spotDraftAtom)) {
         keepScene(store, session.frame, api.getSceneElementsIncludingDeleted());
       }
       setLiveScene(null);

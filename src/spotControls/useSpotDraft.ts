@@ -16,7 +16,7 @@ import {
 import { currentUserAtom } from '../auth/atoms';
 import { bboxWidthMetres } from '../map/bbox';
 import { SKETCH_BUDGET_BYTES, sketchBytes, sketchOf } from '../sketch/scene';
-import { sketchNow } from '../sketch/session';
+import { discardSketch, sketchNow } from '../sketch/session';
 import {
   activeSpotAtom,
   clearSpotFootprintAtom,
@@ -63,6 +63,10 @@ export type SpotDraftController = {
   stage: SpotDraft['stage'];
   /** Leaving a stage writes what it changed. */
   setStage: (stage: SpotDraft['stage']) => void;
+  /** Put the pen down and keep the strokes. */
+  saveSketch: () => void;
+  /** Put the pen down and go back to the stored drawing. */
+  cancelSketch: () => void;
   footprintSideMetres: number | null;
   clearFootprint: () => void;
   hasSketch: boolean;
@@ -322,6 +326,17 @@ export const useSpotDraft = (
     [commit, stageTo],
   );
 
+  const saveSketch = useCallback(() => setStage('idle'), [setStage]);
+
+  // The atom is put back before the stage is left, and the canvas is told not
+  // to write its scene out over it on the way.
+  const cancelSketch = useCallback(() => {
+    discardSketch();
+    setSketchTooBig(false);
+    store.set(spotSketchAtom, held.current.record?.sketch ?? null);
+    stageTo('idle');
+  }, [store, stageTo]);
+
   const clearFootprint = useCallback(() => {
     dropFootprint();
     patch({ footprint: null });
@@ -391,6 +406,8 @@ export const useSpotDraft = (
     revertText,
     stage: draft.stage,
     setStage,
+    saveSketch,
+    cancelSketch,
     footprintSideMetres: footprint
       ? Math.round(bboxWidthMetres(footprint))
       : null,
