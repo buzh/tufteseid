@@ -43,7 +43,7 @@ const src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 const HIDPI = 2;
 
 /** Multiples of the SVG units above: `saved` is 19 css px wide, 23 tall. */
-const SIZE = { saved: 0.85, active: 1, hand: 1.08 };
+const SIZE = { saved: 0.85, hand: 1.08 };
 
 // Hoisted: an `Icon` carries its decoded image and the style function runs per
 // pin per redraw.
@@ -56,7 +56,6 @@ const pinIcon = (scale: number, opacity = 1) =>
   });
 
 const savedPin = pinIcon(SIZE.saved);
-const activePin = pinIcon(SIZE.active);
 const handPin = pinIcon(SIZE.hand);
 const cursorPin = pinIcon(SIZE.hand, 0.85);
 
@@ -83,7 +82,7 @@ const LABEL_GAP = 7;
 const LABEL_MAX = 28;
 
 /** Centred over the head, not over the tip. */
-const label = (name: string, scale: number, active: boolean) => {
+const label = (name: string, scale: number) => {
   const [dx, dy] = headOffset(scale);
   return new Text({
     text:
@@ -96,7 +95,7 @@ const label = (name: string, scale: number, active: boolean) => {
     fill: new Fill({ color: '#fff' }),
     backgroundFill: new Fill({ color: 'rgba(31, 34, 36, 0.86)' }),
     backgroundStroke: new Stroke({
-      color: active ? ACCENT : 'rgba(255, 255, 255, 0.22)',
+      color: 'rgba(255, 255, 255, 0.22)',
       width: 1,
     }),
     padding: [2, 5, 2, 5],
@@ -104,11 +103,8 @@ const label = (name: string, scale: number, active: boolean) => {
   });
 };
 
-export const spotStyle = (name: string, active: boolean) => [
-  new Style({
-    image: active ? activePin : savedPin,
-    text: label(name, active ? SIZE.active : SIZE.saved, active),
-  }),
+export const spotStyle = (name: string) => [
+  new Style({ image: savedPin, text: label(name, SIZE.saved) }),
 ];
 
 export const draftPinStyle = [ring(9), new Style({ image: handPin })];

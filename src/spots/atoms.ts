@@ -112,6 +112,19 @@ export const standingSpotFootprintAtom = atom((get): Bbox | null => {
     : (get(activeSpotAtom)?.footprint ?? null);
 });
 
+/** The one spot the pin layer leaves undrawn. A pin is for placing, so it
+ *  stands only while the properties box is open on it — and that one is
+ *  `pinAdjust.ts`'s to draw. The card and the reader are read against the ground
+ *  the pin sits in the middle of, so theirs goes.
+ *
+ *  Derived, so that the pin drag writing the draft every frame only restyles
+ *  the layer when the id it answers with actually changes. */
+export const unpinnedSpotIdAtom = atom((get): string | null => {
+  const draft = get(spotDraftAtom);
+  if (draft) return draft.recordId;
+  return get(activeSpotAtom)?.id ?? null;
+});
+
 /** The `+` is armed: the next click on the map places the pin. Exclusive with
  *  `spotDraftAtom` — every writer of the draft clears this. */
 export const spotPlacingAtom = atom(false);

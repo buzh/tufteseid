@@ -10,7 +10,12 @@ import { useEffect, useMemo } from 'react';
 
 import type { SpotRecord } from '../api/spots';
 import { mapAtom } from '../map/atoms';
-import { activeSpotAtom, spotDraftAtom, spotPlacingAtom } from './atoms';
+import {
+  activeSpotAtom,
+  spotDraftAtom,
+  spotPlacingAtom,
+  unpinnedSpotIdAtom,
+} from './atoms';
 import { SPOT_LAYER_ID, SPOT_RECORD_KEY, spotAtPixel } from './hitTest';
 import { PIN_Z_INDEX, spotStyle } from './pinStyle';
 import { spotRecordsAtom } from './spotRecords';
@@ -31,7 +36,6 @@ const draw = (source: VectorSource, view: string, records: SpotRecord[]) => {
 export const useSpotLayer = () => {
   const map = useAtomValue(mapAtom);
   const records = useAtomValue(spotRecordsAtom);
-  const active = useAtomValue(activeSpotAtom);
   const draft = useAtomValue(spotDraftAtom);
   const placing = useAtomValue(spotPlacingAtom);
   const setActive = useSetAtom(activeSpotAtom);
@@ -40,17 +44,13 @@ export const useSpotLayer = () => {
   const source = useMemo(() => new VectorSource({ wrapX: false }), []);
 
   useEffect(() => {
-    /** The record being edited, whose pin `pinAdjust.ts` draws instead. */
-    let hidden = store.get(spotDraftAtom)?.recordId ?? null;
-
     const layer = new VectorLayer({
       zIndex: PIN_Z_INDEX,
       source,
       style: (feature: FeatureLike) => {
         const record = feature.get(SPOT_RECORD_KEY) as SpotRecord;
-        if (record.id === hidden) return undefined;
-        const open = store.get(activeSpotAtom);
-        return spotStyle(record.name, record.id === open?.id);
+        if (record.id === store.get(unpinnedSpotIdAtom)) return undefined;
+        return spotStyle(record.name);
       },
       properties: { id: SPOT_LAYER_ID },
     });
@@ -59,29 +59,20 @@ export const useSpotLayer = () => {
     // The style function is built once and lives as long as the layer, so
     // anything closed over here would stick at its first-render value: read
     // from the store and redraw off a subscription instead.
-    const unsubscribe = [
-      store.sub(activeSpotAtom, () => layer.changed()),
-      store.sub(spotDraftAtom, () => {
-        const next = store.get(spotDraftAtom)?.recordId ?? null;
-        if (next === hidden) return;
-        hidden = next;
-        layer.changed();
-      }),
-    ];
+    const unsubscribe = store.sub(unpinnedSpotIdAtom, () => layer.changed());
 
     return () => {
-      unsubscribe.forEach((off) => off());
+      unsubscribe();
       map.removeLayer(layer);
     };
   }, [map, source, store]);
 
-  // The followed link only until the list lands; null afterwards, so opening a
-  // spot does not rebuild every feature.
-  const linkOnly = records ? null : active;
+  // A followed link is not drawn while the list is still out: the spot it opens
+  // is the one spot with no pin, and nothing else is known yet.
   useEffect(() => {
     const view = map.getView().getProjection().getCode();
-    draw(source, view, records ?? (linkOnly ? [linkOnly] : []));
-  }, [map, source, records, linkOnly]);
+    draw(source, view, records ?? []);
+  }, [map, source, records]);
 
   useEffect(() => {
     const onClick = (event: MapBrowserEvent) => {

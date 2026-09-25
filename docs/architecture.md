@@ -74,6 +74,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `spotPlacingAtom` | `spots/atoms.ts` | The `+` is armed: the next map click places the pin. Exclusive with `spotDraftAtom`. |
 | `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom`, `spotFootprintAtom` | same | The spot being edited: where its pin is, which of the four stages has hold of the map (`idle` is none of them), which box is on screen (`box`), what is typed, what is drawn, and the ground it names. The record itself is not here — `useSpotDraft` holds it. |
 | `spotFootprintAdjustingAtom`, `standingSpotFootprintAtom` | same | Derived: the draft is in its `footprint` stage, and which rectangle the standing frame draws. |
+| `unpinnedSpotIdAtom` | same | Derived: the one spot the pin layer leaves undrawn — the record an editor draft stands for, whose pin `pinAdjust.ts` draws instead, or the open spot, whose card or reader is the box in front of it. |
 | `place`/`edit`/`adjust`/`closeSpotDraftAtom`, `setSpotStageAtom` | same | Write-only. `adjustSpotDraftAtom` is the card's: it opens a draft straight into a stage with `box: 'card'`. |
 | `activeSpotAtom` | same | The record being read — opened by a click, by an index row, or by `?lok=`. |
 | `spotReadingAtom` | same | The open spot's kept renders are being read on the map. Held as the id it was entered on; writing `activeSpotAtom` with a different spot — or none — clears it, and a draft suspends it. True regardless for a spot the reader may not edit, for whom writing it false does nothing. |
@@ -158,6 +159,12 @@ the pictures. Reading terrain against a place is the ongoing act and naming it
 a one-off, so the card is the workbench and the properties box is behind a
 button. A button becomes a row — the hint and its Ferdig, or the pen's
 Avbryt/Lagre — for as long as it has the map, and only one of the two can.
+
+The pin belongs to the properties box and stands only while it is open
+(`unpinnedSpotIdAtom`, `pinAdjust.ts`). The card and the reader are read against
+the ground the pin sits in the middle of, so the open spot loses it there — the
+footprint frame is what marks the place then, and the name is in the box's own
+title. Every other spot keeps its pin, which is what a reader clicks to move on.
 
 A spot is written as it is made. `createSpot` runs the moment the pin lands —
 under the pin's own coordinate as a provisional name, because the column is

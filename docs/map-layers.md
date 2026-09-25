@@ -249,7 +249,7 @@ layer taken off a map loses everything it had loaded.
 | 4 | a rectangle in hand — the terrain window or a spot's footprint | `src/map/rectAdjust.ts` |
 | 4 | terrain-analysis window frame, standing | `src/terrain/windowLayer.ts` |
 | 5 | a spot's footprint frame, standing | `src/spots/footprintLayer.ts` (`PIN_Z_INDEX - 1`) |
-| 6 | a spot's pin and label | `src/spots/pinStyle.ts` (`PIN_Z_INDEX`) |
+| 6 | a spot's pin and label — not the spot whose card or reader is open | `src/spots/pinStyle.ts` (`PIN_Z_INDEX`) |
 | 10 | Kulturminner theme layers | set by the caller in `src/map/layers/atoms.ts`, not by `themeWMS.ts` |
 
 7–9 are free. A new overlay should be written down here.
@@ -260,8 +260,9 @@ the terrain window's grip, and taking the terrain window back steps the draft to
 once would put two frames and two pointer interactions on the map, and neither
 could be grabbed. They are told apart by the layer id they are given
 (`terrainAdjustLayer`, `spotFootprintAdjustLayer`). Each standing frame goes down
-while its own rectangle is being dragged. The footprint sits just under the pin
-so the pin it belongs to stays legible over it.
+while its own rectangle is being dragged. The footprint sits just under the pin,
+so a pin standing over its own rectangle — which only the properties box leaves
+on the map — stays legible over it.
 
 The hint layer is why 0.75 exists: roads and place names have to clear the hint
 patches as well as the ground.

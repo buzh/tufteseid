@@ -27,11 +27,12 @@ export const useSpotPinAdjust = () => {
   const map = useAtomValue(mapAtom);
   const draft = useAtomValue(spotDraftAtom);
   const store = useStore();
-  const open = draft !== null;
+  const open = draft?.box === 'editor';
   const placing = draft?.stage === 'pin';
 
-  // The pin is drawn for the whole draft; the drag interaction below runs only
-  // in the `pin` stage, since the sketch canvas covers the map.
+  // The pin is drawn for the whole of an editor draft; the drag interaction
+  // below runs only in the `pin` stage, since the sketch canvas covers the map.
+  // A card draft gets none: the box behind it shows no pin either.
   useEffect(() => {
     if (!open) return;
     const view = map.getView().getProjection().getCode();
