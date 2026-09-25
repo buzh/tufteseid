@@ -4,7 +4,7 @@ import ImageLayer from 'ol/layer/Image';
 import type { Size } from 'ol/size';
 import ImageCanvasSource from 'ol/source/ImageCanvas';
 import Static from 'ol/source/ImageStatic';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { mapAtom } from '../map/atoms';
 
@@ -90,6 +90,19 @@ export const useEvidenceOverlay = (
   );
 };
 
+/** The controls the reading puts on a loop, in the loop's own terms rather
+ *  than the element's: one figure, 0–1 through the round. */
+export type LoopTransport = {
+  playing: boolean;
+  /** Where the frame on the ground sits in the loop. */
+  progress: number;
+  /** The element has read the loop's length. Until then there is nothing to
+   *  seek over, and a browser that refused the file never gets there. */
+  ready: boolean;
+  toggle: () => void;
+  seek: (progress: number) => void;
+};
+
 /**
  * Plays `url` over `extent`, looping, or nothing for either missing. Same
  * ground, same z and the same `opacity` as the still overlay above; the reader
@@ -98,8 +111,8 @@ export const useEvidenceOverlay = (
  *
  * `ImageStatic` takes a URL to a still and nothing else, so the frames go
  * through an `ImageCanvas` the way the terrain render does
- * (`terrain/terrainLayer.ts`). The element is the only decoder — the box shows
- * the caption, not a second copy.
+ * (`terrain/terrainLayer.ts`). The element is the only decoder — the returned
+ * transport drives that one rather than the box holding a second copy.
  *
  * `bandTop` (0–1) is where the burnt-in legend starts. Below it the frame is a
  * caption rather than ground, so it is left off the map; the rows above it keep
@@ -111,10 +124,16 @@ export const useEvidenceLoopOverlay = (
   extent: [number, number, number, number] | null,
   opacity: number,
   bandTop: number,
-) => {
+): LoopTransport => {
   const map = useAtomValue(mapAtom);
   const [minX, minY, maxX, maxY] = extent ?? [NaN, NaN, NaN, NaN];
   const shown = useRef<ImageLayer<ImageCanvasSource> | null>(null);
+  // The element the transport below drives. It belongs to the effect, which is
+  // the only thing that may make or discard one.
+  const element = useRef<HTMLVideoElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!url || !Number.isFinite(minX)) return;
@@ -133,6 +152,20 @@ export const useEvidenceLoopOverlay = (
     video.style.cssText =
       'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0.01;pointer-events:none';
     document.body.append(video);
+    element.current = video;
+
+    // The element is the state and the buttons read it back rather than
+    // remembering what they asked for: an autoplay may be refused, and then a
+    // button that trusted its own request would offer to pause a still frame.
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    // Finite: a WebM whose header lost its Duration reads back as `Infinity`,
+    // which is a length nothing can be placed along.
+    const onDuration = () =>
+      setReady(Number.isFinite(video.duration) && video.duration > 0);
+    video.addEventListener('play', onPlay);
+    video.addEventListener('pause', onPause);
+    video.addEventListener('durationchange', onDuration);
 
     // One viewport-sized canvas, reused across frames.
     let out: HTMLCanvasElement | null = null;
@@ -207,6 +240,9 @@ export const useEvidenceLoopOverlay = (
       handle = requestAnimationFrame(tick);
       if (video.readyState < 2 || video.currentTime === drawn) return;
       drawn = video.currentTime;
+      // Frame by frame rather than on a clock of its own: the seek bar says
+      // which azimuth is on the ground, so it may not run ahead of it.
+      if (video.duration > 0) setProgress(video.currentTime / video.duration);
       source.changed();
     };
     tick();
@@ -217,6 +253,9 @@ export const useEvidenceLoopOverlay = (
 
     return () => {
       cancelAnimationFrame(handle);
+      video.removeEventListener('play', onPlay);
+      video.removeEventListener('pause', onPause);
+      video.removeEventListener('durationchange', onDuration);
       video.pause();
       // Or the element goes on holding the decoded loop once it is off the map
       // and out of the document.
@@ -225,7 +264,11 @@ export const useEvidenceLoopOverlay = (
       video.remove();
       map.removeLayer(layer);
       shown.current = null;
+      element.current = null;
       out = null;
+      setPlaying(false);
+      setProgress(0);
+      setReady(false);
     };
 
     // `opacity` is seeded here and kept in step by the effect below. Naming it
@@ -237,4 +280,23 @@ export const useEvidenceLoopOverlay = (
   useEffect(() => {
     shown.current?.setOpacity(opacity);
   }, [opacity]);
+
+  const toggle = useCallback(() => {
+    const video = element.current;
+    if (!video) return;
+    if (video.paused) void video.play().catch(() => {});
+    else video.pause();
+  }, []);
+
+  const seek = useCallback((next: number) => {
+    const video = element.current;
+    if (!video || !Number.isFinite(video.duration) || video.duration <= 0) {
+      return;
+    }
+    // Short of the end: the duration itself wraps a looping element round to
+    // the first frame, which is not where the hand let go.
+    video.currentTime = Math.min(Math.max(next, 0), 0.999) * video.duration;
+  }, []);
+
+  return { playing, progress, ready, toggle, seek };
 };

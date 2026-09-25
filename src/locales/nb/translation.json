@@ -35,6 +35,9 @@
     "position": "{{index}} av {{total}}",
     "previous": "Forrige bilde (←)",
     "next": "Neste bilde (→)",
+    "play": "Spill av",
+    "pause": "Sett på pause",
+    "azimuth": "Solretning",
     "layout": {
       "wide": "Legg boksen nederst",
       "tall": "Legg boksen til høyre"

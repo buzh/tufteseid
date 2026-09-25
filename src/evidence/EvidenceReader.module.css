@@ -196,6 +196,13 @@
   min-width: 5rem;
 }
 
+/* Wider than the two fades because the bar is stepped by frame and a hand has
+   to be able to land on one. */
+.transport {
+  flex: 0 1 12rem;
+  min-width: 7rem;
+}
+
 /* `SketchFade` brings its own insides; what the footer says is how much of the
    row it gets — the same as the picture's fade, two things over one ground. */
 .sketch {
@@ -240,6 +247,7 @@
 }
 
 /* Stacked, the row's flex basis would be read as a height. */
+.tall .transport,
 .tall .sketch,
 .tall .fade {
   flex: none;

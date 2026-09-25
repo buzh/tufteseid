@@ -244,8 +244,12 @@ holds the ground still and changes only how it was seen.
   `ImageStatic` and takes a URL to a still, so a loop goes to
   `useEvidenceLoopOverlay` in the same module — one `<video>`, drawn frame by
   frame into an `ImageCanvas` the way `terrain/terrainLayer.ts` draws its own
-  canvas. The two never stand together. The box holds no player: a second
-  element would be a second decode of the same file.
+  canvas. The two never stand together. The box holds no second element — that
+  would be a second decode of the same file — only a transport over the one
+  that is already decoding: play, pause and a bar stepped by frame
+  (`EvidenceTransport.tsx`). The bar is read in degrees of azimuth rather than
+  seconds, because the loop walks the circle from north in `meta.stepDeg` steps
+  and so one frame is one bearing, the bearing the burnt-in band names.
   - The element is a pixel wide and all but transparent in the corner of the
     document rather than detached or `display: none`, because a browser is
     entitled to stop decoding what nobody can see, and the frames are wanted
@@ -476,10 +480,14 @@ show group; anything else that applies to the reading belongs to the tools.
   `source.changed()`, and OpenLayers has no way to redraw one layer, so reading
   a loop costs a map render 24 times a second for as long as it is up. Cheap
   enough against cached tiles; a view carrying the `projection` URL parameter
-  reprojects each of those frames on top, which nothing has measured.
-- **A loop has no transport.** It plays and repeats, and that is all: no pause,
-  no scrub, no single azimuth to stop on. Flipping to another row is the only
-  way to stop it. The transparency slider is the one control it answers.
+  reprojects each of those frames on top, which nothing has measured. The same
+  frames re-render the reader, because the seek bar may not run ahead of the
+  ground it reports; that render is the cheap half of the pair.
+- **A loop's transport is what the element gives.** Play, pause and a seek bar
+  stepped by azimuth, driven off the hidden `<video>` and reading its state
+  back, so a browser that refused the autoplay shows a play button rather than
+  a lie. No speed, no frame-by-frame step, and a scrub decodes forward from the
+  file's one keyframe.
 - **A render is not a cache.** Upstreams re-fly and reprocess, so the same spec
   re-rendered later may not be the picture its author read. `meta.renderedAt`
   says when the file was made; nothing re-renders on its own.

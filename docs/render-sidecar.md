@@ -164,9 +164,13 @@ connection carries one request, so the deadline bounds the whole thread.
    over the stamped holes as well.
 7. **Raw grey straight into ffmpeg**: `-f rawvideo -pix_fmt gray … -c:v libvpx-vp9
    -pix_fmt yuv420p -crf 32 -b:v 0 -row-mt 1 -g <frames>`. No PNG round trip and
-   no frame files. Dimensions are forced even for `yuv420p`. One GOP, because the
-   loop is played whole and never seeked into. The output goes to a real file:
-   a WebM written to a pipe cannot be seeked back to for its cues. So does
+   no frame files. Dimensions are forced even for `yuv420p`. One GOP: the loop
+   is played whole, and a second keyframe in 72 frames of hillshade costs more
+   file than the seek bar saves — scrubbing decodes forward from the one
+   keyframe, which is a short wait on a file this size and already buffered.
+   The output goes to a real file: a WebM written to a pipe cannot be seeked
+   back to for its cues, and without them the reader can neither seek nor read
+   the loop's length off the header. So does
    **stderr**: 72 frames of up to 1600 px is ~180 MB fed down stdin over minutes
    during which nothing here can drain a pipe, and an ffmpeg blocked on a full
    stderr would stop reading stdin and wedge both ends for good. A timer kills

@@ -5,7 +5,13 @@ import type { EvidenceKind, EvidenceRecord } from '../api/evidence';
 import { lidarStyleLabel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { usesHorizon } from '../terrain/render';
 import type { MaterialSymbol } from '../ui/Icon';
-import { evidenceBbox, NIB_MOSAIC, specOf, type EvidenceSpec } from './spec';
+import {
+  evidenceBbox,
+  NIB_MOSAIC,
+  specOf,
+  SUNLOOP_STEP_DEG,
+  type EvidenceSpec,
+} from './spec';
 
 export const KIND_ICON: Record<EvidenceKind, MaterialSymbol> = {
   lidar: 'landscape',
@@ -44,6 +50,14 @@ export const isReadable = (rec: EvidenceRecord): boolean =>
  *  lands. */
 export const isVideoEvidence = (rec: EvidenceRecord): boolean =>
   rec.kind === 'sunloop';
+
+/** Degrees of azimuth between one frame of a loop and the next, which is what
+ *  its seek bar steps by. The row's own figure where it kept one, because an
+ *  older loop may have been walked in coarser steps than today's. */
+export const loopStepDeg = (rec: EvidenceRecord): number => {
+  const spec = specOf(rec);
+  return spec?.kind === 'sunloop' ? spec.stepDeg : SUNLOOP_STEP_DEG;
+};
 
 /** Readable, and a still. The narrow question the draft's ground asks, which
  *  is the picture a sketch is traced over: strokes register to a rectangle,

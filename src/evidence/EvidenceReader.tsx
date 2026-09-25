@@ -20,6 +20,7 @@ import { Panel } from '../ui/Panel';
 import { useEvidenceDownload } from './download';
 import styles from './EvidenceReader.module.css';
 import { useEvidenceLoopOverlay, useEvidenceOverlay } from './evidenceOverlay';
+import { EvidenceTransport } from './EvidenceTransport';
 import {
   coverOf,
   downloadLabel,
@@ -28,6 +29,7 @@ import {
   isReadable,
   isVideoEvidence,
   KIND_ICON,
+  loopStepDeg,
 } from './labels';
 import { useReaderWindow, type ReaderLayout } from './readerWindow';
 import { evidenceBandTop, evidenceBbox } from './spec';
@@ -82,7 +84,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
     still ? evidenceBbox(still) : null,
     1 - transparency / 100,
   );
-  useEvidenceLoopOverlay(
+  const transport = useEvidenceLoopOverlay(
     loop ? evidenceFileUrl(loop) : '',
     loop ? evidenceBbox(loop) : null,
     1 - transparency / 100,
@@ -265,6 +267,14 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
                     <span className={styles.facts}>{facts.join(' · ')}</span>
                   )}
                 </div>
+              )}
+
+              {loop && (
+                <EvidenceTransport
+                  className={styles.transport}
+                  loop={transport}
+                  stepDeg={loopStepDeg(loop)}
+                />
               )}
 
               {hasSketch && <SketchFade className={styles.sketch} />}
