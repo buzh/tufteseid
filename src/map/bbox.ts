@@ -17,23 +17,44 @@ export const MAX_SIDE_M = 500;
 // Floor for a hand-dragged square.
 export const MIN_SIDE_M = 50;
 
-// EPSG:25833 metres. EPSG:3857 metres are out by a factor of two at 60° N.
-export const bboxToMetric = (bbox: Bbox): [number, number, number, number] =>
-  transformExtent(bbox, 'EPSG:4326', 'EPSG:25833') as [
-    number,
-    number,
-    number,
-    number,
-  ];
+export type Metric = [minX: number, minY: number, maxX: number, maxY: number];
 
-export const bboxFromMetric = (
-  extent: [number, number, number, number],
-): Bbox => transformExtent(extent, 'EPSG:25833', 'EPSG:4326') as Bbox;
+// EPSG:25833 metres. EPSG:3857 metres are out by a factor of two at 60° N.
+export const bboxToMetric = (bbox: Bbox): Metric =>
+  transformExtent(bbox, 'EPSG:4326', 'EPSG:25833') as Metric;
+
+const carry = (extent: Metric): Bbox =>
+  transformExtent(extent, 'EPSG:25833', 'EPSG:4326') as Bbox;
 
 /**
- * Ground width in metres. The x extent, not the mean of the two sides: a square
- * built in EPSG:25833 measures a metre or two taller once carried to lon/lat.
+ * `bboxToMetric` undone — deliberately not the metric rectangle's lon/lat
+ * bounding box.
+ *
+ * UTM 33's grid north leans off true north by up to nine degrees over Norway,
+ * so a rectangle on the metric axes has *rotated* corners in lon/lat, and the
+ * box bounding those corners carries back an eighth wider than what went in
+ * around Oslo and nearly a third on the west coast. A rectangle under the hand
+ * is read, moved and written on every frame, so anything short of an inverse
+ * grows it as the reader drags. The lean is measured instead of derived from
+ * the meridian convergence, which makes this the inverse of whatever `ol/proj`
+ * does rather than of a formula restated here.
  */
+export const bboxFromMetric = (extent: Metric): Bbox => {
+  const [minX, minY, maxX, maxY] = extent;
+  const back = bboxToMetric(carry(extent));
+  // Scale-free — it is an angle — so measuring it on the rectangle itself
+  // rather than on a probe of some fixed size costs nothing.
+  const gainX = (back[2] - back[0]) / (maxX - minX);
+  const gainY = (back[3] - back[1]) / (maxY - minY);
+  if (!(gainX > 0) || !(gainY > 0)) return carry(extent);
+  const halfX = (maxX - minX) / gainX / 2;
+  const halfY = (maxY - minY) / gainY / 2;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  return carry([cx - halfX, cy - halfY, cx + halfX, cy + halfY]);
+};
+
+/** Ground width in metres. */
 export const bboxWidthMetres = (bbox: Bbox): number => {
   const [minX, , maxX] = bboxToMetric(bbox);
   return maxX - minX;

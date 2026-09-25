@@ -21,6 +21,7 @@ import {
   MAX_SIDE_M,
   MIN_SIDE_M,
   type Bbox,
+  type Metric,
 } from './bbox';
 import { cursorLease } from './cursorLease';
 
@@ -48,8 +49,6 @@ const handleStyle = [
     }),
   }),
 ];
-
-type Metric = [number, number, number, number];
 
 /** South-west, south-east, north-east, north-west: corner `i` is anchored by
  *  corner `i + 2`. */

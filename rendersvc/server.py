@@ -58,8 +58,9 @@ PER_CALLER_MAX = 1
 # `STALE_JOB_MS` (five beats, `src/evidence/queue.ts`).
 BEAT_S = 60
 
-# `MAX_SIDE_M` in `src/map/bbox.ts`, plus room for the metre or two a square
-# built in EPSG:25833 gains on the way out to lon/lat and back.
+# `MAX_SIDE_M` in `src/map/bbox.ts` plus rounding slack. A footprint that
+# carries back over the cap is refused rather than trimmed: adjusting the
+# rectangle once is the reader's fix.
 MAX_SIDE_M = 505
 
 MAX_BODY_BYTES = 64 * 1024
