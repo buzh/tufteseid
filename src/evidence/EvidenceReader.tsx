@@ -9,7 +9,7 @@ import type { SpotRecord } from '../api/spots';
 import { mapAtom } from '../map/atoms';
 import { sketchOf } from '../sketch/scene';
 import { SketchFade } from '../sketch/SketchFade';
-import { editSpotDraftAtom, spotReadingAtom } from '../spots/atoms';
+import { activeSpotAtom, spotReadingAtom } from '../spots/atoms';
 import { formatPoint } from '../spots/geo';
 import { useMayEditSpot } from '../spots/mayEdit';
 import { cx } from '../ui/cx';
@@ -52,7 +52,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   const { t, i18n } = useTranslation();
   const map = useAtomValue(mapAtom);
   const setReading = useSetAtom(spotReadingAtom);
-  const edit = useSetAtom(editSpotDraftAtom);
+  const setActive = useSetAtom(activeSpotAtom);
   const mayEdit = useMayEditSpot(spot);
   const { items } = useSpotEvidence(spot);
   const box = useReaderWindow();
@@ -126,8 +126,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   }, [step]);
 
   // A reading with nothing to read is not a reading — but only an editor has a
-  // card to fall back to. For anybody else this box is the spot's whole UI, and
-  // stepping out of it would close a spot they just opened.
+  // card to fall back to. For anybody else this box is the spot's whole UI.
   useEffect(() => {
     if (mayEdit && items !== null && readable.length === 0) setReading(false);
   }, [mayEdit, items, readable.length, setReading]);
@@ -211,7 +210,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
                   color="gray"
                   size="sm"
                   aria-label={t('spots.edit')}
-                  onClick={() => edit(spot)}
+                  onClick={() => setReading(false)}
                 >
                   <Icon icon="edit" size={18} />
                 </ActionIcon>
@@ -231,7 +230,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
           </>
         }
         collapsible={false}
-        onClose={() => setReading(false)}
+        onClose={() => setActive(null)}
         footer={
           (readable.length > 0 || hasSketch) && (
             <div className={styles.controls}>

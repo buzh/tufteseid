@@ -87,9 +87,10 @@ export const activeSpotAtom = atom(
 /** The open spot's evidence is being read on the map. A draft only suspends the
  *  reading — closing one returns to it.
  *
- *  A reader who may not edit the spot gets the reading and nothing else: there
- *  is no card behind it to step back to, so opening such a spot is a reading
- *  and ending one closes the spot. */
+ *  True regardless for a reader who may not edit the spot: the card behind the
+ *  reading is the author's workbench, so for anybody else the reading is the
+ *  whole of the spot and writing this false does nothing. They leave by closing
+ *  the spot itself. */
 export const spotReadingAtom = atom(
   (get) => {
     const active = get(activeSpotAtom);
@@ -98,12 +99,7 @@ export const spotReadingAtom = atom(
     return get(readingSpotIdAtom) === active.id;
   },
   (get, set, reading: boolean) => {
-    const active = get(activeSpotAtom);
-    if (!reading && !get(mayEditSpotAtom)(active)) {
-      set(activeSpotAtom, null);
-      return;
-    }
-    set(readingSpotIdAtom, reading ? (active?.id ?? null) : null);
+    set(readingSpotIdAtom, reading ? (get(activeSpotAtom)?.id ?? null) : null);
   },
 );
 

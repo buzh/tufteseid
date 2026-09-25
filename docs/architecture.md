@@ -76,7 +76,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `spotFootprintAdjustingAtom`, `standingSpotFootprintAtom` | same | Derived: the draft is in its `footprint` stage, and which rectangle the standing frame draws. |
 | `place`/`edit`/`adjust`/`closeSpotDraftAtom`, `setSpotStageAtom` | same | Write-only. `adjustSpotDraftAtom` is the card's: it opens a draft straight into a stage with `box: 'card'`. |
 | `activeSpotAtom` | same | The record being read — opened by a click, by an index row, or by `?lok=`. |
-| `spotReadingAtom` | same | The open spot's kept renders are being read on the map. Held as the id it was entered on; writing `activeSpotAtom` with a different spot — or none — clears it, and a draft suspends it. True regardless for a spot the reader may not edit, and writing it false there closes the spot. |
+| `spotReadingAtom` | same | The open spot's kept renders are being read on the map. Held as the id it was entered on; writing `activeSpotAtom` with a different spot — or none — clears it, and a draft suspends it. True regardless for a spot the reader may not edit, for whom writing it false does nothing. |
 | `spotRecordsAtom`, `spotsFailedAtom` | `spots/spotRecords.ts` | Every record the session may see, null until the list lands; and whether it never did. |
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
@@ -345,25 +345,26 @@ holds the ground still and changes only how it was seen.
     band stays in the file and off the map (`docs/render-sidecar.md`).
 - **The card is an owner's surface.** Somebody else's spot opens straight into
   the reading, however it was opened — a click on the pin, an index row, `?lok=`
-  — and the close button ends the whole thing: `spotReadingAtom` reads true for
-  a spot outside `mayEdit` and writing it false clears `activeSpotAtom`. So a
-  visitor sees one box, and closing it leaves the map as it was. The card holds
-  the rectangle, the pen, the visibility switch and the offers, none of which a
-  visitor may press; keeping it behind the reading would be a panel of disabled
-  controls and one button that works. So neither the card nor `EvidenceGallery`,
-  which only the card mounts, branches on `mayEdit` at all — the reader is the
-  surface that does.
+  — and stays there: `spotReadingAtom` reads true for a spot outside `mayEdit`
+  whatever is written to it, so there is nothing for the reading to step back
+  to. A visitor sees one box, and closing it leaves the map as it was. The card
+  holds the rectangle, the pen, the visibility switch and the offers, none of
+  which a visitor may press; keeping it behind the reading would be a panel of
+  disabled controls and one button that works. So neither the card nor
+  `EvidenceGallery`, which only the card mounts, branches on `mayEdit` at all —
+  the reader is the surface that does.
 - `/l/<code>` opens the reading for an owner too: a link is an invitation to
   read. The reading fits the footprint itself, so `shareLink.ts` keeps its hands
   off the view whenever one is open rather than putting two animations on it.
   The code goes back onto the URL for whatever spot is open, so a reload lands
   in the reading too.
-- Because the reading stands in for the card, it carries the card's edit button
-  as well, on the same `mayEdit` (`src/spots/mayEdit.ts`). Otherwise the only
-  way to an owner's own edit is a close that reads as leaving the spot. A draft
-  opened from the reading returns to it: `editSpotDraftAtom` leaves
-  `readingSpotIdAtom` alone, and `spotReadingAtom` is false only for as long as
-  the draft is up.
+- **The reading's two ways out say two different things.** The close is the
+  spot's own: it clears `activeSpotAtom` and leaves the map as it was, and it
+  means that for an author as much as for a visitor. The pencil beside it, on
+  `mayEdit` (`src/spots/mayEdit.ts`), only ends the reading and so steps back to
+  the card — the workbench, not the naming form, which is one further press on
+  the card's cogwheel. Without it an author's only way back to their own spot
+  would be to close it and open it again.
 
 The box floats (`src/evidence/readerWindow.ts`). It is dragged by its title row
 and resized from the corner grip, and it has two layouts: `wide`, a bar along
