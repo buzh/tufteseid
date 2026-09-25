@@ -34,7 +34,16 @@
   color: var(--mantine-color-dimmed);
 }
 
-/* One row of the editor: the point, the drawing, the rectangle. */
+/* The rectangle and the drawing at rest: two buttons on a line, not two framed
+   rows. The row below is what either of them becomes once it has the map. */
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mantine-spacing-xs);
+  margin-top: var(--mantine-spacing-xs);
+}
+
+/* One row of the box: the point, the drawing, the rectangle. */
 .unit {
   display: flex;
   align-items: center;
@@ -77,12 +86,6 @@
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-.meta {
-  margin-top: var(--mantine-spacing-xs);
-  font-size: var(--mantine-font-size-xs);
-  color: var(--mantine-color-dimmed);
 }
 
 .sketchFade {

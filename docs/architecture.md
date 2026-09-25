@@ -153,9 +153,11 @@ the tile guard and the theme-layer effect walk whatever maps exist.
 Two boxes stand over one record. `SpotEditor` is what a spot is *called* — name,
 description, the pin, and the delete — reached from the card's cogwheel and from
 the `+` that makes a new one. `SpotCard` is where the reader then spends their
-time: the rectangle and the drawing in a row each, and the pictures. Reading
+time: the rectangle and the drawing as a button each, and the pictures. Reading
 terrain against a place is the ongoing act and naming it a one-off, so the card
-is the workbench and the editor is behind a button.
+is the workbench and the editor is behind a button. A button becomes a row —
+the hint and its Ferdig, or the pen's Avbryt/Lagre — for as long as it has the
+map, and only one of the two can.
 
 A spot is written as it is made. `createSpot` runs the moment the pin lands —
 under the pin's own coordinate as a provisional name, because the column is
@@ -348,7 +350,9 @@ holds the ground still and changes only how it was seen.
   visitor sees one box, and closing it leaves the map as it was. The card holds
   the rectangle, the pen, the visibility switch and the offers, none of which a
   visitor may press; keeping it behind the reading would be a panel of disabled
-  controls and one button that works.
+  controls and one button that works. So neither the card nor `EvidenceGallery`,
+  which only the card mounts, branches on `mayEdit` at all — the reader is the
+  surface that does.
 - `/l/<code>` opens the reading for an owner too: a link is an invitation to
   read. The reading fits the footprint itself, so `shareLink.ts` keeps its hands
   off the view whenever one is open rather than putting two animations on it.
@@ -410,8 +414,8 @@ stored bytes and the bytes that leave, so a downloaded figure comes out in the
 reader's language and the current wording rather than whatever was true when the
 queue ran.
 
-The download is the only door, and it is not behind `mayEdit`: a visitor reading
-somebody else's public spot is exactly who wants a citable figure.
+The download is the only door, and a visitor reading somebody else's public spot
+is exactly who wants a citable figure out of it — so the reader has one too.
 `useEvidenceDownload` (`download.ts`) is shared by the gallery's per-row button
 and the reader's, which downloads the picture on the ground. One at a time —
 decoding, stamping and re-encoding 2500 px is a second of main-thread work.

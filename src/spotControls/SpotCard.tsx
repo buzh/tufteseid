@@ -2,6 +2,10 @@
 // and naming it a one-off, so this box — not the editor — is where the reader
 // spends their time: what the spot is in two terse lines, the rectangle and the
 // drawing to reach for, and the pictures. The editor is behind the cogwheel.
+//
+// Only ever the author's own, or an admin's: `spotReadingAtom` sends anybody
+// else straight to `EvidenceReader` and keeps them there, so nothing in here —
+// nor in `EvidenceGallery`, which only this box mounts — is behind `mayEdit`.
 
 import { ActionIcon, Alert, Button, Switch, Tooltip } from '@mantine/core';
 import { useAtomValue, useSetAtom } from 'jotai';
@@ -24,8 +28,6 @@ import {
   type SpotDraft,
 } from '../spots/atoms';
 import { derivedFootprint } from '../spots/footprint';
-import { formatPoint } from '../spots/geo';
-import { useMayEditSpot } from '../spots/mayEdit';
 import { cx } from '../ui/cx';
 import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
@@ -57,61 +59,55 @@ const SpotUnits = ({
 
   return (
     <>
-      <div className={cx(styles.unit, framing && styles.unitStep)}>
-        <Icon icon="crop_free" size={14} />
-        <span className={styles.unitText}>
-          {framing
-            ? t('spots.footprintHint')
-            : metres != null
-              ? t('spots.footprintSide', { metres })
-              : ''}
-        </span>
-        {framing && hold ? (
+      {framing && hold ? (
+        <div className={cx(styles.unit, styles.unitStep)}>
+          <Icon icon="crop_free" size={14} />
+          <span className={styles.unitText}>{t('spots.footprintHint')}</span>
           <Button size="compact-xs" onClick={hold.finish}>
             {t('spots.done')}
           </Button>
-        ) : (
+        </div>
+      ) : drawing && hold ? (
+        <div className={cx(styles.unit, styles.unitStep)}>
+          <Icon icon="draw" size={14} />
+          <span className={styles.unitText}>{t('spots.sketchLabel')}</span>
           <Button
             size="compact-xs"
-            variant="default"
-            disabled={drawing}
-            onClick={() => adjust(spot, 'footprint')}
+            variant="subtle"
+            color="gray"
+            onClick={hold.abort}
           >
-            {t('spots.change')}
+            {t('spots.abort')}
           </Button>
-        )}
-      </div>
-
-      <div className={cx(styles.unit, drawing && styles.unitStep)}>
-        <Icon icon="draw" size={14} />
-        <span className={styles.unitText}>
-          {hasSketch ? t('spots.sketchLabel') : t('spots.sketchNone')}
-        </span>
-        {drawing && hold ? (
-          <>
+          <Button size="compact-xs" onClick={hold.finish}>
+            {t('spots.save')}
+          </Button>
+        </div>
+      ) : (
+        <div className={styles.tools}>
+          <Tooltip label={t('spots.footprintChange')}>
             <Button
               size="compact-xs"
-              variant="subtle"
-              color="gray"
-              onClick={hold.abort}
+              variant="default"
+              leftSection={<Icon icon="crop_free" size={14} />}
+              aria-label={t('spots.footprintChange')}
+              onClick={() => adjust(spot, 'footprint')}
             >
-              {t('spots.abort')}
+              {metres != null
+                ? t('spots.footprintSide', { metres })
+                : t('spots.footprintLabel')}
             </Button>
-            <Button size="compact-xs" onClick={hold.finish}>
-              {t('spots.save')}
-            </Button>
-          </>
-        ) : (
+          </Tooltip>
           <Button
             size="compact-xs"
             variant="default"
-            disabled={framing}
+            leftSection={<Icon icon="draw" size={14} />}
             onClick={() => adjust(spot, 'sketch')}
           >
-            {hasSketch ? t('spots.change') : t('spots.sketchAdd')}
+            {hasSketch ? t('spots.sketchChange') : t('spots.sketchAdd')}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       {hasSketch && !drawing && <SketchFade className={styles.sketchFade} />}
 
@@ -139,7 +135,6 @@ const SpotUnitsHeld = ({
 
 export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   const { t } = useTranslation();
-  const mayEdit = useMayEditSpot(spot);
   const setActive = useSetAtom(activeSpotAtom);
   const edit = useSetAtom(editSpotDraftAtom);
   const setReading = useSetAtom(spotReadingAtom);
@@ -158,14 +153,14 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   // whose own writes are serialized and this one is not.
   const repairing = useRef(false);
   useEffect(() => {
-    if (!mayEdit || draft || spot.footprint || repairing.current) return;
+    if (draft || spot.footprint || repairing.current) return;
     repairing.current = true;
     updateSpot(spot.id, {
       footprint: derivedFootprint(spot.point, spot.sketch).bbox,
     })
       .then(setActive)
       .catch((err) => console.warn('[spots] footprint repair failed', err));
-  }, [mayEdit, draft, spot, setActive]);
+  }, [draft, spot, setActive]);
 
   const setVisibility = (makePublic: boolean) => {
     setBusy(true);
@@ -186,20 +181,18 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
       title={spot.name}
       onClose={() => setActive(null)}
       actions={
-        mayEdit && (
-          <Tooltip label={t('spots.edit')}>
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              disabled={draft != null}
-              aria-label={t('spots.edit')}
-              onClick={() => edit(spot)}
-            >
-              <Icon icon="settings" size={18} />
-            </ActionIcon>
-          </Tooltip>
-        )
+        <Tooltip label={t('spots.edit')}>
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            size="sm"
+            disabled={draft != null}
+            aria-label={t('spots.edit')}
+            onClick={() => edit(spot)}
+          >
+            <Icon icon="settings" size={18} />
+          </ActionIcon>
+        </Tooltip>
       }
       footer={
         readable > 0 && (
@@ -217,31 +210,23 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
         )
       }
     >
-      <div className={styles.meta}>
-        {formatPoint(spot.point)}
-        {spot.credit && ` · ${t('spots.credit', { name: spot.credit })}`}
-      </div>
-
-      {mayEdit &&
-        (draft ? (
-          <SpotUnitsHeld key={draft.id} spot={spot} draft={draft} />
-        ) : (
-          <SpotUnits spot={spot} />
-        ))}
+      {draft ? (
+        <SpotUnitsHeld key={draft.id} spot={spot} draft={draft} />
+      ) : (
+        <SpotUnits spot={spot} />
+      )}
 
       {spot.description && <p className={styles.prose}>{spot.description}</p>}
 
-      {mayEdit && (
-        <Switch
-          mt="xs"
-          size="xs"
-          disabled={busy}
-          checked={spot.visibility === 'public'}
-          label={t('spots.public')}
-          description={t('spots.publicHint')}
-          onChange={(event) => setVisibility(event.currentTarget.checked)}
-        />
-      )}
+      <Switch
+        mt="xs"
+        size="xs"
+        disabled={busy}
+        checked={spot.visibility === 'public'}
+        label={t('spots.public')}
+        description={t('spots.publicHint')}
+        onChange={(event) => setVisibility(event.currentTarget.checked)}
+      />
 
       <EvidenceGallery spot={spot} evidence={evidence} held={draft != null} />
 

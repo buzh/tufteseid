@@ -20,7 +20,6 @@ import {
 import type { SpotRecord } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
 import { bboxToMetric } from '../map/bbox';
-import { useMayEditSpot } from '../spots/mayEdit';
 import { sunLoopLegend } from './legendContent';
 import { keepOffersAtom } from './offer';
 import { sortsForMove } from './order';
@@ -52,7 +51,6 @@ export type SpotEvidence = {
   /** What the reader could keep a picture of right now: whatever is on the
    *  ground under the rectangle, plus the sun loop. */
   offers: KeepOffer[];
-  mayEdit: boolean;
   keep: (spec: EvidenceSpec) => void;
   retry: (rec: EvidenceRecord) => void;
   remove: (id: string) => void;
@@ -78,7 +76,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
   const { i18n } = useTranslation();
   const language = i18n.language;
   const user = useAtomValue(currentUserAtom);
-  const mayEdit = useMayEditSpot(spot);
   const offered = useAtomValue(keepOffersAtom);
 
   const [items, setItems] = useState<EvidenceRecord[] | null>(null);
@@ -143,7 +140,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
 
   const offers = useMemo(
     () =>
-      mayEdit && metric && items
+      metric && items
         ? // The sun loop last: it reads nothing on screen, so unlike the others
           // it is the same ask whatever the reader is looking at.
           [...offered, SUN_LOOP_SPEC].map((spec) => ({
@@ -151,7 +148,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
             kept: items.some((rec) => evidenceMatches(rec, spec, metric)),
           }))
         : [],
-    [mayEdit, offered, items, metric],
+    [offered, items, metric],
   );
 
   const render = useCallback(
@@ -244,7 +241,6 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     items,
     failed,
     offers,
-    mayEdit,
     keep,
     retry: render,
     remove,

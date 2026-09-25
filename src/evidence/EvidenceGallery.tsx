@@ -81,7 +81,6 @@ const EvidenceItem = ({
   state,
   cover,
   onMap,
-  mayEdit,
   downloading,
   downloadFailed,
   lifted,
@@ -98,7 +97,6 @@ const EvidenceItem = ({
   state: RenderState | undefined;
   cover: boolean;
   onMap: boolean;
-  mayEdit: boolean;
   downloading: boolean;
   downloadFailed: boolean;
   lifted: boolean;
@@ -128,22 +126,20 @@ const EvidenceItem = ({
 
   return (
     <li className={cx(styles.row, lifted && styles.lifted)}>
-      {mayEdit && (
-        <Tooltip label={t('evidence.order.move')}>
-          <button
-            type="button"
-            className={styles.handle}
-            aria-label={t('evidence.order.move')}
-            onPointerDown={onDragStart}
-            onPointerMove={onDragMove}
-            onPointerUp={onDragEnd}
-            onPointerCancel={onDragEnd}
-            onKeyDown={onNudge}
-          >
-            <Icon icon="drag_indicator" size={16} />
-          </button>
-        </Tooltip>
-      )}
+      <Tooltip label={t('evidence.order.move')}>
+        <button
+          type="button"
+          className={styles.handle}
+          aria-label={t('evidence.order.move')}
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          onKeyDown={onNudge}
+        >
+          <Icon icon="drag_indicator" size={16} />
+        </button>
+      </Tooltip>
 
       {/* A loop cannot be a sketch ground: the overlay is an `ImageStatic`. */}
       <Tooltip
@@ -185,8 +181,6 @@ const EvidenceItem = ({
               onClick={() => window.open(file, '_blank', 'noopener,noreferrer')}
             />
           </Tooltip>
-          {/* Not behind `mayEdit`: a visitor reading somebody else's public
-              spot is exactly who wants a citable figure out of it. */}
           <Tooltip
             label={downloadLabel({ downloading, failed: downloadFailed })}
           >
@@ -200,7 +194,7 @@ const EvidenceItem = ({
         </>
       )}
 
-      {mayEdit && mayRetry(state) && (
+      {mayRetry(state) && (
         <Tooltip label={t('evidence.retry')}>
           <ControlButton
             icon="refresh"
@@ -210,15 +204,13 @@ const EvidenceItem = ({
         </Tooltip>
       )}
 
-      {mayEdit && (
-        <Tooltip label={t('evidence.remove')}>
-          <ControlButton
-            icon="delete"
-            aria-label={t('evidence.remove')}
-            onClick={onRemove}
-          />
-        </Tooltip>
-      )}
+      <Tooltip label={t('evidence.remove')}>
+        <ControlButton
+          icon="delete"
+          aria-label={t('evidence.remove')}
+          onClick={onRemove}
+        />
+      </Tooltip>
     </li>
   );
 };
@@ -236,7 +228,7 @@ export const EvidenceGallery = ({
   held: boolean;
 }) => {
   const { t } = useTranslation();
-  const { items, offers, mayEdit, reorder } = evidence;
+  const { items, offers, reorder } = evidence;
   const file = useEvidenceDownload(spot);
   const [ground, setGround] = useAtom(draftGroundAtom);
   const listRef = useRef<HTMLUListElement>(null);
@@ -316,8 +308,6 @@ export const EvidenceGallery = ({
     setGround(ground?.id === rec.id ? null : { id: rec.id, url, extent });
   };
 
-  if (!mayEdit && (items === null || items.length === 0)) return null;
-
   const rows = items ? (drag ? moved(items, drag.from, drag.to) : items) : [];
   const cover = coverOf(rows)?.id;
 
@@ -360,7 +350,7 @@ export const EvidenceGallery = ({
             <Icon icon="photo_library" size={14} />
             <span>{t('evidence.label')}</span>
           </div>
-          {mayEdit && <p className={styles.hint}>{t('evidence.order.hint')}</p>}
+          <p className={styles.hint}>{t('evidence.order.hint')}</p>
           <ul className={styles.list} ref={listRef}>
             {rows.map((rec, index) => (
               <EvidenceItem
@@ -369,7 +359,6 @@ export const EvidenceGallery = ({
                 state={evidence.stateOf(rec)}
                 cover={rec.id === cover}
                 onMap={ground?.id === rec.id}
-                mayEdit={mayEdit}
                 downloading={file.busyId === rec.id}
                 downloadFailed={file.failedId === rec.id}
                 lifted={drag?.id === rec.id}
