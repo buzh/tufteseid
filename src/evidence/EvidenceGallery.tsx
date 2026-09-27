@@ -1,7 +1,5 @@
-// The spot's kept pictures, one list. Asking for another one is the camera in
-// `SpotCard`, not here. This list is also where the order is set and where a
-// picture is laid back on the map to trace over, so there is no second list of
-// the same rows anywhere.
+// The spot's kept pictures, in the card: the one place their order is set and
+// the one place a picture is laid back on the map to trace over.
 
 import { Alert, Tooltip } from '@mantine/core';
 import { useAtom } from 'jotai';
@@ -22,18 +20,11 @@ import { Icon } from '../ui/Icon';
 import { draftGroundAtom } from './draftGround';
 import { useEvidenceDownload } from './download';
 import styles from './EvidenceGallery.module.css';
-import {
-  coverOf,
-  downloadLabel,
-  evidenceLabel,
-  evidenceResolution,
-  isVideoEvidence,
-  KIND_ICON,
-  laysOnGround,
-} from './labels';
+import { EvidenceThumb } from './EvidenceThumb';
+import { downloadLabel, evidenceLabel, KIND_ICON, renderNote } from './labels';
 import { moved } from './order';
 import { mayRetry, type RenderState } from './queue';
-import { evidenceBbox } from './spec';
+import { coverOf, evidenceBbox, laysOnGround } from './spec';
 import type { SpotEvidence } from './useSpotEvidence';
 
 type Drag = {
@@ -44,35 +35,6 @@ type Drag = {
   /** Where the middle of every slot is, measured at the press. The rows are
    *  one height, so previewing a move does not move the slots. */
   slots: number[];
-};
-
-const Thumb = ({ record }: { record: EvidenceRecord }) => {
-  const video = isVideoEvidence(record);
-  // PocketBase makes no thumbnail for a video, so a loop is its own handle.
-  const url = video
-    ? evidenceFileUrl(record)
-    : evidenceFileUrl(record, '200x200');
-  if (!url) {
-    return (
-      <span className={cx(styles.thumb, styles.pending)}>
-        <Icon icon="hourglass_top" size={16} />
-      </span>
-    );
-  }
-  return video ? (
-    // `#t=0.1` so a frame is painted rather than a black box: with
-    // `preload="metadata"` alone, nothing is decoded until play.
-    <video
-      className={styles.thumb}
-      src={`${url}#t=0.1`}
-      preload="metadata"
-      muted
-      playsInline
-      aria-hidden="true"
-    />
-  ) : (
-    <img className={styles.thumb} src={url} alt="" />
-  );
 };
 
 const EvidenceItem = ({
@@ -111,17 +73,7 @@ const EvidenceItem = ({
   const { t } = useTranslation();
   const title = evidenceLabel(record);
   const file = evidenceFileUrl(record);
-  const metresPerPx = evidenceResolution(record);
-  const note =
-    state === 'queued' || state === 'running'
-      ? t('evidence.rendering')
-      : state === 'failed'
-        ? t('evidence.renderFailed')
-        : state === 'empty'
-          ? t('evidence.renderEmpty')
-          : metresPerPx != null
-            ? t('evidence.resolution', { m: metresPerPx.toFixed(2) })
-            : '';
+  const note = renderNote(record, state);
 
   return (
     <li className={cx(styles.row, lifted && styles.lifted)}>
@@ -151,7 +103,13 @@ const EvidenceItem = ({
           disabled={!laysOnGround(record)}
           onClick={onPick}
         >
-          <Thumb record={record} />
+          {record.file ? (
+            <EvidenceThumb record={record} className={styles.thumb} />
+          ) : (
+            <span className={cx(styles.thumb, styles.pending)}>
+              <Icon icon="hourglass_top" size={16} />
+            </span>
+          )}
           <span className={styles.text}>
             <span className={styles.title}>
               <Icon icon={KIND_ICON[record.kind]} size={12} /> {title}
@@ -171,8 +129,6 @@ const EvidenceItem = ({
 
       {file && (
         <>
-          {/* The thumbnail is a handle for laying the picture on the map; the
-              render at the source's own resolution is the artifact. */}
           <Tooltip label={t('evidence.open')}>
             <ControlButton
               icon="open_in_new"
@@ -279,9 +235,9 @@ export const EvidenceGallery = ({
     setDrag(null);
   };
 
-  // The handle answers the arrows too: a drag is the only other way to reorder,
-  // and there is no reaching one without a pointer. Stopped before the bounds
-  // check, or OpenLayers' keyboard pan answers the press that runs off the end.
+  // The handle answers the arrows too, for a reader with no pointer. Stopped
+  // before the bounds check, or OpenLayers' keyboard pan answers the press that
+  // runs off the end.
   const nudge =
     (id: string, index: number, total: number) =>
     (event: ReactKeyboardEvent<HTMLElement>) => {

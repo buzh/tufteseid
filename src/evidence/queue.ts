@@ -16,16 +16,14 @@ import { specOf } from './spec';
 /**
  * Where a row stands with the queue. Absent means "not the queue's business" —
  * either the pixels are there or nobody has asked. `failed` is a fault;
- * `empty` says the source had nothing over this rectangle. Both are worth
- * asking again: a probe that errored, an upstream that shed, or a coverage
- * measurement taken one morning are not verdicts on the ground.
+ * `empty` says the source had nothing over this rectangle.
  */
 export type RenderState = 'queued' | 'running' | 'empty' | 'failed';
 
 const STATES: readonly RenderState[] = ['queued', 'running', 'empty', 'failed'];
 
-/** Whether the row can be asked for again. Neither settled state is terminal,
- *  and no surface should be spelling the set out for itself. */
+/** Whether the row can be asked for again. Neither settled state is
+ *  terminal. */
 export const mayRetry = (state: RenderState | undefined): boolean =>
   state === 'failed' || state === 'empty';
 

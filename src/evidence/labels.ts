@@ -5,11 +5,11 @@ import type { EvidenceKind, EvidenceRecord } from '../api/evidence';
 import { lidarStyleLabel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { usesHorizon } from '../terrain/render';
 import type { MaterialSymbol } from '../ui/Icon';
+import type { RenderState } from './queue';
 import {
-  evidenceBbox,
+  evidenceResolution,
   NIB_MOSAIC,
   specOf,
-  SUNLOOP_STEP_DEG,
   type EvidenceSpec,
 } from './spec';
 
@@ -40,40 +40,6 @@ export const evidenceLabel = (rec: EvidenceRecord): string => {
   return spec ? evidenceTitle(spec) : t('evidence.unreadable');
 };
 
-/** Pixels and the ground to lay them over: a row missing either cannot be
- *  shown on the map, whatever else it says. */
-export const isReadable = (rec: EvidenceRecord): boolean =>
-  rec.file !== '' && evidenceBbox(rec) !== null;
-
-/** A WebM loop rather than a raster. Off the kind rather than the filename:
- *  the kind is what the producer promised, and it is known before the file
- *  lands. */
-export const isVideoEvidence = (rec: EvidenceRecord): boolean =>
-  rec.kind === 'sunloop';
-
-/** Degrees of azimuth between one frame of a loop and the next, which is what
- *  its seek bar steps by. The row's own figure where it kept one, because an
- *  older loop may have been walked in coarser steps than today's. */
-export const loopStepDeg = (rec: EvidenceRecord): number => {
-  const spec = specOf(rec);
-  return spec?.kind === 'sunloop' ? spec.stepDeg : SUNLOOP_STEP_DEG;
-};
-
-/** Readable, and a still. The narrow question the draft's ground asks, which
- *  is the picture a sketch is traced over: strokes register to a rectangle,
- *  and a shadow that has moved since they were drawn is not something to
- *  trace. The reading has no such trouble and lays a loop on the ground too
- *  (`useEvidenceLoopOverlay`). */
-export const laysOnGround = (rec: EvidenceRecord): boolean =>
-  isReadable(rec) && !isVideoEvidence(rec);
-
-/** The row the reading opens on, and the one the strip stars. Readable is the
- *  whole test, not `laysOnGround`: the reading grounds a loop as readily as a
- *  still. */
-export const coverOf = (
-  rows: readonly EvidenceRecord[],
-): EvidenceRecord | null => rows.find(isReadable) ?? null;
-
 export const downloadLabel = (state: {
   downloading: boolean;
   failed: boolean;
@@ -86,9 +52,18 @@ export const downloadLabel = (state: {
         : 'evidence.download',
   );
 
-export const evidenceResolution = (rec: EvidenceRecord): number | null => {
-  const value = rec.meta?.metresPerPx;
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+/** Where the row stands, or what it came out at once it stands nowhere. */
+export const renderNote = (
+  rec: EvidenceRecord,
+  state: RenderState | undefined,
+): string => {
+  if (state === 'queued' || state === 'running') return t('evidence.rendering');
+  if (state === 'failed') return t('evidence.renderFailed');
+  if (state === 'empty') return t('evidence.renderEmpty');
+  const metresPerPx = evidenceResolution(rec);
+  return metresPerPx != null
+    ? t('evidence.resolution', { m: metresPerPx.toFixed(2) })
+    : '';
 };
 
 const dayOf = (iso: string, language: string): string =>
@@ -98,9 +73,8 @@ const dayOf = (iso: string, language: string): string =>
     year: 'numeric',
   });
 
-// Which knobs the visualization actually answered to, mirroring the rows
-// `TerrainPanel` offers: a sun angle under a Skyview would be a fact about
-// nothing.
+// Which knobs the visualization actually answered to: a sun angle under a
+// Skyview would be a fact about nothing.
 const terrainFacts = (
   spec: Extract<EvidenceSpec, { kind: 'terrain' }>,
 ): string[] => {
@@ -128,9 +102,9 @@ const terrainFacts = (
   return facts;
 };
 
-/** What the catalogue knew about the source: everything that is true of a row
- *  before any pixel of it exists. Separate from `evidenceFacts` because a row
- *  that is about to be rendered still holds the previous render's figures. */
+/** What the catalogue knew about the source: everything true of a row before
+ *  any pixel of it exists. Separate from `evidenceFacts` because a row about to
+ *  be rendered still holds the previous render's figures. */
 export const specFacts = (spec: EvidenceSpec, language: string): string[] => {
   switch (spec.kind) {
     case 'lidar': {
@@ -162,9 +136,8 @@ export const specFacts = (spec: EvidenceSpec, language: string): string[] => {
 export const evidenceFacts = (
   rec: EvidenceRecord,
   language: string,
-  /** The rectangle's centre, for the surface that has room to say where the
-   *  ground is. Goes before the render date rather than after it because the
-   *  legend sheds from the end, and where beats when. */
+  /** The rectangle's centre. Ordered before the render date because the legend
+   *  sheds from the end. */
   centre?: string,
 ): string[] => {
   const spec = specOf(rec);

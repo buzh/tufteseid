@@ -1,3 +1,8 @@
+// A `Panel` that floats over the map: dragged by its title row, resized from a
+// corner grip, and docked by being pushed through a wall. The placement lives
+// in module-level atoms, so it survives a component that remounts — and so only
+// one floating panel can be up at a time.
+
 import { atom, useAtom } from 'jotai';
 import {
   useCallback,
@@ -8,7 +13,7 @@ import {
 } from 'react';
 
 /** `wide` is a bar along an edge, `tall` a column down one. */
-export type ReaderLayout = 'wide' | 'tall';
+export type PanelLayout = 'wide' | 'tall';
 
 type Side = 'left' | 'right' | 'top' | 'bottom';
 
@@ -27,13 +32,13 @@ type Placement = Ceiling & {
   top: number;
 };
 
-const readerLayoutAtom = atom<ReaderLayout>('wide');
+const panelLayoutAtom = atom<PanelLayout>('wide');
 
 /** Null until the box has been moved, resized or docked: until then the
- *  layout's own CSS places it, so a reading opens where the layout says. */
-const readerPlacementAtom = atom<Placement | null>(null);
+ *  layout's own CSS places it. */
+const panelPlacementAtom = atom<Placement | null>(null);
 
-/** Floors for the ceiling: under these the strip has nothing to show. */
+/** Floors for the ceiling: under these the box has nothing to show. */
 const MIN_WIDTH = 260;
 const MIN_HEIGHT = 140;
 
@@ -42,18 +47,17 @@ const MIN_HEIGHT = 140;
 const GUTTER = 10;
 
 /** A wall implies a shape: down the side is a column, along the top or the
- *  bottom a bar. That shape is all a dock is besides the anchor — the layout's
- *  own ceilings are what make a column narrow, so the dock keeps none of its
- *  own and drops any the grip had set. */
-const LAYOUT_OF: Record<Side, ReaderLayout> = {
+ *  bottom a bar. The layout's own ceilings are what make a column narrow, so a
+ *  dock keeps none of its own and drops any the grip had set. */
+const LAYOUT_OF: Record<Side, PanelLayout> = {
   left: 'tall',
   right: 'tall',
   top: 'wide',
   bottom: 'wide',
 };
 
-/** The map rectangle the box floats over. `.reader` is absolute, so its
- *  offset parent is the one positioned element around the map. */
+/** The map rectangle the box floats over. The box is absolutely positioned, so
+ *  its offset parent is the one positioned element around the map. */
 const parentOf = (box: HTMLElement): HTMLElement | null =>
   box.offsetParent instanceof HTMLElement ? box.offsetParent : null;
 
@@ -85,9 +89,9 @@ const inside = (left: number, top: number, size: Size, within: Size) => ({
   top: between(top, 0, within.height - size.height),
 });
 
-/** The wall a box has been pushed through, if any, and the hardest one when
- *  it is a corner. Pushing through is the whole gesture: a box at rest keeps
- *  the gutter, so no ordinary nudge can reach a wall by accident. */
+/** The wall a box has been pushed through, and the hardest one when it is a
+ *  corner. A box at rest keeps the gutter, so no ordinary nudge reaches a wall
+ *  by accident. */
 const wallCrossed = (
   at: { left: number; top: number },
   size: Size,
@@ -105,10 +109,9 @@ const wallCrossed = (
   return past[worst] > 0 ? worst : null;
 };
 
-/** Flush against one wall, in the shape that wall asks for. A column is
- *  pinned to the top of its side; a bar keeps the run it was dragged to,
- *  because pinning that too would slide it out from under the hand that put
- *  it there. */
+/** Flush against one wall. A column is pinned to the top of its side; a bar
+ *  keeps the run it was dragged to, or it would slide out from under the hand
+ *  that put it there. */
 const dockedTo = (side: Side, at: { left: number; top: number }): Placement =>
   side === 'left' || side === 'right'
     ? { side, left: GUTTER, top: GUTTER }
@@ -137,16 +140,16 @@ type Gesture = {
   y: number;
 };
 
-export const useReaderWindow = () => {
-  const [layout, setLayoutAtom] = useAtom(readerLayoutAtom);
-  const [placement, setPlacement] = useAtom(readerPlacementAtom);
+export const useFloatingPanel = () => {
+  const [layout, setLayoutAtom] = useAtom(panelLayoutAtom);
+  const [placement, setPlacement] = useAtom(panelPlacementAtom);
   const boxRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
 
   // Choosing a layout is also the way back: a box docked or dragged somewhere
   // unhelpful is put right by asking for the shape it should have had.
   const setLayout = useCallback(
-    (next: ReaderLayout) => {
+    (next: PanelLayout) => {
       setLayoutAtom(next);
       setPlacement(null);
     },
@@ -154,9 +157,8 @@ export const useReaderWindow = () => {
   );
 
   // A window resized under the box leaves it off the map — as does one resized
-  // between two readings, hence the pass on mount too. A dock survives it: the
-  // wall it names is an anchor, not a number, and the corner a bar keeps along
-  // its edge is clamped here with everything else.
+  // between two uses, hence the pass on mount too. A dock survives it: the wall
+  // it names is an anchor, not a number.
   useEffect(() => {
     const onResize = () => {
       const box = boxRef.current;
@@ -192,8 +194,8 @@ export const useReaderWindow = () => {
         at: { left: rect.left, top: rect.top },
         size: rect,
         // A ceiling the grip has set is kept across a move; one it has not is
-        // not invented here, or a box would freeze at the size the reading it
-        // was dragged in happened to need.
+        // not invented here, or the box would freeze at the size its content
+        // happened to need.
         ceiling: {
           maxWidth: placement?.maxWidth,
           maxHeight: placement?.maxHeight,
@@ -214,8 +216,8 @@ export const useReaderWindow = () => {
     const dy = event.clientY - held.y;
 
     if (held.mode === 'resize') {
-      // Off the corner the box is actually drawn at, not off the ceiling: the
-      // grip is where the hand is, and a ceiling above the content is not.
+      // Off the corner the box is drawn at, not off the ceiling: the grip is
+      // where the hand is, and a ceiling above the content is not.
       setPlacement({
         side: null,
         left: at.left,
@@ -230,18 +232,16 @@ export const useReaderWindow = () => {
       return;
     }
 
-    // Unclamped on purpose: a frame pushed through a wall is what asks for the
-    // dock, and a docked box is inside the map again, so nothing ever ends up
-    // off it.
+    // Unclamped on purpose: a box pushed through a wall is what asks for the
+    // dock, and a docked box is inside the map again.
     const pushed = { left: at.left + dx, top: at.top + dy };
     const side = wallCrossed(pushed, size, within);
     if (!side) {
       setPlacement({ side: null, ...pushed, ...ceiling });
       return;
     }
-    // The shape is the dock, as much as the anchor is: switching the layout
-    // here rather than on release is what makes the wall a preview of it. Any
-    // ceiling the grip had set goes with it — the layout brings its own.
+    // Switching the layout here rather than on release is what makes the wall a
+    // preview of the dock.
     setLayoutAtom(LAYOUT_OF[side]);
     setPlacement(dockedTo(side, inside(pushed.left, pushed.top, size, within)));
   };

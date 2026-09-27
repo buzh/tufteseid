@@ -8,8 +8,8 @@ export const NIB_MOSAIC = 'mosaic';
 
 /** Degrees between frames. Must divide 360, or the loop jumps where it closes;
  *  the sidecar refuses one that does not. */
-export const SUNLOOP_STEP_DEG = 5;
-export const SUNLOOP_FPS = 24;
+const SUNLOOP_STEP_DEG = 5;
+const SUNLOOP_FPS = 24;
 
 export type EvidenceSpec =
   | {
@@ -69,7 +69,7 @@ const asModel = (v: unknown): DemModel | null =>
   v === 'dtm' || v === 'dom' ? v : null;
 
 /** The spec, flattened for the column. The render merges what it achieved over
- *  this; nothing here is a number the pixels have to live up to. */
+ *  this, so nothing here is a figure the pixels have to live up to. */
 export const metaOf = (spec: EvidenceSpec): EvidenceMeta => {
   switch (spec.kind) {
     case 'lidar':
@@ -109,7 +109,7 @@ export const metaOf = (spec: EvidenceSpec): EvidenceMeta => {
 };
 
 /** A stored row read back as parameters. Null when the column no longer
- *  describes a render — which is a row with nothing to retry, not a failure. */
+ *  describes a render — a row with nothing to retry, not a failure. */
 export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
   const meta = rec.meta;
   if (!meta) return null;
@@ -187,15 +187,43 @@ export const evidenceBbox = (
 
 /**
  * Where the burnt-in provenance band starts, as a fraction of the picture's
- * height; 1 for anything without one, which is everything but a sun loop. A
- * still is stamped in the reader's own tab at download time and the kept
- * pixels are clean, but `createImageBitmap` throws on a WebM, so a loop is
- * cited on the way out of the sidecar instead (`docs/render-sidecar.md`). Only
+ * height; 1 for anything without one, which is everything but a sun loop. Only
  * the part above the band is registered to `bbox25833`.
  */
 export const evidenceBandTop = (rec: EvidenceRecord): number => {
   const value = num(rec.meta?.bandTop);
   return value != null && value > 0 && value <= 1 ? value : 1;
+};
+
+export const evidenceResolution = (rec: EvidenceRecord): number | null =>
+  num(rec.meta?.metresPerPx);
+
+/** Pixels and the ground to lay them over: a row missing either cannot be
+ *  shown on the map, whatever else it says. */
+export const isReadable = (rec: EvidenceRecord): boolean =>
+  rec.file !== '' && evidenceBbox(rec) !== null;
+
+/** A WebM loop rather than a raster. Off the kind rather than the filename:
+ *  the kind is known before the file lands. */
+export const isVideoEvidence = (rec: EvidenceRecord): boolean =>
+  rec.kind === 'sunloop';
+
+/** Readable, and a still — the narrower question the traced sketch ground asks
+ *  (`docs/architecture.md`). */
+export const laysOnGround = (rec: EvidenceRecord): boolean =>
+  isReadable(rec) && !isVideoEvidence(rec);
+
+/** The row the reading opens on, and the one the strip stars. */
+export const coverOf = (
+  rows: readonly EvidenceRecord[],
+): EvidenceRecord | null => rows.find(isReadable) ?? null;
+
+/** Degrees of azimuth between one frame of a loop and the next. The row's own
+ *  figure where it kept one: an older loop may have been walked in coarser
+ *  steps than today's. */
+export const loopStepDeg = (rec: EvidenceRecord): number => {
+  const spec = specOf(rec);
+  return spec?.kind === 'sunloop' ? spec.stepDeg : SUNLOOP_STEP_DEG;
 };
 
 // Metres; absorbs a JSON round trip, and a sub-metre nudge is the same ground.

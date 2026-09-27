@@ -1,8 +1,8 @@
-/* The reading window. It floats: `readerWindow.ts` moves and resizes it, and
-   the two layout classes are only where each shape starts from. Nothing here
-   or there gives the box a size — it shrink-wraps its content in both axes and
-   every rule below is a ceiling, so a reading with three pictures and no prose
-   gets a box that small. The wrapper is what the resize grip sits in the
+/* The reading window. It floats: `src/ui/useFloatingPanel.ts` moves and resizes
+   it, and the two layout classes are only where each shape starts from. Nothing
+   here or there gives the box a size — it shrink-wraps its content in both axes
+   and every rule below is a ceiling, so a reading with three pictures and no
+   prose gets a box that small. The wrapper is what the resize grip sits in the
    corner of. */
 .reader {
   position: absolute;

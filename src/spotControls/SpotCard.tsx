@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 
 import { updateSpot, type SpotRecord } from '../api/spots';
 import { EvidenceGallery } from '../evidence/EvidenceGallery';
-import { isReadable } from '../evidence/labels';
+import { isReadable } from '../evidence/spec';
 import {
   useSpotEvidence,
   type SpotEvidence,

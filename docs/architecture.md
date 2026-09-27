@@ -83,7 +83,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
 | `keepOfferAtom` | same | Derived: the terrain's offer when an analysis is running, otherwise the ground's (off the A half). Null where the view cannot be re-rendered. |
 | `draftGroundAtom` | `evidence/draftGround.ts` | One of the spot's own pictures laid back on the map at the extent it was rendered over, to trace a drawing onto. Published by `EvidenceGallery`, which is the only thing holding the rows. |
-| the reading box's layout and placement | `evidence/readerWindow.ts` | Which way round the box is laid out, where it was dragged to, how big it may get and which wall it is docked against. Module-private, reached through `useReaderWindow`: held outside the component, which remounts per spot. |
+| the floating panel's layout and placement | `ui/useFloatingPanel.ts` | Which way round the box is laid out, where it was dragged to, how big it may get and which wall it is docked against. Module-private, reached through `useFloatingPanel`: held outside the component, which remounts per spot — and so only one floating panel at a time. `EvidenceReader` is the one caller. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
 | `sketchShownAtom`, `sketchFadeAtom` | `sketch/overlay.ts` | Whether the open spot's drawing is on the ground, and how far it is faded towards it. A reading setting, not the record's: they outlive the spot the box was opened on. |
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |
@@ -242,7 +242,7 @@ same rows full size and changes none of them.
 
 - **The cover is the first readable row.** Nothing marks one: the reading opens
   on it, so dragging a picture to the top is how a cover is chosen, and the star
-  says which one is. `coverOf` (`evidence/labels.ts`) is the single authority
+  says which one is. `coverOf` (`evidence/spec.ts`) is the single authority
   both surfaces ask, and a sun loop passes — the reading grounds a loop as
   readily as a still. `laysOnGround`, in the same module, answers the narrower
   question the traced ground asks, and a video fails it: that picture is the one
@@ -387,7 +387,7 @@ holds the ground still and changes only how it was seen.
   the card's cogwheel. Without it an author's only way back to their own spot
   would be to close it and open it again.
 
-The box floats (`src/evidence/readerWindow.ts`). It is dragged by its title row
+The box floats (`src/ui/useFloatingPanel.ts`). It is dragged by its title row
 and resized from the corner grip, and it has two layouts: `wide`, a bar along
 an edge, and `tall`, a column down one. Both live in atoms outside the
 component, because the reader is keyed on the spot and remounts when another is
@@ -431,7 +431,7 @@ opened.
 A stored render is bare pixels. The reader lays that same file back on the
 ground it was made over and the sketch draws on top of it, so a caption burned
 into the file would ride the map and be drawn over. The legend goes on **at the
-door instead** — `stampEvidence` (`src/evidence/stamp.ts`) sits between the
+door instead** — `stampEvidence` (`src/evidence/download.ts`) sits between the
 stored bytes and the bytes that leave, so a downloaded figure comes out in the
 reader's language and the current wording rather than whatever was true when the
 queue ran.

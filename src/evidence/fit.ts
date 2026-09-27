@@ -1,3 +1,5 @@
+import type { Metric } from '../map/bbox';
+
 // Encoded size spreads some 250× across content, so the pixel budget is the
 // rule and the byte budget a backstop that is measured rather than predicted.
 // The byte cap is `evidence.file`'s: PocketBase answers 400 over it, and every
@@ -8,6 +10,14 @@ const MAX_STORED_BYTES = 50000000;
 // The geometric step converges in one pass from any plausible start; the cap is
 // so a pathological encoder cannot spin the queue.
 const MAX_FIT_PASSES = 3;
+
+/** Pixels and the ground they cover, EPSG:25833 — what every producer hands
+ *  back, `lidarExtract`'s `ExtractedCanvas` among them. */
+export type Raster = {
+  canvas: HTMLCanvasElement;
+  metresPerPx: number;
+  bbox25833: Metric;
+};
 
 const scaleCanvas = (
   src: HTMLCanvasElement,

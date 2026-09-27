@@ -14,16 +14,11 @@ import {
 import { bboxToMetric, type Bbox, type Metric } from '../map/bbox';
 import type { CvatAcquisition } from '../map/layers/config/backgroundLayers/cvatGround';
 import { getWMSTileGrid } from '../map/layers/wmsTileGrid';
+import type { Raster } from './fit';
 
 // A hit is a SELECT against a bind-mounted SQLite file on the same host, so the
 // limit is here to bound the canvas work rather than to spare an upstream.
 const MAX_CONCURRENT = 6;
-
-type CvatRaster = {
-  canvas: HTMLCanvasElement;
-  metresPerPx: number;
-  bbox25833: Metric;
-};
 
 /** Null for a tile the pipeline has not written: 404 is how the acquisition's
  *  footprint is drawn (`cvat-tiles/server.mjs`), not a fault. A store it cannot
@@ -66,7 +61,7 @@ export const fetchCvatRaster = async (
   bbox4326: Bbox,
   acquisition: CvatAcquisition,
   signal?: AbortSignal,
-): Promise<CvatRaster | null> => {
+): Promise<Raster | null> => {
   const grid = getWMSTileGrid('EPSG:25833');
   if (!grid) return null;
 

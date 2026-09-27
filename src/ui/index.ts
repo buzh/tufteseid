@@ -6,3 +6,4 @@ export { Icon, type MaterialSymbol } from './Icon';
 export { Panel, type PanelProps } from './Panel';
 export { theme } from './theme';
 export { useConfirm, type Confirm } from './useConfirm';
+export { useFloatingPanel, type PanelLayout } from './useFloatingPanel';

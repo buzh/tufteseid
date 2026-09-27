@@ -53,13 +53,9 @@ export type SpotEvidence = {
    *  on the cover (`coverOf`), so this is also how a cover is chosen. */
   reorder: (id: string, to: number) => void;
   /**
-   * Where a row stands, by one rule. A row that has pixels has no state at
-   * all. Otherwise a job this browser is still holding wins, because it is the
-   * only account there is of an ask the sidecar has not marked yet — and past
-   * that the sidecar's own `meta.job` outranks whatever the local queue
-   * concluded, since it is the side doing the work. A handover that timed out
-   * or was refused as a duplicate therefore stops saying so the moment the
-   * sidecar says otherwise.
+   * Where a row stands. A row with pixels has no state at all; otherwise a job
+   * this browser is still holding wins, and past that the sidecar's own
+   * `meta.job` outranks whatever the local queue concluded.
    */
   stateOf: (rec: EvidenceRecord) => RenderState | undefined;
 };
@@ -150,12 +146,8 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       enqueueRender({
         rec,
         bbox4326: footprint,
-        // Composed here and sent with the job, because only a sun loop's band
-        // is typeset by the sidecar and only the client knows the reader's
-        // language. No centre, which nothing knows before the ground is
-        // fetched, and neither the resolution nor the render date: the sidecar
-        // substitutes the resolution it achieves, and on a second attempt the
-        // stored pair describes the first one.
+        // Composed here and sent with the job: only the client knows the
+        // reader's language, and only a sun loop's band is typeset elsewhere.
         legend:
           rec.kind === 'sunloop' ? sunLoopLegend(rec, spot, language) : null,
         onDone: upsert,

@@ -91,10 +91,8 @@ const niceMetres = (raw: number): number => {
 // Under this the four segments are indistinguishable and the bar is left off.
 const MIN_BAR_PX = 24;
 
-// Of the image, not of the legend: the bar is a statement about the ground, and
-// one that changed with how long the rights line was would be a strange thing
-// to measure with. It shares its line with a rights line, so it takes less of
-// the width than a bar on a plate of its own could.
+// Of the image, not of the legend: a bar whose length depended on how long the
+// rights line was would be a strange thing to measure ground with.
 const BAR_TARGET_FRACTION = 0.18;
 
 // Between the bar and its label, in ems of the label's own size.
@@ -162,8 +160,8 @@ type LegendOptions = {
    *  the line will not fit, so the list must be ordered with the fact that can
    *  best be spared last. */
   facts: string[];
-  /** The right column, one line each, and the one thing here that is never
-   *  shed: it is the only part of the legend the licences actually require. */
+  /** The right column, one line each, and never shed: the only part of the
+   *  legend the licences actually require. */
   rights: string[];
   /** The left column under the scale bar. Empty where there is nothing to point
    *  at. */
@@ -185,13 +183,10 @@ const SEP = ' · ';
 const GAP_EM = 1.5;
 
 // The bar and the link are shed to keep the band under this fraction of the
-// image. The rights lines are not shed, so a picture too small to carry them
-// inside the fraction is stamped with a band over it rather than left
-// uncredited.
+// image; the rights lines never are.
 const SHED_HEIGHT_FRACTION = 0.2;
 
-// Past this the legend is not a caption on a picture, it is a picture with a
-// caption attached, and nothing is drawn. Narrow images are turned away by the
+// Past this nothing is drawn at all. Narrow images are turned away by the
 // `contentW` floor before they reach here.
 const MAX_HEIGHT_FRACTION = 0.5;
 

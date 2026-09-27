@@ -45,10 +45,9 @@ const groundOfferAtom = atom<EvidenceSpec | null>((get) => {
         };
   }
 
-  // A flight rendered once by `vat-cache/` and held on disk, which is a
-  // provenance like any other: the same key as the WMS ground of that flight,
-  // told apart by the style. `vat-cache/` runs against Prosjekt_DTM, so the
-  // store carries no surface model and the ground being up settles the model.
+  // The same key as the WMS ground of that flight, told apart by the style.
+  // `vat-cache/` runs against Prosjekt_DTM, so the store carries no surface
+  // model and the ground being up settles the model.
   if (layer === 'lidarCvat') {
     const acquisition = get(activeCvatAcquisitionHalves.a);
     return acquisition
@@ -94,8 +93,7 @@ export const terrainOfferAtom = atom<EvidenceSpec | null>(null);
 
 /**
  * The one offer standing: what the camera in the spot card would keep of the
- * view as it is. The analysis wins when one is running, because it is then what
- * the reader is looking at — the ground it was computed from is underneath it.
+ * view as it is, the analysis winning over the ground underneath it.
  *
  * An offer is parameters, not pixels: keeping it re-renders over the spot's
  * footprint at the source's own resolution, not the rectangle or the resolution

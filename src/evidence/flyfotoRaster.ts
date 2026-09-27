@@ -5,20 +5,19 @@
 // meta-tiled onto the app's own grid, and a kept render wants the acquisition's
 // own resolution rather than whatever zoom level happened to be up.
 
-import { transformExtent } from 'ol/proj';
-
 import {
   fetchAndPaint,
   planTiles,
   runWithConcurrency,
 } from '../lidarExtract/stitch';
-import type { Bbox } from '../map/bbox';
+import { bboxToMetric, type Bbox, type Metric } from '../map/bbox';
 import {
   FLYFOTO_PROJECT_IMAGESERVER,
   flyfotoMosaicRule,
 } from '../map/layers/config/backgroundLayers/flyfoto';
 import type { FlyfotoProject } from '../map/layers/config/backgroundLayers/flyfotoProjects';
 import { isUpstreamDown } from '../upstream/health';
+import type { Raster } from './fit';
 
 const FLYFOTO_WMS_URL = '/wms/nib/ortofoto';
 const FLYFOTO_LAYER = 'ortofoto';
@@ -37,15 +36,9 @@ const MAX_CONCURRENT = 4;
 const TILE_RETRIES = 3;
 const RETRY_BASE_MS = 400;
 
-type FlyfotoRaster = {
-  canvas: HTMLCanvasElement;
-  metresPerPx: number;
-  bbox25833: [number, number, number, number];
-};
-
 const projectUrl = (
   project: FlyfotoProject,
-  bbox25833: [number, number, number, number],
+  bbox25833: Metric,
   widthPx: number,
   heightPx: number,
 ): string => {
@@ -64,7 +57,7 @@ const projectUrl = (
 };
 
 const mosaicUrl = (
-  bbox25833: [number, number, number, number],
+  bbox25833: Metric,
   widthPx: number,
   heightPx: number,
 ): string => {
@@ -91,13 +84,8 @@ const mosaicUrl = (
 export const fetchFlyfotoRaster = async (
   bbox4326: Bbox,
   { project, signal }: { project?: FlyfotoProject; signal?: AbortSignal } = {},
-): Promise<FlyfotoRaster | null> => {
-  const bbox25833 = transformExtent(bbox4326, 'EPSG:4326', 'EPSG:25833') as [
-    number,
-    number,
-    number,
-    number,
-  ];
+): Promise<Raster | null> => {
+  const bbox25833 = bboxToMetric(bbox4326);
 
   // Never finer than the acquisition holds — a 1937 flight upsampled is four
   // times the tiles for the same detail. The mosaic keeps the target.

@@ -12,11 +12,11 @@ export const moved = <T>(list: readonly T[], from: number, to: number): T[] => {
   return rest;
 };
 
-export type SortWrite = { id: string; sort: number };
+type SortWrite = { id: string; sort: number };
 
-/** Evenly spaced keys ending on the list's current greatest, so the rows keep
- *  their order without any of them moving ahead of `Date.now()` — a picture
- *  kept after this must still land last. */
+/** Evenly spaced keys ending on the list's current greatest, so none of them
+ *  moves ahead of `Date.now()`: a picture kept after this must still land
+ *  last. */
 const renumbered = (list: readonly EvidenceRecord[]): SortWrite[] => {
   const last = Math.max(...list.map((rec) => rec.sort));
   return list
