@@ -70,7 +70,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `heritageTipAtom`, `heritagePopupAtom` | `map/featureInfo/atoms.ts` | What the pointer found, and what a click kept. |
 | `terrainWindowAtom` | `terrain/window.ts` | The rectangle under analysis; null is the analysis being off. |
 | `terrainAdjustingAtom` | same | It is still being placed, so nothing is fetched yet. |
-| `open`/`adjust`/`closeTerrainWindowAtom` | same | Write-only. |
+| `open`/`adjust`/`read`/`closeTerrainWindowAtom` | same | Write-only. `read` takes a rectangle settled elsewhere — the spot card hands it the footprint — and starts the reading without a square to place. |
 | `spotPlacingAtom` | `spots/atoms.ts` | The `+` is armed: the next map click places the pin. Exclusive with `spotDraftAtom`. |
 | `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom`, `spotFootprintAtom` | same | The spot being edited: where its pin is, which of the four stages has hold of the map (`idle` is none of them), which box is on screen (`box`), what is typed, what is drawn, and the ground it names. The record itself is not here — `useSpotDraft` holds it. |
 | `spotFootprintAdjustingAtom`, `standingSpotFootprintAtom` | same | Derived: the draft is in its `footprint` stage, and which rectangle the standing frame draws. |
@@ -156,9 +156,12 @@ Three boxes stand over one record, one at a time. `SpotProperties` is what a
 spot is *called* — name, description, the pin, and the delete — reached from the
 card's cogwheel and from the `+` that makes a new one. `SpotCard` is where the
 reader then spends their time: the rectangle and the drawing as an icon button
-each, and the pictures. Reading terrain against a place is the ongoing act and
-naming it a one-off, so the card is the workbench and the properties box is
-behind a button. A button becomes a row — the hint and its Ferdig, or the pen's
+each, an elevation button that points the terrain analysis at that rectangle
+rather than framing another (`readTerrainWindowAtom`, so the reading starts at
+once and its offer is what the camera beside it then keeps), and the pictures.
+Reading terrain against a place is the ongoing act and naming it a one-off, so
+the card is the workbench and the properties box is behind a button. A button
+becomes a row — the hint and its Ferdig, or the pen's
 Avbryt/Lagre — for as long as it has the map, and only one of the two can. The
 third, `SpotAcquire`, is behind the card's microscope and orders the pictures
 that are asked for over the footprint rather than read off the view

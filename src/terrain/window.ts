@@ -1,7 +1,9 @@
 import { atom } from 'jotai';
 import { mapAtom } from '../map/atoms';
 import {
+  bboxEquals,
   bboxOverlaps,
+  bringBboxIntoView,
   squareBboxWithin,
   viewportBbox,
   type Bbox,
@@ -31,6 +33,19 @@ export const openTerrainWindowAtom = atom(null, (get, set): boolean => {
   set(terrainWindowAtom, squareBboxWithin(seed));
   set(terrainAdjustingAtom, true);
   return true;
+});
+
+/**
+ * Read a rectangle that was settled elsewhere — a spot's footprint — rather
+ * than one framed on the view: there is nothing to place, so the reading starts
+ * at once. Left alone if it is already the rectangle being read, whose grid
+ * would otherwise be fetched a second time.
+ */
+export const readTerrainWindowAtom = atom(null, (get, set, bbox: Bbox) => {
+  const current = get(terrainWindowAtom);
+  if (!current || !bboxEquals(current, bbox)) set(terrainWindowAtom, bbox);
+  set(terrainAdjustingAtom, false);
+  bringBboxIntoView(get(mapAtom), bbox);
 });
 
 /** Take hold of the rectangle again; reframed only if it is off screen. */

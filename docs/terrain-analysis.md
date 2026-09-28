@@ -15,7 +15,7 @@ Read-only: nothing here is written or persisted. Internal name `terreng`.
 | `src/terrain/dem.ts` | `fetchDem`, the coverage probe, the tiled-float TIFF reader, the `Dem` type |
 | `src/terrain/shade.ts` | every operator, every visualization constant, `composeVat` |
 | `src/terrain/render.ts` | field → canvas, ramps and stretches, `clampRadius`, `demImageExtent`, defaults |
-| `src/terrain/window.ts` | `terrainWindowAtom`, `terrainAdjustingAtom` and the three write atoms |
+| `src/terrain/window.ts` | `terrainWindowAtom`, `terrainAdjustingAtom` and the four write atoms |
 | `src/map/rectAdjust.ts` | the placement drag (frame + four corner handles, one `ol/interaction/Pointer`). Shared: a spot's footprint is placed the same way |
 | `src/terrain/windowLayer.ts` | the dashed frame once the rectangle is fixed (zIndex 4) |
 | `src/terrain/terrainLayer.ts` | `ImageLayer` over `ImageCanvasSource`, EPSG:25833, zIndex 1 |
@@ -264,7 +264,8 @@ does.
 
 `terrainWindowAtom` (a `Bbox`, null = analysis off) and `terrainAdjustingAtom`
 (the square is being placed, so nothing has been fetched) are the whole state.
-Every verb — on, off, `Start`, `Juster` — is a write to one of them.
+Every verb — on, off, `Start`, `Juster`, and the spot card's own elevation
+button — is a write to one of them.
 
 - `openTerrainWindowAtom` frames `squareBboxWithin(viewportBbox(map))`: the
   largest square fitting inside the visible map, at most `MAX_SIDE_M`, and sets
@@ -273,6 +274,12 @@ Every verb — on, off, `Start`, `Juster` — is a write to one of them.
   reader cannot grab.
 - `adjustTerrainWindowAtom` (`Juster`) reframes onto the current view **only**
   when the rectangle no longer overlaps it (`bboxOverlaps`).
+- `readTerrainWindowAtom` takes a rectangle that was settled elsewhere — the
+  spot card's elevation button hands it the spot's footprint — and clears
+  adjusting, so the reading starts without a square to place. The rectangle is
+  written only if it differs by value (`bboxEquals`), because writing an equal
+  one keys the fetch effect afresh and refetches the grid; the view is then
+  brought onto it, out only, the same as everywhere else.
 - `closeTerrainWindowAtom` drops both.
 - The analysis does **not** follow the map — the grid is held, not refetched on
   pan.

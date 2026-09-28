@@ -60,6 +60,9 @@ export const bboxWidthMetres = (bbox: Bbox): number => {
   return maxX - minX;
 };
 
+export const bboxEquals = (a: Bbox, b: Bbox): boolean =>
+  a.every((value, index) => value === b[index]);
+
 export const bboxOverlaps = (a: Bbox, b: Bbox): boolean =>
   a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
 

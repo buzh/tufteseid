@@ -32,6 +32,7 @@ import {
   type SpotDraft,
 } from '../spots/atoms';
 import { derivedFootprint } from '../spots/footprint';
+import { readTerrainWindowAtom } from '../terrain/window';
 import { ControlButton } from '../ui/ControlButton';
 import { cx } from '../ui/cx';
 import { Hint } from '../ui/Hint';
@@ -43,10 +44,12 @@ import { useSpotDraft, type SpotDraftController } from './useSpotDraft';
 /**
  * The camera, the rectangle and the drawing: the three things done against the
  * ground rather than filled into a form, so the card does them itself — and on
- * the end of the same row the microscope, which is the one button here that
- * asks for a picture made somewhere else. `hold` is present exactly while a
- * draft has the map, and is then the only current account of the rectangle and
- * the drawing — the record lags it by a round trip.
+ * the end of the same row the two that ask for a picture rather than take one,
+ * the terrain analysis over the spot's own rectangle and the microscope, which
+ * is the one button here that asks for a picture made somewhere else. `hold` is
+ * present exactly while a draft has the map, and is then the only current
+ * account of the rectangle and the drawing — the record lags it by a round
+ * trip.
  */
 const SpotUnits = ({
   spot,
@@ -60,6 +63,7 @@ const SpotUnits = ({
   const { t } = useTranslation();
   const adjust = useSetAtom(adjustSpotDraftAtom);
   const setAcquiring = useSetAtom(spotAcquiringAtom);
+  const readTerrain = useSetAtom(readTerrainWindowAtom);
   const framing = hold?.stage === 'footprint';
   const drawing = hold?.stage === 'sketch';
 
@@ -128,6 +132,16 @@ const SpotUnits = ({
                 hasSketch ? t('spots.sketchChange') : t('spots.sketchAdd')
               }
               onClick={() => adjust(spot, 'sketch')}
+            />
+          </Tooltip>
+          <Tooltip label={t('terrainControls.readFootprint')}>
+            <ControlButton
+              icon="elevation"
+              aria-label={t('terrainControls.readFootprint')}
+              // Nothing to read over, and the card's repair write is on its way
+              // to giving the spot one.
+              disabled={hold != null || !spot.footprint}
+              onClick={() => spot.footprint && readTerrain(spot.footprint)}
             />
           </Tooltip>
           <Tooltip label={t('acquire.open')}>

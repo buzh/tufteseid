@@ -388,6 +388,7 @@
     "label": "Terrenganalyse",
     "show": "Marker et område å analysere",
     "hide": "Avslutt terrenganalysen",
+    "readFootprint": "Analyser terrenget i utsnittet",
     "start": "Start analysen",
     "startHint": "Forskjellige visualiseringer rett i nettleseren. Hint: Ta et så lite område som mulig, dette kan være tungt å kjøre",
     "adjust": "Juster utsnittet",
