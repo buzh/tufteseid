@@ -200,8 +200,9 @@ megabytes on every press.
 - **The toolbox is ours, not Excalidraw's.** Neither its toolbar nor its
   properties island has a prop behind it and neither leaves a slot to put a
   button in, so both are hidden in `SketchCanvas.module.css` and `SketchTools`
-  stands in for them: nine tools in one row, six colours, three widths and a
-  fill in the other. `toolbox.ts` is the seam — reading is off `onChange`'s app
+  stands in for them: nine tools and the note in one row, six colours, three
+  widths and a fill in the other. `toolbox.ts` is the seam — reading is off
+  `onChange`'s app
   state, writing is `setActiveTool` and `updateScene`. A style press restyles
   the selection as the island did, carrying a container's bound label along and
   passing the tombstones back with it so undo keeps its reach, under
@@ -220,6 +221,18 @@ megabytes on every press.
   edges are deliberately left as Excalidraw's own — a traced line should look
   drawn rather than plotted. The fill is hatched and never solid, because a
   filled shape here sits over the ground being read.
+- **The note is the one button that is not a tool.** Excalidraw makes a sticky
+  note the long way — draw a rectangle, press Enter, type — so `addNote`
+  (`toolbox.ts`) does all three: `convertToExcalidrawElements` builds the
+  rectangle with its label bound inside it, `updateScene` drops it in the
+  middle of the view and selects it, and a synthesised Enter at the Excalidraw
+  container opens the label for editing, which is the one thing the imperative
+  API has no verb for. The editor selects the text it finds, so the
+  placeholder is typed over rather than edited around, and a run of notes
+  cascades by a fixed step so the second does not land on the first. Its
+  yellow is solid and its writing is dark, against the strip's rule for every
+  other fill: a note is written over the ground rather than traced off it, and
+  paper that cannot be read through is the point.
 - **The accent walks the reader through it.** `step` is whichever stage has
   hold of the map and, failing that, the first thing the record is still
   missing: description, then drawing. `idle` is the fourth stage — the box

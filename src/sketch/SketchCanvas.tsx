@@ -31,6 +31,7 @@ import {
 } from './session';
 import { SketchTools } from './SketchTools';
 import {
+  addNote,
   applyStyle,
   fillable,
   readLive,
@@ -130,7 +131,7 @@ const buildInitialData = (
 });
 
 export const SketchCanvas = ({ session }: { session: SketchSession }) => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const map = useAtomValue(mapAtom);
   // The store rather than a setter: a hook here would rebuild the canvas every
   // time the pin moved.
@@ -160,6 +161,9 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
     fillable: fillable(pen.tool ?? 'selection'),
   }));
   const lastLive = useRef('');
+  // Only ever counts up, so notes dropped in one session cascade rather than
+  // stacking on the middle of the view.
+  const notes = useRef(0);
 
   // `pen` is not set here: `rememberTool` runs off `onChange`, so reading the
   // record back on this line would still answer with the tool before this one.
@@ -298,6 +302,13 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
           onStyle={(next) => {
             const api = apiRef.current;
             if (api) applyStyle(api, next);
+          }}
+          onNote={() => {
+            const api = apiRef.current;
+            const host = hostRef.current;
+            if (api && host) {
+              addNote(api, host, t('spots.penNoteText'), notes.current++);
+            }
           }}
         />
       )}

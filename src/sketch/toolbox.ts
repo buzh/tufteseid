@@ -3,7 +3,12 @@
 // neither exposes its actions, so reading is off `onChange`'s app state and
 // writing is `setActiveTool` and `updateScene`.
 
-import { CaptureUpdateAction, newElementWith } from '@excalidraw/excalidraw';
+import {
+  CaptureUpdateAction,
+  convertToExcalidrawElements,
+  newElementWith,
+  viewportCoordsToSceneCoords,
+} from '@excalidraw/excalidraw';
 import type {
   AppState,
   ExcalidrawImperativeAPI,
@@ -144,5 +149,82 @@ export const applyStyle = (api: ExcalidrawImperativeAPI, next: SketchStyle) => {
     // One undo step of its own; left to Excalidraw the restyle would ride on
     // whatever the reader drew next.
     captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+  });
+};
+
+/** A note is a rectangle with text bound inside it. Excalidraw has no tool
+ *  that makes one — natively it is draw a box, then press Enter — so the strip
+ *  builds the pair and hands it over. */
+const NOTE = {
+  widthPx: 170,
+  heightPx: 100,
+  /** Excalidraw's own yellow, filled solid rather than with the hatch every
+   *  other fill here uses: a note is written over the ground, not traced off
+   *  it, and paper it cannot be read through is the point. */
+  background: '#ffec99',
+  /** Also the label's colour — `bindTextToContainer` falls back to the
+   *  container's stroke — which is what keeps the writing off the pen's own. */
+  stroke: '#1e1e1e',
+} as const;
+
+/** Notes are dropped in the middle of the view, so without a shift the second
+ *  one would land exactly on the first. */
+const CASCADE_PX = 22;
+const CASCADE_STEPS = 6;
+
+export const addNote = (
+  api: ExcalidrawImperativeAPI,
+  host: HTMLElement,
+  text: string,
+  nth: number,
+) => {
+  const appState = api.getAppState();
+  const middle = viewportCoordsToSceneCoords(
+    {
+      clientX: appState.offsetLeft + appState.width / 2,
+      clientY: appState.offsetTop + appState.height / 2,
+    },
+    appState,
+  );
+  const shift = (nth % CASCADE_STEPS) * CASCADE_PX;
+  // Two elements back: the rectangle and the text bound to it.
+  const made = convertToExcalidrawElements([
+    {
+      type: 'rectangle',
+      x: middle.x - NOTE.widthPx / 2 + shift,
+      y: middle.y - NOTE.heightPx / 2 + shift,
+      width: NOTE.widthPx,
+      height: NOTE.heightPx,
+      backgroundColor: NOTE.background,
+      fillStyle: 'solid',
+      strokeColor: NOTE.stroke,
+      strokeWidth: 1,
+      label: { text },
+    },
+  ]);
+  const note = made[0];
+  if (!note) return;
+
+  // Selection, so the note can be dragged off the middle straight away; a
+  // press on the note button while the pen was down would otherwise leave the
+  // reader drawing.
+  api.setActiveTool({ type: 'selection' });
+  api.updateScene({
+    elements: [...api.getSceneElementsIncludingDeleted(), ...made],
+    appState: { selectedElementIds: { [note.id]: true } },
+    captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+  });
+
+  // Enter on a selected container is how Excalidraw opens its label for
+  // editing and there is no API for it, so the press is synthesised — the same
+  // trick `SketchCanvas` plays on the wheel. The editor selects the text it
+  // finds, so the placeholder is typed over rather than edited around. After a
+  // frame: the selection above goes through `setState` and the handler reads
+  // it back.
+  const container = host.querySelector('.excalidraw-container');
+  requestAnimationFrame(() => {
+    container?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+    );
   });
 };

@@ -350,6 +350,8 @@
       "bold": "Middels strek",
       "extraBold": "Tykk strek"
     },
+    "penNote": "Notatlapp",
+    "penNoteText": "Notat",
     "penFillOn": "Skraver flaten",
     "penFillOff": "Fjern skraveringen",
     "penLock": "Behold verktøyet etter hvert strøk (Q)",

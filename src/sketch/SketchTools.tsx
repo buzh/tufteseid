@@ -44,18 +44,20 @@ const HOLD_MS = 350;
 type Choose = (tool: BoxTool, locked: boolean) => void;
 
 type ToolButtonProps = {
-  tool: BoxTool;
-  on: boolean;
+  icon: MaterialSymbol;
   label: string;
+  /** Left out by the note button, which does a thing rather than being a
+   *  state: `aria-pressed="false"` would promise a toggle that is not there. */
+  on?: boolean;
   /** Marks the corner, so a button with more under it looks like one. */
   grouped?: boolean;
   ref?: Ref<HTMLButtonElement>;
 } & Omit<ComponentPropsWithoutRef<'button'>, 'className'>;
 
 const ToolButton = ({
-  tool,
-  on,
+  icon,
   label,
+  on,
   grouped = false,
   ref,
   ...rest
@@ -73,7 +75,7 @@ const ToolButton = ({
         grouped && styles.grouped,
       )}
     >
-      <Icon icon={ICONS[tool]} size={18} />
+      <Icon icon={icon} size={18} />
     </button>
   </Tooltip>
 );
@@ -113,7 +115,7 @@ const ToolGroup = ({
       <Popover.Target>
         <ToolButton
           grouped
-          tool={current}
+          icon={ICONS[current]}
           on={live.tool === current}
           label={t(`spots.penTool.${current}`)}
           // Set here rather than left to `Popover.Target`, which hands its
@@ -149,7 +151,7 @@ const ToolGroup = ({
         {members.map((member) => (
           <ToolButton
             key={member}
-            tool={member}
+            icon={ICONS[member]}
             on={live.tool === member}
             label={t(`spots.penTool.${member}`)}
             onClick={() => {
@@ -168,11 +170,13 @@ export const SketchTools = ({
   pen,
   choose,
   onStyle,
+  onNote,
 }: {
   live: Live;
   pen: Pen;
   choose: Choose;
   onStyle: (next: SketchStyle) => void;
+  onNote: () => void;
 }) => {
   const { t } = useTranslation();
 
@@ -186,7 +190,7 @@ export const SketchTools = ({
 
   const plain = (tool: BoxTool) => (
     <ToolButton
-      tool={tool}
+      icon={ICONS[tool]}
       on={live.tool === tool}
       label={t(`spots.penTool.${tool}`)}
       onClick={() => choose(tool, live.locked)}
@@ -224,6 +228,11 @@ export const SketchTools = ({
             choose={choose}
           />
           {plain('text')}
+          <ToolButton
+            icon="sticky_note_2"
+            label={t('spots.penNote')}
+            onClick={onNote}
+          />
           {plain('eraser')}
         </ControlUnit>
 
