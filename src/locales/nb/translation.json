@@ -361,6 +361,7 @@
     "linkNeedsAccount": "Lenken peker til en lokalitet du må være innlogget for å se — eller som ikke finnes.",
     "penTools": "Tegneverktøy",
     "penTool": {
+      "hand": "Flytt kartet (H)",
       "selection": "Velg (V)",
       "freedraw": "Frihånd (P)",
       "ellipse": "Ellipse (O)",

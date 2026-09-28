@@ -90,6 +90,12 @@ const zoomOnWheel = (event: WheelEvent) => {
 
 type Offset = { x: number; y: number; zoom: number };
 
+// What every canvas opens on, the reader's remembered pen notwithstanding: the
+// hand behaves as the map they just left did, a drag moving the view rather
+// than laying a stroke down. Panning is the map's own interaction elsewhere and
+// that one is frozen for the session, so this is the tool that stands in for it.
+const OPENING_TOOL: BoxTool = 'hand';
+
 // Excalidraw has no prop for a zoom floor or a scroll extent, so a frame that
 // takes the scene off the map (`holdSceneOnMap`) is put back.
 const holdView = (api: ExcalidrawImperativeAPI | null, view: SceneView) =>
@@ -169,16 +175,17 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
   const [opening] = useState(() => session.opening);
 
   // Two records behind the strip. `pen` is what the reader last reached for,
-  // which is what the grouped buttons stand for and what the canvas opens with;
-  // `live` is Excalidraw's own state. Both are refreshed off `onChange`.
+  // which is what the grouped buttons stand for and what the canvas opens
+  // styled with; `live` is Excalidraw's own state. Both are refreshed off
+  // `onChange`.
   const [pen, setPen] = useState(rememberedPen);
   const [live, setLive] = useState<Live>(() => ({
-    tool: pen.tool ?? 'selection',
+    tool: OPENING_TOOL,
     locked: pen.locked,
     colour: pen.colour,
     width: pen.width,
     filled: false,
-    fillable: fillable(pen.tool ?? 'selection'),
+    fillable: fillable(OPENING_TOOL),
   }));
   const lastLive = useRef('');
   // Only ever counts up, so notes dropped in one session cascade rather than
@@ -226,11 +233,10 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
         read: () => api.getSceneElementsIncludingDeleted(),
       });
       // Through the API rather than `initialData`, which restores an active
-      // tool only for the values its own restorer allows.
-      const opened = rememberedPen();
-      if (opened.tool) {
-        api.setActiveTool({ type: opened.tool, locked: opened.locked });
-      }
+      // tool only for the values its own restorer allows. The lock is the
+      // reader's own; the tool is not, so nothing here can put a stroke down by
+      // accident on the press that opened the canvas.
+      api.setActiveTool({ type: OPENING_TOOL, locked: rememberedPen().locked });
     },
     [session.frame],
   );

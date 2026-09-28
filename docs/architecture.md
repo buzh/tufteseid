@@ -223,7 +223,7 @@ megabytes on every press.
 - **The toolbox is ours, not Excalidraw's.** Neither its toolbar nor its
   properties island has a prop behind it and neither leaves a slot to put a
   button in, so both are hidden in `SketchCanvas.module.css` and `SketchTools`
-  stands in for them: nine tools and the note in one row, six colours, three
+  stands in for them: ten tools and the note in one row, six colours, three
   widths and a fill in the other. `toolbox.ts` is the seam — reading is off
   `onChange`'s app
   state, writing is `setActiveTool` and `updateScene`. A style press restyles
@@ -233,11 +233,17 @@ megabytes on every press.
 - **Two tools share a button where the shape is the only difference.** Circle,
   square and diamond are one; arrow and line are the other. A press picks what
   the button is showing and a hold opens the rest, which is what keeps a row of
-  nine down to a row a reader can scan. The member shown is the last one
-  picked, and `pen.ts` remembers it — with the tool, the lock, the colour and
-  the width — under `sketchPen.v1`, validated field by field so an older record
-  upgrades in place rather than being thrown away.
-- **What went with the island stays gone on purpose.** The hand, laser and
+  ten down to a row a reader can scan. The member shown is the last one
+  picked, and `pen.ts` remembers it — with the lock, the colour and the width —
+  under `sketchPen.v1`, validated field by field so an older record upgrades in
+  place rather than being thrown away. The tool itself is not remembered:
+  `OPENING_TOOL` is the hand and every canvas opens on it, so entering the draw
+  stage behaves as the map did a press earlier — a drag moves the view, and
+  nothing is drawn until the reader reaches for something that draws. Panning is
+  the map's own interaction everywhere else and that one is frozen for the
+  session, so the hand is also the only thing that moves the view once zooming
+  in has bought the room for it.
+- **What went with the island stays gone on purpose.** The laser and
   frame tools have no use over a map; the layer order, the alignment and the
   actions are on the canvas's own context menu; and the properties the strip
   does not offer are set once in `buildInitialData`. Roughness and rounded

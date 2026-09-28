@@ -67,8 +67,9 @@
  * imperative API. `.App-mobile-menu` is where the same properties go on a
  * narrow viewport.
  *
- * What goes with them: the hand, laser and frame tools, which have no use over
- * a map; the layer order, the alignment and the actions, which the canvas's own
+ * What goes with them: the laser and frame tools, which have no use over a map
+ * — the hand does and is on the strip; the layer order, the alignment and the
+ * actions, which the canvas's own
  * context menu still carries; and the property defaults the strip does not
  * offer, which `buildInitialData` sets instead. */
 .surface :global(.App-toolbar-container),

@@ -18,9 +18,12 @@ import { LINEAR_TOOLS, SHAPE_TOOLS } from './pen';
 import type { SceneElement } from './scene';
 
 /** The strip's own set. Excalidraw's `ToolType` is not a package export, and
- *  the tools left out of this list — hand, laser, frame, embeddable — have no
- *  use on a map and are off the strip. */
+ *  the tools left out of this list — laser, frame, embeddable — have no use on
+ *  a map and are off the strip. The hand is first because the map's own
+ *  dragging is frozen for the session, so it is the only thing that moves the
+ *  view. */
 const BOX_TOOLS = [
+  'hand',
   'selection',
   'freedraw',
   ...SHAPE_TOOLS,

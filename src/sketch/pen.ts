@@ -1,20 +1,6 @@
 /** The theme's papaya, the same orange the pin is drawn in. */
 export const PEN_STROKE_COLOUR = '#ff6a00';
 
-/** Only the tools that put something on the ground: Excalidraw reverts to
- *  `selection` by itself once a shape is finished. */
-const PEN_TOOLS = [
-  'freedraw',
-  'line',
-  'arrow',
-  'rectangle',
-  'diamond',
-  'ellipse',
-  'text',
-] as const;
-
-export type PenTool = (typeof PEN_TOOLS)[number];
-
 /** The two toolbar buttons that stand for a group rather than a tool, opened
  *  by holding the button down. First in each is what a reader who has never
  *  held one gets. */
@@ -46,13 +32,11 @@ export const PEN_WIDTHS = [
   { value: 4, name: 'extraBold' },
 ] as const;
 
-/** Everything the toolbox carries between sessions. */
+/** Everything the toolbox carries between sessions. The tool itself is not
+ *  among them: every canvas opens on the hand (`SketchCanvas`). */
 export type Pen = {
-  /** null until the reader has reached for one, which leaves a fresh canvas on
-   *  Excalidraw's own selection tool. */
-  tool: PenTool | null;
-  /** Excalidraw's tool lock; without it a restored tool would last one
-   *  stroke. */
+  /** Excalidraw's tool lock; without it a tool picked off the strip would last
+   *  one stroke. */
   locked: boolean;
   /** Which member each grouped button currently stands for. */
   shape: ShapeTool;
@@ -66,7 +50,6 @@ export type Pen = {
 const STORAGE_KEY = 'sketchPen.v1';
 
 const DEFAULT_PEN: Pen = {
-  tool: null,
   locked: false,
   shape: SHAPE_TOOLS[0],
   linear: LINEAR_TOOLS[0],
@@ -90,10 +73,9 @@ const stored = (): Pen => {
     if (!raw) return DEFAULT_PEN;
     const parsed = JSON.parse(raw) as Partial<Pen>;
     // localStorage is reader-editable and all of this reaches Excalidraw: an
-    // unknown tool would go to `setActiveTool`, and a colour it cannot parse
-    // draws nothing at all.
+    // unknown group member would go to `setActiveTool`, and a colour it cannot
+    // parse draws nothing at all.
     return {
-      tool: oneOf(PEN_TOOLS, parsed?.tool) ?? DEFAULT_PEN.tool,
       locked: parsed?.locked === true,
       shape: oneOf(SHAPE_TOOLS, parsed?.shape) ?? DEFAULT_PEN.shape,
       linear: oneOf(LINEAR_TOOLS, parsed?.linear) ?? DEFAULT_PEN.linear,
@@ -119,7 +101,6 @@ const write = (next: Partial<Pen>) => {
   const current = rememberedPen();
   const merged = { ...current, ...next };
   if (
-    merged.tool === current.tool &&
     merged.locked === current.locked &&
     merged.shape === current.shape &&
     merged.linear === current.linear &&
@@ -145,16 +126,12 @@ const isLinear = (type: string): type is LinearTool =>
 /** Called from Excalidraw's `onChange`, which fires on every pointer sample,
  *  so only a real change is written. Picking a member of a group is what makes
  *  it the one its button stands for — no separate call from the flyout. */
-export const rememberTool = (type: string, locked: boolean) => {
-  if (!(PEN_TOOLS as readonly string[]).includes(type)) return;
-  const tool = type as PenTool;
+export const rememberTool = (type: string, locked: boolean) =>
   write({
-    tool,
     locked,
-    ...(isShape(tool) ? { shape: tool } : {}),
-    ...(isLinear(tool) ? { linear: tool } : {}),
+    ...(isShape(type) ? { shape: type } : {}),
+    ...(isLinear(type) ? { linear: type } : {}),
   });
-};
 
 /** From `onChange` as well, so a colour taken with the eyedropper or carried
  *  in by paste-styles is remembered like one pressed on the strip. */

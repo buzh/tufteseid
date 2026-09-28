@@ -26,6 +26,7 @@ import styles from './SketchTools.module.css';
 import type { BoxTool, Live, SketchStyle } from './toolbox';
 
 const ICONS: Record<BoxTool, MaterialSymbol> = {
+  hand: 'pan_tool',
   selection: 'arrow_selector_tool',
   freedraw: 'draw',
   ellipse: 'circle',
@@ -213,6 +214,7 @@ export const SketchTools = ({
     >
       <div className={styles.row}>
         <ControlUnit>
+          {plain('hand')}
           {plain('selection')}
           {plain('freedraw')}
           <ToolGroup
