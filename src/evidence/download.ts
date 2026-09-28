@@ -9,7 +9,6 @@
 // throws on a WebM.
 
 import { useCallback, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 
 import { evidenceFileUrl, type EvidenceRecord } from '../api/evidence';
 import type { SpotRecord } from '../api/spots';
@@ -57,7 +56,6 @@ const stampEvidence = async (
   blob: Blob,
   rec: EvidenceRecord,
   spot: SpotRecord,
-  language: string,
 ): Promise<Blob> => {
   if (blob.type.startsWith('video/')) return blob;
 
@@ -67,12 +65,7 @@ const stampEvidence = async (
     if (!canvas || !ctx) return blob;
 
     const bbox = evidenceBbox(rec);
-    const content = legendContentFor(
-      rec,
-      spot,
-      language,
-      bbox ? centreOf(bbox) : '',
-    );
+    const content = legendContentFor(rec, spot, bbox ? centreOf(bbox) : '');
     if (!content) return blob;
 
     const drawn = await drawLegend(ctx, {
@@ -121,7 +114,6 @@ type EvidenceDownload = {
 };
 
 export const useEvidenceDownload = (spot: SpotRecord): EvidenceDownload => {
-  const { i18n } = useTranslation();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [failedId, setFailedId] = useState<string | null>(null);
 
@@ -137,12 +129,7 @@ export const useEvidenceDownload = (spot: SpotRecord): EvidenceDownload => {
         try {
           const res = await fetch(url);
           if (!res.ok) throw new Error(`file ${res.status}`);
-          const stamped = await stampEvidence(
-            await res.blob(),
-            rec,
-            spot,
-            i18n.language,
-          );
+          const stamped = await stampEvidence(await res.blob(), rec, spot);
           const spec = specOf(rec);
           const name = sanitizeFilename(
             [spot.name, spec && evidenceTitle(spec)].filter(Boolean).join(' '),
@@ -156,7 +143,7 @@ export const useEvidenceDownload = (spot: SpotRecord): EvidenceDownload => {
         }
       })();
     },
-    [spot, busyId, i18n.language],
+    [spot, busyId],
   );
 
   return { download, busyId, failedId };

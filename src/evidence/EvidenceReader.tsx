@@ -53,7 +53,7 @@ const LAYOUT_ICON = { wide: 'dock_to_bottom', tall: 'dock_to_right' } as const;
 const ARROWS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
 
 export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const map = useAtomValue(mapAtom);
   const setReading = useSetAtom(spotReadingAtom);
   const setActive = useSetAtom(activeSpotAtom);
@@ -151,7 +151,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   }, [map]);
 
   const title = current ? evidenceLabel(current) : '';
-  const facts = current ? evidenceFacts(current, i18n.language) : [];
+  const facts = current ? evidenceFacts(current) : [];
 
   const hasSketch = sketchOf(spot.sketch) !== null;
 

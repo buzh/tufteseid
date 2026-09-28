@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import type { SpotRecord } from '../api/spots';
 import { isAuthDialogOpenAtom, isSignedInAtom } from '../auth/atoms';
 import { activeSpotAtom, spotDraftAtom, spotPlacingAtom } from '../spots/atoms';
+import { isoDay } from '../shared/utils/isoDay';
 import { mySpotsAtom, spotsFailedAtom } from '../spots/spotRecords';
 import { ControlChip } from '../ui/ControlChip';
 import { Icon } from '../ui/Icon';
@@ -16,15 +17,8 @@ const FILTER_FROM = 8;
 
 const LIST_MAX_HEIGHT = 340;
 
-const changedOn = (iso: string, language: string): string =>
-  new Date(iso).toLocaleDateString(language, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-
 export const SpotMenu = () => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const signedIn = useAtomValue(isSignedInAtom);
   const spots = useAtomValue(mySpotsAtom);
   const failed = useAtomValue(spotsFailedAtom);
@@ -85,7 +79,7 @@ export const SpotMenu = () => {
           )}
         </Group>
         <Text size="xs" c="dimmed">
-          {changedOn(spot.updated, i18n.language)}
+          {isoDay(spot.updated)}
         </Text>
       </Menu.Item>
     );

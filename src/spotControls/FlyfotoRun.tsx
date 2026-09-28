@@ -17,7 +17,7 @@ import styles from './FlyfotoRun.module.css';
 import type { FlyfotoRun as Run } from './useFlyfotoRun';
 
 export const FlyfotoRun = ({ run, failed }: { run: Run; failed: boolean }) => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   // Excalidraw binds its own single-letter shortcuts while the canvas is up.
   const penHasTheMap = useAtomValue(sketchSessionAtom) !== null;
 
@@ -65,7 +65,7 @@ export const FlyfotoRun = ({ run, failed }: { run: Run; failed: boolean }) => {
   const note = !card
     ? ''
     : card.state === 'ready'
-      ? specFacts(card.spec, i18n.language).join(' · ')
+      ? specFacts(card.spec).join(' · ')
       : card.state === 'empty'
         ? t('evidence.renderEmpty')
         : card.state === 'failed'

@@ -133,14 +133,13 @@ export const centreOf = (
 export const legendContentFor = (
   rec: EvidenceRecord,
   spot: SpotRecord,
-  language: string,
   centre = '',
 ): LegendContent | null => {
   const spec = specOf(rec);
   if (!spec) return null;
   return {
     title: evidenceTitle(spec),
-    facts: evidenceFacts(rec, language, centre),
+    facts: evidenceFacts(rec, centre),
     rights: rightsOf(spec, spot.credit),
     // A private spot's code resolves to nothing for anyone but its owner, so
     // printing it would be an invitation to a dead link.
@@ -180,7 +179,7 @@ export const sunLoopLegend = (
   if (!spec) return null;
   return {
     title: evidenceTitle(spec),
-    facts: specFacts(spec, language),
+    facts: specFacts(spec),
     // Whether there is an author to name is wording; which author it is is not.
     rights: rightsOf(spec, spot.credit ? CREDIT_TOKEN : ''),
     resolutionFormat: t('evidence.resolution', { m: RESOLUTION_TOKEN }),

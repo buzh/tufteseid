@@ -3,6 +3,7 @@ import { t } from 'i18next';
 
 import type { EvidenceKind, EvidenceRecord } from '../api/evidence';
 import { lidarStyleLabel } from '../map/layers/config/backgroundLayers/lidarProjects';
+import { isoDay } from '../shared/utils/isoDay';
 import { usesHorizon } from '../terrain/render';
 import type { MaterialSymbol } from '../ui/Icon';
 import type { RenderState } from './queue';
@@ -66,13 +67,6 @@ export const renderNote = (
     : '';
 };
 
-const dayOf = (iso: string, language: string): string =>
-  new Date(iso).toLocaleDateString(language, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-
 // Which knobs the visualization actually answered to: a sun angle under a
 // Skyview would be a fact about nothing.
 const terrainFacts = (
@@ -105,7 +99,7 @@ const terrainFacts = (
 /** What the catalogue knew about the source: everything true of a row before
  *  any pixel of it exists. Separate from `evidenceFacts` because a row about to
  *  be rendered still holds the previous render's figures. */
-export const specFacts = (spec: EvidenceSpec, language: string): string[] => {
+export const specFacts = (spec: EvidenceSpec): string[] => {
   switch (spec.kind) {
     case 'lidar': {
       const facts = [spec.model.toUpperCase()];
@@ -118,7 +112,8 @@ export const specFacts = (spec: EvidenceSpec, language: string): string[] => {
     case 'terrain':
       return terrainFacts(spec);
     case 'flyfoto':
-      if (spec.photoDate) return [dayOf(spec.photoDate, language)];
+      // Already `YYYY-MM-DD` off the catalogue.
+      if (spec.photoDate) return [spec.photoDate];
       return spec.year != null ? [String(spec.year)] : [];
     case 'sunloop':
       // No azimuth: it is every azimuth, which is what the frame count says.
@@ -135,13 +130,12 @@ export const specFacts = (spec: EvidenceSpec, language: string): string[] => {
  *  it was made, in the order it would be cited. */
 export const evidenceFacts = (
   rec: EvidenceRecord,
-  language: string,
   /** The rectangle's centre. Ordered before the render date because the legend
    *  sheds from the end. */
   centre?: string,
 ): string[] => {
   const spec = specOf(rec);
-  const facts: string[] = spec ? specFacts(spec, language) : [];
+  const facts: string[] = spec ? specFacts(spec) : [];
 
   const metresPerPx = evidenceResolution(rec);
   if (metresPerPx != null) {
@@ -152,9 +146,7 @@ export const evidenceFacts = (
 
   const renderedAt = rec.meta?.renderedAt;
   if (typeof renderedAt === 'string' && renderedAt) {
-    facts.push(
-      t('evidence.facts.rendered', { date: dayOf(renderedAt, language) }),
-    );
+    facts.push(t('evidence.facts.rendered', { date: isoDay(renderedAt) }));
   }
 
   return facts;
