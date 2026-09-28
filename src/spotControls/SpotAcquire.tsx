@@ -12,6 +12,7 @@ import { Alert } from '@mantine/core';
 import { useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
+import type { EvidenceRecord } from '../api/evidence';
 import type { SpotRecord } from '../api/spots';
 import { KIND_ICON, evidenceTitle } from '../evidence/labels';
 import { mayRetry } from '../evidence/queue';
@@ -44,16 +45,22 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
   );
 
   // A row with no pixels that nobody has settled is a render already on its
-  // way, and the sidecar takes one job per caller — whichever chip asked for
-  // it. A settled one is left to the gallery's retry, which is where every
+  // way. A settled one is left to the gallery's retry, which is where every
   // other kind's is.
-  const outstanding = ordered.some(
-    (rec) => !rec.file && !mayRetry(evidence.stateOf(rec)),
-  );
+  const onItsWay = (rec: EvidenceRecord) =>
+    !rec.file && !mayRetry(evidence.stateOf(rec));
+
+  // The sidecar takes one job per caller, whichever chip asked for it, so one
+  // render closes every chip here — but only the chip whose picture it is may
+  // say it is being made.
+  const outstanding = ordered.some(onItsWay);
 
   const metric = spot.footprint ? bboxToMetric(spot.footprint) : null;
-  const kept = (spec: EvidenceSpec) =>
-    metric != null && ordered.some((rec) => evidenceMatches(rec, spec, metric));
+  const matching = (spec: EvidenceSpec) =>
+    metric != null
+      ? ordered.filter((rec) => evidenceMatches(rec, spec, metric))
+      : [];
+  const kept = (spec: EvidenceSpec) => matching(spec).length > 0;
 
   // Every chip here orders the same way and refuses for the same reasons; only
   // the wording and what is asked for differ. `note` is the line under the
@@ -68,7 +75,8 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
     const title = `${label} — ${about}`;
     const state = () => {
       if (!spot.footprint) return t('acquire.noFootprint');
-      if (outstanding) return t('evidence.rendering');
+      if (matching(spec).some(onItsWay)) return t('evidence.rendering');
+      if (outstanding) return t('acquire.busy');
       if (kept(spec)) return t('evidence.kept');
       return note;
     };

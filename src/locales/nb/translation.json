@@ -8,6 +8,7 @@
     "flyfoto": "Flyfotoserie",
     "flyfotoHint": "gå gjennom opptakene over utsnittet, ett om gangen.",
     "noFootprint": "utsnittet mangler",
+    "busy": "tjeneren lager et annet bilde",
     "run": {
       "progress": "Opptak {{index}} av {{count}}",
       "none": "Ingen opptak dekker utsnittet",
