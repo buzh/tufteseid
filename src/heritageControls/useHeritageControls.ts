@@ -2,7 +2,7 @@
 // `heritageHiddenAtom` (a blind over all of them), so the ticks survive an off.
 
 import { useAtom, useAtomValue } from 'jotai';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { mapAtom } from '../map/atoms';
 import {
   activeThemeLayersAtom,
@@ -17,6 +17,11 @@ import {
 } from '../map/layers/heritage';
 import { themeLayerMinZoom } from '../map/layers/themeLayerConfigApi';
 import type { ThemeLayerName } from '../map/layers/themeWMS';
+import { sketchSessionAtom } from '../sketch/session';
+import { TYPING_SURFACE } from '../ui/hints';
+
+/** `k` for kulturminner. */
+const TOGGLE_KEY = 'k';
 
 export const useHeritageControls = () => {
   const map = useAtomValue(mapAtom);
@@ -29,7 +34,7 @@ export const useHeritageControls = () => {
   const shown = !hidden && sources.size > 0;
   const sitesShown = sources.has(RESHAPEABLE_THEME_LAYER);
 
-  const toggleShown = () => {
+  const toggleShown = useCallback(() => {
     // With nothing ticked, arm the overlay rather than raise a blind over an
     // empty selection.
     if (sources.size === 0) {
@@ -38,7 +43,22 @@ export const useHeritageControls = () => {
       return;
     }
     setHidden(!hidden);
-  };
+  }, [sources, hidden, setSources, setHidden]);
+
+  // Excalidraw binds its own single-letter shortcuts while the canvas is up.
+  const penHasTheMap = useAtomValue(sketchSessionAtom) !== null;
+  useEffect(() => {
+    if (penHasTheMap) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== TOGGLE_KEY) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(TYPING_SURFACE)) return;
+      toggleShown();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [penHasTheMap, toggleShown]);
 
   const toggleSource = (id: ThemeLayerName) => {
     setSources((prev) => {

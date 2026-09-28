@@ -105,8 +105,8 @@
   },
   "heritageControls": {
     "label": "Kulturminner",
-    "show": "Lokaliteter og funn fra Kulturminnesøk",
-    "hide": "Skjul kulturminnesøk-data",
+    "show": "Lokaliteter og funn fra Kulturminnesøk (k)",
+    "hide": "Skjul kulturminnesøk-data (k)",
     "chipTitle": "Kjente kulturminner: {{sources}} — {{render}}",
     "chipSourcesTitle": "Kulturminner: {{sources}}",
     "chipHiddenTitle": "Kulturminner er skjult — velg hva som skal tegnes",

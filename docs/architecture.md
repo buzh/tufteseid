@@ -573,6 +573,12 @@ show group; anything else that applies to the reading belongs to the tools.
   lit halves.
 - Shared metrics: `--control-height` and `--control-icon-width` in
   `src/index.css`.
+- The show group's two toggles each answer to a single key: **`k`** —
+  kulturminner — raises and lowers the heritage blind, **`t`** the drawing.
+  Both are bound to the document by the hook behind the box rather than by the
+  box, so they answer from a card as well; both keep their hands off a press
+  aimed at an input, and both go quiet while the pen has the map, where
+  Excalidraw owns the single letters.
 - `ControlUnit` laps its children into one seam-free box, styling them **by
   position** (`:not(:first-child)`, `:not(:last-child)`) rather than by class.
   Children must be single boxes, not nested units. A component contributing more
