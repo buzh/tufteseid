@@ -309,8 +309,8 @@ Category defaults on `culturalHeritage`, cascading to all five:
   and the card shows a placeholder.
 - `extraWmsParams: { map_resolution: 192 }` — MapServer DPI hint scaling symbols
   and line widths; the default is 96.
-- `minZoom: 8` — ~300k heritage records nationally is an unreadable wall of pins
-  below z8.
+- `minZoom: 12` — ~300k heritage records nationally is an unreadable wall of
+  pins below z12.
 
 `themeLayerEffect` (`src/map/layers/atoms.ts`) puts them on the map, and on both
 maps in the split view: `syncThemeLayers` is called once per map and each gets

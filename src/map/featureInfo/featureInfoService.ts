@@ -18,7 +18,7 @@ import { DEFAULT_INFO_FORMAT } from './types';
 
 export type QueryableWMSLayer = TileLayer | ImageLayer<ImageWMS>;
 
-// Not `getVisible()`, which is only the checkbox: a layer with `minZoom: 8`
+// Not `getVisible()`, which is only the checkbox: a layer with a `minZoom`
 // still reports visible below it. `isVisible` folds in the zoom, resolution and
 // extent limits.
 const isRendering = (layer: BaseLayer, map: OLMap): boolean =>
