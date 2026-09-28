@@ -66,6 +66,25 @@ export type SceneView = {
   offsetTop: number;
 };
 
+// The transform the map element is wearing, kept so `thawMap` can hand the
+// view what the scene was looking at.
+let worn: { x: number; y: number; scale: number } | null = null;
+
+/** Where the transform puts the map element's own top-left, in the element's
+ *  own space. */
+const sceneTranslation = (view: SceneView, scale: number) => ({
+  x:
+    view.scrollX * view.zoom +
+    view.offsetLeft -
+    mapOrigin.x -
+    sceneToMap.origin.x * scale,
+  y:
+    view.scrollY * view.zoom +
+    view.offsetTop -
+    mapOrigin.y -
+    sceneToMap.origin.y * scale,
+});
+
 /*
  * Point the frozen map at whatever the scene is looking at. Excalidraw puts
  * scene point `s` at client `(s + scroll) · zoom + offset`; the map,
@@ -81,6 +100,7 @@ export const slaveMapToScene = (map: Map, view: SceneView | null) => {
   const target = map.getTargetElement();
   if (!target) return;
   if (!view) {
+    worn = null;
     target.style.transform = '';
     target.style.transformOrigin = '';
     return;
@@ -89,18 +109,47 @@ export const slaveMapToScene = (map: Map, view: SceneView | null) => {
   // takes off again.
   if (!frozen) return;
   const scale = view.zoom / sceneToMap.unit;
-  const x =
-    view.scrollX * view.zoom +
-    view.offsetLeft -
-    mapOrigin.x -
-    sceneToMap.origin.x * scale;
-  const y =
-    view.scrollY * view.zoom +
-    view.offsetTop -
-    mapOrigin.y -
-    sceneToMap.origin.y * scale;
+  const { x, y } = sceneTranslation(view, scale);
+  worn = { x, y, scale };
   target.style.transformOrigin = '0 0';
   target.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+};
+
+// Under a hundredth of a scene unit a correction is invisible, and writing one
+// back could chase float noise frame after frame.
+const HOLD_SLACK = 0.01;
+
+// The scaled element is `room` larger than the surface, so the translation may
+// run from the far edges meeting to the near ones and no further.
+const inRoom = (t: number, room: number) => Math.max(-room, Math.min(0, t));
+
+/** The nearest view to `view` that keeps the frozen map under the whole
+ *  surface, or null when `view` already does.
+ *
+ *  `floorZoom` is the zoom the canvas opened at. The map is one element scaled
+ *  by `zoom / unit`, laid out exactly under the surface Excalidraw draws on: at
+ *  the floor it covers that surface and nothing else, so there is no scrolling
+ *  it and zooming out past it would bring no more ground in — it would pull the
+ *  ground off the edges instead. Above the floor the element is larger than the
+ *  surface, and the difference is how far the scene may be scrolled. */
+export const holdSceneOnMap = (
+  map: Map,
+  view: SceneView,
+  floorZoom: number,
+): SceneView | null => {
+  const size = map.getSize();
+  if (!frozen || !size) return null;
+  const zoom = Math.max(view.zoom, floorZoom);
+  const scale = zoom / sceneToMap.unit;
+  const held = { ...view, zoom };
+  const t = sceneTranslation(held, scale);
+  held.scrollX += (inRoom(t.x, size[0] * (scale - 1)) - t.x) / zoom;
+  held.scrollY += (inRoom(t.y, size[1] * (scale - 1)) - t.y) / zoom;
+  return zoom !== view.zoom ||
+    Math.abs(held.scrollX - view.scrollX) > HOLD_SLACK ||
+    Math.abs(held.scrollY - view.scrollY) > HOLD_SLACK
+    ? held
+    : null;
 };
 
 export const freezeMap = (map: Map) => {
@@ -151,10 +200,34 @@ export const initialSceneView = (rect: { left: number; top: number }) => ({
   scrollY: (mapOrigin.y + sceneToMap.origin.y - rect.top) / sceneToMap.unit,
 });
 
+/* The view takes over what the scene was looking at, so the pen is put down on
+ * the ground it was lifted from rather than on the extent the session froze.
+ * The centre is exact; `constrainResolution` rounds the scale to a whole zoom
+ * level, and the view's `maxZoom` caps how far in it can follow. */
+const followTransform = (map: Map) => {
+  const size = map.getSize();
+  const view = map.getView();
+  const resolution = view.getResolution();
+  if (!worn || !size || !resolution) return;
+  // Read before the view moves: the transform is inverted against the frame
+  // state the frozen view rendered.
+  const centre = map.getCoordinateFromPixel([
+    (size[0] / 2 - worn.x) / worn.scale,
+    (size[1] / 2 - worn.y) / worn.scale,
+  ]);
+  if (!centre) return;
+  view.setResolution(resolution / worn.scale);
+  view.setCenter(centre);
+  // Before the transform comes off, or the element paints the extent it froze
+  // on for a frame.
+  map.renderSync();
+};
+
 export const thawMap = (map: Map) => {
   if (!frozen) return;
   const was = frozen;
   frozen = null;
+  followTransform(map);
   slaveMapToScene(map, null);
   sceneToMap = { unit: 1, origin: { x: 0, y: 0 } };
   // Only the ones still on the map: an interaction removed while the pen was

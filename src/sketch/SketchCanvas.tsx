@@ -1,7 +1,7 @@
 // Must stay above the import below: it sets the global Excalidraw reads to find
 // its fonts, and ES modules evaluate in source order.
 import './excalidrawAssets';
-import { Excalidraw } from '@excalidraw/excalidraw';
+import { CaptureUpdateAction, Excalidraw } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
 import type {
   ExcalidrawImperativeAPI,
@@ -24,9 +24,11 @@ import { rememberedPen, rememberStroke, rememberTool, type Pen } from './pen';
 import styles from './SketchCanvas.module.css';
 import { storableScene, type SceneElement } from './scene';
 import {
+  holdSceneOnMap,
   initialSceneView,
   setLiveScene,
   slaveMapToScene,
+  type SceneView,
   type SketchSession,
 } from './session';
 import { SketchTools } from './SketchTools';
@@ -88,6 +90,19 @@ const zoomOnWheel = (event: WheelEvent) => {
 
 type Offset = { x: number; y: number; zoom: number };
 
+// Excalidraw has no prop for a zoom floor or a scroll extent, so a frame that
+// takes the scene off the map (`holdSceneOnMap`) is put back.
+const holdView = (api: ExcalidrawImperativeAPI | null, view: SceneView) =>
+  api?.updateScene({
+    appState: {
+      scrollX: view.scrollX,
+      scrollY: view.scrollY,
+      zoom: { value: view.zoom as NormalizedZoomValue },
+    },
+    // Not an edit: undo must not step back through a view being put back.
+    captureUpdate: CaptureUpdateAction.NEVER,
+  });
+
 type Store = ReturnType<typeof useStore>;
 
 const keepScene = (
@@ -139,6 +154,11 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState<Offset | null>(null);
+  // The zoom the canvas opened at, as Excalidraw normalised it: the floor the
+  // scene may not be taken out past. Read off the first frame rather than
+  // `offset`, because Excalidraw clamps a zoom it is handed to its own
+  // 10%…3000%, and a floor it can never reach would put every frame back.
+  const floorZoom = useRef<number | null>(null);
   // `onChange` fires on every pointer sample, so the transform is rewritten
   // only when the view actually moved.
   const lastView = useRef('');
@@ -245,10 +265,14 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
               offsetLeft: appState.offsetLeft,
               offsetTop: appState.offsetTop,
             };
+            const floor = floorZoom.current ?? view.zoom;
+            floorZoom.current = floor;
             const key = Object.values(view).join();
             if (key !== lastView.current) {
               lastView.current = key;
-              slaveMapToScene(map, view);
+              const held = holdSceneOnMap(map, view, floor);
+              if (held) holdView(apiRef.current, held);
+              else slaveMapToScene(map, view);
             }
             rememberTool(appState.activeTool.type, appState.activeTool.locked);
             rememberStroke(

@@ -204,6 +204,22 @@ megabytes on every press.
   down and answers with an empty scene, which went over `spotSketchAtom` as a
   drawing with no strokes. So `commit` writes that atom as well as the record,
   and the pen's Avbryt puts it back to what is stored.
+- **The scene opens on the view the map is showing and is held over it.** The
+  map is frozen for the session and follows the scene by a CSS transform
+  (`slaveMapToScene`), so the canvas opens at the zoom that makes that transform
+  the identity (`initialSceneView`) — one map element laid out exactly under the
+  surface being drawn on. Zooming out from there brings no more ground in; it
+  scales the ground off the edges. So `holdSceneOnMap` puts the zoom floor at
+  the opening zoom and the scroll inside whatever room zooming *in* bought,
+  which at the floor is none at all, and `SketchCanvas` writes any frame outside
+  that back with `updateScene`. Excalidraw has a prop for neither. Zooming in is
+  not capped: stretched tiles still cover.
+- **Leaving hands the view what the scene was looking at.** `thawMap` inverts
+  the transform it is about to take off into a centre and a resolution, so the
+  pen is put down on the ground it was lifted from rather than on the extent the
+  session froze. The centre is exact; `constrainResolution` rounds the scale to
+  a whole zoom level, so a scene zoomed to something between two of them lands
+  on the nearer.
 - **The toolbox is ours, not Excalidraw's.** Neither its toolbar nor its
   properties island has a prop behind it and neither leaves a slot to put a
   button in, so both are hidden in `SketchCanvas.module.css` and `SketchTools`
