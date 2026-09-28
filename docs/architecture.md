@@ -448,10 +448,11 @@ holds the ground still and changes only how it was seen.
     reaching the compositor, which is exactly what this element is hidden from,
     and an ungated rAF would repaint the whole map 60 times a second to show a
     24 fps loop.
-  - The sidecar burns a provenance band over the bottom of every frame, because
-    a WebM cannot be stamped in the browser the way a still is. `meta.bandTop`
-    says where it starts and the overlay draws only the rows above it, so the
-    band stays in the file and off the map (`docs/render-sidecar.md`).
+  - The sidecar burns a provenance band under every frame, because a WebM cannot
+    be stamped in the browser the way a still is. The ground keeps the whole
+    rectangle; `meta.bandTop` says where it stops and the overlay draws only the
+    rows above it, so the band stays in the file and off the map
+    (`docs/render-sidecar.md`).
 - **The card is an owner's surface.** Somebody else's spot opens straight into
   the reading, however it was opened — a click on the pin, an index row, `?lok=`
   — and stays there: `spotReadingAtom` reads true for a spot outside `mayEdit`

@@ -115,9 +115,9 @@ export type LoopTransport = {
  * transport drives that one rather than the box holding a second copy.
  *
  * `bandTop` (0–1) is where the burnt-in legend starts. Below it the frame is a
- * caption rather than ground, so it is left off the map; the rows above it keep
- * the registration they had, because the band was blended over the picture and
- * never grew it.
+ * caption rather than ground, so it is left off the map; the rows above it are
+ * the whole rectangle, because the sidecar stacks its band under the ground
+ * rather than blending it over the bottom of it.
  */
 export const useEvidenceLoopOverlay = (
   url: string,
@@ -205,7 +205,7 @@ export const useEvidenceLoopOverlay = (
         (minX - canvasExtent[0]) * scale,
         (canvasExtent[3] - maxY) * scale,
         w,
-        h * bandTop,
+        h,
       );
       return out;
     };

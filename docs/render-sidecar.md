@@ -160,11 +160,13 @@ connection carries one request, so the deadline bounds the whole thread.
    has to be painted over the finished frame. Mid grey and not either end,
    because a real frame saturates at both: whole slopes come out 0 and lit faces
    come out 255.
-6. **The band is composed once** (`legend.py`) and blended into every frame,
-   over the stamped holes as well.
+6. **The band is composed once** (`legend.py`) and stacked under every frame, so
+   the ground keeps the whole rectangle and the frame is taller than it.
 7. **Raw grey straight into ffmpeg**: `-f rawvideo -pix_fmt gray … -c:v libvpx-vp9
    -pix_fmt yuv420p -crf 32 -b:v 0 -row-mt 1 -g <frames>`. No PNG round trip and
-   no frame files. Dimensions are forced even for `yuv420p`. One GOP: the loop
+   no frame files. Dimensions are forced even for `yuv420p` — the width and the
+   ground's height in `sunloop`, the frame's whole height by the band, which is
+   the only part of it that can now be an odd number of rows. One GOP: the loop
    is played whole, and a second keyframe in 72 frames of hillshade costs more
    file than the seek bar saves — scrubbing decodes forward from the one
    keyframe, which is a short wait on a file this size and already buffered.
@@ -300,20 +302,25 @@ burning early:
 
 The face is DejaVu, not Mulish — the image has no npm build to take Mulish from —
 and the layout is a stacked band rather than `legend.ts`'s two shedding columns.
-What matches is what has to: the band sits over the bottom edge and never resizes
-the frame, so the pixels stay registered to `bbox25833` everywhere the band is
-not. Past 40 % of the frame height the link is dropped, then the scale bar. The
-rights lines never are.
+The third difference is the one a reader sees: the band is **appended under** the
+frame, not blended over its bottom edge, so the ground keeps the whole rectangle
+and `bbox25833` is the rows above the band. A still can afford the other way
+round, because it is stamped over pixels the browser already has; a loop's band
+is in the file for good, and a loop is rendered at the acquisition's own
+resolution — a 140 m footprint of half-metre ground is 276 px, of which a band
+that cannot set type below 11 px is better than a third. Past 40 % of the
+ground's height the link is dropped, then the scale bar. The rights lines never
+are.
 
-Where the band starts travels back as `meta.bandTop`, a fraction of the frame's
+Where the ground stops travels back as `meta.bandTop`, a fraction of the frame's
 height. The reading lays a loop on the map over its own rectangle, and the band
 is a caption rather than ground: `useEvidenceLoopOverlay` draws the rows above
-`bandTop` into the matching top part of the rectangle and leaves the rest of the
-footprint alone. The file keeps its citation; the map does not wear it. A still
-needs no such figure — it is stamped in the reader's own tab at download time and
-the kept pixels are clean. **A loop rendered before `bandTop` existed has none**,
-and the fallback of 1 lays its band on the ground; re-asking for the loop is the
-fix, since nothing re-renders a row by itself.
+`bandTop` over the whole footprint and leaves the caption in the file. The file
+keeps its citation; the map does not wear it. A still needs no such figure — it
+is stamped in the reader's own tab at download time and the kept pixels are
+clean. **A loop rendered before the band moved under the frame** has ground where
+the overlay now expects caption, and comes out stretched down the footprint;
+re-asking for the loop is the fix, since nothing re-renders a row by itself.
 
 `ImageDraw` on an `L`-mode image defaults its ink to **1**, not 255, so every
 text call passes `fill=INK` explicitly. Getting that wrong draws the band and the

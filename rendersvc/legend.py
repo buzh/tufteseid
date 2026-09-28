@@ -1,17 +1,21 @@
-"""The provenance band, burnt into every frame.
+"""The provenance band, burnt under every frame.
 
-A still is stamped in the browser at download time (`src/evidence/stamp.ts`),
+A still is stamped in the browser at download time (`src/evidence/download.ts`),
 but `createImageBitmap` throws on a WebM, so a loop is cited on the way out
 instead. The client sends the lines — which facts a visualization answered to is
 its rule and stays in one place — and this only typesets them. The lines arrive
 with holes in them where a fact has to come off the record instead of out of the
 request; `server.py`'s `legend_of` fills those, this one the resolution.
 
-Two deliberate differences from `src/evidence/legend.ts`: the face is DejaVu
-rather than Mulish, which the image has no npm build to take Mulish from; and
-the layout is a stacked band rather than its two shedding columns. What matches
-is what has to: the band sits over the bottom edge and never resizes the frame,
-so the pixels stay registered to the bbox everywhere the band is not.
+Three deliberate differences from `src/evidence/legend.ts`: the face is DejaVu
+rather than Mulish, which the image has no npm build to take Mulish from; the
+layout is a stacked band rather than its two shedding columns; and the band is
+appended under the frame rather than blended over its bottom edge. That last one
+is the one the reader sees. A still is stamped over pixels the browser already
+has, but a loop's band is in the file for good, and a loop is rendered at the
+acquisition's own resolution — 140 m of half-metre ground is 276 px, of which a
+band that cannot set type below 11 px is better than a third. Blended in, that
+third of the footprint would be caption instead of ground on the map.
 """
 
 import numpy as np
@@ -20,9 +24,8 @@ from PIL import Image, ImageDraw, ImageFont
 REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
-# legend.ts's band: near-black at 62 %, white ink.
+# legend.ts's band with nothing to show through it: near-black, white ink.
 BAND_VALUE = 10
-BAND_ALPHA = 158
 INK = 255
 
 SEP = " · "
@@ -41,8 +44,9 @@ RESOLUTION_TOKEN = "{res}"
 # before a line is sent, and substitution is one pass over the text.
 CREDIT_TOKEN = "{credit}"
 
-# Of the frame. Past it the link, then the scale bar, are dropped. The rights
-# lines never are — they are the only part a licence actually requires.
+# Of the ground the band is added to. Past it the link, then the scale bar, are
+# dropped. The rights lines never are — they are the only part a licence
+# actually requires.
 MAX_BAND_FRACTION = 0.4
 
 BAR_TARGET_FRACTION = 0.18
@@ -110,9 +114,9 @@ def _draw_bar(draw, x, y, bar_px, height):
 
 
 def compose(width, height, content, metres_per_px):
-    """The band as (top row, keep, add): `frame[top:] = frame[top:] * keep // 255
-    + add`, one vectorised pass per frame. None when the frame is too small to
-    carry a legend at all."""
+    """The band as an (h, width) uint8 strip to stack under each frame of ground
+    `height` rows tall. None when the frame is too small to carry a legend at
+    all."""
     size = _font_size(width)
     pad = int(round(size * 0.7))
     line_h = int(round(size * 1.35))
@@ -126,7 +130,7 @@ def compose(width, height, content, metres_per_px):
     semibold = ImageFont.truetype(BOLD, size)
     small = ImageFont.truetype(REGULAR, max(8, int(round(size * 0.9))))
 
-    # A coverage mask, not a picture: `apply` blends it over each frame. Every
+    # A coverage mask, not a picture: the strip is mixed from it below. Every
     # draw names INK, because PIL's default ink on an L image is 1, not white.
     mask = Image.new("L", (width, height), 0)
     draw = ImageDraw.Draw(mask)
@@ -161,9 +165,14 @@ def compose(width, height, content, metres_per_px):
         tail = False
 
     total = band_height(len(body), tail)
+    # The frame is the ground plus this, and yuv420p wants an even height, so
+    # the band is what keeps it even now that it is no longer part of the ground.
+    total += total % 2
     if total >= height:
         return None
 
+    # Typeset against the bottom of a ground-sized canvas and sliced off it, so
+    # the layout above is the one `legend.ts` writes for a frame of this size.
     top = height - total
     y = top + pad
     draw.text(
@@ -189,14 +198,7 @@ def compose(width, height, content, metres_per_px):
                 fill=INK,
             )
 
+    # The mask carries the glyphs' antialiasing, so mixing the two values by it
+    # is what keeps the type from coming out jagged against the dark ground.
     strip = np.asarray(mask, dtype=np.uint16)[top:]
-    alpha = BAND_ALPHA + (255 - BAND_ALPHA) * strip // 255
-    ink = (BAND_VALUE * (255 - strip) + INK * strip) // 255
-    return top, (255 - alpha).astype(np.uint16), (ink * alpha // 255).astype(np.uint16)
-
-
-def apply(frame, band):
-    """In place, on a (H, W) uint8 frame."""
-    top, keep, add = band
-    region = frame[top:].astype(np.uint16)
-    frame[top:] = np.minimum(region * keep // 255 + add, 255).astype(np.uint8)
+    return ((BAND_VALUE * (255 - strip) + INK * strip) // 255).astype(np.uint8)

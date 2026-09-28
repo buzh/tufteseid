@@ -147,6 +147,7 @@ def render(spec, bbox25833, legend_content, log):
         ve_factor=spec["zFactor"],
     )
     band = legend.compose(width, height, legend_content, metres_per_px)
+    frame_h = height + (0 if band is None else band.shape[0])
 
     frames = []
     for azimuth in azimuths:
@@ -162,8 +163,8 @@ def render(spec, bbox25833, legend_content, log):
         frame = byte_scale(shaded[crop, crop], c_min=0, c_max=1)
         frame = np.ascontiguousarray(frame)
         frame[absent] = NO_DATA_VALUE
-        if band:
-            legend.apply(frame, band)
+        if band is not None:
+            frame = np.vstack((frame, band))
         frames.append(frame)
     log(f"{len(frames)} frames in {time.perf_counter() - started:.1f} s")
 
@@ -180,11 +181,11 @@ def render(spec, bbox25833, legend_content, log):
     meta = {
         "metresPerPx": round(metres_per_px, 4),
         "bbox25833": bbox25833,
-        # Where the terrain stops, as a fraction of the frame's height: the band
-        # is burnt in, so the ground overlay has to know how much of the picture
-        # is not registered to the bbox. A fraction rather than the row, because
-        # what the client measures is the decoded frame, not this array.
-        "bandTop": round(band[0] / height, 5) if band else 1,
+        # Where the ground stops, as a fraction of the frame's height: the band
+        # is burnt in under it, so the overlay has to know how much of the
+        # picture is registered to the bbox. A fraction rather than the row,
+        # because what the client measures is the decoded frame, not this array.
+        "bandTop": round(height / frame_h, 5),
         "coverage": round(coverage, 3),
         "frames": len(frames),
         "durationMs": round(len(frames) * 1000 / fps),
