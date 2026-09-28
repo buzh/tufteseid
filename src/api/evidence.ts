@@ -4,8 +4,10 @@ const COLLECTION = 'evidence';
 
 /** Which producer made the pixels. Mirrors the `kind` select values in
  *  `pb_migrations/1700001300_evidence.js`, plus `sunloop` from
- *  `1700001400_evidence_sunloop.js` — the one kind rendered on the server. */
-export type EvidenceKind = 'lidar' | 'terrain' | 'flyfoto' | 'sunloop';
+ *  `1700001400_evidence_sunloop.js` and `rvt` from `1700001500_evidence_rvt.js`
+ *  — the two rendered on the server. `rvt` is every RVT blend: which one is
+ *  `meta.vis`. */
+export type EvidenceKind = 'lidar' | 'terrain' | 'flyfoto' | 'sunloop' | 'rvt';
 
 /** Free-form per kind, and read back through `src/evidence/spec.ts` rather than
  *  trusted. Server-side ceiling is 10 kB. */

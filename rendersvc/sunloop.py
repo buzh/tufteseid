@@ -38,6 +38,12 @@ MARGIN_PX = 4
 FPS_DEFAULT = 24
 STEP_DEG_DEFAULT = 5
 
+KIND = "sunloop"
+
+# The band is burnt into the frames: `createImageBitmap` throws on a WebM, so a
+# loop cannot be stamped client-side at download time the way a still is.
+WANTS_LEGEND = True
+
 # What a pixel with no laser data is painted. A WebM in yuv420p carries no alpha
 # channel, so the browser producers' "no-data is transparent" is not available
 # here and absence has to be a grey a reader cannot read as terrain. Not 0 and
@@ -62,6 +68,41 @@ ENCODE_TIMEOUT_S = 900
 
 def _even(n):
     return int(n) - (int(n) % 2)
+
+
+def _number(value, low, high):
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    return float(value) if low <= value <= high else None
+
+
+def spec_of(meta):
+    """The stored parameters, read back rather than trusted. Mirrors `specOf`
+    for the `sunloop` arm in `src/evidence/spec.ts`."""
+    if not isinstance(meta, dict):
+        raise ValueError("meta is not an object")
+    model = meta.get("model")
+    altitude = _number(meta.get("altitude"), 1, 89)
+    z_factor = _number(meta.get("zFactor"), 0.1, 10)
+    step = meta.get("stepDeg", STEP_DEG_DEFAULT)
+    fps = meta.get("fps", FPS_DEFAULT)
+    if model not in ("dtm", "dom"):
+        raise ValueError("model is neither dtm nor dom")
+    if altitude is None or z_factor is None:
+        raise ValueError("altitude or zFactor out of range")
+    # A step that does not divide the circle leaves a jump between the last
+    # frame and the first, which is the one thing a loop must not have.
+    if not isinstance(step, int) or step < 1 or step > 45 or 360 % step:
+        raise ValueError("stepDeg does not divide 360")
+    if not isinstance(fps, int) or not 1 <= fps <= 60:
+        raise ValueError("fps out of range")
+    return {
+        "model": model,
+        "altitude": altitude,
+        "zFactor": z_factor,
+        "stepDeg": step,
+        "fps": fps,
+    }
 
 
 def render(spec, bbox25833, legend_content, log):

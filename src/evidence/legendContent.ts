@@ -98,9 +98,10 @@ const rightsOf = (spec: EvidenceSpec, credit: string): string[] => {
       );
       return spec.style === CVAT_STYLE ? [line, rvtMethod()] : [line];
     }
-    // The sidecar shades the same heights the browser does, only more of them.
+    // The sidecar works the same heights the browser does, only harder.
     case 'terrain':
     case 'sunloop':
+    case 'rvt':
       return [heightData(), ourVisualisation(credit), rvtMethod()];
     case 'flyfoto':
       return [

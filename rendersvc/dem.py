@@ -1,8 +1,10 @@
 """Float elevation out of hoydedata.no for one rectangle.
 
 The endpoint's quirks are `docs/terrain-analysis.md`; this is the server-side
-twin of `src/terrain/dem.ts`, minus the tiling — the per-project services cap at
-15 000 px a side and a footprint is 500 m, so one call always covers it.
+twin of `src/terrain/dem.ts`, minus the tiling. A caller asks for one grid and
+gets one `exportImage`; where that would be too large a grid — about 2200 px a
+side for F32, past which the service answers 500 under its own timeout — it is
+the caller that coarsens.
 
 Straight to hoydedata.no, never through wmscache: every job is a rectangle
 nobody will ask for again, so caching it only evicts tiles that are re-read.

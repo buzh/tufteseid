@@ -1,19 +1,20 @@
 # The render sidecar (`rendersvc`)
 
-Read before touching `rendersvc/`, `src/api/render.ts`, or the `sunloop` arms in
-`src/evidence/`. What the browser's own producers do is `docs/architecture.md`
-and `docs/terrain-analysis.md`.
+Read before touching `rendersvc/`, `src/api/render.ts`, or the `sunloop` and
+`rvt` arms in `src/evidence/`. What the browser's own producers do is
+`docs/architecture.md` and `docs/terrain-analysis.md`.
 
 Every other kept render is made in the tab that asked for it: `evidence/queue.ts`
 drains one job, a producer in `render.ts` fetches and paints, and
-`attachEvidenceFile` PATCHes the pixels onto a row that already exists. A 360°
-sun rotation does not fit in that: it is 72 hillshades of one grid and a VP9
-encode — a minute of work the main thread should not be doing, and work worth
-spending only on a reader who has signed in.
+`attachEvidenceFile` PATCHes the pixels onto a row that already exists. Two kinds
+do not fit in that. A 360° sun rotation is 72 hillshades of one grid and a VP9
+encode; an RVT blend is a stack of horizon scans over a grid with hundreds of
+metres of context around it. Both are minutes of work the main thread should not
+be doing, and work worth spending only on a reader who has signed in.
 
 So `rendersvc` takes an evidence row, renders it with RVT-py, and writes the file
-back itself. One producer today, `sunloop`; the envelope around it — the token
-check, the queue, the write-back — knows nothing about sun.
+back itself. Two producers, `sunloop` and `rvt`; the envelope around them — the
+token check, the queue, the write-back — knows neither from the other.
 
 Python, stdlib HTTP, no framework, the way the two node sidecars are stdlib node.
 `rvt-py` is the one non-obvious dependency and `vat-cache/` already paid for it.
@@ -28,12 +29,19 @@ RVT's other visualizations come along.
 POST /render/sunloop        Authorization: <the caller's PocketBase token>
 { "evidence": "<record id>", "legend": { … } }
 
+POST /render/rvt            Authorization: <the caller's PocketBase token>
+{ "evidence": "<record id>" }
+
 202  queued                     408  the body stalled on the way in
 400  no body, or not JSON       409  already queued or running for that row
-401  no token                   422  the row is not a renderable sunloop
+401  no token                   422  the row is not renderable by that route
 403  may not write that row     429  queue full, or this caller has one in flight
 404  no such row                502  PocketBase or the producer fell over
 ```
+
+One route per producer, and the row's `kind` must be the route's: `/render/rvt`
+answers 422 for a `sunloop` row. Which blend an `rvt` row is comes out of its
+own `meta.vis`, so the route does not multiply with the recipes.
 
 `GET /render/health` answers `{ok, pending, capacity}`, which is what
 `scripts/live-check.sh` asserts. `ok` is the worker thread's liveness and the
@@ -73,8 +81,10 @@ Signed-in-only falls out of the token check. On top of it:
 | One job per caller, queued or running | `PER_CALLER_MAX` |
 | Footprint ≤ 505 m a side (`MAX_SIDE_M` in `src/map/bbox.ts` plus round-trip slack) | `bbox_of` |
 | 1600 px a side, whatever the ground publishes | `sunloop.MAX_FRAME_PX` |
-| Step must divide 360, ≤ 45°; fps 1–60 | `spec_of` |
+| Step must divide 360, ≤ 45°; fps 1–60 | `sunloop.spec_of` |
 | 900 s an encode, the feed included, then the child is killed | `sunloop.ENCODE_TIMEOUT_S` |
+| 2200 px a side per fetch, margin and context included, so a blend is two grids of that at most | `blends.MAX_FETCH_PX` |
+| The blend must be one the recipe table names | `blends.spec_of` |
 | 64 kB request body | `MAX_BODY_BYTES` |
 | 10 s a request, headers and body together | `REQUEST_TIMEOUT_S` |
 | `cpus: 2.0`, `mem_limit: 2g` | `docker-compose.yml` |
@@ -104,7 +114,10 @@ socket timeout is renewed by every byte. A body that stalls is answered 408 and
 the connection closed. `protocol_version` stays HTTP/1.0: with no keep-alive a
 connection carries one request, so the deadline bounds the whole thread.
 
-## The render
+## The ground
+
+The three opening moves are the same for both producers, and the third is where
+a row is settled **empty**.
 
 1. **Coverage probe** (`dem.probe_coverage`) — one `outStatistics` query for
    `min(OPPLOSNING)` over the rectangle, `where OPPLOSNING IS NOT NULL` so the
@@ -112,16 +125,24 @@ connection carries one request, so the deadline bounds the whole thread.
    with a null statistic, and the service upper-cases the field name to `BEST`.
    A null marks the row **empty** and stops. A probe that *fails* is not an
    absence: it falls through at 0.25 m and lets the pixels answer.
-2. **One `exportImage`** for the whole grid — `Prosjekt_DTM`/`Prosjekt_DOM`,
+2. **One `exportImage`** per grid — `Prosjekt_DTM`/`Prosjekt_DOM`,
    `pixelType=F32`, `renderingRule` `None`, the explicit finest-wins
-   `mosaicRule`. No tiling: the per-project services cap at 15 000 px and a
-   footprint is 500 m. Four pixels of margin are fetched and cropped off after
-   the gradient, so the edge is shaded against real ground.
+   `mosaicRule`. No tiling: a grid is coarsened until it fits one call instead.
+   Margin is fetched with it and cropped off after, so the edge is computed
+   against real ground — four pixels for a sun loop's gradient, tens of metres
+   for a blend, whose scales reach much further.
+
+   **About 2200 px a side is the practical ceiling** for an F32 grid: past it
+   `exportImage` answers 500 under its own 60 s timeout, the more readily the
+   busier it is. That is the client's own `MAX_DEM_PX_PER_SIDE` and it is what
+   `blends.MAX_FETCH_PX` coarsens against; a sun loop stays under it by way of
+   `MAX_FRAME_PX`, which is lower for reasons of its own.
 
    The pixel size is settled before the fetch and is **square by construction**:
-   the width's even pixel count fixes `metres_per_px`, the height follows from
-   that same figure, and the rectangle is then trimmed to the pixel grid about
-   its centre. Otherwise `slope_aspect`, which is told
+   the width's pixel count fixes `metres_per_px` — rounded even for a loop,
+   whose encoder demands it — the height follows from that same figure, and the
+   rectangle is then trimmed to the pixel grid about its centre. Otherwise
+   `slope_aspect`, which is told
    `resolution_x == resolution_y`, and the burnt-in scale bar, which is drawn
    from one number, would both be wrong down the frame for a footprint whose two
    sides round differently — reachable, because the EPSG:4326 round trip is
@@ -136,7 +157,7 @@ connection carries one request, so the deadline bounds the whole thread.
    catalogue answers for the rectangle as a whole, so a footprint over the edge
    of an acquisition or a lake the DTM is sparse over passes the probe and
    decodes mostly NaN. `binary_dilation` of the non-finite pixels, cropped to the
-   rendered rectangle, is both the mask every azimuth reuses and the measure:
+   rendered rectangle, is both the mask absence is painted with and the measure:
    under `MIN_COVERAGE` (half the square) the row is marked **empty** rather than
    given a picture of its own holes, and what is left is stored as
    `meta.coverage`.
@@ -145,6 +166,11 @@ connection carries one request, so the deadline bounds the whole thread.
    neighbour (`roll_fill_nans`) and so halves the gradient right around a hole.
    rvt restores the input's NaN mask onto its output, so the hole itself is *not*
    drawn larger than it is; the invented rim is the reason for the extra pixel.
+
+## The sun loop
+
+Picking up from the decoded grid.
+
 4. **`slope_aspect` once**, then `hillshade(…, slope=, aspect=)` per azimuth.
    That is RVT's own reuse parameter, so the gradient is computed once without
    reimplementing anything. Two things follow from it and are easy to get wrong:
@@ -191,6 +217,61 @@ connection carries one request, so the deadline bounds the whole thread.
 
 Budget at 1600 px: ~3 s of RVT, ~5–15 s of fetch, ~20–60 s of VP9.
 
+## The RVT blends
+
+`blends.py`. One kind, `rvt`, and a table of recipes keyed by `meta.vis`;
+e4MSTP is the one entry today. **Not named `rvt.py`** — a module of that name in
+`/app` shadows the installed `rvt` package, and every import inside it would
+resolve to itself.
+
+Each recipe is **transcribed** from `rvt.blend` and built on `rvt.vis` and
+`rvt.blend_func` alone. e4MSTP is not in rvt-py 2.2.3 at all, only in the
+upstream master, and `rvt.blend` and `rvt.default` import `osgeo.gdal` for an IO
+layer none of this touches. The transcription was checked against
+`rvt.blend.e4mstp` on real ground and is equal to the bit. Same trade and the
+same blend loop — normalize, ramp, blend, render, last layer first — as
+`vat-cache/cvat.py`.
+
+**RVT's radii are pixel counts calibrated at 0.5 m/px**, so they are scaled here
+to hold their reach in metres whatever the acquisition publishes. A 0.25 m
+project would otherwise get half the neighbourhood the blend was designed
+around.
+
+**Two grids, because a blend reads far outside what it draws.** e4MSTP's broad
+MSTP scale reaches 250 m and its other layers 25 m. Given no context RVT pads
+`symmetric`, and the broad channel becomes a picture of the mirror. Fetching
+250 m of real ground on every side of a 500 m footprint at 0.25 m would be a
+4000 px grid, which `exportImage` sheds. So:
+
+| Grid | Covers | At | Feeds |
+| --- | --- | --- | --- |
+| fine | footprint + 25 m | the acquisition's own resolution, coarsened to fit `MAX_FETCH_PX` | local and meso MSTP, SVF, openness, local dominance, slope |
+| coarse | footprint + 250 m | 0.5 m/px or coarser | the broad MSTP channel alone, resampled up bilinearly |
+
+Measured against context fetched at full resolution, the coarse channel costs a
+mean 0.005 of the finished pixel; mirroring costs 0.087.
+
+**The slope layer is in radians, and that is not a bug.** `rvt.blend.e4mstp`
+calls `slope_aspect` without `output_units`, so the bottom layer is radians
+normalized over 0..55 — an all-but-flat dark red, which is where the blend's
+colour comes from. Passing degrees instead, which is RVT's own default
+elsewhere, produces a plausible picture that is not e4MSTP. The transcription
+keeps the radians and says so in a comment.
+
+The output is an **RGBA PNG, alpha 0 where the ground is absent** — the dilated
+hole mask, plus any pixel the blend itself left non-finite. `meta` is
+`metresPerPx`, `bbox25833`, `coverage` and `renderedAt`; no `bandTop`, because
+this kind is **stored bare**. A still is stamped in the reader's own tab at
+download time, so `WANTS_LEGEND` is false, the sidecar's `legend.py` never runs
+for it, and the stored pixels are the ones the map lays back over the ground.
+
+Budget, measured against live hoydedata.no on a 505 m footprint of 0.25 m
+ground — the worst case the footprint cap allows: 2002 px fine and 2010 px
+coarse, 200 s of fetch, 90 s of compute (62 of it local dominance), a 9.3 MB
+PNG, 315 s all told and 1.0 GB peak RSS against the container's 2 GB. A 300 m
+footprint is 45 s and 3.4 MB. The fetch dominates and varies with the day; the
+compute does not.
+
 **Direct to hoydedata.no, never through wmscache.** Every job is a rectangle
 nobody will ask for again, so caching one only evicts tiles that are re-read —
 the same rule `vat-cache/` follows.
@@ -199,8 +280,8 @@ the same rule `vat-cache/` follows.
 
 The sidecar writes `meta.job = {state, at, detail}` when it takes a job and when
 it fails; success replaces the whole marker with the file and the usual
-`metresPerPx`, `bbox25833`, `coverage`, `frames`, `durationMs`, `renderedAt`,
-`bandTop`.
+`metresPerPx`, `bbox25833`, `coverage` and `renderedAt`, plus whatever the
+producer adds — a loop's `frames`, `durationMs` and `bandTop`.
 The app is already subscribed (`subscribeEvidence`), so progress arrives over the
 existing feed and **survives a reload or a closed tab**, which a browser render
 does not.
@@ -245,9 +326,13 @@ first one failed.
 
 ## The legend
 
-The loop leaves the server already cited, because `stampEvidence` cannot help it:
-`decodeToCanvas` is `createImageBitmap`, which throws on a WebM. So a still is
-stamped at the door and a loop is burnt at render time.
+This section is the sun loop's alone. The loop leaves the server already cited,
+because `stampEvidence` cannot help it: `decodeToCanvas` is `createImageBitmap`,
+which throws on a WebM. So a still is stamped at the door and a loop is burnt at
+render time — including a still the sidecar rendered, which is why a producer
+declares `WANTS_LEGEND` and the `rvt` one declares it false. Nothing composes a
+band for a producer that does not want one, and no `legend` is read off its
+request body.
 
 The *wording* is the client's either way — `legendContentFor` in
 `src/evidence/legendContent.ts` composes the `{title, facts, rights, centre,
@@ -355,6 +440,7 @@ render with it. If the thread stops all the same, `/health` answers 503 and
 | `exportImage` sheds (a text body under a 200 status) | five retries with backoff inside `fetch_grid`, then `failed` |
 | The coverage probe itself errors | logged, render continues at 0.25 m |
 | ffmpeg fails, or the file will not fit after three encodes | `failed`, with ffmpeg's stderr in `job.detail` (300 chars) |
+| A blend's PNG will not fit the 50 MB field | `failed` — there is no re-encode ladder for a still, and the worst case the footprint cap allows measures 9.3 MB |
 | An encode passes 900 s | the child is killed and reaped, `failed`, and the worker takes the next job with nothing left running |
 | The container is restarted mid-job | nothing beats the markers any more, so they go stale after five minutes and read as `failed`; the queue is not persisted, so the rows that were waiting go with it |
 | PocketBase refuses the claim | 403 to the caller, the queue slot is given back, no marker written |
@@ -380,10 +466,12 @@ quirks — `vat-cache/README.md` records the other end of the coupling.
 
 `rvt-py` is installed `--no-deps`: it declares gdal, rasterio, geopandas and
 jupyter for an IO layer none of this touches. `requirements.txt` carries what
-`rvt.vis` actually reaches for — numpy, pillow, pyproj and `scipy<1.15` (it
-imports `scipy.ndimage.morphology`, removed there). Not matplotlib: only
-`rvt.blend_func` wants that, `rvt/__init__.py` is a docstring, and the sidecar
-imports `rvt.vis` alone.
+`rvt.vis` and `rvt.blend_func` actually reach for — numpy, pillow, pyproj,
+`scipy<1.15` (it imports `scipy.ndimage.morphology`, removed there) and
+matplotlib, which `rvt.blend_func` imports at the top for its colour ramps and
+which e4MSTP's slope layer genuinely draws one from. `rvt/__init__.py` is a
+docstring, and `rvt.blend` and `rvt.default` — the two that want GDAL — are
+never imported.
 
 **The base image is `python:3.11-slim` and must stay under 3.12.** rvt-py 2.2.3
 declares `Requires-Python: >=3.6, <3.12`, and pip does not report that as a
@@ -395,25 +483,40 @@ like an upstream that deleted a release. The pin is 2.2.3 because that is what
 No CSP change: `media-src` falls back to `default-src 'self'`, and both the
 endpoint and the file are same-origin.
 
-## Adding a second producer
+## Adding a producer
 
-A producer is a module with one function returning
-`(blob, filename, content_type, meta)` or `None` for "the source has nothing
-here". What is already general: the route table in `Handler`, the token check,
-`Refused`, the queue and its limits, `bbox_of`, the claim/attach pair, and the
-`meta.job` protocol the client reads.
+A producer is a module with four names, and `server.py` knows nothing else about
+one:
 
-What is per-producer: the `spec_of` validation, the `kind` the row must carry,
-and the migration that adds that kind to `evi_kind`.
+| Name | What |
+| --- | --- |
+| `KIND` | the `kind` a row must carry; a request for a row of any other is refused 422 |
+| `WANTS_LEGEND` | whether a band is composed and handed to `render` |
+| `spec_of(meta)` | the stored parameters, read back rather than trusted; raises `ValueError`, which becomes the 422's text |
+| `render(spec, bbox25833, legend_content, log)` | `(blob, filename, content_type, meta)`, or `None` for "the ground has nothing here" |
 
-On the client it is a variant in `src/evidence/spec.ts`, an arm in `labels.ts`,
-somewhere to ask for it, and a branch in `queue.ts` that POSTs instead of
-rendering. Where to ask follows what the producer reads: a reading of the map as
-it stands is an offer atom feeding `keepOfferAtom`, which is what the camera in
-the spot card keeps, the way the three browser kinds are. A sun loop reads
-nothing on screen, so it does not belong on that camera; it is ordered from
-`SpotAcquire` (`src/spotControls/`) instead, off the fixed `SUN_LOOP_SPEC`, and
-that box is where a second server-side producer's chip goes.
-`BrowserSpec` in `render.ts` is `Exclude<EvidenceSpec, {kind: 'sunloop'}>` — a
-server-side kind is excluded there so the browser producers' switch stays
-exhaustive, and a second one joins that exclusion.
+Then one entry in `ROUTES`, which is the whole of the wiring. What is already
+general: the token check, `Refused`, the queue and its limits, `bbox_of`, the
+heartbeat, the claim/attach pair, and the `meta.job` protocol the client reads.
+Off the module, one thing remains per producer: the migration that adds the kind
+to `evi_kind`.
+
+**A blend is not a producer.** Another RVT visualization is one entry in
+`blends.PRODUCERS`, one entry in `RVT_BLENDS` (`src/evidence/spec.ts`), one arm
+of the `evidence.rvt.*` strings, and nothing else: the kind, the route, the
+migration and the chip loop already exist.
+
+On the client a producer is a variant in `src/evidence/spec.ts`, an arm in
+`labels.ts`, somewhere to ask for it, and a branch in `queue.ts` that POSTs
+instead of rendering. Where to ask follows what the producer reads: a reading of
+the map as it stands is an offer atom feeding `keepOfferAtom`, which is what the
+camera in the spot card keeps, the way the three browser kinds are. Neither
+server-side kind reads anything on screen, so neither belongs on that camera;
+both are ordered from `SpotAcquire` (`src/spotControls/`), off fixed specs —
+`SUN_LOOP_SPEC` and one per entry in `RVT_SPECS` — and that box is where the
+next one's chip goes too.
+
+Two places state the server/browser split and both must agree: `rendersOnServer`
+in `spec.ts`, which is what `SpotAcquire` filters and counts on, and
+`BrowserSpec` in `render.ts`, which excludes the server-side kinds so the
+browser producers' switch stays exhaustive.

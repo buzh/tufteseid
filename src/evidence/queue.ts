@@ -11,7 +11,7 @@
 // reorder. Two at once is the width of that exception.
 
 import { attachEvidenceFile, type EvidenceRecord } from '../api/evidence';
-import { requestSunLoop } from '../api/render';
+import { requestRvtBlend, requestSunLoop } from '../api/render';
 import type { Bbox } from '../map/bbox';
 import { withDeadline } from '../shared/utils/deadline';
 import type { SunLoopLegend } from './legendContent';
@@ -42,9 +42,9 @@ const STALE_JOB_MS = 300000;
 /**
  * The same four states, as the render sidecar left them in `meta.job`. Absent
  * once the file lands: the sidecar writes the pixels and the meta in one
- * request, and the meta it writes has no marker. Only a `sunloop` ever carries
- * one — the three browser-rendered kinds are never handed to the sidecar and
- * write nothing but their own achieved meta.
+ * request, and the meta it writes has no marker. Only a kind the sidecar
+ * renders ever carries one — the three browser-rendered kinds are never handed
+ * over and write nothing but their own achieved meta.
  */
 export const jobState = (rec: EvidenceRecord): RenderState | undefined => {
   const job = rec.meta?.job;
@@ -137,9 +137,9 @@ const runJob = async (job: RenderJob): Promise<EvidenceRecord | null> => {
   }
 
   // Handed to the sidecar, which renders it and PATCHes the file on itself. The
-  // row is then realtime's to report on, and this queue drops it — a loop that
-  // takes minutes must not park every other job behind it, and it outlives the
-  // tab either way.
+  // row is then realtime's to report on, and this queue drops it — a render
+  // that takes minutes must not park every other job behind it, and it outlives
+  // the tab either way.
   if (spec.kind === 'sunloop') {
     if (!job.legend) {
       states.set(job.rec.id, 'empty');
@@ -148,6 +148,14 @@ const runJob = async (job: RenderJob): Promise<EvidenceRecord | null> => {
     const legend = job.legend;
     await withDeadline(HANDOVER_DEADLINE_MS, 'sun loop handover', () =>
       requestSunLoop(job.rec.id, legend),
+    );
+    states.delete(job.rec.id);
+    return null;
+  }
+
+  if (spec.kind === 'rvt') {
+    await withDeadline(HANDOVER_DEADLINE_MS, 'rvt handover', () =>
+      requestRvtBlend(job.rec.id),
     );
     states.delete(job.rec.id);
     return null;

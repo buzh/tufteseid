@@ -1,4 +1,8 @@
-import type { EvidenceMeta, EvidenceRecord } from '../api/evidence';
+import type {
+  EvidenceKind,
+  EvidenceMeta,
+  EvidenceRecord,
+} from '../api/evidence';
 import type { LidarModel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import type { DemModel } from '../terrain/dem';
 import { DEFAULT_ALTITUDE, DEFAULT_Z_FACTOR } from '../terrain/render';
@@ -11,6 +15,13 @@ export const NIB_MOSAIC = 'mosaic';
  *  the sidecar refuses one that does not. */
 const SUNLOOP_STEP_DEG = 5;
 const SUNLOOP_FPS = 24;
+
+/** The RVT blends the sidecar can make. Mirrors the `PRODUCERS` table in
+ *  `rendersvc/blends.py`, and each name is a key under `evidence.rvt` in the
+ *  locale files. */
+export const RVT_BLENDS = ['e4mstp'] as const;
+
+export type RvtBlend = (typeof RVT_BLENDS)[number];
 
 export type EvidenceSpec =
   | {
@@ -53,6 +64,15 @@ export type EvidenceSpec =
       zFactor: number;
       stepDeg: number;
       fps: number;
+    }
+  | {
+      /** One of RVT's own blended visualizations, several passes over the same
+       *  float elevation stacked into one picture. Rendered by the sidecar,
+       *  never in the browser: the recipe is RVT's and so is the arithmetic.
+       *  One kind for all of them — which blend is `vis`. */
+      kind: 'rvt';
+      vis: RvtBlend;
+      model: DemModel;
     };
 
 /**
@@ -70,6 +90,19 @@ export const SUN_LOOP_SPEC: Extract<EvidenceSpec, { kind: 'sunloop' }> = {
   fps: SUNLOOP_FPS,
 };
 
+/**
+ * The blends on offer, in the order the box lists them. Fixed, the way the sun
+ * loop is: a blend is RVT's recipe whole, and there is nothing in it for a form
+ * to ask about. DTM, because a blend of the canopy is a picture of the canopy.
+ */
+export const RVT_SPECS: readonly Extract<EvidenceSpec, { kind: 'rvt' }>[] =
+  RVT_BLENDS.map((vis) => ({ kind: 'rvt', vis, model: 'dtm' }));
+
+/** Rendered by the sidecar rather than in the tab that asked. The same split
+ *  `BrowserSpec` (`render.ts`) states as a type, off a stored row's kind. */
+export const rendersOnServer = (kind: EvidenceKind): boolean =>
+  kind === 'sunloop' || kind === 'rvt';
+
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null;
 
@@ -83,6 +116,11 @@ const asVis = (v: unknown): Visualization | null =>
 
 const asModel = (v: unknown): DemModel | null =>
   v === 'dtm' || v === 'dom' ? v : null;
+
+const asBlend = (v: unknown): RvtBlend | null =>
+  typeof v === 'string' && (RVT_BLENDS as readonly string[]).includes(v)
+    ? (v as RvtBlend)
+    : null;
 
 /** The spec, flattened for the column. The render merges what it achieved over
  *  this, so nothing here is a figure the pixels have to live up to. */
@@ -121,6 +159,8 @@ export const metaOf = (spec: EvidenceSpec): EvidenceMeta => {
         stepDeg: spec.stepDeg,
         fps: spec.fps,
       };
+    case 'rvt':
+      return { vis: spec.vis, model: spec.model };
   }
 };
 
@@ -181,6 +221,13 @@ export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
         stepDeg: num(meta.stepDeg) ?? SUNLOOP_STEP_DEG,
         fps: num(meta.fps) ?? SUNLOOP_FPS,
       };
+    }
+    case 'rvt': {
+      const vis = asBlend(meta.vis);
+      const model = asModel(meta.model);
+      // A blend this build no longer knows how to name or ask for again.
+      if (!vis || !model) return null;
+      return { kind: 'rvt', vis, model };
     }
   }
 };
@@ -310,6 +357,12 @@ export const evidenceMatches = (
         sameNumber(stored.zFactor, spec.zFactor) &&
         stored.stepDeg === spec.stepDeg &&
         stored.fps === spec.fps
+      );
+    case 'rvt':
+      return (
+        stored.kind === 'rvt' &&
+        stored.vis === spec.vis &&
+        stored.model === spec.model
       );
   }
 };

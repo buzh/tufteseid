@@ -1,9 +1,13 @@
 # rvt-py itself is installed separately, with --no-deps — see the Dockerfile.
-# Everything `rvt.vis` actually reaches for is here — and nothing more: the rest
-# of the package is not imported, so its own dependencies stay out.
+# Everything `rvt.vis` and `rvt.blend_func` actually reach for is here — and
+# nothing more: `rvt.blend` and `rvt.default` are the ones that want GDAL, and
+# neither is imported.
 numpy>=2.0
 pillow>=11.0
 # rvt.vis imports scipy.ndimage.morphology, removed in scipy 1.15.
 scipy<1.15
 # EPSG:4326 -> EPSG:25833, the one thing the stdlib cannot do.
 pyproj>=3.6
+# rvt.blend_func imports it at the top for the colour ramps, and e4MSTP's slope
+# layer genuinely draws one (`Reds_r`).
+matplotlib>=3.7

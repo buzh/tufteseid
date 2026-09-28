@@ -1,6 +1,6 @@
 // Work ordered, not kept. The camera in the card keeps the view as it stands,
 // so everything it offers is already on screen; these are the pictures that are
-// asked for over the footprint instead — a sun loop the sidecar makes, and the
+// asked for over the footprint instead — what the sidecar makes, and the
 // flyfoto series, which is a walk through every acquisition over the spot
 // rather than a reading of the one ground that happens to be up. Stands in
 // front of the card, which is where the rows themselves are then waited on.
@@ -13,8 +13,15 @@ import { useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
 import type { SpotRecord } from '../api/spots';
+import { KIND_ICON, evidenceTitle } from '../evidence/labels';
 import { mayRetry } from '../evidence/queue';
-import { evidenceMatches, SUN_LOOP_SPEC } from '../evidence/spec';
+import {
+  evidenceMatches,
+  rendersOnServer,
+  RVT_SPECS,
+  SUN_LOOP_SPEC,
+  type EvidenceSpec,
+} from '../evidence/spec';
 import { useSpotEvidence } from '../evidence/useSpotEvidence';
 import { bboxToMetric } from '../map/bbox';
 import { spotAcquiringAtom } from '../spots/atoms';
@@ -32,25 +39,52 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
   const evidence = useSpotEvidence(spot);
   const run = useFlyfotoRun(spot.footprint, evidence);
 
-  const loops = (evidence.items ?? []).filter((rec) => rec.kind === 'sunloop');
+  const ordered = (evidence.items ?? []).filter((rec) =>
+    rendersOnServer(rec.kind),
+  );
 
-  // A row with no pixels that nobody has settled is a loop already on its way,
-  // and the sidecar takes one job per caller. A settled one is left to the
-  // gallery's retry, which is where every other kind's is.
-  const outstanding = loops.some(
+  // A row with no pixels that nobody has settled is a render already on its
+  // way, and the sidecar takes one job per caller — whichever chip asked for
+  // it. A settled one is left to the gallery's retry, which is where every
+  // other kind's is.
+  const outstanding = ordered.some(
     (rec) => !rec.file && !mayRetry(evidence.stateOf(rec)),
   );
 
   const metric = spot.footprint ? bboxToMetric(spot.footprint) : null;
-  const kept =
-    metric != null &&
-    loops.some((rec) => evidenceMatches(rec, SUN_LOOP_SPEC, metric));
+  const kept = (spec: EvidenceSpec) =>
+    metric != null && ordered.some((rec) => evidenceMatches(rec, spec, metric));
 
-  const sunHint = () => {
-    if (!spot.footprint) return t('acquire.noFootprint');
-    if (outstanding) return t('evidence.rendering');
-    if (kept) return t('evidence.kept');
-    return t('evidence.facts.frames', { n: SUN_LOOP_FRAMES });
+  // Every chip here orders the same way and refuses for the same reasons; only
+  // the wording and what is asked for differ. `note` is the line under the
+  // label while nothing is happening, `about` the sentence in the tooltip —
+  // the same string unless the idle line is better spent on a figure.
+  const orderChip = (
+    spec: EvidenceSpec,
+    label: string,
+    note: string,
+    about = note,
+  ) => {
+    const title = `${label} — ${about}`;
+    const state = () => {
+      if (!spot.footprint) return t('acquire.noFootprint');
+      if (outstanding) return t('evidence.rendering');
+      if (kept(spec)) return t('evidence.kept');
+      return note;
+    };
+    return (
+      <ControlChip
+        key={label}
+        icon={KIND_ICON[spec.kind]}
+        label={label}
+        hint={state()}
+        withChevron={false}
+        title={title}
+        aria-label={title}
+        disabled={!spot.footprint || outstanding || kept(spec)}
+        onClick={() => evidence.keep(spec)}
+      />
+    );
   };
 
   // The list of what to propose is read off the rows as the run starts, so the
@@ -62,7 +96,6 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
     return t('acquire.flyfotoHint');
   };
 
-  const sunTitle = `${t('evidence.sunLoop')} — ${t('acquire.sunLoopHint')}`;
   const flyfotoTitle = `${t('acquire.flyfoto')} — ${t('acquire.flyfotoHint')}`;
 
   // A run has the map, so the box becomes a bar along the bottom of it — the
@@ -83,16 +116,15 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
     >
       <p className={styles.note}>{t('acquire.hint')}</p>
       <div className={styles.chips}>
-        <ControlChip
-          icon="motion_photos_on"
-          label={t('evidence.sunLoop')}
-          hint={sunHint()}
-          withChevron={false}
-          title={sunTitle}
-          aria-label={sunTitle}
-          disabled={!spot.footprint || outstanding || kept}
-          onClick={() => evidence.keep(SUN_LOOP_SPEC)}
-        />
+        {orderChip(
+          SUN_LOOP_SPEC,
+          t('evidence.sunLoop'),
+          t('evidence.facts.frames', { n: SUN_LOOP_FRAMES }),
+          t('acquire.sunLoopHint'),
+        )}
+        {RVT_SPECS.map((spec) =>
+          orderChip(spec, evidenceTitle(spec), t('acquire.rvtHint')),
+        )}
         <ControlChip
           icon="photo_camera"
           label={t('acquire.flyfoto')}

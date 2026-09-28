@@ -4,6 +4,7 @@
     "open": "Innhenting av bilder",
     "hint": "Bilder som bestilles over utsnittet, ikke av kartet slik det står. De legger seg under Bilder i kortet.",
     "sunLoopHint": "skyggerelieff med sola hele veien rundt, laget på tjeneren. Tar noen minutter.",
+    "rvtHint": "fire terrengmål lagt oppå hverandre i farger, laget på tjeneren. Tar noen minutter.",
     "flyfoto": "Flyfotoserie",
     "flyfotoHint": "gå gjennom opptakene over utsnittet, ett om gangen.",
     "noFootprint": "utsnittet mangler",
@@ -46,6 +47,9 @@
     "renderEmpty": "ingen dekning over utsnittet",
     "resolution": "{{m}} m/px",
     "sunLoop": "Solrunde",
+    "rvt": {
+      "e4mstp": "e4MSTP"
+    },
     "unreadable": "Ukjent bilde",
     "retry": "Prøv igjen",
     "remove": "Slett bildet",

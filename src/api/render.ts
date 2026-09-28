@@ -21,20 +21,31 @@ const errorOf = async (response: Response): Promise<string> => {
  * queued — the pixels land later, over the realtime feed, and survive a reload
  * or a closed tab.
  */
-export const requestSunLoop = async (
-  evidenceId: string,
-  legend: SunLoopLegend,
+const handOver = async (
+  path: string,
+  body: Record<string, unknown>,
 ): Promise<void> => {
   const token = pb.authStore.token;
   if (!token) throw new Error('not signed in');
 
-  const response = await fetch(`${getEnv().renderUrl}/sunloop`, {
+  const response = await fetch(`${getEnv().renderUrl}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: token,
     },
-    body: JSON.stringify({ evidence: evidenceId, legend }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) throw new Error(await errorOf(response));
 };
+
+/** The band is burnt into the frames, so the wording goes with the ask. */
+export const requestSunLoop = (
+  evidenceId: string,
+  legend: SunLoopLegend,
+): Promise<void> => handOver('/sunloop', { evidence: evidenceId, legend });
+
+/** Which blend is `meta.vis` on the row, so there is nothing to send but the
+ *  id. */
+export const requestRvtBlend = (evidenceId: string): Promise<void> =>
+  handOver('/rvt', { evidence: evidenceId });

@@ -19,6 +19,7 @@ export const KIND_ICON: Record<EvidenceKind, MaterialSymbol> = {
   terrain: 'elevation',
   flyfoto: 'photo_camera',
   sunloop: 'motion_photos_on',
+  rvt: 'layers',
 };
 
 export const evidenceTitle = (spec: EvidenceSpec): string => {
@@ -33,6 +34,8 @@ export const evidenceTitle = (spec: EvidenceSpec): string => {
         : (spec.projectName ?? spec.projectId);
     case 'sunloop':
       return t('evidence.sunLoop');
+    case 'rvt':
+      return t(`evidence.rvt.${spec.vis}`);
   }
 };
 
@@ -123,6 +126,10 @@ export const specFacts = (spec: EvidenceSpec): string[] => {
         t('evidence.facts.zFactor', { z: spec.zFactor }),
         t('evidence.facts.frames', { n: Math.round(360 / spec.stepDeg) }),
       ];
+    // Every other parameter is RVT's own and the same for every render, so the
+    // blend's name already says it.
+    case 'rvt':
+      return [spec.model.toUpperCase()];
   }
 };
 

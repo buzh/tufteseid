@@ -29,9 +29,9 @@ export type Produced = {
   meta: EvidenceMeta;
 };
 
-/** Everything but `sunloop`, which the sidecar renders. Stated as a type so the
- *  switch below stays exhaustive and the compiler refuses a loop here. */
-export type BrowserSpec = Exclude<EvidenceSpec, { kind: 'sunloop' }>;
+/** Everything the sidecar does not render. Stated as a type so the switch below
+ *  stays exhaustive and the compiler refuses a server-side kind here. */
+export type BrowserSpec = Exclude<EvidenceSpec, { kind: 'sunloop' | 'rvt' }>;
 
 /**
  * The tail every arm shares: the pixels fitted to the store, described by what

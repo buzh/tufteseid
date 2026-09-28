@@ -31,7 +31,7 @@ Each owns its subject; this file keeps only what is true across all of them.
 | `docs/map-layers.md` | Background grounds, theme layers, and the recipes for adding another | `src/map/layers/`, any new map source |
 | `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream and Caddy → mapproxy → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
-| `docs/render-sidecar.md` | The server-side render service: the contract, the token trade, the queue's limits, the RVT and ffmpeg recipe, the burnt-in legend, the failure modes | `rendersvc/`, `src/api/render.ts`, the `sunloop` arms in `src/evidence/` |
+| `docs/render-sidecar.md` | The server-side render service: the contract, the token trade, the queue's limits, the RVT and ffmpeg recipes, the burnt-in legend, the failure modes | `rendersvc/`, `src/api/render.ts`, the `sunloop` and `rvt` arms in `src/evidence/` |
 | `docs/monitoring.md` | The access logs, the usage report, the cron health check, retention | `scripts/usage-report.sh`, `scripts/health-check.sh`, any log format or `logging:` cap |
 | `vat-cache/README.md` | The out-of-band Python pipeline that precomputes the cached VAT ground | `vat-cache/`, `cvat-tiles/` |
 | `README.md` | Third-party install and admin guide | any change to install, first-run or licensing |
@@ -164,7 +164,8 @@ Two collections carry the reader's records:
   evidence is rendered over, ≤500 m on a side), `sketch` (json ≤5 MB: an
   Excalidraw scene plus the frame that georeferences it, or null).
 - **`evidence`** (id `pbc_evidence`) — `spot` (→ spots, cascade), `owner`
-  (→ users, cascade), `kind` (lidar | terrain | flyfoto | sunloop), `file`
+  (→ users, cascade), `kind` (lidar | terrain | flyfoto | sunloop | rvt, the
+  last being every RVT blend, with `meta.vis` saying which), `file`
   (≤50 MB image or `video/webm`,
   **empty until the render lands** — test it rather than assuming a row has a
   picture), `caption`, `meta` (json ≤10 kB: the parameters asked for, the
@@ -177,8 +178,8 @@ re-renders a row by itself, and `meta.renderedAt` says when the picture was
 made.
 
 Which queue depends on the kind. Three kinds are rendered in the tab that asked
-(`src/evidence/queue.ts`); `sunloop` is handed to the `rendersvc` sidecar, which
-writes `meta.job` as it goes and the file when it is done
+(`src/evidence/queue.ts`); `sunloop` and `rvt` are handed to the `rendersvc`
+sidecar, which writes `meta.job` as it goes and the file when it is done
 (`docs/render-sidecar.md`).
 
 `localities`, `finds` and `attachments` are still on disk from the old model and

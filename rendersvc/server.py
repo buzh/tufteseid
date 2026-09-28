@@ -1,4 +1,4 @@
-"""The render sidecar: one endpoint, one worker, one producer.
+"""The render sidecar: one worker, one route per producer.
 
 A job names an evidence row and nothing else. The row is read and claimed with
 the caller's own token, so PocketBase decides who may start a render and the
@@ -24,12 +24,17 @@ import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import blends
 import dem
 import legend
 import pb
 import sunloop
 
 PORT = int(os.environ.get("PORT", "8080"))
+
+# A producer is a module with `KIND`, `WANTS_LEGEND`, `spec_of` and `render`.
+# Nothing else here knows one from another.
+ROUTES = {"/sunloop": sunloop, "/rvt": blends}
 
 # The host the burnt-in share link names, `PUBLIC_ORIGIN` with its scheme taken
 # off the way `legendContentFor` takes it off client-side. Configured rather than
@@ -126,41 +131,6 @@ def caller_of(token):
     return UNKNOWN_CALLER
 
 
-def _number(value, low, high):
-    if not isinstance(value, (int, float)) or isinstance(value, bool):
-        return None
-    return float(value) if low <= value <= high else None
-
-
-def spec_of(meta):
-    """The stored parameters, read back rather than trusted. Mirrors `specOf`
-    for the `sunloop` arm in `src/evidence/spec.ts`."""
-    if not isinstance(meta, dict):
-        raise Refused(422, "meta is not an object")
-    model = meta.get("model")
-    altitude = _number(meta.get("altitude"), 1, 89)
-    z_factor = _number(meta.get("zFactor"), 0.1, 10)
-    step = meta.get("stepDeg", sunloop.STEP_DEG_DEFAULT)
-    fps = meta.get("fps", sunloop.FPS_DEFAULT)
-    if model not in ("dtm", "dom"):
-        raise Refused(422, "model is neither dtm nor dom")
-    if altitude is None or z_factor is None:
-        raise Refused(422, "altitude or zFactor out of range")
-    # A step that does not divide the circle leaves a jump between the last
-    # frame and the first, which is the one thing a loop must not have.
-    if not isinstance(step, int) or step < 1 or step > 45 or 360 % step:
-        raise Refused(422, "stepDeg does not divide 360")
-    if not isinstance(fps, int) or not 1 <= fps <= 60:
-        raise Refused(422, "fps out of range")
-    return {
-        "model": model,
-        "altitude": altitude,
-        "zFactor": z_factor,
-        "stepDeg": step,
-        "fps": fps,
-    }
-
-
 def _strings(value, count, chars):
     if not isinstance(value, list):
         return []
@@ -228,7 +198,7 @@ def bbox_of(spot):
     return [round(v, 3) for v in bbox]
 
 
-def accept(token, body):
+def accept(producer, token, body):
     record_id = body.get("evidence")
     if not isinstance(record_id, str) or not record_id:
         raise Refused(400, "no evidence id")
@@ -238,10 +208,13 @@ def accept(token, body):
     except pb.PbError as e:
         raise Refused(404 if e.status == 404 else 502, e.detail) from e
 
-    if record.get("kind") != "sunloop":
-        raise Refused(422, "the row is not a sunloop")
+    if record.get("kind") != producer.KIND:
+        raise Refused(422, f"the row is not a {producer.KIND}")
     meta = record.get("meta")
-    spec = spec_of(meta)
+    try:
+        spec = producer.spec_of(meta)
+    except ValueError as e:
+        raise Refused(422, str(e)) from e
     spot = spot_of(record)
     bbox = bbox_of(spot)
     caller = caller_of(token)
@@ -274,14 +247,17 @@ def accept(token, body):
             )
         except pb.PbError as e:
             raise Refused(403 if e.status in (401, 403, 404) else 502, e.detail) from e
-        jobs.put((record_id, token, spec, bbox, meta, legend_of(body, spot)))
+        content = legend_of(body, spot) if producer.WANTS_LEGEND else None
+        jobs.put((producer, record_id, token, spec, bbox, meta, content))
         queued = True
     finally:
         if not queued:
             with lock:
                 pending.pop(record_id, None)
 
-    log.info("queued %s (%s, %s m)", record_id, spec["model"], round(bbox[2] - bbox[0]))
+    log.info(
+        "queued %s (%s, %s m)", record_id, producer.KIND, round(bbox[2] - bbox[0])
+    )
     return {"state": "queued", "pending": len(pending)}
 
 
@@ -335,7 +311,7 @@ class Heartbeat:
                     log.info("%s heartbeat failed: %s", record_id, e)
 
 
-def run_job(record_id, token, spec, bbox, meta, legend_content):
+def run_job(producer, record_id, token, spec, bbox, meta, legend_content):
     def trace(message):
         log.info("%s %s", record_id, message)
 
@@ -343,7 +319,7 @@ def run_job(record_id, token, spec, bbox, meta, legend_content):
     beat = Heartbeat(record_id)
     beat.start()
     try:
-        produced = sunloop.render(spec, bbox, legend_content, trace)
+        produced = producer.render(spec, bbox, legend_content, trace)
     finally:
         beat.stop()
     if produced is None:
@@ -360,9 +336,9 @@ def run_job(record_id, token, spec, bbox, meta, legend_content):
 
 def worker():
     while True:
-        record_id, token, spec, bbox, meta, legend_content = jobs.get()
+        producer, record_id, token, spec, bbox, meta, legend_content = jobs.get()
         try:
-            run_job(record_id, token, spec, bbox, meta, legend_content)
+            run_job(producer, record_id, token, spec, bbox, meta, legend_content)
         except Exception as e:
             log.warning("%s failed: %s", record_id, e)
             try:
@@ -456,7 +432,8 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def do_POST(self):
-        if self.path != "/sunloop":
+        producer = ROUTES.get(self.path)
+        if producer is None:
             self.reply(404, {"error": "no such path"})
             return
         token = self.headers.get("Authorization", "")
@@ -485,7 +462,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(400, {"error": "body is not JSON"})
             return
         try:
-            self.reply(202, accept(token, body))
+            self.reply(202, accept(producer, token, body))
         except Refused as e:
             self.reply(e.status, {"error": e.reason})
         except Exception as e:
@@ -498,7 +475,13 @@ def main():
         level=logging.INFO, format="[rendersvc] %(asctime)s %(message)s"
     )
     worker_thread.start()
-    log.info("listening on %s, queue %s, pocketbase %s", PORT, QUEUE_MAX, pb.BASE)
+    log.info(
+        "listening on %s, routes %s, queue %s, pocketbase %s",
+        PORT,
+        " ".join(sorted(ROUTES)),
+        QUEUE_MAX,
+        pb.BASE,
+    )
     ThreadingHTTPServer(("", PORT), Handler).serve_forever()
 
 

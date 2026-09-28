@@ -376,8 +376,10 @@ of them.
   signal gates the queue position rather than the render: a burst already on the
   wire runs out its own deadline, and only the result is dropped.
 - **Not every row is made here.** Three kinds are rendered in the tab that asked
-  for them; `sunloop` is created the same way and then handed to the render
-  sidecar, which writes the file back itself (`docs/render-sidecar.md`). The row,
+  for them; `sunloop` and `rvt` are created the same way and then handed to the
+  render sidecar, which writes the file back itself
+  (`docs/render-sidecar.md`). `rendersOnServer` (`evidence/spec.ts`) is where
+  that split is stated. The row,
   the gallery, the ordering and the reading are the same either way — the
   difference is who makes the pixels, and that a sidecar render survives the tab
   being closed. `stateOf` (`useSpotEvidence.ts`) states the one precedence rule:
