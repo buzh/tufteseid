@@ -4,6 +4,9 @@
 // flyfoto series, which is a walk through every acquisition over the spot
 // rather than a reading of the one ground that happens to be up. Stands in
 // front of the card, which is where the rows themselves are then waited on.
+//
+// The flyfoto walk takes the map, and then this box is a bar under it
+// (`FlyfotoRun`) rather than a panel in the corner.
 
 import { Alert } from '@mantine/core';
 import { useSetAtom } from 'jotai';
@@ -62,6 +65,13 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
   const sunTitle = `${t('evidence.sunLoop')} — ${t('acquire.sunLoopHint')}`;
   const flyfotoTitle = `${t('acquire.flyfoto')} — ${t('acquire.flyfotoHint')}`;
 
+  // A run has the map, so the box becomes a bar along the bottom of it — the
+  // same move the card's rectangle and pen make, for the same reason: what is
+  // being judged is on the ground and the buttons follow the eye.
+  if (run.phase !== 'off') {
+    return <FlyfotoRun run={run} failed={evidence.failed} />;
+  }
+
   return (
     <Panel
       className={styles.panel}
@@ -71,35 +81,29 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
       // own, and the spot itself is closed from there.
       onClose={() => setAcquiring(false)}
     >
-      {run.phase === 'off' ? (
-        <>
-          <p className={styles.note}>{t('acquire.hint')}</p>
-          <div className={styles.chips}>
-            <ControlChip
-              icon="motion_photos_on"
-              label={t('evidence.sunLoop')}
-              hint={sunHint()}
-              withChevron={false}
-              title={sunTitle}
-              aria-label={sunTitle}
-              disabled={!spot.footprint || outstanding || kept}
-              onClick={() => evidence.keep(SUN_LOOP_SPEC)}
-            />
-            <ControlChip
-              icon="photo_camera"
-              label={t('acquire.flyfoto')}
-              hint={flyfotoHint()}
-              withChevron={false}
-              title={flyfotoTitle}
-              aria-label={flyfotoTitle}
-              disabled={!flyfotoReady}
-              onClick={run.start}
-            />
-          </div>
-        </>
-      ) : (
-        <FlyfotoRun run={run} />
-      )}
+      <p className={styles.note}>{t('acquire.hint')}</p>
+      <div className={styles.chips}>
+        <ControlChip
+          icon="motion_photos_on"
+          label={t('evidence.sunLoop')}
+          hint={sunHint()}
+          withChevron={false}
+          title={sunTitle}
+          aria-label={sunTitle}
+          disabled={!spot.footprint || outstanding || kept}
+          onClick={() => evidence.keep(SUN_LOOP_SPEC)}
+        />
+        <ControlChip
+          icon="photo_camera"
+          label={t('acquire.flyfoto')}
+          hint={flyfotoHint()}
+          withChevron={false}
+          title={flyfotoTitle}
+          aria-label={flyfotoTitle}
+          disabled={!flyfotoReady}
+          onClick={run.start}
+        />
+      </div>
 
       {evidence.failed && (
         <Alert color="red" mt="xs" p="xs">

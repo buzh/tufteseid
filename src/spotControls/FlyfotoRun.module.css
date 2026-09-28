@@ -1,86 +1,88 @@
-/* The run takes the acquisition box's body while it is on. Narrow on purpose:
-   the proposal is a decision about which flight, not a reading of it — the
-   picture goes into the gallery at the source's own resolution either way. */
-
-.run {
-  display: flex;
-  flex-direction: column;
-  gap: var(--mantine-spacing-xs);
-  margin-top: var(--mantine-spacing-xs);
+/* A bar along the bottom of the map: the same shape, and for the same reason,
+   as the reading's wide layout (`evidence/EvidenceReader.module.css`). The
+   proposal under review is on the ground in the footprint, so the buttons
+   belong under it rather than in the corner the box came from. Centred by auto
+   margins between two zero offsets, the one way to centre a box of unknown
+   width. */
+.bar {
+  position: absolute;
+  right: 0;
+  bottom: var(--mantine-spacing-xs);
+  left: 0;
+  width: max-content;
+  max-width: min(46rem, calc(100% - 2 * var(--mantine-spacing-xs)));
+  margin-inline: auto;
+  padding: 6px var(--mantine-spacing-sm);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-body);
+  box-shadow: var(--mantine-shadow-md);
 }
 
-.head {
+/* The scale bar moves to the centre on a narrow window (`map/map.css`), where
+   this would otherwise cover it. */
+@media (max-width: 768px) {
+  .bar {
+    bottom: 44px;
+  }
+}
+
+.row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--mantine-spacing-xs);
-  font-size: var(--mantine-font-size-xs);
-  color: var(--mantine-color-dimmed);
+  min-width: 0;
+}
+
+/* Only the name gives way when the bar runs out of room. */
+.row > button,
+.lead,
+.progress {
+  flex: none;
+}
+
+.lead {
+  display: flex;
 }
 
 .progress {
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
   font-variant-numeric: tabular-nums;
 }
 
-.spacer {
-  flex: 1;
-}
-
-/* A fixed square, so the box does not resize under the reader as one proposal
-   gives way to the next; `contain` because a stitch of the footprint rarely is
-   square and a keep-or-discard must not be made on a cropped picture. */
-.stage {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  aspect-ratio: 1;
-  border: 1px solid var(--mantine-color-default-border);
-  border-radius: var(--mantine-radius-sm);
-  background: var(--mantine-color-anthracite-9);
-  overflow: hidden;
-}
-
-.shot {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-/* What the stage says while it has no picture: one icon, one line. */
-.face {
+/* The name over what it is, so the bar is one line high whatever an
+   acquisition is called. */
+.text {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: var(--mantine-spacing-xs);
-  color: var(--mantine-color-dimmed);
-  font-size: var(--mantine-font-size-xs);
-  text-align: center;
+  min-width: 0;
 }
 
 .title {
+  overflow: hidden;
   font-size: var(--mantine-font-size-sm);
-  line-height: 1.3;
-  overflow-wrap: anywhere;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .facts {
+  overflow: hidden;
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-xs);
+  line-height: 1.25;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.actions {
-  display: flex;
-  gap: var(--mantine-spacing-xs);
-}
-
-.actions button {
-  flex: 1;
-}
-
-.line {
-  display: flex;
-  align-items: center;
-  gap: var(--mantine-spacing-xs);
+.foot {
+  margin-top: 2px;
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-xs);
+  line-height: 1.3;
+}
+
+.error {
+  color: var(--mantine-color-red-4);
 }

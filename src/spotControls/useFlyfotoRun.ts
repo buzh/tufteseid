@@ -3,14 +3,26 @@
 // existed in this tab — so running again asks about it a second time. What the
 // spot already holds is what the run passes over, which is also how an
 // acquisition the catalogue has added since comes up on its own.
+//
+// The proposal under review goes on the map, in the footprint, under the
+// spot's own drawing, because the question a reader is actually answering is
+// whether what they traced off the terrain is there in the photograph. Nothing
+// here takes the map, so zoom and pan stay theirs for as long as they look.
 
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { draftGroundAtom, type DraftGround } from '../evidence/draftGround';
 import { enqueuePreview } from '../evidence/queue';
 import type { Produced } from '../evidence/render';
-import { evidenceMatches, type EvidenceSpec } from '../evidence/spec';
+import {
+  bboxOfMeta,
+  evidenceMatches,
+  type EvidenceSpec,
+} from '../evidence/spec';
 import type { SpotEvidence } from '../evidence/useSpotEvidence';
-import { bboxToMetric, type Bbox } from '../map/bbox';
+import { mapAtom } from '../map/atoms';
+import { bboxToMetric, bringBboxIntoView, type Bbox } from '../map/bbox';
 import { fetchFlyfotoProjectsForBbox } from '../map/layers/config/backgroundLayers/flyfotoProjects';
 
 type FlyfotoSpec = Extract<EvidenceSpec, { kind: 'flyfoto' }>;
@@ -19,8 +31,11 @@ export type RunCard = {
   spec: FlyfotoSpec;
   state: 'waiting' | 'rendering' | 'ready' | 'empty' | 'failed';
   produced: Produced | null;
-  /** An object URL over `produced.blob`, revoked when the card leaves. */
-  url: string | null;
+  /** The proposal as the map takes it: an object URL over `produced.blob` and
+   *  the ground it covers. Made when the pixels land, revoked when the card
+   *  leaves, and one stable object so the overlay is not rebuilt under a
+   *  card that only changed state. */
+  ground: DraftGround | null;
 };
 
 export type RunTally = {
@@ -46,7 +61,9 @@ export type FlyfotoRun = {
 const NO_TALLY: RunTally = { skipped: 0, kept: 0, discarded: 0 };
 
 const revokeAll = (cards: readonly RunCard[]) => {
-  for (const card of cards) if (card.url) URL.revokeObjectURL(card.url);
+  for (const card of cards) {
+    if (card.ground) URL.revokeObjectURL(card.ground.url);
+  }
 };
 
 export const useFlyfotoRun = (
@@ -57,6 +74,8 @@ export const useFlyfotoRun = (
   const [cards, setCards] = useState<RunCard[]>([]);
   const [tally, setTally] = useState<RunTally>(NO_TALLY);
   const [keeping, setKeeping] = useState(false);
+  const map = useAtomValue(mapAtom);
+  const setGround = useSetAtom(draftGroundAtom);
 
   // Ended rather than cancelled: a preview already on the wire runs out its own
   // deadline, and this is what says its result is no longer wanted.
@@ -77,9 +96,17 @@ export const useFlyfotoRun = (
     () => () => {
       alive.current?.abort();
       revokeAll(now.current.cards);
+      setGround(null);
     },
-    [],
+    [setGround],
   );
+
+  // The one under review is the one on the map. Keyed on the ground object
+  // rather than on the card, which is replaced on every state change.
+  const shown = cards[0]?.ground ?? null;
+  useEffect(() => {
+    setGround(shown);
+  }, [shown, setGround]);
 
   const patch = useCallback(
     (projectId: string, next: Partial<RunCard>) =>
@@ -110,6 +137,10 @@ export const useFlyfotoRun = (
     const ac = new AbortController();
     alive.current = ac;
     setPhase('listing');
+    // The proposals are laid in this rectangle, so a reader who cannot see it
+    // would be asked to judge a picture that is off screen. Out only, never
+    // in: a view already holding the footprint is the one they chose.
+    bringBboxIntoView(map, bbox);
 
     const metric = bboxToMetric(bbox);
     fetchFlyfotoProjectsForBbox(bbox, ac.signal)
@@ -129,7 +160,7 @@ export const useFlyfotoRun = (
             skipped += 1;
             continue;
           }
-          fresh.push({ spec, state: 'waiting', produced: null, url: null });
+          fresh.push({ spec, state: 'waiting', produced: null, ground: null });
         }
         setTally({ ...NO_TALLY, skipped });
         setCards(fresh);
@@ -140,7 +171,7 @@ export const useFlyfotoRun = (
         console.warn('[flyfoto] acquisition list failed', err);
         setPhase('failed');
       });
-  }, [finish]);
+  }, [finish, map]);
 
   // The one under review and the one behind it: a reader who keeps walking
   // never waits on a render, and at most one is made for a card nobody reaches.
@@ -162,10 +193,20 @@ export const useFlyfotoRun = (
             patch(projectId, { state: 'empty' });
             return;
           }
+          // No rectangle means no place on the map. The pixels are still worth
+          // keeping, so the card goes ready without a ground rather than
+          // counting as a failure.
+          const extent = bboxOfMeta(produced.meta);
           patch(projectId, {
             state: 'ready',
             produced,
-            url: URL.createObjectURL(produced.blob),
+            ground: extent
+              ? {
+                  id: projectId,
+                  url: URL.createObjectURL(produced.blob),
+                  extent,
+                }
+              : null,
           });
         })
         .catch((err) => {
@@ -178,7 +219,9 @@ export const useFlyfotoRun = (
 
   const drop = useCallback(() => {
     const front = now.current.cards[0];
-    if (front?.url) URL.revokeObjectURL(front.url);
+    // Safe while the overlay may still be showing it: the layer holds the
+    // decoded image, and the URL is only ever read once.
+    if (front?.ground) URL.revokeObjectURL(front.ground.url);
     setCards((prev) => prev.slice(1));
   }, []);
 

@@ -1,73 +1,71 @@
-// The acquisition box's body while a flyfoto run is on: one proposal at a
-// time, kept or discarded, and nothing on screen is a record until it is kept.
+// The acquisition box while a run has the map. The proposal itself is on the
+// ground, in the footprint and under the spot's drawing, so this is a bar
+// along the bottom rather than a box in the corner: keep or discard sits next
+// to what is being judged, and nothing here covers it.
 
-import { Alert, Button, Loader } from '@mantine/core';
+import { Button, Loader } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 
 import { evidenceTitle, specFacts } from '../evidence/labels';
+import { cx } from '../ui/cx';
 import { Icon } from '../ui/Icon';
 import styles from './FlyfotoRun.module.css';
-import type { FlyfotoRun as Run, RunCard } from './useFlyfotoRun';
+import type { FlyfotoRun as Run } from './useFlyfotoRun';
 
-/** What the stage says while it has no picture. A `ready` card always has one,
- *  so the spinner covers everything that is not a settled answer. */
-const Face = ({ state }: { state: RunCard['state'] }) => {
-  const { t } = useTranslation();
-
-  if (state === 'empty') {
-    return (
-      <span className={styles.face}>
-        <Icon icon="hide_image" size={22} />
-        {t('evidence.renderEmpty')}
-      </span>
-    );
-  }
-  if (state === 'failed') {
-    return (
-      <span className={styles.face}>
-        <Icon icon="broken_image" size={22} />
-        {t('evidence.renderFailed')}
-      </span>
-    );
-  }
-  return (
-    <span className={styles.face}>
-      <Loader size={18} color="papaya" />
-      {t('evidence.rendering')}
-    </span>
-  );
-};
-
-export const FlyfotoRun = ({ run }: { run: Run }) => {
+export const FlyfotoRun = ({ run, failed }: { run: Run; failed: boolean }) => {
   const { t, i18n } = useTranslation();
 
   if (run.phase === 'off') return null;
-
-  if (run.phase === 'listing') {
-    return (
-      <p className={styles.line}>
-        <Loader size={14} color="papaya" />
-        {t('flyfotoControls.loading')}
-      </p>
-    );
-  }
 
   const settled = run.tally.kept + run.tally.discarded;
   const card = run.cards[0];
   // Nothing proposed and nothing passed over: never flown here, which is a
   // different answer from having reached the end of the walk.
   const barren = settled === 0 && run.tally.skipped === 0;
-  const settledCard = card?.state === 'empty' || card?.state === 'failed';
+  const stuck = card?.state === 'empty' || card?.state === 'failed';
+  const pending = card != null && card.state !== 'ready' && !stuck;
+
+  // What the picture is, once there is one; until then, why there is not.
+  const note = !card
+    ? ''
+    : card.state === 'ready'
+      ? specFacts(card.spec, i18n.language).join(' · ')
+      : card.state === 'empty'
+        ? t('evidence.renderEmpty')
+        : card.state === 'failed'
+          ? t('evidence.renderFailed')
+          : t('evidence.rendering');
+
+  const foot = [
+    run.tally.skipped > 0 &&
+      t('acquire.run.skipped', { count: run.tally.skipped }),
+    settled > 0 &&
+      t('acquire.run.tally', {
+        kept: run.tally.kept,
+        discarded: run.tally.discarded,
+      }),
+    t('acquire.run.hint'),
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
-    <div className={styles.run}>
-      {run.phase === 'failed' ? (
-        <Alert color="red" p="xs">
-          {t('flyfotoControls.error')}
-        </Alert>
-      ) : (
-        <>
-          <div className={styles.head}>
+    <div className={styles.bar} role="group" aria-label={t('acquire.flyfoto')}>
+      <div className={styles.row}>
+        <span className={styles.lead}>
+          {run.phase === 'listing' || pending ? (
+            <Loader size={16} color="papaya" />
+          ) : (
+            <Icon icon="photo_camera" size={16} />
+          )}
+        </span>
+
+        {run.phase === 'listing' ? (
+          <span className={styles.title}>{t('flyfotoControls.loading')}</span>
+        ) : run.phase === 'failed' ? (
+          <span className={styles.title}>{t('flyfotoControls.error')}</span>
+        ) : (
+          <>
             <span className={styles.progress}>
               {card
                 ? t('acquire.run.progress', {
@@ -78,51 +76,20 @@ export const FlyfotoRun = ({ run }: { run: Run }) => {
                   ? t('acquire.run.none')
                   : t('acquire.run.through')}
             </span>
-            <span className={styles.spacer} />
-            {settled > 0 && (
-              <span>
-                {t('acquire.run.tally', {
-                  kept: run.tally.kept,
-                  discarded: run.tally.discarded,
-                })}
-              </span>
-            )}
-          </div>
 
-          {/* Only what the spot has no picture of is proposed, so this line is
-              the whole answer to "why so few". */}
-          {run.tally.skipped > 0 && (
-            <p className={styles.facts}>
-              {t('acquire.run.skipped', { count: run.tally.skipped })}
-            </p>
-          )}
+            {card && (
+              <>
+                <span className={styles.text}>
+                  <span className={styles.title}>
+                    {evidenceTitle(card.spec)}
+                  </span>
+                  <span className={styles.facts}>{note}</span>
+                </span>
 
-          {card && (
-            <>
-              <div className={styles.stage}>
-                {card.url ? (
-                  <img
-                    src={card.url}
-                    alt={evidenceTitle(card.spec)}
-                    className={styles.shot}
-                  />
-                ) : (
-                  <Face state={card.state} />
-                )}
-              </div>
-
-              <div>
-                <div className={styles.title}>{evidenceTitle(card.spec)}</div>
-                <div className={styles.facts}>
-                  {specFacts(card.spec, i18n.language).join(' · ')}
-                </div>
-              </div>
-
-              {/* Two buttons, always: a proposal with no pixels to keep has
-                  the ask again in the same place, so the discard never moves
-                  out from under the hand. */}
-              <div className={styles.actions}>
-                {settledCard ? (
+                {/* Two buttons, always: a proposal with no pixels to keep has
+                    the ask again in the same place, so the discard never moves
+                    out from under the hand. */}
+                {stuck ? (
                   <Button
                     size="compact-xs"
                     variant="default"
@@ -150,17 +117,25 @@ export const FlyfotoRun = ({ run }: { run: Run }) => {
                 >
                   {t('acquire.run.discard')}
                 </Button>
-              </div>
-            </>
-          )}
-        </>
+              </>
+            )}
+          </>
+        )}
+
+        <Button
+          size="compact-xs"
+          variant="subtle"
+          color="gray"
+          onClick={run.finish}
+        >
+          {t('acquire.run.finish')}
+        </Button>
+      </div>
+
+      {failed && (
+        <p className={cx(styles.foot, styles.error)}>{t('evidence.failed')}</p>
       )}
-
-      <Button size="compact-xs" variant="default" onClick={run.finish}>
-        {t('acquire.run.finish')}
-      </Button>
-
-      <p className={styles.facts}>{t('acquire.run.hint')}</p>
+      <p className={styles.foot}>{foot}</p>
     </div>
   );
 };

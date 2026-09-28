@@ -83,7 +83,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
 | `keepOfferAtom` | same | Derived: the terrain's offer when an analysis is running, otherwise the ground's (off the A half). Null where the view cannot be re-rendered. |
-| `draftGroundAtom` | `evidence/draftGround.ts` | One of the spot's own pictures laid back on the map at the extent it was rendered over, to trace a drawing onto. Published by `EvidenceGallery`, which is the only thing holding the rows. |
+| `draftGroundAtom` | `evidence/draftGround.ts` | A picture laid on the map at the extent it was rendered over: a kept row to trace a drawing onto, published by `EvidenceGallery`, or a flyfoto proposal under review, published by `useFlyfotoRun`. Never both — the card and the acquisition box do not stand at once. |
 | the floating panel's layout and placement | `ui/useFloatingPanel.ts` | Which way round the box is laid out, where it was dragged to, how big it may get and which wall it is docked against. Module-private, reached through `useFloatingPanel`: held outside the component, which remounts per spot — and so only one floating panel at a time. `EvidenceReader` is the one caller. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
 | `sketchShownAtom`, `sketchFadeAtom` | `sketch/overlay.ts` | Whether the open spot's drawing is on the ground, and how far it is faded towards it. A reading setting, not the record's: they outlive the spot the box was opened on. |
@@ -331,9 +331,9 @@ of them.
   settled row is retried in the gallery, where every other kind's is.
 - **The flyfoto series is a walk, not a batch.** The other chip in `SpotAcquire`
   proposes every Norge i bilder acquisition over the footprint, one at a time,
-  and the reader keeps or discards each (`useFlyfotoRun.ts`, `FlyfotoRun.tsx`,
-  which takes the box's body while the run is on). A proposal is rendered before
-  it is offered, at the acquisition's own resolution, so keeping writes the very
+  and the reader keeps or discards each (`useFlyfotoRun.ts`, `FlyfotoRun.tsx`).
+  A proposal is rendered before it is offered, at the acquisition's own
+  resolution, so keeping writes the very
   bytes on screen: `keepProduced` (`useSpotEvidence.ts`) creates the row and
   PATCHes the file in one go, and deletes the row again if the file will not
   land, because a row with no pixels and no queue state is nothing the gallery
@@ -344,6 +344,17 @@ of them.
   comes up on its own, and how moving the footprint re-offers the lot. The
   seamless mosaic is not in the series: that one is a ground, and the card's
   camera already keeps it.
+- **A proposal is judged on the map, not in a box.** The picture under review
+  goes on the ground through `draftGroundAtom`, in the footprint, under the
+  spot's own drawing — because the question the reader is answering is whether
+  what they traced off the terrain is there in the photograph, and that is a
+  comparison a thumbnail cannot carry. So the acquisition box becomes a bar
+  along the bottom of the map for as long as the run lasts, the same move the
+  card's rectangle and pen make and for the same reason: the buttons follow the
+  eye. Nothing in the run takes the map, so zoom and pan stay the reader's
+  throughout; `bringBboxIntoView` runs once at the start, out only, so a view
+  that already holds the footprint is left alone. The object URL behind each
+  proposal is revoked as its card leaves, which is why a discard costs nothing.
 - **A proposal shares the render lane.** `enqueuePreview` (`evidence/queue.ts`)
   puts pixels with no row behind them into the same serial queue as the rows'
   own renders, because the reason for one lane is the shared public edge and not

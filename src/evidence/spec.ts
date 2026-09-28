@@ -192,8 +192,14 @@ export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
  */
 export const evidenceBbox = (
   rec: EvidenceRecord,
+): [number, number, number, number] | null => bboxOfMeta(rec.meta);
+
+/** The same rectangle off a `meta` that has no row behind it yet — what a
+ *  render hands back before anything is kept. */
+export const bboxOfMeta = (
+  meta: EvidenceMeta | null,
 ): [number, number, number, number] | null => {
-  const raw = rec.meta?.bbox25833;
+  const raw = meta?.bbox25833;
   if (!Array.isArray(raw) || raw.length !== 4) return null;
   const out = raw.map(num);
   return out.every((v) => v != null)

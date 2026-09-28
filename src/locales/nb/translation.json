@@ -17,7 +17,7 @@
       "keep": "Behold",
       "discard": "Forkast",
       "finish": "Ferdig",
-      "hint": "Bildene lages her i fana, ett om gangen. Lukker du boksen stopper runden, og det du har forkastet blir spurt om på nytt neste gang. Det stedet har fra før, blir hoppet over."
+      "hint": "Opptaket ligger i utsnittet på kartet, under tegningen din. Zoom og panorer fritt. Det du forkaster, blir spurt om på nytt neste gang."
     }
   },
   "auth": {
