@@ -459,9 +459,12 @@ ceiling and its own bounded retry.
   resolution, because that resolution is the point of keeping. So it is a
   wmscache path, and it is a cache miss nearly every time — no two footprints
   share a bbox.
-- **The render queue is serial** (`src/evidence/queue.ts`): one job at a time,
+- **A row's render runs alone** (`src/evidence/queue.ts`): one job at a time,
   whatever the reader clicks. Two 4-wide fan-outs at once finish no sooner and
-  invite the shed response.
+  invite the shed response. The one exception is a flyfoto run's proposals,
+  which go `PREVIEW_LANES` at a time — there the reader is sitting in front of
+  one upstream with nothing else asked for, and the wait is the render's own
+  length. Two lanes is 8 requests in flight, the ceiling for this app.
 - **A 500 m footprint is the cap** (`MAX_SIDE_M`, `src/map/bbox.ts`), which at
   0.2 m/px is 2500 px a side — a handful of tiles, not a screenful.
 

@@ -13,7 +13,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { draftGroundAtom, type DraftGround } from '../evidence/draftGround';
-import { enqueuePreview } from '../evidence/queue';
+import { enqueuePreview, PREVIEW_LANES } from '../evidence/queue';
 import type { Produced } from '../evidence/render';
 import {
   bboxOfMeta,
@@ -173,15 +173,17 @@ export const useFlyfotoRun = (
       });
   }, [finish, map]);
 
-  // The one under review and the one behind it: a reader who keeps walking
-  // never waits on a render, and at most one is made for a card nobody reaches.
-  // The lane is what keeps the two from being two tile bursts at once.
+  // The one under review and a render in every lane behind it, which is as far
+  // ahead as there is any point looking: a reader deciding faster than one
+  // render takes is then waiting on two at a time rather than one, and beyond
+  // that the queue only makes pictures nobody reaches. The cost of the whole
+  // window is at most `PREVIEW_LANES` renders thrown away at the end of a run.
   useEffect(() => {
     const ac = alive.current;
     const bbox = now.current.footprint;
     if (phase !== 'walking' || !ac || !bbox) return;
 
-    for (const card of cards.slice(0, 2)) {
+    for (const card of cards.slice(0, PREVIEW_LANES + 1)) {
       const projectId = card.spec.projectId;
       if (card.state !== 'waiting' || started.current.has(projectId)) continue;
       started.current.add(projectId);

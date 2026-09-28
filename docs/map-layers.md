@@ -175,7 +175,10 @@ prosessert"), with `ortofototype = 6` ("Satellittbilde", nationwide 10 m
 Sentinel-2 mosaics) dropped. `prosjektnavn` is the same column there and in the
 ImageServer catalogue. The ImageServer's own `/query` is unusable:
 `returnDistinctValues=true` silently returns zero features, undistinct one row
-per raster tile.
+per raster tile. The answer is held per rectangle for five minutes in
+`flyfotoProjects.ts`, because a render re-reads it to recover the acquisition's
+own resolution and the round trip would otherwise sit in front of every tile
+burst; the catalogue gains a row a handful of times a year.
 
 **`interpolate: false`** on the LiDAR grounds and `lidarCvat`: above a source's
 deepest level the bilinear kernel clamps at each tile's own edge and draws a seam

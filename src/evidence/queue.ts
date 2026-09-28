@@ -1,9 +1,14 @@
 // Module-level: a render outlives the surface that started it, so closing a
 // spot does not abandon pixels the reader decided to keep.
 //
-// One job at a time. Every producer is either a burst of tile requests against
-// a shared public edge or an 800 ms horizon scan on the main thread, so two at
-// once finish no sooner and invite shed responses.
+// A row's render runs alone. Every producer is either a burst of tile requests
+// against a shared public edge or an 800 ms horizon scan on the main thread, so
+// two at once finish no sooner and invite shed responses.
+//
+// A preview is the one exception, and `PREVIEW_LANES` is the whole of it: a
+// picker run is a reader waiting on one upstream with nothing else in hand, and
+// the wait there is the render's own length rather than anything the queue can
+// reorder. Two at once is the width of that exception.
 
 import { attachEvidenceFile, type EvidenceRecord } from '../api/evidence';
 import { requestSunLoop } from '../api/render';
@@ -65,8 +70,8 @@ type RenderJob = {
   onDone?: (rec: EvidenceRecord) => void;
 };
 
-// Ceilings on a stall, not budgets. The queue is serial, so a render that never
-// settles parks every job behind it; expiry is treated as an ordinary `failed`,
+// Ceilings on a stall, not budgets. The lanes are few, so a render that never
+// settles parks the jobs behind it; expiry is treated as an ordinary `failed`,
 // with a retry. The upload gets the same, which is 50 MB — the field's cap — at
 // about 1.5 Mbit/s up.
 const RENDER_DEADLINE_MS = 300000;
@@ -75,13 +80,26 @@ const UPLOAD_DEADLINE_MS = 300000;
 // not on this clock.
 const HANDOVER_DEADLINE_MS = 30000;
 
-// Thunks rather than jobs: a picker's preview shares the lane without sharing
+/**
+ * How many previews may be on the wire at once, and — because a run wants a
+ * render going in every lane it is allowed — how far ahead of the proposal
+ * under review a picker looks. Raising one without the other buys nothing:
+ * lanes with no work queued sit idle, and a queue deeper than the lanes only
+ * renders pictures nobody reaches.
+ */
+export const PREVIEW_LANES = 2;
+
+// Thunks rather than jobs: a picker's preview shares the queue without sharing
 // the bookkeeping, having no row to keep a state for. Each settles itself, so
-// the drain below never sees a throw.
-const queue: (() => Promise<void>)[] = [];
+// the pump below never sees a throw. `solo` is a row's render, which runs with
+// nothing beside it.
+type Task = { run: () => Promise<void>; solo: boolean };
+
+const queue: Task[] = [];
 const states = new Map<string, RenderState>();
 const listeners = new Set<() => void>();
-let draining = false;
+let busy = 0;
+let soloBusy = false;
 
 // Copied on publish rather than handed out live: `useSyncExternalStore` decides
 // whether to re-render by identity, and a Map mutated in place never changes.
@@ -160,13 +178,21 @@ const runJob = async (job: RenderJob): Promise<EvidenceRecord | null> => {
   return done;
 };
 
-const drain = async () => {
-  if (draining) return;
-  draining = true;
-  try {
-    for (let task = queue.shift(); task; task = queue.shift()) await task();
-  } finally {
-    draining = false;
+// Strictly in order: a `solo` at the head holds the previews behind it rather
+// than being overtaken, so a row the reader asked for is never starved by a
+// run that keeps proposing.
+const pump = () => {
+  while (queue.length > 0 && !soloBusy) {
+    const next = queue[0];
+    if (next.solo ? busy > 0 : busy >= PREVIEW_LANES) return;
+    queue.shift();
+    busy += 1;
+    if (next.solo) soloBusy = true;
+    void next.run().finally(() => {
+      busy -= 1;
+      if (next.solo) soloBusy = false;
+      pump();
+    });
   }
 };
 
@@ -178,25 +204,34 @@ export const enqueueRender = (job: RenderJob): void => {
   const state = states.get(job.rec.id);
   if (state === 'queued' || state === 'running') return;
   states.set(job.rec.id, 'queued');
-  queue.push(async () => {
-    states.set(job.rec.id, 'running');
-    publish();
-    try {
-      await runJob(job);
-    } catch (e) {
-      console.warn('[evidence] render failed', job.rec.id, failureDetail(e), e);
-      states.set(job.rec.id, 'failed');
-    }
-    publish();
+  queue.push({
+    solo: true,
+    run: async () => {
+      states.set(job.rec.id, 'running');
+      publish();
+      try {
+        await runJob(job);
+      } catch (e) {
+        console.warn(
+          '[evidence] render failed',
+          job.rec.id,
+          failureDetail(e),
+          e,
+        );
+        states.set(job.rec.id, 'failed');
+      }
+      publish();
+    },
   });
   publish();
-  void drain();
+  pump();
 };
 
 /**
  * Pixels with no row behind them: what a picker run shows the reader before
- * asking whether to keep it. In the same lane as the rows' own renders, because
- * the reason for one lane is the shared public edge and not the rows.
+ * asking whether to keep it. In the same queue as the rows' own renders,
+ * because the reason for a queue at all is the shared public edge and not the
+ * rows — but `PREVIEW_LANES` wide, so a run keeps more than one render moving.
  *
  * `signal` gates the queue position rather than the render: a burst already on
  * the wire ends on its own deadline and only its result is dropped. Rejects
@@ -208,14 +243,19 @@ export const enqueuePreview = (
   signal: AbortSignal,
 ): Promise<Produced | null> =>
   new Promise((resolve, reject) => {
-    queue.push(async () => {
-      if (signal.aborted) {
-        reject(signal.reason);
-        return;
-      }
-      await withDeadline(RENDER_DEADLINE_MS, `${spec.kind} preview`, (inner) =>
-        renderEvidence(spec, bbox4326, inner),
-      ).then(resolve, reject);
+    queue.push({
+      solo: false,
+      run: async () => {
+        if (signal.aborted) {
+          reject(signal.reason);
+          return;
+        }
+        await withDeadline(
+          RENDER_DEADLINE_MS,
+          `${spec.kind} preview`,
+          (inner) => renderEvidence(spec, bbox4326, inner),
+        ).then(resolve, reject);
+      },
     });
-    void drain();
+    pump();
   });

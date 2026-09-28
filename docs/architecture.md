@@ -355,14 +355,18 @@ of them.
   throughout; `bringBboxIntoView` runs once at the start, out only, so a view
   that already holds the footprint is left alone. The object URL behind each
   proposal is revoked as its card leaves, which is why a discard costs nothing.
-- **A proposal shares the render lane.** `enqueuePreview` (`evidence/queue.ts`)
-  puts pixels with no row behind them into the same serial queue as the rows'
-  own renders, because the reason for one lane is the shared public edge and not
-  the rows. The run aims one render ahead of the card under review, so a reader
-  who keeps walking never waits and at most one stitch is made for a proposal
-  nobody reaches. Its signal gates the queue position rather than the render: a
-  burst already on the wire runs out its own deadline, and only the result is
-  dropped.
+- **A proposal shares the render queue, in wider lanes.** `enqueuePreview`
+  (`evidence/queue.ts`) puts pixels with no row behind them into the same queue
+  as the rows' own renders, because the reason for a queue at all is the shared
+  public edge and not the rows. A row's render still runs alone; previews run
+  `PREVIEW_LANES` at a time, that being a reader sitting in front of one upstream
+  with nothing else asked for. Order is strict either way, so a row the reader
+  asked for is never starved by a run that keeps proposing. The run looks
+  `PREVIEW_LANES + 1` cards ahead — the one under review and a render in every
+  lane behind it — which is why the constant is exported rather than guessed at
+  twice; the waste is at most that many stitches nobody reaches. A preview's
+  signal gates the queue position rather than the render: a burst already on the
+  wire runs out its own deadline, and only the result is dropped.
 - **Not every row is made here.** Three kinds are rendered in the tab that asked
   for them; `sunloop` is created the same way and then handed to the render
   sidecar, which writes the file back itself (`docs/render-sidecar.md`). The row,

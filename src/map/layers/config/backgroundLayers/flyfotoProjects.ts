@@ -75,6 +75,19 @@ function toProject(attrs: QueryAttributes): FlyfotoProject | null {
   };
 }
 
+// The catalogue gains a row when a flight is processed, a handful of times a
+// year, so one rectangle asked for twice in a sitting is the same answer. Held
+// because a flyfoto run asks for the very same rectangle once per proposal:
+// `renderEvidence` re-reads the catalogue to recover an acquisition's own
+// resolution, and that round trip sits in front of the tile burst rather than
+// beside it.
+const CACHE_TTL_MS = 300_000;
+// The picker walks a new rectangle on every pan, so this is bounded rather
+// than complete. Oldest written out first — `Map` keeps insertion order.
+const CACHE_MAX = 32;
+
+const cache = new Map<string, { at: number; projects: FlyfotoProject[] }>();
+
 function byNewest(a: FlyfotoProject, b: FlyfotoProject): number {
   const da = a.photoDate ?? (a.year !== null ? `${a.year}-00-00` : '');
   const db = b.photoDate ?? (b.year !== null ? `${b.year}-00-00` : '');
@@ -83,7 +96,7 @@ function byNewest(a: FlyfotoProject, b: FlyfotoProject): number {
 }
 
 // The server filters against the real outlines, not their bounding boxes.
-export async function fetchFlyfotoProjectsForBbox(
+async function queryProjects(
   bbox4326: Bbox,
   signal?: AbortSignal,
 ): Promise<FlyfotoProject[]> {
@@ -127,4 +140,25 @@ export async function fetchFlyfotoProjectsForBbox(
     projects.push(project);
   }
   return projects.sort(byNewest);
+}
+
+export async function fetchFlyfotoProjectsForBbox(
+  bbox4326: Bbox,
+  signal?: AbortSignal,
+): Promise<FlyfotoProject[]> {
+  const key = bbox4326.join(',');
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return [...hit.projects];
+
+  // Only an answer is held. A failure is the upstream's mood rather than the
+  // catalogue's contents, and the caller asking again is how it is retried.
+  const projects = await queryProjects(bbox4326, signal);
+  // Re-inserted, so the order is recency of write and not of first sight.
+  cache.delete(key);
+  if (cache.size >= CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  cache.set(key, { at: Date.now(), projects });
+  return [...projects];
 }
