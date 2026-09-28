@@ -13,6 +13,7 @@ type ControlChipProps = ComponentPropsWithoutRef<'button'> & {
   hint?: ReactNode;
   withChevron?: boolean;
   dimmed?: boolean;
+  on?: boolean;
   readout?: boolean;
   warn?: boolean;
   ref?: Ref<HTMLButtonElement>;
@@ -24,6 +25,7 @@ export const ControlChip = ({
   hint,
   withChevron = true,
   dimmed = false,
+  on = false,
   readout = false,
   warn = false,
   className,
@@ -38,6 +40,7 @@ export const ControlChip = ({
         bare && styles.chipBare,
         dimmed && styles.chipDimmed,
         readout && styles.chipReadout,
+        on && styles.chipOn,
         warn && styles.chipWarn,
         className,
       )}

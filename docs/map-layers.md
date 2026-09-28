@@ -189,10 +189,10 @@ at every tile boundary.
 that acquisition's store does — z16 on a 0.25 m flight, z15 on a 0.5 m one, and
 a half-built acquisition is shallower still. `lidarNativeResolution`
 (`stack.ts`) answers the metres per pixel of that level; `useLidarControls`
-divides it by the view's own resolution, and `DepthReadout` puts the whole power
-of two on the ribbon as `×2`, `×4`, `×8`. Below the ground's floor there is no
-chip: its appearing is the signal that the blocks on screen are stretched tiles
-rather than terrain.
+divides it by the view's own resolution, and `ZoomReadout` puts the whole power
+of two on the ribbon as a lit `×2`, `×4`, `×8`. Below the ground's floor there is
+no chip: its appearing is the signal that the blocks on screen are stretched
+tiles rather than terrain.
 
 ## The background stack
 

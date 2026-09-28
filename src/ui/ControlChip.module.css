@@ -44,6 +44,22 @@
   background: var(--mantine-color-default);
 }
 
+.chipOn {
+  border-color: var(--mantine-primary-color-filled);
+  background: var(--mantine-primary-color-filled);
+  color: var(--mantine-primary-color-contrast);
+}
+
+/* Both after the hovers above, or the seat either takes is painted over the
+   moment the pointer crosses it: equal specificity, source order decides. */
+.chipOn:hover {
+  background: var(--mantine-primary-color-filled-hover);
+}
+
+.chipReadout.chipOn:hover {
+  background: var(--mantine-primary-color-filled);
+}
+
 /* After the hovers, same rule and same reason as `ControlButton`: equal
    specificity, so a seat taken first would be painted over the moment the
    pointer crossed it. */
@@ -78,6 +94,12 @@
 .chipChevron {
   flex: none;
   color: var(--mantine-color-dimmed);
+}
+
+.chipOn .chipIcon,
+.chipOn .chipHint,
+.chipOn .chipChevron {
+  color: inherit;
 }
 
 .chipWarn {

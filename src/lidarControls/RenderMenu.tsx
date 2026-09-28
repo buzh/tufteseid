@@ -54,7 +54,7 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
     t('lidarControls.render.chipTitle', { render: label, source: hint }),
     nativeResolution == null
       ? null
-      : t('lidarControls.depth.native', { m: nativeResolution.toFixed(2) }),
+      : t('lidarControls.zoom.native', { m: nativeResolution.toFixed(2) }),
   ]
     .filter(Boolean)
     .join(' — ');

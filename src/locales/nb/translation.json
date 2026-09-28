@@ -249,10 +249,10 @@
       "error": "Fant ikke dekningen for utsnittet",
       "none": "Ingen datasett dekker utsnittet"
     },
-    "depth": {
+    "zoom": {
       "factor": "×{{factor}}",
       "native": "Maks forstørrelse {{m}} m/piksel",
-      "title": "Forstørret {{factor}}×({{m}} m/piksel)." 
+      "title": "Forstørret {{factor}}× ({{m}} m/piksel)."
     },
     "render": {
       "chipTitle": "{{render}} — {{source}}",
