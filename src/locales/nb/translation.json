@@ -14,10 +14,12 @@
       "tally": "{{kept}} beholdt · {{discarded}} forkastet",
       "skipped_one": "1 opptak har stedet fra før",
       "skipped_other": "{{count}} opptak har stedet fra før",
-      "keep": "Behold",
-      "discard": "Forkast",
+      "keep": "Ja",
+      "discard": "Nei",
+      "keepTitle": "Behold opptaket (j)",
+      "discardTitle": "Forkast opptaket (n)",
       "finish": "Ferdig",
-      "hint": "Opptaket ligger i utsnittet på kartet, under tegningen din. Zoom og panorer fritt. Det du forkaster, blir spurt om på nytt neste gang."
+      "hint": "Opptaket ligger i utsnittet på kartet, under tegningen din. Zoom og panorer fritt. Tastene j og n svarer for deg. Det du forkaster, blir spurt om på nytt neste gang."
     }
   },
   "auth": {

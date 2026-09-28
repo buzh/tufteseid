@@ -2,15 +2,16 @@
    as the reading's wide layout (`evidence/EvidenceReader.module.css`). The
    proposal under review is on the ground in the footprint, so the buttons
    belong under it rather than in the corner the box came from. Centred by auto
-   margins between two zero offsets, the one way to centre a box of unknown
-   width. */
+   margins between two zero offsets. One width for the whole walk rather than
+   the content's: the answers sit at the right edge, and a bar that shrank to
+   fit the acquisition's name would move them between one proposal and the
+   next. */
 .bar {
   position: absolute;
   right: 0;
   bottom: var(--mantine-spacing-xs);
   left: 0;
-  width: max-content;
-  max-width: min(46rem, calc(100% - 2 * var(--mantine-spacing-xs)));
+  width: min(46rem, calc(100% - 2 * var(--mantine-spacing-xs)));
   margin-inline: auto;
   padding: 6px var(--mantine-spacing-sm);
   border: 1px solid var(--mantine-color-default-border);
@@ -35,10 +36,16 @@
 }
 
 /* Only the name gives way when the bar runs out of room. */
-.row > button,
+.actions,
 .lead,
 .progress {
   flex: none;
+}
+
+.actions {
+  display: flex;
+  gap: var(--mantine-spacing-xs);
+  margin-left: auto;
 }
 
 .lead {

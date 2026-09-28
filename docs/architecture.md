@@ -358,6 +358,11 @@ of them.
   throughout; `bringBboxIntoView` runs once at the start, out only, so a view
   that already holds the footprint is left alone. The object URL behind each
   proposal is revoked as its card leaves, which is why a discard costs nothing.
+  The answer is yes or no, by button or by `j` and `n` — bound in `FlyfotoRun`
+  and off while the pen has the map, as every other single letter is. The bar
+  holds one width for the whole walk and the answers sit at its right edge, so
+  the hand stays where it is between one acquisition's name and the next; a key
+  does no more than its button, so neither answers while the keep is in flight.
 - **A proposal shares the render queue, in wider lanes.** `enqueuePreview`
   (`evidence/queue.ts`) puts pixels with no row behind them into the same queue
   as the rows' own renders, because the reason for a queue at all is the shared
