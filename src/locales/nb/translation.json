@@ -221,6 +221,11 @@
       "error": "Fant ikke dekningen for utsnittet",
       "none": "Ingen datasett dekker utsnittet"
     },
+    "depth": {
+      "factor": "×{{factor}}",
+      "native": "dypeste nivå {{m}} m/piksel",
+      "title": "Forstørret {{factor}}× forbi dypeste nivå ({{m}} m/piksel). Videre innzooming gir ingen nye detaljer."
+    },
     "render": {
       "chipTitle": "{{render}} — {{source}}",
       "more": "Flere",

@@ -25,7 +25,7 @@ const NATIONAL_HELD_URL: Record<LidarModel, string> = {
 
 // A 1 m product; z16 is 0.33 m/px, past which the service upsamples its own
 // grid.
-const NATIONAL_CACHE_MAX_ZOOM = 16;
+export const NATIONAL_CACHE_MAX_ZOOM = 16;
 
 export const buildNationalLidarConfig = (
   style: string,

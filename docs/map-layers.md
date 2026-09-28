@@ -181,6 +181,16 @@ per raster tile.
 deepest level the bilinear kernel clamps at each tile's own edge and draws a seam
 at every tile boundary.
 
+**Deepest level held.** The view goes to z20; no LiDAR ground does.
+`lidarHillshade` stops at z16, `lidarProject` at z17, and `lidarCvat` wherever
+that acquisition's store does — z16 on a 0.25 m flight, z15 on a 0.5 m one, and
+a half-built acquisition is shallower still. `lidarNativeResolution`
+(`stack.ts`) answers the metres per pixel of that level; `useLidarControls`
+divides it by the view's own resolution, and `DepthReadout` puts the whole power
+of two on the ribbon as `×2`, `×4`, `×8`. Below the ground's floor there is no
+chip: its appearing is the signal that the blocks on screen are stretched tiles
+rather than terrain.
+
 ## The background stack
 
 `resolveStack` / `buildStack` (`config/backgroundLayers/stack.ts`) build a stack,

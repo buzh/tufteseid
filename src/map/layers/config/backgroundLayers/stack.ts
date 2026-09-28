@@ -1,8 +1,9 @@
 import TileLayer from 'ol/layer/Tile';
 import type OlMap from 'ol/Map';
 import { BackgroundLayerName } from '../../backgroundLayers';
+import { getWMSTileGrid } from '../../wmsTileGrid';
 import { buildCvatGroundConfig, type CvatAcquisition } from './cvatGround';
-import { buildNationalLidarConfig } from './elevation';
+import { buildNationalLidarConfig, NATIONAL_CACHE_MAX_ZOOM } from './elevation';
 import {
   buildFlyfotoProjectConfig,
   FLYFOTO_MOSAIC_CONFIG,
@@ -53,6 +54,36 @@ const HYBRID_OVERLAY_Z = 0.75;
 // NDH project rasters are 0.25 m at their finest, 0.5 m for most flights; z17
 // is 0.166 m/px, one level of magnification past native.
 const LIDAR_PROJECT_MAX_ZOOM = 17;
+
+const lidarNativeMaxZoom = (
+  layerName: BackgroundLayerName,
+  cvat: CvatAcquisition | null,
+): number | null => {
+  switch (layerName) {
+    // Per acquisition, and a half-built one is a normal state of the store.
+    case 'lidarCvat':
+      return cvat?.maxZoom ?? null;
+    case 'lidarHillshade':
+      return NATIONAL_CACHE_MAX_ZOOM;
+    case 'lidarProject':
+      return LIDAR_PROJECT_MAX_ZOOM;
+    default:
+      return null;
+  }
+};
+
+/** Metres per pixel of the deepest level a LiDAR ground is ever asked for; null
+ *  off a LiDAR ground, and until the manifest has named the cached acquisition.
+ *  Past it OpenLayers stretches the last tiles it holds rather than fetching
+ *  finer ones. The grid is 25833's whatever the view is set to. */
+export const lidarNativeResolution = (
+  layerName: BackgroundLayerName,
+  cvat: CvatAcquisition | null,
+): number | null => {
+  const z = lidarNativeMaxZoom(layerName, cvat);
+  if (z == null) return null;
+  return getWMSTileGrid('EPSG:25833')?.getResolution(z) ?? null;
+};
 
 const emptyBackgroundLayer: EmptyBackgroundLayer = {
   type: 'Empty',

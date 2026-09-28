@@ -40,6 +40,7 @@ import {
   lidarPickerOpenHalves,
   lidarViewportAtom,
 } from '../map/layers/config/backgroundLayers/lidarRelevance';
+import { lidarNativeResolution } from '../map/layers/config/backgroundLayers/stack';
 
 export const useLidarControls = (half: CompareHalf) => {
   const map = useAtomValue(mapAtom);
@@ -266,6 +267,16 @@ export const useLidarControls = (half: CompareHalf) => {
   const shownStyle = effectiveLidarStyle(activeLidarStyle, lidarModel);
   const cachedFlightIds = new Set(cvatAcquisitions.map((a) => a.project.id));
 
+  // How far past the deepest level held the view has been pushed: 1 while the
+  // pixels are the source's own, 2, 4, 8 … once the last tiles are only being
+  // stretched. The view snaps to the ladder (`constrainResolution`), so the
+  // ratio is a whole power of two.
+  const nativeResolution = lidarNativeResolution(backgroundLayer, activeCvat);
+  const magnification =
+    resolution != null && nativeResolution != null
+      ? Math.max(1, Math.round(nativeResolution / resolution))
+      : 1;
+
   return {
     isNationalMosaic,
     isLidarFlight,
@@ -275,6 +286,8 @@ export const useLidarControls = (half: CompareHalf) => {
     activeLidarProject,
     activeCvat,
     cachedFlightIds,
+    nativeResolution,
+    magnification,
     viewport,
     autoDataset,
     toggleAuto,

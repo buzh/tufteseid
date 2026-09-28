@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { ControlUnit } from '../ui/ControlUnit';
 import { AutoToggle } from './AutoToggle';
 import { DatasetMenu } from './DatasetMenu';
+import { DepthReadout } from './DepthReadout';
 import { HybridToggle } from './HybridToggle';
 import { ModelToggle } from './ModelToggle';
 import { RenderMenu } from './RenderMenu';
@@ -26,6 +27,7 @@ export const LidarControlGroup = ({ lidar }: { lidar: LidarControls }) => {
       <RenderMenu lidar={lidar} />
       <ModelToggle lidar={lidar} />
       <HybridToggle lidar={lidar} />
+      <DepthReadout lidar={lidar} />
     </ControlUnit>
   );
 };

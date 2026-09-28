@@ -40,6 +40,7 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
     activeCvat,
     lidarModel,
     autoDataset,
+    nativeResolution,
   } = lidar;
 
   const label = lidarStyleLabel(shownStyle);
@@ -49,10 +50,14 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
     : t('lidarControls.render.wmsHint');
 
   const chipIcon = isLidarCvat ? 'database' : styleIcon(shownStyle);
-  const chipTitle = t('lidarControls.render.chipTitle', {
-    render: label,
-    source: hint,
-  });
+  const chipTitle = [
+    t('lidarControls.render.chipTitle', { render: label, source: hint }),
+    nativeResolution == null
+      ? null
+      : t('lidarControls.depth.native', { m: nativeResolution.toFixed(2) }),
+  ]
+    .filter(Boolean)
+    .join(' — ');
 
   // DOM publishes one style, and the cache is terrain-only, so nothing to pick.
   if (lidarModel === 'dom') {
