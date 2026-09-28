@@ -602,9 +602,12 @@ show group; anything else that applies to the reading belongs to the tools.
   Waving a tip off puts it away for the page load, ticking the box writes its id
   to `hintsDismissed.v1` in localStorage. Ids live in the `HINT_IDS` list in
   `src/ui/hints.ts`; one that leaves the list is dropped on read. One id per
-  key, hung on the thing that key works: `sketchKey` on the band's
-  `SketchToggle` and `pictureKeys` on the reader's roll of thumbnails. A tip
-  that has to name the control it is about is pointing at the wrong one.
+  key, hung on the thing that key works: `heritageKey` on `HeritageToggle`,
+  `sketchKey` on the band's `SketchToggle` and `pictureKeys` on the reader's
+  roll of thumbnails. A tip that has to name the control it is about is
+  pointing at the wrong one. Each waits for its key to be worth knowing — the
+  heritage tip until the overlay is on, the drawing's until there is a drawing
+  — so nothing greets a reader who has not started.
 
 ## Known gaps
 

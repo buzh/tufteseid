@@ -1,6 +1,7 @@
 import { Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { ControlButton } from '../ui/ControlButton';
+import { Hint } from '../ui/Hint';
 import type { HeritageControls } from './useHeritageControls';
 
 export const HeritageToggle = ({
@@ -12,16 +13,23 @@ export const HeritageToggle = ({
   const { shown, toggleShown } = heritage;
 
   return (
-    <Tooltip
-      label={shown ? t('heritageControls.hide') : t('heritageControls.show')}
+    <Hint
+      id="heritageKey"
+      tips={shown ? [t('hints.heritage')] : []}
+      keys={['k']}
+      position="bottom"
     >
-      <ControlButton
-        icon="castle"
-        on={shown}
-        aria-label={t('heritageControls.label')}
-        aria-pressed={shown}
-        onClick={toggleShown}
-      />
-    </Tooltip>
+      <Tooltip
+        label={shown ? t('heritageControls.hide') : t('heritageControls.show')}
+      >
+        <ControlButton
+          icon="castle"
+          on={shown}
+          aria-label={t('heritageControls.label')}
+          aria-pressed={shown}
+          onClick={toggleShown}
+        />
+      </Tooltip>
+    </Hint>
   );
 };
