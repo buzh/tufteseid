@@ -250,8 +250,9 @@ The loop leaves the server already cited, because `stampEvidence` cannot help it
 stamped at the door and a loop is burnt at render time.
 
 The *wording* is the client's either way — `legendContentFor` in
-`src/evidence/legendContent.ts` composes the `{title, facts, rights, link}`
-`drawLegend` takes, and `sunLoopLegend` composes the sidecar's variant of it.
+`src/evidence/legendContent.ts` composes the `{title, facts, rights, centre,
+link}` `withLegend` takes, and `sunLoopLegend` composes the sidecar's variant of
+it.
 Which facts a visualization answered to is the client's rule and stays in one
 place, and the client is the only side that knows the reader's language.
 
@@ -300,21 +301,28 @@ burning early:
   date older than the pixels under it. `evidenceFacts` keeps both for the three
   browser-rendered kinds, where they describe the file in hand.
 
-The face is DejaVu, not Mulish — the image has no npm build to take Mulish from.
-The shape is `legend.ts`'s: a head line, the rights lines under it, then a footer
-row carrying the scale bar. Two cosmetic details still differ — the sidecar sets
-the whole head line bold rather than only the title, and puts the link beside the
-bar in the small face rather than at the right edge.
+The shape is `legend.ts`'s and so is the placement: a head line, the rights lines
+under it, a footer row carrying the scale bar, and the whole band **appended
+under** the frame rather than blended over its bottom edge. So the ground keeps
+the whole rectangle and `bbox25833` is the rows above the band. A loop is
+rendered at the acquisition's own resolution — a 140 m footprint of half-metre
+ground is 276 px, of which a band that cannot set type below 11 px is better
+than a third, and blended in that third of the footprint would be caption
+instead of ground on the map.
 
-The difference a reader sees is neither: the band is **appended under** the
-frame, not blended over its bottom edge, so the ground keeps the whole rectangle
-and `bbox25833` is the rows above the band. A still can afford the other way
-round, because it is stamped over pixels the browser already has; a loop's band
-is in the file for good, and a loop is rendered at the acquisition's own
-resolution — a 140 m footprint of half-metre ground is 276 px, of which a band
-that cannot set type below 11 px is better than a third. Past 40 % of the
-ground's height the link is dropped, then the scale bar. The rights lines never
-are.
+Four small differences from the still. The face is DejaVu, not Mulish — the image
+has no npm build to take Mulish from. The whole head line is bold rather than the
+title alone. The link sits beside the bar in the small face rather than in a cell
+of its own, and there is no centre cell. And past 40 % of the ground's height the
+link is dropped, then the scale bar, where a still instead mats its capture out
+to whatever width the band needs; a loop cannot, because its frames are the video
+and the band is already the thing keeping their height even. The rights lines are
+never shed either way.
+
+The difference that is not cosmetic is where the band ends up. A still's is in
+the downloaded copy only, and the stored file stays bare — which is the one the
+map lays back over the ground. A loop's is in the stored file for good, which is
+what `meta.bandTop` below is for.
 
 Where the ground stops travels back as `meta.bandTop`, a fraction of the frame's
 height. The reading lays a loop on the map over its own rectangle, and the band

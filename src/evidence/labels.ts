@@ -128,12 +128,7 @@ export const specFacts = (spec: EvidenceSpec): string[] => {
 
 /** What the catalogue knew about the source, what the render achieved and when
  *  it was made, in the order it would be cited. */
-export const evidenceFacts = (
-  rec: EvidenceRecord,
-  /** The rectangle's centre. Ordered before the render date because the legend
-   *  sheds from the end. */
-  centre?: string,
-): string[] => {
+export const evidenceFacts = (rec: EvidenceRecord): string[] => {
   const spec = specOf(rec);
   const facts: string[] = spec ? specFacts(spec) : [];
 
@@ -141,8 +136,6 @@ export const evidenceFacts = (
   if (metresPerPx != null) {
     facts.push(t('evidence.resolution', { m: metresPerPx.toFixed(2) }));
   }
-
-  if (centre) facts.push(centre);
 
   const renderedAt = rec.meta?.renderedAt;
   if (typeof renderedAt === 'string' && renderedAt) {

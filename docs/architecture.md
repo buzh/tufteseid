@@ -537,22 +537,25 @@ and the reader's, which downloads the picture on the ground. One at a time —
 decoding, stamping and re-encoding a multi-megapixel raster is about a second
 of main-thread work.
 
-`legend.ts` draws it: a band along the bottom edge, every dimension derived from
-the one font size, which is `clamp(11, width / 70, 26)`. A footprint is
-50–500 m and the producers publish between 1 and 0.08 m/px, so a render is
-anywhere from 50 to 6300 px across and the legend has to hold its proportions
-over the whole of that.
+`withLegend` in `legend.ts` composes it onto a canvas of its own: the capture
+unchanged at the top, the band appended underneath, every dimension derived from
+the one font size, which is `clamp(11, captureWidth / 70, 26)`. Off the capture
+and not the finished canvas, because the band can widen the canvas and a font
+size that grew with it would want a wider band again. A footprint is 50–500 m
+and the producers publish between 1 and 0.08 m/px, so a capture is anywhere from
+50 to 6300 px across and the legend has to hold its proportions over the whole
+of that.
 
 - **Line one** is the title in weight 600 and `evidenceFacts` after it, the same
-  list the card and the reader print, with the rectangle's centre in it. Too
-  long for the width, it sheds facts from the end, so the render date is dropped
-  before the centre is: where the ground is beats when the picture was made. A
-  title too long for the width on its own is cut with an ellipsis.
+  list the card and the reader print. Too long for the width, it sheds facts
+  from the end, so the render date is the first to go. A title too long for the
+  width on its own is cut with an ellipsis.
 - **Below it, the rights lines**, flush left and one per holder rather than one
   joined line: Norge i bilder's holder name is sixty characters on its own.
-- **Last, a footer row**: the scale bar at the left edge and, for a public spot,
-  its `/l/<code>` at the right. The link is cut to whatever the bar leaves,
-  because the bar is the one a reader can measure ground with.
+- **Last, a footer row** in three cells: the scale bar at the left edge, the
+  rectangle's centre in the middle, and for a public spot its `/l/<code>` at the
+  right. The middle is centred in what the other two leave rather than on the
+  canvas, so the three cannot collide.
 - **Rights lines are never shed** and wrap rather than being cut: they are the
   only part of the legend the licences require. Each names the holder by the part
   it plays *in this picture* — the same Kartverket is `høydedata` under a
@@ -563,13 +566,21 @@ over the whole of that.
   Visualization Toolbox — terrain, the sun loop, the cached VAT — adds a
   short-form citation of RVT's authors, who ask for one. The full references are
   in `README.md`, and a figure cannot carry them.
-- **The footer row is shed whole to keep the band under a fifth of the image
-  height.** Bar and link share a line, so dropping one of them would buy no
-  height. The rights lines are not shed even when they take the band past the
-  fifth, so a small render comes out with a heavy band rather than
-  uncredited. Nothing is drawn at all past half the height, or where the image
-  is narrower than eight ems — national LiDAR over the smallest footprint is
-  50 px square, and a caption covering it would be worse than none.
+- **Nothing is ever shed, and the capture is never covered.** The band is
+  appended, so the height it takes costs no ground, and a capture too narrow to
+  carry the footer row is matted out to it with `MAT` either side rather than
+  losing the bar or the link — national LiDAR over the smallest footprint is
+  50 px square and comes back a few hundred wide, the picture a small square in
+  the middle of it. The footer sets that floor because it is the one part that
+  is neither cut nor wrapped; the head ellipsizes and the rights wrap, so
+  neither asks for width of its own. The scale bar likewise takes the next round
+  distance up rather than none where four segments would be illegible, which
+  over a small capture means a ruler wider than the picture. That reads
+  correctly: the mat beside it is not ground.
+- **The download is no longer registered to its bbox** — the capture sits
+  inset. That is the trade for spending no pixel of ground on caption, and it
+  costs nothing downstream: the file the map lays back over the rectangle is the
+  *stored* one, which is never stamped.
 - **A loop cannot be stamped at the door**: `decodeToCanvas` is
   `createImageBitmap`, which throws on a WebM, so `stampEvidence` hands a video
   back untouched and the band is burnt in at render time instead. The wording is
@@ -580,11 +591,12 @@ over the whole of that.
   `docs/render-sidecar.md` records the whole split, and what burning early
   costs: a credit edited afterwards, and a resolution the client has to send as
   a hole in a pre-localized string.
-- Canvas text does not wait for webfonts, so `drawLegend` loads Mulish 400 and
+- Canvas text does not wait for webfonts, so `withLegend` loads Mulish 400 and
   600 before measuring, which is why it is async. Without it two figures stamped
-  a second apart come out in different faces. It returns whether it drew, so
-  `stamp.ts` can hand back the bytes it was given rather than spend a JPEG
-  generation re-encoding an unchanged canvas.
+  a second apart come out in different faces. Measuring happens before the
+  canvas is sized, because what it measures is what the width has to be —
+  and setting `width` resets every context property, so nothing survives that
+  line.
 
 ## URL parameters
 

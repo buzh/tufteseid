@@ -2,8 +2,10 @@ import i18n from 'i18next';
 
 const FAMILY = "Mulish, system-ui, -apple-system, 'Segoe UI', sans-serif";
 
-// The band sits on ground that is black under a VAT and white under a slope map.
-const BAND = 'rgba(10, 12, 14, 0.62)';
+// Both the band under the capture and the mat beside one too narrow to carry
+// the footer row. Opaque: the band is appended rather than blended, so there is
+// no ground under it left to show through.
+const MAT = '#0a0c0e';
 const MARK = '#ffffff';
 const MARK_DARK = '#14171a';
 
@@ -88,7 +90,14 @@ const niceMetres = (raw: number): number => {
   return (n >= 5 ? 5 : n >= 2 ? 2 : 1) * pow;
 };
 
-// Under this the four segments are indistinguishable and the bar is left off.
+/** The next round distance up: 1 → 2 → 5 → 10. */
+const nextNiceMetres = (metres: number): number => {
+  const pow = 10 ** Math.floor(Math.log10(metres));
+  const n = Math.round(metres / pow);
+  return (n < 2 ? 2 : n < 5 ? 5 : 10) * pow;
+};
+
+// Under this the four segments are indistinguishable.
 const MIN_BAR_PX = 24;
 
 // Of the image, not of the legend: a bar whose length depended on how long the
@@ -106,9 +115,14 @@ const planScaleBar = (
 ): ScaleBar | null => {
   if (!Number.isFinite(metresPerPx) || metresPerPx <= 0) return null;
   if (!Number.isFinite(targetPx) || targetPx <= 0) return null;
-  const metres = niceMetres(targetPx * metresPerPx);
+  let metres = niceMetres(targetPx * metresPerPx);
+  // The bar is never shed, so a target too small for four legible segments
+  // takes the next round distance up rather than leaving the figure unmeasured.
+  // Over a small capture that makes a ruler wider than the picture, which is
+  // honest — the mat beside it is not ground.
+  while (metres / metresPerPx < MIN_BAR_PX) metres = nextNiceMetres(metres);
   const barPx = metres / metresPerPx;
-  if (!Number.isFinite(barPx) || barPx < MIN_BAR_PX) return null;
+  if (!Number.isFinite(barPx)) return null;
   // A footprint is capped at `MAX_SIDE_M`, and the bar spans a fraction of it,
   // so the label never reaches a kilometre.
   return { barPx, label: `${int(metres)} m` };
@@ -152,51 +166,49 @@ const paintScaleBar = (
 // ---------------------------------------------------------------------------
 
 type LegendOptions = {
-  width: number;
-  height: number;
   /** Line one, weight 600: what the picture is. */
   title: string;
   /** The rest of line one, joined with the separator. Shed from the end when
    *  the line will not fit, so the list must be ordered with the fact that can
    *  best be spared last. */
   facts: string[];
-  /** Under line one, flush left, one per line and never shed: the only part of
-   *  the legend the licences actually require. */
+  /** Under line one, flush left, one per line, wrapped rather than cut: the
+   *  only part of the legend the licences actually require. */
   rights: string[];
+  /** The footer row's middle. Empty where the row has no rectangle. */
+  centre: string;
   /** The footer row's right end. Empty where there is nothing to point at. */
   link: string;
-  /** Of the image as it will be written, so the bar measures true. */
+  /** Of the capture, so the bar measures true. */
   metresPerPx: number;
 };
 
 const SEP = ' · ';
 
-// Least space between the scale bar and the link that still reads as two things
-// rather than one run of text.
+// Least space between two cells of the footer row that still reads as two
+// things rather than one run of text.
 const GAP_EM = 1.5;
 
-// The footer row is shed whole to keep the band under this fraction of the
-// image: the bar and the link share a line, so dropping one of them buys no
-// height. The rights lines are never shed.
-const SHED_HEIGHT_FRACTION = 0.2;
-
-// Past this nothing is drawn at all. Narrow images are turned away by the
-// `contentW` floor before they reach here.
-const MAX_HEIGHT_FRACTION = 0.5;
-
 /**
- * Paint the legend along the image's bottom edge. Never throws, never resizes
- * and never touches a pixel above the band, so a stamped file is still
- * pixel-registered to its bbox everywhere the legend is not.
+ * The capture with its provenance under it, on a canvas of its own: the pixels
+ * unchanged at the top, the band appended below, and a mat either side of a
+ * capture too narrow to carry the footer row.
  *
- * False when the image is too small to carry one, which is the caller's cue to
- * ship the bytes it already has rather than re-encode them unchanged.
+ * Appended rather than blended over the bottom edge, so no pixel of the ground
+ * is spent on caption. The cost is that the file is no longer registered to its
+ * bbox — the download is a figure to cite, and the row the map lays back over
+ * the ground is the stored one, which is never stamped.
+ *
+ * Returns the source canvas untouched only where there is no 2D context to
+ * composite onto.
  */
-export const drawLegend = async (
-  ctx: CanvasRenderingContext2D,
-  { width, height, title, facts, rights, link, metresPerPx }: LegendOptions,
-): Promise<boolean> => {
-  const fontSize = fontSizeFor(width);
+export const withLegend = async (
+  image: HTMLCanvasElement,
+  { title, facts, rights, centre, link, metresPerPx }: LegendOptions,
+): Promise<HTMLCanvasElement> => {
+  // Off the capture rather than the canvas being composed: the mat widens the
+  // canvas, and a font size that grew with it would want a wider band again.
+  const fontSize = fontSizeFor(image.width);
   await ensureFont(fontSize);
 
   const pad = Math.round(fontSize * 0.7);
@@ -205,13 +217,35 @@ export const drawLegend = async (
   const barH = Math.max(4, Math.round(fontSize * 0.38));
   const labelSize = Math.round(fontSize * 0.9);
 
-  const contentW = width - pad * 2;
-  if (contentW < fontSize * 8) return false;
-
   const headFont = font(fontSize, 600);
   const bodyFont = font(fontSize);
 
-  ctx.save();
+  const out = document.createElement('canvas');
+  const ctx = out.getContext('2d');
+  if (!ctx) return image;
+
+  // Measured before the canvas is sized, because what it measures is what the
+  // width has to be. Setting `width` below resets every context property, so
+  // nothing set here survives into the painting pass.
+  const bar = planScaleBar(metresPerPx, image.width * BAR_TARGET_FRACTION);
+  ctx.font = font(labelSize, 600);
+  const barW = bar
+    ? bar.barPx +
+      Math.round(labelSize * BAR_LABEL_GAP_EM) +
+      ctx.measureText(bar.label).width
+    : 0;
+  ctx.font = bodyFont;
+  const centreW = centre ? ctx.measureText(centre).width : 0;
+  const linkW = link ? ctx.measureText(link).width : 0;
+
+  // The footer row sets the floor: it is never shed and never cut, so a capture
+  // narrower than its three cells is matted out to them rather than the other
+  // way round. The head is ellipsized and the rights wrap, so neither forces a
+  // width of its own.
+  const footerW =
+    barW + centreW + linkW + (centreW ? gap : 0) + (linkW ? gap : 0);
+  const width = Math.max(image.width, Math.ceil(footerW) + pad * 2);
+  const contentW = width - pad * 2;
 
   ctx.font = headFont;
   const head = ellipsize(ctx, title, contentW);
@@ -226,43 +260,23 @@ export const drawLegend = async (
   }
   const tail = kept.length > 0 ? SEP + kept.join(SEP) : '';
 
-  // A rights line too wide for the image wraps rather than being cut.
   const body = rights
     .filter(Boolean)
     .flatMap((line) => wrap(ctx, line, contentW));
 
-  const bar = planScaleBar(
-    metresPerPx,
-    Math.min(width * BAR_TARGET_FRACTION, contentW / 2),
-  );
-  ctx.font = font(labelSize, 600);
-  const barW = bar
-    ? bar.barPx +
-      Math.round(labelSize * BAR_LABEL_GAP_EM) +
-      ctx.measureText(bar.label).width
-    : 0;
+  const bandH = pad * 2 + lineH * (2 + body.length);
 
-  const bandHeight = (withFooter: boolean) =>
-    pad * 2 + lineH * (1 + body.length + (withFooter ? 1 : 0));
+  out.width = width;
+  out.height = image.height + bandH;
 
-  let footer = Boolean(bar) || Boolean(link);
-  if (footer && bandHeight(true) > height * SHED_HEIGHT_FRACTION) {
-    footer = false;
-  }
-
-  const legendH = bandHeight(footer);
-  if (legendH > height * MAX_HEIGHT_FRACTION) {
-    ctx.restore();
-    return false;
-  }
-
-  ctx.fillStyle = BAND;
-  ctx.fillRect(0, height - legendH, width, legendH);
+  ctx.fillStyle = MAT;
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(image, Math.round((width - image.width) / 2), 0);
 
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   ctx.fillStyle = MARK;
-  let mid = Math.round(height - legendH + pad + lineH / 2);
+  let mid = image.height + pad + Math.round(lineH / 2);
 
   ctx.font = headFont;
   ctx.fillText(head, pad, mid);
@@ -277,21 +291,24 @@ export const drawLegend = async (
     ctx.fillText(line, pad, mid);
   }
 
-  if (footer) {
-    mid += lineH;
-    if (bar) paintScaleBar(ctx, bar, pad, mid, barH, labelSize);
-    // What the bar leaves, less the gap that keeps the two apart. The link is
-    // cut rather than allowed to run into the bar: the bar is the one a reader
-    // measures ground with.
-    const room = contentW - (bar ? barW + gap : 0);
-    if (link && room > 0) {
-      ctx.textAlign = 'right';
-      ctx.fillStyle = MARK;
-      ctx.font = bodyFont;
-      ctx.fillText(ellipsize(ctx, link, room), width - pad, mid);
-    }
+  mid += lineH;
+  if (bar) paintScaleBar(ctx, bar, pad, mid, barH, labelSize);
+  if (centre) {
+    // Centred in what the bar and the link leave rather than on the canvas, so
+    // the three cells cannot collide at the width the footer itself set.
+    ctx.textAlign = 'center';
+    ctx.fillStyle = MARK;
+    ctx.font = bodyFont;
+    const from = pad + (barW ? barW + gap : 0);
+    const to = width - pad - (linkW ? linkW + gap : 0);
+    ctx.fillText(centre, Math.round((from + to) / 2), mid);
+  }
+  if (link) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = MARK;
+    ctx.font = bodyFont;
+    ctx.fillText(link, width - pad, mid);
   }
 
-  ctx.restore();
-  return true;
+  return out;
 };

@@ -15,7 +15,7 @@ import type { SpotRecord } from '../api/spots';
 import { sanitizeFilename } from '../shared/utils/filename';
 import { canvasBlob } from './fit';
 import { evidenceTitle } from './labels';
-import { drawLegend } from './legend';
+import { withLegend } from './legend';
 import { centreOf, legendContentFor } from './legendContent';
 import { evidenceBbox, evidenceResolution, specOf } from './spec';
 
@@ -47,7 +47,7 @@ const decodeToCanvas = async (
 };
 
 /**
- * The stored raster with its provenance on it. Failure is never fatal: every
+ * The stored raster with its provenance under it. Failure is never fatal: every
  * path that cannot produce a legend returns the bytes it was given, a video
  * among them. Re-encodes in the type it was handed, so a JPEG ortofoto does not
  * come back a PNG four times the size.
@@ -61,16 +61,13 @@ const stampEvidence = async (
 
   try {
     const canvas = await decodeToCanvas(blob);
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return blob;
+    if (!canvas) return blob;
 
     const bbox = evidenceBbox(rec);
     const content = legendContentFor(rec, spot, bbox ? centreOf(bbox) : '');
     if (!content) return blob;
 
-    const drawn = await drawLegend(ctx, {
-      width: canvas.width,
-      height: canvas.height,
+    const stamped = await withLegend(canvas, {
       ...content,
       // Off the decoded width rather than `meta.metresPerPx`, so the bar
       // measures the pixels in hand even where the stored figure disagrees.
@@ -78,12 +75,10 @@ const stampEvidence = async (
         ? (bbox[2] - bbox[0]) / canvas.width
         : (evidenceResolution(rec) ?? 0),
     });
-    // Nothing painted, so re-encoding would only cost a JPEG generation.
-    if (!drawn) return blob;
 
     const jpeg = blob.type === 'image/jpeg';
     const out = await canvasBlob(
-      canvas,
+      stamped,
       jpeg ? 'image/jpeg' : 'image/png',
       jpeg ? 0.9 : undefined,
     );

@@ -7,15 +7,23 @@ its rule and stays in one place — and this only typesets them. The lines arriv
 with holes in them where a fact has to come off the record instead of out of the
 request; `server.py`'s `legend_of` fills those, this one the resolution.
 
-Two deliberate differences from `src/evidence/legend.ts`, which lays out the same
-three parts: the face is DejaVu rather than Mulish, which the image has no npm
-build to take Mulish from, and the band is appended under the frame rather than
-blended over its bottom edge. The second is the one the reader sees. A still is
-stamped over pixels the browser already has, but a loop's band is in the file for
-good, and a loop is rendered at the acquisition's own resolution — 140 m of
-half-metre ground is 276 px, of which a band that cannot set type below 11 px is
-better than a third. Blended in, that third of the footprint would be caption
-instead of ground on the map.
+`src/evidence/legend.ts` lays out the same three parts and appends the band the
+same way, so neither spends a pixel of ground on caption. A loop is rendered at
+the acquisition's own resolution — 140 m of half-metre ground is 276 px, of which
+a band that cannot set type below 11 px is better than a third — and blended in,
+that third of the footprint would be caption instead of ground on the map.
+
+Four differences from it, all of them small: the face is DejaVu rather than
+Mulish, which the image has no npm build to take Mulish from; the whole head line
+is bold here rather than the title alone; the link sits beside the bar in the
+small face rather than in a cell of its own, and there is no centre cell; and a
+band that will not fit sheds, where a still mats its capture out to the width the
+band needs.
+
+The one that is not cosmetic is where the band ends up. A still's is in the
+downloaded copy only and the stored file stays bare, which is the one the map
+lays back over the ground. A loop's is in the stored file for good, so where the
+ground stops has to travel back as `meta.bandTop`.
 """
 
 import numpy as np

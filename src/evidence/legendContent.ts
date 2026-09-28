@@ -20,13 +20,15 @@ type LegendContent = {
   title: string;
   facts: string[];
   rights: string[];
+  centre: string;
   link: string;
 };
 
 /** What the sidecar is sent: wording, with holes where the facts it reads off
- *  the record go. No `link` — it composes that itself. Mirrors `legend_of` in
+ *  the record go. No `link` — it composes that itself — and no `centre`, which
+ *  its stacked band has nowhere to put. Mirrors `legend_of` in
  *  `rendersvc/server.py`. */
-export type SunLoopLegend = Omit<LegendContent, 'link'> & {
+export type SunLoopLegend = Omit<LegendContent, 'link' | 'centre'> & {
   resolutionFormat: string;
   decimal: string;
 };
@@ -139,8 +141,9 @@ export const legendContentFor = (
   if (!spec) return null;
   return {
     title: evidenceTitle(spec),
-    facts: evidenceFacts(rec, centre),
+    facts: evidenceFacts(rec),
     rights: rightsOf(spec, spot.credit),
+    centre,
     // A private spot's code resolves to nothing for anyone but its owner, so
     // printing it would be an invitation to a dead link.
     link:
