@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next';
 
 import { mapAtom } from '../map/atoms';
 import { spotSketchAtom } from '../spots/atoms';
-import { PEN_STROKE_COLOUR, rememberedPen, rememberPen } from './pen';
+import { rememberedPen, rememberStroke, rememberTool, type Pen } from './pen';
 import styles from './SketchCanvas.module.css';
 import { storableScene, type SceneElement } from './scene';
 import {
@@ -29,6 +29,14 @@ import {
   slaveMapToScene,
   type SketchSession,
 } from './session';
+import { SketchTools } from './SketchTools';
+import {
+  applyStyle,
+  fillable,
+  readLive,
+  type BoxTool,
+  type Live,
+} from './toolbox';
 
 // Excalidraw's language codes are regioned and ours are not; anything
 // unrecognised falls to English, as `i18n.ts` does.
@@ -93,6 +101,7 @@ const keepScene = (
 const buildInitialData = (
   offset: Offset,
   elements: readonly SceneElement[],
+  pen: Pen,
 ): ExcalidrawInitialDataState => ({
   elements,
   appState: {
@@ -101,8 +110,16 @@ const buildInitialData = (
     // over the canvas, so strokes would be drawn in one set of colours and kept
     // in another. The chrome is restyled in the CSS module instead.
     theme: 'light',
-    // The colour of the *next* stroke; existing ones keep theirs.
-    currentItemStrokeColor: PEN_STROKE_COLOUR,
+    // The *next* stroke; existing ones keep what they were drawn with. Only
+    // the three the strip offers are set — the rest, roughness and rounded
+    // edges among them, are Excalidraw's own and are what make a traced line
+    // look drawn rather than plotted.
+    currentItemStrokeColor: pen.colour,
+    currentItemStrokeWidth: pen.width,
+    currentItemBackgroundColor: 'transparent',
+    // Hatched rather than Excalidraw's solid: a filled shape here sits over
+    // the ground being read, and a solid one hides the evidence.
+    currentItemFillStyle: 'hachure',
     // Puts the scene over its ground with the map untransformed
     // (`initialSceneView`).
     zoom: { value: offset.zoom as NormalizedZoomValue },
@@ -129,6 +146,26 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
   // Read once: `spotSketchAtom` is written from here on every change, and
   // feeding that back into `initialData` would rebuild the scene mid-stroke.
   const [opening] = useState(() => session.opening);
+
+  // Two records behind the strip. `pen` is what the reader last reached for,
+  // which is what the grouped buttons stand for and what the canvas opens with;
+  // `live` is Excalidraw's own state. Both are refreshed off `onChange`.
+  const [pen, setPen] = useState(rememberedPen);
+  const [live, setLive] = useState<Live>(() => ({
+    tool: pen.tool ?? 'selection',
+    locked: pen.locked,
+    colour: pen.colour,
+    width: pen.width,
+    filled: false,
+    fillable: fillable(pen.tool ?? 'selection'),
+  }));
+  const lastLive = useRef('');
+
+  // `pen` is not set here: `rememberTool` runs off `onChange`, so reading the
+  // record back on this line would still answer with the tool before this one.
+  const choose = useCallback((tool: BoxTool, locked: boolean) => {
+    apiRef.current?.setActiveTool({ type: tool, locked });
+  }, []);
 
   // Scene (0, 0) is the top-left of the frozen viewport but this surface covers
   // only the map's rectangle, so the scene is scrolled by its inset. A layout
@@ -166,8 +203,10 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
       });
       // Through the API rather than `initialData`, which restores an active
       // tool only for the values its own restorer allows.
-      const pen = rememberedPen();
-      if (pen) api.setActiveTool({ type: pen.tool, locked: pen.locked });
+      const opened = rememberedPen();
+      if (opened.tool) {
+        api.setActiveTool({ type: opened.tool, locked: opened.locked });
+      }
     },
     [session.frame],
   );
@@ -188,7 +227,7 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
     <div className={styles.surface} ref={hostRef}>
       {offset && (
         <Excalidraw
-          initialData={buildInitialData(offset, opening)}
+          initialData={buildInitialData(offset, opening, pen)}
           excalidrawAPI={registerApi}
           langCode={excalidrawLang(i18n.language)}
           onChange={(elements, appState) => {
@@ -207,7 +246,21 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
               lastView.current = key;
               slaveMapToScene(map, view);
             }
-            rememberPen(appState.activeTool.type, appState.activeTool.locked);
+            rememberTool(appState.activeTool.type, appState.activeTool.locked);
+            rememberStroke(
+              appState.currentItemStrokeColor,
+              appState.currentItemStrokeWidth,
+            );
+            // Same object back unless one of the two above wrote, so the
+            // grouped buttons re-render only when their member changed.
+            setPen(rememberedPen());
+
+            const next = readLive(appState, elements);
+            const liveKey = Object.values(next).join();
+            if (liveKey !== lastLive.current) {
+              lastLive.current = liveKey;
+              setLive(next);
+            }
 
             if (settle.current != null) window.clearTimeout(settle.current);
             settle.current = window.setTimeout(() => {
@@ -234,6 +287,17 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
             // No image tool: a PNG dropped in here would be stored inside the
             // drawing, against the 5 MB `sketch` cap, where nothing can see it.
             tools: { image: false },
+          }}
+        />
+      )}
+      {offset && (
+        <SketchTools
+          live={live}
+          pen={pen}
+          choose={choose}
+          onStyle={(next) => {
+            const api = apiRef.current;
+            if (api) applyStyle(api, next);
           }}
         />
       )}

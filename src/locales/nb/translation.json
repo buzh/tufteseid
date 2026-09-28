@@ -324,7 +324,36 @@
       "min": "Tegningen var mindre enn 50 m på tvers, så utsnittet er satt til 50 m. Endre det om du vil ha mer med.",
       "max": "Tegningen var større enn 500 m på tvers, så utsnittet er satt til 500 m og dekker ikke alt du tegnet."
     },
-    "linkNeedsAccount": "Lenken peker til en lokalitet du må være innlogget for å se — eller som ikke finnes."
+    "linkNeedsAccount": "Lenken peker til en lokalitet du må være innlogget for å se — eller som ikke finnes.",
+    "penTools": "Tegneverktøy",
+    "penTool": {
+      "selection": "Velg (V)",
+      "freedraw": "Frihånd (P)",
+      "ellipse": "Ellipse (O)",
+      "rectangle": "Rektangel (R)",
+      "diamond": "Rombe (D)",
+      "arrow": "Pil (A)",
+      "line": "Linje (L)",
+      "text": "Tekst (T)",
+      "eraser": "Viskelær (E)"
+    },
+    "penColour": {
+      "papaya": "Oransje",
+      "white": "Hvit",
+      "black": "Svart",
+      "red": "Rød",
+      "blue": "Blå",
+      "cyan": "Cyan"
+    },
+    "penWidth": {
+      "thin": "Tynn strek",
+      "bold": "Middels strek",
+      "extraBold": "Tykk strek"
+    },
+    "penFillOn": "Skraver flaten",
+    "penFillOff": "Fjern skraveringen",
+    "penLock": "Behold verktøyet etter hvert strøk (Q)",
+    "penUnlock": "Gå tilbake til velgeren etter hvert strøk (Q)"
   },
   "terrainControls": {
     "label": "Terrenganalyse",

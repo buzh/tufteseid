@@ -60,3 +60,19 @@
 .surface :global(.help-icon) {
   display: none;
 }
+
+/* The toolbar and the properties island, both replaced by `SketchTools` —
+ * Excalidraw has no prop for either and no slot to put a button in, so the way
+ * to a toolbox of our own is to hide its own and drive it through the
+ * imperative API. `.App-mobile-menu` is where the same properties go on a
+ * narrow viewport.
+ *
+ * What goes with them: the hand, laser and frame tools, which have no use over
+ * a map; the layer order, the alignment and the actions, which the canvas's own
+ * context menu still carries; and the property defaults the strip does not
+ * offer, which `buildInitialData` sets instead. */
+.surface :global(.App-toolbar-container),
+.surface :global(.App-menu__left),
+.surface :global(.App-mobile-menu) {
+  display: none;
+}

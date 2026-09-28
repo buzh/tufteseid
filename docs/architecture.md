@@ -29,7 +29,7 @@ One row per directory under `src/`.
 | `search/` | Kartverket place, address, road, property and elevation lookups. One function has a live caller. |
 | `shared/` | Error boundary, URL parameter access, coordinate parsing, enum and number helpers, and the request deadline that reports to the breaker. |
 | `showControls/` | The band's what-is-drawn-over-the-ground group: the Kulturminner control and the drawing's toggle. |
-| `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the pen, and the render onto the ground. |
+| `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the toolbox that stands in for Excalidraw's own, the remembered pen, and the render onto the ground. |
 | `spotControls/` | The reader's records as surfaces: the `+`, the properties box, the read card, the index menu. |
 | `spots/` | Spot state and geometry: the pin layer and its style, the footprint frame, hit test, place and adjust, share link, name suggestion. |
 | `terrain/` | Client-side terrain analysis: DEM fetch, shading, the analysis window and its layers. |
@@ -197,6 +197,29 @@ megabytes on every press.
   down and answers with an empty scene, which went over `spotSketchAtom` as a
   drawing with no strokes. So `commit` writes that atom as well as the record,
   and the pen's Avbryt puts it back to what is stored.
+- **The toolbox is ours, not Excalidraw's.** Neither its toolbar nor its
+  properties island has a prop behind it and neither leaves a slot to put a
+  button in, so both are hidden in `SketchCanvas.module.css` and `SketchTools`
+  stands in for them: nine tools in one row, six colours, three widths and a
+  fill in the other. `toolbox.ts` is the seam — reading is off `onChange`'s app
+  state, writing is `setActiveTool` and `updateScene`. A style press restyles
+  the selection as the island did, carrying a container's bound label along and
+  passing the tombstones back with it so undo keeps its reach, under
+  `CaptureUpdateAction.IMMEDIATELY` so the restyle is an undo step of its own.
+- **Two tools share a button where the shape is the only difference.** Circle,
+  square and diamond are one; arrow and line are the other. A press picks what
+  the button is showing and a hold opens the rest, which is what keeps a row of
+  nine down to a row a reader can scan. The member shown is the last one
+  picked, and `pen.ts` remembers it — with the tool, the lock, the colour and
+  the width — under `sketchPen.v1`, validated field by field so an older record
+  upgrades in place rather than being thrown away.
+- **What went with the island stays gone on purpose.** The hand, laser and
+  frame tools have no use over a map; the layer order, the alignment and the
+  actions are on the canvas's own context menu; and the properties the strip
+  does not offer are set once in `buildInitialData`. Roughness and rounded
+  edges are deliberately left as Excalidraw's own — a traced line should look
+  drawn rather than plotted. The fill is hatched and never solid, because a
+  filled shape here sits over the ground being read.
 - **The accent walks the reader through it.** `step` is whichever stage has
   hold of the map and, failing that, the first thing the record is still
   missing: description, then drawing. `idle` is the fourth stage — the box

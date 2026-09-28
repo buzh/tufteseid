@@ -1,0 +1,149 @@
+/* The whole toolbox: Excalidraw's own toolbar and properties island are hidden
+   in `SketchCanvas.module.css` and this stands in for both. Above
+   `--zIndex-layerUI: 4` and well below its `--zIndex-modal: 1000`, so the
+   context menu — which is where delete, duplicate and the layer order live
+   now — still opens over the strip. */
+.strip {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.375rem;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-body);
+  box-shadow: var(--mantine-shadow-md);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rule {
+  align-self: stretch;
+  width: 1px;
+  margin-block: 0.25rem;
+  background: var(--mantine-color-default-border);
+}
+
+.tool {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: var(--control-icon-width);
+  height: var(--control-height);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-default);
+  color: var(--mantine-color-text);
+  cursor: pointer;
+}
+
+.tool:hover {
+  background: var(--mantine-color-default-hover);
+}
+
+.tool:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 1px;
+}
+
+/* Must follow `.tool:hover`: same specificity, wins on source order only. */
+.toolOn,
+.toolOn:hover {
+  border-color: var(--mantine-primary-color-filled);
+  background: var(--mantine-primary-color-filled);
+  color: var(--mantine-primary-color-contrast);
+}
+
+/* The corner notch that says there is more under the button. Drawn rather than
+   an icon so it can sit in the corner without taking a row of its own. */
+.grouped::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  border-block-end: 4px solid currentcolor;
+  border-inline-start: 4px solid transparent;
+  opacity: 0.55;
+}
+
+.flyout {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.375rem;
+}
+
+.swatches {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-xs);
+  cursor: pointer;
+}
+
+/* The text colour, not the accent: papaya's own swatch would wear a ring it
+   cannot be told apart from. The offset leaves a gap of the strip behind it,
+   which is what keeps the ring off the white swatch. */
+.swatchOn {
+  outline: 2px solid var(--mantine-color-text);
+  outline-offset: 1px;
+}
+
+.swatch:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+.width {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: var(--control-height);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-default);
+  cursor: pointer;
+}
+
+.width:hover {
+  background: var(--mantine-color-default-hover);
+}
+
+.width:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 1px;
+}
+
+/* Same rule, same reason as `.toolOn`. */
+.widthOn,
+.widthOn:hover {
+  border-color: var(--mantine-primary-color-filled);
+  background: var(--mantine-primary-color-filled);
+}
+
+.bar {
+  width: 14px;
+  border-radius: 2px;
+  background: var(--mantine-color-text);
+}
+
+.widthOn .bar {
+  background: var(--mantine-primary-color-contrast);
+}
