@@ -128,7 +128,7 @@ export const useEvidenceDownload = (spot: SpotRecord): EvidenceDownload => {
   const download = useCallback(
     (rec: EvidenceRecord) => {
       const url = evidenceFileUrl(rec);
-      // One at a time: stamping a 2500 px raster is about a second of
+      // One at a time: stamping a multi-megapixel raster is about a second of
       // main-thread work, and two at once only slows both.
       if (!url || busyId) return;
       setBusyId(rec.id);

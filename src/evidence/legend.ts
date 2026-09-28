@@ -14,8 +14,8 @@ const int = (value: number): string =>
 
 /**
  * Linear in the image width between the clamps. A footprint is 50–500 m and the
- * producers publish between 1 and 0.2 m/px, so a render is anywhere from 50 to
- * 2500 px across; this keeps the legend a roughly constant fraction of it.
+ * producers publish between 1 and 0.08 m/px, so a render is anywhere from 50 to
+ * 6300 px across; this keeps the legend a roughly constant fraction of it.
  */
 const fontSizeFor = (width: number): number =>
   Math.round(Math.min(26, Math.max(11, width / 70)));

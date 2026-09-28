@@ -465,8 +465,12 @@ ceiling and its own bounded retry.
   which go `PREVIEW_LANES` at a time — there the reader is sitting in front of
   one upstream with nothing else asked for, and the wait is the render's own
   length. Two lanes is 8 requests in flight, the ceiling for this app.
-- **A 500 m footprint is the cap** (`MAX_SIDE_M`, `src/map/bbox.ts`), which at
-  0.2 m/px is 2500 px a side — a handful of tiles, not a screenful.
+- **A 500 m footprint is the cap** (`MAX_SIDE_M`, `src/map/bbox.ts`). LiDAR and
+  terrain bottom out at their own 0.25–0.5 m grids, a few hundred pixels a side.
+  Flyfoto asks for the acquisition's own pixel size, which for a recent flight
+  is 0.1 m or finer, and the store's 40 MP budget (`storeLimit`,
+  `src/evidence/flyfotoRaster.ts`) holds it at 0.08 m/px there — 6300 px a side
+  and sixteen tiles, the most any one render asks for.
 
 ### `guardTileSource` (`src/upstream/tileGuard.ts`)
 

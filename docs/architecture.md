@@ -534,12 +534,13 @@ The download is the only door, and a visitor reading somebody else's public spot
 is exactly who wants a citable figure out of it — so the reader has one too.
 `useEvidenceDownload` (`download.ts`) is shared by the gallery's per-row button
 and the reader's, which downloads the picture on the ground. One at a time —
-decoding, stamping and re-encoding 2500 px is a second of main-thread work.
+decoding, stamping and re-encoding a multi-megapixel raster is about a second
+of main-thread work.
 
 `legend.ts` draws it: a band along the bottom edge, every dimension derived from
 the one font size, which is `clamp(11, width / 70, 26)`. A footprint is
-50–500 m and the producers publish between 1 and 0.2 m/px, so a render is
-anywhere from 50 to 2500 px across and the legend has to hold its proportions
+50–500 m and the producers publish between 1 and 0.08 m/px, so a render is
+anywhere from 50 to 6300 px across and the legend has to hold its proportions
 over the whole of that.
 
 - **Line one** is the title in weight 600 and `evidenceFacts` after it, the same

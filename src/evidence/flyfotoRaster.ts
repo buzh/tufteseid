@@ -17,7 +17,7 @@ import {
 } from '../map/layers/config/backgroundLayers/flyfoto';
 import type { FlyfotoProject } from '../map/layers/config/backgroundLayers/flyfotoProjects';
 import { isUpstreamDown } from '../upstream/health';
-import type { Raster } from './fit';
+import { MAX_STORED_PIXELS, type Raster } from './fit';
 
 const FLYFOTO_WMS_URL = '/wms/nib/ortofoto';
 const FLYFOTO_LAYER = 'ortofoto';
@@ -27,14 +27,23 @@ const FLYFOTO_LAYER = 'ortofoto';
 // prosjektnavn column, picked with a mosaicRule `where`.
 const FLYFOTO_PROJECT_URL = `${FLYFOTO_PROJECT_IMAGESERVER}/exportImage`;
 
-// A target, not a floor: `planTiles` scales down past its canvas cap, and the
-// value reported back is the one actually achieved.
-const TARGET_M_PER_PX = 0.2;
+// The seamless mosaic carries no pixel size of its own, so this stands in for
+// one. An acquisition uses its own figure, coarser or finer.
+const MOSAIC_M_PER_PX = 0.2;
 
 // NiB sits behind the same shed-and-retry public edge as Kartverket.
 const MAX_CONCURRENT = 4;
 const TILE_RETRIES = 3;
 const RETRY_BASE_MS = 400;
+
+// Finest worth asking for: `fitImageBlob` scales anything past the store's
+// pixel budget back down again, so tiles beyond it are fetched to be thrown
+// away. A 500 m footprint bottoms out here at 0.08 m/px.
+const storeLimit = (bbox25833: Metric): number =>
+  Math.sqrt(
+    ((bbox25833[2] - bbox25833[0]) * (bbox25833[3] - bbox25833[1])) /
+      MAX_STORED_PIXELS,
+  );
 
 const projectUrl = (
   project: FlyfotoProject,
@@ -87,9 +96,14 @@ export const fetchFlyfotoRaster = async (
 ): Promise<Raster | null> => {
   const bbox25833 = bboxToMetric(bbox4326);
 
-  // Never finer than the acquisition holds — a 1937 flight upsampled is four
-  // times the tiles for the same detail. The mosaic keeps the target.
-  const metresPerPx = Math.max(TARGET_M_PER_PX, project?.metresPerPx ?? 0);
+  // The acquisition's own grid: never upsampled, because a 1937 flight
+  // stretched is four times the tiles for the same detail, and never
+  // downsampled either, because that resolution is the point of keeping.
+  const native = project?.metresPerPx ?? 0;
+  const metresPerPx = Math.max(
+    native > 0 ? native : MOSAIC_M_PER_PX,
+    storeLimit(bbox25833),
+  );
   const plan = planTiles(bbox25833, metresPerPx);
   if (plan.tiles.length === 0) return null;
 

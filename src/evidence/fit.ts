@@ -4,7 +4,7 @@ import type { Metric } from '../map/bbox';
 // rule and the byte budget a backstop that is measured rather than predicted.
 // The byte cap is `evidence.file`'s: PocketBase answers 400 over it, and every
 // retry of the same blob fails the same way.
-const MAX_STORED_PIXELS = 40000000;
+export const MAX_STORED_PIXELS = 40000000;
 const MAX_STORED_BYTES = 50000000;
 
 // The geometric step converges in one pass from any plausible start; the cap is
