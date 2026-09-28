@@ -548,12 +548,11 @@ over the whole of that.
   long for the width, it sheds facts from the end, so the render date is dropped
   before the centre is: where the ground is beats when the picture was made. A
   title too long for the width on its own is cut with an ellipsis.
-- **Below it, two columns.** Left carries the scale bar and, for a public spot,
-  its `/l/<code>`; right carries the rights lines. A left cell pairs with a
-  right one where both fit and goes alone where they do not, so the legend is
-  two lines usually and three where the credit is long. Norge i bilder's holder name
-  is sixty characters and its terms are not CC BY, which is exactly the case
-  that earns the third line.
+- **Below it, the rights lines**, flush left and one per holder rather than one
+  joined line: Norge i bilder's holder name is sixty characters on its own.
+- **Last, a footer row**: the scale bar at the left edge and, for a public spot,
+  its `/l/<code>` at the right. The link is cut to whatever the bar leaves,
+  because the bar is the one a reader can measure ground with.
 - **Rights lines are never shed** and wrap rather than being cut: they are the
   only part of the legend the licences require. Each names the holder by the part
   it plays *in this picture* — the same Kartverket is `høydedata` under a
@@ -564,9 +563,10 @@ over the whole of that.
   Visualization Toolbox — terrain, the sun loop, the cached VAT — adds a
   short-form citation of RVT's authors, who ask for one. The full references are
   in `README.md`, and a figure cannot carry them.
-- **The bar and the link are shed to keep the band under a fifth of the image
-  height**, in that order. The rights lines are not shed even when they take it
-  past the fifth, so a small render comes out with a heavy band rather than
+- **The footer row is shed whole to keep the band under a fifth of the image
+  height.** Bar and link share a line, so dropping one of them would buy no
+  height. The rights lines are not shed even when they take the band past the
+  fifth, so a small render comes out with a heavy band rather than
   uncredited. Nothing is drawn at all past half the height, or where the image
   is narrower than eight ems — national LiDAR over the smallest footprint is
   50 px square, and a caption covering it would be worse than none.

@@ -7,15 +7,15 @@ its rule and stays in one place — and this only typesets them. The lines arriv
 with holes in them where a fact has to come off the record instead of out of the
 request; `server.py`'s `legend_of` fills those, this one the resolution.
 
-Three deliberate differences from `src/evidence/legend.ts`: the face is DejaVu
-rather than Mulish, which the image has no npm build to take Mulish from; the
-layout is a stacked band rather than its two shedding columns; and the band is
-appended under the frame rather than blended over its bottom edge. That last one
-is the one the reader sees. A still is stamped over pixels the browser already
-has, but a loop's band is in the file for good, and a loop is rendered at the
-acquisition's own resolution — 140 m of half-metre ground is 276 px, of which a
-band that cannot set type below 11 px is better than a third. Blended in, that
-third of the footprint would be caption instead of ground on the map.
+Two deliberate differences from `src/evidence/legend.ts`, which lays out the same
+three parts: the face is DejaVu rather than Mulish, which the image has no npm
+build to take Mulish from, and the band is appended under the frame rather than
+blended over its bottom edge. The second is the one the reader sees. A still is
+stamped over pixels the browser already has, but a loop's band is in the file for
+good, and a loop is rendered at the acquisition's own resolution — 140 m of
+half-metre ground is 276 px, of which a band that cannot set type below 11 px is
+better than a third. Blended in, that third of the footprint would be caption
+instead of ground on the map.
 """
 
 import numpy as np

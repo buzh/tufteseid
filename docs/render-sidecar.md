@@ -300,9 +300,13 @@ burning early:
   date older than the pixels under it. `evidenceFacts` keeps both for the three
   browser-rendered kinds, where they describe the file in hand.
 
-The face is DejaVu, not Mulish — the image has no npm build to take Mulish from —
-and the layout is a stacked band rather than `legend.ts`'s two shedding columns.
-The third difference is the one a reader sees: the band is **appended under** the
+The face is DejaVu, not Mulish — the image has no npm build to take Mulish from.
+The shape is `legend.ts`'s: a head line, the rights lines under it, then a footer
+row carrying the scale bar. Two cosmetic details still differ — the sidecar sets
+the whole head line bold rather than only the title, and puts the link beside the
+bar in the small face rather than at the right edge.
+
+The difference a reader sees is neither: the band is **appended under** the
 frame, not blended over its bottom edge, so the ground keeps the whole rectangle
 and `bbox25833` is the rows above the band. A still can afford the other way
 round, because it is stamped over pixels the browser already has; a loop's band

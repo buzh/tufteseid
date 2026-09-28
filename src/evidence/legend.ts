@@ -160,71 +160,29 @@ type LegendOptions = {
    *  the line will not fit, so the list must be ordered with the fact that can
    *  best be spared last. */
   facts: string[];
-  /** The right column, one line each, and never shed: the only part of the
-   *  legend the licences actually require. */
+  /** Under line one, flush left, one per line and never shed: the only part of
+   *  the legend the licences actually require. */
   rights: string[];
-  /** The left column under the scale bar. Empty where there is nothing to point
-   *  at. */
+  /** The footer row's right end. Empty where there is nothing to point at. */
   link: string;
   /** Of the image as it will be written, so the bar measures true. */
   metresPerPx: number;
 };
 
-type TextCell = { kind: 'text'; text: string; width: number };
-
-type Cell = { kind: 'bar'; bar: ScaleBar; width: number } | TextCell;
-
-// The right column is rights lines and nothing else, so it never holds a bar.
-type Row = { left?: Cell; right?: TextCell };
-
 const SEP = ' · ';
 
-// Between the two columns. Below this they read as one run of text.
+// Least space between the scale bar and the link that still reads as two things
+// rather than one run of text.
 const GAP_EM = 1.5;
 
-// The bar and the link are shed to keep the band under this fraction of the
-// image; the rights lines never are.
+// The footer row is shed whole to keep the band under this fraction of the
+// image: the bar and the link share a line, so dropping one of them buys no
+// height. The rights lines are never shed.
 const SHED_HEIGHT_FRACTION = 0.2;
 
 // Past this nothing is drawn at all. Narrow images are turned away by the
 // `contentW` floor before they reach here.
 const MAX_HEIGHT_FRACTION = 0.5;
-
-/** Greedy: a left cell pairs with a right one where both fit, otherwise the
- *  left goes alone and the right waits for the next line. A rights line too
- *  wide for the image even on its own wraps rather than being cut. */
-const layOut = (
-  ctx: CanvasRenderingContext2D,
-  left: Cell[],
-  right: TextCell[],
-  contentW: number,
-  gap: number,
-): Row[] => {
-  const rows: Row[] = [];
-  let li = 0;
-  let ri = 0;
-  while (li < left.length || ri < right.length) {
-    const l = left[li];
-    const r = right[ri];
-    if (l && r && l.width + gap + r.width <= contentW) {
-      rows.push({ left: l, right: r });
-      li++;
-      ri++;
-    } else if (l) {
-      rows.push({ left: l });
-      li++;
-    } else if (r) {
-      if (r.width <= contentW) rows.push({ right: r });
-      else {
-        for (const line of wrap(ctx, r.text, contentW)) {
-          rows.push({ right: { kind: 'text', text: line, width: 0 } });
-        }
-      }
-      ri++;
-    } else break;
-  }
-  return rows;
-};
 
 /**
  * Paint the legend along the image's bottom edge. Never throws, never resizes
@@ -268,44 +226,31 @@ export const drawLegend = async (
   }
   const tail = kept.length > 0 ? SEP + kept.join(SEP) : '';
 
+  // A rights line too wide for the image wraps rather than being cut.
+  const body = rights
+    .filter(Boolean)
+    .flatMap((line) => wrap(ctx, line, contentW));
+
   const bar = planScaleBar(
     metresPerPx,
     Math.min(width * BAR_TARGET_FRACTION, contentW / 2),
   );
+  ctx.font = font(labelSize, 600);
+  const barW = bar
+    ? bar.barPx +
+      Math.round(labelSize * BAR_LABEL_GAP_EM) +
+      ctx.measureText(bar.label).width
+    : 0;
 
-  // Ordered so that shedding from the end takes the link before the bar.
-  const left: Cell[] = [];
-  if (bar) {
-    ctx.font = font(labelSize, 600);
-    left.push({
-      kind: 'bar',
-      bar,
-      width:
-        bar.barPx +
-        Math.round(labelSize * BAR_LABEL_GAP_EM) +
-        ctx.measureText(bar.label).width,
-    });
-  }
-  ctx.font = bodyFont;
-  if (link) {
-    const text = ellipsize(ctx, link, contentW);
-    left.push({ kind: 'text', text, width: ctx.measureText(text).width });
-  }
-  const right: TextCell[] = rights.filter(Boolean).map((text) => ({
-    kind: 'text' as const,
-    text,
-    width: ctx.measureText(text).width,
-  }));
+  const bandHeight = (withFooter: boolean) =>
+    pad * 2 + lineH * (1 + body.length + (withFooter ? 1 : 0));
 
-  const bandHeight = (rows: Row[]) => pad * 2 + lineH * (1 + rows.length);
-
-  let rows = layOut(ctx, left, right, contentW, gap);
-  while (left.length > 0 && bandHeight(rows) > height * SHED_HEIGHT_FRACTION) {
-    left.pop();
-    rows = layOut(ctx, left, right, contentW, gap);
+  let footer = Boolean(bar) || Boolean(link);
+  if (footer && bandHeight(true) > height * SHED_HEIGHT_FRACTION) {
+    footer = false;
   }
 
-  const legendH = bandHeight(rows);
+  const legendH = bandHeight(footer);
   if (legendH > height * MAX_HEIGHT_FRACTION) {
     ctx.restore();
     return false;
@@ -315,10 +260,10 @@ export const drawLegend = async (
   ctx.fillRect(0, height - legendH, width, legendH);
 
   ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
   ctx.fillStyle = MARK;
   let mid = Math.round(height - legendH + pad + lineH / 2);
 
-  ctx.textAlign = 'left';
   ctx.font = headFont;
   ctx.fillText(head, pad, mid);
   if (tail) {
@@ -326,21 +271,24 @@ export const drawLegend = async (
     ctx.fillText(tail, Math.round(pad + titleW), mid);
   }
 
-  for (const row of rows) {
+  ctx.font = bodyFont;
+  for (const line of body) {
     mid += lineH;
-    if (row.left?.kind === 'bar') {
-      paintScaleBar(ctx, row.left.bar, pad, mid, barH, labelSize);
-    } else if (row.left) {
-      ctx.textAlign = 'left';
-      ctx.fillStyle = MARK;
-      ctx.font = bodyFont;
-      ctx.fillText(row.left.text, pad, mid);
-    }
-    if (row.right) {
+    ctx.fillText(line, pad, mid);
+  }
+
+  if (footer) {
+    mid += lineH;
+    if (bar) paintScaleBar(ctx, bar, pad, mid, barH, labelSize);
+    // What the bar leaves, less the gap that keeps the two apart. The link is
+    // cut rather than allowed to run into the bar: the bar is the one a reader
+    // measures ground with.
+    const room = contentW - (bar ? barW + gap : 0);
+    if (link && room > 0) {
       ctx.textAlign = 'right';
       ctx.fillStyle = MARK;
       ctx.font = bodyFont;
-      ctx.fillText(row.right.text, width - pad, mid);
+      ctx.fillText(ellipsize(ctx, link, room), width - pad, mid);
     }
   }
 
