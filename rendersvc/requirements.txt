@@ -9,5 +9,7 @@ scipy<1.15
 # EPSG:4326 -> EPSG:25833, the one thing the stdlib cannot do.
 pyproj>=3.6
 # rvt.blend_func imports it at the top for the colour ramps, and e4MSTP's slope
-# layer genuinely draws one (`Reds_r`).
-matplotlib>=3.7
+# layer genuinely draws one (`Reds_r`). Capped because that import is
+# `matplotlib.cm.get_cmap`, which 3.10 removed: unpinned, the sidecar does not
+# start at all.
+matplotlib>=3.7,<3.10

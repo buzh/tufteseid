@@ -468,8 +468,12 @@ quirks — `vat-cache/README.md` records the other end of the coupling.
 jupyter for an IO layer none of this touches. `requirements.txt` carries what
 `rvt.vis` and `rvt.blend_func` actually reach for — numpy, pillow, pyproj,
 `scipy<1.15` (it imports `scipy.ndimage.morphology`, removed there) and
-matplotlib, which `rvt.blend_func` imports at the top for its colour ramps and
-which e4MSTP's slope layer genuinely draws one from. `rvt/__init__.py` is a
+`matplotlib<3.10` (it imports `matplotlib.cm.get_cmap`, removed there), which
+e4MSTP's slope layer genuinely draws a ramp from. Both caps are a 2.2.3 that
+stopped being maintained rather than anything this code wants, and both are
+**startup** failures: the producer modules are imported by `server.py`, so a
+sidecar with the wrong version of either does not answer `/health` at all.
+`rvt/__init__.py` is a
 docstring, and `rvt.blend` and `rvt.default` — the two that want GDAL — are
 never imported.
 

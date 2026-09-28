@@ -32,5 +32,8 @@ RUN useradd --system --no-create-home rendersvc
 USER rendersvc
 
 ENV PYTHONUNBUFFERED=1
+# The service user has no home, so matplotlib's cache has nowhere to go and it
+# makes a fresh temporary one on every start — slow, and noisy in the log.
+ENV MPLCONFIGDIR=/tmp/matplotlib
 EXPOSE 8080
 CMD ["python", "server.py"]
