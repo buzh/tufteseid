@@ -10,6 +10,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import {
+  attachEvidenceFile,
   createEvidence,
   deleteEvidence,
   listSpotEvidence,
@@ -30,6 +31,7 @@ import {
   subscribeRenderQueue,
   type RenderState,
 } from './queue';
+import type { Produced } from './render';
 import { evidenceMatches, metaOf, type EvidenceSpec } from './spec';
 
 type KeepOffer = {
@@ -47,6 +49,12 @@ export type SpotEvidence = {
    *  stands — or null where nothing on screen can be re-rendered. */
   offer: KeepOffer | null;
   keep: (spec: EvidenceSpec) => void;
+  /**
+   * A row written from pixels already made, for a picker run that renders
+   * before it asks. False where nothing was written — the proposal is still the
+   * run's, and the reader can press again.
+   */
+  keepProduced: (spec: EvidenceSpec, produced: Produced) => Promise<boolean>;
   retry: (rec: EvidenceRecord) => void;
   remove: (id: string) => void;
   /** Move a row to `to`, an index into `items` as it stands. The reading opens
@@ -180,6 +188,51 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     [user, footprint, spotId, upsert, render],
   );
 
+  const keepProduced = useCallback(
+    async (spec: EvidenceSpec, produced: Produced) => {
+      if (!user || !footprint) return false;
+      setFailed(false);
+      let created: EvidenceRecord | null = null;
+      try {
+        created = await createEvidence(
+          { spot: spotId, kind: spec.kind, meta: metaOf(spec) },
+          user.id,
+        );
+        upsert(created);
+        upsert(
+          await attachEvidenceFile(
+            created.id,
+            produced.blob,
+            produced.filename,
+            {
+              ...metaOf(spec),
+              ...produced.meta,
+              renderedAt: new Date().toISOString(),
+            },
+          ),
+        );
+        return true;
+      } catch (err) {
+        console.warn(
+          '[evidence] keep failed',
+          err,
+          (err as { response?: { data?: unknown } })?.response?.data,
+        );
+        // A row whose file never landed has nothing the gallery can retry — the
+        // pixels were the run's, and the run still holds them.
+        if (created) {
+          const id = created.id;
+          byId.current.delete(id);
+          publish();
+          deleteEvidence(id).catch(() => {});
+        }
+        setFailed(true);
+        return false;
+      }
+    },
+    [user, footprint, spotId, upsert, publish],
+  );
+
   const reorder = useCallback(
     (id: string, to: number) => {
       if (!items) return;
@@ -227,6 +280,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     failed,
     offer,
     keep,
+    keepProduced,
     retry: render,
     remove,
     reorder,

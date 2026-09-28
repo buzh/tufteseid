@@ -161,7 +161,8 @@ naming it a one-off, so the card is the workbench and the properties box is
 behind a button. A button becomes a row — the hint and its Ferdig, or the pen's
 Avbryt/Lagre — for as long as it has the map, and only one of the two can. The
 third, `SpotAcquire`, is behind the card's microscope and orders the pictures
-that are made somewhere else (*The pictures of a spot*).
+that are asked for over the footprint rather than read off the view
+(*The pictures of a spot*).
 
 The pin belongs to the properties box and stands only while it is open
 (`unpinnedSpotIdAtom`, `pinAdjust.ts`). The card and the reader are read against
@@ -321,15 +322,36 @@ of them.
   belonged on a camera that keeps the view. It is asked for in `SpotAcquire`
   (`src/spotControls/`), the box behind the microscope on the end of the card's
   tools row, which stands in front of the card and holds one chip per picture
-  that is made somewhere other than the tab that asked. `SUN_LOOP_SPEC` (`evidence/spec.ts`) is the whole
+  that is asked for over the footprint rather than read off the view.
+  `SUN_LOOP_SPEC` (`evidence/spec.ts`) is the whole
   ask — DTM, the analysis panel's own sun and exaggeration, 72 frames — so there
   is no form and nothing about the ask follows the map. The chip is dead while a
   loop of the spot's is outstanding, because the sidecar takes one job per
   caller, and while one already covers the footprint with those parameters; a
-  settled row is retried in the gallery, where every other kind's is. The
-  flyfoto series beside it is disabled and is the reason the box is a box rather
-  than a second camera: the legacy branch fetched every acquisition over a spot
-  at once, and that too is an order rather than a reading of the view.
+  settled row is retried in the gallery, where every other kind's is.
+- **The flyfoto series is a walk, not a batch.** The other chip in `SpotAcquire`
+  proposes every Norge i bilder acquisition over the footprint, one at a time,
+  and the reader keeps or discards each (`useFlyfotoRun.ts`, `FlyfotoRun.tsx`,
+  which takes the box's body while the run is on). A proposal is rendered before
+  it is offered, at the acquisition's own resolution, so keeping writes the very
+  bytes on screen: `keepProduced` (`useSpotEvidence.ts`) creates the row and
+  PATCHes the file in one go, and deletes the row again if the file will not
+  land, because a row with no pixels and no queue state is nothing the gallery
+  could retry. A discard was never a record — the pixels only ever existed in
+  the tab — so running again asks about it a second time. What the run passes
+  over is only what `evidenceMatches` already finds against the footprint as it
+  now stands, which is also how an acquisition the catalogue has added since
+  comes up on its own, and how moving the footprint re-offers the lot. The
+  seamless mosaic is not in the series: that one is a ground, and the card's
+  camera already keeps it.
+- **A proposal shares the render lane.** `enqueuePreview` (`evidence/queue.ts`)
+  puts pixels with no row behind them into the same serial queue as the rows'
+  own renders, because the reason for one lane is the shared public edge and not
+  the rows. The run aims one render ahead of the card under review, so a reader
+  who keeps walking never waits and at most one stitch is made for a proposal
+  nobody reaches. Its signal gates the queue position rather than the render: a
+  burst already on the wire runs out its own deadline, and only the result is
+  dropped.
 - **Not every row is made here.** Three kinds are rendered in the tab that asked
   for them; `sunloop` is created the same way and then handed to the render
   sidecar, which writes the file back itself (`docs/render-sidecar.md`). The row,
@@ -652,10 +674,6 @@ show group; anything else that applies to the reading belongs to the tools.
   back, so a browser that refused the autoplay shows a play button rather than
   a lie. No speed, no frame-by-frame step, and a scrub decodes forward from the
   file's one keyframe.
-- **The flyfoto series is a dead chip.** The second order in `SpotAcquire` is
-  disabled. The legacy branch fetched every Norge i bilder acquisition over a
-  record in one go, behind a picker with a cap and a rights notice; nothing here
-  has brought that back. The chip stands so the box is the place it lands.
 - **A render is not a cache.** Upstreams re-fly and reprocess, so the same spec
   re-rendered later may not be the picture its author read. `meta.renderedAt`
   says when the file was made; nothing re-renders on its own.

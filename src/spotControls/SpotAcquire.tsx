@@ -1,7 +1,9 @@
 // Work ordered, not kept. The camera in the card keeps the view as it stands,
 // so everything it offers is already on screen; these are the pictures that are
-// made somewhere else and land in the spot when they are done. Stands in front
-// of the card, which is where the rows themselves are then waited on.
+// asked for over the footprint instead — a sun loop the sidecar makes, and the
+// flyfoto series, which is a walk through every acquisition over the spot
+// rather than a reading of the one ground that happens to be up. Stands in
+// front of the card, which is where the rows themselves are then waited on.
 
 import { Alert } from '@mantine/core';
 import { useSetAtom } from 'jotai';
@@ -15,7 +17,9 @@ import { bboxToMetric } from '../map/bbox';
 import { spotAcquiringAtom } from '../spots/atoms';
 import { ControlChip } from '../ui/ControlChip';
 import { Panel } from '../ui/Panel';
+import { FlyfotoRun } from './FlyfotoRun';
 import styles from './SpotBox.module.css';
+import { useFlyfotoRun } from './useFlyfotoRun';
 
 const SUN_LOOP_FRAMES = Math.round(360 / SUN_LOOP_SPEC.stepDeg);
 
@@ -23,6 +27,7 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
   const { t } = useTranslation();
   const setAcquiring = useSetAtom(spotAcquiringAtom);
   const evidence = useSpotEvidence(spot);
+  const run = useFlyfotoRun(spot.footprint, evidence);
 
   const loops = (evidence.items ?? []).filter((rec) => rec.kind === 'sunloop');
 
@@ -45,6 +50,15 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
     return t('evidence.facts.frames', { n: SUN_LOOP_FRAMES });
   };
 
+  // The list of what to propose is read off the rows as the run starts, so the
+  // chip waits for them rather than offering a second copy of what is there.
+  const flyfotoReady = spot.footprint != null && evidence.items != null;
+  const flyfotoHint = () => {
+    if (!spot.footprint) return t('acquire.noFootprint');
+    if (!flyfotoReady) return t('evidence.loading');
+    return t('acquire.flyfotoHint');
+  };
+
   const sunTitle = `${t('evidence.sunLoop')} — ${t('acquire.sunLoopHint')}`;
   const flyfotoTitle = `${t('acquire.flyfoto')} — ${t('acquire.flyfotoHint')}`;
 
@@ -57,29 +71,35 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
       // own, and the spot itself is closed from there.
       onClose={() => setAcquiring(false)}
     >
-      <p className={styles.note}>{t('acquire.hint')}</p>
-
-      <div className={styles.chips}>
-        <ControlChip
-          icon="motion_photos_on"
-          label={t('evidence.sunLoop')}
-          hint={sunHint()}
-          withChevron={false}
-          title={sunTitle}
-          aria-label={sunTitle}
-          disabled={!spot.footprint || outstanding || kept}
-          onClick={() => evidence.keep(SUN_LOOP_SPEC)}
-        />
-        <ControlChip
-          icon="photo_camera"
-          label={t('acquire.flyfoto')}
-          hint={t('acquire.later')}
-          withChevron={false}
-          title={flyfotoTitle}
-          aria-label={flyfotoTitle}
-          disabled
-        />
-      </div>
+      {run.phase === 'off' ? (
+        <>
+          <p className={styles.note}>{t('acquire.hint')}</p>
+          <div className={styles.chips}>
+            <ControlChip
+              icon="motion_photos_on"
+              label={t('evidence.sunLoop')}
+              hint={sunHint()}
+              withChevron={false}
+              title={sunTitle}
+              aria-label={sunTitle}
+              disabled={!spot.footprint || outstanding || kept}
+              onClick={() => evidence.keep(SUN_LOOP_SPEC)}
+            />
+            <ControlChip
+              icon="photo_camera"
+              label={t('acquire.flyfoto')}
+              hint={flyfotoHint()}
+              withChevron={false}
+              title={flyfotoTitle}
+              aria-label={flyfotoTitle}
+              disabled={!flyfotoReady}
+              onClick={run.start}
+            />
+          </div>
+        </>
+      ) : (
+        <FlyfotoRun run={run} />
+      )}
 
       {evidence.failed && (
         <Alert color="red" mt="xs" p="xs">

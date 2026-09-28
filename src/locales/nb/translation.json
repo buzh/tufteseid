@@ -2,12 +2,23 @@
   "acquire": {
     "title": "Innhenting",
     "open": "Innhenting av bilder",
-    "hint": "Disse bildene lages et annet sted og legger seg under Bilder når de er ferdige. Du kan lukke boksen imens.",
+    "hint": "Bilder som bestilles over utsnittet, ikke av kartet slik det står. De legger seg under Bilder i kortet.",
     "sunLoopHint": "skyggerelieff med sola hele veien rundt, laget på tjeneren. Tar noen minutter.",
     "flyfoto": "Flyfotoserie",
-    "flyfotoHint": "alle opptakene over lokaliteten, hvert som sitt eget bilde.",
-    "later": "kommer",
-    "noFootprint": "utsnittet mangler"
+    "flyfotoHint": "gå gjennom opptakene over utsnittet, ett om gangen.",
+    "noFootprint": "utsnittet mangler",
+    "run": {
+      "progress": "Opptak {{index}} av {{count}}",
+      "none": "Ingen opptak dekker utsnittet",
+      "through": "Ingen flere opptak",
+      "tally": "{{kept}} beholdt · {{discarded}} forkastet",
+      "skipped_one": "1 opptak har stedet fra før",
+      "skipped_other": "{{count}} opptak har stedet fra før",
+      "keep": "Behold",
+      "discard": "Forkast",
+      "finish": "Ferdig",
+      "hint": "Bildene lages her i fana, ett om gangen. Lukker du boksen stopper runden, og det du har forkastet blir spurt om på nytt neste gang. Det stedet har fra før, blir hoppet over."
+    }
   },
   "auth": {
     "title": "Logg inn",

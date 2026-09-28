@@ -10,7 +10,7 @@ import { requestSunLoop } from '../api/render';
 import type { Bbox } from '../map/bbox';
 import { withDeadline } from '../shared/utils/deadline';
 import type { SunLoopLegend } from './legendContent';
-import { renderEvidence } from './render';
+import { renderEvidence, type BrowserSpec, type Produced } from './render';
 import { specOf } from './spec';
 
 /**
@@ -75,7 +75,10 @@ const UPLOAD_DEADLINE_MS = 300000;
 // not on this clock.
 const HANDOVER_DEADLINE_MS = 30000;
 
-const queue: RenderJob[] = [];
+// Thunks rather than jobs: a picker's preview shares the lane without sharing
+// the bookkeeping, having no row to keep a state for. Each settles itself, so
+// the drain below never sees a throw.
+const queue: (() => Promise<void>)[] = [];
 const states = new Map<string, RenderState>();
 const listeners = new Set<() => void>();
 let draining = false;
@@ -161,22 +164,7 @@ const drain = async () => {
   if (draining) return;
   draining = true;
   try {
-    for (let job = queue.shift(); job; job = queue.shift()) {
-      states.set(job.rec.id, 'running');
-      publish();
-      try {
-        await runJob(job);
-      } catch (e) {
-        console.warn(
-          '[evidence] render failed',
-          job.rec.id,
-          failureDetail(e),
-          e,
-        );
-        states.set(job.rec.id, 'failed');
-      }
-      publish();
-    }
+    for (let task = queue.shift(); task; task = queue.shift()) await task();
   } finally {
     draining = false;
   }
@@ -190,7 +178,44 @@ export const enqueueRender = (job: RenderJob): void => {
   const state = states.get(job.rec.id);
   if (state === 'queued' || state === 'running') return;
   states.set(job.rec.id, 'queued');
-  queue.push(job);
+  queue.push(async () => {
+    states.set(job.rec.id, 'running');
+    publish();
+    try {
+      await runJob(job);
+    } catch (e) {
+      console.warn('[evidence] render failed', job.rec.id, failureDetail(e), e);
+      states.set(job.rec.id, 'failed');
+    }
+    publish();
+  });
   publish();
   void drain();
 };
+
+/**
+ * Pixels with no row behind them: what a picker run shows the reader before
+ * asking whether to keep it. In the same lane as the rows' own renders, because
+ * the reason for one lane is the shared public edge and not the rows.
+ *
+ * `signal` gates the queue position rather than the render: a burst already on
+ * the wire ends on its own deadline and only its result is dropped. Rejects
+ * with the signal's reason for a preview the run no longer wants.
+ */
+export const enqueuePreview = (
+  spec: BrowserSpec,
+  bbox4326: Bbox,
+  signal: AbortSignal,
+): Promise<Produced | null> =>
+  new Promise((resolve, reject) => {
+    queue.push(async () => {
+      if (signal.aborted) {
+        reject(signal.reason);
+        return;
+      }
+      await withDeadline(RENDER_DEADLINE_MS, `${spec.kind} preview`, (inner) =>
+        renderEvidence(spec, bbox4326, inner),
+      ).then(resolve, reject);
+    });
+    void drain();
+  });

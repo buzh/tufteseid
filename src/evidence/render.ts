@@ -23,7 +23,7 @@ import { fetchFlyfotoRaster } from './flyfotoRaster';
 import { NIB_MOSAIC, type EvidenceSpec } from './spec';
 
 /** `meta` is merged over the spec's own — never replacing it. */
-type Produced = {
+export type Produced = {
   blob: Blob;
   filename: string;
   meta: EvidenceMeta;
@@ -31,7 +31,7 @@ type Produced = {
 
 /** Everything but `sunloop`, which the sidecar renders. Stated as a type so the
  *  switch below stays exhaustive and the compiler refuses a loop here. */
-type BrowserSpec = Exclude<EvidenceSpec, { kind: 'sunloop' }>;
+export type BrowserSpec = Exclude<EvidenceSpec, { kind: 'sunloop' }>;
 
 /**
  * The tail every arm shares: the pixels fitted to the store, described by what
