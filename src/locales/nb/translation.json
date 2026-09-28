@@ -251,8 +251,8 @@
     },
     "depth": {
       "factor": "×{{factor}}",
-      "native": "dypeste nivå {{m}} m/piksel",
-      "title": "Forstørret {{factor}}× forbi dypeste nivå ({{m}} m/piksel). Videre innzooming gir ingen nye detaljer."
+      "native": "Maks forstørrelse {{m}} m/piksel",
+      "title": "Forstørret {{factor}}×({{m}} m/piksel)." 
     },
     "render": {
       "chipTitle": "{{render}} — {{source}}",
@@ -260,7 +260,7 @@
       "cvatHint": "Tufteseids hjemmerendrede RVT CVAT",
       "wmsHint": "Kartverkets render",
       "cvatMissing": "Venter på at disk blir billig igjen",
-      "cvatProvenance": "RVT_py Combined VAT av «{{acquisition}}»: {{renderer}} {{template}}, radius {{general}}/{{flat}} piksler.",
+      "cvatProvenance": "RVT_py cVAT av «{{acquisition}}»: {{renderer}} {{template}}, radius {{general}}/{{flat}} piksler.",
       "domLocked": "Overflatemodellen publiserer bare skyggerelieff"
     },
     "hybrid": {
