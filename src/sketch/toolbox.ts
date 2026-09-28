@@ -91,7 +91,8 @@ export const readLive = (
   const selected = elements.filter(
     (element) => !element.isDeleted && appState.selectedElementIds[element.id],
   );
-  const last = selected.at(-1);
+  // Indexed rather than `at(-1)`: the build targets ES2020.
+  const last: SceneElement | undefined = selected[selected.length - 1];
   const background =
     last?.backgroundColor ?? appState.currentItemBackgroundColor;
   const tool = appState.activeTool.type;
