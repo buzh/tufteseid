@@ -44,6 +44,16 @@
   background: var(--mantine-color-default);
 }
 
+/* After the hovers, same rule and same reason as `ControlButton`: equal
+   specificity, so a seat taken first would be painted over the moment the
+   pointer crossed it. */
+.chip:disabled,
+.chip:disabled:hover {
+  background: var(--mantine-color-default);
+  color: var(--mantine-color-dimmed);
+  cursor: not-allowed;
+}
+
 .chipIcon {
   flex: none;
   color: var(--mantine-color-dimmed);

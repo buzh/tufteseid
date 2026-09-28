@@ -1,5 +1,5 @@
-/* Shared by `SpotPlacePrompt`, `SpotProperties` and `SpotCard`; never two at once.
-   Placement and width only — the shell is `Panel`. */
+/* Shared by `SpotPlacePrompt`, `SpotProperties`, `SpotCard` and `SpotAcquire`;
+   never two at once. Placement and width only — the shell is `Panel`. */
 .panel {
   position: absolute;
   top: var(--mantine-spacing-xs);
@@ -79,6 +79,29 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* What can be ordered, one to a line. */
+.chips {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-xs);
+  margin-top: var(--mantine-spacing-xs);
+}
+
+/* A chip is shaped for the band; in the box it takes the width. Reached through
+   the parent because `.chip`'s own `max-width` has the same specificity, and
+   which of the two won would come down to the order of the stylesheets. */
+.chips button {
+  width: 100%;
+  max-width: none;
+}
+
+/* Standing instructions rather than anything about the spot. */
+.note {
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  line-height: 1.4;
 }
 
 /* `pre-wrap` keeps the author's own paragraph breaks. */

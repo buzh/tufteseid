@@ -1,6 +1,7 @@
 import type { EvidenceMeta, EvidenceRecord } from '../api/evidence';
 import type { LidarModel } from '../map/layers/config/backgroundLayers/lidarProjects';
 import type { DemModel } from '../terrain/dem';
+import { DEFAULT_ALTITUDE, DEFAULT_Z_FACTOR } from '../terrain/render';
 import { VISUALIZATIONS, type Visualization } from '../terrain/shade';
 
 /** The seamless best-available mosaic, as against one acquisition. */
@@ -53,6 +54,21 @@ export type EvidenceSpec =
       stepDeg: number;
       fps: number;
     };
+
+/**
+ * The one sun loop on offer. Fixed rather than a form: the sun's height and the
+ * exaggeration are the analysis panel's own defaults, so a loop and a still of
+ * the same ground are lit alike. DTM, because a canopy walked round is a
+ * picture of the canopy.
+ */
+export const SUN_LOOP_SPEC: Extract<EvidenceSpec, { kind: 'sunloop' }> = {
+  kind: 'sunloop',
+  model: 'dtm',
+  altitude: DEFAULT_ALTITUDE,
+  zFactor: DEFAULT_Z_FACTOR,
+  stepDeg: SUNLOOP_STEP_DEG,
+  fps: SUNLOOP_FPS,
+};
 
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null;

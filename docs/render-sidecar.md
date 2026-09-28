@@ -392,10 +392,9 @@ somewhere to ask for it, and a branch in `queue.ts` that POSTs instead of
 rendering. Where to ask follows what the producer reads: a reading of the map as
 it stands is an offer atom feeding `keepOfferAtom`, which is what the camera in
 the spot card keeps, the way the three browser kinds are. A sun loop reads
-nothing on screen, so it does not belong on that camera — and **nothing offers
-one today**. Everything below still runs: an existing row renders, retries and
-reads. A new one needs a surface first, which is a spot-card or spot-editor
-control of its own carrying the sun's height, the exaggeration and the step.
+nothing on screen, so it does not belong on that camera; it is ordered from
+`SpotAcquire` (`src/spotControls/`) instead, off the fixed `SUN_LOOP_SPEC`, and
+that box is where a second server-side producer's chip goes.
 `BrowserSpec` in `render.ts` is `Exclude<EvidenceSpec, {kind: 'sunloop'}>` — a
 server-side kind is excluded there so the browser producers' switch stays
 exhaustive, and a second one joins that exclusion.

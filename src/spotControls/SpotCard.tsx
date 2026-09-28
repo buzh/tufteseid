@@ -26,6 +26,7 @@ import {
   activeSpotAtom,
   adjustSpotDraftAtom,
   editSpotDraftAtom,
+  spotAcquiringAtom,
   spotDraftAtom,
   spotReadingAtom,
   type SpotDraft,
@@ -41,10 +42,11 @@ import { useSpotDraft, type SpotDraftController } from './useSpotDraft';
 
 /**
  * The camera, the rectangle and the drawing: the three things done against the
- * ground rather than filled into a form, so the card does them itself. `hold`
- * is present exactly while a draft has the map, and is then the only current
- * account of the rectangle and the drawing — the record lags it by a round
- * trip.
+ * ground rather than filled into a form, so the card does them itself — and on
+ * the end of the same row the microscope, which is the one button here that
+ * asks for a picture made somewhere else. `hold` is present exactly while a
+ * draft has the map, and is then the only current account of the rectangle and
+ * the drawing — the record lags it by a round trip.
  */
 const SpotUnits = ({
   spot,
@@ -57,6 +59,7 @@ const SpotUnits = ({
 }) => {
   const { t } = useTranslation();
   const adjust = useSetAtom(adjustSpotDraftAtom);
+  const setAcquiring = useSetAtom(spotAcquiringAtom);
   const framing = hold?.stage === 'footprint';
   const drawing = hold?.stage === 'sketch';
 
@@ -125,6 +128,16 @@ const SpotUnits = ({
                 hasSketch ? t('spots.sketchChange') : t('spots.sketchAdd')
               }
               onClick={() => adjust(spot, 'sketch')}
+            />
+          </Tooltip>
+          <Tooltip label={t('acquire.open')}>
+            <ControlButton
+              icon="biotech"
+              aria-label={t('acquire.open')}
+              // The box is suspended for as long as any draft lives, so with
+              // the map in hand it would not open.
+              disabled={hold != null}
+              onClick={() => setAcquiring(true)}
             />
           </Tooltip>
         </div>

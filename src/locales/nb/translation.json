@@ -1,4 +1,14 @@
 {
+  "acquire": {
+    "title": "Innhenting",
+    "open": "Innhenting av bilder",
+    "hint": "Disse bildene lages et annet sted og legger seg under Bilder når de er ferdige. Du kan lukke boksen imens.",
+    "sunLoopHint": "skyggerelieff med sola hele veien rundt, laget på tjeneren. Tar noen minutter.",
+    "flyfoto": "Flyfotoserie",
+    "flyfotoHint": "alle opptakene over lokaliteten, hvert som sitt eget bilde.",
+    "later": "kommer",
+    "noFootprint": "utsnittet mangler"
+  },
   "auth": {
     "title": "Logg inn",
     "blurb": "Du trenger en konto for å lagre egne lokaliteter. Lokalitetene dine er private til du gjør dem offentlige.",

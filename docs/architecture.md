@@ -30,7 +30,7 @@ One row per directory under `src/`.
 | `shared/` | Error boundary, URL parameter access, coordinate parsing, enum and number helpers, and the request deadline that reports to the breaker. |
 | `showControls/` | The band's what-is-drawn-over-the-ground group: the Kulturminner control and the drawing's toggle. |
 | `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the toolbox that stands in for Excalidraw's own, the remembered pen, and the render onto the ground. |
-| `spotControls/` | The reader's records as surfaces: the `+`, the properties box, the read card, the index menu. |
+| `spotControls/` | The reader's records as surfaces: the `+`, the properties box, the read card, the box that orders a render from elsewhere, the index menu. |
 | `spots/` | Spot state and geometry: the pin layer and its style, the footprint frame, hit test, place and adjust, share link, name suggestion. |
 | `terrain/` | Client-side terrain analysis: DEM fetch, shading, the analysis window and its layers. |
 | `terrainControls/` | The terrain toggle and its panel. |
@@ -78,6 +78,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `place`/`edit`/`adjust`/`closeSpotDraftAtom`, `setSpotStageAtom` | same | Write-only. `adjustSpotDraftAtom` is the card's: it opens a draft straight into a stage with `box: 'card'`. |
 | `activeSpotAtom` | same | The record being read — opened by a click, by an index row, or by `?lok=`. |
 | `spotReadingAtom` | same | The open spot's kept renders are being read on the map. Held as the id it was entered on; writing `activeSpotAtom` with a different spot — or none — clears it, and a draft suspends it. True regardless for a spot the reader may not edit, for whom writing it false does nothing. |
+| `spotAcquiringAtom` | same | The acquisition box stands in front of the card. Held the same way as the reading and suspended by a draft for the same reason; never true for a reader who may not edit the spot, who is held in the reading. |
 | `spotRecordsAtom`, `spotsFailedAtom` | `spots/spotRecords.ts` | Every record the session may see, null until the list lands; and whether it never did. |
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
@@ -151,14 +152,16 @@ the tile guard and the theme-layer effect walk whatever maps exist.
 
 ## Making a spot
 
-Two boxes stand over one record. `SpotProperties` is what a spot is *called* —
-name, description, the pin, and the delete — reached from the card's cogwheel
-and from the `+` that makes a new one. `SpotCard` is where the reader then
-spends their time: the rectangle and the drawing as an icon button each, and
-the pictures. Reading terrain against a place is the ongoing act and naming it
-a one-off, so the card is the workbench and the properties box is behind a
-button. A button becomes a row — the hint and its Ferdig, or the pen's
-Avbryt/Lagre — for as long as it has the map, and only one of the two can.
+Three boxes stand over one record, one at a time. `SpotProperties` is what a
+spot is *called* — name, description, the pin, and the delete — reached from the
+card's cogwheel and from the `+` that makes a new one. `SpotCard` is where the
+reader then spends their time: the rectangle and the drawing as an icon button
+each, and the pictures. Reading terrain against a place is the ongoing act and
+naming it a one-off, so the card is the workbench and the properties box is
+behind a button. A button becomes a row — the hint and its Ferdig, or the pen's
+Avbryt/Lagre — for as long as it has the map, and only one of the two can. The
+third, `SpotAcquire`, is behind the card's microscope and orders the pictures
+that are made somewhere else (*The pictures of a spot*).
 
 The pin belongs to the properties box and stands only while it is open
 (`unpinnedSpotIdAtom`, `pinAdjust.ts`). The card and the reader are read against
@@ -273,8 +276,10 @@ epoch milliseconds, so a row lands last by being created. There is one list over
 them — `EvidenceGallery` on the card — and it does everything but the asking:
 the kept rows, the drag that sets the order, and the press that lays a picture
 back on the map to trace over. Asking for another is the camera in the card's
-tools row, beside the rectangle and the pen. `EvidenceReader` flips through the
-same rows full size and changes none of them.
+tools row, beside the rectangle and the pen — or, on the end of that same row,
+the microscope, which is where the pictures nobody can take from the view are
+ordered. `EvidenceReader` flips through the same rows full size and changes none
+of them.
 
 - **The cover is the first readable row.** Nothing marks one: the reading opens
   on it, so dragging a picture to the top is how a cover is chosen, and the star
@@ -312,12 +317,19 @@ same rows full size and changes none of them.
   level the store holds and crops them, where the WMS grounds ask for the
   rectangle at the source's own resolution. A tile the pipeline has not written
   is a 404, so a rectangle off the flight reads as `empty` rather than failed.
-- **Nothing asks for a `sunloop`.** The kind, `rendersvc` and the queue's
-  handover arm are all live and an existing row still reads and retries, but no
-  surface offers a new one: a sun loop reads nothing on screen, so it did not
-  belong on a camera that keeps the view, and it has not been given another
-  home yet. The offer atom is the hook a future one hangs off
-  (`docs/render-sidecar.md`).
+- **A sun loop is ordered, not kept.** It reads nothing on screen, so it never
+  belonged on a camera that keeps the view. It is asked for in `SpotAcquire`
+  (`src/spotControls/`), the box behind the microscope on the end of the card's
+  tools row, which stands in front of the card and holds one chip per picture
+  that is made somewhere other than the tab that asked. `SUN_LOOP_SPEC` (`evidence/spec.ts`) is the whole
+  ask — DTM, the analysis panel's own sun and exaggeration, 72 frames — so there
+  is no form and nothing about the ask follows the map. The chip is dead while a
+  loop of the spot's is outstanding, because the sidecar takes one job per
+  caller, and while one already covers the footprint with those parameters; a
+  settled row is retried in the gallery, where every other kind's is. The
+  flyfoto series beside it is disabled and is the reason the box is a box rather
+  than a second camera: the legacy branch fetched every acquisition over a spot
+  at once, and that too is an order rather than a reading of the view.
 - **Not every row is made here.** Three kinds are rendered in the tab that asked
   for them; `sunloop` is created the same way and then handed to the render
   sidecar, which writes the file back itself (`docs/render-sidecar.md`). The row,
@@ -640,6 +652,10 @@ show group; anything else that applies to the reading belongs to the tools.
   back, so a browser that refused the autoplay shows a play button rather than
   a lie. No speed, no frame-by-frame step, and a scrub decodes forward from the
   file's one keyframe.
+- **The flyfoto series is a dead chip.** The second order in `SpotAcquire` is
+  disabled. The legacy branch fetched every Norge i bilder acquisition over a
+  record in one go, behind a picker with a cap and a rights notice; nothing here
+  has brought that back. The chip stands so the box is the place it lands.
 - **A render is not a cache.** Upstreams re-fly and reprocess, so the same spec
   re-rendered later may not be the picture its author read. `meta.renderedAt`
   says when the file was made; nothing re-renders on its own.

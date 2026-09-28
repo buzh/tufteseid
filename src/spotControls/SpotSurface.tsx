@@ -11,6 +11,7 @@ import { sketchSessionAtom } from '../sketch/session';
 import { useSketchSession } from '../sketch/useSketchSession';
 import {
   activeSpotAtom,
+  spotAcquiringAtom,
   spotDraftAtom,
   spotFootprintAdjustingAtom,
   spotFootprintAtom,
@@ -23,6 +24,7 @@ import { useSpotPlacement } from '../spots/pinPlace';
 import { useSpotShareLink } from '../spots/shareLink';
 import { useSpotLayer } from '../spots/spotLayer';
 import { useSpotRecords } from '../spots/spotRecords';
+import { SpotAcquire } from './SpotAcquire';
 import { SpotCard } from './SpotCard';
 import { SpotPlacePrompt } from './SpotPlacePrompt';
 import { SpotProperties } from './SpotProperties';
@@ -55,6 +57,7 @@ export const SpotSurface = () => {
   const placing = useAtomValue(spotPlacingAtom);
   const active = useAtomValue(activeSpotAtom);
   const reading = useAtomValue(spotReadingAtom);
+  const acquiring = useAtomValue(spotAcquiringAtom);
   const session = useAtomValue(sketchSessionAtom);
   const drawn = useAtomValue(spotSketchAtom);
   const ground = useAtomValue(draftGroundAtom);
@@ -112,6 +115,8 @@ export const SpotSurface = () => {
         active &&
         (reading ? (
           <EvidenceReader key={active.id} spot={active} />
+        ) : acquiring ? (
+          <SpotAcquire key={active.id} spot={active} />
         ) : (
           <SpotCard key={active.id} spot={active} />
         ))
