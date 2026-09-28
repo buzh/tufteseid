@@ -1,0 +1,10 @@
+/* Mantine's `CloseButton` takes no `color`, so the papaya the `Panel` boxes
+   get from `ActionIcon` is painted by hand here. */
+.close {
+  background-color: var(--mantine-primary-color-filled);
+  color: var(--mantine-primary-color-contrast);
+}
+
+.close:hover {
+  background-color: var(--mantine-primary-color-filled-hover);
+}

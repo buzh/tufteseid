@@ -115,8 +115,8 @@ export const Panel = ({
         {onClose && (
           <Tooltip label={closeLabel}>
             <ActionIcon
-              variant={close.armed ? 'filled' : 'subtle'}
-              color={close.armed ? 'red' : 'gray'}
+              variant="filled"
+              color={close.armed ? 'red' : 'papaya'}
               size="sm"
               aria-label={closeLabel}
               onClick={close.press}

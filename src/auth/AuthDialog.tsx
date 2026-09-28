@@ -6,6 +6,7 @@ import { useAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
 import { authPromptAtom, isAuthDialogOpenAtom } from './atoms';
+import styles from './AuthDialog.module.css';
 import { useOAuthProviders, useSignIn } from './hooks';
 
 // PocketBase's `displayName` takes its casing from whoever configured the
@@ -45,6 +46,7 @@ export const AuthDialog = () => {
       opened={open}
       onClose={close}
       title={t('auth.title')}
+      closeButtonProps={{ className: styles.close }}
       centered
       size="sm"
     >
