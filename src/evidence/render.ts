@@ -115,7 +115,11 @@ export const renderEvidence = async (
     }
 
     case 'terrain': {
-      const dem = await fetchDem(bbox4326, { model: spec.model, signal });
+      const dem = await fetchDem(bbox4326, {
+        model: spec.model,
+        signal,
+        whole: true,
+      });
       if (!dem) return null;
       // Write the clamped radius back, or the duplicate guard never matches and
       // the button offers to make this same picture forever.

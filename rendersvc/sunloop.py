@@ -158,6 +158,7 @@ def render(spec, bbox25833, legend_content, log):
         ],
         width + 2 * MARGIN_PX,
         height + 2 * MARGIN_PX,
+        log,
     )
     crop = slice(MARGIN_PX, -MARGIN_PX) if MARGIN_PX else slice(None)
     # rvt 2.2.3 restores the input's NaN mask onto its output, so a hole is never

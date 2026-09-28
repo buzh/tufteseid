@@ -79,6 +79,13 @@ tiled 128×128, never striped.
   TOPOBATHY. Stretch on percentiles, not min/max.
 - An all-errored fetch must not surface as "no LiDAR here": `fetchDem` throws
   when every tile failed, and returns `null` only for real absence.
+- **A partly-errored fetch must not be kept.** A shed tile decodes to the same
+  NaN as ground no laser ever covered, so a grid with a hole in it is a picture
+  that cannot be told from the truth later — and nothing re-renders a kept row.
+  So `fetchDem` takes `whole`, which turns any failed tile into a throw, and
+  the evidence producer passes it while the reading view does not: a row gets
+  the retry, and the panel keeps showing what it has until the next pan fetches
+  the rest.
 
 ### Mosaic choice — no fallback to the national one
 

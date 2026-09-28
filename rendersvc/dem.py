@@ -11,6 +11,7 @@ nobody will ask for again, so caching it only evicts tiles that are re-read.
 """
 
 import json
+import random
 import time
 import urllib.parse
 import urllib.request
@@ -36,11 +37,29 @@ MOSAIC_RULE = json.dumps(
 # Finest resolution the per-project services publish.
 FINEST_M_PER_PX = 0.25
 
+# No retry, and short: a probe that fails costs the render nothing but this,
+# because the fall-through assumes the finest resolution the services publish.
+# Erring that way asks for more pixels than the ground has, never fewer.
 PROBE_TIMEOUT_S = 20
-FETCH_TIMEOUT_S = 180
-# exportImage answers a burst with a text body under a 200 status. This is the
-# step that fails, and it recovers on its own.
-FETCH_RETRIES = 5
+
+# One attempt. `urlopen`'s timeout is the socket's, so this bounds how long the
+# service may go silent rather than how long the transfer may take — which is
+# the right thing to be patient about: ArcGIS composes the whole mosaic before
+# it sends a byte, and a 2200 px F32 grid has been measured at 134 s of that on
+# a busy afternoon. Cutting a grid off for being slow buys nothing at all, since
+# the retry starts from the beginning against the same service.
+FETCH_TIMEOUT_S = 600
+# Every attempt at one grid, together. The picture is never made coarser to fit
+# a struggling upstream, so patience is the only thing left to spend — bounded
+# here, because the worker is serial and the queue behind it is real. A blend
+# fetches two grids and so may spend twice this.
+FETCH_BUDGET_S = 900
+# exportImage answers a burst with a text body under a 200 status, and that
+# recovers on its own in seconds. Real load does not, and hammering is how a
+# slow minute becomes a slow hour — so the wait grows, with jitter, and the
+# attempts are capped as well as the budget.
+MAX_ATTEMPTS = 6
+BACKOFF_CAP_S = 60
 
 _to_metric = Transformer.from_crs("EPSG:4326", "EPSG:25833", always_xy=True)
 
@@ -110,9 +129,19 @@ def probe_coverage(model, bbox25833):
     return float(best)
 
 
-def fetch_grid(model, bbox25833, width, height):
+def _slow(e):
+    """A service that never answered, rather than one that answered badly.
+    `urlopen` hands the socket's `TimeoutError` back inside a `URLError`."""
+    return isinstance(e, TimeoutError) or isinstance(
+        getattr(e, "reason", None), TimeoutError
+    )
+
+
+def fetch_grid(model, bbox25833, width, height, log=None):
     """(height, width) float32, metres above the vertical datum, north-up. NaN
-    where no acquisition covers the pixel."""
+    where no acquisition covers the pixel. Raises rather than answering with
+    less than was asked for: a grid is the picture's resolution, and a caller
+    that cannot have it wants the row retried, not quietly coarsened."""
     query = {
         "f": "image",
         "bbox": ",".join(str(v) for v in bbox25833),
@@ -132,15 +161,34 @@ def fetch_grid(model, bbox25833, width, height):
         + urllib.parse.urlencode(query)
     )
 
+    started = time.monotonic()
+    deadline = started + FETCH_BUDGET_S
     last = None
-    for attempt in range(FETCH_RETRIES):
+    attempt = 0
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        left = deadline - time.monotonic()
+        if left <= 0:
+            break
         try:
-            buf = _get(url, FETCH_TIMEOUT_S)
+            buf = _get(url, min(FETCH_TIMEOUT_S, left))
             if buf[:2] not in (b"II", b"MM"):
                 raise RuntimeError(f"not an image: {buf[:300]!r}")
             return read_tiff_f32(buf)
         except (OSError, RuntimeError, ValueError) as e:
             last = e
-            if attempt < FETCH_RETRIES - 1:
-                time.sleep(2 * (attempt + 1))
-    raise RuntimeError(f"exportImage failed {FETCH_RETRIES} times: {last}")
+        if log:
+            log(f"{width}x{height} attempt {attempt} failed: {last}")
+        # A timeout has already done the waiting, and waiting again only spends
+        # budget that would hold the next connection open instead.
+        wait = (
+            0
+            if _slow(last)
+            else min(BACKOFF_CAP_S, 2**attempt) * (0.5 + random.random())
+        )
+        if time.monotonic() + wait >= deadline:
+            break
+        time.sleep(wait)
+    raise RuntimeError(
+        f"exportImage failed {attempt} times in "
+        f"{time.monotonic() - started:.0f} s at {width}x{height}: {last}"
+    )

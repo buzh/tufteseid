@@ -273,7 +273,7 @@ def spec_of(meta):
     return {"vis": vis, "model": model}
 
 
-def _fetch(model, bbox25833, res_x, res_y, width, height, pad_px):
+def _fetch(model, bbox25833, res_x, res_y, width, height, pad_px, log):
     """The rectangle with `pad_px` of real ground around it, at that pixel
     size."""
     pad_x, pad_y = pad_px * res_x, pad_px * res_y
@@ -287,6 +287,7 @@ def _fetch(model, bbox25833, res_x, res_y, width, height, pad_px):
         ],
         width + 2 * pad_px,
         height + 2 * pad_px,
+        log,
     )
 
 
@@ -337,7 +338,7 @@ def render(spec, bbox25833, legend_content, log):
     margin_px = max(1, int(np.ceil(margin_m / metres_per_px)))
     started = time.perf_counter()
     fine = _fetch(
-        model, bbox25833, metres_per_px, metres_per_px, width, height, margin_px
+        model, bbox25833, metres_per_px, metres_per_px, width, height, margin_px, log
     )
     crop = (slice(margin_px, margin_px + height), slice(margin_px, margin_px + width))
     # rvt restores the input's NaN mask onto its output, so a hole is never
@@ -375,6 +376,7 @@ def render(spec, bbox25833, legend_content, log):
             coarse_width,
             coarse_height,
             context_px,
+            log,
         )
         log(
             f"context {coarse.shape[1]}x{coarse.shape[0]} at "

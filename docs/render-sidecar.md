@@ -272,6 +272,32 @@ PNG, 315 s all told and 1.0 GB peak RSS against the container's 2 GB. A 300 m
 footprint is 45 s and 3.4 MB. The fetch dominates and varies with the day; the
 compute does not.
 
+## When hoydedata.no is slow
+
+The rule is that **no picture is made worse to get it made**. A grid is the
+resolution the acquisition publishes and the context the blend needs; a service
+that cannot supply that gets waited on, and failing that the row is marked
+`failed` and the reader is offered the retry. Nothing coarsens, crops, or fills
+in to finish on time.
+
+So the patience is where the cost is bounded, not the pixels:
+
+| | | |
+| --- | --- | --- |
+| `FETCH_TIMEOUT_S` | 600 s | one attempt, and it is the *socket's* timeout, so it bounds how long the service may stay silent rather than how long a transfer may take. ArcGIS composes the whole mosaic before sending a byte, and 134 s of that has been measured on a 2200 px grid |
+| `FETCH_BUDGET_S` | 900 s | every attempt at one grid together, so patience never multiplies by the retry count. A blend fetches two grids and may spend twice this |
+| `MAX_ATTEMPTS` | 6 | with backoff doubling to a 60 s cap, jittered. A shed burst recovers in seconds; real load does not, and hammering is how a slow minute becomes a slow hour |
+| `PROBE_TIMEOUT_S` | 20 s | no retry. A probe that fails costs only this, because the fall-through assumes the finest resolution the services publish — erring towards more pixels than the ground has, never fewer |
+
+Every attempt after the first is logged with the grid's size and the reason, so
+a slow render can be told from a stuck one in the log rather than by waiting.
+
+The trade this accepts: one job can now hold the single worker for half an hour
+against a service having a bad afternoon, with `QUEUE_MAX` 8 behind it and
+`PER_CALLER_MAX` 1 refusing that reader a second order meanwhile. The heartbeat
+keeps every one of those rows honestly marked `queued` or `running`, so nothing
+goes stale and nothing lies.
+
 **Direct to hoydedata.no, never through wmscache.** Every job is a rectangle
 nobody will ask for again, so caching one only evicts tiles that are re-read —
 the same rule `vat-cache/` follows.
@@ -437,7 +463,8 @@ render with it. If the thread stops all the same, `/health` answers 503 and
 | What happens | What the row says |
 | --- | --- |
 | No laser data over the footprint, or a grid under half covered once decoded | `job.state = empty` — an answer about the ground rather than a fault, and still worth asking again |
-| `exportImage` sheds (a text body under a 200 status) | five retries with backoff inside `fetch_grid`, then `failed` |
+| `exportImage` sheds (a text body under a 200 status) | retried with growing, jittered backoff inside `fetch_grid` until `FETCH_BUDGET_S` or `MAX_ATTEMPTS` runs out, then `failed` |
+| hoydedata.no is merely slow | waited out — 600 s of silence per attempt, 900 s a grid, and the marker is beaten throughout, so the row says `rendering` rather than going stale |
 | The coverage probe itself errors | logged, render continues at 0.25 m |
 | ffmpeg fails, or the file will not fit after three encodes | `failed`, with ffmpeg's stderr in `job.detail` (300 chars) |
 | A blend's PNG will not fit the 50 MB field | `failed` — there is no re-encode ladder for a still, and the worst case the footprint cap allows measures 9.3 MB |

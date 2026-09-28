@@ -155,13 +155,19 @@ function probeCoverage(
 export type FetchDemOptions = {
   model?: DemModel;
   signal?: AbortSignal;
+  /** Refuse a grid any tile of which errored, rather than returning it with a
+   *  hole. For pixels that are kept: a tile the service shed reads exactly like
+   *  ground no laser ever covered, and a picture nothing re-renders would carry
+   *  that lie for good. The reading view takes the partial grid instead, where
+   *  the next pan fetches it again. */
+  whole?: boolean;
 };
 
 // Null when the bbox is entirely outside LiDAR coverage; throws when every tile
-// request failed.
+// request failed, or when any did and `whole` was asked for.
 export async function fetchDem(
   bbox4326: Bbox,
-  { model = 'dtm', signal }: FetchDemOptions = {},
+  { model = 'dtm', signal, whole = false }: FetchDemOptions = {},
 ): Promise<Dem | null> {
   const bbox25833 = transformExtent(bbox4326, 'EPSG:4326', 'EPSG:25833') as [
     number,
@@ -223,6 +229,9 @@ export async function fetchDem(
   // real absence arrives as valid but entirely sparse TIFFs.
   if (covered === 0 && failed > 0) {
     throw new Error('every DEM tile request failed');
+  }
+  if (whole && failed > 0) {
+    throw new Error(`${failed} of ${plan.tiles.length} DEM tiles failed`);
   }
   if (covered === 0) return null;
 
