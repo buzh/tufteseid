@@ -406,7 +406,8 @@
       "busy": "Legg fra deg den nye lokaliteten for å bla i lokalitetene",
       "tabMine": "Mine",
       "tabPopular": "Populære",
-      "empty": "Ingen offentlige lokaliteter ennå."
+      "empty": "Ingen offentlige lokaliteter ennå.",
+      "failed": "Fikk ikke hentet lokalitetene."
     }
   },
   "terrainControls": {

@@ -172,7 +172,7 @@ export const SpotMenu = () => {
                 disabled
                 leftSection={<Icon icon="warning" size={18} />}
               >
-                {t('spots.mine.failed')}
+                {t(tab === 'mine' ? 'spots.mine.failed' : 'spots.list.failed')}
               </Menu.Item>
             )}
             {!failed && spots == null && (
