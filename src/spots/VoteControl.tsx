@@ -10,18 +10,11 @@ import { useTranslation } from 'react-i18next';
 import type { SpotRecord } from '../api/spots';
 import { castVote, retractVote, type VoteDirection } from '../api/votes';
 import { currentUserAtom } from '../auth/atoms';
-import { cx } from '../ui/cx';
 import { ControlButton } from '../ui/ControlButton';
 import { myVotesAtom, spotScoresAtom } from './spotScores';
 import styles from './VoteControl.module.css';
 
-export const VoteControl = ({
-  spot,
-  className,
-}: {
-  spot: SpotRecord;
-  className?: string;
-}) => {
+export const VoteControl = ({ spot }: { spot: SpotRecord }) => {
   const { t } = useTranslation();
   const user = useAtomValue(currentUserAtom);
   const scores = useAtomValue(spotScoresAtom);
@@ -58,7 +51,7 @@ export const VoteControl = ({
     // span: a disabled button fires no pointer events, so a tooltip on the
     // button itself would never be the one the reader needs.
     <Tooltip label={blocked} disabled={blocked == null}>
-      <span className={cx(styles.group, className)}>
+      <span className={styles.group}>
         <Tooltip label={t('spots.voteUp')} disabled={blocked != null}>
           <ControlButton
             icon="thumb_up"
