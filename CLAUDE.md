@@ -162,7 +162,9 @@ Two collections carry the reader's records:
   (private | public), `point` (json, `[lon, lat]` EPSG:4326), `footprint` (json,
   `[west, south, east, north]` EPSG:4326 or null — the square every piece of
   evidence is rendered over, ≤500 m on a side), `sketch` (json ≤5 MB: an
-  Excalidraw scene plus the frame that georeferences it, or null).
+  Excalidraw scene plus the frame that georeferences it, or null), `mapSketch`
+  (which drawing stands on the shared drawing layer; empty means the `sketch`
+  column, which is the only drawing a spot can hold today).
 - **`evidence`** (id `pbc_evidence`) — `spot` (→ spots, cascade), `owner`
   (→ users, cascade), `kind` (lidar | terrain | flyfoto | sunloop | rvt, the
   last being every RVT blend, with `meta.vis` saying which), `file`

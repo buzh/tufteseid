@@ -1,6 +1,10 @@
 import type { ExcalidrawInitialDataState } from '@excalidraw/excalidraw/types';
 
-import type { SpotSketch } from '../api/spots';
+import {
+  MAP_SKETCH_COLUMN,
+  type SpotRecord,
+  type SpotSketch,
+} from '../api/spots';
 import type { SketchFrame } from './frame';
 
 export type SceneElement = NonNullable<
@@ -77,4 +81,18 @@ export const sketchOf = (
     },
     elements: value.elements as SceneElement[],
   };
+};
+
+/** The drawing a spot stands on the shared layer. A spot holds one drawing
+ *  today, so `mapSketch` is empty or names the column; an id this build cannot
+ *  resolve draws nothing rather than falling back, because falling back would
+ *  put the drawing the author took off the map back on it. Unset rather than
+ *  empty means the migration has not run — read as the column, so a forgotten
+ *  `docker compose restart pocketbase` does not empty the layer. */
+export const mapSketchOf = (spot: SpotRecord): Sketch | null => {
+  const chosen = spot.mapSketch;
+  if (chosen != null && chosen !== '' && chosen !== MAP_SKETCH_COLUMN) {
+    return null;
+  }
+  return sketchOf(spot.sketch);
 };

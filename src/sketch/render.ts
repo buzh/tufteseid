@@ -7,6 +7,7 @@
 // editor bundle, which reads the font path off the global as it evaluates, and
 // a short link renders here without `SketchCanvas` ever mounting.
 import './excalidrawAssets';
+import type { Extent } from 'ol/extent';
 import { transformExtent } from 'ol/proj';
 
 import { sceneToCoord, type SketchFrame } from './frame';
@@ -17,6 +18,7 @@ import type { SceneElement } from './scene';
 const EXPORT_PADDING = 10;
 
 // A frame budget, not a storage one: the overlay re-exports on every zoom step.
+// The shared layer asks for less, having many drawings up at once.
 const MAX_RENDER_PIXELS = 16000000;
 
 export type SceneRender = {
@@ -42,6 +44,7 @@ export const renderScene = async (
   frame: SketchFrame,
   elements: readonly SceneElement[],
   scale: number,
+  maxPixels: number = MAX_RENDER_PIXELS,
 ): Promise<SceneRender | null> => {
   if (elements.length === 0) return null;
   let mod: ExcalidrawModule;
@@ -77,7 +80,7 @@ export const renderScene = async (
 
   const wanted = Math.max(scale, 0.01);
   const budget = Math.sqrt(
-    MAX_RENDER_PIXELS / (sceneWidth * sceneHeight * wanted * wanted),
+    maxPixels / (sceneWidth * sceneHeight * wanted * wanted),
   );
   const drawn = budget < 1 ? wanted * budget : wanted;
 
@@ -131,4 +134,31 @@ export const renderScene = async (
             number,
           ]),
   };
+};
+
+/** Puts a render on a canvas showing `extent` (EPSG:25833, as the render is)
+ *  at `resolution`. Both overlays draw into an `ImageCanvasSource`. */
+export const paintRender = (
+  ctx: CanvasRenderingContext2D,
+  render: SceneRender,
+  extent: Extent,
+  resolution: number,
+  pixelRatio: number,
+): void => {
+  const [minX, minY, maxX, maxY] = render.extent25833;
+  const scale = pixelRatio / resolution;
+  const width = (maxX - minX) * scale;
+  const height = (maxY - minY) * scale;
+  if (!(width > 0) || !(height > 0)) return;
+  ctx.drawImage(
+    render.canvas,
+    0,
+    0,
+    render.canvas.width,
+    render.canvas.height,
+    (minX - extent[0]) * scale,
+    (extent[3] - maxY) * scale,
+    width,
+    height,
+  );
 };

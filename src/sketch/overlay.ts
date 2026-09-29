@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react';
 import { mapAtom } from '../map/atoms';
 import { TYPING_SURFACE } from '../ui/hints';
 import { metresPerScenePx } from './frame';
-import { renderScene, type SceneRender } from './render';
+import { paintRender, renderScene, type SceneRender } from './render';
 import type { Sketch } from './scene';
 
 // Over the terrain analysis (1), under its frame (4) and under the pin (6).
@@ -104,25 +104,9 @@ const drawEntry =
       entry,
       (metresPerScenePx(entry.sketch.frame) * pixelRatio) / resolution,
     );
-    const render = entry.render;
-    if (!render) return out;
-
-    const [minX, minY, maxX, maxY] = render.extent25833;
-    const scale = pixelRatio / resolution;
-    const w = (maxX - minX) * scale;
-    const h = (maxY - minY) * scale;
-    if (!(w > 0) || !(h > 0)) return out;
-    ctx.drawImage(
-      render.canvas,
-      0,
-      0,
-      render.canvas.width,
-      render.canvas.height,
-      (minX - extent[0]) * scale,
-      (extent[3] - maxY) * scale,
-      w,
-      h,
-    );
+    if (entry.render) {
+      paintRender(ctx, entry.render, extent, resolution, pixelRatio);
+    }
     return out;
   };
 

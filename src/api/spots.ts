@@ -45,9 +45,17 @@ export type SpotRecord = {
    *  repairs on sight. */
   footprint: SpotFootprint | null;
   sketch: SpotSketch | null;
+  /** Which drawing the spot puts on the shared drawing layer: a sketch id, or
+   *  empty for the `sketch` column below — which is every record written
+   *  before the field existed, and the only drawing a spot can hold today.
+   *  Resolved by `sketch/scene.ts`. */
+  mapSketch: string;
   created: string;
   updated: string;
 };
+
+/** The reserved `mapSketch` value naming the `sketch` column itself. */
+export const MAP_SKETCH_COLUMN = 'sketch';
 
 // Mirrors the column widths in `pb_migrations/1700001100_spots.js`.
 export const SPOT_NAME_MAX = 200;
@@ -69,6 +77,7 @@ export type SpotPatch = Partial<{
   point: SpotPoint;
   footprint: SpotFootprint | null;
   sketch: SpotSketch | null;
+  mapSketch: string;
 }>;
 
 // Crockford base32; 32 divides 256, so `% 32` on a random byte is unbiased.

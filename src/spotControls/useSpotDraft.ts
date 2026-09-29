@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createSpot,
   deleteSpot,
+  MAP_SKETCH_COLUMN,
   updateSpot,
   type SpotPatch,
   type SpotRecord,
@@ -319,6 +320,11 @@ export const useSpotDraft = (
         else {
           setSketchTooBig(false);
           fields.sketch = drawing;
+          // Written with the column it names, so a record that predates the
+          // field gets it the first time its drawing is touched. A spot holds
+          // one drawing today; when it can hold several this is the one on the
+          // shared layer.
+          fields.mapSketch = drawing ? MAP_SKETCH_COLUMN : '';
           kept = drawing;
           // The toggle is a reading setting and outlives the spot it was
           // turned off on, so strokes put down while it is off would be

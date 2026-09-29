@@ -81,6 +81,8 @@ export type UrlParameter =
   | 'heritageDetails'
   | 'heritageRender'
   | 'heritageOpacity'
+  // Every spot's chosen drawing on the ground at once.
+  | 'sketches'
   | 'lat'
   | 'lon'
   | 'zoom';

@@ -257,6 +257,7 @@ layer taken off a map loses everything it had loaded.
 | 1 | terrain-analysis render | `src/terrain/terrainLayer.ts` |
 | 1.25 | the render being read on a spot, kept or merely proposed — `spotEvidenceOverlay` for a still, `spotEvidenceLoop` for a sun loop, never both | `src/evidence/evidenceOverlay.ts` |
 | 1.5 | the B half of a two-ground view | `src/map/compare/compareLayers.ts` (`COMPARE_Z`) |
+| 1.9 | every other spot's chosen drawing at once, off until asked for (`a`) | `src/sketch/allSketches.ts` |
 | 2 | an open spot's drawing, hidden and faded from the box that opened it (`t`) | `src/sketch/overlay.ts` |
 | 3 | LiDAR footprint outlines | `src/map/lidarFootprintsLayer.ts` |
 | 4 | a rectangle in hand — the terrain window or a spot's footprint | `src/map/rectAdjust.ts` |

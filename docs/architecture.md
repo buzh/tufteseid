@@ -28,8 +28,8 @@ One row per directory under `src/`.
 | `ribbon/` | The top band: its three sections and the upstream status light while the map is the context in front, and the draw band while a drawing is. Layout only. |
 | `search/` | Kartverket place, address, road, property and elevation lookups. One function has a live caller. |
 | `shared/` | The context in front (`uiContext.ts`), the error boundary, URL parameter access, coordinate parsing, enum and number helpers, and the request deadline that reports to the breaker. |
-| `showControls/` | The band's what-is-drawn-over-the-ground group: the Kulturminner control and the drawing's toggle. |
-| `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the toolbox that stands in for Excalidraw's own, the remembered pen, and the render onto the ground. |
+| `showControls/` | The band's what-is-drawn-over-the-ground group: the Kulturminner control, the open drawing's toggle and the shared drawing layer's. |
+| `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the toolbox that stands in for Excalidraw's own, the remembered pen, the render onto the ground, and the layer that puts every spot's drawing on it at once. |
 | `spotControls/` | The reader's records as surfaces: the `+`, the properties box, the read card, the box that orders a render from elsewhere, the index menu. |
 | `spots/` | Spot state and geometry: the pin layer, its clustering and its style, the footprint frame, hit test, place and adjust, share link, name suggestion. |
 | `terrain/` | Client-side terrain analysis: DEM fetch, shading, the analysis window and its layers. |
@@ -89,6 +89,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `uiContextAtom` | `shared/uiContext.ts` | Derived: `map` or `draw`, off the session above. Which surface is in front (*The context in front*). |
 | `drawHoldAtom` | same | What the draw context puts in the band: whose drawing it is and the two ways out. Published by whichever `useSpotDraft` has the pen, because its box is away and the writes are still the controller's. |
 | `sketchShownAtom`, `sketchFadeAtom` | `sketch/overlay.ts` | Whether the open spot's drawing is on the ground, and how far it is faded towards it. A reading setting, not the record's: they outlive the spot the box was opened on. Putting the pen down with strokes kept turns the first back on, so a drawing is never written out of sight. |
+| `allSketchesShownAtom` | `sketch/allSketches.ts` | Whether every spot's chosen drawing is on the ground at once. Seeded from the `sketches` URL parameter and written back to it, so a link carries the reading. |
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |
 | `isSignedInAtom`, `isAdminAtom` | same | Derived, so a component does not re-render on an unrelated user field. |
 | `isAuthDialogOpenAtom`, `authPromptAtom` | same | Whether the dialog is up, and why when the reader did not press anything. |
@@ -609,6 +610,38 @@ opened.
 - `Panel` grew `handle` and `actions` for this. Folding is off — moving,
   resizing, docking and closing are enough ways to stop covering something.
 
+## Every drawing at once
+
+`src/sketch/allSketches.ts` puts one drawing per spot on the ground as a single
+transparent layer at z 1.9, with no pin and no name plate: the reading is the
+drawings themselves, laid over the country, and a click on the strokes opens
+the spot they belong to. Off until asked for, on the `a` key and the band's
+second drawing button, and carried by the `sketches` URL parameter.
+
+- **Which drawing is the record's to say.** `spots.mapSketch` names it, and
+  `mapSketchOf` (`sketch/scene.ts`) resolves it. A spot holds one drawing
+  today, so the field is empty on every record written before it existed and
+  the resolver reads empty as the `sketch` column; an edit that writes the
+  drawing writes `mapSketch` with it. An id this build cannot resolve draws
+  nothing rather than falling back — falling back would put a drawing its
+  author took off the map back on it.
+- **The open spot is left out**, as is the one being drafted. `overlay.ts`
+  already has those, with the fade slider and the `t` key the box owns, and two
+  copies of one drawing would darken every stroke.
+- **The cost is the export, not the drawing.** Each scene is re-exported
+  through Excalidraw at the view's resolution, so the layer culls to the
+  viewport, skips anything under 24 px across, holds two exports in flight at
+  a time and gives each a quarter of the pixel budget a lone drawing gets.
+  Renders off screen are dropped once more than forty are held. A hidden layer
+  is never asked for a canvas, so a layer switched off costs nothing at all.
+- **A click reads the alpha channel**, not the rectangle: the pixel under the
+  pointer is looked up in the render that covers it, within six pixels, and the
+  smallest drawing wins where two overlap. A pin takes the click first — it is
+  the smaller target and it says which spot it opens.
+- **The list is fetched signed out too** (`spots/spotRecords.ts`). A public
+  spot is readable with no account, so a guest gets the coverage and the pins
+  that go with it; signing in adds the reader's own records to the same list.
+
 ## The provenance legend
 
 A stored render is bare pixels. The reader lays that same file back on the
@@ -691,7 +724,8 @@ of that.
 
 `UrlParameter`, `src/shared/utils/urlUtils.ts`: `lok`, `projection`,
 `backgroundLayer`, `hybrid`, `contours`, `lidarModel`, `themeLayers`,
-`heritageDetails`, `heritageRender`, `heritageOpacity`, `lat`, `lon`, `zoom`.
+`heritageDetails`, `heritageRender`, `heritageOpacity`, `sketches`, `lat`,
+`lon`, `zoom`.
 
 `lok` is the only one naming a record rather than a setting: the spot's
 six-character code, written by whatever record is open and read once at import
@@ -786,6 +820,15 @@ show group; anything else that applies to the reading belongs to the tools.
   `src/types/searchTypes.ts` are mostly the tail of a deleted surface; one
   function, `getPlaceNamesByLocation`, has a live caller (`spots/spotName.ts`).
   Kept as they are.
+- **The record list carries every drawing.** `listSpots` is one `getFullList`
+  of whole records, so every readable spot's scene — up to 5 MB apiece — is
+  fetched on load whether or not the shared drawing layer is ever switched on,
+  and now for a guest as well. Fine at a few dozen records, which is also all
+  the index is built for.
+- **A drawing gives no hover affordance.** The shared layer answers a click on
+  its strokes but the cursor never changes over them, so nothing says a drawing
+  can be opened; testing the alpha channel on every pointer move is what that
+  would cost.
 - **The spot index is your own records only.** `SpotMenu` is a Mantine `Menu`
   ordered by date with no hover-to-light-the-pin: enough for a few dozen
   records, not a few hundred.

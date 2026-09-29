@@ -6,6 +6,7 @@ import { EvidenceReader } from '../evidence/EvidenceReader';
 import { useEvidenceOverlay } from '../evidence/evidenceOverlay';
 import { useRectangleAdjust } from '../map/rectAdjust';
 import { uiContextAtom } from '../shared/uiContext';
+import { useAllSketchesLayer } from '../sketch/allSketches';
 import { useSketchOverlay } from '../sketch/overlay';
 import { sketchOf } from '../sketch/scene';
 import { sketchSessionAtom } from '../sketch/session';
@@ -94,6 +95,7 @@ export const SpotSurface = () => {
   });
   useSketchSession(draft?.stage === 'sketch');
   useSketchOverlay(shown);
+  useAllSketchesLayer();
   // Rides the map element, so a sketch session's transform carries it along.
   useEvidenceOverlay(ground?.url ?? '', ground?.extent ?? null, 1);
 
