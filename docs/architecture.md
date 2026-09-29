@@ -31,7 +31,7 @@ One row per directory under `src/`.
 | `showControls/` | The band's what-is-drawn-over-the-ground group: the Kulturminner control and the drawing's toggle. |
 | `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the toolbox that stands in for Excalidraw's own, the remembered pen, and the render onto the ground. |
 | `spotControls/` | The reader's records as surfaces: the `+`, the properties box, the read card, the box that orders a render from elsewhere, the index menu. |
-| `spots/` | Spot state and geometry: the pin layer and its style, the footprint frame, hit test, place and adjust, share link, name suggestion. |
+| `spots/` | Spot state and geometry: the pin layer, its clustering and its style, the footprint frame, hit test, place and adjust, share link, name suggestion. |
 | `terrain/` | Client-side terrain analysis: DEM fetch, shading, the analysis window and its layers. |
 | `terrainControls/` | The terrain toggle and its panel. |
 | `types/` | Search response types. |
@@ -214,6 +214,22 @@ The pin belongs to the properties box and stands only while it is open
 the ground the pin sits in the middle of, so the open spot loses it there — the
 footprint frame is what marks the place then, and the name is in the box's own
 title. Every other spot keeps its pin, which is what a reader clicks to move on.
+
+Pins that come within 44 css pixels of each other are drawn as one translucent
+disc carrying their count (`ol/source/Cluster`, `src/spots/spotLayer.ts`), so a
+zoomed-out view reads as a scatter of weights rather than a mat of overlapping
+name plates. A disc stands for no record: clicking one fits the view to the
+pins it gathered instead of opening anything, and `spotsAtPixel` answers with
+the whole gathering so the heritage query stays out of the way of both. The
+open spot is dropped by the cluster's `geometryFunction`, not merely left
+unstyled, so losing its pin also takes it out of the count.
+
+Both ways a click could land on nothing are closed. Clustering is off at the
+view's deepest zoom, because two spots six metres apart is an ordinary thing to
+record and a gathering that no amount of zooming could break apart would answer
+a click with silence; and a gathering whose pins share one coordinate exactly —
+which no zoom separates either — opens the first of them instead of fitting to
+a rectangle of no width.
 
 A spot is written as it is made. `createSpot` runs the moment the pin lands —
 under the pin's own coordinate as a provisional name, because the column is

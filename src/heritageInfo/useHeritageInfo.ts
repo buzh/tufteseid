@@ -15,7 +15,7 @@ import {
 import type { FeatureInfoReading } from '../map/featureInfo/types';
 import { uiContextAtom } from '../shared/uiContext';
 import { spotFootprintAdjustingAtom, spotPlacingAtom } from '../spots/atoms';
-import { spotAtPixel } from '../spots/hitTest';
+import { spotsAtPixel } from '../spots/hitTest';
 import { terrainAdjustingAtom } from '../terrain/window';
 
 /** How long the pointer has to hold still before a hover asks. */
@@ -130,7 +130,7 @@ export const useHeritageInfo = (): HeritageInfo => {
         // A click placing a pin or a rectangle, or landing on a pin, belongs to
         // whatever is being placed.
         if (placingOnMap()) return;
-        if (spotAtPixel(map, e.pixel)) return;
+        if (spotsAtPixel(map, e.pixel)) return;
         stopHovering();
         setTip(null);
         clickQuery?.abort();

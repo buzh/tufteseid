@@ -107,6 +107,38 @@ export const spotStyle = (name: string) => [
   new Style({ image: savedPin, text: label(name, SIZE.saved) }),
 ];
 
+/** Radius in css pixels of the disc standing for `size` pins. Logarithmic and
+ *  capped: a hundred spots must not swallow the view. */
+const clusterRadius = (size: number) =>
+  Math.min(26, 11 + Math.log2(size) * 3.2);
+
+// Kept per size for the same reason the pin icons are hoisted: the style
+// function runs per feature per redraw, and there are only ever as many sizes
+// as there are spots.
+const clusters = new Map<number, Style[]>();
+
+export const clusterStyle = (size: number): Style[] => {
+  const held = clusters.get(size);
+  if (held) return held;
+  const style = [
+    new Style({
+      image: new CircleStyle({
+        radius: clusterRadius(size),
+        fill: new Fill({ color: 'rgba(255, 106, 0, 0.3)' }),
+        stroke: new Stroke({ color: 'rgba(255, 106, 0, 0.75)', width: 1.5 }),
+      }),
+      text: new Text({
+        text: String(size),
+        font: '600 12px Mulish, sans-serif',
+        fill: new Fill({ color: '#fff' }),
+        stroke: new Stroke({ color: 'rgba(0, 0, 0, 0.55)', width: 2.5 }),
+      }),
+    }),
+  ];
+  clusters.set(size, style);
+  return style;
+};
+
 export const draftPinStyle = [ring(9), new Style({ image: handPin })];
 
 export const placingPinStyle = [ring(7), new Style({ image: cursorPin })];

@@ -1,10 +1,13 @@
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { Feature } from 'ol';
 import type { FeatureLike } from 'ol/Feature';
+import type Map from 'ol/Map';
 import type MapBrowserEvent from 'ol/MapBrowserEvent';
+import { boundingExtent, getHeight, getWidth } from 'ol/extent';
 import Point from 'ol/geom/Point';
 import VectorLayer from 'ol/layer/Vector';
 import { transform } from 'ol/proj';
+import ClusterSource from 'ol/source/Cluster';
 import VectorSource from 'ol/source/Vector';
 import { useEffect, useMemo } from 'react';
 
@@ -16,9 +19,22 @@ import {
   spotPlacingAtom,
   unpinnedSpotIdAtom,
 } from './atoms';
-import { SPOT_LAYER_ID, SPOT_RECORD_KEY, spotAtPixel } from './hitTest';
-import { PIN_Z_INDEX, spotStyle } from './pinStyle';
+import {
+  clusterRecords,
+  SPOT_LAYER_ID,
+  SPOT_RECORD_KEY,
+  spotsAtPixel,
+} from './hitTest';
+import { clusterStyle, PIN_Z_INDEX, spotStyle } from './pinStyle';
 import { spotRecordsAtom } from './spotRecords';
+
+/** How near two pins come, in css pixels, before they are drawn as one disc.
+ *  Wider than the pin itself, because it is the name plates that collide
+ *  first. */
+const CLUSTER_DISTANCE = 44;
+
+/** Room left around a gathering the view was zoomed into. */
+const FIT_PADDING_PX = 48;
 
 const draw = (source: VectorSource, view: string, records: SpotRecord[]) => {
   source.clear();
@@ -33,6 +49,35 @@ const draw = (source: VectorSource, view: string, records: SpotRecord[]) => {
   );
 };
 
+/**
+ * What a click on the pin layer means. A gathering is not a record, so it goes
+ * in far enough to break the gathering apart rather than opening anything —
+ * unless no zoom could, every pin being on the one coordinate, and then the
+ * reader cannot have meant one of them over another.
+ */
+const openHit = (
+  map: Map,
+  records: SpotRecord[],
+  open: (record: SpotRecord) => void,
+) => {
+  const view = map.getView();
+  const projection = view.getProjection();
+  const extent = boundingExtent(
+    records.map((record) => transform(record.point, 'EPSG:4326', projection)),
+  );
+  if (
+    records.length === 1 ||
+    (getWidth(extent) === 0 && getHeight(extent) === 0)
+  ) {
+    open(records[0]);
+    return;
+  }
+  view.fit(extent, {
+    padding: [FIT_PADDING_PX, FIT_PADDING_PX, FIT_PADDING_PX, FIT_PADDING_PX],
+    duration: 300,
+  });
+};
+
 export const useSpotLayer = () => {
   const map = useAtomValue(mapAtom);
   const records = useAtomValue(spotRecordsAtom);
@@ -43,29 +88,62 @@ export const useSpotLayer = () => {
 
   const source = useMemo(() => new VectorSource({ wrapX: false }), []);
 
+  const clusters = useMemo(
+    () =>
+      new ClusterSource({
+        source,
+        distance: CLUSTER_DISTANCE,
+        // Null drops the feature. The spot whose card or reader is open keeps
+        // no pin, so it must not swell the count of a gathering either.
+        geometryFunction: (feature) => {
+          const record = feature.get(SPOT_RECORD_KEY) as SpotRecord;
+          if (record.id === store.get(unpinnedSpotIdAtom)) return null;
+          return feature.getGeometry() as Point;
+        },
+      }),
+    [source, store],
+  );
+
   useEffect(() => {
     const layer = new VectorLayer({
       zIndex: PIN_Z_INDEX,
-      source,
+      source: clusters,
       style: (feature: FeatureLike) => {
-        const record = feature.get(SPOT_RECORD_KEY) as SpotRecord;
-        if (record.id === store.get(unpinnedSpotIdAtom)) return undefined;
-        return spotStyle(record.name);
+        const gathered = clusterRecords(feature);
+        return gathered.length === 1
+          ? spotStyle(gathered[0].name)
+          : clusterStyle(gathered.length);
       },
       properties: { id: SPOT_LAYER_ID },
     });
     map.addLayer(layer);
 
-    // The style function is built once and lives as long as the layer, so
+    // The geometry function is built once and lives as long as the source, so
     // anything closed over here would stick at its first-render value: read
-    // from the store and redraw off a subscription instead.
-    const unsubscribe = store.sub(unpinnedSpotIdAtom, () => layer.changed());
+    // from the store and re-cluster off a subscription instead.
+    const unsubscribe = store.sub(unpinnedSpotIdAtom, () => clusters.refresh());
 
     return () => {
       unsubscribe();
       map.removeLayer(layer);
     };
-  }, [map, source, store]);
+  }, [map, clusters, store]);
+
+  // Off at the deepest zoom, so two spots a few metres apart are always
+  // reachable: a gathering the view cannot break apart would answer a click
+  // with nothing.
+  useEffect(() => {
+    const view = map.getView();
+    const apply = () => {
+      const zoom = view.getZoom() ?? 0;
+      clusters.setDistance(zoom >= view.getMaxZoom() ? 0 : CLUSTER_DISTANCE);
+    };
+    apply();
+    view.on('change:resolution', apply);
+    return () => {
+      view.un('change:resolution', apply);
+    };
+  }, [map, clusters]);
 
   // A followed link is not drawn while the list is still out: the spot it opens
   // is the one spot with no pin, and nothing else is known yet.
@@ -78,8 +156,8 @@ export const useSpotLayer = () => {
     const onClick = (event: MapBrowserEvent) => {
       // Deaf while drafting: the same click places the new pin (`pinPlace.ts`).
       if (draft || placing) return;
-      const hit = spotAtPixel(map, event.pixel);
-      if (hit) setActive(hit);
+      const hit = spotsAtPixel(map, event.pixel);
+      if (hit) openHit(map, hit, setActive);
     };
     map.on('singleclick', onClick);
     return () => {
