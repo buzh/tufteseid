@@ -1,6 +1,7 @@
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
 
+import type { SpotRecord } from '../api/spots';
 import {
   getSpotScore,
   listMyVotes,
@@ -9,7 +10,6 @@ import {
   type SpotScore,
   type VoteRecord,
 } from '../api/votes';
-import type { SpotRecord } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
 import { spotRecordsAtom } from './spotRecords';
 
