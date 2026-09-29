@@ -36,11 +36,11 @@ the bundle, gets the app's 404 page, and renders nothing. Casdoor's own
 deployment docs only ever describe a whole domain proxied at `/`.
 
 So `CASDOOR_HOST` in `.env` is a hostname of its own — `id.<app host>`, and a
-subdomain of the app's host rather than a domain of its own for a reason: both
-the sign-in box and the comment threads' silent leg run Casdoor inside a frame
-on the app's page, and only a Casdoor that is *same-site* with the app keeps
-its own cookies there. On a registrable domain of its own the browser counts
-them third-party and both fall back. It is **not** a second listener: it
+subdomain of the app's host rather than a domain of its own for a reason: the
+comment threads' silent leg runs Casdoor inside a frame on the app's page, and
+only a Casdoor that is *same-site* with the app keeps its own cookies there.
+On a registrable domain of its own the browser counts them third-party and the
+leg falls back. It is **not** a second listener: it
 points at the same `127.0.0.1:3030` the app does,
 and a `host` matcher at the top of `Caddyfile`'s route hands it to
 `casdoor:8000`. Only the `Host` header separates the two, which is why the
@@ -145,10 +145,10 @@ Casdoor answers a reader it already knows with a *Continue with …* panel
 rather than a redirect, which would make the comment engine's leg a second
 click. Remark42's authorize URL carries `silentSignin=1` to turn that off for
 that client alone, so the app can run the leg in a hidden iframe
-(`docs/discussion-and-votes.md`). The app's own leg keeps the panel — drawn
-inside the sign-in box like everything else Casdoor shows there: it is also
-*Or sign in with another account*, and it is the only way to change who a
-shared browser is signed in as. `enableAutoSignin` on the application in
+(`docs/discussion-and-votes.md`). The app's own leg keeps the panel, on
+Casdoor's page like everything else the reader sees there: it is also *Or sign
+in with another account*, and it is the only way to change who a shared
+browser is signed in as. `enableAutoSignin` on the application in
 Casdoor's console would do the same thing for both, and take that away.
 
 The panel only appears at all when the reader's organization matches the
@@ -166,124 +166,99 @@ pointed at `https://$CASDOOR_HOST/.well-known/openid-configuration`. Provider
 config is not versioned in `pb_migrations/`, so it is set by hand on each host
 and the `displayName` typed there is the button text `AuthDialog` renders.
 
-## The sign-in box
+## Signing in
 
-The reader never leaves the page to sign in. The account button opens one
-Mantine modal, and that modal holds Casdoor's own login page in a frame
-(`src/auth/AuthDialog.tsx`).
+**The reader leaves the page.** The account button opens one Mantine modal —
+a line on why an account is wanted and a button per provider — and pressing a
+provider hands the browser to Casdoor's own login page on `$CASDOOR_HOST`.
+Casdoor sends them back to `$PUBLIC_ORIGIN/auth/callback` carrying an
+authorization code, and `src/auth/trip.ts` trades it for a session before
+React mounts.
 
-What makes the frame possible is that **PocketBase's popup is optional**.
-`authWithOAuth2` opens a window only when it is not given a `urlCallback`;
-given one it hands the authorize URL over and waits, and the code arrives from
-`/pb/api/oauth2-redirect` over PocketBase's realtime channel rather than
-through `window.opener`. Nothing in the round trip cares whether it happened
-in a window.
+What makes leaving affordable is that **the whole view is already in the URL**.
+A trip stores the address it left from in `sessionStorage` beside the PKCE
+verifier and the `state`, and puts it back with `history.replaceState` on the
+way in — so the reader returns to the map they left, at the zoom and with the
+layers and the open spot they had. Nothing else in the app has to know a trip
+happened.
 
-Four things follow from that:
+Three things follow from the order that happens in:
 
-- **One provider means no choice to make**, so the box starts the trip as it
-  opens rather than asking the reader to press a name first. Two or more and
-  it lists them. After a failure the list comes back either way, because
-  pressing a provider is also how the trip is retried.
-- **Closing the box does not cancel it.** The OAuth2 state, the realtime
-  subscription and the promise waiting on it all outlive the modal, so
-  reopening puts the same authorize URL back in the frame instead of starting
-  a second trip.
-- **Dropping the realtime connection does cancel it**, and no reconnect
-  rescues it: the subscription's client id *is* the OAuth2 `state`, so a
-  reconnected one no longer matches the authorize URL in the frame. The SDK
-  rejects with "realtime connection interrupted" the moment the stream dies.
-  The box answers by spending another trip — a fresh URL into the same frame,
-  three tries before it gives up and shows the error. That is a bandage over
-  something the app cannot fix from its side: **whatever fronts the stack
-  must not time out an idle `/pb/api/realtime`.** PocketBase sends nothing
-  down that stream between events, so nginx's default `proxy_read_timeout` of
-  60 s reads it as a stalled upstream and closes it — sign-in then fails
-  about a minute after the form appears, however fast the reader types
-  (`README.md`). With the proxy out of the way the ceiling is PocketBase's
-  own: `apis/realtime.go` closes a stream after five idle minutes and any
-  stream after thirty, and only a delivered message resets the idle timer.
-  Five minutes to fill a login form in is not a limit worth fighting, so the
-  retry stays for the reader who takes longer.
-- **Two CSP directives hold it up**, and they are on opposite hosts:
-  `frame-src` on the app's policy names `$CASDOOR_HOST`, and the Casdoor block
-  in `Caddyfile` answers with `frame-ancestors 'self' $PUBLIC_ORIGIN`. The
-  second is new protection rather than a concession — Casdoor sends no framing
-  header at all, so until it was added the one page on the stack where a
-  password is typed could be embedded by anybody.
-- **The frame can still be refused**, by a browser that partitions its
-  cookies or a Casdoor that is not same-site with the app. There is no
-  fallback in the box — an installation that hits this has a `CASDOOR_HOST`
-  problem to fix rather than a second button to press, and the authorize URL
-  works in a window if one is ever needed.
+- **The restore runs before the app is imported.** Several modules take a boot
+  value off the address bar as they are evaluated — `src/spots/shareLink.ts`
+  reads `lok` at import — and on the way back the address bar is the
+  callback's. So `src/mainApp.tsx` awaits `completeSignIn` and only then
+  imports `App`, dynamically: a static import is hoisted above any statement
+  that could fix the URL first.
+- **`/auth/callback` needs a matcher of its own** in `Caddyfile`. There is no
+  SPA fallback here — `/l/<code>` is a narrow `redir` on purpose, so that a
+  wrong path still 404s rather than answering 200 with the app. The callback
+  is a `rewrite` to `/index.html`, and the path is registered in Casdoor,
+  which matches it exactly, so the two move together.
+- **Nothing rests on the realtime channel.** PocketBase's other two OAuth2
+  legs — a popup and a framed form — both wait for the code to arrive over
+  `/pb/api/realtime`, which makes signing in fail outright if anything
+  fronting the stack times an idle stream out, and PocketBase closes an idle
+  one itself after five minutes. A code on the query string has no such
+  clock. The stream still carries finished renders, so the
+  `proxy_read_timeout` advice in `README.md` stands — it no longer decides
+  whether anybody can sign in.
+
+**Casdoor is still framed, for the threads.** The comment engine's silent
+sign-in leg runs its own round trip in a hidden iframe
+(`src/api/remark42.ts`), so `frame-src https://$CASDOOR_HOST` on the app's
+policy and `frame-ancestors 'self' $PUBLIC_ORIGIN` on the Casdoor block both
+stay, and `CASDOOR_HOST` is still a subdomain of the app's host rather than a
+domain of its own — on one of those the frame's cookies count as third-party
+and the leg falls back to the widget's own button. Signing in to the app
+depends on none of it.
+
+**A trip that comes back without a session says so.** No `code`, a `state`
+that does not match the one that left, or an exchange that fails or runs past
+its 15 s deadline, and the box comes back up on the reader's own page with
+`auth.signInFailed` on it — otherwise nothing would show they had tried. A
+cold visit to `/auth/callback` with no trip in `sessionStorage` is not a
+failure: it restores to `/` and says nothing.
 
 ### Its looks are Casdoor's to set
 
-The frame is cross-origin, so no stylesheet in the app reaches inside it, and
-**the application's own Custom CSS is not the way in**. Casdoor renders that
-field — `formCss`, labelled "Custom CSS" on the tab below and not to be
-confused with the Custom CSS a signin *item* carries — behind
-`inIframe() || isMobile() ? null : …`, along with the background image and the
-form offset: a framed login page is one it declines to style.
+The login page is Casdoor's own page on Casdoor's own host, so no stylesheet
+in the app reaches it and the reader sees `$CASDOOR_HOST` in the address bar
+for the length of the form. What is worth setting is what keeps it from
+reading as a different product.
 
-**The dark algorithm is not the application's to set either.** The theme
-below decides `colorPrimary` and `borderRadius`, but light-versus-dark comes
-off `?theme=dark|default` in the URL, is remembered in that origin's
+**The dark algorithm is not the application's to set.** The theme below
+decides `colorPrimary` and `borderRadius`, but light-versus-dark comes off
+`?theme=dark|default` in the URL, is remembered in that origin's
 `localStorage`, and is light when neither says otherwise — `themeType` on the
-application never reaches it. So the app appends `theme=dark` to the authorize
-URL before framing it (`src/auth/AuthDialog.tsx`); without that the frame is a
-white form with a papaya button in it. It sticks, which is why Casdoor's own
-console turns dark for whoever signs in here — `?theme=default` on the console
-URL puts it back.
+application never reaches it. So `src/auth/trip.ts` appends `theme=dark` to
+the authorize URL; without it the reader lands on a white form with a papaya
+button in it. It sticks, which is why Casdoor's own console turns dark for
+whoever signs in here — `?theme=default` on the console URL puts it back.
 
-What is left is per application, typed in by hand on each host like the OAuth2
+The rest is per application, typed in by hand on each host like the OAuth2
 provider config. All of it lives on one tab of the application editor —
 `https://<CASDOOR_HOST>/applications/admin/<application>#ui-customization`,
 `admin` being the application's *owner* rather than the organization it
-serves. Header HTML, Page HTML and Footer HTML look like one-line text
-inputs and have no Edit button beside them: clicking the input is what opens
-the code editor.
+serves. Header HTML, Page HTML and Footer HTML look like one-line text inputs
+and have no Edit button beside them: clicking the input is what opens the code
+editor.
 
 - **Theme** — primary colour `#ff8b3d`, border radius 6: papaya 5 and `md` out
   of `src/ui/theme.ts`. Set *Theme type* to dark as well, so the console
   previews what the reader sees, but it is the URL above that does the work.
-  Under the dark algorithm the panel takes the class `login-panel-dark`, which
-  has **no rule anywhere in Casdoor's stylesheet** — so it arrives
-  transparent, and only the page behind it needs painting.
-- **Header HTML** — the block below, and note the **`<style>` and `<script>`
-  tags are part of it**: the field's contents are appended to `document.head`
-  as markup, so bare CSS pasted in there is inert text that changes nothing
-  and reports nothing. It runs with no iframe check and on every entry page,
-  which is what makes it the one hook worth using: per-item Custom CSS
-  reaches neither the signup page, whose items have no such field, nor the
-  "Continue with …" panel, which renders no items at all.
+- **Logo** — on the application's first tab, and it is the app's own mark that
+  belongs there rather than Casdoor's default. It is the one piece of the page
+  a reader will read as branding.
+- **Header HTML** — the block below, and note the **`<style>` tag is part of
+  it**: the field's contents are appended to `document.head` as markup, so
+  bare CSS pasted in there is inert text that changes nothing and reports
+  nothing.
 
   ```html
   <style>
-    html,
-    body,
-    .loginBackground,
-    .loginBackgroundDark {
-      background: transparent !important;
-    }
     body {
       font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-    }
-    .login-panel,
-    .login-panel-dark {
-      margin: 0;
-      background: transparent;
-      box-shadow: none;
-    }
-    .login-form {
-      padding: 0;
-    }
-    #parent-area {
-      min-height: 0;
-    }
-    .panel-logo,
-    #footer {
-      display: none;
     }
     .login-button,
     .signup-button {
@@ -291,65 +266,26 @@ the code editor.
       font-weight: 600;
     }
   </style>
-  <script>
-    (function () {
-      if (window.parent === window) return;
-      var post = function () {
-        parent.postMessage(
-          { casdoorFormHeight: document.documentElement.scrollHeight },
-          '*',
-        );
-      };
-      new ResizeObserver(post).observe(document.documentElement);
-      addEventListener('load', post);
-      post();
-    })();
-  </script>
   ```
 
-  Transparent rather than anthracite on purpose: what shows through is the
-  modal's own `--mantine-color-body`, so the frame follows the app's surface
-  instead of holding a copy of it. The papaya button is painted anthracite
-  because antd would put white on it and papaya 5 is too light to read white
-  on — the app's own buttons get the same treatment from `autoContrast`.
-  Mulish cannot cross the origin: it is served under a hashed filename by
-  Vite, so there is no stable URL for an `@font-face` here and the frame runs
-  on the rest of the stack.
+  The papaya button is painted anthracite because antd would put white on it
+  and papaya 5 is too light to read white on — the app's own buttons get the
+  same treatment from `autoContrast`. Mulish cannot cross the origin: it is
+  served under a hashed filename by Vite, so there is no stable URL for an
+  `@font-face` here and the page runs on the rest of the stack.
 
-  **The script is the only way the box learns how tall to be.** A
-  cross-origin frame cannot be measured from outside and will not say which
-  of its pages is showing, and sign-up runs to roughly two and a half times
-  the height of sign-in, so a fixed frame is either cramped on one page or
-  empty on the other. Header HTML is where it goes because the injector
-  re-creates a `<script>` element rather than setting `innerHTML`, so it
-  actually runs; `posting '*'` is a page height crossing to whoever chose to
-  embed the page, and the app checks the sender's origin at the other end.
-  `#parent-area { min-height: 0 }` above is what makes the measurement mean
-  anything: Casdoor sizes that element to `100vh`, which inside a frame is
-  the height the app set, so without it the page would only ever report back
-  the number it was given.
+  Header HTML rather than the application's **Custom CSS** field — `formCss`,
+  on the tab below, and not to be confused with the Custom CSS a signin *item*
+  carries — because Casdoor renders that one behind
+  `inIframe() || isMobile() ? null : …`, along with the background image and
+  the form offset. Unframed it finally works, and then vanishes on a phone.
+  Header HTML runs with no check at all and on every entry page, which also
+  makes it the only hook that reaches the signup page and the "Continue with …"
+  panel.
 
-- **Signin items → Logo, Languages** and **Signup items → Languages** — clear
-  *visible* on all three, in the two tables higher up the same tab. The app's
-  own title stands above the frame, and one language needs no picker. The
-  signup page's logo is not an item, which is why `.panel-logo` is hidden in
-  CSS above rather than by a toggle, and the Signup items table only appears
-  at all while sign-up is enabled.
-
-The modal is 420 px wide around a form Casdoor lays out at 300, one width for
-both its pages — the extra fields sign-up asks for make it taller, not wider.
-The height follows the page, over the `postMessage` above: 400 px until the
-first measurement arrives, and 400 px is also the floor, since a frame that
-shrinks is worse to look at than one with room to spare. The ceiling of
-1200 px in `AuthDialog.tsx` is there because the number crosses an origin
-boundary, and a page taller than that scrolls inside itself.
-
-`#footer` is hidden above for that reason as much as for the Casdoor logo it
-carries. Casdoor's `#parent-area` is `min-height: 100vh`, which inside a frame
-means the height set here — and the footer sits *below* those 100vh, so it
-guarantees a scrollbar however short the form is, with its own padding showing
-as a gap under the sign-up link. Casdoor knows: **Reset to Empty**, under the
-Footer HTML row, writes exactly this rule into that field.
+- **Signin items → Languages** and **Signup items → Languages** — clear
+  *visible* in the two tables higher up the same tab. One language needs no
+  picker. The Signup items table only appears at all while sign-up is enabled.
 
 Two limits worth knowing before reaching for any of this:
 
@@ -357,8 +293,8 @@ Two limits worth knowing before reaching for any of this:
   (casdoor/casdoor#5800), framed or not. Whether Header HTML survives that
   version is untested. One more thing the 3.119.0 pin is holding.
 - **The form speaks English.** 3.119.0 ships eleven UI locales and Norwegian
-  is not among them, so the only user-visible strings in the app that are not
-  `nb` are the ones inside this frame.
+  is not among them, so the only user-visible strings in the whole sign-in
+  flow that are not `nb` are the ones on Casdoor's page.
 
 ## Two things OIDC does not carry
 

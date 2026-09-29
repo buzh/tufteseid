@@ -37,10 +37,12 @@ route {
                 header X-Robots-Tag noindex
                 header Strict-Transport-Security max-age=31536000
                 header X-Content-Type-Options nosniff
-                # The app frames Casdoor's login page in its sign-in box
-                # (src/auth/AuthDialog.tsx), and Casdoor sends no framing
-                # header of its own — so without this the one page on the
-                # stack where a password is typed is embeddable by anybody.
+                # The app frames Casdoor for the comment threads' silent
+                # sign-in leg (src/api/remark42.ts), and Casdoor sends no
+                # framing header of its own — so without this the one page on
+                # the stack where a password is typed is embeddable by
+                # anybody. `$PUBLIC_ORIGIN` is the app's alone: nothing else
+                # has reason to frame it.
                 # A CSP carrying only `frame-ancestors` restricts framing and
                 # nothing else, which is what keeps the console running here.
                 header Content-Security-Policy "frame-ancestors 'self' {$PUBLIC_ORIGIN}"
@@ -79,13 +81,12 @@ route {
         # style-src-elem 'unsafe-inline' is required by MantineProvider's
         # runtime <style>; a nonce is impossible behind a static file_server.
         #
-        # frame-src names Casdoor twice over: the sign-in box holds its login
-        # page (src/auth/AuthDialog.tsx), and the comment threads are signed
-        # in to in a hidden iframe that passes through it (src/api/remark42.ts).
-        # Drop the host and the first has no form in it; the second does not
-        # error either — the frame is blocked, the round trip times out, and
-        # the reader is quietly back to pressing the widget's own sign-in
-        # button.
+        # frame-src names Casdoor for the comment threads alone: they are
+        # signed in to in a hidden iframe that passes through it
+        # (src/api/remark42.ts). The app's own sign-in leaves the page instead
+        # (src/auth/trip.ts) and needs nothing here. Drop the host and nothing
+        # errors — the frame is blocked, the round trip times out, and the
+        # reader is quietly back to pressing the widget's own sign-in button.
         header Content-Security-Policy "
                 default-src 'self';
                 script-src 'self';
@@ -104,6 +105,16 @@ route {
         # wrong path with a 200.
         @shortLink path_regexp shortLink ^/l/([0-9A-Za-z]+)$
         redir @shortLink /?lok={re.shortLink.1}
+
+        # Where Casdoor sends the reader back, and the one path other than the
+        # root that has to answer with the SPA. A rewrite rather than a redir
+        # because the authorization code rides the query string and a redir
+        # would put it on an address the reader keeps; `src/auth/trip.ts`
+        # spends it and replaces the URL before the app is imported. The path
+        # is registered in Casdoor, which matches it exactly, so the two move
+        # together.
+        @authCallback path /auth/callback
+        rewrite @authCallback /index.html
 
         handle_path /wms/geonorge/* {
                 rewrite * /skwms1{http.request.uri.path}

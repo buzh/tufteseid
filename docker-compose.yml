@@ -11,7 +11,7 @@ services:
       # app's and nothing but the Host header separates them.
       - CASDOOR_HOST=${CASDOOR_HOST:?set CASDOOR_HOST in .env}
       # The one origin allowed to frame Casdoor's login page, which is how the
-      # sign-in box draws it.
+      # comment threads' silent sign-in leg passes through it.
       - PUBLIC_ORIGIN=${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}
     volumes:
       - ./config.js:/var/www/config.js:ro

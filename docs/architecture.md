@@ -14,7 +14,7 @@ One row per directory under `src/`.
 | Directory | Owns |
 | --- | --- |
 | `api/` | PocketBase singleton (`pocketbase.ts`), the `spots`, `evidence` and `votes` collection clients, the one call into the render sidecar (`render.ts`), and the comment engine's own session (`remark42.ts`). |
-| `auth/` | OAuth2 dialog, the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
+| `auth/` | The OAuth2 dialog, the redirect trip it starts and picks up again (`trip.ts`), the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
 | `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue and the handover to the render sidecar, the gallery that lists and orders what was kept, the reader that lays them back on the map, and the provenance legend stamped onto a download. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
 | `grounds/` | The ground switch. Which ground is up is derived from the half's background layer, never stored. |
@@ -98,6 +98,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |
 | `isSignedInAtom`, `isAdminAtom` | same | Derived, so a component does not re-render on an unrelated user field. |
 | `isAuthDialogOpenAtom`, `authPromptAtom` | same | Whether the dialog is up, and why when the reader did not press anything. |
+| `signInFailedAtom` | same | Whether the last attempt came back without a session. Seeded, like the atom above, from the page's boot: signing in is a redirect, so a failure has to survive the page that started it (`docs/identity.md`). |
 | `upstreamHealthAtom` | `upstream/health.ts` | One breaker status per origin. |
 
 ## The context in front

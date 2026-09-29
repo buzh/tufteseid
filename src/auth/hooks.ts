@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { pb } from '../api/pocketbase';
-import { endRemarkSession, resetRemarkSession } from '../api/remark42';
+import { endRemarkSession } from '../api/remark42';
 
 export type OAuthProvider = { name: string; displayName: string };
 
-// A property of the deployment, not the session, so cached for the page's life.
+// A property of the deployment, not the session, so cached for the page's
+// life. Names and labels only: `listAuthMethods` also hands back a `state` and
+// a PKCE verifier, and those belong to one trip rather than to the page, so
+// `startSignIn` lists again rather than reading them here.
 let cachedProviders: OAuthProvider[] | null = null;
 
 export const useOAuthProviders = () => {
@@ -20,7 +23,9 @@ export const useOAuthProviders = () => {
     pb.collection('users')
       .listAuthMethods()
       .then((methods) => {
-        cachedProviders = methods.oauth2.providers;
+        cachedProviders = methods.oauth2.providers.map(
+          ({ name, displayName }) => ({ name, displayName }),
+        );
         if (live) setProviders(cachedProviders);
       })
       .catch((err) => {
@@ -34,24 +39,6 @@ export const useOAuthProviders = () => {
 
   return { providers, failed };
 };
-
-// Bounces through /pb/api/oauth2-redirect, which hands the code back over
-// PocketBase's realtime channel rather than through `window.opener`. Nothing
-// in the round trip needs a window, so `urlCallback` takes the authorize URL
-// off the SDK — given one it opens no popup, and the caller can put the URL
-// wherever it likes. `AuthDialog` frames it.
-export const useSignIn = () =>
-  useCallback(
-    async (providerName: string, urlCallback: (url: string) => void) => {
-      await pb
-        .collection('users')
-        .authWithOAuth2({ provider: providerName, urlCallback });
-      // There is a Casdoor session now where the page may already have looked
-      // and found none, so the threads get to ask again.
-      resetRemarkSession();
-    },
-    [],
-  );
 
 // Both sessions, and remark42's first: the thread box re-creates the widget
 // the moment the authStore changes, and a widget created while the cookie is

@@ -54,9 +54,9 @@ the `Host` header.
 **That proxy must not time `/pb/` out.** PocketBase pushes spots, votes and
 finished renders down one long-lived event stream, and sends nothing between
 events — so a proxy that times an idle upstream out closes it on schedule.
-nginx does, after 60 seconds by default, which breaks signing in outright and
-makes everything else reconnect once a minute. Giving it a location of its own
-in an nginx server block:
+nginx does, after 60 seconds by default, which makes a spot, a vote or a
+finished render take up to a minute to appear while the stream reconnects
+under it. Giving it a location of its own in an nginx server block:
 
 ```nginx
 location /pb/ {
@@ -120,7 +120,7 @@ applications under it. Each hands back a client id and a secret when saved:
 
 | Application | Redirect URL |
 | --- | --- |
-| the app | `https://<your-host>/pb/api/oauth2-redirect` |
+| the app | `https://<your-host>/auth/callback` |
 | the threads | `https://<your-host>/remark42/auth/tufteseid/callback` |
 
 The threads' pair goes into `.env` as `REMARK42_OIDC_CID` and

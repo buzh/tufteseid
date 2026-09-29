@@ -127,6 +127,9 @@ else
   fail entry-bundle 'index.html names no /assets/*.js'
 fi
 check short-link "$BASE/l/$SHORT_CODE" 302 '' 0 '' "location: /\?lok=$SHORT_CODE"
+# Where Casdoor sends the reader back. Anything but the app here and every
+# sign-in ends on a 404 with the code unspent.
+check auth-callback "$BASE/auth/callback" 200 text/html 300 'id="root"'
 # 200 means a catch-all rewrite: every typo would answer with the app.
 check unknown-path "$BASE/tufteseid-no-such-path" 404 '' 0
 

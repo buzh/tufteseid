@@ -110,10 +110,10 @@ export const primeRemarkSession = (): Promise<boolean> => {
   return priming;
 };
 
-/** Forgets the answer above, so the next thread asks again. Signing in is the
- *  reason to: the page may already have concluded there was nobody to sign
- *  in. */
-export const resetRemarkSession = (): void => {
+/** Forgets the answer above, so the next thread asks again. Signing out is
+ *  the only thing that changes it within one page: signing in is a redirect,
+ *  and the page that comes back has never asked. */
+const resetRemarkSession = (): void => {
   priming = null;
 };
 

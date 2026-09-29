@@ -2,6 +2,7 @@ import { atom } from 'jotai';
 import { atomEffect } from 'jotai-effect';
 
 import { pb, Role, SiteUser } from '../api/pocketbase';
+import { signInReturnFailed } from './trip';
 
 // Mirrors the SDK's authStore, which stays the source of truth. Do not set
 // this directly — go through the SDK's auth calls, which `pbAuthSyncEffect`
@@ -44,7 +45,12 @@ const roleAtom = atom<Role>((get) => {
 
 export const isAdminAtom = atom((get) => get(roleAtom) === 'admin');
 
-export const isAuthDialogOpenAtom = atom(false);
+// Both seeded from the page's boot: a trip that came back without a session
+// leaves the reader on their own URL with nothing to show they tried, so the
+// box comes up again carrying the failure.
+export const isAuthDialogOpenAtom = atom(signInReturnFailed());
+
+export const signInFailedAtom = atom(signInReturnFailed());
 
 /** Why the dialog is up when the reader did not ask for it; null for the
  *  sign-in button itself. */
