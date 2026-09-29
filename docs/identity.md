@@ -292,9 +292,10 @@ provider config:
   why `.panel-logo` is hidden in CSS above rather than by a toggle.
 
 The frame's height is fixed at 400 px in `AuthDialog.module.css` because a
-cross-origin frame cannot be measured from outside, and the modal is `sm`
-because Casdoor lays its form out at 300 px. A page that outgrows the height
-scrolls inside itself; those two numbers are what to change.
+cross-origin frame cannot be measured from outside, and the modal is 418 px
+wide — Mantine's `sm` and a tenth — around a form Casdoor lays out at 300. A
+page that outgrows the height scrolls inside itself; those two numbers are
+what to change.
 
 `#footer` is hidden above for that reason as much as for the Casdoor logo it
 carries. Casdoor's `#parent-area` is `min-height: 100vh`, which inside a frame

@@ -111,7 +111,9 @@ export const AuthDialog = () => {
       title={t('auth.title')}
       closeButtonProps={{ className: styles.close }}
       centered
-      size="sm"
+      // Mantine's `sm` (380) and a tenth. Casdoor lays the form out at 300,
+      // so this is what gives it room without the box going roomy around it.
+      size={418}
     >
       <Stack gap="sm">
         {prompt === 'spotLink' && (
