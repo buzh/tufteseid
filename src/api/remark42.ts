@@ -117,13 +117,20 @@ export const resetRemarkSession = (): void => {
   priming = null;
 };
 
+/** A sidecar that accepts the connection and never answers would otherwise
+ *  hold the whole sign-out open, and the app's own session is cleared after
+ *  this one. */
+const LOGOUT_BUDGET_MS = 3000;
+
 /** Signs out of the threads. The Casdoor session behind both sides is left
  *  alone — it is what makes the next sign-in a single click, and ending it is
  *  Casdoor's own business, on Casdoor's own hostname. */
 export const endRemarkSession = async (): Promise<void> => {
   resetRemarkSession();
   try {
-    await fetch(`${BASE}/auth/logout?site=${REMARK_SITE}`);
+    await fetch(`${BASE}/auth/logout?site=${REMARK_SITE}`, {
+      signal: AbortSignal.timeout(LOGOUT_BUDGET_MS),
+    });
   } catch {
     // A sidecar that cannot be reached is not holding a session open either.
   }
