@@ -13,7 +13,7 @@ One row per directory under `src/`.
 
 | Directory | Owns |
 | --- | --- |
-| `api/` | PocketBase singleton (`pocketbase.ts`), the `spots`, `evidence` and `votes` collection clients, and the one call into the render sidecar (`render.ts`). |
+| `api/` | PocketBase singleton (`pocketbase.ts`), the `spots`, `evidence` and `votes` collection clients, the one call into the render sidecar (`render.ts`), and the comment engine's own session (`remark42.ts`). |
 | `auth/` | OAuth2 dialog, the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
 | `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue and the handover to the render sidecar, the gallery that lists and orders what was kept, the reader that lays them back on the map, and the provenance legend stamped onto a download. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { pb } from '../api/pocketbase';
+import { endRemarkSession, resetRemarkSession } from '../api/remark42';
 
 export type OAuthProvider = { name: string; displayName: string };
 
@@ -38,9 +39,16 @@ export const useOAuthProviders = () => {
 export const useSignIn = () =>
   useCallback(async (providerName: string) => {
     await pb.collection('users').authWithOAuth2({ provider: providerName });
+    // There is a Casdoor session now where the page may already have looked
+    // and found none, so the threads get to ask again.
+    resetRemarkSession();
   }, []);
 
+// Both sessions, and remark42's first: the thread box re-creates the widget
+// the moment the authStore changes, and a widget created while the cookie is
+// still there shows the reader as signed in to a site they just left.
 export const useSignOut = () =>
-  useCallback(() => {
+  useCallback(async () => {
+    await endRemarkSession();
     pb.authStore.clear();
   }, []);

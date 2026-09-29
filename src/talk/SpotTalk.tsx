@@ -6,11 +6,13 @@
 // it here are the only nb in the box.
 
 import { Alert, Loader } from '@mantine/core';
-import { useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { primeRemarkSession, REMARK_SITE, remarkHost } from '../api/remark42';
 import type { SpotRecord } from '../api/spots';
+import { isSignedInAtom } from '../auth/atoms';
 import { spotTalkingAtom } from '../spots/atoms';
 import { shareUrlOf } from '../spots/shareLink';
 import { VoteControl } from '../spots/VoteControl';
@@ -18,7 +20,6 @@ import { Panel } from '../ui/Panel';
 import styles from './SpotTalk.module.css';
 
 const EMBED_SRC = '/remark42/web/embed.mjs';
-const SITE_ID = 'tufteseid';
 
 /** The widget looks this up by id; only ever one thread is mounted. */
 const MOUNT_ID = 'remark42';
@@ -66,6 +67,7 @@ const loadEmbed = (): Promise<void> => {
 export const SpotTalk = ({ spot }: { spot: SpotRecord }) => {
   const { t } = useTranslation();
   const setTalking = useSetAtom(spotTalkingAtom);
+  const signedIn = useAtomValue(isSignedInAtom);
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -80,8 +82,8 @@ export const SpotTalk = ({ spot }: { spot: SpotRecord }) => {
     let instance: RemarkInstance | undefined;
 
     const config: RemarkConfig = {
-      host: `${window.location.origin}/remark42`,
-      site_id: SITE_ID,
+      host: remarkHost(),
+      site_id: REMARK_SITE,
       // The canonical short link, not the current address: `/?lok=…` carries
       // the map's own parameters, and the thread key has to survive both those
       // and a rename.
@@ -93,7 +95,14 @@ export const SpotTalk = ({ spot }: { spot: SpotRecord }) => {
     };
     window.remark_config = config;
 
-    loadEmbed()
+    // The widget reads remark42's session once, when it is created, so the
+    // silent sign-in has to have finished by then — mounting first and
+    // priming after would show the reader a sign-in button they do not need.
+    // `primeRemarkSession` gives up rather than hangs, and a reader who is a
+    // guest here is a guest there too.
+    const session = signedIn ? primeRemarkSession() : Promise.resolve(false);
+
+    Promise.all([loadEmbed(), session])
       .then(() => {
         if (!live) return;
         instance = window.REMARK42?.createInstance(config);
@@ -109,7 +118,7 @@ export const SpotTalk = ({ spot }: { spot: SpotRecord }) => {
       live = false;
       instance?.destroy?.();
     };
-  }, [isPublic, spot.code, spot.name]);
+  }, [isPublic, signedIn, spot.code, spot.name]);
 
   return (
     <Panel

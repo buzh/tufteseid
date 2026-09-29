@@ -187,7 +187,14 @@ services:
       # reaching its own public hostname depends on the host's NAT loopback,
       # which is not something to make a sign-in depend on. No `/api` on the
       # authorize URL — that one is a frontend route.
-      - AUTH_CUSTOM_AUTH_URL=https://${CASDOOR_HOST:-}/login/oauth/authorize
+      #
+      # `silentSignin` is what keeps this from being a second sign-in: without
+      # it Casdoor draws a "Continue with …" panel even for a reader it
+      # already knows, and the app runs this round trip in a hidden iframe
+      # where nobody can press it (src/api/remark42.ts). The query string
+      # survives because go-pkgz/auth composes the redirect with x/oauth2's
+      # AuthCodeURL, which appends with `&` when the base already has a `?`.
+      - AUTH_CUSTOM_AUTH_URL=https://${CASDOOR_HOST:-}/login/oauth/authorize?silentSignin=1
       - AUTH_CUSTOM_TOKEN_URL=http://casdoor:8000/api/login/oauth/access_token
       - AUTH_CUSTOM_INFO_URL=http://casdoor:8000/api/userinfo
       - AUTH_CUSTOM_SCOPES=openid,profile,email

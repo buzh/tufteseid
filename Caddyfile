@@ -71,6 +71,12 @@ route {
         header Referrer-Policy strict-origin
         # style-src-elem 'unsafe-inline' is required by MantineProvider's
         # runtime <style>; a nonce is impossible behind a static file_server.
+        #
+        # frame-src names Casdoor because the app signs the reader in to the
+        # comment threads in a hidden iframe that passes through it
+        # (src/api/remark42.ts). Drop the host and nothing errors — the frame
+        # is blocked, the round trip times out, and the reader is quietly back
+        # to pressing the widget's own sign-in button.
         header Content-Security-Policy "
                 default-src 'self';
                 script-src 'self';
@@ -81,6 +87,7 @@ route {
                 style-src-attr 'unsafe-inline';
                 font-src 'self';
                 frame-ancestors 'self';
+                frame-src 'self' https://{$CASDOOR_HOST};
         "
         header Permissions-Policy "geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), accelerometer=(), camera=()"
 

@@ -137,6 +137,19 @@ id and a secret.
 Both are on the **app's** origin, not Casdoor's: a redirect URI is where the
 reader is sent back to.
 
+Casdoor answers a reader it already knows with a *Continue with …* panel
+rather than a redirect, which would make the comment engine's leg a second
+click. Remark42's authorize URL carries `silentSignin=1` to turn that off for
+that client alone, so the app can run the leg in a hidden iframe
+(`docs/discussion-and-votes.md`). The app's own leg keeps the panel: it is
+also *Or sign in with another account*, and it is the only way to change who
+a shared browser is signed in as. `enableAutoSignin` on the application in
+Casdoor's console would do the same thing for both, and take that away.
+
+The panel only appears at all when the reader's organization matches the
+application's, which is another reason both applications belong under the
+readers' organization rather than `built-in`.
+
 Remark42's path segment is its `AUTH_CUSTOM_NAME`, so the two have to be
 changed together. The name must match `^[a-z0-9][a-z0-9_-]*$` and must not
 collide with one of the built-in provider names.

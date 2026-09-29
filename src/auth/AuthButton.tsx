@@ -76,7 +76,7 @@ export const AuthButton = () => {
         )}
         <Menu.Item
           leftSection={<Icon icon="logout" size={16} />}
-          onClick={signOut}
+          onClick={() => void signOut()}
         >
           {t('auth.signOut')}
         </Menu.Item>

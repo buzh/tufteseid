@@ -226,6 +226,19 @@ check remark-embed "$BASE/remark42/web/embed.mjs" 200 javascript 500
 check remark-providers "$BASE/remark42/api/v1/config?site=tufteseid" \
   200 json 20 '"auth_providers":\["tufteseid"\]'
 
+# The one sign-in: remark42 hands the reader to Casdoor with `silentSignin`,
+# which is what lets the app run the trip in a hidden iframe rather than make
+# the reader press a second button. The `&client_id=` is part of the
+# assertion — x/oauth2 appending to the query string rather than overwriting
+# it is the fragile half.
+check remark-silent-signin "$BASE/remark42/auth/tufteseid/login?site=tufteseid" \
+  302 '' 0 '' 'location:.*/login/oauth/authorize\?silentSignin=1&client_id='
+
+# The frame that trip happens in. Without the IdP here the browser blocks it
+# and the reader is back to two sign-ins, with nothing in any log to say so.
+check csp-frame-src "$BASE/" 200 text/html 300 '' \
+  "content-security-policy:.*frame-src 'self' $IDP"
+
 section 'Render sidecar'
 
 check render-health "$BASE/render/health" 200 json 10 '"ok":true'

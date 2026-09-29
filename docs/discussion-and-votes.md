@@ -59,14 +59,37 @@ remark42 starts clean, serves threads and offers no way to sign in to one.
 The symptom is `/remark42/api/v1/config` reporting `"auth_providers":[]`,
 which `live-check.sh` asserts against for exactly this reason.
 
-Because both the app and Remark42 federate to the same provider, the second
-sign-in is a click: the reader presses the one provider button in the widget
-and comes back without entering a credential. That is the whole point of the
-arrangement, and the first thing to check after a deploy.
-
 Moderation is `ADMIN_SHARED_ID`: the Casdoor subject of whoever may delete and
 block, given to Remark42 as an opaque id. It is unrelated to PocketBase's
 `role = "admin"` — the same person needs both, set in two places.
+
+### One sign-in
+
+Remark42 holds a session of its own, so signing in to the app leaves the
+reader a stranger to the thread. Both federate to the same Casdoor, so no
+second credential is ever asked for — but the OAuth2 round trip still has to
+run, and the widget's way of running it is a button the reader has to find.
+
+`src/api/remark42.ts` runs it for them, in a hidden iframe, before the widget
+is created. Three things have to hold or it does not stay silent:
+
+| | |
+| --- | --- |
+| `silentSignin=1` on `AUTH_CUSTOM_AUTH_URL` | Casdoor otherwise draws a *Continue with …* panel for a reader it already knows, and a hidden frame is the one place nobody can press it. The parameter survives because go-pkgz/auth composes the redirect with x/oauth2's `AuthCodeURL`, which appends with `&` when the base URL already carries a query. |
+| `frame-src` naming `$CASDOOR_HOST` | The app's CSP is `default-src 'self'`, which would block the frame at Casdoor's hop. |
+| Casdoor on the app's registrable domain | `id.<app host>` is same-site, so the frame's cookies are first-party. A Casdoor on a domain of its own is not, and a browser that blocks third-party cookies then hands Casdoor a frame with no session in it. |
+
+The widget's own provider button is the fallback under all three, and under
+an expired Casdoor session as well, so a failure costs a click rather than a
+thread. Nothing in a log says which happened, which is why `live-check.sh`
+asserts the first two.
+
+The order matters. The widget reads remark42's session once, when it is
+created: `SpotTalk` waits on the round trip before `createInstance` and
+re-creates the widget when the app's own sign-in state changes, and signing
+out of the app ends remark42's session before clearing PocketBase's. The
+Casdoor session behind both is left alone — it is what makes the next sign-in
+a single click, and it is ended on Casdoor's own hostname.
 
 ### If the public origin moves
 
