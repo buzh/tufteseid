@@ -90,6 +90,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `drawHoldAtom` | same | What the draw context puts in the band: whose drawing it is and the two ways out. Published by whichever `useSpotDraft` has the pen, because its box is away and the writes are still the controller's. |
 | `sketchShownAtom`, `sketchFadeAtom` | `sketch/overlay.ts` | Whether the open spot's drawing is on the ground, and how far it is faded towards it. A reading setting, not the record's: they outlive the spot the box was opened on. Putting the pen down with strokes kept turns the first back on, so a drawing is never written out of sight. |
 | `allSketchesShownAtom` | `sketch/allSketches.ts` | Whether every spot's chosen drawing is on the ground at once. Seeded from the `sketches` URL parameter and written back to it, so a link carries the reading. |
+| `drawnSketchSpotsAtom` | same | Which spots have their drawing on the ground this frame, published by the layer after it paints. Read by `spotLayer`'s clustering, which drops their pins. Empty while the layer is off. |
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |
 | `isSignedInAtom`, `isAdminAtom` | same | Derived, so a component does not re-render on an unrelated user field. |
 | `isAuthDialogOpenAtom`, `authPromptAtom` | same | Whether the dialog is up, and why when the reader did not press anything. |
@@ -628,6 +629,13 @@ second drawing button, and carried by the `sketches` URL parameter.
 - **The open spot is left out**, as is the one being drafted. `overlay.ts`
   already has those, with the fade slider and the `t` key the box owns, and two
   copies of one drawing would darken every stroke.
+- **A drawing on the ground takes its own pin off.** The layer publishes what
+  it painted to `drawnSketchSpotsAtom` and `spotLayer`'s cluster geometry drops
+  those records, so the pin and its name plate go and the count on a gathering
+  goes with them. Published from what was painted rather than worked out from
+  the zoom: a spot is never left with neither pin nor strokes, and an export
+  still in flight keeps its pin until the drawing is really there. A spot with
+  no drawing keeps its pin at every zoom — it has nothing else to be found by.
 - **The cost is the export, not the drawing.** Each scene is re-exported
   through Excalidraw at the view's resolution, so the layer culls to the
   viewport, skips anything under 24 px across, holds two exports in flight at

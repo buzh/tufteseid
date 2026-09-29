@@ -53,6 +53,16 @@ export const allSketchesShownAtom = atom(
   getUrlParameter('sketches') === 'true',
 );
 
+/** The spots whose drawing is on the ground this frame. Their pins come off in
+ *  `spots/spotLayer.ts` — the drawing is the pin, and a name plate over it is
+ *  the furniture this reading is without. Written by the layer after it paints
+ *  rather than derived from the zoom, so a spot is never left with neither:
+ *  an id is in here only once its strokes are actually there. Empty while the
+ *  layer is off. */
+export const drawnSketchSpotsAtom = atom<ReadonlySet<string>>(
+  new Set<string>(),
+);
+
 // Same reasoning as `overlay.ts`: past this the strokes soften, under it every
 // frame of a pinch queues an export — and here there are many to queue.
 const RESCALE_TOLERANCE = 1.4;
@@ -97,6 +107,16 @@ type State = {
   inFlight: number;
   out: HTMLCanvasElement | null;
   redraw: () => void;
+  /** What `standing` was last told, so a frame that changed nothing is not an
+   *  atom write and a re-cluster. */
+  standing: ReadonlySet<string>;
+  publish: (ids: ReadonlySet<string>) => void;
+};
+
+const sameIds = (a: ReadonlySet<string>, b: ReadonlySet<string>): boolean => {
+  if (a.size !== b.size) return false;
+  for (const id of a) if (!b.has(id)) return false;
+  return true;
 };
 
 const needsRender = (entry: Entry, scale: number): boolean =>
@@ -157,6 +177,7 @@ const drawAll =
 
     const wanted: { entry: Entry; scale: number; span: number }[] = [];
     const offScreen: Entry[] = [];
+    const standing = new Set<string>();
     let kept = 0;
 
     for (const entry of state.entries.values()) {
@@ -169,6 +190,7 @@ const drawAll =
       if (span < MIN_ON_SCREEN_PX) continue;
       if (entry.render) {
         kept += 1;
+        standing.add(entry.record.id);
         paintRender(ctx, entry.render, extent, resolution, pixelRatio);
       }
       const scale =
@@ -194,6 +216,7 @@ const drawAll =
       }
     }
 
+    state.publish(standing);
     return out;
   };
 
@@ -295,6 +318,17 @@ export const useAllSketchesLayer = () => {
       inFlight: 0,
       out: null,
       redraw: () => {},
+      standing: new Set<string>(),
+      // Off the render stack: the pin layer re-clusters on this, and that is
+      // not something to set going from inside another layer's draw.
+      publish: (ids) => {
+        if (sameIds(ids, state.standing)) return;
+        state.standing = ids;
+        queueMicrotask(() => {
+          if (stateRef.current !== state) return;
+          store.set(drawnSketchSpotsAtom, ids);
+        });
+      },
     };
     const source = new ImageCanvasSource({
       // Fixed, so a view in another projection reprojects.
@@ -319,16 +353,25 @@ export const useAllSketchesLayer = () => {
       stateRef.current = null;
       layerRef.current = null;
       map.removeLayer(layer);
+      store.set(drawnSketchSpotsAtom, new Set<string>());
     };
-  }, [map]);
+  }, [map, store]);
 
   // A hidden layer is never asked for a canvas, so taking the drawings off
-  // also stops them being exported.
+  // also stops them being exported — and stops it saying which pins to stand
+  // down, which is why the list is given back here rather than in a frame
+  // that will not come.
   useEffect(() => {
     layerRef.current?.setVisible(shown);
-    if (shown) setUrlParameter('sketches', true);
-    else removeUrlParameter('sketches');
-  }, [map, shown]);
+    if (shown) {
+      setUrlParameter('sketches', true);
+    } else {
+      removeUrlParameter('sketches');
+      const state = stateRef.current;
+      if (state) state.standing = new Set<string>();
+      store.set(drawnSketchSpotsAtom, new Set<string>());
+    }
+  }, [map, shown, store]);
 
   // The open spot and the one being drafted are left out: `overlay.ts` draws
   // those, and two copies of one drawing would darken every stroke.

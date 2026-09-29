@@ -13,6 +13,7 @@ import { useEffect, useMemo } from 'react';
 
 import type { SpotRecord } from '../api/spots';
 import { mapAtom } from '../map/atoms';
+import { drawnSketchSpotsAtom } from '../sketch/allSketches';
 import {
   activeSpotAtom,
   spotDraftAtom,
@@ -99,10 +100,14 @@ export const useSpotLayer = () => {
         source,
         distance: CLUSTER_DISTANCE,
         // Null drops the feature. The spot whose card or reader is open keeps
-        // no pin, so it must not swell the count of a gathering either.
+        // no pin, so it must not swell the count of a gathering either. Nor
+        // does one whose drawing is on the shared layer: there the drawing is
+        // the pin, and the reader zoomed in to read the strokes, not a plate
+        // over them.
         geometryFunction: (feature) => {
           const record = feature.get(SPOT_RECORD_KEY) as SpotRecord;
           if (record.id === store.get(unpinnedSpotIdAtom)) return null;
+          if (store.get(drawnSketchSpotsAtom).has(record.id)) return null;
           return feature.getGeometry() as Point;
         },
       }),
@@ -129,9 +134,13 @@ export const useSpotLayer = () => {
     // anything closed over here would stick at its first-render value: read
     // from the store and re-cluster off a subscription instead.
     const unsubscribe = store.sub(unpinnedSpotIdAtom, () => clusters.refresh());
+    const unsubscribeDrawn = store.sub(drawnSketchSpotsAtom, () =>
+      clusters.refresh(),
+    );
 
     return () => {
       unsubscribe();
+      unsubscribeDrawn();
       map.removeLayer(layer);
     };
   }, [map, clusters, store]);
