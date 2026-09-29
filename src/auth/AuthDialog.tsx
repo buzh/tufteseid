@@ -9,10 +9,10 @@
 // The form itself is Casdoor's, framed rather than opened in a popup: the code
 // comes back over PocketBase's realtime channel, so the round trip does not
 // care whether it happened in a window. What makes it look like the rest of
-// the app is a theme and a per-item stylesheet typed into Casdoor's console
-// per host (docs/identity.md) — the frame is cross-origin, no style here
-// reaches inside it, and Casdoor skips its own Form CSS field when it is
-// framed.
+// the app is a theme and a stylesheet typed into Casdoor's console per host
+// (docs/identity.md), plus the `?theme=dark` below — the frame is
+// cross-origin, so no style here reaches inside it, and Casdoor skips its own
+// Form CSS field when it is framed.
 
 import {
   Alert,
@@ -30,6 +30,18 @@ import { useTranslation } from 'react-i18next';
 import { authPromptAtom, isAuthDialogOpenAtom } from './atoms';
 import styles from './AuthDialog.module.css';
 import { useOAuthProviders, useSignIn } from './hooks';
+
+// Casdoor picks its light or dark algorithm from `?theme=`, falling back to
+// whatever the last visit left in that origin's localStorage and then to
+// light. Its application theme does not come into it — that carries the
+// colours only — so without this the frame is a white form with a papaya
+// button in it. The parameter also persists, which is why the Casdoor
+// console goes dark for whoever signs in here.
+const darkened = (url: string): string => {
+  const themed = new URL(url);
+  themed.searchParams.set('theme', 'dark');
+  return themed.toString();
+};
 
 export const AuthDialog = () => {
   const { t } = useTranslation();
@@ -60,7 +72,7 @@ export const AuthDialog = () => {
         // would do it during that effect's render.
         await signIn(provider, (url) => {
           setSignInFailed(false);
-          setFormUrl(url);
+          setFormUrl(darkened(url));
         });
         close();
       } catch (err) {
