@@ -16,6 +16,7 @@ import {
 import { currentUserAtom } from '../auth/atoms';
 import { bboxWidthMetres } from '../map/bbox';
 import { drawHoldAtom } from '../shared/uiContext';
+import { sketchShownAtom } from '../sketch/overlay';
 import { SKETCH_BUDGET_BYTES, sketchBytes, sketchOf } from '../sketch/scene';
 import { sketchNow } from '../sketch/session';
 import {
@@ -319,6 +320,10 @@ export const useSpotDraft = (
           setSketchTooBig(false);
           fields.sketch = drawing;
           kept = drawing;
+          // The toggle is a reading setting and outlives the spot it was
+          // turned off on, so strokes put down while it is off would be
+          // written straight out of sight.
+          if (drawing) store.set(sketchShownAtom, true);
         }
       }
       // The canvas goes as soon as the stage is left and Excalidraw's scene
