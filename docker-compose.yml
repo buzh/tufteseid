@@ -111,8 +111,10 @@ services:
       options:
         max-size: "20m"
         max-file: "3"
-    # --createDatabase is a no-op once the schema is there, so it can stay.
-    entrypoint: /bin/sh -c './server --createDatabase=true'
+    # No entrypoint override: the image runs `/server`, which creates the
+    # tables and seeds the built-in organisation by itself. The
+    # `--createDatabase=true` the docs suggest is MySQL-only DDL and panics
+    # on sqlite.
     environment:
       # Every app.conf key can be overridden by an env var of the same name,
       # and the env var wins. Hence the un-shouty names.

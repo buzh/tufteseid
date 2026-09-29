@@ -50,16 +50,19 @@ environment variable of the same name, the variable winning. So the service
 declares the four that matter — `driverName`, `dataSourceName`, `runmode`,
 `httpport` — and leaves the rest.
 
-Two traps, both of which present as a container that will not start:
+Three traps, all of which present as a container restarting in a loop:
 
-- The SQLite DSN must **not** carry the `file:` scheme. `/data/casdoor.db` is
-  right; `file:/data/casdoor.db` is not.
+- The SQLite DSN must **not** carry the `file:` scheme, even though Casdoor's
+  own default config does. modernc.org/sqlite takes the prefix as part of the
+  path and creates a file called `file:casdoor.db`, leaving the real one
+  empty. `/data/casdoor.db?cache=shared` is right.
 - The data directory must be owned by uid/gid 1000. `sudo mkdir -p` leaves it
   owned by root and Casdoor cannot create its database.
-
-`--createDatabase=true` on the entrypoint is what builds the schema and the
-built-in organisation on an empty volume. It is a no-op afterwards, so it
-stays.
+- **No `--createDatabase=true`.** Casdoor's docs offer it and the flag is
+  MySQL-only: it issues `CREATE DATABASE … default charset utf8mb4`, which
+  SQLite rejects with a syntax error and Casdoor turns into a panic. Nothing
+  is lost by leaving it off — `/server` creates the tables and seeds the
+  built-in organisation on an empty volume either way.
 
 ## Registering the clients
 
