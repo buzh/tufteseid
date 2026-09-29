@@ -200,7 +200,11 @@ Four things follow from that:
   down that stream between events, so nginx's default `proxy_read_timeout` of
   60 s reads it as a stalled upstream and closes it — sign-in then fails
   about a minute after the form appears, however fast the reader types
-  (`README.md`).
+  (`README.md`). With the proxy out of the way the ceiling is PocketBase's
+  own: `apis/realtime.go` closes a stream after five idle minutes and any
+  stream after thirty, and only a delivered message resets the idle timer.
+  Five minutes to fill a login form in is not a limit worth fighting, so the
+  retry stays for the reader who takes longer.
 - **Two CSP directives hold it up**, and they are on opposite hosts:
   `frame-src` on the app's policy names `$CASDOOR_HOST`, and the Casdoor block
   in `Caddyfile` answers with `frame-ancestors 'self' $PUBLIC_ORIGIN`. The
