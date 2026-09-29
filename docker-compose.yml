@@ -104,7 +104,8 @@ services:
   # subdomain — `origin` and every registered callback move with it, nothing
   # else does.
   casdoor:
-    image: casbin/casdoor:v3.119.0
+    # No `v` prefix on Casdoor's tags, unlike remark42's below.
+    image: casbin/casdoor:3.119.0
     restart: unless-stopped
     logging:
       options:
