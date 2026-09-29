@@ -35,9 +35,13 @@ Strip a `/id` prefix in front of that and the browser asks the SPA's origin for
 the bundle, gets the app's 404 page, and renders nothing. Casdoor's own
 deployment docs only ever describe a whole domain proxied at `/`.
 
-So `CASDOOR_HOST` in `.env` is a hostname of its own — `id.<app host>` by
-convention, though nothing requires it to be a subdomain of anything. It is
-**not** a second listener: it points at the same `127.0.0.1:3030` the app does,
+So `CASDOOR_HOST` in `.env` is a hostname of its own — `id.<app host>`, and a
+subdomain of the app's host rather than a domain of its own for a reason: both
+the sign-in box and the comment threads' silent leg run Casdoor inside a frame
+on the app's page, and only a Casdoor that is *same-site* with the app keeps
+its own cookies there. On a registrable domain of its own the browser counts
+them third-party and both fall back. It is **not** a second listener: it
+points at the same `127.0.0.1:3030` the app does,
 and a `host` matcher at the top of `Caddyfile`'s route hands it to
 `casdoor:8000`. Only the `Host` header separates the two, which is why the
 matcher stands before any path matcher could claim one of them.
@@ -141,9 +145,10 @@ Casdoor answers a reader it already knows with a *Continue with …* panel
 rather than a redirect, which would make the comment engine's leg a second
 click. Remark42's authorize URL carries `silentSignin=1` to turn that off for
 that client alone, so the app can run the leg in a hidden iframe
-(`docs/discussion-and-votes.md`). The app's own leg keeps the panel: it is
-also *Or sign in with another account*, and it is the only way to change who
-a shared browser is signed in as. `enableAutoSignin` on the application in
+(`docs/discussion-and-votes.md`). The app's own leg keeps the panel — drawn
+inside the sign-in box like everything else Casdoor shows there: it is also
+*Or sign in with another account*, and it is the only way to change who a
+shared browser is signed in as. `enableAutoSignin` on the application in
 Casdoor's console would do the same thing for both, and take that away.
 
 The panel only appears at all when the reader's organization matches the
@@ -160,6 +165,83 @@ The PocketBase pair is typed into PocketBase's own admin UI: Collections →
 pointed at `https://$CASDOOR_HOST/.well-known/openid-configuration`. Provider
 config is not versioned in `pb_migrations/`, so it is set by hand on each host
 and the `displayName` typed there is the button text `AuthDialog` renders.
+
+## The sign-in box
+
+The reader never leaves the page to sign in. The account button opens one
+Mantine modal, and that modal holds Casdoor's own login page in a frame
+(`src/auth/AuthDialog.tsx`).
+
+What makes the frame possible is that **PocketBase's popup is optional**.
+`authWithOAuth2` opens a window only when it is not given a `urlCallback`;
+given one it hands the authorize URL over and waits, and the code arrives from
+`/pb/api/oauth2-redirect` over PocketBase's realtime channel rather than
+through `window.opener`. Nothing in the round trip cares whether it happened
+in a window.
+
+Four things follow from that:
+
+- **One provider means no choice to make**, so the box starts the trip as it
+  opens rather than asking the reader to press a name first. Two or more and
+  it lists them. After a failure the list comes back either way, because
+  pressing a provider is also how the trip is retried.
+- **Closing the box does not cancel it.** The OAuth2 state, the realtime
+  subscription and the promise waiting on it all outlive the modal, so
+  reopening puts the same authorize URL back in the frame instead of starting
+  a second trip.
+- **Two CSP directives hold it up**, and they are on opposite hosts:
+  `frame-src` on the app's policy names `$CASDOOR_HOST`, and the Casdoor block
+  in `Caddyfile` answers with `frame-ancestors 'self' $PUBLIC_ORIGIN`. The
+  second is new protection rather than a concession — Casdoor sends no framing
+  header at all, so until it was added the one page on the stack where a
+  password is typed could be embedded by anybody.
+- **The frame can still be refused**, by a browser that partitions its
+  cookies or a Casdoor that is not same-site with the app. Under the box is a
+  link that opens the same authorize URL in a window; the code comes back on
+  the same channel.
+
+### Its looks are Casdoor's to set
+
+The frame is cross-origin, so no stylesheet in the app reaches inside it. Two
+fields in Casdoor's console do, and like the OAuth2 provider config they are
+typed in by hand on each host:
+
+- **Application → Theme** — dark, primary colour `#ff8b3d`, border radius 6.
+  That is papaya 5 and `md` out of `src/ui/theme.ts`.
+- **Application → Form CSS** — raw CSS, no `<style>` wrapper, Casdoor adds
+  one:
+
+  ```css
+  body,
+  .login-content,
+  .login-panel {
+    background: transparent;
+    box-shadow: none;
+  }
+  .login-panel {
+    padding: 0;
+  }
+  .login-form {
+    width: 100%;
+    padding: 0;
+  }
+  ```
+
+  `.login-panel` and `.login-form` are the two containers Casdoor documents.
+  The logo above them and the language footer below go by whatever selector
+  the browser's inspector shows in the version installed.
+
+The frame's height is fixed at 460 px in `AuthDialog.module.css` because a
+cross-origin frame cannot be measured from outside. A form that outgrows it
+scrolls inside itself, and that number is the thing to change.
+
+Two limits worth knowing before reaching for any of this:
+
+- **Form CSS does nothing in Casdoor 4.x** (casdoor/casdoor#5800): the fields
+  save and the pages ignore them. One more thing the 3.119.0 pin is holding.
+- **The form speaks English.** 3.119.0 ships eleven UI locales and Norwegian
+  is not among them, so the only user-visible strings in the app that are not
+  `nb` are the ones inside this frame.
 
 ## Two things OIDC does not carry
 

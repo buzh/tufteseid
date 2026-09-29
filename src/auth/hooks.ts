@@ -35,14 +35,23 @@ export const useOAuthProviders = () => {
   return { providers, failed };
 };
 
-// The SDK's all-in-one popup flow, bouncing through /pb/api/oauth2-redirect.
+// Bounces through /pb/api/oauth2-redirect, which hands the code back over
+// PocketBase's realtime channel rather than through `window.opener`. Nothing
+// in the round trip needs a window, so `urlCallback` takes the authorize URL
+// off the SDK — given one it opens no popup, and the caller can put the URL
+// wherever it likes. `AuthDialog` frames it.
 export const useSignIn = () =>
-  useCallback(async (providerName: string) => {
-    await pb.collection('users').authWithOAuth2({ provider: providerName });
-    // There is a Casdoor session now where the page may already have looked
-    // and found none, so the threads get to ask again.
-    resetRemarkSession();
-  }, []);
+  useCallback(
+    async (providerName: string, urlCallback: (url: string) => void) => {
+      await pb
+        .collection('users')
+        .authWithOAuth2({ provider: providerName, urlCallback });
+      // There is a Casdoor session now where the page may already have looked
+      // and found none, so the threads get to ask again.
+      resetRemarkSession();
+    },
+    [],
+  );
 
 // Both sessions, and remark42's first: the thread box re-creates the widget
 // the moment the authStore changes, and a widget created while the cookie is

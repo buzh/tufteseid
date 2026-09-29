@@ -8,3 +8,17 @@
 .close:hover {
   background-color: var(--mantine-primary-color-filled-hover);
 }
+
+/* Casdoor's login page. A cross-origin frame cannot be measured and will not
+   inherit a style, so the height is fixed here against what the `formCss` in
+   docs/identity.md leaves standing, and everything inside it is Casdoor's own
+   dark theme. `color-scheme` only spares the reader a white flash before the
+   page has painted. */
+.frame {
+  display: block;
+  width: 100%;
+  height: 460px;
+  border: 0;
+  background-color: transparent;
+  color-scheme: dark;
+}

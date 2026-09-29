@@ -37,6 +37,13 @@ route {
                 header X-Robots-Tag noindex
                 header Strict-Transport-Security max-age=31536000
                 header X-Content-Type-Options nosniff
+                # The app frames Casdoor's login page in its sign-in box
+                # (src/auth/AuthDialog.tsx), and Casdoor sends no framing
+                # header of its own — so without this the one page on the
+                # stack where a password is typed is embeddable by anybody.
+                # A CSP carrying only `frame-ancestors` restricts framing and
+                # nothing else, which is what keeps the console running here.
+                header Content-Security-Policy "frame-ancestors 'self' {$PUBLIC_ORIGIN}"
                 reverse_proxy http://casdoor:8000
         }
 
@@ -72,11 +79,13 @@ route {
         # style-src-elem 'unsafe-inline' is required by MantineProvider's
         # runtime <style>; a nonce is impossible behind a static file_server.
         #
-        # frame-src names Casdoor because the app signs the reader in to the
-        # comment threads in a hidden iframe that passes through it
-        # (src/api/remark42.ts). Drop the host and nothing errors — the frame
-        # is blocked, the round trip times out, and the reader is quietly back
-        # to pressing the widget's own sign-in button.
+        # frame-src names Casdoor twice over: the sign-in box holds its login
+        # page (src/auth/AuthDialog.tsx), and the comment threads are signed
+        # in to in a hidden iframe that passes through it (src/api/remark42.ts).
+        # Drop the host and the first has no form in it; the second does not
+        # error either — the frame is blocked, the round trip times out, and
+        # the reader is quietly back to pressing the widget's own sign-in
+        # button.
         header Content-Security-Policy "
                 default-src 'self';
                 script-src 'self';
