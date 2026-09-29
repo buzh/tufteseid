@@ -80,7 +80,7 @@ Three traps, all of which present as a container restarting in a loop:
 - The SQLite DSN must **not** carry the `file:` scheme, even though Casdoor's
   own default config does. modernc.org/sqlite takes the prefix as part of the
   path and creates a file called `file:casdoor.db`, leaving the real one
-  empty. `/data/casdoor.db?cache=shared` is right.
+  empty.
 - The data directory must be owned by uid/gid 1000. `sudo mkdir -p` leaves it
   owned by root and Casdoor cannot create its database.
 - **No `--createDatabase=true`.** Casdoor's docs offer it and the flag is
@@ -88,6 +88,27 @@ Three traps, all of which present as a container restarting in a loop:
   SQLite rejects with a syntax error and Casdoor turns into a panic. Nothing
   is lost by leaving it off — `/server` creates the tables and seeds the
   built-in organisation on an empty volume either way.
+
+### "database is locked"
+
+Casdoor on SQLite hits `SQLITE_BUSY` under nothing much at all — adding a
+user, changing a password — and turns it into a panic rather than a retry, so
+the admin UI answers 500 while the container stays up. It is a default
+problem, not a load problem: xorm holds a connection pool, SQLite takes one
+writer, and Casdoor's own DSN asks for shared cache, which makes contention
+worse.
+
+The DSN in `docker-compose.yml` answers all of it:
+
+| | |
+| --- | --- |
+| `_pragma=journal_mode(WAL)` | readers do not block the writer |
+| `_pragma=busy_timeout(10000)` | wait and retry rather than fail at once |
+| `_txlock=immediate` | take the write lock up front — the deferred-to-write upgrade is the one deadlock no timeout retries its way out of |
+| no `cache=shared` | shared cache turns file contention into table contention, which `busy_timeout` does not cover |
+
+WAL leaves `casdoor.db-wal` and `casdoor.db-shm` beside the database. Both
+belong there; a backup that takes only the `.db` is not a backup.
 
 ## Registering the clients
 

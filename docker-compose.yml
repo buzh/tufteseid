@@ -123,7 +123,16 @@ services:
       - driverName=sqlite
       # No `file:` scheme — modernc.org/sqlite takes the prefix as part of the
       # path and silently creates a file called `file:`.
-      - dataSourceName=/data/casdoor.db?cache=shared
+      #
+      # The three `_pragma`s are what keep Casdoor off "database is locked":
+      # xorm holds a connection pool, SQLite takes one writer, and Casdoor
+      # turns the SQLITE_BUSY into a panic rather than a retry. WAL lets
+      # readers through while one writes, busy_timeout retries instead of
+      # failing at once, and an immediate transaction takes the write lock up
+      # front — the deferred-to-write upgrade is the one deadlock no timeout
+      # can retry its way out of. No `cache=shared`, which Casdoor's own
+      # default carries and which makes this worse rather than better.
+      - "dataSourceName=/data/casdoor.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(10000)&_txlock=immediate"
       - runmode=prod
       - httpport=8000
       # OIDC discovery composes every endpoint from this, so it must be the
