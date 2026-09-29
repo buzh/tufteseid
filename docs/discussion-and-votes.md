@@ -25,6 +25,14 @@ once per session as a module script; `window.remark_config` is set, then
 `window.REMARK42.createInstance()` on mount and `destroy()` on unmount, so
 opening a second spot swaps the thread rather than stacking one.
 
+Order matters on the first open. The script's own `init()` runs on evaluation
+and creates an instance out of `window.remark_config` itself — and throws if
+there is none — so the config is set before the append, and the append waits
+on the silent sign-in below. Fetching the script alongside the round trip
+instead raced them: the widget read remark42's session before it existed, and
+the later `createInstance()` reuses an iframe already in the mount node rather
+than reading the session again.
+
 A failed load degrades to `talk.failed` and clears the cached promise, so
 closing and reopening the box retries — a sidecar that was down at first press
 is often up at the second.
@@ -85,7 +93,8 @@ thread. Nothing in a log says which happened, which is why `live-check.sh`
 asserts the first two.
 
 The order matters. The widget reads remark42's session once, when it is
-created: `SpotTalk` waits on the round trip before `createInstance` and
+created: `SpotTalk` waits on the round trip before the embed is appended and
+`createInstance` is called, and
 re-creates the widget when the app's own sign-in state changes, and signing
 out of the app ends remark42's session before clearing PocketBase's. The
 Casdoor session behind both is left alone — it is what makes the next sign-in

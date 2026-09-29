@@ -93,8 +93,6 @@ export const SpotTalk = ({ spot }: { spot: SpotRecord }) => {
       components: ['embed'],
       page_title: spot.name,
     };
-    window.remark_config = config;
-
     // The widget reads remark42's session once, when it is created, so the
     // silent sign-in has to have finished by then — mounting first and
     // priming after would show the reader a sign-in button they do not need.
@@ -102,7 +100,20 @@ export const SpotTalk = ({ spot }: { spot: SpotRecord }) => {
     // guest here is a guest there too.
     const session = signedIn ? primeRemarkSession() : Promise.resolve(false);
 
-    Promise.all([loadEmbed(), session])
+    // Hence the ordering: the embed script creates an instance out of
+    // `window.remark_config` the moment it evaluates, and throws if there is
+    // none, so the config is set first and the script appended only once the
+    // session is primed. Loading the two in parallel raced the widget against
+    // the round trip, and a widget already created is one `createInstance`
+    // reuses rather than re-reads the session for.
+    session
+      .then(() => {
+        // A box closed mid-trip has taken the mount node with it, and the
+        // script would evaluate against nothing.
+        if (!live) return;
+        window.remark_config = config;
+        return loadEmbed();
+      })
       .then(() => {
         if (!live) return;
         instance = window.REMARK42?.createInstance(config);
