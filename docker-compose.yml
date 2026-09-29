@@ -147,6 +147,13 @@ services:
       - SITE=tufteseid
       - SECRET=${REMARK42_SECRET:?set REMARK42_SECRET in .env}
       - ADMIN_SHARED_ID=${REMARK42_ADMIN_ID:-}
+      # Unlocks `backup`, `restore` and `remap` — the last being the only way
+      # back if the public origin ever moves, since threads are keyed by the
+      # spot's share URL. Blank disables it, which is the default: it is HTTP
+      # basic auth over the same public /remark42/api/v1/admin/* the widget's
+      # own moderation uses, so a set password is a second, guessable way in.
+      # Set it for the length of a migration and blank it again after.
+      - ADMIN_PASSWD=${REMARK42_ADMIN_PASSWD:-}
       - ALLOWED_HOSTS='self'
       - AUTH_SAME_SITE=strict
       - EMOJI=true

@@ -62,6 +62,33 @@ Moderation is `ADMIN_SHARED_ID`: the Casdoor subject of whoever may delete and
 block, given to Remark42 as an opaque id. It is unrelated to PocketBase's
 `role = "admin"` — the same person needs both, set in two places.
 
+### If the public origin moves
+
+The thread key is `https://<host>/l/<CODE>`, so changing the host points every
+spot at a thread that does not exist yet. Nothing is lost — the comments are
+still in the store under their old keys — but nothing finds them either, and
+no amount of restarting fixes it. `remap` is what moves them:
+
+```sh
+# REMARK42_ADMIN_PASSWD in .env, then `docker compose up -d remark42`.
+docker compose exec remark42 backup -s tufteseid
+printf 'https://old.example* https://new.example*\n' \
+  | sudo tee /site/tufteseid/data/remark42/rules
+docker compose exec remark42 remap -s tufteseid -f var/rules
+docker compose restart remark42
+```
+
+The rules file is one `<from> <to>` pair per line and takes a trailing `*` on
+each side for a whole-host move. Remapping runs asynchronously and the result
+does not show until the restart, so a run that looks like it did nothing
+usually has not finished. Blank `REMARK42_ADMIN_PASSWD` again when you are
+done.
+
+Two other things the move touches and this does not: already-rendered evidence
+has the old host **burnt into its pixels** by `rendersvc` and no remap reaches
+it, and Casdoor's two registered redirect URIs live in its database rather
+than its environment. `docs/identity.md` has the second.
+
 ## Votes
 
 A score per spot, ours, in PocketBase. No comment engine votes on a *page* —
