@@ -9,6 +9,14 @@
   max-height: calc(100% - 2 * var(--mantine-spacing-xs));
 }
 
+/* A box standing down for another context. `display: none` rather than an
+   unmount: the box is suspended, not closed, and what is behind it — the draft
+   controller and its write chain, the picture list, where the box was dragged
+   to — has to be there when the context in front goes. */
+.away {
+  display: none;
+}
+
 /* `pointer-events: none`, or the prompt would be the one place on the map a pin
    cannot be placed. */
 .prompt {
@@ -35,8 +43,8 @@
 }
 
 /* The camera, the rectangle and the drawing at rest: three buttons on a line,
-   not three framed rows. The row below is what the last two become once one of
-   them has the map. */
+   not three framed rows. The row below is what the rectangle becomes once it
+   has the map; the drawing takes the band instead, and the card with it. */
 .tools {
   display: flex;
   flex-wrap: wrap;

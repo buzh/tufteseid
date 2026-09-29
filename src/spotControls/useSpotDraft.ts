@@ -15,6 +15,7 @@ import {
 } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
 import { bboxWidthMetres } from '../map/bbox';
+import { drawHoldAtom } from '../shared/uiContext';
 import { SKETCH_BUDGET_BYTES, sketchBytes, sketchOf } from '../sketch/scene';
 import { sketchNow } from '../sketch/session';
 import {
@@ -63,10 +64,6 @@ export type SpotDraftController = {
   stage: SpotDraft['stage'];
   /** Leaving a stage writes what it changed. */
   setStage: (stage: SpotDraft['stage']) => void;
-  /** Put the pen down and keep the strokes. */
-  saveSketch: () => void;
-  /** Put the pen down and go back to the stored drawing. */
-  cancelSketch: () => void;
   footprintSideMetres: number | null;
   /** The drawing the rectangle was derived from was smaller than `MIN_SIDE_M`
    *  or larger than `MAX_SIDE_M`, so the square is not what was drawn. */
@@ -85,8 +82,6 @@ export type SpotDraftController = {
    *  the write to the unmount, which cannot tell a kept drawing from a
    *  discarded one. */
   finish: () => void;
-  /** Let the draft go and keep nothing the stage did. */
-  abort: () => void;
 };
 
 // A PocketBase validation message names no field; the one at fault is only in
@@ -357,8 +352,10 @@ export const useSpotDraft = (
     [commit, stageTo],
   );
 
+  /** Put the pen down and keep the strokes. */
   const saveSketch = useCallback(() => setStage('idle'), [setStage]);
 
+  /** Put the pen down and go back to the stored drawing. */
   const cancelSketch = useCallback(() => {
     setSketchTooBig(false);
     store.set(spotSketchAtom, held.current.record?.sketch ?? null);
@@ -380,6 +377,7 @@ export const useSpotDraft = (
   );
 
   const finish = useCallback(() => leave(true), [leave]);
+  /** Let the draft go and keep nothing the stage did. */
   const abort = useCallback(() => leave(false), [leave]);
 
   const remove = useCallback(() => {
@@ -417,6 +415,34 @@ export const useSpotDraft = (
     [commit, store, setActive],
   );
 
+  // The canvas takes the whole map rectangle and this controller's box is away
+  // behind it, so the band drives the two ways out from here — the writes are
+  // this hook's and nothing else can make them. Which pair depends on the box:
+  // a card draft is nothing but the hold and is let go, an editor draft steps
+  // back into a box that is still open.
+  const drawing = draft.stage === 'sketch';
+  const fromCard = draft.box === 'card';
+  const setDrawHold = useSetAtom(drawHoldAtom);
+  useEffect(() => {
+    if (!drawing) return;
+    setDrawHold({
+      name: form.name.trim() || record?.name || '',
+      save: fromCard ? finish : saveSketch,
+      abort: fromCard ? abort : cancelSketch,
+    });
+    return () => setDrawHold(null);
+  }, [
+    drawing,
+    fromCard,
+    form.name,
+    record?.name,
+    finish,
+    abort,
+    saveSketch,
+    cancelSketch,
+    setDrawHold,
+  ]);
+
   const step: SpotStep =
     draft.stage !== 'idle'
       ? draft.stage
@@ -444,8 +470,6 @@ export const useSpotDraft = (
     revertText,
     stage: draft.stage,
     setStage,
-    saveSketch,
-    cancelSketch,
     footprintSideMetres: footprint
       ? Math.round(bboxWidthMetres(footprint))
       : null,
@@ -458,6 +482,5 @@ export const useSpotDraft = (
     remove,
     close: closeDraft,
     finish,
-    abort,
   };
 };

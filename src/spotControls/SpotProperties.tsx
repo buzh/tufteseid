@@ -17,7 +17,6 @@ import type { SpotDraftController } from './useSpotDraft';
 export const SpotProperties = ({ spot }: { spot: SpotDraftController }) => {
   const { t } = useTranslation();
   const placing = spot.stage === 'pin';
-  const drawing = spot.stage === 'sketch';
   const framing = spot.stage === 'footprint';
   const sided = spot.footprintSideMetres != null;
 
@@ -113,33 +112,20 @@ export const SpotProperties = ({ spot }: { spot: SpotDraftController }) => {
         </Button>
       </div>
 
+      {/* No row for putting the pen down: the canvas takes the whole map and
+          this box is away behind it, so the band carries the two ways out
+          (`ribbon/DrawBand`). */}
       <div
         className={cx(styles.unit, spot.step === 'sketch' && styles.unitStep)}
       >
-        {drawing ? (
-          <>
-            <Button
-              size="compact-xs"
-              variant="subtle"
-              color="gray"
-              onClick={spot.cancelSketch}
-            >
-              {t('spots.abort')}
-            </Button>
-            <Button size="compact-xs" onClick={spot.saveSketch}>
-              {t('spots.save')}
-            </Button>
-          </>
-        ) : (
-          <Button
-            size="compact-xs"
-            variant="default"
-            leftSection={<Icon icon="draw" size={14} />}
-            onClick={() => spot.setStage('sketch')}
-          >
-            {spot.hasSketch ? t('spots.sketchChange') : t('spots.sketchAdd')}
-          </Button>
-        )}
+        <Button
+          size="compact-xs"
+          variant="default"
+          leftSection={<Icon icon="draw" size={14} />}
+          onClick={() => spot.setStage('sketch')}
+        >
+          {spot.hasSketch ? t('spots.sketchChange') : t('spots.sketchAdd')}
+        </Button>
       </div>
 
       <div className={styles.unit}>

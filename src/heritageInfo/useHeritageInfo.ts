@@ -13,6 +13,7 @@ import {
   queryHeritageAt,
 } from '../map/featureInfo/heritageQuery';
 import type { FeatureInfoReading } from '../map/featureInfo/types';
+import { uiContextAtom } from '../shared/uiContext';
 import { spotFootprintAdjustingAtom, spotPlacingAtom } from '../spots/atoms';
 import { spotAtPixel } from '../spots/hitTest';
 import { terrainAdjustingAtom } from '../terrain/window';
@@ -44,8 +45,19 @@ export const useHeritageInfo = (): HeritageInfo => {
   const [popup, setPopup] = useAtom(heritagePopupAtom);
   const [pending, setPending] = useState<[number, number] | null>(null);
   const map = useAtomValue(mapAtom);
+  const context = useAtomValue(uiContextAtom);
 
   const closePopup = useCallback(() => setPopup(null), [setPopup]);
+
+  // Both of these are OpenLayers overlays on the map element, which a drawing
+  // session wears a CSS transform on: left up they would be dragged and scaled
+  // with the ground rather than anchored to it. Closed rather than hidden —
+  // the reading belonged to the context that has gone.
+  useEffect(() => {
+    if (context === 'map') return;
+    setTip(null);
+    setPopup(null);
+  }, [context, setTip, setPopup]);
 
   useEffect(() => {
     const store = getDefaultStore();

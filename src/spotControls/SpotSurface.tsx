@@ -5,6 +5,7 @@ import { draftGroundAtom } from '../evidence/draftGround';
 import { EvidenceReader } from '../evidence/EvidenceReader';
 import { useEvidenceOverlay } from '../evidence/evidenceOverlay';
 import { useRectangleAdjust } from '../map/rectAdjust';
+import { uiContextAtom } from '../shared/uiContext';
 import { useSketchOverlay } from '../sketch/overlay';
 import { sketchOf } from '../sketch/scene';
 import { sketchSessionAtom } from '../sketch/session';
@@ -25,6 +26,7 @@ import { useSpotShareLink } from '../spots/shareLink';
 import { useSpotLayer } from '../spots/spotLayer';
 import { useSpotRecords } from '../spots/spotRecords';
 import { SpotAcquire } from './SpotAcquire';
+import styles from './SpotBox.module.css';
 import { SpotCard } from './SpotCard';
 import { SpotPlacePrompt } from './SpotPlacePrompt';
 import { SpotProperties } from './SpotProperties';
@@ -61,6 +63,7 @@ export const SpotSurface = () => {
   const session = useAtomValue(sketchSessionAtom);
   const drawn = useAtomValue(spotSketchAtom);
   const ground = useAtomValue(draftGroundAtom);
+  const context = useAtomValue(uiContextAtom);
 
   // Nothing while a canvas is up (it already shows the scene), the draft's own
   // while one is open, otherwise the open spot's. Keyed on `active.id`/
@@ -105,22 +108,28 @@ export const SpotSurface = () => {
         </Suspense>
       )}
       {placing && <SpotPlacePrompt />}
-      {/* Keyed on the spot so opening a second does not inherit the first's
-          confirm — and so the card survives a card draft opening under it,
-          which is what keeps the picture list and the traced ground in place
-          while the reader reaches for the rectangle. */}
-      {draft?.box === 'editor' ? (
-        <SpotPropertiesBox key={draft.id} />
-      ) : (
-        active &&
-        (reading ? (
-          <EvidenceReader key={active.id} spot={active} />
-        ) : acquiring ? (
-          <SpotAcquire key={active.id} spot={active} />
+      {/* Away rather than unmounted while a drawing is up: the box carries the
+          draft controller, and it is that controller that writes the strokes —
+          on the button the band presses, or failing that on its own unmount,
+          which here would fire with the canvas still open. */}
+      <div className={context === 'draw' ? styles.away : undefined}>
+        {/* Keyed on the spot so opening a second does not inherit the first's
+            confirm — and so the card survives a card draft opening under it,
+            which is what keeps the picture list and the traced ground in place
+            while the reader reaches for the rectangle. */}
+        {draft?.box === 'editor' ? (
+          <SpotPropertiesBox key={draft.id} />
         ) : (
-          <SpotCard key={active.id} spot={active} />
-        ))
-      )}
+          active &&
+          (reading ? (
+            <EvidenceReader key={active.id} spot={active} />
+          ) : acquiring ? (
+            <SpotAcquire key={active.id} spot={active} />
+          ) : (
+            <SpotCard key={active.id} spot={active} />
+          ))
+        )}
+      </div>
     </>
   );
 };

@@ -321,6 +321,8 @@
     "sketchNone": "Ingen tegning",
     "sketchTooBig": "Tegningen er for stor til å lagres. Fjern noen elementer og prøv igjen.",
     "sketchLabel": "Tegning",
+    "drawingOn": "Tegner på «{{name}}»",
+    "drawingHere": "Tegner",
     "sketchShow": "Vis tegningen (T)",
     "sketchHide": "Skjul tegningen (T)",
     "sketchFade": "Tegningens transparens",

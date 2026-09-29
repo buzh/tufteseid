@@ -25,9 +25,9 @@ One row per directory under `src/`.
 | `lidarExtract/` | LiDAR tile planning, fetching and stitching. `stitch.ts` serves the DEM fetch, `run.ts` and `sources.ts` the LiDAR evidence render. |
 | `locales/` | i18next JSON, one directory per language. |
 | `map/` | The OpenLayers map and everything attached to it: layer configuration and stacks, the compare halves and the split pane, feature info, projections, the rectangle-placing interaction, the footprint and pin and hint layers. |
-| `ribbon/` | The top band: its three sections and the upstream status light. Layout only. |
+| `ribbon/` | The top band: its three sections and the upstream status light while the map is the context in front, and the draw band while a drawing is. Layout only. |
 | `search/` | Kartverket place, address, road, property and elevation lookups. One function has a live caller. |
-| `shared/` | Error boundary, URL parameter access, coordinate parsing, enum and number helpers, and the request deadline that reports to the breaker. |
+| `shared/` | The context in front (`uiContext.ts`), the error boundary, URL parameter access, coordinate parsing, enum and number helpers, and the request deadline that reports to the breaker. |
 | `showControls/` | The band's what-is-drawn-over-the-ground group: the Kulturminner control and the drawing's toggle. |
 | `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the toolbox that stands in for Excalidraw's own, the remembered pen, and the render onto the ground. |
 | `spotControls/` | The reader's records as surfaces: the `+`, the properties box, the read card, the box that orders a render from elsewhere, the index menu. |
@@ -86,11 +86,52 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `draftGroundAtom` | `evidence/draftGround.ts` | A picture laid on the map at the extent it was rendered over: a kept row to trace a drawing onto, published by `EvidenceGallery`, or a flyfoto proposal under review, published by `useFlyfotoRun`. Never both — the card and the acquisition box do not stand at once. |
 | the floating panel's layout and placement | `ui/useFloatingPanel.ts` | Which way round the box is laid out, where it was dragged to, how big it may get and which wall it is docked against. Module-private, reached through `useFloatingPanel`: held outside the component, which remounts per spot — and so only one floating panel at a time. `EvidenceReader` is the one caller. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
+| `uiContextAtom` | `shared/uiContext.ts` | Derived: `map` or `draw`, off the session above. Which surface is in front (*The context in front*). |
+| `drawHoldAtom` | same | What the draw context puts in the band: whose drawing it is and the two ways out. Published by whichever `useSpotDraft` has the pen, because its box is away and the writes are still the controller's. |
 | `sketchShownAtom`, `sketchFadeAtom` | `sketch/overlay.ts` | Whether the open spot's drawing is on the ground, and how far it is faded towards it. A reading setting, not the record's: they outlive the spot the box was opened on. |
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |
 | `isSignedInAtom`, `isAdminAtom` | same | Derived, so a component does not re-render on an unrelated user field. |
 | `isAuthDialogOpenAtom`, `authPromptAtom` | same | Whether the dialog is up, and why when the reader did not press anything. |
 | `upstreamHealthAtom` | `upstream/health.ts` | One breaker status per origin. |
+
+## The context in front
+
+One context at a time, named by `uiContextAtom` (`src/shared/uiContext.ts`).
+`map` is the app at rest: the band over the ground and boxes floating on it.
+`draw` is a drawing open — the canvas takes the whole map rectangle, so
+everything the map context put over that rectangle stands down and the band
+carries the drawing's own controls instead.
+
+What that costs each surface is different, and the difference is the rule:
+
+- **The band swaps, it does not go.** `Ribbon` puts `DrawBand` on the column
+  and hides its own three sections with `display: none` — hidden rather than
+  unmounted, because each ground arm's controller remembers something across a
+  visit elsewhere (the flyfoto era, the dataset lists) that an unmount would
+  lose and fetch again. Both bands wear `.ribbon`, whose height is fixed rather
+  than left to the contents: the scene↔ground mapping is bound to the map
+  rectangle as it was at the freeze that opened the session and is never
+  rebound, so a band that grew or shrank afterwards would slide the map element
+  out from under strokes already registered to it.
+- **The boxes go away, not out.** `SpotSurface` wraps them in a
+  `display: none`, because the box carries the draft controller and it is that
+  controller that writes the strokes. Unmounting it would fire its leaving
+  write with the canvas still open, against a scene Excalidraw has not been
+  asked for. The band drives the same controller through `drawHoldAtom`.
+- **The terrain panel goes and the terrain render stays.** `TerrainSurface`
+  mounts `useTerrainControls` either way, so only the box stands down — the
+  reading on the ground is what a drawing is traced over. The frame does let go
+  of the map: `setSpotStageAtom` clears `terrainAdjustingAtom` on the way into
+  the draw stage, because a rectangle under a canvas could not be put down
+  again.
+- **The heritage tip and card close outright.** Both ride OpenLayers overlays
+  on the map element, which the session wears a CSS transform on, so left up
+  they would be dragged and scaled with the ground rather than anchored to it.
+  They belonged to the context that has gone, so `useHeritageInfo` clears
+  them rather than hiding them.
+
+A second full-surface context reuses the atom: add it to `UiContext`, and every
+surface above already asks the right question.
 
 ## Two grounds (the halves mechanism)
 
@@ -160,12 +201,13 @@ each, an elevation button that points the terrain analysis at that rectangle
 rather than framing another (`readTerrainWindowAtom`, so the reading starts at
 once and its offer is what the camera beside it then keeps), and the pictures.
 Reading terrain against a place is the ongoing act and naming it a one-off, so
-the card is the workbench and the properties box is behind a button. A button
-becomes a row — the hint and its Ferdig, or the pen's
-Avbryt/Lagre — for as long as it has the map, and only one of the two can. The
-third, `SpotAcquire`, is behind the card's microscope and orders the pictures
-that are asked for over the footprint rather than read off the view
-(*The pictures of a spot*).
+the card is the workbench and the properties box is behind a button. The
+rectangle's button becomes a row — the hint and its Ferdig — for as long as it
+has the map; the pen takes the whole map instead, so the box goes away behind
+the canvas and its Avbryt/Lagre are in the band (*The context in front*). Only
+one of the two can have the map at a time. The third box, `SpotAcquire`, is
+behind the card's microscope and orders the pictures that are asked for over
+the footprint rather than read off the view (*The pictures of a spot*).
 
 The pin belongs to the properties box and stands only while it is open
 (`unpinnedSpotIdAtom`, `pinAdjust.ts`). The card and the reader are read against
@@ -642,6 +684,11 @@ session state, so a shared link opens on one ground.
 ```
 GroundSection half="a"  →  ViewSection  →  [GroundSection half="b"]  →  ToolSection
 ```
+
+That is the map context. With a drawing open the same shell carries `DrawBand`
+instead — whose spot is being drawn on, Avbryt, Lagre — and nothing else, since
+nothing in the band may change the ground under strokes already registered to
+it (*The context in front*).
 
 The second ground section mounts only while two grounds are up. `ViewSection`
 carries two units: `ViewControlGroup`, the one/curtain/split switch, and beside

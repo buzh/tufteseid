@@ -204,10 +204,16 @@ export const setSpotStageAtom = atom(
   (get, set, stage: SpotDraft['stage']) => {
     const draft = get(spotDraftAtom);
     if (!draft || draft.stage === stage) return;
-    if (stage === 'footprint') {
-      // Only one `useRectangleAdjust` may be live: two would put two frames and
-      // two pointer interactions on the map, and neither could be grabbed.
+    if (stage === 'footprint' || stage === 'sketch') {
+      // The terrain rectangle lets go of the map. Against another rectangle,
+      // because only one `useRectangleAdjust` may be live: two would put two
+      // frames and two pointer interactions on the map, and neither could be
+      // grabbed. Against the pen, because the canvas covers the map and
+      // freezes its interactions, so a frame left in hand could not be put
+      // down again.
       set(terrainAdjustingAtom, false);
+    }
+    if (stage === 'footprint') {
       const map = get(mapAtom);
       const rect =
         get(spotFootprintAtom) ??

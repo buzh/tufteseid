@@ -65,6 +65,9 @@ const SpotUnits = ({
   const setAcquiring = useSetAtom(spotAcquiringAtom);
   const readTerrain = useSetAtom(readTerrainWindowAtom);
   const framing = hold?.stage === 'footprint';
+  // The card is away behind the canvas for the whole of a draw stage, so this
+  // only keeps the fade — whose slider is over the drawing being made — from
+  // re-rendering on every settle of a pen nobody can see it from.
   const drawing = hold?.stage === 'sketch';
 
   // A stage has the map: the rectangle being dragged is not the one the record
@@ -83,22 +86,6 @@ const SpotUnits = ({
           <span className={styles.unitText}>{t('spots.footprintHint')}</span>
           <Button size="compact-xs" onClick={hold.finish}>
             {t('spots.done')}
-          </Button>
-        </div>
-      ) : drawing && hold ? (
-        <div className={cx(styles.unit, styles.unitStep)}>
-          <Icon icon="draw" size={14} />
-          <span className={styles.unitText}>{t('spots.sketchLabel')}</span>
-          <Button
-            size="compact-xs"
-            variant="subtle"
-            color="gray"
-            onClick={hold.abort}
-          >
-            {t('spots.abort')}
-          </Button>
-          <Button size="compact-xs" onClick={hold.finish}>
-            {t('spots.save')}
           </Button>
         </div>
       ) : (

@@ -1,17 +1,51 @@
 /* Three columns, so the view and show controls keep the band's centre line
    whatever the sections beside them carry. Scrolls rather than wraps: a second
-   line would push the map down under the cursor. */
+   line would push the map down under the cursor.
+
+   The height is fixed rather than left to the contents, because every context
+   uses this shell and the band must be the same height in all of them: the
+   scene↔ground mapping of an open drawing is bound to the map rectangle as it
+   was when the session froze (`shared/uiContext.ts`). One row of controls plus
+   the padding and the rule. */
 .ribbon {
   flex: none;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: var(--mantine-spacing-xs);
+  min-height: calc(var(--control-height) + 2 * var(--mantine-spacing-xs) + 1px);
   padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
   background: var(--mantine-color-body);
   border-bottom: 1px solid var(--mantine-color-default-border);
   overflow-x: auto;
   scrollbar-width: thin;
+}
+
+/* The map's band standing down for another context. Out of flow, so the band in
+   front is the only one on the column and the shell's height is unchanged. */
+.away {
+  display: none;
+}
+
+/* The draw context has nothing to put on the centre line, so its title takes
+   the run and the two ways out stay pinned right. */
+.drawBand {
+  grid-template-columns: 1fr auto;
+}
+
+.drawing {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  min-width: 0;
+  color: var(--mantine-color-dimmed);
+}
+
+.drawingName {
+  overflow: hidden;
+  font-size: var(--mantine-font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .side {
