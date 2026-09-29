@@ -159,20 +159,30 @@ Rules — *how a spot stands* is public, *who voted* is not:
 | --- | --- |
 | list / view | `owner = @request.auth.id \|\| @request.auth.role = "admin"` |
 | create | signed in, owns the record, and the spot is public |
-| update / delete | owner or admin |
+| update | owner or admin, the spot is still public, and neither `spot` nor `owner` is in the body |
+| delete | owner or admin |
+
+Update carries the public gate too, and pins both relations, because a vote is
+otherwise created against a public spot and PATCHed onto a private one — the
+only field that legitimately moves is `direction`
+(`1700001800_votes_public_only.js`).
 
 ### `spotScores` (id `pbc_spot_scores`)
 
 A view collection, list and view rule open — a guest sees the ranking without
-an account.
+an account. The join is what makes that safe: the rules are open, so the query
+itself has to keep a private spot out, and a spot its owner turns private
+drops out of the ranking with the votes it already has.
 
 ```sql
-SELECT spot AS id, spot,
+SELECT v.spot AS id, v.spot AS spot,
        COUNT(*) AS votes,
-       SUM(CASE WHEN direction = 'up' THEN 1 ELSE 0 END) AS up,
-       SUM(CASE WHEN direction = 'down' THEN 1 ELSE 0 END) AS down,
-       SUM(CASE WHEN direction = 'up' THEN 1 ELSE -1 END) AS score
-FROM votes GROUP BY spot
+       SUM(CASE WHEN v.direction = 'up' THEN 1 ELSE 0 END) AS up,
+       SUM(CASE WHEN v.direction = 'down' THEN 1 ELSE 0 END) AS down,
+       SUM(CASE WHEN v.direction = 'up' THEN 1 ELSE -1 END) AS score
+FROM votes v JOIN spots s ON s.id = v.spot
+WHERE s.visibility = 'public'
+GROUP BY v.spot
 ```
 
 Two properties of a view collection the client is written against:

@@ -202,9 +202,9 @@ sidecar, which writes `meta.job` as it goes and the file when it is done
   Readable only by its owner — *how a spot stands* is public, *who voted* is
   not.
 - **`spotScores`** (id `pbc_spot_scores`) — a **view** over `votes`, open to a
-  guest, carrying `up`, `down`, `votes` and `score` per spot. Two things to
-  code against: PocketBase publishes **no realtime feed on a view**, and a
-  spot with no votes is **absent** rather than present at zero
+  guest, carrying `up`, `down`, `votes` and `score` per **public** spot. Two
+  things to code against: PocketBase publishes **no realtime feed on a view**,
+  and a spot with no votes is **absent** rather than present at zero
   (`docs/discussion-and-votes.md`).
 
 `localities`, `finds` and `attachments` are still on disk from the old model and
