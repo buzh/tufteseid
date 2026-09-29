@@ -28,18 +28,22 @@ answers 404, which is what ground outside the LiDAR footprint looks like
 anyway.
 
 Secrets live in a `.env` beside `docker-compose.yml`, which is gitignored.
-Copy the committed shape and fill it in — `remark42` refuses to start with any
-of its OAuth2 variables missing, and the pair it wants comes out of Casdoor,
-so the first `up` runs before they exist:
+Copy the committed shape and set `PUBLIC_ORIGIN` and `REMARK42_SECRET`. The
+OAuth2 pair comes out of Casdoor, which is not running yet, so leave those two
+on the placeholders `.env.example` ships — blanking them aborts
+`docker compose up` before anything starts, Casdoor included.
 
 ```sh
 git clone https://github.com/buzh/tufteseid.git
 cd tufteseid
 cp .env.example .env
-$EDITOR .env            # PUBLIC_ORIGIN and REMARK42_SECRET now, the rest below
+$EDITOR .env            # PUBLIC_ORIGIN and REMARK42_SECRET
 docker compose build --pull
 docker compose up -d
 ```
+
+Sign-in is broken until the next section fills the pair in. Everything else —
+the map, the terrain, spots you already have — works.
 
 That listens on `127.0.0.1:3030`, expecting another reverse proxy in front.
 
@@ -66,9 +70,13 @@ credential is entered. Both the app and the comment engine are OAuth2 clients
 of it, so a reader signs in once and can then comment without signing in
 again. [`docs/identity.md`](docs/identity.md) has the full account.
 
-Open **<http://localhost:3030/id/>**, sign in with Casdoor's own initial
-administrator (`admin` / `123` — change it immediately), and create two
-applications. Each hands back a client id and a secret. Their redirect URLs:
+Open **<http://localhost:3030/id/>** and sign in as `built-in` / `admin` /
+`123`. **Change that password before the host is reachable from the internet.**
+
+**Make an organization for readers first.** Every member of Casdoor's
+`built-in` organization has full Casdoor admin rights, so readers must not
+land there. **Organizations → Add**, name it `tufteseid`, and create both
+applications under it. Each hands back a client id and a secret when saved:
 
 | Application | Redirect URL |
 | --- | --- |
@@ -76,9 +84,10 @@ applications. Each hands back a client id and a secret. Their redirect URLs:
 | the threads | `https://<your-host>/remark42/auth/tufteseid/callback` |
 
 The threads' pair goes into `.env` as `REMARK42_OIDC_CID` and
-`REMARK42_OIDC_CSEC`; `docker compose up -d` again to pick them up. The app's
-pair is typed into PocketBase instead: **Collections → users → Edit collection
-→ Options → OAuth2**, the generic **OIDC** provider, pointed at
+`REMARK42_OIDC_CSEC`, replacing the placeholders; `docker compose up -d` again
+to pick them up. The app's pair is typed into PocketBase instead:
+**Collections → users → Edit collection → Options → OAuth2**, the generic
+**OIDC** provider, pointed at
 
 ```
 https://<your-host>/id/.well-known/openid-configuration

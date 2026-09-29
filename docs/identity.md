@@ -63,6 +63,12 @@ stays.
 
 ## Registering the clients
 
+**Readers do not belong in the `built-in` organization.** Every member of it
+has full Casdoor admin rights, and this is a site people sign themselves up
+for — so the first thing to make is an organization of their own, with both
+applications under it. Users belong to the organization rather than to an
+application, which is what lets one sign-in serve both clients.
+
 Both are applications in Casdoor's console, and both hand back a client id and
 a secret.
 
