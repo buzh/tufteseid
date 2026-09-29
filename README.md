@@ -51,22 +51,40 @@ app, so `CASDOOR_HOST` needs a DNS record and a server block of its own in
 that proxy — same backend, different `server_name`. Caddy sorts them out on
 the `Host` header.
 
-**That proxy must leave `/pb/` alone.** PocketBase pushes spots, votes and
+**That proxy must not time `/pb/` out.** PocketBase pushes spots, votes and
 finished renders down one long-lived event stream, and sends nothing between
 events — so a proxy that times an idle upstream out closes it on schedule.
 nginx does, after 60 seconds by default, which breaks signing in outright and
-makes everything else reconnect once a minute. In an nginx server block:
+makes everything else reconnect once a minute. Giving it a location of its own
+in an nginx server block:
 
 ```nginx
 location /pb/ {
     proxy_pass http://127.0.0.1:3030;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_buffering off;
+    proxy_redirect off;
+
+    proxy_http_version      1.1;
+    proxy_buffering         off;
+    proxy_request_buffering off;
+
     proxy_read_timeout 1h;
+    proxy_send_timeout 1h;
+
+    proxy_set_header Connection        "Keep-Alive";
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
 }
 ```
+
+Every header is repeated on purpose: **a location inherits from `server`, not
+from a sibling location**, so the ones set for `/` do not reach here. Dropping
+the forwarded-for pair is the quiet failure — the stack keeps working, Caddy
+logs every reader as 127.0.0.1, PocketBase rate-limits them as one, and
+`scripts/usage-report.sh` counts one visitor. Watch the spelling of `Host`
+too: nginx takes `Host:` with a stray colon as a *different* header, adds its
+own `Host` alongside, and Caddy answers 400 to every request carrying two.
 
 To let Caddy terminate TLS itself instead: change the `:3000` line in `Caddyfile`
 to your hostname and publish 80/443 rather than 3030. Certificates are then
