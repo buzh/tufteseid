@@ -39,6 +39,24 @@ route {
                 }
         }
 
+        # Both of these serve their own HTML and their own JavaScript, so they
+        # stand above the app's CSP for the same reason /stats/ does — under
+        # `script-src 'self'` neither console would run. They set no CSP of
+        # their own, hence the two hardening headers restated by hand.
+        handle_path /id/* {
+                header X-Robots-Tag noindex
+                header Strict-Transport-Security max-age=31536000
+                header X-Content-Type-Options nosniff
+                reverse_proxy http://casdoor:8000
+        }
+
+        handle_path /remark42/* {
+                header X-Robots-Tag noindex
+                header Strict-Transport-Security max-age=31536000
+                header X-Content-Type-Options nosniff
+                reverse_proxy http://remark42:8080
+        }
+
         header Strict-Transport-Security max-age=31536000
         header X-Content-Type-Options nosniff
         header Referrer-Policy strict-origin

@@ -1,5 +1,9 @@
 // OAuth2 only: this lists whatever `listAuthMethods()` reports. A provider is
-// added in PocketBase's admin UI (Collections -> users -> Options -> OAuth2).
+// added in PocketBase's admin UI (Collections -> users -> Options -> OAuth2),
+// and in practice there is one — the `oidc` entry pointing at the Casdoor
+// sidecar, which is also what the comment engine federates to. Its button text
+// is the `displayName` set there, so naming the provider is an admin's job
+// rather than a table here.
 
 import { Alert, Button, Loader, Modal, Stack, Text } from '@mantine/core';
 import { useAtom } from 'jotai';
@@ -8,17 +12,6 @@ import { useTranslation } from 'react-i18next';
 import { authPromptAtom, isAuthDialogOpenAtom } from './atoms';
 import styles from './AuthDialog.module.css';
 import { useOAuthProviders, useSignIn } from './hooks';
-
-// PocketBase's `displayName` takes its casing from whoever configured the
-// provider; these are the vendors' own spellings.
-const PROVIDER_LABELS: Record<string, string> = {
-  apple: 'Apple',
-  github: 'GitHub',
-  gitlab: 'GitLab',
-  google: 'Google',
-  microsoft: 'Microsoft',
-  oidc: 'OIDC',
-};
 
 export const AuthDialog = () => {
   const { t } = useTranslation();
@@ -74,10 +67,7 @@ export const AuthDialog = () => {
             onClick={() => void handle(provider.name)}
           >
             {t('auth.signInWith', {
-              provider:
-                PROVIDER_LABELS[provider.name] ??
-                provider.displayName ??
-                provider.name,
+              provider: provider.displayName || provider.name,
             })}
           </Button>
         ))}

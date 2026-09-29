@@ -14,6 +14,9 @@ dist-ssr
 
 /public/config.js
 
+# Secrets for the compose stack; .env.example is the committed shape.
+.env
+
 .vscode/*
 !.vscode/extensions.json
 .idea

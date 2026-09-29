@@ -192,6 +192,35 @@ check no-private-leak \
 OPTS=(-s -X POST -H 'Content-Type: application/json' -d '{"name":"live-check"}')
 check anon-write-refused "$BASE/pb/api/collections/spots/records" 400 json 10
 
+# The tallies are open — the ranking works with no account — while `votes` is
+# the reader's own rows only, so a guest is shown none of them. Both answer
+# 200; the difference is what is in the body. A spot with no votes is absent
+# from the view, so 0 here is a valid state.
+check scores-open "$BASE/pb/api/collections/spotScores/records?perPage=1&fields=spot,score" \
+  200 json 20 '"totalItems":'
+note "$(json_num totalItems) spot(s) with a tally"
+
+check votes-hidden "$BASE/pb/api/collections/votes/records?perPage=1&fields=id" \
+  200 json 20 '"totalItems":0'
+
+section 'Identity and discussion'
+
+# Casdoor and remark42 both serve their own HTML and their own JavaScript, so
+# they stand above the app's CSP. That they answer at all is the check that
+# the two `handle_path` blocks are still ahead of it in the route.
+check oidc-discovery "$BASE/id/.well-known/openid-configuration" \
+  200 json 100 '"authorization_endpoint"'
+check oidc-noindex "$BASE/id/.well-known/openid-configuration" \
+  200 '' 0 '' 'x-robots-tag: noindex'
+
+check remark-ping "$BASE/remark42/api/v1/ping" 200 '' 2 'pong'
+check remark-embed "$BASE/remark42/web/embed.mjs" 200 javascript 500
+
+# One provider, and it is ours: a built-in left on would offer a second
+# identity the app knows nothing about.
+check remark-providers "$BASE/remark42/api/v1/config?site=tufteseid" \
+  200 json 20 '"auth_providers":\["tufteseid"\]'
+
 section 'Render sidecar'
 
 check render-health "$BASE/render/health" 200 json 10 '"ok":true'

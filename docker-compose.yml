@@ -19,6 +19,8 @@ services:
       - pocketbase
       - cvat-tiles
       - rendersvc
+      - casdoor
+      - remark42
 
   cvat-tiles:
     build: ./cvat-tiles
@@ -92,6 +94,75 @@ services:
   nib-proxy:
     build: ./nib-proxy
     restart: unless-stopped
+
+  # The reader's account lives here, not in PocketBase: two services need the
+  # same identity and only an OIDC provider can give it to both. PocketBase is
+  # a client of this (admin UI → users → OAuth2 → OIDC), remark42 another.
+  #
+  # Served under /id. Casdoor's admin console is a React SPA that assumes it
+  # owns the root, so if it comes up blank behind the subpath the fallback is a
+  # subdomain — `origin` and every registered callback move with it, nothing
+  # else does.
+  casdoor:
+    image: casbin/casdoor:v3.119.0
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "20m"
+        max-file: "3"
+    # --createDatabase is a no-op once the schema is there, so it can stay.
+    entrypoint: /bin/sh -c './server --createDatabase=true'
+    environment:
+      # Every app.conf key can be overridden by an env var of the same name,
+      # and the env var wins. Hence the un-shouty names.
+      - driverName=sqlite
+      # No `file:` scheme — modernc.org/sqlite takes the prefix as part of the
+      # path and silently creates a file called `file:`.
+      - dataSourceName=/data/casdoor.db?cache=shared
+      - runmode=prod
+      - httpport=8000
+      # OIDC discovery composes every endpoint from this, so it must be the
+      # public address including the subpath.
+      - origin=${PUBLIC_ORIGIN:-}/id
+    volumes:
+      # Must be writable by uid 1000 gid 1000 (the image's casdoor user) or the
+      # first write fails and the container restarts forever.
+      - /site/tufteseid/data/casdoor:/data
+
+  # Comment threads on public spots. Keeps its own identity store — it cannot
+  # read PocketBase's — federated to Casdoor so the reader signs in once.
+  # Exactly one custom OAuth2 provider is supported, and a missing AUTH_CUSTOM_*
+  # var is a startup failure rather than a disabled provider.
+  remark42:
+    image: ghcr.io/umputun/remark42:v1.14.0
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "20m"
+        max-file: "3"
+    environment:
+      # Cookies, CORS and the OAuth callback are all composed from this, so it
+      # must match the public address exactly, subpath included.
+      - REMARK_URL=${PUBLIC_ORIGIN:-}/remark42
+      - SITE=tufteseid
+      - SECRET=${REMARK42_SECRET:?set REMARK42_SECRET in .env}
+      - ADMIN_SHARED_ID=${REMARK42_ADMIN_ID:-}
+      - ALLOWED_HOSTS='self'
+      - AUTH_SAME_SITE=strict
+      - EMOJI=true
+      # Must match ^[a-z0-9][a-z0-9_-]*$ and collide with no built-in provider
+      # name; it is the last path segment of the callback URL.
+      - AUTH_CUSTOM_NAME=tufteseid
+      - AUTH_CUSTOM_CID=${REMARK42_OIDC_CID:?set REMARK42_OIDC_CID in .env}
+      - AUTH_CUSTOM_CSEC=${REMARK42_OIDC_CSEC:?set REMARK42_OIDC_CSEC in .env}
+      - AUTH_CUSTOM_AUTH_URL=${PUBLIC_ORIGIN:-}/id/login/oauth/authorize
+      - AUTH_CUSTOM_TOKEN_URL=${PUBLIC_ORIGIN:-}/id/api/login/oauth/access_token
+      - AUTH_CUSTOM_INFO_URL=${PUBLIC_ORIGIN:-}/id/api/userinfo
+      - AUTH_CUSTOM_SCOPES=openid,profile,email
+    volumes:
+      - /site/tufteseid/data/remark42:/srv/var
+    depends_on:
+      - casdoor
 
 volumes:
   wmscache:

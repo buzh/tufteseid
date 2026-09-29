@@ -9,9 +9,14 @@ import type { SpotRecord } from '../api/spots';
 import { mapAtom } from '../map/atoms';
 import { sketchOf } from '../sketch/scene';
 import { SketchFade } from '../sketch/SketchFade';
-import { activeSpotAtom, spotReadingAtom } from '../spots/atoms';
+import {
+  activeSpotAtom,
+  spotReadingAtom,
+  spotTalkingAtom,
+} from '../spots/atoms';
 import { formatPoint } from '../spots/geo';
 import { useMayEditSpot } from '../spots/mayEdit';
+import { VoteControl } from '../spots/VoteControl';
 import { cx } from '../ui/cx';
 import { ControlButton } from '../ui/ControlButton';
 import { Hint } from '../ui/Hint';
@@ -57,6 +62,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   const map = useAtomValue(mapAtom);
   const setReading = useSetAtom(spotReadingAtom);
   const setActive = useSetAtom(activeSpotAtom);
+  const setTalking = useSetAtom(spotTalkingAtom);
   const mayEdit = useMayEditSpot(spot);
   const { items } = useSpotEvidence(spot);
   const box = useFloatingPanel();
@@ -180,6 +186,31 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
         handle={box.dragHandle}
         actions={
           <>
+            <VoteControl spot={spot} />
+            <Tooltip
+              label={
+                spot.visibility === 'public'
+                  ? t('talk.open')
+                  : t('talk.private')
+              }
+            >
+              {/* A span, because Mantine's Tooltip needs an element that fires
+                  pointer events and a disabled button does not. */}
+              <span>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="sm"
+                  aria-label={t('talk.open')}
+                  // No thread on a private spot: the engine holds no account
+                  // of who may read one.
+                  disabled={spot.visibility !== 'public'}
+                  onClick={() => setTalking(true)}
+                >
+                  <Icon icon="forum" size={18} />
+                </ActionIcon>
+              </span>
+            </Tooltip>
             {current && (
               <Tooltip
                 label={downloadLabel({

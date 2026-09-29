@@ -74,6 +74,8 @@ const readingSpotIdAtom = atom<string | null>(null);
 
 const acquiringSpotIdAtom = atom<string | null>(null);
 
+const talkingSpotIdAtom = atom<string | null>(null);
+
 const openSpotAtom = atom<SpotRecord | null>(null);
 
 /** The open spot. Opening a different one — or none — ends the reading of the
@@ -84,6 +86,7 @@ export const activeSpotAtom = atom(
     if (get(openSpotAtom)?.id !== next?.id) {
       set(readingSpotIdAtom, null);
       set(acquiringSpotIdAtom, null);
+      set(talkingSpotIdAtom, null);
     }
     set(openSpotAtom, next);
   },
@@ -123,6 +126,25 @@ export const spotAcquiringAtom = atom(
       acquiringSpotIdAtom,
       acquiring ? (get(activeSpotAtom)?.id ?? null) : null,
     );
+  },
+);
+
+/** The thread stands in front of both the card and the reading, because it is
+ *  reached from either: the author opens it from their workbench, everybody
+ *  else from the only box they ever see. Held and suspended like the other two.
+ *
+ *  Never true for a private spot — the comment engine has no account of who may
+ *  read what, so the only gate is not mounting it. `SpotTalk` re-checks rather
+ *  than trusting every caller to. */
+export const spotTalkingAtom = atom(
+  (get) => {
+    const active = get(activeSpotAtom);
+    if (!active || get(spotDraftAtom)) return false;
+    if (active.visibility !== 'public') return false;
+    return get(talkingSpotIdAtom) === active.id;
+  },
+  (get, set, talking: boolean) => {
+    set(talkingSpotIdAtom, talking ? (get(activeSpotAtom)?.id ?? null) : null);
   },
 );
 

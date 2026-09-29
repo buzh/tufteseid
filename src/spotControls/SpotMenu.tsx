@@ -1,4 +1,12 @@
-import { Badge, Group, Menu, ScrollArea, Text, TextInput } from '@mantine/core';
+import {
+  Badge,
+  Group,
+  Menu,
+  ScrollArea,
+  SegmentedControl,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +16,7 @@ import { isAuthDialogOpenAtom, isSignedInAtom } from '../auth/atoms';
 import { activeSpotAtom, spotDraftAtom, spotPlacingAtom } from '../spots/atoms';
 import { isoDay } from '../shared/utils/isoDay';
 import { mySpotsAtom, spotsFailedAtom } from '../spots/spotRecords';
+import { popularSpotsAtom, spotScoresAtom } from '../spots/spotScores';
 import { ControlChip } from '../ui/ControlChip';
 import { Icon } from '../ui/Icon';
 import styles from './SpotMenu.module.css';
@@ -17,10 +26,14 @@ const FILTER_FROM = 8;
 
 const LIST_MAX_HEIGHT = 340;
 
+type Tab = 'mine' | 'popular';
+
 export const SpotMenu = () => {
   const { t } = useTranslation();
   const signedIn = useAtomValue(isSignedInAtom);
-  const spots = useAtomValue(mySpotsAtom);
+  const mine = useAtomValue(mySpotsAtom);
+  const popular = useAtomValue(popularSpotsAtom);
+  const scores = useAtomValue(spotScoresAtom);
   const failed = useAtomValue(spotsFailedAtom);
   const active = useAtomValue(activeSpotAtom);
   const draft = useAtomValue(spotDraftAtom);
@@ -29,7 +42,12 @@ export const SpotMenu = () => {
   const openAuthDialog = useSetAtom(isAuthDialogOpenAtom);
 
   const [opened, setOpened] = useState(false);
+  const [tab, setTab] = useState<Tab>('popular');
   const [query, setQuery] = useState('');
+
+  // The ranking needs no account, which is why the menu opens for a guest at
+  // all — it used to be the sign-in dialog's trigger.
+  const spots = tab === 'mine' ? mine : popular;
 
   const needle = query.trim().toLowerCase();
   const filtered = !needle
@@ -42,18 +60,18 @@ export const SpotMenu = () => {
 
   const drafting = draft != null || placing;
 
-  const title = !signedIn
-    ? t('spots.mine.needsAccount')
-    : drafting
-      ? t('spots.mine.busy')
-      : spots
-        ? // `total`, not `count`: i18next reads `count` as a request for
-          // plural forms this key has none of.
-          t('spots.mine.count', { total: spots.length })
-        : t('spots.mine.label');
+  const title = drafting
+    ? t('spots.list.busy')
+    : signedIn && mine
+      ? // `total`, not `count`: i18next reads `count` as a request for
+        // plural forms this key has none of.
+        t('spots.mine.count', { total: mine.length })
+      : t('spots.list.label');
 
   const row = (spot: SpotRecord) => {
     const open = spot.id === active?.id;
+    // Absent from the view means nobody has voted, not an unknown tally.
+    const score = scores?.get(spot.id)?.score ?? 0;
     return (
       <Menu.Item
         key={spot.id}
@@ -72,10 +90,21 @@ export const SpotMenu = () => {
           <Text size="sm" truncate miw={0}>
             {spot.name}
           </Text>
-          {spot.visibility === 'public' && (
-            <Badge size="xs" variant="light">
-              {t('spots.public')}
+          {tab === 'popular' ? (
+            <Badge
+              size="xs"
+              variant="light"
+              color={score < 0 ? 'gray' : undefined}
+              leftSection={<Icon icon="thumb_up" size={10} />}
+            >
+              {score}
             </Badge>
+          ) : (
+            spot.visibility === 'public' && (
+              <Badge size="xs" variant="light">
+                {t('spots.public')}
+              </Badge>
+            )
           )}
         </Group>
         <Text size="xs" c="dimmed">
@@ -89,11 +118,8 @@ export const SpotMenu = () => {
     <Menu
       opened={opened}
       onChange={(next) => {
-        if (next && !signedIn) {
-          openAuthDialog(true);
-          return;
-        }
         if (next && drafting) return;
+        if (next) setTab(signedIn ? 'mine' : 'popular');
         if (!next) setQuery('');
         setOpened(next);
       }}
@@ -101,14 +127,23 @@ export const SpotMenu = () => {
       position="bottom-end"
     >
       <Menu.Target>
-        <ControlChip
-          dimmed={!signedIn || drafting}
-          title={title}
-          aria-label={title}
-        />
+        <ControlChip dimmed={drafting} title={title} aria-label={title} />
       </Menu.Target>
       <Menu.Dropdown>
-        <Menu.Label>{t('spots.mine.label')}</Menu.Label>
+        <SegmentedControl
+          fullWidth
+          size="xs"
+          mb={6}
+          value={tab}
+          onChange={(next) => {
+            setTab(next as Tab);
+            setQuery('');
+          }}
+          data={[
+            { value: 'mine', label: t('spots.list.tabMine') },
+            { value: 'popular', label: t('spots.list.tabPopular') },
+          ]}
+        />
 
         {(spots?.length ?? 0) > FILTER_FROM && (
           <TextInput
@@ -123,28 +158,42 @@ export const SpotMenu = () => {
           />
         )}
 
-        {failed && (
-          <Menu.Item disabled leftSection={<Icon icon="warning" size={18} />}>
-            {t('spots.mine.failed')}
+        {tab === 'mine' && !signedIn ? (
+          <Menu.Item
+            leftSection={<Icon icon="login" size={18} />}
+            onClick={() => openAuthDialog(true)}
+          >
+            {t('spots.mine.needsAccount')}
           </Menu.Item>
-        )}
-        {!failed && spots == null && (
-          <Menu.Item disabled>{t('spots.mine.loading')}</Menu.Item>
-        )}
-        {spots?.length === 0 && (
-          <Menu.Item disabled className={styles.empty}>
-            {t('spots.mine.empty')}
-          </Menu.Item>
-        )}
-        {needle && filtered?.length === 0 && (
-          <Menu.Item disabled>
-            {t('spots.mine.noMatch', { query: query.trim() })}
-          </Menu.Item>
-        )}
+        ) : (
+          <>
+            {failed && (
+              <Menu.Item
+                disabled
+                leftSection={<Icon icon="warning" size={18} />}
+              >
+                {t('spots.mine.failed')}
+              </Menu.Item>
+            )}
+            {!failed && spots == null && (
+              <Menu.Item disabled>{t('spots.mine.loading')}</Menu.Item>
+            )}
+            {spots?.length === 0 && (
+              <Menu.Item disabled className={styles.empty}>
+                {t(tab === 'mine' ? 'spots.mine.empty' : 'spots.list.empty')}
+              </Menu.Item>
+            )}
+            {needle && filtered?.length === 0 && (
+              <Menu.Item disabled>
+                {t('spots.mine.noMatch', { query: query.trim() })}
+              </Menu.Item>
+            )}
 
-        <ScrollArea.Autosize mah={LIST_MAX_HEIGHT} type="scroll">
-          {filtered?.map(row)}
-        </ScrollArea.Autosize>
+            <ScrollArea.Autosize mah={LIST_MAX_HEIGHT} type="scroll">
+              {filtered?.map(row)}
+            </ScrollArea.Autosize>
+          </>
+        )}
       </Menu.Dropdown>
     </Menu>
   );

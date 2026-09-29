@@ -346,10 +346,8 @@
     "saving": "Lagrer …",
     "saveFailed": "Fikk ikke lagret lokaliteten. Prøv igjen.",
     "mine": {
-      "label": "Mine lokaliteter",
       "count": "Mine lokaliteter ({{total}})",
       "needsAccount": "Logg inn for å se lokalitetene dine",
-      "busy": "Legg fra deg den nye lokaliteten for å bla i lokalitetene dine",
       "loading": "Henter …",
       "failed": "Fikk ikke hentet lokalitetene dine.",
       "empty": "Du har ingen lokaliteter ennå. Trykk + for å lage en.",
@@ -395,7 +393,19 @@
     "penFillOn": "Skraver flaten",
     "penFillOff": "Fjern skraveringen",
     "penLock": "Behold verktøyet etter hvert strøk (Q)",
-    "penUnlock": "Gå tilbake til velgeren etter hvert strøk (Q)"
+    "penUnlock": "Gå tilbake til velgeren etter hvert strøk (Q)",
+    "voteUp": "Stem opp",
+    "voteDown": "Stem ned",
+    "voteScore": "Poengsum: {{total}}",
+    "voteNeedsAccount": "Logg inn for å stemme",
+    "votePrivate": "Bare offentlige lokaliteter kan få stemmer",
+    "list": {
+      "label": "Lokaliteter",
+      "busy": "Legg fra deg den nye lokaliteten for å bla i lokalitetene",
+      "tabMine": "Mine",
+      "tabPopular": "Populære",
+      "empty": "Ingen offentlige lokaliteter ennå."
+    }
   },
   "terrainControls": {
     "label": "Terrenganalyse",
@@ -488,5 +498,12 @@
       "curtain": "to underlag i samme rute, skilt av en linje du drar",
       "split": "to ruter side om side, sentrert på samme punkt"
     }
+  },
+  "talk": {
+    "title": "Samtale",
+    "open": "Samtale",
+    "private": "Samtale krever at lokaliteten er offentlig",
+    "privateSpot": "Samtalen åpner når lokaliteten gjøres offentlig.",
+    "failed": "Fikk ikke hentet samtalen. Prøv igjen senere."
   }
 }

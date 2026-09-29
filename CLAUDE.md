@@ -32,6 +32,8 @@ Each owns its subject; this file keeps only what is true across all of them.
 | `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream and Caddy → mapproxy → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
 | `docs/render-sidecar.md` | The server-side render service: the contract, the token trade, the queue's limits, the RVT and ffmpeg recipes, the burnt-in legend, the failure modes | `rendersvc/`, `src/api/render.ts`, the `sunloop` and `rvt` arms in `src/evidence/` |
+| `docs/identity.md` | Casdoor, the `/id` subpath, the two OAuth2 clients, what OIDC does not carry | `casdoor` in compose, the PocketBase OAuth2 config, `src/auth/` |
+| `docs/discussion-and-votes.md` | Remark42's contract and the thread key, the public-only gate, the `votes` collection and the `spotScores` view's two quirks | `src/talk/`, `src/spots/spotScores.ts`, `src/api/votes.ts`, the vote migration |
 | `docs/monitoring.md` | The access logs, the usage report, the cron health check, retention | `scripts/usage-report.sh`, `scripts/health-check.sh`, any log format or `logging:` cap |
 | `vat-cache/README.md` | The out-of-band Python pipeline that precomputes the cached VAT ground | `vat-cache/`, `cvat-tiles/` |
 | `README.md` | Third-party install and admin guide | any change to install, first-run or licensing |
@@ -112,6 +114,10 @@ First run on a new host wants `sudo mkdir -p /site/tufteseid/data/{logs,stats}`
 alongside the cVAT and MapProxy store directories (`README.md`,
 `docs/monitoring.md`).
 
+- **`.env` must exist before `docker compose up`.** `casdoor` and `remark42`
+  are the first services here to need secrets, and `remark42` refuses to start
+  with any of its OAuth2 variables missing. `.env.example` is the committed
+  shape; `.env` is gitignored and lives on the server only.
 - Changed anything under `nginx/`? Also `docker compose restart wmscache`. The
   configs are bind-mounted but nginx only reads them at startup, and
   `docker compose up -d` does not recreate the container. Same for `mapproxy/`
@@ -127,6 +133,8 @@ alongside the cVAT and MapProxy store directories (`README.md`,
 | --- | --- |
 | `tufteseid` | `node:24-alpine` builds the SPA, `caddy:2.10.0-alpine` serves `/var/www`, plus the GoAccess report at `/stats/` out of a read-only mount. `config.js` bind-mounted at runtime. |
 | `pocketbase` | Backend for spots (OAuth2 + user content), pinned to 0.40.2. Serves `/pb/*`. SQLite on the `pbdata` volume. |
+| `casdoor` | `casbin/casdoor`, a single Go binary on SQLite. Serves `/id/*`: the one place a credential is entered, with PocketBase and remark42 as its two OAuth2 clients (`docs/identity.md`). |
+| `remark42` | Comment threads on public spots, served at `/remark42/*` and federated to `casdoor` so a reader signs in once. Its own store on a bind mount (`docs/discussion-and-votes.md`). |
 | `nib-proxy` | Token-injecting sidecar for Norge i bilder ortofoto. Reachable only from wmscache and mapproxy. |
 | `rendersvc` | `python:3.11-slim` (rvt-py 2.2.3 caps at `<3.12`) + ffmpeg + RVT-py. Serves `/render/*`: renders an evidence row server-side and PATCHes the file back with the caller's own token. One worker, a queue of 8, CPU and memory capped. |
 | `cvat-tiles` | `node:24-alpine`, zero deps. Serves `/cvat/*` out of one MBTiles database per LiDAR acquisition in the bind-mounted store. Built out of band by `vat-cache/`. |
@@ -147,13 +155,17 @@ field classes), **not** the 0.22 `Dao` API.
   bootstrap and only then registers the JS ones, whatever the timestamps say. A
   JS migration can never run before a core one; anything that must precede a
   core migration happens out of band against a stopped database.
-- **Adding an OAuth provider** is admin-UI only: Collections → `users` → Edit
-  collection → Options → OAuth2. No code change; the SPA's AuthDialog lists
-  whatever `listAuthMethods()` reports.
+- **The OAuth2 client is admin-UI only**, on both ends and on every host:
+  Collections → `users` → Edit collection → Options → OAuth2, the generic
+  `oidc` provider pointed at the `casdoor` sidecar's discovery document. Not
+  versioned in a migration and no code change — the SPA's AuthDialog lists
+  whatever `listAuthMethods()` reports and labels it with the `displayName`
+  typed there. `docs/identity.md` has the URLs and the two things OIDC does
+  not carry.
 
 ### Collections
 
-Two collections carry the reader's records:
+Two collections carry the reader's records, and two more the votes on them:
 
 - **`spots`** (id `pbc_spots`) — `owner` (→ users, cascade), `code` (six
   characters of Crockford base32, unique, generated client-side and retried on
@@ -184,12 +196,23 @@ Which queue depends on the kind. Three kinds are rendered in the tab that asked
 sidecar, which writes `meta.job` as it goes and the file when it is done
 (`docs/render-sidecar.md`).
 
+- **`votes`** (id `pbc_votes`) — `owner` (→ users, cascade), `spot` (→ spots,
+  cascade), `direction` (up | down). Unique over `(owner, spot)`: one vote per
+  account per spot, with retracting being a delete rather than a third value.
+  Readable only by its owner — *how a spot stands* is public, *who voted* is
+  not.
+- **`spotScores`** (id `pbc_spot_scores`) — a **view** over `votes`, open to a
+  guest, carrying `up`, `down`, `votes` and `score` per spot. Two things to
+  code against: PocketBase publishes **no realtime feed on a view**, and a
+  spot with no votes is **absent** rather than present at zero
+  (`docs/discussion-and-votes.md`).
+
 `localities`, `finds` and `attachments` are still on disk from the old model and
 are read by nothing. Leave them alone rather than adding a migration to drop
 them.
 
 Client side: `src/api/pocketbase.ts` (singleton, `pocketbaseUrl` defaults `/pb`),
-`src/api/spots.ts` and `src/api/evidence.ts`.
+`src/api/spots.ts`, `src/api/evidence.ts` and `src/api/votes.ts`.
 
 ### Permissions
 

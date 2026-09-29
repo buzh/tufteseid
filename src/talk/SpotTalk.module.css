@@ -1,0 +1,22 @@
+/* Same seat as the other spot boxes — see `SpotBox.module.css` — but wider and
+   taller, because a thread is read down rather than glanced at. */
+.panel {
+  position: absolute;
+  top: var(--mantine-spacing-xs);
+  right: var(--mantine-spacing-xs);
+  width: 26rem;
+  max-width: calc(100% - 2 * var(--mantine-spacing-xs));
+  max-height: calc(100% - 2 * var(--mantine-spacing-xs));
+}
+
+/* remark42 ships its own stylesheet and paints its own dark scheme from
+   `theme: 'dark'`, so nothing here restyles it — only the room it gets. */
+.thread {
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+.loader {
+  display: block;
+  margin: var(--mantine-spacing-md) auto;
+}

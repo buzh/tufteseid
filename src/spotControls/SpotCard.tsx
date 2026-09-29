@@ -29,9 +29,11 @@ import {
   spotAcquiringAtom,
   spotDraftAtom,
   spotReadingAtom,
+  spotTalkingAtom,
   type SpotDraft,
 } from '../spots/atoms';
 import { derivedFootprint } from '../spots/footprint';
+import { VoteControl } from '../spots/VoteControl';
 import { readTerrainWindowAtom } from '../terrain/window';
 import { ControlButton } from '../ui/ControlButton';
 import { cx } from '../ui/cx';
@@ -175,6 +177,7 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   const setActive = useSetAtom(activeSpotAtom);
   const edit = useSetAtom(editSpotDraftAtom);
   const setReading = useSetAtom(spotReadingAtom);
+  const setTalking = useSetAtom(spotTalkingAtom);
   // Only ever a card draft: an editor draft puts `SpotProperties` here instead.
   const draft = useAtomValue(spotDraftAtom);
 
@@ -218,33 +221,60 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
       title={spot.name}
       onClose={() => setActive(null)}
       actions={
-        <Tooltip label={t('spots.edit')}>
-          <ActionIcon
-            variant="subtle"
-            color="gray"
-            size="sm"
-            disabled={draft != null}
-            aria-label={t('spots.edit')}
-            onClick={() => edit(spot)}
-          >
-            <Icon icon="settings" size={18} />
-          </ActionIcon>
-        </Tooltip>
+        <>
+          <VoteControl spot={spot} />
+          <Tooltip label={t('spots.edit')}>
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="sm"
+              disabled={draft != null}
+              aria-label={t('spots.edit')}
+              onClick={() => edit(spot)}
+            >
+              <Icon icon="settings" size={18} />
+            </ActionIcon>
+          </Tooltip>
+        </>
       }
       footer={
-        readable > 0 && (
-          <Button
-            size="xs"
-            variant="default"
-            // A reading is suspended for as long as any draft lives, so opening
-            // one with the map in hand would do nothing until it was let go.
-            disabled={draft != null}
-            leftSection={<Icon icon="menu_book" size={16} />}
-            onClick={() => setReading(true)}
+        <>
+          {readable > 0 && (
+            <Button
+              size="xs"
+              variant="default"
+              // A reading is suspended for as long as any draft lives, so
+              // opening one with the map in hand would do nothing until it was
+              // let go.
+              disabled={draft != null}
+              leftSection={<Icon icon="menu_book" size={16} />}
+              onClick={() => setReading(true)}
+            >
+              {t('evidence.read')}
+            </Button>
+          )}
+          <Tooltip
+            label={
+              spot.visibility === 'public' ? t('talk.open') : t('talk.private')
+            }
           >
-            {t('evidence.read')}
-          </Button>
-        )
+            {/* A span, because Mantine's Tooltip needs an element that fires
+                pointer events and a disabled button does not. */}
+            <span>
+              <Button
+                size="xs"
+                variant="default"
+                // No thread on a private spot: the engine holds no account of
+                // who may read one.
+                disabled={draft != null || spot.visibility !== 'public'}
+                leftSection={<Icon icon="forum" size={16} />}
+                onClick={() => setTalking(true)}
+              >
+                {t('talk.open')}
+              </Button>
+            </span>
+          </Tooltip>
+        </>
       }
     >
       {draft ? (

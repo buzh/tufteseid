@@ -13,7 +13,7 @@ One row per directory under `src/`.
 
 | Directory | Owns |
 | --- | --- |
-| `api/` | PocketBase singleton (`pocketbase.ts`), the `spots` and `evidence` collection clients, and the one call into the render sidecar (`render.ts`). |
+| `api/` | PocketBase singleton (`pocketbase.ts`), the `spots`, `evidence` and `votes` collection clients, and the one call into the render sidecar (`render.ts`). |
 | `auth/` | OAuth2 dialog, the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
 | `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue and the handover to the render sidecar, the gallery that lists and orders what was kept, the reader that lays them back on the map, and the provenance legend stamped onto a download. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
@@ -31,7 +31,8 @@ One row per directory under `src/`.
 | `showControls/` | The band's what-is-drawn-over-the-ground group: the Kulturminner control, the open drawing's toggle and the shared drawing layer's. |
 | `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the toolbox that stands in for Excalidraw's own, the remembered pen, the render onto the ground, and the layer that puts every spot's drawing on it at once. |
 | `spotControls/` | The reader's records as surfaces: the `+`, the properties box, the read card, the box that orders a render from elsewhere, the index menu. |
-| `spots/` | Spot state and geometry: the pin layer, its clustering and its style, the footprint frame, hit test, place and adjust, share link, name suggestion. |
+| `spots/` | Spot state and geometry: the pin layer, its clustering and its style, the footprint frame, hit test, place and adjust, share link, name suggestion, and the up/down tally each spot is ranked by. |
+| `talk/` | The thread on a public spot: the remark42 widget fetched from our own origin, and the box it stands in (`docs/discussion-and-votes.md`). |
 | `terrain/` | Client-side terrain analysis: DEM fetch, shading, the analysis window and its layers. |
 | `terrainControls/` | The terrain toggle and its panel. |
 | `types/` | Search response types. |
@@ -79,8 +80,11 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `activeSpotAtom` | same | The record being read — opened by a click, by an index row, or by `?lok=`. |
 | `spotReadingAtom` | same | The open spot's kept renders are being read on the map. Held as the id it was entered on; writing `activeSpotAtom` with a different spot — or none — clears it, and a draft suspends it. True regardless for a spot the reader may not edit, for whom writing it false does nothing. |
 | `spotAcquiringAtom` | same | The acquisition box stands in front of the card. Held the same way as the reading and suspended by a draft for the same reason; never true for a reader who may not edit the spot, who is held in the reading. |
+| `spotTalkingAtom` | same | The thread stands in front of both the card and the reading, because it is reached from either. Held and suspended like the two above, and never true for a private spot — the comment engine has no account of who may read what, so the only gate is not mounting it. |
 | `spotRecordsAtom`, `spotsFailedAtom` | `spots/spotRecords.ts` | Every record the session may see, null until the list lands; and whether it never did. |
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
+| `spotScoresAtom`, `myVotesAtom` | `spots/spotScores.ts` | The tally per spot id, and the reader's own vote per spot id. A spot absent from the first is unvoted, not unknown — `spotScores` is a view, which PocketBase publishes no realtime feed for, so `useSpotScores` subscribes to `votes` and refetches the affected row. There is no failure atom: a tally that never lands reads as zero, which is what the surfaces would show anyway. |
+| `popularSpotsAtom` | same | Derived: every public spot, best first, `updated` breaking a tie. Does not wait on the tallies — without them the list reads unranked rather than not at all. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
 | `keepOfferAtom` | same | Derived: the terrain's offer when an analysis is running, otherwise the ground's (off the A half). Null where the view cannot be re-rendered. |
 | `draftGroundAtom` | `evidence/draftGround.ts` | A picture laid on the map at the extent it was rendered over: a kept row to trace a drawing onto, published by `EvidenceGallery`, or a flyfoto proposal under review, published by `useFlyfotoRun`. Never both — the card and the acquisition box do not stand at once. |
@@ -837,9 +841,17 @@ show group; anything else that applies to the reading belongs to the tools.
   its strokes but the cursor never changes over them, so nothing says a drawing
   can be opened; testing the alpha channel on every pointer move is what that
   would cost.
-- **The spot index is your own records only.** `SpotMenu` is a Mantine `Menu`
-  ordered by date with no hover-to-light-the-pin: enough for a few dozen
-  records, not a few hundred.
+- **The spot index does not light the pin.** `SpotMenu` is a Mantine `Menu`
+  with two tabs — the reader's own by date, and every public one by score —
+  and no hover-to-light: enough for a few dozen records, not a few hundred.
+- **The thread widget speaks English.** remark42 ships no Norwegian locale, so
+  its own chrome is `en` while every string the app puts around it is nb. A
+  deliberate exception to *`t()` from day one*, and the only one.
+- **A thread outlives the visibility it was opened under.** Threads exist only
+  for public spots, but remark42 keeps what was written: turning a spot
+  private hides the box and leaves its comments reachable to anyone who kept
+  the URL. Deleting a spot does not delete its thread either — nothing
+  propagates the cascade out of PocketBase.
 - **Evidence files are unprotected.** A public spot is readable with no
   account and a guest can hold no PocketBase file token, so `evidence.file` is
   served to anyone holding the URL. The same trade the old

@@ -8,25 +8,35 @@ Norwegian LiDAR terrain against the Riksantikvaren heritage register.
 
 ## Install
 
-Four directories are bind-mounted from the host and must exist before the stack
-starts, or Docker creates them root-owned and MapProxy answers every `/cache/…`
-with a 502:
+Six directories are bind-mounted from the host and must exist before the stack
+starts, or Docker creates them root-owned and the service that wanted one fails
+— MapProxy answers every `/cache/…` with a 502, Casdoor cannot create its
+database and restarts in a loop:
 
 ```sh
-sudo mkdir -p /site/tufteseid/data/{logs,stats,cvat,mapproxy}
+sudo mkdir -p /site/tufteseid/data/{logs,stats,cvat,mapproxy,casdoor,remark42}
 sudo chown -R 100:101 /site/tufteseid/data/mapproxy
+sudo chown -R 1000:1000 /site/tufteseid/data/{casdoor,remark42}
 ```
 
 `100:101` is the `mapproxy` user inside `mapproxy:7.0.0-alpine-nginx`;
 [`docs/wms-proxy-and-tiles.md`](docs/wms-proxy-and-tiles.md) has the one-liner
-that asks the image, for when that tag moves. Point the paths anywhere writable
-— they are set in `docker-compose.yml`. The `cvat` store may stay empty: an
-empty directory answers 404, which is what ground outside the LiDAR footprint
-looks like anyway.
+that asks the image, for when that tag moves. `1000:1000` is what Casdoor and
+remark42 run as. Point the paths anywhere writable — they are set in
+`docker-compose.yml`. The `cvat` store may stay empty: an empty directory
+answers 404, which is what ground outside the LiDAR footprint looks like
+anyway.
+
+Secrets live in a `.env` beside `docker-compose.yml`, which is gitignored.
+Copy the committed shape and fill it in — `remark42` refuses to start with any
+of its OAuth2 variables missing, and the pair it wants comes out of Casdoor,
+so the first `up` runs before they exist:
 
 ```sh
 git clone https://github.com/buzh/tufteseid.git
 cd tufteseid
+cp .env.example .env
+$EDITOR .env            # PUBLIC_ORIGIN and REMARK42_SECRET now, the rest below
 docker compose build --pull
 docker compose up -d
 ```
@@ -49,17 +59,38 @@ docker compose exec pocketbase /pb/pocketbase superuser create \
 Open **<http://localhost:3030/pb/_/>** and sign in. Under **Settings →
 Application**, set the Application URL to the URL users will actually visit.
 
-**A sign-in provider** (optional) is admin-UI only: **Collections → users → Edit
-collection → Options → OAuth2**. Register this redirect URL in the provider's
-own console:
+## Sign-in, and the comment threads
+
+Readers sign in through the `casdoor` container, which is the only place a
+credential is entered. Both the app and the comment engine are OAuth2 clients
+of it, so a reader signs in once and can then comment without signing in
+again. [`docs/identity.md`](docs/identity.md) has the full account.
+
+Open **<http://localhost:3030/id/>**, sign in with Casdoor's own initial
+administrator (`admin` / `123` — change it immediately), and create two
+applications. Each hands back a client id and a secret. Their redirect URLs:
+
+| Application | Redirect URL |
+| --- | --- |
+| the app | `https://<your-host>/pb/api/oauth2-redirect` |
+| the threads | `https://<your-host>/remark42/auth/tufteseid/callback` |
+
+The threads' pair goes into `.env` as `REMARK42_OIDC_CID` and
+`REMARK42_OIDC_CSEC`; `docker compose up -d` again to pick them up. The app's
+pair is typed into PocketBase instead: **Collections → users → Edit collection
+→ Options → OAuth2**, the generic **OIDC** provider, pointed at
 
 ```
-https://<your-host>/pb/api/oauth2-redirect
+https://<your-host>/id/.well-known/openid-configuration
 ```
+
+The display name typed there is the text on the app's sign-in button.
 
 **Give yourself the app admin role**: sign in through the app once so PocketBase
 creates your user record, then **Collections → users → your record → `role` =
-`admin`**.
+`admin`**. To moderate comments as well, put that account's Casdoor id in
+`.env` as `REMARK42_ADMIN_ID` — the two are separate permissions in separate
+systems.
 
 ## Check that it works
 
