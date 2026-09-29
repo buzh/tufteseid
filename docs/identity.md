@@ -4,9 +4,9 @@ One account, three consumers. A reader signs in once and is then known to the
 SPA, to PocketBase and to the comment engine.
 
 ```
-browser ──► Caddy /id/*  ──► casdoor:8000      the identity provider
-        ──► Caddy /pb/*  ──► pocketbase:8090   OAuth2 client (the app's session)
-        ──► Caddy /remark42/* ──► remark42:8080  OAuth2 client (the threads)
+browser ──► Caddy $CASDOOR_HOST ──► casdoor:8000    the identity provider
+        ──► Caddy /pb/*         ──► pocketbase:8090  OAuth2 client (the app)
+        ──► Caddy /remark42/*   ──► remark42:8080    OAuth2 client (the threads)
 ```
 
 Casdoor is the only place a credential is ever entered. PocketBase and Remark42
@@ -25,23 +25,48 @@ carrying wmscache's 25 GB cache and rendersvc's memory cap. If those features
 are ever wanted, swapping the provider touches this document and the
 `casdoor` service only — the two clients are configured by URL.
 
-## The `/id` subpath
+## Its own hostname
 
-Casdoor's admin console is a React SPA that serves its own HTML and its own
-bundle. Under the app's `script-src 'self'` it would not run, so its
-`handle_path` sits **above** the `header Content-Security-Policy` line in
-`Caddyfile`'s route — directives inside a `route` run in order, which is the
-same mechanism `/stats/` uses. It sets no CSP of its own, so the block restates
-`Strict-Transport-Security` and `X-Content-Type-Options` by hand, and adds
-`X-Robots-Tag: noindex`.
+**Casdoor cannot live under a subpath**, and there is no setting that makes it.
+Its console is a create-react-app build with `/static/js/main.*.js` baked into
+the HTML as a root-absolute path, its XHRs go to `/api/*`, and its router owns
+several dozen more root paths (`/login`, `/users`, `/applications`, …).
+Strip a `/id` prefix in front of that and the browser asks the SPA's origin for
+the bundle, gets the app's 404 page, and renders nothing. Casdoor's own
+deployment docs only ever describe a whole domain proxied at `/`.
 
-`origin=$PUBLIC_ORIGIN/id` tells Casdoor the address it is reached at. Every
-link it prints, and every redirect it issues, is composed from that — so a
-mismatch shows up as a login that loops rather than as an error.
+So `CASDOOR_HOST` in `.env` is a hostname of its own — `id.<app host>` by
+convention, though nothing requires it to be a subdomain of anything. It is
+**not** a second listener: it points at the same `127.0.0.1:3030` the app does,
+and a `host` matcher at the top of `Caddyfile`'s route hands it to
+`casdoor:8000`. Only the `Host` header separates the two, which is why the
+matcher stands before any path matcher could claim one of them.
 
-If the console ever breaks under the subpath, the fallback is a subdomain
-(`id.<host>`) with its own Caddy site block. Nothing else changes: both clients
-name Casdoor by URL.
+It stands above the `header Content-Security-Policy` line for the same reason
+`/stats/` does — directives inside a `route` run in order, and under the app's
+`script-src 'self'` the console would not run. It sets no CSP of its own, so
+the block restates `Strict-Transport-Security` and `X-Content-Type-Options` by
+hand and adds `X-Robots-Tag: noindex`.
+
+`origin=https://$CASDOOR_HOST` tells Casdoor the address it is reached at.
+Every link it prints and every redirect it issues is composed from that — so a
+mismatch shows up as a login that loops rather than as an error. The scheme is
+fixed in `docker-compose.yml` rather than asked for in `.env`: an identity
+provider on plain http is not one.
+
+## Front and back channel
+
+The reader's browser reaches Casdoor at its public hostname. The two calls
+that follow — the code-for-token exchange and the userinfo fetch — are made by
+`remark42` and by PocketBase, not by the browser, and those two point at
+`http://casdoor:8000` inside the compose network instead. A container reaching
+its own public hostname works only if the host does NAT loopback, and a
+sign-in should not rest on that.
+
+PocketBase's OAuth2 config is set from the discovery document, which advertises
+the public URLs, so its back channel *does* hairpin. If sign-in fails there
+with a connection error while `remark42` is fine, that is the cause: type the
+token and userinfo endpoints in by hand, pointed at `http://casdoor:8000`.
 
 ## Configuration
 
@@ -80,6 +105,9 @@ a secret.
 | PocketBase | `$PUBLIC_ORIGIN/pb/api/oauth2-redirect` |
 | Remark42 | `$PUBLIC_ORIGIN/remark42/auth/tufteseid/callback` |
 
+Both are on the **app's** origin, not Casdoor's: a redirect URI is where the
+reader is sent back to.
+
 Remark42's path segment is its `AUTH_CUSTOM_NAME`, so the two have to be
 changed together. The name must match `^[a-z0-9][a-z0-9_-]*$` and must not
 collide with one of the built-in provider names.
@@ -87,7 +115,7 @@ collide with one of the built-in provider names.
 The Remark42 pair goes in `.env` (`REMARK42_OIDC_CID`, `REMARK42_OIDC_CSEC`).
 The PocketBase pair is typed into PocketBase's own admin UI: Collections →
 `users` → Edit collection → Options → OAuth2 → the generic `oidc` provider,
-pointed at `$PUBLIC_ORIGIN/id/.well-known/openid-configuration`. Provider
+pointed at `https://$CASDOOR_HOST/.well-known/openid-configuration`. Provider
 config is not versioned in `pb_migrations/`, so it is set by hand on each host
 and the `displayName` typed there is the button text `AuthDialog` renders.
 

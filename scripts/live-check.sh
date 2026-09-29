@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-#   scripts/live-check.sh [base-url] [spot-code]
+#   scripts/live-check.sh [base-url] [spot-code]      IDP=… for Casdoor's host
 #
 # The spot code is optional: given one, the PocketBase half fetches that public
 # spot by code; without one it only asserts that the spots collection answers.
@@ -13,6 +13,10 @@ set -uo pipefail
 BASE=${1:-https://kart.scheen.no}
 CODE=${2:-}
 BASE=${BASE%/}
+# Casdoor is on a hostname of its own (docs/identity.md); `id.` in front of
+# the app's is the arrangement README.md sets up. Override with IDP=…
+IDP=${IDP:-https://id.${BASE#*://}}
+IDP=${IDP%/}
 TIMEOUT=${TIMEOUT:-60}
 
 # EPSG:25833, easting first: WMS 1.3.0 takes the CRS's own axis order, and
@@ -205,12 +209,13 @@ check votes-hidden "$BASE/pb/api/collections/votes/records?perPage=1&fields=id" 
 
 section 'Identity and discussion'
 
-# Casdoor and remark42 both serve their own HTML and their own JavaScript, so
-# they stand above the app's CSP. That they answer at all is the check that
-# the two `handle_path` blocks are still ahead of it in the route.
-check oidc-discovery "$BASE/id/.well-known/openid-configuration" \
+# Casdoor answers on a hostname of its own, reaching the same Caddy on the
+# Host header alone; remark42 on a subpath. Both stand above the app's CSP,
+# and that they answer at all is the check that they are still ahead of it in
+# the route.
+check oidc-discovery "$IDP/.well-known/openid-configuration" \
   200 json 100 '"authorization_endpoint"'
-check oidc-noindex "$BASE/id/.well-known/openid-configuration" \
+check oidc-noindex "$IDP/.well-known/openid-configuration" \
   200 '' 0 '' 'x-robots-tag: noindex'
 
 check remark-ping "$BASE/remark42/api/v1/ping" 200 '' 2 'pong'

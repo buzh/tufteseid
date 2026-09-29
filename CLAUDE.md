@@ -32,7 +32,7 @@ Each owns its subject; this file keeps only what is true across all of them.
 | `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream and Caddy → mapproxy → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
 | `docs/render-sidecar.md` | The server-side render service: the contract, the token trade, the queue's limits, the RVT and ffmpeg recipes, the burnt-in legend, the failure modes | `rendersvc/`, `src/api/render.ts`, the `sunloop` and `rvt` arms in `src/evidence/` |
-| `docs/identity.md` | Casdoor, the `/id` subpath, the two OAuth2 clients, what OIDC does not carry | `casdoor` in compose, the PocketBase OAuth2 config, `src/auth/` |
+| `docs/identity.md` | Casdoor, its own hostname and why it cannot share the app's, the two OAuth2 clients, what OIDC does not carry | `casdoor` in compose, the PocketBase OAuth2 config, `src/auth/` |
 | `docs/discussion-and-votes.md` | Remark42's contract and the thread key, the public-only gate, the `votes` collection and the `spotScores` view's two quirks | `src/talk/`, `src/spots/spotScores.ts`, `src/api/votes.ts`, the vote migration |
 | `docs/monitoring.md` | The access logs, the usage report, the cron health check, retention | `scripts/usage-report.sh`, `scripts/health-check.sh`, any log format or `logging:` cap |
 | `vat-cache/README.md` | The out-of-band Python pipeline that precomputes the cached VAT ground | `vat-cache/`, `cvat-tiles/` |
@@ -133,7 +133,7 @@ alongside the cVAT and MapProxy store directories (`README.md`,
 | --- | --- |
 | `tufteseid` | `node:24-alpine` builds the SPA, `caddy:2.10.0-alpine` serves `/var/www`, plus the GoAccess report at `/stats/` out of a read-only mount. `config.js` bind-mounted at runtime. |
 | `pocketbase` | Backend for spots (OAuth2 + user content), pinned to 0.40.2. Serves `/pb/*`. SQLite on the `pbdata` volume. |
-| `casdoor` | `casbin/casdoor`, a single Go binary on SQLite. Serves `/id/*`: the one place a credential is entered, with PocketBase and remark42 as its two OAuth2 clients (`docs/identity.md`). |
+| `casdoor` | `casbin/casdoor`, a single Go binary on SQLite. The one place a credential is entered, with PocketBase and remark42 as its two OAuth2 clients. On `CASDOOR_HOST`, a hostname of its own reaching the same Caddy — it cannot be served under a subpath (`docs/identity.md`). |
 | `remark42` | Comment threads on public spots, served at `/remark42/*` and federated to `casdoor` so a reader signs in once. Its own store on a bind mount (`docs/discussion-and-votes.md`). |
 | `nib-proxy` | Token-injecting sidecar for Norge i bilder ortofoto. Reachable only from wmscache and mapproxy. |
 | `rendersvc` | `python:3.11-slim` (rvt-py 2.2.3 caps at `<3.12`) + ffmpeg + RVT-py. Serves `/render/*`: renders an evidence row server-side and PATCHes the file back with the caller's own token. One worker, a queue of 8, CPU and memory capped. |

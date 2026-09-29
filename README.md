@@ -28,16 +28,16 @@ answers 404, which is what ground outside the LiDAR footprint looks like
 anyway.
 
 Secrets live in a `.env` beside `docker-compose.yml`, which is gitignored.
-Copy the committed shape and set `PUBLIC_ORIGIN` and `REMARK42_SECRET`. The
-OAuth2 pair comes out of Casdoor, which is not running yet, so leave those two
-on the placeholders `.env.example` ships — blanking them aborts
-`docker compose up` before anything starts, Casdoor included.
+Copy the committed shape and set `PUBLIC_ORIGIN`, `CASDOOR_HOST` and
+`REMARK42_SECRET`. The OAuth2 pair comes out of Casdoor, which is not running
+yet, so leave those two on the placeholders `.env.example` ships — blanking
+them aborts `docker compose up` before anything starts, Casdoor included.
 
 ```sh
 git clone https://github.com/buzh/tufteseid.git
 cd tufteseid
 cp .env.example .env
-$EDITOR .env            # PUBLIC_ORIGIN and REMARK42_SECRET
+$EDITOR .env            # PUBLIC_ORIGIN, CASDOOR_HOST, REMARK42_SECRET
 docker compose build --pull
 docker compose up -d
 ```
@@ -46,6 +46,10 @@ Sign-in is broken until the next section fills the pair in. Everything else —
 the map, the terrain, spots you already have — works.
 
 That listens on `127.0.0.1:3030`, expecting another reverse proxy in front.
+**Both names go to that one port.** Casdoor cannot share a hostname with the
+app, so `CASDOOR_HOST` needs a DNS record and a server block of its own in
+that proxy — same backend, different `server_name`. Caddy sorts them out on
+the `Host` header.
 
 To let Caddy terminate TLS itself instead: change the `:3000` line in `Caddyfile`
 to your hostname and publish 80/443 rather than 3030. Certificates are then
@@ -70,8 +74,9 @@ credential is entered. Both the app and the comment engine are OAuth2 clients
 of it, so a reader signs in once and can then comment without signing in
 again. [`docs/identity.md`](docs/identity.md) has the full account.
 
-Open **<http://localhost:3030/id/>** and sign in as `built-in` / `admin` /
-`123`. **Change that password before the host is reachable from the internet.**
+Open Casdoor at **`https://<CASDOOR_HOST>/`** and sign in as `built-in` /
+`admin` / `123`. **Change that password before the host is reachable from the
+internet.**
 
 **Make an organization for readers first.** Every member of Casdoor's
 `built-in` organization has full Casdoor admin rights, so readers must not
@@ -90,7 +95,7 @@ to pick them up. The app's pair is typed into PocketBase instead:
 **OIDC** provider, pointed at
 
 ```
-https://<your-host>/id/.well-known/openid-configuration
+https://<CASDOOR_HOST>/.well-known/openid-configuration
 ```
 
 The display name typed there is the text on the app's sign-in button.

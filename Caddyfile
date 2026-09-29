@@ -23,12 +23,29 @@ log {
 }
 
 route {
-        # First in the route so the app's CSP below never reaches it: GoAccess
-        # writes one self-contained HTML whose script and style are inline, and
-        # its template engine compiles with `new Function`, so the report needs
-        # 'unsafe-eval' too or it hangs on the loading screen. Served open,
-        # hence noindex. Empty bind mount before the first usage-report.sh run,
-        # so 404 here means "no report yet".
+        # Casdoor owns a hostname rather than a subpath: its console is a
+        # create-react-app build with `/static/js/…` baked in absolutely and
+        # its router claims a few dozen root paths, so there is no prefix to
+        # strip. Its hostname reaches the same :3000 as the app's, and only
+        # the Host header tells the two apart — hence first in the route,
+        # before any path matcher can claim one of them.
+        #
+        # It stands above the app's CSP for the same reason /stats/ does, and
+        # sets none of its own, hence the two hardening headers by hand.
+        @casdoor host {$CASDOOR_HOST}
+        handle @casdoor {
+                header X-Robots-Tag noindex
+                header Strict-Transport-Security max-age=31536000
+                header X-Content-Type-Options nosniff
+                reverse_proxy http://casdoor:8000
+        }
+
+        # Above the app's CSP as well: GoAccess writes one self-contained HTML
+        # whose script and style are inline, and its template engine compiles
+        # with `new Function`, so the report needs 'unsafe-eval' too or it
+        # hangs on the loading screen. Served open, hence noindex. Empty bind
+        # mount before the first usage-report.sh run, so 404 here means "no
+        # report yet".
         redir /stats /stats/
         handle_path /stats/* {
                 header X-Robots-Tag noindex
@@ -39,17 +56,9 @@ route {
                 }
         }
 
-        # Both of these serve their own HTML and their own JavaScript, so they
-        # stand above the app's CSP for the same reason /stats/ does — under
-        # `script-src 'self'` neither console would run. They set no CSP of
-        # their own, hence the two hardening headers restated by hand.
-        handle_path /id/* {
-                header X-Robots-Tag noindex
-                header Strict-Transport-Security max-age=31536000
-                header X-Content-Type-Options nosniff
-                reverse_proxy http://casdoor:8000
-        }
-
+        # Serves its own HTML and its own JavaScript, so it stands above the
+        # app's CSP too — under `script-src 'self'` the widget's own admin
+        # pages would not run.
         handle_path /remark42/* {
                 header X-Robots-Tag noindex
                 header Strict-Transport-Security max-age=31536000

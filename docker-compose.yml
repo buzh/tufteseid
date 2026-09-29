@@ -6,6 +6,10 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:3030:3000"
+    environment:
+      # Caddy routes on it: Casdoor's hostname arrives on the same port as the
+      # app's and nothing but the Host header separates them.
+      - CASDOOR_HOST=${CASDOOR_HOST:?set CASDOOR_HOST in .env}
     volumes:
       - ./config.js:/var/www/config.js:ro
       # First run: sudo mkdir -p /site/tufteseid/data/{logs,stats}
@@ -99,10 +103,8 @@ services:
   # same identity and only an OIDC provider can give it to both. PocketBase is
   # a client of this (admin UI → users → OAuth2 → OIDC), remark42 another.
   #
-  # Served under /id. Casdoor's admin console is a React SPA that assumes it
-  # owns the root, so if it comes up blank behind the subpath the fallback is a
-  # subdomain — `origin` and every registered callback move with it, nothing
-  # else does.
+  # On its own hostname, not a subpath: the console is a create-react-app
+  # build that assumes it owns the root, and Casdoor has no base-path setting.
   casdoor:
     # No `v` prefix on Casdoor's tags, unlike remark42's below.
     image: casbin/casdoor:3.119.0
@@ -125,8 +127,9 @@ services:
       - runmode=prod
       - httpport=8000
       # OIDC discovery composes every endpoint from this, so it must be the
-      # public address including the subpath.
-      - origin=${PUBLIC_ORIGIN:-}/id
+      # public address. https is not negotiable for an identity provider,
+      # hence the scheme here rather than in .env.
+      - origin=https://${CASDOOR_HOST:-}
     volumes:
       # Must be writable by uid 1000 gid 1000 (the image's casdoor user) or the
       # first write fails and the container restarts forever.
@@ -165,9 +168,14 @@ services:
       - AUTH_CUSTOM_NAME=tufteseid
       - AUTH_CUSTOM_CID=${REMARK42_OIDC_CID:?set REMARK42_OIDC_CID in .env}
       - AUTH_CUSTOM_CSEC=${REMARK42_OIDC_CSEC:?set REMARK42_OIDC_CSEC in .env}
-      - AUTH_CUSTOM_AUTH_URL=${PUBLIC_ORIGIN:-}/id/login/oauth/authorize
-      - AUTH_CUSTOM_TOKEN_URL=${PUBLIC_ORIGIN:-}/id/api/login/oauth/access_token
-      - AUTH_CUSTOM_INFO_URL=${PUBLIC_ORIGIN:-}/id/api/userinfo
+      # The browser follows the first, so it is the public address. The other
+      # two are back-channel and stay inside the compose network: a container
+      # reaching its own public hostname depends on the host's NAT loopback,
+      # which is not something to make a sign-in depend on. No `/api` on the
+      # authorize URL — that one is a frontend route.
+      - AUTH_CUSTOM_AUTH_URL=https://${CASDOOR_HOST:-}/login/oauth/authorize
+      - AUTH_CUSTOM_TOKEN_URL=http://casdoor:8000/api/login/oauth/access_token
+      - AUTH_CUSTOM_INFO_URL=http://casdoor:8000/api/userinfo
       - AUTH_CUSTOM_SCOPES=openid,profile,email
     volumes:
       - /site/tufteseid/data/remark42:/srv/var
