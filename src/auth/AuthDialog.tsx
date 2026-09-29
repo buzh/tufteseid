@@ -9,9 +9,10 @@
 // The form itself is Casdoor's, framed rather than opened in a popup: the code
 // comes back over PocketBase's realtime channel, so the round trip does not
 // care whether it happened in a window. What makes it look like the rest of
-// the app is the `formCss` on Casdoor's application, which is typed into its
-// console per host (docs/identity.md) — the frame is cross-origin and no style
-// here reaches inside it.
+// the app is a theme and a per-item stylesheet typed into Casdoor's console
+// per host (docs/identity.md) — the frame is cross-origin, no style here
+// reaches inside it, and Casdoor skips its own Form CSS field when it is
+// framed.
 
 import {
   Alert,
@@ -91,7 +92,7 @@ export const AuthDialog = () => {
       title={t('auth.title')}
       closeButtonProps={{ className: styles.close }}
       centered
-      size="md"
+      size="sm"
     >
       <Stack gap="sm">
         {prompt === 'spotLink' && (

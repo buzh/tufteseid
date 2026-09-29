@@ -202,43 +202,83 @@ Four things follow from that:
 
 ### Its looks are Casdoor's to set
 
-The frame is cross-origin, so no stylesheet in the app reaches inside it. Two
-fields in Casdoor's console do, and like the OAuth2 provider config they are
-typed in by hand on each host:
+The frame is cross-origin, so no stylesheet in the app reaches inside it, and
+**Form CSS is not the way in**. Casdoor renders that field behind
+`inIframe() || isMobile() ? null : …`, along with the background image and the
+form offset: a framed login page is one it declines to style. What does still
+apply, all of it per application and typed in by hand on each host like the
+OAuth2 provider config:
 
-- **Application → Theme** — dark, primary colour `#ff8b3d`, border radius 6.
-  That is papaya 5 and `md` out of `src/ui/theme.ts`.
-- **Application → Form CSS** — raw CSS, no `<style>` wrapper, Casdoor adds
-  one:
+- **Theme** — dark, primary colour `#ff8b3d`, border radius 6. That is papaya
+  5 and `md` out of `src/ui/theme.ts`, and it is what turns the antd
+  components inside the frame dark and papaya. With the dark algorithm on,
+  the panel takes the class `login-panel-dark`, which has **no rule anywhere
+  in Casdoor's stylesheet** — so it arrives transparent, and only the page
+  behind it needs painting.
+- **Signin items → Logo, Languages** — clear *visible* on both. The app's own
+  title stands above the frame, and one language needs no picker.
+- **Signin items → Login button → Custom CSS** — the stylesheet below. An
+  ordinary item's Custom CSS is injected as a `<style>` beside the item it
+  belongs to, iframe or not, so any always-rendered item would do; the login
+  button is the one that is always there. Raw CSS, no `<style>` wrapper —
+  Casdoor strips the tags and adds its own.
 
   ```css
+  html,
   body,
-  .login-content,
-  .login-panel {
+  .loginBackground,
+  .loginBackgroundDark {
+    background: transparent !important;
+  }
+  body {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  .login-panel,
+  .login-panel-dark {
+    margin: 0;
     background: transparent;
     box-shadow: none;
   }
-  .login-panel {
+  .login-form {
     padding: 0;
   }
-  .login-form {
-    width: 100%;
-    padding: 0;
+  .panel-logo {
+    display: none;
+  }
+  .login-button,
+  .signup-button {
+    color: #1f2628;
+    font-weight: 600;
   }
   ```
 
-  `.login-panel` and `.login-form` are the two containers Casdoor documents.
-  The logo above them and the language footer below go by whatever selector
-  the browser's inspector shows in the version installed.
+  Transparent rather than anthracite on purpose: what shows through is the
+  modal's own `--mantine-color-body`, so the frame follows the app's surface
+  instead of holding a copy of it. The papaya button is painted anthracite
+  because antd would put white on it and papaya 5 is too light to read white
+  on — the app's own buttons get the same treatment from `autoContrast`.
+  Mulish cannot cross the origin: it is served under a hashed filename by
+  Vite, so there is no stable URL for an `@font-face` here and the frame runs
+  on the rest of the stack.
 
-The frame's height is fixed at 460 px in `AuthDialog.module.css` because a
-cross-origin frame cannot be measured from outside. A form that outgrows it
-scrolls inside itself, and that number is the thing to change.
+- **Signup items → Languages** — clear *visible*. The signup page's logo is
+  not an item at all, which is why `.panel-logo` is hidden in CSS above rather
+  than by a toggle.
+- **Signup items → add a `Text 1` item → Label** — the same stylesheet, this
+  time **wrapped in `<style>…</style>`**. Signup's items carry no Custom CSS
+  of their own; a `Text N` item's *label* is injected as raw HTML, which is
+  the only hook that page has.
+
+The frame's height is fixed at 400 px in `AuthDialog.module.css` because a
+cross-origin frame cannot be measured from outside, and the modal is `sm`
+because Casdoor lays its form out at 300 px. A page that outgrows the height
+scrolls inside itself; those two numbers are what to change.
 
 Two limits worth knowing before reaching for any of this:
 
-- **Form CSS does nothing in Casdoor 4.x** (casdoor/casdoor#5800): the fields
-  save and the pages ignore them. One more thing the 3.119.0 pin is holding.
+- **Form CSS does nothing in Casdoor 4.x either** (casdoor/casdoor#5800),
+  framed or not. Whether the per-item Custom CSS above survives that version
+  is untested. One more thing the 3.119.0 pin is holding.
 - **The form speaks English.** 3.119.0 ships eleven UI locales and Norwegian
   is not among them, so the only user-visible strings in the app that are not
   `nb` are the ones inside this frame.
