@@ -215,6 +215,13 @@ the ground the pin sits in the middle of, so the open spot loses it there — th
 footprint frame is what marks the place then, and the name is in the box's own
 title. Every other spot keeps its pin, which is what a reader clicks to move on.
 
+Two rules keep a view of many spots legible, and they answer to different
+things. The name plate is drawn out to zoom 10 only (`LABEL_OFF_ZOOM`,
+`src/spots/pinStyle.ts`): it is for telling spots apart across a view that
+holds several, and from there in the reader is looking at the ground itself,
+where a dark plate over the hillshade covers the thing being read. The pin
+itself always stands.
+
 Pins that come within 44 css pixels of each other are drawn as one translucent
 disc carrying their count (`ol/source/Cluster`, `src/spots/spotLayer.ts`), so a
 zoomed-out view reads as a scatter of weights rather than a mat of overlapping

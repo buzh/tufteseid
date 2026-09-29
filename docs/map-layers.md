@@ -262,7 +262,7 @@ layer taken off a map loses everything it had loaded.
 | 4 | a rectangle in hand — the terrain window or a spot's footprint | `src/map/rectAdjust.ts` |
 | 4 | terrain-analysis window frame, standing | `src/terrain/windowLayer.ts` |
 | 5 | a spot's footprint frame, standing | `src/spots/footprintLayer.ts` (`PIN_Z_INDEX - 1`) |
-| 6 | a spot's pin and label, or the disc counting the pins too close together to draw apart — never the spot whose card or reader is open | `src/spots/pinStyle.ts` (`PIN_Z_INDEX`) |
+| 6 | a spot's pin, its name plate out to zoom 10, or the disc counting the pins too close together to draw apart — never the spot whose card or reader is open | `src/spots/pinStyle.ts` (`PIN_Z_INDEX`) |
 | 10 | Kulturminner theme layers | set by the caller in `src/map/layers/atoms.ts`, not by `themeWMS.ts` |
 
 7–9 are free. A new overlay should be written down here.

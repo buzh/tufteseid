@@ -103,9 +103,20 @@ const label = (name: string, scale: number) => {
   });
 };
 
-export const spotStyle = (name: string) => [
-  new Style({ image: savedPin, text: label(name, SIZE.saved) }),
-];
+/**
+ * The zoom from which a pin stands bare. A name plate is for telling spots
+ * apart across a view that holds several; from here in the reader is looking
+ * at the ground itself, and a dark plate over the hillshade covers the thing
+ * being read.
+ */
+export const LABEL_OFF_ZOOM = 10;
+
+const barePin = [new Style({ image: savedPin })];
+
+export const spotStyle = (name: string, labelled: boolean) =>
+  labelled
+    ? [new Style({ image: savedPin, text: label(name, SIZE.saved) })]
+    : barePin;
 
 /** Radius in css pixels of the disc standing for `size` pins. Logarithmic and
  *  capped: a hundred spots must not swallow the view. */

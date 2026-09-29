@@ -25,12 +25,17 @@ import {
   SPOT_RECORD_KEY,
   spotsAtPixel,
 } from './hitTest';
-import { clusterStyle, PIN_Z_INDEX, spotStyle } from './pinStyle';
+import {
+  clusterStyle,
+  LABEL_OFF_ZOOM,
+  PIN_Z_INDEX,
+  spotStyle,
+} from './pinStyle';
 import { spotRecordsAtom } from './spotRecords';
 
 /** How near two pins come, in css pixels, before they are drawn as one disc.
- *  Wider than the pin itself, because it is the name plates that collide
- *  first. */
+ *  Wider than the pin itself: below `LABEL_OFF_ZOOM` it is the name plates
+ *  that collide first, and above it the gap keeps the heads apart. */
 const CLUSTER_DISTANCE = 44;
 
 /** Room left around a gathering the view was zoomed into. */
@@ -108,11 +113,13 @@ export const useSpotLayer = () => {
     const layer = new VectorLayer({
       zIndex: PIN_Z_INDEX,
       source: clusters,
-      style: (feature: FeatureLike) => {
+      style: (feature: FeatureLike, resolution: number) => {
         const gathered = clusterRecords(feature);
-        return gathered.length === 1
-          ? spotStyle(gathered[0].name)
-          : clusterStyle(gathered.length);
+        if (gathered.length > 1) return clusterStyle(gathered.length);
+        // The frame's own resolution, not the view's zoom: the two differ
+        // mid-animation and the plate would flick on a frame early.
+        const zoom = map.getView().getZoomForResolution(resolution) ?? 0;
+        return spotStyle(gathered[0].name, zoom < LABEL_OFF_ZOOM);
       },
       properties: { id: SPOT_LAYER_ID },
     });
