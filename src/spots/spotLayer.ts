@@ -119,7 +119,7 @@ export const useSpotLayer = () => {
         // The frame's own resolution, not the view's zoom: the two differ
         // mid-animation and the plate would flick on a frame early.
         const zoom = map.getView().getZoomForResolution(resolution) ?? 0;
-        return spotStyle(gathered[0].name, zoom < LABEL_OFF_ZOOM);
+        return spotStyle(gathered[0].name, zoom > LABEL_OFF_ZOOM);
       },
       properties: { id: SPOT_LAYER_ID },
     });
