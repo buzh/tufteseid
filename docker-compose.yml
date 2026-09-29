@@ -137,10 +137,15 @@ services:
 
   # Comment threads on public spots. Keeps its own identity store — it cannot
   # read PocketBase's — federated to Casdoor so the reader signs in once.
-  # Exactly one custom OAuth2 provider is supported, and a missing AUTH_CUSTOM_*
-  # var is a startup failure rather than a disabled provider.
+  # Exactly one custom OAuth2 provider is supported, and once any AUTH_CUSTOM_*
+  # var is set a missing one is a startup failure rather than a disabled
+  # provider.
+  #
+  # **v1.16.0 or newer.** Before it there was no custom provider at all and the
+  # AUTH_CUSTOM_* block is read by nothing: remark42 starts clean, serves
+  # threads, and offers no way to sign in to them.
   remark42:
-    image: ghcr.io/umputun/remark42:v1.14.0
+    image: ghcr.io/umputun/remark42:v1.17.1
     restart: unless-stopped
     logging:
       options:

@@ -49,9 +49,15 @@ retraction.
 ### Federation and moderation
 
 `AUTH_CUSTOM_*` points Remark42 at Casdoor — see `docs/identity.md`. Remark42
-takes **exactly one** custom provider, and refuses to start if any of the six
-variables is missing, which is the usual cause of the container restarting in
-a loop on first deploy.
+takes **exactly one** custom provider, and once any of the six variables is
+set a missing one is a startup failure, which is the usual cause of the
+container restarting in a loop on first deploy.
+
+**The custom provider arrived in v1.16.0**, so the pin cannot go below it.
+On an older image the whole `AUTH_CUSTOM_*` block is read by nothing —
+remark42 starts clean, serves threads and offers no way to sign in to one.
+The symptom is `/remark42/api/v1/config` reporting `"auth_providers":[]`,
+which `live-check.sh` asserts against for exactly this reason.
 
 Because both the app and Remark42 federate to the same provider, the second
 sign-in is a click: the reader presses the one provider button in the widget
