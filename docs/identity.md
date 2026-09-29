@@ -220,7 +220,9 @@ Four things follow from that:
 ### Its looks are Casdoor's to set
 
 The frame is cross-origin, so no stylesheet in the app reaches inside it, and
-**Form CSS is not the way in**. Casdoor renders that field behind
+**the application's own Custom CSS is not the way in**. Casdoor renders that
+field — `formCss`, labelled "Custom CSS" on the tab below and not to be
+confused with the Custom CSS a signin *item* carries — behind
 `inIframe() || isMobile() ? null : …`, along with the background image and the
 form offset: a framed login page is one it declines to style.
 
@@ -235,7 +237,12 @@ console turns dark for whoever signs in here — `?theme=default` on the console
 URL puts it back.
 
 What is left is per application, typed in by hand on each host like the OAuth2
-provider config:
+provider config. All of it lives on one tab of the application editor —
+`https://<CASDOOR_HOST>/applications/admin/<application>#ui-customization`,
+`admin` being the application's *owner* rather than the organization it
+serves. Header HTML, Page HTML and Footer HTML look like one-line text
+inputs and have no Edit button beside them: clicking the input is what opens
+the code editor.
 
 - **Theme** — primary colour `#ff8b3d`, border radius 6: papaya 5 and `md` out
   of `src/ui/theme.ts`. Set *Theme type* to dark as well, so the console
@@ -243,9 +250,11 @@ provider config:
   Under the dark algorithm the panel takes the class `login-panel-dark`, which
   has **no rule anywhere in Casdoor's stylesheet** — so it arrives
   transparent, and only the page behind it needs painting.
-- **Header HTML** — the stylesheet below, **wrapped in `<style>…</style>`**.
-  It is appended to `document.head` with no iframe check and on every entry
-  page, which is what makes it the one hook worth using: per-item Custom CSS
+- **Header HTML** — the block below, and note the **`<style>` and `<script>`
+  tags are part of it**: the field's contents are appended to `document.head`
+  as markup, so bare CSS pasted in there is inert text that changes nothing
+  and reports nothing. It runs with no iframe check and on every entry page,
+  which is what makes it the one hook worth using: per-item Custom CSS
   reaches neither the signup page, whose items have no such field, nor the
   "Continue with …" panel, which renders no items at all.
 
@@ -269,6 +278,9 @@ provider config:
     .login-form {
       padding: 0;
     }
+    #parent-area {
+      min-height: 0;
+    }
     .panel-logo,
     #footer {
       display: none;
@@ -279,6 +291,20 @@ provider config:
       font-weight: 600;
     }
   </style>
+  <script>
+    (function () {
+      if (window.parent === window) return;
+      var post = function () {
+        parent.postMessage(
+          { casdoorFormHeight: document.documentElement.scrollHeight },
+          '*',
+        );
+      };
+      new ResizeObserver(post).observe(document.documentElement);
+      addEventListener('load', post);
+      post();
+    })();
+  </script>
   ```
 
   Transparent rather than anthracite on purpose: what shows through is the
@@ -290,29 +316,46 @@ provider config:
   Vite, so there is no stable URL for an `@font-face` here and the frame runs
   on the rest of the stack.
 
-- **Signin items → Logo, Languages** and **Signup items → Languages** — clear
-  *visible* on all three. The app's own title stands above the frame, and one
-  language needs no picker. The signup page's logo is not an item, which is
-  why `.panel-logo` is hidden in CSS above rather than by a toggle.
+  **The script is the only way the box learns how tall to be.** A
+  cross-origin frame cannot be measured from outside and will not say which
+  of its pages is showing, and sign-up runs to roughly two and a half times
+  the height of sign-in, so a fixed frame is either cramped on one page or
+  empty on the other. Header HTML is where it goes because the injector
+  re-creates a `<script>` element rather than setting `innerHTML`, so it
+  actually runs; `posting '*'` is a page height crossing to whoever chose to
+  embed the page, and the app checks the sender's origin at the other end.
+  `#parent-area { min-height: 0 }` above is what makes the measurement mean
+  anything: Casdoor sizes that element to `100vh`, which inside a frame is
+  the height the app set, so without it the page would only ever report back
+  the number it was given.
 
-The frame's height is fixed at 400 px in `AuthDialog.module.css` because a
-cross-origin frame cannot be measured from outside, and the modal is 418 px
-wide — Mantine's `sm` and a tenth — around a form Casdoor lays out at 300. A
-page that outgrows the height scrolls inside itself; those two numbers are
-what to change.
+- **Signin items → Logo, Languages** and **Signup items → Languages** — clear
+  *visible* on all three, in the two tables higher up the same tab. The app's
+  own title stands above the frame, and one language needs no picker. The
+  signup page's logo is not an item, which is why `.panel-logo` is hidden in
+  CSS above rather than by a toggle, and the Signup items table only appears
+  at all while sign-up is enabled.
+
+The modal is 420 px wide around a form Casdoor lays out at 300, one width for
+both its pages — the extra fields sign-up asks for make it taller, not wider.
+The height follows the page, over the `postMessage` above: 400 px until the
+first measurement arrives, and 400 px is also the floor, since a frame that
+shrinks is worse to look at than one with room to spare. The ceiling of
+1200 px in `AuthDialog.tsx` is there because the number crosses an origin
+boundary, and a page taller than that scrolls inside itself.
 
 `#footer` is hidden above for that reason as much as for the Casdoor logo it
 carries. Casdoor's `#parent-area` is `min-height: 100vh`, which inside a frame
 means the height set here — and the footer sits *below* those 100vh, so it
 guarantees a scrollbar however short the form is, with its own padding showing
-as a gap under the sign-up link. Casdoor knows: the console's "empty footer"
-button writes exactly this rule into Footer HTML.
+as a gap under the sign-up link. Casdoor knows: **Reset to Empty**, under the
+Footer HTML row, writes exactly this rule into that field.
 
 Two limits worth knowing before reaching for any of this:
 
-- **Form CSS does nothing in Casdoor 4.x either** (casdoor/casdoor#5800),
-  framed or not. Whether Header HTML survives that version is untested. One
-  more thing the 3.119.0 pin is holding.
+- **The application's Custom CSS does nothing in Casdoor 4.x either**
+  (casdoor/casdoor#5800), framed or not. Whether Header HTML survives that
+  version is untested. One more thing the 3.119.0 pin is holding.
 - **The form speaks English.** 3.119.0 ships eleven UI locales and Norwegian
   is not among them, so the only user-visible strings in the app that are not
   `nb` are the ones inside this frame.

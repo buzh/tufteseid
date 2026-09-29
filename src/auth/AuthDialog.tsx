@@ -45,6 +45,15 @@ const darkened = (url: string): string => {
 // to keep alive (docs/identity.md).
 const MAX_TRIPS = 3;
 
+// A cross-origin frame cannot be measured from outside and will not say which
+// of its pages is showing, and sign-up is more than twice the height of
+// sign-in. So the frame measures itself: a script in Casdoor's Header HTML
+// posts its document height on every layout change (docs/identity.md). Until
+// the first one arrives the box stands at sign-in height, which is also the
+// floor — a shrinking frame is worse to look at than a roomy one. The ceiling
+// is there because the number crosses an origin boundary.
+const FORM_HEIGHT = { initial: 400, max: 1200 };
+
 export const AuthDialog = () => {
   const { t } = useTranslation();
   const [open, setOpen] = useAtom(isAuthDialogOpenAtom);
@@ -52,6 +61,7 @@ export const AuthDialog = () => {
   const { providers, failed } = useOAuthProviders();
   const signIn = useSignIn();
   const [formUrl, setFormUrl] = useState<string | null>(null);
+  const [formHeight, setFormHeight] = useState(FORM_HEIGHT.initial);
   const [signInFailed, setSignInFailed] = useState(false);
   // The round trip outlives the box. Closing it abandons neither the OAuth2
   // state nor the promise waiting on the realtime channel, so reopening puts
@@ -96,6 +106,25 @@ export const AuthDialog = () => {
   const only = providers?.length === 1 ? providers[0].name : null;
 
   useEffect(() => {
+    if (!formUrl) return;
+    const { origin } = new URL(formUrl);
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== origin) return;
+      const height = (event.data as { casdoorFormHeight?: unknown })
+        ?.casdoorFormHeight;
+      if (typeof height !== 'number' || !Number.isFinite(height)) return;
+      setFormHeight(
+        Math.min(
+          Math.max(Math.ceil(height), FORM_HEIGHT.initial),
+          FORM_HEIGHT.max,
+        ),
+      );
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [formUrl]);
+
+  useEffect(() => {
     // The rule's own advice — set the state from the event instead — has
     // nowhere to go here: the event is the box opening, the state is an
     // authorize URL that exists a network round trip later, and four call
@@ -111,9 +140,10 @@ export const AuthDialog = () => {
       title={t('auth.title')}
       closeButtonProps={{ className: styles.close }}
       centered
-      // Mantine's `sm` (380) and a tenth. Casdoor lays the form out at 300,
-      // so this is what gives it room without the box going roomy around it.
-      size={418}
+      // Casdoor lays the form out at 300, so this is enough room for it
+      // without the box going roomy around it. One width for both its pages:
+      // the extra fields sign-up asks for make it taller, not wider.
+      size={420}
     >
       <Stack gap="sm">
         {prompt === 'spotLink' && (
@@ -137,6 +167,7 @@ export const AuthDialog = () => {
         {formUrl && (
           <iframe
             className={styles.frame}
+            style={{ height: formHeight }}
             src={formUrl}
             title={t('auth.formTitle')}
           />
