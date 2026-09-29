@@ -196,9 +196,10 @@ Four things follow from that:
   header at all, so until it was added the one page on the stack where a
   password is typed could be embedded by anybody.
 - **The frame can still be refused**, by a browser that partitions its
-  cookies or a Casdoor that is not same-site with the app. Under the box is a
-  link that opens the same authorize URL in a window; the code comes back on
-  the same channel.
+  cookies or a Casdoor that is not same-site with the app. There is no
+  fallback in the box — an installation that hits this has a `CASDOOR_HOST`
+  problem to fix rather than a second button to press, and the authorize URL
+  works in a window if one is ever needed.
 
 ### Its looks are Casdoor's to set
 
@@ -252,7 +253,8 @@ provider config:
     .login-form {
       padding: 0;
     }
-    .panel-logo {
+    .panel-logo,
+    #footer {
       display: none;
     }
     .login-button,
@@ -281,6 +283,13 @@ The frame's height is fixed at 400 px in `AuthDialog.module.css` because a
 cross-origin frame cannot be measured from outside, and the modal is `sm`
 because Casdoor lays its form out at 300 px. A page that outgrows the height
 scrolls inside itself; those two numbers are what to change.
+
+`#footer` is hidden above for that reason as much as for the Casdoor logo it
+carries. Casdoor's `#parent-area` is `min-height: 100vh`, which inside a frame
+means the height set here — and the footer sits *below* those 100vh, so it
+guarantees a scrollbar however short the form is, with its own padding showing
+as a gap under the sign-up link. Casdoor knows: the console's "empty footer"
+button writes exactly this rule into Footer HTML.
 
 Two limits worth knowing before reaching for any of this:
 

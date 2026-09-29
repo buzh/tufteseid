@@ -14,15 +14,7 @@
 // cross-origin, so no style here reaches inside it, and Casdoor skips its own
 // Form CSS field when it is framed.
 
-import {
-  Alert,
-  Anchor,
-  Button,
-  Loader,
-  Modal,
-  Stack,
-  Text,
-} from '@mantine/core';
+import { Alert, Button, Loader, Modal, Stack, Text } from '@mantine/core';
 import { useAtom } from 'jotai';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -126,25 +118,11 @@ export const AuthDialog = () => {
         )}
 
         {formUrl && (
-          <>
-            <iframe
-              className={styles.frame}
-              src={formUrl}
-              title={t('auth.formTitle')}
-            />
-            {/* A frame on a Casdoor that is not same-site with the app cannot
-                keep its own cookies, and a browser may refuse it outright. The
-                authorize URL is the same one either way, and so is the channel
-                the code comes back on. */}
-            <Anchor
-              component="button"
-              type="button"
-              size="xs"
-              onClick={() => window.open(formUrl, '_blank', 'noopener')}
-            >
-              {t('auth.openInWindow')}
-            </Anchor>
-          </>
+          <iframe
+            className={styles.frame}
+            src={formUrl}
+            title={t('auth.formTitle')}
+          />
         )}
 
         {/* Nothing to choose from when there is one provider — the effect

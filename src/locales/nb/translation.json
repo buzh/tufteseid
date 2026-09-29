@@ -36,8 +36,7 @@
     "providersError": "Fikk ikke kontakt med innloggingstjenesten.",
     "noProviders": "Ingen innloggingsmåter er satt opp på denne installasjonen.",
     "signInFailed": "Innloggingen ble ikke fullført.",
-    "formTitle": "Innloggingsskjema",
-    "openInWindow": "Åpne innloggingen i et eget vindu"
+    "formTitle": "Innloggingsskjema"
   },
   "evidence": {
     "label": "Bilder",
