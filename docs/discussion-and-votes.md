@@ -171,9 +171,15 @@ Two properties of a view collection the client is written against:
 - **No realtime feed.** PocketBase does not publish events for a view, so
   `useSpotScores()` subscribes to `votes` — a base collection, where realtime
   works — and refetches the one affected row on an event. Since `votes`' list
-  rule is the reader's own rows, that means the tally moves live on the
-  reader's *own* vote and picks up everybody else's at the next full fetch.
+  rule is ordinarily the reader's own rows, that means the tally moves live on
+  the reader's *own* vote and picks up everybody else's at the next full fetch.
   Live enough for a number that has to be right rather than instant.
+
+  The exception is an admin, whose list rule covers every account's votes:
+  `listMyVotes()` filters on `owner` itself and the hook drops feed records
+  somebody else cast. Left to the rule, another reader's row lands in
+  `myVotesAtom` under that spot, `VoteControl` draws a thumb the admin never
+  pressed, and pressing it deletes their vote.
 - **A spot with no votes is absent**, not present at zero. Every reader of
   `spotScoresAtom` treats a missing entry as zero rather than as unknown.
 

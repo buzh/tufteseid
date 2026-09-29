@@ -33,12 +33,18 @@ const isAlreadyVoted = (err: unknown): boolean =>
   (err as { response?: { data?: Record<string, { code?: string }> } })?.response
     ?.data?.owner?.code === 'validation_not_unique';
 
-/** The reader's own votes. The list rule hides everybody else's, so this is
- *  the whole of what an account may see. Empty when signed out. */
-export const listMyVotes = async (): Promise<VoteRecord[]> =>
-  pb.authStore.isValid
-    ? await pb.collection(COLLECTION).getFullList<VoteRecord>()
+/** The reader's own votes. Empty when signed out. Filtered here rather than
+ *  left to the list rule: that rule also lets an admin list everybody's, and
+ *  another reader's row keyed under a spot reads as a vote this account cast
+ *  — and retracting it would delete theirs. */
+export const listMyVotes = async (): Promise<VoteRecord[]> => {
+  const owner = pb.authStore.record?.id;
+  return owner
+    ? await pb.collection(COLLECTION).getFullList<VoteRecord>({
+        filter: pb.filter('owner = {:owner}', { owner }),
+      })
     : [];
+};
 
 /** Every spot that has been voted on, best first. Open to a guest. */
 export const listSpotScores = async (): Promise<SpotScore[]> =>

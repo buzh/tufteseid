@@ -43,10 +43,10 @@ export const popularSpotsAtom = atom((get): SpotRecord[] | null => {
  *
  *  `spotScores` is a view collection and PocketBase runs no realtime feed over
  *  one, so the tallies are fetched rather than subscribed. The subscription is
- *  to `votes`, whose list rule is the reader's own rows — which means this
- *  refreshes on the reader's own vote and not on anybody else's. Somebody
- *  else's vote lands at the next full fetch. Live enough for a number that
- *  only has to be right, not instant. */
+ *  to `votes`, whose list rule is the reader's own rows — and, for an admin,
+ *  everybody's — which means this ordinarily refreshes on the reader's own
+ *  vote and not on anybody else's. Somebody else's vote lands at the next full
+ *  fetch. Live enough for a number that only has to be right, not instant. */
 export const useSpotScores = () => {
   const user = useAtomValue(currentUserAtom);
   const setScores = useSetAtom(spotScoresAtom);
@@ -84,12 +84,17 @@ export const useSpotScores = () => {
     const unsubscribe = subscribeVotes((action, record) => {
       if (!live) return;
 
-      setMyVotes((previous) => {
-        const next = new Map(previous);
-        if (action === 'delete') next.delete(record.spot);
-        else next.set(record.spot, record);
-        return next;
-      });
+      // An admin's list rule covers every account's votes, so the feed carries
+      // rows this reader never cast. They still move a tally; they are not
+      // this reader's opinion.
+      if (record.owner === user?.id) {
+        setMyVotes((previous) => {
+          const next = new Map(previous);
+          if (action === 'delete') next.delete(record.spot);
+          else next.set(record.spot, record);
+          return next;
+        });
+      }
 
       // The vote moved, so the tally did too. Only this spot's row is stale.
       void getSpotScore(record.spot).then((score) => {
