@@ -118,8 +118,16 @@ for — so the first thing to make is an organization of their own, with both
 applications under it. Users belong to the organization rather than to an
 application, which is what lets one sign-in serve both clients.
 
-Both are applications in Casdoor's console, and both hand back a client id and
-a secret.
+Once readers exist, **the console's own login is at
+`https://$CASDOOR_HOST/login/built-in`.** Casdoor sends an unauthenticated
+visitor to `/login/${lastLoginOrg}`, out of `localStorage`, so a browser that
+last signed in as a reader offers the `tufteseid` organization's login page
+and reports the admin account as unknown. The value is per-browser: the
+organization-specific URL, or `localStorage.removeItem('lastLoginOrg')`, is
+the way back.
+
+Both applications are made in Casdoor's console, and both hand back a client
+id and a secret.
 
 | Client | Redirect URI |
 | --- | --- |
