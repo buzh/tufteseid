@@ -35,6 +35,16 @@ const darkened = (url: string): string => {
   return themed.toString();
 };
 
+// A trip lives exactly as long as the realtime connection it listens on, and
+// the drop is fatal rather than survivable: the subscription's client id is
+// the OAuth2 `state`, so a reconnected one is a stranger to the authorize URL
+// already in the frame. Rather than leave the reader looking at a form that
+// can no longer answer, the box spends another trip on a fresh URL — up to a
+// point, past which it says so instead of hammering a backend that is down.
+// What makes this worth having at all is that the connection is not the app's
+// to keep alive (docs/identity.md).
+const MAX_TRIPS = 3;
+
 export const AuthDialog = () => {
   const { t } = useTranslation();
   const [open, setOpen] = useAtom(isAuthDialogOpenAtom);
@@ -58,18 +68,23 @@ export const AuthDialog = () => {
       if (inFlight.current) return;
       inFlight.current = true;
       try {
-        // A retry clears the last failure when its form arrives rather than
-        // when it is asked for: the box starts a trip from an effect, and
-        // setting state before `authWithOAuth2` has been away to the network
-        // would do it during that effect's render.
-        await signIn(provider, (url) => {
-          setSignInFailed(false);
-          setFormUrl(darkened(url));
-        });
-        close();
-      } catch (err) {
-        console.warn('[auth] sign-in failed', err);
-        setSignInFailed(true);
+        for (let trip = 1; trip <= MAX_TRIPS; trip++) {
+          try {
+            // A retry clears the last failure when its form arrives rather
+            // than when it is asked for: the box starts a trip from an
+            // effect, and setting state before `authWithOAuth2` has been away
+            // to the network would do it during that effect's render.
+            await signIn(provider, (url) => {
+              setSignInFailed(false);
+              setFormUrl(darkened(url));
+            });
+            close();
+            break;
+          } catch (err) {
+            console.warn('[auth] sign-in failed', err);
+            if (trip === MAX_TRIPS) setSignInFailed(true);
+          }
+        }
       } finally {
         inFlight.current = false;
         setFormUrl(null);

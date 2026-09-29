@@ -51,6 +51,23 @@ app, so `CASDOOR_HOST` needs a DNS record and a server block of its own in
 that proxy — same backend, different `server_name`. Caddy sorts them out on
 the `Host` header.
 
+**That proxy must leave `/pb/` alone.** PocketBase pushes spots, votes and
+finished renders down one long-lived event stream, and sends nothing between
+events — so a proxy that times an idle upstream out closes it on schedule.
+nginx does, after 60 seconds by default, which breaks signing in outright and
+makes everything else reconnect once a minute. In an nginx server block:
+
+```nginx
+location /pb/ {
+    proxy_pass http://127.0.0.1:3030;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_buffering off;
+    proxy_read_timeout 1h;
+}
+```
+
 To let Caddy terminate TLS itself instead: change the `:3000` line in `Caddyfile`
 to your hostname and publish 80/443 rather than 3030. Certificates are then
 provisioned automatically — but add `- caddydata:/data` to the `tufteseid`

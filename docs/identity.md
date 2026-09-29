@@ -189,6 +189,18 @@ Four things follow from that:
   subscription and the promise waiting on it all outlive the modal, so
   reopening puts the same authorize URL back in the frame instead of starting
   a second trip.
+- **Dropping the realtime connection does cancel it**, and no reconnect
+  rescues it: the subscription's client id *is* the OAuth2 `state`, so a
+  reconnected one no longer matches the authorize URL in the frame. The SDK
+  rejects with "realtime connection interrupted" the moment the stream dies.
+  The box answers by spending another trip — a fresh URL into the same frame,
+  three tries before it gives up and shows the error. That is a bandage over
+  something the app cannot fix from its side: **whatever fronts the stack
+  must not time out an idle `/pb/api/realtime`.** PocketBase sends nothing
+  down that stream between events, so nginx's default `proxy_read_timeout` of
+  60 s reads it as a stalled upstream and closes it — sign-in then fails
+  about a minute after the form appears, however fast the reader types
+  (`README.md`).
 - **Two CSP directives hold it up**, and they are on opposite hosts:
   `frame-src` on the app's policy names `$CASDOOR_HOST`, and the Casdoor block
   in `Caddyfile` answers with `frame-ancestors 'self' $PUBLIC_ORIGIN`. The
