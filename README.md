@@ -16,13 +16,15 @@ database and restarts in a loop:
 ```sh
 sudo mkdir -p /site/tufteseid/data/{logs,stats,cvat,mapproxy,casdoor,remark42}
 sudo chown -R 100:101 /site/tufteseid/data/mapproxy
-sudo chown -R 1000:1000 /site/tufteseid/data/{casdoor,remark42}
+sudo chown -R 1000:1000 /site/tufteseid/data/casdoor
 ```
 
 `100:101` is the `mapproxy` user inside `mapproxy:7.0.0-alpine-nginx`;
 [`docs/wms-proxy-and-tiles.md`](docs/wms-proxy-and-tiles.md) has the one-liner
-that asks the image, for when that tag moves. `1000:1000` is what Casdoor and
-remark42 run as. Point the paths anywhere writable — they are set in
+that asks the image, for when that tag moves. `1000:1000` is Casdoor's user,
+which its image drops to at build time and so cannot chown the directory for
+itself. Remark42 starts as root and chowns its own store on the way down to its
+user, so that one only has to exist. Point the paths anywhere writable — they are set in
 `docker-compose.yml`. The `cvat` store may stay empty: an empty directory
 answers 404, which is what ground outside the LiDAR footprint looks like
 anyway.

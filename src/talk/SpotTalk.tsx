@@ -107,7 +107,10 @@ export const SpotTalk = ({ spot }: { spot: SpotRecord }) => {
       })
       .then(() => {
         if (!live) return;
-        instance = window.REMARK42?.createInstance(config);
+        // A script that loaded without defining this did not load.
+        const remark = window.REMARK42;
+        if (!remark) throw new Error('remark42 embed defined no REMARK42');
+        instance = remark.createInstance(config);
         setReady(true);
       })
       .catch((err) => {

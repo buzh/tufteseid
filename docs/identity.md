@@ -135,11 +135,14 @@ id and a secret.
 
 | Client | Redirect URI |
 | --- | --- |
-| PocketBase | `$PUBLIC_ORIGIN/pb/api/oauth2-redirect` |
+| PocketBase | `$PUBLIC_ORIGIN/auth/callback` |
 | Remark42 | `$PUBLIC_ORIGIN/remark42/auth/tufteseid/callback` |
 
 Both are on the **app's** origin, not Casdoor's: a redirect URI is where the
-reader is sent back to.
+reader is sent back to. PocketBase's is the SPA's own route rather than
+anything under `/pb/` — the app takes the code off the query string itself and
+trades it (`CALLBACK_PATH` in `src/auth/trip.ts`), so the two have to be
+changed together.
 
 Casdoor answers a reader it already knows with a *Continue with …* panel
 rather than a redirect, which would make the comment engine's leg a second
