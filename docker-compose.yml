@@ -7,11 +7,9 @@ services:
     ports:
       - "127.0.0.1:3030:3000"
     environment:
-      # Caddy routes on it: Casdoor's hostname arrives on the same port as the
-      # app's and nothing but the Host header separates them.
+      # Caddy routes Casdoor on the Host header and gates framing of its login
+      # page on the app's origin.
       - CASDOOR_HOST=${CASDOOR_HOST:?set CASDOOR_HOST in .env}
-      # The one origin allowed to frame Casdoor's login page, which is how the
-      # comment threads' silent sign-in leg passes through it.
       - PUBLIC_ORIGIN=${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}
     volumes:
       - ./config.js:/var/www/config.js:ro
@@ -102,12 +100,8 @@ services:
     build: ./nib-proxy
     restart: unless-stopped
 
-  # The reader's account lives here, not in PocketBase: two services need the
-  # same identity and only an OIDC provider can give it to both. PocketBase is
-  # a client of this (admin UI → users → OAuth2 → OIDC), remark42 another.
-  #
-  # On its own hostname, not a subpath: the console is a create-react-app
-  # build that assumes it owns the root, and Casdoor has no base-path setting.
+  # The identity provider, with PocketBase and remark42 as its two OAuth2
+  # clients. On a hostname of its own, not a subpath (docs/identity.md).
   casdoor:
     # No `v` prefix on Casdoor's tags, unlike remark42's below.
     image: casbin/casdoor:3.119.0
@@ -116,46 +110,30 @@ services:
       options:
         max-size: "20m"
         max-file: "3"
-    # No entrypoint override: the image runs `/server`, which creates the
-    # tables and seeds the built-in organisation by itself. The
-    # `--createDatabase=true` the docs suggest is MySQL-only DDL and panics
+    # No entrypoint override: `/server` creates the tables itself, and the
+    # `--createDatabase=true` the docs suggest is MySQL-only DDL that panics
     # on sqlite.
     environment:
-      # Every app.conf key can be overridden by an env var of the same name,
-      # and the env var wins. Hence the un-shouty names.
+      # Each overrides the app.conf key of the same name, hence the un-shouty
+      # names.
       - driverName=sqlite
       # No `file:` scheme — modernc.org/sqlite takes the prefix as part of the
-      # path and silently creates a file called `file:`.
-      #
-      # The three `_pragma`s are what keep Casdoor off "database is locked":
-      # xorm holds a connection pool, SQLite takes one writer, and Casdoor
-      # turns the SQLITE_BUSY into a panic rather than a retry. WAL lets
-      # readers through while one writes, busy_timeout retries instead of
-      # failing at once, and an immediate transaction takes the write lock up
-      # front — the deferred-to-write upgrade is the one deadlock no timeout
-      # can retry its way out of. No `cache=shared`, which Casdoor's own
-      # default carries and which makes this worse rather than better.
+      # path. The pragmas keep Casdoor off "database is locked"
+      # (docs/identity.md).
       - "dataSourceName=/data/casdoor.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(10000)&_txlock=immediate"
       - runmode=prod
       - httpport=8000
-      # OIDC discovery composes every endpoint from this, so it must be the
-      # public address. https is not negotiable for an identity provider,
-      # hence the scheme here rather than in .env.
+      # OIDC discovery composes every endpoint from this, so it is the public
+      # address. https is fixed here: an identity provider on http is not one.
       - origin=https://${CASDOOR_HOST:-}
     volumes:
       # Must be writable by uid 1000 gid 1000 (the image's casdoor user) or the
       # first write fails and the container restarts forever.
       - /site/tufteseid/data/casdoor:/data
 
-  # Comment threads on public spots. Keeps its own identity store — it cannot
-  # read PocketBase's — federated to Casdoor so the reader signs in once.
-  # Exactly one custom OAuth2 provider is supported, and once any AUTH_CUSTOM_*
-  # var is set a missing one is a startup failure rather than a disabled
-  # provider.
-  #
-  # **v1.16.0 or newer.** Before it there was no custom provider at all and the
-  # AUTH_CUSTOM_* block is read by nothing: remark42 starts clean, serves
-  # threads, and offers no way to sign in to them.
+  # Comment threads on public spots, with an identity store of its own
+  # federated to Casdoor. v1.16.0 is the floor — below it the AUTH_CUSTOM_*
+  # block is read by nothing (docs/discussion-and-votes.md).
   remark42:
     image: ghcr.io/umputun/remark42:v1.17.1
     restart: unless-stopped
@@ -164,39 +142,27 @@ services:
         max-size: "20m"
         max-file: "3"
     environment:
-      # Cookies, CORS and the OAuth callback are all composed from this, so it
+      # Cookies, CORS and the OAuth callback are composed from this, so it
       # must match the public address exactly, subpath included.
       - REMARK_URL=${PUBLIC_ORIGIN:-}/remark42
       - SITE=tufteseid
       - SECRET=${REMARK42_SECRET:?set REMARK42_SECRET in .env}
       - ADMIN_SHARED_ID=${REMARK42_ADMIN_ID:-}
-      # Unlocks `backup`, `restore` and `remap` — the last being the only way
-      # back if the public origin ever moves, since threads are keyed by the
-      # spot's share URL. Blank disables it, which is the default: it is HTTP
-      # basic auth over the same public /remark42/api/v1/admin/* the widget's
-      # own moderation uses, so a set password is a second, guessable way in.
-      # Set it for the length of a migration and blank it again after.
+      # Basic auth on the public /remark42/api/v1/admin/* endpoints. Blank
+      # disables it; set it only for the length of a backup or a remap.
       - ADMIN_PASSWD=${REMARK42_ADMIN_PASSWD:-}
       - ALLOWED_HOSTS='self'
       - AUTH_SAME_SITE=strict
       - EMOJI=true
-      # Must match ^[a-z0-9][a-z0-9_-]*$ and collide with no built-in provider
-      # name; it is the last path segment of the callback URL.
+      # The last path segment of the callback URL. Must match
+      # ^[a-z0-9][a-z0-9_-]*$ and no built-in provider's name.
       - AUTH_CUSTOM_NAME=tufteseid
       - AUTH_CUSTOM_CID=${REMARK42_OIDC_CID:?set REMARK42_OIDC_CID in .env}
       - AUTH_CUSTOM_CSEC=${REMARK42_OIDC_CSEC:?set REMARK42_OIDC_CSEC in .env}
-      # The browser follows the first, so it is the public address. The other
-      # two are back-channel and stay inside the compose network: a container
-      # reaching its own public hostname depends on the host's NAT loopback,
-      # which is not something to make a sign-in depend on. No `/api` on the
-      # authorize URL — that one is a frontend route.
-      #
-      # `silentSignin` is what keeps this from being a second sign-in: without
-      # it Casdoor draws a "Continue with …" panel even for a reader it
-      # already knows, and the app runs this round trip in a hidden iframe
-      # where nobody can press it (src/api/remark42.ts). The query string
-      # survives because go-pkgz/auth composes the redirect with x/oauth2's
-      # AuthCodeURL, which appends with `&` when the base already has a `?`.
+      # Authorize is front-channel, hence the public address and no `/api`;
+      # the other two are back-channel and stay off the host's NAT loopback.
+      # `silentSignin` suppresses Casdoor's "Continue with …" panel, which is
+      # what lets the app run the trip in a hidden frame (src/api/remark42.ts).
       - AUTH_CUSTOM_AUTH_URL=https://${CASDOOR_HOST:-}/login/oauth/authorize?silentSignin=1
       - AUTH_CUSTOM_TOKEN_URL=http://casdoor:8000/api/login/oauth/access_token
       - AUTH_CUSTOM_INFO_URL=http://casdoor:8000/api/userinfo

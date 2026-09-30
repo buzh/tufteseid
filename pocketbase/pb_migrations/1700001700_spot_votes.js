@@ -8,9 +8,7 @@ migrate(
     const users = app.findCollectionByNameOrId('users');
     const spots = app.findCollectionByNameOrId('spots');
 
-    // A reader's own vote only. The tallies are public — that is what
-    // `spotScores` below is for — but who cast which is not, so a list of raw
-    // rows never leaves the account that owns them.
+    // How a spot stands is public (`spotScores` below); who voted is not.
     const ownRule = 'owner = @request.auth.id || @request.auth.role = "admin"';
 
     const votes = new Collection({
@@ -19,16 +17,15 @@ migrate(
       type: 'base',
       listRule: ownRule,
       viewRule: ownRule,
-      // A private spot is nobody else's to rank, and its owner ranking it
-      // would only be ranking it against itself.
+      // A private spot is nobody's to rank, its owner's included.
       createRule:
         '@request.auth.id != "" && @request.auth.id = owner && ' +
         'spot.visibility = "public"',
       updateRule: ownRule,
       deleteRule: ownRule,
       indexes: [
-        // One vote per reader per spot. `castVote` leans on this: it creates,
-        // and treats the 400 as "already voted, update instead".
+        // One vote per reader per spot. `castVote` creates and treats the
+        // resulting 400 as "already voted, update instead".
         'CREATE UNIQUE INDEX idx_votes_owner_spot ON votes (owner, spot)',
         'CREATE INDEX idx_votes_spot ON votes (spot)',
       ],
@@ -58,9 +55,8 @@ migrate(
         name: 'direction',
         required: true,
         maxSelect: 1,
-        // A select rather than ±1, because no NumberField constraint can say
-        // "not zero" and a zero vote would silently count as a cast one.
-        // Retracting deletes the row. Must match `VoteDirection` in
+        // A select rather than ±1: no NumberField constraint says "not
+        // zero". Retracting deletes the row. Must match `VoteDirection` in
         // `src/api/votes.ts`.
         values: ['up', 'down'],
       }),
@@ -70,12 +66,8 @@ migrate(
 
     app.save(votes);
 
-    // The tallies, open to a guest: the ranking is the public half of voting.
-    //
-    // Two things the client has to know. A view collection carries no realtime
-    // feed, so scores are refetched off a `votes` event rather than subscribed
-    // to. And a spot nobody has voted on is absent here rather than present
-    // with a zero, so a missing row reads as no votes.
+    // The tallies, open to a guest. A view collection carries no realtime
+    // feed, and a spot with no votes is absent rather than present at zero.
     const scores = new Collection({
       id: 'pbc_spot_scores',
       name: 'spotScores',

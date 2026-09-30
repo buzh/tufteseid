@@ -23,28 +23,17 @@ log {
 }
 
 route {
-        # Casdoor owns a hostname rather than a subpath: its console is a
-        # create-react-app build with `/static/js/…` baked in absolutely and
-        # its router claims a few dozen root paths, so there is no prefix to
-        # strip. Its hostname reaches the same :3000 as the app's, and only
-        # the Host header tells the two apart — hence first in the route,
-        # before any path matcher can claim one of them.
-        #
-        # It stands above the app's CSP for the same reason /stats/ does, and
-        # sets none of its own, hence the two hardening headers by hand.
+        # Casdoor is on a hostname of its own (docs/identity.md), separated
+        # from the app by the Host header alone — so it matches before any
+        # path matcher, and above the app's CSP, which its console cannot run
+        # under. It sets no security headers itself.
         @casdoor host {$CASDOOR_HOST}
         handle @casdoor {
                 header X-Robots-Tag noindex
                 header Strict-Transport-Security max-age=31536000
                 header X-Content-Type-Options nosniff
-                # The app frames Casdoor for the comment threads' silent
-                # sign-in leg (src/api/remark42.ts), and Casdoor sends no
-                # framing header of its own — so without this the one page on
-                # the stack where a password is typed is embeddable by
-                # anybody. `$PUBLIC_ORIGIN` is the app's alone: nothing else
-                # has reason to frame it.
-                # A CSP carrying only `frame-ancestors` restricts framing and
-                # nothing else, which is what keeps the console running here.
+                # Casdoor sends no framing header of its own. A CSP carrying
+                # only frame-ancestors restricts framing and nothing else.
                 header Content-Security-Policy "frame-ancestors 'self' {$PUBLIC_ORIGIN}"
                 reverse_proxy http://casdoor:8000
         }
@@ -65,9 +54,8 @@ route {
                 }
         }
 
-        # Serves its own HTML and its own JavaScript, so it stands above the
-        # app's CSP too — under `script-src 'self'` the widget's own admin
-        # pages would not run.
+        # Above the app's CSP too: the widget's own pages serve their own
+        # inline script.
         handle_path /remark42/* {
                 header X-Robots-Tag noindex
                 header Strict-Transport-Security max-age=31536000
@@ -80,13 +68,8 @@ route {
         header Referrer-Policy strict-origin
         # style-src-elem 'unsafe-inline' is required by MantineProvider's
         # runtime <style>; a nonce is impossible behind a static file_server.
-        #
-        # frame-src names Casdoor for the comment threads alone: they are
-        # signed in to in a hidden iframe that passes through it
-        # (src/api/remark42.ts). The app's own sign-in leaves the page instead
-        # (src/auth/trip.ts) and needs nothing here. Drop the host and nothing
-        # errors — the frame is blocked, the round trip times out, and the
-        # reader is quietly back to pressing the widget's own sign-in button.
+        # frame-src names Casdoor for the threads' silent sign-in frame alone
+        # (src/api/remark42.ts); the app's own sign-in leaves the page.
         header Content-Security-Policy "
                 default-src 'self';
                 script-src 'self';
@@ -106,13 +89,9 @@ route {
         @shortLink path_regexp shortLink ^/l/([0-9A-Za-z]+)$
         redir @shortLink /?lok={re.shortLink.1}
 
-        # Where Casdoor sends the reader back, and the one path other than the
-        # root that has to answer with the SPA. A rewrite rather than a redir
-        # because the authorization code rides the query string and a redir
-        # would put it on an address the reader keeps; `src/auth/trip.ts`
-        # spends it and replaces the URL before the app is imported. The path
-        # is registered in Casdoor, which matches it exactly, so the two move
-        # together.
+        # Where Casdoor sends the reader back; registered there verbatim, so
+        # the two move together. A rewrite rather than a redir, which would
+        # strand the authorization code on an address the reader keeps.
         @authCallback path /auth/callback
         rewrite @authCallback /index.html
 

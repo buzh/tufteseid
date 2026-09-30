@@ -1,11 +1,8 @@
 /// <reference path="../pb_data/types.d.ts" />
 //
 // `1700001700_spot_votes.js` gated voting on a public spot at create time
-// only, which two ordinary sequences walk straight past: a vote PATCHed onto
-// a private spot's id, and a spot its owner turns private after it has been
-// voted on. Either way the tally stayed listable by a guest. So the gate is
-// re-asserted on update, the relations are pinned so only `direction` moves,
-// and the view joins `spots` rather than trusting the rows under it.
+// only, so a vote PATCHed onto a private spot, or a spot turned private after
+// it was voted on, left a tally a guest could list.
 
 const OWN_RULE = 'owner = @request.auth.id || @request.auth.role = "admin"';
 

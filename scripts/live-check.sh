@@ -13,8 +13,7 @@ set -uo pipefail
 BASE=${1:-https://kart.scheen.no}
 CODE=${2:-}
 BASE=${BASE%/}
-# Casdoor is on a hostname of its own (docs/identity.md); `id.` in front of
-# the app's is the arrangement README.md sets up. Override with IDP=…
+# Casdoor's hostname, `id.` in front of the app's as README.md sets it up.
 IDP=${IDP:-https://id.${BASE#*://}}
 IDP=${IDP%/}
 TIMEOUT=${TIMEOUT:-60}
@@ -127,8 +126,7 @@ else
   fail entry-bundle 'index.html names no /assets/*.js'
 fi
 check short-link "$BASE/l/$SHORT_CODE" 302 '' 0 '' "location: /\?lok=$SHORT_CODE"
-# Where Casdoor sends the reader back. Anything but the app here and every
-# sign-in ends on a 404 with the code unspent.
+# Anything but the app here and every sign-in ends on a 404, code unspent.
 check auth-callback "$BASE/auth/callback" 200 text/html 300 'id="root"'
 # 200 means a catch-all rewrite: every typo would answer with the app.
 check unknown-path "$BASE/tufteseid-no-such-path" 404 '' 0
@@ -199,10 +197,8 @@ check no-private-leak \
 OPTS=(-s -X POST -H 'Content-Type: application/json' -d '{"name":"live-check"}')
 check anon-write-refused "$BASE/pb/api/collections/spots/records" 400 json 10
 
-# The tallies are open — the ranking works with no account — while `votes` is
-# the reader's own rows only, so a guest is shown none of them. Both answer
-# 200; the difference is what is in the body. A spot with no votes is absent
-# from the view, so 0 here is a valid state.
+# Tallies are open to a guest, individual votes are not. A spot with no votes
+# is absent from the view, so 0 here is a valid state.
 check scores-open "$BASE/pb/api/collections/spotScores/records?perPage=1&fields=spot,score" \
   200 json 20 '"totalItems":'
 note "$(json_num totalItems) spot(s) with a tally"
@@ -212,10 +208,8 @@ check votes-hidden "$BASE/pb/api/collections/votes/records?perPage=1&fields=id" 
 
 section 'Identity and discussion'
 
-# Casdoor answers on a hostname of its own, reaching the same Caddy on the
-# Host header alone; remark42 on a subpath. Both stand above the app's CSP,
-# and that they answer at all is the check that they are still ahead of it in
-# the route.
+# Both stand above the app's CSP in Caddy's route; that they answer at all is
+# the check that they are still ahead of it.
 check oidc-discovery "$IDP/.well-known/openid-configuration" \
   200 json 100 '"authorization_endpoint"'
 check oidc-noindex "$IDP/.well-known/openid-configuration" \
@@ -224,21 +218,18 @@ check oidc-noindex "$IDP/.well-known/openid-configuration" \
 check remark-ping "$BASE/remark42/api/v1/ping" 200 '' 2 'pong'
 check remark-embed "$BASE/remark42/web/embed.mjs" 200 javascript 500
 
-# One provider, and it is ours: a built-in left on would offer a second
-# identity the app knows nothing about.
+# Exactly one, and ours: a built-in left on would offer a second identity the
+# app knows nothing about. An empty list means a pin below v1.16.0.
 check remark-providers "$BASE/remark42/api/v1/config?site=tufteseid" \
   200 json 20 '"auth_providers":\["tufteseid"\]'
 
-# The one sign-in: remark42 hands the reader to Casdoor with `silentSignin`,
-# which is what lets the app run the trip in a hidden iframe rather than make
-# the reader press a second button. The `&client_id=` is part of the
-# assertion — x/oauth2 appending to the query string rather than overwriting
-# it is the fragile half.
+# `&client_id=` is part of the assertion: x/oauth2 has to append to the query
+# string rather than overwrite it, or `silentSignin` is dropped.
 check remark-silent-signin "$BASE/remark42/auth/tufteseid/login?site=tufteseid" \
   302 '' 0 '' 'location:.*/login/oauth/authorize\?silentSignin=1&client_id='
 
-# The frame that trip happens in. Without the IdP here the browser blocks it
-# and the reader is back to two sign-ins, with nothing in any log to say so.
+# Without the IdP here the browser blocks the silent sign-in frame, and
+# nothing in any log says so.
 check csp-frame-src "$BASE/" 200 text/html 300 '' \
   "content-security-policy:.*frame-src 'self' $IDP"
 
