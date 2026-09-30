@@ -46,8 +46,8 @@ const roleAtom = atom<Role>((get) => {
 export const isAdminAtom = atom((get) => get(roleAtom) === 'admin');
 
 // Both seeded from the page's boot: a trip that came back without a session
-// leaves the reader on their own URL with nothing to show they tried, so the
-// box comes up again carrying the failure.
+// puts the box up again carrying the failure, since nothing else would show
+// the reader they had tried.
 export const isAuthDialogOpenAtom = atom(signInReturnFailed());
 
 export const signInFailedAtom = atom(signInReturnFailed());

@@ -14,12 +14,10 @@ import { projInit } from './map/projections/proj/projInit.ts';
 import { theme } from './ui/theme.ts';
 projInit();
 
-// The app is imported rather than declared at the top for the sake of *when*:
-// modules under it take boot values off the address bar as they are
-// evaluated, and on the way back from a sign-in the address bar is the
-// callback's until `completeSignIn` has put the reader's own back. A static
-// import is hoisted above any statement that could do that, so the import
-// waits instead.
+// Imported dynamically for the sake of ordering: modules under `App` take
+// boot values off the address bar as they are evaluated, and until
+// `completeSignIn` runs that address bar is the callback's. A static import
+// would be hoisted above it.
 const boot = async () => {
   if (isSignInReturn()) await completeSignIn();
 

@@ -258,14 +258,14 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
               spot.visibility === 'public' ? t('talk.open') : t('talk.private')
             }
           >
-            {/* A span, because Mantine's Tooltip needs an element that fires
-                pointer events and a disabled button does not. */}
+            {/* A span: Mantine's Tooltip needs an element that fires pointer
+                events, and a disabled button does not. */}
             <span>
               <Button
                 size="xs"
                 variant="default"
-                // No thread on a private spot: the engine holds no account of
-                // who may read one.
+                // No thread on a private spot — the engine has no access
+                // control, so not mounting it is the only gate.
                 disabled={draft != null || spot.visibility !== 'public'}
                 leftSection={<Icon icon="forum" size={16} />}
                 onClick={() => setTalking(true)}

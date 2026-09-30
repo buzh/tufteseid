@@ -1,6 +1,5 @@
-// Up, the tally, down. Never hidden — a guest and an author both see where a
-// spot stands, they just cannot move it. Pressing the side already voted
-// retracts rather than doubling, which is the only way back to no opinion.
+// Up, the tally, down. Never hidden, only disabled, with the reason on the
+// tooltip. Pressing the side already voted retracts it.
 
 import { Tooltip } from '@mantine/core';
 import { useAtomValue } from 'jotai';
@@ -39,17 +38,16 @@ export const VoteControl = ({ spot }: { spot: SpotRecord }) => {
       mine?.direction === direction
         ? retractVote(mine.id)
         : castVote(spot.id, user.id, direction);
-    // The realtime feed on the reader's own votes carries the result back into
-    // `myVotesAtom` and refetches the tally, so there is nothing to set here.
+    // The realtime feed carries the result back into `myVotesAtom` and
+    // refetches the tally, so there is nothing to set here.
     void done
       .catch((err) => console.warn('[votes] cast failed', err))
       .finally(() => setBusy(false));
   };
 
   return (
-    // The outer tooltip carries the reason the arrows are dead, and stands on a
-    // span: a disabled button fires no pointer events, so a tooltip on the
-    // button itself would never be the one the reader needs.
+    // The outer tooltip stands on a span: a disabled button fires no pointer
+    // events, so one on the button itself would never open.
     <Tooltip label={blocked} disabled={blocked == null}>
       <span className={styles.group}>
         <Tooltip label={t('spots.voteUp')} disabled={blocked != null}>

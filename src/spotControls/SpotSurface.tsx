@@ -128,8 +128,7 @@ export const SpotSurface = () => {
           <SpotPropertiesBox key={draft.id} />
         ) : (
           active &&
-          // The thread first: it is opened from the card and from the reading
-          // alike, so it has to stand in front of both.
+          // The thread stands in front of both, being opened from either.
           (talking ? (
             <SpotTalk key={active.id} spot={active} />
           ) : reading ? (

@@ -34,9 +34,7 @@ const isAlreadyVoted = (err: unknown): boolean =>
     ?.data?.owner?.code === 'validation_not_unique';
 
 /** The reader's own votes. Empty when signed out. Filtered here rather than
- *  left to the list rule: that rule also lets an admin list everybody's, and
- *  another reader's row keyed under a spot reads as a vote this account cast
- *  — and retracting it would delete theirs. */
+ *  left to the list rule, which also lets an admin list everybody's. */
 export const listMyVotes = async (): Promise<VoteRecord[]> => {
   const owner = pb.authStore.record?.id;
   return owner
@@ -64,7 +62,7 @@ export const getSpotScore = async (
 };
 
 /** Cast or change a vote. Creating is the common case, so it goes first and
- *  the unique-index 400 is what says the reader has voted here before. */
+ *  the unique-index 400 says the reader has voted here before. */
 export const castVote = async (
   spotId: string,
   ownerId: string,

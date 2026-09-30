@@ -1,37 +1,25 @@
-// Remark42 keeps a session of its own. It federates to the same Casdoor the
-// app signs in through, so the reader needs no second credential — but the
-// OAuth2 round trip still has to happen, and left to the widget it is a button
-// the reader has to find and press before they can say anything.
-//
-// `primeRemarkSession` runs that trip in a hidden iframe instead. What makes
-// it invisible is `silentSignin` on remark42's authorize URL
-// (`docker-compose.yml`): without it Casdoor draws a "Continue with …" panel
-// even for a reader it already knows, and a hidden frame is the one place
-// nobody can press it.
-//
-// Every way this can fail ends at the widget's own provider button, which is
-// what the reader had before: a Casdoor session that has expired while the
-// app's token has not, a Casdoor on a registrable domain of its own so the
-// frame's cookies count as third-party, a browser that refuses the frame.
+// Remark42 keeps a session of its own, federated to the same Casdoor the app
+// signs in through. `primeRemarkSession` runs that OAuth2 round trip in a
+// hidden frame so the reader is not asked to press a second sign-in button;
+// every way it can fail lands back on the widget's own button
+// (docs/discussion-and-votes.md).
 
 /** Caddy strips the prefix; remark42 itself serves at the root. */
 const BASE = '/remark42';
 
-/** `AUTH_CUSTOM_NAME` in `docker-compose.yml`, which is also the last segment
- *  of the redirect URI registered in Casdoor. The three move together. */
+/** `AUTH_CUSTOM_NAME` in `docker-compose.yml`, and the last segment of the
+ *  redirect URI registered in Casdoor. The three move together. */
 const PROVIDER = 'tufteseid';
 
 /** `SITE` in `docker-compose.yml`. */
 export const REMARK_SITE = 'tufteseid';
 
-/** Where the round trip parks the frame when it is done. On our own origin,
- *  so `frame-ancestors 'self'` allows it and the pathname can be read from
- *  outside; nothing reads the document itself. */
+/** Where the trip parks the frame when it is done. On our own origin, so the
+ *  pathname is readable from outside; nothing reads the document. */
 const LANDING = '/favicon.svg';
 
-/** Two redirects and Casdoor's own bundle on a cold cache, and no longer:
- *  past this the reader is watching a spinner for a thread that would have
- *  rendered. */
+/** Two redirects and Casdoor's bundle on a cold cache. Past this the reader
+ *  is watching a spinner for a thread that would have rendered. */
 const TRIP_BUDGET_MS = 8000;
 
 /** What the widget is pointed at. */
@@ -47,7 +35,7 @@ export const hasRemarkSession = async (): Promise<boolean> => {
 };
 
 /** Resolves on the first of: the frame back on our own origin, Casdoor saying
- *  it has nobody to sign in, or the budget running out. Never rejects — the
+ *  it has nobody to sign in, or the budget running out. Never rejects; the
  *  caller asks remark42 afterwards rather than trusting any of the three. */
 const waitForTrip = (frame: HTMLIFrameElement): Promise<void> =>
   new Promise((resolve) => {
@@ -60,10 +48,8 @@ const waitForTrip = (frame: HTMLIFrameElement): Promise<void> =>
       resolve();
     }
 
-    // Casdoor posts this from inside the frame, and only from inside one. The
-    // origin goes unchecked because it is not known on this side; the worst a
-    // forged message can do is end the trip early, which is the fallback the
-    // reader would have had anyway.
+    // Origin unchecked because Casdoor's is not known on this side. The worst
+    // a forged message can do is end the trip early, which is the fallback.
     function onMessage(event: MessageEvent) {
       const message = event.data as { tag?: string; data?: string } | null;
       if (message?.tag === 'Casdoor' && message.data === 'user-not-logged-in') {
@@ -103,28 +89,25 @@ const runPrime = async (): Promise<boolean> => {
   return await hasRemarkSession();
 };
 
-/** Once per page: the trip is an identity-provider round trip, and a reader
- *  who has no Casdoor session will not grow one by being asked twice. */
+/** Once per page: a reader with no Casdoor session will not grow one by being
+ *  asked twice. */
 export const primeRemarkSession = (): Promise<boolean> => {
   priming ??= runPrime().catch(() => false);
   return priming;
 };
 
-/** Forgets the answer above, so the next thread asks again. Signing out is
- *  the only thing that changes it within one page: signing in is a redirect,
- *  and the page that comes back has never asked. */
+/** Signing out is the only thing that changes the answer within one page —
+ *  signing in is a redirect, and the page that comes back has never asked. */
 const resetRemarkSession = (): void => {
   priming = null;
 };
 
 /** A sidecar that accepts the connection and never answers would otherwise
- *  hold the whole sign-out open, and the app's own session is cleared after
- *  this one. */
+ *  hold the whole sign-out open. */
 const LOGOUT_BUDGET_MS = 3000;
 
 /** Signs out of the threads. The Casdoor session behind both sides is left
- *  alone — it is what makes the next sign-in a single click, and ending it is
- *  Casdoor's own business, on Casdoor's own hostname. */
+ *  alone; ending that one is Casdoor's own business, on its own hostname. */
 export const endRemarkSession = async (): Promise<void> => {
   resetRemarkSession();
   try {

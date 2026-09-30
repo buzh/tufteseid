@@ -129,13 +129,11 @@ export const spotAcquiringAtom = atom(
   },
 );
 
-/** The thread stands in front of both the card and the reading, because it is
- *  reached from either: the author opens it from their workbench, everybody
- *  else from the only box they ever see. Held and suspended like the other two.
+/** The thread box, reached from the card and from the reading alike. Held and
+ *  suspended like the other two.
  *
- *  Never true for a private spot — the comment engine has no account of who may
- *  read what, so the only gate is not mounting it. `SpotTalk` re-checks rather
- *  than trusting every caller to. */
+ *  Never true for a private spot: the comment engine has no access control, so
+ *  not mounting the thread is the only gate. `SpotTalk` re-checks. */
 export const spotTalkingAtom = atom(
   (get) => {
     const active = get(activeSpotAtom);

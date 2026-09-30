@@ -1,9 +1,7 @@
-// The thread on a spot, served by the remark42 sidecar under /remark42.
-//
-// The widget is fetched from our own origin at runtime rather than bundled, so
-// it costs no dependency and the app's `script-src 'self'` covers it. Its own
-// chrome is English: remark42 ships no Norwegian locale, and the strings around
-// it here are the only nb in the box.
+// The thread on a spot, served by the remark42 sidecar under /remark42. The
+// widget is fetched from our own origin at runtime rather than bundled, so it
+// costs no dependency and `script-src 'self'` covers it. Its own chrome is
+// English — remark42 ships no Norwegian locale.
 
 import { Alert, Loader } from '@mantine/core';
 import { useAtomValue, useSetAtom } from 'jotai';
@@ -84,32 +82,25 @@ export const SpotTalk = ({ spot }: { spot: SpotRecord }) => {
     const config: RemarkConfig = {
       host: remarkHost(),
       site_id: REMARK_SITE,
-      // The canonical short link, not the current address: `/?lok=…` carries
-      // the map's own parameters, and the thread key has to survive both those
-      // and a rename.
+      // The thread key. The canonical short link rather than the current
+      // address, which carries the map's own parameters.
       url: shareUrlOf(spot.code),
       theme: 'dark',
       locale: 'en',
       components: ['embed'],
       page_title: spot.name,
     };
-    // The widget reads remark42's session once, when it is created, so the
-    // silent sign-in has to have finished by then — mounting first and
-    // priming after would show the reader a sign-in button they do not need.
-    // `primeRemarkSession` gives up rather than hangs, and a reader who is a
-    // guest here is a guest there too.
     const session = signedIn ? primeRemarkSession() : Promise.resolve(false);
 
-    // Hence the ordering: the embed script creates an instance out of
-    // `window.remark_config` the moment it evaluates, and throws if there is
-    // none, so the config is set first and the script appended only once the
-    // session is primed. Loading the two in parallel raced the widget against
-    // the round trip, and a widget already created is one `createInstance`
-    // reuses rather than re-reads the session for.
+    // Strict ordering. The embed script creates an instance out of
+    // `window.remark_config` the moment it evaluates and throws if there is
+    // none, and the widget reads remark42's session only at creation — so the
+    // config is set first and the script appended only once the silent
+    // sign-in has finished. In parallel, the widget wins the race and the
+    // later `createInstance` reuses it rather than re-reading the session.
     session
       .then(() => {
-        // A box closed mid-trip has taken the mount node with it, and the
-        // script would evaluate against nothing.
+        // A box closed mid-trip took the mount node with it.
         if (!live) return;
         window.remark_config = config;
         return loadEmbed();

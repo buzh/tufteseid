@@ -45,8 +45,7 @@ export const SpotMenu = () => {
   const [tab, setTab] = useState<Tab>('popular');
   const [query, setQuery] = useState('');
 
-  // The ranking needs no account, which is why the menu opens for a guest at
-  // all — it used to be the sign-in dialog's trigger.
+  // The ranking needs no account, so the menu opens for a guest too.
   const spots = tab === 'mine' ? mine : popular;
 
   const needle = query.trim().toLowerCase();

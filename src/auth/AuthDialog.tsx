@@ -1,15 +1,9 @@
-// OAuth2 only: this lists whatever `listAuthMethods()` reports. A provider is
-// added in PocketBase's admin UI (Collections -> users -> Options -> OAuth2),
-// and in practice there is one — the `oidc` entry pointing at the Casdoor
-// sidecar, which is also what the comment engine federates to. Its button
-// text, for the installation that does have two, is the `displayName` set
-// there.
-//
-// The box is the step before leaving rather than the form itself: pressing a
-// provider hands the page over to its login page, and the session is picked up
-// on the way back in (`src/auth/trip.ts`). Even with one provider and nothing
-// to choose it earns the click, because saying why an account is wanted has to
-// happen before the reader is somewhere else.
+// OAuth2 only: this lists whatever `listAuthMethods()` reports, labelled with
+// the `displayName` set in PocketBase's admin UI (Collections -> users ->
+// Options -> OAuth2). Not the sign-in form — pressing a provider hands the
+// page over to its own, and `src/auth/trip.ts` picks the session up on the
+// way back. The box is where the reader is told why an account is wanted,
+// which has to happen before they are somewhere else.
 
 import { Alert, Button, Loader, Modal, Stack, Text } from '@mantine/core';
 import { useAtom } from 'jotai';
@@ -32,8 +26,7 @@ export const AuthDialog = () => {
   const [failed, setFailed] = useAtom(signInFailedAtom);
   const { providers, failed: providersFailed } = useOAuthProviders();
   // Which provider the page is on its way to. Composing the authorize URL is
-  // a round trip of its own, and a second press during it would spend a
-  // second `state`.
+  // a round trip of its own, and a second press would spend a second `state`.
   const [leaving, setLeaving] = useState<string | null>(null);
 
   const close = () => {

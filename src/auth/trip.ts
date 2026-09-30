@@ -1,14 +1,8 @@
-// Signing in leaves the page. PocketBase offers two ways to keep the browser
-// here — a popup and a framed form, both fed by a code that comes back over
-// its realtime channel — and this app uses neither: the whole view is in the
-// URL already, so the only thing a trip has to carry is the address it left
-// from, and nothing then rests on a long-lived stream staying open while
-// somebody fills in a form.
-//
-// What comes back instead is an authorization code on the query string, which
-// `completeSignIn` trades for a session before React mounts. Casdoor's login
-// page is a page rather than a frame here, which is the one state in which it
-// styles itself (docs/identity.md).
+// Signing in leaves the page, rather than using PocketBase's popup or framed
+// form: those wait for the code over the realtime channel, and the whole view
+// is in the URL already, so a trip need only carry the address it left from.
+// `completeSignIn` trades the code for a session before React mounts
+// (docs/identity.md).
 
 import { pb } from '../api/pocketbase';
 import { withDeadline } from '../shared/utils/deadline';
@@ -22,10 +16,8 @@ const CALLBACK_PATH = '/auth/callback';
  *  could spend. */
 const STASH_KEY = 'tufteseid.signInTrip';
 
-/** One POST to our own PocketBase, which does the token exchange and the
- *  userinfo fetch over the compose network. Past this the reader is watching a
- *  blank page for a session that is not coming, and their own page with a
- *  retry on it is the better place to wait. */
+/** One POST to our own PocketBase, which does the token and userinfo calls
+ *  over the compose network. Past this the reader is watching a blank page. */
 const EXCHANGE_MS = 15_000;
 
 type Trip = {
@@ -37,12 +29,9 @@ type Trip = {
 
 const callbackUrl = (): string => `${window.location.origin}${CALLBACK_PATH}`;
 
-// Casdoor picks its light or dark algorithm from `?theme=`, falling back to
-// whatever the last visit left in that origin's localStorage and then to
-// light. The application's own theme carries the colours only, so without this
-// the reader lands on a white form with a papaya button in it. Going through
-// `URL` also encodes the `redirect_uri` that the SDK's own recipe appends
-// raw.
+// Casdoor takes light-versus-dark from `?theme=` alone; the application's own
+// theme carries the colours only. Going through `URL` also encodes the
+// `redirect_uri` that the SDK's own recipe appends raw.
 const darkened = (url: string): string => {
   const themed = new URL(url);
   themed.searchParams.set('theme', 'dark');
@@ -53,8 +42,7 @@ const darkened = (url: string): string => {
  *  Rejects only if the authorize URL could not be composed. */
 export const startSignIn = async (providerName: string): Promise<void> => {
   // Listed again rather than read off `useOAuthProviders`' cache: `state` and
-  // the PKCE verifier arrive with the list, and a pair already spent on one
-  // trip cannot pay for a second.
+  // the PKCE verifier arrive with the list, and neither is reusable.
   const { oauth2 } = await pb.collection('users').listAuthMethods();
   const provider = oauth2.providers.find((one) => one.name === providerName);
   if (!provider) throw new Error(`unknown auth provider ${providerName}`);
@@ -92,10 +80,9 @@ let failed = false;
  *  Read as the auth atoms are created, which is after `completeSignIn`. */
 export const signInReturnFailed = (): boolean => failed;
 
-/** Puts the address bar back where the reader left it and, if a code came back
- *  with them, trades it for a session — both before the app is imported, so no
- *  module that boots off the URL or off the auth store has to know a trip
- *  happened. Never rejects. */
+/** Puts the address bar back where the reader left it and, if a code came
+ *  back with them, trades it for a session. Runs before the app is imported,
+ *  so no module that boots off the URL sees the callback. Never rejects. */
 export const completeSignIn = async (): Promise<void> => {
   const { searchParams } = new URL(window.location.href);
   const trip = takeTrip();

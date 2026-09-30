@@ -194,16 +194,14 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
                   : t('talk.private')
               }
             >
-              {/* A span, because Mantine's Tooltip needs an element that fires
-                  pointer events and a disabled button does not. */}
+              {/* A span: Mantine's Tooltip needs an element that fires
+                  pointer events, and a disabled button does not. */}
               <span>
                 <ActionIcon
                   variant="subtle"
                   color="gray"
                   size="sm"
                   aria-label={t('talk.open')}
-                  // No thread on a private spot: the engine holds no account
-                  // of who may read one.
                   disabled={spot.visibility !== 'public'}
                   onClick={() => setTalking(true)}
                 >
