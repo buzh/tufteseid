@@ -158,7 +158,7 @@ Rules — *how a spot stands* is public, *who voted* is not:
 | | |
 | --- | --- |
 | list / view | `owner = @request.auth.id \|\| @request.auth.role = "admin"` |
-| create | signed in, owns the record, and the spot is public |
+| create | signed in, owns the record, the spot is public, and the spot is not the reader's own |
 | update | owner or admin, the spot is still public, and neither `spot` nor `owner` is in the body |
 | delete | owner or admin |
 
@@ -167,12 +167,20 @@ otherwise created against a public spot and PATCHed onto a private one — the
 only field that legitimately moves is `direction`
 (`1700001800_votes_public_only.js`).
 
+**Nobody ranks their own spot** (`1700001900_votes_not_own.js`). Only create
+carries that clause: update pins both relations, so no vote already cast can
+turn into a self-vote. `VoteControl` disables both thumbs with
+`spots.voteOwn` on the tooltip, the same shape as the other two refusals —
+the author still reads their own tally, they just cannot move it.
+
 ### `spotScores` (id `pbc_spot_scores`)
 
 A view collection, list and view rule open — a guest sees the ranking without
 an account. The join is what makes that safe: the rules are open, so the query
 itself has to keep a private spot out, and a spot its owner turns private
-drops out of the ranking with the votes it already has.
+drops out of the ranking with the votes it already has. `v.owner != s.owner`
+is the same trade for a self-vote: the rule stops a new one, and the query
+stops an old one counting without deleting the row.
 
 ```sql
 SELECT v.spot AS id, v.spot AS spot,
@@ -181,7 +189,7 @@ SELECT v.spot AS id, v.spot AS spot,
        SUM(CASE WHEN v.direction = 'down' THEN 1 ELSE 0 END) AS down,
        SUM(CASE WHEN v.direction = 'up' THEN 1 ELSE -1 END) AS score
 FROM votes v JOIN spots s ON s.id = v.spot
-WHERE s.visibility = 'public'
+WHERE s.visibility = 'public' AND v.owner != s.owner
 GROUP BY v.spot
 ```
 

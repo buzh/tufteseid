@@ -20,16 +20,23 @@ export const VoteControl = ({ spot }: { spot: SpotRecord }) => {
   const myVotes = useAtomValue(myVotesAtom);
   const [busy, setBusy] = useState(false);
 
-  const mine = myVotes.get(spot.id);
+  const isOwn = user != null && spot.owner === user.id;
+  // A self-vote cast before the rule keeps its row and stops counting, so it
+  // must not draw a pressed thumb either.
+  const mine = isOwn ? undefined : myVotes.get(spot.id);
   // Absent from the view means nobody has voted, not that the tally is unknown.
   const score = scores?.get(spot.id)?.score ?? 0;
 
   const isPublic = spot.visibility === 'public';
+  // Own before private: a private spot is only ever read by its owner, for
+  // whom this is the standing reason, or by an admin, for whom it is not.
   const blocked = !user
     ? t('spots.voteNeedsAccount')
-    : !isPublic
-      ? t('spots.votePrivate')
-      : null;
+    : isOwn
+      ? t('spots.voteOwn')
+      : !isPublic
+        ? t('spots.votePrivate')
+        : null;
 
   const cast = (direction: VoteDirection) => {
     if (!user || busy) return;

@@ -198,9 +198,9 @@ sidecar, which writes `meta.job` as it goes and the file when it is done
 
 - **`votes`** (id `pbc_votes`) — `owner` (→ users, cascade), `spot` (→ spots,
   cascade), `direction` (up | down). Unique over `(owner, spot)`: one vote per
-  account per spot, with retracting being a delete rather than a third value.
-  Readable only by its owner — *how a spot stands* is public, *who voted* is
-  not.
+  account per spot, with retracting being a delete rather than a third value,
+  and never on your own spot. Readable only by its owner — *how a spot stands*
+  is public, *who voted* is not.
 - **`spotScores`** (id `pbc_spot_scores`) — a **view** over `votes`, open to a
   guest, carrying `up`, `down`, `votes` and `score` per **public** spot. Two
   things to code against: PocketBase publishes **no realtime feed on a view**,
