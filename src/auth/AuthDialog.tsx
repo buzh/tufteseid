@@ -98,7 +98,11 @@ export const AuthDialog = () => {
           {t('auth.blurb')}
         </Text>
 
-        {beta && (
+        {/* Not to somebody who arrived on an invitation: a code is a way in
+            of its own and never looks at the free places, so how many are
+            left is nothing to do with them — and "they are all taken" reads
+            as a refusal. */}
+        {beta && prompt !== 'inviteLink' && (
           <Alert color="yellow">
             {beta.openSlots > 0
               ? t('auth.beta.slots', { count: beta.openSlots })

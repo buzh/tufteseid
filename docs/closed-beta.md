@@ -61,10 +61,20 @@ and the parameter stays on the URL until the box is dismissed or the trip
 starts: the box is the only place the code can be spent, and a reload before
 the reader gets that far must not be what loses it. A reader who already has
 an account is just following a link to the map, so the parameter is dropped
-on arrival instead. The trip stashes
+on arrival instead. The box shows nothing about free places to somebody
+holding a code — an invite never looks at the counter, and *they are all
+taken* reads as a refusal to a reader who has been let in. The trip stashes
 `window.location.href` as the address to come back to, which is why leaving
 drops the parameter first — finding it again afterwards would reopen the box
 over a session the reader had just got.
+
+Leaving with a code in hand goes to Casdoor's **sign-up** form rather than
+its login form: `src/auth/trip.ts` rewrites `/login/oauth/authorize` to
+`/signup/oauth/authorize`, which `web/src/EntryPage.js` serves off the same
+authorize parameters. Somebody holding an invite is making an account by
+definition, and the login form costs them a press of *sign up* first. The
+rewrite only fires where the path is the one being replaced, so a provider
+that is not Casdoor is left where its own authorize URL points.
 
 Codes are eight characters of Crockford base32, the alphabet `spots.code`
 already uses: no I, L, O or U, so a code read aloud cannot be mistyped into a

@@ -33,13 +33,24 @@ type Trip = {
 
 const callbackUrl = (): string => `${window.location.origin}${CALLBACK_PATH}`;
 
+/** Casdoor serves the same authorize parameters off a sign-up form of its
+ *  own — `web/src/EntryPage.js` in 3.119.0 routes this to its SignupPage. */
+const SIGN_IN_PATH = '/login/oauth/authorize';
+const SIGN_UP_PATH = '/signup/oauth/authorize';
+
 // Casdoor takes light-versus-dark from `?theme=` alone; the application's own
 // theme carries the colours only. Going through `URL` also encodes the
 // `redirect_uri` that the SDK's own recipe appends raw.
-const darkened = (url: string): string => {
-  const themed = new URL(url);
-  themed.searchParams.set('theme', 'dark');
-  return themed.toString();
+//
+// The path is rewritten only where it is the one being replaced, so a
+// provider that is not Casdoor is left where its own authorize URL points.
+const authorizeUrl = (url: string, signingUp: boolean): string => {
+  const authorize = new URL(url);
+  authorize.searchParams.set('theme', 'dark');
+  if (signingUp && authorize.pathname === SIGN_IN_PATH) {
+    authorize.pathname = SIGN_UP_PATH;
+  }
+  return authorize.toString();
 };
 
 /** Hands the page to the provider's login form, so nothing after it runs.
@@ -65,7 +76,13 @@ export const startSignIn = async (
 
   // `authURL` ends at `redirect_uri=`; the SDK composes it by concatenation
   // and so does this.
-  window.location.assign(darkened(provider.authURL + callbackUrl()));
+  //
+  // A reader holding an invite code is making an account by definition, so
+  // the login form would cost them a press of "sign up" and a moment
+  // wondering whether they already had one.
+  window.location.assign(
+    authorizeUrl(provider.authURL + callbackUrl(), invite !== ''),
+  );
 };
 
 export const isSignInReturn = (): boolean =>
