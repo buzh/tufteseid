@@ -115,11 +115,14 @@ What that costs each surface is different, and the difference is the rule:
   and hides its own three sections with `display: none` — hidden rather than
   unmounted, because each ground arm's controller remembers something across a
   visit elsewhere (the flyfoto era, the dataset lists) that an unmount would
-  lose and fetch again. Both bands wear `.ribbon`, whose height is fixed rather
-  than left to the contents: the scene↔ground mapping is bound to the map
-  rectangle as it was at the freeze that opened the session and is never
+  lose and fetch again. Both bands wear `.ribbon`, whose `height` is stated
+  rather than left to the contents: the scene↔ground mapping is bound to the
+  map rectangle as it was at the freeze that opened the session and is never
   rebound, so a band that grew or shrank afterwards would slide the map element
-  out from under strokes already registered to it.
+  out from under strokes already registered to it. For the same reason no
+  scrollport in the band may show a scrollbar — a classic one takes its track
+  out of the content box, and the band would grow by it on a platform that has
+  them.
 - **The boxes go away, not out.** `SpotSurface` wraps them in a
   `display: none`, because the box carries the draft controller and it is that
   controller that writes the strokes. Unmounting it would fire its leaving
@@ -795,6 +798,16 @@ spot's title row, both out of `src/spots/useShareCopy.ts`.
 about where there is room.** A control that means something different per ground
 belongs to an arm; one that turns something on over the ground belongs to the
 show group; anything else that applies to the reading belongs to the tools.
+
+**When the band runs out of room, a ground section gives and nothing else
+does.** The centre and the tools are fixed-width icon controls that cannot
+shrink by a pixel, while a ground section carries a flight name no one can
+predict the width of. So each ground section is its own scrollport and the band
+is not one: the view switch, the show group and the tools stay put at every
+width, and a ground's controls scroll inside the column they were given. The
+band keeps an `overflow-x` of its own for the widths under about 610px where
+the centre and the tools alone outrun it, but that is a last resort rather than
+the design.
 
 - Every arm takes a controller object (`useLidarControls(half)` and friends) and
   owns no atoms of its own. All three controllers mount whichever arm is

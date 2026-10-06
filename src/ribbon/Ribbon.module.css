@@ -1,24 +1,36 @@
 /* Three columns, so the view and show controls keep the band's centre line
-   whatever the sections beside them carry. Scrolls rather than wraps: a second
-   line would push the map down under the cursor.
+   whatever the sections beside them carry. Neither wraps nor scrolls as a
+   whole: a second line would push the map down under the cursor, and a row
+   that scrolled would carry the tools off the right edge with it. What gives
+   instead is a ground section, inside its own scrollport (`.grounds`), that
+   being the only thing here whose width nobody can predict.
 
-   The height is fixed rather than left to the contents, because every context
-   uses this shell and the band must be the same height in all of them: the
-   scene↔ground mapping of an open drawing is bound to the map rectangle as it
-   was when the session froze (`shared/uiContext.ts`). One row of controls plus
-   the padding and the rule. */
+   The height is a `height` and not a floor, because every context uses this
+   shell and the band must be the same height in all of them: the scene↔ground
+   mapping of an open drawing is bound to the map rectangle as it was when the
+   session froze (`shared/uiContext.ts`). One row of controls plus the padding
+   and the rule. Every scrollport in the band hides its scrollbar for the same
+   reason — a classic one takes its track out of the content box, and on a
+   platform that has them the band would grow by it. */
 .ribbon {
   flex: none;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: var(--mantine-spacing-xs);
-  min-height: calc(var(--control-height) + 2 * var(--mantine-spacing-xs) + 1px);
+  height: calc(var(--control-height) + 2 * var(--mantine-spacing-xs) + 1px);
   padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
   background: var(--mantine-color-body);
   border-bottom: 1px solid var(--mantine-color-default-border);
+  /* Under about 610px the centre and the tools alone outrun the band. A last
+     resort, not the design. */
   overflow-x: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+}
+
+/* Safari had no `scrollbar-width` until 18.2. */
+.ribbon::-webkit-scrollbar {
+  display: none;
 }
 
 /* The map's band standing down for another context. Out of flow, so the band in
@@ -48,26 +60,45 @@
   white-space: nowrap;
 }
 
+/* `min-width: 0` so a column may go under its contents. Without it each track
+   keeps its min-content width, the band overflows instead, and whatever is
+   past the right edge goes with it. */
 .side {
   display: flex;
   align-items: center;
   gap: var(--mantine-spacing-xs);
+  min-width: 0;
 }
 
+/* The one thing in the band that gives: a ground's controls run as long as the
+   flight name they carry, so the section scrolls inside the room its column
+   got rather than widening the row. The 3px is the focus ring's reach — a 2px
+   outline at 1px offset — which a scrollport would otherwise clip; the
+   matching negative margin keeps every control on the pixel it was on. */
 .grounds {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 3px;
+  margin: -3px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-/* Pinned to the right edge of the scrollport so the tools stay reachable once
-   the row scrolls; carries the band's background so sections do not show
-   through it. */
+.grounds::-webkit-scrollbar {
+  display: none;
+}
+
+/* Held against the right edge of a column that no longer scrolls, so the tools
+   are reachable at every width without a sticky — which could not have worked
+   here in any case: the containing block is the grid area, and the track is
+   sized to the tools, so there was never any travel to take. The floor is
+   because `.side` above lets a column shrink and the draw band's two ways out
+   wear both classes. */
 .tools {
   flex: none;
+  min-width: max-content;
   margin-left: auto;
-  position: sticky;
-  right: 0;
   padding-left: var(--mantine-spacing-xs);
-  background: var(--mantine-color-body);
 }
 
 .outage + .outage {
