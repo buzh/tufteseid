@@ -83,7 +83,10 @@ export const useSpotShareLink = () => {
   // Read by the centring effect below without being one of its dependencies:
   // `EvidenceReader` fits the footprint when a reading opens, so centring on
   // the point as well would be two animations on one view, and leaving a
-  // reading must not move the view at all.
+  // reading must not move the view at all. Only a spot that has a rectangle
+  // gets that fit, though — so a reading without one is centred here instead,
+  // or a link to a row from before the rectangle rule would leave the view
+  // wherever the reader last had it.
   const reading = useAtomValue(spotReadingAtom);
   const readingNow = useRef(reading);
   useEffect(() => {
@@ -94,8 +97,10 @@ export const useSpotShareLink = () => {
   // panning around their own spot.
   const activeId = active?.id ?? null;
   const activePoint = active?.point;
+  const activeFitsItself = active?.footprint != null;
   useEffect(() => {
-    if (!activeId || !activePoint || readingNow.current) return;
+    if (!activeId || !activePoint || (readingNow.current && activeFitsItself))
+      return;
     const view = map.getView();
     view.animate({
       center: transform(
@@ -107,7 +112,9 @@ export const useSpotShareLink = () => {
       duration: 400,
     });
     // `activePoint` is a fresh array literal per record: naming it would
-    // re-animate on every realtime update of an unrelated field.
+    // re-animate on every realtime update of an unrelated field. Nor
+    // `activeFitsItself`, or the card's repair write landing a rectangle would
+    // animate a second time over a reader already looking at the place.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, activeId]);
 
