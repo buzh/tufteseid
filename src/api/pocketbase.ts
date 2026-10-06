@@ -15,6 +15,9 @@ export type SiteUser = {
   email: string;
   name: string;
   role?: Role;
+  /** How many invites this account may ever mint, granted by hand. What is
+   *  left to mint is this less the rows it has issued. */
+  inviteQuota?: number;
   created: string;
   updated: string;
 };

@@ -2,21 +2,32 @@
 // the `displayName` set in PocketBase's admin UI (Collections -> users ->
 // Options -> OAuth2). Not the sign-in form — pressing a provider hands the
 // page over to its own, and `src/auth/trip.ts` picks the session up on the
-// way back. The box is where the reader is told why an account is wanted,
-// which has to happen before they are somewhere else.
+// way back. The box is where the reader is told why an account is wanted and
+// where an invite code is asked for, both of which have to happen before they
+// are somewhere else.
 
-import { Alert, Button, Loader, Modal, Stack, Text } from '@mantine/core';
+import {
+  Alert,
+  Button,
+  Loader,
+  Modal,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useAtom } from 'jotai';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { bootInviteCode } from '../invites/inviteLink';
 import {
   authPromptAtom,
   isAuthDialogOpenAtom,
   signInFailedAtom,
+  signInRefusalAtom,
 } from './atoms';
 import styles from './AuthDialog.module.css';
-import { useOAuthProviders } from './hooks';
+import { useOAuthProviders, useRegistrationGate } from './hooks';
 import { startSignIn } from './trip';
 
 export const AuthDialog = () => {
@@ -24,7 +35,12 @@ export const AuthDialog = () => {
   const [open, setOpen] = useAtom(isAuthDialogOpenAtom);
   const [prompt, setPrompt] = useAtom(authPromptAtom);
   const [failed, setFailed] = useAtom(signInFailedAtom);
+  const [refusal, setRefusal] = useAtom(signInRefusalAtom);
   const { providers, failed: providersFailed } = useOAuthProviders();
+  const gate = useRegistrationGate(open);
+  // Seeded from the link the reader followed, or from the code the gate just
+  // turned down so a typo can be corrected where it was made.
+  const [invite, setInvite] = useState(bootInviteCode || refusal?.invite || '');
   // Which provider the page is on its way to. Composing the authorize URL is
   // a round trip of its own, and a second press would spend a second `state`.
   const [leaving, setLeaving] = useState<string | null>(null);
@@ -33,17 +49,23 @@ export const AuthDialog = () => {
     setOpen(false);
     setPrompt(null);
     setFailed(false);
+    setRefusal(null);
   };
 
   const leave = (provider: string) => {
     setFailed(false);
+    setRefusal(null);
     setLeaving(provider);
-    void startSignIn(provider).catch((err: unknown) => {
+    void startSignIn(provider, invite.trim()).catch((err: unknown) => {
       console.warn('[auth] could not start sign-in', err);
       setLeaving(null);
       setFailed(true);
     });
   };
+
+  // The gate itself while it is shut, null otherwise — including on an
+  // installation that has none, where the box reads as it always did.
+  const beta = gate?.closed ? gate : null;
 
   return (
     <Modal
@@ -63,11 +85,40 @@ export const AuthDialog = () => {
           {t('auth.blurb')}
         </Text>
 
+        {beta && (
+          <Alert color="yellow">
+            {beta.openSlots > 0
+              ? t('auth.beta.slots', { count: beta.openSlots })
+              : t('auth.beta.full')}
+          </Alert>
+        )}
+
+        {refusal?.reason === 'registrationClosed' && (
+          <Alert color="red">{t('auth.beta.refusedClosed')}</Alert>
+        )}
+
+        {refusal?.reason === 'inviteInvalid' && (
+          <Alert color="red">{t('auth.beta.refusedCode')}</Alert>
+        )}
+
         {providersFailed && (
           <Alert color="red">{t('auth.providersError')}</Alert>
         )}
 
-        {failed && <Alert color="red">{t('auth.signInFailed')}</Alert>}
+        {failed && !refusal && (
+          <Alert color="red">{t('auth.signInFailed')}</Alert>
+        )}
+
+        {beta && (
+          <TextInput
+            label={t('auth.beta.codeLabel')}
+            description={t('auth.beta.codeHelp')}
+            placeholder={t('auth.beta.codePlaceholder')}
+            value={invite}
+            onChange={(event) => setInvite(event.currentTarget.value)}
+            disabled={leaving !== null}
+          />
+        )}
 
         {!providersFailed && providers == null && <Loader size="sm" />}
 

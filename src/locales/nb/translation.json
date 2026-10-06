@@ -35,7 +35,17 @@
     "pocketbase": "PocketBase",
     "providersError": "Fikk ikke kontakt med innloggingstjenesten.",
     "noProviders": "Ingen innloggingsmåter er satt opp på denne installasjonen.",
-    "signInFailed": "Innloggingen ble ikke fullført."
+    "signInFailed": "Innloggingen ble ikke fullført.",
+    "beta": {
+      "slots_one": "Lukket beta: det er én ledig plass igjen.",
+      "slots_other": "Lukket beta: det er {{count}} ledige plasser igjen.",
+      "full": "Lukket beta: alle de ledige plassene er tatt. En ny konto trenger en invitasjonskode. Har du konto fra før, logger du inn som vanlig.",
+      "codeLabel": "Invitasjonskode",
+      "codeHelp": "Trengs bare til en ny konto, og bare når det ikke er ledige plasser igjen.",
+      "codePlaceholder": "For eksempel J3K8QW2M",
+      "refusedClosed": "Det er ingen ledige plasser igjen. Du trenger en invitasjonskode for å lage konto.",
+      "refusedCode": "Invitasjonskoden gjelder ikke. Den kan være feilskrevet eller allerede brukt."
+    }
   },
   "evidence": {
     "label": "Bilder",

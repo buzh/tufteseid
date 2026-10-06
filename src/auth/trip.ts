@@ -25,6 +25,10 @@ type Trip = {
   codeVerifier: string;
   state: string;
   returnTo: string;
+  /** Empty unless the reader typed one. It has to ride along in the stash:
+   *  the gate is enforced where the account is created, which is on the way
+   *  back, and by then the box that asked for it is three pages ago. */
+  invite: string;
 };
 
 const callbackUrl = (): string => `${window.location.origin}${CALLBACK_PATH}`;
@@ -40,7 +44,10 @@ const darkened = (url: string): string => {
 
 /** Hands the page to the provider's login form, so nothing after it runs.
  *  Rejects only if the authorize URL could not be composed. */
-export const startSignIn = async (providerName: string): Promise<void> => {
+export const startSignIn = async (
+  providerName: string,
+  invite = '',
+): Promise<void> => {
   // Listed again rather than read off `useOAuthProviders`' cache: `state` and
   // the PKCE verifier arrive with the list, and neither is reusable.
   const { oauth2 } = await pb.collection('users').listAuthMethods();
@@ -52,6 +59,7 @@ export const startSignIn = async (providerName: string): Promise<void> => {
     codeVerifier: provider.codeVerifier,
     state: provider.state,
     returnTo: window.location.href,
+    invite,
   };
   sessionStorage.setItem(STASH_KEY, JSON.stringify(trip));
 
@@ -76,9 +84,33 @@ const takeTrip = (): Trip | null => {
 
 let failed = false;
 
+/** Why the closed beta turned a first-time reader away, when that is what
+ *  happened. Anything else — a bad exchange, a timeout — leaves this null and
+ *  shows the generic failure. */
+export type SignInRefusal = {
+  reason: 'registrationClosed' | 'inviteInvalid';
+  /** What the reader typed, so the box can hand it back to be corrected. The
+   *  stash it rode in is gone by the time anything can ask. */
+  invite: string;
+};
+
+let refusal: SignInRefusal | null = null;
+
 /** Whether the trip this page load came back from ended without a session.
  *  Read as the auth atoms are created, which is after `completeSignIn`. */
 export const signInReturnFailed = (): boolean => failed;
+
+export const signInReturnRefusal = (): SignInRefusal | null => refusal;
+
+// The gate answers 403 with a `ValidationError` under `invite`, which is the
+// only shape PocketBase passes through to the client intact.
+const refusalReason = (err: unknown): SignInRefusal['reason'] | null => {
+  const code = (err as { response?: { data?: { invite?: { code?: string } } } })
+    ?.response?.data?.invite?.code;
+  if (code === 'registration_closed') return 'registrationClosed';
+  if (code === 'invite_invalid') return 'inviteInvalid';
+  return null;
+};
 
 /** Puts the address bar back where the reader left it and, if a code came
  *  back with them, trades it for a session. Runs before the app is imported,
@@ -110,10 +142,16 @@ export const completeSignIn = async (): Promise<void> => {
           code,
           trip.codeVerifier,
           callbackUrl(),
+          undefined,
+          trip.invite
+            ? { headers: { 'X-Invite-Code': trip.invite } }
+            : undefined,
         ),
     );
   } catch (err) {
     console.warn('[auth] code exchange failed', err);
     failed = true;
+    const reason = refusalReason(err);
+    refusal = reason ? { reason, invite: trip.invite } : null;
   }
 };

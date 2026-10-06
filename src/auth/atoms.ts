@@ -2,7 +2,11 @@ import { atom } from 'jotai';
 import { atomEffect } from 'jotai-effect';
 
 import { pb, Role, SiteUser } from '../api/pocketbase';
-import { signInReturnFailed } from './trip';
+import {
+  signInReturnFailed,
+  signInReturnRefusal,
+  type SignInRefusal,
+} from './trip';
 
 // Mirrors the SDK's authStore, which stays the source of truth. Do not set
 // this directly — go through the SDK's auth calls, which `pbAuthSyncEffect`
@@ -51,6 +55,12 @@ export const isAdminAtom = atom((get) => get(roleAtom) === 'admin');
 export const isAuthDialogOpenAtom = atom(signInReturnFailed());
 
 export const signInFailedAtom = atom(signInReturnFailed());
+
+/** Non-null when the closed beta is what turned the reader away, which the
+ *  box says instead of the generic failure. */
+export const signInRefusalAtom = atom<SignInRefusal | null>(
+  signInReturnRefusal(),
+);
 
 /** Why the dialog is up when the reader did not ask for it; null for the
  *  sign-in button itself. */

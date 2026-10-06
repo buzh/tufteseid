@@ -72,6 +72,10 @@ export const removeFromUrlListParameter = (
 export type UrlParameter =
   // The open spot's six-character code, not its PocketBase id.
   | 'lok'
+  // An invite code to the closed beta. Read and cleared at boot by
+  // `src/invites/inviteLink.ts` — it belongs to the visit that arrived
+  // carrying it, not to a link copied out of the address bar afterwards.
+  | 'invite'
   | 'projection'
   | 'backgroundLayer'
   | 'hybrid'
