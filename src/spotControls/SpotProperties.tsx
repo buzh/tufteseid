@@ -103,9 +103,12 @@ export const SpotProperties = ({ spot }: { spot: SpotDraftController }) => {
       <div className={cx(styles.unit, placing && styles.unitStep)}>
         <Icon icon="my_location" size={14} />
         <span className={styles.unitText}>{formatPoint(spot.draft.point)}</span>
+        {/* Both rows read "Endre", so each says which it changes. Only the row
+            holding the map reads "Ferdig", and only one ever does. */}
         <Button
           size="compact-xs"
           variant={placing ? 'filled' : 'default'}
+          aria-label={placing ? undefined : t('spots.pointChange')}
           onClick={() => spot.setStage(placing ? 'idle' : 'pin')}
         >
           {placing ? t('spots.done') : t('spots.change')}
@@ -135,11 +138,15 @@ export const SpotProperties = ({ spot }: { spot: SpotDraftController }) => {
             ? t('spots.footprintHint')
             : sided
               ? t('spots.footprintSide', { metres: spot.footprintSideMetres })
-              : ''}
+              : // A new spot has none until its first write derives one, which
+                // is the whole life of this box. Saying so beats a blank row
+                // between two that carry a value.
+                t('spots.footprintPending')}
         </span>
         <Button
           size="compact-xs"
           variant={framing ? 'filled' : 'default'}
+          aria-label={framing ? undefined : t('spots.footprintChange')}
           onClick={() => spot.setStage(framing ? 'idle' : 'footprint')}
         >
           {framing ? t('spots.done') : t('spots.change')}
