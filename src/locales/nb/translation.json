@@ -226,6 +226,13 @@
       "helning_prosent": "Helning, prosent",
       "helning_grader": "Helning, grader",
       "dynamisk_farget_hoyde": "Dynamisk fargelagt høyde"
+    },
+    "styleShort": {
+      "cvat": "CVAT",
+      "skyggerelieff": "Skygge",
+      "multiskyggerelieff": "Multiskygge",
+      "helning_prosent": "Helning %",
+      "helning_grader": "Helning °"
     }
   },
   "lidarControls": {

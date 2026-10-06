@@ -126,6 +126,11 @@ export const lidarStyleLabel = (style: string): string => {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 };
 
+/** Chip-width form of {@link lidarStyleLabel}; the full label where none. */
+export const lidarStyleShort = (style: string): string =>
+  t(`lidar.styleShort.${style}`, { defaultValue: '' }) ||
+  lidarStyleLabel(style);
+
 type CachedEntry = { ts: number; projects: LidarProject[] };
 
 let inflight: Promise<LidarProject[]> | null = null;

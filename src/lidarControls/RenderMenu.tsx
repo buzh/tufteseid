@@ -8,6 +8,7 @@ import {
 import {
   CVAT_STYLE,
   lidarStyleLabel,
+  lidarStyleShort,
 } from '../map/layers/config/backgroundLayers/lidarProjects';
 import { ControlChip } from '../ui/ControlChip';
 import { Icon, type MaterialSymbol } from '../ui/Icon';
@@ -49,7 +50,6 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
     ? t('lidarControls.render.cvatHint')
     : t('lidarControls.render.wmsHint');
 
-  const chipIcon = isLidarCvat ? 'database' : styleIcon(shownStyle);
   const chipTitle = [
     t('lidarControls.render.chipTitle', { render: label, source: hint }),
     nativeResolution == null
@@ -64,7 +64,7 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
     return (
       <Tooltip label={t('lidarControls.render.domLocked')}>
         <ControlChip
-          icon={chipIcon}
+          label={lidarStyleShort(shownStyle)}
           aria-label={chipTitle}
           withChevron={false}
           readout
@@ -98,10 +98,11 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
     <Menu width={320}>
       <Menu.Target>
         <ControlChip
-          icon={chipIcon}
+          label={lidarStyleShort(shownStyle)}
           title={chipTitle}
           aria-label={chipTitle}
           dimmed={autoDataset}
+          on={isLidarCvat}
         />
       </Menu.Target>
       <Menu.Dropdown>
