@@ -232,7 +232,7 @@
   },
   "lidar": {
     "style": {
-      "cvat": "CVAT RVT-py",
+      "cvat": "RVT-py 2.2.3 cVAT",
       "skyggerelieff": "Skyggerelieff",
       "multiskyggerelieff": "Multiskygge",
       "helning_prosent": "Helning, prosent",
@@ -266,8 +266,8 @@
       "cached": "I cachen",
       "loading": "Henter dekning …",
       "zoomedOut": "Zoom inn for å velge enkeltdatasett",
-      "error": "Fant ikke dekningen for utsnittet",
-      "none": "Ingen datasett dekker utsnittet"
+      "error": "Fant ikke dekning",
+      "none": "Ingen datasett dekker utsnittet. Pussig."
     },
     "zoom": {
       "factor": "×{{factor}}",
@@ -281,7 +281,7 @@
       "wmsHint": "Kartverkets render",
       "cvatMissing": "Venter på at disk blir billig igjen",
       "cvatProvenance": "RVT_py cVAT av «{{acquisition}}»: {{renderer}} {{template}}, radius {{general}}/{{flat}} piksler.",
-      "domLocked": "Overflatemodellen publiserer bare skyggerelieff"
+      "domLocked": "Modellen har kun skyggerelieff"
     },
     "hybrid": {
       "label": "Referanselag",
@@ -326,7 +326,7 @@
   "spots": {
     "new": "Ny lokalitet",
     "newNeedsAccount": "Logg inn for å lage ny",
-    "placeCancel": "Avbryt plasseringen",
+    "placeCancel": "Avbryt plassering",
     "placeHint": "Plasser nåla der du vil registrere funnet",
     "placeEscape": "Esc avbryter",
     "linkFailed": "Lokalitet ikke funnet",
