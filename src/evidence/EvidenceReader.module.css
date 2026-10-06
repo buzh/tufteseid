@@ -125,6 +125,9 @@
   height: 100%;
   border-radius: inherit;
   object-fit: cover;
+  /* Decoration inside a button: the press belongs to the button, and a video
+     thumbnail would otherwise answer it with the browser's own overlay. */
+  pointer-events: none;
 }
 
 /* Which producer made it, legible over whatever the corner of the picture

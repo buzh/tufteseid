@@ -277,11 +277,6 @@ export const isReadable = (rec: EvidenceRecord): boolean =>
 export const isVideoEvidence = (rec: EvidenceRecord): boolean =>
   rec.kind === 'sunloop';
 
-/** Readable, and a still — the narrower question the traced sketch ground asks
- *  (`docs/architecture.md`). */
-export const laysOnGround = (rec: EvidenceRecord): boolean =>
-  isReadable(rec) && !isVideoEvidence(rec);
-
 /** The row the reading opens on, and the one the strip stars. */
 export const coverOf = (
   rows: readonly EvidenceRecord[],

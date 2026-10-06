@@ -24,7 +24,13 @@ import { EvidenceThumb } from './EvidenceThumb';
 import { downloadLabel, evidenceLabel, KIND_ICON, renderNote } from './labels';
 import { moved } from './order';
 import { mayRetry, type RenderState } from './queue';
-import { coverOf, evidenceBbox, laysOnGround } from './spec';
+import {
+  coverOf,
+  evidenceBandTop,
+  evidenceBbox,
+  isReadable,
+  isVideoEvidence,
+} from './spec';
 import type { SpotEvidence } from './useSpotEvidence';
 
 type Drag = {
@@ -92,7 +98,6 @@ const EvidenceItem = ({
         </button>
       </Tooltip>
 
-      {/* A loop cannot be a sketch ground: the overlay is an `ImageStatic`. */}
       <Tooltip
         label={t(onMap ? 'evidence.order.groundOff' : 'evidence.order.ground')}
       >
@@ -100,7 +105,7 @@ const EvidenceItem = ({
           type="button"
           className={cx(styles.pick, onMap && styles.picked)}
           aria-pressed={onMap}
-          disabled={!laysOnGround(record)}
+          disabled={!isReadable(record)}
           onClick={onPick}
         >
           {record.file ? (
@@ -255,7 +260,10 @@ export const EvidenceGallery = ({
     const extent = evidenceBbox(rec);
     const url = evidenceFileUrl(rec);
     if (!url || !extent) return;
-    setGround(ground?.id === rec.id ? null : { id: rec.id, url, extent });
+    const loop = isVideoEvidence(rec)
+      ? { bandTop: evidenceBandTop(rec) }
+      : undefined;
+    setGround(ground?.id === rec.id ? null : { id: rec.id, url, extent, loop });
   };
 
   const rows = items ? (drag ? moved(items, drag.from, drag.to) : items) : [];

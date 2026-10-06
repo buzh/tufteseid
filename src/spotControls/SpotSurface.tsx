@@ -1,9 +1,12 @@
 import { useAtomValue } from 'jotai';
 import { lazy, Suspense, useEffect, useMemo } from 'react';
 
-import { draftGroundAtom } from '../evidence/draftGround';
+import { draftGroundAtom, type DraftGround } from '../evidence/draftGround';
 import { EvidenceReader } from '../evidence/EvidenceReader';
-import { useEvidenceOverlay } from '../evidence/evidenceOverlay';
+import {
+  useEvidenceLoopOverlay,
+  useEvidenceOverlay,
+} from '../evidence/evidenceOverlay';
 import { useRectangleAdjust } from '../map/rectAdjust';
 import { uiContextAtom } from '../shared/uiContext';
 import { useAllSketchesLayer } from '../sketch/allSketches';
@@ -58,6 +61,21 @@ const SpotPropertiesBox = () => {
   return <SpotProperties spot={spot} />;
 };
 
+/** A laid-on sun loop. Its own component because the loop overlay publishes a
+ *  transport that changes with every frame, and the surface below renders the
+ *  whole card. Nothing drives the transport here: the card lays a picture on
+ *  the ground to draw over, and a loop plays while it is there. */
+const DraftGroundLoop = ({
+  ground,
+  bandTop,
+}: {
+  ground: DraftGround;
+  bandTop: number;
+}) => {
+  useEvidenceLoopOverlay(ground.url, ground.extent, 1, bandTop);
+  return null;
+};
+
 export const SpotSurface = () => {
   const draft = useAtomValue(spotDraftAtom);
   const placing = useAtomValue(spotPlacingAtom);
@@ -102,10 +120,16 @@ export const SpotSurface = () => {
   useSketchOverlay(shown);
   useAllSketchesLayer();
   // Rides the map element, so a sketch session's transform carries it along.
-  useEvidenceOverlay(ground?.url ?? '', ground?.extent ?? null, 1);
+  // A loop goes to `DraftGroundLoop` instead: an `ImageStatic` cannot carry a
+  // WebM, and the two overlays are never up at once.
+  const still = ground?.loop ? null : ground;
+  useEvidenceOverlay(still?.url ?? '', still?.extent ?? null, 1);
 
   return (
     <>
+      {ground?.loop && (
+        <DraftGroundLoop ground={ground} bandTop={ground.loop.bandTop} />
+      )}
       {/* Before the box in document order, so the box paints over it: the
           canvas isolates Excalidraw's z-ladder but still covers the whole
           map rectangle. */}

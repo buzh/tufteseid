@@ -94,6 +94,9 @@
   border-radius: var(--mantine-radius-xs);
   background: var(--mantine-color-anthracite-6);
   object-fit: cover;
+  /* Decoration inside a button: the press belongs to the button, and a video
+     thumbnail would otherwise answer it with the browser's own overlay. */
+  pointer-events: none;
 }
 
 .pending {

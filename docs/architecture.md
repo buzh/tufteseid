@@ -87,7 +87,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `popularSpotsAtom` | same | Derived: every public spot, best first, `updated` breaking a tie. Does not wait on the tallies — without them the list reads unranked rather than not at all. |
 | `terrainOfferAtom` | `evidence/offer.ts` | What the terrain analysis would keep, published by `useTerrainControls` because its settings are component state. |
 | `keepOfferAtom` | same | Derived: the terrain's offer when an analysis is running, otherwise the ground's (off the A half). Null where the view cannot be re-rendered. |
-| `draftGroundAtom` | `evidence/draftGround.ts` | A picture laid on the map at the extent it was rendered over: a kept row to trace a drawing onto, published by `EvidenceGallery`, or a flyfoto proposal under review, published by `useFlyfotoRun`. Never both — the card and the acquisition box do not stand at once. |
+| `draftGroundAtom` | `evidence/draftGround.ts` | A picture laid on the map at the extent it was rendered over: a kept row to trace a drawing onto, published by `EvidenceGallery`, or a flyfoto proposal under review, published by `useFlyfotoRun`. Never both — the card and the acquisition box do not stand at once. `loop` says the file is a WebM, and so which overlay draws it. |
 | the floating panel's layout and placement | `ui/useFloatingPanel.ts` | Which way round the box is laid out, where it was dragged to, how big it may get and which wall it is docked against. Module-private, reached through `useFloatingPanel`: held outside the component, which remounts per spot — and so only one floating panel at a time. `EvidenceReader` is the one caller. |
 | `sketchSessionAtom` | `sketch/session.ts` | Non-null exactly while the map is frozen and Excalidraw has it. |
 | `uiContextAtom` | `shared/uiContext.ts` | Derived: `map` or `draw`, off the session above. Which surface is in front (*The context in front*). |
@@ -382,11 +382,8 @@ of them.
 - **The cover is the first readable row.** Nothing marks one: the reading opens
   on it, so dragging a picture to the top is how a cover is chosen, and the star
   says which one is. `coverOf` (`evidence/spec.ts`) is the single authority
-  both surfaces ask, and a sun loop passes — the reading grounds a loop as
-  readily as a still. `laysOnGround`, in the same module, answers the narrower
-  question the traced ground asks, and a video fails it: that picture is the one
-  a sketch is traced over, and a shadow that has moved since the strokes were
-  drawn is not something to trace.
+  both surfaces ask, and a sun loop passes — both surfaces ground a loop as
+  readily as a still.
 - A drop writes one row. `sortForMove` (`evidence/order.ts`) takes the midpoint
   between the row's new neighbours, so nothing else moves; a row dropped last
   takes the current time instead, or a picture kept a moment later would sort
@@ -484,11 +481,20 @@ of them.
   gallery asks.
 - PocketBase makes no thumbnail for a video, so a loop is its own handle
   everywhere a `200x200` thumb would be: a `<video preload="metadata">` at
-  `#t=0.1`, which is what gets a frame painted rather than a black box.
-- **Clicking a picture lays it on the map**, opaque, through `draftGroundAtom`
-  and the same `useEvidenceOverlay` the reader uses, driven from `SpotSurface`.
-  That is the ground the pen draws over, and it rides the map element, so a
-  sketch session's transform carries it along.
+  `#t=0.1`, which is what gets a frame painted rather than a black box. The
+  element carries `disablePictureInPicture` and the thumbnail is
+  `pointer-events: none`, because Firefox lays a picture-in-picture toggle over
+  a video on hover and at thumbnail size that toggle is the whole picture: the
+  press opened a floating window instead of reaching the button behind it.
+- **Clicking a picture lays it on the map**, opaque, through `draftGroundAtom`,
+  driven from `SpotSurface`. That is the ground the pen draws over, and it
+  rides the map element, so a sketch session's transform carries it along. A
+  sun loop grounds like anything else and plays while it is there; which
+  overlay carries it is the only difference, and `draftGround.loop` is what
+  says so — `useEvidenceOverlay` for a still, `useEvidenceLoopOverlay` for a
+  loop, in a leaf component of its own because that hook's transport changes
+  with every frame and the surface renders the whole card. The card drives no
+  transport; play, pause and seek belong to the reading.
 - Entering the draw stage with a picture chosen fits the view to that picture's
   own rectangle before `captureFrame`, so the frame holds the ground the
   picture does and the strokes register to every other picture of the spot as
