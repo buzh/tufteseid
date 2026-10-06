@@ -14,3 +14,5 @@ const take = (): string => {
 
 export const bootInviteCode = take();
 
+export const inviteUrlOf = (code: string): string =>
+  `${window.location.origin}/?invite=${code}`;

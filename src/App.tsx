@@ -2,6 +2,7 @@ import './i18n';
 import { useAtom } from 'jotai';
 import styles from './App.module.css';
 import { AuthDialog, pbAuthSyncEffect } from './auth';
+import { InvitesDialog } from './invites/InvitesDialog.tsx';
 import { MapComponent } from './map/MapComponent.tsx';
 import { Ribbon } from './ribbon/Ribbon.tsx';
 
@@ -17,6 +18,7 @@ export const App = () => {
         <MapComponent />
       </div>
       <AuthDialog />
+      <InvitesDialog />
     </div>
   );
 };

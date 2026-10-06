@@ -524,5 +524,24 @@
     "private": "Diskusjonstråd er ikke tilgjengelig for upubliserte lokaliteter",
     "privateSpot": "Diskusjonstråd åpner når lokaliteten gjøres offentlig.",
     "failed": "Fikk ikke hentet diskusjonstråden. Prøv igjen senere."
+  },
+  "invites": {
+    "title": "Invitasjoner",
+    "blurb": "Mens betaen er lukket slipper nye lesere inn på en ledig plass eller en invitasjon. Du kan sende koden selv eller la oss sende den på e-post.",
+    "left_one": "Én invitasjon igjen",
+    "left_other": "{{count}} invitasjoner igjen",
+    "mint": "Lag invitasjon",
+    "none": "Du har ingen invitasjoner ennå.",
+    "copy": "Kopier invitasjonslenke",
+    "copied": "Lenke kopiert",
+    "revoke": "Slett invitasjonen",
+    "spent": "Brukt",
+    "sentTo": "Sendt til {{address}}",
+    "send": "Send",
+    "emailPlaceholder": "E-postadresse",
+    "failed": "Fikk ikke hentet invitasjonene dine.",
+    "sendFailed": "Fikk ikke sendt invitasjonen. Sjekk adressen.",
+    "mailFailed": "E-post er ikke satt opp på denne installasjonen. Send koden selv.",
+    "revokeFailed": "Fikk ikke slettet invitasjonen."
   }
 }

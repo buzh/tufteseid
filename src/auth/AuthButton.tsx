@@ -3,6 +3,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
 import { getEnv } from '../env';
+import { isInvitesDialogOpenAtom } from '../invites/atoms';
 import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
 import { currentUserAtom, isAdminAtom, isAuthDialogOpenAtom } from './atoms';
@@ -18,6 +19,7 @@ export const AuthButton = () => {
   const user = useAtomValue(currentUserAtom);
   const isAdmin = useAtomValue(isAdminAtom);
   const setDialogOpen = useSetAtom(isAuthDialogOpenAtom);
+  const setInvitesOpen = useSetAtom(isInvitesDialogOpenAtom);
   const signOut = useSignOut();
 
   if (!user) {
@@ -48,6 +50,13 @@ export const AuthButton = () => {
             {user.name || user.email}
           </Text>
         </Menu.Label>
+        <Menu.Divider />
+        <Menu.Item
+          leftSection={<Icon icon="person_add" size={16} />}
+          onClick={() => setInvitesOpen(true)}
+        >
+          {t('invites.title')}
+        </Menu.Item>
         {isAdmin && (
           <>
             <Menu.Divider />

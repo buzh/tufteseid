@@ -1,0 +1,15 @@
+/* Matches `AuthDialog.module.css`: `CloseButton` takes no `color` prop. */
+.close {
+  color: var(--mantine-primary-color-contrast);
+  background-color: var(--mantine-primary-color-filled);
+}
+
+.close:hover {
+  background-color: var(--mantine-primary-color-filled-hover);
+}
+
+.invite {
+  padding: var(--mantine-spacing-xs);
+  border: 1px solid var(--mantine-color-dark-4);
+  border-radius: var(--mantine-radius-md);
+}
