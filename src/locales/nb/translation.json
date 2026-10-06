@@ -362,7 +362,7 @@
     "save": "Lagre",
     "abort": "Avbryt",
     "change": "Endre",
-    "pointChange": "Endre punktet",
+    "pointChange": "Flytt punktet",
     "done": "Ferdig",
     "saving": "Lagrer …",
     "saveFailed": "Fikk ikke lagret lokaliteten. Prøv igjen.",
@@ -377,7 +377,7 @@
     },
     "footprintHint": "Dra rektangelet, hjørnene endrer størrelsen",
     "footprintSide": "{{metres}} m",
-    "footprintPending": "Settes automatisk",
+    "footprintPending": "(automatisk)",
     "footprintChange": "Endre utsnittet",
     "footprintClamped": {
       "min": "Tegningen var mindre enn 50 m på tvers, så utsnittet er satt til 50 m. Endre det om du vil ha mer med.",
