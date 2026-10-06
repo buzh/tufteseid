@@ -86,7 +86,12 @@ export const HeritageMenu = ({ heritage }: { heritage: HeritageControls }) => {
         />
       </Popover.Target>
       <Popover.Dropdown>
-        <ScrollArea.Autosize mah={420} type="scroll">
+        {/* `auto` rather than `scroll`: the bar is the only sign that the vern
+            filters carry on below the fold, and `scroll` shows it only once a
+            scroll is already under way. The cap leaves room for the band and
+            the dropdown's own offset, so the menu grows into the screen it has
+            rather than stopping at a height chosen for the shortest one. */}
+        <ScrollArea.Autosize mah="calc(100vh - 7rem)" type="auto">
           <Stack gap="xs">
             <Text size="xs" c="dimmed">
               {t('heritageControls.sourcesHead')}
