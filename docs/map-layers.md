@@ -219,7 +219,8 @@ under the outgoing layers, 3–4 over them.
   takes a host map, because an OL layer belongs to one map at a time.
 - The URL follows the resolved stack, not the atoms: `?hybrid=true`,
   `?contours=true` and `?lidarModel=dom` are written only when they ended up in
-  it.
+  it. `?lidarRender=` is written for every LiDAR ground whatever its value —
+  see `docs/architecture.md`, *URL parameters*.
 - Outgoing layers are dimmed to `OUTGOING_OPACITY` (0.35) and retired on the next
   `rendercomplete`, with `SWAP_TIMEOUT_MS` (15 s) as a backstop.
 - `buildOrReuseBackgroundLayer` reuses a layer whose `layerSignature` (url +
@@ -227,8 +228,9 @@ under the outgoing layers, 3–4 over them.
   earlier fade and z-index, so callers set both explicitly on every layer.
   `installCompareLayers` overrides the stack's z-index with `COMPARE_Z`.
 - `VALID_STARTUP_LAYERS` (`atoms.ts`) is what `?backgroundLayer=` may name.
-  Excludes `lidarProject` and `flyfotoProject`: their acquisition atom starts
-  null and only the user can fill it.
+  Excludes `flyfotoProject`: its acquisition atom starts null and only the user
+  can fill it. Both flight grounds are included, because Automatisk derives
+  their flight on every load and `?lidarRender=` says which render it opens on.
 
 ### The layer pool
 

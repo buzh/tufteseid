@@ -81,6 +81,10 @@ export type UrlParameter =
   | 'hybrid'
   | 'contours'
   | 'lidarModel'
+  // Which LiDAR render. Not derivable from `backgroundLayer`: the two flight
+  // grounds are named for cVAT or not-cVAT, and the mosaic's name says nothing
+  // at all.
+  | 'lidarRender'
   | 'themeLayers'
   | 'heritageDetails'
   | 'heritageRender'

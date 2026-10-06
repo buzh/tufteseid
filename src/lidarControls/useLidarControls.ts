@@ -1,5 +1,5 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { mapAtom } from '../map/atoms';
 import { viewportBbox } from '../map/bbox';
 import type { CompareHalf } from '../map/compare/halves';
@@ -30,6 +30,7 @@ import {
   lidarFlightGround,
   type LidarModel,
   type LidarProject,
+  linkedLidarRender,
   preferredLidarRender,
   resolveLidarStyle,
   stylesForModel,
@@ -211,6 +212,11 @@ export const useLidarControls = (half: CompareHalf) => {
     else selectNational();
   };
 
+  // Spent on the first dataset Automatisk settles on, which is the only one the
+  // link can have meant. Held past that it would re-impose the link's render
+  // every time Automatisk changed flight, long after the reader had moved on.
+  const linkRender = useRef(linkedLidarRender);
+
   // Every branch compares against what is drawing before writing, or the pass
   // its own write triggers would loop.
   useEffect(() => {
@@ -221,11 +227,17 @@ export const useLidarControls = (half: CompareHalf) => {
       // The mosaic leaves `activeLidarProject` holding the last flight.
       current: isLidarFlight ? activeLidarProject : null,
     });
+    if (choice.kind === 'hold') return;
+    const wanted = linkRender.current ?? undefined;
+    linkRender.current = null;
     if (choice.kind === 'national') {
-      if (!isNationalMosaic) selectNational();
+      // `wanted` forces the call even on the mosaic already drawing: the seed
+      // is whatever the link said, and the mosaic puts its style straight into
+      // a GetMap, so something has to clamp it to the one style it publishes.
+      if (!isNationalMosaic || wanted) selectNational(wanted);
     } else if (choice.kind === 'project') {
       if (!isLidarFlight || activeLidarProject?.id !== choice.project.id) {
-        selectProject(choice.project);
+        selectProject(choice.project, wanted);
       }
     }
   }, [

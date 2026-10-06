@@ -742,9 +742,16 @@ of that.
 ## URL parameters
 
 `UrlParameter`, `src/shared/utils/urlUtils.ts`: `lok`, `invite`, `projection`,
-`backgroundLayer`, `hybrid`, `contours`, `lidarModel`, `themeLayers`,
-`heritageDetails`, `heritageRender`, `heritageOpacity`, `sketches`, `lat`,
-`lon`, `zoom`.
+`backgroundLayer`, `hybrid`, `contours`, `lidarModel`, `lidarRender`,
+`themeLayers`, `heritageDetails`, `heritageRender`, `heritageOpacity`,
+`sketches`, `lat`, `lon`, `zoom`.
+
+`lidarRender` is the one parameter written even when it holds the default,
+because its *absence* is a value: it says nobody chose a render, which is what
+lets `preferredLidarRender` offer the cVAT one instead. Present, it is what
+Automatisk's first settled dataset is asked for, through the `wanted` argument
+on `selectNational`/`selectProject` — so a shared link reproduces the render it
+was made on rather than being upgraded out of it.
 
 Two of them name something rather than set something, and both are read once
 at import and then taken off the address bar:

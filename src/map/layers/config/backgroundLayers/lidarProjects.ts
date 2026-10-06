@@ -28,9 +28,19 @@ export const activeLidarProjectHalves = halved<LidarProject | null>(null);
 
 export const liveLidarProjectsAtom = acrossHalves(activeLidarProjectHalves);
 
+/** The render a link named, or null for a link that named none — which is what
+ *  leaves `preferredLidarRender`'s cVAT upgrade free to run. Read at import,
+ *  because the effect that mirrors the ground back to the URL rewrites this
+ *  parameter and a later read would race it. Unvalidated: the vocabulary comes
+ *  from a live GetCapabilities, so `resolveLidarStyle` clamping it to what the
+ *  settled dataset publishes is the only check there can be. */
+export const linkedLidarRender = getUrlParameter('lidarRender');
+
 // The picked DTM style: `effectiveLidarStyle` overrides rather than overwrites,
 // so the DTM choice survives a trip through DOM.
-export const activeLidarStyleHalves = halved<string>('skyggerelieff');
+export const activeLidarStyleHalves = halved<string>(
+  linkedLidarRender ?? 'skyggerelieff',
+);
 
 export const activeLidarModelHalves = halved<LidarModel>(
   getUrlParameter('lidarModel') === 'dom' ? 'dom' : 'dtm',

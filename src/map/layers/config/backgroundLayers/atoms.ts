@@ -19,10 +19,11 @@ import {
 import { buildStack, LIDAR_LAYERS, resolveStack } from './stack';
 import { clearBackgroundLayer, swapBackgroundLayers } from './utils';
 
-// Startup values the URL parameter may name. Not `lidarProject` or
-// `flyfotoProject`: their acquisition atom starts null and only the user can
-// fill it, so a cold load into either would render nothing indefinitely.
-// `lidarCvat` is in it because Automatisk derives its flight on every load.
+// Startup values the URL parameter may name. Not `flyfotoProject`: its
+// acquisition atom starts null and only the user can fill it, so a cold load
+// into it would render nothing indefinitely. Both flight grounds are in it
+// because Automatisk derives their flight on every load, and `lidarRender`
+// then says which render it opens on.
 const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'topo',
   'topograatone',
@@ -30,6 +31,7 @@ const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'sjokartraster',
   'amtskart',
   'lidarHillshade',
+  'lidarProject',
   'lidarCvat',
   'flyfoto',
   'empty',
@@ -147,6 +149,14 @@ export const backgroundLayerAtomEffect = atomEffect((get) => {
         setUrlParameter('lidarModel', 'dom');
       } else {
         removeUrlParameter('lidarModel');
+      }
+      // Written even when it is the default, unlike every parameter above:
+      // absence is what tells the next load that nobody chose, and so that the
+      // cVAT upgrade may pick for them.
+      if (LIDAR_LAYERS.has(layerName)) {
+        setUrlParameter('lidarRender', activeLidarStyle);
+      } else {
+        removeUrlParameter('lidarRender');
       }
 
       const moveToExtent = stack.over[0].config.moveToExtent;
