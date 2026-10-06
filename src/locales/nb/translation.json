@@ -223,8 +223,8 @@
       "cvat": "CVAT RVT-py",
       "skyggerelieff": "Skyggerelieff",
       "multiskyggerelieff": "Multiskygge",
-      "helning_prosent": "Slope prosent",
-      "helning_grader": "Slop grader",
+      "helning_prosent": "Helning, prosent",
+      "helning_grader": "Helning, grader",
       "dynamisk_farget_hoyde": "Dynamisk fargelagt høyde"
     }
   },
@@ -432,13 +432,13 @@
       "slope": "Slope"
     },
     "visMeta": {
-      "hillshade": "én sol, du styrer den",
+      "hillshade": "én sol, valgfri retning",
       "multiHillshade": "seks soler, ingenting i mørke",
-      "vat": "fire lag, to oppskrifter",
-      "svf": "hvor mye himmel",
-      "openPos": "hauger, kanter og rygger",
-      "openNeg": "søkk, grøfter og hulveier",
-      "lrm": "småformer uten landskapet",
+      "vat": "Visualisation for Archaeological Topography (VAT)",
+      "svf": "Sky View Factor (SVF)",
+      "openPos": "Openness, positiv",
+      "openNeg": "Openness, negativ",
+      "lrm": "Lokal relieffmodell",
       "slope": "bratthet"
     },
     "visGroup": {
@@ -462,9 +462,9 @@
     "loading": "henter høydedata …",
     "resolution": "{{side}} m · {{m}} m/px",
     "resolutionCapped": "{{side}} m · {{m}} m/px · kilde {{src}} m",
-    "failed": "Klarte ikke å hente høydedata.",
+    "failed": "Kunne ikke hente høydedata.",
     "failedShort": "høydedata svarer ikke",
-    "empty": "Ingen laserdata dekker dette rektangelet.",
+    "empty": "Ingen laserdata dekker dette området.",
     "emptyShort": "ingen laserdata"
   },
   "upstream": {
@@ -497,15 +497,15 @@
     },
     "meta": {
       "single": "hele kartet viser det samme",
-      "curtain": "to underlag i samme rute, skilt av en linje du drar",
-      "split": "to ruter side om side, sentrert på samme punkt"
+      "curtain": "to lag med flyttbar skillelinje",
+      "split": "to lag side om side, sentrert på samme punkt"
     }
   },
   "talk": {
-    "title": "Samtale",
-    "open": "Samtale",
-    "private": "Samtale krever at lokaliteten er offentlig",
-    "privateSpot": "Samtalen åpner når lokaliteten gjøres offentlig.",
-    "failed": "Fikk ikke hentet samtalen. Prøv igjen senere."
+    "title": "Diskusjonstråd",
+    "open": "Diskusjon",
+    "private": "Diskusjonstråd er ikke tilgjengelig for upubliserte lokaliteter",
+    "privateSpot": "Diskusjonstråd åpner når lokaliteten gjøres offentlig.",
+    "failed": "Fikk ikke hentet diskusjonstråden. Prøv igjen senere."
   }
 }
