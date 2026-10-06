@@ -34,6 +34,7 @@ Each owns its subject; this file keeps only what is true across all of them.
 | `docs/render-sidecar.md` | The server-side render service: the contract, the token trade, the queue's limits, the RVT and ffmpeg recipes, the burnt-in legend, the failure modes | `rendersvc/`, `src/api/render.ts`, the `sunloop` and `rvt` arms in `src/evidence/` |
 | `docs/identity.md` | Casdoor, its own hostname and why it cannot share the app's, the two OAuth2 clients, what OIDC does not carry | `casdoor` in compose, the PocketBase OAuth2 config, `src/auth/` |
 | `docs/discussion-and-votes.md` | Remark42's contract and the thread key, the public-only gate, the `votes` collection and the `spotScores` view's two quirks | `src/talk/`, `src/spots/spotScores.ts`, `src/api/votes.ts`, the vote migration |
+| `docs/closed-beta.md` | Who may register and what pays for it, the hook that enforces it, the SQL for opening places and granting invites, the mail route's settings, the two things the gate does not cover | `pocketbase/pb_hooks/`, `src/invites/`, `src/api/invites.ts`, the sign-in box |
 | `docs/monitoring.md` | The access logs, the usage report, the cron health check, retention | `scripts/usage-report.sh`, `scripts/health-check.sh`, any log format or `logging:` cap |
 | `vat-cache/README.md` | The out-of-band Python pipeline that precomputes the cached VAT ground | `vat-cache/`, `cvat-tiles/` |
 | `README.md` | Third-party install and admin guide | any change to install, first-run or licensing |
@@ -122,17 +123,19 @@ alongside the cVAT and MapProxy store directories (`README.md`,
   configs are bind-mounted but nginx only reads them at startup, and
   `docker compose up -d` does not recreate the container. Same for `mapproxy/`
   and `docker compose restart mapproxy`.
-- Added or changed a migration in `pocketbase/pb_migrations/`? Also
-  `docker compose restart pocketbase`, then check its logs. Symptom of
-  forgetting: API calls against the collection 404, which the SPA may surface
-  only in the browser console.
+- Added or changed a migration in `pocketbase/pb_migrations/` or a hook in
+  `pocketbase/pb_hooks/`? Also `docker compose restart pocketbase`, then check
+  its logs. Both are bind-mounted read-only and hook watching is off, so
+  neither is re-read otherwise. Symptom of forgetting: API calls against the
+  collection 404, or a hook that quietly behaves the old way — which the SPA
+  may surface only in the browser console.
 
 ### Services
 
 | Service | What it is |
 | --- | --- |
 | `tufteseid` | `node:24-alpine` builds the SPA, `caddy:2.10.0-alpine` serves `/var/www`, plus the GoAccess report at `/stats/` out of a read-only mount. `config.js` bind-mounted at runtime. |
-| `pocketbase` | Backend for spots (OAuth2 + user content), pinned to 0.40.2. Serves `/pb/*`. SQLite on the `pbdata` volume. |
+| `pocketbase` | Backend for spots (OAuth2 + user content), pinned to 0.40.2. Serves `/pb/*`. SQLite on the `pbdata` volume, migrations and hooks bind-mounted read-only from the repo. |
 | `casdoor` | `casbin/casdoor`, a single Go binary on SQLite. The one place a credential is entered, with PocketBase and remark42 as its two OAuth2 clients. On `CASDOOR_HOST`, a hostname of its own reaching the same Caddy — it cannot be served under a subpath (`docs/identity.md`). |
 | `remark42` | Comment threads on public spots, served at `/remark42/*` and federated to `casdoor` so a reader signs in once. Its own store on a bind mount (`docs/discussion-and-votes.md`). |
 | `nib-proxy` | Token-injecting sidecar for Norge i bilder ortofoto. Reachable only from wmscache and mapproxy. |
@@ -145,7 +148,9 @@ alongside the cVAT and MapProxy store directories (`README.md`,
 
 Migrations are versioned in `pocketbase/pb_migrations/` and use the ≥0.23
 App-based JSVM API (`$app.findCollectionByNameOrId` / `app.save`, flattened
-field classes), **not** the 0.22 `Dao` API.
+field classes), **not** the 0.22 `Dao` API. `pocketbase/pb_hooks/` holds JS
+hooks in the same runtime, for the one thing a collection rule cannot say:
+the closed-beta gate counts rows and spends a counter (`docs/closed-beta.md`).
 
 - **Leave migration filenames alone** — they are recorded in `_migrations`, so
   renaming one makes PocketBase re-run it.
@@ -207,12 +212,26 @@ sidecar, which writes `meta.job` as it goes and the file when it is done
   and a spot with no votes is **absent** rather than present at zero
   (`docs/discussion-and-votes.md`).
 
+Two more carry the closed beta, both written by `pb_hooks/closed_beta.pb.js`
+rather than by the SPA:
+
+- **`registration`** (id `pbc_registration`) — **one row**, readable by a
+  guest: `openSlots` (free registrations left) and `closed`. Nobody may write
+  it over the API; it moves by SQL or in the admin UI.
+- **`invites`** (id `pbc_invites`) — `issuer` (→ users, cascade), `code`
+  (eight characters of Crockford base32, unique, minted by the hook),
+  `redeemedBy`, `redeemedAt`, `email`, `sentAt`. **`redeemedAt` is what says
+  an invite is spent** — `redeemedBy` empties if the invitee closes their
+  account. `users.inviteQuota` caps how many an account may mint, and what is
+  left to mint is that less the rows it has issued, so revoking refunds.
+
 `localities`, `finds` and `attachments` are still on disk from the old model and
 are read by nothing. Leave them alone rather than adding a migration to drop
 them.
 
 Client side: `src/api/pocketbase.ts` (singleton, `pocketbaseUrl` defaults `/pb`),
-`src/api/spots.ts`, `src/api/evidence.ts` and `src/api/votes.ts`.
+`src/api/spots.ts`, `src/api/evidence.ts`, `src/api/votes.ts` and
+`src/api/invites.ts`.
 
 ### Permissions
 

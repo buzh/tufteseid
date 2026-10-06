@@ -741,14 +741,20 @@ of that.
 
 ## URL parameters
 
-`UrlParameter`, `src/shared/utils/urlUtils.ts`: `lok`, `projection`,
+`UrlParameter`, `src/shared/utils/urlUtils.ts`: `lok`, `invite`, `projection`,
 `backgroundLayer`, `hybrid`, `contours`, `lidarModel`, `themeLayers`,
 `heritageDetails`, `heritageRender`, `heritageOpacity`, `sketches`, `lat`,
 `lon`, `zoom`.
 
-`lok` is the only one naming a record rather than a setting: the spot's
-six-character code, written by whatever record is open and read once at import
-(`src/spots/shareLink.ts`).
+Two of them name something rather than set something, and both are read once
+at import and then taken off the address bar:
+
+- `lok`, the open spot's six-character code, written back by whatever record
+  is open (`src/spots/shareLink.ts`).
+- `invite`, a closed-beta invite code, which is the whole of an invitation
+  link (`src/invites/inviteLink.ts`, `docs/closed-beta.md`). It is never
+  written back — it belongs to the visit that arrived carrying it, not to a
+  link the reader copies afterwards.
 
 **The A half is what the URL describes.** The view mode and everything in B are
 session state, so a shared link opens on one ground.

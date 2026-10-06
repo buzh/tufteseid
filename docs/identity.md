@@ -207,6 +207,14 @@ Three things follow from the order that happens in:
   `proxy_read_timeout` advice in `README.md` stands — it no longer decides
   whether anybody can sign in.
 
+**An identity is not an account.** While the closed beta is shut, PocketBase
+creates the `users` row only for a reader who takes a free place or presents
+an invite code, and the box asks for one before the reader leaves
+(`docs/closed-beta.md`). Casdoor's own sign-up stays open either way: the
+identity is made before the app ever sees it, so closing sign-up there would
+close it for invited readers too. Somebody refused by the gate keeps their
+Casdoor identity and can sign in later with a code.
+
 **Casdoor is still framed, for the threads.** The comment engine's silent
 sign-in leg runs its own round trip in a hidden iframe
 (`src/api/remark42.ts`), so `frame-src https://$CASDOOR_HOST` on the app's

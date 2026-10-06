@@ -137,11 +137,43 @@ https://<CASDOOR_HOST>/.well-known/openid-configuration
 
 The display name typed there is the text on the app's sign-in button.
 
-**Give yourself the app admin role**: sign in through the app once so PocketBase
+**Give yourself the app admin role**: open a place first (see below, or your
+own first sign-in is refused), sign in through the app once so PocketBase
 creates your user record, then **Collections → users → your record → `role` =
 `admin`**. To moderate comments as well, put that account's Casdoor id in
 `.env` as `REMARK42_ADMIN_ID` — the two are separate permissions in separate
 systems.
+
+## Who may register
+
+A fresh install **registers nobody**. The app ships as a closed beta: a reader
+signing in for the first time gets an account only if a free place is left or
+they present an invite code, and until you say otherwise there are none of
+either. Existing accounts are never re-checked, and the map, the public spots
+and their threads stay open to anybody with the address.
+
+Open some places:
+
+```sh
+docker run --rm -it -v tufteseid_pbdata:/pb_data alpine:3.20 \
+  sh -c 'apk add --no-cache sqlite &&
+         sqlite3 /pb_data/data.db "UPDATE registration SET openSlots = 50;"'
+```
+
+Or, to run the site as an ordinary open registration instead, turn the gate
+off once and forget it:
+
+```sh
+docker run --rm -it -v tufteseid_pbdata:/pb_data alpine:3.20 \
+  sh -c 'apk add --no-cache sqlite &&
+         sqlite3 /pb_data/data.db "UPDATE registration SET closed = 0;"'
+```
+
+Readers you have granted invites to can pass codes on themselves or have the
+site mail them, which needs SMTP under **Settings → Mail settings**; without
+it the send fails and the reader is told to send the code by hand.
+[`docs/closed-beta.md`](docs/closed-beta.md) has the rest — the SQL for
+granting invites, what the gate does not cover, and how it is enforced.
 
 ## Check that it works
 
