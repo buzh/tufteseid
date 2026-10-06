@@ -1,5 +1,10 @@
 import { atom, type Getter, getDefaultStore, type Setter } from 'jotai';
 import { atomEffect } from 'jotai-effect';
+import {
+  getUrlParameter,
+  removeUrlParameter,
+  setUrlParameter,
+} from '../../shared/utils/urlUtils';
 import { mapAtom } from '../atoms';
 import { BackgroundLayerName } from '../layers/backgroundLayers';
 import {
@@ -11,6 +16,7 @@ import { activeCvatAcquisitionHalves } from '../layers/config/backgroundLayers/c
 import { activeFlyfotoProjectHalves } from '../layers/config/backgroundLayers/flyfotoBackground';
 import {
   isKartVariant,
+  KART_VARIANTS,
   kartVariantHalves,
 } from '../layers/config/backgroundLayers/kartVariants';
 import { lidarAutoDatasetHalves } from '../layers/config/backgroundLayers/lidarAuto';
@@ -30,11 +36,23 @@ import {
   clearCompareLayersExcept,
   compareHostFor,
   installCompareLayers,
+  setCurtainSplit,
 } from './compareLayers';
 import { seedHalfB, type ViewMode, viewModeAtom } from './halves';
 
 /** Where the curtain edge sits, as a fraction of the map width. */
 export const compareSplitAtom = atom(0.5);
+
+// Far enough from either edge that the seam cannot be put out of reach, by a
+// drag or by a link.
+export const MIN_SPLIT = 0.05;
+export const MAX_SPLIT = 0.95;
+
+export const clampSplit = (fraction: number): number =>
+  Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, fraction));
+
+/** The seam the `curtain` parameter is absent for. */
+export const DEFAULT_SPLIT_PERCENT = 50;
 
 const contrastingGround = (a: BackgroundLayerName): 'kart' | 'lidar' =>
   isKartVariant(a) ? 'lidar' : 'kart';
@@ -63,6 +81,115 @@ export const selectViewModeAtom = atom(null, (get, set, mode: ViewMode) => {
     enterGroundB(contrastingGround(get(backgroundLayerHalves.a)), get, set);
   }
   set(viewModeAtom, mode);
+});
+
+// Narrower than A's `VALID_STARTUP_LAYERS`: no `lidarCvat`, because B enters
+// with Automatisk off and so nothing fills `activeCvatAcquisitionHalves.b`, and
+// no `empty`, which is a bare pane.
+const LINKABLE_GROUNDS_B = new Set<BackgroundLayerName>([
+  ...KART_VARIANTS,
+  'lidarHillshade',
+  'flyfoto',
+]);
+
+// A ground the vocabulary cannot carry becomes the seamless product of the same
+// kind rather than being dropped into a blank pane.
+const DEGRADES_TO = new Map<string, BackgroundLayerName>([
+  ['lidarProject', 'lidarHillshade'],
+  ['lidarCvat', 'lidarHillshade'],
+  ['flyfotoProject', 'flyfoto'],
+]);
+
+/** What `backgroundLayerB` says for a ground, or null for one no link can
+ *  carry. Both the reader and the writer go through it, so the address bar
+ *  names the ground a reload would really open. */
+const linkableGroundB = (name: string): BackgroundLayerName | null => {
+  const ground = DEGRADES_TO.get(name) ?? (name as BackgroundLayerName);
+  return LINKABLE_GROUNDS_B.has(ground) ? ground : null;
+};
+
+// Repeats the arms' entry rules again, this time for a ground a link named. A
+// variant off the URL is a pick rather than a re-entry, so it lands in
+// `kartVariantHalves.b` too.
+const enterNamedGroundB = (
+  name: BackgroundLayerName,
+  get: Getter,
+  set: Setter,
+) => {
+  if (isKartVariant(name)) {
+    set(kartVariantHalves.b, name);
+    set(backgroundLayerHalves.b, name);
+    return;
+  }
+  if (name === 'lidarHillshade') {
+    enterGroundB('lidar', get, set);
+    return;
+  }
+  set(backgroundLayerHalves.b, name);
+};
+
+const readLinkedViewMode = (): ViewMode | null => {
+  const raw = getUrlParameter('viewMode');
+  return raw === 'curtain' || raw === 'split' ? raw : null;
+};
+
+const readLinkedSplit = (): number | null => {
+  const raw = getUrlParameter('curtain');
+  if (!raw) return null;
+  const percent = Number(raw);
+  return Number.isFinite(percent) ? clampSplit(percent / 100) : null;
+};
+
+// Read at import, like `lok` and `lidarRender`: `compareUrlAtomEffect` rewrites
+// all three from a map still on one ground the moment it mounts, which is
+// before the restore below gets to run.
+const linkedViewMode = readLinkedViewMode();
+const linkedGroundB = linkableGroundB(
+  getUrlParameter('backgroundLayerB') ?? '',
+);
+const linkedSplit = readLinkedSplit();
+
+let compareRestored = false;
+
+/** Reopen the two-ground view a link described. Driven from a mount effect and
+ *  spent on the first run: `seedHalfB`'s registry is only as full as the import
+ *  graph that has been evaluated, so this cannot happen at module scope, and a
+ *  second mount must not undo a reader who has moved on. The named ground goes
+ *  on **after** `selectViewModeAtom`, over the top of the seed that copies every
+ *  `.b` off its `.a` and the contrast rule that follows it. */
+export const restoreCompareFromUrlAtom = atom(null, (get, set) => {
+  if (compareRestored) return;
+  compareRestored = true;
+  if (!linkedViewMode) return;
+
+  // Before the mode, so the first build of the B stack clips to the right seam.
+  if (linkedSplit != null) {
+    setCurtainSplit(linkedSplit);
+    set(compareSplitAtom, linkedSplit);
+  }
+  set(selectViewModeAtom, linkedViewMode);
+  if (linkedGroundB) enterNamedGroundB(linkedGroundB, get, set);
+});
+
+/** The view mode and B's ground on the address bar. Its own effect rather than
+ *  a tail on `compareLayerAtomEffect`: that one returns early on three paths
+ *  and spans an await, and these have to be right on all of them. */
+export const compareUrlAtomEffect = atomEffect((get) => {
+  const mode = get(viewModeAtom);
+  const ground = linkableGroundB(get(backgroundLayerHalves.b));
+
+  if (mode === 'single') {
+    removeUrlParameter('viewMode');
+    removeUrlParameter('backgroundLayerB');
+    removeUrlParameter('curtain');
+    return;
+  }
+
+  setUrlParameter('viewMode', mode);
+  if (ground) setUrlParameter('backgroundLayerB', ground);
+  else removeUrlParameter('backgroundLayerB');
+  // The seam is `CompareCurtain`'s to write, and it stands in the curtain only.
+  if (mode === 'split') removeUrlParameter('curtain');
 });
 
 // The build awaits, so an earlier run resolving last must not install.

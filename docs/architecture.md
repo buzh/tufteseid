@@ -51,6 +51,8 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `viewModeAtom` | `map/compare/halves.ts` | `single`, `curtain` or `split`. `compareOnAtom` is the derived "not `single`". |
 | `selectViewModeAtom` | `map/compare/atoms.ts` | Write-only: changes the view mode and seeds B on the way out of `single`. |
 | `compareSplitAtom` | same | Where the curtain's edge sits, as a fraction of map width. |
+| `restoreCompareFromUrlAtom` | same | Write-only, spent on its first run: reopens the two-ground view a link described. |
+| `compareUrlAtomEffect` | same | Puts the view mode and B's ground back on the address bar. |
 | `backgroundLayerHalves` (+ `liveBackgroundLayersAtom`) | `…/backgroundLayers/atoms.ts` | Which ground that half is drawing. |
 | `hybridOverlayHalves`, `hybridContoursHalves` | same | Kartverket's transparent overlay, and its contours. |
 | `backgroundLayerCapabilitiesCacheAtom` | same | GetCapabilities documents, keyed by URL. |
@@ -193,6 +195,14 @@ the tile guard and the theme-layer effect walk whatever maps exist.
   cartography A is not, with Automatisk off. B enters LiDAR on the national
   mosaic, not the flight the half is holding. Moving between the curtain and the
   split leaves B where the reader put it.
+- **A link's B ground goes on over the top of that seed, never before it.**
+  `restoreCompareFromUrlAtom` calls `selectViewModeAtom` first and only then
+  writes the ground `?backgroundLayerB=` named, because the seed would otherwise
+  copy A's straight back over it. It runs from a mount effect in
+  `MapComponent` rather than at module scope, since the seeder registry is only
+  as full as the import graph that has been evaluated by then, and a
+  module-level one-shot spends it on the first run — the same idiom as
+  `src/spots/shareLink.ts`.
 
 ### Mirrored into pane B, and not
 
@@ -746,8 +756,8 @@ of that.
 
 `UrlParameter`, `src/shared/utils/urlUtils.ts`: `lok`, `invite`, `projection`,
 `backgroundLayer`, `hybrid`, `contours`, `lidarModel`, `lidarRender`,
-`themeLayers`, `heritageDetails`, `heritageRender`, `heritageOpacity`,
-`sketches`, `lat`, `lon`, `zoom`.
+`viewMode`, `backgroundLayerB`, `curtain`, `themeLayers`, `heritageDetails`,
+`heritageRender`, `heritageOpacity`, `sketches`, `lat`, `lon`, `zoom`.
 
 `lidarRender` is the one parameter written even when it holds the default,
 because its *absence* is a value: it says nobody chose a render, which is what
@@ -766,8 +776,27 @@ at import and then taken off the address bar:
   written back — it belongs to the visit that arrived carrying it, not to a
   link the reader copies afterwards.
 
-**The A half is what the URL describes.** The view mode and everything in B are
-session state, so a shared link opens on one ground.
+**The comparison is on the URL, the B half's settings are not.** Three
+parameters carry it, all written by `src/map/compare/`: `viewMode`
+(`curtain` or `split`, absent while one ground is up), `backgroundLayerB` (the
+ground in the second pane) and `curtain` (the seam as a whole percent, absent
+at the 50 default and in the split, where there is no seam). Everything else
+about B — its render, DTM or DOM, the hybrid overlay, the flight or
+acquisition it was pinned to — is session state, so a link reopens the
+*comparison* rather than the half.
+
+`backgroundLayerB`'s vocabulary is narrower than A's `VALID_STARTUP_LAYERS`
+(`linkableGroundB`, `compare/atoms.ts`): the five Kart variants,
+`lidarHillshade` and `flyfoto`. No `lidarCvat`, because B enters with
+Automatisk off and nothing then fills `activeCvatAcquisitionHalves.b`, and no
+`empty`, which is a bare pane. The same function reads the parameter and
+writes it, so the address bar names the ground a reload would really open: a
+flight degrades to the national mosaic and an ortofoto acquisition to the
+mosaic, on the way out as much as on the way in, and a value outside the
+vocabulary altogether is dropped, which leaves the contrast rule to place B.
+
+`curtain` is written by `CompareCurtain` on a 400 ms debounce, because a drag
+moves the seam on every pointer event and `replaceState` is rate-limited.
 
 ## Ribbon and the UI kit
 

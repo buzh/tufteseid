@@ -85,6 +85,12 @@ export type UrlParameter =
   // grounds are named for cVAT or not-cVAT, and the mosaic's name says nothing
   // at all.
   | 'lidarRender'
+  // The two-ground view: which one, the B half's ground, and where the seam
+  // sits as a whole percent. All three are absent while one ground is up, and
+  // `curtain` is absent at the 50 % default and in the split.
+  | 'viewMode'
+  | 'backgroundLayerB'
+  | 'curtain'
   | 'themeLayers'
   | 'heritageDetails'
   | 'heritageRender'

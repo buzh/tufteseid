@@ -8,7 +8,7 @@ export type CompareHalf = 'a' | 'b';
 
 const BOTH_HALVES = ['a', 'b'] as const;
 
-/** In the order the view control offers them. Not persisted to the URL. */
+/** In the order the view control offers them. */
 export const VIEW_MODES = ['single', 'curtain', 'split'] as const;
 
 export type ViewMode = (typeof VIEW_MODES)[number];

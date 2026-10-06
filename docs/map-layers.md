@@ -231,6 +231,9 @@ under the outgoing layers, 3–4 over them.
   Excludes `flyfotoProject`: its acquisition atom starts null and only the user
   can fill it. Both flight grounds are included, because Automatisk derives
   their flight on every load and `?lidarRender=` says which render it opens on.
+  `?backgroundLayerB=`, the second pane's ground, is narrower again — B enters
+  with Automatisk off, so neither flight ground is in it (`linkableGroundB`,
+  `src/map/compare/atoms.ts`, and `docs/architecture.md`, *URL parameters*).
 
 ### The layer pool
 

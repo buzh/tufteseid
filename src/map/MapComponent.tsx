@@ -1,4 +1,4 @@
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import 'ol/ol.css';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,11 @@ import { spotFootprintLayerEffect } from '../spots/footprintLayer.ts';
 import { terrainWindowLayerEffect } from '../terrain/windowLayer.ts';
 import { TerrainSurface } from '../terrainControls';
 import styles from './MapComponent.module.css';
-import { compareLayerAtomEffect } from './compare/atoms.ts';
+import {
+  compareLayerAtomEffect,
+  compareUrlAtomEffect,
+  restoreCompareFromUrlAtom,
+} from './compare/atoms.ts';
 import { CompareCurtain } from './compare/CompareCurtain.tsx';
 import { viewModeAtom } from './compare/halves.ts';
 import { SplitPane } from './compare/SplitPane.tsx';
@@ -31,8 +35,10 @@ export const MapComponent = () => {
   useLidarFootprintsLayer();
   useCvatHintLayer();
   useAtom(compareLayerAtomEffect);
+  useAtom(compareUrlAtomEffect);
   useAtom(terrainWindowLayerEffect);
   useAtom(spotFootprintLayerEffect);
+  const restoreCompare = useSetAtom(restoreCompareFromUrlAtom);
 
   useEffect(() => {
     if (mapRef.current) {
@@ -42,6 +48,13 @@ export const MapComponent = () => {
       setTargetElement(null);
     };
   }, [setTargetElement, mapRef]);
+
+  // From a mount rather than module scope, and after the target is set: the
+  // seed the restore writes over is only as full as the import graph that has
+  // been evaluated.
+  useEffect(() => {
+    restoreCompare();
+  }, [restoreCompare]);
 
   return (
     <div className={styles.root}>

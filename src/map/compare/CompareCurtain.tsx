@@ -3,18 +3,27 @@
 // rectangle.
 
 import { useAtom } from 'jotai';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { compareSplitAtom } from './atoms';
+import {
+  removeUrlParameter,
+  setUrlParameter,
+} from '../../shared/utils/urlUtils';
+import {
+  clampSplit,
+  compareSplitAtom,
+  DEFAULT_SPLIT_PERCENT,
+  MAX_SPLIT,
+  MIN_SPLIT,
+} from './atoms';
 import styles from './CompareCurtain.module.css';
 import { setCurtainSplit } from './compareLayers';
 
-// Far enough from either edge that the handle can't be pushed out of reach.
-const MIN_SPLIT = 0.05;
-const MAX_SPLIT = 0.95;
 const KEY_STEP = 0.02;
 
-const clamp = (f: number) => Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, f));
+// A drag writes on every pointer move and `replaceState` is rate-limited, so
+// the seam reaches the address bar only once the hand has stopped.
+const URL_DEBOUNCE_MS = 400;
 
 export const CompareCurtain = () => {
   const { t } = useTranslation();
@@ -26,10 +35,19 @@ export const CompareCurtain = () => {
   // next animation frame, so seam and imagery move together. From an effect the
   // clip lags a frame behind the drag.
   const applySplit = (fraction: number) => {
-    const next = clamp(fraction);
+    const next = clampSplit(fraction);
     setCurtainSplit(next);
     setSplit(next);
   };
+
+  useEffect(() => {
+    const percent = Math.round(split * 100);
+    const timer = window.setTimeout(() => {
+      if (percent === DEFAULT_SPLIT_PERCENT) removeUrlParameter('curtain');
+      else setUrlParameter('curtain', percent);
+    }, URL_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [split]);
 
   const moveTo = (clientX: number) => {
     const rect = rootRef.current?.getBoundingClientRect();
