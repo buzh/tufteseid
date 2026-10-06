@@ -1,5 +1,6 @@
-// Up, the tally, down. Never hidden, only disabled, with the reason on the
-// tooltip. Pressing the side already voted retracts it.
+// Up, the tally, down. The thumbs are disabled rather than hidden, with the
+// reason on the tooltip — except on the reader's own spot, which keeps the
+// tally and drops them. Pressing the side already voted retracts it.
 
 import { Tooltip } from '@mantine/core';
 import { useAtomValue } from 'jotai';
@@ -20,23 +21,34 @@ export const VoteControl = ({ spot }: { spot: SpotRecord }) => {
   const myVotes = useAtomValue(myVotesAtom);
   const [busy, setBusy] = useState(false);
 
-  const isOwn = user != null && spot.owner === user.id;
-  // A self-vote cast before the rule keeps its row and stops counting, so it
-  // must not draw a pressed thumb either.
-  const mine = isOwn ? undefined : myVotes.get(spot.id);
   // Absent from the view means nobody has voted, not that the tally is unknown.
   const score = scores?.get(spot.id)?.score ?? 0;
 
+  const tally = (
+    <span
+      className={styles.score}
+      // `total`, not `count`: i18next reads `count` as a request for
+      // plural forms this key has none of.
+      title={t('spots.voteScore', { total: score })}
+    >
+      {score}
+    </span>
+  );
+
+  // The author reads their own tally and is offered no thumbs at all. The
+  // other two refusals are states the reader can leave, so those keep the
+  // buttons and put the way out on the tooltip.
+  if (user != null && spot.owner === user.id) {
+    return <span className={styles.group}>{tally}</span>;
+  }
+
+  const mine = myVotes.get(spot.id);
   const isPublic = spot.visibility === 'public';
-  // Own before private: a private spot is only ever read by its owner, for
-  // whom this is the standing reason, or by an admin, for whom it is not.
   const blocked = !user
     ? t('spots.voteNeedsAccount')
-    : isOwn
-      ? t('spots.voteOwn')
-      : !isPublic
-        ? t('spots.votePrivate')
-        : null;
+    : !isPublic
+      ? t('spots.votePrivate')
+      : null;
 
   const cast = (direction: VoteDirection) => {
     if (!user || busy) return;
@@ -67,14 +79,7 @@ export const VoteControl = ({ spot }: { spot: SpotRecord }) => {
             onClick={() => cast('up')}
           />
         </Tooltip>
-        <span
-          className={styles.score}
-          // `total`, not `count`: i18next reads `count` as a request for
-          // plural forms this key has none of.
-          title={t('spots.voteScore', { total: score })}
-        >
-          {score}
-        </span>
+        {tally}
         <Tooltip label={t('spots.voteDown')} disabled={blocked != null}>
           <ControlButton
             icon="thumb_down"

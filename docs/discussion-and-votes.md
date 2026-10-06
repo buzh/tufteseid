@@ -169,9 +169,11 @@ only field that legitimately moves is `direction`
 
 **Nobody ranks their own spot** (`1700001900_votes_not_own.js`). Only create
 carries that clause: update pins both relations, so no vote already cast can
-turn into a self-vote. `VoteControl` disables both thumbs with
-`spots.voteOwn` on the tooltip, the same shape as the other two refusals —
-the author still reads their own tally, they just cannot move it.
+turn into a self-vote. `VoteControl` drops the thumbs entirely here rather
+than disabling them, which is what it does for the other two refusals: being
+signed out and holding a private spot are both states the reader can leave,
+and the tooltip says how, but there is no way out of owning the thing. The
+tally stays, so the author still reads where their spot stands.
 
 ### `spotScores` (id `pbc_spot_scores`)
 
@@ -216,7 +218,7 @@ Two properties of a view collection the client is written against:
 | --- | --- |
 | `src/api/votes.ts` | the collection calls, the upsert, the realtime subscription |
 | `src/spots/spotScores.ts` | `spotScoresAtom`, `myVotesAtom`, `popularSpotsAtom`, and the `useSpotScores()` hook `SpotSurface` mounts once |
-| `src/spots/VoteControl.tsx` | up, the tally, down — never hidden, only disabled, with the reason on the tooltip |
+| `src/spots/VoteControl.tsx` | up, the tally, down — disabled with the reason on the tooltip, or the tally alone on the reader's own spot |
 | `src/talk/SpotTalk.tsx` | the thread box, a fourth spot box behind `spotTalkingAtom` |
 
 `VoteControl` and the thread button stand in both `SpotCard` (the author's

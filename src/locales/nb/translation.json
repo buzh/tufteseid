@@ -400,7 +400,6 @@
     "voteScore": "Poengsum: {{total}}",
     "voteNeedsAccount": "Logg inn for å stemme",
     "votePrivate": "Bare offentlige lokaliteter kan få stemmer",
-    "voteOwn": "Du kan ikke stemme på din egen lokalitet",
     "list": {
       "label": "Lokaliteter",
       "busy": "Legg fra deg den nye lokaliteten for å bla i lokalitetene",
