@@ -53,6 +53,7 @@
     "read": "Åpne visningsmodus",
     "loading": "Henter bilder …",
     "none": "Ingen bilder ennå.",
+    "noneOwn": "Ingen bilder ennå. Kameraet lagrer visningen; mikroskopet bestiller bilder over utsnittet.",
     "keep": "Lagre visningen som bilde",
     "kept": "Lagret",
     "rendering": "lager bildet …",

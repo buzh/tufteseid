@@ -271,12 +271,20 @@ export const EvidenceGallery = ({
 
   return (
     <div className={styles.gallery}>
-      {rows.length > 0 && (
+      <div className={styles.head}>
+        <Icon icon="photo_library" size={14} />
+        <span>{t('evidence.label')}</span>
+      </div>
+      {/* The heading stands in all three states so the card does not jump as
+          the list lands. An empty list says so here rather than only in
+          `EvidenceReader`, which is the surface for the reader who cannot do
+          anything about it. */}
+      {items === null ? (
+        <p className={styles.hint}>{t('evidence.loading')}</p>
+      ) : rows.length === 0 ? (
+        <p className={styles.hint}>{t('evidence.noneOwn')}</p>
+      ) : (
         <>
-          <div className={styles.head}>
-            <Icon icon="photo_library" size={14} />
-            <span>{t('evidence.label')}</span>
-          </div>
           <p className={styles.hint}>{t('evidence.order.hint')}</p>
           <ul className={styles.list} ref={listRef}>
             {rows.map((rec, index) => (
