@@ -55,6 +55,7 @@ services:
     volumes:
       - pbdata:/pb_data
       - ./pocketbase/pb_migrations:/pb_migrations:ro
+      - ./pocketbase/pb_hooks:/pb_hooks:ro
 
   # Server-side renders. Holds no credentials: every PocketBase call carries the
   # requesting reader's own token, so the collection rules decide what a job may

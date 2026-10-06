@@ -17,7 +17,13 @@ EXPOSE 8090
 # --dir keeps app data (SQLite + uploads) on the mounted volume.
 # --migrationsDir loads JS migrations from the repo-mounted directory,
 # so schema changes are versioned with the code.
+# --hooksDir likewise for the JS hooks. --hooksWatch=false because the watcher
+# answers a bind mount changing under it by re-execing the process: a git pull
+# would restart the backend at a moment nobody chose. Restarting the container
+# is the deliberate way, as it already is for a migration.
 CMD ["/pb/pocketbase", "serve", \
      "--http=0.0.0.0:8090", \
      "--dir=/pb_data", \
-     "--migrationsDir=/pb_migrations"]
+     "--migrationsDir=/pb_migrations", \
+     "--hooksDir=/pb_hooks", \
+     "--hooksWatch=false"]
