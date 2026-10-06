@@ -14,6 +14,7 @@ import {
 } from '../map/bbox';
 import { sketchBbox } from '../sketch/bounds';
 import { sketchOf } from '../sketch/scene';
+import { sketchSessionAtom } from '../sketch/session';
 import { terrainAdjustingAtom } from '../terrain/window';
 import { DEFAULT_FOOTPRINT_SIDE_M } from './footprint';
 import { mayEditSpotAtom } from './mayEdit';
@@ -150,6 +151,7 @@ export const spotTalkingAtom = atom(
  *  a subscriber on the draft would rebuild the layer behind it. */
 export const standingSpotFootprintAtom = atom((get): Bbox | null => {
   if (get(spotFootprintAdjustingAtom)) return null;
+  if (get(sketchSessionAtom)) return null;
   return get(spotDraftAtom)
     ? get(spotFootprintAtom)
     : (get(activeSpotAtom)?.footprint ?? null);

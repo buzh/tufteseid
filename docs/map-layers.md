@@ -274,7 +274,9 @@ the terrain window's grip, and taking the terrain window back steps the draft to
 once would put two frames and two pointer interactions on the map, and neither
 could be grabbed. They are told apart by the layer id they are given
 (`terrainAdjustLayer`, `spotFootprintAdjustLayer`). Each standing frame goes down
-while its own rectangle is being dragged. The footprint sits just under the pin,
+while its own rectangle is being dragged, and the spot's goes down for the whole
+of a sketch session as well: the canvas is drawn on the ground the frame covers,
+so a frame left standing reads as a stroke. The footprint sits just under the pin,
 so a pin standing over its own rectangle — which only the properties box leaves
 on the map — stays legible over it.
 

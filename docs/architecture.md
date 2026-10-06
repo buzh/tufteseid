@@ -74,7 +74,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `open`/`adjust`/`read`/`closeTerrainWindowAtom` | same | Write-only. `read` takes a rectangle settled elsewhere — the spot card hands it the footprint — and starts the reading without a square to place. |
 | `spotPlacingAtom` | `spots/atoms.ts` | The `+` is armed: the next map click places the pin. Exclusive with `spotDraftAtom`. |
 | `spotDraftAtom`, `spotFormAtom`, `spotSketchAtom`, `spotFootprintAtom` | same | The spot being edited: where its pin is, which of the four stages has hold of the map (`idle` is none of them), which box is on screen (`box`), what is typed, what is drawn, and the ground it names. The record itself is not here — `useSpotDraft` holds it. |
-| `spotFootprintAdjustingAtom`, `standingSpotFootprintAtom` | same | Derived: the draft is in its `footprint` stage, and which rectangle the standing frame draws. |
+| `spotFootprintAdjustingAtom`, `standingSpotFootprintAtom` | same | Derived: the draft is in its `footprint` stage, and which rectangle the standing frame draws — nothing while that rectangle is in hand or the pen has the map. |
 | `unpinnedSpotIdAtom` | same | Derived: the one spot the pin layer leaves undrawn — the record an editor draft stands for, whose pin `pinAdjust.ts` draws instead, or the open spot, whose card or reader is the box in front of it. |
 | `place`/`edit`/`adjust`/`closeSpotDraftAtom`, `setSpotStageAtom` | same | Write-only. `adjustSpotDraftAtom` is the card's: it opens a draft straight into a stage with `box: 'card'`. |
 | `activeSpotAtom` | same | The record being read — opened by a click, by an index row, or by `?lok=`. |
