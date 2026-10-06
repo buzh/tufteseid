@@ -5,12 +5,18 @@
 }
 
 /* The split's seam is this row's `gap`: a border on a pane would come out of
-   its box and leave the two viewports different widths. */
+   its box and leave the two viewports different widths.
+
+   Clipped because a sketch session scales the map element with a CSS transform
+   (`sketch/session.ts`) and a transform is not laid out: scaled past the floor
+   zoom the element runs out of this box, and being inside a positioned
+   ancestor it would paint over the band above it. */
 .panes {
   display: flex;
   gap: 2px;
   width: 100%;
   height: 100%;
+  overflow: hidden;
   background: var(--mantine-color-dark-9);
 }
 

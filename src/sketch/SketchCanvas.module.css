@@ -47,6 +47,19 @@
   --input-hover-bg-color: var(--mantine-color-dark-5);
   --input-label-color: var(--mantine-color-dimmed);
 
+  /* Excalidraw's second, newer palette. The islands along the bottom — the
+   * zoom steps and undo/redo — paint their faces from these rather than from
+   * `--island-bg-color`, and the scene is held on the *light* theme on
+   * purpose (see `theme` below), so left alone they come out light under the
+   * text colour above. */
+  --color-surface-lowest: var(--mantine-color-default-border);
+  --color-surface-low: var(--mantine-color-default);
+  --color-surface-mid: var(--mantine-color-body);
+  --color-surface-high: var(--mantine-color-dark-5);
+  --color-on-surface: var(--mantine-color-text);
+  --color-surface-primary-container: var(--mantine-primary-color-filled);
+  --color-on-primary-container: var(--mantine-primary-color-contrast);
+
   --border-radius-md: var(--mantine-radius-md);
   --border-radius-lg: var(--mantine-radius-lg);
   --shadow-island: var(--mantine-shadow-md);
@@ -54,9 +67,13 @@
 
 /* Hidden: the hamburger, whose verbs `UIOptions.canvasActions` empties while
  * still rendering the button; the shape library, which is excalidraw.com
- * content `connect-src` would have to be widened for; and help. */
+ * content `connect-src` would have to be widened for — its button and the
+ * sidebar it slides in, both rendered as internal fallbacks with no prop to
+ * take them off, and the sidebar carries nothing else this app offers; and
+ * help. */
 .surface :global(.main-menu-trigger),
-.surface :global(.sidebar-triggers),
+.surface :global(.default-sidebar-trigger),
+.surface :global(.default-sidebar),
 .surface :global(.help-icon) {
   display: none;
 }
