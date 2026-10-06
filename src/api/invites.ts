@@ -30,10 +30,16 @@ export type InviteRecord = {
   updated: string;
 };
 
-export const getRegistrationGate = async (): Promise<RegistrationGate> =>
-  await pb
-    .collection(GATE)
-    .getFirstListItem<RegistrationGate>('', { requestKey: null });
+/** Null on an installation whose single row is missing, which reads as no
+ *  gate at all. Listed rather than filtered: there is only ever one row, and
+ *  an empty `filter=` is not worth relying on. */
+export const getRegistrationGate =
+  async (): Promise<RegistrationGate | null> => {
+    const { items } = await pb
+      .collection(GATE)
+      .getList<RegistrationGate>(1, 1, { requestKey: null });
+    return items[0] ?? null;
+  };
 
 /** The reader's own invites. Empty when signed out. */
 export const listMyInvites = async (): Promise<InviteRecord[]> => {

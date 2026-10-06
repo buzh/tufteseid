@@ -109,7 +109,9 @@ export const AuthDialog = () => {
           <Alert color="red">{t('auth.signInFailed')}</Alert>
         )}
 
-        {beta && (
+        {/* Also on a refusal: if reading the gate is what failed, this is
+            the only way an invited reader could get in. */}
+        {(beta || refusal) && (
           <TextInput
             label={t('auth.beta.codeLabel')}
             description={t('auth.beta.codeHelp')}
