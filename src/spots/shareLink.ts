@@ -1,6 +1,6 @@
 // `/l/<code>` is a Caddy `redir` to `/?lok=<code>`; this is the client half.
 
-import { useAtomValue, useSetAtom } from 'jotai';
+import { atom, useAtomValue, useSetAtom } from 'jotai';
 import { transform } from 'ol/proj';
 import { useEffect, useRef } from 'react';
 
@@ -27,6 +27,12 @@ export const shareUrlOf = (code: string): string =>
 
 const LINK_ZOOM = 16;
 
+/** A code that answered with nothing, for `SpotLinkFailed` to say so. Only a
+ *  signed-in reader ever sets it: signed out, the same 404 raises the sign-in
+ *  box instead, because a private spot and a missing one are indistinguishable
+ *  from outside. */
+export const spotLinkFailedAtom = atom(false);
+
 export const useSpotShareLink = () => {
   const map = useAtomValue(mapAtom);
   const user = useAtomValue(currentUserAtom);
@@ -35,6 +41,7 @@ export const useSpotShareLink = () => {
   const setReading = useSetAtom(spotReadingAtom);
   const setAuthDialogOpen = useSetAtom(isAuthDialogOpenAtom);
   const setAuthPrompt = useSetAtom(authPromptAtom);
+  const setLinkFailed = useSetAtom(spotLinkFailedAtom);
 
   /** Until the boot code has its answer the writer effect below must not
    *  delete the parameter. */
@@ -65,6 +72,7 @@ export const useSpotShareLink = () => {
         if (user) {
           unresolved.current = null;
           removeUrlParameter('lok');
+          setLinkFailed(true);
           console.warn('[spots] no spot for code', code);
           return;
         }
@@ -78,7 +86,14 @@ export const useSpotShareLink = () => {
     return () => {
       live = false;
     };
-  }, [user, setActive, setReading, setAuthDialogOpen, setAuthPrompt]);
+  }, [
+    user,
+    setActive,
+    setReading,
+    setAuthDialogOpen,
+    setAuthPrompt,
+    setLinkFailed,
+  ]);
 
   // Read by the centring effect below without being one of its dependencies:
   // `EvidenceReader` fits the footprint when a reading opens, so centring on

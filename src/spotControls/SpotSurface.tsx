@@ -35,6 +35,7 @@ import { SpotTalk } from '../talk/SpotTalk';
 import { SpotAcquire } from './SpotAcquire';
 import styles from './SpotBox.module.css';
 import { SpotCard } from './SpotCard';
+import { SpotLinkFailed } from './SpotLinkFailed';
 import { SpotPlacePrompt } from './SpotPlacePrompt';
 import { SpotProperties } from './SpotProperties';
 import { useSpotDraft } from './useSpotDraft';
@@ -138,7 +139,9 @@ export const SpotSurface = () => {
           <SketchCanvas key={session.id} session={session} />
         </Suspense>
       )}
-      {placing && <SpotPlacePrompt />}
+      {/* One banner at a time: both take the same seat, and arming the `+` is
+          a deliberate act that supersedes a notice about a link. */}
+      {placing ? <SpotPlacePrompt /> : <SpotLinkFailed />}
       {/* Away rather than unmounted while a drawing is up: the box carries the
           draft controller, and it is that controller that writes the strokes —
           on the button the band presses, or failing that on its own unmount,
