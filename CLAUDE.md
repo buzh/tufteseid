@@ -152,6 +152,14 @@ field classes), **not** the 0.22 `Dao` API. `pocketbase/pb_hooks/` holds JS
 hooks in the same runtime, for the one thing a collection rule cannot say:
 the closed-beta gate counts rows and spends a counter (`docs/closed-beta.md`).
 
+- **A hook handler cannot see its own file's scope.** PocketBase serializes
+  each handler and runs it in a runtime of its own, so a constant or helper
+  declared at the top of a `.pb.js` file is not there inside its handlers —
+  only the injected globals are. Shared code goes in a plain `.js` beside it
+  (`*.pb.js` is what gets loaded as hooks) and every handler starts with
+  ``require(`${__hooks}/<name>.js`)``. Nothing warns you: the first request
+  raises a `ReferenceError` that reaches the client as a bare 400 with an
+  empty `data` and reaches you only in the admin UI's *Logs*, never stdout.
 - **Leave migration filenames alone** — they are recorded in `_migrations`, so
   renaming one makes PocketBase re-run it.
 - **Collection ids must not equal any collection name** (0.23+ rejects that),

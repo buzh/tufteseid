@@ -14,7 +14,8 @@ users          + inviteQuota, invitesSent
 ## Where it is enforced
 
 `pocketbase/pb_hooks/closed_beta.pb.js`, on `onRecordCreateRequest` over
-`users`. Not on the OAuth2 hook, and not in an API rule:
+`users`, with the logic in `closed_beta.js` beside it for the reason under
+*Deploying a change here*. Not on the OAuth2 hook, and not in an API rule:
 
 - PocketBase creates the account through its **own record-create API** during
   the OAuth2 round trip, cloning the browser's headers onto that internal
@@ -244,3 +245,18 @@ second decision and a different mechanism.
 needs `docker compose restart pocketbase` — the same rule migrations already
 carry. The symptom of forgetting is a gate that still behaves the old way with
 no error anywhere.
+
+**A handler cannot see the scope of the file it is written in.** PocketBase
+serializes each one and runs it in a runtime of its own, so a constant or a
+helper declared at the top of a `.pb.js` file is simply not there inside its
+own handlers. That is why `closed_beta.pb.js` holds nothing but the three
+registrations and every one of them starts with
+`require(\`${__hooks}/closed_beta.js\`)`. The globals — `$app`, `$dbx`,
+`$security`, `MailerMessage`, `DateTime`, the error classes — are injected
+into every runtime and are the exception. The `.js` suffix on the module
+matters too: `*.pb.js` is what PocketBase loads as hooks.
+
+Nothing warns you. The file loads, the handler registers, and the first
+request raises `ReferenceError: X is not defined` — which reaches the client
+as a bare `400` with `"data": {}` and no field named, and reaches you only in
+the admin UI's *Logs*, not on stdout.
