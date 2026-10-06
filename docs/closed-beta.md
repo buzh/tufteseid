@@ -259,4 +259,12 @@ matters too: `*.pb.js` is what PocketBase loads as hooks.
 Nothing warns you. The file loads, the handler registers, and the first
 request raises `ReferenceError: X is not defined` — which reaches the client
 as a bare `400` with `"data": {}` and no field named, and reaches you only in
-the admin UI's *Logs*, not on stdout.
+the admin UI's *Logs*, not on stdout. Any uncaught throw in a handler looks
+like that, so a bare 400 with an empty `data` is the shape to recognize.
+
+**A record event does not carry `e.request`.** A route event does, which is
+what the examples use; `onRecordCreateRequest` hands you a
+`RecordRequestEvent` where it is undefined, whatever the generated types say.
+Headers come off `e.requestInfo().headers`, keyed by
+`inflector.Snakecase` — `X-Invite-Code` is `x_invite_code`, the same
+normalization as `@request.headers.*` in a collection rule.

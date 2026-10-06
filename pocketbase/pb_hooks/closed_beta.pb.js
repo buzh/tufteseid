@@ -29,11 +29,19 @@ onRecordCreateRequest((e) => {
   }
 
   const beta = require(`${__hooks}/closed_beta.js`);
+
+  // `requestInfo()`, not `e.request`, which a record event does not carry
+  // however much the types suggest otherwise — only a route event does. The
+  // keys are snake-cased by `inflector.Snakecase`, the same normalization
+  // behind `@request.headers.*` in a collection rule, so `X-Invite-Code`
+  // arrives as `x_invite_code`.
+  const code = e.requestInfo().headers['x_invite_code'] || '';
+
   const outerApp = e.app;
   try {
     e.app.runInTransaction((txApp) => {
       e.app = txApp;
-      const invite = beta.admit(txApp, e.request.header.get('X-Invite-Code'));
+      const invite = beta.admit(txApp, code);
       e.next();
       if (invite) {
         // Only now does the account have an id.
