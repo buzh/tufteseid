@@ -1,15 +1,20 @@
-// Up, the tally, down. The thumbs are disabled rather than hidden, with the
-// reason on the tooltip — except on the reader's own spot, which keeps the
-// tally and drops them. Pressing the side already voted retracts it.
+// Up, the tally, down. The reader's own spot keeps the tally and drops the
+// thumbs. Pressing the side already voted retracts it.
+//
+// Of the two refusals, only one is a dead end: an admin on somebody's private
+// spot cannot publish it, so there the thumbs really are disabled. A reader
+// with no account can get one, so theirs stay live and open the sign-in box —
+// a button that names its own remedy and does not offer it is worse than no
+// button.
 
 import { Tooltip } from '@mantine/core';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { SpotRecord } from '../api/spots';
 import { castVote, retractVote, type VoteDirection } from '../api/votes';
-import { currentUserAtom } from '../auth/atoms';
+import { currentUserAtom, isAuthDialogOpenAtom } from '../auth/atoms';
 import { ControlButton } from '../ui/ControlButton';
 import { myVotesAtom, spotScoresAtom } from './spotScores';
 import styles from './VoteControl.module.css';
@@ -17,6 +22,7 @@ import styles from './VoteControl.module.css';
 export const VoteControl = ({ spot }: { spot: SpotRecord }) => {
   const { t } = useTranslation();
   const user = useAtomValue(currentUserAtom);
+  const openAuthDialog = useSetAtom(isAuthDialogOpenAtom);
   const scores = useAtomValue(spotScoresAtom);
   const myVotes = useAtomValue(myVotesAtom);
   const [busy, setBusy] = useState(false);
@@ -35,22 +41,25 @@ export const VoteControl = ({ spot }: { spot: SpotRecord }) => {
     </span>
   );
 
-  // The author reads their own tally and is offered no thumbs at all. The
-  // other two refusals are states the reader can leave, so those keep the
-  // buttons and put the way out on the tooltip.
+  // The author reads their own tally and is offered no thumbs at all.
   if (user != null && spot.owner === user.id) {
     return <span className={styles.group}>{tally}</span>;
   }
 
   const mine = myVotes.get(spot.id);
-  const isPublic = spot.visibility === 'public';
-  const blocked = !user
+  const needsAccount = user == null;
+  const dead = !needsAccount && spot.visibility !== 'public';
+  const hint = needsAccount
     ? t('spots.voteNeedsAccount')
-    : !isPublic
+    : dead
       ? t('spots.votePrivate')
       : null;
 
   const cast = (direction: VoteDirection) => {
+    if (needsAccount) {
+      openAuthDialog(true);
+      return;
+    }
     if (!user || busy) return;
     setBusy(true);
     const done =
@@ -67,26 +76,26 @@ export const VoteControl = ({ spot }: { spot: SpotRecord }) => {
   return (
     // The outer tooltip stands on a span: a disabled button fires no pointer
     // events, so one on the button itself would never open.
-    <Tooltip label={blocked} disabled={blocked == null}>
+    <Tooltip label={hint} disabled={hint == null}>
       <span className={styles.group}>
-        <Tooltip label={t('spots.voteUp')} disabled={blocked != null}>
+        <Tooltip label={t('spots.voteUp')} disabled={hint != null}>
           <ControlButton
             icon="thumb_up"
             on={mine?.direction === 'up'}
             aria-label={t('spots.voteUp')}
             aria-pressed={mine?.direction === 'up'}
-            disabled={blocked != null || busy}
+            disabled={dead || busy}
             onClick={() => cast('up')}
           />
         </Tooltip>
         {tally}
-        <Tooltip label={t('spots.voteDown')} disabled={blocked != null}>
+        <Tooltip label={t('spots.voteDown')} disabled={hint != null}>
           <ControlButton
             icon="thumb_down"
             on={mine?.direction === 'down'}
             aria-label={t('spots.voteDown')}
             aria-pressed={mine?.direction === 'down'}
-            disabled={blocked != null || busy}
+            disabled={dead || busy}
             onClick={() => cast('down')}
           />
         </Tooltip>
