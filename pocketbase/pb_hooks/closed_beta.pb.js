@@ -25,12 +25,13 @@ const normalizeCode = (raw) =>
     .replace(/[IL]/g, '1')
     .replace(/O/g, '0');
 
+/** Null on an installation whose single row is missing, which reads as no
+ *  gate at all — the same thing `src/api/invites.ts` tells the sign-in box, so
+ *  the two ends cannot disagree about whether registration is open. A read
+ *  that fails rather than coming back empty still throws. */
 const gateRecord = (app) => {
   const rows = app.findAllRecords(GATE);
-  if (!rows || rows.length === 0) {
-    throw new InternalServerError('The registration gate row is missing.');
-  }
-  return rows[0];
+  return rows && rows.length > 0 ? rows[0] : null;
 };
 
 /**
@@ -45,19 +46,25 @@ const gateRecord = (app) => {
  */
 const admit = (app, rawCode) => {
   const gate = gateRecord(app);
-  if (!gate.getBool('closed')) return null;
+  if (!gate || !gate.getBool('closed')) return null;
 
   const code = normalizeCode(rawCode);
 
   if (code) {
-    let invite;
-    try {
-      invite = app.findFirstRecordByFilter(
-        INVITES,
-        'code = {:code} && redeemedAt = ""',
-        { code },
-      );
-    } catch (_) {
+    // Listed rather than `findFirstRecordByFilter`, which throws the same way
+    // on a code nobody holds and on a database that would not answer: an
+    // empty list is the first, and anything thrown here is the second and
+    // deserves a 500 rather than being read back as a typo.
+    const found = app.findRecordsByFilter(
+      INVITES,
+      'code = {:code} && redeemedAt = ""',
+      '',
+      1,
+      0,
+      { code },
+    );
+
+    if (found.length === 0) {
       // Refused rather than fallen back on the free places: silently
       // admitting on a mistyped code leaves the reader thinking it worked,
       // and spends a place they did not ask for.
@@ -69,6 +76,7 @@ const admit = (app, rawCode) => {
       });
     }
 
+    const invite = found[0];
     invite.set('redeemedAt', new DateTime());
     app.save(invite);
     return invite;
@@ -200,13 +208,52 @@ const inviteMail = (app, invite, from) => {
   });
 };
 
+/**
+ * Reserves one letter against `users.invitesSent`, answering whether there
+ * was one left. False means the budget is spent.
+ *
+ * A counter of its own rather than the mint quota, which cannot double as a
+ * mail budget: revoking refunds it, so mint → send → revoke → mint would post
+ * as many letters as the sender liked, to addresses of their choosing, from
+ * the installation's own sender. This one only ever goes up.
+ *
+ * Read and written in a transaction of its own, outside the mail: two sends
+ * racing would otherwise both see the same count, and holding the single
+ * write connection open across SMTP would block every other writer.
+ */
+const spendMailBudget = (app, userId) => {
+  let spent = false;
+  app.runInTransaction((txApp) => {
+    const user = txApp.findRecordById('users', userId);
+    const sent = user.getInt('invitesSent');
+    if (sent >= user.getInt('inviteQuota')) return;
+    user.set('invitesSent', sent + 1);
+    txApp.save(user);
+    spent = true;
+  });
+  return spent;
+};
+
+/** For a letter SMTP refused outright, which is the installation's fault
+ *  rather than the sender's. */
+const refundMailBudget = (app, userId) => {
+  app.runInTransaction((txApp) => {
+    const user = txApp.findRecordById('users', userId);
+    const sent = user.getInt('invitesSent');
+    if (sent <= 0) return;
+    user.set('invitesSent', sent - 1);
+    txApp.save(user);
+  });
+};
+
 // Sending an invite. A route of its own rather than an update rule, because
 // the reader may set the address but nothing else, and because the row is
 // only marked sent once the mail is actually away.
 //
-// One mail per invite, so the quota an administrator grants is also the mail
-// budget. A reader who mistyped the address revokes the invite, which gives
-// the quota back, and mints another.
+// One mail per invite, and `users.inviteQuota` letters per account however
+// many times its invites are revoked and minted again. A reader who mistyped
+// the address revokes the invite, mints another and sends that — at the cost
+// of one letter from the budget.
 routerAdd(
   'POST',
   '/api/invites/{id}/send',
@@ -215,9 +262,10 @@ routerAdd(
     e.bindBody(body);
 
     const email = String(body.email || '').trim();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      throw new BadRequestError('Ugyldig e-postadresse.');
-    }
+    // Shape is the `EmailField`'s to judge, below, so that what SMTP is handed
+    // is exactly what the row will hold. Empty is this one's: the field is not
+    // required, so '' would save.
+    if (!email) throw new BadRequestError('Ugyldig e-postadresse.');
 
     let invite;
     try {
@@ -234,11 +282,32 @@ routerAdd(
       throw new BadRequestError('Invitasjonen er allerede sendt.');
     }
 
+    // Judged by the `EmailField` itself rather than by a second rule here,
+    // which would disagree with it sooner or later, and judged before the
+    // mail rather than after: an address the row will not hold must not be
+    // one a letter has already gone to. `validate` writes nothing, so only
+    // the save below can fail on anything but the address, and that is a 500.
     invite.set('email', email);
+    try {
+      e.app.validate(invite);
+    } catch (_) {
+      throw new BadRequestError('Ugyldig e-postadresse.');
+    }
+    e.app.save(invite);
+
+    if (!spendMailBudget(e.app, e.auth.id)) {
+      throw new ForbiddenError('Du har ikke flere e-poster igjen.', {
+        email: new ValidationError(
+          'mail_budget_spent',
+          'The account has sent as many invite mails as its quota allows.',
+        ),
+      });
+    }
 
     try {
       e.app.newMailClient().send(inviteMail(e.app, invite, e.auth));
     } catch (err) {
+      refundMailBudget(e.app, e.auth.id);
       e.app
         .logger()
         .error('invite mail failed', 'error', String(err), 'invite', invite.id);

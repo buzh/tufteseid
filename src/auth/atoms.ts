@@ -2,6 +2,7 @@ import { atom } from 'jotai';
 import { atomEffect } from 'jotai-effect';
 
 import { pb, Role, SiteUser } from '../api/pocketbase';
+import { bootInviteCode } from '../invites/inviteLink';
 import {
   signInReturnFailed,
   signInReturnRefusal,
@@ -51,8 +52,11 @@ export const isAdminAtom = atom((get) => get(roleAtom) === 'admin');
 
 // Both seeded from the page's boot: a trip that came back without a session
 // puts the box up again carrying the failure, since nothing else would show
-// the reader they had tried.
-export const isAuthDialogOpenAtom = atom(signInReturnFailed());
+// the reader they had tried. An invitation link puts it up too — the box is
+// the only place the code it carries can be spent.
+export const isAuthDialogOpenAtom = atom(
+  signInReturnFailed() || bootInviteCode !== '',
+);
 
 export const signInFailedAtom = atom(signInReturnFailed());
 
@@ -64,6 +68,9 @@ export const signInRefusalAtom = atom<SignInRefusal | null>(
 
 /** Why the dialog is up when the reader did not ask for it; null for the
  *  sign-in button itself. */
-export type AuthPrompt = 'spotLink';
+export type AuthPrompt = 'spotLink' | 'inviteLink';
 
-export const authPromptAtom = atom<AuthPrompt | null>(null);
+// A failed return says more than the link that started it, so it wins.
+export const authPromptAtom = atom<AuthPrompt | null>(
+  !signInReturnFailed() && bootInviteCode ? 'inviteLink' : null,
+);

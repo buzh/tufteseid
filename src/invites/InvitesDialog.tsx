@@ -34,13 +34,30 @@ import styles from './InvitesDialog.module.css';
 
 const ANSWER_MS = 2000;
 
-/** The sidecar tells a failed send apart from a refused one, so the reader
- *  learns whether it is their address or the installation at fault. */
-const sendFailure = (err: unknown): string =>
-  (err as { response?: { data?: { email?: { code?: string } } } })?.response
-    ?.data?.email?.code === 'mail_failed'
-    ? 'invites.mailFailed'
-    : 'invites.sendFailed';
+const validationCode = (err: unknown, field: 'email' | 'issuer'): string =>
+  (err as { response?: { data?: Record<string, { code?: string }> } })?.response
+    ?.data?.[field]?.code ?? '';
+
+/** The hook tells a failed send apart from a refused one, so the reader
+ *  learns whether it is their address, their budget or the installation at
+ *  fault. */
+const sendFailure = (err: unknown): string => {
+  switch (validationCode(err, 'email')) {
+    case 'mail_failed':
+      return 'invites.mailFailed';
+    case 'mail_budget_spent':
+      return 'invites.budgetSpent';
+    default:
+      return 'invites.sendFailed';
+  }
+};
+
+/** The quota only refreshes on the next page load, so a mint the hook refuses
+ *  is the ordinary way for a stale count to be found out. */
+const mintFailure = (err: unknown): string =>
+  validationCode(err, 'issuer') === 'invite_quota_spent'
+    ? 'invites.quotaSpent'
+    : 'invites.mintFailed';
 
 const InviteRow = ({
   invite,
@@ -71,6 +88,10 @@ const InviteRow = ({
       .catch(() => setCopied(false));
   };
 
+  // Cleared in `finally`, not in the catch: the row survives a successful
+  // send — `onChanged` refetches rather than remounting it — and a row left
+  // busy is one whose revoke button never comes back, which is the way out of
+  // a mistyped address.
   const send = () => {
     setBusy(true);
     setFailure(null);
@@ -79,8 +100,8 @@ const InviteRow = ({
       .catch((err: unknown) => {
         console.warn('[invites] sending failed', err);
         setFailure(sendFailure(err));
-        setBusy(false);
-      });
+      })
+      .finally(() => setBusy(false));
   };
 
   const revoke = () => {
@@ -90,8 +111,8 @@ const InviteRow = ({
       .catch((err: unknown) => {
         console.warn('[invites] revoking failed', err);
         setFailure('invites.revokeFailed');
-        setBusy(false);
-      });
+      })
+      .finally(() => setBusy(false));
   };
 
   const copyLabel = copied ? t('invites.copied') : t('invites.copy');
@@ -167,6 +188,7 @@ export const InvitesDialog = () => {
   const [invites, setInvites] = useState<InviteRecord[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [minting, setMinting] = useState(false);
+  const [mintFailed, setMintFailed] = useState<string | null>(null);
 
   const load = useCallback(
     () =>
@@ -197,11 +219,12 @@ export const InvitesDialog = () => {
   const mint = () => {
     if (!user) return;
     setMinting(true);
+    setMintFailed(null);
     createInvite(user.id)
       .then(() => load())
       .catch((err: unknown) => {
         console.warn('[invites] minting failed', err);
-        setFailed(true);
+        setMintFailed(mintFailure(err));
       })
       .finally(() => setMinting(false));
   };
@@ -233,6 +256,8 @@ export const InvitesDialog = () => {
             {t('invites.none')}
           </Text>
         )}
+
+        {mintFailed && <Alert color="red">{t(mintFailed)}</Alert>}
 
         {invites != null && (
           <Group justify="space-between" wrap="nowrap">

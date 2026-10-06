@@ -44,7 +44,8 @@
       "codeHelp": "Bare for nye kontoer. En kode slipper deg inn uansett om det er ledige plasser igjen, og blir brukt opp.",
       "codePlaceholder": "For eksempel J3K8QW2M",
       "refusedClosed": "Det er ingen ledige plasser igjen. Du trenger en invitasjonskode for å lage konto.",
-      "refusedCode": "Invitasjonskoden gjelder ikke. Den kan være feilskrevet eller allerede brukt."
+      "refusedCode": "Invitasjonskoden gjelder ikke. Den kan være feilskrevet eller allerede brukt.",
+      "invited": "Du har fulgt en invitasjonslenke. Logg inn, så blir koden brukt når kontoen lages."
     }
   },
   "evidence": {
@@ -542,6 +543,9 @@
     "failed": "Fikk ikke hentet invitasjonene dine.",
     "sendFailed": "Fikk ikke sendt invitasjonen. Sjekk adressen.",
     "mailFailed": "E-post er ikke satt opp på denne installasjonen. Send koden selv.",
-    "revokeFailed": "Fikk ikke slettet invitasjonen."
+    "budgetSpent": "Du har brukt opp e-postene dine. Du kan fortsatt kopiere koden og sende den selv.",
+    "revokeFailed": "Fikk ikke slettet invitasjonen.",
+    "mintFailed": "Fikk ikke laget invitasjonen.",
+    "quotaSpent": "Du har ingen invitasjoner igjen."
   }
 }

@@ -19,7 +19,7 @@ import { useAtom } from 'jotai';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { bootInviteCode } from '../invites/inviteLink';
+import { bootInviteCode, forgetInviteLink } from '../invites/inviteLink';
 import {
   authPromptAtom,
   isAuthDialogOpenAtom,
@@ -45,7 +45,11 @@ export const AuthDialog = () => {
   // a round trip of its own, and a second press would spend a second `state`.
   const [leaving, setLeaving] = useState<string | null>(null);
 
+  // Dismissing is the reader saying they are done with the invitation link
+  // they arrived on, so the parameter goes: leaving it would put the box up
+  // again on the next reload.
   const close = () => {
+    forgetInviteLink();
     setOpen(false);
     setPrompt(null);
     setFailed(false);
@@ -53,6 +57,11 @@ export const AuthDialog = () => {
   };
 
   const leave = (provider: string) => {
+    // Before `startSignIn`, which stashes `window.location.href` as the
+    // address to come back to: the code is in the stash by then, and finding
+    // it on the URL again afterwards would reopen the box over a session the
+    // reader just got.
+    forgetInviteLink();
     setFailed(false);
     setRefusal(null);
     setLeaving(provider);
@@ -79,6 +88,10 @@ export const AuthDialog = () => {
       <Stack gap="sm">
         {prompt === 'spotLink' && (
           <Alert color="yellow">{t('spots.linkNeedsAccount')}</Alert>
+        )}
+
+        {prompt === 'inviteLink' && (
+          <Alert color="yellow">{t('auth.beta.invited')}</Alert>
         )}
 
         <Text size="sm" c="dimmed">

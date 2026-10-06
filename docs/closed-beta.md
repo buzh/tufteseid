@@ -8,7 +8,7 @@ guest as they always were, and existing accounts are never re-checked.
 ```
 registration   one row: openSlots, closed
 invites        one row per code: issuer, redeemedBy, redeemedAt, email, sentAt
-users          + inviteQuota
+users          + inviteQuota, invitesSent
 ```
 
 ## Where it is enforced
@@ -40,8 +40,11 @@ handing out fifty codes is handing out fifty possible accounts whatever
 `openSlots` says, even at zero — that arithmetic is yours to do, not the
 gate's.
 
-1. `closed` is false — the beta is over, everybody is admitted and nothing is
-   spent.
+1. `closed` is false, or the `registration` row is missing altogether — the
+   beta is over or was never set up, everybody is admitted and nothing is
+   spent. The hook and `src/api/invites.ts` read a missing row the same way
+   on purpose: the alternative is a sign-in box that shows no gate while
+   every registration behind it dies.
 2. A code was submitted: it is spent and the reader admitted, or, if it does
    not resolve to an unspent invite, they are **refused** rather than fallen
    back on a free place. Admitting on a mistyped code would leave the reader
@@ -52,6 +55,15 @@ The code travels from the sign-in box as the `X-Invite-Code` header on the
 code exchange, having ridden through the identity provider in the trip's
 `sessionStorage` stash (`src/auth/trip.ts`). An invitation link is
 `?invite=<code>` on the app's own origin — no Caddy route, unlike `/l/<code>`.
+Following one puts the sign-in box up with the code filled in and says why,
+and the parameter stays on the URL until the box is dismissed or the trip
+starts: the box is the only place the code can be spent, and a reload before
+the reader gets that far must not be what loses it. A reader who already has
+an account is just following a link to the map, so the parameter is dropped
+on arrival instead. The trip stashes
+`window.location.href` as the address to come back to, which is why leaving
+drops the parameter first — finding it again afterwards would reopen the box
+over a session the reader had just got.
 
 Codes are eight characters of Crockford base32, the alphabet `spots.code`
 already uses: no I, L, O or U, so a code read aloud cannot be mistyped into a
@@ -63,6 +75,10 @@ different valid one. The hook folds I and L onto 1 and O onto 0 on the way in.
 to mint is the quota less the rows it has issued, so **revoking an unspent
 invite gives the quota back**. A spent one cannot be revoked — the delete rule
 refuses it — because it is the record of an admission.
+
+The same number caps how many invite mails the installation will send on that
+account's behalf, counted separately on `users.invitesSent` because that one
+must not refund — see *Mailing an invite*.
 
 `redeemedAt` rather than `redeemedBy` is what says an invite is spent:
 `redeemedBy` empties if the invitee later closes their account, and an invite
@@ -142,12 +158,20 @@ SELECT u.email,
        COALESCE(u.inviteQuota, 0)                                AS quota,
        COUNT(i.id)                                               AS minted,
        SUM(CASE WHEN i.redeemedAt != '' THEN 1 ELSE 0 END)       AS spent,
-       COALESCE(u.inviteQuota, 0) - COUNT(i.id)                  AS available
+       COALESCE(u.inviteQuota, 0) - COUNT(i.id)                  AS available,
+       COALESCE(u.invitesSent, 0)                                AS mailed
 FROM users u
 LEFT JOIN invites i ON i.issuer = u.id
 GROUP BY u.id
 HAVING quota > 0 OR minted > 0
 ORDER BY available DESC, minted DESC;
+```
+
+`mailed` is the only one of these that cannot go down by itself. Giving
+somebody their letters back after a run of bad addresses is a deliberate act:
+
+```sql
+UPDATE users SET invitesSent = 0 WHERE email = 'navn@example.org';
 ```
 
 ```sql
@@ -163,10 +187,22 @@ ORDER BY i.redeemedAt DESC;
 ## Mailing an invite
 
 `POST /pb/api/invites/{id}/send` takes `{ "email": "…" }` and is the only way
-the row's `email` and `sentAt` are ever written. **One mail per invite**, so
-the quota an administrator grants is also the mail budget; a reader who
-mistyped the address revokes the invite, which gives the quota back, and mints
-another.
+the row's `email` and `sentAt` are ever written. **One mail per invite**, and
+**`inviteQuota` mails per account**, counted on `users.invitesSent`.
+
+The second limit is what makes the first one mean anything. The mint quota
+cannot double as a mail budget, because revoking refunds it: mint → send →
+revoke → mint posts as many letters as the sender likes, to addresses of
+their choosing, from the installation's own `From:`. `invitesSent` only ever
+goes up, so a reader who mistyped the address still revokes, mints and sends
+again — at the cost of one letter from the budget — but nobody gets an open
+relay out of it. A letter SMTP refuses outright is refunded; an address that
+simply bounces later is not, since nothing here hears about it.
+
+The address is saved to the row **before** the mail goes out, so the
+`EmailField` validator is what judges it and what SMTP is handed is exactly
+what the row holds. A second send against the same invite answers 400 off
+`sentAt`.
 
 Three settings in PocketBase's admin UI have to be right, none of them
 versioned in a migration:
