@@ -34,14 +34,19 @@ carrying superuser auth skips the gate.
 
 ### What pays for an account
 
-1. `closed` is false — the beta is over, everybody is admitted.
-2. A code was submitted and does not resolve to an unspent invite — refused,
-   whether or not free places remain. Admitting on a mistyped code would leave
-   the reader believing it had worked.
-3. Free places remain — one is spent and **any code the reader submitted is
-   left unspent**. Free places are the public pool the beta exists to spend;
-   an invite is private currency and is only drawn on once the pool is empty.
-4. Otherwise the code is spent, or the reader is refused.
+**The two ways in are independent.** Free places are for whoever walks up to
+the page; an invite is a way in of its own and never looks at the counter. So
+handing out fifty codes is handing out fifty possible accounts whatever
+`openSlots` says, even at zero — that arithmetic is yours to do, not the
+gate's.
+
+1. `closed` is false — the beta is over, everybody is admitted and nothing is
+   spent.
+2. A code was submitted: it is spent and the reader admitted, or, if it does
+   not resolve to an unspent invite, they are **refused** rather than fallen
+   back on a free place. Admitting on a mistyped code would leave the reader
+   believing it had worked and spend a place they did not ask for.
+3. No code: a free place is spent if one remains, otherwise refused.
 
 The code travels from the sign-in box as the `X-Invite-Code` header on the
 code exchange, having ridden through the identity provider in the trip's

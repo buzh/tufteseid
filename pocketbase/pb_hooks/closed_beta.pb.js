@@ -35,17 +35,22 @@ const gateRecord = (app) => {
 
 /**
  * Decides whether an account may be created and spends whatever pays for it.
- * Returns the invite that was drawn on, or null when a free slot covered it.
+ * Returns the invite that was drawn on, or null when a free place covered it.
  * Throws a 403 carrying a code the sign-in box branches on.
+ *
+ * The two ways in are independent. Free places are for whoever walks up to
+ * the page; an invite is a way in of its own and does not look at them, so
+ * handing out fifty codes is handing out fifty possible accounts whatever the
+ * counter says. That arithmetic is the administrator's to do.
  */
 const admit = (app, rawCode) => {
   const gate = gateRecord(app);
   if (!gate.getBool('closed')) return null;
 
   const code = normalizeCode(rawCode);
-  let invite = null;
 
   if (code) {
+    let invite;
     try {
       invite = app.findFirstRecordByFilter(
         INVITES,
@@ -53,8 +58,9 @@ const admit = (app, rawCode) => {
         { code },
       );
     } catch (_) {
-      // Wrong even if a free slot would have let them in anyway: silently
-      // admitting on a mistyped code leaves the reader thinking it worked.
+      // Refused rather than fallen back on the free places: silently
+      // admitting on a mistyped code leaves the reader thinking it worked,
+      // and spends a place they did not ask for.
       throw new ForbiddenError('Invitasjonskoden gjelder ikke.', {
         invite: new ValidationError(
           'invite_invalid',
@@ -62,19 +68,14 @@ const admit = (app, rawCode) => {
         ),
       });
     }
+
+    invite.set('redeemedAt', new DateTime());
+    app.save(invite);
+    return invite;
   }
 
-  // Free slots are what the beta is spending; an invite is private currency
-  // and is only drawn on once the public pool is empty. So a reader holding a
-  // good code while slots remain takes a slot and keeps the code unspent.
   const left = gate.getInt('openSlots');
-  if (left > 0) {
-    gate.set('openSlots', left - 1);
-    app.save(gate);
-    return null;
-  }
-
-  if (!invite) {
+  if (left <= 0) {
     throw new ForbiddenError('Registreringen er stengt.', {
       invite: new ValidationError(
         'registration_closed',
@@ -83,9 +84,9 @@ const admit = (app, rawCode) => {
     });
   }
 
-  invite.set('redeemedAt', new DateTime());
-  app.save(invite);
-  return invite;
+  gate.set('openSlots', left - 1);
+  app.save(gate);
+  return null;
 };
 
 // Registration. PocketBase creates the `users` row through its own record-
