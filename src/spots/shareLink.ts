@@ -33,6 +33,13 @@ const LINK_ZOOM = 16;
  *  from outside. */
 export const spotLinkFailedAtom = atom(false);
 
+/** Nothing in the notice is to be acted on, so it goes by itself rather than
+ *  asking to be dismissed. Long enough to be read after the eye has finished
+ *  wondering why the map did not move. The deadline is armed here and not in
+ *  `SpotLinkFailed`, whose surface is swapped out for the whole time a spot is
+ *  being placed — a timer living there would rewind. */
+const LINK_FAILED_MS = 10000;
+
 export const useSpotShareLink = () => {
   const map = useAtomValue(mapAtom);
   const user = useAtomValue(currentUserAtom);
@@ -66,13 +73,23 @@ export const useSpotShareLink = () => {
         // `EvidenceReader` steps back to their card if there is nothing to read.
         setReading(true);
       })
-      .catch(() => {
+      .catch((err) => {
         if (!live) return;
+        // Only a 404 says the code is not this reader's to see; the SDK gives a
+        // dropped or timed-out request status 0. Neither settled nor cleared
+        // off the URL for one of those, so a reload is still a retry.
+        if ((err as { status?: number })?.status !== 404) {
+          console.warn('[spots] could not resolve the code', code, err);
+          return;
+        }
         settled.current = true;
         if (user) {
           unresolved.current = null;
           removeUrlParameter('lok');
           setLinkFailed(true);
+          // Unguarded by `live`: this branch nulls `unresolved` before arming,
+          // so there is never a second notice for the timer to cut short.
+          window.setTimeout(() => setLinkFailed(false), LINK_FAILED_MS);
           console.warn('[spots] no spot for code', code);
           return;
         }
