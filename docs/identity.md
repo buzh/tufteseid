@@ -93,6 +93,24 @@ Three traps, all of which present as a container restarting in a loop:
   is lost by leaving it off — `/server` creates the tables and seeds the
   built-in organisation on an empty volume either way.
 
+### Where the sessions live
+
+The database on `/data` is not the whole of Casdoor's state. Beego keeps the
+SSO sessions as files under `./tmp` and the image's `WORKDIR` is `/`, so left
+alone they land on the container's writable layer: the cookie promises up to
+30 days and the state behind it lasts until the next recreate — a pin bump, an
+`.env` edit, a `down`, a reboot. `casdoortmp:/tmp` in `docker-compose.yml` is
+what makes the two agree. Losing it signs every reader out of the identity
+provider at once while leaving them signed in to the app, so what it looks
+like from the outside is the threads asking for a password that nothing else
+asks for.
+
+Neither path is configurable. `./tmp` is fixed against the working directory,
+and the working directory cannot move either — `./conf/app.conf`,
+`./web/build` and the log file are all relative to it as well. Setting
+`redisEndpoint` puts the sessions in Redis instead, at the cost of a
+container.
+
 ### "database is locked"
 
 Casdoor on SQLite hits `SQLITE_BUSY` under nothing much at all — adding a
@@ -144,6 +162,23 @@ anything under `/pb/` — the app takes the code off the query string itself and
 trades it (`CALLBACK_PATH` in `src/auth/trip.ts`), so the two have to be
 changed together.
 
+**Tick *Enable signin session* on both of them.** A new application has it
+off, and off means Casdoor hands back an authorization code without
+remembering anybody: `EnableSigninSession` is what decides whether the
+authorize leg calls `SetSessionUsername`, so there is no SSO session for a
+second client to find and no reader is ever *already signed in*. One identity
+provider still serves both clients — it just asks for the password again every
+time, which is the whole thing Casdoor was added to stop. The app's own leg
+meets the login form on every visit, the threads' silent frame meets it in a
+place nobody can type into, and `silentSignin=1` suppresses a panel that was
+never going to be drawn. Both redirects are the right shape either way, which
+is why `scripts/live-check.sh` asks Casdoor about the setting rather than
+inferring it.
+
+The session then lasts the application's *Cookie expire in hours* — 720 where
+it is left at zero — except that Casdoor caps it at 24 for a reader who
+unticks *Auto sign in* on the form.
+
 Casdoor answers a reader it already knows with a *Continue with …* panel
 rather than a redirect, which would make the comment engine's leg a second
 click. Remark42's authorize URL carries `silentSignin=1` to turn that off for
@@ -167,7 +202,9 @@ The PocketBase pair is typed into PocketBase's own admin UI: Collections →
 `users` → Edit collection → Options → OAuth2 → the generic `oidc` provider,
 pointed at `https://$CASDOOR_HOST/.well-known/openid-configuration`. Provider
 config is not versioned in `pb_migrations/`, so it is set by hand on each host
-and the `displayName` typed there is the button text `AuthDialog` renders.
+and the `displayName` typed there is the button text `AuthDialog` renders —
+*Fortsett med …*, so the provider's own `OIDC` left in place puts a protocol
+name in front of the reader.
 
 ## Signing in
 
@@ -243,12 +280,18 @@ decides `colorPrimary` and `borderRadius`, but light-versus-dark comes off
 `?theme=dark|default` in the URL, is remembered in that origin's
 `localStorage`, and is light when neither says otherwise — `themeType` on the
 application never reaches it. So `src/auth/trip.ts` appends `theme=dark` to
-the authorize URL; without it the reader lands on a white form with a papaya
+the authorize URL, and the threads' authorize URL carries it from
+`AUTH_CUSTOM_AUTH_URL` in `docker-compose.yml` because nothing in the app
+composes that one. Without it the reader lands on a white form with a papaya
 button in it. It sticks, which is why Casdoor's own console turns dark for
 whoever signs in here — `?theme=default` on the console URL puts it back.
 
-The rest is per application, typed in by hand on each host like the OAuth2
-provider config. All of it lives on one tab of the application editor —
+The rest is per application and wants doing **twice**, typed in by hand on
+each host like the OAuth2 provider config. The threads' application is the
+one easiest to forget and the easier one to meet: a reader whose silent leg
+did not take is sent to its form from inside the thread box, and an
+application left at its defaults draws Casdoor's own cube on a white page.
+All of it lives on one tab of the application editor —
 `https://<CASDOOR_HOST>/applications/admin/<application>#ui-customization`,
 `admin` being the application's *owner* rather than the organization it
 serves. Header HTML, Page HTML and Footer HTML look like one-line text inputs

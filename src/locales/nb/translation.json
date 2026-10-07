@@ -529,6 +529,7 @@
     "open": "Diskusjon",
     "private": "Diskusjonstråd er ikke tilgjengelig for upubliserte lokaliteter",
     "privateSpot": "Diskusjonstråd åpner når lokaliteten gjøres offentlig.",
+    "needsOwnSignIn": "Diskusjonstråden har sin egen innlogging. Trykk «Sign In» i tråden for å skrive.",
     "failed": "Fikk ikke hentet diskusjonstråden. Prøv igjen senere."
   },
   "invites": {

@@ -125,6 +125,12 @@ applications under it. Each hands back a client id and a secret when saved:
 | the app | `https://<your-host>/auth/callback` |
 | the threads | `https://<your-host>/remark42/auth/tufteseid/callback` |
 
+**Tick *Enable signin session* on both.** A new application has it off, and
+off it means Casdoor forgets each reader the moment it has handed back an
+authorization code — so the app asks for a password on every visit and the
+threads ask again on top of that, which is the one thing having an identity
+provider was meant to prevent.
+
 The threads' pair goes into `.env` as `REMARK42_OIDC_CID` and
 `REMARK42_OIDC_CSEC`, replacing the placeholders; `docker compose up -d` again
 to pick them up. The app's pair is typed into PocketBase instead:
@@ -135,7 +141,9 @@ to pick them up. The app's pair is typed into PocketBase instead:
 https://<CASDOOR_HOST>/.well-known/openid-configuration
 ```
 
-The display name typed there is the text on the app's sign-in button.
+The display name typed there is the text on the app's sign-in button, so the
+provider's own `OIDC` left in place is what readers are asked to continue
+with.
 
 **Give yourself the app admin role**: open a place first (see below, or your
 own first sign-in is refused), sign in through the app once so PocketBase

@@ -131,6 +131,12 @@ services:
       # Must be writable by uid 1000 gid 1000 (the image's casdoor user) or the
       # first write fails and the container restarts forever.
       - /site/tufteseid/data/casdoor:/data
+      # The SSO sessions, which beego keeps as files under `./tmp` with the
+      # image's WORKDIR at `/`. Unmounted they sit on the container's writable
+      # layer, so the cookie promises 30 days and the state behind it lasts
+      # until the next recreate — after which every reader is asked for a
+      # password again (docs/identity.md).
+      - casdoortmp:/tmp
 
   # Comment threads on public spots, with an identity store of its own
   # federated to Casdoor. v1.16.0 is the floor — below it the AUTH_CUSTOM_*
@@ -164,7 +170,9 @@ services:
       # the other two are back-channel and stay off the host's NAT loopback.
       # `silentSignin` suppresses Casdoor's "Continue with …" panel, which is
       # what lets the app run the trip in a hidden frame (src/api/remark42.ts).
-      - AUTH_CUSTOM_AUTH_URL=https://${CASDOOR_HOST:-}/login/oauth/authorize?silentSignin=1
+      # `theme` is how Casdoor is told to draw dark, and nothing on this leg
+      # composes the URL — the app's own leg appends it in src/auth/trip.ts.
+      - AUTH_CUSTOM_AUTH_URL=https://${CASDOOR_HOST:-}/login/oauth/authorize?silentSignin=1&theme=dark
       - AUTH_CUSTOM_TOKEN_URL=http://casdoor:8000/api/login/oauth/access_token
       - AUTH_CUSTOM_INFO_URL=http://casdoor:8000/api/userinfo
       - AUTH_CUSTOM_SCOPES=openid,profile,email
@@ -176,3 +184,4 @@ services:
 volumes:
   wmscache:
   pbdata:
+  casdoortmp:

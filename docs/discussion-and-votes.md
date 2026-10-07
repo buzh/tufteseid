@@ -78,19 +78,29 @@ reader a stranger to the thread. Both federate to the same Casdoor, so no
 second credential is ever asked for — but the OAuth2 round trip still has to
 run, and the widget's way of running it is a button the reader has to find.
 
-`src/api/remark42.ts` runs it for them, in a hidden iframe, before the widget
-is created. Three things have to hold or it does not stay silent:
+`src/api/remark42.ts` runs it for them, in a hidden iframe, at the two
+moments worth spending it: on the way back from signing in to the app, where
+the Casdoor session is newest and the reader is already waiting on a page
+load (`src/auth/trip.ts`), and otherwise in front of the first thread opened
+on a page that did not arrive that way. It is memoized per page — a reader
+Casdoor does not know will not grow a session by being asked twice.
+
+Four things have to hold or it does not stay silent:
 
 | | |
 | --- | --- |
+| *Enable signin session* on the application the app signs in through | Off, Casdoor keeps no session at all, so this leg has nothing to find and the frame lands on a login form. It is off on a new application, and it is the one of the four that fails for every reader at once (`docs/identity.md`). |
 | `silentSignin=1` on `AUTH_CUSTOM_AUTH_URL` | Casdoor otherwise draws a *Continue with …* panel for a reader it already knows, and a hidden frame is the one place nobody can press it. The parameter survives because go-pkgz/auth composes the redirect with x/oauth2's `AuthCodeURL`, which appends with `&` when the base URL already carries a query. |
 | `frame-src` naming `$CASDOOR_HOST` | The app's CSP is `default-src 'self'`, which would block the frame at Casdoor's hop. |
 | Casdoor on the app's registrable domain | `id.<app host>` is same-site, so the frame's cookies are first-party. A Casdoor on a domain of its own is not, and a browser that blocks third-party cookies then hands Casdoor a frame with no session in it. |
 
-The widget's own provider button is the fallback under all three, and under
-an expired Casdoor session as well, so a failure costs a click rather than a
-thread. Nothing in a log says which happened, which is why `live-check.sh`
-asserts the first two.
+The widget's own provider button is the fallback under all four, and under an
+expired Casdoor session as well, so a failure costs a click rather than a
+thread. `SpotTalk` says so with `talk.needsOwnSignIn` when the reader is
+signed in to the app and the leg came back empty — the control they are being
+sent to is English and inside a frame, and nothing else would tell them why
+it is there. Which of the four failed is not in any log, which is why
+`live-check.sh` asserts the first three.
 
 The order matters. The widget reads remark42's session once, when it is
 created: `SpotTalk` waits on the round trip before the embed is appended and

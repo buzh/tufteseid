@@ -224,9 +224,36 @@ check remark-providers "$BASE/remark42/api/v1/config?site=tufteseid" \
   200 json 20 '"auth_providers":\["tufteseid"\]'
 
 # `&client_id=` is part of the assertion: x/oauth2 has to append to the query
-# string rather than overwrite it, or `silentSignin` is dropped.
+# string rather than overwrite it, or `silentSignin` and `theme` are dropped.
 check remark-silent-signin "$BASE/remark42/auth/tufteseid/login?site=tufteseid" \
-  302 '' 0 '' 'location:.*/login/oauth/authorize\?silentSignin=1&client_id='
+  302 '' 0 '' 'location:.*/login/oauth/authorize\?silentSignin=1&theme=dark&client_id='
+
+# Casdoor keeps an SSO session only for an application that asked for one
+# (`EnableSigninSession`). With it off nobody is ever already signed in: the
+# app's leg asks for a password on every visit and the threads' silent frame
+# can never succeed. Both redirects above are the right shape either way, so
+# this is the only thing that says so. The client ids are read back out of
+# the two legs rather than configured here — they live in Casdoor.
+cid() { grep -o 'client_id=[A-Za-z0-9_-]*' | head -1 | cut -d= -f2; }
+
+signinSession() { # signinSession NAME CLIENT_ID REDIRECT_URI
+  if [ -z "$2" ]; then
+    fail "$1" 'no client id in the authorize URL'
+    return
+  fi
+  OPTS=(-s -G --data-urlencode "redirectUri=$3")
+  check "$1" \
+    "$IDP/api/get-app-login?type=code&responseType=code&scope=openid+email+profile&state=live-check&clientId=$2" \
+    200 json 100 '"enableSigninSession": *true'
+}
+
+signinSession casdoor-app-session \
+  "$(curl -s --max-time "$TIMEOUT" "$BASE/pb/api/collections/users/auth-methods" | cid)" \
+  "$BASE/auth/callback"
+signinSession casdoor-thread-session \
+  "$(curl -s -o /dev/null -D- --max-time "$TIMEOUT" \
+    "$BASE/remark42/auth/tufteseid/login?site=tufteseid" | cid)" \
+  "$BASE/remark42/auth/tufteseid/callback"
 
 # Without the IdP here the browser blocks the silent sign-in frame, and
 # nothing in any log says so.

@@ -5,6 +5,7 @@
 // (docs/identity.md).
 
 import { pb } from '../api/pocketbase';
+import { primeRemarkSession } from '../api/remark42';
 import { withDeadline } from '../shared/utils/deadline';
 
 /** Registered in Casdoor, which matches it exactly, and served by a matcher of
@@ -165,6 +166,14 @@ export const completeSignIn = async (): Promise<void> => {
             : undefined,
         ),
     );
+
+    // The threads keep a session of their own, bought with a second round
+    // trip against the same Casdoor. Here is where that session is newest and
+    // the reader is already waiting on a page load, so the trip is spent now
+    // rather than in front of the first thread they open — which may be days
+    // later, against a Casdoor that has since forgotten them. Not awaited:
+    // nothing on the way in is waiting for a comment box.
+    void primeRemarkSession();
   } catch (err) {
     console.warn('[auth] code exchange failed', err);
     failed = true;

@@ -68,6 +68,10 @@ export const SpotTalk = ({ spot }: { spot: SpotRecord }) => {
   const signedIn = useAtomValue(isSignedInAtom);
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
+  // The silent leg did not take, so the widget is showing its own button to a
+  // reader the app has already signed in. Saying nothing leaves them to work
+  // that out from an English control inside a frame.
+  const [needsOwnSignIn, setNeedsOwnSignIn] = useState(false);
 
   // Re-checked here rather than trusted from the caller: an unlisted thread is
   // the only thing keeping a private spot's discussion private.
@@ -99,9 +103,10 @@ export const SpotTalk = ({ spot }: { spot: SpotRecord }) => {
     // sign-in has finished. In parallel, the widget wins the race and the
     // later `createInstance` reuses it rather than re-reading the session.
     session
-      .then(() => {
+      .then((primed) => {
         // A box closed mid-trip took the mount node with it.
         if (!live) return;
+        setNeedsOwnSignIn(signedIn && !primed);
         window.remark_config = config;
         return loadEmbed();
       })
@@ -144,6 +149,11 @@ export const SpotTalk = ({ spot }: { spot: SpotRecord }) => {
         </Alert>
       ) : (
         <>
+          {needsOwnSignIn && (
+            <Alert color="gray" p="xs">
+              {t('talk.needsOwnSignIn')}
+            </Alert>
+          )}
           {!ready && <Loader size="sm" className={styles.loader} />}
           <div id={MOUNT_ID} className={styles.thread} />
         </>
