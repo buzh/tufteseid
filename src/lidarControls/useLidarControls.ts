@@ -1,5 +1,5 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { mapAtom } from '../map/atoms';
 import { viewportBbox } from '../map/bbox';
 import type { CompareHalf } from '../map/compare/halves';
@@ -43,6 +43,15 @@ import {
 } from '../map/layers/config/backgroundLayers/lidarRelevance';
 import { lidarNativeResolution } from '../map/layers/config/backgroundLayers/stack';
 
+// Spent on the first dataset Automatisk settles on, which is the only one the
+// link can have meant, and not before the list the clamp consults is in — an
+// empty one resolves to the default and the render the link carried is gone,
+// with the parameter already rewritten and nothing left to restore it from.
+// Module scope and not a ref, because each ground section runs this hook: B's
+// copy would otherwise sit unspent until the reader turned Automatisk on
+// there, and then impose the link's render over what they had just picked.
+let linkRender: string | null = linkedLidarRender;
+
 export const useLidarControls = (half: CompareHalf) => {
   const map = useAtomValue(mapAtom);
   const [backgroundLayer, setBackgroundLayer] = useAtom(
@@ -71,10 +80,12 @@ export const useLidarControls = (half: CompareHalf) => {
   // Filled by `lidarFootprintsLayer`: one WFS pass over the viewport, shared.
   const viewport = useAtomValue(lidarViewportAtom);
 
-  // Fetched at runtime; empty on an install without a store, never rejects.
-  const [cvatAcquisitions, setCvatAcquisitions] = useState<CvatAcquisition[]>(
-    [],
-  );
+  // Fetched at runtime, never rejects. Null until the manifest lands, empty on
+  // an install without a store: the difference is what the link's render is
+  // held against below, `cvat` being the one style no catalogue row carries.
+  const [cvatAcquisitions, setCvatAcquisitions] = useState<
+    CvatAcquisition[] | null
+  >(null);
   useEffect(() => {
     let cancelled = false;
     fetchCvatAcquisitions().then((held) => {
@@ -132,7 +143,7 @@ export const useLidarControls = (half: CompareHalf) => {
   );
   const selectProject = useCallback(
     (p: LidarProject, wanted?: string) => {
-      const cached = cvatFor(cvatAcquisitions, p);
+      const cached = cvatFor(cvatAcquisitions ?? [], p);
       const offered = stylesForFlight(p, cached);
       const style =
         wanted != null
@@ -212,13 +223,10 @@ export const useLidarControls = (half: CompareHalf) => {
     else selectNational();
   };
 
-  // Spent on the first dataset Automatisk settles on, which is the only one the
-  // link can have meant. Held past that it would re-impose the link's render
-  // every time Automatisk changed flight, long after the reader had moved on.
-  const linkRender = useRef(linkedLidarRender);
-
   // Every branch compares against what is drawing before writing, or the pass
-  // its own write triggers would loop.
+  // its own write triggers would loop. Both spend `linkRender` only once the
+  // list that branch clamps against has arrived; until then the pass runs
+  // without it and the one that lands the list applies it.
   useEffect(() => {
     if (!isLidarBackground || !autoDataset) return;
     const choice = chooseAutoDataset({
@@ -228,17 +236,27 @@ export const useLidarControls = (half: CompareHalf) => {
       current: isLidarFlight ? activeLidarProject : null,
     });
     if (choice.kind === 'hold') return;
-    const wanted = linkRender.current ?? undefined;
-    linkRender.current = null;
     if (choice.kind === 'national') {
+      const settled = nationalStyles.length > 0;
+      const wanted = (settled && linkRender) || undefined;
       // `wanted` forces the call even on the mosaic already drawing: the seed
       // is whatever the link said, and the mosaic puts its style straight into
       // a GetMap, so something has to clamp it to the one style it publishes.
       if (!isNationalMosaic || wanted) selectNational(wanted);
+      if (settled) linkRender = null;
     } else if (choice.kind === 'project') {
-      if (!isLidarFlight || activeLidarProject?.id !== choice.project.id) {
+      const settled = cvatAcquisitions != null;
+      const wanted = (settled && linkRender) || undefined;
+      // Forced for the same reason: the flight may already be the one drawing
+      // by the time the manifest says whether it has a cached render.
+      if (
+        wanted ||
+        !isLidarFlight ||
+        activeLidarProject?.id !== choice.project.id
+      ) {
         selectProject(choice.project, wanted);
       }
+      if (settled) linkRender = null;
     }
   }, [
     isLidarBackground,
@@ -248,6 +266,8 @@ export const useLidarControls = (half: CompareHalf) => {
     isLidarFlight,
     isNationalMosaic,
     activeLidarProject,
+    nationalStyles,
+    cvatAcquisitions,
     selectNational,
     selectProject,
   ]);
@@ -277,7 +297,9 @@ export const useLidarControls = (half: CompareHalf) => {
   const tierAStyles = TIER_A_STYLES.filter((s) => datasetStyles.includes(s));
   const tierBStyles = datasetStyles.filter((s) => !TIER_A_STYLES.includes(s));
   const shownStyle = effectiveLidarStyle(activeLidarStyle, lidarModel);
-  const cachedFlightIds = new Set(cvatAcquisitions.map((a) => a.project.id));
+  const cachedFlightIds = new Set(
+    (cvatAcquisitions ?? []).map((a) => a.project.id),
+  );
 
   // How far past the deepest level held the view has been pushed: 1 while the
   // pixels are the source's own, 2, 4, 8 … once the last tiles are only being

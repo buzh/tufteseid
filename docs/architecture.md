@@ -764,7 +764,12 @@ because its *absence* is a value: it says nobody chose a render, which is what
 lets `preferredLidarRender` offer the cVAT one instead. Present, it is what
 Automatisk's first settled dataset is asked for, through the `wanted` argument
 on `selectNational`/`selectProject` — so a shared link reproduces the render it
-was made on rather than being upgraded out of it.
+was made on rather than being upgraded out of it. It is held, not spent, until
+the list that dataset's clamp consults has arrived — the mosaic's
+GetCapabilities, the cVAT manifest — because `resolveLidarStyle` against an
+empty list answers the default, and by then the effect mirroring the ground
+back to the URL has overwritten the parameter. One value for the whole page
+load, not one per ground section.
 
 Two of them name something rather than set something, and both are read once
 at import and then taken off the address bar:
