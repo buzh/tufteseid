@@ -278,9 +278,12 @@ export const EvidenceGallery = ({
       {/* The heading stands in all three states so the card does not jump as
           the list lands. An empty list says so here rather than only in
           `EvidenceReader`, which is the surface for the reader who cannot do
-          anything about it. */}
+          anything about it. A list that never landed is neither loading nor
+          empty, and the alert below is the whole of what can be said. */}
       {items === null ? (
-        <p className={styles.hint}>{t('evidence.loading')}</p>
+        !evidence.failed && (
+          <p className={styles.hint}>{t('evidence.loading')}</p>
+        )
       ) : rows.length === 0 ? (
         <p className={styles.hint}>{t('evidence.noneOwn')}</p>
       ) : (
