@@ -109,9 +109,10 @@ The order matters. The widget reads remark42's session once, when it is
 created: `SpotTalk` waits on the round trip before the embed is appended and
 `createInstance` is called, and
 re-creates the widget when the app's own sign-in state changes, and signing
-out of the app ends remark42's session before clearing PocketBase's. The
-Casdoor session behind both is left alone — it is what makes the next sign-in
-a single click, and it is ended on Casdoor's own hostname.
+out of the app ends remark42's session and Casdoor's before clearing
+PocketBase's. All three go, which is what makes the next reader on a shared
+browser meet a login form rather than this one's account
+(`docs/identity.md`).
 
 ### If the public origin moves
 

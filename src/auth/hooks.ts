@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getRegistrationGate, type RegistrationGate } from '../api/invites';
 import { pb } from '../api/pocketbase';
 import { endRemarkSession } from '../api/remark42';
+import { endCasdoorSession } from './casdoor';
 
 export type OAuthProvider = { name: string; displayName: string };
 
@@ -65,11 +66,15 @@ export const useRegistrationGate = (open: boolean) => {
   return gate;
 };
 
-// remark42's session first: the thread box re-creates the widget the moment
-// the authStore changes, and one created while the cookie is still there
-// shows the reader as signed in to a site they just left.
+// All three sessions, and the app's own last: the thread box re-creates the
+// widget the moment the authStore changes, and one created while remark42's
+// cookie is still there shows the reader as signed in to a site they just
+// left. Casdoor's goes in the same breath rather than after it — the two are
+// unrelated round trips, and a sign-out should be one wait and not two.
+// Ending Casdoor's is what makes signing out and back in enough to change who
+// a shared browser belongs to (docs/identity.md).
 export const useSignOut = () =>
   useCallback(async () => {
-    await endRemarkSession();
+    await Promise.all([endRemarkSession(), endCasdoorSession()]);
     pb.authStore.clear();
   }, []);

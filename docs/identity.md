@@ -195,14 +195,18 @@ an application reporting `enableAutoSignin` true — that field is not
 masked — had *Signin session* on when it was last saved.
 
 Casdoor answers a reader it already knows with a *Continue with …* panel
-rather than a redirect, which would make the comment engine's leg a second
-click. Remark42's authorize URL carries `silentSignin=1` to turn that off for
-that client alone, so the app can run the leg in a hidden iframe
-(`docs/discussion-and-votes.md`). The app's own leg keeps the panel, on
-Casdoor's page like everything else the reader sees there: it is also *Or sign
-in with another account*, and it is the only way to change who a shared
-browser is signed in as. `enableAutoSignin` on the application in
-Casdoor's console would do the same thing for both, and take that away.
+rather than a redirect, and nothing here wants one: a sign-in already made
+should cost no clicks at all. **Tick *Auto signin* on both applications**, and
+such a reader is sent straight back with a code and never sees Casdoor's page.
+Remark42's authorize URL carries `silentSignin=1` to the same end for the leg
+that runs in a hidden frame, where nobody could press a button anyway
+(`docs/discussion-and-votes.md`).
+
+The panel is also *Or sign in with another account*, and turning it off is
+therefore only safe because signing out ends Casdoor's session too. Changing
+who a shared browser belongs to is signing out and signing back in, and the
+reader needs to know nothing beyond that — see *Signing out* below, which is
+what makes it true.
 
 The panel only appears at all when the reader's organization matches the
 application's, which is another reason both applications belong under the
@@ -267,14 +271,16 @@ identity is made before the app ever sees it, so closing sign-up there would
 close it for invited readers too. Somebody refused by the gate keeps their
 Casdoor identity and can sign in later with a code.
 
-**Casdoor is still framed, for the threads.** The comment engine's silent
-sign-in leg runs its own round trip in a hidden iframe
-(`src/api/remark42.ts`), so `frame-src https://$CASDOOR_HOST` on the app's
-policy and `frame-ancestors 'self' $PUBLIC_ORIGIN` on the Casdoor block both
-stay, and `CASDOOR_HOST` is still a subdomain of the app's host rather than a
-domain of its own — on one of those the frame's cookies count as third-party
-and the leg falls back to the widget's own button. Signing in to the app
-depends on none of it.
+**Casdoor is still framed, twice.** The comment engine's silent sign-in leg
+runs its own round trip in a hidden iframe (`src/api/remark42.ts`), and
+signing out ends Casdoor's session in another (`src/auth/casdoor.ts`). So
+`frame-src https://$CASDOOR_HOST` on the app's policy and
+`frame-ancestors 'self' $PUBLIC_ORIGIN` on the Casdoor block both stay, and
+`CASDOOR_HOST` is still a subdomain of the app's host rather than a domain of
+its own — on one of those the frames' cookies count as third-party, the
+sign-in leg falls back to the widget's own button and the sign-out reaches a
+Casdoor that cannot see the session it was sent to end. Signing in to the app
+depends on neither frame.
 
 **A trip that comes back without a session says so.** No `code`, a `state`
 that does not match the one that left, or an exchange that fails or runs past
@@ -282,6 +288,37 @@ its 15 s deadline, and the box comes back up on the reader's own page with
 `auth.signInFailed` on it — otherwise nothing would show they had tried. A
 cold visit to `/auth/callback` with no trip in `sessionStorage` is not a
 failure: it restores to `/` and says nothing.
+
+### Signing out
+
+**Three sessions end, and the app's own goes last.** Remark42's first,
+because the thread box re-creates its widget the moment the auth store
+changes and one created while that cookie is still there shows the reader as
+signed in to a site they have just left. Casdoor's in the same breath rather
+than after it: the two are unrelated round trips and a sign-out should be one
+wait, not two. `src/auth/hooks.ts` holds the order.
+
+Casdoor's leg is `GET /api/logout` on its own hostname with no parameters at
+all. Without an `id_token_hint` Casdoor ends whatever session the cookie
+names, which is the one thing wanted here, and asks for no registered
+post-logout URI — so neither application needs one. It runs in a hidden frame
+because the app's CSP names `$CASDOOR_HOST` under `frame-src` and not under
+`connect-src`; widening `connect-src` for a single request is the worse
+trade. The origin is read off the authorize URL in `listAuthMethods()` rather
+than configured, since `CASDOOR_HOST` already lives in `.env` and in
+`Caddyfile` and a third copy is one that can drift.
+
+**This is what keeps a shared browser honest.** *Auto signin* means a reader
+Casdoor remembers never sees a form, so if its session outlived the app's
+then signing out and back in would return the same account and there would be
+no way at all to become somebody else. Ending all three is what makes *sign
+out, sign back in* mean what a reader expects it to, with nothing else for
+them to know.
+
+A sign-out that cannot reach Casdoor still clears both sessions on this side.
+What it leaves is an identity provider holding a session the app walks back
+into on the next sign-in, silently — the one failure here worth recognising,
+and `$CASDOOR_HOST/api/get-account` is what answers it.
 
 ### Its looks are Casdoor's to set
 

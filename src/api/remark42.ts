@@ -107,8 +107,8 @@ const resetRemarkSession = (): void => {
  *  hold the whole sign-out open. */
 const LOGOUT_BUDGET_MS = 3000;
 
-/** Signs out of the threads. The Casdoor session behind both sides is left
- *  alone; ending that one is Casdoor's own business, on its own hostname. */
+/** Signs out of the threads. The Casdoor session behind both sides is ended
+ *  alongside this one, by `src/auth/casdoor.ts`. */
 export const endRemarkSession = async (): Promise<void> => {
   resetRemarkSession();
   try {

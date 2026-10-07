@@ -125,12 +125,15 @@ applications under it. Each hands back a client id and a secret when saved:
 | the app | `https://<your-host>/auth/callback` |
 | the threads | `https://<your-host>/remark42/auth/tufteseid/callback` |
 
-**Tick *Signin session* on both**, the switch just above *Auto signin* on the
-application's first tab. A new application has it off, and
-off it means Casdoor forgets each reader the moment it has handed back an
-authorization code — so the app asks for a password on every visit and the
+**Tick *Signin session* and then *Auto signin* on both**, two switches beside
+each other on the application's first tab and in that order — the second
+cannot be turned on before the first. A new application has both off, and
+without the first Casdoor forgets each reader the moment it has handed back
+an authorization code, so the app asks for a password on every visit and the
 threads ask again on top of that, which is the one thing having an identity
-provider was meant to prevent.
+provider was meant to prevent. The second is what spares a reader Casdoor
+remembers even a *Continue as …* click. Signing out of the app ends Casdoor's
+session too, so that stays safe on a shared browser.
 
 The threads' pair goes into `.env` as `REMARK42_OIDC_CID` and
 `REMARK42_OIDC_CSEC`, replacing the placeholders; `docker compose up -d` again
