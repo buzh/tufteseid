@@ -32,7 +32,7 @@ Each owns its subject; this file keeps only what is true across all of them.
 | `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream and Caddy → mapproxy → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
 | `docs/render-sidecar.md` | The server-side render service: the contract, the token trade, the queue's limits, the RVT and ffmpeg recipes, the burnt-in legend, the failure modes | `rendersvc/`, `src/api/render.ts`, the `sunloop` and `rvt` arms in `src/evidence/` |
-| `docs/identity.md` | Casdoor, its own hostname and why it cannot share the app's, the two OAuth2 clients, what OIDC does not carry | `casdoor` in compose, the PocketBase OAuth2 config, `src/auth/` |
+| `docs/identity.md` | Casdoor, its own hostname and why it cannot share the app's, the two OAuth2 clients, how the `users` row mirrors it | `casdoor` in compose, the PocketBase OAuth2 config, `src/auth/` |
 | `docs/discussion-and-votes.md` | Remark42's contract and the thread key, the public-only gate, the `votes` collection and the `spotScores` view's two quirks | `src/talk/`, `src/spots/spotScores.ts`, `src/api/votes.ts`, the vote migration |
 | `docs/closed-beta.md` | Who may register and what pays for it, the hook that enforces it, the SQL for opening places and granting invites, the mail route's settings, the two things the gate does not cover | `pocketbase/pb_hooks/`, `src/invites/`, `src/api/invites.ts`, the sign-in box |
 | `docs/monitoring.md` | The access logs, the usage report, the cron health check, retention | `scripts/usage-report.sh`, `scripts/health-check.sh`, any log format or `logging:` cap |
@@ -149,8 +149,10 @@ alongside the cVAT and MapProxy store directories (`README.md`,
 Migrations are versioned in `pocketbase/pb_migrations/` and use the ≥0.23
 App-based JSVM API (`$app.findCollectionByNameOrId` / `app.save`, flattened
 field classes), **not** the 0.22 `Dao` API. `pocketbase/pb_hooks/` holds JS
-hooks in the same runtime, for the one thing a collection rule cannot say:
-the closed-beta gate counts rows and spends a counter (`docs/closed-beta.md`).
+hooks in the same runtime, for the two things a collection rule cannot say:
+the closed-beta gate counts rows and spends a counter (`docs/closed-beta.md`),
+and the `users` row's `role` is mirrored from Casdoor's claims on every
+sign-in (`docs/identity.md`).
 
 - **A hook handler cannot see its own file's scope.** PocketBase serializes
   each handler and runs it in a runtime of its own, so a constant or helper
@@ -251,7 +253,10 @@ Server-enforced on `spots`:
 - **update/delete** — owner or admin
 
 So the UI carries one permission, `mayEdit` (owner *or* admin): an admin can
-rename, reshape and delete anybody's spot.
+rename, reshape and delete anybody's spot. `users.role` is a mirror of
+Casdoor's roles, rewritten on every sign-in, and the `users` row has no update
+rule at all — neither the rank nor the invite counters are the reader's to set
+(`docs/identity.md`).
 
 `evidence` follows its spot and adds the spot's owner to every write rule, so an
 admin may keep a render against somebody else's spot and that spot's author can

@@ -149,12 +149,17 @@ The display name typed there is the text on the app's sign-in button, so the
 provider's own `OIDC` left in place is what readers are asked to continue
 with.
 
-**Give yourself the app admin role**: open a place first (see below, or your
-own first sign-in is refused), sign in through the app once so PocketBase
-creates your user record, then **Collections → users → your record → `role` =
-`admin`**. To moderate comments as well, put that account's Casdoor id in
-`.env` as `REMARK42_ADMIN_ID` — the two are separate permissions in separate
-systems.
+**Give yourself the app admin role in Casdoor**, not in PocketBase. Sign up at
+`https://<CASDOOR_HOST>` so the identity exists, then **Roles → Add** under the
+readers' organization, name it `admin`, and put your account in its *Users*.
+Open a free place before signing in to the app itself, or that first sign-in is
+refused (see below).
+
+The `users` row's `role` is rewritten from Casdoor's claims on every sign-in
+(`docs/identity.md`), so a rank typed into PocketBase's admin UI holds only
+until the reader signs in again. To moderate comments as well, put that
+account's Casdoor id in `.env` as `REMARK42_ADMIN_ID` — the two are separate
+permissions in separate systems.
 
 ## Who may register
 

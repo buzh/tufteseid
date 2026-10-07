@@ -402,17 +402,54 @@ Two limits worth knowing before reaching for any of this:
   is not among them, so the only user-visible strings in the whole sign-in
   flow that are not `nb` are the ones on Casdoor's page.
 
-## Two things OIDC does not carry
+## The `users` row is a mirror
 
-**`role = "admin"` is a PocketBase field, not a claim.** Every collection rule
-in `pb_migrations/` reads `@request.auth.role`, and nothing in the token
-populates it. An administrator is made by editing the `users` record in
-PocketBase's admin UI, and stays made until it is edited back.
+The row cannot go away. `spots.owner`, `evidence.owner`, `votes.owner` and
+`invites.issuer` are all relations to it, every collection rule is written
+against `@request.auth.*`, and PocketBase can only judge a record of its own —
+there is no way to authorize a request against a foreign token. What the row
+can stop being is a second place a fact about a reader is *decided*.
 
-**Accounts are matched by email, or not at all.** `spots.owner` and
-`evidence.owner` are relations to `users`, and `spots.credit` is a denormalized
-display name. Signing in through a new provider creates a *new* `users` row
-unless an existing one carries the same verified email, in which case
-PocketBase links them. Decide what to do about pre-existing rows before the
-first sign-in through Casdoor — afterwards the ambiguity is real records with
-real owners, and the only way back is re-pointing them by hand.
+**`role` comes from Casdoor.** Its userinfo response lists the reader's role
+*names* under the `profile` scope, which PocketBase's OIDC provider already
+asks for, and PocketBase keeps the whole response on `oAuth2User.rawUser`.
+`pb_hooks/identity.pb.js` reads it on every sign-in: a reader in a Casdoor role
+named `admin` is an administrator here, and an administrator is made and unmade
+in Casdoor's console.
+
+It is a mirror rather than a merge, and that is forced. Casdoor leaves `roles`
+out of the response altogether for a reader holding none, so no handler can
+tell an identity provider with no roles configured from a reader with none.
+An account Casdoor does not call an administrator therefore stops being one
+here at its next sign-in, whatever the row says and whoever typed it. Two
+things follow:
+
+- **Make the role in Casdoor before restarting PocketBase with the hook.**
+  Under the readers' organization, named `admin`, with whoever should keep the
+  rank in it. Forget, and every administrator is demoted at their next
+  sign-in. The way back is to make the role and sign in again — PocketBase's
+  superuser account is a different thing entirely and is not touched by any of
+  this.
+- **Editing `role` in PocketBase's admin UI no longer holds.** It survives
+  until the reader next signs in and is then overwritten.
+
+**Nobody may write their own `users` row.** PocketBase's stock collection ships
+`updateRule = "id = @request.auth.id"`, and a rule cannot name a field — so a
+reader could PATCH `role = "admin"` onto themselves, and an administrator
+reaches every spot in the register. `1700002200_users_not_self_writable.js`
+takes the rule away. Nothing in the SPA has ever written a user row.
+
+**The link is to the Casdoor subject, not to the address.** PocketBase records
+the provider and the `sub` in `_externalAuths` and resolves a returning reader
+by that pair. An email match is only the fallback for a row carrying no such
+link yet — a local account made before Casdoor, which PocketBase then links to
+the first identity presenting the same verified address. So a reader changing
+their address at the identity provider keeps their spots, and the ambiguity
+worth settling before the first sign-in is only ever about rows that predate
+the provider.
+
+**`inviteQuota` and `invitesSent` stay here.** They are grants the installation
+makes rather than facts about an identity, and Casdoor's userinfo carries
+roles, groups and permissions but no custom property to put them in. They move
+by SQL or in the admin UI (`docs/closed-beta.md`), and the rule above is what
+keeps them out of the reader's reach.
