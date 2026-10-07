@@ -162,7 +162,9 @@ anything under `/pb/` — the app takes the code off the query string itself and
 trades it (`CALLBACK_PATH` in `src/auth/trip.ts`), so the two have to be
 changed together.
 
-**Tick *Enable signin session* on both of them.** A new application has it
+**Tick *Signin session* on both of them** — the switch is labelled that, not
+*Enable signin session*, and it sits directly above *Auto signin* on the
+application's first tab. A new application has it
 off, and off means Casdoor hands back an authorization code without
 remembering anybody: `EnableSigninSession` is what decides whether the
 authorize leg calls `SetSessionUsername`, so there is no SSO session for a
@@ -171,13 +173,26 @@ provider still serves both clients — it just asks for the password again every
 time, which is the whole thing Casdoor was added to stop. The app's own leg
 meets the login form on every visit, the threads' silent frame meets it in a
 place nobody can type into, and `silentSignin=1` suppresses a panel that was
-never going to be drawn. Both redirects are the right shape either way, which
-is why `scripts/live-check.sh` asks Casdoor about the setting rather than
-inferring it.
+never going to be drawn.
+
+**Nothing outside Casdoor can read the setting back.** Both redirects are the
+right shape either way, and `GetMaskedApplication` forces
+`EnableSigninSession` to false for every caller who is not that application's
+own admin — along with `EnablePassword`, `EnableWebAuthn`,
+`EnableLinkWithEmail`, `RedirectUris` and `TokenFields` — so
+`/api/get-app-login` reports it off whatever it is, and a config read from
+outside says nothing about any of them. The check is to sign in and ask
+`/api/get-account`: a session, or *Please login first*.
 
 The session then lasts the application's *Cookie expire in hours* — 720 where
 it is left at zero — except that Casdoor caps it at 24 for a reader who
 unticks *Auto sign in* on the form.
+
+The two switches are interlocked, which is the one thing that can be read
+from outside: the console refuses *Auto signin* while *Signin session* is
+off, and turning *Signin session* off switches *Auto signin* off with it. So
+an application reporting `enableAutoSignin` true — that field is not
+masked — had *Signin session* on when it was last saved.
 
 Casdoor answers a reader it already knows with a *Continue with …* panel
 rather than a redirect, which would make the comment engine's leg a second

@@ -89,7 +89,7 @@ Four things have to hold or it does not stay silent:
 
 | | |
 | --- | --- |
-| *Enable signin session* on the application the app signs in through | Off, Casdoor keeps no session at all, so this leg has nothing to find and the frame lands on a login form. It is off on a new application, and it is the one of the four that fails for every reader at once (`docs/identity.md`). |
+| *Signin session* on the application the app signs in through | Off, Casdoor keeps no session at all, so this leg has nothing to find and the frame lands on a login form. It is off on a new application, it is the one of the four that fails for every reader at once, and it is the one no request from outside can read back (`docs/identity.md`). |
 | `silentSignin=1` on `AUTH_CUSTOM_AUTH_URL` | Casdoor otherwise draws a *Continue with …* panel for a reader it already knows, and a hidden frame is the one place nobody can press it. The parameter survives because go-pkgz/auth composes the redirect with x/oauth2's `AuthCodeURL`, which appends with `&` when the base URL already carries a query. |
 | `frame-src` naming `$CASDOOR_HOST` | The app's CSP is `default-src 'self'`, which would block the frame at Casdoor's hop. |
 | Casdoor on the app's registrable domain | `id.<app host>` is same-site, so the frame's cookies are first-party. A Casdoor on a domain of its own is not, and a browser that blocks third-party cookies then hands Casdoor a frame with no session in it. |
@@ -100,7 +100,10 @@ thread. `SpotTalk` says so with `talk.needsOwnSignIn` when the reader is
 signed in to the app and the leg came back empty — the control they are being
 sent to is English and inside a frame, and nothing else would tell them why
 it is there. Which of the four failed is not in any log, which is why
-`live-check.sh` asserts the first three.
+`live-check.sh` asserts the middle two. The last is a property of the two
+hostnames, and the first cannot be read from outside Casdoor at all
+(`docs/identity.md`) — it is checked by signing in and asking
+`$CASDOOR_HOST/api/get-account` whether anybody is there.
 
 The order matters. The widget reads remark42's session once, when it is
 created: `SpotTalk` waits on the round trip before the embed is appended and

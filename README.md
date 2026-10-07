@@ -125,7 +125,8 @@ applications under it. Each hands back a client id and a secret when saved:
 | the app | `https://<your-host>/auth/callback` |
 | the threads | `https://<your-host>/remark42/auth/tufteseid/callback` |
 
-**Tick *Enable signin session* on both.** A new application has it off, and
+**Tick *Signin session* on both**, the switch just above *Auto signin* on the
+application's first tab. A new application has it off, and
 off it means Casdoor forgets each reader the moment it has handed back an
 authorization code — so the app asks for a password on every visit and the
 threads ask again on top of that, which is the one thing having an identity
