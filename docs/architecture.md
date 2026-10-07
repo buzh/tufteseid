@@ -838,10 +838,16 @@ does.** The centre and the tools are fixed-width icon controls that cannot
 shrink by a pixel, while a ground section carries a flight name no one can
 predict the width of. So each ground section is its own scrollport and the band
 is not one: the view switch, the show group and the tools stay put at every
-width, and a ground's controls scroll inside the column they were given. The
-band keeps an `overflow-x` of its own for the widths under about 610px where
-the centre and the tools alone outrun it, but that is a last resort rather than
-the design.
+width, and a ground's controls scroll inside the column they were given.
+
+The three columns are what put the view switch on the band's centre line, and
+they are also what runs the tools off the right edge: the two flexible tracks
+share the slack evenly, so the left column is handed as much room as the right
+even where the right needs all of its own. **Below 640px the centre gives up
+the midline rather than the tools giving up the screen** — the left track
+absorbs the whole shortfall. The band keeps an `overflow-x` of its own for the
+widths under about 450px where the centre and the tools alone outrun it, but
+that is a last resort rather than the design.
 
 - Every arm takes a controller object (`useLidarControls(half)` and friends) and
   owns no atoms of its own. All three controllers mount whichever arm is

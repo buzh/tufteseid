@@ -22,10 +22,22 @@
   padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
   background: var(--mantine-color-body);
   border-bottom: 1px solid var(--mantine-color-default-border);
-  /* Under about 610px the centre and the tools alone outrun the band. A last
+  /* Under about 450px the centre and the tools alone outrun the band. A last
      resort, not the design. */
   overflow-x: auto;
   scrollbar-width: none;
+}
+
+/* Two equal flexible tracks are what put the centre on the midline, and they
+   are also what starves the tools: the left column is handed as much room as
+   the right, while the right needs all 187px of controls that cannot shrink.
+   Below the width where both can be had, the centre gives up the midline
+   rather than the tools giving up the screen — the ground section on the left
+   absorbs the whole shortfall, having its own scrollport to do it in. */
+@media (max-width: 640px) {
+  .ribbon {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
 }
 
 /* Safari had no `scrollbar-width` until 18.2. */
@@ -88,12 +100,13 @@
   display: none;
 }
 
-/* Held against the right edge of a column that no longer scrolls, so the tools
-   are reachable at every width without a sticky — which could not have worked
-   here in any case: the containing block is the grid area, and the track is
-   sized to the tools, so there was never any travel to take. The floor is
-   because `.side` above lets a column shrink and the draw band's two ways out
-   wear both classes. */
+/* Held against the right edge of a column that no longer scrolls, rather than
+   by a sticky — which could not have worked here in any case: the containing
+   block is the grid area, and the track is sized to the tools, so there was
+   never any travel to take. The floor is what keeps the tools whole when the
+   column is squeezed: `.side` above lets a column shrink, a ground section
+   beside them gives first, and the track's own min-content never goes below
+   this. The draw band's two ways out wear both classes. */
 .tools {
   flex: none;
   min-width: max-content;
