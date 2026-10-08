@@ -25,7 +25,7 @@
     "jotai": "^3.0.0",
     "jotai-effect": "^2.4.1",
     "material-symbols": "^0.47.2",
-    "ol": "^10.10.0",
+    "ol": "^10.11.0",
     "pocketbase": "^0.28.1",
     "proj4": "^2.22.0",
     "react": "^19.3.0",
