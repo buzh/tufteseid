@@ -206,9 +206,25 @@ delivery says so.
 A delivery carries its own paperwork: a `metadata/` subtree with the flight
 strips, the clip polygon, the project report — and **point-density rasters,
 which are GeoTIFFs on a metre grid**. Those are set aside rather than read as
-terrain, and counted so it is visible that they were. The `under` lines say
-which directories the elevation actually sits in, which is also what the VRT
-should be built from.
+terrain, and counted so it is visible that they were. The elevation is under
+`<project>/data/dtm/`, which is what the VRT gets built from, and the `under`
+lines say so rather than assuming it.
+
+**`clipToPolygon` does not clip.** A job comes back as whole tiles of the
+delivery's own grid, reaching a few kilometres past the square that was
+ordered, so neighbouring chunks overlap. Unpack an acquisition's zips into one
+tree and the repeated tiles land on each other; `--inspect` measures the
+overhang and says so. Chunks are cut on a round-kilometre grid
+(`CHUNK_ORIGIN`) rather than on `coverage.GRID_ORIGIN`, whose northing ends in
+984 and would miss every mapsheet edge by the same 16 m.
+
+What a first delivery settled: `resolution 0` really is the acquisition's own
+0.25 m; `outputWkid` is honoured, and a project native to EPSG:25832 comes back
+reprojected to 25833 — the same resample the ImageServer already does for
+`imageSR=25833`, so nothing is lost that was not being lost before. The files
+are tiled LZW float32 and **declare no nodata**, which is why `--inspect` reads
+a `.aux.xml` sidecar if the delivery left one and says plainly when neither
+exists.
 
 One quirk it already reads through: Kartverket's rasters come out of ESRI with
 a **user-defined** CRS — `ProjectedCSTypeGeoKey` is 32767 and the EPSG code is

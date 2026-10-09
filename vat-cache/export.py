@@ -52,6 +52,7 @@ import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from xml.etree import ElementTree
 
 import numpy as np
 
@@ -78,6 +79,13 @@ RESOLUTIONS = {"dataset": 0, "1": 1, "10": 10, "50": 50}
 SHEETS = (0, 1000, 2000, 5000, 10000)
 
 DONE = ("complete", "failed", "abandoned")
+
+# Chunks are snapped here and not to `coverage.GRID_ORIGIN`: the tile grid's
+# northing ends in 984, so every chunk edge would miss the round kilometres a
+# mapsheet grid is cut on, and the delivery — which comes back as whole tiles
+# of its own grid, not clipped to what was asked for — would spill further
+# than it needs to.
+CHUNK_ORIGIN = (0.0, 0.0)
 
 
 def post(url, fields, timeout=300):
@@ -126,11 +134,9 @@ def squares(project, chunk_m):
     if not feats:
         sys.exit(f"{project!r} has no footprint in the mosaic catalogue, so "
                  "there is nothing to order.")
-    mask, bounds, _ = coverage_mod.rasterise(
-        feats, fine, origin=coverage_mod.GRID_ORIGIN
-    )
+    mask, bounds, _ = coverage_mod.rasterise(feats, fine, origin=CHUNK_ORIGIN)
     x0, _x1, y0, _y1 = bounds
-    ox, oy = coverage_mod.GRID_ORIGIN
+    ox, oy = CHUNK_ORIGIN
     j, i = np.nonzero(mask)
     cj = (j + round((y0 - oy) / fine)) // 8
     ci = (i + round((x0 - ox) / fine)) // 8
@@ -309,6 +315,37 @@ def tiff_header(path):
     }
 
 
+def extent_of(head):
+    """(west, south, east, north) from the tiepoint and the pixel size."""
+    if not (head.get("origin") and head.get("cell") and head.get("width")):
+        return None
+    west, north = head["origin"]
+    return (west, north - head["height"] * head["cell"][1],
+            west + head["width"] * head["cell"][0], north)
+
+
+def aux_stats(path):
+    """GDAL's sidecar, if the delivery left one. It is where a nodata value and
+    the band statistics go when they are not in the TIFF itself."""
+    side = Path(str(path) + ".aux.xml")
+    if not side.exists():
+        return None
+    try:
+        root = ElementTree.parse(side).getroot()
+    except (ElementTree.ParseError, OSError):
+        return None
+    found = {}
+    for band in root.iter("PAMRasterBand"):
+        value = band.find("NoDataValue")
+        if value is not None and value.text:
+            found["nodata"] = value.text.strip()
+        for item in band.iter("MDI"):
+            key = item.get("key", "")
+            if key.startswith("STATISTICS_") and item.text:
+                found[key[len("STATISTICS_"):].lower()] = item.text.strip()
+    return found or None
+
+
 def one_of(values, name):
     """A single value if they all agree, else the disagreement spelled out."""
     seen = {}
@@ -322,7 +359,7 @@ def one_of(values, name):
             + ", ".join(f"{k} ({v})" for k, v in worst[:4]))
 
 
-def inspect(where, held):
+def inspect(where, held, verbose=False):
     """What the unpacked delivery holds, and whether it is what was ordered."""
     where = Path(where)
     tifs, aside = [], []
@@ -413,22 +450,65 @@ def inspect(where, held):
     for path, head in broken[:5]:
         print(f"  ! {path.name}: {head['error']}")
 
+    stats = next((s for s in (aux_stats(p) for p, _ in heads) if s), None)
+    if stats:
+        told = ", ".join(f"{k} {v}" for k, v in sorted(stats.items()))
+        print(f"  aux.xml     {told}")
+    elif not nodata or nodata == "None":
+        print("  ! no nodata declared, and no .aux.xml to say what fills the "
+              "ground\n    the flight never reached — read one file and look "
+              "before trusting it")
+
+    if verbose or len(heads) <= 12:
+        print()
+        for path, head in heads:
+            box = extent_of(head)
+            where_at = (f"{spaced(round(box[0]))}, {spaced(round(box[1]))} → "
+                        f"{spaced(round(box[2]))}, {spaced(round(box[3]))}"
+                        f"  {(box[2] - box[0]) / 1000:g} x "
+                        f"{(box[3] - box[1]) / 1000:g} km" if box else "no extent")
+            print(f"  {path.name}")
+            print(f"      {head['width']} x {head['height']} px   {where_at}")
+
     if held:
-        boxes = [(h["origin"][0], h["origin"][1] - h["height"] * h["cell"][1],
-                  h["origin"][0] + h["width"] * h["cell"][0], h["origin"][1])
-                 for _, h in heads if h["origin"] and h["cell"] and h["width"]]
-        empty = []
-        for chunk in held["chunks"]:
-            cw, cs, ce, cn = chunk["bbox"]
-            if not any(bw < ce and be > cw and bs < cn and bn > cs
-                       for bw, bs, be, bn in boxes):
-                empty.append(chunk)
+        boxes = [b for b in (extent_of(h) for _, h in heads) if b]
+        # Only a chunk whose own job landed can be missing anything; the rest
+        # are simply not ordered yet, which is not a hole.
         done = [c for c in held["chunks"] if c["file"]]
-        print(f"  ordered     {plural(len(held['chunks']), 'chunk')}, "
-              f"{len(done)} downloaded, {len(empty)} with no file over them")
-        for chunk in empty[:6]:
-            print(f"    gap at {chunk['cj']}_{chunk['ci']} "
-                  f"{[round(v) for v in chunk['bbox']]}")
+        empty = [c for c in done if not any(
+            bw < c["bbox"][2] and be > c["bbox"][0]
+            and bs < c["bbox"][3] and bn > c["bbox"][1]
+            for bw, bs, be, bn in boxes)]
+        print(f"\n  ordered     {plural(len(held['chunks']), 'chunk')}, "
+              f"{len(done)} downloaded, "
+              f"{len(held['chunks']) - len(done)} still to come")
+        if empty:
+            print(f"  ! {plural(len(empty), 'downloaded chunk has', 'downloaded chunks have')}"
+                  " no raster over its square")
+            for chunk in empty[:6]:
+                print(f"    {chunk['cj']}_{chunk['ci']} "
+                      f"{[round(v) for v in chunk['bbox']]}")
+        spill = [c for c in done if any(
+            bw < c["bbox"][0] - 1 or be > c["bbox"][2] + 1
+            or bs < c["bbox"][1] - 1 or bn > c["bbox"][3] + 1
+            for bw, bs, be, bn in boxes)]
+        if spill and boxes:
+            west = min(b[0] for b in boxes)
+            east = max(b[2] for b in boxes)
+            south = min(b[1] for b in boxes)
+            north = max(b[3] for b in boxes)
+            asked = (min(c["bbox"][0] for c in done),
+                     min(c["bbox"][1] for c in done),
+                     max(c["bbox"][2] for c in done),
+                     max(c["bbox"][3] for c in done))
+            print("  ! the delivery reaches past what was ordered, by "
+                  f"{max(asked[0] - west, east - asked[2]) / 1000:.1f} km "
+                  "east-west\n    and "
+                  f"{max(asked[1] - south, north - asked[3]) / 1000:.1f} km "
+                  "north-south. clipToPolygon did not clip:\n    whole tiles "
+                  "of the delivery's own grid came back. Neighbouring\n    "
+                  "chunks will overlap, so unpack an acquisition's zips into "
+                  "one tree\n    and let the repeated tiles land on each other.")
         if float(grid) != held["cell"] and held["resolution"] == "dataset":
             print(f"  ! ordered the acquisition's own {held['cell']} m grid "
                   f"and got {grid} m")
@@ -449,6 +529,13 @@ def load_state(path, settings):
     if differs:
         sys.exit(f"{path.name} was started with a different {', '.join(differs)}"
                  ".\nFinish it, or move it aside and start again.")
+    # Records written before the chunk grid moved off the tile origin name
+    # squares that no longer exist, and there is nothing to reconcile them to.
+    if list(held.get("origin", ())) != list(CHUNK_ORIGIN):
+        sys.exit(f"{path.name} was cut on the old chunk grid, which was offset "
+                 "from any round\nkilometre. The squares in it do not exist "
+                 f"any more.\n  rm {path}\nand order again; what is already "
+                 "downloaded stays where it is and is still good.")
     return held
 
 
@@ -568,6 +655,9 @@ def main():
                    help="order the failed and abandoned chunks again")
     p.add_argument("--status", action="store_true",
                    help="say where the record got to and stop")
+    p.add_argument("-v", "--verbose", action="store_true",
+                   help="for --inspect, name every file rather than the first "
+                        "dozen")
     p.add_argument("--inspect", nargs="?", const="", metavar="DIR",
                    help="read the unpacked GeoTIFFs and say what came back; "
                         "defaults to -o")
@@ -591,6 +681,7 @@ def main():
         "wkid": args.wkid,
         "sheet": args.sheet,
         "chunk_m": args.chunk_km * 1000,
+        "origin": list(CHUNK_ORIGIN),
         "email": args.email,
         "cell": row.get("OPPLOSNING") or 0.25,
     }
@@ -598,7 +689,7 @@ def main():
     held = load_state(path, settings)
 
     if args.inspect is not None:
-        inspect(args.inspect or args.out, held)
+        inspect(args.inspect or args.out, held, args.verbose)
         return
 
     if args.status:
