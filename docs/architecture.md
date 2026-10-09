@@ -95,7 +95,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `uiContextAtom` | `shared/uiContext.ts` | Derived: `map` or `draw`, off the session above. Which surface is in front (*The context in front*). |
 | `drawHoldAtom` | same | What the draw context puts in the band: whose drawing it is and the two ways out. Published by whichever `useSpotDraft` has the pen, because its box is away and the writes are still the controller's. |
 | `sketchShownAtom`, `sketchFadeAtom` | `sketch/overlay.ts` | Whether the open spot's drawing is on the ground, and how far it is faded towards it. A reading setting, not the record's: they outlive the spot the box was opened on. Putting the pen down with strokes kept turns the first back on, so a drawing is never written out of sight. |
-| `allSketchesShownAtom` | `sketch/allSketches.ts` | Whether every spot's chosen drawing is on the ground at once. Seeded from the `sketches` URL parameter and written back to it, so a link carries the reading. |
+| `allSketchesShownAtom` | `sketch/allSketches.ts` | Whether every spot's chosen drawing is on the ground at once. On by default, seeded from the `sketches` URL parameter and written back to it, so a link carries the reading. |
 | `drawnSketchSpotsAtom` | same | Which spots have their drawing on the ground this frame, published by the layer after it paints. Read by `spotLayer`'s clustering, which drops their pins. Empty while the layer is off. |
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |
 | `isSignedInAtom`, `isAdminAtom` | same | Derived, so a component does not re-render on an unrelated user field. |
@@ -640,8 +640,9 @@ opened.
 `src/sketch/allSketches.ts` puts one drawing per spot on the ground as a single
 transparent layer at z 1.9, with no pin and no name plate: the reading is the
 drawings themselves, laid over the country, and a click on the strokes opens
-the spot they belong to. Off until asked for, on the `a` key and the band's
-second drawing button, and carried by the `sketches` URL parameter.
+the spot they belong to. On unless turned off, on the `a` key and the band's
+second drawing button, and carried by the `sketches` URL parameter — which is
+written only as `false`, since absent is the default.
 
 - **Which drawing is the record's to say.** `spots.mapSketch` names it, and
   `mapSketchOf` (`sketch/scene.ts`) resolves it. A spot holds one drawing
@@ -758,6 +759,13 @@ of that.
 `backgroundLayer`, `hybrid`, `contours`, `lidarModel`, `lidarRender`,
 `viewMode`, `backgroundLayerB`, `curtain`, `themeLayers`, `heritageDetails`,
 `heritageRender`, `heritageOpacity`, `sketches`, `lat`, `lon`, `zoom`.
+
+Two of them are on with nothing on the address bar, so what gets written is the
+reader turning them *off*. `themeLayers` absent is the heritage register
+ticked and `themeLayers=` is none ticked — the same trade `heritageDetails`
+makes, where absent is everything and empty is nothing, and the reason both
+read their parameter as a plain string. `sketches` absent is every spot's
+drawing on the ground, and `sketches=false` is the only value ever written.
 
 `lidarRender` is the one parameter written even when it holds the default,
 because its *absence* is a value: it says nobody chose a render, which is what

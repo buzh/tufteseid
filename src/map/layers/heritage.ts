@@ -116,8 +116,7 @@ export const heritageSitesParams = (
   };
 };
 
-// getUrlParameter, not getListUrlParameter: the list helper reads absent and
-// empty alike, so "no details" would come back as "all details".
+// Absent is every detail and empty is none, so the two must not read alike.
 const readDetails = (): Set<HeritageDetail> => {
   const fromUrl = getUrlParameter('heritageDetails');
   if (fromUrl === null) return new Set(HERITAGE_DETAILS);

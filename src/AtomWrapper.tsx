@@ -1,18 +1,11 @@
 import { useHydrateAtoms } from 'jotai/utils';
 import { ReactNode } from 'react';
-import { activeThemeLayersAtom } from './map/layers/atoms.ts';
-import { ThemeLayerName } from './map/layers/themeWMS.ts';
-import { getListUrlParameter } from './shared/utils/urlUtils.ts';
+import { activeThemeLayersAtom, readThemeLayers } from './map/layers/atoms.ts';
 
 // Do not hydrate `backgroundLayerHalves` here: its own default init validates
 // the URL param against a whitelist, and hydrating bypasses that, leaving an
 // unrenderable value and a blank map on cold load.
 export const AtomWrapper = ({ children }: { children: ReactNode }) => {
-  const initialThemeLayersList = getListUrlParameter('themeLayers') || [];
-  const initialThemeLayers = new Set(
-    initialThemeLayersList as ThemeLayerName[],
-  );
-
-  useHydrateAtoms([[activeThemeLayersAtom, initialThemeLayers]]);
+  useHydrateAtoms([[activeThemeLayersAtom, readThemeLayers()]]);
   return children;
 };

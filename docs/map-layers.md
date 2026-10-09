@@ -326,7 +326,15 @@ Category defaults on `culturalHeritage`, cascading to all five:
 `themeLayerEffect` (`src/map/layers/atoms.ts`) puts them on the map, and on both
 maps in the split view: `syncThemeLayers` is called once per map and each gets
 its own instances off the same config. Only the main map's result writes
-`?themeLayers=`.
+`?themeLayers=`, and it writes the whole set rather than a delta: what is
+actually on the map after the sync, so a layer whose config or construction
+failed never reaches the address bar.
+
+`heritageSites` is ticked on a cold load. The parameter's absence *is* that
+default, so turning the register off writes `?themeLayers=` empty rather than
+dropping the key — absent and empty must not read alike, which is why
+`readThemeLayers` reads it with `getUrlParameter` and filters the names against
+the known five.
 
 These five are the only layers a pointer can question. `heritageQuery.ts` asks
 them by id, not by the `theme.` prefix; `src/heritageInfo/` puts the question and

@@ -45,8 +45,10 @@ const LAYER_ID = 'allSketchesLayer';
 /** `a` for alle. */
 const TOGGLE_KEY = 'a';
 
+// On unless the URL says otherwise, so the parameter is written when the
+// reader turns the layer off rather than on.
 export const allSketchesShownAtom = atom(
-  getUrlParameter('sketches') === 'true',
+  getUrlParameter('sketches') !== 'false',
 );
 
 /** The spots whose drawing is on the ground this frame; their pins come off in
@@ -352,9 +354,9 @@ export const useAllSketchesLayer = () => {
   useEffect(() => {
     layerRef.current?.setVisible(shown);
     if (shown) {
-      setUrlParameter('sketches', true);
-    } else {
       removeUrlParameter('sketches');
+    } else {
+      setUrlParameter('sketches', false);
       const state = stateRef.current;
       if (state) state.standing = new Set<string>();
       store.set(drawnSketchSpotsAtom, new Set<string>());

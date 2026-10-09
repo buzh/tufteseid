@@ -2,8 +2,9 @@ import { atom, getDefaultStore } from 'jotai';
 import { atomEffect } from 'jotai-effect';
 import type OlMap from 'ol/Map';
 import {
-  addToUrlListParameter,
-  removeFromUrlListParameter,
+  getUrlParameter,
+  removeUrlParameter,
+  setUrlParameter,
 } from '../../shared/utils/urlUtils';
 import { mapAtom } from '../atoms';
 import { viewModeAtom } from '../compare/halves';
@@ -36,6 +37,64 @@ const NO_THEME_LAYERS: ReadonlySet<ThemeLayerName> = new Set();
 // The one theme layer whose WMS request can be reshaped; the other four RA
 // services publish a single style each.
 export const RESHAPEABLE_THEME_LAYER: ThemeLayerName = 'heritageSites';
+
+// The order a link lists them in, and the vocabulary an incoming one is
+// filtered against.
+const THEME_LAYER_ORDER: readonly ThemeLayerName[] = [
+  'heritageSites',
+  'culturalEnvironments',
+  'sefrakBuildings',
+  'protectedBuildings',
+  'userReportedHeritage',
+];
+
+// Ticked when `themeLayers` is absent: the register is what the terrain is
+// read against, so it is up before the reader asks.
+const DEFAULT_THEME_LAYERS: readonly ThemeLayerName[] = ['heritageSites'];
+
+// getUrlParameter, not a list helper: absent is the default set and empty is
+// none, and the two must not read alike (same trade as `heritageDetails`).
+export const readThemeLayers = (): Set<ThemeLayerName> => {
+  const fromUrl = getUrlParameter('themeLayers');
+  if (fromUrl === null) return new Set(DEFAULT_THEME_LAYERS);
+  return new Set(
+    fromUrl
+      .split(',')
+      .filter((name): name is ThemeLayerName =>
+        (THEME_LAYER_ORDER as readonly string[]).includes(name),
+      ),
+  );
+};
+
+// Written from what reached the map, not from what was asked for: a layer
+// whose config or construction failed would otherwise go into the URL and
+// survive every reload.
+const writeThemeLayersUrlParameter = (
+  layers: ReadonlySet<ThemeLayerName>,
+): void => {
+  const isDefault =
+    layers.size === DEFAULT_THEME_LAYERS.length &&
+    DEFAULT_THEME_LAYERS.every((name) => layers.has(name));
+  if (isDefault) {
+    removeUrlParameter('themeLayers');
+  } else {
+    setUrlParameter(
+      'themeLayers',
+      THEME_LAYER_ORDER.filter((name) => layers.has(name)).join(','),
+    );
+  }
+};
+
+const themeLayersOnMap = (map: OlMap): Set<ThemeLayerName> =>
+  new Set(
+    map
+      .getLayers()
+      .getArray()
+      .map((layer) => layer.get('id'))
+      .filter((id): id is string => typeof id === 'string')
+      .filter((id) => id.startsWith('theme.'))
+      .map((id) => id.substring(6) as ThemeLayerName),
+  );
 
 // Drops one source's features rather than the whole reading, so a card stands
 // when one of several ticked registers is turned off underneath it.
@@ -79,18 +138,9 @@ const syncThemeLayers = (
     heritageOpacity,
     heritageHidden,
   }: ThemeLayerSettings,
-): { added: ThemeLayerName[]; removed: ThemeLayerName[] } => {
+): { onMap: Set<ThemeLayerName>; removed: ThemeLayerName[] } => {
   const mapProjection = map.getView().getProjection().getCode();
-  const themelayersActive = new Set(
-    map
-      .getLayers()
-      .getArray()
-      .filter((layer) => {
-        const id = layer.get('id');
-        return typeof id === 'string' && id.startsWith('theme.');
-      })
-      .map((layer) => layer.get('id').substring(6) as ThemeLayerName),
-  );
+  const themelayersActive = themeLayersOnMap(map);
 
   const themeLayersToAdd = Array.from(themeLayers).filter(
     (layerName) => !themelayersActive.has(layerName),
@@ -98,10 +148,6 @@ const syncThemeLayers = (
   const themeLayersToRemove = Array.from(themelayersActive).filter(
     (layerName) => !themeLayers.has(layerName),
   );
-
-  // Only the ones that reached the map: a skipped layer reported as added
-  // would go into the URL and survive every reload.
-  const added: ThemeLayerName[] = [];
 
   themeLayersToAdd.forEach((layerName) => {
     const layerExists = map
@@ -140,7 +186,6 @@ const syncThemeLayers = (
     }
     layerToAdd.setZIndex(10);
     map.addLayer(layerToAdd);
-    added.push(layerName);
   });
 
   themeLayersToRemove.forEach((layerName) => {
@@ -178,7 +223,7 @@ const syncThemeLayers = (
       source.updateParams(params);
     });
 
-  return { added, removed: themeLayersToRemove };
+  return { onMap: themeLayersOnMap(map), removed: themeLayersToRemove };
 };
 
 export const themeLayerEffect = atomEffect((get) => {
@@ -193,7 +238,7 @@ export const themeLayerEffect = atomEffect((get) => {
   const mode = get(viewModeAtom);
   const store = getDefaultStore();
 
-  const { added, removed } = syncThemeLayers(store.get(mapAtom), settings);
+  const { onMap, removed } = syncThemeLayers(store.get(mapAtom), settings);
 
   // A ticked register draws over both panes of a split. Created here rather
   // than waited for: this effect mounts ahead of the one that builds the B
@@ -207,11 +252,8 @@ export const themeLayerEffect = atomEffect((get) => {
   }
 
   // Off the main map's result alone; the second pane is a mirror.
-  for (const layerName of added) {
-    addToUrlListParameter('themeLayers', layerName);
-  }
+  writeThemeLayersUrlParameter(onMap);
   for (const layerName of removed) {
-    removeFromUrlListParameter('themeLayers', layerName);
     forgetReadingsFrom(`theme.${layerName}`);
   }
 
