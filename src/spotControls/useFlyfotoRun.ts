@@ -1,13 +1,6 @@
-// A run of proposals over the spot's footprint, one at a time, kept or
-// discarded. A discarded proposal was never a record — the pixels only ever
-// existed in this tab — so running again asks about it a second time. What the
-// spot already holds is what the run passes over, which is also how an
-// acquisition the catalogue has added since comes up on its own.
-//
-// The proposal under review goes on the map, in the footprint, under the
-// spot's own drawing, because the question a reader is actually answering is
-// whether what they traced off the terrain is there in the photograph. Nothing
-// here takes the map, so zoom and pan stay theirs for as long as they look.
+// A discarded proposal was never a record — the pixels only ever existed in
+// this tab — so running again asks about it a second time. What the spot
+// already holds is what the run passes over.
 
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -32,9 +25,8 @@ export type RunCard = {
   state: 'waiting' | 'rendering' | 'ready' | 'empty' | 'failed';
   produced: Produced | null;
   /** The proposal as the map takes it: an object URL over `produced.blob` and
-   *  the ground it covers. Made when the pixels land, revoked when the card
-   *  leaves, and one stable object so the overlay is not rebuilt under a
-   *  card that only changed state. */
+   *  the ground it covers. One stable object, so the overlay is not rebuilt
+   *  under a card that only changed state. */
   ground: DraftGround | null;
 };
 
@@ -84,9 +76,9 @@ export const useFlyfotoRun = (
   // state: an effect re-invoked before the patch lands would enqueue twice.
   const started = useRef(new Set<string>());
   const keepingNow = useRef(false);
-  // The callbacks below are handed to buttons and must not be rebuilt as the
-  // cards change state; this is where they read the run as it stands. Declared
-  // before the render effect, so that one sees the same.
+  // The callbacks below must not be rebuilt as the cards change state, so this
+  // is where they read the run as it stands. Declared before the render
+  // effect, so that one sees the same.
   const now = useRef({ cards, footprint, evidence });
   useEffect(() => {
     now.current = { cards, footprint, evidence };
@@ -137,9 +129,8 @@ export const useFlyfotoRun = (
     const ac = new AbortController();
     alive.current = ac;
     setPhase('listing');
-    // The proposals are laid in this rectangle, so a reader who cannot see it
-    // would be asked to judge a picture that is off screen. Out only, never
-    // in: a view already holding the footprint is the one they chose.
+    // The proposals are laid in this rectangle. Out only, never in: a view
+    // already holding the footprint is the one the reader chose.
     bringBboxIntoView(map, bbox);
 
     const metric = bboxToMetric(bbox);
@@ -174,10 +165,8 @@ export const useFlyfotoRun = (
   }, [finish, map]);
 
   // The one under review and a render in every lane behind it, which is as far
-  // ahead as there is any point looking: a reader deciding faster than one
-  // render takes is then waiting on two at a time rather than one, and beyond
-  // that the queue only makes pictures nobody reaches. The cost of the whole
-  // window is at most `PREVIEW_LANES` renders thrown away at the end of a run.
+  // ahead as there is any point looking (`PREVIEW_LANES`). The window costs at
+  // most that many renders thrown away at the end of a run.
   useEffect(() => {
     const ac = alive.current;
     const bbox = now.current.footprint;
@@ -195,9 +184,8 @@ export const useFlyfotoRun = (
             patch(projectId, { state: 'empty' });
             return;
           }
-          // No rectangle means no place on the map. The pixels are still worth
-          // keeping, so the card goes ready without a ground rather than
-          // counting as a failure.
+          // No rectangle means no place on the map, but the pixels are still
+          // worth keeping: ready without a ground, not a failure.
           const extent = bboxOfMeta(produced.meta);
           patch(projectId, {
             state: 'ready',

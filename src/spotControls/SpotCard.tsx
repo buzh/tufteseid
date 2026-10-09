@@ -1,9 +1,3 @@
-// The spot's own workbench. Reading terrain against a place is the ongoing act
-// and naming it a one-off, so this box — not the editor — is where the reader
-// spends their time: what the spot is in two terse lines, the rectangle and the
-// drawing to reach for, and the pictures. `SpotProperties` is behind the
-// cogwheel.
-//
 // Only ever the author's own, or an admin's: `spotReadingAtom` sends anybody
 // else straight to `EvidenceReader` and keeps them there, so nothing in here —
 // nor in `EvidenceGallery`, which only this box mounts — is behind `mayEdit`.
@@ -43,16 +37,9 @@ import { Panel } from '../ui/Panel';
 import styles from './SpotBox.module.css';
 import { useSpotDraft, type SpotDraftController } from './useSpotDraft';
 
-/**
- * The camera, the rectangle and the drawing: the three things done against the
- * ground rather than filled into a form, so the card does them itself — and on
- * the end of the same row the two that ask for a picture rather than take one,
- * the terrain analysis over the spot's own rectangle and the microscope, which
- * is the one button here that asks for a picture made somewhere else. `hold` is
- * present exactly while a draft has the map, and is then the only current
- * account of the rectangle and the drawing — the record lags it by a round
- * trip.
- */
+/** `hold` is present exactly while a draft has the map, and is then the only
+ *  current account of the rectangle and the drawing — the record lags it by a
+ *  round trip. */
 const SpotUnits = ({
   spot,
   evidence,
@@ -68,8 +55,8 @@ const SpotUnits = ({
   const readTerrain = useSetAtom(readTerrainWindowAtom);
   const framing = hold?.stage === 'footprint';
   // The card is away behind the canvas for the whole of a draw stage, so this
-  // only keeps the fade — whose slider is over the drawing being made — from
-  // re-rendering on every settle of a pen nobody can see it from.
+  // only keeps the fade from re-rendering on every settle of a pen nobody can
+  // see it from.
   const drawing = hold?.stage === 'sketch';
 
   // A stage has the map: the rectangle being dragged is not the one the record
@@ -157,8 +144,8 @@ const SpotUnits = ({
   );
 };
 
-/** Mounted only while a card draft lives, so the draft controller opens and —
- *  more to the point — flushes with it, while the card around it stands. */
+/** Mounted only while a card draft lives, so the controller opens and — more
+ *  to the point — flushes with it, while the card around it stands. */
 const SpotUnitsHeld = ({
   spot,
   evidence,
@@ -188,9 +175,9 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
   const [failed, setFailed] = useState(false);
 
   // Rows saved before the rule that a spot always has a rectangle. Repaired
-  // here rather than by a migration: deriving the square from the drawing wants
-  // a projection PocketBase's JSVM has not got. Not while a draft is in hand,
-  // whose own writes are serialized and this one is not.
+  // here rather than by a migration: deriving the square from the drawing
+  // wants a projection PocketBase's JSVM has not got. Not while a draft is in
+  // hand, whose own writes are serialized and this one is not.
   const repairing = useRef(false);
   useEffect(() => {
     if (draft || spot.footprint || repairing.current) return;
@@ -243,9 +230,8 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
             <Button
               size="xs"
               variant="default"
-              // A reading is suspended for as long as any draft lives, so
-              // opening one with the map in hand would do nothing until it was
-              // let go.
+              // A reading is suspended for as long as any draft lives, so with
+              // the map in hand this would do nothing until it was let go.
               disabled={draft != null}
               leftSection={<Icon icon="menu_book" size={16} />}
               onClick={() => setReading(true)}

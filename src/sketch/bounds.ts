@@ -1,7 +1,6 @@
-// The ground a drawing covers. Excalidraw's own `getCommonBounds` is exact for
-// a rotated element, but it lives in the lazy editor bundle and this only seeds
-// a rectangle the reader then adjusts, or culls a drawing against the
-// viewport, so the elements' own boxes will do.
+// The elements' own boxes rather than Excalidraw's `getCommonBounds`, which is
+// exact for a rotated element but lives in the lazy editor bundle. This only
+// seeds a rectangle the reader adjusts, or culls against the viewport.
 
 import { transformExtent } from 'ol/proj';
 

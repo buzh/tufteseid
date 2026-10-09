@@ -1,7 +1,6 @@
-// What Excalidraw's toolbar and properties island used to do, in the tools and
-// the three properties the strip keeps. Neither has a prop behind it and
-// neither exposes its actions, so reading is off `onChange`'s app state and
-// writing is `setActiveTool` and `updateScene`.
+// Excalidraw's toolbar and properties island have no prop behind them and
+// expose no actions, so the strip reads off `onChange`'s app state and writes
+// through `setActiveTool` and `updateScene`.
 
 import {
   CaptureUpdateAction,
@@ -17,11 +16,9 @@ import type {
 import { LINEAR_TOOLS, SHAPE_TOOLS } from './pen';
 import type { SceneElement } from './scene';
 
-/** The strip's own set. Excalidraw's `ToolType` is not a package export, and
- *  the tools left out of this list — laser, frame, embeddable — have no use on
- *  a map and are off the strip. The hand is first because the map's own
- *  dragging is frozen for the session, so it is the only thing that moves the
- *  view. */
+/** The strip's own set: Excalidraw's `ToolType` is not a package export, and
+ *  laser, frame and embeddable have no use on a map. The hand is first because
+ *  the map's own dragging is frozen for the session. */
 const BOX_TOOLS = [
   'hand',
   'selection',
@@ -47,8 +44,8 @@ export type SketchStyle = {
   colour: string;
   width: number;
   /** Excalidraw keeps a background colour and a fill style separately; here a
-   *  fill is on or off and takes the stroke's own colour, hatched so the
-   *  ground being read still shows through (`SketchCanvas`). */
+   *  fill is on or off and takes the stroke's own colour, hatched
+   *  (`SketchCanvas`). */
   filled: boolean;
 };
 
@@ -71,9 +68,8 @@ type LiveState = Pick<
   | 'selectedElementIds'
 >;
 
-/** Selected elements, plus text bound inside them — Excalidraw's own restyling
- *  carries a container's label along, and a label left behind in the old
- *  colour is the thing a reader would call a bug. Locked ones are left. */
+/** Selected elements plus the text bound inside them, as Excalidraw's own
+ *  restyling carries a container's label along. Locked ones are left. */
 const restyled = (
   appState: LiveState,
   elements: readonly SceneElement[],
@@ -119,8 +115,8 @@ export const readLive = (
   };
 };
 
-/** Sets the pen and restyles the selection, the two halves of what one press
- *  on Excalidraw's island did. */
+/** Sets the pen and restyles the selection, the two halves of one press on
+ *  Excalidraw's island. */
 export const applyStyle = (api: ExcalidrawImperativeAPI, next: SketchStyle) => {
   const appState = api.getAppState();
   const background = next.filled ? next.colour : 'transparent';
@@ -163,7 +159,7 @@ const NOTE = {
   heightPx: 100,
   /** Excalidraw's own yellow, filled solid rather than with the hatch every
    *  other fill here uses: a note is written over the ground, not traced off
-   *  it, and paper it cannot be read through is the point. */
+   *  it. */
   background: '#ffec99',
   /** Also the label's colour — `bindTextToContainer` falls back to the
    *  container's stroke — which is what keeps the writing off the pen's own. */
@@ -208,9 +204,8 @@ export const addNote = (
   const note = made[0];
   if (!note) return;
 
-  // Selection, so the note can be dragged off the middle straight away; a
-  // press on the note button while the pen was down would otherwise leave the
-  // reader drawing.
+  // Selection, so the note can be dragged off the middle straight away and a
+  // press made with the pen down does not leave the reader drawing.
   api.setActiveTool({ type: 'selection' });
   api.updateScene({
     elements: [...api.getSceneElementsIncludingDeleted(), ...made],
@@ -220,10 +215,8 @@ export const addNote = (
 
   // Enter on a selected container is how Excalidraw opens its label for
   // editing and there is no API for it, so the press is synthesised — the same
-  // trick `SketchCanvas` plays on the wheel. The editor selects the text it
-  // finds, so the placeholder is typed over rather than edited around. After a
-  // frame: the selection above goes through `setState` and the handler reads
-  // it back.
+  // trick `SketchCanvas` plays on the wheel. After a frame: the selection
+  // above goes through `setState` and the handler reads it back.
   const container = host.querySelector('.excalidraw-container');
   requestAnimationFrame(() => {
     container?.dispatchEvent(

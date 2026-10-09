@@ -1,4 +1,3 @@
-// A stored drawing re-exported to pixels at the view's resolution.
 // `exportToCanvas` frames on the drawing's common bounds grown by
 // `exportPadding`, not on the viewport, so the placement below uses those same
 // bounds.
@@ -37,9 +36,9 @@ const excalidraw = (): Promise<ExcalidrawModule> => {
   return modulePromise;
 };
 
-/** Drawing → canvas, placed on the ground. Never throws; null when there is
- *  nothing to draw or the export failed. `scale` is device pixels per scene
- *  unit, 1 being the resolution the drawing was made at. */
+/** Never throws; null when there is nothing to draw or the export failed.
+ *  `scale` is device pixels per scene unit, 1 being the resolution the drawing
+ *  was made at. */
 export const renderScene = async (
   frame: SketchFrame,
   elements: readonly SceneElement[],
@@ -58,8 +57,8 @@ export const renderScene = async (
 
   // Restored before the bounds are read: `exportToCanvas` restores again and
   // frames on that, so leaving it to do both would put the placement and the
-  // pixels on two different rectangles. Guarded because `sketchOf` checks the
-  // frame, not the elements.
+  // pixels on two rectangles. Guarded because `sketchOf` checks the frame, not
+  // the elements.
   let restored: ReturnType<ExcalidrawModule['restoreElements']>;
   let bounds: ReturnType<ExcalidrawModule['getCommonBounds']>;
   try {
@@ -136,8 +135,8 @@ export const renderScene = async (
   };
 };
 
-/** Puts a render on a canvas showing `extent` (EPSG:25833, as the render is)
- *  at `resolution`. Both overlays draw into an `ImageCanvasSource`. */
+/** `extent` is EPSG:25833, as the render is. Both overlays draw into an
+ *  `ImageCanvasSource`. */
 export const paintRender = (
   ctx: CanvasRenderingContext2D,
   render: SceneRender,

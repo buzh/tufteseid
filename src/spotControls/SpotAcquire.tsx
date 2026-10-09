@@ -1,12 +1,6 @@
-// Work ordered, not kept. The camera in the card keeps the view as it stands,
-// so everything it offers is already on screen; these are the pictures that are
-// asked for over the footprint instead — what the sidecar makes, and the
-// flyfoto series, which is a walk through every acquisition over the spot
-// rather than a reading of the one ground that happens to be up. Stands in
-// front of the card, which is where the rows themselves are then waited on.
-//
-// The flyfoto walk takes the map, and then this box is a bar under it
-// (`FlyfotoRun`) rather than a panel in the corner.
+// Work ordered, not kept: the card's camera keeps the view as it stands, these
+// are the pictures asked for over the footprint instead. The flyfoto walk
+// takes the map, and then this box is a bar under it (`FlyfotoRun`).
 
 import { Alert } from '@mantine/core';
 import { useSetAtom } from 'jotai';
@@ -44,9 +38,8 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
     rendersOnServer(rec.kind),
   );
 
-  // A row with no pixels that nobody has settled is a render already on its
-  // way. A settled one is left to the gallery's retry, which is where every
-  // other kind's is.
+  // A row with no pixels that nobody has settled is a render on its way. A
+  // settled one is left to the gallery's retry, as every other kind is.
   const onItsWay = (rec: EvidenceRecord) =>
     !rec.file && !mayRetry(evidence.stateOf(rec));
 
@@ -62,10 +55,9 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
       : [];
   const kept = (spec: EvidenceSpec) => matching(spec).length > 0;
 
-  // Every chip here orders the same way and refuses for the same reasons; only
-  // the wording and what is asked for differ. `note` is the line under the
-  // label while nothing is happening, `about` the sentence in the tooltip —
-  // the same string unless the idle line is better spent on a figure.
+  // `note` is the line under the label while nothing is happening, `about` the
+  // sentence in the tooltip — the same string unless the idle line is better
+  // spent on a figure.
   const orderChip = (
     spec: EvidenceSpec,
     label: string,
@@ -106,9 +98,7 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
 
   const flyfotoTitle = `${t('acquire.flyfoto')} — ${t('acquire.flyfotoHint')}`;
 
-  // A run has the map, so the box becomes a bar along the bottom of it — the
-  // same move the card's rectangle and pen make, for the same reason: what is
-  // being judged is on the ground and the buttons follow the eye.
+  // A run has the map, so the box becomes a bar along the bottom of it.
   if (run.phase !== 'off') {
     return <FlyfotoRun run={run} failed={evidence.failed} />;
   }
@@ -118,8 +108,7 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
       className={styles.panel}
       icon="biotech"
       title={t('acquire.title')}
-      // Back to the card: this box is one of its tools rather than a box of its
-      // own, and the spot itself is closed from there.
+      // Back to the card, which is where the spot itself is closed from.
       onClose={() => setAcquiring(false)}
     >
       <p className={styles.note}>{t('acquire.hint')}</p>

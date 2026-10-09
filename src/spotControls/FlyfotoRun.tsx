@@ -1,7 +1,6 @@
 // The acquisition box while a run has the map. The proposal itself is on the
 // ground, in the footprint and under the spot's drawing, so this is a bar
-// along the bottom rather than a box in the corner: keep or discard sits next
-// to what is being judged, and nothing here covers it.
+// along the bottom: nothing here covers what is being judged.
 
 import { Button, Loader } from '@mantine/core';
 import { useAtomValue } from 'jotai';
@@ -29,9 +28,8 @@ export const FlyfotoRun = ({ run, failed }: { run: Run; failed: boolean }) => {
   const stuck = card?.state === 'empty' || card?.state === 'failed';
   const pending = card != null && card.state !== 'ready' && !stuck;
 
-  // What yes does: ask again when there are no pixels to keep, keep them when
-  // there are. Null where the button is disabled, so the key can do no more
-  // than the hand.
+  // Ask again when there are no pixels to keep, keep them when there are. Null
+  // where the button is disabled, so the key can do no more than the hand.
   const yes = !card
     ? null
     : stuck
@@ -41,9 +39,8 @@ export const FlyfotoRun = ({ run, failed }: { run: Run; failed: boolean }) => {
         : null;
   const no = !card || run.keeping ? null : run.discard;
 
-  // The answer is a keystroke as well as a button: the reader is out on the
-  // ground zooming and panning over the proposal, and coming back to the bar
-  // for every acquisition is the walk's whole cost.
+  // A keystroke as well as a button: the reader is out on the ground over the
+  // proposal, and coming back to the bar each time is the walk's whole cost.
   useEffect(() => {
     if (penHasTheMap) return;
     const onKey = (event: KeyboardEvent) => {
@@ -122,11 +119,9 @@ export const FlyfotoRun = ({ run, failed }: { run: Run; failed: boolean }) => {
           </>
         )}
 
-        {/* Held against the right edge of a bar of fixed width, so an answer
-            is in the same place whatever the acquisition is called. Two
-            buttons, always: a proposal with no pixels to keep has the ask
-            again where the yes was, so the no never moves out from under the
-            hand. */}
+        {/* Held against the right edge of a bar of fixed width, and always two
+            buttons — a proposal with no pixels puts the ask again where the
+            yes was — so an answer never moves out from under the hand. */}
         <div className={styles.actions}>
           {card &&
             (stuck ? (

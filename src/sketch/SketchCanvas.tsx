@@ -63,9 +63,9 @@ const pixelDeltaY = (event: WheelEvent) =>
 
 // Excalidraw has no prop for a plain wheel zoom, so one is caught in the
 // capture phase and re-dispatched at the same target with `ctrlKey` set — the
-// event a trackpad pinch sends — keeping Excalidraw's own anchoring, stepping
-// and clamping. Ctrl/Cmd+wheel, Shift+wheel and anything off the canvas are
-// left alone.
+// event a trackpad pinch sends — keeping its own anchoring, stepping and
+// clamping. Ctrl/Cmd+wheel, Shift+wheel and anything off the canvas are left
+// alone.
 const zoomOnWheel = (event: WheelEvent) => {
   // `isTrusted` is the recursion guard: a dispatched event is never trusted, so
   // the copy below passes through to Excalidraw's own handler.
@@ -90,10 +90,8 @@ const zoomOnWheel = (event: WheelEvent) => {
 
 type Offset = { x: number; y: number; zoom: number };
 
-// What every canvas opens on, the reader's remembered pen notwithstanding: the
-// hand behaves as the map they just left did, a drag moving the view rather
-// than laying a stroke down. Panning is the map's own interaction elsewhere and
-// that one is frozen for the session, so this is the tool that stands in for it.
+// What every canvas opens on, the remembered pen notwithstanding: the map's own
+// panning is frozen for the session, so the hand stands in for it.
 const OPENING_TOOL: BoxTool = 'hand';
 
 // Excalidraw has no prop for a zoom floor or a scroll extent, so a frame that
@@ -133,14 +131,13 @@ const buildInitialData = (
     // in another. The chrome is restyled in the CSS module instead.
     theme: 'light',
     // The *next* stroke; existing ones keep what they were drawn with. Only
-    // the three the strip offers are set — the rest, roughness and rounded
-    // edges among them, are Excalidraw's own and are what make a traced line
-    // look drawn rather than plotted.
+    // the three the strip offers — roughness and rounded edges are left
+    // Excalidraw's own, which is what makes a traced line look drawn.
     currentItemStrokeColor: pen.colour,
     currentItemStrokeWidth: pen.width,
     currentItemBackgroundColor: 'transparent',
-    // Hatched rather than Excalidraw's solid: a filled shape here sits over
-    // the ground being read, and a solid one hides the evidence.
+    // Hatched rather than Excalidraw's solid: a filled shape sits over the
+    // ground being read, and a solid one hides the evidence.
     currentItemFillStyle: 'hachure',
     // Puts the scene over its ground with the map untransformed
     // (`initialSceneView`).
@@ -160,10 +157,9 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState<Offset | null>(null);
-  // The zoom the canvas opened at, as Excalidraw normalised it: the floor the
-  // scene may not be taken out past. Read off the first frame rather than
-  // `offset`, because Excalidraw clamps a zoom it is handed to its own
-  // 10%…3000%, and a floor it can never reach would put every frame back.
+  // The floor the scene may not be taken out past. Read off the first frame
+  // rather than `offset`, because Excalidraw clamps a zoom it is handed to its
+  // own 10%…3000%, and a floor it can never reach would put every frame back.
   const floorZoom = useRef<number | null>(null);
   // `onChange` fires on every pointer sample, so the transform is rewritten
   // only when the view actually moved.
@@ -174,10 +170,8 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
   // feeding that back into `initialData` would rebuild the scene mid-stroke.
   const [opening] = useState(() => session.opening);
 
-  // Two records behind the strip. `pen` is what the reader last reached for,
-  // which is what the grouped buttons stand for and what the canvas opens
-  // styled with; `live` is Excalidraw's own state. Both are refreshed off
-  // `onChange`.
+  // Two records behind the strip, both refreshed off `onChange`: `pen` is what
+  // the reader last reached for, `live` is Excalidraw's own state.
   const [pen, setPen] = useState(rememberedPen);
   const [live, setLive] = useState<Live>(() => ({
     tool: OPENING_TOOL,
@@ -200,7 +194,7 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
 
   // Scene (0, 0) is the top-left of the frozen viewport but this surface covers
   // only the map's rectangle, so the scene is scrolled by its inset. A layout
-  // effect, so the first paint already has it.
+  // effect, so the first paint has it.
   useLayoutEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -233,18 +227,16 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
         read: () => api.getSceneElementsIncludingDeleted(),
       });
       // Through the API rather than `initialData`, which restores an active
-      // tool only for the values its own restorer allows. The lock is the
-      // reader's own; the tool is not, so nothing here can put a stroke down by
-      // accident on the press that opened the canvas.
+      // tool only for the values its own restorer allows.
       api.setActiveTool({ type: OPENING_TOOL, locked: rememberedPen().locked });
     },
     [session.frame],
   );
 
-  // Nothing is read off the scene here on the way out: by the time this runs
-  // Excalidraw is being torn down and answers with an empty scene, which would
-  // go over the atom as a drawing with no strokes. Whoever ends the session
-  // takes the scene first, through `sketchNow` while the canvas is still up.
+  // Nothing is read off the scene on the way out: Excalidraw is being torn down
+  // by now and answers with an empty one, which would go over the atom as a
+  // drawing with no strokes. Whoever ends the session takes it first, through
+  // `sketchNow` while the canvas is still up.
   useEffect(
     () => () => {
       if (settle.current != null) window.clearTimeout(settle.current);
@@ -307,8 +299,8 @@ export const SketchCanvas = ({ session }: { session: SketchSession }) => {
           // make typing a name pick tools too.
           handleKeyboardGlobally={false}
           UIOptions={{
-            // All of these act on Excalidraw's document as a file; here it is
-            // one field of a spot, saved with the rest of it.
+            // All of these act on the scene as a file; here it is one field of
+            // a spot, saved with the rest of it.
             canvasActions: {
               changeViewBackgroundColor: false,
               clearCanvas: false,

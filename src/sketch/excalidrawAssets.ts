@@ -12,10 +12,10 @@ declare global {
 window.EXCALIDRAW_ASSET_PATH = '/';
 
 // The base is not enough: Excalidraw appends its CDN behind the local URL in
-// every font's src list, and the browser checks CSP against every source in the
-// list at FontFace construction rather than when one is chosen — ~400 blocked
-// entries logged per drawing. The list is assembled inside the editor bundle,
-// so construction is the only place to strip it.
+// every font's src list, and the browser checks CSP against every source in
+// the list at FontFace construction rather than when one is chosen — ~400
+// blocked entries logged per drawing. The list is assembled inside the editor
+// bundle, so construction is the only place to strip it.
 const CDN_FALLBACK = '//esm.sh/';
 
 const withoutCdnFallback = (src: string): string => {

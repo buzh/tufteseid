@@ -1,5 +1,5 @@
-// Every spot's chosen drawing on the ground at once: one layer, no pin/plate.
-// Click on the strokes themselves opens the spot; the open spot is in `overlay.ts`.
+// Every spot's chosen drawing on the ground at once: one layer, no pin or
+// plate. Clicking the strokes opens the spot; the open spot is `overlay.ts`.
 import { atom, useAtom, useAtomValue, useStore } from 'jotai';
 import type { Extent } from 'ol/extent';
 import {
@@ -45,18 +45,14 @@ const LAYER_ID = 'allSketchesLayer';
 /** `a` for alle. */
 const TOGGLE_KEY = 'a';
 
-/** Whether the shared drawing layer is on. Off until asked for: it is a
- *  reading of the whole map, not the furniture. */
 export const allSketchesShownAtom = atom(
   getUrlParameter('sketches') === 'true',
 );
 
-/** The spots whose drawing is on the ground this frame. Their pins come off in
- *  `spots/spotLayer.ts` — the drawing is the pin, and a name plate over it is
- *  the furniture this reading is without. Written by the layer after it paints
- *  rather than derived from the zoom, so a spot is never left with neither:
- *  an id is in here only once its strokes are actually there. Empty while the
- *  layer is off. */
+/** The spots whose drawing is on the ground this frame; their pins come off in
+ *  `spots/spotLayer.ts`. Written by the layer after it paints rather than
+ *  derived from the zoom, so a spot is never left with neither: an id is in
+ *  here only once its strokes are. Empty while the layer is off. */
 export const drawnSketchSpotsAtom = atom<ReadonlySet<string>>(
   new Set<string>(),
 );
@@ -65,20 +61,19 @@ export const drawnSketchSpotsAtom = atom<ReadonlySet<string>>(
 // frame of a pinch queues an export — and here there are many to queue.
 const RESCALE_TOLERANCE = 1.4;
 
-/** Drawings narrower than this on screen are a smudge, and exporting one costs
- *  the same as exporting a legible one. */
+// Narrower than this on screen is a smudge, and exporting one costs what a
+// legible one costs.
 const MIN_ON_SCREEN_PX = 24;
 
-/** Exports in flight at once. Excalidraw's export holds the main thread, so a
- *  wide view full of spots must not start twenty of them. */
+// Excalidraw's export holds the main thread, so a wide view full of spots must
+// not start twenty of them.
 const MAX_IN_FLIGHT = 2;
 
-/** Per drawing, against the 16 M a lone drawing gets: forty at that budget
- *  would be a gigabyte of canvas. */
+// Per drawing, against the 16 M a lone drawing gets: forty at that budget would
+// be a gigabyte of canvas.
 const MAX_RENDER_PIXELS = 4000000;
 
-/** How many renders are held before the off-screen ones are let go. What is on
- *  screen is always kept. */
+// Before the off-screen renders are let go; what is on screen is always kept.
 const MAX_KEPT_RENDERS = 40;
 
 /** Alpha, 0–255, at which a pixel counts as drawn on. */
@@ -90,8 +85,8 @@ const HIT_TOLERANCE_PX = 6;
 type Entry = {
   record: SpotRecord;
   sketch: Sketch;
-  /** The strokes' own ground, EPSG:25833. Culls the drawing against the
-   *  viewport before any pixels exist. */
+  /** The strokes' own ground, EPSG:25833: culls against the viewport before
+   *  any pixels exist. */
   extent: Extent;
   render: SceneRender | null;
   /** Device pixels per scene unit `render` was made at; set even when the
@@ -105,8 +100,8 @@ type State = {
   inFlight: number;
   out: HTMLCanvasElement | null;
   redraw: () => void;
-  /** What `standing` was last told, so a frame that changed nothing is not an
-   *  atom write and a re-cluster. */
+  /** Last published, so a frame that changed nothing is not an atom write and
+   *  a re-cluster. */
   standing: ReadonlySet<string>;
   publish: (ids: ReadonlySet<string>) => void;
 };
@@ -123,8 +118,8 @@ const needsRender = (entry: Entry, scale: number): boolean =>
   scale * RESCALE_TOLERANCE <= entry.renderedScale;
 
 // Called from inside `canvasFunction`, which cannot wait: the drawing appears
-// when the export lands and asks for a redraw. The entry is looked up again
-// afterwards because the record list may have dropped it meanwhile.
+// when the export lands and asks for a redraw. Looked up again afterwards
+// because the record list may have dropped the entry meanwhile.
 const startRender = (state: State, entry: Entry, scale: number) => {
   state.inFlight += 1;
   entry.pending = true;
@@ -198,8 +193,7 @@ const drawAll =
       }
     }
 
-    // Widest first: the drawing the reader is looking at lands before the ones
-    // at the edge of the view.
+    // Widest first, so the drawing being looked at lands before the edges.
     wanted.sort((a, b) => b.span - a.span);
     for (const next of wanted) {
       if (state.inFlight >= MAX_IN_FLIGHT) break;
@@ -218,8 +212,6 @@ const drawAll =
     return out;
   };
 
-/** Whether a ground coordinate lands on a stroke rather than on the
- *  transparency around it. */
 const alphaHit = (
   render: SceneRender,
   [x, y]: number[],
@@ -260,8 +252,8 @@ const alphaHit = (
   return false;
 };
 
-/** The spot whose strokes a pixel takes hold of. The smallest drawing wins
- *  where two overlap: it is the one the larger was drawn around. */
+/** The smallest drawing wins where two overlap: it is the one the larger was
+ *  drawn around. */
 const sketchAtPixel = (
   state: State,
   map: OlMap,
@@ -304,9 +296,8 @@ export const useAllSketchesLayer = () => {
   const penHasTheMap = useAtomValue(sketchSessionAtom) !== null;
   const store = useStore();
 
-  // Everything mutable belongs to the layer and is made with it: the render
-  // cache is written from inside `canvasFunction` and from exports landing
-  // afterwards, neither of which is a render of this component.
+  // The render cache is written from inside `canvasFunction` and from exports
+  // landing afterwards, neither of which is a render of this component.
   const stateRef = useRef<State | null>(null);
   const layerRef = useRef<ImageLayer<ImageCanvasSource> | null>(null);
 
@@ -317,8 +308,8 @@ export const useAllSketchesLayer = () => {
       out: null,
       redraw: () => {},
       standing: new Set<string>(),
-      // Off the render stack: the pin layer re-clusters on this, and that is
-      // not something to set going from inside another layer's draw.
+      // Off the render stack: the pin layer re-clusters on this, which must
+      // not be set going from inside another layer's draw.
       publish: (ids) => {
         if (sameIds(ids, state.standing)) return;
         state.standing = ids;
@@ -355,9 +346,8 @@ export const useAllSketchesLayer = () => {
     };
   }, [map, store]);
 
-  // A hidden layer is never asked for a canvas, so taking the drawings off
-  // also stops them being exported — and stops it saying which pins to stand
-  // down, which is why the list is given back here rather than in a frame
+  // A hidden layer is never asked for a canvas, so it also stops saying which
+  // pins to stand down: the list is given back here rather than in a frame
   // that will not come.
   useEffect(() => {
     layerRef.current?.setVisible(shown);
@@ -371,8 +361,8 @@ export const useAllSketchesLayer = () => {
     }
   }, [map, shown, store]);
 
-  // The open spot and the one being drafted are left out: `overlay.ts` draws
-  // those, and two copies of one drawing would darken every stroke.
+  // The open spot and the drafted one are `overlay.ts`'s; two copies of one
+  // drawing would darken every stroke.
   const skipActive = active?.id ?? null;
   const skipDraft = draft?.recordId ?? null;
 
@@ -415,8 +405,8 @@ export const useAllSketchesLayer = () => {
       // Deaf while drafting: the same click places the new pin
       // (`spots/pinPlace.ts`).
       if (store.get(spotDraftAtom) || store.get(spotPlacingAtom)) return;
-      // A pin over a drawing wins — it is the smaller target and the one that
-      // says which spot it opens.
+      // A pin over a drawing wins: the smaller target, and the one that says
+      // which spot it opens.
       if (spotsAtPixel(map, event.pixel)) return;
       const record = sketchAtPixel(state, map, event.pixel);
       if (record) setActive(record);

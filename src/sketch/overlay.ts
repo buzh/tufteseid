@@ -1,5 +1,4 @@
-// One saved drawing on the map: a transparent layer re-exporting its scene at
-// the resolution the view is showing.
+// One saved drawing on the map, re-exported at the view's own resolution.
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import type { Extent } from 'ol/extent';
 import ImageLayer from 'ol/layer/Image';
@@ -17,7 +16,6 @@ import type { Sketch } from './scene';
 // Inventory in docs/map-layers.md.
 const Z_INDEX = 2;
 
-/** Whether the drawing is on the ground at all. */
 export const sketchShownAtom = atom(true);
 
 /** 0–100, as the reader's slider is. */
@@ -110,7 +108,6 @@ const drawEntry =
     return out;
   };
 
-/** Draws `sketch` over the ground it was made on, or nothing for null. */
 export const useSketchOverlay = (sketch: Sketch | null) => {
   const map = useAtomValue(mapAtom);
   const [shown, setShown] = useAtom(sketchShownAtom);

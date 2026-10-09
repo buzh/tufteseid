@@ -48,9 +48,9 @@ const SketchCanvas = lazy(() =>
   })),
 );
 
-/** Split out so the draft controller mounts and unmounts with the draft. Only
- *  for an editor draft: a card draft's controller belongs inside the card,
- *  which stays on screen for the whole of it. */
+/** Split out so the controller mounts and unmounts with the draft. Only for an
+ *  editor draft: a card draft's belongs inside the card, which stays on screen
+ *  for the whole of it. */
 const SpotPropertiesBox = () => {
   const draft = useAtomValue(spotDraftAtom);
   const active = useAtomValue(activeSpotAtom);
@@ -62,10 +62,8 @@ const SpotPropertiesBox = () => {
   return <SpotProperties spot={spot} />;
 };
 
-/** A laid-on sun loop. Its own component because the loop overlay publishes a
- *  transport that changes with every frame, and the surface below renders the
- *  whole card. Nothing drives the transport here: the card lays a picture on
- *  the ground to draw over, and a loop plays while it is there. */
+/** Its own component because the loop overlay publishes a transport that
+ *  changes with every frame, and the surface below renders the whole card. */
 const DraftGroundLoop = ({
   ground,
   bandTop,
@@ -139,18 +137,17 @@ export const SpotSurface = () => {
           <SketchCanvas key={session.id} session={session} />
         </Suspense>
       )}
-      {/* One banner at a time: both take the same seat, and arming the `+` is
-          a deliberate act that supersedes a notice about a link. */}
+      {/* One banner at a time: both take the same seat. */}
       {placing ? <SpotPlacePrompt /> : <SpotLinkFailed />}
       {/* Away rather than unmounted while a drawing is up: the box carries the
-          draft controller, and it is that controller that writes the strokes —
-          on the button the band presses, or failing that on its own unmount,
-          which here would fire with the canvas still open. */}
+          draft controller, which writes the strokes — on the button the band
+          presses, or failing that on its own unmount, which here would fire
+          with the canvas still open. */}
       <div className={context === 'draw' ? styles.away : undefined}>
         {/* Keyed on the spot so opening a second does not inherit the first's
-            confirm — and so the card survives a card draft opening under it,
-            which is what keeps the picture list and the traced ground in place
-            while the reader reaches for the rectangle. */}
+            confirm, and so the card survives a card draft opening under it —
+            which is what keeps the picture list and the traced ground in
+            place while the reader reaches for the rectangle. */}
         {draft?.box === 'editor' ? (
           <SpotPropertiesBox key={draft.id} />
         ) : (

@@ -38,8 +38,7 @@ const ICONS: Record<BoxTool, MaterialSymbol> = {
   eraser: 'ink_eraser',
 };
 
-/** Long enough not to fire on a press meant as an ordinary one, short enough
- *  that a reader who suspects there is more under the button finds out. */
+// Long enough not to fire on an ordinary press, short enough to be found.
 const HOLD_MS = 350;
 
 type Choose = (tool: BoxTool, locked: boolean) => void;
@@ -81,9 +80,8 @@ const ToolButton = ({
   </Tooltip>
 );
 
-/** One button standing for several tools: a press picks the member it is
- *  showing, a hold opens the rest. Which member it shows is the last one
- *  picked, remembered across sessions by `pen.ts`. */
+/** A press picks the member being shown, a hold opens the rest. Which member
+ *  that is is the last one picked, remembered by `pen.ts`. */
 const ToolGroup = ({
   members,
   current,
@@ -207,9 +205,8 @@ export const SketchTools = ({
       role="toolbar"
       aria-label={t('spots.penTools')}
       // `handleKeyboardGlobally` is off, so Excalidraw's shortcuts are bound to
-      // its own container: a press that moved focus out here would leave the
-      // reader without them until they clicked back onto the canvas. Tabbing
-      // in still works, and the click still fires.
+      // its own container: a press that moved focus out here would lose them
+      // until the reader clicked back. Tabbing in still works.
       onPointerDown={(event) => event.preventDefault()}
     >
       <div className={styles.row}>

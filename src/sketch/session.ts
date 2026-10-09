@@ -1,7 +1,3 @@
-// The map element follows the Excalidraw canvas with a CSS transform while the
-// OpenLayers view holds still, which keeps the frame the strokes are registered
-// to valid for the whole session.
-
 import { atom } from 'jotai';
 // Type-only: a value import would pull OpenLayers into the entry graph.
 import type Map from 'ol/Map';
@@ -15,7 +11,6 @@ import { storableScene, type SceneElement } from './scene';
 export type SketchSession = {
   id: number;
   frame: SketchFrame;
-  /** What the canvas opens on: the draft's strokes so far, or nothing. */
   opening: readonly SceneElement[];
 };
 
@@ -52,9 +47,8 @@ let frozen: Interaction[] | null = null;
 let mapOrigin = { x: 0, y: 0 };
 
 // Map pixels per scene unit, and the map pixel the frame's north-west corner
-// sits at. Degenerate for a freshly captured frame; a resumed one is flown back
-// to a rectangle `constrainResolution` and a resized window have shifted, and
-// the transform absorbs the difference.
+// sits at. Degenerate for a freshly captured frame; for a resumed one the
+// transform absorbs what `constrainResolution` and a resized window shifted.
 let sceneToMap = { unit: 1, origin: { x: 0, y: 0 } };
 
 /** Where the Excalidraw scene is looking, in its own terms. */
@@ -66,8 +60,7 @@ export type SceneView = {
   offsetTop: number;
 };
 
-// The transform the map element is wearing, kept so `thawMap` can hand the
-// view what the scene was looking at.
+// Kept so `thawMap` can hand the view what the scene was looking at.
 let worn: { x: number; y: number; scale: number } | null = null;
 
 /** Where the transform puts the map element's own top-left, in the element's
@@ -85,17 +78,14 @@ const sceneTranslation = (view: SceneView, scale: number) => ({
     sceneToMap.origin.y * scale,
 });
 
-/*
- * Point the frozen map at whatever the scene is looking at. Excalidraw puts
- * scene point `s` at client `(s + scroll) · zoom + offset`; the map,
- * transformed by `translate(t) scale(S)` about its own top-left, puts it at
- * `(origin + s · unit) · S + t + mapOrigin`. Equating the two gives
- * `S = zoom / unit` and the translation below.
- *
- * A CSS transform, not a view change: the view must not move or the frame goes
- * stale, and the transform is invisible to OpenLayers, whose `getSize()` reads
- * layout and whose ResizeObserver watches the content box.
- */
+// Excalidraw puts scene point `s` at client `(s + scroll) · zoom + offset`;
+// the map, transformed by `translate(t) scale(S)` about its own top-left, puts
+// it at `(origin + s · unit) · S + t + mapOrigin`. Equating the two gives
+// `S = zoom / unit` and the translation below.
+//
+// A CSS transform, not a view change: the view must not move or the frame goes
+// stale, and the transform is invisible to OpenLayers, whose `getSize()` reads
+// layout and whose ResizeObserver watches the content box.
 export const slaveMapToScene = (map: Map, view: SceneView | null) => {
   const target = map.getTargetElement();
   if (!target) return;
@@ -124,14 +114,10 @@ const HOLD_SLACK = 0.01;
 const inRoom = (t: number, room: number) => Math.max(-room, Math.min(0, t));
 
 /** The nearest view to `view` that keeps the frozen map under the whole
- *  surface, or null when `view` already does.
- *
- *  `floorZoom` is the zoom the canvas opened at. The map is one element scaled
- *  by `zoom / unit`, laid out exactly under the surface Excalidraw draws on: at
- *  the floor it covers that surface and nothing else, so there is no scrolling
- *  it and zooming out past it would bring no more ground in — it would pull the
- *  ground off the edges instead. Above the floor the element is larger than the
- *  surface, and the difference is how far the scene may be scrolled. */
+ *  surface, or null when `view` already does. At `floorZoom` — the zoom the
+ *  canvas opened at — the scaled element covers the surface exactly, so there
+ *  is no room to scroll and zooming out would pull ground off the edges;
+ *  above it the surplus is that room. */
 export const holdSceneOnMap = (
   map: Map,
   view: SceneView,
@@ -191,19 +177,18 @@ export const bindFrameToMap = (
   };
 };
 
-/** Where the scene looks when the canvas opens, chosen so the first transform
- *  `slaveMapToScene` computes is the identity. `rect` is the canvas's own
- *  position, which Excalidraw uses as the scene offset. */
+/** Chosen so the first transform `slaveMapToScene` computes is the identity.
+ *  `rect` is the canvas's own position, which Excalidraw uses as the scene
+ *  offset. */
 export const initialSceneView = (rect: { left: number; top: number }) => ({
   zoom: sceneToMap.unit,
   scrollX: (mapOrigin.x + sceneToMap.origin.x - rect.left) / sceneToMap.unit,
   scrollY: (mapOrigin.y + sceneToMap.origin.y - rect.top) / sceneToMap.unit,
 });
 
-/* The view takes over what the scene was looking at, so the pen is put down on
- * the ground it was lifted from rather than on the extent the session froze.
- * The centre is exact; `constrainResolution` rounds the scale to a whole zoom
- * level, and the view's `maxZoom` caps how far in it can follow. */
+// The view takes over what the scene was looking at. The centre is exact;
+// `constrainResolution` rounds the scale to a whole zoom level, and the view's
+// `maxZoom` caps how far in it can follow.
 const followTransform = (map: Map) => {
   const size = map.getSize();
   const view = map.getView();

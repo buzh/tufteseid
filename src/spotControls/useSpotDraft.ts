@@ -1,7 +1,6 @@
-// A spot is written as it is made, not at the end: the record is created the
-// moment the pin lands and every unit of the box after that — the point, the
-// typed text, the drawing, the rectangle — is a write of its own. So there is
-// no save button over the whole box, and closing it throws nothing away.
+// A spot is written as it is made, not at the end: every unit of the box is a
+// write of its own, so there is no save button over the whole of it
+// (docs/architecture.md).
 
 import { useAtom, useAtomValue, useSetAtom, useStore } from 'jotai';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -37,8 +36,8 @@ import { suggestSpotName } from '../spots/spotName';
 /** How long the pin stands still before the name register is asked. */
 const SUGGEST_SETTLE_MS = 500;
 
-/** Which unit of the box wears the accent: whatever has hold of the map, and
- *  failing that the first thing the record is still missing. */
+/** Which unit wears the accent: whatever has the map, failing that the first
+ *  thing the record is missing. */
 export type SpotStep = 'pin' | 'description' | 'sketch' | 'footprint' | null;
 
 export type SpotWriteError = 'save' | 'delete' | null;
@@ -57,7 +56,6 @@ export type SpotDraftController = {
   setDescription: (value: string) => void;
   /** A lookup is in flight and the name field may still fill itself in. */
   suggesting: boolean;
-  /** What is typed differs from what is stored. */
   textDirty: boolean;
   canSaveText: boolean;
   saveText: () => void;
@@ -71,7 +69,6 @@ export type SpotDraftController = {
    *  or larger than `MAX_SIDE_M`, so the square is not what was drawn. */
   footprintClamped: 'min' | 'max' | null;
   hasSketch: boolean;
-  /** A write is in flight. */
   busy: boolean;
   deleting: boolean;
   error: SpotWriteError;
@@ -79,8 +76,8 @@ export type SpotDraftController = {
   sketchTooBig: boolean;
   remove: () => void;
   close: () => void;
-  /** Write what the stage in hand changed and let the draft go. The card closes
-   *  itself from a button on the stage, so unlike the editor it cannot leave
+  /** Write what the stage in hand changed and let the draft go. The card
+   *  closes from a button on the stage, so unlike the editor it cannot leave
    *  the write to the unmount, which cannot tell a kept drawing from a
    *  discarded one. */
   finish: () => void;
@@ -134,11 +131,9 @@ export const useSpotDraft = (
   /** Once the author has typed a name, the register never writes it again. */
   const nameTouched = useRef(saved != null);
 
-  /**
-   * Every write against the record, one at a time and in the order the reader
-   * made them. Two PATCHes in flight together would leave whichever landed
-   * second's copy of the spot on screen, and the create has to be first of all.
-   */
+  // Every write in the order the reader made them: two PATCHes in flight
+  // together would leave whichever landed second's copy on screen, and the
+  // create has to come first of all.
   const chain = useRef<Promise<SpotRecord | null>>(Promise.resolve(saved));
 
   const enqueue = useCallback(
@@ -181,8 +176,8 @@ export const useSpotDraft = (
     [write],
   );
 
-  // The record exists from the moment the pin lands, which is also what lets
-  // the pictures hang off it while the rest is still being filled in.
+  // The record exists from the moment the pin lands, which is what lets the
+  // pictures hang off it while the rest is still being filled in.
   const creating = useRef(saved != null);
   useEffect(() => {
     if (creating.current || !user) return;
@@ -238,8 +233,8 @@ export const useSpotDraft = (
         setSuggesting(false);
         if (!suggestion || nameTouched.current) return;
         setForm((current) => ({ ...current, name: suggestion }));
-        // The record was created under the coordinate, so the register's answer
-        // is a write of its own rather than something the reader must confirm.
+        // The record was created under the coordinate, so the answer is a
+        // write of its own rather than something to confirm.
         patch({ name: suggestion });
       });
     }, SUGGEST_SETTLE_MS);
@@ -267,12 +262,9 @@ export const useSpotDraft = (
     setForm({ name: record.name, description: record.description });
   }, [record, setForm]);
 
-  /**
-   * What the units on the map hold, as the last render saw it. Read through a
-   * ref because the box can be closed from outside itself — the band's `+` —
-   * and the leaving write is then made on the way out rather than by whoever
-   * closed it.
-   */
+  // What the units on the map hold, as the last render saw it. Through a ref
+  // because the box can be closed from outside itself — the band's `+` — and
+  // the leaving write is then made on the way out.
   const held = useRef({
     stage: draft.stage,
     point: draft.point,
@@ -320,10 +312,8 @@ export const useSpotDraft = (
         else {
           setSketchTooBig(false);
           fields.sketch = drawing;
-          // Written with the column it names, so a record that predates the
-          // field gets it the first time its drawing is touched. A spot holds
-          // one drawing today; when it can hold several this is the one on the
-          // shared layer.
+          // Written with the column it names, so a record predating the field
+          // gets it the first time its drawing is touched.
           fields.mapSketch = drawing ? MAP_SKETCH_COLUMN : '';
           kept = drawing;
           // The toggle is a reading setting and outlives the spot it was
@@ -332,16 +322,15 @@ export const useSpotDraft = (
           if (drawing) store.set(sketchShownAtom, true);
         }
       }
-      // The canvas goes as soon as the stage is left and Excalidraw's scene
-      // with it, so this is the only copy the row and the overlay have to read
-      // afterwards. Not on the way out of the box, where the atoms are already
-      // cleared and the draft is gone.
+      // The canvas and Excalidraw's scene go as soon as the stage is left, so
+      // this is the only copy the row and the overlay can read afterwards. Not
+      // on the way out of the box, where the atoms are already cleared.
       if (store.get(spotDraftAtom)) store.set(spotSketchAtom, drawing);
     }
 
-    // A spot always has a rectangle, and the reader is never asked for one: the
-    // first write that finds the record without one gives it the square around
-    // whatever has been drawn, or the default around the pin.
+    // A spot always has a rectangle and is never asked for one: the first
+    // write that finds the record without gives it the square around whatever
+    // has been drawn, or the default around the pin.
     if (rect == null && current.footprint == null) {
       const derived = derivedFootprint(point, kept);
       fields.footprint = derived.bbox;
@@ -413,10 +402,10 @@ export const useSpotDraft = (
     });
   }, [closeDraft, setActive]);
 
-  // The way out, whoever took it. Guarded on the draft actually being gone:
-  // React's development double-invoke would otherwise fire this the moment the
-  // box opened. A delete has already settled the chain on null, so the write
-  // below is skipped and the card does not reopen on a spot that is not there.
+  // Guarded on the draft actually being gone: React's development
+  // double-invoke would otherwise fire this the moment the box opened. A
+  // delete has settled the chain on null, so the write below is skipped and
+  // the card does not reopen on a spot that is not there.
   useEffect(
     () => () => {
       if (left.current || store.get(spotDraftAtom)) return;
@@ -426,11 +415,10 @@ export const useSpotDraft = (
     [commit, store, setActive],
   );
 
-  // The canvas takes the whole map rectangle and this controller's box is away
-  // behind it, so the band drives the two ways out from here — the writes are
-  // this hook's and nothing else can make them. Which pair depends on the box:
-  // a card draft is nothing but the hold and is let go, an editor draft steps
-  // back into a box that is still open.
+  // The canvas takes the whole map rectangle and this box is away behind it,
+  // so the band drives the two ways out: the writes are this hook's and
+  // nothing else can make them. Which pair depends on the box — a card draft
+  // is let go, an editor draft steps back into a box that is still open.
   const drawing = draft.stage === 'sketch';
   const fromCard = draft.box === 'card';
   const setDrawHold = useSetAtom(drawHoldAtom);

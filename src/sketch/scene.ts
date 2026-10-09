@@ -83,11 +83,11 @@ export const sketchOf = (
   };
 };
 
-/** The drawing a spot stands on the shared layer. A spot holds one drawing
- *  today, so `mapSketch` is empty or names the column; an id this build cannot
- *  resolve draws nothing rather than falling back, because falling back would
- *  put the drawing the author took off the map back on it. Unset rather than
- *  empty means the migration has not run — read as the column, so a forgotten
+/** The drawing a spot stands on the shared layer. A spot holds one today, so
+ *  `mapSketch` is empty or names the column; an id this build cannot resolve
+ *  draws nothing rather than falling back, which would put a drawing the
+ *  author took off the map back on it. Unset rather than empty means the
+ *  migration has not run — read as the column, so a forgotten
  *  `docker compose restart pocketbase` does not empty the layer. */
 export const mapSketchOf = (spot: SpotRecord): Sketch | null => {
   const chosen = spot.mapSketch;

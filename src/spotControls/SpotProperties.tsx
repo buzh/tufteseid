@@ -1,6 +1,5 @@
 // Everything about a spot that is typed rather than dragged, plus the delete.
-// The pictures are not here: they belong to `SpotCard`, which is the surface
-// the reader works from and the one this box is reached from.
+// The pictures belong to `SpotCard`, which this box is reached from.
 
 import { Alert, Button, Group, Textarea, TextInput } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
@@ -139,8 +138,7 @@ export const SpotProperties = ({ spot }: { spot: SpotDraftController }) => {
             : sided
               ? t('spots.footprintSide', { metres: spot.footprintSideMetres })
               : // A new spot has none until its first write derives one, which
-                // is the whole life of this box. Saying so beats a blank row
-                // between two that carry a value.
+                // is the whole life of this box.
                 t('spots.footprintPending')}
         </span>
         <Button

@@ -1,8 +1,7 @@
 // Freeze first, then frame: `freezeMap` also cancels an easing view animation,
-// so the extent read afterwards is one the map will still show. A draft that
-// already has strokes keeps their frame and is flown back to it first;
-// `bindFrameToMap` absorbs the difference between the rectangle asked for and
-// the one `constrainResolution` lands on.
+// so the extent read afterwards is one the map will still show. A draft with
+// strokes keeps their frame and is flown back to it first; `bindFrameToMap`
+// absorbs what `constrainResolution` then rounds off.
 
 import { useAtomValue, useStore } from 'jotai';
 import { transformExtent } from 'ol/proj';

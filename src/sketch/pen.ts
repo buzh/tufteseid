@@ -1,19 +1,17 @@
 /** The theme's papaya, the same orange the pin is drawn in. */
 export const PEN_STROKE_COLOUR = '#ff6a00';
 
-/** The two toolbar buttons that stand for a group rather than a tool, opened
- *  by holding the button down. First in each is what a reader who has never
- *  held one gets. */
+/** The two buttons that stand for a group rather than a tool, opened by
+ *  holding. First in each is the default. */
 export const SHAPE_TOOLS = ['ellipse', 'rectangle', 'diamond'] as const;
 export const LINEAR_TOOLS = ['arrow', 'line'] as const;
 
 export type ShapeTool = (typeof SHAPE_TOOLS)[number];
 export type LinearTool = (typeof LINEAR_TOOLS)[number];
 
-/** What the strip offers: strokes that hold their own over both a grey
- *  hillshade and a green ortofoto. A scene may carry any colour — one arriving
- *  by eyedropper or from another reader is drawn and reflected like any
- *  other — these are the ones reachable by a press. */
+/** Only what the strip offers; a scene may carry any colour, an eyedropper's
+ *  among them. Chosen to hold over both a grey hillshade and a green
+ *  ortofoto. */
 export const PEN_COLOURS = [
   { value: PEN_STROKE_COLOUR, name: 'papaya' },
   { value: '#ffffff', name: 'white' },
@@ -24,8 +22,8 @@ export const PEN_COLOURS = [
 ] as const;
 
 /** Excalidraw's own three, thinnest first: `STROKE_WIDTH` is not a package
- *  export. Thinnest is the default — a traced edge is a claim about where
- *  something is, and a 4 px stroke covers two metres of ground. */
+ *  export. Thinnest is the default, a 4 px stroke covering two metres of
+ *  ground. */
 export const PEN_WIDTHS = [
   { value: 1, name: 'thin' },
   { value: 2, name: 'bold' },
@@ -123,9 +121,9 @@ const isShape = (type: string): type is ShapeTool =>
 const isLinear = (type: string): type is LinearTool =>
   (LINEAR_TOOLS as readonly string[]).includes(type);
 
-/** Called from Excalidraw's `onChange`, which fires on every pointer sample,
- *  so only a real change is written. Picking a member of a group is what makes
- *  it the one its button stands for — no separate call from the flyout. */
+/** From `onChange`, which fires on every pointer sample, so only a real change
+ *  is written. Picking a group member is what makes it the one its button
+ *  stands for; the flyout makes no call of its own. */
 export const rememberTool = (type: string, locked: boolean) =>
   write({
     locked,
