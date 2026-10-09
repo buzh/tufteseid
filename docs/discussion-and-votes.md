@@ -183,11 +183,12 @@ only field that legitimately moves is `direction`
 
 **Nobody ranks their own spot** (`1700001900_votes_not_own.js`). Only create
 carries that clause: update pins both relations, so no vote already cast can
-turn into a self-vote. `VoteControl` drops the thumbs entirely here rather
-than disabling them, which is what it does for the other two refusals: being
-signed out and holding a private spot are both states the reader can leave,
-and the tooltip says how, but there is no way out of owning the thing. The
-tally stays, so the author still reads where their spot stands.
+turn into a self-vote. `VoteControl` drops the thumbs entirely here, since
+there is no way out of owning the thing; the tally stays, so the author still
+reads where their spot stands. The other two refusals keep the thumbs and
+say why on the tooltip, and only one of them disables: an admin cannot
+publish somebody else's private spot, but a reader with no account can get
+one, so pressing a live thumb signed out raises the sign-in box.
 
 ### `spotScores` (id `pbc_spot_scores`)
 
