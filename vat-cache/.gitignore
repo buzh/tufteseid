@@ -5,5 +5,6 @@ coverage-*.npz
 # per-machine snapshot of hoydedata.no's catalogue
 catalogue.json
 *.mbtiles
-# plan.py's footprints on the shared grid
+# plan.py's shared-grid footprints and export.py's job records
 plan-*.npz
+export-*.json

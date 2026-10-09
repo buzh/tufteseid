@@ -160,6 +160,42 @@ onto a grid every acquisition shares (`coverage.GRID_ORIGIN`) and cached in
 `plan-<slug>.npz`. Within 0.1 % of the 25 m build mask, and 1/64th of the fill.
 First run over the whole country is some minutes; after that, seconds.
 
+## Ordering raw DTM
+
+```
+.venv/bin/python export.py "NDH Stryn 10pkt 2022" --dry-run
+.venv/bin/python export.py "NDH Stryn 10pkt 2022" -m you@example.com --limit 2
+.venv/bin/python export.py stryn -m you@example.com         carries on
+.venv/bin/python export.py stryn --status
+```
+
+`exportImage` renders a window per work unit — ~90 GB of float TIFF over a full
+ladder, fetched again on every `--redo`, off the one service that falls over
+overnight. The export queue hands over the acquisition's own 0.25 m DTM as
+files, once.
+
+`StartExport` → `ExportStatus` → zip, all three open: no login, no key, and
+`-m` is a copy of the delivery note rather than the route — the script polls.
+Coverage is cut into `--chunk-km` squares on the shared grid and chunks the
+flight never reached are not ordered. Size goes as the square of the chunk and
+the inverse square of the cell: at 0.25 m a square kilometre is 64 MB of
+float32, so the 8 km default is a few GB a job. `export-<slug>.json` holds
+every chunk and its job, so a killed run carries on, `--limit` takes the next
+batch rather than the same one, and `--retry` re-orders what failed.
+
+| Asked for | Sent as |
+| --- | --- |
+| DTM, GeoTIFF | `projectProduct` 1, `format` 5 (point cloud is 0 and LAZ 1; DOM 2; both 3) |
+| the acquisition's own grid | `resolution` 0 — 1, 10 and 50 are the national model's, and come off static files |
+| EPSG:25833 | `outputWkid`; 0 keeps the acquisition's own, which is 25832 for three quarters of them |
+| one job's square | `coordInput`, with `clipToPolygon` 1 so chunks do not overlap |
+| mapsheet inside the zip | `Mapsheetsize`; `--sheet 1` is one file per chunk, and sends `projectMerge` 1 instead |
+
+A closed acquisition is refused: `TILGANG` 2 means every file service answers
+401, and only the ImageServer will ever serve it. **Nothing here has been run
+against the queue** — it orders real work on somebody else's machines, so
+`--dry-run` first and `--limit` small.
+
 ## Which acquisitions have a point cloud
 
 ```
@@ -235,6 +271,7 @@ its own grid and the reach changes with zoom.
 | `vatcache.py` | Store front end: the queue, what is in it, the audit. Never writes |
 | `copc.py` | Upstream front end: which acquisitions hoydedata.no has converted to COPC, and which are closed to download. Reads nothing local but `acquisitions.json` |
 | `plan.py` | Which acquisition to build next: the candidates, their footprints on one shared grid, and the greedy new-ground order |
+| `export.py` | Orders an acquisition's own DTM off the hoydedata.no export queue and downloads the zips. The only thing here that asks somebody else to do work |
 | `build_tiles.py` | Grid geometry, the MBTiles container, a level built into it, the read-back |
 | `cvat.py` | The combined VAT itself — presets, layer walk, `radii_for`. The only module that decides what a pixel is |
 | `fetch_dem.py` | `exportImage` against `Prosjekt_DTM` pinned to one `LAS_PROJECT_NAME`, plus a minimal tiled-float32 TIFF reader. **Also an input to `rendersvc`'s image**, which copies it in for `read_tiff_f32` — one reader, one set of quirks. `.dockerignore` excludes `vat-cache` and re-admits this one file; a rename or a signature change wants `docs/render-sidecar.md` read first |
