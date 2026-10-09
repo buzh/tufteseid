@@ -8,3 +8,5 @@ catalogue.json
 # plan.py's shared-grid footprints and export.py's job records
 plan-*.npz
 export-*.json
+# delivery zips, when -o points inside the repo
+*.zip
