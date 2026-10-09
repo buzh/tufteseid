@@ -71,10 +71,8 @@ export type ExtractedCanvas = {
   bbox25833: [number, number, number, number];
 };
 
-/**
- * `null` when nothing painted and nothing failed — no coverage; a run where
- * every tile errored throws instead.
- */
+/** `null` when nothing painted and nothing failed — no coverage; a run where
+ *  every tile errored throws instead. */
 export async function extractCanvas(
   bbox25833: [number, number, number, number],
   source: LidarSource,

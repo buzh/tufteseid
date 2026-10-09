@@ -10,12 +10,10 @@ const arrived = getUrlParameter('invite') ?? '';
 // already has one — they are following a link to the map like any other.
 export const bootInviteCode = pb.authStore.isValid ? '' : arrived;
 
-// Read at import but left on the URL, the way `shareLink.ts` holds `lok`
-// until the code is settled: the sign-in box is the only thing that can spend
-// it, and a reload or a back-navigation before the reader gets there must not
-// be what loses them their invitation. `src/auth/atoms.ts` puts the box up
-// off this, and the box drops the parameter when it is dismissed or when the
-// trip to the identity provider starts.
+// Read at import but left on the URL, the way `shareLink.ts` holds `lok`: the
+// sign-in box is the only thing that can spend it, and a reload before the
+// reader gets there must not lose them their invitation. The box is what
+// calls this, on dismissal or on starting the trip.
 export const forgetInviteLink = (): void => {
   if (arrived) removeUrlParameter('invite');
 };
