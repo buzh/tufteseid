@@ -146,8 +146,8 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       enqueueRender({
         rec,
         bbox4326: footprint,
-        // Composed here: only the client knows the reader's language, and only a
-        // sun loop's band is typeset by the sidecar.
+        // Composed here: only the client knows the reader's language, and only
+        // a sun loop's band is typeset by the sidecar.
         legend:
           rec.kind === 'sunloop' ? sunLoopLegend(rec, spot, language) : null,
         onDone: upsert,
@@ -235,8 +235,8 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       if (before.length !== writes.length) return;
 
       setFailed(false);
-      // Written first so the row stays where the hand left it, not snapping back
-      // for the round trip.
+      // Written first so the row stays where the hand left it, not snapping
+      // back for the round trip.
       writes.forEach((write, i) => upsert({ ...before[i], sort: write.sort }));
       Promise.all(
         writes.map((write) => setEvidenceSort(write.id, write.sort)),

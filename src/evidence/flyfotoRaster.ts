@@ -25,7 +25,8 @@ const FLYFOTO_LAYER = 'ortofoto';
 // prosjektnavn column, picked with a mosaicRule `where`.
 const FLYFOTO_PROJECT_URL = `${FLYFOTO_PROJECT_IMAGESERVER}/exportImage`;
 
-// The seamless mosaic has no pixel size of its own; an acquisition uses its own.
+// The seamless mosaic has no pixel size of its own; an acquisition uses its
+// own.
 const MOSAIC_M_PER_PX = 0.2;
 
 // NiB sits behind the same shed-and-retry public edge as Kartverket.
@@ -82,17 +83,18 @@ const mosaicUrl = (
   return `${FLYFOTO_WMS_URL}?${params.toString()}`;
 };
 
-// Null when nothing painted and nothing failed (outside coverage, not a fault); a
-// grab where every tile errored throws. Same rule as `extractCanvas` and `fetchDem`.
+// Null when nothing painted and nothing failed (outside coverage, not a fault);
+// a grab where every tile errored throws. Same rule as `extractCanvas` and
+// `fetchDem`.
 export const fetchFlyfotoRaster = async (
   bbox4326: Bbox,
   { project, signal }: { project?: FlyfotoProject; signal?: AbortSignal } = {},
 ): Promise<Raster | null> => {
   const bbox25833 = bboxToMetric(bbox4326);
 
-  // The acquisition's own grid: never upsampled (a 1937 flight stretched is four
-  // times the tiles for the same detail) nor downsampled (that resolution is the
-  // point of keeping).
+  // The acquisition's own grid: never upsampled (a 1937 flight stretched is
+  // four times the tiles for the same detail) nor downsampled (that resolution
+  // is the point of keeping).
   const native = project?.metresPerPx ?? 0;
   const metresPerPx = Math.max(
     native > 0 ? native : MOSAIC_M_PER_PX,

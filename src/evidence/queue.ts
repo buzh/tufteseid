@@ -12,8 +12,9 @@ import type { SunLoopLegend } from './legendContent';
 import { renderEvidence, type BrowserSpec, type Produced } from './render';
 import { specOf } from './spec';
 
-// Absent means "not the queue's business": the pixels are there or nobody asked.
-// `failed` is a fault; `empty` says the source had nothing over this rectangle.
+// Absent means "not the queue's business": the pixels are there or nobody
+// asked. `failed` is a fault; `empty` says the source had nothing over this
+// rectangle.
 export type RenderState = 'queued' | 'running' | 'empty' | 'failed';
 
 const STATES: readonly RenderState[] = ['queued', 'running', 'empty', 'failed'];
@@ -24,8 +25,8 @@ export const mayRetry = (state: RenderState | undefined): boolean =>
 
 // The sidecar beats `job.at` every minute while a job is queued or running
 // (`BEAT_S` in `rendersvc/server.py`); five beats' silence is a dead worker,
-// not a slow one. A job can legitimately hold for ~an hour (fetch retries, three
-// encode attempts).
+// not a slow one. A job can legitimately hold for ~an hour (fetch retries,
+// three encode attempts).
 const STALE_JOB_MS = 300000;
 
 // Absent once the file lands: the sidecar writes pixels and meta in one request
@@ -56,15 +57,18 @@ type RenderJob = {
 // cap) at ~1.5 Mbit/s up.
 const RENDER_DEADLINE_MS = 300000;
 const UPLOAD_DEADLINE_MS = 300000;
-// The sidecar answers once it has claimed the row; the render is not on this clock.
+// The sidecar answers once it has claimed the row; the render is not on this
+// clock.
 const HANDOVER_DEADLINE_MS = 30000;
 
 // Also how far ahead of the proposal a picker looks: raising one without the
-// other buys nothing, since a run wants a render going in every lane it may use.
+// other buys nothing, since a run wants a render going in every lane it may
+// use.
 export const PREVIEW_LANES = 2;
 
-// Thunks, not jobs: a preview has no row to keep a state for, and settles itself
-// so the pump never sees a throw. `solo` is a row's render, which runs alone.
+// Thunks, not jobs: a preview has no row to keep a state for, and settles
+// itself so the pump never sees a throw. `solo` is a row's render, which runs
+// alone.
 type Task = { run: () => Promise<void>; solo: boolean };
 
 const queue: Task[] = [];
@@ -154,8 +158,8 @@ const runJob = async (job: RenderJob): Promise<EvidenceRecord | null> => {
   return done;
 };
 
-// Strictly in order, so a `solo` at the head holds previews behind it: a row the
-// reader asked for is never starved by a run that keeps proposing.
+// Strictly in order, so a `solo` at the head holds previews behind it: a row
+// the reader asked for is never starved by a run that keeps proposing.
 const pump = () => {
   while (queue.length > 0 && !soloBusy) {
     const next = queue[0];
@@ -201,8 +205,8 @@ export const enqueueRender = (job: RenderJob): void => {
 };
 
 // Pixels with no row behind them, shown before the reader decides to keep them.
-// `signal` gates the queue position, not the render: a burst on the wire ends on
-// its own deadline and only its result is dropped. Rejects with the signal's
+// `signal` gates the queue position, not the render: a burst on the wire ends
+// on its own deadline and only its result is dropped. Rejects with the signal's
 // reason for a preview no longer wanted.
 export const enqueuePreview = (
   spec: BrowserSpec,

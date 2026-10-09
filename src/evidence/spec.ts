@@ -84,8 +84,8 @@ export const SUN_LOOP_SPEC: Extract<EvidenceSpec, { kind: 'sunloop' }> = {
   fps: SUNLOOP_FPS,
 };
 
-// Fixed, like the sun loop: a blend is RVT's whole recipe, nothing to ask about.
-// DTM, because a blend of the canopy is a picture of the canopy.
+// Fixed, like the sun loop: a blend is RVT's whole recipe, nothing to ask
+// about. DTM, because a blend of the canopy is a picture of the canopy.
 export const RVT_SPECS: readonly Extract<EvidenceSpec, { kind: 'rvt' }>[] =
   RVT_BLENDS.map((vis) => ({ kind: 'rvt', vis, model: 'dtm' }));
 
@@ -155,8 +155,8 @@ export const metaOf = (spec: EvidenceSpec): EvidenceMeta => {
   }
 };
 
-// A stored row read back as parameters; null when the column no longer describes
-// a render — nothing to retry, not a failure.
+// A stored row read back as parameters; null when the column no longer
+// describes a render — nothing to retry, not a failure.
 export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
   const meta = rec.meta;
   if (!meta) return null;
@@ -224,7 +224,8 @@ export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
 };
 
 // EPSG:25833, as the render wrote it — not the spot's footprint, which may have
-// moved. Null for a row with no rectangle, which cannot be laid back on the map.
+// moved. Null for a row with no rectangle, which cannot be laid back on the
+// map.
 export const evidenceBbox = (
   rec: EvidenceRecord,
 ): [number, number, number, number] | null => bboxOfMeta(rec.meta);
@@ -288,10 +289,10 @@ const sameBbox = (a: [number, number, number, number], b: unknown): boolean =>
 
 const sameNumber = (a: number, b: number) => Math.abs(a - b) <= PARAM_TOLERANCE;
 
-// Whether this row is already the picture `spec` would produce over `bbox25833`.
-// Only identifying fields count (year and point density are provenance, not
-// identity); strict about the rectangle, so a row kept before the footprint moved
-// does not read as kept.
+// Whether this row is already the picture `spec` would produce over
+// `bbox25833`. Only identifying fields count (year and point density are
+// provenance, not identity); strict about the rectangle, so a row kept before
+// the footprint moved does not read as kept.
 export const evidenceMatches = (
   rec: EvidenceRecord,
   spec: EvidenceSpec,

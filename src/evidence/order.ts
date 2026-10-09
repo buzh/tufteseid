@@ -48,8 +48,8 @@ export const sortsForMove = (
   }
 
   const between = (before + after) / 2;
-  // No key left between the neighbours (equal keys, or a gap halved to nothing);
-  // spread the whole list out again instead.
+  // No key left between the neighbours (equal keys, or a gap halved to
+  // nothing); spread the whole list out again instead.
   if (between > before && between < after) return [{ id, sort: between }];
   return renumbered(moved(list, from, to));
 };

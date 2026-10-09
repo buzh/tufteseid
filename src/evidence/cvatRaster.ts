@@ -1,7 +1,7 @@
-// The cached ground as pixels over one rectangle: the same tiles `cvatGround.ts`
-// puts on the map, read off /cvat/* and stitched. Not a WMS grab — the store
-// answers whole tiles on the app's own grid (`wmsTileGrid.ts`), so the level is
-// chosen and the edges cropped here.
+// The cached ground as pixels over one rectangle: the same tiles
+// `cvatGround.ts` puts on the map, read off /cvat/* and stitched. Not a WMS
+// grab — the store answers whole tiles on the app's own grid
+// (`wmsTileGrid.ts`), so the level is chosen and the edges cropped here.
 
 import type TileGrid from 'ol/tilegrid/TileGrid';
 
@@ -14,12 +14,12 @@ import type { CvatAcquisition } from '../map/layers/config/backgroundLayers/cvat
 import { getWMSTileGrid } from '../map/layers/wmsTileGrid';
 import type { Raster } from './fit';
 
-// A hit is a SELECT against a local SQLite file, so this bounds the canvas work,
-// not an upstream.
+// A hit is a SELECT against a local SQLite file, so this bounds the canvas
+// work, not an upstream.
 const MAX_CONCURRENT = 6;
 
-// 404 is how the acquisition's footprint is drawn (`cvat-tiles/server.mjs`), not
-// a fault; a store it cannot open answers 503, which is.
+// 404 is how the acquisition's footprint is drawn (`cvat-tiles/server.mjs`),
+// not a fault; a store it cannot open answers 503, which is.
 const fetchTile = async (
   url: string,
   signal?: AbortSignal,
@@ -31,8 +31,8 @@ const fetchTile = async (
 };
 
 // The deepest level whose canvas stays inside the stitch's cap. Footprint 500 m
-// at most and z16 is 0.331 m/px, so this is the acquisition's own resolution for
-// anything the card can ask for.
+// at most and z16 is 0.331 m/px, so this is the acquisition's own resolution
+// for anything the card can ask for.
 const levelFor = (
   grid: TileGrid,
   acquisition: CvatAcquisition,
@@ -48,8 +48,8 @@ const levelFor = (
   return acquisition.minZoom;
 };
 
-// Null when nothing painted and nothing failed (off this flight, not a fault); a
-// grab where every tile errored throws. Same rule as `extractCanvas`,
+// Null when nothing painted and nothing failed (off this flight, not a fault);
+// a grab where every tile errored throws. Same rule as `extractCanvas`,
 // `fetchFlyfotoRaster` and `fetchDem`.
 export const fetchCvatRaster = async (
   bbox4326: Bbox,

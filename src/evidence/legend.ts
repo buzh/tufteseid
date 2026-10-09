@@ -169,7 +169,8 @@ const GAP_EM = 1.5;
 // The capture with its provenance appended below (not blended over it), so no
 // ground pixel is spent on caption. The cost: the file is no longer registered
 // to its bbox, so it is a figure to cite — the row laid back on the map is the
-// stored, unstamped one. Returns the source untouched if there is no 2D context.
+// stored, unstamped one. Returns the source untouched if there is no 2D
+// context.
 export const withLegend = async (
   image: HTMLCanvasElement,
   { title, facts, rights, centre, link, metresPerPx }: LegendOptions,
@@ -206,7 +207,8 @@ export const withLegend = async (
   const linkW = link ? ctx.measureText(link).width : 0;
 
   // The footer row sets the floor: never shed or cut, so a narrower capture is
-  // matted out to it. The head ellipsizes and the rights wrap, forcing no width.
+  // matted out to it. The head ellipsizes and the rights wrap, forcing no
+  // width.
   const footerW =
     barW + centreW + linkW + (centreW ? gap : 0) + (linkW ? gap : 0);
   const width = Math.max(image.width, Math.ceil(footerW) + pad * 2);

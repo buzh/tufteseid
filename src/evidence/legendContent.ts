@@ -39,8 +39,8 @@ const RESOLUTION_TOKEN = '{res}';
 // `CREDIT_TOKEN` in `rendersvc/legend.py`.
 const CREDIT_TOKEN = '{credit}';
 
-// The holder is a proper name, never translated; `terms` resolves to the licence,
-// which is.
+// The holder is a proper name, never translated; `terms` resolves to the
+// licence, which is.
 const KARTVERKET = {
   holder: 'Kartverket',
   terms: 'evidence.figure.terms.ccby',
@@ -75,8 +75,8 @@ const heightData = (): string =>
     KARTVERKET.terms,
   );
 
-// Not a rights holder: RVT asks that work using it cite the method, and a figure
-// travels away from the README that holds the full references.
+// Not a rights holder: RVT asks that work using it cite the method, and a
+// figure travels away from the README that holds the full references.
 const rvtMethod = (): string => t('evidence.figure.rights.method');
 
 // One line per holder: Norge i bilder's name alone is sixty characters.
@@ -123,8 +123,8 @@ export const centreOf = (
   }
 };
 
-// Null for a row that no longer describes a render: an invented caption would be
-// the opposite of provenance.
+// Null for a row that no longer describes a render: an invented caption would
+// be the opposite of provenance.
 export const legendContentFor = (
   rec: EvidenceRecord,
   spot: SpotRecord,
@@ -145,8 +145,8 @@ export const legendContentFor = (
   };
 };
 
-// The band is in the reader's language, and `0.50` beside `1,5×` reads as a typo.
-// Defaulted, never thrown: a legend is not worth failing a render for.
+// The band is in the reader's language, and `0.50` beside `1,5×` reads as a
+// typo. Defaulted, never thrown: a legend is not worth failing a render for.
 const decimalSeparator = (language: string): string => {
   try {
     return new Intl.NumberFormat(language).format(1.1).charAt(1) || '.';

@@ -1,7 +1,8 @@
-// The stored file, provenance typeset on, saved under the spot's name. The store
-// keeps the file bare (the reader lays it back on the map, where a burnt-in band
-// would be drawn over), so the band goes on here, in the reader's language. A sun
-// loop is the exception, cited by the sidecar: `createImageBitmap` throws on WebM.
+// The stored file, provenance typeset on, saved under the spot's name. The
+// store keeps the file bare (the reader lays it back on the map, where a
+// burnt-in band would be drawn over), so the band goes on here, in the reader's
+// language. A sun loop is the exception, cited by the sidecar:
+// `createImageBitmap` throws on WebM.
 
 import { useCallback, useState } from 'react';
 
@@ -40,9 +41,9 @@ const decodeToCanvas = async (
   }
 };
 
-// Failure is never fatal: any path that cannot produce a legend returns the bytes
-// it was given, a video among them. Re-encodes in the type handed, so a JPEG
-// ortofoto does not come back a PNG four times the size.
+// Failure is never fatal: any path that cannot produce a legend returns the
+// bytes it was given, a video among them. Re-encodes in the type handed, so a
+// JPEG ortofoto does not come back a PNG four times the size.
 const stampEvidence = async (
   blob: Blob,
   rec: EvidenceRecord,

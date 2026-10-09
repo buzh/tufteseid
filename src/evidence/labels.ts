@@ -100,7 +100,8 @@ const terrainFacts = (
 };
 
 // Everything true of a row before any pixel of it exists. Separate from
-// `evidenceFacts` because a row about to render still holds the previous figures.
+// `evidenceFacts` because a row about to render still holds the previous
+// figures.
 export const specFacts = (spec: EvidenceSpec): string[] => {
   switch (spec.kind) {
     case 'lidar': {
