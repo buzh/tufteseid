@@ -127,6 +127,39 @@ unit's tiles and record in one transaction and rebuilds. Sound tiles you want
 made again — a level rendered under an older `cvat.py` — are `-g <name> --redo`
 instead, which asks nothing and rebuilds everything the levels cover.
 
+## What to build next
+
+```
+.venv/bin/python plan.py --built built.txt          the order, against what is made
+.venv/bin/python plan.py --built built.txt --top 12
+.venv/bin/python plan.py telemark                   only the names that fit
+.venv/bin/python plan.py --built built.txt --copc   + whether raw data exists yet
+.venv/bin/python plan.py --cell any --closed        drop the hard filters
+```
+
+A candidate is an acquisition worth the ~16 core-hours a full ladder costs: on
+the **0.25 m** grid, **open** to download, **not** a `Bilde*` photogrammetry
+DTM (the app drops those whatever the store holds) and **published by the
+per-project WMS** (the manifest joins onto it). `--cell` and `--closed` loosen
+the first two.
+
+It ranks by *new* ground. Coverage overlaps heavily, so each row's `new` is
+what it adds on top of every row above it and on top of `--built`; where that
+column reaches zero the useful queue ends. **That is the opposite of the rule
+`acquisitions.json` records** — which takes overlap on purpose, because two
+flights over one landscape are two rows worth reading against each other.
+`plan.py` answers the other question: the most ground for the fewest hours.
+
+`--built` is how it learns what is made, the store being on the server and this
+not: one acquisition per line, names or slugs or `.mbtiles` stems, which is
+what `vatcache.py -l` there or a plain `ls` gives. `-o DIR` reads a store here
+too.
+
+Footprints come off the mosaic catalogue, one query each, rasterised at 200 m
+onto a grid every acquisition shares (`coverage.GRID_ORIGIN`) and cached in
+`plan-<slug>.npz`. Within 0.1 % of the 25 m build mask, and 1/64th of the fill.
+First run over the whole country is some minutes; after that, seconds.
+
 ## Which acquisitions have a point cloud
 
 ```
@@ -201,10 +234,11 @@ its own grid and the reach changes with zoom.
 | `makevat.py` | Build front end: catalogue, one acquisition into one file, repair. Knows nothing about a store |
 | `vatcache.py` | Store front end: the queue, what is in it, the audit. Never writes |
 | `copc.py` | Upstream front end: which acquisitions hoydedata.no has converted to COPC, and which are closed to download. Reads nothing local but `acquisitions.json` |
+| `plan.py` | Which acquisition to build next: the candidates, their footprints on one shared grid, and the greedy new-ground order |
 | `build_tiles.py` | Grid geometry, the MBTiles container, a level built into it, the read-back |
 | `cvat.py` | The combined VAT itself — presets, layer walk, `radii_for`. The only module that decides what a pixel is |
 | `fetch_dem.py` | `exportImage` against `Prosjekt_DTM` pinned to one `LAS_PROJECT_NAME`, plus a minimal tiled-float32 TIFF reader. **Also an input to `rendersvc`'s image**, which copies it in for `read_tiff_f32` — one reader, one set of quirks. `.dockerignore` excludes `vat-cache` and re-admits this one file; a rename or a signature change wants `docs/render-sidecar.md` read first |
-| `coverage.py` | Footprint union rasterisation, sample-site picker, tile fill |
+| `coverage.py` | Footprint union rasterisation, sample-site picker, tile fill. `rasterise(origin=…)` snaps to `GRID_ORIGIN`, which is what lets two acquisitions' coverage meet by index |
 | `acquisitions.py` | Acquisition identity: queue, published cell sizes, the catalogue rows and WMS name sets |
 | `acquisitions.json` | The build queue, committed, in the order `vatcache.py -l` indexes |
 | `report.py` | Formatting and the shared audit, used by both front ends |

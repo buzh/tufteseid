@@ -14,6 +14,11 @@ from fetch_dem import catalogue
 
 CELL = 25.0  # rasterisation cell, metres
 
+# The EPSG:25833 top-left the app's TileGrid uses (src/map/layers/wmsTileGrid.ts,
+# origin = [extent[0], extent[3]]). Also what `rasterise(origin=…)` snaps to, so
+# a footprint, a tile and an export chunk all land on edges of the same grid.
+GRID_ORIGIN = (-2500000.0, 9045984.0)
+
 HERE = Path(__file__).resolve().parent
 
 
@@ -26,12 +31,21 @@ def footprints(project):
     )["features"]
 
 
-def rasterise(features, cell=CELL):
-    """Even-odd scanline fill of the union. Returns (mask, (x0, x1, y0, y1), cell)."""
+def rasterise(features, cell=CELL, origin=None):
+    """Even-odd scanline fill of the union. Returns (mask, (x0, x1, y0, y1), cell).
+
+    `origin` pins the cell edges to a grid other acquisitions can share, so two
+    masks meet by index and never by resampling."""
     rings = [np.asarray(r) for f in features for r in f["geometry"]["rings"]]
     xs = np.concatenate([r[:, 0] for r in rings])
     ys = np.concatenate([r[:, 1] for r in rings])
     x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
+    if origin is not None:
+        ox, oy = origin
+        x0 = ox + np.floor((x0 - ox) / cell) * cell
+        y0 = oy + np.floor((y0 - oy) / cell) * cell
+        x1 = ox + np.ceil((x1 - ox) / cell) * cell
+        y1 = oy + np.ceil((y1 - oy) / cell) * cell
     w = int(np.ceil((x1 - x0) / cell))
     h = int(np.ceil((y1 - y0) / cell))
     mask = np.zeros((h, w), bool)
@@ -109,12 +123,8 @@ def sample_sites(mask, bounds, cell, count=6, side_m=1024.0, seed=7):
     return np.array(picked)
 
 
-def tile_fill(mask, cell, tile_m, grid_origin=(-2500000.0, 9045984.0), mask_origin=None):
-    """Tiles touched, and their mean covered fraction, on the app's tile grid.
-
-    grid_origin is the EPSG:25833 top-left the app's TileGrid uses
-    (src/map/layers/wmsTileGrid.ts, origin = [extent[0], extent[3]]).
-    """
+def tile_fill(mask, cell, tile_m, grid_origin=GRID_ORIGIN, mask_origin=None):
+    """Tiles touched, and their mean covered fraction, on the app's tile grid."""
     h, w = mask.shape
     mx0, my0 = mask_origin
     gx0, gy0 = grid_origin
