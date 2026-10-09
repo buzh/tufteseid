@@ -127,6 +127,34 @@ unit's tiles and record in one transaction and rebuilds. Sound tiles you want
 made again — a level rendered under an older `cvat.py` — are `-g <name> --redo`
 instead, which asks nothing and rebuilds everything the levels cover.
 
+## Which acquisitions have a point cloud
+
+```
+.venv/bin/python copc.py                 the ones that have one
+.venv/bin/python copc.py -q              only the build queue
+.venv/bin/python copc.py -a vestfold     every acquisition the name fits
+.venv/bin/python copc.py -v stryn        + tiles, points and the ground covered
+.venv/bin/python copc.py --json FILE     the survey, machine-readable
+```
+
+Kartverket is converting the laser archive to COPC, and publishes a `.vpc`
+STAC index beside each converted acquisition naming its `.copc.laz` files. Both
+are static files on plain HTTP with byte ranges, so a reader takes the points
+under one work unit without fetching the flight — the one source that would let
+a build grid its own DTM rather than ask `Prosjekt_DTM` for one.
+
+Nothing publishes a list of what has been converted, so `copc.py` asks about
+every acquisition and prints what came back: ~21 s for the whole catalogue, no
+snapshot, because the answer is the thing that moves. **76 of 1 082 as of
+2026-10-09**, newest-first, with another 18 carrying a path and no file behind
+it yet (`pending`). None of the build queue.
+
+**A closed acquisition cannot be asked.** `TILGANG` is 2 for 462 of them and
+every file service answers 401, while the ImageServer and the WMS serve their
+pixels to anybody. Ten of the queue's twenty-three are closed, so they are
+buildable today and would not be buildable off raw data at all. Worth reading
+before planning a queue around point clouds.
+
 ## Grid and output
 
 | | |
@@ -172,11 +200,12 @@ its own grid and the reach changes with zoom.
 | --- | --- |
 | `makevat.py` | Build front end: catalogue, one acquisition into one file, repair. Knows nothing about a store |
 | `vatcache.py` | Store front end: the queue, what is in it, the audit. Never writes |
+| `copc.py` | Upstream front end: which acquisitions hoydedata.no has converted to COPC, and which are closed to download. Reads nothing local but `acquisitions.json` |
 | `build_tiles.py` | Grid geometry, the MBTiles container, a level built into it, the read-back |
 | `cvat.py` | The combined VAT itself — presets, layer walk, `radii_for`. The only module that decides what a pixel is |
 | `fetch_dem.py` | `exportImage` against `Prosjekt_DTM` pinned to one `LAS_PROJECT_NAME`, plus a minimal tiled-float32 TIFF reader. **Also an input to `rendersvc`'s image**, which copies it in for `read_tiff_f32` — one reader, one set of quirks. `.dockerignore` excludes `vat-cache` and re-admits this one file; a rename or a signature change wants `docs/render-sidecar.md` read first |
 | `coverage.py` | Footprint union rasterisation, sample-site picker, tile fill |
-| `acquisitions.py` | Acquisition identity: queue, published cell sizes, the catalogue and WMS name sets |
+| `acquisitions.py` | Acquisition identity: queue, published cell sizes, the catalogue rows and WMS name sets |
 | `acquisitions.json` | The build queue, committed, in the order `vatcache.py -l` indexes |
 | `report.py` | Formatting and the shared audit, used by both front ends |
 

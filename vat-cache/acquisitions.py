@@ -82,17 +82,36 @@ def catalogue_cells(names, timeout=180):
     return cells
 
 
-def catalogue_names(timeout=180):
-    """Every distinct LAS_PROJECT_NAME hoydedata.no's mosaic catalogue carries."""
-    names, offset = set(), 0
+# `TILGANG` is 1 for an acquisition anybody may download and 2 for one behind a
+# login; both are served as pixels, so the ImageServer and the WMS do not
+# distinguish them and the file services do.
+OPEN = "1"
+
+_CATALOGUE_FIELDS = (
+    "LAS_PROJECT_ID",
+    "LAS_PROJECT_NAME",
+    "AARSTALL",
+    "OPPLOSNING",
+    "PUNKTTETTHET",
+    "TILGANG",
+    "KOORDINATSYSTEM",
+)
+
+
+def catalogue_projects(timeout=180):
+    """Every acquisition the mosaic catalogue carries, one row each.
+
+    `LAS_PROJECT_ID` is what the LaserInnsyn services take; the name is what
+    everything else joins on."""
+    rows, offset = [], 0
     while True:
         query = {
             "where": "1=1",
             "f": "json",
             "returnGeometry": "false",
-            "outFields": "LAS_PROJECT_NAME",
+            "outFields": ",".join(_CATALOGUE_FIELDS),
             "returnDistinctValues": "true",
-            "orderByFields": "LAS_PROJECT_NAME",
+            "orderByFields": "LAS_PROJECT_ID",
             "resultOffset": str(offset),
             "resultRecordCount": str(_PAGE),
         }
@@ -100,14 +119,17 @@ def catalogue_names(timeout=180):
         with urllib.request.urlopen(url, timeout=timeout) as response:
             body = json.load(response)
         features = body.get("features", [])
-        for f in features:
-            name = f["attributes"].get("LAS_PROJECT_NAME")
-            # The catalogue carries rows with no project name.
-            if name:
-                names.add(name)
+        # The catalogue carries rows with no project name.
+        rows += [f["attributes"] for f in features
+                 if f["attributes"].get("LAS_PROJECT_NAME")]
         if not features or not body.get("exceededTransferLimit"):
-            return names
+            return rows
         offset += len(features)
+
+
+def catalogue_names(timeout=180):
+    """Every distinct LAS_PROJECT_NAME hoydedata.no's mosaic catalogue carries."""
+    return {row["LAS_PROJECT_NAME"] for row in catalogue_projects(timeout)}
 
 
 def wms_names(timeout=180):
