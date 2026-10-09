@@ -7,8 +7,8 @@ export type SpotVisibility = 'private' | 'public';
 /** Lon/lat, EPSG:4326. */
 export type SpotPoint = [lon: number, lat: number];
 
-/** The ground the spot's evidence covers, EPSG:4326. Structurally the `Bbox` of
- *  `src/map/bbox.ts`, restated here so this module stays clear of OpenLayers. */
+/** The ground the spot's evidence covers, EPSG:4326. Structurally the `Bbox`
+ *  of `src/map/bbox.ts`, restated so this module stays clear of OpenLayers. */
 export type SpotFootprint = [
   minLon: number,
   minLat: number,

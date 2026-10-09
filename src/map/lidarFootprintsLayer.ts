@@ -1,6 +1,5 @@
-// Draws where a LiDAR project lies while the dataset pulldown is open, and runs
-// the WFS pass that fills `lidarViewportAtom`. The `live…` atoms hold one entry
-// per drawing half, every array indexed the same way (`compare/halves.ts`).
+// The `live…` atoms hold one entry per drawing half, every array indexed the
+// same way (`compare/halves.ts`).
 
 import { useAtomValue, useSetAtom } from 'jotai';
 import { Feature } from 'ol';
@@ -60,11 +59,9 @@ const REFRESH_DEBOUNCE_MS = 250;
 
 type Tier = 'hover' | 'active';
 
-/**
- * The cached acquisitions covering a viewport, tiered like the WFS list, for
- * when the WFS list cannot be had. The store publishes only an envelope, so the
- * entries carry no geometry and `areaRatio` is an upper bound.
- */
+/** The cached acquisitions covering a viewport, for when the WFS list cannot
+ *  be had. The store publishes only an envelope, so the entries carry no
+ *  geometry and `areaRatio` is an upper bound. */
 const heldInView = async (
   extentLonLat: [number, number, number, number],
   filters: LidarFilterSettings,

@@ -75,12 +75,10 @@ function toProject(attrs: QueryAttributes): FlyfotoProject | null {
   };
 }
 
-// The catalogue gains a row when a flight is processed, a handful of times a
-// year, so one rectangle asked for twice in a sitting is the same answer. Held
-// because a flyfoto run asks for the very same rectangle once per proposal:
-// `renderEvidence` re-reads the catalogue to recover an acquisition's own
-// resolution, and that round trip sits in front of the tile burst rather than
-// beside it.
+// The catalogue gains a row a handful of times a year, so one rectangle asked
+// for twice in a sitting is the same answer. Held because `renderEvidence`
+// re-reads it once per proposal to recover an acquisition's resolution, in
+// front of the tile burst rather than beside it.
 const CACHE_TTL_MS = 300_000;
 // The picker walks a new rectangle on every pan, so this is bounded rather
 // than complete. Oldest written out first — `Map` keeps insertion order.

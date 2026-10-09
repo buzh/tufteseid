@@ -44,11 +44,13 @@ export type SpotEvidence = {
   /** Null until the list lands; an empty array means none. */
   items: EvidenceRecord[] | null;
   failed: boolean;
-  /** The view as it stands, or null where nothing on screen can be re-rendered. */
+  /** The view as it stands, or null where nothing on screen can be
+   *  re-rendered. */
   offer: KeepOffer | null;
   keep: (spec: EvidenceSpec) => void;
-  /** A row written from pixels already made, for a picker that renders before it
-   *  asks. False where nothing was written and the reader can press again. */
+  /** A row written from pixels already made, for a picker that renders before
+   *  it asks. False where nothing was written and the reader can press
+   *  again. */
   keepProduced: (spec: EvidenceSpec, produced: Produced) => Promise<boolean>;
   retry: (rec: EvidenceRecord) => void;
   remove: (id: string) => void;

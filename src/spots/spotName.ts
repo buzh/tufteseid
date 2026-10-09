@@ -167,7 +167,7 @@ const NAME_TYPE_DEMOTE = new Set([
 // How much nearer a neutral name has to be to beat a promoted one.
 const PROMOTE_BONUS_M = 400;
 
-// Bigger than any reachable meterFraPunkt: the demoted tier sorts strictly last.
+// Bigger than any reachable meterFraPunkt: the demoted tier sorts last.
 const DEMOTE_PENALTY_M = 1000000;
 
 // Breaks ties on places with no `hovednavn`, where the first entry is often a

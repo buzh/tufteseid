@@ -10,7 +10,8 @@ import type { LidarControls } from './useLidarControls';
 
 export const LidarControlGroup = ({ lidar }: { lidar: LidarControls }) => {
   // The picker atom is shared with the map and an unmount never fires the
-  // dataset menu's close callback; left open, the map keeps painting footprints.
+  // dataset menu's close callback; left open, the map keeps painting
+  // footprints.
   const { setPickerOpen, setHoveredProjectId } = lidar;
   useEffect(
     () => () => {

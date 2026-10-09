@@ -52,7 +52,8 @@ export const useFlyfotoControls = (half: CompareHalf) => {
   useEffect(() => {
     if (!isFlyfotoBackground) return;
     let cancelled = false;
-    // Panning refreshes faster than the service answers; only the newest writes.
+    // Panning refreshes faster than the service answers; only the newest
+    // writes.
     let latestRequest = 0;
     let inFlight: AbortController | null = null;
 

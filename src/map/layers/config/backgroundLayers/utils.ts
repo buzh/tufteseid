@@ -244,9 +244,9 @@ const layerSignature = (
   return null;
 };
 
-// Reuses a layer that would render identically, so callers must set opacity and
-// z-index explicitly: it may carry an earlier swap's. An OL layer belongs to one
-// map at a time, so `host` must be the map the layer is destined for.
+// Reuses a layer that would render identically, so callers must set opacity
+// and z-index explicitly: it may carry an earlier swap's. An OL layer belongs
+// to one map at a time, so `host` must be the map the layer is destined for.
 export const buildOrReuseBackgroundLayer = async (
   config: BackgroundLayer,
   projection: string,

@@ -5,9 +5,9 @@ import OlMap from 'ol/Map';
 import { mapAtom } from '../atoms';
 
 // The right pane of the split view: a second OpenLayers map sharing the main
-// map's `View`, so the two are centred and scaled identically. `Map#updateSize`
-// writes its own viewport size into the shared view, so the last map to resize
-// wins; harmless only while the panes are the same width.
+// map's `View` object. `Map#updateSize` writes its own viewport size into that
+// shared view, so the last map to resize wins — harmless only while the panes
+// are the same width.
 
 let splitMap: OlMap | null = null;
 
@@ -33,5 +33,4 @@ export const getSplitMap = (): OlMap => {
   return splitMap;
 };
 
-/** The right pane's map if it has ever been opened, and null otherwise. */
 export const peekSplitMap = (): OlMap | null => splitMap;

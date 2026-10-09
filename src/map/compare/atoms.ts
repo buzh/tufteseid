@@ -43,8 +43,8 @@ import { seedHalfB, type ViewMode, viewModeAtom } from './halves';
 /** Where the curtain edge sits, as a fraction of the map width. */
 export const compareSplitAtom = atom(0.5);
 
-// Far enough from either edge that the seam cannot be put out of reach, by a
-// drag or by a link.
+// Far enough from either edge that no drag or link can put the seam out of
+// reach.
 export const MIN_SPLIT = 0.05;
 export const MAX_SPLIT = 0.95;
 
@@ -57,21 +57,19 @@ export const DEFAULT_SPLIT_PERCENT = 50;
 const contrastingGround = (a: BackgroundLayerName): 'kart' | 'lidar' =>
   isKartVariant(a) ? 'lidar' : 'kart';
 
-// Repeats the arms' entry rules: B is seeded before React re-renders with the
-// second ground section mounted.
+// Repeats the arms' entry rules rather than calling them: B is seeded before
+// the second ground section mounts.
 const enterGroundB = (ground: 'kart' | 'lidar', get: Getter, set: Setter) => {
   if (ground === 'kart') {
     set(backgroundLayerHalves.b, get(kartVariantHalves.b));
     return;
   }
-  // `enterLidar` with Automatisk off: the national mosaic, not the held flight,
-  // which need not cover this screen.
+  // The national mosaic, not the held flight, which need not cover this screen.
   set(activeLidarStyleHalves.b, DEFAULT_LIDAR_PROJECT_STYLE);
   set(backgroundLayerHalves.b, 'lidarHillshade');
 };
 
-/** B is seeded from A only on the way out of `single`; moving between the
- *  curtain and the split keeps B where the reader put it. */
+/** B is seeded from A only on the way out of `single`. */
 export const selectViewModeAtom = atom(null, (get, set, mode: ViewMode) => {
   const previous = get(viewModeAtom);
   if (mode === previous) return;
@@ -83,17 +81,14 @@ export const selectViewModeAtom = atom(null, (get, set, mode: ViewMode) => {
   set(viewModeAtom, mode);
 });
 
-// Narrower than A's `VALID_STARTUP_LAYERS`: no `lidarCvat`, because B enters
-// with Automatisk off and so nothing fills `activeCvatAcquisitionHalves.b`, and
-// no `empty`, which is a bare pane.
+// Narrower than A's `VALID_STARTUP_LAYERS`, and why, in
+// `docs/architecture.md`.
 const LINKABLE_GROUNDS_B = new Set<BackgroundLayerName>([
   ...KART_VARIANTS,
   'lidarHillshade',
   'flyfoto',
 ]);
 
-// A ground the vocabulary cannot carry becomes the seamless product of the same
-// kind rather than being dropped into a blank pane.
 const DEGRADES_TO = new Map<string, BackgroundLayerName>([
   ['lidarProject', 'lidarHillshade'],
   ['lidarCvat', 'lidarHillshade'],
@@ -101,15 +96,13 @@ const DEGRADES_TO = new Map<string, BackgroundLayerName>([
 ]);
 
 /** What `backgroundLayerB` says for a ground, or null for one no link can
- *  carry. Both the reader and the writer go through it, so the address bar
- *  names the ground a reload would really open. */
+ *  carry. Both the reader and the writer go through it. */
 const linkableGroundB = (name: string): BackgroundLayerName | null => {
   const ground = DEGRADES_TO.get(name) ?? (name as BackgroundLayerName);
   return LINKABLE_GROUNDS_B.has(ground) ? ground : null;
 };
 
-// Repeats the arms' entry rules again, this time for a ground a link named. A
-// variant off the URL is a pick rather than a re-entry, so it lands in
+// A variant off the URL is a pick rather than a re-entry, so it lands in
 // `kartVariantHalves.b` too.
 const enterNamedGroundB = (
   name: BackgroundLayerName,
@@ -141,8 +134,7 @@ const readLinkedSplit = (): number | null => {
 };
 
 // Read at import, like `lok` and `lidarRender`: `compareUrlAtomEffect` rewrites
-// all three from a map still on one ground the moment it mounts, which is
-// before the restore below gets to run.
+// all three the moment it mounts, before the restore below runs.
 const linkedViewMode = readLinkedViewMode();
 const linkedGroundB = linkableGroundB(
   getUrlParameter('backgroundLayerB') ?? '',
@@ -151,12 +143,9 @@ const linkedSplit = readLinkedSplit();
 
 let compareRestored = false;
 
-/** Reopen the two-ground view a link described. Driven from a mount effect and
- *  spent on the first run: `seedHalfB`'s registry is only as full as the import
- *  graph that has been evaluated, so this cannot happen at module scope, and a
- *  second mount must not undo a reader who has moved on. The named ground goes
- *  on **after** `selectViewModeAtom`, over the top of the seed that copies every
- *  `.b` off its `.a` and the contrast rule that follows it. */
+/** Reopen the two-ground view a link described. Driven from a mount effect,
+ *  spent on the first run, and the named ground applied after the mode — all
+ *  three load-bearing, see `docs/architecture.md`. */
 export const restoreCompareFromUrlAtom = atom(null, (get, set) => {
   if (compareRestored) return;
   compareRestored = true;
@@ -171,9 +160,9 @@ export const restoreCompareFromUrlAtom = atom(null, (get, set) => {
   if (linkedGroundB) enterNamedGroundB(linkedGroundB, get, set);
 });
 
-/** The view mode and B's ground on the address bar. Its own effect rather than
- *  a tail on `compareLayerAtomEffect`: that one returns early on three paths
- *  and spans an await, and these have to be right on all of them. */
+/** The view mode and B's ground on the address bar. Not a tail on
+ *  `compareLayerAtomEffect`: that one returns early on three paths and spans
+ *  an await. */
 export const compareUrlAtomEffect = atomEffect((get) => {
   const mode = get(viewModeAtom);
   const ground = linkableGroundB(get(backgroundLayerHalves.b));

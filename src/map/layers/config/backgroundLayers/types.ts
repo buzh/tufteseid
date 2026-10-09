@@ -64,7 +64,7 @@ export type XYZBackgroundLayer = BackgroundLayerBase & {
   url: string;
   /** The grid the tiles were written on, whatever the view is set to. */
   projection: ProjectionIdentifier;
-  /** Levels the store holds, inclusive; absolute z on that grid, not offsets. */
+  /** Levels the store holds, inclusive; absolute z on that grid. */
   minZoom: number;
   maxZoom: number;
   /** Levels either side of the one on screen to fetch ahead; 0 where a miss

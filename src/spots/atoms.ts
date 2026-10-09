@@ -157,16 +157,14 @@ export const standingSpotFootprintAtom = atom((get): Bbox | null => {
     : (get(activeSpotAtom)?.footprint ?? null);
 });
 
-/** The one spot the pin layer leaves undrawn. A pin is for placing, so it
- *  stands only while the properties box is open on it — and that one is
- *  `pinAdjust.ts`'s to draw. The card and the reader are read against the ground
- *  the pin sits in the middle of, so theirs goes — but only where the footprint
- *  frame stands in its place. A row from before the rectangle rule has no
- *  frame and nobody repairs one for a reader who may not edit it, so dropping
- *  its pin as well would leave the open spot with nothing marking it at all.
+/** The one spot the pin layer leaves undrawn: a draft, whose pin is
+ *  `pinAdjust.ts`'s to draw, or an open spot whose footprint frame stands in
+ *  the pin's place. A row from before the rectangle rule has no frame and
+ *  nobody repairs one for a reader who may not edit it, so its pin stays or
+ *  the spot is marked by nothing at all.
  *
- *  Derived, so that the pin drag writing the draft every frame only restyles
- *  the layer when the id it answers with actually changes. */
+ *  Derived, so the pin drag writing the draft every frame only restyles the
+ *  layer when the id changes. */
 export const unpinnedSpotIdAtom = atom((get): string | null => {
   const draft = get(spotDraftAtom);
   if (draft) return draft.recordId;

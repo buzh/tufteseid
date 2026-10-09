@@ -1,4 +1,4 @@
-/* Matches the width of a Menu.Item's check, so rows without one still line up. */
+/* Matches the width of a Menu.Item's check, so rows without one line up. */
 .gutter {
   display: block;
   width: 18px;

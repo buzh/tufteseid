@@ -197,7 +197,8 @@ export const useTerrainControls = () => {
       adjustWindow();
     }, [releaseFootprint, adjustWindow]),
     close: closeWindow,
-    /** Metres on a side: off the grid where there is one, else the rectangle. */
+    /** Metres on a side: off the grid where there is one, else the
+     *  rectangle. */
     sideMetres: dem
       ? Math.round(dem.bbox25833[2] - dem.bbox25833[0])
       : bbox

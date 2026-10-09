@@ -39,7 +39,8 @@ export const MULTI_AZIMUTHS = [
 // The scan costs width × height × directions × steps.
 export const SVF_DIRECTIONS = 16;
 
-// Step budget per ray: extra reach is bought by decimating, not walking further.
+// Step budget per ray: extra reach is bought by decimating, not by walking
+// further.
 export const SVF_MAX_RADIUS_PX = 24;
 
 // Coarsest grid the scan decimates down to, so with the step budget the reach

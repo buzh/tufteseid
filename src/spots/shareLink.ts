@@ -70,7 +70,7 @@ export const useSpotShareLink = () => {
         setActive(record);
         // No-op for a reader who may not edit — the reading is the only thing
         // they get. An owner following their own link lands in it too, and
-        // `EvidenceReader` steps back to their card if there is nothing to read.
+        // `EvidenceReader` steps back to the card if there is nothing to read.
         setReading(true);
       })
       .catch((err) => {

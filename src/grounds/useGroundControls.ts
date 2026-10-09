@@ -1,6 +1,6 @@
-// Which ground is up is derived from the half's background layer, never stored:
-// a second piece of state could disagree with the map. Entering one is the arm's
-// own business, hence the `enter` callbacks rather than a write in here.
+// Which ground is up is derived from the half's background layer, never
+// stored: a second piece of state could disagree with the map. Entering one is
+// the arm's own business, hence the `enter` callbacks rather than a write here.
 
 import { useAtomValue } from 'jotai';
 import type { CompareHalf } from '../map/compare/halves';

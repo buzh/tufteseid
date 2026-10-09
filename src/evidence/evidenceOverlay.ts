@@ -90,8 +90,8 @@ export const useEvidenceOverlay = (
 export type LoopTransport = {
   playing: boolean;
   progress: number;
-  /** The element has read the loop's length; until then there is nothing to seek
-   *  over, and a browser that refused the file never gets there. */
+  /** The element has read the loop's length; until then there is nothing to
+   *  seek over, and a browser that refused the file never gets there. */
   ready: boolean;
   toggle: () => void;
   seek: (progress: number) => void;

@@ -18,11 +18,9 @@ const SNAP_PX = 6;
 export const heritageIsQueryable = (map: Map): boolean =>
   getQueryableWMSLayers(map, CULTURAL_HERITAGE_LAYER_IDS).length > 0;
 
-/**
- * What the Kulturminner layers say about this pixel; null where they say
- * nothing, or where none of them is drawing. Rejects if `signal` aborts, so a
- * caller can tell its own cancellation from an empty map.
- */
+/** What the Kulturminner layers say about this pixel; null where they say
+ *  nothing, or where none of them is drawing. Rejects if `signal` aborts, so a
+ *  caller can tell its own cancellation from an empty map. */
 export const queryHeritageAt = async (
   map: Map,
   pixel: [number, number],

@@ -33,10 +33,8 @@ const KATEGORI_ICONS: Record<string, MaterialSymbol> = {
 export const kategoriIcon = (kategori: string): MaterialSymbol =>
   KATEGORI_ICONS[normalize(kategori)] ?? 'castle';
 
-/**
- * Vernetype, bucketed into `HERITAGE_RENDERS`' five vern subsets. `ukjent` is a
- * sixth, for an unmapped label: `uavklart` is a claim, not an absence.
- */
+/** Vernetype, bucketed into `HERITAGE_RENDERS`' five vern subsets. `ukjent` is
+ *  a sixth, for an unmapped label: `uavklart` is a claim, not an absence. */
 export type VernBucket =
   | 'fredede'
   | 'verneverdige'

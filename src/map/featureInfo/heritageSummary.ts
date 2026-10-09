@@ -1,4 +1,3 @@
-// Classify, group and summarize a GetFeatureInfo over the Kulturminner layers.
 // `parseXmlFeatureInfo` loses the sublayer element name each feature came back
 // under, so the kind is re-derived from the property fingerprint. The field
 // names below were read off live GetFeatureInfo, not off a specification.
@@ -39,11 +38,9 @@ export interface EnkeltminneSummary {
   datering: string;
 }
 
-/**
- * One thing on the map, whatever number of WMS features said so. Every string
- * field is empty rather than absent; the plural ones are rolled up across a
- * lokalitet and its enkeltminner.
- */
+/** One thing on the map, whatever number of WMS features said so. Every string
+ *  field is empty rather than absent; the plural ones are rolled up across a
+ *  lokalitet and its enkeltminner. */
 export interface HeritageSummary {
   key: string;
   kind: FeatureKind;

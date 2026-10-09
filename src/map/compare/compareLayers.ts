@@ -14,10 +14,9 @@ import { retireLayer } from '../layers/layerPool';
 import type { ViewMode } from './halves';
 import { getSplitMap, peekSplitMap } from './splitMap';
 
-// The B half's layers. Ids carry a `cmp.` prefix and `isBackgroundLayer` is a
-// strict `startsWith('bg.')`, so a background swap never sweeps one up. An OL
-// layer belongs to one map at a time, so a change of view mode rebuilds the B
-// stack in the new host rather than moving it.
+// The B half's layers (`docs/architecture.md`). The `cmp.` prefix pairs with
+// `isBackgroundLayer`'s strict `startsWith('bg.')`, so a background swap never
+// sweeps one up.
 
 // Above the backgrounds (0), below everything the app draws on top of them.
 const COMPARE_Z = 1.5;
@@ -45,8 +44,8 @@ const clearFrom = (map: OlMap): boolean => {
 };
 
 /** Where the B stack draws. Creates the right pane's map when asked for
- *  `split`, so only ask with the mode that is up. Takes the mode rather than
- *  reading it: resolve, build and install span an await and must agree. */
+ *  `split`, so only ask with the mode that is up; takes the mode rather than
+ *  reading it, because resolve, build and install span an await. */
 export const compareHostFor = (mode: ViewMode): OlMap =>
   mode === 'split' ? getSplitMap() : getMainMap();
 
@@ -85,10 +84,10 @@ const clipToRightOfSplit = (e: RenderEvent) => {
 
 const unclip = (e: RenderEvent) => canvas2d(e)?.restore();
 
-// The clip only hides pixels; it runs in `prerender`, after the renderer has
-// queued a whole viewport of tiles. What saves requests is the layer `extent`,
-// which OL tests before asking for a tile. The curtain is intersected into it
-// and the layer's own extent stashed here, so unclipping can put it back.
+// The clip only hides pixels — `prerender` runs after a whole viewport of
+// tiles is queued. What saves requests is the layer `extent`, which OL tests
+// before asking for a tile; the curtain is intersected into it and the layer's
+// own extent stashed here, so unclipping can put it back.
 const BASE_EXTENT = 'cmpBaseExtent';
 
 type LayerExtent = ReturnType<TileLayer['getExtent']>;
@@ -127,7 +126,7 @@ const applyCurtainExtents = () => {
 };
 
 // Panning moves the revealed strip over new ground, so the extents have to be
-// recomputed or B stops filling in. One listener for the whole curtain.
+// recomputed or B stops filling in.
 let curtainMoveHandler: (() => void) | null = null;
 
 const trackCurtain = (on: boolean) => {
@@ -143,8 +142,8 @@ const trackCurtain = (on: boolean) => {
 };
 
 // Flagged so it is idempotent: layers come back from the pool with the flag,
-// stashed extent and handlers still on them, and a second attach would clip
-// twice a frame.
+// stashed extent and handlers still on them, and a second attach clips twice
+// a frame.
 const setClip = (layer: TileLayer, on: boolean) => {
   if (Boolean(layer.get('cmpClip')) === on) return;
   layer.set('cmpClip', on);
@@ -165,7 +164,7 @@ let cancelPendingRetire: (() => void) | null = null;
 
 /** Put this stack up as the B half and take down the previous one. `under` and
  * `over` mean what they do in `swapBackgroundLayers`. Every layer shares one
- * z-index, so within B only collection order decides what covers what. */
+ * z-index, so within B collection order alone decides what covers what. */
 export const installCompareLayers = (
   under: TileLayer[],
   over: TileLayer[],
@@ -230,9 +229,9 @@ export const clearCompareLayers = () => {
 export const clearCompareLayersExcept = (host: OlMap) => {
   for (const other of [getMainMap(), peekSplitMap()]) {
     if (!other || other === host) continue;
-    // Only where something went: the deferred retire belongs to whichever host
-    // was installed into last, and cancelling it on a no-op sweep would strand
-    // that host's outgoing layers faded on top of the stack.
+    // Only where something went: the deferred retire belongs to the host
+    // installed into last, and cancelling it on a no-op sweep strands that
+    // host's outgoing layers faded on top of the stack.
     if (clearFrom(other)) cancelPendingRetire?.();
   }
 };

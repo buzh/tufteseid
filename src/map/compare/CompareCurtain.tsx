@@ -1,6 +1,5 @@
-// The grab target and the visible seam only; `compareLayers.ts` does the clip,
-// and the two agree because this shell and the map viewport are the same
-// rectangle.
+// The grab target and the visible seam only; `compareLayers.ts` does the clip.
+// The two agree because this shell and the map viewport are the same rectangle.
 
 import { useAtom } from 'jotai';
 import { useEffect, useRef, useState } from 'react';
@@ -31,9 +30,8 @@ export const CompareCurtain = () => {
   const rootRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  // Both writes stay in the handler, not an effect: React commits before the
-  // next animation frame, so seam and imagery move together. From an effect the
-  // clip lags a frame behind the drag.
+  // Both writes stay in the handler, not an effect: from an effect the clip
+  // lags a frame behind the drag.
   const applySplit = (fraction: number) => {
     const next = clampSplit(fraction);
     setCurtainSplit(next);
