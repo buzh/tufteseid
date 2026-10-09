@@ -44,6 +44,7 @@ Pick what to order with `plan.py`; see what has a raw point cloud instead with
 
 import argparse
 import json
+import math
 import re
 import shutil
 import struct
@@ -74,18 +75,26 @@ PRODUCTS = {"pointcloud": (0, 1), "dtm": (1, 5), "dom": (2, 5), "both": (3, 5)}
 # ordering: 1, 10 and 50 are the national model's and come off static files.
 RESOLUTIONS = {"dataset": 0, "1": 1, "10": 10, "50": 50}
 
-# Mapsheet the server splits each zip along. Not how much is ordered — that is
-# the chunk — only how many files come back inside it.
-SHEETS = (0, 1000, 2000, 5000, 10000)
-
 DONE = ("complete", "failed", "abandoned")
 
-# Chunks are snapped here and not to `coverage.GRID_ORIGIN`: the tile grid's
-# northing ends in 984, so every chunk edge would miss the round kilometres a
-# mapsheet grid is cut on, and the delivery — which comes back as whole tiles
-# of its own grid, not clipped to what was asked for — would spill further
-# than it needs to.
-CHUNK_ORIGIN = (0.0, 0.0)
+# `clipToPolygon` does not clip: a job comes back as whole mapsheets of the
+# grid `Mapsheetsize` names, so a chunk that is not a block of those spills
+# over its neighbours and the same ground is fetched twice. Chunks are cut on
+# the sheet grid instead, and nothing overlaps.
+#
+# Measured off a 1:10000 delivery in EPSG:25833, whose files are named
+# `<project>-33-10-<col>-<row>-dtm.tif` for west = col * 6400 - 2 700 000 and
+# south = row * 4800 + 6 000 000. The finer divisions halve each way; only
+# 10000 has been seen.
+SHEET_ORIGIN = (-2700000.0, 6000000.0)
+SHEETS = {
+    10000: (6400.0, 4800.0),
+    5000: (3200.0, 2400.0),
+    2000: (1280.0, 960.0),
+    1000: (640.0, 480.0),
+    0: (6400.0, 4800.0),    # "as dataset", which has been the 1:10000 grid
+    1: (6400.0, 4800.0),    # "no division", one file, still cut out of sheets
+}
 
 
 def post(url, fields, timeout=300):
@@ -123,31 +132,44 @@ def resolve(rows, token):
              + "\n  ".join(sorted(r["LAS_PROJECT_NAME"] for r in hits[:12])))
 
 
-def squares(project, chunk_m):
+def sheet_block(chunk_m, sheet):
+    """Chunk size as whole mapsheets: (width, height, across, down).
+
+    A chunk that is not a whole number of sheets on a sheet edge buys nothing —
+    the delivery rounds out to sheets anyway — so `--chunk-km` is taken as a
+    wish and rounded to the nearest block of them."""
+    wide, tall = SHEETS[sheet]
+    across = max(1, round(chunk_m / wide))
+    down = max(1, round(chunk_m / tall))
+    return across * wide, down * tall, across, down
+
+
+def squares(project, chunk_m, sheet):
     """The chunks the acquisition covers and the ground inside them.
 
-    Filled at an eighth of the chunk so a sliver of coverage still claims its
-    square; a chunk the flight never reached is never ordered. Order is west to
-    east, north first."""
-    fine = chunk_m / 8
+    Filled fine enough that a sliver of coverage still claims its square; a
+    chunk the flight never reached is never ordered. Order is west to east,
+    north first."""
+    wide, tall, _, _ = sheet_block(chunk_m, sheet)
+    fine = math.gcd(int(wide), int(tall)) / 8
     feats = coverage_mod.footprints(project)
     if not feats:
         sys.exit(f"{project!r} has no footprint in the mosaic catalogue, so "
                  "there is nothing to order.")
-    mask, bounds, _ = coverage_mod.rasterise(feats, fine, origin=CHUNK_ORIGIN)
+    mask, bounds, _ = coverage_mod.rasterise(feats, fine, origin=SHEET_ORIGIN)
     x0, _x1, y0, _y1 = bounds
-    ox, oy = CHUNK_ORIGIN
+    ox, oy = SHEET_ORIGIN
     j, i = np.nonzero(mask)
-    cj = (j + round((y0 - oy) / fine)) // 8
-    ci = (i + round((x0 - ox) / fine)) // 8
+    cj = (j + round((y0 - oy) / fine)) // int(tall / fine)
+    ci = (i + round((x0 - ox) / fine)) // int(wide / fine)
     out = []
     for block_j, block_i in sorted(set(zip(cj.tolist(), ci.tolist())),
                                    key=lambda c: (-c[0], c[1])):
-        west = ox + block_i * chunk_m
-        south = oy + block_j * chunk_m
+        west = ox + block_i * wide
+        south = oy + block_j * tall
         out.append({
             "cj": block_j, "ci": block_i,
-            "bbox": [west, south, west + chunk_m, south + chunk_m],
+            "bbox": [west, south, west + wide, south + tall],
             "job": None, "state": None, "url": None, "file": None,
         })
     return out, float(mask.sum()) * fine * fine / 1e6
@@ -531,9 +553,9 @@ def load_state(path, settings):
                  ".\nFinish it, or move it aside and start again.")
     # Records written before the chunk grid moved off the tile origin name
     # squares that no longer exist, and there is nothing to reconcile them to.
-    if list(held.get("origin", ())) != list(CHUNK_ORIGIN):
-        sys.exit(f"{path.name} was cut on the old chunk grid, which was offset "
-                 "from any round\nkilometre. The squares in it do not exist "
+    if list(held.get("origin", ())) != list(SHEET_ORIGIN):
+        sys.exit(f"{path.name} was cut on a chunk grid that is not the "
+                 "delivery's mapsheet grid.\nThe squares in it do not exist "
                  f"any more.\n  rm {path}\nand order again; what is already "
                  "downloaded stays where it is and is still good.")
     return held
@@ -556,8 +578,9 @@ def report_chunks(held, out):
     for chunk in held["chunks"]:
         counts[chunk["state"] or "not ordered"] = \
             counts.get(chunk["state"] or "not ordered", 0) + 1
+    wide, tall = held["chunk_m"]
     print(f"{held['project']}: {plural(len(held['chunks']), 'chunk')} of "
-          f"{held['chunk_m'] / 1000:g} km")
+          f"{wide / 1000:g} x {tall / 1000:g} km")
     for state in sorted(counts):
         print(f"  {state:14} {counts[state]}")
     files = [out / c["file"] for c in held["chunks"] if c["file"]]
@@ -680,8 +703,8 @@ def main():
         "resolution": args.resolution,
         "wkid": args.wkid,
         "sheet": args.sheet,
-        "chunk_m": args.chunk_km * 1000,
-        "origin": list(CHUNK_ORIGIN),
+        "chunk_m": list(sheet_block(args.chunk_km * 1000, args.sheet)[:2]),
+        "origin": list(SHEET_ORIGIN),
         "email": args.email,
         "cell": row.get("OPPLOSNING") or 0.25,
     }
@@ -701,7 +724,8 @@ def main():
 
     if held is None:
         print(f"{project}: working out the chunks…", file=sys.stderr)
-        chunks, flown = squares(project, settings["chunk_m"])
+        chunks, flown = squares(project, args.chunk_km * 1000,
+                                settings["sheet"])
         held = dict(settings, chunks=chunks, flown_km2=round(flown, 1))
         del held["email"]
 
@@ -709,9 +733,11 @@ def main():
     flown = held["flown_km2"]
     weight = estimate_mb(settings, flown)
     print(f"{project}  {row.get('AARSTALL')}  {settings['cell']} m grid")
-    print(f"  {plural(len(chunks), 'chunk')} of "
-          f"{settings['chunk_m'] / 1000:g} km over {spaced(round(flown))} km² "
-          f"of flown ground")
+    wide, tall = settings["chunk_m"]
+    _, _, across, down = sheet_block(args.chunk_km * 1000, settings["sheet"])
+    print(f"  {plural(len(chunks), 'chunk')} of {wide / 1000:g} x "
+          f"{tall / 1000:g} km ({across} x {down} mapsheets) over "
+          f"{spaced(round(flown))} km² of flown ground")
     if weight:
         print(f"  about {size(weight * 1e6)} of float32 before the zip, "
               f"{size(weight * 1e6 / len(chunks))} a job on average")

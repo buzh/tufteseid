@@ -210,13 +210,18 @@ terrain, and counted so it is visible that they were. The elevation is under
 `<project>/data/dtm/`, which is what the VRT gets built from, and the `under`
 lines say so rather than assuming it.
 
-**`clipToPolygon` does not clip.** A job comes back as whole tiles of the
-delivery's own grid, reaching a few kilometres past the square that was
-ordered, so neighbouring chunks overlap. Unpack an acquisition's zips into one
-tree and the repeated tiles land on each other; `--inspect` measures the
-overhang and says so. Chunks are cut on a round-kilometre grid
-(`CHUNK_ORIGIN`) rather than on `coverage.GRID_ORIGIN`, whose northing ends in
-984 and would miss every mapsheet edge by the same 16 m.
+**`clipToPolygon` does not clip.** A job comes back as whole mapsheets of the
+grid `--sheet` names, so a chunk cut on anything else spills over its
+neighbours and the same ground is fetched twice. Chunks are therefore cut on
+the sheet grid itself and nothing overlaps; `--chunk-km` is a wish, rounded to
+a whole block of sheets, and the plan says which block it became.
+
+That grid is measured rather than documented: a 1:10000 delivery in EPSG:25833
+is named `<project>-33-10-<col>-<row>-dtm.tif` for west = col × 6400 −
+2 700 000 and south = row × 4800 + 6 000 000 — **6.4 × 4.8 km sheets**, 30.72
+km² and 1.97 GB of float32 apiece. The finer divisions are assumed to halve
+each way; only 1:10000 has been seen. `--inspect` measures any overhang that
+remains and says so.
 
 What a first delivery settled: `resolution 0` really is the acquisition's own
 0.25 m; `outputWkid` is honoured, and a project native to EPSG:25832 comes back
