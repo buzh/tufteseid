@@ -168,6 +168,7 @@ First run over the whole country is some minutes; after that, seconds.
 .venv/bin/python export.py stryn -m you@example.com         carries on
 .venv/bin/python export.py stryn --status
 .venv/bin/python export.py stryn --inspect dem/stryn
+.venv/bin/python export.py stryn --adopt dem/stryn -m you@example.com
 ```
 
 `exportImage` renders a window per work unit — ~90 GB of float TIFF over a full
@@ -222,6 +223,13 @@ is named `<project>-33-10-<col>-<row>-dtm.tif` for west = col × 6400 −
 km² and 1.97 GB of float32 apiece. The finer divisions are assumed to halve
 each way; only 1:10000 has been seen. `--inspect` measures any overhang that
 remains and says so.
+
+Because a chunk is a whole block of sheets, **`--adopt DIR` is exact**: a
+chunk is taken as done when every one of its sheets is already unpacked there,
+and ordered otherwise. That is what makes a 150 GB run survive a lost job
+record, and what stops ground fetched under an older chunk grid from being
+fetched again. Sheets left over from a coarser block only count when the
+blocks line up, so `--chunk-km 6` — one sheet a chunk — adopts the most.
 
 What a first delivery settled: `resolution 0` really is the acquisition's own
 0.25 m; `outputWkid` is honoured, and a project native to EPSG:25832 comes back

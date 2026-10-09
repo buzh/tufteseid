@@ -368,6 +368,50 @@ def aux_stats(path):
     return found or None
 
 
+def rasters_under(where):
+    """Every delivered elevation raster's extent, the paperwork left out."""
+    where = Path(where)
+    boxes = []
+    for path in sorted(where.rglob("*")):
+        if path.suffix.lower() not in (".tif", ".tiff"):
+            continue
+        if ASIDE.search(path.relative_to(where).as_posix()):
+            continue
+        try:
+            box = extent_of(tiff_header(path))
+        except (OSError, struct.error):
+            continue
+        if box:
+            boxes.append(box)
+    return boxes
+
+
+def adopt(chunks, where, sheet):
+    """Mark the chunks every sheet of which is already unpacked.
+
+    A chunk is a whole block of mapsheets, so this is exact: either all of its
+    sheets are on disk or it still has to be ordered. It is what makes a run
+    survive a lost job record, and what keeps ground already fetched under an
+    older chunk grid from being fetched again."""
+    boxes = rasters_under(where)
+    if not boxes:
+        return 0
+    wide, tall = SHEETS[sheet]
+    taken = 0
+    for chunk in chunks:
+        if chunk["state"] in DONE:
+            continue
+        west, south, east, north = chunk["bbox"]
+        middles = [(west + (i + 0.5) * wide, south + (j + 0.5) * tall)
+                   for i in range(round((east - west) / wide))
+                   for j in range(round((north - south) / tall))]
+        if all(any(bw <= x <= be and bs <= y <= bn for bw, bs, be, bn in boxes)
+               for x, y in middles):
+            chunk.update(state="complete", file=str(where))
+            taken += 1
+    return taken
+
+
 def one_of(values, name):
     """A single value if they all agree, else the disagreement spelled out."""
     seen = {}
@@ -678,6 +722,9 @@ def main():
                    help="order the failed and abandoned chunks again")
     p.add_argument("--status", action="store_true",
                    help="say where the record got to and stop")
+    p.add_argument("--adopt", metavar="DIR",
+                   help="take the chunks already unpacked here as done, "
+                        "whoever ordered them")
     p.add_argument("-v", "--verbose", action="store_true",
                    help="for --inspect, name every file rather than the first "
                         "dozen")
@@ -728,6 +775,11 @@ def main():
                                 settings["sheet"])
         held = dict(settings, chunks=chunks, flown_km2=round(flown, 1))
         del held["email"]
+
+    if args.adopt:
+        taken = adopt(held["chunks"], args.adopt, settings["sheet"])
+        print(f"{plural(taken, 'chunk')} already unpacked under {args.adopt}",
+              file=sys.stderr)
 
     chunks = held["chunks"]
     flown = held["flown_km2"]
