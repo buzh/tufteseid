@@ -44,6 +44,7 @@ Pick what to order with `plan.py`; see what has a raw point cloud instead with
 
 import argparse
 import json
+import re
 import shutil
 import struct
 import sys
@@ -203,6 +204,11 @@ _COMPRESSION = {1: "none", 5: "LZW", 7: "JPEG", 8: "deflate", 32773: "packbits",
                 32946: "deflate", 34925: "LZMA", 50000: "zstd", 50001: "webp"}
 _SAMPLE = {1: "uint", 2: "int", 3: "float"}
 
+# A delivery carries its own paperwork beside the elevation: the flight strips,
+# the clip polygon, the project report, and point-density rasters that are
+# GeoTIFFs on a metre grid and would otherwise be read as terrain.
+ASIDE = re.compile(r"(^|/)metadata(/|$)|punkttetthet", re.I)
+
 # ESRI writes a user-defined CRS rather than an EPSG code: ProjectedCSTypeGeoKey
 # is 32767 and the name is left in the citation. The zone is still in
 # ProjectionGeoKey as 16000 + zone north, and ETRS89's UTM codes are 25800 +
@@ -233,38 +239,54 @@ def crs_of(keys, ascii_params):
     return None, citation
 
 
-def tiff_header(path, probe=1 << 20):
-    """Grid, CRS and sample type off the front of a GeoTIFF."""
-    with open(path, "rb") as handle:
-        buf = handle.read(probe)
-    if buf[:2] == b"II":
-        end = "<"
-    elif buf[:2] == b"MM":
-        end = ">"
-    else:
-        return {"error": "not a TIFF"}
-    if struct.unpack(end + "H", buf[2:4])[0] != 42:
-        return {"error": "BigTIFF, which nothing here reads"}
+def tiff_header(path):
+    """Grid, CRS and sample type out of a GeoTIFF, reading no pixels.
 
-    (ifd,) = struct.unpack(end + "I", buf[4:8])
-    (count,) = struct.unpack(end + "H", buf[ifd:ifd + 2])
-    tags = {}
-    for n in range(count):
-        at = ifd + 2 + n * 12
-        tag, kind, many = struct.unpack(end + "HHI", buf[at:at + 8])
-        fmt = _TIFF_TYPE.get(kind)
-        if fmt is None and kind != 2:
-            continue
-        span = many if kind == 2 else fmt[1] * many
-        if span <= 4:
-            raw = buf[at + 8:at + 8 + span]
+    Seeks rather than reading a prefix: a writer may leave the IFD at the end
+    of the file, and a tag's values anywhere at all."""
+    with open(path, "rb") as handle:
+        def at(offset, length):
+            handle.seek(offset)
+            return handle.read(length)
+
+        start = at(0, 8)
+        if len(start) < 8:
+            return {"error": "too short to be a TIFF"}
+        if start[:2] == b"II":
+            end = "<"
+        elif start[:2] == b"MM":
+            end = ">"
         else:
-            (far,) = struct.unpack(end + "I", buf[at + 8:at + 12])
-            raw = buf[far:far + span]
-        if len(raw) != span:
-            continue
-        tags[tag] = (raw.decode("latin1") if kind == 2
-                     else struct.unpack(end + fmt[0] * many, raw))
+            return {"error": "not a TIFF"}
+        magic = struct.unpack(end + "H", start[2:4])[0]
+        if magic == 43:
+            return {"error": "BigTIFF, which nothing here reads"}
+        if magic != 42:
+            return {"error": f"TIFF magic {magic}, which nothing here reads"}
+
+        (ifd,) = struct.unpack(end + "I", start[4:8])
+        entries = at(ifd, 2)
+        if len(entries) < 2:
+            return {"error": "the directory offset points past the file"}
+        (count,) = struct.unpack(end + "H", entries)
+        block = at(ifd + 2, count * 12)
+        tags = {}
+        for n in range(min(count, len(block) // 12)):
+            field = block[n * 12:n * 12 + 12]
+            tag, kind, many = struct.unpack(end + "HHI", field[:8])
+            fmt = _TIFF_TYPE.get(kind)
+            if fmt is None and kind != 2:
+                continue
+            span = many if kind == 2 else fmt[1] * many
+            if span <= 4:
+                raw = field[8:8 + span]
+            else:
+                (far,) = struct.unpack(end + "I", field[8:12])
+                raw = at(far, span)
+            if len(raw) != span:
+                continue
+            tags[tag] = (raw.decode("latin1") if kind == 2
+                         else struct.unpack(end + fmt[0] * many, raw))
 
     epsg, citation = crs_of(tags.get(34735, ()), tags.get(34737, ""))
     scale = tags.get(33550)
@@ -303,26 +325,37 @@ def one_of(values, name):
 def inspect(where, held):
     """What the unpacked delivery holds, and whether it is what was ordered."""
     where = Path(where)
-    tifs = sorted(p for p in where.rglob("*")
-                  if p.suffix.lower() in (".tif", ".tiff"))
+    tifs, aside = [], []
+    for path in sorted(where.rglob("*")):
+        if path.suffix.lower() not in (".tif", ".tiff"):
+            continue
+        (aside if ASIDE.search(path.relative_to(where).as_posix())
+         else tifs).append(path)
     zips = sorted(where.rglob("*.zip"))
     clouds = sorted(p for p in where.rglob("*") if p.suffix.lower() == ".laz")
     if not tifs:
-        print(f"No GeoTIFF under {where}."
+        print(f"No elevation GeoTIFF under {where}."
               + (f" {plural(len(zips), 'zip is', 'zips are')} still packed — "
                  "unpack each\ninto a directory of its own first."
                  if zips else "")
+              + (f" {plural(len(aside), 'raster')} are the delivery's own "
+                 "metadata, which is not it." if aside else "")
               + (f" {plural(len(clouds), 'LAZ file')}, which is a point cloud "
                  "and not this." if clouds else ""))
         return
 
     heads, broken = [], []
     for path in tifs:
-        head = tiff_header(path)
+        try:
+            head = tiff_header(path)
+        except (OSError, struct.error) as err:
+            head = {"error": f"{type(err).__name__}: {err}"}
         (broken if head.get("error") else heads).append((path, head))
     if not heads:
         print(f"{plural(len(broken), 'file')} under {where}, none of them a "
               "readable TIFF.")
+        for path, head in broken[:5]:
+            print(f"  {path.name}: {head['error']}")
         return
 
     cells = [h["cell"][0] if h["cell"] else None for _, h in heads]
@@ -347,6 +380,15 @@ def inspect(where, held):
 
     print(f"{where}: {plural(len(heads), 'GeoTIFF')}"
           + (f", {plural(len(zips), 'zip')} still packed" if zips else ""))
+    folders = {}
+    for path, _ in heads:
+        parent = path.parent.relative_to(where).as_posix() or "."
+        folders[parent] = folders.get(parent, 0) + 1
+    for parent in sorted(folders, key=lambda d: (-folders[d], d))[:6]:
+        print(f"  under       {parent}/  {plural(folders[parent], 'file')}")
+    if aside:
+        print(f"  set aside   {plural(len(aside), 'raster')} of the delivery's "
+              "own metadata")
     told = f"EPSG:{crs}" if crs != "None" else "no EPSG code in the file"
     print(f"  grid        {grid} m, {told}")
     if heads[0][1].get("citation"):

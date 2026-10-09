@@ -203,6 +203,13 @@ actually arrived, plus which ordered chunks have no file over them. `resolution
 0` meaning 0.25 m and `outputWkid` being honoured are assumptions until a
 delivery says so.
 
+A delivery carries its own paperwork: a `metadata/` subtree with the flight
+strips, the clip polygon, the project report — and **point-density rasters,
+which are GeoTIFFs on a metre grid**. Those are set aside rather than read as
+terrain, and counted so it is visible that they were. The `under` lines say
+which directories the elevation actually sits in, which is also what the VRT
+should be built from.
+
 One quirk it already reads through: Kartverket's rasters come out of ESRI with
 a **user-defined** CRS — `ProjectedCSTypeGeoKey` is 32767 and the EPSG code is
 nowhere in the file. The zone is still in `ProjectionGeoKey` as 16000 + zone,
