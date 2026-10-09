@@ -55,12 +55,9 @@ const draw = (source: VectorSource, view: string, records: SpotRecord[]) => {
   );
 };
 
-/**
- * What a click on the pin layer means. A gathering is not a record, so it goes
- * in far enough to break the gathering apart rather than opening anything —
- * unless no zoom could, every pin being on the one coordinate, and then the
- * reader cannot have meant one of them over another.
- */
+/** What a click on the pin layer means. A gathering is not a record, so it
+ *  zooms in far enough to break apart rather than opening anything — unless
+ *  no zoom could, every pin being on the one coordinate. */
 const openHit = (
   map: Map,
   records: SpotRecord[],

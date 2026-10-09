@@ -33,11 +33,8 @@ const LINK_ZOOM = 16;
  *  from outside. */
 export const spotLinkFailedAtom = atom(false);
 
-/** Nothing in the notice is to be acted on, so it goes by itself rather than
- *  asking to be dismissed. Long enough to be read after the eye has finished
- *  wondering why the map did not move. The deadline is armed here and not in
- *  `SpotLinkFailed`, whose surface is swapped out for the whole time a spot is
- *  being placed — a timer living there would rewind. */
+// Armed here and not in `SpotLinkFailed`, whose surface is swapped out for the
+// whole time a spot is being placed — a timer living there would rewind.
 const LINK_FAILED_MS = 10000;
 
 export const useSpotShareLink = () => {
@@ -113,12 +110,10 @@ export const useSpotShareLink = () => {
   ]);
 
   // Read by the centring effect below without being one of its dependencies:
-  // `EvidenceReader` fits the footprint when a reading opens, so centring on
-  // the point as well would be two animations on one view, and leaving a
-  // reading must not move the view at all. Only a spot that has a rectangle
-  // gets that fit, though — so a reading without one is centred here instead,
-  // or a link to a row from before the rectangle rule would leave the view
-  // wherever the reader last had it.
+  // `EvidenceReader` fits the footprint when a reading opens, so centring as
+  // well would be two animations on one view, and leaving a reading must not
+  // move the view at all. A reading of a spot with no rectangle gets no fit,
+  // so that one is centred here instead.
   const reading = useAtomValue(spotReadingAtom);
   const readingNow = useRef(reading);
   useEffect(() => {

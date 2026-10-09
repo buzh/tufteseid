@@ -1,11 +1,7 @@
-// Up, the tally, down. The reader's own spot keeps the tally and drops the
-// thumbs. Pressing the side already voted retracts it.
-//
-// Of the two refusals, only one is a dead end: an admin on somebody's private
-// spot cannot publish it, so there the thumbs really are disabled. A reader
-// with no account can get one, so theirs stay live and open the sign-in box —
-// a button that names its own remedy and does not offer it is worse than no
-// button.
+// Of the two refusals only one is a dead end, so only one disables the thumbs:
+// an admin cannot publish somebody's private spot, but a reader with no
+// account can get one, so theirs stay live and open the sign-in box
+// (`docs/discussion-and-votes.md`).
 
 import { Tooltip } from '@mantine/core';
 import { useAtomValue, useSetAtom } from 'jotai';

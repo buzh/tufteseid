@@ -103,12 +103,8 @@ const label = (name: string, scale: number) => {
   });
 };
 
-/**
- * The zoom from which a pin stands bare. A name plate is for telling spots
- * apart across a view that holds several; from here in the reader is looking
- * at the ground itself, and a dark plate over the hillshade covers the thing
- * being read.
- */
+/** The zoom from which a pin stands bare: from here in a dark plate over the
+ *  hillshade covers the thing being read. */
 export const LABEL_OFF_ZOOM = 10;
 
 const barePin = [new Style({ image: savedPin })];

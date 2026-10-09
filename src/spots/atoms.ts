@@ -40,12 +40,9 @@ export const spotFormAtom = atom<SpotForm>({ name: '', description: '' });
 
 export const spotSketchAtom = atom<SpotSketch | null>(null);
 
-/**
- * Where a rectangle starts when the reader asks for one: around the drawing if
- * there is one on screen, and otherwise the middle of the view. A drawing
- * nowhere near the viewport is not what the reader is looking at, so it is
- * passed over rather than the map being dragged off to it.
- */
+/** Where a rectangle starts: around the drawing if one is on screen, else the
+ *  middle of the view. A drawing nowhere near the viewport is not what the
+ *  reader is looking at, so it is passed over. */
 const seedFootprint = (
   map: Map,
   drawing: SpotSketch | null,
@@ -93,13 +90,10 @@ export const activeSpotAtom = atom(
   },
 );
 
-/** The open spot's evidence is being read on the map. A draft only suspends the
- *  reading — closing one returns to it.
- *
- *  True regardless for a reader who may not edit the spot: the card behind the
- *  reading is the author's workbench, so for anybody else the reading is the
- *  whole of the spot and writing this false does nothing. They leave by closing
- *  the spot itself. */
+/** The open spot's evidence is being read on the map; a draft suspends the
+ *  reading rather than ending it. True regardless for a reader who may not
+ *  edit the spot — writing it false does nothing, and they leave by closing
+ *  the spot (`docs/architecture.md`). */
 export const spotReadingAtom = atom(
   (get) => {
     const active = get(activeSpotAtom);
@@ -112,10 +106,8 @@ export const spotReadingAtom = atom(
   },
 );
 
-/** The acquisition box stands in front of the card. Held the same way as the
- *  reading and suspended by a draft for the same reason; never reached by a
- *  reader who may not edit the spot, who is held in the reading and never sees
- *  the card it is opened from. */
+/** The acquisition box stands in front of the card. Held and suspended like
+ *  the reading; never reached by a reader who may not edit the spot. */
 export const spotAcquiringAtom = atom(
   (get) => {
     const active = get(activeSpotAtom);
@@ -131,10 +123,9 @@ export const spotAcquiringAtom = atom(
 );
 
 /** The thread box, reached from the card and from the reading alike. Held and
- *  suspended like the other two.
- *
- *  Never true for a private spot: the comment engine has no access control, so
- *  not mounting the thread is the only gate. `SpotTalk` re-checks. */
+ *  suspended like the other two. Never true for a private spot: the comment
+ *  engine has no access control, so not mounting the thread is the only gate,
+ *  and `SpotTalk` re-checks. */
 export const spotTalkingAtom = atom(
   (get) => {
     const active = get(activeSpotAtom);
@@ -229,12 +220,9 @@ export const setSpotStageAtom = atom(
     const draft = get(spotDraftAtom);
     if (!draft || draft.stage === stage) return;
     if (stage === 'footprint' || stage === 'sketch') {
-      // The terrain rectangle lets go of the map. Against another rectangle,
-      // because only one `useRectangleAdjust` may be live: two would put two
-      // frames and two pointer interactions on the map, and neither could be
-      // grabbed. Against the pen, because the canvas covers the map and
-      // freezes its interactions, so a frame left in hand could not be put
-      // down again.
+      // The terrain rectangle lets go of the map: only one
+      // `useRectangleAdjust` may be live, or neither frame can be grabbed, and
+      // the sketch canvas freezes the map's interactions under it.
       set(terrainAdjustingAtom, false);
     }
     if (stage === 'footprint') {
@@ -261,9 +249,7 @@ export const releaseSpotFootprintAtom = atom(null, (get, set) => {
   else set(spotDraftAtom, { ...draft, stage: 'idle' });
 });
 
-/** Take hold of the map from the card, which stays on screen: the rectangle and
- *  the drawing are adjusted against the ground rather than filled into a form,
- *  so they are the two units the card owns outright. */
+/** Take hold of the map from the card, which stays on screen. */
 export const adjustSpotDraftAtom = atom(
   null,
   (_get, set, record: SpotRecord, stage: 'footprint' | 'sketch') => {

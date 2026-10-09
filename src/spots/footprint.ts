@@ -1,7 +1,5 @@
-// Every spot has a rectangle. It is what the pictures are rendered over, so a
-// spot without one can hold none — and the reader is never asked for it up
-// front: the first write that finds a record without one derives it here, and
-// adjusting it afterwards is a separate act.
+// Every spot has a rectangle and nobody is asked for one: the first write that
+// finds a record without one derives it here (`docs/architecture.md`).
 
 import type { SpotPoint, SpotSketch } from '../api/spots';
 import {
