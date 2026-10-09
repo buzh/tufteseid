@@ -1,6 +1,5 @@
-// What a legend says, apart from how it is drawn. Two typesetters need it: a
-// still is drawn onto a canvas at download time (`download.ts`), a sun loop by
-// the sidecar at render time.
+// What a legend says, apart from how it is drawn. Two typesetters: a still at
+// download time (`download.ts`), a sun loop by the sidecar at render time.
 
 import { t } from 'i18next';
 import { transform } from 'ol/proj';
@@ -24,26 +23,24 @@ type LegendContent = {
   link: string;
 };
 
-/** What the sidecar is sent: wording, with holes where the facts it reads off
- *  the record go. No `link` — it composes that itself — and no `centre`, which
- *  its stacked band has nowhere to put. Mirrors `legend_of` in
- *  `rendersvc/server.py`. */
+/** Wording with holes where the sidecar fills facts; no `link` (it composes its
+ *  own) and no `centre` (its stacked band has nowhere to put one). Mirrors
+ *  `legend_of` in `rendersvc/server.py`. */
 export type SunLoopLegend = Omit<LegendContent, 'link' | 'centre'> & {
   resolutionFormat: string;
   decimal: string;
 };
 
-// The hole the sidecar fills once it knows what it managed to fetch. Matches
-// `RESOLUTION_TOKEN` in `rendersvc/legend.py`.
+// Filled once the sidecar knows what it fetched. Matches `RESOLUTION_TOKEN` in
+// `rendersvc/legend.py`.
 const RESOLUTION_TOKEN = '{res}';
 
-// The hole the sidecar fills with the credit off the record it is rendering,
-// rather than with whoever asked for the render. Matches `CREDIT_TOKEN` in
-// `rendersvc/legend.py`.
+// Filled with the credit off the rendered record, not whoever asked. Matches
+// `CREDIT_TOKEN` in `rendersvc/legend.py`.
 const CREDIT_TOKEN = '{credit}';
 
-/** A rights holder named on the legend. The holder is a proper name and is
- *  never translated; the terms key resolves to the licence, which is. */
+// The holder is a proper name, never translated; `terms` resolves to the licence,
+// which is.
 const KARTVERKET = {
   holder: 'Kartverket',
   terms: 'evidence.figure.terms.ccby',
@@ -58,8 +55,7 @@ const NORGE_I_BILDER = {
 const rightsLine = (role: string, holder: string, terms: string): string =>
   t('evidence.figure.rights.line', { role, holder, terms: t(terms) });
 
-// Float elevation in, pixels out: the kinds whose picture we made rather than
-// fetched, so they name co-authors.
+// The kinds whose picture we made rather than fetched, so they name co-authors.
 const ourVisualisation = (credit: string): string =>
   rightsLine(
     t('evidence.figure.role.visualisering'),
@@ -79,18 +75,16 @@ const heightData = (): string =>
     KARTVERKET.terms,
   );
 
-/** Not a rights holder: RVT's authors ask that work using the tools cite them,
- *  and a figure travels away from the README that holds the full references. */
+// Not a rights holder: RVT asks that work using it cite the method, and a figure
+// travels away from the README that holds the full references.
 const rvtMethod = (): string => t('evidence.figure.rights.method');
 
-/** One line per holder rather than one joined line: Norge i bilder's name
- *  alone is sixty characters. */
+// One line per holder: Norge i bilder's name alone is sixty characters.
 const rightsOf = (spec: EvidenceSpec, credit: string): string[] => {
   switch (spec.kind) {
     case 'lidar': {
-      // The WMS serves the shading, not the heights: the picture itself is what
-      // Kartverket published. The cached VAT is the exception — `vat-cache/`
-      // computed that one with RVT.
+      // The WMS serves the shading, which is what Kartverket published. The
+      // cached VAT is the exception — `vat-cache/` computed that one with RVT.
       const line = rightsLine(
         lidarStyleLabel(spec.style).toLowerCase(),
         KARTVERKET.holder,
@@ -98,7 +92,6 @@ const rightsOf = (spec: EvidenceSpec, credit: string): string[] => {
       );
       return spec.style === CVAT_STYLE ? [line, rvtMethod()] : [line];
     }
-    // The sidecar works the same heights the browser does, only harder.
     case 'terrain':
     case 'sunloop':
     case 'rvt':
@@ -114,7 +107,6 @@ const rightsOf = (spec: EvidenceSpec, credit: string): string[] => {
   }
 };
 
-/** The rectangle's centre as a place. */
 export const centreOf = (
   bbox25833: [number, number, number, number],
 ): string => {
@@ -131,8 +123,8 @@ export const centreOf = (
   }
 };
 
-/** Null for a row whose column no longer describes a render: there is nothing
- *  to cite, and an invented caption would be the opposite of provenance. */
+// Null for a row that no longer describes a render: an invented caption would be
+// the opposite of provenance.
 export const legendContentFor = (
   rec: EvidenceRecord,
   spot: SpotRecord,
@@ -145,8 +137,7 @@ export const legendContentFor = (
     facts: evidenceFacts(rec),
     rights: rightsOf(spec, spot.credit),
     centre,
-    // A private spot's code resolves to nothing for anyone but its owner, so
-    // printing it would be an invitation to a dead link.
+    // A private spot's code is a dead link to anyone but its owner.
     link:
       spot.visibility === 'public'
         ? shareUrlOf(spot.code).replace(/^https?:\/\//, '')
@@ -154,9 +145,8 @@ export const legendContentFor = (
   };
 };
 
-// The band is otherwise in the reader's language, and `0.50` beside `1,5×`
-// reads as a typo. Defaulted rather than thrown on: a legend is never worth
-// failing a render for.
+// The band is in the reader's language, and `0.50` beside `1,5×` reads as a typo.
+// Defaulted, never thrown: a legend is not worth failing a render for.
 const decimalSeparator = (language: string): string => {
   try {
     return new Intl.NumberFormat(language).format(1.1).charAt(1) || '.';
@@ -165,15 +155,9 @@ const decimalSeparator = (language: string): string => {
   }
 };
 
-/**
- * The same band, composed for a server that typesets it: the client chooses the
- * wording and not what the wording asserts, so the credit travels as a hole and
- * the link is left to the sidecar altogether.
- *
- * No centre, resolution or render date. The first is unknown before the ground
- * is fetched; the sidecar substitutes the resolution it achieves, and the other
- * would describe the previous render.
- */
+// The same band composed for the sidecar to typeset: the client chooses the
+// wording, not what it asserts, so the credit travels as a hole. No centre
+// (unknown before fetch), resolution (the sidecar substitutes its own) or date.
 export const sunLoopLegend = (
   rec: EvidenceRecord,
   spot: SpotRecord,

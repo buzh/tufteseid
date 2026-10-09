@@ -45,9 +45,8 @@ const groundOfferAtom = atom<EvidenceSpec | null>((get) => {
         };
   }
 
-  // The same key as the WMS ground of that flight, told apart by the style.
-  // `vat-cache/` runs against Prosjekt_DTM, so the store carries no surface
-  // model and the ground being up settles the model.
+  // Same key as the WMS ground of that flight, told apart by style. `vat-cache/`
+  // runs Prosjekt_DTM, so the store is DTM-only.
   if (layer === 'lidarCvat') {
     const acquisition = get(activeCvatAcquisitionHalves.a);
     return acquisition
@@ -87,18 +86,12 @@ const groundOfferAtom = atom<EvidenceSpec | null>((get) => {
   return null;
 });
 
-/** Written by `useTerrainControls` while the analysis has something to show,
- *  because its settings are component state rather than atoms. */
+// Written by `useTerrainControls`: its settings are component state, not atoms.
 export const terrainOfferAtom = atom<EvidenceSpec | null>(null);
 
-/**
- * The one offer standing: what the camera in the spot card would keep of the
- * view as it is, the analysis winning over the ground underneath it.
- *
- * An offer is parameters, not pixels: keeping it re-renders over the spot's
- * footprint at the source's own resolution, not the rectangle or the resolution
- * on screen.
- */
+// The one standing offer, analysis winning over the ground under it. Parameters,
+// not pixels: keeping it re-renders over the spot's footprint at the source's own
+// resolution, not the rectangle or resolution on screen.
 export const keepOfferAtom = atom<EvidenceSpec | null>(
   (get) => get(terrainOfferAtom) ?? get(groundOfferAtom),
 );

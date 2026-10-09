@@ -1,9 +1,7 @@
 // Same-origin through /wms/nib/* and /arcgis/nib/* → Caddy → wmscache →
-// nib-proxy, which injects the anonymous token.
-//
-// Not mapproxy's /cache/flyfoto, which is what the ground layer reads: that is
-// meta-tiled onto the app's own grid, and a kept render wants the acquisition's
-// own resolution rather than whatever zoom level happened to be up.
+// nib-proxy, which injects the anonymous token. Not mapproxy's /cache/flyfoto
+// (what the ground layer reads): that is meta-tiled onto the app's grid, and a
+// kept render wants the acquisition's own resolution, not the zoom that was up.
 
 import {
   fetchAndPaint,
@@ -22,13 +20,12 @@ import { MAX_STORED_PIXELS, type Raster } from './fit';
 const FLYFOTO_WMS_URL = '/wms/nib/ortofoto';
 const FLYFOTO_LAYER = 'ortofoto';
 
-// One acquisition is not a WMS operation: /wms/nib/ortofoto publishes only the
-// merged layer. It is an ArcGIS ImageServer whose catalogue carries a
+// One acquisition is not a WMS operation (/wms/nib/ortofoto publishes only the
+// merged layer): it is an ArcGIS ImageServer whose catalogue carries a
 // prosjektnavn column, picked with a mosaicRule `where`.
 const FLYFOTO_PROJECT_URL = `${FLYFOTO_PROJECT_IMAGESERVER}/exportImage`;
 
-// The seamless mosaic carries no pixel size of its own, so this stands in for
-// one. An acquisition uses its own figure, coarser or finer.
+// The seamless mosaic has no pixel size of its own; an acquisition uses its own.
 const MOSAIC_M_PER_PX = 0.2;
 
 // NiB sits behind the same shed-and-retry public edge as Kartverket.
@@ -36,9 +33,9 @@ const MAX_CONCURRENT = 4;
 const TILE_RETRIES = 3;
 const RETRY_BASE_MS = 400;
 
-// Finest worth asking for: `fitImageBlob` scales anything past the store's
-// pixel budget back down again, so tiles beyond it are fetched to be thrown
-// away. A 500 m footprint bottoms out here at 0.08 m/px.
+// Finest worth asking for: `fitImageBlob` scales anything past the pixel budget
+// back down, so finer tiles are fetched to be thrown away. A 500 m footprint
+// bottoms out at 0.08 m/px.
 const storeLimit = (bbox25833: Metric): number =>
   Math.sqrt(
     ((bbox25833[2] - bbox25833[0]) * (bbox25833[3] - bbox25833[1])) /
@@ -57,8 +54,8 @@ const projectUrl = (
     bboxSR: '25833',
     imageSR: '25833',
     size: `${widthPx},${heightPx}`,
-    // Plain jpg, not jpgpng: the stitch flattens onto opaque white below, and
-    // `fetchAndPaint`'s uniform check drops the empty tiles.
+    // Plain jpg, not jpgpng: the stitch flattens onto opaque white, and
+    // `fetchAndPaint`'s uniform check drops empty tiles.
     format: 'jpg',
     mosaicRule: flyfotoMosaicRule(project.id),
   });
@@ -85,20 +82,17 @@ const mosaicUrl = (
   return `${FLYFOTO_WMS_URL}?${params.toString()}`;
 };
 
-/**
- * Null when nothing painted and nothing failed: outside coverage, which is not
- * a fault and offers nothing to retry. A grab where every tile errored throws
- * instead. Same rule as `extractCanvas` and `fetchDem`.
- */
+// Null when nothing painted and nothing failed (outside coverage, not a fault); a
+// grab where every tile errored throws. Same rule as `extractCanvas` and `fetchDem`.
 export const fetchFlyfotoRaster = async (
   bbox4326: Bbox,
   { project, signal }: { project?: FlyfotoProject; signal?: AbortSignal } = {},
 ): Promise<Raster | null> => {
   const bbox25833 = bboxToMetric(bbox4326);
 
-  // The acquisition's own grid: never upsampled, because a 1937 flight
-  // stretched is four times the tiles for the same detail, and never
-  // downsampled either, because that resolution is the point of keeping.
+  // The acquisition's own grid: never upsampled (a 1937 flight stretched is four
+  // times the tiles for the same detail) nor downsampled (that resolution is the
+  // point of keeping).
   const native = project?.metresPerPx ?? 0;
   const metresPerPx = Math.max(
     native > 0 ? native : MOSAIC_M_PER_PX,

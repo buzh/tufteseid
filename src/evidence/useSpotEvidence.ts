@@ -36,8 +36,7 @@ import { evidenceMatches, metaOf, type EvidenceSpec } from './spec';
 
 type KeepOffer = {
   spec: EvidenceSpec;
-  /** A row already covers this ground with these parameters, so keeping again
-   *  would only make the same picture twice. */
+  /** A row already covers this ground with these parameters. */
   kept: boolean;
 };
 
@@ -45,26 +44,19 @@ export type SpotEvidence = {
   /** Null until the list lands; an empty array means none. */
   items: EvidenceRecord[] | null;
   failed: boolean;
-  /** What the reader could keep a picture of right now — the view as it
-   *  stands — or null where nothing on screen can be re-rendered. */
+  /** The view as it stands, or null where nothing on screen can be re-rendered. */
   offer: KeepOffer | null;
   keep: (spec: EvidenceSpec) => void;
-  /**
-   * A row written from pixels already made, for a picker run that renders
-   * before it asks. False where nothing was written — the proposal is still the
-   * run's, and the reader can press again.
-   */
+  /** A row written from pixels already made, for a picker that renders before it
+   *  asks. False where nothing was written and the reader can press again. */
   keepProduced: (spec: EvidenceSpec, produced: Produced) => Promise<boolean>;
   retry: (rec: EvidenceRecord) => void;
   remove: (id: string) => void;
-  /** Move a row to `to`, an index into `items` as it stands. The reading opens
-   *  on the cover (`coverOf`), so this is also how a cover is chosen. */
+  /** Move a row to index `to`. The reading opens on the cover (`coverOf`), so
+   *  this also chooses a cover. */
   reorder: (id: string, to: number) => void;
-  /**
-   * Where a row stands. A row with pixels has no state at all; otherwise a job
-   * this browser is still holding wins, and past that the sidecar's own
-   * `meta.job` outranks whatever the local queue concluded.
-   */
+  /** A row with pixels has no state; otherwise a job this browser still holds
+   *  wins, and past that the sidecar's `meta.job` outranks the local queue. */
   stateOf: (rec: EvidenceRecord) => RenderState | undefined;
 };
 
@@ -97,8 +89,8 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     [publish],
   );
 
-  // No reset for a second spot: the card keying on the record's id is what
-  // carries a change of spot, so this hook only ever sees one.
+  // No reset for a second spot: the card keys on the record's id, so this hook
+  // only ever sees one.
   const spotId = spot.id;
   useEffect(() => {
     let live = true;
@@ -154,8 +146,8 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       enqueueRender({
         rec,
         bbox4326: footprint,
-        // Composed here and sent with the job: only the client knows the
-        // reader's language, and only a sun loop's band is typeset elsewhere.
+        // Composed here: only the client knows the reader's language, and only a
+        // sun loop's band is typeset by the sidecar.
         legend:
           rec.kind === 'sunloop' ? sunLoopLegend(rec, spot, language) : null,
         onDone: upsert,
@@ -218,8 +210,8 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
           err,
           (err as { response?: { data?: unknown } })?.response?.data,
         );
-        // A row whose file never landed has nothing the gallery can retry — the
-        // pixels were the run's, and the run still holds them.
+        // A row whose file never landed has nothing to retry — the pixels were
+        // the run's, and the run still holds them.
         if (created) {
           const id = created.id;
           byId.current.delete(id);
@@ -243,8 +235,8 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       if (before.length !== writes.length) return;
 
       setFailed(false);
-      // Written here first: `publish` re-sorts, so the row stays where the hand
-      // left it rather than snapping back for the length of the round trip.
+      // Written first so the row stays where the hand left it, not snapping back
+      // for the round trip.
       writes.forEach((write, i) => upsert({ ...before[i], sort: write.sort }));
       Promise.all(
         writes.map((write) => setEvidenceSort(write.id, write.sort)),
@@ -263,7 +255,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       if (!was) return;
       setFailed(false);
       // Dropped first: the realtime delete may never arrive for a row only this
-      // reader could see.
+      // reader can see.
       byId.current.delete(id);
       publish();
       deleteEvidence(id).catch((err) => {

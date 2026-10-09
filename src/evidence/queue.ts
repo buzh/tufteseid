@@ -1,14 +1,8 @@
-// Module-level: a render outlives the surface that started it, so closing a
-// spot does not abandon pixels the reader decided to keep.
-//
-// A row's render runs alone. Every producer is either a burst of tile requests
-// against a shared public edge or an 800 ms horizon scan on the main thread, so
-// two at once finish no sooner and invite shed responses.
-//
-// A preview is the one exception, and `PREVIEW_LANES` is the whole of it: a
-// picker run is a reader waiting on one upstream with nothing else in hand, and
-// the wait there is the render's own length rather than anything the queue can
-// reorder. Two at once is the width of that exception.
+// A render outlives the surface that started it, so closing a spot does not
+// abandon pixels the reader chose to keep. One row renders at a time: every
+// producer is a burst against a shared public edge or an 800 ms main-thread
+// scan, so parallelism gains nothing and invites shed responses. Previews are
+// the one exception (PREVIEW_LANES).
 
 import { attachEvidenceFile, type EvidenceRecord } from '../api/evidence';
 import { requestRvtBlend, requestSunLoop } from '../api/render';
@@ -18,34 +12,24 @@ import type { SunLoopLegend } from './legendContent';
 import { renderEvidence, type BrowserSpec, type Produced } from './render';
 import { specOf } from './spec';
 
-/**
- * Where a row stands with the queue. Absent means "not the queue's business" —
- * either the pixels are there or nobody has asked. `failed` is a fault;
- * `empty` says the source had nothing over this rectangle.
- */
+// Absent means "not the queue's business": the pixels are there or nobody asked.
+// `failed` is a fault; `empty` says the source had nothing over this rectangle.
 export type RenderState = 'queued' | 'running' | 'empty' | 'failed';
 
 const STATES: readonly RenderState[] = ['queued', 'running', 'empty', 'failed'];
 
-/** Whether the row can be asked for again. Neither settled state is
- *  terminal. */
+/** Neither settled state (`failed`, `empty`) is terminal. */
 export const mayRetry = (state: RenderState | undefined): boolean =>
   state === 'failed' || state === 'empty';
 
-// A sidecar marker nobody is refreshing. The sidecar beats `job.at` every
-// minute for as long as a job is queued or running (`BEAT_S` in
-// `rendersvc/server.py`), so five beats' silence is a worker that is gone, not
-// a slow one — a fetch with its retries and three encode attempts can hold one
-// job for the better part of an hour.
+// The sidecar beats `job.at` every minute while a job is queued or running
+// (`BEAT_S` in `rendersvc/server.py`); five beats' silence is a dead worker,
+// not a slow one. A job can legitimately hold for ~an hour (fetch retries, three
+// encode attempts).
 const STALE_JOB_MS = 300000;
 
-/**
- * The same four states, as the render sidecar left them in `meta.job`. Absent
- * once the file lands: the sidecar writes the pixels and the meta in one
- * request, and the meta it writes has no marker. Only a kind the sidecar
- * renders ever carries one — the three browser-rendered kinds are never handed
- * over and write nothing but their own achieved meta.
- */
+// Absent once the file lands: the sidecar writes pixels and meta in one request
+// and the meta it writes has no marker. Only sidecar-rendered kinds carry one.
 export const jobState = (rec: EvidenceRecord): RenderState | undefined => {
   const job = rec.meta?.job;
   if (!job || typeof job !== 'object') return undefined;
@@ -60,39 +44,27 @@ export const jobState = (rec: EvidenceRecord): RenderState | undefined => {
 
 type RenderJob = {
   rec: EvidenceRecord;
-  /** The spot's footprint, EPSG:4326. */
+  /** EPSG:4326. */
   bbox4326: Bbox;
-  /** The band the sidecar burns in. Only a `sunloop` carries one; null for the
-   *  browser-rendered kinds, and for a row whose meta no longer describes a
-   *  render. */
+  /** The band the sidecar burns in; only a `sunloop` carries one, else null. */
   legend: SunLoopLegend | null;
-  /** The finished record, handed back to whoever is showing it. */
   onDone?: (rec: EvidenceRecord) => void;
 };
 
-// Ceilings on a stall, not budgets. The lanes are few, so a render that never
-// settles parks the jobs behind it; expiry is treated as an ordinary `failed`,
-// with a retry. The upload gets the same, which is 50 MB — the field's cap — at
-// about 1.5 Mbit/s up.
+// Ceilings on a stall, not budgets: a never-settling render parks the jobs
+// behind it, so expiry is an ordinary `failed` with a retry. 50 MB (the field's
+// cap) at ~1.5 Mbit/s up.
 const RENDER_DEADLINE_MS = 300000;
 const UPLOAD_DEADLINE_MS = 300000;
-// The sidecar answers as soon as it has claimed the row; the render itself is
-// not on this clock.
+// The sidecar answers once it has claimed the row; the render is not on this clock.
 const HANDOVER_DEADLINE_MS = 30000;
 
-/**
- * How many previews may be on the wire at once, and — because a run wants a
- * render going in every lane it is allowed — how far ahead of the proposal
- * under review a picker looks. Raising one without the other buys nothing:
- * lanes with no work queued sit idle, and a queue deeper than the lanes only
- * renders pictures nobody reaches.
- */
+// Also how far ahead of the proposal a picker looks: raising one without the
+// other buys nothing, since a run wants a render going in every lane it may use.
 export const PREVIEW_LANES = 2;
 
-// Thunks rather than jobs: a picker's preview shares the queue without sharing
-// the bookkeeping, having no row to keep a state for. Each settles itself, so
-// the pump below never sees a throw. `solo` is a row's render, which runs with
-// nothing beside it.
+// Thunks, not jobs: a preview has no row to keep a state for, and settles itself
+// so the pump never sees a throw. `solo` is a row's render, which runs alone.
 type Task = { run: () => Promise<void>; solo: boolean };
 
 const queue: Task[] = [];
@@ -101,8 +73,8 @@ const listeners = new Set<() => void>();
 let busy = 0;
 let soloBusy = false;
 
-// Copied on publish rather than handed out live: `useSyncExternalStore` decides
-// whether to re-render by identity, and a Map mutated in place never changes.
+// Copied on publish: `useSyncExternalStore` compares by identity, and a Map
+// mutated in place never changes.
 let snapshot: ReadonlyMap<string, RenderState> = new Map();
 
 const publish = () => {
@@ -117,7 +89,6 @@ export const subscribeRenderQueue = (fn: () => void): (() => void) => {
   };
 };
 
-/** Every row the queue has an opinion about, keyed by evidence id. */
 export const renderStates = (): ReadonlyMap<string, RenderState> => snapshot;
 
 // PocketBase's ClientResponseError logs only "400: Failed to update record.";
@@ -129,17 +100,15 @@ const failureDetail = (e: unknown): string => {
 
 const runJob = async (job: RenderJob): Promise<EvidenceRecord | null> => {
   const spec = specOf(job.rec);
-  // A row whose meta no longer parses: `failed` would offer a retry against
-  // nothing.
+  // Meta no longer parses; `failed` would offer a retry against nothing.
   if (!spec) {
     states.set(job.rec.id, 'empty');
     return null;
   }
 
-  // Handed to the sidecar, which renders it and PATCHes the file on itself. The
-  // row is then realtime's to report on, and this queue drops it — a render
-  // that takes minutes must not park every other job behind it, and it outlives
-  // the tab either way.
+  // Handed to the sidecar, which PATCHes the file on itself; the row is then
+  // realtime's to report on and this queue drops it, so a minutes-long render
+  // parks nothing behind it.
   if (spec.kind === 'sunloop') {
     if (!job.legend) {
       states.set(job.rec.id, 'empty');
@@ -171,9 +140,8 @@ const runJob = async (job: RenderJob): Promise<EvidenceRecord | null> => {
     return null;
   }
 
-  // No signal: a multipart PATCH already on the wire cannot be taken back, so
-  // the deadline only guarantees rejection — the queue moves on while the
-  // browser finishes or drops the transfer in its own time.
+  // No signal: a multipart PATCH on the wire cannot be taken back, so the
+  // deadline only rejects — the browser finishes or drops it in its own time.
   const done = await withDeadline(UPLOAD_DEADLINE_MS, 'evidence upload', () =>
     attachEvidenceFile(job.rec.id, produced.blob, produced.filename, {
       ...(job.rec.meta ?? {}),
@@ -186,9 +154,8 @@ const runJob = async (job: RenderJob): Promise<EvidenceRecord | null> => {
   return done;
 };
 
-// Strictly in order: a `solo` at the head holds the previews behind it rather
-// than being overtaken, so a row the reader asked for is never starved by a
-// run that keeps proposing.
+// Strictly in order, so a `solo` at the head holds previews behind it: a row the
+// reader asked for is never starved by a run that keeps proposing.
 const pump = () => {
   while (queue.length > 0 && !soloBusy) {
     const next = queue[0];
@@ -204,10 +171,8 @@ const pump = () => {
   }
 };
 
-/**
- * Idempotent while a job is in flight — the guard is on the live state rather
- * than on having been asked, so a `failed` or `empty` row can still be retried.
- */
+// Idempotent while in flight: the guard is on live state, not on having been
+// asked, so a `failed` or `empty` row can still be retried.
 export const enqueueRender = (job: RenderJob): void => {
   const state = states.get(job.rec.id);
   if (state === 'queued' || state === 'running') return;
@@ -235,16 +200,10 @@ export const enqueueRender = (job: RenderJob): void => {
   pump();
 };
 
-/**
- * Pixels with no row behind them: what a picker run shows the reader before
- * asking whether to keep it. In the same queue as the rows' own renders,
- * because the reason for a queue at all is the shared public edge and not the
- * rows — but `PREVIEW_LANES` wide, so a run keeps more than one render moving.
- *
- * `signal` gates the queue position rather than the render: a burst already on
- * the wire ends on its own deadline and only its result is dropped. Rejects
- * with the signal's reason for a preview the run no longer wants.
- */
+// Pixels with no row behind them, shown before the reader decides to keep them.
+// `signal` gates the queue position, not the render: a burst on the wire ends on
+// its own deadline and only its result is dropped. Rejects with the signal's
+// reason for a preview no longer wanted.
 export const enqueuePreview = (
   spec: BrowserSpec,
   bbox4326: Bbox,

@@ -14,9 +14,8 @@ export const moved = <T>(list: readonly T[], from: number, to: number): T[] => {
 
 type SortWrite = { id: string; sort: number };
 
-/** Evenly spaced keys ending on the list's current greatest, so none of them
- *  moves ahead of `Date.now()`: a picture kept after this must still land
- *  last. */
+// Evenly spaced keys ending on the list's current greatest, so none moves ahead
+// of `Date.now()` and a picture kept after still lands last.
 const renumbered = (list: readonly EvidenceRecord[]): SortWrite[] => {
   const last = Math.max(...list.map((rec) => rec.sort));
   return list
@@ -27,12 +26,9 @@ const renumbered = (list: readonly EvidenceRecord[]): SortWrite[] => {
     .filter((write, i) => write.sort !== list[i].sort);
 };
 
-/**
- * The `sort` writes that put `id` at `to` of `list`, which is the order on
- * screen, or nothing for a row already there. A row dropped last takes the
- * current time rather than a step past its neighbour, so a picture kept a
- * moment later still lands after it.
- */
+// The `sort` writes that put `id` at index `to`, or nothing for a row already
+// there. A row dropped last takes the current time, not a step past its
+// neighbour, so a picture kept a moment later still lands after it.
 export const sortsForMove = (
   list: readonly EvidenceRecord[],
   id: string,
@@ -52,10 +48,8 @@ export const sortsForMove = (
   }
 
   const between = (before + after) / 2;
-  // Two rows kept in the same millisecond hold the same key, and halving a gap
-  // enough times lands on one end of it: either way there is no key left to
-  // drop this row into, and writing one of the neighbours' own would leave the
-  // list exactly as it is. Spread the whole list out again instead.
+  // No key left between the neighbours (equal keys, or a gap halved to nothing);
+  // spread the whole list out again instead.
   if (between > before && between < after) return [{ id, sort: between }];
   return renumbered(moved(list, from, to));
 };

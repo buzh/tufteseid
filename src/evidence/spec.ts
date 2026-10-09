@@ -43,7 +43,7 @@ export type EvidenceSpec =
       azimuth: number;
       altitude: number;
       zFactor: number;
-      /** Metres. Carried for every view; the ones with no radius ignore it. */
+      /** Metres; ignored by views with no radius. */
       radius: number;
     }
   | {
@@ -56,8 +56,7 @@ export type EvidenceSpec =
     }
   | {
       /** Shaded relief with the sun walked all the way round, as a WebM loop.
-       *  Rendered by the sidecar, never in the browser. No azimuth: the loop is
-       *  every azimuth. */
+       *  Sidecar only. No azimuth: the loop is every azimuth. */
       kind: 'sunloop';
       model: DemModel;
       altitude: number;
@@ -66,21 +65,16 @@ export type EvidenceSpec =
       fps: number;
     }
   | {
-      /** One of RVT's own blended visualizations, several passes over the same
-       *  float elevation stacked into one picture. Rendered by the sidecar,
-       *  never in the browser: the recipe is RVT's and so is the arithmetic.
-       *  One kind for all of them — which blend is `vis`. */
+      /** One of RVT's blended visualizations, sidecar only. One kind for all of
+       *  them; which blend is `vis`. */
       kind: 'rvt';
       vis: RvtBlend;
       model: DemModel;
     };
 
-/**
- * The one sun loop on offer. Fixed rather than a form: the sun's height and the
- * exaggeration are the analysis panel's own defaults, so a loop and a still of
- * the same ground are lit alike. DTM, because a canopy walked round is a
- * picture of the canopy.
- */
+// Fixed, not a form: height and exaggeration are the analysis panel's defaults,
+// so a loop and a still of the same ground are lit alike. DTM, because a canopy
+// walked round is a picture of the canopy.
 export const SUN_LOOP_SPEC: Extract<EvidenceSpec, { kind: 'sunloop' }> = {
   kind: 'sunloop',
   model: 'dtm',
@@ -90,11 +84,8 @@ export const SUN_LOOP_SPEC: Extract<EvidenceSpec, { kind: 'sunloop' }> = {
   fps: SUNLOOP_FPS,
 };
 
-/**
- * The blends on offer, in the order the box lists them. Fixed, the way the sun
- * loop is: a blend is RVT's recipe whole, and there is nothing in it for a form
- * to ask about. DTM, because a blend of the canopy is a picture of the canopy.
- */
+// Fixed, like the sun loop: a blend is RVT's whole recipe, nothing to ask about.
+// DTM, because a blend of the canopy is a picture of the canopy.
 export const RVT_SPECS: readonly Extract<EvidenceSpec, { kind: 'rvt' }>[] =
   RVT_BLENDS.map((vis) => ({ kind: 'rvt', vis, model: 'dtm' }));
 
@@ -122,8 +113,8 @@ const asBlend = (v: unknown): RvtBlend | null =>
     ? (v as RvtBlend)
     : null;
 
-/** The spec, flattened for the column. The render merges what it achieved over
- *  this, so nothing here is a figure the pixels have to live up to. */
+// The spec flattened for the column. The render merges what it achieved over
+// this, so nothing here is a figure the pixels must live up to.
 export const metaOf = (spec: EvidenceSpec): EvidenceMeta => {
   switch (spec.kind) {
     case 'lidar':
@@ -164,8 +155,8 @@ export const metaOf = (spec: EvidenceSpec): EvidenceMeta => {
   }
 };
 
-/** A stored row read back as parameters. Null when the column no longer
- *  describes a render — a row with nothing to retry, not a failure. */
+// A stored row read back as parameters; null when the column no longer describes
+// a render — nothing to retry, not a failure.
 export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
   const meta = rec.meta;
   if (!meta) return null;
@@ -232,17 +223,13 @@ export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
   }
 };
 
-/**
- * The ground the pixels cover, EPSG:25833, as the render wrote it — not the
- * spot's footprint, which may have moved since. Null for a row that has no
- * rectangle, and so cannot be laid back on the map.
- */
+// EPSG:25833, as the render wrote it — not the spot's footprint, which may have
+// moved. Null for a row with no rectangle, which cannot be laid back on the map.
 export const evidenceBbox = (
   rec: EvidenceRecord,
 ): [number, number, number, number] | null => bboxOfMeta(rec.meta);
 
-/** The same rectangle off a `meta` that has no row behind it yet — what a
- *  render hands back before anything is kept. */
+// The same rectangle off a `meta` with no row behind it yet.
 export const bboxOfMeta = (
   meta: EvidenceMeta | null,
 ): [number, number, number, number] | null => {
@@ -254,11 +241,9 @@ export const bboxOfMeta = (
     : null;
 };
 
-/**
- * Where the burnt-in provenance band starts, as a fraction of the picture's
- * height; 1 for anything without one, which is everything but a sun loop. Only
- * the part above the band is registered to `bbox25833`.
- */
+// Where the burnt-in band starts, as a fraction of height; 1 for anything
+// without one (everything but a sun loop). Only the part above it is registered
+// to `bbox25833`.
 export const evidenceBandTop = (rec: EvidenceRecord): number => {
   const value = num(rec.meta?.bandTop);
   return value != null && value > 0 && value <= 1 ? value : 1;
@@ -267,24 +252,20 @@ export const evidenceBandTop = (rec: EvidenceRecord): number => {
 export const evidenceResolution = (rec: EvidenceRecord): number | null =>
   num(rec.meta?.metresPerPx);
 
-/** Pixels and the ground to lay them over: a row missing either cannot be
- *  shown on the map, whatever else it says. */
+// Needs both pixels and a ground to lay them over.
 export const isReadable = (rec: EvidenceRecord): boolean =>
   rec.file !== '' && evidenceBbox(rec) !== null;
 
-/** A WebM loop rather than a raster. Off the kind rather than the filename:
- *  the kind is known before the file lands. */
+// Off the kind, not the filename: the kind is known before the file lands.
 export const isVideoEvidence = (rec: EvidenceRecord): boolean =>
   rec.kind === 'sunloop';
 
-/** The row the reading opens on, and the one the strip stars. */
 export const coverOf = (
   rows: readonly EvidenceRecord[],
 ): EvidenceRecord | null => rows.find(isReadable) ?? null;
 
-/** Degrees of azimuth between one frame of a loop and the next. The row's own
- *  figure where it kept one: an older loop may have been walked in coarser
- *  steps than today's. */
+// Azimuth degrees per frame. The row's own figure where it kept one: an older
+// loop may have been walked in coarser steps.
 export const loopStepDeg = (rec: EvidenceRecord): number => {
   const spec = specOf(rec);
   return spec?.kind === 'sunloop' ? spec.stepDeg : SUNLOOP_STEP_DEG;
@@ -307,13 +288,10 @@ const sameBbox = (a: [number, number, number, number], b: unknown): boolean =>
 
 const sameNumber = (a: number, b: number) => Math.abs(a - b) <= PARAM_TOLERANCE;
 
-/**
- * Whether this row is already the picture `spec` would produce over
- * `bbox25833`. Only the identifying fields count — an acquisition's year and
- * point density are stored for provenance, not identity. Strict about the
- * rectangle: a row kept before the footprint moved covers different ground and
- * must not read as kept.
- */
+// Whether this row is already the picture `spec` would produce over `bbox25833`.
+// Only identifying fields count (year and point density are provenance, not
+// identity); strict about the rectangle, so a row kept before the footprint moved
+// does not read as kept.
 export const evidenceMatches = (
   rec: EvidenceRecord,
   spec: EvidenceSpec,

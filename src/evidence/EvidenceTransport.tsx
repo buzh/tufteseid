@@ -6,14 +6,9 @@ import { cx } from '../ui/cx';
 import styles from './EvidenceTransport.module.css';
 import type { LoopTransport } from './evidenceOverlay';
 
-/**
- * Play, pause and seek the loop on the ground.
- *
- * The bar is the sun's azimuth rather than the file's seconds: a loop walks
- * the whole circle from north in `stepDeg` steps (`rendersvc/sunloop.py`), so
- * one frame is one bearing and the figure under the hand is the figure burnt
- * into the picture.
- */
+// The bar is the sun's azimuth, not the file's seconds: a loop walks the circle
+// from north in `stepDeg` steps (`rendersvc/sunloop.py`), so one frame is one
+// bearing and the figure under the hand is the one burnt into the picture.
 export const EvidenceTransport = ({
   loop,
   stepDeg,

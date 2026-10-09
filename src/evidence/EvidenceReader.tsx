@@ -108,10 +108,9 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
     [index, readable],
   );
 
-  // Arrow keys flip rather than pan: `keyboardEventTarget` is the document, so
-  // capture phase on the document is what gets in front of OpenLayers' own pan.
-  // Up and down are swallowed too and do nothing, rather than leaving half the
-  // cluster sliding the ground out from under the pictures.
+  // Arrow keys flip, not pan: OL's `keyboardEventTarget` is the document, so
+  // capture phase on the document gets in front of its pan. Up/down are swallowed
+  // too, or half the cluster would slide the ground out from under the pictures.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (!ARROWS.includes(event.key)) return;
@@ -149,10 +148,8 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
       transformExtent(footprint, 'EPSG:4326', view.getProjection().getCode()),
       { padding: FIT_PADDING[box.layout], duration: FIT_MS },
     );
-    // Once, on entering the reading, against the layout the box opens in. The
-    // reader mounts with it, and neither a realtime update of an unrelated
-    // field nor a box moved out of the way afterwards may yank back a reader
-    // who has zoomed in to look at something.
+    // Once, on entering the reading: a later realtime update or a moved box must
+    // not yank back a reader who has zoomed in to look at something.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
 

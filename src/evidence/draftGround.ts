@@ -11,9 +11,7 @@ export type DraftGround = {
   loop?: { bandTop: number };
 };
 
-/** A picture laid on the map at the extent it was rendered over, to trace a
- *  drawing onto or to read the spot's own drawing against. Set and cleared by
- *  `EvidenceGallery` for a kept row and by `useFlyfotoRun` for a proposal;
- *  drawn by `SpotSurface`'s evidence overlays. Only one of the two is ever
- *  mounted. */
+// A picture laid on the map at the extent it was rendered over, to trace a drawing
+// onto. Set/cleared by `EvidenceGallery` (a kept row) and `useFlyfotoRun` (a
+// proposal), drawn by `SpotSurface`'s overlays; only one is ever mounted.
 export const draftGroundAtom = atom<DraftGround | null>(null);

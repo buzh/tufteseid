@@ -1,12 +1,7 @@
-// A picture out of the door: the stored file with its provenance typeset onto
-// it, saved under the spot's name.
-//
-// The stored file is bare. The reader lays it back on the ground it was made
-// over and the sketch draws on top of it, so a band burned into the pixels
-// would ride the map and be drawn over; the provenance goes on here instead,
-// which is why it comes out in the reader's current language. A sun loop is the
-// exception and is cited by the sidecar at render time: `createImageBitmap`
-// throws on a WebM.
+// The stored file, provenance typeset on, saved under the spot's name. The store
+// keeps the file bare (the reader lays it back on the map, where a burnt-in band
+// would be drawn over), so the band goes on here, in the reader's language. A sun
+// loop is the exception, cited by the sidecar: `createImageBitmap` throws on WebM.
 
 import { useCallback, useState } from 'react';
 
@@ -19,8 +14,7 @@ import { withLegend } from './legend';
 import { centreOf, legendContentFor } from './legendContent';
 import { evidenceBbox, evidenceResolution, specOf } from './spec';
 
-// Off the blob rather than the row: the stamp re-encodes in the type it was
-// handed, so the type in hand is the one the bytes are in.
+// Off the blob, not the row: the stamp re-encodes in the type it was handed.
 const EXTENSIONS: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -46,12 +40,9 @@ const decodeToCanvas = async (
   }
 };
 
-/**
- * The stored raster with its provenance under it. Failure is never fatal: every
- * path that cannot produce a legend returns the bytes it was given, a video
- * among them. Re-encodes in the type it was handed, so a JPEG ortofoto does not
- * come back a PNG four times the size.
- */
+// Failure is never fatal: any path that cannot produce a legend returns the bytes
+// it was given, a video among them. Re-encodes in the type handed, so a JPEG
+// ortofoto does not come back a PNG four times the size.
 const stampEvidence = async (
   blob: Blob,
   rec: EvidenceRecord,
@@ -69,8 +60,8 @@ const stampEvidence = async (
 
     const stamped = await withLegend(canvas, {
       ...content,
-      // Off the decoded width rather than `meta.metresPerPx`, so the bar
-      // measures the pixels in hand even where the stored figure disagrees.
+      // Off the decoded width, not `meta.metresPerPx`, so the bar measures the
+      // pixels in hand even where the stored figure disagrees.
       metresPerPx: bbox
         ? (bbox[2] - bbox[0]) / canvas.width
         : (evidenceResolution(rec) ?? 0),
@@ -115,7 +106,7 @@ export const useEvidenceDownload = (spot: SpotRecord): EvidenceDownload => {
   const download = useCallback(
     (rec: EvidenceRecord) => {
       const url = evidenceFileUrl(rec);
-      // One at a time: stamping a multi-megapixel raster is about a second of
+      // One at a time: stamping a multi-megapixel raster is ~a second of
       // main-thread work, and two at once only slows both.
       if (!url || busyId) return;
       setBusyId(rec.id);

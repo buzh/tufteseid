@@ -1,21 +1,12 @@
 import { evidenceFileUrl, type EvidenceRecord } from '../api/evidence';
 import { isVideoEvidence } from './spec';
 
-/**
- * The stored file, small. Both the list and the reading strip show one, so the
- * video quirks live here: PocketBase makes no thumbnail for a video, so a loop
- * is its own handle at full size, and `#t=0.1` is what makes the element paint
- * a frame rather than a black box — `preload="metadata"` alone decodes nothing
- * until play.
- *
- * `disablePictureInPicture` and the thumbnail's own `pointer-events: none`
- * keep the press on the button behind it: Firefox lays a picture-in-picture
- * toggle over a video on hover, and at this size that toggle is the whole
- * thumbnail, so a click opened a floating window instead of grounding the row.
- *
- * The caller checks `rec.file` first: a row still waiting on its render has no
- * URL to give.
- */
+// Video quirks: PocketBase makes no thumbnail for a video, so a loop is its own
+// handle at full size; `#t=0.1` paints a frame rather than a black box
+// (`preload="metadata"` alone decodes nothing until play); `disablePictureInPicture`
+// plus the thumbnail's `pointer-events: none` keep the press on the button behind
+// it, since Firefox lays a PiP toggle over a video on hover that at this size is
+// the whole thumbnail. The caller checks `rec.file` first.
 export const EvidenceThumb = ({
   record,
   className,

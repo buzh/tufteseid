@@ -29,15 +29,13 @@ export type Produced = {
   meta: EvidenceMeta;
 };
 
-/** Everything the sidecar does not render. Stated as a type so the switch below
- *  stays exhaustive and the compiler refuses a server-side kind here. */
+/** Everything the sidecar does not render, as a type so the switch stays
+ *  exhaustive and the compiler refuses a server-side kind here. */
 export type BrowserSpec = Exclude<EvidenceSpec, { kind: 'sunloop' | 'rvt' }>;
 
-/**
- * The tail every arm shares: the pixels fitted to the store, described by what
- * came out rather than by what was asked for. The resolution recorded is the
- * file's and not the grid's, because the fit may have coarsened it.
- */
+// The tail every arm shares: pixels fitted to the store, described by what came
+// out. The resolution recorded is the file's, not the grid's — the fit may have
+// coarsened it.
 const produce = async (
   raster: Raster,
   filename: string,
@@ -63,11 +61,8 @@ const produce = async (
   };
 };
 
-/**
- * Null means the source has nothing over this rectangle: an answer about the
- * ground rather than a fault. A throw is a fault. `queue.ts` tells the two
- * apart on exactly that, and offers a retry either way.
- */
+// Null means the source has nothing over this rectangle; a throw is a fault.
+// `queue.ts` tells the two apart on exactly that.
 export const renderEvidence = async (
   spec: BrowserSpec,
   bbox4326: Bbox,
@@ -75,8 +70,8 @@ export const renderEvidence = async (
 ): Promise<Produced | null> => {
   switch (spec.kind) {
     case 'lidar': {
-      // The one style with no service behind it: the pixels are in our own
-      // store, keyed by the same flight the WMS publishes.
+      // The one style with no service behind it: pixels in our own store, keyed
+      // by the same flight the WMS publishes.
       if (spec.style === CVAT_STYLE) {
         const acquisition = (await fetchCvatAcquisitions()).find(
           (a) => projectSourceKey(a.project.projectName) === spec.sourceKey,
@@ -97,8 +92,8 @@ export const renderEvidence = async (
 
       const sources = await enumerateLidarSources(bbox4326, spec.model);
       const source = sources.find((s) => s.key === spec.sourceKey);
-      // Retired upstream, no longer covering this rectangle, or no longer
-      // publishing this style — asking anyway answers 200 with a JSON body.
+      // Retired, out of coverage, or no longer publishing this style — asking
+      // anyway answers 200 with a JSON body.
       if (!source?.styles.includes(spec.style)) return null;
       const raster = await extractCanvas(
         bboxToMetric(bbox4326),
@@ -122,7 +117,7 @@ export const renderEvidence = async (
       });
       if (!dem) return null;
       // Write the clamped radius back, or the duplicate guard never matches and
-      // the button offers to make this same picture forever.
+      // the button offers to remake this same picture forever.
       const radius = clampRadius(spec.vis, dem, spec.radius);
       const staticField = terrainStaticField(dem, spec.vis, radius);
       const field = terrainField(
@@ -160,8 +155,8 @@ export const renderEvidence = async (
       if (spec.projectId !== NIB_MOSAIC && !project) return null;
       const raster = await fetchFlyfotoRaster(bbox4326, { project, signal });
       if (!raster) return null;
-      // JPEG all the way through, like the stitch: a lossless copy of a
-      // lossy-sourced photograph is several times the bytes for nothing.
+      // JPEG all the way through: a lossless copy of a lossy-sourced photograph
+      // is several times the bytes for nothing.
       return produce(
         raster,
         `flyfoto_${sanitizeFilename(spec.projectId)}.jpg`,

@@ -1,9 +1,7 @@
-// The cached ground as pixels over one rectangle: the same tiles
-// `cvatGround.ts` puts on the map, read back off /cvat/* and stitched.
-//
-// Not a WMS grab. The store answers whole tiles on the app's own grid
-// (`wmsTileGrid.ts`) and nothing else, so the level is chosen and the edges
-// cropped here rather than asked for.
+// The cached ground as pixels over one rectangle: the same tiles `cvatGround.ts`
+// puts on the map, read off /cvat/* and stitched. Not a WMS grab — the store
+// answers whole tiles on the app's own grid (`wmsTileGrid.ts`), so the level is
+// chosen and the edges cropped here.
 
 import type TileGrid from 'ol/tilegrid/TileGrid';
 
@@ -16,13 +14,12 @@ import type { CvatAcquisition } from '../map/layers/config/backgroundLayers/cvat
 import { getWMSTileGrid } from '../map/layers/wmsTileGrid';
 import type { Raster } from './fit';
 
-// A hit is a SELECT against a bind-mounted SQLite file on the same host, so the
-// limit is here to bound the canvas work rather than to spare an upstream.
+// A hit is a SELECT against a local SQLite file, so this bounds the canvas work,
+// not an upstream.
 const MAX_CONCURRENT = 6;
 
-/** Null for a tile the pipeline has not written: 404 is how the acquisition's
- *  footprint is drawn (`cvat-tiles/server.mjs`), not a fault. A store it cannot
- *  open answers 503, which is. */
+// 404 is how the acquisition's footprint is drawn (`cvat-tiles/server.mjs`), not
+// a fault; a store it cannot open answers 503, which is.
 const fetchTile = async (
   url: string,
   signal?: AbortSignal,
@@ -33,9 +30,9 @@ const fetchTile = async (
   return createImageBitmap(await res.blob());
 };
 
-/** The deepest level the store holds whose canvas stays inside the stitch's
- *  cap. A spot's footprint is 500 m at most and z16 is 0.331 m/px, so this is
- *  the acquisition's own resolution for anything the card can ask for. */
+// The deepest level whose canvas stays inside the stitch's cap. Footprint 500 m
+// at most and z16 is 0.331 m/px, so this is the acquisition's own resolution for
+// anything the card can ask for.
 const levelFor = (
   grid: TileGrid,
   acquisition: CvatAcquisition,
@@ -51,12 +48,9 @@ const levelFor = (
   return acquisition.minZoom;
 };
 
-/**
- * Null when nothing painted and nothing failed: the rectangle is off this
- * flight, which is an answer about the ground rather than a fault. A grab where
- * every tile errored throws instead. Same rule as `extractCanvas`,
- * `fetchFlyfotoRaster` and `fetchDem`.
- */
+// Null when nothing painted and nothing failed (off this flight, not a fault); a
+// grab where every tile errored throws. Same rule as `extractCanvas`,
+// `fetchFlyfotoRaster` and `fetchDem`.
 export const fetchCvatRaster = async (
   bbox4326: Bbox,
   acquisition: CvatAcquisition,
@@ -72,9 +66,8 @@ export const fetchCvatRaster = async (
   const size = grid.getTileSize(z);
   const tilePx = typeof size === 'number' ? size : size[0];
 
-  // Grid pixels at this level, snapped outward. Every source pixel is then
-  // drawn 1:1 — the store stops at z15 or z16 and resampling it to land exactly
-  // on the footprint would soften the one thing the render is for.
+  // Grid pixels, snapped outward, drawn 1:1: the store stops at z15/z16 and
+  // resampling to land exactly on the footprint would soften the shading.
   const left = Math.floor((bbox25833[0] - originX) / res);
   const right = Math.ceil((bbox25833[2] - originX) / res);
   const top = Math.floor((originY - bbox25833[3]) / res);

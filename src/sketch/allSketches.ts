@@ -1,7 +1,5 @@
-// Every spot's chosen drawing on the ground at once: one transparent layer, no
-// pin and no name plate, and a click on the strokes themselves opens the spot
-// they belong to. The open spot is left out — `overlay.ts` already has it, with
-// the fade slider the box owns.
+// Every spot's chosen drawing on the ground at once: one layer, no pin/plate.
+// Click on the strokes themselves opens the spot; the open spot is in `overlay.ts`.
 import { atom, useAtom, useAtomValue, useStore } from 'jotai';
 import type { Extent } from 'ol/extent';
 import {

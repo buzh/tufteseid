@@ -1,18 +1,16 @@
 import type { Metric } from '../map/bbox';
 
-// Encoded size spreads some 250× across content, so the pixel budget is the
-// rule and the byte budget a backstop that is measured rather than predicted.
-// The byte cap is `evidence.file`'s: PocketBase answers 400 over it, and every
-// retry of the same blob fails the same way.
+// Pixel budget is the rule, byte budget a measured backstop (encoded size
+// spreads ~250× across content). The byte cap is `evidence.file`'s: PocketBase
+// answers 400 over it, and every retry of the same blob fails the same way.
 export const MAX_STORED_PIXELS = 40000000;
 const MAX_STORED_BYTES = 50000000;
 
-// The geometric step converges in one pass from any plausible start; the cap is
-// so a pathological encoder cannot spin the queue.
+// The geometric step converges in one pass; the cap stops a pathological encoder
+// spinning the queue.
 const MAX_FIT_PASSES = 3;
 
-/** Pixels and the ground they cover, EPSG:25833 — what every producer hands
- *  back, `lidarExtract`'s `ExtractedCanvas` among them. */
+/** Pixels and the ground they cover, EPSG:25833. */
 export type Raster = {
   canvas: HTMLCanvasElement;
   metresPerPx: number;
@@ -42,11 +40,8 @@ export const canvasBlob = (
 ): Promise<Blob | null> =>
   new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 
-/**
- * Bare pixels fitted to the store, edge to edge over the rectangle they were
- * rendered for. The returned `metresPerPx` is the one achieved, which is not
- * the one passed in when the fit had to downscale.
- */
+// The returned `metresPerPx` is the one achieved, not the one passed in, when the
+// fit had to downscale.
 export const fitImageBlob = async (
   image: HTMLCanvasElement,
   metresPerPx: number,
@@ -64,12 +59,11 @@ export const fitImageBlob = async (
     const blob = await canvasBlob(source, type, quality);
     if (!blob) return null;
     if (blob.size <= MAX_STORED_BYTES) {
-      // Ratio of widths rather than the factor applied, so the rounding
-      // `scaleCanvas` did is included instead of being asserted away.
+      // Ratio of widths, not the factor applied, to include `scaleCanvas`'s rounding.
       return { blob, metresPerPx: (metresPerPx * image.width) / source.width };
     }
-    // Fails closed: an oversized blob is a 400 from PocketBase on every retry,
-    // where null records the row as empty and stops asking.
+    // Fails closed: an oversized blob is a 400 on every retry, so null records the
+    // row as empty and stops asking.
     if (pass === MAX_FIT_PASSES) return null;
     // Bytes do not fall as fast as pixels, so the step takes a margin.
     source = scaleCanvas(

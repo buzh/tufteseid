@@ -1,5 +1,5 @@
-// The spot's kept pictures, in the card: the one place their order is set and
-// the one place a picture is laid back on the map to trace over.
+// The spot's kept pictures in the card: the one place their order is set and the
+// one place a picture is laid back on the map to trace over.
 
 import { Alert, Tooltip } from '@mantine/core';
 import { useAtom } from 'jotai';
@@ -240,9 +240,8 @@ export const EvidenceGallery = ({
     setDrag(null);
   };
 
-  // The handle answers the arrows too, for a reader with no pointer. Stopped
-  // before the bounds check, or OpenLayers' keyboard pan answers the press that
-  // runs off the end.
+  // The handle answers arrows too, for a reader with no pointer. Stopped before
+  // the bounds check, or OL's keyboard pan answers a press that runs off the end.
   const nudge =
     (id: string, index: number, total: number) =>
     (event: ReactKeyboardEvent<HTMLElement>) => {
@@ -275,11 +274,9 @@ export const EvidenceGallery = ({
         <Icon icon="photo_library" size={14} />
         <span>{t('evidence.label')}</span>
       </div>
-      {/* The heading stands in all three states so the card does not jump as
-          the list lands. An empty list says so here rather than only in
-          `EvidenceReader`, which is the surface for the reader who cannot do
-          anything about it. A list that never landed is neither loading nor
-          empty, and the alert below is the whole of what can be said. */}
+      {/* Heading stands in all three states so the card does not jump as the list
+          lands. A list that never landed is neither loading nor empty — the alert
+          below is the whole of what can be said. */}
       {items === null ? (
         !evidence.failed && (
           <p className={styles.hint}>{t('evidence.loading')}</p>

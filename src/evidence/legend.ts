@@ -2,9 +2,8 @@ import i18n from 'i18next';
 
 const FAMILY = "Mulish, system-ui, -apple-system, 'Segoe UI', sans-serif";
 
-// Both the band under the capture and the mat beside one too narrow to carry
-// the footer row. Opaque: the band is appended rather than blended, so there is
-// no ground under it left to show through.
+// Band under the capture and mat beside a too-narrow one. Opaque: the band is
+// appended, not blended.
 const MAT = '#0a0c0e';
 const MARK = '#ffffff';
 const MARK_DARK = '#14171a';
@@ -14,19 +13,13 @@ const locale = () => i18n.language || 'nb';
 const int = (value: number): string =>
   new Intl.NumberFormat(locale(), { maximumFractionDigits: 0 }).format(value);
 
-/**
- * Linear in the image width between the clamps. A footprint is 50–500 m and the
- * producers publish between 1 and 0.08 m/px, so a render is anywhere from 50 to
- * 6300 px across; this keeps the legend a roughly constant fraction of it.
- */
+// Linear in image width between the clamps: a render is 50–6300 px across
+// (footprint 50–500 m, producers 1–0.08 m/px), kept a constant fraction of it.
 const fontSizeFor = (width: number): number =>
   Math.round(Math.min(26, Math.max(11, width / 70)));
 
-/**
- * Canvas text does not wait for webfonts — it silently falls through to the
- * next family in the stack, which would make two figures stamped a second apart
- * look different. Covers the cold case only.
- */
+// Canvas text does not wait for webfonts — it falls through the stack silently,
+// so two figures stamped seconds apart could differ. Covers the cold case only.
 const ensureFont = async (size: number): Promise<void> => {
   const fonts = document.fonts;
   if (!fonts?.load) return;
@@ -36,7 +29,7 @@ const ensureFont = async (size: number): Promise<void> => {
       fonts.load(`600 ${size}px Mulish`),
     ]);
   } catch {
-    // A legend in the fallback face beats no legend.
+    // Fallback face beats no legend.
   }
 };
 
@@ -79,9 +72,7 @@ const ellipsize = (
   return `${cut}…`;
 };
 
-// ---------------------------------------------------------------------------
 // Scale bar
-// ---------------------------------------------------------------------------
 
 /** Round down to 1, 2 or 5 × a power of ten. */
 const niceMetres = (raw: number): number => {
@@ -100,8 +91,7 @@ const nextNiceMetres = (metres: number): number => {
 // Under this the four segments are indistinguishable.
 const MIN_BAR_PX = 24;
 
-// Of the image, not of the legend: a bar whose length depended on how long the
-// rights line was would be a strange thing to measure ground with.
+// Fraction of the image, not of the legend.
 const BAR_TARGET_FRACTION = 0.18;
 
 // Between the bar and its label, in ems of the label's own size.
@@ -116,20 +106,15 @@ const planScaleBar = (
   if (!Number.isFinite(metresPerPx) || metresPerPx <= 0) return null;
   if (!Number.isFinite(targetPx) || targetPx <= 0) return null;
   let metres = niceMetres(targetPx * metresPerPx);
-  // The bar is never shed, so a target too small for four legible segments
-  // takes the next round distance up rather than leaving the figure unmeasured.
-  // Over a small capture that makes a ruler wider than the picture, which is
-  // honest — the mat beside it is not ground.
+  // The bar is never shed: too small for four legible segments takes the next
+  // round distance up, even past the picture's own width.
   while (metres / metresPerPx < MIN_BAR_PX) metres = nextNiceMetres(metres);
   const barPx = metres / metresPerPx;
   if (!Number.isFinite(barPx)) return null;
-  // A footprint is capped at `MAX_SIDE_M`, and the bar spans a fraction of it,
-  // so the label never reaches a kilometre.
+  // Footprint capped at `MAX_SIDE_M`, so the label never reaches a kilometre.
   return { barPx, label: `${int(metres)} m` };
 };
 
-/** Four alternating segments with the ground distance beside them, centred on
- *  its line rather than sitting on a baseline. */
 const paintScaleBar = (
   ctx: CanvasRenderingContext2D,
   bar: ScaleBar,
@@ -140,8 +125,7 @@ const paintScaleBar = (
 ) => {
   const y = Math.round(mid - barH / 2);
   for (let i = 0; i < 4; i++) {
-    // Rounded boundaries rather than a rounded width, so the segments meet with
-    // no seam and the last one ends on the stroked edge.
+    // Rounded boundaries, not a rounded width: the segments meet with no seam.
     const from = Math.round(x + (i * bar.barPx) / 4);
     const to = Math.round(x + ((i + 1) * bar.barPx) / 4);
     ctx.fillStyle = i % 2 === 0 ? MARK : MARK_DARK;
@@ -161,23 +145,16 @@ const paintScaleBar = (
   );
 };
 
-// ---------------------------------------------------------------------------
 // Legend
-// ---------------------------------------------------------------------------
 
 type LegendOptions = {
-  /** Line one, weight 600: what the picture is. */
   title: string;
-  /** The rest of line one, joined with the separator. Shed from the end when
-   *  the line will not fit, so the list must be ordered with the fact that can
-   *  best be spared last. */
+  /** Shed from the end when the line will not fit, so order the most expendable
+   *  fact last. */
   facts: string[];
-  /** Under line one, flush left, one per line, wrapped rather than cut: the
-   *  only part of the legend the licences actually require. */
+  /** Wrapped, not cut: the only part the licences require. */
   rights: string[];
-  /** The footer row's middle. Empty where the row has no rectangle. */
   centre: string;
-  /** The footer row's right end. Empty where there is nothing to point at. */
   link: string;
   /** Of the capture, so the bar measures true. */
   metresPerPx: number;
@@ -189,25 +166,16 @@ const SEP = ' · ';
 // things rather than one run of text.
 const GAP_EM = 1.5;
 
-/**
- * The capture with its provenance under it, on a canvas of its own: the pixels
- * unchanged at the top, the band appended below, and a mat either side of a
- * capture too narrow to carry the footer row.
- *
- * Appended rather than blended over the bottom edge, so no pixel of the ground
- * is spent on caption. The cost is that the file is no longer registered to its
- * bbox — the download is a figure to cite, and the row the map lays back over
- * the ground is the stored one, which is never stamped.
- *
- * Returns the source canvas untouched only where there is no 2D context to
- * composite onto.
- */
+// The capture with its provenance appended below (not blended over it), so no
+// ground pixel is spent on caption. The cost: the file is no longer registered
+// to its bbox, so it is a figure to cite — the row laid back on the map is the
+// stored, unstamped one. Returns the source untouched if there is no 2D context.
 export const withLegend = async (
   image: HTMLCanvasElement,
   { title, facts, rights, centre, link, metresPerPx }: LegendOptions,
 ): Promise<HTMLCanvasElement> => {
-  // Off the capture rather than the canvas being composed: the mat widens the
-  // canvas, and a font size that grew with it would want a wider band again.
+  // Off the capture, not the composed canvas: sizing off the matted width would
+  // feed back into a wider band.
   const fontSize = fontSizeFor(image.width);
   await ensureFont(fontSize);
 
@@ -224,9 +192,8 @@ export const withLegend = async (
   const ctx = out.getContext('2d');
   if (!ctx) return image;
 
-  // Measured before the canvas is sized, because what it measures is what the
-  // width has to be. Setting `width` below resets every context property, so
-  // nothing set here survives into the painting pass.
+  // Measured before the canvas is sized, since it decides the width. Setting
+  // `width` below resets every context property, so nothing set here survives.
   const bar = planScaleBar(metresPerPx, image.width * BAR_TARGET_FRACTION);
   ctx.font = font(labelSize, 600);
   const barW = bar
@@ -238,10 +205,8 @@ export const withLegend = async (
   const centreW = centre ? ctx.measureText(centre).width : 0;
   const linkW = link ? ctx.measureText(link).width : 0;
 
-  // The footer row sets the floor: it is never shed and never cut, so a capture
-  // narrower than its three cells is matted out to them rather than the other
-  // way round. The head is ellipsized and the rights wrap, so neither forces a
-  // width of its own.
+  // The footer row sets the floor: never shed or cut, so a narrower capture is
+  // matted out to it. The head ellipsizes and the rights wrap, forcing no width.
   const footerW =
     barW + centreW + linkW + (centreW ? gap : 0) + (linkW ? gap : 0);
   const width = Math.max(image.width, Math.ceil(footerW) + pad * 2);
@@ -294,8 +259,8 @@ export const withLegend = async (
   mid += lineH;
   if (bar) paintScaleBar(ctx, bar, pad, mid, barH, labelSize);
   if (centre) {
-    // Centred in what the bar and the link leave rather than on the canvas, so
-    // the three cells cannot collide at the width the footer itself set.
+    // Centred in what the bar and link leave, not on the canvas, so the three
+    // cells cannot collide.
     ctx.textAlign = 'center';
     ctx.fillStyle = MARK;
     ctx.font = bodyFont;

@@ -99,9 +99,8 @@ const terrainFacts = (
   return facts;
 };
 
-/** What the catalogue knew about the source: everything true of a row before
- *  any pixel of it exists. Separate from `evidenceFacts` because a row about to
- *  be rendered still holds the previous render's figures. */
+// Everything true of a row before any pixel of it exists. Separate from
+// `evidenceFacts` because a row about to render still holds the previous figures.
 export const specFacts = (spec: EvidenceSpec): string[] => {
   switch (spec.kind) {
     case 'lidar': {
@@ -126,15 +125,13 @@ export const specFacts = (spec: EvidenceSpec): string[] => {
         t('evidence.facts.zFactor', { z: spec.zFactor }),
         t('evidence.facts.frames', { n: Math.round(360 / spec.stepDeg) }),
       ];
-    // Every other parameter is RVT's own and the same for every render, so the
-    // blend's name already says it.
+    // Every other parameter is RVT's own; the blend's name already says it.
     case 'rvt':
       return [spec.model.toUpperCase()];
   }
 };
 
-/** What the catalogue knew about the source, what the render achieved and when
- *  it was made, in the order it would be cited. */
+// Source facts, render resolution and date, in the order they would be cited.
 export const evidenceFacts = (rec: EvidenceRecord): string[] => {
   const spec = specOf(rec);
   const facts: string[] = spec ? specFacts(spec) : [];

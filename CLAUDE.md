@@ -84,11 +84,23 @@ Each owns its subject; this file keeps only what is true across all of them.
 - **Keep unused code out.** A helper with no live caller after a change gets
   deleted, not kept "for later". One exception is deliberate and recorded in
   `docs/architecture.md`: `src/search/`.
-- **Minimal comments.** The code is the documentation. A comment earns its place
-  by recording something the code cannot say — an upstream's quirk, a CRS or
-  axis-order fact, a unit not in the identifier, a required call ordering, where
-  a magic number came from, or a constraint a maintainer would otherwise "fix"
-  into a bug. Not what the next line does, and not why a decision was taken.
+- **Comments earn their place or go.** The code is the documentation; a comment
+  is for the one fact the code cannot carry. Keep only:
+  - an upstream or platform quirk (an opaque 400, an `<img>` error with no status);
+  - a CRS, axis-order, datum or units fact not in the identifier;
+  - a required ordering (import side effects, a call that must precede another);
+  - where a magic number came from, or a cross-config coupling ("change one,
+    break three");
+  - a constraint a maintainer would otherwise "fix" into a bug;
+  - a load-bearing directive and its reason (`eslint-disable-*`,
+    `/// <reference`), a locale-key or cross-repo coupling, a `docs/*.md`
+    cross-reference.
+
+  Delete the rest: module-header essays, "why we chose X", and any line that
+  restates what the code does. When a real fact is wrapped in prose, keep the
+  fact as one terse line and drop the prose. Narrative and background belong in
+  `docs/`, not the source — a surface that needs a paragraph gets a line in the
+  doc that owns it, not a comment block.
 - **Commits**: short imperative subject; body explains the *why* when the diff
   doesn't. Write the `Co-Authored-By` trailer yourself — nothing adds it.
 - **Docs state the present tense.** A change that reverses an earlier decision
