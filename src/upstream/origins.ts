@@ -6,10 +6,8 @@ import { getEnv } from '../env';
 
 export type OriginId = 'hoyde' | 'kartverketCache' | 'ra' | 'nib';
 
-/**
- * A one-metre box in Oslo, EPSG:25833, inside LiDAR, Kulturminner and ortofoto
- * coverage alike.
- */
+/** A one-metre box in Oslo, EPSG:25833, inside LiDAR, Kulturminner and
+ *  ortofoto coverage alike. */
 const PROBE_BBOX_25833 = '262000,6649000,262001,6649001';
 
 const wmsProbe = (url: string, layers: string, format = 'image/png'): string =>
@@ -27,12 +25,11 @@ const wmsProbe = (url: string, layers: string, format = 'image/png'): string =>
   })}`;
 
 type Origin = {
-  /**
-   * The liveness check: a 1×1 GetMap or the coarsest WMTS tile, and one that
-   * exercises the renderer — a HEAD or a GetCapabilities reads as up while the
-   * backend behind the edge is dead. The WMS answers stay under the 300-byte
-   * `$skip_cache` floor in `nginx/wms-cache.conf`, so they never enter the LRU.
-   */
+  /** The liveness check: a 1×1 GetMap or the coarsest WMTS tile, and one that
+   *  exercises the renderer — a HEAD or a GetCapabilities reads as up while
+   *  the backend behind the edge is dead. The WMS answers stay under the
+   *  300-byte `$skip_cache` floor in `nginx/wms-cache.conf`, so they never
+   *  enter the LRU. */
   probeUrl: string;
   /** Request prefixes the origin answers, matched against the URL. */
   prefixes: string[];

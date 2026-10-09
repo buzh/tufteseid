@@ -1,9 +1,7 @@
-// Remark42 keeps a session of its own, federated to the same Casdoor the app
-// signs in through. `primeRemarkSession` runs that OAuth2 round trip in a
-// hidden frame so the reader is not asked to press a second sign-in button —
-// on the way back from signing in, and again in front of the first thread of
-// a page that did not. Every way it can fail lands back on the widget's own
-// button, which `SpotTalk` says out loud (docs/discussion-and-votes.md).
+// Remark42 keeps a session of its own, federated to the same Casdoor.
+// `primeRemarkSession` runs that OAuth2 round trip in a hidden frame so the
+// reader is not asked to press a second sign-in button. Every way it can fail
+// lands back on the widget's own button (`docs/discussion-and-votes.md`).
 
 /** Caddy strips the prefix; remark42 itself serves at the root. */
 const BASE = '/remark42';

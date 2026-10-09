@@ -1,13 +1,7 @@
-// Which surface is in front, and one at a time. The map context is the app at
-// rest: the band over the ground, boxes floating on it. A drawing takes the
-// whole map rectangle, so every box stands down for it and the band carries
-// the drawing's own controls instead of the map's.
-//
-// The band keeps its height across the swap. The scene↔ground mapping is bound
-// at the freeze that opens a session (`sketch/session.ts`) and never rebound,
-// so a band that grew or shrank afterwards would slide the map element out
-// from under strokes already registered to it. `Ribbon.module.css` holds the
-// height that makes both bands the same.
+// Which surface is in front, and one at a time. What each surface owes the
+// swap is `docs/architecture.md`, *The context in front* — including why
+// `Ribbon.module.css` states the band's height rather than leaving it to the
+// contents.
 
 import { atom } from 'jotai';
 import { sketchSessionAtom } from '../sketch/session';
@@ -28,10 +22,7 @@ export type DrawHold = {
   abort: () => void;
 };
 
-/**
- * Published by whichever draft controller has the pen (`useSpotDraft`), which
- * is the only thing that can write the drawing — its box is away for the
- * session but the controller under it is not, and the band drives it from
- * here.
- */
+/** Published by whichever draft controller has the pen (`useSpotDraft`), the
+ *  only thing that can write the drawing: its box is away for the session but
+ *  the controller under it is not, and the band drives it from here. */
 export const drawHoldAtom = atom<DrawHold | null>(null);

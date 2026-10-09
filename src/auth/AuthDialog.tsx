@@ -1,10 +1,8 @@
 // OAuth2 only: this lists whatever `listAuthMethods()` reports, labelled with
-// the `displayName` set in PocketBase's admin UI (Collections -> users ->
-// Options -> OAuth2). Not the sign-in form — pressing a provider hands the
-// page over to its own, and `src/auth/trip.ts` picks the session up on the
-// way back. The box is where the reader is told why an account is wanted and
-// where an invite code is asked for, both of which have to happen before they
-// are somewhere else.
+// the `displayName` set in PocketBase's admin UI (`docs/identity.md`). Not the
+// sign-in form — pressing a provider hands the page over to its own, and
+// `src/auth/trip.ts` picks the session up on the way back. The invite code is
+// asked for here because by then the reader is somewhere else.
 
 import {
   Alert,

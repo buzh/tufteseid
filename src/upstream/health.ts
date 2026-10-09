@@ -39,10 +39,8 @@ export const upstreamHealthAtom = atom<Record<OriginId, OriginStatus>>(
 );
 
 type Live = OriginStatus & {
-  /**
-   * Failures net of successes, over a run of trouble no two failures of which
-   * are more than FAIL_WINDOW_MS apart.
-   */
+  /** Failures net of successes, over a run of trouble no two failures of which
+   *  are more than FAIL_WINDOW_MS apart. */
   failures: number;
   lastFailureAt: number;
   /** Outages and failed probes since the origin was last durably healthy. */
@@ -163,10 +161,8 @@ const recover = (id: OriginId) => {
   publish();
 };
 
-/**
- * Timeouts, decode failures and the WMS rate-limit exception (HTTP 200 with a
- * ServiceException body, see `wmsTileGrid.ts`) all count the same.
- */
+/** Timeouts, decode failures and the WMS rate-limit exception (HTTP 200 with a
+ *  ServiceException body, see `wmsTileGrid.ts`) all count the same. */
 export const reportFailure = (id: OriginId) => {
   const l = live[id];
   const now = Date.now();
@@ -175,11 +171,9 @@ export const reportFailure = (id: OriginId) => {
   if (l.failures >= FAIL_THRESHOLD) trip(id);
 };
 
-/**
- * Pays the failure counter down by one rather than zeroing it: wmscache serves
- * cached tiles straight through an upstream 504, so hits and failures
- * interleave and a zeroing rule would never trip.
- */
+/** Pays the failure counter down by one rather than zeroing it: wmscache
+ *  serves cached tiles straight through an upstream 504, so hits and failures
+ *  interleave and a zeroing rule would never trip. */
 export const reportSuccess = (id: OriginId) => {
   const l = live[id];
   // Only the probe reaches this while down; nothing else is let through.
@@ -192,21 +186,17 @@ export const reportSuccess = (id: OriginId) => {
   if (l.failures === 0) l.okSince = Date.now();
 };
 
-/**
- * 5xx is the service breaking; anything else is the service working and
- * disagreeing. Fails open, so a probe URL that goes stale and starts returning
- * 400 reads as up rather than wedging the origin shut.
- */
+/** 5xx is the service breaking; anything else is the service working and
+ *  disagreeing. Fails open, so a probe URL that goes stale and starts
+ *  returning 400 reads as up rather than wedging the origin shut. */
 export const reportStatus = (id: OriginId, status: number) => {
   if (status >= 500) reportFailure(id);
   else reportSuccess(id);
 };
 
-/**
- * A relative URL is answered by wmscache, which serves stale on 503/504, so a
- * probe matching a stored entry would never see the outage — hence the cache
- * buster. An absolute one goes to a CDN, where `no-store` is enough.
- */
+/** A relative URL is answered by wmscache, which serves stale on 503/504, so a
+ *  probe matching a stored entry would never see the outage — hence the cache
+ *  buster. An absolute one goes to a CDN, where `no-store` is enough. */
 const probeUrl = (id: OriginId): string => {
   const url = ORIGINS[id].probeUrl;
   return url.startsWith('/') ? `${url}&_probe=${Date.now()}` : url;

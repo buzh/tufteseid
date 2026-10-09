@@ -74,11 +74,9 @@ export const createEvidence = async (
     }),
   );
 
-/**
- * `meta` goes up in the same request so a record can never hold a file its meta
- * does not describe. Pass the whole of it: PocketBase replaces a JSON field
- * wholesale.
- */
+/** `meta` goes up in the same request, so a record can never hold a file its
+ *  meta does not describe. Pass the whole of it: PocketBase replaces a JSON
+ *  field wholesale. */
 export const attachEvidenceFile = async (
   id: string,
   blob: Blob,

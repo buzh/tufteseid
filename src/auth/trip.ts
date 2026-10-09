@@ -76,11 +76,8 @@ export const startSignIn = async (
   sessionStorage.setItem(STASH_KEY, JSON.stringify(trip));
 
   // `authURL` ends at `redirect_uri=`; the SDK composes it by concatenation
-  // and so does this.
-  //
-  // A reader holding an invite code is making an account by definition, so
-  // the login form would cost them a press of "sign up" and a moment
-  // wondering whether they already had one.
+  // and so does this. A reader holding an invite code is making an account by
+  // definition, so they go to the sign-up form rather than the login one.
   window.location.assign(
     authorizeUrl(provider.authURL + callbackUrl(), invite !== ''),
   );
@@ -167,12 +164,11 @@ export const completeSignIn = async (): Promise<void> => {
         ),
     );
 
-    // The threads keep a session of their own, bought with a second round
-    // trip against the same Casdoor. Here is where that session is newest and
-    // the reader is already waiting on a page load, so the trip is spent now
-    // rather than in front of the first thread they open — which may be days
-    // later, against a Casdoor that has since forgotten them. Not awaited:
-    // nothing on the way in is waiting for a comment box.
+    // The threads' own session is bought with a second round trip against the
+    // same Casdoor. Spent here, where that session is newest, rather than in
+    // front of the first thread opened — which may be days later, against a
+    // Casdoor that has forgotten them. Not awaited: nothing on the way in is
+    // waiting for a comment box.
     void primeRemarkSession();
   } catch (err) {
     console.warn('[auth] code exchange failed', err);

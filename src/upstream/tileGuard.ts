@@ -27,20 +27,17 @@ const RETRY_DELAY_MS = [400, 900];
 /** Up to this much again, so a failed screenful does not retry in lockstep. */
 const RETRY_JITTER_MS = 300;
 
-/**
- * Keyed by the tile because `load()` re-enters the loader below with the same
- * tile and a fresh image; weak because the source disposes its tiles.
- */
+/** Keyed by the tile because `load()` re-enters the loader below with the same
+ *  tile and a fresh image; weak because the source disposes its tiles. */
 const attempts = new WeakMap<Tile, number>();
 
 type GuardOptions = {
   /** Whether a request that produced no picture is worth making again. */
   retry?: boolean;
-  /**
-   * A store holding the same tiles with nothing upstream behind it, as a
-   * template differing from `url` only in the part that names the store. Given
-   * one, a tile asked for while the breaker is open goes there instead.
-   */
+  /** A store holding the same tiles with nothing upstream behind it, as a
+   *  template differing from `url` only in the part that names the store.
+   *  Given one, a tile asked for while the breaker is open goes there
+   *  instead. */
   heldUrl?: string;
 };
 
@@ -50,10 +47,8 @@ const storePrefix = (template: string): string => {
   return cut < 0 ? template : template.slice(0, cut);
 };
 
-/**
- * Put `source` behind the retry, and behind the breaker for whichever origin
- * `url` belongs to. A source in no origin row gets the retry only.
- */
+/** Put `source` behind the retry, and behind the breaker for whichever origin
+ *  `url` belongs to. A source in no origin row gets the retry only. */
 export const guardTileSource = (
   source: TileImage,
   url: string,

@@ -16,11 +16,9 @@ const errorOf = async (response: Response): Promise<string> => {
   return String(response.status);
 };
 
-/**
- * Hands the row over. Resolves once the sidecar has accepted and marked it
- * queued — the pixels land later, over the realtime feed, and survive a reload
- * or a closed tab.
- */
+/** Hands the row over. Resolves once the sidecar has accepted and marked it
+ *  queued — the pixels land later, over the realtime feed, and survive a
+ *  reload or a closed tab. */
 const handOver = async (
   path: string,
   body: Record<string, unknown>,
