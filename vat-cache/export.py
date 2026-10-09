@@ -5,6 +5,7 @@
     .venv/bin/python export.py stryn -m you@example.com --limit 2      a pilot
     .venv/bin/python export.py stryn -m you@example.com                carries on
     .venv/bin/python export.py stryn --status                          where it got to
+    .venv/bin/python export.py stryn --inspect dem/stryn                what came back
 
 `Prosjekt_DTM`'s `exportImage` renders a window per work unit, which is ~90 GB
 of float TIFF over a full ladder, fetched again on every `--redo`, off the one
@@ -29,6 +30,12 @@ somebody else's queue; bigger ones mean zips that take an hour.
 became of it, so a killed run carries on, `--limit` takes the next batch rather
 than the same one, and a failed job is re-ordered by `--retry`.
 
+**Read the delivery before building on it.** `--inspect DIR` walks the
+unpacked GeoTIFFs and says what grid, CRS, sample type and nodata actually came
+back, and which ordered chunks have no file over them. `resolution 0` meaning
+0.25 m and `outputWkid` being honoured are assumptions until a delivery says
+so; everything downstream rests on both.
+
 A closed acquisition (`TILGANG` 2) is refused outright: the file services
 answer 401 whatever is asked, and only the ImageServer will ever serve it.
 Pick what to order with `plan.py`; see what has a raw point cloud instead with
@@ -38,6 +45,7 @@ Pick what to order with `plan.py`; see what has a raw point cloud instead with
 import argparse
 import json
 import shutil
+import struct
 import sys
 import time
 import urllib.parse
@@ -187,6 +195,205 @@ def download(url, into, timeout=1800):
     return target
 
 
+# Enough of TIFF to read a header and no pixels. `fetch_dem.read_tiff_f32`
+# decodes instead, and refuses anything compressed; a delivery is whatever the
+# server felt like writing, so this reads the tags and judges nothing.
+_TIFF_TYPE = {1: ("B", 1), 3: ("H", 2), 4: ("I", 4), 11: ("f", 4), 12: ("d", 8)}
+_COMPRESSION = {1: "none", 5: "LZW", 7: "JPEG", 8: "deflate", 32773: "packbits",
+                32946: "deflate", 34925: "LZMA", 50000: "zstd", 50001: "webp"}
+_SAMPLE = {1: "uint", 2: "int", 3: "float"}
+
+# ESRI writes a user-defined CRS rather than an EPSG code: ProjectedCSTypeGeoKey
+# is 32767 and the name is left in the citation. The zone is still in
+# ProjectionGeoKey as 16000 + zone north, and ETRS89's UTM codes are 25800 +
+# zone — which is how a delivery that really is on the app's grid still says
+# 32767. Kartverket's own published DTM1 does the same.
+_USER_DEFINED = 32767
+
+
+def crs_of(keys, ascii_params):
+    """(EPSG or None, the citation). Reads through a user-defined projection."""
+    found, zone, named = None, None, {}
+    for n in range(4, len(keys) - 3, 4):
+        key, where, count, value = keys[n:n + 4]
+        if key == 3072 and where == 0:
+            found = value
+        elif key == 3074 and where == 0 and 16001 <= value <= 16060:
+            zone = value - 16000
+        elif where == 34737:
+            named[key] = ascii_params[value:value + count].strip("|\0 ")
+    # GTCitationGeoKey is the short name; ProjectedCitationGeoKey is an ESRI PE
+    # string several hundred characters long.
+    citation = named.get(1026) or named.get(3073, "")
+    if found and found != _USER_DEFINED:
+        return found, citation
+    # ETRS89 only; a delivery on anything else is worth seeing spelled out.
+    if zone and "ETRS" in " ".join(named.values()).upper():
+        return 25800 + zone, citation
+    return None, citation
+
+
+def tiff_header(path, probe=1 << 20):
+    """Grid, CRS and sample type off the front of a GeoTIFF."""
+    with open(path, "rb") as handle:
+        buf = handle.read(probe)
+    if buf[:2] == b"II":
+        end = "<"
+    elif buf[:2] == b"MM":
+        end = ">"
+    else:
+        return {"error": "not a TIFF"}
+    if struct.unpack(end + "H", buf[2:4])[0] != 42:
+        return {"error": "BigTIFF, which nothing here reads"}
+
+    (ifd,) = struct.unpack(end + "I", buf[4:8])
+    (count,) = struct.unpack(end + "H", buf[ifd:ifd + 2])
+    tags = {}
+    for n in range(count):
+        at = ifd + 2 + n * 12
+        tag, kind, many = struct.unpack(end + "HHI", buf[at:at + 8])
+        fmt = _TIFF_TYPE.get(kind)
+        if fmt is None and kind != 2:
+            continue
+        span = many if kind == 2 else fmt[1] * many
+        if span <= 4:
+            raw = buf[at + 8:at + 8 + span]
+        else:
+            (far,) = struct.unpack(end + "I", buf[at + 8:at + 12])
+            raw = buf[far:far + span]
+        if len(raw) != span:
+            continue
+        tags[tag] = (raw.decode("latin1") if kind == 2
+                     else struct.unpack(end + fmt[0] * many, raw))
+
+    epsg, citation = crs_of(tags.get(34735, ()), tags.get(34737, ""))
+    scale = tags.get(33550)
+    tie = tags.get(33922)
+    nodata = tags.get(42113, "").split("\0")[0].strip() or None
+
+    return {
+        "width": tags.get(256, (None,))[0],
+        "height": tags.get(257, (None,))[0],
+        "cell": (scale[0], scale[1]) if scale else None,
+        "origin": (tie[3], tie[4]) if tie and len(tie) >= 6 else None,
+        "epsg": epsg,
+        "citation": citation,
+        "sample": f"{_SAMPLE.get(tags.get(339, (1,))[0], '?')}"
+                  f"{tags.get(258, (0,))[0]}",
+        "compression": _COMPRESSION.get(tags.get(259, (1,))[0],
+                                        str(tags.get(259, (1,))[0])),
+        "tiled": bool(tags.get(322)),
+        "nodata": nodata,
+    }
+
+
+def one_of(values, name):
+    """A single value if they all agree, else the disagreement spelled out."""
+    seen = {}
+    for value in values:
+        seen[value] = seen.get(value, 0) + 1
+    if len(seen) == 1:
+        return str(next(iter(seen))), None
+    worst = sorted(seen.items(), key=lambda kv: -kv[1])
+    return (f"{worst[0][0]} and {len(seen) - 1} other",
+            f"{name} differs between files: "
+            + ", ".join(f"{k} ({v})" for k, v in worst[:4]))
+
+
+def inspect(where, held):
+    """What the unpacked delivery holds, and whether it is what was ordered."""
+    where = Path(where)
+    tifs = sorted(p for p in where.rglob("*")
+                  if p.suffix.lower() in (".tif", ".tiff"))
+    zips = sorted(where.rglob("*.zip"))
+    clouds = sorted(p for p in where.rglob("*") if p.suffix.lower() == ".laz")
+    if not tifs:
+        print(f"No GeoTIFF under {where}."
+              + (f" {plural(len(zips), 'zip is', 'zips are')} still packed — "
+                 "unpack each\ninto a directory of its own first."
+                 if zips else "")
+              + (f" {plural(len(clouds), 'LAZ file')}, which is a point cloud "
+                 "and not this." if clouds else ""))
+        return
+
+    heads, broken = [], []
+    for path in tifs:
+        head = tiff_header(path)
+        (broken if head.get("error") else heads).append((path, head))
+    if not heads:
+        print(f"{plural(len(broken), 'file')} under {where}, none of them a "
+              "readable TIFF.")
+        return
+
+    cells = [h["cell"][0] if h["cell"] else None for _, h in heads]
+    grid, grid_note = one_of(cells, "pixel size")
+    crs, crs_note = one_of([h["epsg"] for _, h in heads], "CRS")
+    samples, sample_note = one_of([h["sample"] for _, h in heads], "sample type")
+    nodata, nodata_note = one_of([h["nodata"] for _, h in heads], "nodata")
+
+    west = south = east = north = None
+    pixels = 0
+    for _, h in heads:
+        pixels += (h["width"] or 0) * (h["height"] or 0)
+        if not (h["origin"] and h["cell"] and h["width"]):
+            continue
+        x0, y1 = h["origin"]
+        x1 = x0 + h["width"] * h["cell"][0]
+        y0 = y1 - h["height"] * h["cell"][1]
+        west = x0 if west is None else min(west, x0)
+        south = y0 if south is None else min(south, y0)
+        east = x1 if east is None else max(east, x1)
+        north = y1 if north is None else max(north, y1)
+
+    print(f"{where}: {plural(len(heads), 'GeoTIFF')}"
+          + (f", {plural(len(zips), 'zip')} still packed" if zips else ""))
+    told = f"EPSG:{crs}" if crs != "None" else "no EPSG code in the file"
+    print(f"  grid        {grid} m, {told}")
+    if heads[0][1].get("citation"):
+        print(f"  crs says    {heads[0][1]['citation'][:68]}")
+    print(f"  samples     {samples}, {heads[0][1]['compression']}, "
+          f"{'tiled' if heads[0][1]['tiled'] else 'striped'}, "
+          f"nodata {nodata or '— none declared'}")
+    if west is not None:
+        print(f"  extent      {spaced(round(west))}, {spaced(round(south))} → "
+              f"{spaced(round(east))}, {spaced(round(north))}"
+              f"  ({(east - west) / 1000:.1f} x {(north - south) / 1000:.1f} km)")
+    try:
+        ground = pixels * float(grid) ** 2 / 1e6
+        print(f"  pixels      {pixels / 1e9:.2f} Gpx over "
+              f"{plural(len(heads), 'file')}, {spaced(round(ground))} km²")
+    except ValueError:
+        pass
+
+    for note in (grid_note, crs_note, sample_note, nodata_note):
+        if note:
+            print(f"  ! {note}")
+    for path, head in broken[:5]:
+        print(f"  ! {path.name}: {head['error']}")
+
+    if held:
+        boxes = [(h["origin"][0], h["origin"][1] - h["height"] * h["cell"][1],
+                  h["origin"][0] + h["width"] * h["cell"][0], h["origin"][1])
+                 for _, h in heads if h["origin"] and h["cell"] and h["width"]]
+        empty = []
+        for chunk in held["chunks"]:
+            cw, cs, ce, cn = chunk["bbox"]
+            if not any(bw < ce and be > cw and bs < cn and bn > cs
+                       for bw, bs, be, bn in boxes):
+                empty.append(chunk)
+        done = [c for c in held["chunks"] if c["file"]]
+        print(f"  ordered     {plural(len(held['chunks']), 'chunk')}, "
+              f"{len(done)} downloaded, {len(empty)} with no file over them")
+        for chunk in empty[:6]:
+            print(f"    gap at {chunk['cj']}_{chunk['ci']} "
+                  f"{[round(v) for v in chunk['bbox']]}")
+        if float(grid) != held["cell"] and held["resolution"] == "dataset":
+            print(f"  ! ordered the acquisition's own {held['cell']} m grid "
+                  f"and got {grid} m")
+        if held["wkid"] and str(held["wkid"]) != crs:
+            print(f"  ! ordered EPSG:{held['wkid']} and got EPSG:{crs}")
+
+
 def state_file(project, out):
     return out / f"export-{slug(project)}.json"
 
@@ -319,6 +526,9 @@ def main():
                    help="order the failed and abandoned chunks again")
     p.add_argument("--status", action="store_true",
                    help="say where the record got to and stop")
+    p.add_argument("--inspect", nargs="?", const="", metavar="DIR",
+                   help="read the unpacked GeoTIFFs and say what came back; "
+                        "defaults to -o")
     p.add_argument("--dry-run", action="store_true",
                    help="work out the chunks and what they weigh, order nothing")
     args = p.parse_args()
@@ -344,6 +554,10 @@ def main():
     }
     path = state_file(project, args.out)
     held = load_state(path, settings)
+
+    if args.inspect is not None:
+        inspect(args.inspect or args.out, held)
+        return
 
     if args.status:
         if not held:

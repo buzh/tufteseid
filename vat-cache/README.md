@@ -167,6 +167,7 @@ First run over the whole country is some minutes; after that, seconds.
 .venv/bin/python export.py "NDH Stryn 10pkt 2022" -m you@example.com --limit 2
 .venv/bin/python export.py stryn -m you@example.com         carries on
 .venv/bin/python export.py stryn --status
+.venv/bin/python export.py stryn --inspect dem/stryn
 ```
 
 `exportImage` renders a window per work unit — ~90 GB of float TIFF over a full
@@ -192,9 +193,22 @@ batch rather than the same one, and `--retry` re-orders what failed.
 | mapsheet inside the zip | `Mapsheetsize`; `--sheet 1` is one file per chunk, and sends `projectMerge` 1 instead |
 
 A closed acquisition is refused: `TILGANG` 2 means every file service answers
-401, and only the ImageServer will ever serve it. **Nothing here has been run
-against the queue** — it orders real work on somebody else's machines, so
-`--dry-run` first and `--limit` small.
+401, and only the ImageServer will ever serve it. Ordering is real work on
+somebody else's machines, so `--dry-run` first and `--limit` small.
+
+**Read the delivery before building on it.** Unpack each zip into a directory
+of its own, then `--inspect DIR`: it walks the GeoTIFFs, reads the headers and
+decodes no pixels, and says the grid, CRS, sample type, nodata and extent that
+actually arrived, plus which ordered chunks have no file over them. `resolution
+0` meaning 0.25 m and `outputWkid` being honoured are assumptions until a
+delivery says so.
+
+One quirk it already reads through: Kartverket's rasters come out of ESRI with
+a **user-defined** CRS — `ProjectedCSTypeGeoKey` is 32767 and the EPSG code is
+nowhere in the file. The zone is still in `ProjectionGeoKey` as 16000 + zone,
+and the citation names the datum, so EPSG:25833 is recovered from the two
+rather than reported as missing. Kartverket's own published DTM1 is written the
+same way.
 
 ## Which acquisitions have a point cloud
 
