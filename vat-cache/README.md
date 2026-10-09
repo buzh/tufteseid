@@ -246,6 +246,37 @@ and the citation names the datum, so EPSG:25833 is recovered from the two
 rather than reported as missing. Kartverket's own published DTM1 is written the
 same way.
 
+## Building off the delivery
+
+```
+.venv/bin/pip install rasterio
+.venv/bin/python makevat.py -g "NDH Jonsnuten 4pkt 2019" --dem dem/jonsnuten
+```
+
+`--dem DIR` reads the acquisition's own GeoTIFFs off local disk instead of
+asking `exportImage` for a window at a time. Same square, same pixels, same
+NaN for no coverage, so nothing downstream changes — but the ~90 GB a full
+ladder fetches, and re-fetches on every `--redo`, is read rather than asked
+for. `local_dem.py` is the reader; `rasterio` is imported only on this path,
+so a build off the service still wants nothing new.
+
+Two things the delivery does not say, and this does:
+
+- **The fill is `0.0`.** No nodata is declared and ground the flight never
+  reached is exact zero — measured on NDH Jonsnuten, where a corner sheet came
+  back 100 % zeros and no NaN at all. It is read as no data, which costs a
+  shoreline pixel that really is 0.000000.
+- **A missing sheet is not empty ground.** Both are NaN to the renderer, so a
+  half-downloaded acquisition would build clean tiles over the part that never
+  arrived and mark those units done. The footprint is checked against what is
+  on disk before the run starts, and a short delivery is refused rather than
+  built: *"1 km² of the footprint has no raster under it."* `--force` builds
+  what is there anyway.
+
+`settings()["source"]` names the delivery, and the recipe digest covers it, so
+a file built off the service will not quietly be extended off files — the
+existing guard asks for `--redo` over everything it holds.
+
 ## Which acquisitions have a point cloud
 
 ```
@@ -324,6 +355,7 @@ its own grid and the reach changes with zoom.
 | `export.py` | Orders an acquisition's own DTM off the hoydedata.no export queue and downloads the zips. The only thing here that asks somebody else to do work |
 | `build_tiles.py` | Grid geometry, the MBTiles container, a level built into it, the read-back |
 | `cvat.py` | The combined VAT itself — presets, layer walk, `radii_for`. The only module that decides what a pixel is |
+| `local_dem.py` | The same patch as `fetch_dem.fetch`, read off an acquisition's delivered GeoTIFFs. Knows the 0 fill and what the delivery is missing. The only module that wants `rasterio` |
 | `fetch_dem.py` | `exportImage` against `Prosjekt_DTM` pinned to one `LAS_PROJECT_NAME`, plus a minimal tiled-float32 TIFF reader. **Also an input to `rendersvc`'s image**, which copies it in for `read_tiff_f32` — one reader, one set of quirks. `.dockerignore` excludes `vat-cache` and re-admits this one file; a rename or a signature change wants `docs/render-sidecar.md` read first |
 | `coverage.py` | Footprint union rasterisation, sample-site picker, tile fill. `rasterise(origin=…)` snaps to `GRID_ORIGIN`, which is what lets two acquisitions' coverage meet by index |
 | `acquisitions.py` | Acquisition identity: queue, published cell sizes, the catalogue rows and WMS name sets |

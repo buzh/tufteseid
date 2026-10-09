@@ -144,14 +144,19 @@ class Coverage:
         return out
 
 
-def fetch_unit(z, ux, uy, unit_tiles, project, attempts=5, delay=2.0):
-    """The unit's DEM, grown by the overlap, at the level's own resolution."""
+def fetch_unit(z, ux, uy, unit_tiles, project, dem=None, attempts=5, delay=2.0):
+    """The unit's DEM, grown by the overlap, at the level's own resolution.
+
+    `dem` is a `local_dem.Store` when the acquisition has been delivered as
+    files; there is then nothing to retry, the read being off local disk."""
     res = resolution(z)
     west, south, east, north = unit_bbox(z, ux, uy, unit_tiles)
     grow = OVERLAP_PX * res
     side_m = (east - west) + 2 * grow
     px = unit_tiles * TILE_PX + 2 * OVERLAP_PX
     cx, cy = (west + east) / 2, (south + north) / 2
+    if dem is not None:
+        return dem.fetch(cx, cy, side_m, px)
     for attempt in range(attempts):
         try:
             return fetch_dem.fetch(cx, cy, side_m, px, project=project)
@@ -365,6 +370,9 @@ def read_store(out, project):
 _MASKS = {}
 
 
+_STORES = {}
+
+
 def worker_coverage(path):
     """The footprint, read once per worker process rather than sent per unit."""
     if path not in _MASKS:
@@ -372,12 +380,21 @@ def worker_coverage(path):
     return _MASKS[path]
 
 
+def worker_dem(root):
+    """The delivery, indexed once per worker process rather than per unit."""
+    if root not in _STORES:
+        import local_dem
+        _STORES[root] = local_dem.Store(root)
+    return _STORES[root]
+
+
 def build_unit(args):
     """Fetch and render one work unit. Runs in a worker process, and returns its
     tiles rather than writing them: the parent is the database's only writer."""
-    z, ux, uy, unit_tiles, project, coverage_path = args
+    z, ux, uy, unit_tiles, project, coverage_path, dem_root = args
     res = resolution(z)
-    dem = fetch_unit(z, ux, uy, unit_tiles, project)
+    dem = fetch_unit(z, ux, uy, unit_tiles, project,
+                     worker_dem(dem_root) if dem_root else None)
     # radius_in_metres=False: RVT's max_rad as written, so this level is RVT's
     # combined VAT of its own grid.
     composite = cvat.cvat(dem, res, radius_in_metres=False)
@@ -401,14 +418,15 @@ def build_unit(args):
     return z, ux, uy, tiles
 
 
-def settings(levels, unit_tiles):
+def settings(levels, unit_tiles, source=None):
     """The recipe: everything that decides what a pixel is, given ground to read."""
     from importlib.metadata import version
 
     return {
         "generator": "vat-cache/build_tiles.py",
         "renderer": f"rvt-py {version('rvt-py')}",
-        "source": "hoydedata.no Prosjekt_DTM exportImage, pixelType=F32",
+        "source": source or
+                  "hoydedata.no Prosjekt_DTM exportImage, pixelType=F32",
         "visualization": "RVT combined VAT (VAT_Combined.rft.xml)",
         "presets": cvat.VAT_PRESETS,
         "blend_order": ["Hillshade normal 100", "Slope luminosity 50",
@@ -468,7 +486,7 @@ def marked_units(out, project, z):
 
 
 def run_levels(store, project, coverage, levels, unit_tiles=DEFAULT_UNIT_TILES,
-               jobs=1, limit=None, done=None):
+               jobs=1, limit=None, done=None, dem_root=None):
     """Build the named levels for one acquisition into an open store, skipping
     units already recorded there.
 
@@ -499,7 +517,7 @@ def run_levels(store, project, coverage, levels, unit_tiles=DEFAULT_UNIT_TILES,
             continue
 
         started, tiles = time.perf_counter(), 0
-        work = [(z, ux, uy, unit_tiles, project, coverage.path)
+        work = [(z, ux, uy, unit_tiles, project, coverage.path, dem_root)
                 for ux, uy in pending]
         if jobs > 1:
             with ProcessPoolExecutor(max_workers=jobs) as pool:

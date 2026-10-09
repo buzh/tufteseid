@@ -340,10 +340,30 @@ def do_get(args, snap, name):
     # takes minutes.
     levels = wanted_levels(name, cell_of(snap, name), args.levels)
     target = build_tiles.store_path(out, name)
-    recipe = build_tiles.settings(levels, args.unit_tiles)
+    source, store = None, None
+    if args.dem:
+        import local_dem
+        store = local_dem.Store(args.dem)
+        if not len(store):
+            sys.exit(f"No elevation raster under {args.dem}. Unpack the zips "
+                     "export.py fetched,\nand see what is there with "
+                     f"`export.py {name!r} --inspect {args.dem}`.")
+        source = local_dem.source_note(args.dem, store)
+        print(f"{args.dem}: {local_dem.summarise(store)}")
+    recipe = build_tiles.settings(levels, args.unit_tiles, source)
     if not args.dry_run:
         guard(target, name, recipe, levels, args.force, args.redo)
     mask = report.mask_for(name)
+    if store is not None:
+        short, total = store.gaps(mask)
+        print(f"  covers {spaced(round(total - short))} km² of the "
+              f"footprint's {spaced(round(total))} km²")
+        if short and not args.force:
+            sys.exit(f"{spaced(round(short))} km² of the footprint has no "
+                     "raster under it. Those units would\nbuild as empty "
+                     "ground and be marked done, which is worse than not "
+                     "building\nthem. Order the rest, or --force to build "
+                     "what is here.")
 
     if args.dry_run:
         build_tiles.run_levels(
@@ -354,16 +374,17 @@ def do_get(args, snap, name):
 
     if args.redo:
         forget(out, name, mask, levels, args.unit_tiles, args.limit)
-    store = build_tiles.Store(target, write=True)
-    store.stamp(name, recipe)
+    target_store = build_tiles.Store(target, write=True)
+    target_store.stamp(name, recipe)
     try:
-        build_tiles.run_levels(store, name, mask, levels, args.unit_tiles,
-                               args.jobs, args.limit)
+        build_tiles.run_levels(target_store, name, mask, levels,
+                               args.unit_tiles, args.jobs, args.limit,
+                               dem_root=args.dem)
     finally:
         # Again at the end, for the level span: the first stamp predates this
         # run's tiles.
-        store.stamp(name, recipe)
-        store.close()
+        target_store.stamp(name, recipe)
+        target_store.close()
     delivered(target, name)
 
 
@@ -442,13 +463,19 @@ def do_check(args, name):
         return
 
     print(f"\nrepairing {plural(total, 'work unit')}.\n")
-    recipe = build_tiles.settings(sorted(hurt, reverse=True), args.unit_tiles)
+    source = None
+    if args.dem:
+        import local_dem
+        source = local_dem.source_note(args.dem, local_dem.Store(args.dem))
+    recipe = build_tiles.settings(sorted(hurt, reverse=True), args.unit_tiles,
+                                  source)
     for z, units in hurt.items():
         build_tiles.unmark(out, name, z, units, args.unit_tiles)
     store = build_tiles.Store(target, write=True)
     try:
         build_tiles.run_levels(store, name, mask, sorted(hurt, reverse=True),
-                               args.unit_tiles, args.jobs)
+                               args.unit_tiles, args.jobs,
+                               dem_root=args.dem)
     finally:
         store.stamp(name, recipe)
         store.close()
@@ -489,6 +516,10 @@ def main():
                    help="tiles along one side of a work unit")
     p.add_argument("--jobs", type=int, default=1,
                    help="units in parallel; every one is a fetch, so be kind")
+    p.add_argument("--dem", metavar="DIR",
+                   help="build off an acquisition's own delivered GeoTIFFs "
+                        "under this directory rather than off hoydedata.no. "
+                        "export.py is what puts them there")
     p.add_argument("--limit", type=int,
                    help="stop after this many unbuilt units, for a pilot; run "
                         "it twice and it does the next batch, not the same one")
