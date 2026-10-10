@@ -33,19 +33,19 @@
     "account": "Kontoen din",
     "stats": "Bruksstatistikk",
     "pocketbase": "PocketBase",
-    "providersError": "Fikk ikke kontakt med innloggingstjenesten.",
+    "providersError": "Krøll i maskineriet, prøv igjen.",
     "noProviders": "Ingen auth-provider konfigurert",
-    "signInFailed": "Innloggingen ble ikke fullført.",
+    "signInFailed": "Innloggingen fullførte ikke.",
     "beta": {
       "slots_one": "Lukket beta: det er én ledig plass igjen.",
       "slots_other": "Lukket beta: det er {{count}} ledige plasser igjen.",
-      "full": "Vi har for tiden ingen ledige plasser",
+      "full": "Fullt, beklager!",
       "codeLabel": "Invitasjonskode",
       "codeHelp": "Hvis du har en invitasjonskode kan du lage en ny konto",
-      "codePlaceholder": "For eksempel J3K8QW2M",
-      "refusedClosed": "Du trenger en invitasjonskode for å lage konto. Har du konto fra før, var du kanskje innlogget som en annen bruker — vi har logget deg ut av innloggingstjenesten, så prøv på nytt.",
+      "codePlaceholder": "XYZXYZXYZX",
+      "refusedClosed": "Kan ikke registrere flere brukere uten invitasjon, prøv senere",
       "refusedCode": "Ugyldig kode",
-      "invited": "Du har fulgt en invitasjonslenke. Logg inn, så blir koden brukt når kontoen lages."
+      "invited": "Fullfør registrering for å bruke invitasjon"
     }
   },
   "evidence": {
