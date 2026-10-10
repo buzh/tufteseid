@@ -72,8 +72,6 @@ const readingSpotIdAtom = atom<string | null>(null);
 
 const acquiringSpotIdAtom = atom<string | null>(null);
 
-const talkingSpotIdAtom = atom<string | null>(null);
-
 const openSpotAtom = atom<SpotRecord | null>(null);
 
 /** The open spot. Opening a different one — or none — ends the reading of the
@@ -84,7 +82,6 @@ export const activeSpotAtom = atom(
     if (get(openSpotAtom)?.id !== next?.id) {
       set(readingSpotIdAtom, null);
       set(acquiringSpotIdAtom, null);
-      set(talkingSpotIdAtom, null);
     }
     set(openSpotAtom, next);
   },
@@ -119,22 +116,6 @@ export const spotAcquiringAtom = atom(
       acquiringSpotIdAtom,
       acquiring ? (get(activeSpotAtom)?.id ?? null) : null,
     );
-  },
-);
-
-/** The thread box, reached from the card and from the reading alike. Held and
- *  suspended like the other two. Never true for a private spot: the comment
- *  engine has no access control, so not mounting the thread is the only gate,
- *  and `SpotTalk` re-checks. */
-export const spotTalkingAtom = atom(
-  (get) => {
-    const active = get(activeSpotAtom);
-    if (!active || get(spotDraftAtom)) return false;
-    if (active.visibility !== 'public') return false;
-    return get(talkingSpotIdAtom) === active.id;
-  },
-  (get, set, talking: boolean) => {
-    set(talkingSpotIdAtom, talking ? (get(activeSpotAtom)?.id ?? null) : null);
   },
 );
 

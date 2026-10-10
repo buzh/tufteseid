@@ -77,9 +77,8 @@ MAX_BODY_BYTES = 64 * 1024
 REQUEST_TIMEOUT_S = 10
 
 # What a reader must hold to spend the sidecar's time. One of the names on
-# `users.features`, mirrored there from the Casdoor permissions their roles
-# hold (`docs/identity.md`), so which tiers may render is the installation's to
-# arrange in Casdoor's console and no tier is named here.
+# `users.features`, granted per account in PocketBase's admin UI
+# (`docs/identity.md`).
 RENDER_FEATURE = "render"
 
 # `meta` is capped at 10 kB by the collection, and a failure detail is the one
@@ -117,7 +116,7 @@ def admit(token):
     `features` is the gate and the id is a fairness bucket nobody can pick.
 
     An administrator holds every feature. That is the one rule this side states
-    rather than mirrors, and it is here so that a Casdoor permission nobody
+    rather than reads, and it is here so that a `features` entry nobody
     remembered to grant cannot lock an installation out of its own renders."""
     try:
         record = pb.whoami(token).get("record") or {}

@@ -23,7 +23,6 @@ import {
   spotPlacingAtom,
   spotReadingAtom,
   spotSketchAtom,
-  spotTalkingAtom,
 } from '../spots/atoms';
 import { useSpotPinAdjust } from '../spots/pinAdjust';
 import { useSpotPlacement } from '../spots/pinPlace';
@@ -31,7 +30,6 @@ import { useSpotShareLink } from '../spots/shareLink';
 import { useSpotLayer } from '../spots/spotLayer';
 import { useSpotRecords } from '../spots/spotRecords';
 import { useSpotScores } from '../spots/spotScores';
-import { SpotTalk } from '../talk/SpotTalk';
 import { SpotAcquire } from './SpotAcquire';
 import styles from './SpotBox.module.css';
 import { SpotCard } from './SpotCard';
@@ -81,7 +79,6 @@ export const SpotSurface = () => {
   const active = useAtomValue(activeSpotAtom);
   const reading = useAtomValue(spotReadingAtom);
   const acquiring = useAtomValue(spotAcquiringAtom);
-  const talking = useAtomValue(spotTalkingAtom);
   const session = useAtomValue(sketchSessionAtom);
   const drawn = useAtomValue(spotSketchAtom);
   const ground = useAtomValue(draftGroundAtom);
@@ -152,10 +149,7 @@ export const SpotSurface = () => {
           <SpotPropertiesBox key={draft.id} />
         ) : (
           active &&
-          // The thread stands in front of both, being opened from either.
-          (talking ? (
-            <SpotTalk key={active.id} spot={active} />
-          ) : reading ? (
+          (reading ? (
             <EvidenceReader key={active.id} spot={active} />
           ) : acquiring ? (
             <SpotAcquire key={active.id} spot={active} />

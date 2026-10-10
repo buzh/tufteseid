@@ -2,8 +2,8 @@
 
 While the beta is shut, a `users` row is only created for somebody who takes
 one of a fixed number of free places or presents an invite code. Everything
-else is unchanged: the map, the public spots and their threads are open to a
-guest as they always were, and existing accounts are never re-checked.
+else is unchanged: the map and the public spots are open to a guest as they
+always were, and existing accounts are never re-checked.
 
 ```
 registration   one row: openSlots, closed
@@ -15,23 +15,21 @@ users          + inviteQuota, invitesSent
 
 `pocketbase/pb_hooks/closed_beta.pb.js`, on `onRecordCreateRequest` over
 `users`, with the logic in `closed_beta.js` beside it for the reason under
-*Deploying a change here*. Not on the OAuth2 hook, and not in an API rule:
+*Deploying a change here*. Not in an API rule:
 
-- PocketBase creates the account through its **own record-create API** during
-  the OAuth2 round trip, cloning the browser's headers onto that internal
-  request. Hanging the gate there covers every way an account can come into
-  being — the identity provider's leg, and a direct `POST` to the collection —
-  rather than only the one.
-- That internal request is already **inside the OAuth2 transaction**, so a
-  refusal rolls the row back instead of leaving an account that was never
-  admitted. The hook reuses the live transaction rather than opening a second:
-  PocketBase's write pool is a single connection and a second would block on
-  it forever.
+- Every account comes into being through the **record-create API** on
+  `users` — registration is the SPA posting a row — so one hook there covers
+  all of them.
 - A rule cannot **count** rows or decrement a counter, which is what both
   halves of this need.
+- The handler wraps the create in a **transaction**, so the counter is spent
+  and the row written together or not at all. Without it a refusal thrown
+  after the write would leak a free place.
 
 An administrator adding somebody by hand is not a registration, so a request
-carrying superuser auth skips the gate.
+carrying superuser auth skips the gate. The same request skips
+`pb_hooks/identity.pb.js`, which is what pins `role` and the invite counters
+on everybody else's row (`docs/identity.md`).
 
 ### What pays for an account
 
@@ -52,29 +50,26 @@ gate's.
    believing it had worked and spend a place they did not ask for.
 3. No code: a free place is spent if one remains, otherwise refused.
 
-The code travels from the sign-in box as the `X-Invite-Code` header on the
-code exchange, having ridden through the identity provider in the trip's
-`sessionStorage` stash (`src/auth/trip.ts`). An invitation link is
-`?invite=<code>` on the app's own origin — no Caddy route, unlike `/l/<code>`.
-Following one puts the sign-in box up with the code filled in and says why,
-and the parameter stays on the URL until the box is dismissed or the trip
-starts: the box is the only place the code can be spent, and a reload before
-the reader gets that far must not be what loses it. A reader who already has
-an account is just following a link to the map, so the parameter is dropped
-on arrival instead. The box shows nothing about free places to somebody
-holding a code — an invite never looks at the counter, and *they are all
-taken* reads as a refusal to a reader who has been let in. The trip stashes
-`window.location.href` as the address to come back to, which is why leaving
-drops the parameter first — finding it again afterwards would reopen the box
-over a session the reader had just got.
+The code travels from the sign-in box as the `X-Invite-Code` **header** on the
+create, not as a field on the record (`src/auth/session.ts`). It pays for the
+row rather than belonging to it, and a header is what a hook can read on a
+request whose body is the collection's to validate.
 
-Leaving with a code in hand goes to Casdoor's **sign-up** form rather than
-its login form: `src/auth/trip.ts` rewrites `/login/oauth/authorize` to
-`/signup/oauth/authorize`, which `web/src/EntryPage.js` serves off the same
-authorize parameters. Somebody holding an invite is making an account by
-definition, and the login form costs them a press of *sign up* first. The
-rewrite only fires where the path is the one being replaced, so a provider
-that is not Casdoor is left where its own authorize URL points.
+An invitation link is `?invite=<code>` on the app's own origin — no Caddy
+route, unlike `/l/<code>`. Following one opens the sign-in box on its *Lag ny
+konto* half with the code filled in and says why, and the parameter stays on
+the URL until the box is dismissed or the account is made: the box is the only
+place the code can be spent, and a reload before the reader gets that far must
+not be what loses it. A reader who already has an account is just following a
+link to the map, so the parameter is dropped on arrival instead. The box shows
+nothing about free places to somebody holding a code — an invite never looks
+at the counter, and *they are all taken* reads as a refusal to a reader who
+has been let in.
+
+A refusal costs the reader nothing: it is one 403 on the form they are still
+looking at, with the code still in the field to be corrected. The box reads
+the reason off the `ValidationError` under `invite`, which is the only shape
+PocketBase passes through to the client intact.
 
 Codes are eight characters of Crockford base32, the alphabet `spots.code`
 already uses: no I, L, O or U, so a code read aloud cannot be mistyped into a
@@ -233,21 +228,18 @@ composed on the server, where the locale files do not reach, and letting the
 client post the wording would turn the route into a relay for whatever it
 liked.
 
-## Two things the gate does not cover
+## What the gate does not cover
 
-**Casdoor sign-up stays open.** The gate is on the app's account, not on the
-identity. A stranger can still create a Casdoor identity; they simply get no
-`users` row and no ability to save anything. Closing Casdoor's own sign-up
-would close it for invited readers too, since the identity is made before the
-app ever sees them.
+**The free places are first come, first served, and unthrottled.** Nothing
+here rate-limits the create or verifies an address before spending a place, so
+a script can take every open slot in one pass. That is the trade of having
+free places at all; with `openSlots` at zero and invites the only way in, it
+does not arise. PocketBase's own rate limiter is the lever if it does.
 
-**Comment threads federate straight to Casdoor.** Remark42 holds its own user
-store keyed to the Casdoor subject and knows nothing of PocketBase, so
-somebody with an identity but no account can still post on a public spot.
-Nothing in this design reaches that; `ADMIN_SHARED_ID` and Remark42's own
-moderation are what answer it (`docs/discussion-and-votes.md`). If the beta is
-meant to hold spam off the threads as well as off the register, that is a
-second decision and a different mechanism.
+**A refused reader leaves nothing behind.** The create is refused inside a
+transaction, so there is no half-made account to clean up and no address held
+against a second attempt — somebody turned down today can register with the
+same address the moment a place opens or a code reaches them.
 
 ## Deploying a change here
 

@@ -7,11 +7,11 @@
 // their own `inviteQuota`.
 //
 // Null rather than a narrower filter: there is no field left on the row that
-// is the reader's to set. `role` mirrors Casdoor and `email` and `name` come
-// from the same claims (`pb_hooks/identity.pb.js`); the two invite counters
-// are the closed beta's (`pb_hooks/closed_beta.pb.js`). Nothing in the SPA
-// has ever written a user row. Superusers and hooks save records directly
-// and are not held by an API rule.
+// is the reader's to set. `role` and `features` are granted by hand and the
+// two invite counters are the closed beta's, all four pinned at create time
+// by `pb_hooks/identity.pb.js`. Nothing in the SPA has ever written a user
+// row after making it. Superusers and hooks save records directly and are
+// not held by an API rule.
 
 migrate(
   (app) => {

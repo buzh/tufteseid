@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-#   scripts/live-check.sh [base-url] [spot-code]      IDP=… for Casdoor's host
+#   scripts/live-check.sh [base-url] [spot-code]
 #
 # The spot code is optional: given one, the PocketBase half fetches that public
 # spot by code; without one it only asserts that the spots collection answers.
@@ -13,9 +13,6 @@ set -uo pipefail
 BASE=${1:-https://kart.scheen.no}
 CODE=${2:-}
 BASE=${BASE%/}
-# Casdoor's hostname, `id.` in front of the app's as README.md sets it up.
-IDP=${IDP:-https://id.${BASE#*://}}
-IDP=${IDP%/}
 TIMEOUT=${TIMEOUT:-60}
 
 # EPSG:25833, easting first: WMS 1.3.0 takes the CRS's own axis order, and
@@ -226,44 +223,25 @@ note "$(json_num totalItems) spot(s) with a tally"
 check votes-hidden "$BASE/pb/api/collections/votes/records?perPage=1&fields=id" \
   200 json 20 '"totalItems":0'
 
-section 'Identity and discussion'
+section 'Identity'
 
-# Both stand above the app's CSP in Caddy's route; that they answer at all is
-# the check that they are still ahead of it.
-check oidc-discovery "$IDP/.well-known/openid-configuration" \
-  200 json 100 '"authorization_endpoint"'
-check oidc-noindex "$IDP/.well-known/openid-configuration" \
-  200 '' 0 '' 'x-robots-tag: noindex'
+# Sign-in is PocketBase's own and nothing else serves it. An `oauth2` provider
+# listed here would be one the app draws no button for but that still accepts
+# a code (docs/identity.md).
+check auth-methods "$BASE/pb/api/collections/users/auth-methods" \
+  200 json 20 '"password":\{"enabled":true'
+check auth-no-oauth2 "$BASE/pb/api/collections/users/auth-methods" \
+  200 json 20 '"providers":\[\]'
 
-if ! on talk; then
-  skip remark42 'ENABLE_TALK is off'
-else
-  check remark-ping "$BASE/remark42/api/v1/ping" 200 '' 2 'pong'
-  check remark-embed "$BASE/remark42/web/embed.mjs" 200 javascript 500
+# The register's own gate, read by the sign-in box before it offers to make an
+# account (docs/closed-beta.md).
+check registration-gate "$BASE/pb/api/collections/registration/records?perPage=1" \
+  200 json 20 '"openSlots"'
 
-  # Exactly one, and ours: a built-in left on would offer a second identity the
-  # app knows nothing about. An empty list means a pin below v1.16.0.
-  check remark-providers "$BASE/remark42/api/v1/config?site=tufteseid" \
-    200 json 20 '"auth_providers":\["tufteseid"\]'
-
-  # `&client_id=` is part of the assertion: x/oauth2 has to append to the query
-  # string rather than overwrite it, or `silentSignin` and `theme` are dropped.
-  check remark-silent-signin "$BASE/remark42/auth/tufteseid/login?site=tufteseid" \
-    302 '' 0 '' 'location:.*/login/oauth/authorize\?silentSignin=1&theme=dark&client_id='
-fi
-
-# Whether Casdoor keeps an SSO session at all is the one thing here that
-# decides if a reader is ever already signed in, and nothing unauthenticated
-# can read it: `GetMaskedApplication` forces `EnableSigninSession` to false
-# for every caller who is not the application's own admin, so `get-app-login`
-# reports it off whatever it is. Signing in and asking `/api/get-account` is
-# the check, and it needs a credential this script does not have
-# (docs/identity.md).
-
-# Without the IdP here the browser blocks the silent sign-in frame, and
-# nothing in any log says so.
-check csp-frame-src "$BASE/" 200 text/html 300 '' \
-  "content-security-policy:.*frame-src 'self' $IDP"
+# Who holds an invite is nobody's business but the issuer's. The rule filters
+# rather than refuses, so a guest sees an empty page rather than a 403.
+check invites-hidden "$BASE/pb/api/collections/invites/records?perPage=1&fields=id" \
+  200 json 20 '"totalItems":0'
 
 section 'Render sidecar'
 

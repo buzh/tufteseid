@@ -1,7 +1,9 @@
 /// <reference path="../pb_data/types.d.ts" />
 //
-// A required `role` breaks PocketBase's OAuth auto-provisioning, which
-// populates only its own fields. `fields.add()` replaces the field by id.
+// `role` is optional on the field and pinned at create instead, by
+// `pb_hooks/identity.pb.js` — a required SelectField would have to be sent by
+// whoever makes the row, which on registration is the reader.
+// `fields.add()` replaces the field by id.
 
 migrate(
   (app) => {

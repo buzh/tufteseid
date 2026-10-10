@@ -7,14 +7,9 @@ import { useTranslation } from 'react-i18next';
 import { evidenceFileUrl } from '../api/evidence';
 import type { SpotRecord } from '../api/spots';
 import { mapAtom } from '../map/atoms';
-import { serviceOn } from '../services';
 import { sketchOf } from '../sketch/scene';
 import { SketchFade } from '../sketch/SketchFade';
-import {
-  activeSpotAtom,
-  spotReadingAtom,
-  spotTalkingAtom,
-} from '../spots/atoms';
+import { activeSpotAtom, spotReadingAtom } from '../spots/atoms';
 import { formatPoint } from '../spots/geo';
 import { useMayEditSpot } from '../spots/mayEdit';
 import { VoteControl } from '../spots/VoteControl';
@@ -63,7 +58,6 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   const map = useAtomValue(mapAtom);
   const setReading = useSetAtom(spotReadingAtom);
   const setActive = useSetAtom(activeSpotAtom);
-  const setTalking = useSetAtom(spotTalkingAtom);
   const mayEdit = useMayEditSpot(spot);
   const { items } = useSpotEvidence(spot);
   const box = useFloatingPanel();
@@ -187,30 +181,6 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
         actions={
           <>
             <VoteControl spot={spot} />
-            {serviceOn('talk') && (
-              <Tooltip
-                label={
-                  spot.visibility === 'public'
-                    ? t('talk.open')
-                    : t('talk.private')
-                }
-              >
-                {/* A span: Mantine's Tooltip needs an element that fires
-                    pointer events, and a disabled button does not. */}
-                <span>
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    size="sm"
-                    aria-label={t('talk.open')}
-                    disabled={spot.visibility !== 'public'}
-                    onClick={() => setTalking(true)}
-                  >
-                    <Icon icon="forum" size={18} />
-                  </ActionIcon>
-                </span>
-              </Tooltip>
-            )}
             {current && (
               <Tooltip
                 label={downloadLabel({

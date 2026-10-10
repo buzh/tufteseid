@@ -88,7 +88,7 @@ must carry `render`, and the `id` is the fairness bucket below. An
 administrator holds every feature whatever the row says, which
 `src/auth/features.ts` states on the other end in the same words.
 
-Which tiers hold `render` is Casdoor's to say and no name here knows them
+Who holds `render` is granted per account in PocketBase's admin UI
 (`docs/identity.md`). What this side knows is one string.
 
 Two things follow from reading it rather than the token. **The token is

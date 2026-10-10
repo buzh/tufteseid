@@ -16,7 +16,6 @@ window.__TUFTESEID_SERVICES__ = {
   flyfoto: $(on "${ENABLE_FLYFOTO:-}"),
   cvat: $(on "${ENABLE_CVAT:-}"),
   render: $(on "${ENABLE_RENDER:-}"),
-  talk: $(on "${ENABLE_TALK:-}"),
 };
 EOF
 

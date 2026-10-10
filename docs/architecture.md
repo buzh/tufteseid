@@ -13,8 +13,8 @@ One row per directory under `src/`.
 
 | Directory | Owns |
 | --- | --- |
-| `api/` | PocketBase singleton (`pocketbase.ts`), the `spots`, `evidence` and `votes` collection clients, the one call into the render sidecar (`render.ts`), and the comment engine's own session (`remark42.ts`). |
-| `auth/` | The OAuth2 dialog, the redirect trip it starts and picks up again (`trip.ts`), the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
+| `api/` | PocketBase singleton (`pocketbase.ts`), the `spots`, `evidence`, `votes` and `invites` collection clients, and the one call into the render sidecar (`render.ts`). |
+| `auth/` | The sign-in dialog — password, registration and reset on one form — the three calls behind it (`session.ts`), the account menu (with the admin-only links to `/stats/` and PocketBase's dashboard), and `currentUserAtom` mirrored off the SDK's `authStore`. |
 | `evidence/` | Keeping a reading of a spot's ground: the offer the map is making, the spec that survives it, the producers, the serial render queue and the handover to the render sidecar, the gallery that lists and orders what was kept, the reader that lays them back on the map, and the provenance legend stamped onto a download. |
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
 | `grounds/` | The ground switch. Which ground is up is derived from the half's background layer, never stored. |
@@ -32,7 +32,6 @@ One row per directory under `src/`.
 | `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the toolbox that stands in for Excalidraw's own, the remembered pen, the render onto the ground, and the layer that puts every spot's drawing on it at once. |
 | `spotControls/` | The reader's records as surfaces: the `+`, the properties box, the read card, the box that orders a render from elsewhere, the index menu. |
 | `spots/` | Spot state and geometry: the pin layer, its clustering and its style, the footprint frame, hit test, place and adjust, share link, name suggestion, and the up/down tally each spot is ranked by. |
-| `talk/` | The thread on a public spot: the remark42 widget fetched from our own origin, and the box it stands in (`docs/discussion-and-votes.md`). |
 | `terrain/` | Client-side terrain analysis: DEM fetch, shading, the analysis window and its layers. |
 | `terrainControls/` | The terrain toggle and its panel. |
 | `types/` | Search response types. |
@@ -82,7 +81,6 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `activeSpotAtom` | same | The record being read — opened by a click, by an index row, or by `?lok=`. |
 | `spotReadingAtom` | same | The open spot's kept renders are being read on the map. Held as the id it was entered on; writing `activeSpotAtom` with a different spot — or none — clears it, and a draft suspends it. True regardless for a spot the reader may not edit, for whom writing it false does nothing. |
 | `spotAcquiringAtom` | same | The acquisition box stands in front of the card. Held the same way as the reading and suspended by a draft for the same reason; never true for a reader who may not edit the spot, who is held in the reading. |
-| `spotTalkingAtom` | same | The thread stands in front of both the card and the reading, because it is reached from either. Held and suspended like the two above, and never true for a private spot — the comment engine has no account of who may read what, so the only gate is not mounting it. |
 | `spotRecordsAtom`, `spotsFailedAtom` | `spots/spotRecords.ts` | Every record the session may see, null until the list lands; and whether it never did. |
 | `mySpotsAtom` | same | Derived: the reader's own, newest change first. |
 | `spotScoresAtom`, `myVotesAtom` | `spots/spotScores.ts` | The tally per spot id, and the reader's own vote per spot id. A spot absent from the first is unvoted, not unknown — `spotScores` is a view, which PocketBase publishes no realtime feed for, so `useSpotScores` subscribes to `votes` and refetches the affected row. There is no failure atom: a tally that never lands reads as zero, which is what the surfaces would show anyway. |
@@ -99,8 +97,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `drawnSketchSpotsAtom` | same | Which spots have their drawing on the ground this frame, published by the layer after it paints. Read by `spotLayer`'s clustering, which drops their pins. Empty while the layer is off. |
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |
 | `isSignedInAtom`, `isAdminAtom` | same | Derived, so a component does not re-render on an unrelated user field. |
-| `isAuthDialogOpenAtom`, `authPromptAtom` | same | Whether the dialog is up, and why when the reader did not press anything. |
-| `signInFailedAtom` | same | Whether the last attempt came back without a session. Seeded, like the atom above, from the page's boot: signing in is a redirect, so a failure has to survive the page that started it (`docs/identity.md`). |
+| `isAuthDialogOpenAtom`, `authPromptAtom` | same | Whether the dialog is up, and why when the reader did not press anything. Both seeded from an `?invite=` on the page's boot, that box being the only place a code can be spent (`docs/closed-beta.md`). Whether an attempt failed is the dialog's own state — nothing leaves the page, so no failure has to survive one. |
 | `upstreamHealthAtom` | `upstream/health.ts` | One breaker status per origin. |
 
 ## The context in front
@@ -755,7 +752,7 @@ of that.
 
 ## Opt-in services
 
-Four sidecars are off unless the installation names them, so a minimal stack
+Three sidecars are off unless the installation names them, so a minimal stack
 is the map, the heritage register, the LiDAR grounds, the terrain analysis,
 the extract and the reader's own spots. One key in `.env` per service does
 both halves of the job:
@@ -765,17 +762,15 @@ both halves of the job:
 | `ENABLE_FLYFOTO` | `nib-proxy` | The Flyfoto ground and its arm, the archive walk, the `flyfoto` evidence kind, the `nib` origin in the breaker |
 | `ENABLE_CVAT` | `cvat-tiles` | The cVAT render, its hint and footprint layers, the *not built for this flight* row in the render menu, the gallery's redo on a `lidar` row in the `cvat` style |
 | `ENABLE_RENDER` | `rendersvc` | The `sunloop` and `rvt` order chips, and the gallery's redo on a row of either kind |
-| `ENABLE_TALK` | `remark42` | The thread box and the two buttons that open it, and the silent sign-in leg on the way in and out |
 
-Casdoor and PocketBase are not in the table: accounts are what spots, votes
-and invites are made of, and the threads are an OAuth2 client of Casdoor
-besides.
+PocketBase is not in the table: accounts are what spots, votes and invites
+are made of, and sign-in is PocketBase's own (`docs/identity.md`).
 
-The server side is `profiles: ["enabled-${ENABLE_*}"]` on each of the four,
+The server side is `profiles: ["enabled-${ENABLE_*}"]` on each of the three,
 against the fixed `COMPOSE_PROFILES=enabled-true` — so `true` exactly starts
 the container and anything else leaves it out. The client side is
 `/services.js`, written into `/var/www` by `docker-entrypoint.sh` out of the
-same four variables and read by `src/services.ts` before the module graph
+same three variables and read by `src/services.ts` before the module graph
 evaluates, the way `config.js` is read. A dev server has no `services.js` and
 falls back to the whole stack.
 
@@ -967,14 +962,9 @@ that is a last resort rather than the design.
 - **The spot index does not light the pin.** `SpotMenu` is a Mantine `Menu`
   with two tabs — the reader's own by date, and every public one by score —
   and no hover-to-light: enough for a few dozen records, not a few hundred.
-- **The thread widget speaks English.** remark42 ships no Norwegian locale, so
-  its own chrome is `en` while every string the app puts around it is nb. A
-  deliberate exception to *`t()` from day one*, and the only one.
-- **A thread outlives the visibility it was opened under.** Threads exist only
-  for public spots, but remark42 keeps what was written: turning a spot
-  private hides the box and leaves its comments reachable to anyone who kept
-  the URL. Deleting a spot does not delete its thread either — nothing
-  propagates the cascade out of PocketBase.
+- **A spot carries no discussion.** A public spot can be voted on and nothing
+  else; there is no way for a reader to write on somebody else's record
+  (`docs/votes.md`).
 - **Evidence files are unprotected.** A public spot is readable with no
   account and a guest can hold no PocketBase file token, so `evidence.file` is
   served to anyone holding the URL. The same trade the old

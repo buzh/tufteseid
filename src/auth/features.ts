@@ -6,10 +6,8 @@ import { currentUserAtom, isAdminAtom } from './atoms';
 /**
  * What an account may spend, beyond what every signed-in reader may.
  *
- * Each name is a Casdoor permission, held through whichever tier roles its
- * console lists on it and mirrored onto the user row at sign-in
- * (`docs/identity.md`). So the tiers are not here and never will be: this side
- * knows only that something is gated, not who is on the right side of it.
+ * Each name is a string on `users.features`, granted in PocketBase's admin UI
+ * and nobody's to set over the API (`docs/identity.md`).
  *
  * Nothing gated here is enforced here. `render` is the sidecar's to refuse
  * (`docs/render-sidecar.md`); hiding the controls that would ask is a courtesy

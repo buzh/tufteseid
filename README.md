@@ -9,41 +9,37 @@ Norwegian LiDAR terrain against the Riksantikvaren heritage register.
 ## Install
 
 A default install is the map, the heritage register, the LiDAR grounds, the
-terrain analysis, the extract and the reader's own spots. **Four sidecars are
+terrain analysis, the extract and the reader's own spots. **Three sidecars are
 opt-in** and start only when `.env` names them: ortofoto from Norge i bilder
-(`ENABLE_FLYFOTO`), the precomputed relief ground (`ENABLE_CVAT`), server-side
-sun loops and RVT blends (`ENABLE_RENDER`) and comment threads
-(`ENABLE_TALK`). Each key decides both whether the container runs and whether
+(`ENABLE_FLYFOTO`), the precomputed relief ground (`ENABLE_CVAT`) and
+server-side sun loops and RVT blends (`ENABLE_RENDER`). Each key decides both
+whether the container runs and whether
 the app draws the controls for it, so an installation never offers a chip that
 would meet a 502. Changing one later is an edit to `.env` and
 `docker compose up -d --remove-orphans` — the orphan flag because compose
 starts a service you have just enabled but leaves one you have just disabled
 running.
 
-Six directories are bind-mounted from the host and must exist before the stack
-starts, or Docker creates them root-owned and the service that wanted one fails
-— MapProxy answers every `/cache/…` with a 502, Casdoor cannot create its
-database and restarts in a loop. The last two belong to opt-in services and
-are only wanted once those are on:
+Four directories are bind-mounted from the host and must exist before the
+stack starts, or Docker creates them root-owned and the service that wanted
+one fails — MapProxy answers every `/cache/…` with a 502. The last belongs to
+an opt-in service and is only wanted once that is on:
 
 ```sh
-sudo mkdir -p /site/tufteseid/data/{logs,stats,cvat,mapproxy,casdoor,remark42}
+sudo mkdir -p /site/tufteseid/data/{logs,stats,mapproxy,cvat}
 sudo chown -R 100:101 /site/tufteseid/data/mapproxy
-sudo chown -R 1000:1000 /site/tufteseid/data/casdoor
 ```
 
 `100:101` is the `mapproxy` user inside `mapproxy:7.0.0-alpine-nginx`;
 [`docs/wms-proxy-and-tiles.md`](docs/wms-proxy-and-tiles.md) has the one-liner
-that asks the image, for when that tag moves. `1000:1000` is Casdoor's user,
-which its image drops to at build time and so cannot chown the directory for
-itself. Remark42 starts as root and chowns its own store on the way down to its
-user, so that one only has to exist. Point the paths anywhere writable — they are set in
+that asks the image, for when that tag moves. Point the paths anywhere
+writable — they are set in
 `docker-compose.yml`. The `cvat` store may stay empty even with
 `ENABLE_CVAT=true`: an empty directory answers 404, which is what ground
 outside the LiDAR footprint looks like anyway.
 
 Settings live in a `.env` beside `docker-compose.yml`, which is gitignored.
-Copy the committed shape and set `PUBLIC_ORIGIN` and `CASDOOR_HOST`. The
+Copy the committed shape and set `PUBLIC_ORIGIN`. The
 `ENABLE_*` keys start at `false`; leave them there for a first run and turn
 them on once the stack is up. Do not touch the `COMPOSE_PROFILES` line — it is
 what makes those keys mean anything to compose. An existing install upgrading
@@ -56,19 +52,13 @@ a 502.
 git clone https://github.com/buzh/tufteseid.git
 cd tufteseid
 cp .env.example .env
-$EDITOR .env            # PUBLIC_ORIGIN, CASDOOR_HOST
+$EDITOR .env            # PUBLIC_ORIGIN
 docker compose build --pull
 docker compose up -d
 ```
 
-Sign-in is broken until the next section fills the pair in. Everything else —
-the map, the terrain, spots you already have — works.
-
 That listens on `127.0.0.1:3030`, expecting another reverse proxy in front.
-**Both names go to that one port.** Casdoor cannot share a hostname with the
-app, so `CASDOOR_HOST` needs a DNS record and a server block of its own in
-that proxy — same backend, different `server_name`. Caddy sorts them out on
-the `Host` header.
+One hostname is all it needs.
 
 **That proxy must not time `/pb/` out.** PocketBase pushes spots, votes and
 finished renders down one long-lived event stream, and sends nothing between
@@ -121,94 +111,49 @@ docker compose exec pocketbase /pb/pocketbase superuser create \
 Open **<http://localhost:3030/pb/_/>** and sign in. Under **Settings →
 Application**, set the Application URL to the URL users will actually visit.
 
-## Sign-in, and the comment threads
+## Sign-in and who may do what
 
-Readers sign in through the `casdoor` container, which is the only place a
-credential is entered. Both the app and the comment engine are OAuth2 clients
-of it, so a reader signs in once and can then comment without signing in
-again. [`docs/identity.md`](docs/identity.md) has the full account.
+Readers sign in with an email address and a password, held by PocketBase
+itself. There is nothing else to configure and no second system to register
+the app with. [`docs/identity.md`](docs/identity.md) has the full account.
 
-Open Casdoor at **`https://<CASDOOR_HOST>/`** and sign in as `built-in` /
-`admin` / `123`. **Change that password before the host is reachable from the
-internet.**
+Two things want **Settings → Mail settings** filled in, and neither works
+without SMTP: the *Glemt passord* letter, and mailing somebody an invite. A
+reader whose invite mail fails is told to pass the code on by hand; a reader
+who cannot reset their password has no way round it but you.
 
-**Make an organization for readers first.** Every member of Casdoor's
-`built-in` organization has full Casdoor admin rights, so readers must not
-land there. **Organizations → Add**, name it `tufteseid`, and create the
-applications under it. Each hands back a client id and a secret when saved.
-The second is only wanted with `ENABLE_TALK=true`:
+**Make yourself an app administrator.** This is separate from the PocketBase
+superuser you just made — that one is the database's, not the app's. Register
+in the app as an ordinary reader (open a free place first, or that first
+registration is refused — see below), then in the admin UI open
+**Collections → users → your row** and set `role` to `admin`. It takes effect
+on that reader's next page load.
 
-| Application | Redirect URL |
-| --- | --- |
-| the app | `https://<your-host>/auth/callback` |
-| the threads | `https://<your-host>/remark42/auth/tufteseid/callback` |
-
-**Tick *Signin session* and then *Auto signin* on both**, two switches beside
-each other on the application's first tab and in that order — the second
-cannot be turned on before the first. A new application has both off, and
-without the first Casdoor forgets each reader the moment it has handed back
-an authorization code, so the app asks for a password on every visit and the
-threads ask again on top of that, which is the one thing having an identity
-provider was meant to prevent. The second is what spares a reader Casdoor
-remembers even a *Continue as …* click. Signing out of the app ends Casdoor's
-session too, so that stays safe on a shared browser.
-
-The threads' pair goes into `.env` as `REMARK42_OIDC_CID` and
-`REMARK42_OIDC_CSEC`, alongside `ENABLE_TALK=true` and a `REMARK42_SECRET`
-from `openssl rand -hex 32`; `docker compose up -d` again to pick them up.
-A blank one of the three stops the container at startup and says so in
-`docker compose logs remark42`, not in compose's own output — the keys cannot
-be required of an installation that leaves the threads off. The app's pair is
-typed into PocketBase instead:
-**Collections → users → Edit collection → Options → OAuth2**, the generic
-**OIDC** provider, pointed at
-
-```
-https://<CASDOOR_HOST>/.well-known/openid-configuration
-```
-
-The display name typed there is the text on the app's sign-in button, so the
-provider's own `OIDC` left in place is what readers are asked to continue
-with.
-
-**Give yourself the app admin role in Casdoor**, not in PocketBase. Sign up at
-`https://<CASDOOR_HOST>` so the identity exists, then **Roles → Add** under the
-readers' organization, name it `admin`, and put your account in its *Users*.
-Open a free place before signing in to the app itself, or that first sign-in is
-refused (see below).
-
-The `users` row's `role` is rewritten from Casdoor's claims on every sign-in
-(`docs/identity.md`), so a rank typed into PocketBase's admin UI holds only
-until the reader signs in again. To moderate comments as well, put that
-account's Casdoor id in `.env` as `REMARK42_ADMIN_ID` — the two are separate
-permissions in separate systems.
+An administrator may rename, reshape and delete anybody's spot, reaches
+`/stats/` and the PocketBase dashboard from the account menu, and holds every
+feature below.
 
 **Say who may order a server-side render.** Only with `ENABLE_RENDER=true` —
 without it the sidecar does not run and the order chips are absent for
-everybody, administrator included. A sun loop or an RVT blend is
-minutes of CPU on your machine, so it is held by a named Casdoor permission
-rather than by every account. **Permissions → Add** under the readers'
-organization, name it `render`, fill in the resource and action fields Casdoor
-insists on — nothing here reads them — and list the roles that should hold it;
-an empty list means nobody but you. An administrator holds every feature, so a
-fresh install can order renders before any of this is arranged, and the two
-order chips are simply absent for a reader without it.
-[`docs/identity.md`](docs/identity.md) has the tiers, what a permission's other
-fields do and do not do, and the *Token fields* setting that can hide the claim
-altogether.
+everybody, administrator included. A sun loop or an RVT blend is minutes of
+CPU on your machine, so it is held per account rather than by everybody: open
+**Collections → users → the row** and put `render` on the `features` array. An
+administrator holds it without being granted it, so a fresh install can order
+renders before any of this is arranged, and for a reader without it the two
+order chips are simply absent rather than failing.
 
-**On an existing install, readers collect a new tier at their next sign-in**,
-not at their next load: the mirror is written when Casdoor hands the account
-over, and the app never goes back to ask. Until they sign out and in again they
-meet the gate as it stood.
+**Nobody can grant themselves any of this.** The `users` collection has no
+update rule at all, and `role`, `features` and the two invite counters are
+pinned at registration by a hook — the admin UI is the only way any of them
+moves ([`docs/identity.md`](docs/identity.md)).
 
 ## Who may register
 
 A fresh install **registers nobody**. The app ships as a closed beta: a reader
-signing in for the first time gets an account only if a free place is left or
+registering for the first time gets an account only if a free place is left or
 they present an invite code, and until you say otherwise there are none of
-either. Existing accounts are never re-checked, and the map, the public spots
-and their threads stay open to anybody with the address.
+either. Existing accounts are never re-checked, and the map and the public
+spots stay open to anybody with the address.
 
 Open some places:
 
@@ -228,8 +173,7 @@ docker run --rm -it -v tufteseid_pbdata:/pb_data alpine:3.20 \
 ```
 
 Readers you have granted invites to can pass codes on themselves or have the
-site mail them, which needs SMTP under **Settings → Mail settings**; without
-it the send fails and the reader is told to send the code by hand.
+site mail them, which needs the SMTP settings above.
 [`docs/closed-beta.md`](docs/closed-beta.md) has the rest — the SQL for
 granting invites, what the gate does not cover, and how it is enforced.
 

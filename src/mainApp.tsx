@@ -8,19 +8,15 @@ import '@mantine/core/styles.css';
 import 'material-symbols/rounded.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { completeSignIn, isSignInReturn } from './auth/trip.ts';
 import './index.css';
 import { projInit } from './map/projections/proj/projInit.ts';
 import { theme } from './ui/theme.ts';
 projInit();
 
-// Imported dynamically for the sake of ordering: modules under `App` take
-// boot values off the address bar as they are evaluated, and until
-// `completeSignIn` runs that address bar is the callback's. A static import
-// would be hoisted above it.
+// Imported dynamically for the sake of ordering: the map modules under `App`
+// register projections as they are evaluated, so `projInit` has to have run
+// first. A static import would be hoisted above it.
 const boot = async () => {
-  if (isSignInReturn()) await completeSignIn();
-
   const [{ App }, { AtomWrapper }] = await Promise.all([
     import('./App.tsx'),
     import('./AtomWrapper.tsx'),

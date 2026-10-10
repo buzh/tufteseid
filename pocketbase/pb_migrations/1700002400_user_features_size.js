@@ -1,11 +1,8 @@
 /// <reference path="../pb_data/types.d.ts" />
 //
-// Casdoor reports every permission the account resolves to, not only the ones
-// this installation has named, so the length of `users.features` is not this
-// side's to predict. Over the cap the field fails validation inside the
-// sign-in hook, `app.save` throws, and the reader cannot sign in at all —
-// which reaches them as a bare 400 and reaches a maintainer only in the admin
-// UI's *Logs*. 50 kB is some three thousand names.
+// Headroom on `users.features`, whose names are the installation's to choose
+// and so not this side's to size. 50 kB is some three thousand of them. Over
+// the cap the field fails validation and the write it is part of throws.
 //
 // `fields.add()` with an existing id replaces the field; an omitted property
 // is a property removed.

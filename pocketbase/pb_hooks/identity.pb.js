@@ -1,33 +1,28 @@
 /// <reference path="../pb_data/types.d.ts" />
 //
-// Casdoor is where a reader's rank and what they may spend both live. The
-// `users` row carries a copy because every collection rule in
-// `pb_migrations/` reads `@request.auth.role` and PocketBase can only judge a
-// record of its own, so the copy is rewritten from the claims on every sign-in
-// and is nobody's to edit (`1700002200_users_not_self_writable.js`,
-// `docs/identity.md`).
+// Everything on a new `users` row that is not the reader's to choose.
 //
-// Every handler runs in a runtime of its own and cannot see this file's
-// scope, so the logic lives in `identity.js` and is required in.
+// Registration is a plain record create against an open create rule — a
+// reader signs themselves up — and a collection rule cannot name a field. So
+// without this, a POST carrying `role: "admin"` would be honoured and reach
+// every spot in the register, and one carrying `inviteQuota: 500` would mint
+// its way past the closed beta.
+//
+// Past the create there is no way back in: `users` has no update rule at all,
+// so these four are only ever moved by a superuser or by a hook
+// (`1700002200_users_not_self_writable.js`, `docs/identity.md`).
 
-onRecordAuthWithOAuth2Request((e) => {
-  const identity = require(`${__hooks}/identity.js`);
-  const claims = identity.fromClaims(e.oAuth2User);
-
-  // An existing row is reconciled before `e.next()`, which is what writes the
-  // auth response: a role saved after it would not be in the body the browser
-  // has just been handed, and the reader would hold the old one until their
-  // next refresh.
-  if (!e.isNewRecord) {
-    identity.apply(e.app, e.record, claims);
+onRecordCreateRequest((e) => {
+  // An administrator adding somebody by hand chooses the whole row.
+  if (e.hasSuperuserAuth()) {
     e.next();
     return;
   }
 
-  // A new row has nothing to save against until it exists, so its turn comes
-  // after. The first sign-in of an account Casdoor already calls an
-  // administrator therefore answers without the rank; `authRefresh` on the
-  // next load picks it up.
+  e.record.set('role', 'user');
+  e.record.set('features', []);
+  e.record.set('inviteQuota', 0);
+  e.record.set('invitesSent', 0);
+
   e.next();
-  identity.apply(e.app, e.record, claims);
 }, 'users');

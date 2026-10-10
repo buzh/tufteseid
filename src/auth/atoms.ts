@@ -3,11 +3,6 @@ import { atomEffect } from 'jotai-effect';
 
 import { pb, Role, SiteUser } from '../api/pocketbase';
 import { bootInviteCode } from '../invites/inviteLink';
-import {
-  signInReturnFailed,
-  signInReturnRefusal,
-  type SignInRefusal,
-} from './trip';
 
 // Mirrors the SDK's authStore, which stays the source of truth. Do not set
 // this directly — go through the SDK's auth calls, which `pbAuthSyncEffect`
@@ -50,27 +45,14 @@ const roleAtom = atom<Role>((get) => {
 
 export const isAdminAtom = atom((get) => get(roleAtom) === 'admin');
 
-// Both seeded from the page's boot: a trip that came back without a session
-// puts the box up again carrying the failure, since nothing else would show
-// the reader they had tried. An invitation link puts it up too — the box is
+// Seeded from the page's boot: an invitation link puts the box up, that being
 // the only place the code it carries can be spent.
-export const isAuthDialogOpenAtom = atom(
-  signInReturnFailed() || bootInviteCode !== '',
-);
-
-export const signInFailedAtom = atom(signInReturnFailed());
-
-/** Non-null when the closed beta is what turned the reader away, which the
- *  box says instead of the generic failure. */
-export const signInRefusalAtom = atom<SignInRefusal | null>(
-  signInReturnRefusal(),
-);
+export const isAuthDialogOpenAtom = atom(bootInviteCode !== '');
 
 /** Why the dialog is up when the reader did not ask for it; null for the
  *  sign-in button itself. */
 export type AuthPrompt = 'spotLink' | 'inviteLink';
 
-// A failed return says more than the link that started it, so it wins.
 export const authPromptAtom = atom<AuthPrompt | null>(
-  !signInReturnFailed() && bootInviteCode ? 'inviteLink' : null,
+  bootInviteCode ? 'inviteLink' : null,
 );

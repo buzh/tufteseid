@@ -7,17 +7,12 @@ services:
     ports:
       - "127.0.0.1:3030:3000"
     environment:
-      # Caddy routes Casdoor on the Host header and gates framing of its login
-      # page on the app's origin.
-      - CASDOOR_HOST=${CASDOOR_HOST:?set CASDOOR_HOST in .env}
-      - PUBLIC_ORIGIN=${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}
       # The opt-in services, written into /var/www/services.js by the image's
       # entrypoint so the SPA hides what this installation does not run. The
       # same keys drive the `profiles:` below — change one, break three.
       - ENABLE_FLYFOTO=${ENABLE_FLYFOTO:-false}
       - ENABLE_CVAT=${ENABLE_CVAT:-false}
       - ENABLE_RENDER=${ENABLE_RENDER:-false}
-      - ENABLE_TALK=${ENABLE_TALK:-false}
     volumes:
       - ./config.js:/var/www/config.js:ro
       # First run: sudo mkdir -p /site/tufteseid/data/{logs,stats}
@@ -25,7 +20,7 @@ services:
       # Outside /var/www: under it the SPA's file_server would serve the
       # report with the app's CSP, which blocks GoAccess's inline script.
       - /site/tufteseid/data/stats:/srv/stats:ro
-    # The opt-in four are left out. Naming a service a profile has switched
+    # The opt-in three are left out. Naming a service a profile has switched
     # off either aborts the `up` or drags the service back in, depending on
     # the compose version, and neither is wanted. Nothing is lost: Caddy
     # resolves an upstream when a request arrives rather than at boot, so a
@@ -35,7 +30,6 @@ services:
       - wmscache
       - mapproxy
       - pocketbase
-      - casdoor
 
   cvat-tiles:
     build: ./cvat-tiles
@@ -112,107 +106,6 @@ services:
     restart: unless-stopped
     profiles: ["enabled-${ENABLE_FLYFOTO:-false}"]
 
-  # The identity provider, with PocketBase and remark42 as its two OAuth2
-  # clients. On a hostname of its own, not a subpath (docs/identity.md).
-  casdoor:
-    # No `v` prefix on Casdoor's tags, unlike remark42's below.
-    image: casbin/casdoor:3.119.0
-    restart: unless-stopped
-    logging:
-      options:
-        max-size: "20m"
-        max-file: "3"
-    # No entrypoint override: `/server` creates the tables itself, and the
-    # `--createDatabase=true` the docs suggest is MySQL-only DDL that panics
-    # on sqlite.
-    environment:
-      # Each overrides the app.conf key of the same name, hence the un-shouty
-      # names.
-      - driverName=sqlite
-      # No `file:` scheme — modernc.org/sqlite takes the prefix as part of the
-      # path. The pragmas keep Casdoor off "database is locked"
-      # (docs/identity.md).
-      - "dataSourceName=/data/casdoor.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(10000)&_txlock=immediate"
-      - runmode=prod
-      - httpport=8000
-      # OIDC discovery composes every endpoint from this, so it is the public
-      # address. https is fixed here: an identity provider on http is not one.
-      - origin=https://${CASDOOR_HOST:-}
-    volumes:
-      # Must be writable by uid 1000 gid 1000 (the image's casdoor user) or the
-      # first write fails and the container restarts forever.
-      - /site/tufteseid/data/casdoor:/data
-      # The SSO sessions, which beego keeps as files under `./tmp` with the
-      # image's WORKDIR at `/`. Unmounted they sit on the container's writable
-      # layer, so the cookie promises 30 days and the state behind it lasts
-      # until the next recreate — after which every reader is asked for a
-      # password again (docs/identity.md).
-      - casdoortmp:/tmp
-
-  # Comment threads on public spots, with an identity store of its own
-  # federated to Casdoor. v1.16.0 is the floor — below it the AUTH_CUSTOM_*
-  # block is read by nothing (docs/discussion-and-votes.md).
-  remark42:
-    image: ghcr.io/umputun/remark42:v1.17.1
-    restart: unless-stopped
-    profiles: ["enabled-${ENABLE_TALK:-false}"]
-    logging:
-      options:
-        max-size: "20m"
-        max-file: "3"
-    # remark42 declares SECRET required, but go-flags counts an env var that is
-    # merely present as set and compose always injects one — so a blank
-    # REMARK42_SECRET would start it signing every auth cookie with an empty
-    # key instead of refusing. This is that refusal. An `entrypoint:` override
-    # clears the image's CMD, hence `/srv/remark42 server` restated here.
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |-
-        [ -n "$$SECRET" ] || {
-          echo 'REMARK42_SECRET is empty: set it, or ENABLE_TALK=false' >&2
-          exit 1
-        }
-        exec /init.sh /srv/remark42 server
-    environment:
-      # Cookies, CORS and the OAuth callback are composed from this, so it
-      # must match the public address exactly, subpath included.
-      - REMARK_URL=${PUBLIC_ORIGIN:-}/remark42
-      - SITE=tufteseid
-      # Not `:?`, unlike CASDOOR_HOST above: compose interpolates the whole
-      # file before starting anything, profiles included, so a required key
-      # here would make every installation that leaves ENABLE_TALK off invent
-      # a secret. Blank with ENABLE_TALK=true is caught by the entrypoint
-      # above instead, in this container's logs rather than compose's output.
-      - SECRET=${REMARK42_SECRET:-}
-      - ADMIN_SHARED_ID=${REMARK42_ADMIN_ID:-}
-      # Basic auth on the public /remark42/api/v1/admin/* endpoints. Blank
-      # disables it; set it only for the length of a backup or a remap.
-      - ADMIN_PASSWD=${REMARK42_ADMIN_PASSWD:-}
-      - ALLOWED_HOSTS='self'
-      - AUTH_SAME_SITE=strict
-      - EMOJI=true
-      # The last path segment of the callback URL. Must match
-      # ^[a-z0-9][a-z0-9_-]*$ and no built-in provider's name.
-      - AUTH_CUSTOM_NAME=tufteseid
-      - AUTH_CUSTOM_CID=${REMARK42_OIDC_CID:-}
-      - AUTH_CUSTOM_CSEC=${REMARK42_OIDC_CSEC:-}
-      # Authorize is front-channel, hence the public address and no `/api`;
-      # the other two are back-channel and stay off the host's NAT loopback.
-      # `silentSignin` suppresses Casdoor's "Continue with …" panel, which is
-      # what lets the app run the trip in a hidden frame (src/api/remark42.ts).
-      # `theme` is how Casdoor is told to draw dark, and nothing on this leg
-      # composes the URL — the app's own leg appends it in src/auth/trip.ts.
-      - AUTH_CUSTOM_AUTH_URL=https://${CASDOOR_HOST:-}/login/oauth/authorize?silentSignin=1&theme=dark
-      - AUTH_CUSTOM_TOKEN_URL=http://casdoor:8000/api/login/oauth/access_token
-      - AUTH_CUSTOM_INFO_URL=http://casdoor:8000/api/userinfo
-      - AUTH_CUSTOM_SCOPES=openid,profile,email
-    volumes:
-      - /site/tufteseid/data/remark42:/srv/var
-    depends_on:
-      - casdoor
-
 volumes:
   wmscache:
   pbdata:
-  casdoortmp:

@@ -2,12 +2,12 @@ import { Menu, Text, Tooltip } from '@mantine/core';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
+import { pb } from '../api/pocketbase';
 import { getEnv } from '../env';
 import { isInvitesDialogOpenAtom } from '../invites/atoms';
 import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
 import { currentUserAtom, isAdminAtom, isAuthDialogOpenAtom } from './atoms';
-import { useSignOut } from './hooks';
 
 // The GoAccess report Caddy serves out of the stats bind mount, and
 // PocketBase's own dashboard behind the same proxy path as its API.
@@ -20,7 +20,6 @@ export const AuthButton = () => {
   const isAdmin = useAtomValue(isAdminAtom);
   const setDialogOpen = useSetAtom(isAuthDialogOpenAtom);
   const setInvitesOpen = useSetAtom(isInvitesDialogOpenAtom);
-  const signOut = useSignOut();
 
   if (!user) {
     return (
@@ -85,7 +84,7 @@ export const AuthButton = () => {
         )}
         <Menu.Item
           leftSection={<Icon icon="logout" size={16} />}
-          onClick={() => void signOut()}
+          onClick={() => pb.authStore.clear()}
         >
           {t('auth.signOut')}
         </Menu.Item>

@@ -10,17 +10,13 @@
 // and cannot see this file's scope, so each one requires what it needs — see
 // `closed_beta.js`, which is where the logic lives and why.
 
-// Registration. PocketBase creates the `users` row through its own record-
-// create API during the OAuth2 round trip, carrying the browser's headers
-// onto the internal request — so this one hook covers every way an account
-// can come into being, the identity provider's included.
+// Registration. Every account comes into being through the record-create API
+// on `users`, so this one hook covers all of them.
 //
-// The OAuth2 path is already inside a transaction, and `runInTransaction`
-// reuses a live one rather than opening a second: a second would block
-// forever, the write pool being a single connection. Reassigning `e.app` is
-// what makes it see the live one. The wrapper earns its place on the paths
-// that arrive outside a transaction, where a refusal after the row was
-// written would leak a slot.
+// The transaction is what keeps a refusal from leaking a free place: the
+// counter is spent before `e.next()` writes the row, and a throw from either
+// rolls both back. Reassigning `e.app` is what makes the inner handlers write
+// through the same transaction.
 onRecordCreateRequest((e) => {
   // An administrator adding somebody by hand is not a registration.
   if (e.hasSuperuserAuth()) {

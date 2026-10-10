@@ -1,9 +1,9 @@
 /// <reference path="../pb_data/types.d.ts" />
 //
-// What this reader may spend, as a list of feature names. A mirror of the
-// Casdoor permissions their roles hold, rewritten from the claims on every
-// sign-in and nobody's to edit — `users` has no update rule and
-// `pb_hooks/identity.pb.js` saves the record itself (`docs/identity.md`).
+// What this reader may spend, as a list of feature names. Granted by hand in
+// the admin UI and nobody's to edit over the API: `users` has no update rule
+// and `pb_hooks/identity.pb.js` empties the field at create (
+// `docs/identity.md`).
 //
 // Names are the installation's to choose, so nothing here enumerates them.
 

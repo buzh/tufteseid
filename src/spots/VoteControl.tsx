@@ -1,7 +1,7 @@
 // Of the two refusals only one is a dead end, so only one disables the thumbs:
 // an admin cannot publish somebody's private spot, but a reader with no
 // account can get one, so theirs stay live and open the sign-in box
-// (`docs/discussion-and-votes.md`).
+// (`docs/votes.md`).
 
 import { Tooltip } from '@mantine/core';
 import { useAtomValue, useSetAtom } from 'jotai';

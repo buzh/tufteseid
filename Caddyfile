@@ -23,27 +23,12 @@ log {
 }
 
 route {
-        # Casdoor is on a hostname of its own (docs/identity.md), separated
-        # from the app by the Host header alone — so it matches before any
-        # path matcher, and above the app's CSP, which its console cannot run
-        # under. It sets no security headers itself.
-        @casdoor host {$CASDOOR_HOST}
-        handle @casdoor {
-                header X-Robots-Tag noindex
-                header Strict-Transport-Security max-age=31536000
-                header X-Content-Type-Options nosniff
-                # Casdoor sends no framing header of its own. A CSP carrying
-                # only frame-ancestors restricts framing and nothing else.
-                header Content-Security-Policy "frame-ancestors 'self' {$PUBLIC_ORIGIN}"
-                reverse_proxy http://casdoor:8000
-        }
-
-        # Above the app's CSP as well: GoAccess writes one self-contained HTML
-        # whose script and style are inline, and its template engine compiles
-        # with `new Function`, so the report needs 'unsafe-eval' too or it
-        # hangs on the loading screen. Served open, hence noindex. Empty bind
-        # mount before the first usage-report.sh run, so 404 here means "no
-        # report yet".
+        # Above the app's CSP: GoAccess writes one self-contained HTML whose
+        # script and style are inline, and its template engine compiles with
+        # `new Function`, so the report needs 'unsafe-eval' too or it hangs on
+        # the loading screen. Served open, hence noindex. Empty bind mount
+        # before the first usage-report.sh run, so 404 here means "no report
+        # yet".
         redir /stats /stats/
         handle_path /stats/* {
                 header X-Robots-Tag noindex
@@ -54,22 +39,11 @@ route {
                 }
         }
 
-        # Above the app's CSP too: the widget's own pages serve their own
-        # inline script.
-        handle_path /remark42/* {
-                header X-Robots-Tag noindex
-                header Strict-Transport-Security max-age=31536000
-                header X-Content-Type-Options nosniff
-                reverse_proxy http://remark42:8080
-        }
-
         header Strict-Transport-Security max-age=31536000
         header X-Content-Type-Options nosniff
         header Referrer-Policy strict-origin
         # style-src-elem 'unsafe-inline' is required by MantineProvider's
         # runtime <style>; a nonce is impossible behind a static file_server.
-        # frame-src names Casdoor for the threads' silent sign-in frame alone
-        # (src/api/remark42.ts); the app's own sign-in leaves the page.
         header Content-Security-Policy "
                 default-src 'self';
                 script-src 'self';
@@ -80,7 +54,6 @@ route {
                 style-src-attr 'unsafe-inline';
                 font-src 'self';
                 frame-ancestors 'self';
-                frame-src 'self' https://{$CASDOOR_HOST};
         "
         header Permissions-Policy "geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), accelerometer=(), camera=()"
 
@@ -88,12 +61,6 @@ route {
         # wrong path with a 200.
         @shortLink path_regexp shortLink ^/l/([0-9A-Za-z]+)$
         redir @shortLink /?lok={re.shortLink.1}
-
-        # Where Casdoor sends the reader back; registered there verbatim, so
-        # the two move together. A rewrite rather than a redir, which would
-        # strand the authorization code on an address the reader keeps.
-        @authCallback path /auth/callback
-        rewrite @authCallback /index.html
 
         handle_path /wms/geonorge/* {
                 rewrite * /skwms1{http.request.uri.path}

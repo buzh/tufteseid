@@ -32,9 +32,9 @@ Each owns its subject; this file keeps only what is true across all of them.
 | `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream and Caddy → mapproxy → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
 | `docs/render-sidecar.md` | The server-side render service: the contract, the token trade, the queue's limits, the RVT and ffmpeg recipes, the burnt-in legend, the failure modes | `rendersvc/`, `src/api/render.ts`, the `sunloop` and `rvt` arms in `src/evidence/` |
-| `docs/identity.md` | Casdoor, its own hostname and why it cannot share the app's, the two OAuth2 clients, how the `users` row mirrors it | `casdoor` in compose, the PocketBase OAuth2 config, `src/auth/` |
-| `docs/discussion-and-votes.md` | Remark42's contract and the thread key, the public-only gate, the `votes` collection and the `spotScores` view's two quirks | `src/talk/`, `src/spots/spotScores.ts`, `src/api/votes.ts`, the vote migration |
-| `docs/closed-beta.md` | Who may register and what pays for it, the hook that enforces it, the SQL for opening places and granting invites, the mail route's settings, the two things the gate does not cover | `pocketbase/pb_hooks/`, `src/invites/`, `src/api/invites.ts`, the sign-in box |
+| `docs/identity.md` | PocketBase password auth, the three modes of the sign-in box, the four fields on `users` nobody may set themselves, and what a feature gates | `src/auth/`, `pocketbase/pb_hooks/identity.pb.js`, the `users` migrations |
+| `docs/votes.md` | The public-only gate, the `votes` collection and the `spotScores` view's two quirks | `src/spots/spotScores.ts`, `src/api/votes.ts`, the vote migration |
+| `docs/closed-beta.md` | Who may register and what pays for it, the hook that enforces it, the SQL for opening places and granting invites, the mail route's settings, what the gate does not cover | `pocketbase/pb_hooks/`, `src/invites/`, `src/api/invites.ts`, the sign-in box |
 | `docs/monitoring.md` | The access logs, the usage report, the cron health check, retention | `scripts/usage-report.sh`, `scripts/health-check.sh`, any log format or `logging:` cap |
 | `vat-cache/README.md` | The out-of-band Python pipeline that precomputes the cached VAT ground | `vat-cache/`, `cvat-tiles/` |
 | `README.md` | Third-party install and admin guide | any change to install, first-run or licensing |
@@ -127,12 +127,12 @@ First run on a new host wants `sudo mkdir -p /site/tufteseid/data/{logs,stats}`
 alongside the cVAT and MapProxy store directories (`README.md`,
 `docs/monitoring.md`).
 
-- **`.env` must exist before `docker compose up`.** `casdoor` needs
-  `CASDOOR_HOST` and `PUBLIC_ORIGIN` and compose refuses to start without
-  them. `.env.example` is the committed shape; `.env` is gitignored and lives
-  on the server only.
-- **Four services are opt-in and default off**: `nib-proxy`, `cvat-tiles`,
-  `rendersvc` and `remark42`, each behind one `ENABLE_*` key that drives both
+- **`.env` must exist before `docker compose up`.** Nothing in it is
+  required any more, but `COMPOSE_PROFILES` is what makes the `ENABLE_*` keys
+  mean anything. `.env.example` is the committed shape; `.env` is gitignored
+  and lives on the server only.
+- **Three services are opt-in and default off**: `nib-proxy`, `cvat-tiles`
+  and `rendersvc`, each behind one `ENABLE_*` key that drives both
   a compose profile and `/services.js`, which `src/services.ts` reads
   (`docs/architecture.md`). Adding a surface that talks to one of them means
   hiding it behind `serviceOn(…)` in the same change. A service gates the
@@ -168,9 +168,7 @@ alongside the cVAT and MapProxy store directories (`README.md`,
 | Service | What it is |
 | --- | --- |
 | `tufteseid` | `node:24-alpine` builds the SPA, `caddy:2.10.0-alpine` serves `/var/www`, plus the GoAccess report at `/stats/` out of a read-only mount. `config.js` bind-mounted at runtime; `services.js` written beside it by `docker-entrypoint.sh`. |
-| `pocketbase` | Backend for spots (OAuth2 + user content), pinned to 0.40.2. Serves `/pb/*`. SQLite on the `pbdata` volume, migrations and hooks bind-mounted read-only from the repo. |
-| `casdoor` | `casbin/casdoor`, a single Go binary on SQLite. The one place a credential is entered, with PocketBase and remark42 as its two OAuth2 clients. On `CASDOOR_HOST`, a hostname of its own reaching the same Caddy — it cannot be served under a subpath (`docs/identity.md`). |
-| `remark42` | **Opt-in (`ENABLE_TALK`).** Comment threads on public spots, served at `/remark42/*` and federated to `casdoor` so a reader signs in once. Its own store on a bind mount (`docs/discussion-and-votes.md`). |
+| `pocketbase` | Backend for accounts and spots, pinned to 0.40.2. Serves `/pb/*`. SQLite on the `pbdata` volume, migrations and hooks bind-mounted read-only from the repo. |
 | `nib-proxy` | **Opt-in (`ENABLE_FLYFOTO`).** Token-injecting sidecar for Norge i bilder ortofoto. Reachable only from wmscache and mapproxy. |
 | `rendersvc` | **Opt-in (`ENABLE_RENDER`).** `python:3.11-slim` (rvt-py 2.2.3 caps at `<3.12`) + ffmpeg + RVT-py. Serves `/render/*`: renders an evidence row server-side and PATCHes the file back with the caller's own token. One worker, a queue of 8, CPU and memory capped. |
 | `cvat-tiles` | **Opt-in (`ENABLE_CVAT`).** `node:24-alpine`, zero deps. Serves `/cvat/*` out of one MBTiles database per LiDAR acquisition in the bind-mounted store. Built out of band by `vat-cache/`. |
@@ -184,8 +182,9 @@ App-based JSVM API (`$app.findCollectionByNameOrId` / `app.save`, flattened
 field classes), **not** the 0.22 `Dao` API. `pocketbase/pb_hooks/` holds JS
 hooks in the same runtime, for the two things a collection rule cannot say:
 the closed-beta gate counts rows and spends a counter (`docs/closed-beta.md`),
-and the `users` row's `role` is mirrored from Casdoor's claims on every
-sign-in (`docs/identity.md`).
+and `identity.pb.js` pins the four fields on a new `users` row that are not
+the reader's to choose, a rule being unable to name a field
+(`docs/identity.md`).
 
 - **A hook handler cannot see its own file's scope.** PocketBase serializes
   each handler and runs it in a runtime of its own, so a constant or helper
@@ -203,13 +202,11 @@ sign-in (`docs/identity.md`).
   bootstrap and only then registers the JS ones, whatever the timestamps say. A
   JS migration can never run before a core one; anything that must precede a
   core migration happens out of band against a stopped database.
-- **The OAuth2 client is admin-UI only**, on both ends and on every host:
-  Collections → `users` → Edit collection → Options → OAuth2, the generic
-  `oidc` provider pointed at the `casdoor` sidecar's discovery document. Not
-  versioned in a migration and no code change — the SPA's AuthDialog lists
-  whatever `listAuthMethods()` reports and labels it with the `displayName`
-  typed there. `docs/identity.md` has the URLs and the two things OIDC does
-  not carry.
+- **Sign-in is PocketBase's own password auth**, versioned in
+  `1700002500_password_auth.js` rather than left to the admin UI, and
+  `oauth2` is switched off with its `providers` cleared — a config left
+  enabled but unused still answers `listAuthMethods` and still accepts a
+  code. `docs/identity.md` has what turning one back on would take.
 
 ### Collections
 
@@ -253,7 +250,7 @@ sidecar, which writes `meta.job` as it goes and the file when it is done
   guest, carrying `up`, `down`, `votes` and `score` per **public** spot. Two
   things to code against: PocketBase publishes **no realtime feed on a view**,
   and a spot with no votes is **absent** rather than present at zero
-  (`docs/discussion-and-votes.md`).
+  (`docs/votes.md`).
 
 Two more carry the closed beta, both written by `pb_hooks/closed_beta.pb.js`
 rather than by the SPA:
@@ -286,19 +283,18 @@ Server-enforced on `spots`:
 - **update/delete** — owner or admin
 
 So the UI carries one permission, `mayEdit` (owner *or* admin): an admin can
-rename, reshape and delete anybody's spot. `users.role` is a mirror of
-Casdoor's roles and `users.features` of the Casdoor permissions those roles
-hold, both rewritten on every sign-in, and the `users` row has no update rule
-at all — neither the rank nor the membership nor the invite counters are the
-reader's to set (`docs/identity.md`).
+rename, reshape and delete anybody's spot. `users.role` and `users.features`
+are granted by hand in the admin UI, pinned at registration by
+`pb_hooks/identity.pb.js`, and the `users` row has no update rule at all —
+neither the rank nor the membership nor the invite counters are the reader's
+to set (`docs/identity.md`).
 
 **What a feature gates is making, never reading.** A gated capability is a
-name (`render` so far) held by whichever Casdoor tiers the console puts on it,
-enforced where the cost is rather than in a collection rule — `rendersvc`
-reads the caller's own row and refuses. `src/auth/features.ts` hides the
-control that would only meet a 403, and an admin holds every feature. Adding a
-tier or moving a feature between tiers is a Casdoor console edit with no code
-change; adding a *feature* is a string on both ends.
+name (`render` so far) on `users.features`, enforced where the cost is rather
+than in a collection rule — `rendersvc` reads the caller's own row and
+refuses. `src/auth/features.ts` hides the control that would only meet a 403,
+and an admin holds every feature. Granting one is an admin-UI edit with no
+code change; adding a *feature* is a string on both ends.
 
 `evidence` follows its spot and adds the spot's owner to every write rule, so an
 admin may keep a render against somebody else's spot and that spot's author can

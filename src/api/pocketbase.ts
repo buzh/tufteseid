@@ -8,15 +8,14 @@ export const pb = new PocketBase(getEnv().pocketbaseUrl);
 
 export type Role = 'guest' | 'user' | 'admin';
 
-// `role` is absent on an OAuth auto-provisioned account; missing reads as
-// 'user'.
+// `role` is optional on the collection, so missing reads as 'user'.
 export type SiteUser = {
   id: string;
   email: string;
   name: string;
   role?: Role;
-  /** What this account may spend, mirrored from Casdoor at sign-in. Read it
-   *  through `useHasFeature` (`src/auth/features.ts`), never directly — an
+  /** What this account may spend, granted by hand (`docs/identity.md`). Read
+   *  it through `useHasFeature` (`src/auth/features.ts`), never directly — an
    *  admin holds every feature and this list does not say so. */
   features?: string[];
   /** How many invites this account may ever mint, granted by hand. What is
