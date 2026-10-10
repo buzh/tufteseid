@@ -9,41 +9,59 @@
 // this file registers none.
 
 /** The Casdoor role whose members are administrators here. Casdoor reports
- *  role *names*, not the `organization/name` ids its console URLs carry. */
+ *  role *names*, not the `organization/name` ids its console URLs carry, and
+ *  the same goes for the permission names below. */
 const ADMIN_ROLE = 'admin';
 
-/** `rawUser.roles` is a Go slice handed to the JS runtime, so it answers to
- *  `length` and to an index and to nothing else — not `includes`. */
-const holdsRole = (roles, wanted) => {
-  const count = roles ? roles.length || 0 : 0;
-  for (let i = 0; i < count; i++) {
-    if (String(roles[i]) === wanted) return true;
-  }
-  return false;
+/** `rawUser.roles` and `rawUser.permissions` are Go slices handed to the JS
+ *  runtime, so they answer to `length` and to an index and to nothing else —
+ *  not `includes`, not `map`. Sorted because Casdoor's order is not promised
+ *  and a reshuffle is not a change worth a write. */
+const names = (slice) => {
+  const count = slice ? slice.length || 0 : 0;
+  const out = [];
+  for (let i = 0; i < count; i++) out.push(String(slice[i]));
+  return out.sort();
 };
 
 /**
- * What the identity provider says this reader is. Casdoor lists their roles
- * in its userinfo response under the `profile` scope, which PocketBase's OIDC
- * provider asks for, and PocketBase keeps the whole response on `rawUser`.
+ * What the identity provider says this reader is and may spend. Casdoor lists
+ * both in its userinfo response under the `profile` scope, which PocketBase's
+ * OIDC provider asks for, and PocketBase keeps the whole response on
+ * `rawUser`. `permissions` carries a permission's *name* and resolves through
+ * roles and role hierarchy, so the tiers are Casdoor's to arrange and no name
+ * here is known to this file.
  *
- * A reader holding no role at all is reported by leaving `roles` out of the
- * response rather than by sending it empty, so an absent key and an empty one
- * cannot be told apart and both read as `user`. Which is why this is a mirror
- * and not a merge: see `docs/identity.md` for what that costs on the way in.
+ * A reader holding none of either is reported by leaving the key out rather
+ * than by sending it empty, so an absent key and an empty one cannot be told
+ * apart and both read as nothing held. Which is why this is a mirror and not a
+ * merge: see `docs/identity.md` for what that costs on the way in.
  */
-const roleFromClaims = (oAuth2User) => {
+const fromClaims = (oAuth2User) => {
   const raw = oAuth2User ? oAuth2User.rawUser : null;
-  const roles = raw ? raw['roles'] : null;
-  return holdsRole(roles, ADMIN_ROLE) ? 'admin' : 'user';
+  const roles = names(raw ? raw['roles'] : null);
+  return {
+    role: roles.indexOf(ADMIN_ROLE) !== -1 ? 'admin' : 'user',
+    features: names(raw ? raw['permissions'] : null),
+  };
 };
 
 /** Writes only on a difference, so that signing in is not by itself a reason
- *  to move `updated`. */
-const applyRole = (app, record, role) => {
-  if (!record || record.getString('role') === role) return;
-  record.set('role', role);
+ *  to move `updated`. A json field reads back as its own text, which is what
+ *  `getString` answers with, so `features` is compared against the
+ *  serialization rather than against an array that is not there to compare. */
+const apply = (app, record, identity) => {
+  if (!record) return;
+  const features = JSON.stringify(identity.features);
+  if (
+    record.getString('role') === identity.role &&
+    record.getString('features') === features
+  ) {
+    return;
+  }
+  record.set('role', identity.role);
+  record.set('features', identity.features);
   app.save(record);
 };
 
-module.exports = { roleFromClaims, applyRole };
+module.exports = { fromClaims, apply };

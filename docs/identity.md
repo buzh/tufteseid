@@ -433,6 +433,67 @@ things follow:
 - **Editing `role` in PocketBase's admin UI no longer holds.** It survives
   until the reader next signs in and is then overwritten.
 
+### Membership and what it may spend
+
+Some of what the app can do costs the installation real money — a server-side
+render is minutes of CPU — and is therefore not every account's to ask for.
+Casdoor already models that, so nothing here invents a second scheme:
+
+| In Casdoor | Here |
+| --- | --- |
+| a **role** | a membership tier: `normal`, `member`, `vip`, `pro`, whatever the installation wants |
+| a **permission** | a gated feature, named — `render` is the only one so far |
+| the permission's *Roles* list | which tiers hold that feature |
+
+Userinfo under the `profile` scope carries `permissions` beside `roles`, as a
+flat list of permission **names**, and Casdoor resolves it through direct
+assignment, through the reader's roles, through their groups and through role
+hierarchy. `pb_hooks/identity.pb.js` writes the list to `users.features` on the
+same pass that writes `role`, and it is a mirror on the same terms: nobody's to
+edit, rewritten whole on every sign-in, and an account Casdoor stops granting a
+permission stops holding it here.
+
+So **re-assigning a feature is a console edit** — open the permission, change
+which roles are on it, save. No migration, no deploy, and nothing in this
+repository names a tier.
+
+Three things to know before arranging them:
+
+- **The tiers ladder by sub-role, and the containing role is the lower rung.**
+  A role lists the roles it *contains*, and a user in a contained role holds
+  the container too. So `normal` lists `member`, `member` lists `vip`, `vip`
+  lists `pro`, and a `pro` reader resolves to all four — a permission granted
+  to `member` is then held by `vip` and `pro` without being listed on either.
+  Flat roles work as well if the tiers are not a ladder; grant each permission
+  to each role that should have it.
+- **A permission is Casbin's object and most of it is unused.** Resources,
+  actions and effect have to be filled in to save one and nothing reads them —
+  only the name and who holds it crosses to this side. Casdoor applies no
+  enabled or state filter either, so a permission switched off is still
+  reported: take the roles off it instead.
+- **An application's *Token fields*, if set, must list `Permissions`.** Left
+  empty, which is the default, every claim is sent.
+
+**A new tier lands at the reader's next sign-in, not at their next load.** The
+mirror is written by the OAuth2 handler, and `authRefresh` does not go back to
+Casdoor — so an account granted `pro` keeps meeting the old gate until its
+Casdoor session is spent, which is up to the application's *Cookie expire in
+hours*. Signing out and back in is what collects it, and is worth saying to
+whoever is granting the tier.
+
+**The app's own side holds one rule rather than a mirror: an administrator
+holds every feature.** `src/auth/features.ts` and `rendersvc/server.py` both
+say so, so that a permission nobody remembered to grant cannot lock an
+installation out of its own renders.
+
+Which leaves the enforcement, and it is **not** in the collection rules.
+`evidence` rows are parameters, and a row costs nothing until something renders
+it; the gate therefore sits where the cost is, in `rendersvc`, which reads the
+caller's own row to find it (`docs/render-sidecar.md`). The SPA hides the two
+order chips for a reader without `render` — a courtesy, not a gate. **Pictures
+already rendered stay readable to everybody who can see the spot**, guests
+included: a membership decides what may be made, never what may be looked at.
+
 **Nobody may write their own `users` row.** PocketBase's stock collection ships
 `updateRule = "id = @request.auth.id"`, and a rule cannot name a field — so a
 reader could PATCH `role = "admin"` onto themselves, and an administrator
@@ -448,8 +509,8 @@ their address at the identity provider keeps their spots, and the ambiguity
 worth settling before the first sign-in is only ever about rows that predate
 the provider.
 
-**`inviteQuota` and `invitesSent` stay here.** They are grants the installation
-makes rather than facts about an identity, and Casdoor's userinfo carries
-roles, groups and permissions but no custom property to put them in. They move
+**`inviteQuota` and `invitesSent` stay here.** They are counters the
+installation spends rather than facts about an identity, and a permission
+cannot hold a number. They move
 by SQL or in the admin UI (`docs/closed-beta.md`), and the rule above is what
 keeps them out of the reader's reach.

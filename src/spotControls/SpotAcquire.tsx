@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { EvidenceRecord } from '../api/evidence';
 import type { SpotRecord } from '../api/spots';
+import { useHasFeature } from '../auth/features';
 import { KIND_ICON, evidenceTitle } from '../evidence/labels';
 import { mayRetry } from '../evidence/queue';
 import {
@@ -33,6 +34,7 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
   const setAcquiring = useSetAtom(spotAcquiringAtom);
   const evidence = useSpotEvidence(spot);
   const run = useFlyfotoRun(spot.footprint, evidence);
+  const mayRender = useHasFeature('render');
 
   const ordered = (evidence.items ?? []).filter((rec) =>
     rendersOnServer(rec.kind),
@@ -113,15 +115,17 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
     >
       <p className={styles.note}>{t('acquire.hint')}</p>
       <div className={styles.chips}>
-        {orderChip(
-          SUN_LOOP_SPEC,
-          t('evidence.sunLoop'),
-          t('evidence.facts.frames', { n: SUN_LOOP_FRAMES }),
-          t('acquire.sunLoopHint'),
-        )}
-        {RVT_SPECS.map((spec) =>
-          orderChip(spec, evidenceTitle(spec), t('acquire.rvtHint')),
-        )}
+        {mayRender &&
+          orderChip(
+            SUN_LOOP_SPEC,
+            t('evidence.sunLoop'),
+            t('evidence.facts.frames', { n: SUN_LOOP_FRAMES }),
+            t('acquire.sunLoopHint'),
+          )}
+        {mayRender &&
+          RVT_SPECS.map((spec) =>
+            orderChip(spec, evidenceTitle(spec), t('acquire.rvtHint')),
+          )}
         <ControlChip
           icon="photo_camera"
           label={t('acquire.flyfoto')}

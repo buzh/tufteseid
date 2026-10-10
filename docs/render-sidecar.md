@@ -10,7 +10,8 @@ drains one job, a producer in `render.ts` fetches and paints, and
 do not fit in that. A 360° sun rotation is 72 hillshades of one grid and a VP9
 encode; an RVT blend is a stack of horizon scans over a grid with hundreds of
 metres of context around it. Both are minutes of work the main thread should not
-be doing, and work worth spending only on a reader who has signed in.
+be doing, and work worth spending only on a reader whose membership carries it
+(`docs/identity.md`).
 
 So `rendersvc` takes an evidence row, renders it with RVT-py, and writes the file
 back itself. Two producers, `sunloop` and `rvt`; the envelope around them — the
@@ -34,8 +35,10 @@ POST /render/rvt            Authorization: <the caller's PocketBase token>
 
 202  queued                     408  the body stalled on the way in
 400  no body, or not JSON       409  already queued or running for that row
-401  no token                   422  the row is not renderable by that route
-403  may not write that row     429  queue full, or this caller has one in flight
+401  no token, or a stale one   422  the row is not renderable by that route
+403  no render in this          429  queue full, or this caller has one in
+     membership, or may not          flight
+     write that row
 404  no such row                502  PocketBase or the producer fell over
 ```
 
@@ -67,12 +70,32 @@ A public spot's evidence is readable with no account at all, so a successful rea
 proves nothing. The order is read → claim → enqueue, and a claim PocketBase
 refuses is answered 403 before anything is queued.
 
+### Who may render at all
+
+A rule can say who may write a row. It cannot say who may spend two CPU-minutes,
+because that is a fact about the reader rather than about the record — so it is
+asked separately, and first. `admit` POSTs `auth-refresh` with the caller's
+token, and the row that comes back answers both questions at once: `features`
+must carry `render`, and the `id` is the fairness bucket below. An
+administrator holds every feature whatever the row says, which
+`src/auth/features.ts` states on the other end in the same words.
+
+Which tiers hold `render` is Casdoor's to say and no name here knows them
+(`docs/identity.md`). What this side knows is one string.
+
+Two things follow from reading it rather than the token. **The token is
+verified**: a bucket cannot be picked by editing a JWT payload, so there is no
+forged-caller case left to reason about. And **a stale token is now 401 rather
+than a confusing 404** on the row read — PocketBase is asked about it before
+anything else is.
+
 A token expiring mid-render loses the write-back, not the render. The row keeps
 its `running` marker until it goes stale.
 
 ### Cost control
 
-Signed-in-only falls out of the token check. On top of it:
+Signed-in-only falls out of the token check, and members-only out of the
+feature above it. On top of them:
 
 | Limit | Where |
 | --- | --- |
@@ -96,13 +119,8 @@ able to starve Caddy or PocketBase.
 the token, because the collection rules let an admin and a spot's author write
 somebody else's evidence: counting the row's owner would let one admin fill the
 queue across eight readers' spots, and would refuse a reader who has queued
-nothing. The id comes out of the PocketBase JWT's payload, base64url-decoded and
-**not verified** — `pb.claim` is still the only thing deciding whether a token
-may write a row, and a payload edited to name somebody else no longer verifies
-there, so the slot it took is given straight back on the 403. A token whose
-payload will not read shares one bucket rather than escaping the count. What a
-forged claim buys is a different bucket, and `QUEUE_MAX` bounds the total either
-way.
+nothing. The id is the one PocketBase handed back with the feature check, so it
+is the token's own and cannot be chosen.
 
 **The request timeout is a thread bound, not a courtesy.** `/render/*` is public
 through a plain Caddy `reverse_proxy`, which streams rather than buffers, and the
@@ -470,6 +488,8 @@ render with it. If the thread stops all the same, `/health` answers 503 and
 | A blend's PNG will not fit the 50 MB field | `failed` — there is no re-encode ladder for a still, and the worst case the footprint cap allows measures 9.3 MB |
 | An encode passes 900 s | the child is killed and reaped, `failed`, and the worker takes the next job with nothing left running |
 | The container is restarted mid-job | nothing beats the markers any more, so they go stale after five minutes and read as `failed`; the queue is not persisted, so the rows that were waiting go with it |
+| The caller's membership does not carry `render` | 403 before the row is read, nothing queued, nothing written |
+| PocketBase will not recognise the token | 401 at the same point, which is also what an expired session looks like |
 | PocketBase refuses the claim | 403 to the caller, the queue slot is given back, no marker written |
 | The failure write itself fails | logged and dropped; the loop takes the next job and the stale rule catches the row |
 

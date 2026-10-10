@@ -266,9 +266,18 @@ Server-enforced on `spots`:
 
 So the UI carries one permission, `mayEdit` (owner *or* admin): an admin can
 rename, reshape and delete anybody's spot. `users.role` is a mirror of
-Casdoor's roles, rewritten on every sign-in, and the `users` row has no update
-rule at all — neither the rank nor the invite counters are the reader's to set
-(`docs/identity.md`).
+Casdoor's roles and `users.features` of the Casdoor permissions those roles
+hold, both rewritten on every sign-in, and the `users` row has no update rule
+at all — neither the rank nor the membership nor the invite counters are the
+reader's to set (`docs/identity.md`).
+
+**What a feature gates is making, never reading.** A gated capability is a
+name (`render` so far) held by whichever Casdoor tiers the console puts on it,
+enforced where the cost is rather than in a collection rule — `rendersvc`
+reads the caller's own row and refuses. `src/auth/features.ts` hides the
+control that would only meet a 403, and an admin holds every feature. Adding a
+tier or moving a feature between tiers is a Casdoor console edit with no code
+change; adding a *feature* is a string on both ends.
 
 `evidence` follows its spot and adds the spot's owner to every write rule, so an
 admin may keep a render against somebody else's spot and that spot's author can

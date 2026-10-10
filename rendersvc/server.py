@@ -13,7 +13,6 @@ beaten for as long as the job is alive, so one nobody has refreshed means nobody
 is working on the row.
 """
 
-import base64
 import json
 import logging
 import os
@@ -77,9 +76,11 @@ MAX_BODY_BYTES = 64 * 1024
 # per connection until the container's 2 GB is gone.
 REQUEST_TIMEOUT_S = 10
 
-# Handed to a caller whose token carries no readable id. One bucket for all of
-# them, because a bucket per unreadable token is no bucket at all.
-UNKNOWN_CALLER = "?"
+# What a reader must hold to spend the sidecar's time. One of the names on
+# `users.features`, mirrored there from the Casdoor permissions their roles
+# hold (`docs/identity.md`), so which tiers may render is the installation's to
+# arrange in Casdoor's console and no tier is named here.
+RENDER_FEATURE = "render"
 
 # `meta` is capped at 10 kB by the collection, and a failure detail is the one
 # thing here that can run long.
@@ -110,25 +111,25 @@ class Refused(Exception):
         self.reason = reason
 
 
-def caller_of(token):
-    """The `id` claim out of the caller's PocketBase JWT, **unverified**. It is a
-    fairness bucket and nothing else: `pb.claim` is still the only thing that
-    decides whether this token may write the row, and a payload edited to name
-    somebody else no longer verifies there. A token that cannot be read at all
-    shares `UNKNOWN_CALLER` rather than escaping the count."""
-    words = token.split()
-    parts = words[-1].split(".") if words else []
-    if len(parts) == 3:
-        try:
-            payload = base64.urlsafe_b64decode(parts[1] + "=" * (-len(parts[1]) % 4))
-            claims = json.loads(payload)
-        except (ValueError, TypeError):
-            return UNKNOWN_CALLER
-        if isinstance(claims, dict):
-            claimed = claims.get("id")
-            if isinstance(claimed, str) and claimed:
-                return claimed[:64]
-    return UNKNOWN_CALLER
+def admit(token):
+    """Whether this token may start a render at all, answering who is asking.
+    PocketBase settles both: the row it hands back is the token's own, so
+    `features` is the gate and the id is a fairness bucket nobody can pick.
+
+    An administrator holds every feature. That is the one rule this side states
+    rather than mirrors, and it is here so that a Casdoor permission nobody
+    remembered to grant cannot lock an installation out of its own renders."""
+    try:
+        record = pb.whoami(token).get("record") or {}
+    except pb.PbError as e:
+        raise Refused(401 if e.status in (401, 403, 404) else 502, e.detail) from e
+
+    features = record.get("features")
+    held = isinstance(features, list) and RENDER_FEATURE in features
+    if not held and record.get("role") != "admin":
+        raise Refused(403, "renders are not part of this membership")
+
+    return str(record.get("id") or "")
 
 
 def _strings(value, count, chars):
@@ -203,6 +204,10 @@ def accept(producer, token, body):
     if not isinstance(record_id, str) or not record_id:
         raise Refused(400, "no evidence id")
 
+    # Before the row is read: a reader whose membership does not carry renders
+    # is turned away without the service doing any work on their behalf.
+    caller = admit(token)
+
     try:
         record = pb.get_evidence(record_id, token)
     except pb.PbError as e:
@@ -217,7 +222,6 @@ def accept(producer, token, body):
         raise Refused(422, str(e)) from e
     spot = spot_of(record)
     bbox = bbox_of(spot)
-    caller = caller_of(token)
     # A retry reads back the marker the failed attempt left. Every write below
     # is built from this, so drop it here or a successful second run lands a row
     # whose meta still says it failed.

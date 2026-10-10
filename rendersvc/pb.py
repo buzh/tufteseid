@@ -58,6 +58,24 @@ def _call(method, path, token, body=None, content_type=None, timeout=READ_TIMEOU
         raise PbError(502, f"{type(e).__name__}: {e}") from e
 
 
+def whoami(token):
+    """The caller's own user row, and PocketBase's word that the token is one it
+    issued. Every other call here is judged by a collection rule against the
+    row it names; who may start a render at all is a fact about the reader, so
+    it is read once up front.
+
+    An explicit empty object rather than no body at all: a POST without a
+    `Content-Length` is a thing proxies and servers are each entitled to read
+    their own way."""
+    return _call(
+        "POST",
+        "/api/collections/users/auth-refresh",
+        token,
+        b"{}",
+        "application/json",
+    )
+
+
 def _record_path(record_id, expand=False):
     path = "/api/collections/evidence/records/" + urllib.parse.quote(record_id, "")
     return path + "?expand=spot" if expand else path

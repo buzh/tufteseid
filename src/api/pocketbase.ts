@@ -15,6 +15,10 @@ export type SiteUser = {
   email: string;
   name: string;
   role?: Role;
+  /** What this account may spend, mirrored from Casdoor at sign-in. Read it
+   *  through `useHasFeature` (`src/auth/features.ts`), never directly — an
+   *  admin holds every feature and this list does not say so. */
+  features?: string[];
   /** How many invites this account may ever mint, granted by hand. What is
    *  left to mint is this less the rows it has issued. */
   inviteQuota?: number;
