@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 import { evidenceFileUrl, type EvidenceRecord } from '../api/evidence';
 import type { SpotRecord } from '../api/spots';
+import { useHasFeature } from '../auth/features';
 import { ControlButton } from '../ui/ControlButton';
 import { cx } from '../ui/cx';
 import { Icon } from '../ui/Icon';
@@ -30,6 +31,7 @@ import {
   evidenceBbox,
   isReadable,
   isVideoEvidence,
+  rendersOnServer,
 } from './spec';
 import type { SpotEvidence } from './useSpotEvidence';
 
@@ -80,6 +82,10 @@ const EvidenceItem = ({
   const title = evidenceLabel(record);
   const file = evidenceFileUrl(record);
   const note = renderNote(record, state);
+  // A row kept before the gate, or rendered onto this spot by an admin, can
+  // outlive the feature that ordered it — and the sidecar would only answer
+  // 403 (`src/auth/features.ts`).
+  const mayRedo = useHasFeature('render') || !rendersOnServer(record.kind);
 
   return (
     <li className={cx(styles.row, lifted && styles.lifted)}>
@@ -154,7 +160,7 @@ const EvidenceItem = ({
         </>
       )}
 
-      {mayRetry(state) && (
+      {mayRetry(state) && mayRedo && (
         <Tooltip label={t('evidence.retry')}>
           <ControlButton
             icon="refresh"

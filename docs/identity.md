@@ -489,10 +489,13 @@ installation out of its own renders.
 Which leaves the enforcement, and it is **not** in the collection rules.
 `evidence` rows are parameters, and a row costs nothing until something renders
 it; the gate therefore sits where the cost is, in `rendersvc`, which reads the
-caller's own row to find it (`docs/render-sidecar.md`). The SPA hides the two
-order chips for a reader without `render` — a courtesy, not a gate. **Pictures
-already rendered stay readable to everybody who can see the spot**, guests
-included: a membership decides what may be made, never what may be looked at.
+caller's own row to find it (`docs/render-sidecar.md`). The SPA hides what
+would only meet that refusal — the two order chips, and the gallery's retry on
+a row that renders on the server, which a reader can be left holding from
+before the feature moved or from an administrator's render onto their spot. A
+courtesy, not a gate. **Pictures already rendered stay readable to everybody
+who can see the spot**, guests included: a membership decides what may be
+made, never what may be looked at.
 
 **Nobody may write their own `users` row.** PocketBase's stock collection ships
 `updateRule = "id = @request.auth.id"`, and a rule cannot name a field — so a

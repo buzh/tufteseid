@@ -161,6 +161,23 @@ until the reader signs in again. To moderate comments as well, put that
 account's Casdoor id in `.env` as `REMARK42_ADMIN_ID` — the two are separate
 permissions in separate systems.
 
+**Say who may order a server-side render.** A sun loop or an RVT blend is
+minutes of CPU on your machine, so it is held by a named Casdoor permission
+rather than by every account. **Permissions → Add** under the readers'
+organization, name it `render`, fill in the resource and action fields Casdoor
+insists on — nothing here reads them — and list the roles that should hold it;
+an empty list means nobody but you. An administrator holds every feature, so a
+fresh install can order renders before any of this is arranged, and the two
+order chips are simply absent for a reader without it.
+[`docs/identity.md`](docs/identity.md) has the tiers, what a permission's other
+fields do and do not do, and the *Token fields* setting that can hide the claim
+altogether.
+
+**On an existing install, readers collect a new tier at their next sign-in**,
+not at their next load: the mirror is written when Casdoor hands the account
+over, and the app never goes back to ask. Until they sign out and in again they
+meet the gate as it stood.
+
 ## Who may register
 
 A fresh install **registers nobody**. The app ships as a closed beta: a reader

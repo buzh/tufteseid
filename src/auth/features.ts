@@ -11,8 +11,8 @@ import { currentUserAtom, isAdminAtom } from './atoms';
  * knows only that something is gated, not who is on the right side of it.
  *
  * Nothing gated here is enforced here. `render` is the sidecar's to refuse
- * (`docs/render-sidecar.md`); hiding the chips is a courtesy to a reader who
- * would only meet a 403.
+ * (`docs/render-sidecar.md`); hiding the controls that would ask is a courtesy
+ * to a reader who would only meet a 403.
  */
 export type Feature = 'render';
 

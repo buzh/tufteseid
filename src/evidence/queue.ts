@@ -5,7 +5,7 @@
 // the one exception (PREVIEW_LANES).
 
 import { attachEvidenceFile, type EvidenceRecord } from '../api/evidence';
-import { requestRvtBlend, requestSunLoop } from '../api/render';
+import { RenderRefused, requestRvtBlend, requestSunLoop } from '../api/render';
 import type { Bbox } from '../map/bbox';
 import { withDeadline } from '../shared/utils/deadline';
 import type { SunLoopLegend } from './legendContent';
@@ -50,6 +50,9 @@ type RenderJob = {
   /** The band the sidecar burns in; only a `sunloop` carries one, else null. */
   legend: SunLoopLegend | null;
   onDone?: (rec: EvidenceRecord) => void;
+  /** The sidecar refused the handover, so no job exists and nothing will ever
+   *  settle this row. Whoever created it decides what becomes of it. */
+  onRefused?: () => void;
 };
 
 // Ceilings on a stall, not budgets: a never-settling render parks the jobs
@@ -196,6 +199,7 @@ export const enqueueRender = (job: RenderJob): void => {
           e,
         );
         states.set(job.rec.id, 'failed');
+        if (e instanceof RenderRefused) job.onRefused?.();
       }
       publish();
     },

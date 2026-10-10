@@ -359,6 +359,16 @@ what stops a handover that timed out — the POST is not aborted, so the sidecar
 may well have taken the job — from captioning a finished loop "the render
 failed" until the page is reloaded.
 
+**A refused handover takes the row back.** A sidecar that answers at all — 403
+for a membership without `render`, 429 for a full queue, 503 for a dead worker
+— has queued nothing and written no marker, so the row it was handed would
+stand for ever with neither pixels nor state: `stateOf` says nothing about it
+after a reload, `SpotAcquire` reads that as a render still on its way, and
+every order chip is disabled behind it. So `keep` deletes the row on a
+`RenderRefused` (`src/api/render.ts`) and the reader is told the keep failed,
+the same trade `keepProduced` already made. A handover that merely *timed out*
+is left alone, because the POST is not aborted and the job may yet be claimed.
+
 `empty` is persisted and is **not terminal**: a reload still explains why the row
 has no picture, and `mayRetry` (`queue.ts`) offers it the same retry a `failed`
 row gets. A probe that answered for the rectangle as a whole, or a coverage

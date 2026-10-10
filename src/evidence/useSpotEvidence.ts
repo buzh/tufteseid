@@ -142,11 +142,21 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     [offered, items, metric],
   );
 
+  const discard = useCallback(
+    (id: string) => {
+      byId.current.delete(id);
+      publish();
+      deleteEvidence(id).catch(() => {});
+    },
+    [publish],
+  );
+
   const render = useCallback(
-    (rec: EvidenceRecord) => {
+    (rec: EvidenceRecord, onRefused?: () => void) => {
       if (!footprint) return;
       enqueueRender({
         rec,
+        onRefused,
         bbox4326: footprint,
         // Composed here: only the client knows the reader's language, and only
         // a sun loop's band is typeset by the sidecar.
@@ -168,7 +178,14 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       )
         .then((rec) => {
           upsert(rec);
-          render(rec);
+          // A refused handover leaves no `meta.job`, and a row with neither
+          // pixels nor job reads as a render still on its way for as long as
+          // it stands — jamming every order chip behind it. Nothing was kept,
+          // so the row goes with it.
+          render(rec, () => {
+            discard(rec.id);
+            setFailed(true);
+          });
         })
         .catch((err) => {
           console.warn(
@@ -179,7 +196,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
           setFailed(true);
         });
     },
-    [user, footprint, spotId, upsert, render],
+    [user, footprint, spotId, upsert, render, discard],
   );
 
   const keepProduced = useCallback(
@@ -214,17 +231,12 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
         );
         // A row whose file never landed has nothing to retry — the pixels were
         // the run's, and the run still holds them.
-        if (created) {
-          const id = created.id;
-          byId.current.delete(id);
-          publish();
-          deleteEvidence(id).catch(() => {});
-        }
+        if (created) discard(created.id);
         setFailed(true);
         return false;
       }
     },
-    [user, footprint, spotId, upsert, publish],
+    [user, footprint, spotId, upsert, discard],
   );
 
   const reorder = useCallback(
