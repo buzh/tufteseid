@@ -2,7 +2,7 @@
   "acquire": {
     "title": "Hent bilder",
     "open": "Innhenting av bilder",
-    "hint": "Bilder som bestilles over utsnittet, ikke av kartet slik det står. De legger seg under Bilder i kortet.",
+    "hint": "Hent bilder for utsnittet",
     "sunLoopHint": "skyggerelieff med sola hele veien rundt, laget på tjeneren. Tar noen minutter.",
     "rvtHint": "fire terrengmål lagt oppå hverandre i farger, laget på tjeneren. Tar noen minutter.",
     "flyfoto": "Flyfotoserie",
@@ -26,7 +26,7 @@
   },
   "auth": {
     "title": "Logg inn",
-    "blurb": "Du må registrere deg for å lagre egne funn. Funn er private til du gjør dem offentlige.",
+    "blurb": "Du må registrere deg for å lagre egne funn.",
     "signIn": "Logg inn",
     "signInWith": "Logg inn",
     "signOut": "Logg ut",
@@ -110,14 +110,14 @@
         "nib": "fri bruk privat, ikke-kommersielt"
       },
       "rights": {
-        "line": "{{role}}: © {{holder}} ({{terms}})",
+        "line": "{{role}}: {{holder}} ({{terms}})",
         "authors": "{{author}} og {{app}}",
         "method": "RVT-py 2.2.3 (Zakšek et al. 2011; Kokalj et al. 2011; Kokalj & Somrak 2019)"
       }
     }
   },
   "flyfotoControls": {
-    "mosaic": "Beste mosaikk",
+    "mosaic": "Nyeste",
     "mosaicShort": "Mosaikk · nyeste",
     "mosaicHint": "nyeste tilgjengelige, sømløs over hele landet",
     "projectsLabel": "Enkeltprosjekter, nyeste først",
@@ -310,9 +310,9 @@
   },
   "ribbon": {
     "groundSection": {
-      "only": "Underlag",
-      "left": "Underlag, venstre halvdel",
-      "right": "Underlag, høyre halvdel"
+      "only": "Kartlag",
+      "left": "Kartlag, venstre halvdel",
+      "right": "Kartlag, høyre halvdel"
     },
     "shareSpot": "Kopier lenke til lokaliteten",
     "shareView": "Kopier lenke til visningen"
@@ -519,16 +519,16 @@
       "split": "Delt skjerm"
     },
     "meta": {
-      "single": "hele kartet viser det samme",
-      "curtain": "to lag med flyttbar skillelinje",
-      "split": "to lag side om side, sentrert på samme punkt"
+      "single": "normal modus: ett vindu",
+      "curtain": "to visninger med flyttbar skillelinje",
+      "split": "side om side, sentrert på samme punkt"
     }
   },
   "talk": {
     "title": "Diskusjonstråd",
     "open": "Diskusjon",
-    "private": "Diskusjonstråd er ikke tilgjengelig for upubliserte lokaliteter",
-    "privateSpot": "Diskusjonstråd åpner når lokaliteten gjøres offentlig.",
+    "private": "Diskusjon er ikke tilgjengelig for upubliserte lokaliteter",
+    "privateSpot": "Diskusjonstråden åpner når lokaliteten gjøres offentlig.",
     "needsOwnSignIn": "Diskusjonstråden har sin egen innlogging. Trykk «Sign In» i tråden for å skrive.",
     "failed": "Fikk ikke hentet diskusjonstråden. Prøv igjen senere."
   },
