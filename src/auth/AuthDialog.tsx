@@ -14,7 +14,7 @@ import {
   TextInput,
 } from '@mantine/core';
 import { useAtom } from 'jotai';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { bootInviteCode, forgetInviteLink } from '../invites/inviteLink';
@@ -25,6 +25,7 @@ import {
   signInRefusalAtom,
 } from './atoms';
 import styles from './AuthDialog.module.css';
+import { endCasdoorSession } from './casdoor';
 import { useOAuthProviders, useRegistrationGate } from './hooks';
 import { startSignIn } from './trip';
 
@@ -74,6 +75,27 @@ export const AuthDialog = () => {
   // installation that has none, where the box reads as it always did.
   const beta = gate?.closed ? gate : null;
 
+  const refusedClosed = refusal?.reason === 'registrationClosed';
+
+  // The refusal leaves Casdoor's session standing, and *Auto signin* walks
+  // the next attempt straight back into the same identity with no form — so
+  // a reader holding an account under a different one could never reach the
+  // sign-out that would clear it (`docs/identity.md`). Not on a bad invite
+  // code: that is corrected in the box above, and a second password for a
+  // typo is a punishment.
+  //
+  // Seeded rather than set in the effect, which holds the providers from the
+  // first render: the message says to try again, and a press landing before
+  // the frame does would walk straight back into the session being cleared.
+  // A refusal only ever arrives with the page — nothing sets one after mount,
+  // it is only cleared — so the seed is the whole story.
+  const [clearing, setClearing] = useState(refusedClosed);
+
+  useEffect(() => {
+    if (!refusedClosed) return;
+    void endCasdoorSession().then(() => setClearing(false));
+  }, [refusedClosed]);
+
   return (
     <Modal
       opened={open}
@@ -108,7 +130,7 @@ export const AuthDialog = () => {
           </Alert>
         )}
 
-        {refusal?.reason === 'registrationClosed' && (
+        {refusedClosed && (
           <Alert color="red">{t('auth.beta.refusedClosed')}</Alert>
         )}
 
@@ -147,8 +169,10 @@ export const AuthDialog = () => {
           <Button
             key={provider.name}
             variant="default"
-            loading={leaving === provider.name}
-            disabled={leaving !== null && leaving !== provider.name}
+            loading={leaving === provider.name || clearing}
+            disabled={
+              clearing || (leaving !== null && leaving !== provider.name)
+            }
             onClick={() => leave(provider.name)}
           >
             {t('auth.signInWith', {

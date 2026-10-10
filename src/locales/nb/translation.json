@@ -43,7 +43,7 @@
       "codeLabel": "Invitasjonskode",
       "codeHelp": "Hvis du har en invitasjonskode kan du lage en ny konto",
       "codePlaceholder": "For eksempel J3K8QW2M",
-      "refusedClosed": "Du trenger en invitasjonskode for å lage konto.",
+      "refusedClosed": "Du trenger en invitasjonskode for å lage konto. Har du konto fra før, var du kanskje innlogget som en annen bruker — vi har logget deg ut av innloggingstjenesten, så prøv på nytt.",
       "refusedCode": "Ugyldig kode",
       "invited": "Du har fulgt en invitasjonslenke. Logg inn, så blir koden brukt når kontoen lages."
     }

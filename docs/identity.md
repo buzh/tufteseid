@@ -315,6 +315,17 @@ no way at all to become somebody else. Ending all three is what makes *sign
 out, sign back in* mean what a reader expects it to, with nothing else for
 them to know.
 
+**A refused registration runs the same leg**, and for the same reason. The
+closed beta turns away an identity with no `users` row behind it, which is
+also what a reader meets who holds an account under a *different* Casdoor
+identity — the built-in administrator, most easily, since that session is one
+console visit away and belongs to no reader. *Auto signin* would hand every
+retry the same identity with no form, and the sign-out above needs a session
+to reach, so without this the reader is shut out of their own account with
+nothing to press. `AuthDialog` ends Casdoor's session when the box comes up
+carrying `registrationClosed`. Not on a bad invite code: that is corrected in
+the box as it stands, and a second password for a typo is a punishment.
+
 A sign-out that cannot reach Casdoor still clears both sessions on this side.
 What it leaves is an identity provider holding a session the app walks back
 into on the next sign-in, silently — the one failure here worth recognising,
