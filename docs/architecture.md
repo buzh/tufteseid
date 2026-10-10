@@ -753,6 +753,45 @@ of that.
   and setting `width` resets every context property, so nothing survives that
   line.
 
+## Opt-in services
+
+Four sidecars are off unless the installation names them, so a minimal stack
+is the map, the heritage register, the LiDAR grounds, the terrain analysis,
+the extract and the reader's own spots. One key in `.env` per service does
+both halves of the job:
+
+| Key | Container | What goes with it |
+| --- | --- | --- |
+| `ENABLE_FLYFOTO` | `nib-proxy` | The Flyfoto ground and its arm, the archive walk, the `flyfoto` evidence kind, the `nib` origin in the breaker |
+| `ENABLE_CVAT` | `cvat-tiles` | The cVAT render, its hint and footprint layers, the *not built for this flight* row in the render menu |
+| `ENABLE_RENDER` | `rendersvc` | The `sunloop` and `rvt` order chips, and the gallery's redo on a row of either kind |
+| `ENABLE_TALK` | `remark42` | The thread box and the two buttons that open it, and the silent sign-in leg on the way in and out |
+
+Casdoor and PocketBase are not in the table: accounts are what spots, votes
+and invites are made of, and the threads are an OAuth2 client of Casdoor
+besides.
+
+The server side is `profiles: ["enabled-${ENABLE_*}"]` on each of the four,
+against the fixed `COMPOSE_PROFILES=enabled-true` — so `true` exactly starts
+the container and anything else leaves it out. The client side is
+`/services.js`, written into `/var/www` by `docker-entrypoint.sh` out of the
+same four variables and read by `src/services.ts` before the module graph
+evaluates, the way `config.js` is read. A dev server has no `services.js` and
+falls back to the whole stack.
+
+**A service gates the making, never the reading** — the rule
+`src/auth/features.ts` already states for an account's features, which is why
+the two compose rather than collide: `useHasFeature('render')` answers false
+when the sidecar is not there, admin or not. An evidence row of a kind this
+installation can no longer make still reads, still downloads and still carries
+its legend; what goes is the chip that would ask for another
+(`kindRenderable`, `src/evidence/spec.ts`).
+
+Two places read the URL rather than a control, so they filter too: a
+`backgroundLayer` naming a ground this installation does not serve falls back
+to `lidarHillshade`, and `flyfoto` leaves `LINKABLE_GROUNDS_B` — otherwise a
+link made elsewhere would seat a pane that can never draw.
+
 ## URL parameters
 
 `UrlParameter`, `src/shared/utils/urlUtils.ts`: `lok`, `invite`, `projection`,
@@ -800,7 +839,8 @@ acquisition it was pinned to — is session state, so a link reopens the
 
 `backgroundLayerB`'s vocabulary is narrower than A's `VALID_STARTUP_LAYERS`
 (`linkableGroundB`, `compare/atoms.ts`): the five Kart variants,
-`lidarHillshade` and `flyfoto`. No `lidarCvat`, because B enters with
+`lidarHillshade` and — where `nib-proxy` runs — `flyfoto`. No `lidarCvat`,
+because B enters with
 Automatisk off and nothing then fills `activeCvatAcquisitionHalves.b`, and no
 `empty`, which is a bare pane. The same function reads the parameter and
 writes it, so the address bar names the ground a reload would really open: a

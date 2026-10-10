@@ -8,10 +8,23 @@ Norwegian LiDAR terrain against the Riksantikvaren heritage register.
 
 ## Install
 
+A default install is the map, the heritage register, the LiDAR grounds, the
+terrain analysis, the extract and the reader's own spots. **Four sidecars are
+opt-in** and start only when `.env` names them: ortofoto from Norge i bilder
+(`ENABLE_FLYFOTO`), the precomputed relief ground (`ENABLE_CVAT`), server-side
+sun loops and RVT blends (`ENABLE_RENDER`) and comment threads
+(`ENABLE_TALK`). Each key decides both whether the container runs and whether
+the app draws the controls for it, so an installation never offers a chip that
+would meet a 502. Changing one later is an edit to `.env` and
+`docker compose up -d --remove-orphans` — the orphan flag because compose
+starts a service you have just enabled but leaves one you have just disabled
+running.
+
 Six directories are bind-mounted from the host and must exist before the stack
 starts, or Docker creates them root-owned and the service that wanted one fails
 — MapProxy answers every `/cache/…` with a 502, Casdoor cannot create its
-database and restarts in a loop:
+database and restarts in a loop. The last two belong to opt-in services and
+are only wanted once those are on:
 
 ```sh
 sudo mkdir -p /site/tufteseid/data/{logs,stats,cvat,mapproxy,casdoor,remark42}
@@ -25,21 +38,21 @@ that asks the image, for when that tag moves. `1000:1000` is Casdoor's user,
 which its image drops to at build time and so cannot chown the directory for
 itself. Remark42 starts as root and chowns its own store on the way down to its
 user, so that one only has to exist. Point the paths anywhere writable — they are set in
-`docker-compose.yml`. The `cvat` store may stay empty: an empty directory
-answers 404, which is what ground outside the LiDAR footprint looks like
-anyway.
+`docker-compose.yml`. The `cvat` store may stay empty even with
+`ENABLE_CVAT=true`: an empty directory answers 404, which is what ground
+outside the LiDAR footprint looks like anyway.
 
-Secrets live in a `.env` beside `docker-compose.yml`, which is gitignored.
-Copy the committed shape and set `PUBLIC_ORIGIN`, `CASDOOR_HOST` and
-`REMARK42_SECRET`. The OAuth2 pair comes out of Casdoor, which is not running
-yet, so leave those two on the placeholders `.env.example` ships — blanking
-them aborts `docker compose up` before anything starts, Casdoor included.
+Settings live in a `.env` beside `docker-compose.yml`, which is gitignored.
+Copy the committed shape and set `PUBLIC_ORIGIN` and `CASDOOR_HOST`. The
+`ENABLE_*` keys start at `false`; leave them there for a first run and turn
+them on once the stack is up. Do not touch the `COMPOSE_PROFILES` line — it is
+what makes those keys mean anything to compose.
 
 ```sh
 git clone https://github.com/buzh/tufteseid.git
 cd tufteseid
 cp .env.example .env
-$EDITOR .env            # PUBLIC_ORIGIN, CASDOOR_HOST, REMARK42_SECRET
+$EDITOR .env            # PUBLIC_ORIGIN, CASDOOR_HOST
 docker compose build --pull
 docker compose up -d
 ```
@@ -117,8 +130,9 @@ internet.**
 
 **Make an organization for readers first.** Every member of Casdoor's
 `built-in` organization has full Casdoor admin rights, so readers must not
-land there. **Organizations → Add**, name it `tufteseid`, and create both
-applications under it. Each hands back a client id and a secret when saved:
+land there. **Organizations → Add**, name it `tufteseid`, and create the
+applications under it. Each hands back a client id and a secret when saved.
+The second is only wanted with `ENABLE_TALK=true`:
 
 | Application | Redirect URL |
 | --- | --- |
@@ -136,8 +150,12 @@ remembers even a *Continue as …* click. Signing out of the app ends Casdoor's
 session too, so that stays safe on a shared browser.
 
 The threads' pair goes into `.env` as `REMARK42_OIDC_CID` and
-`REMARK42_OIDC_CSEC`, replacing the placeholders; `docker compose up -d` again
-to pick them up. The app's pair is typed into PocketBase instead:
+`REMARK42_OIDC_CSEC`, alongside `ENABLE_TALK=true` and a `REMARK42_SECRET`
+from `openssl rand -hex 32`; `docker compose up -d` again to pick them up.
+Remark42 refuses to start on a missing one of the three and says so in
+`docker compose logs remark42`, not in compose's own output — the keys cannot
+be required of an installation that leaves the threads off. The app's pair is
+typed into PocketBase instead:
 **Collections → users → Edit collection → Options → OAuth2**, the generic
 **OIDC** provider, pointed at
 
@@ -161,7 +179,9 @@ until the reader signs in again. To moderate comments as well, put that
 account's Casdoor id in `.env` as `REMARK42_ADMIN_ID` — the two are separate
 permissions in separate systems.
 
-**Say who may order a server-side render.** A sun loop or an RVT blend is
+**Say who may order a server-side render.** Only with `ENABLE_RENDER=true` —
+without it the sidecar does not run and the order chips are absent for
+everybody, administrator included. A sun loop or an RVT blend is
 minutes of CPU on your machine, so it is held by a named Casdoor permission
 rather than by every account. **Permissions → Add** under the readers'
 organization, name it `render`, fill in the resource and action fields Casdoor
@@ -283,9 +303,10 @@ The **Arkeologisk relieff** background is the one picture this project computes
 rather than fetches: relief visualizations made with the Relief Visualization
 Toolbox from Kartverket's LiDAR terrain model and stored as tiles
 ([`vat-cache/`](vat-cache/README.md)). The elevation data behind it stays
-Kartverket's, on Kartverket's licence. The store is optional and read at
-runtime: an install without it shows the national mosaic there, and one that
-grows by another acquisition offers it on the next page load with no rebuild. It
+Kartverket's, on Kartverket's licence. The ground is off unless `.env` sets
+`ENABLE_CVAT=true`, and the store behind it is read at runtime: an install
+without either shows the national mosaic there, and one whose store grows by
+another acquisition offers it on the next page load with no rebuild. It
 need not be computed here either — `vat-cache/makevat.py` renders one
 acquisition into one self-contained file on whatever machine has the cores, and
 copying that file into the store is the whole of the deploy.

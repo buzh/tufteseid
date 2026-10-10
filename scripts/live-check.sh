@@ -46,6 +46,9 @@ section() { printf '\n%s%s%s\n' "$BOLD" "$1" "$OFF"; }
 
 note() { printf '     %s%s%s\n' "$DIM" "$1" "$OFF"; }
 
+# A service this installation does not run. Counts as neither pass nor fail.
+skip() { printf '  %s--   %-26s %s%s\n' "$DIM" "$1" "${2:-}" "$OFF"; }
+
 # For assertions made without a request of their own.
 pass() {
   passed=$((passed + 1))
@@ -120,6 +123,15 @@ note "entry bundle ${ENTRY:-none found}"
 
 check csp-header "$BASE/" 200 text/html 300 '' "content-security-policy:.*default-src 'self'"
 check config-js "$BASE/config.js" 200 javascript 50 '__TUFTESEID_CONFIG__'
+
+# Written by the container's entrypoint out of the ENABLE_* keys in `.env`, and
+# the same keys decide which sidecars compose started — so this is also what
+# says which sections below have anything to check.
+check services-js "$BASE/services.js" 200 javascript 50 '__TUFTESEID_SERVICES__'
+SERVICES=$(cat "$TMP/body")
+on() { printf '%s' "$SERVICES" | grep -q "$1: *true"; }
+note "$(printf '%s' "$SERVICES" | grep -o '[a-z]*: *true' | sed 's/: *true//' |
+  paste -sd, - | sed 's/^$/none/') enabled"
 if [ -n "$ENTRY" ]; then
   check entry-bundle "$BASE$ENTRY" 200 javascript 500
 else
@@ -215,18 +227,22 @@ check oidc-discovery "$IDP/.well-known/openid-configuration" \
 check oidc-noindex "$IDP/.well-known/openid-configuration" \
   200 '' 0 '' 'x-robots-tag: noindex'
 
-check remark-ping "$BASE/remark42/api/v1/ping" 200 '' 2 'pong'
-check remark-embed "$BASE/remark42/web/embed.mjs" 200 javascript 500
+if ! on talk; then
+  skip remark42 'ENABLE_TALK is off'
+else
+  check remark-ping "$BASE/remark42/api/v1/ping" 200 '' 2 'pong'
+  check remark-embed "$BASE/remark42/web/embed.mjs" 200 javascript 500
 
-# Exactly one, and ours: a built-in left on would offer a second identity the
-# app knows nothing about. An empty list means a pin below v1.16.0.
-check remark-providers "$BASE/remark42/api/v1/config?site=tufteseid" \
-  200 json 20 '"auth_providers":\["tufteseid"\]'
+  # Exactly one, and ours: a built-in left on would offer a second identity the
+  # app knows nothing about. An empty list means a pin below v1.16.0.
+  check remark-providers "$BASE/remark42/api/v1/config?site=tufteseid" \
+    200 json 20 '"auth_providers":\["tufteseid"\]'
 
-# `&client_id=` is part of the assertion: x/oauth2 has to append to the query
-# string rather than overwrite it, or `silentSignin` and `theme` are dropped.
-check remark-silent-signin "$BASE/remark42/auth/tufteseid/login?site=tufteseid" \
-  302 '' 0 '' 'location:.*/login/oauth/authorize\?silentSignin=1&theme=dark&client_id='
+  # `&client_id=` is part of the assertion: x/oauth2 has to append to the query
+  # string rather than overwrite it, or `silentSignin` and `theme` are dropped.
+  check remark-silent-signin "$BASE/remark42/auth/tufteseid/login?site=tufteseid" \
+    302 '' 0 '' 'location:.*/login/oauth/authorize\?silentSignin=1&theme=dark&client_id='
+fi
 
 # Whether Casdoor keeps an SSO session at all is the one thing here that
 # decides if a reader is ever already signed in, and nothing unauthenticated
@@ -243,13 +259,17 @@ check csp-frame-src "$BASE/" 200 text/html 300 '' \
 
 section 'Render sidecar'
 
-check render-health "$BASE/render/health" 200 json 10 '"ok":true'
-note "queue $(json_num pending) of $(json_num capacity)"
+if ! on render; then
+  skip rendersvc 'ENABLE_RENDER is off'
+else
+  check render-health "$BASE/render/health" 200 json 10 '"ok":true'
+  note "queue $(json_num pending) of $(json_num capacity)"
 
-# Refused before PocketBase is ever reached: the sidecar has no credentials of
-# its own, so a job without a token has nothing to act as.
-OPTS=(-s -X POST -H 'Content-Type: application/json' -d '{"evidence":"livecheck"}')
-check render-anon-refused "$BASE/render/sunloop" 401 json 10
+  # Refused before PocketBase is ever reached: the sidecar has no credentials
+  # of its own, so a job without a token has nothing to act as.
+  OPTS=(-s -X POST -H 'Content-Type: application/json' -d '{"evidence":"livecheck"}')
+  check render-anon-refused "$BASE/render/sunloop" 401 json 10
+fi
 
 section 'Same-origin upstreams (Caddy → wmscache → origin)'
 
@@ -282,17 +302,21 @@ check wms-kulturminner \
 
 check kms-record "$BASE/kms/api/v2/search/$KMS_ID" 200 json 500 '"name":"[^"]'
 
-# An expired or IP-bound token answers with a small JSON error, which the size
-# floor catches.
-check nib-ortofoto \
-  "$BASE/wms/nib/ortofoto?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ortofoto&STYLES=&CRS=EPSG:25833&BBOX=$BBOX&WIDTH=256&HEIGHT=256&FORMAT=image/png" \
-  200 image/png 10000
+if ! on flyfoto; then
+  skip nib-proxy 'ENABLE_FLYFOTO is off'
+else
+  # An expired or IP-bound token answers with a small JSON error, which the
+  # size floor catches.
+  check nib-ortofoto \
+    "$BASE/wms/nib/ortofoto?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ortofoto&STYLES=&CRS=EPSG:25833&BBOX=$BBOX&WIDTH=256&HEIGHT=256&FORMAT=image/png" \
+    200 image/png 10000
 
-# Not `returnCountOnly`: that answer is under the 300-byte floor in
-# `$skip_cache`, so it never caches and reads as a permanent MISS.
-check nib-prosjekter \
-  "$BASE/arcgis/nib/prosjekter/MapServer/4/query?f=json&where=1%3D1&geometry=$BBOX&geometryType=esriGeometryEnvelope&inSR=25833&spatialRel=esriSpatialRelIntersects&outFields=prosjektnavn,aar,fotodato_date,ortofototype,pixelstorrelse,x_min,y_min,x_max,y_max&returnGeometry=false" \
-  200 json 500 '"prosjektnavn":"[^"]'
+  # Not `returnCountOnly`: that answer is under the 300-byte floor in
+  # `$skip_cache`, so it never caches and reads as a permanent MISS.
+  check nib-prosjekter \
+    "$BASE/arcgis/nib/prosjekter/MapServer/4/query?f=json&where=1%3D1&geometry=$BBOX&geometryType=esriGeometryEnvelope&inSR=25833&spatialRel=esriSpatialRelIntersects&outFields=prosjektnavn,aar,fotodato_date,ortofototype,pixelstorrelse,x_min,y_min,x_max,y_max&returnGeometry=false" \
+    200 json 500 '"prosjektnavn":"[^"]'
+fi
 
 check hoydedata-dem \
   "$BASE/arcgis/hoydedata/Prosjekt_DTM/ImageServer/exportImage?f=image&format=tiff&bbox=$BBOX&bboxSR=25833&imageSR=25833&size=256,256&renderingRule=%7B%22rasterFunction%22%3A%22None%22%7D" \

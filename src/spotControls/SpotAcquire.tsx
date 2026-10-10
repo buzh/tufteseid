@@ -20,6 +20,7 @@ import {
 } from '../evidence/spec';
 import { useSpotEvidence } from '../evidence/useSpotEvidence';
 import { bboxToMetric } from '../map/bbox';
+import { serviceOn } from '../services';
 import { spotAcquiringAtom } from '../spots/atoms';
 import { ControlChip } from '../ui/ControlChip';
 import { Panel } from '../ui/Panel';
@@ -126,16 +127,18 @@ export const SpotAcquire = ({ spot }: { spot: SpotRecord }) => {
           RVT_SPECS.map((spec) =>
             orderChip(spec, evidenceTitle(spec), t('acquire.rvtHint')),
           )}
-        <ControlChip
-          icon="photo_camera"
-          label={t('acquire.flyfoto')}
-          hint={flyfotoHint()}
-          withChevron={false}
-          title={flyfotoTitle}
-          aria-label={flyfotoTitle}
-          disabled={!flyfotoReady}
-          onClick={run.start}
-        />
+        {serviceOn('flyfoto') && (
+          <ControlChip
+            icon="photo_camera"
+            label={t('acquire.flyfoto')}
+            hint={flyfotoHint()}
+            withChevron={false}
+            title={flyfotoTitle}
+            aria-label={flyfotoTitle}
+            disabled={!flyfotoReady}
+            onClick={run.start}
+          />
+        )}
       </div>
 
       {evidence.failed && (

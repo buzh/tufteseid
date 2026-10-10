@@ -3,6 +3,8 @@
 // reader is not asked to press a second sign-in button. Every way it can fail
 // lands back on the widget's own button (`docs/discussion-and-votes.md`).
 
+import { serviceOn } from '../services';
+
 /** Caddy strips the prefix; remark42 itself serves at the root. */
 const BASE = '/remark42';
 
@@ -89,8 +91,10 @@ const runPrime = async (): Promise<boolean> => {
 };
 
 /** Once per page: a reader with no Casdoor session will not grow one by being
- *  asked twice. */
+ *  asked twice. False on an installation with no threads, where nothing mounts
+ *  the widget anyway (`ENABLE_TALK`). */
 export const primeRemarkSession = (): Promise<boolean> => {
+  if (!serviceOn('talk')) return Promise.resolve(false);
   priming ??= runPrime().catch(() => false);
   return priming;
 };
@@ -108,6 +112,7 @@ const LOGOUT_BUDGET_MS = 3000;
 /** Signs out of the threads. The Casdoor session behind both sides is ended
  *  alongside this one, by `src/auth/casdoor.ts`. */
 export const endRemarkSession = async (): Promise<void> => {
+  if (!serviceOn('talk')) return;
   resetRemarkSession();
   try {
     await fetch(`${BASE}/auth/logout?site=${REMARK_SITE}`, {

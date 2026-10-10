@@ -8,11 +8,15 @@ import type { BackgroundLayerName } from '../map/layers/backgroundLayers';
 import { backgroundLayerHalves } from '../map/layers/config/backgroundLayers/atoms';
 import { isKartVariant } from '../map/layers/config/backgroundLayers/kartVariants';
 import { LIDAR_LAYERS } from '../map/layers/config/backgroundLayers/stack';
+import { serviceOn } from '../services';
 
-// Also the order the switch draws them in.
-export const GROUND_MODES = ['lidar', 'kart', 'flyfoto'] as const;
+const GROUND_MODES = ['lidar', 'kart', 'flyfoto'] as const;
 
 export type GroundMode = (typeof GROUND_MODES)[number];
+
+/** What this installation can show, and the order the switch draws them in. */
+export const AVAILABLE_GROUND_MODES: readonly GroundMode[] =
+  GROUND_MODES.filter((mode) => mode !== 'flyfoto' || serviceOn('flyfoto'));
 
 /** Null for `empty`, the one background that belongs to no ground. */
 const groundOf = (name: BackgroundLayerName): GroundMode | null => {

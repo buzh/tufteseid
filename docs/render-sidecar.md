@@ -20,6 +20,14 @@ token check, the queue, the write-back — knows neither from the other.
 Python, stdlib HTTP, no framework, the way the two node sidecars are stdlib node.
 `rvt-py` is the one non-obvious dependency and `vat-cache/` already paid for it.
 
+**Opt-in.** The container runs only where `.env` sets `ENABLE_RENDER=true`, and
+the same key reaches the app, where it makes `useHasFeature('render')` answer
+false for everybody — so the two order chips and the gallery's redo on a
+`sunloop` or `rvt` row are absent rather than failing
+(`docs/architecture.md`). Rows made before the service was turned off still
+read, download and carry their legend; the membership gate below is the second
+filter, on an installation that runs the sidecar at all.
+
 **Not headless QGIS.** PyQGIS offscreen is an 800 MB–2 GB image whose hillshade
 is gdaldem's — the same Lambert cosine with more machinery around it, and none of
 RVT's other visualizations come along.

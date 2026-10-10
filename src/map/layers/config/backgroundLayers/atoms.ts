@@ -1,5 +1,6 @@
 import { atom, getDefaultStore } from 'jotai';
 import { atomEffect } from 'jotai-effect';
+import { serviceOn } from '../../../../services';
 import {
   getUrlParameter,
   removeUrlParameter,
@@ -37,11 +38,25 @@ const VALID_STARTUP_LAYERS = new Set<BackgroundLayerName>([
   'empty',
 ]);
 
+// A shared link can name a ground this installation does not serve, which
+// would render nothing indefinitely.
+const servedHere = (name: BackgroundLayerName): boolean => {
+  if (name === 'flyfoto' || name === 'flyfotoProject') {
+    return serviceOn('flyfoto');
+  }
+  if (name === 'lidarCvat') return serviceOn('cvat');
+  return true;
+};
+
 const getDefaultBackgroundLayer = (): BackgroundLayerName => {
   const layerNameFromUrl = getUrlParameter(
     'backgroundLayer',
   ) as BackgroundLayerName | null;
-  if (layerNameFromUrl && VALID_STARTUP_LAYERS.has(layerNameFromUrl)) {
+  if (
+    layerNameFromUrl &&
+    VALID_STARTUP_LAYERS.has(layerNameFromUrl) &&
+    servedHere(layerNameFromUrl)
+  ) {
     return layerNameFromUrl;
   }
   return 'lidarHillshade';

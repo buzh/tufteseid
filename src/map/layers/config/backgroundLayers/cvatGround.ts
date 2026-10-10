@@ -4,6 +4,7 @@
 
 import { extend } from 'ol/extent';
 import { transformExtent } from 'ol/proj';
+import { serviceOn } from '../../../../services';
 import { halved } from '../../../compare/halves';
 import { getWMSTileGrid } from '../../wmsTileGrid';
 import {
@@ -101,6 +102,10 @@ const parseStore = (body: unknown): CvatStore => {
 let storePromise: Promise<CvatStore> | null = null;
 
 export const fetchCvatStore = (): Promise<CvatStore> => {
+  // An empty store is what the rest of the cVAT surface already reads as
+  // "nothing cached", so this is the whole of the opt-in: no style chip, no
+  // hint layer, no footprint badge.
+  if (!serviceOn('cvat')) return Promise.resolve({});
   storePromise ??= fetch(CVAT_MANIFEST_URL)
     .then((res) => (res.ok ? res.json() : null))
     .then(parseStore)

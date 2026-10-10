@@ -27,7 +27,7 @@ Each owns its subject; this file keeps only what is true across all of them.
 
 | Doc | Subject | Read before touching |
 | --- | --- | --- |
-| `docs/architecture.md` | Module map, the Jotai atoms, the two-ground `halves` mechanism, URL parameters, the ribbon's contracts, known gaps | anything under `src/`, especially before building a surface |
+| `docs/architecture.md` | Module map, the Jotai atoms, the two-ground `halves` mechanism, the opt-in services, URL parameters, the ribbon's contracts, known gaps | anything under `src/`, especially before building a surface |
 | `docs/map-layers.md` | Background grounds, theme layers, and the recipes for adding another | `src/map/layers/`, any new map source |
 | `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream and Caddy → mapproxy → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
@@ -127,10 +127,25 @@ First run on a new host wants `sudo mkdir -p /site/tufteseid/data/{logs,stats}`
 alongside the cVAT and MapProxy store directories (`README.md`,
 `docs/monitoring.md`).
 
-- **`.env` must exist before `docker compose up`.** `casdoor` and `remark42`
-  are the first services here to need secrets, and `remark42` refuses to start
-  with any of its OAuth2 variables missing. `.env.example` is the committed
-  shape; `.env` is gitignored and lives on the server only.
+- **`.env` must exist before `docker compose up`.** `casdoor` needs
+  `CASDOOR_HOST` and `PUBLIC_ORIGIN` and compose refuses to start without
+  them. `.env.example` is the committed shape; `.env` is gitignored and lives
+  on the server only.
+- **Four services are opt-in and default off**: `nib-proxy`, `cvat-tiles`,
+  `rendersvc` and `remark42`, each behind one `ENABLE_*` key that drives both
+  a compose profile and `/services.js`, which `src/services.ts` reads
+  (`docs/architecture.md`). Adding a surface that talks to one of them means
+  hiding it behind `serviceOn(…)` in the same change. A service gates the
+  *making*, never the reading — the rule `src/auth/features.ts` already
+  states for an account's features.
+- Flipped an `ENABLE_*` key? **`docker compose up -d --remove-orphans`.** The
+  key is in the `tufteseid` service's `environment` as well as in the
+  profile, so compose recreates that container by itself and the entrypoint
+  rewrites `services.js` — leave it there, or turning a service off would
+  stop the container and leave its chips on screen. `--remove-orphans` is the
+  other half: compose starts a newly enabled service but does *not* stop a
+  newly disabled one, which it reports as an orphan and otherwise leaves
+  running.
 - Changed anything under `nginx/`? Also `docker compose restart wmscache`. The
   configs are bind-mounted but nginx only reads them at startup, and
   `docker compose up -d` does not recreate the container. Same for `mapproxy/`
@@ -146,13 +161,13 @@ alongside the cVAT and MapProxy store directories (`README.md`,
 
 | Service | What it is |
 | --- | --- |
-| `tufteseid` | `node:24-alpine` builds the SPA, `caddy:2.10.0-alpine` serves `/var/www`, plus the GoAccess report at `/stats/` out of a read-only mount. `config.js` bind-mounted at runtime. |
+| `tufteseid` | `node:24-alpine` builds the SPA, `caddy:2.10.0-alpine` serves `/var/www`, plus the GoAccess report at `/stats/` out of a read-only mount. `config.js` bind-mounted at runtime; `services.js` written beside it by `docker-entrypoint.sh`. |
 | `pocketbase` | Backend for spots (OAuth2 + user content), pinned to 0.40.2. Serves `/pb/*`. SQLite on the `pbdata` volume, migrations and hooks bind-mounted read-only from the repo. |
 | `casdoor` | `casbin/casdoor`, a single Go binary on SQLite. The one place a credential is entered, with PocketBase and remark42 as its two OAuth2 clients. On `CASDOOR_HOST`, a hostname of its own reaching the same Caddy — it cannot be served under a subpath (`docs/identity.md`). |
-| `remark42` | Comment threads on public spots, served at `/remark42/*` and federated to `casdoor` so a reader signs in once. Its own store on a bind mount (`docs/discussion-and-votes.md`). |
-| `nib-proxy` | Token-injecting sidecar for Norge i bilder ortofoto. Reachable only from wmscache and mapproxy. |
-| `rendersvc` | `python:3.11-slim` (rvt-py 2.2.3 caps at `<3.12`) + ffmpeg + RVT-py. Serves `/render/*`: renders an evidence row server-side and PATCHes the file back with the caller's own token. One worker, a queue of 8, CPU and memory capped. |
-| `cvat-tiles` | `node:24-alpine`, zero deps. Serves `/cvat/*` out of one MBTiles database per LiDAR acquisition in the bind-mounted store. Built out of band by `vat-cache/`. |
+| `remark42` | **Opt-in (`ENABLE_TALK`).** Comment threads on public spots, served at `/remark42/*` and federated to `casdoor` so a reader signs in once. Its own store on a bind mount (`docs/discussion-and-votes.md`). |
+| `nib-proxy` | **Opt-in (`ENABLE_FLYFOTO`).** Token-injecting sidecar for Norge i bilder ortofoto. Reachable only from wmscache and mapproxy. |
+| `rendersvc` | **Opt-in (`ENABLE_RENDER`).** `python:3.11-slim` (rvt-py 2.2.3 caps at `<3.12`) + ffmpeg + RVT-py. Serves `/render/*`: renders an evidence row server-side and PATCHes the file back with the caller's own token. One worker, a queue of 8, CPU and memory capped. |
+| `cvat-tiles` | **Opt-in (`ENABLE_CVAT`).** `node:24-alpine`, zero deps. Serves `/cvat/*` out of one MBTiles database per LiDAR acquisition in the bind-mounted store. Built out of band by `vat-cache/`. |
 | `mapproxy` | `mapproxy:7.0.0-alpine-nginx`. Serves `/cache/*`: the six upstream layers whose parameters never change, meta-tiled onto the app's own grid and held in MBTiles. Config in `mapproxy/`, store bind-mounted. |
 | `wmscache` | `nginx:1.27-alpine` reverse proxy + 25 GB disk cache in front of every external WMS/WFS/ArcGIS service whose parameters are chosen at request time, plus Kulturminnesøk's record API. |
 

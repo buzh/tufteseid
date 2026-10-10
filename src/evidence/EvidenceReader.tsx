@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { evidenceFileUrl } from '../api/evidence';
 import type { SpotRecord } from '../api/spots';
 import { mapAtom } from '../map/atoms';
+import { serviceOn } from '../services';
 import { sketchOf } from '../sketch/scene';
 import { SketchFade } from '../sketch/SketchFade';
 import {
@@ -186,28 +187,30 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
         actions={
           <>
             <VoteControl spot={spot} />
-            <Tooltip
-              label={
-                spot.visibility === 'public'
-                  ? t('talk.open')
-                  : t('talk.private')
-              }
-            >
-              {/* A span: Mantine's Tooltip needs an element that fires
-                  pointer events, and a disabled button does not. */}
-              <span>
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  size="sm"
-                  aria-label={t('talk.open')}
-                  disabled={spot.visibility !== 'public'}
-                  onClick={() => setTalking(true)}
-                >
-                  <Icon icon="forum" size={18} />
-                </ActionIcon>
-              </span>
-            </Tooltip>
+            {serviceOn('talk') && (
+              <Tooltip
+                label={
+                  spot.visibility === 'public'
+                    ? t('talk.open')
+                    : t('talk.private')
+                }
+              >
+                {/* A span: Mantine's Tooltip needs an element that fires
+                    pointer events, and a disabled button does not. */}
+                <span>
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    size="sm"
+                    aria-label={t('talk.open')}
+                    disabled={spot.visibility !== 'public'}
+                    onClick={() => setTalking(true)}
+                  >
+                    <Icon icon="forum" size={18} />
+                  </ActionIcon>
+                </span>
+              </Tooltip>
+            )}
             {current && (
               <Tooltip
                 label={downloadLabel({

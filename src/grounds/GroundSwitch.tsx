@@ -7,7 +7,7 @@ import { ControlButton } from '../ui/ControlButton';
 import { ControlUnit } from '../ui/ControlUnit';
 import type { MaterialSymbol } from '../ui/Icon';
 import {
-  GROUND_MODES,
+  AVAILABLE_GROUND_MODES,
   type GroundControls,
   type GroundMode,
 } from './useGroundControls';
@@ -24,7 +24,7 @@ export const GroundSwitch = ({ ground }: { ground: GroundControls }) => {
 
   return (
     <ControlUnit>
-      {GROUND_MODES.map((candidate) => (
+      {AVAILABLE_GROUND_MODES.map((candidate) => (
         <Tooltip
           key={candidate}
           label={t('grounds.tooltip', {

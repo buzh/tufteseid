@@ -4,7 +4,9 @@ Precomputes RVT's combined VAT over one Norwegian LiDAR acquisition into one
 `<slug>.mbtiles`, which the `cvat-tiles` sidecar serves at `/cvat/*`. Out of
 band — nothing in `src/` imports it and the docker build does not see it. Needs
 python, disk and a direct route to `hoydedata.no`, not the machine that serves
-the tiles. Deploy is a copy into `/site/tufteseid/data/cvat`.
+the tiles. Deploy is a copy into `/site/tufteseid/data/cvat`, on an
+installation whose `.env` sets `ENABLE_CVAT=true` — without it the sidecar does
+not run and the app offers no cVAT render (`docs/architecture.md`).
 
 ## Install
 

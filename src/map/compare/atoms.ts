@@ -1,5 +1,6 @@
 import { atom, type Getter, getDefaultStore, type Setter } from 'jotai';
 import { atomEffect } from 'jotai-effect';
+import { serviceOn } from '../../services';
 import {
   getUrlParameter,
   removeUrlParameter,
@@ -86,7 +87,9 @@ export const selectViewModeAtom = atom(null, (get, set, mode: ViewMode) => {
 const LINKABLE_GROUNDS_B = new Set<BackgroundLayerName>([
   ...KART_VARIANTS,
   'lidarHillshade',
-  'flyfoto',
+  // Dropped where there is no `nib-proxy`, so a link made elsewhere cannot
+  // seat a ground this installation cannot draw.
+  ...(serviceOn('flyfoto') ? (['flyfoto'] as BackgroundLayerName[]) : []),
 ]);
 
 const DEGRADES_TO = new Map<string, BackgroundLayerName>([

@@ -8,12 +8,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { updateSpot, type SpotRecord } from '../api/spots';
+import { useHasFeature } from '../auth/features';
 import { EvidenceGallery } from '../evidence/EvidenceGallery';
 import { isReadable } from '../evidence/spec';
 import {
   useSpotEvidence,
   type SpotEvidence,
 } from '../evidence/useSpotEvidence';
+import { serviceOn } from '../services';
 import { sketchOf } from '../sketch/scene';
 import { SketchFade } from '../sketch/SketchFade';
 import {
@@ -53,6 +55,10 @@ const SpotUnits = ({
   const adjust = useSetAtom(adjustSpotDraftAtom);
   const setAcquiring = useSetAtom(spotAcquiringAtom);
   const readTerrain = useSetAtom(readTerrainWindowAtom);
+  // Every chip in the acquire box comes from one of these two, so with
+  // neither the box would open on nothing (`SpotAcquire`).
+  const mayRender = useHasFeature('render');
+  const mayOrder = serviceOn('flyfoto') || mayRender;
   const framing = hold?.stage === 'footprint';
   // The card is away behind the canvas for the whole of a draw stage, so this
   // only keeps the fade from re-rendering on every settle of a pen nobody can
@@ -120,16 +126,18 @@ const SpotUnits = ({
               onClick={() => spot.footprint && readTerrain(spot.footprint)}
             />
           </Tooltip>
-          <Tooltip label={t('acquire.open')}>
-            <ControlButton
-              icon="biotech"
-              aria-label={t('acquire.open')}
-              // The box is suspended for as long as any draft lives, so with
-              // the map in hand it would not open.
-              disabled={hold != null}
-              onClick={() => setAcquiring(true)}
-            />
-          </Tooltip>
+          {mayOrder && (
+            <Tooltip label={t('acquire.open')}>
+              <ControlButton
+                icon="biotech"
+                aria-label={t('acquire.open')}
+                // The box is suspended for as long as any draft lives, so with
+                // the map in hand it would not open.
+                disabled={hold != null}
+                onClick={() => setAcquiring(true)}
+              />
+            </Tooltip>
+          )}
         </div>
       )}
 
@@ -239,27 +247,31 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
               {t('evidence.read')}
             </Button>
           )}
-          <Tooltip
-            label={
-              spot.visibility === 'public' ? t('talk.open') : t('talk.private')
-            }
-          >
-            {/* A span: Mantine's Tooltip needs an element that fires pointer
-                events, and a disabled button does not. */}
-            <span>
-              <Button
-                size="xs"
-                variant="default"
-                // No thread on a private spot — the engine has no access
-                // control, so not mounting it is the only gate.
-                disabled={draft != null || spot.visibility !== 'public'}
-                leftSection={<Icon icon="forum" size={16} />}
-                onClick={() => setTalking(true)}
-              >
-                {t('talk.open')}
-              </Button>
-            </span>
-          </Tooltip>
+          {serviceOn('talk') && (
+            <Tooltip
+              label={
+                spot.visibility === 'public'
+                  ? t('talk.open')
+                  : t('talk.private')
+              }
+            >
+              {/* A span: Mantine's Tooltip needs an element that fires pointer
+                  events, and a disabled button does not. */}
+              <span>
+                <Button
+                  size="xs"
+                  variant="default"
+                  // No thread on a private spot — the engine has no access
+                  // control, so not mounting it is the only gate.
+                  disabled={draft != null || spot.visibility !== 'public'}
+                  leftSection={<Icon icon="forum" size={16} />}
+                  onClick={() => setTalking(true)}
+                >
+                  {t('talk.open')}
+                </Button>
+              </span>
+            </Tooltip>
+          )}
         </>
       }
     >

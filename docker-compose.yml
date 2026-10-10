@@ -11,6 +11,13 @@ services:
       # page on the app's origin.
       - CASDOOR_HOST=${CASDOOR_HOST:?set CASDOOR_HOST in .env}
       - PUBLIC_ORIGIN=${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}
+      # The opt-in services, written into /var/www/services.js by the image's
+      # entrypoint so the SPA hides what this installation does not run. The
+      # same keys drive the `profiles:` below — change one, break three.
+      - ENABLE_FLYFOTO=${ENABLE_FLYFOTO:-false}
+      - ENABLE_CVAT=${ENABLE_CVAT:-false}
+      - ENABLE_RENDER=${ENABLE_RENDER:-false}
+      - ENABLE_TALK=${ENABLE_TALK:-false}
     volumes:
       - ./config.js:/var/www/config.js:ro
       # First run: sudo mkdir -p /site/tufteseid/data/{logs,stats}
@@ -18,18 +25,22 @@ services:
       # Outside /var/www: under it the SPA's file_server would serve the
       # report with the app's CSP, which blocks GoAccess's inline script.
       - /site/tufteseid/data/stats:/srv/stats:ro
+    # The opt-in four are left out. Naming a service a profile has switched
+    # off either aborts the `up` or drags the service back in, depending on
+    # the compose version, and neither is wanted. Nothing is lost: Caddy
+    # resolves an upstream when a request arrives rather than at boot, so a
+    # route to a container that is not there costs a 502 on a path the SPA no
+    # longer asks for.
     depends_on:
       - wmscache
       - mapproxy
       - pocketbase
-      - cvat-tiles
-      - rendersvc
       - casdoor
-      - remark42
 
   cvat-tiles:
     build: ./cvat-tiles
     restart: unless-stopped
+    profiles: ["enabled-${ENABLE_CVAT:-false}"]
     volumes:
       - /site/tufteseid/data/cvat:/store:ro
 
@@ -46,8 +57,6 @@ services:
       # Must be writable by uid 100 gid 101 (the image's mapproxy user) or
       # uwsgi exits at import and every /cache/… answers 502.
       - /site/tufteseid/data/mapproxy:/mapproxy/config/cache_data
-    depends_on:
-      - nib-proxy
 
   pocketbase:
     build: ./pocketbase
@@ -65,6 +74,7 @@ services:
       context: .
       dockerfile: rendersvc/Dockerfile
     restart: unless-stopped
+    profiles: ["enabled-${ENABLE_RENDER:-false}"]
     cpus: 2.0
     mem_limit: 2g
     logging:
@@ -92,14 +102,15 @@ services:
       - ./nginx/wms-cache.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/wms-proxy-common.conf:/etc/nginx/wms-proxy-common.conf:ro
       - wmscache:/var/cache/nginx/wms
-    depends_on:
-      - nib-proxy
 
   # NiB tokens are bound to the minting IP and referer, so they are minted and
   # used server-side only. Reachable from wmscache and mapproxy, not the host.
+  # Off, the ortofoto locations in `nginx/` and `mapproxy/` answer 502 and the
+  # SPA stops asking (`ENABLE_FLYFOTO`).
   nib-proxy:
     build: ./nib-proxy
     restart: unless-stopped
+    profiles: ["enabled-${ENABLE_FLYFOTO:-false}"]
 
   # The identity provider, with PocketBase and remark42 as its two OAuth2
   # clients. On a hostname of its own, not a subpath (docs/identity.md).
@@ -144,6 +155,7 @@ services:
   remark42:
     image: ghcr.io/umputun/remark42:v1.17.1
     restart: unless-stopped
+    profiles: ["enabled-${ENABLE_TALK:-false}"]
     logging:
       options:
         max-size: "20m"
@@ -153,7 +165,12 @@ services:
       # must match the public address exactly, subpath included.
       - REMARK_URL=${PUBLIC_ORIGIN:-}/remark42
       - SITE=tufteseid
-      - SECRET=${REMARK42_SECRET:?set REMARK42_SECRET in .env}
+      # Not `:?`, unlike CASDOOR_HOST above: compose interpolates the whole
+      # file before starting anything, profiles included, so a required key
+      # here would make every installation that leaves ENABLE_TALK off invent
+      # a secret. Blank with ENABLE_TALK=true is remark42's own refusal to
+      # start, in its logs rather than compose's output.
+      - SECRET=${REMARK42_SECRET:-}
       - ADMIN_SHARED_ID=${REMARK42_ADMIN_ID:-}
       # Basic auth on the public /remark42/api/v1/admin/* endpoints. Blank
       # disables it; set it only for the length of a backup or a remap.
@@ -164,8 +181,8 @@ services:
       # The last path segment of the callback URL. Must match
       # ^[a-z0-9][a-z0-9_-]*$ and no built-in provider's name.
       - AUTH_CUSTOM_NAME=tufteseid
-      - AUTH_CUSTOM_CID=${REMARK42_OIDC_CID:?set REMARK42_OIDC_CID in .env}
-      - AUTH_CUSTOM_CSEC=${REMARK42_OIDC_CSEC:?set REMARK42_OIDC_CSEC in .env}
+      - AUTH_CUSTOM_CID=${REMARK42_OIDC_CID:-}
+      - AUTH_CUSTOM_CSEC=${REMARK42_OIDC_CSEC:-}
       # Authorize is front-channel, hence the public address and no `/api`;
       # the other two are back-channel and stay off the host's NAT loopback.
       # `silentSignin` suppresses Casdoor's "Continue with …" panel, which is

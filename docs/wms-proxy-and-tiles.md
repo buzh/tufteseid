@@ -279,6 +279,12 @@ reads them only at startup and the container is not recreated:
 
 `nib-proxy/server.mjs`, `node:24-alpine`, zero dependencies, listens on `:8080`.
 
+**Opt-in**: the container runs only where `.env` sets `ENABLE_FLYFOTO=true`.
+The ortofoto locations in `nginx/wms-cache.conf` and the `flyfoto` source in
+`mapproxy/mapproxy.yaml` are left in place either way — both resolve the
+upstream when a request arrives, so with the sidecar absent they answer 502 on
+paths the app has stopped asking for (`docs/architecture.md`).
+
 - **Anonymous mint**: `GET https://backend-api.klienter-prod-k8s2.norgeibilder.no/token/nib`
   with `Referer: https://norgeibilder.no/`. No login.
 - **The token is bound to the requesting IP and referer**, so it must be minted

@@ -31,6 +31,7 @@ import {
   evidenceBbox,
   isReadable,
   isVideoEvidence,
+  kindRenderable,
   rendersOnServer,
 } from './spec';
 import type { SpotEvidence } from './useSpotEvidence';
@@ -84,8 +85,11 @@ const EvidenceItem = ({
   const note = renderNote(record, state);
   // A row kept before the gate, or rendered onto this spot by an admin, can
   // outlive the feature that ordered it — and the sidecar would only answer
-  // 403 (`src/auth/features.ts`).
-  const mayRedo = useHasFeature('render') || !rendersOnServer(record.kind);
+  // 403 (`src/auth/features.ts`). A kind whose service this installation no
+  // longer runs is the same story with a 502.
+  const mayRender = useHasFeature('render');
+  const mayRedo =
+    kindRenderable(record.kind) && (mayRender || !rendersOnServer(record.kind));
 
   return (
     <li className={cx(styles.row, lifted && styles.lifted)}>

@@ -10,6 +10,7 @@ import {
   lidarStyleLabel,
   lidarStyleShort,
 } from '../map/layers/config/backgroundLayers/lidarProjects';
+import { serviceOn } from '../services';
 import { ControlChip } from '../ui/ControlChip';
 import { Icon, type MaterialSymbol } from '../ui/Icon';
 import styles from './controls.module.css';
@@ -91,8 +92,11 @@ export const RenderMenu = ({ lidar }: { lidar: LidarControls }) => {
     </Menu.Item>
   );
 
-  // The national mosaic is never in the cVAT store.
-  const cacheMissing = isLidarFlight && activeLidarProject && !activeCvat;
+  // The national mosaic is never in the cVAT store. Nothing is, on an
+  // installation with no `cvat-tiles`, so the row would stand under every
+  // flight saying so.
+  const cacheMissing =
+    serviceOn('cvat') && isLidarFlight && activeLidarProject && !activeCvat;
 
   return (
     <Menu width={320}>

@@ -3,6 +3,7 @@
 // listed here get `tileGuard.ts`'s retry but no breaker and no probe.
 
 import { getEnv } from '../env';
+import { serviceOn } from '../services';
 
 export type OriginId = 'hoyde' | 'kartverketCache' | 'ra' | 'nib';
 
@@ -82,7 +83,12 @@ export const ORIGINS: Record<OriginId, Origin> = {
   },
 };
 
-export const ORIGIN_IDS = Object.keys(ORIGINS) as OriginId[];
+/** Everything the probe loop and the status chip walk. NiB drops out of it on
+ *  an installation with no `nib-proxy`, where the status light would otherwise
+ *  report an absent sidecar as an outage at Norge i bilder. */
+export const ORIGIN_IDS = (Object.keys(ORIGINS) as OriginId[]).filter(
+  (id) => id !== 'nib' || serviceOn('flyfoto'),
+);
 
 /** Which origin answers a URL, or null for one nothing here covers. */
 export const originForUrl = (url: string): OriginId | null =>
