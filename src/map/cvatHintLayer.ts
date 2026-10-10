@@ -29,8 +29,9 @@ const hintLayers = (map: OlMap): BaseLayer[] =>
     .getArray()
     .filter((l) => String(l.get('id') ?? '').startsWith(CVAT_HINT_ID_PREFIX));
 
-/** One acquisition's layer. `getXYZLayer` supplies the extent culling, without
- *  which every acquisition takes hundreds of 404s per pan. */
+/** One acquisition's layer. `getXYZLayer` supplies the culling — the extent,
+ *  and the boundary mask inside it — without which every acquisition takes
+ *  hundreds of 404s per pan (`docs/map-layers.md`). */
 const buildHintLayer = (acquisition: CvatAcquisition) => {
   const layer = getXYZLayer(buildCvatGroundConfig(acquisition));
   if (!layer) return null;

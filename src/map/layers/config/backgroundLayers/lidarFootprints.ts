@@ -1,3 +1,4 @@
+import { intersects } from 'ol/extent';
 import GeoJSON from 'ol/format/GeoJSON';
 import { Geometry } from 'ol/geom';
 import { fetchWithin } from '../../../../shared/utils/deadline';
@@ -284,8 +285,14 @@ export const viewportCoverage = (
   return hits / (COVERAGE_GRID * COVERAGE_GRID);
 };
 
-// Stricter than the coverage sample: real geometry, not the envelope.
+// Stricter than the coverage sample: real geometry, not the envelope. OL's
+// `intersectsExtent` walks every segment with no cheap rejection of its own,
+// and this runs per tile under `coverageMask`, so the boundary's own box goes
+// first — `getExtent` is memoised on the geometry.
 export const touchesExtent = (
   geometries: Geometry[],
   extent: [number, number, number, number],
-): boolean => geometries.some((g) => g.intersectsExtent(extent));
+): boolean =>
+  geometries.some(
+    (g) => intersects(g.getExtent(), extent) && g.intersectsExtent(extent),
+  );

@@ -138,12 +138,26 @@ manifest envelope (year and density parsed out of the name, no WMS styles). The
 store's envelope is inclusive tile indices at `ENVELOPE_FLOOR_Z = 12`
 (`cvat-tiles/server.mjs`), or the coarsest level held.
 
-`lidarCvat` sets `sparse: true`: unwritten tiles inside the extent 404, OL leaves
-them transparent, and that transparency is the coverage mask — so the retry in
+`lidarCvat` sets `sparse: true`: a tile the store does not hold 404s, OL leaves
+it transparent, and that transparency is what draws the edge — so the retry in
 `tileGuard.ts` is off. `preload: 2`, since a miss is a `SELECT` against a
 bind-mounted database. `getXYZLayer` sets `maxResolution` one step coarser than
 the store's coarsest level, or OL clamps there and asks for four screenfuls to
 upscale.
+
+**`coverageMask` is what keeps that from being hundreds of 404s a pan.** The
+envelope is only the box around an acquisition, and a county flown in strips
+leaves most of its box unwritten — *Vestfold og Telemark 5pkt 2021* fills under
+a fifth of a box 70 tiles wide at z12. So `XYZBackgroundLayer.coverageMask`
+takes a tile's extent in the layer's own projection and answers whether to ask
+at all; `getXYZLayer` wraps the source's `tileUrlFunction` with it, and an
+undefined url leaves the tile EMPTY and unrequested. `cvatGround.ts` tests the
+acquisition's `Prosjektavgrensning` boundary (`lidarFootprints.ts`, the same
+WFS the ranking already reads), grown by `FOOTPRINT_MARGIN_M = 500` so a
+delivery polygon that disagrees with the raster's edge cannot cut a hole in the
+ground. The boundary is fetched on the first tile a layer asks for, so an
+acquisition the reader never looks at costs no WFS query, and a boundary not
+yet known reads as covered.
 
 **Provenance constants** for the cVAT plate live in `cvatGround.ts` —
 `CVAT_RENDERER`, `CVAT_TEMPLATE`, `CVAT_STACK`, `CVAT_AZIMUTH`,

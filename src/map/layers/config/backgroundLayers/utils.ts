@@ -175,6 +175,20 @@ export const getXYZLayer = (
     zDirection: WMS_Z_DIRECTION,
     interpolate: layerConfig.interpolate,
   });
+  const mask = layerConfig.coverageMask;
+  if (mask) {
+    const template = source.getTileUrlFunction();
+    // An undefined url leaves the tile EMPTY and unrequested, which is what
+    // the extent does at the box's edge and this does inside it.
+    source.setTileUrlFunction((coord, pixelRatio, projection) =>
+      mask(
+        tileGrid.getTileCoordExtent(coord) as [number, number, number, number],
+      )
+        ? template(coord, pixelRatio, projection)
+        : undefined,
+    );
+  }
+
   guardTileSource(source, layerConfig.url, {
     retry: !layerConfig.sparse,
     heldUrl: layerConfig.heldUrl,

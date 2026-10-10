@@ -2,11 +2,13 @@
 // one MBTiles database each by `vat-cache/makevat.py` and served by the
 // `cvat-tiles` sidecar.
 
-import { extend } from 'ol/extent';
+import { buffer, extend } from 'ol/extent';
+import type { Geometry } from 'ol/geom';
 import { transformExtent } from 'ol/proj';
 import { serviceOn } from '../../../../services';
 import { halved } from '../../../compare/halves';
 import { getWMSTileGrid } from '../../wmsTileGrid';
+import { fetchLidarFootprints, touchesExtent } from './lidarFootprints';
 import {
   CVAT_STYLE,
   fetchLidarProjects,
@@ -203,25 +205,67 @@ export const stylesForFlight = (
   cached: CvatAcquisition | null,
 ): string[] => (cached ? [CVAT_STYLE, ...project.styles] : project.styles);
 
+// The grid the store was written on, and so the CRS a boundary is tested in.
+const CVAT_CRS = 'EPSG:25833';
+
+// The acquisition's own boundary, which `extent25833` is only the box around:
+// a county flown in strips leaves most of that box unwritten, and the hint
+// layer carries one of these per acquisition (`docs/map-layers.md`).
+const footprints = new Map<string, Geometry[]>();
+const asked = new Set<string>();
+
+const loadFootprint = (project: LidarProject): void => {
+  if (asked.has(project.id)) return;
+  asked.add(project.id);
+  void fetchLidarFootprints([project], CVAT_CRS).then(
+    ({ footprints: found, unanswered }) => {
+      const geometries = found.get(project.id)?.geometries;
+      if (geometries?.length) footprints.set(project.id, geometries);
+      // An outage rather than an answer: let the next tile ask again. A WFS
+      // that simply holds no row under this name is an answer, and stands.
+      else if (unanswered) asked.delete(project.id);
+    },
+  );
+};
+
+// The delivery polygon and the raster's own edge need not agree to the metre,
+// and a hole in the ground is a worse answer than a 404.
+const FOOTPRINT_MARGIN_M = 500;
+
+// Consulted per tile. The fetch starts on the first tile a layer asks for, so
+// an acquisition the reader never looks at costs no WFS query, and a boundary
+// not yet known reads as covered — which is how this behaved before there was
+// one.
+const cvatCoverageMask =
+  (project: LidarProject) =>
+  (extent: [number, number, number, number]): boolean => {
+    loadFootprint(project);
+    const geometries = footprints.get(project.id);
+    if (!geometries) return true;
+    const grown = buffer(extent, FOOTPRINT_MARGIN_M);
+    return touchesExtent(geometries, [grown[0], grown[1], grown[2], grown[3]]);
+  };
+
 export const buildCvatGroundConfig = (
   acquisition: CvatAcquisition,
 ): XYZBackgroundLayer => ({
   type: 'XYZ',
   layerName: 'lidarCvat',
   url: cvatTileUrl(acquisition.path),
-  projection: 'EPSG:25833',
+  projection: CVAT_CRS,
   minZoom: acquisition.minZoom,
   maxZoom: acquisition.maxZoom,
   // A miss is a SELECT against a bind-mounted database, so preloading is free.
   preload: 2,
-  // Unwritten tiles inside the extent answer 404; that transparency is the
-  // coverage mask.
+  // A hole the boundary does not account for still answers 404, and that
+  // transparency is what draws the edge of what was built.
   sparse: true,
   // The store stops at z15 or z16 and the view goes to z20 (`types.ts`).
   interpolate: false,
   coverageExtent: acquisition.extent25833
-    ? { extent: acquisition.extent25833, crs: 'EPSG:25833' }
+    ? { extent: acquisition.extent25833, crs: CVAT_CRS }
     : { extent: acquisition.project.bboxLonLat, crs: 'EPSG:4326' },
+  coverageMask: cvatCoverageMask(acquisition.project),
 });
 
 // The provenance plate the render menu shows. Transcribed from

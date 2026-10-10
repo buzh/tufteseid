@@ -82,6 +82,11 @@ export type XYZBackgroundLayer = BackgroundLayerBase & {
    *  clamps at each tile's own edge and seams at every tile boundary. */
   interpolate?: boolean;
   coverageExtent?: CoverageExtent;
+  /** Finer than `coverageExtent`, which is only the box: a tile this refuses
+   *  is never asked for. Takes the tile's extent in the layer's own
+   *  `projection` and is called once per tile request, so it must be cheap.
+   *  True where coverage is unknown, which asks as if there were no mask. */
+  coverageMask?: (extent: [number, number, number, number]) => boolean;
 };
 
 export type EmptyBackgroundLayer = BackgroundLayerBase & {
