@@ -13,8 +13,10 @@ short link.
 **Opt-in, and the only one of the four with a prerequisite.** The container
 runs where `.env` sets `ENABLE_TALK=true`, which also wants `REMARK42_SECRET`
 and the OIDC pair, and it federates to Casdoor — so there is no threads
-without accounts. Off, the two buttons that open the box are absent and the
-silent sign-in leg is skipped on the way in and out
+without accounts. A blank `REMARK42_SECRET` is stopped by the service's
+entrypoint in `docker-compose.yml`, not by remark42, which declares the key
+required and then signs with an empty one. Off, the two buttons that open the
+box are absent and the silent sign-in leg is skipped on the way in and out
 (`src/api/remark42.ts`). The votes below are PocketBase's and are unaffected:
 a spot still has a tally on an installation with no threads.
 

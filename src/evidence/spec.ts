@@ -3,7 +3,10 @@ import type {
   EvidenceMeta,
   EvidenceRecord,
 } from '../api/evidence';
-import type { LidarModel } from '../map/layers/config/backgroundLayers/lidarProjects';
+import {
+  CVAT_STYLE,
+  type LidarModel,
+} from '../map/layers/config/backgroundLayers/lidarProjects';
 import { serviceOn } from '../services';
 import type { DemModel } from '../terrain/dem';
 import { DEFAULT_ALTITUDE, DEFAULT_Z_FACTOR } from '../terrain/render';
@@ -94,12 +97,6 @@ export const RVT_SPECS: readonly Extract<EvidenceSpec, { kind: 'rvt' }>[] =
  *  `BrowserSpec` (`render.ts`) states as a type, off a stored row's kind. */
 export const rendersOnServer = (kind: EvidenceKind): boolean =>
   kind === 'sunloop' || kind === 'rvt';
-
-/** Whether this installation can still make a picture of this kind. A row of
- *  one it cannot reads as it always did — a service gates the making, never
- *  the reading (`src/services.ts`). */
-export const kindRenderable = (kind: EvidenceKind): boolean =>
-  kind === 'flyfoto' ? serviceOn('flyfoto') : true;
 
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null;
@@ -228,6 +225,19 @@ export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
       return { kind: 'rvt', vis, model };
     }
   }
+};
+
+/** Whether this installation can still make this picture again. A row it
+ *  cannot reads as it always did — a service gates the making, never the
+ *  reading (`src/services.ts`). Off the spec rather than the kind: one lidar
+ *  style is served by `cvat-tiles` and the rest by a WMS. */
+export const evidenceRenderable = (rec: EvidenceRecord): boolean => {
+  const spec = specOf(rec);
+  if (!spec) return false;
+  if (spec.kind === 'flyfoto') return serviceOn('flyfoto');
+  if (spec.kind === 'lidar')
+    return spec.style !== CVAT_STYLE || serviceOn('cvat');
+  return true;
 };
 
 // EPSG:25833, as the render wrote it — not the spot's footprint, which may have

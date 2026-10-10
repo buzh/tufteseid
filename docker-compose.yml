@@ -160,6 +160,20 @@ services:
       options:
         max-size: "20m"
         max-file: "3"
+    # remark42 declares SECRET required, but go-flags counts an env var that is
+    # merely present as set and compose always injects one — so a blank
+    # REMARK42_SECRET would start it signing every auth cookie with an empty
+    # key instead of refusing. This is that refusal. An `entrypoint:` override
+    # clears the image's CMD, hence `/srv/remark42 server` restated here.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |-
+        [ -n "$$SECRET" ] || {
+          echo 'REMARK42_SECRET is empty: set it, or ENABLE_TALK=false' >&2
+          exit 1
+        }
+        exec /init.sh /srv/remark42 server
     environment:
       # Cookies, CORS and the OAuth callback are composed from this, so it
       # must match the public address exactly, subpath included.
@@ -168,8 +182,8 @@ services:
       # Not `:?`, unlike CASDOOR_HOST above: compose interpolates the whole
       # file before starting anything, profiles included, so a required key
       # here would make every installation that leaves ENABLE_TALK off invent
-      # a secret. Blank with ENABLE_TALK=true is remark42's own refusal to
-      # start, in its logs rather than compose's output.
+      # a secret. Blank with ENABLE_TALK=true is caught by the entrypoint
+      # above instead, in this container's logs rather than compose's output.
       - SECRET=${REMARK42_SECRET:-}
       - ADMIN_SHARED_ID=${REMARK42_ADMIN_ID:-}
       # Basic auth on the public /remark42/api/v1/admin/* endpoints. Blank

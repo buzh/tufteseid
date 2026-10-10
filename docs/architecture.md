@@ -763,7 +763,7 @@ both halves of the job:
 | Key | Container | What goes with it |
 | --- | --- | --- |
 | `ENABLE_FLYFOTO` | `nib-proxy` | The Flyfoto ground and its arm, the archive walk, the `flyfoto` evidence kind, the `nib` origin in the breaker |
-| `ENABLE_CVAT` | `cvat-tiles` | The cVAT render, its hint and footprint layers, the *not built for this flight* row in the render menu |
+| `ENABLE_CVAT` | `cvat-tiles` | The cVAT render, its hint and footprint layers, the *not built for this flight* row in the render menu, the gallery's redo on a `lidar` row in the `cvat` style |
 | `ENABLE_RENDER` | `rendersvc` | The `sunloop` and `rvt` order chips, and the gallery's redo on a row of either kind |
 | `ENABLE_TALK` | `remark42` | The thread box and the two buttons that open it, and the silent sign-in leg on the way in and out |
 
@@ -785,7 +785,9 @@ the two compose rather than collide: `useHasFeature('render')` answers false
 when the sidecar is not there, admin or not. An evidence row of a kind this
 installation can no longer make still reads, still downloads and still carries
 its legend; what goes is the chip that would ask for another
-(`kindRenderable`, `src/evidence/spec.ts`).
+(`evidenceRenderable`, `src/evidence/spec.ts`), which reads the row's spec
+rather than its kind because one `lidar` style is served by `cvat-tiles` and
+the rest by a WMS.
 
 Two places read the URL rather than a control, so they filter too: a
 `backgroundLayer` naming a ground this installation does not serve falls back

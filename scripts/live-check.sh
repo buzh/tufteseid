@@ -129,9 +129,17 @@ check config-js "$BASE/config.js" 200 javascript 50 '__TUFTESEID_CONFIG__'
 # says which sections below have anything to check.
 check services-js "$BASE/services.js" 200 javascript 50 '__TUFTESEID_SERVICES__'
 SERVICES=$(cat "$TMP/body")
-on() { printf '%s' "$SERVICES" | grep -q "$1: *true"; }
-note "$(printf '%s' "$SERVICES" | grep -o '[a-z]*: *true' | sed 's/: *true//' |
-  paste -sd, - | sed 's/^$/none/') enabled"
+# Whatever the check left behind on a failure — a Caddy error page, a container
+# predating the entrypoint. Empty means nothing is known, and `on` then says
+# yes to all four so each sidecar fails for itself rather than reading as off.
+printf '%s' "$SERVICES" | grep -q '__TUFTESEID_SERVICES__' || SERVICES=''
+on() { [ -z "$SERVICES" ] || printf '%s' "$SERVICES" | grep -q "$1: *true"; }
+if [ -z "$SERVICES" ]; then
+  note 'services.js unreadable — every sidecar checked below'
+else
+  note "$(printf '%s' "$SERVICES" | grep -o '[a-z]*: *true' | sed 's/: *true//' |
+    paste -sd, - | sed 's/^$/none/') enabled"
+fi
 if [ -n "$ENTRY" ]; then
   check entry-bundle "$BASE$ENTRY" 200 javascript 500
 else

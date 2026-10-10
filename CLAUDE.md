@@ -114,9 +114,9 @@ the container; compose maps host `127.0.0.1:3030 → 3000`.
 
 ```
 git pull
-docker compose build --pull tufteseid cvat-tiles rendersvc
+docker compose build --pull
 docker compose up -d
-docker compose logs -f tufteseid wmscache mapproxy rendersvc
+docker compose logs -f tufteseid wmscache mapproxy
 scripts/live-check.sh https://<host> [spot-code]
 ```
 
@@ -138,6 +138,12 @@ alongside the cVAT and MapProxy store directories (`README.md`,
   hiding it behind `serviceOn(…)` in the same change. A service gates the
   *making*, never the reading — the rule `src/auth/features.ts` already
   states for an account's features.
+- **`COMPOSE_PROFILES=enabled-true` must be in `.env` too**, and `git pull`
+  never puts it there — an installation whose `.env` predates the opt-in keys
+  has to gain that line by hand. Without it neither `enabled-true` nor
+  `enabled-false` is active, so an `ENABLE_*` key turns the chips on (it is
+  also in the `tufteseid` service's `environment`) while leaving the container
+  out, and every chip meets a 502.
 - Flipped an `ENABLE_*` key? **`docker compose up -d --remove-orphans`.** The
   key is in the `tufteseid` service's `environment` as well as in the
   profile, so compose recreates that container by itself and the entrypoint

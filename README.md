@@ -46,7 +46,11 @@ Settings live in a `.env` beside `docker-compose.yml`, which is gitignored.
 Copy the committed shape and set `PUBLIC_ORIGIN` and `CASDOOR_HOST`. The
 `ENABLE_*` keys start at `false`; leave them there for a first run and turn
 them on once the stack is up. Do not touch the `COMPOSE_PROFILES` line — it is
-what makes those keys mean anything to compose.
+what makes those keys mean anything to compose. An existing install upgrading
+into the opt-in services has to **add that line by hand**: `git pull` never
+touches `.env`, and without it neither profile is active, so turning a key on
+draws the controls while leaving the container out and every one of them meets
+a 502.
 
 ```sh
 git clone https://github.com/buzh/tufteseid.git
@@ -152,7 +156,7 @@ session too, so that stays safe on a shared browser.
 The threads' pair goes into `.env` as `REMARK42_OIDC_CID` and
 `REMARK42_OIDC_CSEC`, alongside `ENABLE_TALK=true` and a `REMARK42_SECRET`
 from `openssl rand -hex 32`; `docker compose up -d` again to pick them up.
-Remark42 refuses to start on a missing one of the three and says so in
+A blank one of the three stops the container at startup and says so in
 `docker compose logs remark42`, not in compose's own output — the keys cannot
 be required of an installation that leaves the threads off. The app's pair is
 typed into PocketBase instead:
