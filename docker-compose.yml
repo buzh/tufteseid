@@ -55,6 +55,11 @@ services:
   pocketbase:
     build: ./pocketbase
     restart: unless-stopped
+    environment:
+      # How many accounts hold a place; 0 or unset is no cap. Read by
+      # `pb_hooks/capacity.js` alone — the SPA asks /pb/api/capacity rather
+      # than being told at build time (docs/identity.md).
+      - MAXUSERS=${MAXUSERS:-0}
     volumes:
       - pbdata:/pb_data
       - ./pocketbase/pb_migrations:/pb_migrations:ro

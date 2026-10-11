@@ -21,7 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { bootInviteCode, forgetInviteLink } from '../invites/inviteLink';
 import { authPromptAtom, isAuthDialogOpenAtom } from './atoms';
 import styles from './AuthDialog.module.css';
-import { useRegistrationGate } from './hooks';
+import { useCapacity, useRegistrationGate } from './hooks';
 import {
   badFields,
   refusalOf,
@@ -56,6 +56,7 @@ const messageFor = (err: unknown, mode: Mode): string => {
   const refusal = refusalOf(err);
   if (refusal === 'registrationClosed') return 'auth.beta.refusedClosed';
   if (refusal === 'inviteInvalid') return 'auth.beta.refusedCode';
+  if (refusal === 'queued') return 'auth.cap.queued';
 
   const status = (err as { status?: number })?.status;
   if (status !== 400) return 'auth.failed';
@@ -75,6 +76,7 @@ export const AuthDialog = () => {
   const [open, setOpen] = useAtom(isAuthDialogOpenAtom);
   const [prompt, setPrompt] = useAtom(authPromptAtom);
   const gate = useRegistrationGate(open);
+  const capacity = useCapacity(open);
 
   // A reader who followed an invitation link is making an account by
   // definition, so the box opens on that half of the form.
@@ -136,6 +138,10 @@ export const AuthDialog = () => {
   // installation that has none, where the box reads as it always did.
   const beta = gate?.closed ? gate : null;
 
+  // Only an installation that asked for a cap says anything about one.
+  const cap = capacity && capacity.max > 0 ? capacity : null;
+  const full = cap != null && cap.users >= cap.max;
+
   const registering = mode === 'register';
   // The gate's own two refusals, which are the one case where the code field
   // has to appear whatever the gate said — including when reading it is what
@@ -185,7 +191,26 @@ export const AuthDialog = () => {
             </Alert>
           )}
 
-          {error && <Alert color="red">{t(error)}</Alert>}
+          {/* Unlike the free places, this is shown to an invited reader too:
+              a code buys an account but not a place, so being full is very
+              much their business. */}
+          {cap && registering && (
+            <Text size="xs" c="dimmed">
+              {t('shared.userCap', { count: cap.users, max: cap.max })}
+            </Text>
+          )}
+
+          {full && registering && (
+            <Alert color="yellow">{t('auth.cap.willQueue')}</Alert>
+          )}
+
+          {/* Being queued is not a failure: the account was made and keeps
+              the code it cost. */}
+          {error && (
+            <Alert color={error === 'auth.cap.queued' ? 'yellow' : 'red'}>
+              {t(error)}
+            </Alert>
+          )}
 
           {sent && <Alert color="green">{t('auth.resetSent')}</Alert>}
 

@@ -39,6 +39,12 @@ handing out fifty codes is handing out fifty possible accounts whatever
 `openSlots` says, even at zero — that arithmetic is yours to do, not the
 gate's.
 
+**The user cap is a third thing again, and it refuses nobody.** `MAXUSERS`
+decides how many accounts the installation *seats*, not how many may be made:
+at the cap a free place or an invite still buys an account, still spends, and
+the account is simply parked in the `queued` role until a place opens
+(`docs/identity.md`). Nothing here looks at it.
+
 1. `closed` is false, or the `registration` row is missing altogether — the
    beta is over or was never set up, everybody is admitted and nothing is
    spent. The hook and `src/api/invites.ts` read a missing row the same way

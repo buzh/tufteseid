@@ -63,6 +63,10 @@
       "refusedClosed": "Kan ikke registrere flere brukere uten invitasjon, prøv senere",
       "refusedCode": "Ugyldig kode",
       "invited": "Fullfør registrering for å bruke invitasjon"
+    },
+    "cap": {
+      "willQueue": "Det er fullt akkurat nå. Du kan registrere deg, men havner på venteliste og får logge inn når en plass blir ledig.",
+      "queued": "Ingen ledige plasser, men du er registrert - kom tilbake senere"
     }
   },
   "evidence": {
@@ -370,7 +374,9 @@
     "errorBoundary": {
       "title": "Noe gikk galt her",
       "retry": "Prøv igjen"
-    }
+    },
+    "userCap_one": "Nå: én bruker av {{max}} maks",
+    "userCap_other": "Nå: {{count}} brukere av {{max}} maks"
   },
   "spots": {
     "new": "Ny lokalitet",
@@ -610,6 +616,7 @@
     "mailFailed": "E-post er ikke satt opp på denne installasjonen. Send koden selv.",
     "revokeFailed": "Fikk ikke slettet invitasjonen.",
     "mintFailed": "Fikk ikke laget invitasjonen.",
-    "quotaSpent": "Du har ingen invitasjoner igjen."
+    "quotaSpent": "Du har ingen invitasjoner igjen.",
+    "capFull": "Det er fullt akkurat nå, så den du inviterer havner på venteliste til en plass blir ledig."
   }
 }

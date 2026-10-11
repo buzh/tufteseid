@@ -4,17 +4,31 @@
 
 import { pb } from '../api/pocketbase';
 
-/** Why the closed beta turned a would-be reader away. Anything else shows as
- *  the generic failure. */
-export type Refusal = 'registrationClosed' | 'inviteInvalid';
+/** Why a hook turned a would-be reader away: the closed beta refusing to
+ *  make the account, or the user cap refusing to seat one that was made.
+ *  Anything else shows as the generic failure. */
+export type Refusal = 'registrationClosed' | 'inviteInvalid' | 'queued';
 
-// The gate answers 403 with a `ValidationError` under `invite`, which is the
-// only shape PocketBase passes through to the client intact.
+/** Must match what `pb_hooks/closed_beta.js` and `pb_hooks/capacity.js`
+ *  throw. */
+const REFUSALS: Record<string, Refusal> = {
+  registration_closed: 'registrationClosed',
+  invite_invalid: 'inviteInvalid',
+  account_queued: 'queued',
+};
+
+// A hook answers 403 with a `ValidationError` under a field of its own,
+// which is the only shape PocketBase passes through to the client intact.
+// Matched on the code rather than the field, so which field carries it stays
+// the hook's business.
 export const refusalOf = (err: unknown): Refusal | null => {
-  const code = (err as { response?: { data?: { invite?: { code?: string } } } })
-    ?.response?.data?.invite?.code;
-  if (code === 'registration_closed') return 'registrationClosed';
-  if (code === 'invite_invalid') return 'inviteInvalid';
+  const data =
+    (err as { response?: { data?: Record<string, { code?: string }> } })
+      ?.response?.data ?? {};
+  for (const field of Object.values(data)) {
+    const refusal = REFUSALS[field?.code ?? ''];
+    if (refusal) return refusal;
+  }
   return null;
 };
 

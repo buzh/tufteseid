@@ -19,7 +19,12 @@ onRecordCreateRequest((e) => {
     return;
   }
 
-  e.record.set('role', 'user');
+  const capacity = require(`${__hooks}/capacity.js`);
+
+  // A place if the installation has one left, the queue if it does not. The
+  // closed beta's handler has already wrapped this in its transaction, so the
+  // count is the one the row is written against.
+  e.record.set('role', capacity.roleForNewUser(e.app));
   e.record.set('features', []);
   e.record.set('inviteQuota', 0);
 

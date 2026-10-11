@@ -238,6 +238,12 @@ check auth-no-oauth2 "$BASE/pb/api/collections/users/auth-methods" \
 check registration-gate "$BASE/pb/api/collections/registration/records?perPage=1" \
   200 json 20 '"openSlots"'
 
+# How full the installation is, read by the sign-in box and the invite panel
+# before either offers an account (docs/identity.md). A cap of 0 is one that
+# asked for none, and both surfaces then say nothing.
+check user-cap "$BASE/pb/api/capacity" 200 json 10 '"max":'
+note "$(json_num users) account(s) seated, cap $(json_num max)"
+
 # Who holds an invite is nobody's business but the issuer's. The rule filters
 # rather than refuses, so a guest sees an empty page rather than a 403.
 check invites-hidden "$BASE/pb/api/collections/invites/records?perPage=1&fields=id" \

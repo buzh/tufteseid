@@ -6,7 +6,9 @@ import { getEnv } from '../env';
 // request of a cold load already carries any stored token.
 export const pb = new PocketBase(getEnv().pocketbaseUrl);
 
-export type Role = 'guest' | 'user' | 'admin';
+/** `queued` is an account the user cap would not seat, which is refused at
+ *  sign-in, so it never reaches `currentUserAtom` (`docs/identity.md`). */
+export type Role = 'guest' | 'user' | 'admin' | 'queued';
 
 // `role` is optional on the collection, so missing reads as 'user'.
 export type SiteUser = {

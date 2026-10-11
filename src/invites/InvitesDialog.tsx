@@ -27,6 +27,7 @@ import {
   sendInvite,
 } from '../api/invites';
 import { currentUserAtom } from '../auth/atoms';
+import { useCapacity } from '../auth/hooks';
 import { Icon } from '../ui/Icon';
 import { isInvitesDialogOpenAtom } from './atoms';
 import { inviteUrlOf } from './inviteLink';
@@ -171,6 +172,7 @@ export const InvitesDialog = () => {
   const { t } = useTranslation();
   const [open, setOpen] = useAtom(isInvitesDialogOpenAtom);
   const user = useAtomValue(currentUserAtom);
+  const capacity = useCapacity(open);
   const [invites, setInvites] = useState<InviteRecord[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [minting, setMinting] = useState(false);
@@ -205,6 +207,11 @@ export const InvitesDialog = () => {
   const left = (user?.inviteQuota ?? 0) - minted;
   const outstanding = invites?.filter((invite) => invite.redeemedAt === '');
 
+  // Only an installation that asked for a cap says anything about one. A code
+  // is still good while it is full — it just buys a queued account, which is
+  // worth knowing before the reader sends one (docs/identity.md).
+  const cap = capacity && capacity.max > 0 ? capacity : null;
+
   const mint = () => {
     if (!user) return;
     setMinting(true);
@@ -231,6 +238,16 @@ export const InvitesDialog = () => {
         <Text size="sm" c="dimmed">
           {t('invites.blurb')}
         </Text>
+
+        {cap && (
+          <Text size="xs" c="dimmed">
+            {t('shared.userCap', { count: cap.users, max: cap.max })}
+          </Text>
+        )}
+
+        {cap && cap.users >= cap.max && (
+          <Alert color="yellow">{t('invites.capFull')}</Alert>
+        )}
 
         {failed && <Alert color="red">{t('invites.failed')}</Alert>}
 

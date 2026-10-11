@@ -32,7 +32,7 @@ Each owns its subject; this file keeps only what is true across all of them.
 | `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream and Caddy → mapproxy → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
 | `docs/render-sidecar.md` | The server-side render service: the contract, the token trade, the queue's limits, the RVT and ffmpeg recipes, the burnt-in legend, the failure modes | `rendersvc/`, `src/api/render.ts`, the `sunloop` and `rvt` arms in `src/evidence/` |
-| `docs/identity.md` | PocketBase password auth, the three modes of the sign-in box, the three fields on `users` nobody may set themselves, and what a feature gates | `src/auth/`, `pocketbase/pb_hooks/identity.pb.js`, the `users` migrations |
+| `docs/identity.md` | PocketBase password auth, the three modes of the sign-in box, the three fields on `users` nobody may set themselves, what a feature gates, and the `MAXUSERS` cap with its `queued` role | `src/auth/`, `pocketbase/pb_hooks/identity.pb.js`, `pocketbase/pb_hooks/capacity.pb.js`, the `users` migrations |
 | `docs/votes.md` | The public-only gate, the `votes` and `stars` collections, the two views' shared quirks, and why a self-star is listed but not counted | `src/spots/spotScores.ts`, `src/spots/spotStars.ts`, `src/api/votes.ts`, `src/api/stars.ts`, the vote and star migrations |
 | `docs/closed-beta.md` | Who may register and what pays for it, the hook that enforces it, the SQL for opening places and granting invites, the mail route's settings, what the gate does not cover | `pocketbase/pb_hooks/`, `src/invites/`, `src/api/invites.ts`, the sign-in box |
 | `docs/monitoring.md` | The access logs, the usage report, the cron health check, retention | `scripts/usage-report.sh`, `scripts/health-check.sh`, any log format or `logging:` cap |
@@ -131,6 +131,9 @@ alongside the cVAT and MapProxy store directories (`README.md`,
   required any more, but `COMPOSE_PROFILES` is what makes the `ENABLE_*` keys
   mean anything. `.env.example` is the committed shape; `.env` is gitignored
   and lives on the server only.
+- **`MAXUSERS` caps how many accounts are seated**, 0 or unset being no cap.
+  It reaches the `pocketbase` service only, and changing it is
+  `docker compose up -d` — no migration, no rebuild (`docs/identity.md`).
 - **Three services are opt-in and default off**: `nib-proxy`, `cvat-tiles`
   and `rendersvc`, each behind one `ENABLE_*` key that drives both
   a compose profile and `/services.js`, which `src/services.ts` reads
@@ -295,7 +298,10 @@ Server-enforced on `spots`:
 So the UI carries one permission, `mayEdit` (owner *or* admin): an admin can
 rename, reshape and delete anybody's spot. `users.role` and `users.features`
 are granted by hand in the admin UI, pinned at registration by
-`pb_hooks/identity.pb.js`, and the `users` row has no update rule at all —
+`pb_hooks/identity.pb.js` — which also parks the row in the `queued` role
+when the installation is at `MAXUSERS`, a fourth role that may hold no token
+until a place opens (`docs/identity.md`) — and the `users` row has no update
+rule at all —
 neither the rank nor the membership nor the invite quota is the reader's to
 set (`docs/identity.md`).
 

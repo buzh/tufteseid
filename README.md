@@ -177,6 +177,15 @@ site mail them, which needs the SMTP settings above.
 [`docs/closed-beta.md`](docs/closed-beta.md) has the rest — the SQL for
 granting invites, what the gate does not cover, and how it is enforced.
 
+**`MAXUSERS` in `.env` is a separate ceiling**, on how many accounts the
+installation *seats* rather than on how many may be made. It starts at `0`,
+which is no cap at all. Set it and the sign-in box says *Nå: 11 brukere av 20
+maks*; at the cap registration still works and an invite is still spent, but
+the new account is parked and told to come back later, and it is let in on
+its next sign-in after a place opens. Raising or lowering it is an edit to
+`.env` and `docker compose up -d` — no migration, and nobody already signed
+in is ever turned out ([`docs/identity.md`](docs/identity.md)).
+
 ## Check that it works
 
 ```sh

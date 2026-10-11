@@ -60,7 +60,7 @@ mechanisms to hold that — one at create, one after:
 
 | field | what it decides |
 | --- | --- |
-| `role` | `admin` reaches every spot in the register |
+| `role` | `admin` reaches every spot in the register; `queued` may not sign in at all (below) |
 | `features` | what this account may spend (below) |
 | `inviteQuota` | how many invites it may ever mint |
 
@@ -134,10 +134,68 @@ that caught this repository out before, worth writing down:
   such link yet. So the accounts that predate the provider are the only ones
   where the match is ambiguous.
 
+## How many may hold a place
+
+`MAXUSERS` in `.env` caps how many accounts this installation seats. **0 is no
+cap**, and so is unset, blank, unparseable or negative — a cap has to be asked
+for, and there is no reading of a bad value that should lock everybody out.
+Compose passes the key to the `pocketbase` service alone;
+`pb_hooks/capacity.js` is the only thing that reads it, and the SPA asks
+`/pb/api/capacity` rather than being told at build time.
+
+**Being full refuses nobody.** Registration works at the cap exactly as it
+does below it, and whatever paid for it — a free place, an invite — is spent
+all the same. What changes is the role the row is written with:
+
+- **Under the cap**, `pb_hooks/identity.pb.js` pins `role` to `user` as it
+  always did, and the account is seated.
+- **At the cap**, it pins `queued` instead. The account exists, owns nothing
+  yet, and holds no place.
+
+**A queued account cannot hold a token.** `pb_hooks/capacity.pb.js` hooks
+`onRecordAuthRequest`, which every way of getting one comes through — a
+password sign-in and an `authRefresh` alike — so a page left open signs itself
+out on its next load rather than keeping a session the cap no longer allows.
+The refusal is a 403 the sign-in box reads off the `ValidationError` under
+`queue`, the same shape the closed beta's two refusals use
+(`src/auth/session.ts`).
+
+That is also the one seam in registering: the create succeeds, the
+`authWithPassword` straight after it is refused, and the box says *Ingen
+ledige plasser, men du er registrert* rather than a failure — because it is
+not one. The account is there to come back to.
+
+**Signing in is also how a queue is drained.** The same hook promotes a
+queued account to `user` the moment it authenticates with a place free,
+whether the place came from `MAXUSERS` going up or from an account going away.
+First come, first served: there is no position in the queue and nothing
+reserves one, so raising the cap admits whoever comes back soonest rather than
+whoever waited longest.
+
+**Queued rows do not count against the cap** — counting them would have the
+queue fill the very places it is waiting for — so what `/pb/api/capacity`
+reports as `users` is every row that is *not* queued. The sign-in box and the
+invite panel both show it as *Nå: 11 brukere av 20 maks*, and say nothing at
+all on an installation with no cap.
+
+**Lowering `MAXUSERS` demotes nobody.** Roles only ever move up here; an
+installation taken below its own count simply seats nobody new until it is
+back under. Raising it costs one sign-in per waiting reader, and nothing
+notifies them — there is no mail on promotion.
+
+The count is read and the row written in one transaction, but the registration
+count is read before the row it will be written against exists, so two
+registrations landing in the same instant can both see the last place. The
+window is the same unthrottled one the free places already have
+(`docs/closed-beta.md`), and overshooting by one seats one account too many
+rather than losing anything.
+
 ## The closed beta sits on top of this
 
 Who may hold an account at all is a separate mechanism, enforced in
 `pb_hooks/closed_beta.pb.js` on the same create this file's hook pins:
 `docs/closed-beta.md` has the whole of it. The two compose in one order —
 `closed_beta` decides *whether* the row is written, `identity` decides *what is
-on it*.
+on it*, the user cap above being one of the things it decides. That order is
+load order, which is alphabetical by filename, and the cap's count has to be
+taken inside the transaction `closed_beta` opened.
