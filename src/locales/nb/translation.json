@@ -453,10 +453,22 @@
     "voteScore": "Poengsum: {{total}}",
     "voteNeedsAccount": "Logg inn for å stemme",
     "votePrivate": "Bare offentlige lokaliteter kan få stemmer",
+    "starAdd": "Legg til i favorittene",
+    "starRemove": "Fjern fra favorittene",
+    "starOwn": "Din egen favoritt, den teller ikke i tallet",
+    "starCount": "Favoritter: {{total}}",
+    "starNeedsAccount": "Logg inn for å ha favoritter",
+    "starPrivate": "Bare offentlige lokaliteter kan bli favoritter",
+    "favourites": {
+      "needsAccount": "Logg inn for å se favorittene dine",
+      "empty": "Du har ingen favoritter ennå. Trykk stjerna på en lokalitet for å legge den hit.",
+      "failed": "Fikk ikke hentet favorittene dine."
+    },
     "list": {
       "label": "Lokaliteter",
       "busy": "Legg fra deg den nye lokaliteten for å bla i lokalitetene",
       "tabMine": "Mine",
+      "tabFavourites": "Favoritter",
       "tabPopular": "Populære",
       "empty": "Ingen offentlige lokaliteter ennå.",
       "failed": "Fikk ikke hentet lokalitetene."

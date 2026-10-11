@@ -28,6 +28,7 @@ import {
   type SpotDraft,
 } from '../spots/atoms';
 import { derivedFootprint } from '../spots/footprint';
+import { StarControl } from '../spots/StarControl';
 import { VoteControl } from '../spots/VoteControl';
 import { readTerrainWindowAtom } from '../terrain/window';
 import { ControlButton } from '../ui/ControlButton';
@@ -216,6 +217,7 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
       actions={
         <>
           <VoteControl spot={spot} />
+          <StarControl spot={spot} />
           <Tooltip label={t('spots.edit')}>
             <ActionIcon
               variant="subtle"

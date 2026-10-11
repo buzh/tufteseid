@@ -17,6 +17,11 @@ import { activeSpotAtom, spotDraftAtom, spotPlacingAtom } from '../spots/atoms';
 import { isoDay } from '../shared/utils/isoDay';
 import { mySpotsAtom, spotsFailedAtom } from '../spots/spotRecords';
 import { popularSpotsAtom, spotScoresAtom } from '../spots/spotScores';
+import {
+  favouriteSpotsAtom,
+  starCountsAtom,
+  starsFailedAtom,
+} from '../spots/spotStars';
 import { ControlChip } from '../ui/ControlChip';
 import { Icon } from '../ui/Icon';
 import styles from './SpotMenu.module.css';
@@ -26,15 +31,28 @@ const FILTER_FROM = 8;
 
 const LIST_MAX_HEIGHT = 340;
 
-type Tab = 'mine' | 'popular';
+type Tab = 'mine' | 'favourites' | 'popular';
+
+/** Which empty and failure line each tab reads with. */
+const TAB_COPY = {
+  mine: { empty: 'spots.mine.empty', failed: 'spots.mine.failed' },
+  favourites: {
+    empty: 'spots.favourites.empty',
+    failed: 'spots.favourites.failed',
+  },
+  popular: { empty: 'spots.list.empty', failed: 'spots.list.failed' },
+} as const satisfies Record<Tab, { empty: string; failed: string }>;
 
 export const SpotMenu = () => {
   const { t } = useTranslation();
   const signedIn = useAtomValue(isSignedInAtom);
   const mine = useAtomValue(mySpotsAtom);
+  const favourites = useAtomValue(favouriteSpotsAtom);
   const popular = useAtomValue(popularSpotsAtom);
   const scores = useAtomValue(spotScoresAtom);
-  const failed = useAtomValue(spotsFailedAtom);
+  const starCounts = useAtomValue(starCountsAtom);
+  const spotsFailed = useAtomValue(spotsFailedAtom);
+  const starsFailed = useAtomValue(starsFailedAtom);
   const active = useAtomValue(activeSpotAtom);
   const draft = useAtomValue(spotDraftAtom);
   const placing = useAtomValue(spotPlacingAtom);
@@ -45,8 +63,12 @@ export const SpotMenu = () => {
   const [tab, setTab] = useState<Tab>('popular');
   const [query, setQuery] = useState('');
 
-  // The ranking needs no account, so the menu opens for a guest too.
-  const spots = tab === 'mine' ? mine : popular;
+  // The ranking needs no account, so the menu opens for a guest too. The
+  // other two tabs are the reader's own and ask for one.
+  const ownTab = tab === 'mine' || tab === 'favourites';
+  const spots =
+    tab === 'mine' ? mine : tab === 'favourites' ? favourites : popular;
+  const failed = spotsFailed || (tab === 'favourites' && starsFailed);
 
   const needle = query.trim().toLowerCase();
   const filtered = !needle
@@ -69,8 +91,10 @@ export const SpotMenu = () => {
 
   const row = (spot: SpotRecord) => {
     const open = spot.id === active?.id;
-    // Absent from the view means nobody has voted, not an unknown tally.
+    // Absent from the view means nobody has voted or starred, not an
+    // unknown tally.
     const score = scores?.get(spot.id)?.score ?? 0;
+    const stars = starCounts?.get(spot.id)?.stars ?? 0;
     return (
       <Menu.Item
         key={spot.id}
@@ -97,6 +121,14 @@ export const SpotMenu = () => {
               leftSection={<Icon icon="thumb_up" size={10} />}
             >
               {score}
+            </Badge>
+          ) : tab === 'favourites' ? (
+            <Badge
+              size="xs"
+              variant="light"
+              leftSection={<Icon icon="star" size={10} />}
+            >
+              {stars}
             </Badge>
           ) : (
             spot.visibility === 'public' && (
@@ -140,6 +172,7 @@ export const SpotMenu = () => {
           }}
           data={[
             { value: 'mine', label: t('spots.list.tabMine') },
+            { value: 'favourites', label: t('spots.list.tabFavourites') },
             { value: 'popular', label: t('spots.list.tabPopular') },
           ]}
         />
@@ -157,12 +190,16 @@ export const SpotMenu = () => {
           />
         )}
 
-        {tab === 'mine' && !signedIn ? (
+        {ownTab && !signedIn ? (
           <Menu.Item
             leftSection={<Icon icon="login" size={18} />}
             onClick={() => openAuthDialog(true)}
           >
-            {t('spots.mine.needsAccount')}
+            {t(
+              tab === 'mine'
+                ? 'spots.mine.needsAccount'
+                : 'spots.favourites.needsAccount',
+            )}
           </Menu.Item>
         ) : (
           <>
@@ -171,7 +208,7 @@ export const SpotMenu = () => {
                 disabled
                 leftSection={<Icon icon="warning" size={18} />}
               >
-                {t(tab === 'mine' ? 'spots.mine.failed' : 'spots.list.failed')}
+                {t(TAB_COPY[tab].failed)}
               </Menu.Item>
             )}
             {!failed && spots == null && (
@@ -179,7 +216,7 @@ export const SpotMenu = () => {
             )}
             {spots?.length === 0 && (
               <Menu.Item disabled className={styles.empty}>
-                {t(tab === 'mine' ? 'spots.mine.empty' : 'spots.list.empty')}
+                {t(TAB_COPY[tab].empty)}
               </Menu.Item>
             )}
             {needle && filtered?.length === 0 && (

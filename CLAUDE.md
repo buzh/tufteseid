@@ -33,7 +33,7 @@ Each owns its subject; this file keeps only what is true across all of them.
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
 | `docs/render-sidecar.md` | The server-side render service: the contract, the token trade, the queue's limits, the RVT and ffmpeg recipes, the burnt-in legend, the failure modes | `rendersvc/`, `src/api/render.ts`, the `sunloop` and `rvt` arms in `src/evidence/` |
 | `docs/identity.md` | PocketBase password auth, the three modes of the sign-in box, the three fields on `users` nobody may set themselves, and what a feature gates | `src/auth/`, `pocketbase/pb_hooks/identity.pb.js`, the `users` migrations |
-| `docs/votes.md` | The public-only gate, the `votes` collection and the `spotScores` view's two quirks | `src/spots/spotScores.ts`, `src/api/votes.ts`, the vote migration |
+| `docs/votes.md` | The public-only gate, the `votes` and `stars` collections, the two views' shared quirks, and why a self-star is listed but not counted | `src/spots/spotScores.ts`, `src/spots/spotStars.ts`, `src/api/votes.ts`, `src/api/stars.ts`, the vote and star migrations |
 | `docs/closed-beta.md` | Who may register and what pays for it, the hook that enforces it, the SQL for opening places and granting invites, the mail route's settings, what the gate does not cover | `pocketbase/pb_hooks/`, `src/invites/`, `src/api/invites.ts`, the sign-in box |
 | `docs/monitoring.md` | The access logs, the usage report, the cron health check, retention | `scripts/usage-report.sh`, `scripts/health-check.sh`, any log format or `logging:` cap |
 | `vat-cache/README.md` | The out-of-band Python pipeline that precomputes the cached VAT ground | `vat-cache/`, `cvat-tiles/` |
@@ -210,7 +210,8 @@ the reader's to choose, a rule being unable to name a field
 
 ### Collections
 
-Two collections carry the reader's records, and two more the votes on them:
+Two collections carry the reader's records, and four more the votes and
+stars on them:
 
 - **`spots`** (id `pbc_spots`) — `owner` (→ users, cascade), `code` (six
   characters of Crockford base32, unique, generated client-side and retried on
@@ -251,6 +252,15 @@ sidecar, which writes `meta.job` as it goes and the file when it is done
   things to code against: PocketBase publishes **no realtime feed on a view**,
   and a spot with no votes is **absent** rather than present at zero
   (`docs/votes.md`).
+- **`stars`** (id `pbc_stars`) — `owner` (→ users, cascade), `spot` (→ spots,
+  cascade), `created`. A favourite: unique over `(owner, spot)` like a vote,
+  readable only by its owner like a vote, but with **no update rule** — it
+  holds nothing that can change — and allowed **on your own spot**, which is
+  what puts it in *Mine favoritter*.
+- **`starCounts`** (id `pbc_star_counts`) — a **view** over `stars` with the
+  same two quirks as `spotScores`, carrying `stars` per **public** spot and
+  **leaving the owner's own star out**, so the favourites list and the tally
+  disagree on an author's own spot by design (`docs/votes.md`).
 
 Two more carry the closed beta, both written by `pb_hooks/closed_beta.pb.js`
 rather than by the SPA:
@@ -270,8 +280,8 @@ are read by nothing. Leave them alone rather than adding a migration to drop
 them.
 
 Client side: `src/api/pocketbase.ts` (singleton, `pocketbaseUrl` defaults `/pb`),
-`src/api/spots.ts`, `src/api/evidence.ts`, `src/api/votes.ts` and
-`src/api/invites.ts`.
+`src/api/spots.ts`, `src/api/evidence.ts`, `src/api/votes.ts`,
+`src/api/stars.ts` and `src/api/invites.ts`.
 
 ### Permissions
 

@@ -1,8 +1,16 @@
-# Votes
+# Votes and stars
 
-A score per spot, in PocketBase. There is no comment engine and no discussion
-thread: a spot carries a tally and nothing else a reader can write on somebody
-else's record.
+Two tallies per spot, in PocketBase. There is no comment engine and no
+discussion thread: a spot carries numbers and nothing else a reader can write
+on somebody else's record.
+
+A **vote** says how good the spot is and runs both ways; a **star** says the
+reader wants it back and only runs one. They are counted apart and ranked
+apart — *Populære* is the vote score, *Favoritter* is the reader's own stars.
+
+Both are a base collection of one row per reader per spot with a view
+collection over it, and both views carry the two properties `spotScores`
+records below.
 
 `pocketbase/pb_migrations/1700001700_spot_votes.js` creates two collections.
 
@@ -84,7 +92,7 @@ Two properties of a view collection the client is written against:
 - **A spot with no votes is absent**, not present at zero. Every reader of
   `spotScoresAtom` treats a missing entry as zero rather than as unknown.
 
-## Client
+## Vote client
 
 | | |
 | --- | --- |
@@ -100,3 +108,81 @@ would hide the feature from one of the two audiences.
 `SpotMenu`: every public spot, best first, `updated` breaking a tie. It does
 not wait on the tallies — if they never land the list still reads, unranked,
 rather than hanging on a spinner.
+
+## `stars` (id `pbc_stars`)
+
+`pocketbase/pb_migrations/1700002700_spot_stars.js` creates the second pair,
+in the shape of the first.
+
+| field | type |
+| --- | --- |
+| `owner` | relation → `users`, required, cascade |
+| `spot` | relation → `spots`, required, cascade |
+| `created` | autodate — the favourites list is ordered by it |
+
+`idx_stars_owner_spot` is unique over `(owner, spot)`. A star holds nothing
+that can change, so `addStar()` treats the resulting `validation_not_unique`
+400 as "already starred" and hands back the row that is there rather than
+upserting, and retracting is a delete.
+
+| | |
+| --- | --- |
+| list / view | `owner = @request.auth.id \|\| @request.auth.role = "admin"` |
+| create | signed in, owns the record, and the spot is public |
+| update | **no rule at all** — nothing to change |
+| delete | owner or admin |
+
+Two differences from a vote, both following from a star being a bookmark as
+much as a verdict:
+
+- **An author may star their own spot**, because the star is what puts it in
+  the favourites. The tally leaves a self-star out (`t.owner != s.owner` in
+  the view, as `spotScores` does), so the list and the number disagree on
+  purpose: `StarControl` on one's own card can show a lit star over a zero.
+  `spots.starOwn` is the tooltip that says so.
+- **No update rule.** The vote's carries a public-spot gate and pins both
+  relations because `direction` can legitimately move; a star has no such
+  field, so there is no request to allow and no private spot to PATCH one
+  onto.
+
+## `starCounts` (id `pbc_star_counts`)
+
+A view collection, list and view rule open, one row per starred public spot:
+
+```sql
+SELECT t.spot AS id, t.spot AS spot, COUNT(*) AS stars
+FROM stars t JOIN spots s ON s.id = t.spot
+WHERE s.visibility = 'public' AND t.owner != s.owner
+GROUP BY t.spot
+```
+
+The join does the same two jobs here as in `spotScores`: the rules are open,
+so the query is what keeps a private spot out, and a star already cast stops
+counting when the spot goes private or when it is the author's own, without
+the row being deleted.
+
+## Star client
+
+| | |
+| --- | --- |
+| `src/api/stars.ts` | the collection calls, the idempotent create, the realtime subscription |
+| `src/spots/spotStars.ts` | `starCountsAtom`, `myStarsAtom`, `starsFailedAtom`, `favouriteSpotsAtom`, and the `useSpotStars()` hook `SpotSurface` mounts once |
+| `src/spots/StarControl.tsx` | the star and its tally, beside `VoteControl` in the same two boxes |
+
+`myStarsAtom` is **null until the list lands** where `myVotesAtom` starts
+empty: a thumb that has not loaded reads as unpressed and nobody is misled,
+but *Favoritter* is a list, where "none yet" and "not here yet" are different
+sentences. `starsFailedAtom` carries the third, for the same reason.
+
+`favouriteSpotsAtom` resolves the reader's stars against `spotRecordsAtom`,
+most recently starred first. A spot whose owner has since made it private is
+in no record list the reader can see, so it drops out of the favourites with
+its star row left alone — the same trade the view makes for the tally.
+
+## What the tallies are not, yet
+
+Nothing reads a per-account total. Granting an invite or a flair off stars
+received would be a view grouping `stars` by `s.owner` rather than by
+`t.spot`, and `users.inviteQuota` and `users.features` are already the two
+fields such a thing would move (`docs/identity.md`,
+`docs/closed-beta.md`).

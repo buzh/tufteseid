@@ -12,6 +12,7 @@ import { SketchFade } from '../sketch/SketchFade';
 import { activeSpotAtom, spotReadingAtom } from '../spots/atoms';
 import { formatPoint } from '../spots/geo';
 import { useMayEditSpot } from '../spots/mayEdit';
+import { StarControl } from '../spots/StarControl';
 import { VoteControl } from '../spots/VoteControl';
 import { cx } from '../ui/cx';
 import { ControlButton } from '../ui/ControlButton';
@@ -181,6 +182,7 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
         actions={
           <>
             <VoteControl spot={spot} />
+            <StarControl spot={spot} />
             {current && (
               <Tooltip
                 label={downloadLabel({

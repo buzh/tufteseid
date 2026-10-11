@@ -13,7 +13,7 @@ import { castVote, retractVote, type VoteDirection } from '../api/votes';
 import { currentUserAtom, isAuthDialogOpenAtom } from '../auth/atoms';
 import { ControlButton } from '../ui/ControlButton';
 import { myVotesAtom, spotScoresAtom } from './spotScores';
-import styles from './VoteControl.module.css';
+import styles from './tally.module.css';
 
 export const VoteControl = ({ spot }: { spot: SpotRecord }) => {
   const { t } = useTranslation();
@@ -28,7 +28,7 @@ export const VoteControl = ({ spot }: { spot: SpotRecord }) => {
 
   const tally = (
     <span
-      className={styles.score}
+      className={styles.tally}
       // `total`, not `count`: i18next reads `count` as a request for
       // plural forms this key has none of.
       title={t('spots.voteScore', { total: score })}

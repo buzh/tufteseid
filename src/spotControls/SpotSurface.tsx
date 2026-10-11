@@ -30,6 +30,7 @@ import { useSpotShareLink } from '../spots/shareLink';
 import { useSpotLayer } from '../spots/spotLayer';
 import { useSpotRecords } from '../spots/spotRecords';
 import { useSpotScores } from '../spots/spotScores';
+import { useSpotStars } from '../spots/spotStars';
 import { SpotAcquire } from './SpotAcquire';
 import styles from './SpotBox.module.css';
 import { SpotCard } from './SpotCard';
@@ -103,6 +104,7 @@ export const SpotSurface = () => {
 
   useSpotRecords();
   useSpotScores();
+  useSpotStars();
   useSpotLayer();
   useSpotShareLink();
   useSpotPlacement();
