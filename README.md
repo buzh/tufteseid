@@ -143,8 +143,8 @@ renders before any of this is arranged, and for a reader without it the two
 order chips are simply absent rather than failing.
 
 **Nobody can grant themselves any of this.** The `users` collection has no
-update rule at all, and `role`, `features` and the two invite counters are
-pinned at registration by a hook — the admin UI is the only way any of them
+update rule at all, and `role`, `features` and `inviteQuota` are pinned at
+registration by a hook — the admin UI is the only way any of them
 moves ([`docs/identity.md`](docs/identity.md)).
 
 ## Who may register

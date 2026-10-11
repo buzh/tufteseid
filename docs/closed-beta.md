@@ -8,7 +8,7 @@ always were, and existing accounts are never re-checked.
 ```
 registration   one row: openSlots, closed
 invites        one row per code: issuer, redeemedBy, redeemedAt, email, sentAt
-users          + inviteQuota, invitesSent
+users          + inviteQuota
 ```
 
 ## Where it is enforced
@@ -28,7 +28,7 @@ users          + inviteQuota, invitesSent
 
 An administrator adding somebody by hand is not a registration, so a request
 carrying superuser auth skips the gate. The same request skips
-`pb_hooks/identity.pb.js`, which is what pins `role` and the invite counters
+`pb_hooks/identity.pb.js`, which is what pins `role` and the invite quota
 on everybody else's row (`docs/identity.md`).
 
 ### What pays for an account
@@ -77,18 +77,21 @@ different valid one. The hook folds I and L onto 1 and O onto 0 on the way in.
 
 ## Invites
 
-`users.inviteQuota` is how many invites an account may ever mint. What is left
-to mint is the quota less the rows it has issued, so **revoking an unspent
-invite gives the quota back**. A spent one cannot be revoked — the delete rule
-refuses it — because it is the record of an admission.
+`users.inviteQuota` is how many invites an account may ever mint, and **a code
+is the only thing an invite costs**. What is left to mint is the quota less
+the rows it has issued, so five granted and three minted leaves two whatever
+became of the three. `inviteQuota` itself never moves — it is a ceiling, not a
+balance — and the number the panel shows is that subtraction.
 
-The same number caps how many invite mails the installation will send on that
-account's behalf, counted separately on `users.invitesSent` because that one
-must not refund — see *Mailing an invite*.
-
-`redeemedAt` rather than `redeemedBy` is what says an invite is spent:
+**Revoking an unspent invite gives the quota back.** A spent one cannot be
+revoked — the delete rule refuses it — because it is the record of an
+admission. `redeemedAt` rather than `redeemedBy` is what says it is spent:
 `redeemedBy` empties if the invitee later closes their account, and an invite
-must not look unused again.
+somebody came in on must not look unused again.
+
+How the code reached its holder is nothing the gate counts. Mailing one is a
+convenience the installation offers, not a second currency — see *Mailing an
+invite*.
 
 A reader mints, copies and sends from the account menu → *Invitasjoner*.
 
@@ -164,8 +167,7 @@ SELECT u.email,
        COALESCE(u.inviteQuota, 0)                                AS quota,
        COUNT(i.id)                                               AS minted,
        SUM(CASE WHEN i.redeemedAt != '' THEN 1 ELSE 0 END)       AS spent,
-       COALESCE(u.inviteQuota, 0) - COUNT(i.id)                  AS available,
-       COALESCE(u.invitesSent, 0)                                AS mailed
+       COALESCE(u.inviteQuota, 0) - COUNT(i.id)                  AS available
 FROM users u
 LEFT JOIN invites i ON i.issuer = u.id
 GROUP BY u.id
@@ -173,12 +175,8 @@ HAVING quota > 0 OR minted > 0
 ORDER BY available DESC, minted DESC;
 ```
 
-`mailed` is the only one of these that cannot go down by itself. Giving
-somebody their letters back after a run of bad addresses is a deliberate act:
-
-```sql
-UPDATE users SET invitesSent = 0 WHERE email = 'navn@example.org';
-```
+`quota` is the only column here that an administrator moves; the other three
+follow from the `invites` rows.
 
 ```sql
 -- Who came in on whose invite.
@@ -193,17 +191,17 @@ ORDER BY i.redeemedAt DESC;
 ## Mailing an invite
 
 `POST /pb/api/invites/{id}/send` takes `{ "email": "…" }` and is the only way
-the row's `email` and `sentAt` are ever written. **One mail per invite**, and
-**`inviteQuota` mails per account**, counted on `users.invitesSent`.
+the row's `email` and `sentAt` are ever written. **One mail per invite**, off
+`sentAt`, and no other limit: a letter is not what an invite costs. A reader
+who mistyped the address revokes the invite, mints another against the
+refunded quota and sends that.
 
-The second limit is what makes the first one mean anything. The mint quota
-cannot double as a mail budget, because revoking refunds it: mint → send →
-revoke → mint posts as many letters as the sender likes, to addresses of
-their choosing, from the installation's own `From:`. `invitesSent` only ever
-goes up, so a reader who mistyped the address still revokes, mints and sends
-again — at the cost of one letter from the budget — but nobody gets an open
-relay out of it. A letter SMTP refuses outright is refunded; an address that
-simply bounces later is not, since nothing here hears about it.
+That is also the hole, and it is deliberate: mint → send → revoke → mint
+posts as many letters as the sender likes, to addresses of their choosing,
+from the installation's own `From:`. Only an account an administrator has
+granted a quota to can send at all, which in a closed beta is a short and
+known list. Closing it would mean refusing to revoke an invite already
+mailed, at the cost of making a mistyped address permanent.
 
 The address is saved to the row **before** the mail goes out, so the
 `EmailField` validator is what judges it and what SMTP is handed is exactly

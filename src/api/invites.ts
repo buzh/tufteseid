@@ -63,11 +63,8 @@ export const revokeInvite = async (id: string): Promise<void> => {
   await pb.collection(COLLECTION).delete(id);
 };
 
-/** One mail per invite, so this answers 400 on a second try, and
- *  `inviteQuota` mails per account however often an invite is revoked and
- *  minted again, so it answers 403 `mail_budget_spent` once those are gone. A
- *  route of its own because the reader may set the address and nothing
- *  else. */
+/** One mail per invite, so this answers 400 on a second try. A route of its
+ *  own because the reader may set the address and nothing else. */
 export const sendInvite = async (id: string, email: string): Promise<void> => {
   await pb.send(`/api/invites/${id}/send`, {
     method: 'POST',

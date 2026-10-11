@@ -38,19 +38,12 @@ const validationCode = (err: unknown, field: 'email' | 'issuer'): string =>
   (err as { response?: { data?: Record<string, { code?: string }> } })?.response
     ?.data?.[field]?.code ?? '';
 
-/** The hook tells a failed send apart from a refused one, so the reader
- *  learns whether it is their address, their budget or the installation at
- *  fault. */
-const sendFailure = (err: unknown): string => {
-  switch (validationCode(err, 'email')) {
-    case 'mail_failed':
-      return 'invites.mailFailed';
-    case 'mail_budget_spent':
-      return 'invites.budgetSpent';
-    default:
-      return 'invites.sendFailed';
-  }
-};
+/** The hook tells SMTP's failure apart from a bad address, so the reader
+ *  learns whether it is theirs or the installation's fault. */
+const sendFailure = (err: unknown): string =>
+  validationCode(err, 'email') === 'mail_failed'
+    ? 'invites.mailFailed'
+    : 'invites.sendFailed';
 
 /** The quota only refreshes on the next page load, so a mint the hook refuses
  *  is the ordinary way for a stale count to be found out. */

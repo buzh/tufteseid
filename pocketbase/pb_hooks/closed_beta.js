@@ -170,49 +170,9 @@ const inviteMail = (app, invite, from) => {
   });
 };
 
-/**
- * Reserves one letter against `users.invitesSent`, answering whether there
- * was one left. False means the budget is spent.
- *
- * A counter of its own rather than the mint quota, which cannot double as a
- * mail budget: revoking refunds it, so mint → send → revoke → mint would post
- * as many letters as the sender liked, to addresses of their choosing, from
- * the installation's own sender. This one only ever goes up.
- *
- * Read and written in a transaction of its own, outside the mail: two sends
- * racing would otherwise both see the same count, and holding the single
- * write connection open across SMTP would block every other writer.
- */
-const spendMailBudget = (app, userId) => {
-  let spent = false;
-  app.runInTransaction((txApp) => {
-    const user = txApp.findRecordById('users', userId);
-    const sent = user.getInt('invitesSent');
-    if (sent >= user.getInt('inviteQuota')) return;
-    user.set('invitesSent', sent + 1);
-    txApp.save(user);
-    spent = true;
-  });
-  return spent;
-};
-
-/** For a letter SMTP refused outright, which is the installation's fault
- *  rather than the sender's. */
-const refundMailBudget = (app, userId) => {
-  app.runInTransaction((txApp) => {
-    const user = txApp.findRecordById('users', userId);
-    const sent = user.getInt('invitesSent');
-    if (sent <= 0) return;
-    user.set('invitesSent', sent - 1);
-    txApp.save(user);
-  });
-};
-
 module.exports = {
   INVITES,
   admit,
   prepareMint,
   inviteMail,
-  spendMailBudget,
-  refundMailBudget,
 };

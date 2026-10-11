@@ -9,7 +9,7 @@
 // its way past the closed beta.
 //
 // Past the create there is no way back in: `users` has no update rule at all,
-// so these four are only ever moved by a superuser or by a hook
+// so these three are only ever moved by a superuser or by a hook
 // (`1700002200_users_not_self_writable.js`, `docs/identity.md`).
 
 onRecordCreateRequest((e) => {
@@ -22,7 +22,6 @@ onRecordCreateRequest((e) => {
   e.record.set('role', 'user');
   e.record.set('features', []);
   e.record.set('inviteQuota', 0);
-  e.record.set('invitesSent', 0);
 
   e.next();
 }, 'users');

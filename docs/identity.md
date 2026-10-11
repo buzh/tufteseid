@@ -55,18 +55,17 @@ The row cannot go away. `spots.owner`, `evidence.owner`, `votes.owner` and
 `invites.issuer` are all relations to it, every collection rule is written
 against `@request.auth.*`, and PocketBase can only judge a record of its own.
 
-Four fields on it are **not the reader's to set**, and it takes two mechanisms
-to hold that — one at create, one after:
+Three fields on it are **not the reader's to set**, and it takes two
+mechanisms to hold that — one at create, one after:
 
 | field | what it decides |
 | --- | --- |
 | `role` | `admin` reaches every spot in the register |
 | `features` | what this account may spend (below) |
 | `inviteQuota` | how many invites it may ever mint |
-| `invitesSent` | how many letters it has posted |
 
-- **At create**, `pb_hooks/identity.pb.js` pins all four: `role` to `user`,
-  `features` to empty, the counters to zero. It has to, because registration
+- **At create**, `pb_hooks/identity.pb.js` pins all three: `role` to `user`,
+  `features` to empty, the quota to zero. It has to, because registration
   is a plain record create against an open create rule and *a collection rule
   cannot name a field* — without the hook, a POST carrying `role: "admin"`
   would be honoured. A superuser create is left alone, so adding somebody by
@@ -74,7 +73,8 @@ to hold that — one at create, one after:
 - **After create**, `1700002200_users_not_self_writable.js` takes the update
   rule away entirely. Nothing in the SPA has ever PATCHed a user row. A
   superuser and a hook save records directly and are not held by an API rule,
-  so the admin UI and `pb_hooks/` are the only two ways any of the four moves.
+  so the admin UI and `pb_hooks/` are the only two ways any of the three
+  moves.
 
 **Granting a rank or a feature is an admin-UI edit**: Collections → `users` →
 the row → `role`, or an entry on the `features` array. It takes effect on the

@@ -32,7 +32,7 @@ Each owns its subject; this file keeps only what is true across all of them.
 | `docs/wms-proxy-and-tiles.md` | Caddy → wmscache → upstream and Caddy → mapproxy → upstream, nib-proxy, cache rules, CSP hosts, tile-loading limits | `Caddyfile`, `nginx/`, `mapproxy/`, `nib-proxy/`, tile grids, anything that multiplies request counts |
 | `docs/terrain-analysis.md` | Float elevation from hoydedata.no, the endpoint's quirks, the visualizations | `src/terrain/` |
 | `docs/render-sidecar.md` | The server-side render service: the contract, the token trade, the queue's limits, the RVT and ffmpeg recipes, the burnt-in legend, the failure modes | `rendersvc/`, `src/api/render.ts`, the `sunloop` and `rvt` arms in `src/evidence/` |
-| `docs/identity.md` | PocketBase password auth, the three modes of the sign-in box, the four fields on `users` nobody may set themselves, and what a feature gates | `src/auth/`, `pocketbase/pb_hooks/identity.pb.js`, the `users` migrations |
+| `docs/identity.md` | PocketBase password auth, the three modes of the sign-in box, the three fields on `users` nobody may set themselves, and what a feature gates | `src/auth/`, `pocketbase/pb_hooks/identity.pb.js`, the `users` migrations |
 | `docs/votes.md` | The public-only gate, the `votes` collection and the `spotScores` view's two quirks | `src/spots/spotScores.ts`, `src/api/votes.ts`, the vote migration |
 | `docs/closed-beta.md` | Who may register and what pays for it, the hook that enforces it, the SQL for opening places and granting invites, the mail route's settings, what the gate does not cover | `pocketbase/pb_hooks/`, `src/invites/`, `src/api/invites.ts`, the sign-in box |
 | `docs/monitoring.md` | The access logs, the usage report, the cron health check, retention | `scripts/usage-report.sh`, `scripts/health-check.sh`, any log format or `logging:` cap |
@@ -182,7 +182,7 @@ App-based JSVM API (`$app.findCollectionByNameOrId` / `app.save`, flattened
 field classes), **not** the 0.22 `Dao` API. `pocketbase/pb_hooks/` holds JS
 hooks in the same runtime, for the two things a collection rule cannot say:
 the closed-beta gate counts rows and spends a counter (`docs/closed-beta.md`),
-and `identity.pb.js` pins the four fields on a new `users` row that are not
+and `identity.pb.js` pins the three fields on a new `users` row that are not
 the reader's to choose, a rule being unable to name a field
 (`docs/identity.md`).
 
@@ -286,8 +286,8 @@ So the UI carries one permission, `mayEdit` (owner *or* admin): an admin can
 rename, reshape and delete anybody's spot. `users.role` and `users.features`
 are granted by hand in the admin UI, pinned at registration by
 `pb_hooks/identity.pb.js`, and the `users` row has no update rule at all —
-neither the rank nor the membership nor the invite counters are the reader's
-to set (`docs/identity.md`).
+neither the rank nor the membership nor the invite quota is the reader's to
+set (`docs/identity.md`).
 
 **What a feature gates is making, never reading.** A gated capability is a
 name (`render` so far) on `users.features`, enforced where the cost is rather

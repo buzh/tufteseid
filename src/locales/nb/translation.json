@@ -576,7 +576,6 @@
     "failed": "Fikk ikke hentet invitasjonene dine.",
     "sendFailed": "Fikk ikke sendt invitasjonen. Sjekk adressen.",
     "mailFailed": "E-post er ikke satt opp på denne installasjonen. Send koden selv.",
-    "budgetSpent": "Du har brukt opp e-postene dine. Du kan fortsatt kopiere koden og sende den selv.",
     "revokeFailed": "Fikk ikke slettet invitasjonen.",
     "mintFailed": "Fikk ikke laget invitasjonen.",
     "quotaSpent": "Du har ingen invitasjoner igjen."

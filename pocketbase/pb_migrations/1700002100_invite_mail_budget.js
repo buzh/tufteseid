@@ -1,13 +1,10 @@
 /// <reference path="../pb_data/types.d.ts" />
 //
-// How many invite mails an account has had the installation send. The mint
-// quota cannot double as the mail budget: revoking an invite refunds it, so
-// mint → send → revoke → mint would post as many letters as the sender liked
-// (`pb_hooks/closed_beta.pb.js`). This counter only goes up, and the send
-// route stops at `inviteQuota`.
+// How many invite mails an account has had the installation send.
 //
-// Nobody's to write over the API: `users` has no update rule reaching it and
-// the hook saves the record itself.
+// Reversed by `1700002600_drop_invite_mail_budget.js`: a letter is not what
+// an invite costs (`docs/closed-beta.md`). This file stays because
+// `_migrations` records it and a rename makes PocketBase re-run it.
 
 migrate(
   (app) => {

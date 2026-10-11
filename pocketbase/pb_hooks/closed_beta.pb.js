@@ -71,10 +71,9 @@ onRecordCreateRequest((e) => {
 // the reader may set the address but nothing else, and because the row is
 // only marked sent once the mail is actually away.
 //
-// One mail per invite, and `users.inviteQuota` letters per account however
-// many times its invites are revoked and minted again. A reader who mistyped
-// the address revokes the invite, mints another and sends that — at the cost
-// of one letter from the budget.
+// One mail per invite and nothing beyond it: what an invite costs is the
+// quota row it was minted against, never the letter. A reader who mistyped
+// the address revokes the invite and mints another.
 routerAdd(
   'POST',
   '/api/invites/{id}/send',
@@ -118,19 +117,9 @@ routerAdd(
     }
     e.app.save(invite);
 
-    if (!beta.spendMailBudget(e.app, e.auth.id)) {
-      throw new ForbiddenError('Du har ikke flere e-poster igjen.', {
-        email: new ValidationError(
-          'mail_budget_spent',
-          'The account has sent as many invite mails as its quota allows.',
-        ),
-      });
-    }
-
     try {
       e.app.newMailClient().send(beta.inviteMail(e.app, invite, e.auth));
     } catch (err) {
-      beta.refundMailBudget(e.app, e.auth.id);
       e.app
         .logger()
         .error('invite mail failed', 'error', String(err), 'invite', invite.id);
