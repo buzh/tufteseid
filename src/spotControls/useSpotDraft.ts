@@ -15,6 +15,7 @@ import {
 } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
 import { bboxWidthMetres } from '../map/bbox';
+import { suggestPlaceName } from '../search/placeNames';
 import { drawHoldAtom } from '../shared/uiContext';
 import { sketchShownAtom } from '../sketch/overlay';
 import { SKETCH_BUDGET_BYTES, sketchBytes, sketchOf } from '../sketch/scene';
@@ -31,7 +32,6 @@ import {
 } from '../spots/atoms';
 import { derivedFootprint } from '../spots/footprint';
 import { formatPoint } from '../spots/geo';
-import { suggestSpotName } from '../spots/spotName';
 
 /** How long the pin stands still before the name register is asked. */
 const SUGGEST_SETTLE_MS = 500;
@@ -228,7 +228,7 @@ export const useSpotDraft = (
 
     const timer = setTimeout(() => {
       // Degrees: the draft's point is EPSG:4326.
-      void suggestSpotName(lon, lat, 'EPSG:4326').then((suggestion) => {
+      void suggestPlaceName(lon, lat, 'EPSG:4326').then((suggestion) => {
         if (!live) return;
         setSuggesting(false);
         if (!suggestion || nameTouched.current) return;

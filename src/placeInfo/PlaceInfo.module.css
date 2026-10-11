@@ -1,0 +1,110 @@
+/* The overlay element is `pointer-events: none`; this box takes it back. */
+.popup {
+  box-sizing: border-box;
+  width: 90vw;
+  max-width: calc(21rem * var(--ui-scale));
+  max-height: 60vh;
+  pointer-events: auto;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-xs);
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mantine-spacing-xs);
+  font-size: var(--mantine-font-size-sm);
+}
+
+.rowIcon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--mantine-color-dimmed);
+}
+
+.rowValue {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The second line of the coordinate row: the same point, said in the grid the
+   renders are made on. */
+.rowAside {
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  margin-top: var(--mantine-spacing-sm);
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-sm);
+}
+
+.places {
+  margin-top: var(--mantine-spacing-sm);
+  padding-top: var(--mantine-spacing-xs);
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.placesHead {
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 700;
+}
+
+.place {
+  display: flex;
+  align-items: baseline;
+  gap: var(--mantine-spacing-xs);
+  margin-top: calc(2px * var(--ui-scale));
+  font-size: var(--mantine-font-size-sm);
+}
+
+.placeName {
+  overflow-wrap: anywhere;
+}
+
+.placeKind {
+  flex: 1;
+  min-width: 0;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+.placeDistance {
+  flex: none;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* `pointer-events: none`, or the banner would be the one place on the map a
+   lookup cannot be asked for. */
+.prompt {
+  position: absolute;
+  top: var(--mantine-spacing-xs);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: var(--mantine-spacing-xs);
+  max-width: calc(100% - 2 * var(--mantine-spacing-xs));
+  padding: calc(4px * var(--ui-scale)) var(--mantine-spacing-sm);
+  border: 1px solid var(--mantine-color-papaya-6);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-body);
+  box-shadow: var(--mantine-shadow-sm);
+  font-size: var(--mantine-font-size-xs);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.promptKey {
+  color: var(--mantine-color-dimmed);
+}

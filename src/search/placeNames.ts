@@ -1,10 +1,11 @@
-import type { PlaceNamePoint } from '../types/searchTypes';
-import { getPlaceNamesByLocation } from '../search/searchApi';
 import type { ProjectionIdentifier } from '../map/projections/types';
+import type { PlaceNamePoint } from '../types/searchTypes';
+import { getPlaceNamesByLocation } from './searchApi';
 
-// A name suggestion for a new pin, off ws.geonorge.no's stedsnavn register,
-// ranked by `navneobjekttype` first and distance second. The three sets below
-// are `navneobjekttype` values; anything unlisted is the neutral middle.
+// Reading ws.geonorge.no's stedsnavn register around a point: which entries
+// name the place, and which of them names it best. Ranked by `navneobjekttype`
+// first and distance second. The three sets below are `navneobjekttype` values;
+// anything unlisted is the neutral middle.
 //
 // Denied: administrative geography.
 const NAME_TYPE_DENY = new Set([
@@ -179,9 +180,15 @@ const SETTLED_SPELLING = new Set([
   'vedteke',
 ]);
 
-const SEARCH_RADIUS_M = 600;
+export const PLACE_RADIUS_M = 600;
 
-const TIMEOUT_MS = 6000;
+export type NearbyPlace = {
+  key: string;
+  name: string;
+  /** `navneobjekttype`; the register carries trailing spaces on some labels. */
+  kind: string;
+  metres: number;
+};
 
 /** `hovednavn` if the entry has one, else the first settled spelling, else
  *  whatever came first. */
@@ -194,49 +201,63 @@ const spellingOf = (point: PlaceNamePoint): string => {
   return chosen?.skrivemåte?.trim() ?? '';
 };
 
-const pickPlaceName = (points: PlaceNamePoint[]): string => {
-  let bestName = '';
-  let bestScore = Number.POSITIVE_INFINITY;
+const scored = (
+  points: PlaceNamePoint[],
+): { place: NearbyPlace; score: number }[] => {
+  const out: { place: NearbyPlace; score: number }[] = [];
 
   for (const point of points) {
     if (point.stedstatus !== 'aktiv') continue;
 
-    // The register carries trailing spaces on some type labels.
-    const type = point.navneobjekttype.trim();
-    if (NAME_TYPE_DENY.has(type)) continue;
+    const kind = point.navneobjekttype.trim();
+    if (NAME_TYPE_DENY.has(kind)) continue;
 
     const name = spellingOf(point);
     if (!name) continue;
 
-    const score =
-      point.meterFraPunkt -
-      (NAME_TYPE_PROMOTE.has(type) ? PROMOTE_BONUS_M : 0) +
-      (NAME_TYPE_DEMOTE.has(type) ? DEMOTE_PENALTY_M : 0);
-
-    if (score < bestScore) {
-      bestScore = score;
-      bestName = name;
-    }
+    out.push({
+      place: {
+        key: String(point.stedsnummer),
+        name,
+        kind,
+        metres: point.meterFraPunkt,
+      },
+      score:
+        point.meterFraPunkt -
+        (NAME_TYPE_PROMOTE.has(kind) ? PROMOTE_BONUS_M : 0) +
+        (NAME_TYPE_DEMOTE.has(kind) ? DEMOTE_PENALTY_M : 0),
+    });
   }
 
-  return bestName;
+  return out;
 };
 
-/** Never throws and never hangs: every failure, timeout included, is ''. */
-export const suggestSpotName = async (
+/** Everything that names the ground around the point, nearest first. */
+export const nearbyPlaces = (points: PlaceNamePoint[]): NearbyPlace[] =>
+  scored(points)
+    .sort((a, b) => a.place.metres - b.place.metres)
+    .map((entry) => entry.place);
+
+/** The one that names the point best: its type weighs more than its
+ *  distance. */
+export const tellingPlace = (points: PlaceNamePoint[]): NearbyPlace | null =>
+  scored(points).sort((a, b) => a.score - b.score)[0]?.place ?? null;
+
+/** A name for a point. Never throws: a failure, the transport's deadline
+ *  included, is ''. */
+export const suggestPlaceName = async (
   x: number,
   y: number,
   projection: ProjectionIdentifier,
 ): Promise<string> => {
   try {
-    const response = await Promise.race([
-      getPlaceNamesByLocation(x, y, SEARCH_RADIUS_M, projection),
-      new Promise<null>((resolve) =>
-        setTimeout(() => resolve(null), TIMEOUT_MS),
-      ),
-    ]);
-    if (!response) return '';
-    return pickPlaceName(response.navn ?? []);
+    const response = await getPlaceNamesByLocation(
+      x,
+      y,
+      PLACE_RADIUS_M,
+      projection,
+    );
+    return tellingPlace(response.navn ?? [])?.name ?? '';
   } catch {
     return '';
   }

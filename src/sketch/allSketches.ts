@@ -20,6 +20,7 @@ import { useEffect, useRef } from 'react';
 
 import type { SpotRecord } from '../api/spots';
 import { mapAtom } from '../map/atoms';
+import { placeInfoArmedAtom } from '../placeInfo/atoms';
 import {
   getUrlParameter,
   removeUrlParameter,
@@ -405,8 +406,15 @@ export const useAllSketchesLayer = () => {
       const state = stateRef.current;
       if (!state) return;
       // Deaf while drafting: the same click places the new pin
-      // (`spots/pinPlace.ts`).
-      if (store.get(spotDraftAtom) || store.get(spotPlacingAtom)) return;
+      // (`spots/pinPlace.ts`). Deaf too while a place lookup is armed, which
+      // asks about the ground the strokes are over.
+      if (
+        store.get(spotDraftAtom) ||
+        store.get(spotPlacingAtom) ||
+        store.get(placeInfoArmedAtom)
+      ) {
+        return;
+      }
       // A pin over a drawing wins: the smaller target, and the one that says
       // which spot it opens.
       if (spotsAtPixel(map, event.pixel)) return;

@@ -19,19 +19,20 @@ One row per directory under `src/`.
 | `flyfotoControls/` | The Flyfoto arm: which Norge i bilder acquisition, and its era grouping. |
 | `grounds/` | The ground switch. Which ground is up is derived from the half's background layer, never stored. |
 | `heritageControls/` | The Kulturminner control: which theme layers are ticked and how they are drawn. |
-| `heritageInfo/` | The pointer tip and the click-kept card over heritage features, plus the OL overlay they ride. |
+| `heritageInfo/` | The pointer tip and the click-kept card over heritage features. |
 | `kartControls/` | The Kart arm: which cartography. |
 | `lidarControls/` | The LiDAR arm: dataset menu, render, DTM/DOM, Automatisk, hybrid overlay and contours. |
 | `lidarExtract/` | LiDAR tile planning, fetching and stitching. `stitch.ts` serves the DEM fetch, `run.ts` and `sources.ts` the LiDAR evidence render. |
 | `locales/` | i18next JSON, one directory per language. |
-| `map/` | The OpenLayers map and everything attached to it: layer configuration and stacks, the compare halves and the split pane, feature info, projections, the rectangle-placing interaction, the footprint and pin and hint layers. |
+| `map/` | The OpenLayers map and everything attached to it: layer configuration and stacks, the compare halves and the split pane, feature info, projections, the rectangle-placing interaction, the footprint and pin and hint layers, and the overlay-to-portal hook the map-anchored boxes ride. |
+| `placeInfo/` | The *Stedsinformasjon* arm: the band's button, the armed click, and the card of what the four point registers answered about it. |
 | `ribbon/` | The top band: its three sections and the upstream status light while the map is the context in front, and the draw band while a drawing is. Layout only. |
-| `search/` | The band's search field: Geonorge place and address lookup, a typed coordinate, and the fly to whichever was picked. The road, property and elevation calls beside them have no caller. |
+| `search/` | The band's search field: Geonorge place and address lookup, a typed coordinate, and the fly to whichever was picked. Beside them the point lookups — place names, kommune, matrikkel and elevation — and the ranking of a stedsnavn answer that names a spot and heads a place card alike. The road and property calls by *name* have no caller. |
 | `shared/` | The context in front (`uiContext.ts`), the error boundary, URL parameter access, coordinate parsing, enum and number helpers, and the request deadline that reports to the breaker. |
 | `showControls/` | The band's what-is-drawn-over-the-ground group: the Kulturminner control, the open drawing's toggle and the shared drawing layer's. |
 | `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the toolbox that stands in for Excalidraw's own, the remembered pen, the render onto the ground, and the layer that puts every spot's drawing on it at once. |
 | `spotControls/` | The reader's records as surfaces: the `+`, the properties box, the read card, the box that orders a render from elsewhere, the index menu. |
-| `spots/` | Spot state and geometry: the pin layer, its clustering and its style, the footprint frame, hit test, place and adjust, share link, name suggestion, and the up/down tally each spot is ranked by. |
+| `spots/` | Spot state and geometry: the pin layer, its clustering and its style, the footprint frame, hit test, place and adjust, share link, and the up/down tally each spot is ranked by. |
 | `terrain/` | Client-side terrain analysis: DEM fetch, shading, the analysis window and its layers. |
 | `terrainControls/` | The terrain toggle and its panel. |
 | `types/` | Search response types. |
@@ -70,6 +71,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `heritageDetailsAtom`, `heritageRenderAtom`, `heritageOpacityAtom` | `map/layers/heritage.ts` | How they are drawn. |
 | `heritageHiddenAtom` | same | A blind: hides them without unticking the sources. Not URL-persisted. |
 | `heritageTipAtom`, `heritagePopupAtom` | `map/featureInfo/atoms.ts` | What the pointer found, and what a click kept. |
+| `placeInfoArmedAtom`, `placeReadingAtom` | `placeInfo/atoms.ts` | The next click on the map is a place lookup, and what the last one found. `armPlaceInfoAtom` is the writer: arming takes the map off the `+`, the terrain rectangle and a footprint in hand, and `otherHoldOnMapAtom` is the derived other half — any of those three taking it back disarms. |
 | `terrainWindowAtom` | `terrain/window.ts` | The rectangle under analysis; null is the analysis being off. |
 | `terrainAdjustingAtom` | same | It is still being placed, so nothing is fetched yet. |
 | `open`/`adjust`/`read`/`closeTerrainWindowAtom` | same | Write-only. `read` takes a rectangle settled elsewhere — the spot card hands it the footprint — and starts the reading without a square to place. |
@@ -136,11 +138,12 @@ What that costs each surface is different, and the difference is the rule:
   of the map: `setSpotStageAtom` clears `terrainAdjustingAtom` on the way into
   the draw stage, because a rectangle under a canvas could not be put down
   again.
-- **The heritage tip and card close outright.** Both ride OpenLayers overlays
-  on the map element, which the session wears a CSS transform on, so left up
-  they would be dragged and scaled with the ground rather than anchored to it.
-  They belonged to the context that has gone, so `useHeritageInfo` clears
-  them rather than hiding them.
+- **The heritage tip and card and the place card close outright.** All three
+  ride OpenLayers overlays on the map element, which the session wears a CSS
+  transform on, so left up they would be dragged and scaled with the ground
+  rather than anchored to it. They belonged to the context that has gone, so
+  `useHeritageInfo` and `usePlaceInfo` clear them rather than hiding them —
+  and the latter disarms the button with them.
 
 A second full-surface context reuses the atom: add it to `UiContext`, and every
 surface above already asks the right question.
@@ -882,6 +885,25 @@ keeps nothing** — no marker, no layer, and never a zoom out, the hit's zoom
 being a floor the way a `?lok=` link's is. It reads `mapAtom`, so in a
 two-ground view it answers for the main map (*Known gaps*).
 
+`PlaceInfoToggle` stands next to it and answers the other half of the same
+question: not "where is X" but "what is here". Pressing it arms the map, the
+next click asks, and the button disarms itself on that click — the `+`'s
+gesture, and exclusive with it. Four registers are asked at once and each is
+allowed to fail on its own, so the card carries whatever landed: metres above
+the sea from hoydedata, kommune and fylke from Geonorge's kommuneinfo, the
+matrikkel parcel from its eiendom service, and the stedsnavn within 600 m,
+nearest first under the one that names the point best. The coordinate needs no
+network and is on the card from the first frame, in degrees and in UTM 33N —
+the grid stated by name rather than the view's own, which the `projection`
+parameter can change under it. A lookup that finds nothing but the coordinate
+says so; an empty row is never a row.
+
+The card rides the same `useMapOverlay` the heritage card does, so the same
+rules apply to it: it is anchored to the ground, it closes rather than hides
+when the drawing context takes over, and Esc puts it away. While the button is
+armed, the heritage click, the pin click and the shared drawing layer's click
+all stand down — one click, one answer.
+
 `ShareButton` hands over the open spot's short link, or, with no spot open, the
 address bar as it stands: every ground, overlay and the centre are already
 parameters on it. Same gesture and same two-second answer as the button in a
@@ -995,15 +1017,15 @@ that is a last resort rather than the design.
   keeps the viewport list warm while datasets are cycled; nothing walks the
   flight rings.
 - **The second pane is looked at, not asked.** The heritage tip and card
-  (`src/heritageInfo/`), the terrain analysis and the search field read
-  `mapAtom` and never `peekSplitMap`, so they answer for the main map only.
-- **The search box asks two of the five services in front of it.**
-  `src/search/searchApi.ts` and `src/types/searchTypes.ts` still carry the road,
-  property and elevation lookups of the surface this one replaced, with no
-  caller between them; `getPlaceNamesByLocation` has one in
-  `spots/spotName.ts`. Kept as they are. The property and road calls are also
-  the only ones here that would go to `api.norgeskart.no` rather than straight
-  to Geonorge.
+  (`src/heritageInfo/`), the place card (`src/placeInfo/`), the terrain analysis
+  and the search field read `mapAtom` and never `peekSplitMap`, so they answer
+  for the main map only.
+- **Three lookups in `src/search/` still have no caller.** `getRoads`,
+  `getProperties` and `getPropertyDetailsByMatrikkelId` search the matrikkel by
+  *name* or by *number*, which no surface here does; they and their types are
+  the remains of the surface this search box replaced. Kept as they are. They
+  are also the only calls in the module that would go to `api.norgeskart.no`
+  rather than straight to Geonorge.
 - **The record list carries every drawing.** `listSpots` is one `getFullList`
   of whole records, so every readable spot's scene — up to 5 MB apiece — is
   fetched on load whether or not the shared drawing layer is ever switched on,

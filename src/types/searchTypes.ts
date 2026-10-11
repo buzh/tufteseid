@@ -145,6 +145,27 @@ export type PlaceNamePointApiResponse = {
   navn: PlaceNamePoint[];
 };
 
+export type MunicipalityPoint = Municipality & County;
+
+/** One `Teig` out of the matrikkel — a parcel on the ground, which may hold
+ *  several matrikkel units. */
+export type CadastralTeig = {
+  bruksnummer: number;
+  festenummer: number;
+  gardsnummer: number;
+  hovedområde: boolean;
+  kommunenummer: string;
+  /** `gnr/bnr`, with the festenummer and seksjonsnummer appended when set. */
+  matrikkelnummertekst: string;
+  meterFraPunkt: number;
+  seksjonsnummer: number;
+  teigmedflerematrikkelenheter: boolean;
+};
+
+export type CadastreApiResponse = {
+  features: { properties: CadastralTeig }[];
+};
+
 export type Road = {
   ADRESSEKODE: string;
   FYLKESNAVN: string;

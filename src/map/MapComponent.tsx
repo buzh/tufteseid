@@ -3,6 +3,7 @@ import 'ol/ol.css';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HeritageInfo } from '../heritageInfo';
+import { PlaceInfo } from '../placeInfo';
 import { ErrorBoundary } from '../shared/ErrorBoundary.tsx';
 import { SpotSurface } from '../spotControls';
 import { spotFootprintLayerEffect } from '../spots/footprintLayer.ts';
@@ -69,6 +70,9 @@ export const MapComponent = () => {
       </ErrorBoundary>
       <ErrorBoundary fallback={null} name="kulturminner">
         <HeritageInfo />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null} name="stedsinfo">
+        <PlaceInfo />
       </ErrorBoundary>
       <ErrorBoundary fallback={null} name="terreng">
         <TerrainSurface />

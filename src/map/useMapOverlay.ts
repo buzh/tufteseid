@@ -8,7 +8,7 @@ import { Overlay } from 'ol';
 import type { Coordinate } from 'ol/coordinate';
 import type { Options } from 'ol/Overlay';
 import { useEffect, useRef, useState } from 'react';
-import { mapAtom } from '../map/atoms';
+import { mapAtom } from './atoms';
 
 export const useMapOverlay = (
   position: Coordinate | undefined,

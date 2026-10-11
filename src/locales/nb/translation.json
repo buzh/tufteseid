@@ -325,6 +325,25 @@
     "close": "Vekk",
     "closeUnsaved": "Lukk uten å lagre? Klikk igjen."
   },
+  "placeInfo": {
+    "label": "Stedsinformasjon",
+    "cancel": "Avbryt oppslaget",
+    "hint": "Klikk i kartet for å se hva som er kjent om stedet",
+    "escape": "Esc avbryter",
+    "title": "Stedsinformasjon",
+    "busy": "Slår opp …",
+    "telling": "{{name}} · {{kind}} · {{metres}} m unna",
+    "elevation": "Høyde over havet",
+    "elevationValue": "{{metres}} moh.",
+    "coordinate": "Koordinat",
+    "utm": "UTM 33N {{east}} Ø, {{north}} N",
+    "municipality": "Kommune og fylke",
+    "municipalityValue": "{{kommune}}, {{fylke}}",
+    "cadastre": "Matrikkelnummer",
+    "nearby": "Stedsnavn i nærheten",
+    "metres": "{{metres}} m",
+    "nothing": "Ingen opplysninger herfra — bare punktet selv."
+  },
   "ribbon": {
     "groundSection": {
       "only": "Kartlag",

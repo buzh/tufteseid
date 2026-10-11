@@ -6,7 +6,7 @@ import type { FeatureInfoReading } from '../map/featureInfo/types';
 import { cx, Icon } from '../ui';
 import { rollup, summaryIcon, vernToneClass } from './heritageLabels';
 import styles from './HeritageTip.module.css';
-import { useMapOverlay } from './useMapOverlay';
+import { useMapOverlay } from '../map/useMapOverlay';
 
 const MAX_ROWS = 3;
 

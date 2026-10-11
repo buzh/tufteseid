@@ -13,6 +13,7 @@ import { useEffect, useMemo } from 'react';
 
 import type { SpotRecord } from '../api/spots';
 import { mapAtom } from '../map/atoms';
+import { placeInfoArmedAtom } from '../placeInfo/atoms';
 import { drawnSketchSpotsAtom } from '../sketch/allSketches';
 import {
   activeSpotAtom,
@@ -86,6 +87,7 @@ export const useSpotLayer = () => {
   const records = useAtomValue(spotRecordsAtom);
   const draft = useAtomValue(spotDraftAtom);
   const placing = useAtomValue(spotPlacingAtom);
+  const armed = useAtomValue(placeInfoArmedAtom);
   const setActive = useSetAtom(activeSpotAtom);
   const store = useStore();
 
@@ -168,7 +170,9 @@ export const useSpotLayer = () => {
   useEffect(() => {
     const onClick = (event: MapBrowserEvent) => {
       // Deaf while drafting: the same click places the new pin (`pinPlace.ts`).
-      if (draft || placing) return;
+      // Deaf while a place lookup is armed, which asks about the ground under
+      // the pin rather than the pin.
+      if (draft || placing || armed) return;
       const hit = spotsAtPixel(map, event.pixel);
       if (hit) openHit(map, hit, setActive);
     };
@@ -176,5 +180,5 @@ export const useSpotLayer = () => {
     return () => {
       map.un('singleclick', onClick);
     };
-  }, [map, setActive, draft, placing]);
+  }, [map, setActive, draft, placing, armed]);
 };

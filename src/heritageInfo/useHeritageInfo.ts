@@ -13,6 +13,7 @@ import {
   queryHeritageAt,
 } from '../map/featureInfo/heritageQuery';
 import type { FeatureInfoReading } from '../map/featureInfo/types';
+import { placeInfoArmedAtom } from '../placeInfo/atoms';
 import { uiContextAtom } from '../shared/uiContext';
 import { spotFootprintAdjustingAtom, spotPlacingAtom } from '../spots/atoms';
 import { spotsAtPixel } from '../spots/hitTest';
@@ -22,13 +23,14 @@ import { terrainAdjustingAtom } from '../terrain/window';
 const REST_MS = 220;
 
 /** Any gesture that has taken the map: the terrain rectangle, a spot's
- *  footprint, or an armed pin. */
+ *  footprint, an armed pin, or an armed place lookup. */
 const placingOnMap = (): boolean => {
   const store = getDefaultStore();
   return (
     store.get(terrainAdjustingAtom) ||
     store.get(spotFootprintAdjustingAtom) ||
-    store.get(spotPlacingAtom)
+    store.get(spotPlacingAtom) ||
+    store.get(placeInfoArmedAtom)
   );
 };
 

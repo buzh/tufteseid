@@ -17,7 +17,7 @@ import type { FeatureInfoReading } from '../map/featureInfo/types';
 import { cx, Icon, Panel, type MaterialSymbol } from '../ui';
 import { rollup, summaryIcon, vernToneClass } from './heritageLabels';
 import styles from './HeritagePopup.module.css';
-import { useMapOverlay } from './useMapOverlay';
+import { useMapOverlay } from '../map/useMapOverlay';
 
 const MetaChip = ({
   icon,

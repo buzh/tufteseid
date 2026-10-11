@@ -1,9 +1,12 @@
 import { transform } from 'ol/proj';
 import { getEnv } from '../env.ts';
 import { ProjectionIdentifier } from '../map/projections/types.ts';
+import { fetchWithin } from '../shared/utils/deadline.ts';
 import { isNumberOk } from '../shared/utils/numberUtils.ts';
 import {
   AddressApiResponse,
+  CadastreApiResponse,
+  MunicipalityPoint,
   PlaceNameApiResponse,
   PlaceNamePointApiResponse,
   Property,
@@ -29,6 +32,9 @@ const isInvalidAddressSearch = (query: string): boolean => {
 // Both page sizes are the search box's list lengths: nothing pages.
 const ADDRESS_SEARCH_PAGE_SIZE = 8;
 const PLACE_SEARCH_PAGE_SIZE = 8;
+
+/** What the lookups behind one point are given, each on its own. */
+const POINT_DEADLINE_MS = 8000;
 
 const emptyAddressResult = (query: string): AddressApiResponse => ({
   adresser: [],
@@ -137,22 +143,16 @@ export const getPlaceNamesByLocation = async (
   y: number,
   radius: number,
   projection: ProjectionIdentifier,
+  signal?: AbortSignal,
 ): Promise<PlaceNamePointApiResponse> => {
   const projectionEPSGNumber = projection.split(':')[1];
   const url = `${env.geoNorgeApiBaseUrl}/stedsnavn/v1/punkt?nord=${y}&ost=${x}&treffPerSide=35&koordsys=${projectionEPSGNumber}&radius=${radius}&side=1`;
-  try {
-    const res = await fetch(url);
 
-    if (!res.ok) {
-      throw new Error(
-        `API failed [placeNamesByLocation]: ${res.status} for (${x}, ${y}) r=${radius} in ${projection}`,
-      );
-    }
-    return res.json();
-  } catch (error) {
-    console.error(error);
-    throw error;
-  }
+  return fetchWithin(
+    url,
+    { ms: POINT_DEADLINE_MS, what: 'stedsnavn', signal },
+    (res) => res.json() as Promise<PlaceNamePointApiResponse>,
+  );
 };
 
 export const getRoads = async (query: string): Promise<Road[]> => {
@@ -207,59 +207,79 @@ export const getProperties = async (query: string): Promise<Property[]> => {
   }
 };
 
+/** Metres above the vertical datum at one point, or null where the national
+ *  mosaic has no coverage — which arrives as the string `NoData` rather than
+ *  as an error. Water inside coverage reads exactly 0
+ *  (`docs/terrain-analysis.md`). */
 export const getElevation = async (
   x: number,
   y: number,
   srs: ProjectionIdentifier,
-) => {
-  if (!isNumberOk(x) || !isNumberOk(y)) {
-    return;
-  }
-  const [xTransformed, yTransformed] = transform([x, y], srs, 'EPSG:25833');
+  signal?: AbortSignal,
+): Promise<number | null> => {
+  if (!isNumberOk(x) || !isNumberOk(y)) return null;
+  const [east, north] = transform([x, y], srs, 'EPSG:25833');
 
-  const url = new URL(
-    'https://hoydedata.no/arcgis/rest/services/NHM_DTM_TOPOBATHY_25833/ImageServer/identify',
+  const query = new URLSearchParams({
+    f: 'json',
+    geometry: `${east},${north}`,
+    geometryType: 'esriGeometryPoint',
+    // Fixed, and matches the transform above: the ImageServer is 25833-only.
+    sr: '25833',
+    returnGeometry: 'false',
+    returnCatalogItems: 'false',
+  });
+
+  const answer = await fetchWithin(
+    `/arcgis/hoydedata/NHM_DTM_25833/ImageServer/identify?${query}`,
+    { ms: POINT_DEADLINE_MS, what: 'elevation', signal },
+    (res) => res.json() as Promise<{ value?: string }>,
   );
-  url.searchParams.append('f', 'json');
-  url.searchParams.append('geometry', `${xTransformed},${yTransformed}`);
-  url.searchParams.append('geometryType', 'esriGeometryPoint');
-  // Fixed, and matches the transform above: the ImageServer is 25833-only.
-  url.searchParams.append('sr', '25833');
-  url.searchParams.append('returnGeometry', 'false');
-  url.searchParams.append('returnCatalogItems', 'false');
-  try {
-    const res = await fetch(url.toString());
-    if (!res.ok) {
-      throw new Error(
-        `API failed [elevation]: ${res.status} for coordinates (${x}, ${y}), Statuscode:${res.status}`,
-      );
-    }
-    return res.json();
-  } catch (error) {
-    console.error(error);
-    throw error;
-  }
+
+  const metres = Number(answer.value);
+  return isNumberOk(metres) ? metres : null;
 };
 
-export const getPropetyInfoByCoordinates = async (lat: number, lon: number) => {
-  const url = new URL(`${env.geoNorgeApiBaseUrl}/eiendom/v1/punkt/omrader`);
-  url.searchParams.append('radius', '1');
-  url.searchParams.append('nord', lat.toString());
-  url.searchParams.append('ost', lon.toString());
-  url.searchParams.append('koordsys', '4258');
+/** Which kommune and fylke the point falls in. Off the mainland the service
+ *  answers 404 rather than an empty body, so "nowhere" throws like a failure
+ *  does. */
+export const getMunicipalityAtPoint = async (
+  east: number,
+  north: number,
+  signal?: AbortSignal,
+): Promise<MunicipalityPoint> => {
+  const query = new URLSearchParams({
+    nord: north.toString(),
+    ost: east.toString(),
+    koordsys: '25833',
+  });
 
-  try {
-    const res = await fetch(url.toString());
-    if (!res.ok) {
-      throw new Error(
-        `API failed [propertyInfoByCoordinates]: ${res.status} for coordinates (${lat}, ${lon}), Statuscode:${res.status}`,
-      );
-    }
-    return res.json();
-  } catch (error) {
-    console.error(error);
-    throw error;
-  }
+  return fetchWithin(
+    `${env.geoNorgeApiBaseUrl}/kommuneinfo/v1/punkt?${query}`,
+    { ms: POINT_DEADLINE_MS, what: 'kommuneinfo', signal },
+    (res) => res.json() as Promise<MunicipalityPoint>,
+  );
+};
+
+/** The matrikkel parcels within a metre of the point. Empty off registered
+ *  land, which is a 200 with no features. */
+export const getCadastreAtPoint = async (
+  east: number,
+  north: number,
+  signal?: AbortSignal,
+): Promise<CadastreApiResponse> => {
+  const query = new URLSearchParams({
+    radius: '1',
+    nord: north.toString(),
+    ost: east.toString(),
+    koordsys: '25833',
+  });
+
+  return fetchWithin(
+    `${env.geoNorgeApiBaseUrl}/eiendom/v1/punkt/omrader?${query}`,
+    { ms: POINT_DEADLINE_MS, what: 'matrikkel', signal },
+    (res) => res.json() as Promise<CadastreApiResponse>,
+  );
 };
 
 export const getPropertyDetailsByMatrikkelId = async (
