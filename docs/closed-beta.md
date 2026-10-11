@@ -81,7 +81,7 @@ different valid one. The hook folds I and L onto 1 and O onto 0 on the way in.
 is the only thing an invite costs**. What is left to mint is the quota less
 the rows it has issued, so five granted and three minted leaves two whatever
 became of the three. `inviteQuota` itself never moves — it is a ceiling, not a
-balance — and the number the panel shows is that subtraction.
+balance.
 
 **Revoking an unspent invite gives the quota back.** A spent one cannot be
 revoked — the delete rule refuses it — because it is the record of an
@@ -93,7 +93,11 @@ How the code reached its holder is nothing the gate counts. Mailing one is a
 convenience the installation offers, not a second currency — see *Mailing an
 invite*.
 
-A reader mints, copies and sends from the account menu → *Invitasjoner*.
+A reader mints, copies and sends from the account menu → *Invitasjoner*. The
+panel lists only the codes **nobody has come in on yet**, which are the ones
+left to act on, and carries the whole grant as two numbers that add to it:
+*tilgjengelig*, the quota less every row issued, and *sendt*, those rows. A
+redeemed invite leaves the list and stays in the second number.
 
 ## Running the SQL
 

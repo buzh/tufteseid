@@ -71,7 +71,6 @@ const InviteRow = ({
     return () => clearTimeout(timer);
   }, [copied]);
 
-  const spent = invite.redeemedAt !== '';
   const sent = invite.sentAt !== '';
 
   const copy = () => {
@@ -119,26 +118,20 @@ const InviteRow = ({
             <Icon icon={copied ? 'link' : 'content_copy'} size={16} />
           </ActionIcon>
         </Tooltip>
-        {!spent && (
-          <Tooltip label={t('invites.revoke')}>
-            <ActionIcon
-              variant="subtle"
-              color="red"
-              aria-label={t('invites.revoke')}
-              disabled={busy}
-              onClick={revoke}
-            >
-              <Icon icon="delete" size={16} />
-            </ActionIcon>
-          </Tooltip>
-        )}
+        <Tooltip label={t('invites.revoke')}>
+          <ActionIcon
+            variant="subtle"
+            color="red"
+            aria-label={t('invites.revoke')}
+            disabled={busy}
+            onClick={revoke}
+          >
+            <Icon icon="delete" size={16} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
 
-      {spent ? (
-        <Text size="xs" c="dimmed">
-          {t('invites.spent')}
-        </Text>
-      ) : sent ? (
+      {sent ? (
         <Text size="xs" c="dimmed">
           {t('invites.sentTo', { address: invite.email })}
         </Text>
@@ -204,10 +197,13 @@ export const InvitesDialog = () => {
     void load();
   }, [open, load]);
 
-  // The quota counts every invite ever minted, so revoking an unspent one
-  // gives it back. Both halves of that subtraction are the server's; this is
-  // only what the button needs to know.
-  const left = (user?.inviteQuota ?? 0) - (invites?.length ?? 0);
+  // Every row counts against the quota, redeemed or not, so the two numbers
+  // add up to it and revoking an unspent one moves both. Only the rows
+  // somebody has yet to come in on are worth listing — a redeemed invite is
+  // nothing the reader can act on.
+  const minted = invites?.length ?? 0;
+  const left = (user?.inviteQuota ?? 0) - minted;
+  const outstanding = invites?.filter((invite) => invite.redeemedAt === '');
 
   const mint = () => {
     if (!user) return;
@@ -240,11 +236,11 @@ export const InvitesDialog = () => {
 
         {invites == null && !failed && <Loader size="sm" />}
 
-        {invites?.map((invite) => (
+        {outstanding?.map((invite) => (
           <InviteRow key={invite.id} invite={invite} onChanged={load} />
         ))}
 
-        {invites?.length === 0 && (
+        {outstanding?.length === 0 && (
           <Text size="sm" c="dimmed">
             {t('invites.none')}
           </Text>
@@ -255,7 +251,9 @@ export const InvitesDialog = () => {
         {invites != null && (
           <Group justify="space-between" wrap="nowrap">
             <Text size="xs" c="dimmed">
-              {t('invites.left', { count: Math.max(left, 0) })}
+              {t('invites.available', { count: Math.max(left, 0) })}
+              {' / '}
+              {t('invites.sent', { count: minted })}
             </Text>
             <Button
               size="xs"
