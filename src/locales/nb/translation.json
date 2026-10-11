@@ -333,6 +333,19 @@
     "shareSpot": "Kopier lenke til lokaliteten",
     "shareView": "Kopier lenke til visningen"
   },
+  "search": {
+    "label": "Søk etter sted, adresse eller koordinat",
+    "placeholder": "Søk etter sted eller adresse",
+    "clear": "Tøm søket",
+    "searching": "Søker …",
+    "noMatch": "Ingen treff",
+    "tooShort": "Skriv minst {{least}} tegn",
+    "group": {
+      "coordinate": "Koordinat",
+      "place": "Steder",
+      "address": "Adresser"
+    }
+  },
   "shared": {
     "errorBoundary": {
       "title": "Noe gikk galt her",

@@ -26,7 +26,7 @@ One row per directory under `src/`.
 | `locales/` | i18next JSON, one directory per language. |
 | `map/` | The OpenLayers map and everything attached to it: layer configuration and stacks, the compare halves and the split pane, feature info, projections, the rectangle-placing interaction, the footprint and pin and hint layers. |
 | `ribbon/` | The top band: its three sections and the upstream status light while the map is the context in front, and the draw band while a drawing is. Layout only. |
-| `search/` | Kartverket place, address, road, property and elevation lookups. One function has a live caller. |
+| `search/` | The band's search field: Geonorge place and address lookup, a typed coordinate, and the fly to whichever was picked. The road, property and elevation calls beside them have no caller. |
 | `shared/` | The context in front (`uiContext.ts`), the error boundary, URL parameter access, coordinate parsing, enum and number helpers, and the request deadline that reports to the breaker. |
 | `showControls/` | The band's what-is-drawn-over-the-ground group: the Kulturminner control, the open drawing's toggle and the shared drawing layer's. |
 | `sketch/` | Excalidraw over a frozen map: the georeferencing frame, the scene, the toolbox that stands in for Excalidraw's own, the remembered pen, the render onto the ground, and the layer that puts every spot's drawing on it at once. |
@@ -865,8 +865,19 @@ The second ground section mounts only while two grounds are up. `ViewSection`
 carries two units: `ViewControlGroup`, the one/curtain/split switch, and beside
 it `ShowControlGroup` — Kulturminner and the drawing, what is laid over the
 ground whichever ground is up. `ToolSection` holds the rest of the controls that
-apply to the reading — terrain, the spot `+` and its index, the share link, the
-account — with `UpstreamStatus` last, because it comes and goes on its own.
+apply to the reading — the search field, terrain, the spot `+` and its index,
+the share link, the account — with `UpstreamStatus` last, because it comes and
+goes on its own.
+
+`SearchChip` is a magnifier that widens into a field on focus and folds back on
+a blur, which is also what clears it. What it finds is a coordinate parsed out
+of what was typed (`shared/utils/coordinateParser`), Geonorge's place names and
+Geonorge's addresses, in that order and grouped under those headings, on a
+250 ms debounce; a query being refined keeps the list it is narrowing rather
+than emptying the box between keystrokes. Picking one **moves the view and
+keeps nothing** — no marker, no layer, and never a zoom out, the hit's zoom
+being a floor the way a `?lok=` link's is. It reads `mapAtom`, so in a
+two-ground view it answers for the main map (*Known gaps*).
 
 `ShareButton` hands over the open spot's short link, or, with no spot open, the
 address bar as it stands: every ground, overlay and the centre are already
@@ -883,7 +894,10 @@ does.** The centre and the tools are fixed-width icon controls that cannot
 shrink by a pixel, while a ground section carries a flight name no one can
 predict the width of. So each ground section is its own scrollport and the band
 is not one: the view switch, the show group and the tools stay put at every
-width, and a ground's controls scroll inside the column they were given.
+width, and a ground's controls scroll inside the column they were given. The
+one thing in the tools whose width moves is the search field, and it moves only
+while it has the focus — which is why what it widens to is capped against the
+viewport as well.
 
 The three columns are what put the view switch on the band's centre line, and
 they are also what runs the tools off the right edge: the two flexible tracks
@@ -944,12 +958,15 @@ that is a last resort rather than the design.
   keeps the viewport list warm while datasets are cycled; nothing walks the
   flight rings.
 - **The second pane is looked at, not asked.** The heritage tip and card
-  (`src/heritageInfo/`) and the terrain analysis read `mapAtom` and never
-  `peekSplitMap`, so they answer for the main map only.
-- **There is no search box.** `src/search/searchApi.ts` and
-  `src/types/searchTypes.ts` are mostly the tail of a deleted surface; one
-  function, `getPlaceNamesByLocation`, has a live caller (`spots/spotName.ts`).
-  Kept as they are.
+  (`src/heritageInfo/`), the terrain analysis and the search field read
+  `mapAtom` and never `peekSplitMap`, so they answer for the main map only.
+- **The search box asks two of the five services in front of it.**
+  `src/search/searchApi.ts` and `src/types/searchTypes.ts` still carry the road,
+  property and elevation lookups of the surface this one replaced, with no
+  caller between them; `getPlaceNamesByLocation` has one in
+  `spots/spotName.ts`. Kept as they are. The property and road calls are also
+  the only ones here that would go to `api.norgeskart.no` rather than straight
+  to Geonorge.
 - **The record list carries every drawing.** `listSpots` is one `getFullList`
   of whole records, so every readable spot's scene — up to 5 MB apiece — is
   fetched on load whether or not the shared drawing layer is ever switched on,

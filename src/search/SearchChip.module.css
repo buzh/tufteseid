@@ -1,0 +1,90 @@
+/* Collapsed, the field is chip-sized and the magnifier is all there is to see;
+   the focus widens it in place. The tools are the one section the band never
+   takes room from, so the widening is capped against the viewport rather than
+   left to run the ground arms off the screen (`docs/architecture.md`). */
+.box {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.icon {
+  position: absolute;
+  left: 7px;
+  color: var(--mantine-color-dimmed);
+  pointer-events: none;
+}
+
+.field {
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0 8px 0 30px;
+  appearance: none;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-default);
+  font-size: var(--mantine-font-size-sm);
+  cursor: pointer;
+  transition: width 140ms ease;
+}
+
+.field::placeholder {
+  color: var(--mantine-color-placeholder);
+}
+
+.field:hover {
+  background: var(--mantine-color-default-hover);
+}
+
+.field:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 1px;
+}
+
+.fieldOpen {
+  width: 15rem;
+  max-width: 40vw;
+  padding-right: 28px;
+  cursor: text;
+}
+
+.clear {
+  position: absolute;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border: none;
+  border-radius: var(--mantine-radius-sm);
+  background: transparent;
+  color: var(--mantine-color-dimmed);
+  cursor: pointer;
+}
+
+.clear:hover {
+  color: var(--mantine-color-text);
+}
+
+.options {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.row {
+  display: flex;
+  gap: var(--mantine-spacing-xs);
+  align-items: center;
+  min-width: 0;
+}
+
+.rowIcon {
+  flex: none;
+  color: var(--mantine-color-dimmed);
+}
+
+/* `min-width: 0` so the two lines may be ellipsised: a flex item is as wide as
+   its content until it is told otherwise. */
+.rowText {
+  min-width: 0;
+}

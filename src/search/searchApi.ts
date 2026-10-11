@@ -26,12 +26,16 @@ const isInvalidAddressSearch = (query: string): boolean => {
   return directionWithNumber.test(q) || latLonLike.test(q);
 };
 
+// Both page sizes are the search box's list lengths: nothing pages.
+const ADDRESS_SEARCH_PAGE_SIZE = 8;
+const PLACE_SEARCH_PAGE_SIZE = 8;
+
 const emptyAddressResult = (query: string): AddressApiResponse => ({
   adresser: [],
   metadata: {
     side: 1,
     totaltAntallTreff: 0,
-    treffPerSide: 100,
+    treffPerSide: ADDRESS_SEARCH_PAGE_SIZE,
     viserFra: 0,
     viserTil: 0,
     sokeStreng: query,
@@ -48,7 +52,7 @@ export const getAddresses = async (
       return emptyAddressResult(query);
     }
     const encodedQuery = encodeURIComponent(normalizedQuery);
-    const url = `${env.geoNorgeApiBaseUrl}/adresser/v1/sok?sok=${encodedQuery}&treffPerSide=100`;
+    const url = `${env.geoNorgeApiBaseUrl}/adresser/v1/sok?sok=${encodedQuery}&treffPerSide=${ADDRESS_SEARCH_PAGE_SIZE}`;
     const res = await fetch(url);
 
     if (!res.ok) {
@@ -84,7 +88,6 @@ export const normalizePlaceQuery = (input: string) => {
   };
 };
 
-export const PLACE_SEARCH_PAGE_SIZE = 10;
 export const getPlaceNames = async (
   query: string,
   page: number,
@@ -99,6 +102,9 @@ export const getPlaceNames = async (
   url.searchParams.append('treffPerSide', PLACE_SEARCH_PAGE_SIZE.toString());
   url.searchParams.append('side', page.toString());
   url.searchParams.append('fuzzy', 'true');
+  // The hits carry `nord`/`øst` with no datum on them, so the request names
+  // one: ETRS89 degrees, which are WGS84 at display precision.
+  url.searchParams.append('utkoordsys', '4258');
 
   try {
     const res = await fetch(url.toString());
@@ -116,11 +122,11 @@ export const getPlaceNames = async (
       metadata: {
         side: page,
         totaltAntallTreff: 0,
-        treffPerSide: 15,
+        treffPerSide: PLACE_SEARCH_PAGE_SIZE,
         viserFra: 0,
         viserTil: 0,
         sokeStreng: query,
-        utkoordsys: 25833,
+        utkoordsys: 4258,
       },
     };
   }

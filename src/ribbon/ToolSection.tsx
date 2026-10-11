@@ -3,6 +3,7 @@
 
 import { Group } from '@mantine/core';
 import { AuthButton } from '../auth';
+import { SearchChip } from '../search/SearchChip';
 import { SpotControlGroup } from '../spotControls';
 import { TerrainToggle } from '../terrainControls';
 import styles from './Ribbon.module.css';
@@ -11,6 +12,7 @@ import { UpstreamStatus } from './UpstreamStatus';
 
 export const ToolSection = () => (
   <Group gap="xs" wrap="nowrap" className={styles.tools}>
+    <SearchChip />
     <TerrainToggle />
     <SpotControlGroup />
     <ShareButton />
