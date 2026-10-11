@@ -561,7 +561,7 @@
   },
   "invites": {
     "title": "Invitasjoner",
-    "blurb": "Mens betaen er lukket slipper nye lesere inn på en ledig plass eller en invitasjon. Du kan sende koden selv eller la oss sende den på e-post.",
+    "blurb": "Du kan invitere nye brukere. Send koden/lenken selv, eller skriv inn adresse for å sende mail. OBS: Pass på at adressen er riktig, feilsendte invitasjoner går tapt.",
     "available_one": "Én invitasjon tilgjengelig",
     "available_other": "{{count}} invitasjoner tilgjengelig",
     "sent_one": "Én invitasjon sendt",
