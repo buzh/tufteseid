@@ -13,7 +13,8 @@
   flex: none;
   align-items: center;
   gap: var(--mantine-spacing-xs);
-  padding: 4px 6px 4px var(--mantine-spacing-xs);
+  padding: calc(4px * var(--ui-scale)) calc(6px * var(--ui-scale))
+    calc(4px * var(--ui-scale)) var(--mantine-spacing-xs);
 }
 
 .headerOpen {

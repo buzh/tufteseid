@@ -4,7 +4,7 @@
   position: absolute;
   top: var(--mantine-spacing-xs);
   left: var(--mantine-spacing-xs);
-  width: 17rem;
+  width: calc(17rem * var(--ui-scale));
   max-width: calc(100% - 2 * var(--mantine-spacing-xs));
   max-height: calc(100% - 2 * var(--mantine-spacing-xs));
 }

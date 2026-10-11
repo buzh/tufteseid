@@ -3,8 +3,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--mantine-spacing-xs);
-  margin: 4px;
-  padding: 6px var(--mantine-spacing-sm);
+  margin: calc(4px * var(--ui-scale));
+  padding: calc(6px * var(--ui-scale)) var(--mantine-spacing-sm);
   border: 1px solid var(--mantine-color-red-light-hover);
   border-radius: var(--mantine-radius-md);
   background: var(--mantine-color-red-light);
@@ -18,7 +18,7 @@
   border: 1px solid var(--mantine-color-red-light-hover);
   border-radius: var(--mantine-radius-sm);
   background: transparent;
-  padding: 2px var(--mantine-spacing-xs);
+  padding: calc(2px * var(--ui-scale)) var(--mantine-spacing-xs);
   font: inherit;
   font-size: var(--mantine-font-size-xs);
   color: inherit;

@@ -2,7 +2,7 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: 2px;
+  gap: calc(2px * var(--ui-scale));
 }
 
 /* Tabular figures so the row does not shift as a tally crosses 9 or 99. */

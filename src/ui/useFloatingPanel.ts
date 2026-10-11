@@ -11,6 +11,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
+import { uiScaleFactor } from './uiScale';
 
 /** `wide` is a bar along an edge, `tall` a column down one. */
 export type PanelLayout = 'wide' | 'tall';
@@ -45,6 +46,10 @@ const MIN_HEIGHT = 140;
 /** `--mantine-spacing-xs`, the gap every box on the map keeps from the edge.
  *  A dock is flush with that gap, not with the pixel. */
 const GUTTER = 10;
+
+/** All three are the small UI's pixels, and everything they are measured
+ *  against scales with the reader's preference (`src/ui/uiScale.ts`). */
+const scaled = (px: number) => px * uiScaleFactor();
 
 /** A wall implies a shape: down the side is a column, along the top or the
  *  bottom a bar. The layout's own ceilings are what make a column narrow, so a
@@ -114,15 +119,15 @@ const wallCrossed = (
  *  that put it there. */
 const dockedTo = (side: Side, at: { left: number; top: number }): Placement =>
   side === 'left' || side === 'right'
-    ? { side, left: GUTTER, top: GUTTER }
-    : { side, left: at.left, top: GUTTER };
+    ? { side, left: scaled(GUTTER), top: scaled(GUTTER) }
+    : { side, left: at.left, top: scaled(GUTTER) };
 
 /** A dock pins the axis it is a wall of; the other keeps its corner. */
 const styleOf = (placed: Placement): CSSProperties => ({
   left: placed.side === 'right' ? undefined : placed.left,
-  right: placed.side === 'right' ? GUTTER : undefined,
+  right: placed.side === 'right' ? scaled(GUTTER) : undefined,
   top: placed.side === 'bottom' ? undefined : placed.top,
-  bottom: placed.side === 'bottom' ? GUTTER : undefined,
+  bottom: placed.side === 'bottom' ? scaled(GUTTER) : undefined,
   maxWidth: placed.maxWidth,
   maxHeight: placed.maxHeight,
 });
@@ -222,10 +227,14 @@ export const useFloatingPanel = () => {
         side: null,
         left: at.left,
         top: at.top,
-        maxWidth: between(size.width + dx, MIN_WIDTH, within.width - at.left),
+        maxWidth: between(
+          size.width + dx,
+          scaled(MIN_WIDTH),
+          within.width - at.left,
+        ),
         maxHeight: between(
           size.height + dy,
-          MIN_HEIGHT,
+          scaled(MIN_HEIGHT),
           within.height - at.top,
         ),
       });

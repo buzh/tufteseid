@@ -50,6 +50,7 @@
     "passwordTooShort": "Passordet må ha minst 8 tegn.",
     "signOut": "Logg ut",
     "account": "Kontoen din",
+    "guestMenu": "Logg inn og innstillinger",
     "stats": "Bruksstatistikk",
     "pocketbase": "PocketBase",
     "beta": {
@@ -518,6 +519,11 @@
     "failedShort": "høydedata svarer ikke",
     "empty": "Ingen laserdata dekker dette området.",
     "emptyShort": "ingen laserdata"
+  },
+  "uiScale": {
+    "label": "Grensesnitt",
+    "small": "Liten",
+    "large": "Stor"
   },
   "upstream": {
     "notAnswering": "svarer ikke",

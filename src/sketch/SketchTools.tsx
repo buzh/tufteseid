@@ -290,7 +290,9 @@ export const SketchTools = ({
                       bars are the widths plus one. */}
                   <span
                     className={styles.bar}
-                    style={{ height: width.value + 1 }}
+                    style={{
+                      height: `calc(${width.value + 1}px * var(--ui-scale))`,
+                    }}
                   />
                 </button>
               </Tooltip>

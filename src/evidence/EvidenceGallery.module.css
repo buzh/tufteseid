@@ -18,8 +18,8 @@
 }
 
 .hint {
-  margin-top: 2px;
-  font-size: calc(var(--mantine-font-size-xs) - 1px);
+  margin-top: calc(2px * var(--ui-scale));
+  font-size: calc(var(--mantine-font-size-xs) - 1px * var(--ui-scale));
   line-height: 1.35;
   color: var(--mantine-color-dimmed);
 }
@@ -27,7 +27,7 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: calc(4px * var(--ui-scale));
   margin-top: var(--mantine-spacing-xs);
   padding: 0;
   list-style: none;
@@ -39,7 +39,7 @@
 .row {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: calc(2px * var(--ui-scale));
 }
 
 .lifted {
@@ -68,7 +68,7 @@
   display: flex;
   align-items: center;
   gap: var(--mantine-spacing-xs);
-  padding: 4px;
+  padding: calc(4px * var(--ui-scale));
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-sm);
   background: none;
@@ -89,8 +89,8 @@
    landed. The thumbnail is square; a stitch of the footprint rarely is. */
 .thumb {
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: calc(36px * var(--ui-scale));
+  height: calc(36px * var(--ui-scale));
   border-radius: var(--mantine-radius-xs);
   background: var(--mantine-color-anthracite-6);
   object-fit: cover;
@@ -123,7 +123,7 @@
 
 .note {
   display: block;
-  font-size: calc(var(--mantine-font-size-xs) - 1px);
+  font-size: calc(var(--mantine-font-size-xs) - 1px * var(--ui-scale));
   color: var(--mantine-color-dimmed);
 }
 

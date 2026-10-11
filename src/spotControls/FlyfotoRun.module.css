@@ -11,9 +11,12 @@
   right: 0;
   bottom: var(--mantine-spacing-xs);
   left: 0;
-  width: min(46rem, calc(100% - 2 * var(--mantine-spacing-xs)));
+  width: min(
+    calc(46rem * var(--ui-scale)),
+    calc(100% - 2 * var(--mantine-spacing-xs))
+  );
   margin-inline: auto;
-  padding: 6px var(--mantine-spacing-sm);
+  padding: calc(6px * var(--ui-scale)) var(--mantine-spacing-sm);
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-sm);
   background: var(--mantine-color-body);
@@ -24,7 +27,7 @@
    this would otherwise cover it. */
 @media (max-width: 768px) {
   .bar {
-    bottom: 44px;
+    bottom: calc(44px * var(--ui-scale));
   }
 }
 
@@ -84,7 +87,7 @@
 }
 
 .foot {
-  margin-top: 2px;
+  margin-top: calc(2px * var(--ui-scale));
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-xs);
   line-height: 1.3;

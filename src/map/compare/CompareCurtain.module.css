@@ -9,8 +9,8 @@
   top: 0;
   bottom: 0;
   /* Wider than the line, which is too thin to grab. */
-  width: 24px;
-  margin-left: -12px;
+  width: calc(24px * var(--ui-scale));
+  margin-left: calc(-12px * var(--ui-scale));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -41,8 +41,8 @@
 
 .grip {
   position: relative;
-  width: 18px;
-  height: 44px;
+  width: calc(18px * var(--ui-scale));
+  height: calc(44px * var(--ui-scale));
   border-radius: 999px;
   background: var(--mantine-color-body);
   border: 1px solid var(--mantine-color-default-border);
@@ -53,16 +53,16 @@
 .grip::after {
   content: '';
   position: absolute;
-  top: 14px;
-  bottom: 14px;
+  top: calc(14px * var(--ui-scale));
+  bottom: calc(14px * var(--ui-scale));
   width: 1px;
   background: var(--mantine-color-dimmed);
 }
 
 .grip::before {
-  left: 6px;
+  left: calc(6px * var(--ui-scale));
 }
 
 .grip::after {
-  right: 6px;
+  right: calc(6px * var(--ui-scale));
 }

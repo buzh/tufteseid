@@ -1,5 +1,5 @@
-import { Menu, Text, Tooltip } from '@mantine/core';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { Box, Menu, SegmentedControl, Text } from '@mantine/core';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
 import { pb } from '../api/pocketbase';
@@ -7,12 +7,38 @@ import { getEnv } from '../env';
 import { isInvitesDialogOpenAtom } from '../invites/atoms';
 import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
+import { uiScaleAtom, type UiScale } from '../ui/uiScale';
 import { currentUserAtom, isAdminAtom, isAuthDialogOpenAtom } from './atoms';
 
 // The GoAccess report Caddy serves out of the stats bind mount, and
 // PocketBase's own dashboard behind the same proxy path as its API.
 const STATS_URL = '/stats/';
 const POCKETBASE_ADMIN_URL = `${getEnv().pocketbaseUrl.replace(/\/$/, '')}/_/`;
+
+// Not a `Menu.Item`: those close the dropdown on click, and the reader wants to
+// see what the other size looks like before letting go of it.
+const UiScaleSection = () => {
+  const { t } = useTranslation();
+  const [scale, setScale] = useAtom(uiScaleAtom);
+
+  return (
+    <>
+      <Menu.Label>{t('uiScale.label')}</Menu.Label>
+      <Box px="xs" pb={4}>
+        <SegmentedControl
+          fullWidth
+          size="xs"
+          value={scale}
+          onChange={(value) => setScale(value as UiScale)}
+          data={[
+            { value: 'small', label: t('uiScale.small') },
+            { value: 'large', label: t('uiScale.large') },
+          ]}
+        />
+      </Box>
+    </>
+  );
+};
 
 export const AuthButton = () => {
   const { t } = useTranslation();
@@ -23,13 +49,24 @@ export const AuthButton = () => {
 
   if (!user) {
     return (
-      <Tooltip label={t('auth.signIn')}>
-        <ControlButton
-          icon="account_circle"
-          aria-label={t('auth.signIn')}
-          onClick={() => setDialogOpen(true)}
-        />
-      </Tooltip>
+      <Menu position="bottom-end" withinPortal>
+        <Menu.Target>
+          <ControlButton
+            icon="account_circle"
+            aria-label={t('auth.guestMenu')}
+          />
+        </Menu.Target>
+        <Menu.Dropdown>
+          <UiScaleSection />
+          <Menu.Divider />
+          <Menu.Item
+            leftSection={<Icon icon="login" size={16} />}
+            onClick={() => setDialogOpen(true)}
+          >
+            {t('auth.signIn')}
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
     );
   }
 
@@ -49,6 +86,8 @@ export const AuthButton = () => {
             {user.name || user.email}
           </Text>
         </Menu.Label>
+        <Menu.Divider />
+        <UiScaleSection />
         <Menu.Divider />
         <Menu.Item
           leftSection={<Icon icon="person_add" size={16} />}

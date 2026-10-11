@@ -1,11 +1,23 @@
 @import './map/map.css';
 
-/* Shared by every map control, which are declared in modules that cannot import
-   each other. 30px is a Mantine `size="xs"` Button. */
+/* `--control-*` are shared by every map control, which are declared in modules
+   that cannot import each other. 30px is a Mantine `size="xs"` Button. */
 :root {
-  --control-height: 30px;
-  --control-icon-width: 34px;
-  --control-chevron-width: 12px;
+  --ui-scale: 1;
+  --control-height: calc(30px * var(--ui-scale));
+  --control-icon-width: calc(34px * var(--ui-scale));
+  --control-chevron-width: calc(12px * var(--ui-scale));
+}
+
+/* The reader's size preference, put on <html> at boot by `src/ui/uiScale.ts`.
+   `--mantine-scale` multiplies every rem Mantine emits, which is every font
+   size, spacing, radius and component dimension it owns; `--ui-scale` is the
+   same factor for the px and rem this app writes itself. Change one, change
+   both. The attribute outranks both the rule above and the plain `:root`
+   Mantine's provider emits, so source order against either does not matter. */
+:root[data-ui-scale='large'] {
+  --ui-scale: 2;
+  --mantine-scale: 2;
 }
 
 *,

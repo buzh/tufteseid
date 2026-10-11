@@ -2,10 +2,10 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: 6px;
-  max-width: 16rem;
+  gap: calc(6px * var(--ui-scale));
+  max-width: calc(16rem * var(--ui-scale));
   height: var(--control-height);
-  padding: 0 8px;
+  padding: 0 calc(8px * var(--ui-scale));
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-sm);
   background: var(--mantine-color-default);

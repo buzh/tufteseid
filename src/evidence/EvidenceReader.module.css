@@ -28,7 +28,10 @@
   right: 0;
   bottom: var(--mantine-spacing-xs);
   left: 0;
-  max-width: min(46rem, calc(100% - 2 * var(--mantine-spacing-xs)));
+  max-width: min(
+    calc(46rem * var(--ui-scale)),
+    calc(100% - 2 * var(--mantine-spacing-xs))
+  );
   max-height: 60%;
   margin-inline: auto;
 }
@@ -38,7 +41,10 @@
 .tall {
   top: var(--mantine-spacing-xs);
   right: var(--mantine-spacing-xs);
-  max-width: min(23rem, calc(100% - 2 * var(--mantine-spacing-xs)));
+  max-width: min(
+    calc(23rem * var(--ui-scale)),
+    calc(100% - 2 * var(--mantine-spacing-xs))
+  );
   max-height: calc(100% - 2 * var(--mantine-spacing-xs));
 }
 
@@ -46,7 +52,7 @@
    the bar layout would otherwise cover it. */
 @media (max-width: 768px) {
   .wide {
-    bottom: 44px;
+    bottom: calc(44px * var(--ui-scale));
   }
 }
 
@@ -61,10 +67,10 @@
 
 .grip {
   position: absolute;
-  right: 2px;
-  bottom: 2px;
-  width: 16px;
-  height: 16px;
+  right: calc(2px * var(--ui-scale));
+  bottom: calc(2px * var(--ui-scale));
+  width: calc(16px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
   background: linear-gradient(
     135deg,
     transparent 0 58%,
@@ -96,8 +102,8 @@
 
 .strip {
   display: flex;
-  gap: 6px;
-  padding-bottom: 4px;
+  gap: calc(6px * var(--ui-scale));
+  padding-bottom: calc(4px * var(--ui-scale));
   overflow-x: auto;
   scrollbar-width: thin;
 }
@@ -105,8 +111,8 @@
 .frame {
   position: relative;
   flex: none;
-  width: 56px;
-  height: 56px;
+  width: calc(56px * var(--ui-scale));
+  height: calc(56px * var(--ui-scale));
   padding: 0;
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-xs);
@@ -134,8 +140,8 @@
    happens to be. */
 .frameKind {
   position: absolute;
-  right: 2px;
-  bottom: 2px;
+  right: calc(2px * var(--ui-scale));
+  bottom: calc(2px * var(--ui-scale));
   color: var(--mantine-color-anthracite-0);
   text-shadow: 0 0 3px var(--mantine-color-anthracite-9);
 }
@@ -147,14 +153,14 @@
   align-items: center;
   gap: var(--mantine-spacing-sm);
   width: 100%;
-  padding-right: 12px;
+  padding-right: calc(12px * var(--ui-scale));
 }
 
 .nav {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
 }
 
 .count {
@@ -193,24 +199,24 @@
 
 .fade {
   display: flex;
-  flex: 0 1 10rem;
+  flex: 0 1 calc(10rem * var(--ui-scale));
   align-items: center;
   gap: var(--mantine-spacing-xs);
-  min-width: 5rem;
+  min-width: calc(5rem * var(--ui-scale));
 }
 
 /* Wider than the two fades because the bar is stepped by frame and a hand has
    to be able to land on one. */
 .transport {
-  flex: 0 1 12rem;
-  min-width: 7rem;
+  flex: 0 1 calc(12rem * var(--ui-scale));
+  min-width: calc(7rem * var(--ui-scale));
 }
 
 /* `SketchFade` brings its own insides; what the footer says is how much of the
    row it gets — the same as the picture's fade, two things over one ground. */
 .sketch {
-  flex: 0 1 10rem;
-  min-width: 5rem;
+  flex: 0 1 calc(10rem * var(--ui-scale));
+  min-width: calc(5rem * var(--ui-scale));
 }
 
 .fadeIcon {
@@ -236,7 +242,7 @@
 .tall .controls {
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
 }
 
 /* Stacked, the caption reads as a heading over the controls rather than as

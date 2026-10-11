@@ -20,18 +20,23 @@ export const Icon = ({
   filled?: boolean;
   color?: string;
   className?: string;
-}) => (
-  <span
-    aria-hidden="true"
-    translate="no"
-    className={cx(
-      'material-symbols-rounded',
-      styles.icon,
-      filled && styles.filled,
-      className,
-    )}
-    style={{ fontSize: `${size}px`, width: size, height: size, color }}
-  >
-    {icon}
-  </span>
-);
+}) => {
+  // `size` is the small UI's pixels; `--ui-scale` is the reader's preference
+  // (`src/ui/uiScale.ts`), which a bare number would not answer to.
+  const box = `calc(${size}px * var(--ui-scale))`;
+  return (
+    <span
+      aria-hidden="true"
+      translate="no"
+      className={cx(
+        'material-symbols-rounded',
+        styles.icon,
+        filled && styles.filled,
+        className,
+      )}
+      style={{ fontSize: box, width: box, height: box, color }}
+    >
+      {icon}
+    </span>
+  );
+};

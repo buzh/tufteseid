@@ -30,6 +30,12 @@ const papaya: MantineColorsTuple = [
   '#8a380f',
 ];
 
+// Mantine puts only its *own* sizes through `rem()`, which is what carries
+// `--mantine-scale`; an override here is emitted verbatim. So the two scales
+// below have to answer to the reader's size preference themselves
+// (`src/ui/uiScale.ts`).
+const scaled = (px: number) => `calc(${px}px * var(--ui-scale))`;
+
 export const theme = createTheme({
   primaryColor: 'papaya',
   primaryShade: { light: 6, dark: 5 },
@@ -42,18 +48,18 @@ export const theme = createTheme({
   headings: { fontFamily: 'inherit', fontWeight: '600' },
   defaultRadius: 'md',
   fontSizes: {
-    xs: '11px',
-    sm: '13px',
-    md: '14px',
-    lg: '16px',
-    xl: '20px',
+    xs: scaled(11),
+    sm: scaled(13),
+    md: scaled(14),
+    lg: scaled(16),
+    xl: scaled(20),
   },
   radius: {
-    xs: '3px',
-    sm: '4px',
-    md: '6px',
-    lg: '10px',
-    xl: '16px',
+    xs: scaled(3),
+    sm: scaled(4),
+    md: scaled(6),
+    lg: scaled(10),
+    xl: scaled(16),
   },
   components: {
     Menu: {

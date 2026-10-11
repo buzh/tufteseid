@@ -4,7 +4,7 @@
   position: absolute;
   top: var(--mantine-spacing-xs);
   right: var(--mantine-spacing-xs);
-  width: 19rem;
+  width: calc(19rem * var(--ui-scale));
   max-width: calc(100% - 2 * var(--mantine-spacing-xs));
   max-height: calc(100% - 2 * var(--mantine-spacing-xs));
 }
@@ -28,7 +28,7 @@
   align-items: baseline;
   gap: var(--mantine-spacing-xs);
   max-width: calc(100% - 2 * var(--mantine-spacing-xs));
-  padding: 4px var(--mantine-spacing-sm);
+  padding: calc(4px * var(--ui-scale)) var(--mantine-spacing-sm);
   border: 1px solid var(--mantine-color-papaya-6);
   border-radius: var(--mantine-radius-sm);
   background: var(--mantine-color-body);
@@ -58,7 +58,7 @@
   align-items: center;
   gap: var(--mantine-spacing-xs);
   margin-top: var(--mantine-spacing-xs);
-  padding: 4px 6px;
+  padding: calc(4px * var(--ui-scale)) calc(6px * var(--ui-scale));
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-sm);
 }
@@ -75,7 +75,7 @@
    a border, so nothing on the row moves when the accent leaves it. */
 .unitStep {
   outline: 1px solid var(--mantine-color-papaya-6);
-  outline-offset: 3px;
+  outline-offset: calc(3px * var(--ui-scale));
   border-radius: var(--mantine-radius-sm);
 }
 

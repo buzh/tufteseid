@@ -2,7 +2,7 @@
 .popup {
   box-sizing: border-box;
   width: 90vw;
-  max-width: 26rem;
+  max-width: calc(26rem * var(--ui-scale));
   max-height: 60vh;
   pointer-events: auto;
 }
@@ -68,15 +68,15 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: calc(4px * var(--ui-scale));
   margin-top: var(--mantine-spacing-xs);
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 1px 6px;
+  gap: calc(4px * var(--ui-scale));
+  padding: calc(1px * var(--ui-scale)) calc(6px * var(--ui-scale));
   border-radius: var(--mantine-radius-sm);
   background: var(--mantine-color-default);
   color: var(--mantine-color-dimmed);
@@ -102,7 +102,7 @@
 .nestedToggle {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: calc(2px * var(--ui-scale));
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-xs);
   font-weight: 700;
@@ -116,7 +116,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--mantine-spacing-xs);
-  margin-top: 4px;
+  margin-top: calc(4px * var(--ui-scale));
 }
 
 .nestedItem {
@@ -125,7 +125,7 @@
 }
 
 .nestedItem .chips {
-  margin-top: 2px;
+  margin-top: calc(2px * var(--ui-scale));
 }
 
 .nestedName {
@@ -155,7 +155,7 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: calc(2px * var(--ui-scale));
   color: var(--mantine-color-dimmed);
   text-decoration: underline dotted;
 }

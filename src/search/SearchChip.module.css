@@ -11,7 +11,7 @@
 
 .icon {
   position: absolute;
-  left: 7px;
+  left: calc(7px * var(--ui-scale));
   color: var(--mantine-color-dimmed);
   pointer-events: none;
 }
@@ -19,7 +19,7 @@
 .field {
   width: var(--control-height);
   height: var(--control-height);
-  padding: 0 8px 0 30px;
+  padding: 0 calc(8px * var(--ui-scale)) 0 calc(30px * var(--ui-scale));
   appearance: none;
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-sm);
@@ -43,18 +43,18 @@
 }
 
 .fieldOpen {
-  width: 15rem;
+  width: calc(15rem * var(--ui-scale));
   max-width: 40vw;
-  padding-right: 28px;
+  padding-right: calc(28px * var(--ui-scale));
   cursor: text;
 }
 
 .clear {
   position: absolute;
-  right: 4px;
+  right: calc(4px * var(--ui-scale));
   display: flex;
   align-items: center;
-  padding: 2px;
+  padding: calc(2px * var(--ui-scale));
   border: none;
   border-radius: var(--mantine-radius-sm);
   background: transparent;
@@ -67,7 +67,7 @@
 }
 
 .options {
-  max-height: 320px;
+  max-height: calc(320px * var(--ui-scale));
   overflow-y: auto;
 }
 

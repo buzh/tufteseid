@@ -11,7 +11,9 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import { projInit } from './map/projections/proj/projInit.ts';
 import { theme } from './ui/theme.ts';
+import { applyStoredUiScale } from './ui/uiScale.ts';
 projInit();
+applyStoredUiScale();
 
 // Imported dynamically for the sake of ordering: the map modules under `App`
 // register projections as they are evaluated, so `projInit` has to have run

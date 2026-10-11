@@ -11,5 +11,5 @@
 
 .slider {
   flex: 1;
-  min-width: 4rem;
+  min-width: calc(4rem * var(--ui-scale));
 }

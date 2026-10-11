@@ -35,7 +35,7 @@ One row per directory under `src/`.
 | `terrain/` | Client-side terrain analysis: DEM fetch, shading, the analysis window and its layers. |
 | `terrainControls/` | The terrain toggle and its panel. |
 | `types/` | Search response types. |
-| `ui/` | The kit: `ControlChip`, `ControlButton`, `ControlUnit`, `Panel`, `Hint`, `Icon`, the Mantine theme, `useConfirm`. |
+| `ui/` | The kit: `ControlChip`, `ControlButton`, `ControlUnit`, `Panel`, `Hint`, `Icon`, the Mantine theme, `useConfirm`, the size preference. |
 | `upstream/` | Per-origin circuit breaker, the origin registry, and the tile guard that reports to it. |
 | `viewControls/` | The view-mode control: one ground, the curtain, or the split. |
 
@@ -98,6 +98,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |
 | `isSignedInAtom`, `isAdminAtom` | same | Derived, so a component does not re-render on an unrelated user field. |
 | `isAuthDialogOpenAtom`, `authPromptAtom` | same | Whether the dialog is up, and why when the reader did not press anything. Both seeded from an `?invite=` on the page's boot, that box being the only place a code can be spent (`docs/closed-beta.md`). Whether an attempt failed is the dialog's own state — nothing leaves the page, so no failure has to survive one. |
+| `uiScaleAtom` | `ui/uiScale.ts` | How big the chrome is drawn, `small` or `large`. Writing it paints `data-ui-scale` on `<html>` and stores the name; the CSS does the rest (*Ribbon and the UI kit*). |
 | `upstreamHealthAtom` | `upstream/health.ts` | One breaker status per origin. |
 
 ## The context in front
@@ -916,6 +917,40 @@ that is a last resort rather than the design.
   lit halves.
 - Shared metrics: `--control-height` and `--control-icon-width` in
   `src/index.css`.
+- **The whole interface draws at one of two sizes**, `small` — what it has
+  always been — and `large`, which is twice that. The reader picks one in the
+  account menu, guest or not, and it is kept in `uiScale.v1` in localStorage
+  rather than on the account: `users` has no update rule, so a preference
+  there would not be the reader's to set (`docs/identity.md`). `uiScaleAtom`
+  paints `data-ui-scale` on `<html>`; `src/mainApp.tsx` paints the stored one
+  before the first render, there being no inline script to do it in
+  (`index.html` has none — the CSP carries no nonce).
+
+  Two custom properties in `src/index.css` are the whole mechanism, and they
+  move together. `--mantine-scale` is Mantine's own multiplier on every rem
+  **it** emits: spacing, shadows, component dimensions, and the numeric props
+  the app passes it (`width={320}`, `mah={340}`). `--ui-scale` is the same
+  factor for every length written here instead, and there are three kinds.
+
+  - **A px or rem literal in a CSS module** has to be wrapped in
+    `calc(… * var(--ui-scale))` or it will not grow with the rest.
+  - **The `fontSizes` and `radius` scales in `ui/theme.ts`**, because Mantine
+    puts only its *own* values through `rem()` — an override is emitted
+    verbatim and `--mantine-scale` never reaches it. They carry
+    `var(--ui-scale)` themselves, which is also why neither scales twice.
+  - **Geometry in JavaScript**, which no CSS reaches: `Icon` wraps its `size`
+    prop, and `useFloatingPanel` reads the factor as a number through
+    `uiScaleFactor()`.
+
+  Deliberately left alone: border and outline widths and their offsets, and
+  the media-query breakpoints, which are about the viewport rather than the
+  chrome.
+
+  The map is not scaled: a doubled canvas would read the terrain at half the
+  resolution, which is the one thing this app is for. The size control is out
+  of reach while a drawing is open, the band being `DrawBand` then — which is
+  what keeps a scene↔ground mapping frozen at one map rectangle from moving
+  under the strokes registered to it (*The context in front*).
 - The show group's two toggles each answer to a single key: **`k`** —
   kulturminner — raises and lowers the heritage blind, **`t`** the drawing.
   Both are bound to the document by the hook behind the box rather than by the

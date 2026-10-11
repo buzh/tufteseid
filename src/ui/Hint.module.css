@@ -8,7 +8,7 @@
 .head {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: calc(4px * var(--ui-scale));
   color: var(--mantine-color-papaya-5);
   font-size: var(--mantine-font-size-xs);
   font-weight: 600;
@@ -19,7 +19,7 @@
 /* `src/index.css` strips list markers everywhere; a tip is one of the few
    places a bullet earns its keep. */
 .tips {
-  margin: 6px 0 var(--mantine-spacing-xs);
+  margin: calc(6px * var(--ui-scale)) 0 var(--mantine-spacing-xs);
   padding-left: 1.1em;
   list-style: disc;
   font-size: var(--mantine-font-size-xs);
@@ -31,5 +31,5 @@
 }
 
 .tips li + li {
-  margin-top: 4px;
+  margin-top: calc(4px * var(--ui-scale));
 }

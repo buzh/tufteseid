@@ -6,7 +6,9 @@ no identity provider, no redirect and nothing to federate to.
 
 ## Signing in
 
-**Nothing leaves the page.** The account button opens one Mantine modal,
+**Nothing leaves the page.** The account button is a menu whether or not
+anybody is signed in — a guest's carries *Logg inn* and the size preference
+(`docs/architecture.md`) — and *Logg inn* opens one Mantine modal,
 `src/auth/AuthDialog.tsx`, which is three modes on a single form:
 
 | mode | what it posts |
