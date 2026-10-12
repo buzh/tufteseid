@@ -121,7 +121,6 @@ export const useSpotLayer = () => {
     });
     map.addLayer(layer);
 
-
     const unsubscribe = store.sub(unpinnedSpotIdAtom, () => clusters.refresh());
     const unsubscribeDrawn = store.sub(drawnSketchSpotsAtom, () =>
       clusters.refresh(),
@@ -133,7 +132,6 @@ export const useSpotLayer = () => {
       map.removeLayer(layer);
     };
   }, [map, clusters, store]);
-
 
   useEffect(() => {
     const view = map.getView();
@@ -148,7 +146,6 @@ export const useSpotLayer = () => {
     };
   }, [map, clusters]);
 
-
   useEffect(() => {
     const view = map.getView().getProjection().getCode();
     draw(source, view, records ?? []);
@@ -156,7 +153,6 @@ export const useSpotLayer = () => {
 
   useEffect(() => {
     const onClick = (event: MapBrowserEvent) => {
-
       if (draft || placing || armed) return;
       const hit = spotsAtPixel(map, event.pixel);
       if (hit) openHit(map, hit, setActive);
