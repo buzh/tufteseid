@@ -35,9 +35,6 @@ import {
 } from './pinStyle';
 import { spotRecordsAtom } from './spotRecords';
 
-/** How near two pins come, in css pixels, before they are drawn as one disc.
- *  Wider than the pin itself: below `LABEL_OFF_ZOOM` it is the name plates
- *  that collide first, and above it the gap keeps the heads apart. */
 const CLUSTER_DISTANCE = 44;
 
 /** Room left around a gathering the view was zoomed into. */
@@ -56,9 +53,6 @@ const draw = (source: VectorSource, view: string, records: SpotRecord[]) => {
   );
 };
 
-/** What a click on the pin layer means. A gathering is not a record, so it
- *  zooms in far enough to break apart rather than opening anything — unless
- *  no zoom could, every pin being on the one coordinate. */
 const openHit = (
   map: Map,
   records: SpotRecord[],
@@ -120,8 +114,6 @@ export const useSpotLayer = () => {
       style: (feature: FeatureLike, resolution: number) => {
         const gathered = clusterRecords(feature);
         if (gathered.length > 1) return clusterStyle(gathered.length);
-        // The frame's own resolution, not the view's zoom: the two differ
-        // mid-animation and the plate would flick on a frame early.
         const zoom = map.getView().getZoomForResolution(resolution) ?? 0;
         return spotStyle(gathered[0].name, zoom > LABEL_OFF_ZOOM);
       },
@@ -129,9 +121,7 @@ export const useSpotLayer = () => {
     });
     map.addLayer(layer);
 
-    // The geometry function is built once and lives as long as the source, so
-    // anything closed over here would stick at its first-render value: read
-    // from the store and re-cluster off a subscription instead.
+
     const unsubscribe = store.sub(unpinnedSpotIdAtom, () => clusters.refresh());
     const unsubscribeDrawn = store.sub(drawnSketchSpotsAtom, () =>
       clusters.refresh(),
@@ -144,9 +134,7 @@ export const useSpotLayer = () => {
     };
   }, [map, clusters, store]);
 
-  // Off at the deepest zoom, so two spots a few metres apart are always
-  // reachable: a gathering the view cannot break apart would answer a click
-  // with nothing.
+
   useEffect(() => {
     const view = map.getView();
     const apply = () => {
@@ -160,8 +148,7 @@ export const useSpotLayer = () => {
     };
   }, [map, clusters]);
 
-  // A followed link is not drawn while the list is still out: the spot it opens
-  // is the one spot with no pin, and nothing else is known yet.
+
   useEffect(() => {
     const view = map.getView().getProjection().getCode();
     draw(source, view, records ?? []);
@@ -169,9 +156,7 @@ export const useSpotLayer = () => {
 
   useEffect(() => {
     const onClick = (event: MapBrowserEvent) => {
-      // Deaf while drafting: the same click places the new pin (`pinPlace.ts`).
-      // Deaf while a place lookup is armed, which asks about the ground under
-      // the pin rather than the pin.
+
       if (draft || placing || armed) return;
       const hit = spotsAtPixel(map, event.pixel);
       if (hit) openHit(map, hit, setActive);
