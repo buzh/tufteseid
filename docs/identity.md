@@ -99,7 +99,7 @@ lives.
 **Enforcement is where the cost is, not in a collection rule.** An `evidence`
 row is parameters, and parameters cost nothing until something renders them —
 so `rendersvc` reads the caller's own row and refuses (`docs/render-sidecar.md`).
-The SPA hides what would only meet that 403: the card's `fx` chip with the
+The SPA hides what would only meet that 403: the card's `fx` button with the
 two render lines behind it, and the gallery's retry on a row that renders on
 the server. A courtesy, not a gate.
 

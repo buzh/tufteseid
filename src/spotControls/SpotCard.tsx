@@ -31,7 +31,6 @@ import { StarControl } from '../spots/StarControl';
 import { VoteControl } from '../spots/VoteControl';
 import { readTerrainWindowAtom } from '../terrain/window';
 import { ControlButton } from '../ui/ControlButton';
-import { ControlChip } from '../ui/ControlChip';
 import { cx } from '../ui/cx';
 import { Hint } from '../ui/Hint';
 import { Icon } from '../ui/Icon';
@@ -152,17 +151,18 @@ const SpotUnits = ({
             </Tooltip>
           )}
           {mayRender && (
-            <ControlChip
-              icon="function"
-              label={t('renders.title')}
-              on={renders.open}
-              aria-expanded={renders.open}
-              title={t('renders.hint')}
-              // The sidecar renders over the footprint, which a draft is in
-              // the middle of moving.
-              disabled={hold != null}
-              onClick={renders.toggle}
-            />
+            <Tooltip label={t('renders.hint')}>
+              <ControlButton
+                icon="function"
+                on={renders.open}
+                aria-label={t('renders.title')}
+                aria-expanded={renders.open}
+                // The sidecar renders over the footprint, which a draft is in
+                // the middle of moving.
+                disabled={hold != null}
+                onClick={renders.toggle}
+              />
+            </Tooltip>
           )}
         </div>
       )}

@@ -22,8 +22,8 @@ Python, stdlib HTTP, no framework, the way the two node sidecars are stdlib node
 
 **Opt-in.** The container runs only where `.env` sets `ENABLE_RENDER=true`, and
 the same key reaches the app, where it makes `useHasFeature('render')` answer
-false for everybody — so the `fx` chip that holds the two render lines, and the
-gallery's redo on a `sunloop` or `rvt` row, are absent rather than failing
+false for everybody — so the `fx` button that holds the two render lines, and
+the gallery's redo on a `sunloop` or `rvt` row, are absent rather than failing
 (`docs/architecture.md`). Rows made before the service was turned off still
 read, download and carry their legend; the membership gate below is the second
 filter, on an installation that runs the sidecar at all.

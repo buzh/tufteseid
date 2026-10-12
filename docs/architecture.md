@@ -231,7 +231,7 @@ has the map; the pen takes the whole map instead, so the box goes away behind
 the canvas and its Avbryt/Lagre are in the band (*The context in front*). Only
 one of the two can have the map at a time. The pictures that are asked for over
 the footprint rather than read off the view are ordered from the card as well:
-the renders fold out of the `fx` chip and the flyfoto walk starts from the
+the renders fold out of the `fx` button and the flyfoto walk starts from the
 aeroplane beside it (*The pictures of a spot*).
 
 The pin belongs to the properties box and stands only while it is open
@@ -393,7 +393,7 @@ them — `EvidenceGallery` on the card — and it does everything but the asking
 the kept rows, the drag that sets the order, and the press that lays a picture
 back on the map to trace over. Asking for another is the camera in the card's
 tools row, beside the rectangle and the pen — or, on the end of that same row,
-the `fx` chip and the aeroplane, which are where the pictures nobody can take
+the `fx` button and the aeroplane, which are where the pictures nobody can take
 from the view are ordered. `EvidenceReader` flips through the same rows full
 size and changes none of them.
 
@@ -432,8 +432,8 @@ size and changes none of them.
   is a 404, so a rectangle off the flight reads as `empty` rather than failed.
 - **A sun loop is ordered, not kept.** It reads nothing on screen, so it never
   belonged on a camera that keeps the view. It is ordered from `SpotRenders`
-  (`src/spotControls/`), the list that folds out of the `fx` chip on the card's
-  tools row and holds one line per picture the sidecar makes over the
+  (`src/spotControls/`), the list that folds out of the `fx` button on the
+  card's tools row and holds one line per picture the sidecar makes over the
   footprint. A line is the picture's name, the acquisition it reads, a cogwheel
   where there is anything to ask, and the press — which is armed first
   (`useConfirm`), because a render is minutes of somebody's server and is never
@@ -780,7 +780,7 @@ both halves of the job:
 | --- | --- | --- |
 | `ENABLE_FLYFOTO` | `nib-proxy` | The Flyfoto ground and its arm, the archive walk, the `flyfoto` evidence kind, the `nib` origin in the breaker. The ground is also an account feature, so the switch keeps its button either way (`docs/identity.md`) |
 | `ENABLE_CVAT` | `cvat-tiles` | The cVAT render, its hint and footprint layers, the *not built for this flight* row in the render menu, the gallery's redo on a `lidar` row in the `cvat` style |
-| `ENABLE_RENDER` | `rendersvc` | The card's `fx` chip, which is the `sunloop` and `rvt` render lines, and the gallery's redo on a row of either kind |
+| `ENABLE_RENDER` | `rendersvc` | The card's `fx` button, which is the `sunloop` and `rvt` render lines, and the gallery's redo on a row of either kind |
 
 PocketBase is not in the table: accounts are what spots, votes and invites
 are made of, and sign-in is PocketBase's own (`docs/identity.md`).
