@@ -2,10 +2,13 @@
 // ground.
 
 import { Tooltip } from '@mantine/core';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
+import { mapAtom } from '../map/atoms';
 import { ControlButton } from '../ui/ControlButton';
 import { ControlUnit } from '../ui/ControlUnit';
 import type { MaterialSymbol } from '../ui/Icon';
+import { norgeIBilderUrl } from './norgeIBilder';
 import {
   GROUND_MODES,
   type GroundControls,
@@ -18,12 +21,11 @@ const GROUND_ICON: Record<GroundMode, MaterialSymbol> = {
   flyfoto: 'photo_camera',
 };
 
-// Where Flyfoto sends a reader who may not enter it: the pictures are Norge i
-// bilder's, and their own viewer is open to anybody (`src/auth/features.ts`).
-const NORGE_I_BILDER = 'https://norgeibilder.no/';
-
 export const GroundSwitch = ({ ground }: { ground: GroundControls }) => {
   const { t } = useTranslation();
+  // The view is read at the click rather than followed: the switch has no
+  // reason to re-render on every pan.
+  const map = useAtomValue(mapAtom);
   const { mode, select, mayFlyfoto } = ground;
 
   return (
@@ -46,7 +48,11 @@ export const GroundSwitch = ({ ground }: { ground: GroundControls }) => {
               aria-pressed={away ? undefined : candidate === mode}
               onClick={() =>
                 away
-                  ? window.open(NORGE_I_BILDER, '_blank', 'noopener,noreferrer')
+                  ? window.open(
+                      norgeIBilderUrl(map),
+                      '_blank',
+                      'noopener,noreferrer',
+                    )
                   : select(candidate)
               }
             />

@@ -106,8 +106,8 @@ gallery's retry on a row that renders on the server. A courtesy, not a gate.
 carry the installation's own Norge i bilder token rather than the reader's, so
 nothing upstream can tell two accounts apart. What the feature decides is what
 the ground switch does: without it the Flyfoto button opens norgeibilder.no in
-a new tab instead of entering the ground, the pictures being that site's to
-give away (`src/grounds/GroundSwitch.tsx`). A hand-written
+a new tab over the view on screen instead of entering the ground, the pictures
+being that site's to give away (`src/grounds/norgeIBilder.ts`). A hand-written
 `?backgroundLayer=flyfoto` still seats the ground, and the archive walk over a
 spot's footprint is the *service's* to offer, not the feature's.
 
