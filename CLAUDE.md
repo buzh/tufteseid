@@ -138,9 +138,9 @@ alongside the cVAT and MapProxy store directories (`README.md`,
   and `rendersvc`, each behind one `ENABLE_*` key that drives both
   a compose profile and `/services.js`, which `src/services.ts` reads
   (`docs/architecture.md`). Adding a surface that talks to one of them means
-  hiding it behind `serviceOn(…)` in the same change. A service gates the
-  *making*, never the reading — the rule `src/auth/features.ts` already
-  states for an account's features.
+  hiding it behind `serviceOn(…)` in the same change. No evidence row goes
+  dark for want of a service: what goes is the control that would ask for
+  another one.
 - **`COMPOSE_PROFILES=enabled-true` must be in `.env` too**, and `git pull`
   never puts it there — an installation whose `.env` predates the opt-in keys
   has to gain that line by hand. Without it neither `enabled-true` nor
@@ -307,12 +307,16 @@ for the three fields that are the reader's — `name`, `description` and
 every PATCH. The address needs a route of its own and the current password;
 the password needs PocketBase's own `oldPassword` (`docs/identity.md`).
 
-**What a feature gates is making, never reading.** A gated capability is a
-name (`render` so far) on `users.features`, enforced where the cost is rather
-than in a collection rule — `rendersvc` reads the caller's own row and
-refuses. `src/auth/features.ts` hides the control that would only meet a 403,
-and an admin holds every feature. Granting one is an admin-UI edit with no
-code change; adding a *feature* is a string on both ends.
+**What a feature gates is what costs somebody money**, never what a spot
+already carries. A gated capability is a name on `users.features` — `render`
+and `flyfoto` so far — kept out of the collection rules and enforced where the
+cost is: `rendersvc` reads the caller's own row and refuses, so
+`src/auth/features.ts` only hides the control that would meet that 403.
+`flyfoto` has no server end at all and is the hiding alone — an ungranted
+reader's Flyfoto button opens norgeibilder.no instead of the ground
+(`docs/identity.md`). An admin holds every feature, and nobody holds one whose
+service is off. Granting one is an admin-UI edit with no code change; adding a
+*feature* is a string on both ends.
 
 `evidence` follows its spot and adds the spot's owner to every write rule, so an
 admin may keep a render against somebody else's spot and that spot's author can

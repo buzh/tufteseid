@@ -766,7 +766,7 @@ both halves of the job:
 
 | Key | Container | What goes with it |
 | --- | --- | --- |
-| `ENABLE_FLYFOTO` | `nib-proxy` | The Flyfoto ground and its arm, the archive walk, the `flyfoto` evidence kind, the `nib` origin in the breaker |
+| `ENABLE_FLYFOTO` | `nib-proxy` | The Flyfoto ground and its arm, the archive walk, the `flyfoto` evidence kind, the `nib` origin in the breaker. The ground is also an account feature, so the switch keeps its button either way (`docs/identity.md`) |
 | `ENABLE_CVAT` | `cvat-tiles` | The cVAT render, its hint and footprint layers, the *not built for this flight* row in the render menu, the gallery's redo on a `lidar` row in the `cvat` style |
 | `ENABLE_RENDER` | `rendersvc` | The `sunloop` and `rvt` order chips, and the gallery's redo on a row of either kind |
 
@@ -781,15 +781,19 @@ same three variables and read by `src/services.ts` before the module graph
 evaluates, the way `config.js` is read. A dev server has no `services.js` and
 falls back to the whole stack.
 
-**A service gates the making, never the reading** — the rule
-`src/auth/features.ts` already states for an account's features, which is why
-the two compose rather than collide: `useHasFeature('render')` answers false
-when the sidecar is not there, admin or not. An evidence row of a kind this
+**No evidence row goes dark for want of a service.** A row of a kind this
 installation can no longer make still reads, still downloads and still carries
 its legend; what goes is the chip that would ask for another
 (`evidenceRenderable`, `src/evidence/spec.ts`), which reads the row's spec
 rather than its kind because one `lidar` style is served by `cvat-tiles` and
 the rest by a WMS.
+
+A service and an account feature compose rather than collide, because the
+service has the first word: `useHasFeature(…)` answers false when the sidecar
+is not there, admin or not (`src/auth/features.ts`). That is what lets the
+Flyfoto button mean one thing everywhere — an installation with no `nib-proxy`
+seats nobody on the ground, so every reader takes the same way out to
+norgeibilder.no that an ungranted one does (`docs/identity.md`).
 
 Two places read the URL rather than a control, so they filter too: a
 `backgroundLayer` naming a ground this installation does not serve falls back

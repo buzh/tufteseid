@@ -162,7 +162,8 @@
     },
     "flyfoto": {
       "name": "Flyfoto",
-      "hint": "Se flyfoto"
+      "hint": "Se flyfoto",
+      "away": "Åpne norgeibilder.no i ny fane"
     }
   },
   "heritageControls": {

@@ -89,10 +89,12 @@ sign-in.
 
 ### Membership and what it may spend
 
-Some of what the app can do costs the installation real money — a server-side
-render is minutes of CPU — so it is not every account's to ask for.
-`users.features` is a list of names, `render` being the only one so far, and
-`src/auth/features.ts` is where the client side of it lives.
+Some of what the app can do costs somebody real money — a server-side render is
+minutes of CPU, and a session on the Flyfoto ground is a stream of calls
+against an upstream quota the installation does not own — so it is not every
+account's to ask for. `users.features` is a list of names, `render` and
+`flyfoto` so far, and `src/auth/features.ts` is where the client side of it
+lives.
 
 **Enforcement is where the cost is, not in a collection rule.** An `evidence`
 row is parameters, and parameters cost nothing until something renders them —
@@ -100,13 +102,24 @@ so `rendersvc` reads the caller's own row and refuses (`docs/render-sidecar.md`)
 The SPA hides what would only meet that 403: the two order chips, and the
 gallery's retry on a row that renders on the server. A courtesy, not a gate.
 
+**`flyfoto` has no such end, and is the courtesy alone.** The ortofoto tiles
+carry the installation's own Norge i bilder token rather than the reader's, so
+nothing upstream can tell two accounts apart. What the feature decides is what
+the ground switch does: without it the Flyfoto button opens norgeibilder.no in
+a new tab instead of entering the ground, the pictures being that site's to
+give away (`src/grounds/GroundSwitch.tsx`). A hand-written
+`?backgroundLayer=flyfoto` still seats the ground, and the archive walk over a
+spot's footprint is the *service's* to offer, not the feature's.
+
 **An administrator holds every feature.** `src/auth/features.ts` and
 `rendersvc/server.py` both say so, so that a `features` entry nobody
 remembered to grant cannot lock an installation out of its own renders.
 
 **Pictures already rendered stay readable to everybody who can see the spot**,
-guests included. A feature decides what may be *made*, never what may be
-looked at — the same rule a service follows (`docs/architecture.md`).
+guests included: a feature decides what may be *asked for*, never what a spot
+already carries. Flyfoto bends that — browsing an archive is reading, and it is
+gated because every pan is another call on the quota — but no evidence row goes
+dark for want of a feature.
 
 ### `name` is what gets the credit
 

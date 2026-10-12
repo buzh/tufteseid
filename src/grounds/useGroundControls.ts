@@ -3,20 +3,19 @@
 // the arm's own business, hence the `enter` callbacks rather than a write here.
 
 import { useAtomValue } from 'jotai';
+import { useHasFeature } from '../auth/features';
 import type { CompareHalf } from '../map/compare/halves';
 import type { BackgroundLayerName } from '../map/layers/backgroundLayers';
 import { backgroundLayerHalves } from '../map/layers/config/backgroundLayers/atoms';
 import { isKartVariant } from '../map/layers/config/backgroundLayers/kartVariants';
 import { LIDAR_LAYERS } from '../map/layers/config/backgroundLayers/stack';
-import { serviceOn } from '../services';
 
-const GROUND_MODES = ['lidar', 'kart', 'flyfoto'] as const;
+/** Also the order the switch draws them in. All three are drawn on every
+ *  installation: Flyfoto is a granted feature, and a reader without it gets
+ *  the upstream viewer rather than no button (`GroundSwitch`). */
+export const GROUND_MODES = ['lidar', 'kart', 'flyfoto'] as const;
 
 export type GroundMode = (typeof GROUND_MODES)[number];
-
-/** What this installation can show, and the order the switch draws them in. */
-export const AVAILABLE_GROUND_MODES: readonly GroundMode[] =
-  GROUND_MODES.filter((mode) => mode !== 'flyfoto' || serviceOn('flyfoto'));
 
 /** Null for `empty`, the one background that belongs to no ground. */
 const groundOf = (name: BackgroundLayerName): GroundMode | null => {
@@ -31,14 +30,17 @@ export const useGroundControls = (
   enter: Record<GroundMode, () => void>,
 ) => {
   const backgroundLayer = useAtomValue(backgroundLayerHalves[half]);
+  const mayFlyfoto = useHasFeature('flyfoto');
   const mode = groundOf(backgroundLayer);
 
   return {
     mode,
+    mayFlyfoto,
     // Picking the ground already showing is not a re-entry: it would re-run
     // Automatisk, or drop Flyfoto back to the mosaic, for a click that said
     // nothing.
     select: (next: GroundMode) => {
+      if (next === 'flyfoto' && !mayFlyfoto) return;
       if (next !== mode) enter[next]();
     },
   };
