@@ -13,8 +13,16 @@ export type Role = 'guest' | 'user' | 'admin' | 'queued';
 // `role` is optional on the collection, so missing reads as 'user'.
 export type SiteUser = {
   id: string;
+  /** What `pb.files.getURL` reads to build the path to `avatar`. */
+  collectionId: string;
   email: string;
   name: string;
+  /** The stored filename, '' for none. Only the reader themselves can see it:
+   *  `users` is closed to everybody else, which is also why `spots.credit` is
+   *  denormalized (`docs/identity.md`). */
+  avatar?: string;
+  /** The reader's own line about themselves, ≤120 characters. */
+  description?: string;
   role?: Role;
   /** What this account may spend, granted by hand (`docs/identity.md`). Read
    *  it through `useHasFeature` (`src/auth/features.ts`), never directly — an

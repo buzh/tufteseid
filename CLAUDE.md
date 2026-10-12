@@ -183,10 +183,11 @@ alongside the cVAT and MapProxy store directories (`README.md`,
 Migrations are versioned in `pocketbase/pb_migrations/` and use the ≥0.23
 App-based JSVM API (`$app.findCollectionByNameOrId` / `app.save`, flattened
 field classes), **not** the 0.22 `Dao` API. `pocketbase/pb_hooks/` holds JS
-hooks in the same runtime, for the two things a collection rule cannot say:
+hooks in the same runtime, for the three things a collection rule cannot say:
 the closed-beta gate counts rows and spends a counter (`docs/closed-beta.md`),
-and `identity.pb.js` pins the three fields on a new `users` row that are not
-the reader's to choose, a rule being unable to name a field
+`identity.pb.js` pins the three fields on a `users` row that are not the
+reader's to choose, a rule being unable to name a field, and `profile.pb.js`
+moves an account's address, which PocketBase refuses on a self-PATCH
 (`docs/identity.md`).
 
 - **A hook handler cannot see its own file's scope.** PocketBase serializes
@@ -300,10 +301,11 @@ rename, reshape and delete anybody's spot. `users.role` and `users.features`
 are granted by hand in the admin UI, pinned at registration by
 `pb_hooks/identity.pb.js` — which also parks the row in the `queued` role
 when the installation is at `MAXUSERS`, a fourth role that may hold no token
-until a place opens (`docs/identity.md`) — and the `users` row has no update
-rule at all —
-neither the rank nor the membership nor the invite quota is the reader's to
-set (`docs/identity.md`).
+until a place opens (`docs/identity.md`). The `users` row is self-updatable
+for the three fields that are the reader's — `name`, `description` and
+`avatar` — and the same hook puts rank, membership and invite quota back on
+every PATCH. The address needs a route of its own and the current password;
+the password needs PocketBase's own `oldPassword` (`docs/identity.md`).
 
 **What a feature gates is making, never reading.** A gated capability is a
 name (`render` so far) on `users.features`, enforced where the cost is rather

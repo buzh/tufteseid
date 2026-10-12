@@ -1,4 +1,11 @@
-import { Box, Menu, SegmentedControl, Text } from '@mantine/core';
+import {
+  Avatar,
+  Box,
+  Group,
+  Menu,
+  SegmentedControl,
+  Text,
+} from '@mantine/core';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
@@ -8,7 +15,12 @@ import { isInvitesDialogOpenAtom } from '../invites/atoms';
 import { ControlButton } from '../ui/ControlButton';
 import { Icon } from '../ui/Icon';
 import { uiScaleAtom, type UiScale } from '../ui/uiScale';
-import { currentUserAtom, isAdminAtom, isAuthDialogOpenAtom } from './atoms';
+import {
+  currentUserAtom,
+  isAdminAtom,
+  isAuthDialogOpenAtom,
+  isProfileDialogOpenAtom,
+} from './atoms';
 
 // The GoAccess report Caddy serves out of the stats bind mount, and
 // PocketBase's own dashboard behind the same proxy path as its API.
@@ -46,6 +58,7 @@ export const AuthButton = () => {
   const isAdmin = useAtomValue(isAdminAtom);
   const setDialogOpen = useSetAtom(isAuthDialogOpenAtom);
   const setInvitesOpen = useSetAtom(isInvitesDialogOpenAtom);
+  const setProfileOpen = useSetAtom(isProfileDialogOpenAtom);
 
   if (!user) {
     return (
@@ -82,13 +95,34 @@ export const AuthButton = () => {
       </Menu.Target>
       <Menu.Dropdown>
         <Menu.Label>
-          <Text size="xs" truncate>
-            {user.name || user.email}
-          </Text>
+          <Group gap="xs" wrap="nowrap">
+            {/* Only ever their own: `users` is closed to everybody else, so
+                nobody else's picture can be read (`docs/identity.md`). */}
+            <Avatar
+              size={20}
+              radius="xl"
+              src={
+                user.avatar
+                  ? pb.files.getURL(user, user.avatar, {
+                      thumb: '40x40',
+                    })
+                  : null
+              }
+            />
+            <Text size="xs" truncate>
+              {user.name || user.email}
+            </Text>
+          </Group>
         </Menu.Label>
         <Menu.Divider />
         <UiScaleSection />
         <Menu.Divider />
+        <Menu.Item
+          leftSection={<Icon icon="settings" size={16} />}
+          onClick={() => setProfileOpen(true)}
+        >
+          {t('profile.title')}
+        </Menu.Item>
         <Menu.Item
           leftSection={<Icon icon="person_add" size={16} />}
           onClick={() => setInvitesOpen(true)}
@@ -123,7 +157,12 @@ export const AuthButton = () => {
         )}
         <Menu.Item
           leftSection={<Icon icon="logout" size={16} />}
-          onClick={() => pb.authStore.clear()}
+          onClick={() => {
+            // The account box draws nothing without an account, but the atom
+            // would otherwise have it up again on the next sign-in.
+            setProfileOpen(false);
+            pb.authStore.clear();
+          }}
         >
           {t('auth.signOut')}
         </Menu.Item>

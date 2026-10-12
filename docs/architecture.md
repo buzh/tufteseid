@@ -102,6 +102,7 @@ A `Halves` suffix means a pair (see below). Each pair's `live*` sibling is
 | `currentUserAtom` | `auth/atoms.ts` | Who is signed in. Written only by `pbAuthSyncEffect`. |
 | `isSignedInAtom`, `isAdminAtom` | same | Derived, so a component does not re-render on an unrelated user field. |
 | `isAuthDialogOpenAtom`, `authPromptAtom` | same | Whether the dialog is up, and why when the reader did not press anything. Both seeded from an `?invite=` on the page's boot, that box being the only place a code can be spent (`docs/closed-beta.md`). Whether an attempt failed is the dialog's own state — nothing leaves the page, so no failure has to survive one. |
+| `isProfileDialogOpenAtom` | same | Whether the account box is up, opened by the cogwheel in the account menu. Each of its three forms keeps its own state, so closing it drops every half-typed change (`docs/identity.md`). |
 | `uiScaleAtom` | `ui/uiScale.ts` | How big the chrome is drawn, `small` or `large`. Writing it paints `data-ui-scale` on `<html>` and stores the name; the CSS does the rest (*Ribbon and the UI kit*). |
 | `upstreamHealthAtom` | `upstream/health.ts` | One breaker status per origin. |
 

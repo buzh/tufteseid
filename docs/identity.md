@@ -70,11 +70,17 @@ mechanisms to hold that — one at create, one after:
   cannot name a field* — without the hook, a POST carrying `role: "admin"`
   would be honoured. A superuser create is left alone, so adding somebody by
   hand in the admin UI still chooses the whole row.
-- **After create**, `1700002200_users_not_self_writable.js` takes the update
-  rule away entirely. Nothing in the SPA has ever PATCHed a user row. A
-  superuser and a hook save records directly and are not held by an API rule,
-  so the admin UI and `pb_hooks/` are the only two ways any of the three
-  moves.
+- **On every update**, the same hook puts all three back from
+  `record.original()`, which is the row as the database holds it. PocketBase
+  loads the request body onto the record *before* a `*Request` hook runs and
+  validates it inside `e.next()`, so what the handler sets is what gets saved.
+  A superuser edit is left alone the same way.
+
+`1700002200_users_not_self_writable.js` took the update rule away entirely
+rather than pin anything, there being no field on the row the reader had any
+business setting. `1700002900_user_profile.js` hands it back as
+`id = @request.auth.id`, because there are three now (below); the pinning hook
+is what pays for that.
 
 **Granting a rank or a feature is an admin-UI edit**: Collections → `users` →
 the row → `role`, or an entry on the `features` array. It takes effect on the
@@ -108,6 +114,59 @@ The reader may type a display name when they register, and `spots.credit` is
 denormalized from it at save time rather than joined: `users` is closed to a
 guest, so a public spot's author could not otherwise be shown to one. A reader
 who renames themselves does not rename the credit on spots already saved.
+
+## Managing the account
+
+The account button's cogwheel opens `src/auth/ProfileDialog.tsx`, one Mantine
+modal holding three forms that save one at a time. They are apart because they
+cost different things, not for want of room.
+
+| form | what it posts |
+| --- | --- |
+| *Profil* | a PATCH on the reader's own `users` row: `name`, `description`, `avatar` |
+| *E-postadresse* | `POST /pb/api/profile/email`, carrying the new address and the current password |
+| *Bytt passord* | a PATCH carrying `oldPassword`, `password`, `passwordConfirm`, then a sign-in |
+
+`src/api/profile.ts` holds all three and nothing else does.
+
+**`name`, `description` and `avatar` are the whole of what a PATCH may move.**
+`description` is a 120-character line the reader writes about themselves, new
+in `1700002900_user_profile.js`; `avatar` is the stock collection's own file
+field, which was always there. Everything else on the row is either pinned
+back by the hook or refused by the upsert form.
+
+**Nobody but the reader sees either one yet.** `users` keeps its stock list
+and view rules, `id = @request.auth.id`, so nothing can read somebody else's
+row — the same closure that has `spots.credit` denormalized. The avatar
+appears twice, in the account menu and in the box itself, and both are the
+reader's own. Showing an author's picture on a public spot would mean a view
+the way `spotScores` is one, and there is no such view.
+
+`avatar` is **unprotected**, like `evidence.file` and for the same reason: an
+`<img>` carries no Authorization header, so a protected field would not render
+at all. A file URL works for anybody who has it; what the view rule keeps is
+that nobody else can find out the filename.
+
+**Changing the address costs the current password, and sends no letter.**
+PocketBase will not take `email` on a self-PATCH at all: the upsert form pins
+it to the stored value for anything short of manage access, and what it offers
+instead is `requestEmailChange` and a confirmation link — the verification
+step this installation does not run. `pb_hooks/profile.pb.js` is a route that
+does it without one, and the password is what stands in for the letter: with
+nothing to confirm, the address is the whole of account recovery, so a
+borrowed tab must not be able to move it. The route clears `verified`, which
+nothing reads, and leaves the token key alone, so the session survives.
+
+Setting `manageRule` on `users` would have let the SPA PATCH the address
+directly and spared the route. It also drops PocketBase's `oldPassword`
+requirement on a password change, which is the one guard worth keeping here,
+so it stays unset.
+
+**A password change ends every session, the reader's own included.**
+PocketBase refreshes the record's token key, so the token in hand dies with
+the old password. `changePassword` signs straight back in with the new one;
+when that does not land, the dialog closes and the sign-in box opens, because
+the account is fine and the session is not.
 
 ## Adding an OAuth2 provider later
 

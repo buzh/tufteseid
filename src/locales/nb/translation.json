@@ -348,6 +348,43 @@
     "metres": "{{metres}} m",
     "nothing": "Ingen opplysninger herfra — bare punktet selv."
   },
+  "profile": {
+    "title": "Kontoen din",
+    "blurb": "Navn og bilde er bare synlig for deg selv inntil videre. Lokaliteter du alt har publisert beholder navnet de ble lagret med.",
+    "pick": "Velg bilde",
+    "drop": "Fjern bilde",
+    "avatarHelp": "PNG, JPEG, WebP, GIF eller SVG.",
+    "name": "Visningsnavn",
+    "nameHelp": "Navnet som står som kilde på lokalitetene du publiserer.",
+    "about": "Om deg",
+    "aboutHelp": "{{used}} av {{max}} tegn.",
+    "save": "Lagre",
+    "saved": "Lagret.",
+    "failed": "Fikk ikke lagret.",
+    "email": {
+      "title": "E-postadresse",
+      "blurb": "Adressen logger du inn med, og den er eneste vei tilbake hvis du glemmer passordet. Vi sender ingen bekreftelse, så skriv den riktig.",
+      "address": "Ny e-postadresse",
+      "password": "Nåværende passord",
+      "submit": "Endre e-post",
+      "changed": "E-postadressen er endret.",
+      "wrongPassword": "Feil passord.",
+      "unavailable": "E-postadressen er ugyldig eller allerede i bruk.",
+      "failed": "Fikk ikke endret e-postadressen."
+    },
+    "password": {
+      "open": "Bytt passord",
+      "old": "Nåværende passord",
+      "new": "Nytt passord",
+      "confirm": "Gjenta nytt passord",
+      "submit": "Bytt passord",
+      "changed": "Passordet er byttet.",
+      "mismatch": "De to nye passordene er ikke like.",
+      "wrongOld": "Feil nåværende passord.",
+      "tooShort": "Passordet må ha minst 8 tegn.",
+      "failed": "Fikk ikke byttet passordet."
+    }
+  },
   "ribbon": {
     "groundSection": {
       "only": "Kartlag",

@@ -49,6 +49,8 @@ export const isAdminAtom = atom((get) => get(roleAtom) === 'admin');
 // the only place the code it carries can be spent.
 export const isAuthDialogOpenAtom = atom(bootInviteCode !== '');
 
+export const isProfileDialogOpenAtom = atom(false);
+
 /** Why the dialog is up when the reader did not ask for it; null for the
  *  sign-in button itself. */
 export type AuthPrompt = 'spotLink' | 'inviteLink';
