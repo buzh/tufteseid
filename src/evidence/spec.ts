@@ -15,6 +15,12 @@ import { VISUALIZATIONS, type Visualization } from '../terrain/shade';
 /** The seamless best-available mosaic, as against one acquisition. */
 export const NIB_MOSAIC = 'mosaic';
 
+/** `meta.source` on a server-rendered row: the finest acquisition covering each
+ *  pixel, which is what the catalogue mosaics by itself. Anything else is one
+ *  acquisition, spelled as hoydedata's `LAS_PROJECT_NAME`
+ *  (`src/terrain/demProjects.ts`, `docs/render-sidecar.md`). */
+export const AUTO_SOURCE = 'auto';
+
 /** Degrees between frames. Must divide 360, or the loop jumps where it closes;
  *  the sidecar refuses one that does not. */
 const SUNLOOP_STEP_DEG = 5;
@@ -63,6 +69,8 @@ export type EvidenceSpec =
        *  Sidecar only. No azimuth: the loop is every azimuth. */
       kind: 'sunloop';
       model: DemModel;
+      /** `AUTO_SOURCE`, or one acquisition's `LAS_PROJECT_NAME`. */
+      source: string;
       altitude: number;
       zFactor: number;
       stepDeg: number;
@@ -74,24 +82,46 @@ export type EvidenceSpec =
       kind: 'rvt';
       vis: RvtBlend;
       model: DemModel;
+      /** `AUTO_SOURCE`, or one acquisition's `LAS_PROJECT_NAME`. */
+      source: string;
     };
 
-// Fixed, not a form: height and exaggeration are the analysis panel's defaults,
-// so a loop and a still of the same ground are lit alike. DTM, because a canopy
-// walked round is a picture of the canopy.
-export const SUN_LOOP_SPEC: Extract<EvidenceSpec, { kind: 'sunloop' }> = {
-  kind: 'sunloop',
-  model: 'dtm',
+/** What the sun loop is lit by where the reader asks nothing: the analysis
+ *  panel's own height and exaggeration, so a loop and a still of the same
+ *  ground are lit alike. */
+export const SUN_LOOP_DEFAULTS = {
   altitude: DEFAULT_ALTITUDE,
   zFactor: DEFAULT_Z_FACTOR,
   stepDeg: SUNLOOP_STEP_DEG,
-  fps: SUNLOOP_FPS,
 };
 
-// Fixed, like the sun loop: a blend is RVT's whole recipe, nothing to ask
-// about. DTM, because a blend of the canopy is a picture of the canopy.
-export const RVT_SPECS: readonly Extract<EvidenceSpec, { kind: 'rvt' }>[] =
-  RVT_BLENDS.map((vis) => ({ kind: 'rvt', vis, model: 'dtm' }));
+export type SunLoopSettings = typeof SUN_LOOP_DEFAULTS;
+
+// DTM, because a canopy walked round is a picture of the canopy. The frame rate
+// is not the reader's: it is how fast the finished loop plays, and the frames
+// are the step's.
+export const sunLoopSpec = (
+  source: string,
+  settings: SunLoopSettings,
+): Extract<EvidenceSpec, { kind: 'sunloop' }> => ({
+  kind: 'sunloop',
+  model: 'dtm',
+  source,
+  fps: SUNLOOP_FPS,
+  ...settings,
+});
+
+// Nothing to ask about: a blend is RVT's whole recipe. DTM, because a blend of
+// the canopy is a picture of the canopy.
+export const rvtSpec = (
+  vis: RvtBlend,
+  source: string,
+): Extract<EvidenceSpec, { kind: 'rvt' }> => ({
+  kind: 'rvt',
+  vis,
+  model: 'dtm',
+  source,
+});
 
 /** Rendered by the sidecar rather than in the tab that asked. The same split
  *  `BrowserSpec` (`render.ts`) states as a type, off a stored row's kind. */
@@ -149,13 +179,14 @@ export const metaOf = (spec: EvidenceSpec): EvidenceMeta => {
     case 'sunloop':
       return {
         model: spec.model,
+        source: spec.source,
         altitude: spec.altitude,
         zFactor: spec.zFactor,
         stepDeg: spec.stepDeg,
         fps: spec.fps,
       };
     case 'rvt':
-      return { vis: spec.vis, model: spec.model };
+      return { vis: spec.vis, model: spec.model, source: spec.source };
   }
 };
 
@@ -211,6 +242,9 @@ export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
       return {
         kind: 'sunloop',
         model,
+        // Rows made before the acquisition could be named were rendered off
+        // the mosaic, which is what `AUTO_SOURCE` asks for again.
+        source: str(meta.source) ?? AUTO_SOURCE,
         altitude: num(meta.altitude) ?? 0,
         zFactor: num(meta.zFactor) ?? 1,
         stepDeg: num(meta.stepDeg) ?? SUNLOOP_STEP_DEG,
@@ -222,7 +256,12 @@ export const specOf = (rec: EvidenceRecord): EvidenceSpec | null => {
       const model = asModel(meta.model);
       // A blend this build no longer knows how to name or ask for again.
       if (!vis || !model) return null;
-      return { kind: 'rvt', vis, model };
+      return {
+        kind: 'rvt',
+        vis,
+        model,
+        source: str(meta.source) ?? AUTO_SOURCE,
+      };
     }
   }
 };
@@ -344,6 +383,7 @@ export const evidenceMatches = (
       return (
         stored.kind === 'sunloop' &&
         stored.model === spec.model &&
+        stored.source === spec.source &&
         sameNumber(stored.altitude, spec.altitude) &&
         sameNumber(stored.zFactor, spec.zFactor) &&
         stored.stepDeg === spec.stepDeg &&
@@ -353,7 +393,8 @@ export const evidenceMatches = (
       return (
         stored.kind === 'rvt' &&
         stored.vis === spec.vis &&
-        stored.model === spec.model
+        stored.model === spec.model &&
+        stored.source === spec.source
       );
   }
 };

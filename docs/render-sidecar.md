@@ -22,8 +22,8 @@ Python, stdlib HTTP, no framework, the way the two node sidecars are stdlib node
 
 **Opt-in.** The container runs only where `.env` sets `ENABLE_RENDER=true`, and
 the same key reaches the app, where it makes `useHasFeature('render')` answer
-false for everybody — so the two order chips and the gallery's redo on a
-`sunloop` or `rvt` row are absent rather than failing
+false for everybody — so the `fx` chip that holds the two render lines, and the
+gallery's redo on a `sunloop` or `rvt` row, are absent rather than failing
 (`docs/architecture.md`). Rows made before the service was turned off still
 read, download and carry their legend; the membership gate below is the second
 filter, on an installation that runs the sidecar at all.
@@ -59,6 +59,17 @@ own `meta.vis`, so the route does not multiply with the recipes.
 status follows it: 503 when the thread is gone, 200 while it is running. A queue
 depth is not health — every other route keeps answering normally when the only
 worker has stopped, so that is the one thing the probe has to see.
+
+**Which acquisition.** `meta.source` is `auto` — every flight, finest wins per
+pixel, which is what `MOSAIC_RULE` composes — or one acquisition's
+`LAS_PROJECT_NAME`, which goes into both the probe's `where` and the mosaic's,
+so the grid is that flight's own pixels and NaN everywhere it did not fly. The
+name is a fact about the catalogue, not about us: `src/terrain/demProjects.ts`
+reads the list off the same image service, so the two ends cannot drift apart.
+It reaches ArcGIS inside SQL, so `dem.project_of` **checks it rather than
+escaping it** — word characters, spaces and `.,()-/`, 200 at most — and a name
+that fails is a 422 like any other unreadable `meta`. A render of one flight
+costs what the mosaic would: the catalogue is filtered, not the pixels.
 
 **The client names a row, not a rectangle.** The sidecar reads
 `/api/collections/evidence/records/{id}?expand=spot` with the caller's own token;
@@ -149,8 +160,10 @@ a row is settled **empty**.
    `min(OPPLOSNING)` over the rectangle, `where OPPLOSNING IS NOT NULL` so the
    10 m contour-derived rows cannot answer. No coverage arrives as one feature
    with a null statistic, and the service upper-cases the field name to `BEST`.
-   A null marks the row **empty** and stops. A probe that *fails* is not an
-   absence: it falls through at 0.25 m and lets the pixels answer.
+   A null marks the row **empty** and stops — and with an acquisition named, a
+   null is also what a footprint off the edge of *that* flight answers, which
+   is the point of asking it. A probe that *fails* is not an absence: it falls
+   through at 0.25 m and lets the pixels answer.
 2. **One `exportImage`** per grid — `Prosjekt_DTM`/`Prosjekt_DOM`,
    `pixelType=F32`, `renderingRule` `None`, the explicit finest-wins
    `mosaicRule`. No tiling: a grid is coarsened until it fits one call instead.
@@ -371,8 +384,8 @@ failed" until the page is reloaded.
 for a membership without `render`, 429 for a full queue, 503 for a dead worker
 — has queued nothing and written no marker, so the row it was handed would
 stand for ever with neither pixels nor state: `stateOf` says nothing about it
-after a reload, `SpotAcquire` reads that as a render still on its way, and
-every order chip is disabled behind it. So `keep` deletes the row on a
+after a reload, `SpotRenders` reads that as a render still on its way, and
+every press is dead behind it. So `keep` deletes the row on a
 `RenderRefused` (`src/api/render.ts`) and the reader is told the keep failed,
 the same trade `keepProduced` already made. A handover that merely *timed out*
 is left alone, because the POST is not aborted and the job may yet be claimed.
@@ -573,7 +586,7 @@ to `evi_kind`.
 **A blend is not a producer.** Another RVT visualization is one entry in
 `blends.PRODUCERS`, one entry in `RVT_BLENDS` (`src/evidence/spec.ts`), one arm
 of the `evidence.rvt.*` strings, and nothing else: the kind, the route, the
-migration and the chip loop already exist.
+migration and the line loop already exist.
 
 On the client a producer is a variant in `src/evidence/spec.ts`, an arm in
 `labels.ts`, somewhere to ask for it, and a branch in `queue.ts` that POSTs
@@ -581,11 +594,11 @@ instead of rendering. Where to ask follows what the producer reads: a reading of
 the map as it stands is an offer atom feeding `keepOfferAtom`, which is what the
 camera in the spot card keeps, the way the three browser kinds are. Neither
 server-side kind reads anything on screen, so neither belongs on that camera;
-both are ordered from `SpotAcquire` (`src/spotControls/`), off fixed specs —
-`SUN_LOOP_SPEC` and one per entry in `RVT_SPECS` — and that box is where the
-next one's chip goes too.
+both are ordered from `SpotRenders` (`src/spotControls/`), one line each off
+`sunLoopSpec` or `rvtSpec` (`spec.ts`), and that list is where the next one's
+line goes too.
 
 Two places state the server/browser split and both must agree: `rendersOnServer`
-in `spec.ts`, which is what `SpotAcquire` filters and counts on, and
+in `spec.ts`, which is what `SpotRenders` filters and counts on, and
 `BrowserSpec` in `render.ts`, which excludes the server-side kinds so the
 browser producers' switch stays exhaustive.

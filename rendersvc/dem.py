@@ -12,6 +12,7 @@ nobody will ask for again, so caching it only evicts tiles that are re-read.
 
 import json
 import random
+import re
 import time
 import urllib.parse
 import urllib.request
@@ -30,9 +31,50 @@ SERVICES = {"dtm": "Prosjekt_DTM", "dom": "Prosjekt_DOM"}
 
 # Finest acquisition wins where they overlap. Stated explicitly because
 # Prosjekt_DOM defaults to a Northwest mosaic method and Prosjekt_DTM does not.
-MOSAIC_RULE = json.dumps(
-    {"mosaicMethod": "esriMosaicAttribute", "sortField": "lowps", "sortValue": 0}
-)
+MOSAIC_RULE = {
+    "mosaicMethod": "esriMosaicAttribute",
+    "sortField": "lowps",
+    "sortValue": 0,
+}
+
+# `meta.source` asking for the mosaic above rather than one acquisition.
+# Mirrors `AUTO_SOURCE` in `src/evidence/spec.ts`.
+AUTO_SOURCE = "auto"
+
+# The 10 m fallback rows have no OPPLOSNING, so excluding them makes a null
+# coverage answer mean "no laser data".
+LASER_ONLY = "OPPLOSNING IS NOT NULL"
+
+# An acquisition's name reaches the service inside a SQL `where`, so it is
+# checked rather than escaped: a LAS_PROJECT_NAME is a place, a density and a
+# year ("NDH Vestfold 5pkt 2016"), and nothing with a quote in it is one.
+_NAME = re.compile(r"^[\w .,()\-/]{1,200}$")
+
+
+def project_of(meta):
+    """The acquisition `meta` names, or None for the mosaic. Raises on a name
+    the catalogue filter may not carry, which the route answers 422."""
+    source = meta.get("source", AUTO_SOURCE)
+    if source is None or source == AUTO_SOURCE:
+        return None
+    if not isinstance(source, str) or not _NAME.match(source):
+        raise ValueError("source is not an acquisition name")
+    return source
+
+
+def _only(project):
+    """The catalogue filter for one acquisition, as a `where` fragment."""
+    return f"LAS_PROJECT_NAME = '{project}'"
+
+
+def _mosaic_rule(project):
+    """Which rasters may answer. With no project this is the finest-wins
+    mosaic; with one, that acquisition alone — the finest of its own tiles,
+    which is the same rule over a smaller catalogue."""
+    rule = dict(MOSAIC_RULE)
+    if project:
+        rule["where"] = _only(project)
+    return json.dumps(rule)
 
 # Finest resolution the per-project services publish.
 FINEST_M_PER_PX = 0.25
@@ -80,10 +122,11 @@ def _get(url, timeout):
         return response.read()
 
 
-def probe_coverage(model, bbox25833):
+def probe_coverage(model, bbox25833, project=None):
     """Finest OPPLOSNING in metres over the rectangle, or None where the
-    catalogue holds no laser data. Raises when the probe itself fails, which is
-    not the same answer and must not read as an absence."""
+    catalogue holds no laser data — none of this acquisition's, where one is
+    named. Raises when the probe itself fails, which is not the same answer and
+    must not read as an absence."""
     query = {
         "f": "json",
         "geometry": json.dumps(
@@ -98,9 +141,7 @@ def probe_coverage(model, bbox25833):
         "geometryType": "esriGeometryEnvelope",
         "inSR": 25833,
         "spatialRel": "esriSpatialRelIntersects",
-        # The 10 m fallback rows have no OPPLOSNING, so excluding them makes a
-        # null answer mean "no laser data".
-        "where": "OPPLOSNING IS NOT NULL",
+        "where": LASER_ONLY + (f" AND {_only(project)}" if project else ""),
         "outStatistics": json.dumps(
             [
                 {
@@ -137,11 +178,12 @@ def _slow(e):
     )
 
 
-def fetch_grid(model, bbox25833, width, height, log=None):
+def fetch_grid(model, bbox25833, width, height, log=None, project=None):
     """(height, width) float32, metres above the vertical datum, north-up. NaN
-    where no acquisition covers the pixel. Raises rather than answering with
-    less than was asked for: a grid is the picture's resolution, and a caller
-    that cannot have it wants the row retried, not quietly coarsened."""
+    where no acquisition covers the pixel — where the named one does not, with
+    a project. Raises rather than answering with less than was asked for: a
+    grid is the picture's resolution, and a caller that cannot have it wants
+    the row retried, not quietly coarsened."""
     query = {
         "f": "image",
         "bbox": ",".join(str(v) for v in bbox25833),
@@ -154,7 +196,7 @@ def fetch_grid(model, bbox25833, width, height, log=None):
         # rasterFunction 'None' returns values; the service's other function,
         # `skyggerelieff`, returns a shaded image.
         "renderingRule": json.dumps({"rasterFunction": "None"}),
-        "mosaicRule": MOSAIC_RULE,
+        "mosaicRule": _mosaic_rule(project),
     }
     url = (
         f"{BASE}/{SERVICES[model]}/ImageServer/exportImage?"

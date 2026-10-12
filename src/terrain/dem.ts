@@ -29,6 +29,11 @@ const MOSAIC_RULE = JSON.stringify({
 // 0.5 or 1 m.
 const FINEST_M_PER_PX = 0.25;
 
+/** A catalogue query against the same service the pixels come from
+ *  (`demProjects.ts` asks which acquisitions are in it). */
+export const demQueryUrl = (model: DemModel, params: URLSearchParams): string =>
+  `${IMAGE_SERVER_BASE}/${SERVICE[model]}/ImageServer/query?${params.toString()}`;
+
 // Ground fetched outside the rectangle on every side and cropped off before
 // painting, so horizon rays near the edge do not walk off the grid. 24 m is the
 // longest reach any view can ask for (`horizonMaxRadiusMetres`).
@@ -127,7 +132,7 @@ function probeCoverage(
     ]),
     returnGeometry: 'false',
   });
-  const url = `${IMAGE_SERVER_BASE}/${SERVICE[model]}/ImageServer/query?${params.toString()}`;
+  const url = demQueryUrl(model, params);
 
   const pending = (async (): Promise<Coverage> => {
     const body = await fetchWithin(

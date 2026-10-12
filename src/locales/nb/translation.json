@@ -1,14 +1,8 @@
 {
   "acquire": {
-    "title": "Hent bilder",
-    "open": "Innhenting av bilder",
-    "hint": "Hent bilder for utsnittet",
-    "sunLoopHint": "Animert skyggerelieff med solrunde",
-    "rvtHint": "Enhanced multi-scale topographic position (Kokalj 2025)",
     "flyfoto": "Flyfotoserie",
     "flyfotoHint": "gå gjennom bildene",
     "noFootprint": "utsnitt mangler",
-    "busy": "Jobber, vennligst vent",
     "run": {
       "progress": "Opptak {{index}} av {{count}}",
       "none": "Ingen opptak dekker utsnittet",
@@ -204,6 +198,29 @@
     "pictures": "Piltastene ← → blar i bildene.",
     "keepPicture": "Klikk her for å lagre visningen som vedlegg"
   },
+  "invites": {
+    "title": "Invitasjoner",
+    "blurb": "Du kan invitere nye brukere. Send koden/lenken selv, eller skriv inn adresse for å sende mail. OBS: Pass på at adressen er riktig, feilsendte invitasjoner går tapt.",
+    "available_one": "Én invitasjon tilgjengelig",
+    "available_other": "{{count}} invitasjoner tilgjengelig",
+    "sent_one": "Én invitasjon sendt",
+    "sent_other": "{{count}} invitasjoner sendt",
+    "mint": "Lag invitasjon",
+    "none": "Du har ingen ubrukte invitasjoner.",
+    "copy": "Kopier invitasjonslenke",
+    "copied": "Lenke kopiert",
+    "revoke": "Slett invitasjonen",
+    "sentTo": "Sendt til {{address}}",
+    "send": "Send",
+    "emailPlaceholder": "E-postadresse",
+    "failed": "Fikk ikke hentet invitasjonene dine.",
+    "sendFailed": "Fikk ikke sendt invitasjonen. Sjekk adressen.",
+    "mailFailed": "E-post er ikke satt opp på denne installasjonen. Send koden selv.",
+    "revokeFailed": "Fikk ikke slettet invitasjonen.",
+    "mintFailed": "Fikk ikke laget invitasjonen.",
+    "quotaSpent": "Du har ingen invitasjoner igjen.",
+    "capFull": "Det er fullt akkurat nå, så den du inviterer havner på venteliste til en plass blir ledig."
+  },
   "kartControls": {
     "chipTitle": "{{variant}} — {{hint}}",
     "historicHint": "Eldre kartverk, tegnet før 1900-tallet endret landskapet.",
@@ -384,6 +401,29 @@
       "wrongOld": "Feil nåværende passord.",
       "tooShort": "Passordet må ha minst 8 tegn.",
       "failed": "Fikk ikke byttet passordet."
+    }
+  },
+  "renders": {
+    "title": "Beregninger",
+    "hint": "Bilder serveren lager for utsnittet",
+    "sunLoopHint": "Animert skyggerelieff med solrunde",
+    "rvtHint": "Enhanced multi-scale topographic position (Kokalj 2025)",
+    "play": "Lag bildet",
+    "confirm": "Trykk en gang til",
+    "busy": "Jobber, vennligst vent",
+    "settings": "Innstillinger",
+    "source": {
+      "auto": "Beste dekning",
+      "autoShort": "Beste",
+      "autoHint": "finest tilgjengelige opptak i hver piksel",
+      "loading": "Henter opptak …",
+      "none": "Ingen laserdata her",
+      "failed": "Fikk ikke listet opptakene"
+    },
+    "sun": {
+      "altitude": "Solhøyde",
+      "zFactor": "Overdrivelse",
+      "frames": "Bilder i runden"
     }
   },
   "ribbon": {
@@ -633,28 +673,5 @@
       "curtain": "to visninger med flyttbar skillelinje",
       "split": "side om side, sentrert på samme punkt"
     }
-  },
-  "invites": {
-    "title": "Invitasjoner",
-    "blurb": "Du kan invitere nye brukere. Send koden/lenken selv, eller skriv inn adresse for å sende mail. OBS: Pass på at adressen er riktig, feilsendte invitasjoner går tapt.",
-    "available_one": "Én invitasjon tilgjengelig",
-    "available_other": "{{count}} invitasjoner tilgjengelig",
-    "sent_one": "Én invitasjon sendt",
-    "sent_other": "{{count}} invitasjoner sendt",
-    "mint": "Lag invitasjon",
-    "none": "Du har ingen ubrukte invitasjoner.",
-    "copy": "Kopier invitasjonslenke",
-    "copied": "Lenke kopiert",
-    "revoke": "Slett invitasjonen",
-    "sentTo": "Sendt til {{address}}",
-    "send": "Send",
-    "emailPlaceholder": "E-postadresse",
-    "failed": "Fikk ikke hentet invitasjonene dine.",
-    "sendFailed": "Fikk ikke sendt invitasjonen. Sjekk adressen.",
-    "mailFailed": "E-post er ikke satt opp på denne installasjonen. Send koden selv.",
-    "revokeFailed": "Fikk ikke slettet invitasjonen.",
-    "mintFailed": "Fikk ikke laget invitasjonen.",
-    "quotaSpent": "Du har ingen invitasjoner igjen.",
-    "capFull": "Det er fullt akkurat nå, så den du inviterer havner på venteliste til en plass blir ledig."
   }
 }

@@ -8,6 +8,7 @@ import { usesHorizon } from '../terrain/render';
 import type { MaterialSymbol } from '../ui/Icon';
 import type { RenderState } from './queue';
 import {
+  AUTO_SOURCE,
   evidenceResolution,
   NIB_MOSAIC,
   specOf,
@@ -99,6 +100,11 @@ const terrainFacts = (
   return facts;
 };
 
+// The mosaic is cited by the resolution the render came out at, so only a
+// named acquisition is a fact of its own.
+const sourceFacts = (source: string): string[] =>
+  source === AUTO_SOURCE ? [] : [source];
+
 // Everything true of a row before any pixel of it exists. Separate from
 // `evidenceFacts` because a row about to render still holds the previous
 // figures.
@@ -122,13 +128,14 @@ export const specFacts = (spec: EvidenceSpec): string[] => {
       // No azimuth: it is every azimuth, which is what the frame count says.
       return [
         spec.model.toUpperCase(),
+        ...sourceFacts(spec.source),
         t('evidence.facts.altitude', { altitude: spec.altitude }),
         t('evidence.facts.zFactor', { z: spec.zFactor }),
         t('evidence.facts.frames', { n: Math.round(360 / spec.stepDeg) }),
       ];
     // Every other parameter is RVT's own; the blend's name already says it.
     case 'rvt':
-      return [spec.model.toUpperCase()];
+      return [spec.model.toUpperCase(), ...sourceFacts(spec.source)];
   }
 };
 

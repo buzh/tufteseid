@@ -99,8 +99,9 @@ lives.
 **Enforcement is where the cost is, not in a collection rule.** An `evidence`
 row is parameters, and parameters cost nothing until something renders them —
 so `rendersvc` reads the caller's own row and refuses (`docs/render-sidecar.md`).
-The SPA hides what would only meet that 403: the two order chips, and the
-gallery's retry on a row that renders on the server. A courtesy, not a gate.
+The SPA hides what would only meet that 403: the card's `fx` chip with the
+two render lines behind it, and the gallery's retry on a row that renders on
+the server. A courtesy, not a gate.
 
 **`flyfoto` has no such end, and is the courtesy alone.** The ortofoto tiles
 carry the installation's own Norge i bilder token rather than the reader's, so

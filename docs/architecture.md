@@ -229,9 +229,10 @@ the card is the workbench and the properties box is behind a button. The
 rectangle's button becomes a row — the hint and its Ferdig — for as long as it
 has the map; the pen takes the whole map instead, so the box goes away behind
 the canvas and its Avbryt/Lagre are in the band (*The context in front*). Only
-one of the two can have the map at a time. The third box, `SpotAcquire`, is
-behind the card's microscope and orders the pictures that are asked for over
-the footprint rather than read off the view (*The pictures of a spot*).
+one of the two can have the map at a time. The pictures that are asked for over
+the footprint rather than read off the view are ordered from the card as well:
+the renders fold out of the `fx` chip and the flyfoto walk starts from the
+aeroplane beside it (*The pictures of a spot*).
 
 The pin belongs to the properties box and stands only while it is open
 (`unpinnedSpotIdAtom`, `pinAdjust.ts`). The card and the reader are read against
@@ -392,9 +393,9 @@ them — `EvidenceGallery` on the card — and it does everything but the asking
 the kept rows, the drag that sets the order, and the press that lays a picture
 back on the map to trace over. Asking for another is the camera in the card's
 tools row, beside the rectangle and the pen — or, on the end of that same row,
-the microscope, which is where the pictures nobody can take from the view are
-ordered. `EvidenceReader` flips through the same rows full size and changes none
-of them.
+the `fx` chip and the aeroplane, which are where the pictures nobody can take
+from the view are ordered. `EvidenceReader` flips through the same rows full
+size and changes none of them.
 
 - **The cover is the first readable row.** Nothing marks one: the reading opens
   on it, so dragging a picture to the top is how a cover is chosen, and the star
@@ -430,19 +431,30 @@ of them.
   rectangle at the source's own resolution. A tile the pipeline has not written
   is a 404, so a rectangle off the flight reads as `empty` rather than failed.
 - **A sun loop is ordered, not kept.** It reads nothing on screen, so it never
-  belonged on a camera that keeps the view. It is asked for in `SpotAcquire`
-  (`src/spotControls/`), the box behind the microscope on the end of the card's
-  tools row, which stands in front of the card and holds one chip per picture
-  that is asked for over the footprint rather than read off the view.
-  `SUN_LOOP_SPEC` (`evidence/spec.ts`) is the whole
-  ask — DTM, the analysis panel's own sun and exaggeration, 72 frames — so there
-  is no form and nothing about the ask follows the map. The chip is dead while a
-  loop of the spot's is outstanding, because the sidecar takes one job per
-  caller, and while one already covers the footprint with those parameters; a
-  settled row is retried in the gallery, where every other kind's is.
-- **The flyfoto series is a walk, not a batch.** The other chip in `SpotAcquire`
-  proposes every Norge i bilder acquisition over the footprint, one at a time,
-  and the reader keeps or discards each (`useFlyfotoRun.ts`, `FlyfotoRun.tsx`).
+  belonged on a camera that keeps the view. It is ordered from `SpotRenders`
+  (`src/spotControls/`), the list that folds out of the `fx` chip on the card's
+  tools row and holds one line per picture the sidecar makes over the
+  footprint. A line is the picture's name, the acquisition it reads, a cogwheel
+  where there is anything to ask, and the press — which is armed first
+  (`useConfirm`), because a render is minutes of somebody's server and is never
+  one stray click away. The press is dead while any sidecar render of the
+  spot's is outstanding, since the sidecar takes one job per caller, and while
+  one already covers the footprint with those parameters; a settled row is
+  retried in the gallery, where every other kind's is. The box is wider for as
+  long as the list stands, and the list stands down when a draft takes the map.
+- **Which acquisition a render reads is the reader's.** `meta.source` on a
+  `sunloop` or `rvt` row is `auto` — the finest laser data covering each pixel,
+  which is what the catalogue mosaics by itself — or one acquisition's
+  `LAS_PROJECT_NAME`, which the sidecar puts in the mosaic's `where`
+  (`docs/render-sidecar.md`). The names come off the same image service the
+  elevation does (`terrain/demProjects.ts`), not off the WMS catalogue the
+  grounds use, because only that vocabulary is certain to agree with the
+  pixels. It is part of what `evidenceMatches` compares, so the same ground off
+  two flights is two rows rather than one kept one.
+- **The flyfoto series is a walk, not a batch.** The aeroplane on the card's
+  tools row proposes every Norge i bilder acquisition over the footprint, one
+  at a time, and the reader keeps or discards each (`useFlyfotoRun.ts`,
+  `FlyfotoRun.tsx`).
   A proposal is rendered before it is offered, at the acquisition's own
   resolution, so keeping writes the very
   bytes on screen: `keepProduced` (`useSpotEvidence.ts`) creates the row and
@@ -459,7 +471,7 @@ of them.
   goes on the ground through `draftGroundAtom`, in the footprint, under the
   spot's own drawing — because the question the reader is answering is whether
   what they traced off the terrain is there in the photograph, and that is a
-  comparison a thumbnail cannot carry. So the acquisition box becomes a bar
+  comparison a thumbnail cannot carry. So the card becomes a bar
   along the bottom of the map for as long as the run lasts, the same move the
   card's rectangle and pen make and for the same reason: the buttons follow the
   eye. Nothing in the run takes the map, so zoom and pan stay the reader's
@@ -768,7 +780,7 @@ both halves of the job:
 | --- | --- | --- |
 | `ENABLE_FLYFOTO` | `nib-proxy` | The Flyfoto ground and its arm, the archive walk, the `flyfoto` evidence kind, the `nib` origin in the breaker. The ground is also an account feature, so the switch keeps its button either way (`docs/identity.md`) |
 | `ENABLE_CVAT` | `cvat-tiles` | The cVAT render, its hint and footprint layers, the *not built for this flight* row in the render menu, the gallery's redo on a `lidar` row in the `cvat` style |
-| `ENABLE_RENDER` | `rendersvc` | The `sunloop` and `rvt` order chips, and the gallery's redo on a row of either kind |
+| `ENABLE_RENDER` | `rendersvc` | The card's `fx` chip, which is the `sunloop` and `rvt` render lines, and the gallery's redo on a row of either kind |
 
 PocketBase is not in the table: accounts are what spots, votes and invites
 are made of, and sign-in is PocketBase's own (`docs/identity.md`).

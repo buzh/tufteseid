@@ -270,10 +270,10 @@ def spec_of(meta):
         raise ValueError("no such visualization")
     if model not in ("dtm", "dom"):
         raise ValueError("model is neither dtm nor dom")
-    return {"vis": vis, "model": model}
+    return {"vis": vis, "model": model, "project": dem_source.project_of(meta)}
 
 
-def _fetch(model, bbox25833, res_x, res_y, width, height, pad_px, log):
+def _fetch(model, bbox25833, res_x, res_y, width, height, pad_px, log, project):
     """The rectangle with `pad_px` of real ground around it, at that pixel
     size."""
     pad_x, pad_y = pad_px * res_x, pad_px * res_y
@@ -288,6 +288,7 @@ def _fetch(model, bbox25833, res_x, res_y, width, height, pad_px, log):
         width + 2 * pad_px,
         height + 2 * pad_px,
         log,
+        project,
     )
 
 
@@ -297,11 +298,12 @@ def render(spec, bbox25833, legend_content, log):
     ground rather than a fault, though not one that settles the question."""
     recipe = PRODUCERS[spec["vis"]]
     model = spec["model"]
+    project = spec["project"]
     width_m = bbox25833[2] - bbox25833[0]
     height_m = bbox25833[3] - bbox25833[1]
 
     try:
-        native = dem_source.probe_coverage(model, bbox25833)
+        native = dem_source.probe_coverage(model, bbox25833, project)
     except Exception as e:
         # A probe that fails is not an absence; fall through at the finest the
         # services publish and let the pixels answer.
@@ -338,7 +340,15 @@ def render(spec, bbox25833, legend_content, log):
     margin_px = max(1, int(np.ceil(margin_m / metres_per_px)))
     started = time.perf_counter()
     fine = _fetch(
-        model, bbox25833, metres_per_px, metres_per_px, width, height, margin_px, log
+        model,
+        bbox25833,
+        metres_per_px,
+        metres_per_px,
+        width,
+        height,
+        margin_px,
+        log,
+        project,
     )
     crop = (slice(margin_px, margin_px + height), slice(margin_px, margin_px + width))
     # rvt restores the input's NaN mask onto its output, so a hole is never
@@ -377,6 +387,7 @@ def render(spec, bbox25833, legend_content, log):
             coarse_height,
             context_px,
             log,
+            project,
         )
         log(
             f"context {coarse.shape[1]}x{coarse.shape[0]} at "

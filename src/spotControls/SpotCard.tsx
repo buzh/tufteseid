@@ -4,7 +4,7 @@
 
 import { ActionIcon, Alert, Button, Switch, Tooltip } from '@mantine/core';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { updateSpot, type SpotRecord } from '../api/spots';
@@ -22,7 +22,6 @@ import {
   activeSpotAtom,
   adjustSpotDraftAtom,
   editSpotDraftAtom,
-  spotAcquiringAtom,
   spotDraftAtom,
   spotReadingAtom,
   type SpotDraft,
@@ -32,12 +31,20 @@ import { StarControl } from '../spots/StarControl';
 import { VoteControl } from '../spots/VoteControl';
 import { readTerrainWindowAtom } from '../terrain/window';
 import { ControlButton } from '../ui/ControlButton';
+import { ControlChip } from '../ui/ControlChip';
 import { cx } from '../ui/cx';
 import { Hint } from '../ui/Hint';
 import { Icon } from '../ui/Icon';
 import { Panel } from '../ui/Panel';
+import { FlyfotoRun } from './FlyfotoRun';
 import styles from './SpotBox.module.css';
+import { SpotRenders } from './SpotRenders';
+import { useFlyfotoRun, type FlyfotoRun as Run } from './useFlyfotoRun';
 import { useSpotDraft, type SpotDraftController } from './useSpotDraft';
+
+/** Open or closed, and the press that changes it: the renders list is the
+ *  card's, because the box is wider while it stands. */
+type RendersFold = { open: boolean; toggle: () => void };
 
 /** `hold` is present exactly while a draft has the map, and is then the only
  *  current account of the rectangle and the drawing — the record lags it by a
@@ -45,20 +52,20 @@ import { useSpotDraft, type SpotDraftController } from './useSpotDraft';
 const SpotUnits = ({
   spot,
   evidence,
+  run,
+  renders,
   hold,
 }: {
   spot: SpotRecord;
   evidence: SpotEvidence;
+  run: Run;
+  renders: RendersFold;
   hold?: SpotDraftController;
 }) => {
   const { t } = useTranslation();
   const adjust = useSetAtom(adjustSpotDraftAtom);
-  const setAcquiring = useSetAtom(spotAcquiringAtom);
   const readTerrain = useSetAtom(readTerrainWindowAtom);
-  // Every chip in the acquire box comes from one of these two, so with
-  // neither the box would open on nothing (`SpotAcquire`).
   const mayRender = useHasFeature('render');
-  const mayOrder = serviceOn('flyfoto') || mayRender;
   const framing = hold?.stage === 'footprint';
   // The card is away behind the canvas for the whole of a draw stage, so this
   // only keeps the fade from re-rendering on every settle of a pen nobody can
@@ -72,6 +79,12 @@ const SpotUnits = ({
   const keepLabel = t(offer?.kept ? 'evidence.kept' : 'evidence.keep');
 
   const hasSketch = hold ? hold.hasSketch : sketchOf(spot.sketch) !== null;
+
+  const flyfotoHint = !spot.footprint
+    ? t('acquire.noFootprint')
+    : !evidence.items
+      ? t('evidence.loading')
+      : `${t('acquire.flyfoto')} — ${t('acquire.flyfotoHint')}`;
 
   return (
     <>
@@ -126,19 +139,36 @@ const SpotUnits = ({
               onClick={() => spot.footprint && readTerrain(spot.footprint)}
             />
           </Tooltip>
-          {mayOrder && (
-            <Tooltip label={t('acquire.open')}>
+          {serviceOn('flyfoto') && (
+            <Tooltip label={flyfotoHint}>
               <ControlButton
-                icon="biotech"
-                aria-label={t('acquire.open')}
-                // The box is suspended for as long as any draft lives, so with
-                // the map in hand it would not open.
-                disabled={hold != null}
-                onClick={() => setAcquiring(true)}
+                icon="flight"
+                aria-label={t('acquire.flyfoto')}
+                // The walk takes the map, and the list of what to propose is
+                // read off the rows as it starts.
+                disabled={hold != null || !spot.footprint || !evidence.items}
+                onClick={run.start}
               />
             </Tooltip>
           )}
+          {mayRender && (
+            <ControlChip
+              icon="function"
+              label={t('renders.title')}
+              on={renders.open}
+              aria-expanded={renders.open}
+              title={t('renders.hint')}
+              // The sidecar renders over the footprint, which a draft is in
+              // the middle of moving.
+              disabled={hold != null}
+              onClick={renders.toggle}
+            />
+          )}
         </div>
+      )}
+
+      {renders.open && !hold && mayRender && (
+        <SpotRenders spot={spot} evidence={evidence} />
       )}
 
       {hasSketch && !drawing && <SketchFade className={styles.sketchFade} />}
@@ -155,16 +185,17 @@ const SpotUnits = ({
 /** Mounted only while a card draft lives, so the controller opens and — more
  *  to the point — flushes with it, while the card around it stands. */
 const SpotUnitsHeld = ({
-  spot,
-  evidence,
   draft,
+  ...rest
 }: {
   spot: SpotRecord;
   evidence: SpotEvidence;
+  run: Run;
+  renders: RendersFold;
   draft: SpotDraft;
 }) => {
-  const hold = useSpotDraft(draft, spot);
-  return <SpotUnits spot={spot} evidence={evidence} hold={hold} />;
+  const hold = useSpotDraft(draft, rest.spot);
+  return <SpotUnits {...rest} hold={hold} />;
 };
 
 export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
@@ -177,9 +208,18 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
 
   const evidence = useSpotEvidence(spot);
   const readable = (evidence.items ?? []).filter(isReadable).length;
+  const run = useFlyfotoRun(spot.footprint, evidence);
 
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [rendersOpen, setRendersOpen] = useState(false);
+  const renders = useMemo(
+    () => ({
+      open: rendersOpen,
+      toggle: () => setRendersOpen((open) => !open),
+    }),
+    [rendersOpen],
+  );
 
   // Rows saved before the rule that a spot always has a rectangle. Repaired
   // here rather than by a migration: deriving the square from the drawing
@@ -208,9 +248,16 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
       .finally(() => setBusy(false));
   };
 
+  // A run has the map, so the card becomes a bar along the bottom of it.
+  if (run.phase !== 'off') {
+    return <FlyfotoRun run={run} failed={evidence.failed} />;
+  }
+
   return (
     <Panel
-      className={styles.panel}
+      // The list stands down while a draft has the map, and the box narrows
+      // with it rather than holding the width of something not on screen.
+      className={cx(styles.panel, rendersOpen && !draft && styles.panelWide)}
       icon="location_on"
       title={spot.name}
       onClose={() => setActive(null)}
@@ -255,10 +302,17 @@ export const SpotCard = ({ spot }: { spot: SpotRecord }) => {
           key={draft.id}
           spot={spot}
           evidence={evidence}
+          run={run}
+          renders={renders}
           draft={draft}
         />
       ) : (
-        <SpotUnits spot={spot} evidence={evidence} />
+        <SpotUnits
+          spot={spot}
+          evidence={evidence}
+          run={run}
+          renders={renders}
+        />
       )}
 
       {spot.description && <p className={styles.prose}>{spot.description}</p>}

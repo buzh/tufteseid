@@ -70,19 +70,14 @@ export const spotFootprintAdjustingAtom = atom(
 
 const readingSpotIdAtom = atom<string | null>(null);
 
-const acquiringSpotIdAtom = atom<string | null>(null);
-
 const openSpotAtom = atom<SpotRecord | null>(null);
 
 /** The open spot. Opening a different one — or none — ends the reading of the
- *  last and closes the acquisition box, so no caller has to remember to. */
+ *  last, so no caller has to remember to. */
 export const activeSpotAtom = atom(
   (get) => get(openSpotAtom),
   (get, set, next: SpotRecord | null) => {
-    if (get(openSpotAtom)?.id !== next?.id) {
-      set(readingSpotIdAtom, null);
-      set(acquiringSpotIdAtom, null);
-    }
+    if (get(openSpotAtom)?.id !== next?.id) set(readingSpotIdAtom, null);
     set(openSpotAtom, next);
   },
 );
@@ -100,22 +95,6 @@ export const spotReadingAtom = atom(
   },
   (get, set, reading: boolean) => {
     set(readingSpotIdAtom, reading ? (get(activeSpotAtom)?.id ?? null) : null);
-  },
-);
-
-/** The acquisition box stands in front of the card. Held and suspended like
- *  the reading; never reached by a reader who may not edit the spot. */
-export const spotAcquiringAtom = atom(
-  (get) => {
-    const active = get(activeSpotAtom);
-    if (!active || get(spotDraftAtom)) return false;
-    return get(acquiringSpotIdAtom) === active.id;
-  },
-  (get, set, acquiring: boolean) => {
-    set(
-      acquiringSpotIdAtom,
-      acquiring ? (get(activeSpotAtom)?.id ?? null) : null,
-    );
   },
 );
 

@@ -98,6 +98,7 @@ def spec_of(meta):
         raise ValueError("fps out of range")
     return {
         "model": model,
+        "project": dem_source.project_of(meta),
         "altitude": altitude,
         "zFactor": z_factor,
         "stepDeg": step,
@@ -110,11 +111,12 @@ def render(spec, bbox25833, legend_content, log):
     little laser data to be worth a picture — which is an answer about the
     ground rather than a fault, though not one that settles the question."""
     model = spec["model"]
+    project = spec["project"]
     width_m = bbox25833[2] - bbox25833[0]
     height_m = bbox25833[3] - bbox25833[1]
 
     try:
-        native = dem_source.probe_coverage(model, bbox25833)
+        native = dem_source.probe_coverage(model, bbox25833, project)
     except Exception as e:
         # A probe that fails is not an absence; fall through at the finest the
         # services publish and let the pixels answer.
@@ -159,6 +161,7 @@ def render(spec, bbox25833, legend_content, log):
         width + 2 * MARGIN_PX,
         height + 2 * MARGIN_PX,
         log,
+        project,
     )
     crop = slice(MARGIN_PX, -MARGIN_PX) if MARGIN_PX else slice(None)
     # rvt 2.2.3 restores the input's NaN mask onto its output, so a hole is never
