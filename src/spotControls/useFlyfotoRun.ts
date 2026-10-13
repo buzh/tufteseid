@@ -152,7 +152,13 @@ export const useFlyfotoRun = (
             year: project.year,
             photoDate: project.photoDate,
           };
-          if (items.some((rec) => evidenceMatches(rec, spec, metric))) {
+          // Pixels or a render on its way, not merely a row: one the render
+          // settled with neither is an acquisition still worth proposing.
+          if (
+            items.some(
+              (rec) => held.covered(rec) && evidenceMatches(rec, spec, metric),
+            )
+          ) {
             skipped += 1;
             continue;
           }

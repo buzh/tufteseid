@@ -81,13 +81,14 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
   // reshuffles the list under the reader.
   const [shownKey, setShownKey] = useState<string | null>(null);
   // Nothing flipped to yet, or the group that was is gone: fall back to the
-  // first, which holds the cover.
-  const shown = shownKey ?? groups[0]?.key;
+  // first, which holds the cover. The strip marks the group being read, not
+  // the key asked for, or a dead key would leave nothing pressed.
   const index = Math.max(
     0,
-    groups.findIndex((group) => group.key === shown),
+    groups.findIndex((group) => group.key === shownKey),
   );
   const group = groups[index] ?? null;
+  const shown = group?.key;
   const current = group?.cover ?? null;
 
   const [transparency, setTransparency] = useState(0);
@@ -200,11 +201,11 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
           <>
             <VoteControl spot={spot} />
             <StarControl spot={spot} />
-            {current && (
+            {group && (
               <Tooltip
                 label={downloadLabel({
-                  downloading: file.busyId === current.id,
-                  failed: file.failedId === current.id,
+                  downloading: file.busyId === group.cover.id,
+                  failed: file.failedId === group.cover.id,
                 })}
               >
                 <ActionIcon
@@ -212,12 +213,14 @@ export const EvidenceReader = ({ spot }: { spot: SpotRecord }) => {
                   color="gray"
                   size="sm"
                   aria-label={t('evidence.download')}
-                  disabled={file.busyId === current.id}
-                  onClick={() => file.download(current)}
+                  disabled={file.busyId === group.cover.id}
+                  onClick={() => file.download(group)}
                 >
                   <Icon
                     icon={
-                      file.busyId === current.id ? 'hourglass_top' : 'download'
+                      file.busyId === group.cover.id
+                        ? 'hourglass_top'
+                        : 'download'
                     }
                     size={18}
                   />

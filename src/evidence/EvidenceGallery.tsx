@@ -224,9 +224,11 @@ export const EvidenceGallery = ({
 
   // A group's state for the one slot that shows it: a retryable tile so the
   // group offers a redo, else working, else nothing (every tile has pixels).
+  // A fault outranks an empty tile, which is a note of its own.
   const groupStateOf = (group: EvidenceGroup): RenderState | undefined => {
     const states = group.rows.map((rec) => evidence.stateOf(rec));
-    if (states.some((s) => mayRetry(s))) return 'failed';
+    if (states.some((s) => s === 'failed')) return 'failed';
+    if (states.some((s) => s === 'empty')) return 'empty';
     if (states.some((s) => s === 'running')) return 'running';
     if (states.some((s) => s === 'queued')) return 'queued';
     return undefined;
@@ -350,7 +352,7 @@ export const EvidenceGallery = ({
                 downloadFailed={file.failedId === group.cover.id}
                 lifted={drag?.key === group.key}
                 onPick={() => pick(group)}
-                onDownload={() => file.download(group.cover)}
+                onDownload={() => file.download(group)}
                 onRetry={() =>
                   group.rows
                     .filter((rec) => mayRetry(evidence.stateOf(rec)))

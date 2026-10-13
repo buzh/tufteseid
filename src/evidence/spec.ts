@@ -348,11 +348,28 @@ export const specKey = (spec: EvidenceSpec): string => {
   }
 };
 
-/** The group a row belongs to — its spec's key, or the row's own id when the
- *  meta no longer parses, so an orphan stands alone rather than merging. */
+/** Stamped on every row one press of keep creates, so a mosaic's tiles find
+ *  each other without comparing ground. Survives the render: both the browser
+ *  queue and the sidecar write the row's own meta back under what they
+ *  achieved. */
+export const newKeepId = (): string => Math.random().toString(36).slice(2, 10);
+
+export const keepIdOf = (rec: EvidenceRecord): string | null => {
+  const id = rec.meta?.keep;
+  return typeof id === 'string' && id !== '' ? id : null;
+};
+
+/** The group a row belongs to — its spec and the keep it came from, or the
+ *  row's own id when the meta no longer parses, so an orphan stands alone
+ *  rather than merging. A row kept before the stamp has no keep to belong to,
+ *  and stands on the ground it covers instead: whole metres, since a pre-stamp
+ *  row is a picture on its own and two of them a metre apart are two
+ *  pictures. */
 export const evidenceGroupKey = (rec: EvidenceRecord): string => {
   const spec = specOf(rec);
-  return spec ? specKey(spec) : rec.id;
+  if (!spec) return rec.id;
+  const ground = evidenceBbox(rec)?.map(Math.round).join(',') ?? '';
+  return `${specKey(spec)}@${keepIdOf(rec) ?? ground}`;
 };
 
 // Metres; absorbs a JSON round trip, and a sub-metre nudge is the same ground.

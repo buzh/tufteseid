@@ -12,7 +12,10 @@ import { getWMSTileGrid } from './layers/wmsTileGrid';
 // MBTiles stand on (mapproxy/mapproxy.yaml, vat-cache/build_tiles.py): change
 // the ladder in one and the mosaic stops lining up with the tiles behind it.
 
-// ≈338.5 m, the deepest level whose tile is under MAX_SIDE_M.
+// 338.5 m, the deepest level whose tile is under MAX_SIDE_M. Not a whole
+// number of DEM cells at 1 m, unlike MAX_SIDE_M (`bbox.ts`): over a 1 m
+// acquisition neighbouring tiles sample half a cell out of phase. The grid is
+// shared with the tiles behind the mosaic and wins over the alignment.
 export const TILE_Z = 15;
 
 // Caps the render fan-out. The drag clamp is one tile short of this so the
@@ -48,14 +51,25 @@ export const maxBoundaryMetres = (): number => {
   return size ? (MOSAIC_MAX_TILES_PER_SIDE - 1) * size : MAX_SIDE_M;
 };
 
+// An edge within this of a grid line counts as on it. The snap has to be
+// idempotent: a snapped boundary is written as lon/lat and read back through
+// `bboxFromMetric`, an approximate inverse, so it returns a hair off the line
+// — and a bare floor would then push the edge out a whole tile on every
+// release. Centimetres of drift, metres of slack, hundreds of metres of tile.
+const SNAP_TOLERANCE_M = 0.5;
+
 // Grid lines sit at origin + k·size on both axes; the north-west origin counts
 // y downward, but oy − k·size is the same lattice as oy + m·size, so a plain
 // floor/ceil snaps either axis.
 const snapExtent = (m: Metric, g: GridParams): Metric => {
-  const below = (v: number, origin: number) =>
-    origin + Math.floor((v - origin) / g.size) * g.size;
-  const above = (v: number, origin: number) =>
-    origin + Math.ceil((v - origin) / g.size) * g.size;
+  const line = (v: number, origin: number, out: (k: number) => number) => {
+    const k = (v - origin) / g.size;
+    const on = Math.round(k);
+    const index = Math.abs(k - on) * g.size <= SNAP_TOLERANCE_M ? on : out(k);
+    return origin + index * g.size;
+  };
+  const below = (v: number, origin: number) => line(v, origin, Math.floor);
+  const above = (v: number, origin: number) => line(v, origin, Math.ceil);
   return [
     below(m[0], g.ox),
     below(m[1], g.oy),

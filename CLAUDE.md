@@ -235,8 +235,9 @@ stars on them:
   (≤50 MB image or `video/webm`,
   **empty until the render lands** — test it rather than assuming a row has a
   picture), `caption`, `meta` (json ≤10 kB: the parameters asked for, the
-  rectangle covered, the resolution achieved and `renderedAt`), `sort` (epoch
-  milliseconds at creation).
+  rectangle covered, the resolution achieved, `renderedAt`, and `keep` — which
+  press of the camera made the row, so a mosaic's tiles read as one picture),
+  `sort` (epoch milliseconds at creation).
 
 A row is parameters first and pixels second: the client creates it, then a
 serial queue renders and PATCHes the file on. A render is not a cache — nothing

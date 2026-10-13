@@ -91,8 +91,9 @@ export const attachEvidenceFile = async (
   );
 };
 
-/** See `src/evidence/order.ts` for the key itself: only the moved row is
- *  written, whatever the list is doing. */
+/** See `src/evidence/order.ts` for the key itself: a move writes the picture
+ *  that moved and leaves the rest of the list standing, unless the gap it
+ *  lands in has no room. */
 export const setEvidenceSort = async (
   id: string,
   sort: number,

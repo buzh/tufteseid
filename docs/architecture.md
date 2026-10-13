@@ -375,7 +375,11 @@ megabytes on every press.
 - **Past the cap the rectangle is a boundary, tiled into render boxes.** A
   spot-footprint drag may grow to `maxBoundaryMetres()` (`src/map/grid.ts`), and
   on release anything over `MAX_SIDE_M` snaps to whole z15 tiles on the app's own
-  grid (`wmsTileGrid`). `mosaicTiles(footprint)` then derives the render boxes:
+  grid (`wmsTileGrid`). The snap counts an edge within half a metre of a grid
+  line as on it: a boundary is stored as lon/lat and read back through
+  `bboxFromMetric`, an approximate inverse, so a bare floor would push it out
+  another tile per axis on every release.
+  `mosaicTiles(footprint)` then derives the render boxes:
   one free box within the cap — today's behaviour unchanged — or the covering
   tiles past it, each ≤ cap. The boundary frame is solid, the tile cells drawn
   thin inside it (`spots/footprintLayer.ts`). The terrain window stays a single
@@ -417,12 +421,16 @@ size and changes none of them.
   single authority both surfaces ask — of a group's own rows for the row that
   stands for it, and of the whole list for the spot's cover — and a sun loop
   passes: both surfaces ground a loop as readily as a still.
-- A drop renumbers. A mosaic moves as a block, so there is no one row to slip
-  between two neighbours: `evenSorts` (`evidence/order.ts`) spaces the whole
-  reshuffled list evenly, ending on its current greatest key so nothing moves
-  ahead of `Date.now()` and a picture kept a moment later still lands last. A
-  key belongs to a slot rather than to a row, so a spaced list only writes what
-  changed slots. The writes are optimistic and put every row back on a refusal.
+- A drop writes the picture that moved. A mosaic moves as a block, so there is
+  no one row to slip between two neighbours: `groupMoveSorts`
+  (`evidence/order.ts`) gives the whole group one key in the gap between the
+  neighbours it lands between — the tie-break on `created` keeps its own tiles
+  in order — so three mosaics of 36 tiles is 36 writes, not 108. A move to the
+  end takes one millisecond past the greatest key rather than a step, or a
+  picture kept a moment later would land before it instead of last. Where the
+  gap has no room, or the list is an older one whose groups interleave,
+  `evenSorts` renumbers it evenly instead. The writes are optimistic and put
+  every row back on a refusal.
 - The rows are one height, so a drag measures every slot's middle once at the
   press and then takes the nearest one to the pointer: the preview moves rows
   between slots, and the slots themselves do not move. The handle answers ↑ and
@@ -433,7 +441,10 @@ size and changes none of them.
 - **One offer, and it is a button.** The camera in the card's tools row keeps
   the view as it stands, so the gallery lists only what is already kept. Asking
   is one press with no source name attached: the row it makes carries the title
-  (`evidenceTitle`), and the reader chose the view by looking at it.
+  (`evidenceTitle`), and the reader chose the view by looking at it. It reads
+  as kept only once every tile has pixels or a render on the way — a tile whose
+  render failed leaves the camera live, and pressing it renders onto the row
+  that tile already has rather than standing a second one up beside it.
 - **What is offered follows the map.** `keepOfferAtom` publishes a reading of
   the ground as it stands, or of the analysis when one is running — the
   analysis wins, because it is then what is on screen and the ground it was
@@ -456,7 +467,8 @@ size and changes none of them.
   (`useConfirm`), because a render is minutes of somebody's server and is never
   one stray click away. The press is dead while any sidecar render of the
   spot's is outstanding, since the sidecar takes one job per caller, and while
-  one already covers the footprint with those parameters; a settled row is
+  one with those parameters already has pixels over the footprint. A row
+  whose render settled with none leaves the line orderable again, and is also
   retried in the gallery, where every other kind's is. The lines are blocked
   outright on a boundary larger than one tile: the sidecar renders the single box
   it reads off the spot row and refuses anything over the cap, so sun loops and
@@ -570,11 +582,21 @@ takes a set), holding the ground still and changing only how it was seen. The
 author's gallery groups the same way, so a mosaic is one slot to drag, to ground
 and to delete.
 
+What gathers them is a stamp, not the ground: one press of keep writes the same
+`meta.keep` on every row it creates, and `evidenceGroupKey` is the spec's key
+and that stamp. Filling the gaps a failed mosaic left joins the picture the
+standing tiles belong to; keeping the same spec again after the footprint has
+moved is a second picture, over ground of its own. A row kept before the stamp
+existed falls back to the rectangle it covers.
+
 - The overlay is at z 1.25: over the terrain render, **under the B half**, so a
   curtain reads a kept render against a live ground. The transparency slider
   does the same against A.
 - The outgoing picture comes off only once the incoming one has pixels. A blink
   between two readings of the same ground would make the comparison worthless.
+  Only the tiles *on screen* are waited for: `ImageStatic` requests nothing for
+  a tile outside the view, so a mosaic read from one corner would otherwise
+  never retire the picture under it.
 - Left and right flip. `keyboardEventTarget` is the document (`map/atoms.ts`),
   so the listener is in the capture phase — OpenLayers' own keyboard pan would
   otherwise answer the same press. Up and down are swallowed there too and do
@@ -736,10 +758,13 @@ is exactly who wants a citable figure out of it — so the reader has one too.
 `useEvidenceDownload` (`download.ts`) is shared by the gallery's per-picture
 button and the reader's, which downloads the picture on the ground. One at a
 time — decoding, stamping and re-encoding a multi-megapixel raster is about a
-second of main-thread work. A download is one file, so a mosaic's is its cover
-tile, stamped with that tile's own rectangle; the whole of a boundary comes out
-of the export bundle, which carries every row georeferenced (*The export
-bundle*).
+second of main-thread work. A download is one file and a mosaic is one picture,
+so its tiles are stitched into the ground they cover together and the band goes
+on once, over the whole of it. The tiles are decoded one at a time (thirty-six
+2048² of them held at once is half a gigabyte) into a canvas capped at
+`MAX_STORED_PIXELS`, and a stitch that cannot be made is a failed download
+rather than a cover tile saved under the picture's name. The tiles as separate
+georeferenced files are the export bundle's job (*The export bundle*).
 
 `withLegend` in `legend.ts` composes it onto a canvas of its own: the capture
 unchanged at the top, the band appended underneath, every dimension derived from
@@ -1188,10 +1213,10 @@ that is a last resort rather than the design.
   back, so a browser that refused the autoplay shows a play button rather than
   a lie. No speed, no frame-by-frame step, and a scrub decodes forward from the
   file's one keyframe.
-- **A mosaic has no single file.** Both surfaces read and ground a boundary's
-  tiles as one picture, but the download button is one file and hands over the
-  cover tile; stitching the grid into one stamped raster is what a whole-picture
-  download would cost. The export bundle is the way out with every tile in it.
+- **A mosaic is one picture everywhere, the download included.** It is
+  stitched on the way out, so the file that leaves covers the boundary rather
+  than one tile of it — at the finest tile's resolution, scaled down where the
+  grid is larger than one canvas may be.
 - **A render is not a cache.** Upstreams re-fly and reprocess, so the same spec
   re-rendered later may not be the picture its author read. `meta.renderedAt`
   says when the file was made; nothing re-renders on its own.

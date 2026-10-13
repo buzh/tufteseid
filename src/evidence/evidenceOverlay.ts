@@ -1,6 +1,8 @@
 import { useAtomValue } from 'jotai';
-import type { Extent } from 'ol/extent';
+import { intersects, type Extent } from 'ol/extent';
 import ImageLayer from 'ol/layer/Image';
+import type Map from 'ol/Map';
+import { transformExtent } from 'ol/proj';
 import type { Size } from 'ol/size';
 import ImageCanvasSource from 'ol/source/ImageCanvas';
 import Static from 'ol/source/ImageStatic';
@@ -21,6 +23,20 @@ const LOOP_LAYER_ID = 'spotEvidenceLoop';
 export type OverlayTile = {
   url: string;
   extent: [number, number, number, number];
+};
+
+// Null before the map has a size or a resolved view, which the caller reads as
+// "cannot tell what is on screen" rather than as an empty screen.
+const viewExtent25833 = (map: Map): Extent | null => {
+  const size = map.getSize();
+  if (!size) return null;
+  const view = map.getView();
+  const extent = transformExtent(
+    view.calculateExtent(size),
+    view.getProjection(),
+    'EPSG:25833',
+  );
+  return extent.every(Number.isFinite) ? extent : null;
 };
 
 // A set, so a mosaic lays all its tiles under one overlay. One tile is the
@@ -48,14 +64,26 @@ export const useEvidenceOverlay = (tiles: OverlayTile[], opacity: number) => {
 
     const outgoing = shown.current;
     const incoming: ImageLayer<Static>[] = [];
-    // Dropped in one go once the last incoming tile lands, so a mosaic flips
-    // whole rather than tile by tile.
-    let pending = tiles.length;
-    const retireOutgoing = () => {
-      pending -= 1;
-      if (pending > 0) return;
+
+    // `ImageStatic` is lazy: it requests nothing for a tile the view has not
+    // asked for, so an off-screen tile fires neither event and waiting on the
+    // whole mosaic would leave the outgoing set up for ever. Only the tiles on
+    // screen are waited for — off screen there is no flip to see.
+    const seen = viewExtent25833(map);
+    const awaited = new Set(
+      seen ? tiles.filter((t) => intersects(t.extent, seen)) : tiles,
+    );
+
+    const dropOutgoing = () => {
       for (const old of outgoing) map.removeLayer(old);
       shown.current = shown.current.filter((l) => !outgoing.includes(l));
+    };
+    // Dropped in one go once the last awaited tile lands, so a mosaic flips
+    // whole rather than tile by tile.
+    let pending = awaited.size;
+    const retireOutgoing = () => {
+      pending -= 1;
+      if (pending <= 0) dropOutgoing();
     };
 
     for (const tile of tiles) {
@@ -72,11 +100,13 @@ export const useEvidenceOverlay = (tiles: OverlayTile[], opacity: number) => {
       });
       map.addLayer(layer);
       incoming.push(layer);
+      if (!awaited.has(tile)) continue;
       source.once('imageloadend', retireOutgoing);
       // Or an image that never arrives leaves the previous set up for ever.
       source.once('imageloaderror', retireOutgoing);
     }
     shown.current = [...outgoing, ...incoming];
+    if (pending === 0) dropOutgoing();
 
     // No cleanup: the next set retires this one, and the unmount effect sweeps
     // whatever is left.

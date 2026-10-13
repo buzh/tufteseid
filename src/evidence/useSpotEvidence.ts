@@ -22,10 +22,10 @@ import type { SpotRecord } from '../api/spots';
 import { currentUserAtom } from '../auth/atoms';
 import { bboxFromMetric, bboxToMetric, type Bbox } from '../map/bbox';
 import { mosaicTiles } from '../map/grid';
+import { groupEvidence } from './groups';
 import { sunLoopLegend } from './legendContent';
 import { keepOfferAtom } from './offer';
-import { groupEvidence } from './groups';
-import { evenSorts, moved } from './order';
+import { evenSorts, groupMoveSorts, moved } from './order';
 import {
   enqueueRender,
   jobState,
@@ -37,7 +37,9 @@ import type { Produced } from './render';
 import {
   evidenceBbox,
   evidenceMatches,
+  keepIdOf,
   metaOf,
+  newKeepId,
   type EvidenceSpec,
 } from './spec';
 
@@ -67,6 +69,10 @@ export type SpotEvidence = {
   /** A row with pixels has no state; otherwise a job this browser still holds
    *  wins, and past that the sidecar's `meta.job` outranks the local queue. */
   stateOf: (rec: EvidenceRecord) => RenderState | undefined;
+  /** Nothing left to ask for on this row: it has pixels, or a render on its
+   *  way. A row the render settled with neither is not covered — it is what
+   *  asking again renders onto. */
+  covered: (rec: EvidenceRecord) => boolean;
 };
 
 const byOrder = (a: EvidenceRecord, b: EvidenceRecord) =>
@@ -131,6 +137,25 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
 
   const states = useSyncExternalStore(subscribeRenderQueue, renderStates);
 
+  const stateOf = useCallback(
+    (rec: EvidenceRecord) => {
+      if (rec.file) return undefined;
+      const local = states.get(rec.id);
+      if (local === 'queued' || local === 'running') return local;
+      return jobState(rec) ?? local;
+    },
+    [states],
+  );
+
+  const covered = useCallback(
+    (rec: EvidenceRecord) => {
+      if (rec.file) return true;
+      const state = stateOf(rec);
+      return state === 'queued' || state === 'running';
+    },
+    [stateOf],
+  );
+
   const footprint = spot.footprint;
 
   // The render boxes the boundary covers: one free box within the cap, a grid
@@ -146,14 +171,16 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       metrics.length > 0 && items && offered
         ? {
             spec: offered,
-            // Kept only once every tile is covered; a half-filled mosaic still
-            // offers the keep that completes it.
+            // Kept only once every tile is covered; a half-filled mosaic, or
+            // one a render failed on, still offers the keep that completes it.
             kept: metrics.every((m) =>
-              items.some((rec) => evidenceMatches(rec, offered, m)),
+              items.some(
+                (rec) => covered(rec) && evidenceMatches(rec, offered, m),
+              ),
             ),
           }
         : null,
-    [offered, items, metrics],
+    [offered, items, metrics, covered],
   );
 
   const discard = useCallback(
@@ -185,20 +212,34 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     (spec: EvidenceSpec) => {
       if (!user || tiles.length === 0) return;
       setFailed(false);
+      const standing = metrics.map(
+        (m) => items?.find((rec) => evidenceMatches(rec, spec, m)) ?? null,
+      );
+      // One stamp for every row this press creates, so the tiles read as one
+      // picture (`evidenceGroupKey`). Filling the gaps an earlier mosaic left
+      // joins that picture rather than standing up a second one beside it.
+      const keepId =
+        standing.map((rec) => rec && keepIdOf(rec)).find(Boolean) ??
+        newKeepId();
+
       tiles.forEach((tile, i) => {
-        const metric = metrics[i];
-        // Only the tiles not yet covered: re-keeping fills the gaps a failed or
-        // interrupted mosaic left rather than doubling the ones that landed.
-        if (items?.some((rec) => evidenceMatches(rec, spec, metric))) return;
+        const already = standing[i];
+        // Re-keeping fills the gaps rather than doubling the tiles that
+        // landed: a tile whose render failed keeps the row it has and is
+        // rendered onto again.
+        if (already) {
+          if (!covered(already)) render(already, tile);
+          return;
+        }
         createEvidence(
-          // The tile's box is stamped up front so the kept check and a retry
-          // both know which tile this row is, before any pixels land. The
-          // render overwrites it with the box it achieved, the same tile
-          // within `BBOX_TOLERANCE_M`.
           {
             spot: spotId,
             kind: spec.kind,
-            meta: { ...metaOf(spec), bbox25833: metric },
+            // The tile's box is stamped up front so the kept check and a retry
+            // both know which tile this row is, before any pixels land. The
+            // render overwrites it with the box it achieved, the same tile
+            // within `BBOX_TOLERANCE_M`.
+            meta: { ...metaOf(spec), bbox25833: metrics[i], keep: keepId },
           },
           user.id,
         )
@@ -223,7 +264,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
           });
       });
     },
-    [user, tiles, metrics, items, spotId, upsert, render, discard],
+    [user, tiles, metrics, items, spotId, upsert, render, discard, covered],
   );
 
   const keepProduced = useCallback(
@@ -231,9 +272,12 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
       if (!user || !footprint) return false;
       setFailed(false);
       let created: EvidenceRecord | null = null;
+      // Stamped on both writes: the file goes up with a meta of its own, not
+      // with the row's, so a stamp only on the create would not survive it.
+      const keep = newKeepId();
       try {
         created = await createEvidence(
-          { spot: spotId, kind: spec.kind, meta: metaOf(spec) },
+          { spot: spotId, kind: spec.kind, meta: { ...metaOf(spec), keep } },
           user.id,
         );
         upsert(created);
@@ -245,6 +289,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
             {
               ...metaOf(spec),
               ...produced.meta,
+              keep,
               renderedAt: new Date().toISOString(),
             },
           ),
@@ -278,16 +323,18 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     [render, footprint],
   );
 
-  // A whole mosaic moves as a block: its tiles stay contiguous and in order, so
-  // the list renumbers rather than slipping one row between two neighbours.
+  // A whole mosaic moves as a block: its tiles stay contiguous and in order.
+  // Only the group that moved is written where the gap it lands in has room;
+  // past that the list renumbers.
   const reorderGroup = useCallback(
     (key: string, to: number) => {
       if (!items) return;
       const groups = groupEvidence(items);
       const from = groups.findIndex((group) => group.key === key);
       if (from < 0 || from === to) return;
-      const flat = moved(groups, from, to).flatMap((group) => group.rows);
-      const writes = evenSorts(flat);
+      const writes =
+        groupMoveSorts(groups, from, to) ??
+        evenSorts(moved(groups, from, to).flatMap((group) => group.rows));
       const before = writes
         .map((write) => byId.current.get(write.id))
         .filter((rec): rec is EvidenceRecord => rec !== undefined);
@@ -335,14 +382,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     retry,
     remove,
     reorderGroup,
-    stateOf: useCallback(
-      (rec: EvidenceRecord) => {
-        if (rec.file) return undefined;
-        const local = states.get(rec.id);
-        if (local === 'queued' || local === 'running') return local;
-        return jobState(rec) ?? local;
-      },
-      [states],
-    ),
+    stateOf,
+    covered,
   };
 };

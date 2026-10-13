@@ -367,6 +367,10 @@ export const SpotRenders = ({
   const onItsWay = (rec: EvidenceRecord) =>
     !rec.file && !mayRetry(evidence.stateOf(rec));
 
+  // Pixels, not a row: the row stands from the moment the line is pressed, so
+  // a line whose render failed must be orderable again.
+  const landed = (rec: EvidenceRecord) => rec.file !== '';
+
   // The sidecar takes one job per caller, whichever line asked for it, so one
   // render closes every line here — but only the line whose picture it is may
   // say it is being made.
@@ -407,7 +411,7 @@ export const SpotRenders = ({
             ? 'blocked'
             : mine.some(onItsWay)
               ? 'rendering'
-              : mine.length > 0
+              : mine.some(landed)
                 ? 'kept'
                 : outstanding
                   ? 'blocked'
