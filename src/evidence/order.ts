@@ -26,30 +26,8 @@ const renumbered = (list: readonly EvidenceRecord[]): SortWrite[] => {
     .filter((write, i) => write.sort !== list[i].sort);
 };
 
-// The `sort` writes that put `id` at index `to`, or nothing for a row already
-// there. A row dropped last takes the current time, not a step past its
-// neighbour, so a picture kept a moment later still lands after it.
-export const sortsForMove = (
-  list: readonly EvidenceRecord[],
-  id: string,
-  to: number,
-): SortWrite[] => {
-  const from = list.findIndex((rec) => rec.id === id);
-  if (from < 0 || from === to) return [];
-
-  const rest = list.filter((rec) => rec.id !== id);
-  const at = Math.max(0, Math.min(to, rest.length));
-  const before: number | undefined = rest[at - 1]?.sort;
-  const after: number | undefined = rest[at]?.sort;
-
-  if (before == null) return [{ id, sort: (after ?? Date.now()) - STEP_MS }];
-  if (after == null) {
-    return [{ id, sort: Math.max(before + STEP_MS, Date.now()) }];
-  }
-
-  const between = (before + after) / 2;
-  // No key left between the neighbours (equal keys, or a gap halved to
-  // nothing); spread the whole list out again instead.
-  if (between > before && between < after) return [{ id, sort: between }];
-  return renumbered(moved(list, from, to));
-};
+// The `sort` writes for a list reshuffled whole — a mosaic moves as a block, so
+// there is no single row to slip between two neighbours. Only the rows whose key
+// actually changes are written.
+export const evenSorts = (list: readonly EvidenceRecord[]): SortWrite[] =>
+  renumbered(list);

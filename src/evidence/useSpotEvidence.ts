@@ -24,7 +24,8 @@ import { bboxFromMetric, bboxToMetric, type Bbox } from '../map/bbox';
 import { mosaicTiles } from '../map/grid';
 import { sunLoopLegend } from './legendContent';
 import { keepOfferAtom } from './offer';
-import { sortsForMove } from './order';
+import { groupEvidence } from './groups';
+import { evenSorts, moved } from './order';
 import {
   enqueueRender,
   jobState,
@@ -60,9 +61,9 @@ export type SpotEvidence = {
   keepProduced: (spec: EvidenceSpec, produced: Produced) => Promise<boolean>;
   retry: (rec: EvidenceRecord) => void;
   remove: (id: string) => void;
-  /** Move a row to index `to`. The reading opens on the cover (`coverOf`), so
-   *  this also chooses a cover. */
-  reorder: (id: string, to: number) => void;
+  /** Move a group (a mosaic's tiles, or a lone row) to group index `to`. The
+   *  reading opens on the cover (`coverOf`), so this also chooses a cover. */
+  reorderGroup: (key: string, to: number) => void;
   /** A row with pixels has no state; otherwise a job this browser still holds
    *  wins, and past that the sidecar's `meta.job` outranks the local queue. */
   stateOf: (rec: EvidenceRecord) => RenderState | undefined;
@@ -277,17 +278,23 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     [render, footprint],
   );
 
-  const reorder = useCallback(
-    (id: string, to: number) => {
+  // A whole mosaic moves as a block: its tiles stay contiguous and in order, so
+  // the list renumbers rather than slipping one row between two neighbours.
+  const reorderGroup = useCallback(
+    (key: string, to: number) => {
       if (!items) return;
-      const writes = sortsForMove(items, id, to);
+      const groups = groupEvidence(items);
+      const from = groups.findIndex((group) => group.key === key);
+      if (from < 0 || from === to) return;
+      const flat = moved(groups, from, to).flatMap((group) => group.rows);
+      const writes = evenSorts(flat);
       const before = writes
         .map((write) => byId.current.get(write.id))
-        .filter((rec) => rec !== undefined);
+        .filter((rec): rec is EvidenceRecord => rec !== undefined);
       if (before.length !== writes.length) return;
 
       setFailed(false);
-      // Written first so the row stays where the hand left it, not snapping
+      // Written first so the rows stay where the hand left them, not snapping
       // back for the round trip.
       writes.forEach((write, i) => upsert({ ...before[i], sort: write.sort }));
       Promise.all(
@@ -327,7 +334,7 @@ export const useSpotEvidence = (spot: SpotRecord): SpotEvidence => {
     keepProduced,
     retry,
     remove,
-    reorder,
+    reorderGroup,
     stateOf: useCallback(
       (rec: EvidenceRecord) => {
         if (rec.file) return undefined;

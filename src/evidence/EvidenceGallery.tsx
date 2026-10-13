@@ -5,6 +5,7 @@ import { Alert, Tooltip } from '@mantine/core';
 import { useAtom } from 'jotai';
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -22,6 +23,7 @@ import { draftGroundAtom } from './draftGround';
 import { useEvidenceDownload } from './download';
 import styles from './EvidenceGallery.module.css';
 import { EvidenceThumb } from './EvidenceThumb';
+import { groupEvidence, type EvidenceGroup } from './groups';
 import { downloadLabel, evidenceLabel, KIND_ICON, renderNote } from './labels';
 import { moved } from './order';
 import { mayRetry, type RenderState } from './queue';
@@ -34,12 +36,14 @@ import {
   isVideoEvidence,
   rendersOnServer,
 } from './spec';
+import type { OverlayTile } from './evidenceOverlay';
 import type { SpotEvidence } from './useSpotEvidence';
 
 type Drag = {
-  id: string;
+  /** The group key being dragged. */
+  key: string;
   from: number;
-  /** The slot the row is being shown in, which is also where it would land. */
+  /** The slot the group is being shown in, which is also where it would land. */
   to: number;
   /** Where the middle of every slot is, measured at the press. The rows are
    *  one height, so previewing a move does not move the slots. */
@@ -48,6 +52,7 @@ type Drag = {
 
 const EvidenceItem = ({
   record,
+  count,
   state,
   cover,
   onMap,
@@ -64,6 +69,7 @@ const EvidenceItem = ({
   onNudge,
 }: {
   record: EvidenceRecord;
+  count: number;
   state: RenderState | undefined;
   cover: boolean;
   onMap: boolean;
@@ -128,6 +134,7 @@ const EvidenceItem = ({
           <span className={styles.text}>
             <span className={styles.title}>
               <Icon icon={KIND_ICON[record.kind]} size={12} /> {title}
+              {count > 1 && ` · ${t('evidence.tileCount', { count })}`}
             </span>
             {note && <span className={styles.note}>{note}</span>}
           </span>
@@ -193,30 +200,45 @@ export const EvidenceGallery = ({
   evidence: SpotEvidence;
 }) => {
   const { t } = useTranslation();
-  const { items, reorder } = evidence;
+  const { items } = evidence;
   const file = useEvidenceDownload(spot);
   const [ground, setGround] = useAtom(draftGroundAtom);
   const listRef = useRef<HTMLUListElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
 
-  // A row the author deleted, or whose render the queue is redoing, must not
-  // leave its picture on the map.
+  // One entry per picture, its tiles gathered — the author manages a mosaic as
+  // one thing, the way the reader reads it.
+  const groups = useMemo(() => groupEvidence(items ?? []), [items]);
+
+  // A picture whose tiles are all gone — deleted, or whose renders the queue is
+  // redoing — must not leave its ground on the map.
   useEffect(() => {
     if (!ground || items === null) return;
-    if (!items.some((rec) => rec.id === ground.id && rec.file)) setGround(null);
+    const group = groupEvidence(items).find((g) => g.key === ground.id);
+    if (!group || !group.rows.some((rec) => rec.file)) setGround(null);
   }, [ground, items, setGround]);
 
   // The list goes when the spot is closed or the reading opens, and the picture
   // is the list's: nothing else is left to take it off the map.
   useEffect(() => () => setGround(null), [setGround]);
 
+  // A group's state for the one slot that shows it: a retryable tile so the group
+  // offers a redo, else working, else nothing (every tile has pixels).
+  const groupStateOf = (group: EvidenceGroup): RenderState | undefined => {
+    const states = group.rows.map((rec) => evidence.stateOf(rec));
+    if (states.some((s) => mayRetry(s))) return 'failed';
+    if (states.some((s) => s === 'running')) return 'running';
+    if (states.some((s) => s === 'queued')) return 'queued';
+    return undefined;
+  };
+
   const startDrag =
-    (id: string, from: number) => (event: ReactPointerEvent<HTMLElement>) => {
+    (key: string, from: number) => (event: ReactPointerEvent<HTMLElement>) => {
       const list = listRef.current;
       if (!list || event.button !== 0) return;
       event.currentTarget.setPointerCapture(event.pointerId);
       setDrag({
-        id,
+        key,
         from,
         to: from,
         slots: [...list.children].map((row) => {
@@ -246,7 +268,7 @@ export const EvidenceGallery = ({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    if (drag) reorder(drag.id, drag.to);
+    if (drag) evidence.reorderGroup(drag.key, drag.to);
     setDrag(null);
   };
 
@@ -254,7 +276,7 @@ export const EvidenceGallery = ({
   // the bounds check, or OL's keyboard pan answers a press that runs off the
   // end.
   const nudge =
-    (id: string, index: number, total: number) =>
+    (key: string, index: number, total: number) =>
     (event: ReactKeyboardEvent<HTMLElement>) => {
       const delta =
         event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
@@ -263,21 +285,39 @@ export const EvidenceGallery = ({
       event.stopPropagation();
       const to = index + delta;
       if (to < 0 || to >= total) return;
-      reorder(id, to);
+      evidence.reorderGroup(key, to);
     };
 
-  const pick = (rec: EvidenceRecord) => {
-    const extent = evidenceBbox(rec);
-    const url = evidenceFileUrl(rec);
-    if (!url || !extent) return;
-    const loop = isVideoEvidence(rec)
-      ? { bandTop: evidenceBandTop(rec) }
-      : undefined;
-    setGround(ground?.id === rec.id ? null : { id: rec.id, url, extent, loop });
+  // Lays the whole picture: a mosaic's tiles, or the one box — a loop to its own
+  // overlay, stills to the other.
+  const pick = (group: EvidenceGroup) => {
+    if (ground?.id === group.key) {
+      setGround(null);
+      return;
+    }
+    const cover = group.cover;
+    if (isVideoEvidence(cover)) {
+      const extent = evidenceBbox(cover);
+      const url = evidenceFileUrl(cover);
+      if (!url || !extent) return;
+      setGround({
+        id: group.key,
+        tiles: [],
+        loop: { url, extent, bandTop: evidenceBandTop(cover) },
+      });
+      return;
+    }
+    const tiles: OverlayTile[] = [];
+    for (const rec of group.rows) {
+      const extent = evidenceBbox(rec);
+      const url = evidenceFileUrl(rec);
+      if (extent && url) tiles.push({ url, extent });
+    }
+    if (tiles.length > 0) setGround({ id: group.key, tiles });
   };
 
-  const rows = items ? (drag ? moved(items, drag.from, drag.to) : items) : [];
-  const cover = coverOf(rows)?.id;
+  const shown = drag ? moved(groups, drag.from, drag.to) : groups;
+  const coverId = coverOf(items ?? [])?.id;
 
   return (
     <div className={styles.gallery}>
@@ -292,30 +332,37 @@ export const EvidenceGallery = ({
         !evidence.failed && (
           <p className={styles.hint}>{t('evidence.loading')}</p>
         )
-      ) : rows.length === 0 ? (
+      ) : shown.length === 0 ? (
         <p className={styles.hint}>{t('evidence.noneOwn')}</p>
       ) : (
         <>
           <p className={styles.hint}>{t('evidence.order.hint')}</p>
           <ul className={styles.list} ref={listRef}>
-            {rows.map((rec, index) => (
+            {shown.map((group, index) => (
               <EvidenceItem
-                key={rec.id}
-                record={rec}
-                state={evidence.stateOf(rec)}
-                cover={rec.id === cover}
-                onMap={ground?.id === rec.id}
-                downloading={file.busyId === rec.id}
-                downloadFailed={file.failedId === rec.id}
-                lifted={drag?.id === rec.id}
-                onPick={() => pick(rec)}
-                onDownload={() => file.download(rec)}
-                onRetry={() => evidence.retry(rec)}
-                onRemove={() => evidence.remove(rec.id)}
-                onDragStart={startDrag(rec.id, index)}
+                key={group.key}
+                record={group.cover}
+                count={group.rows.length}
+                state={groupStateOf(group)}
+                cover={group.rows.some((rec) => rec.id === coverId)}
+                onMap={ground?.id === group.key}
+                downloading={file.busyId === group.cover.id}
+                downloadFailed={file.failedId === group.cover.id}
+                lifted={drag?.key === group.key}
+                onPick={() => pick(group)}
+                onDownload={() => file.download(group.cover)}
+                onRetry={() =>
+                  group.rows
+                    .filter((rec) => mayRetry(evidence.stateOf(rec)))
+                    .forEach((rec) => evidence.retry(rec))
+                }
+                onRemove={() =>
+                  group.rows.forEach((rec) => evidence.remove(rec.id))
+                }
+                onDragStart={startDrag(group.key, index)}
                 onDragMove={onDragMove}
                 onDragEnd={endDrag}
-                onNudge={nudge(rec.id, index, rows.length)}
+                onNudge={nudge(group.key, index, shown.length)}
               />
             ))}
           </ul>

@@ -7,7 +7,7 @@ import { useAtomValue, useStore } from 'jotai';
 import { transformExtent } from 'ol/proj';
 import { useEffect } from 'react';
 
-import { draftGroundAtom } from '../evidence/draftGround';
+import { draftGroundAtom, draftGroundExtent } from '../evidence/draftGround';
 import { mapAtom } from '../map/atoms';
 import { setSpotStageAtom, spotSketchAtom } from '../spots/atoms';
 import { captureFrame, frameExtentIn } from './frame';
@@ -35,12 +35,13 @@ export const useSketchSession = (wanted: boolean) => {
     const ground = store.get(draftGroundAtom);
     const size = map.getSize();
     // No duration: the freeze below cancels animations.
+    const groundExtent = ground ? draftGroundExtent(ground) : null;
     if (resume && size) {
       view.fit(frameExtentIn(resume.frame, projection), { size });
-    } else if (ground && size) {
+    } else if (groundExtent && size) {
       // Only where there are no strokes yet: an existing frame is the one thing
-      // that must not move. `draftGround.extent` is EPSG:25833.
-      view.fit(transformExtent(ground.extent, 'EPSG:25833', projection), {
+      // that must not move. The bounds span a mosaic's tiles; EPSG:25833.
+      view.fit(transformExtent(groundExtent, 'EPSG:25833', projection), {
         size,
       });
     }

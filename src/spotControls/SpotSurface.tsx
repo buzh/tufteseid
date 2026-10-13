@@ -63,13 +63,11 @@ const SpotPropertiesBox = () => {
 /** Its own component because the loop overlay publishes a transport that
  *  changes with every frame, and the surface below renders the whole card. */
 const DraftGroundLoop = ({
-  ground,
-  bandTop,
+  loop,
 }: {
-  ground: DraftGround;
-  bandTop: number;
+  loop: NonNullable<DraftGround['loop']>;
 }) => {
-  useEvidenceLoopOverlay(ground.url, ground.extent, 1, bandTop);
+  useEvidenceLoopOverlay(loop.url, loop.extent, 1, loop.bandTop);
   return null;
 };
 
@@ -122,17 +120,11 @@ export const SpotSurface = () => {
   // Rides the map element, so a sketch session's transform carries it along.
   // A loop goes to `DraftGroundLoop` instead: an `ImageStatic` cannot carry a
   // WebM, and the two overlays are never up at once.
-  const still = ground?.loop ? null : ground;
-  useEvidenceOverlay(
-    still ? [{ url: still.url, extent: still.extent }] : [],
-    1,
-  );
+  useEvidenceOverlay(ground && !ground.loop ? ground.tiles : [], 1);
 
   return (
     <>
-      {ground?.loop && (
-        <DraftGroundLoop ground={ground} bandTop={ground.loop.bandTop} />
-      )}
+      {ground?.loop && <DraftGroundLoop loop={ground.loop} />}
       {/* Before the box in document order, so the box paints over it: the
           canvas isolates Excalidraw's z-ladder but still covers the whole
           map rectangle. */}

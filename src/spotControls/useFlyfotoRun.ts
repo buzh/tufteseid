@@ -55,7 +55,8 @@ const NO_TALLY: RunTally = { skipped: 0, kept: 0, discarded: 0 };
 
 const revokeAll = (cards: readonly RunCard[]) => {
   for (const card of cards) {
-    if (card.ground) URL.revokeObjectURL(card.ground.url);
+    const url = card.ground?.tiles[0]?.url;
+    if (url) URL.revokeObjectURL(url);
   }
 };
 
@@ -198,8 +199,7 @@ export const useFlyfotoRun = (
             ground: extent
               ? {
                   id: projectId,
-                  url: URL.createObjectURL(produced.blob),
-                  extent,
+                  tiles: [{ url: URL.createObjectURL(produced.blob), extent }],
                 }
               : null,
           });
@@ -216,7 +216,8 @@ export const useFlyfotoRun = (
     const front = now.current.cards[0];
     // Safe while the overlay may still be showing it: the layer holds the
     // decoded image, and the URL is only ever read once.
-    if (front?.ground) URL.revokeObjectURL(front.ground.url);
+    const url = front?.ground?.tiles[0]?.url;
+    if (url) URL.revokeObjectURL(url);
     setCards((prev) => prev.slice(1));
   }, []);
 
